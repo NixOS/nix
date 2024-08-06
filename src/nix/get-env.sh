@@ -128,20 +128,25 @@ __escapeString() {
     printf '"%s"' "$__s"
 }
 
-# In case of `__structuredAttrs = true;` the list of outputs is an associative
-# array with a format like `outname => /nix/store/hash-drvname-outname`, so `__olist`
-# must contain the array's keys (hence `${!...[@]}`) in this case.
-if [ -e "$NIX_ATTRS_SH_FILE" ]; then
-    __olist="${!outputs[@]}"
-else
-    __olist=$outputs
-fi
-
-for __output in $__olist; do
-    if [[ -z $__done ]]; then
-        __dumpEnv > ${!__output}
+__dumpEnvToOutput() {
+    local __output="$1"
+    if [[ -z ${__done-} ]]; then
+        __dumpEnv > "$__output"
         __done=1
     else
-        echo -n >> "${!__output}"
+        echo -n >> "$__output"
     fi
-done
+}
+
+# In case of `__structuredAttrs = true;` the list of outputs is an associative
+# array with a format like `outname => /nix/store/hash-drvname-outname`.
+# Otherwise it is a space-separated list of output variable names.
+if [ -e "$NIX_ATTRS_SH_FILE" ]; then
+    for __output in "${outputs[@]}"; do
+        __dumpEnvToOutput "$__output"
+    done
+else
+    for __outname in $outputs; do
+        __dumpEnvToOutput "${!__outname}"
+    done
+fi

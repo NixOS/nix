@@ -1,6 +1,10 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 enableFeatures "daemon-trust-override"
+
+TODO_NixOS
 
 restartDaemon
 

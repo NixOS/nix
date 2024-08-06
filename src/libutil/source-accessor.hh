@@ -4,10 +4,33 @@
 
 #include "canon-path.hh"
 #include "hash.hh"
+#include "ref.hh"
 
 namespace nix {
 
 struct Sink;
+
+/**
+ * Note there is a decent chance this type soon goes away because the problem is solved another way.
+ * See the discussion in https://github.com/NixOS/nix/pull/9985.
+ */
+enum class SymlinkResolution {
+    /**
+     * Resolve symlinks in the ancestors only.
+     *
+     * Only the last component of the result is possibly a symlink.
+     */
+    Ancestors,
+
+    /**
+     * Resolve symlinks fully, realpath(3)-style.
+     *
+     * No component of the result will be a symlink.
+     */
+    Full,
+};
+
+MakeError(FileNotFound, Error);
 
 /**
  * A read-only filesystem abstraction. This is used by the Nix
@@ -15,7 +38,7 @@ struct Sink;
  * filesystem-like entities (such as the real filesystem, tarballs or
  * Git repositories).
  */
-struct SourceAccessor
+struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
 {
     const size_t number;
 
@@ -112,9 +135,9 @@ struct SourceAccessor
         PathFilter & filter = defaultPathFilter);
 
     Hash hashPath(
-            const CanonPath & path,
-            PathFilter & filter = defaultPathFilter,
-            HashAlgorithm ha = HashAlgorithm::SHA256);
+        const CanonPath & path,
+        PathFilter & filter = defaultPathFilter,
+        HashAlgorithm ha = HashAlgorithm::SHA256);
 
     /**
      * Return a corresponding path in the root filesystem, if
@@ -129,14 +152,62 @@ struct SourceAccessor
         return number == x.number;
     }
 
-    bool operator < (const SourceAccessor & x) const
+    auto operator <=> (const SourceAccessor & x) const
     {
-        return number < x.number;
+        return number <=> x.number;
     }
 
     void setPathDisplay(std::string displayPrefix, std::string displaySuffix = "");
 
     virtual std::string showPath(const CanonPath & path);
+
+    /**
+     * Resolve any symlinks in `path` according to the given
+     * resolution mode.
+     *
+     * @param mode might only be a temporary solution for this.
+     * See the discussion in https://github.com/NixOS/nix/pull/9985.
+     */
+    CanonPath resolveSymlinks(
+        const CanonPath & path,
+        SymlinkResolution mode = SymlinkResolution::Full);
+
+    /**
+     * A string that uniquely represents the contents of this
+     * accessor. This is used for caching lookups (see `fetchToStore()`).
+     */
+    std::optional<std::string> fingerprint;
+
+    /**
+     * Return the maximum last-modified time of the files in this
+     * tree, if available.
+     */
+    virtual std::optional<time_t> getLastModified()
+    { return std::nullopt; }
 };
+
+/**
+ * Return a source accessor that contains only an empty root directory.
+ */
+ref<SourceAccessor> makeEmptySourceAccessor();
+
+/**
+ * Exception thrown when accessing a filtered path (see
+ * `FilteringSourceAccessor`).
+ */
+MakeError(RestrictedPathError, Error);
+
+/**
+ * Return an accessor for the root filesystem.
+ */
+ref<SourceAccessor> getFSSourceAccessor();
+
+/**
+ * Construct an accessor for the filesystem rooted at `root`. Note
+ * that it is not possible to escape `root` by appending `..` path
+ * elements, and that absolute symlinks are resolved relative to
+ * `root`.
+ */
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root);
 
 }

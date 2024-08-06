@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include "comparator.hh"
 #include "error.hh"
 #include "json-utils.hh"
 #include "types.hh"
@@ -26,16 +25,17 @@ enum struct ExperimentalFeature
     RecursiveNix,
     NoUrlLiterals,
     FetchClosure,
-    ReplFlake,
     AutoAllocateUids,
     Cgroups,
     DaemonTrustOverride,
     DynamicDerivations,
     ParseTomlTimestamps,
     ReadOnlyLocalStore,
+    LocalOverlayStore,
     ConfigurableImpureEnv,
     MountedSSHStore,
     VerifiedFetches,
+    PipeOperators,
 };
 
 /**

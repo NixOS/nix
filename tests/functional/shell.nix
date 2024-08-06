@@ -21,18 +21,13 @@ let pkgs = rec {
       export PATH=$PATH:$pkg/bin
     done
 
-    # mimic behavior of stdenv for `$out` etc. for structured attrs.
-    if [ -n "''${NIX_ATTRS_SH_FILE}" ]; then
-      for o in "''${!outputs[@]}"; do
-        eval "''${o}=''${outputs[$o]}"
-        export "''${o}"
-      done
-    fi
-
     declare -a arr1=(1 2 "3 4" 5)
     declare -a arr2=(x $'\n' $'x\ny')
     fun() {
       echo blabla
+    }
+    runHook() {
+      eval "''${!1}"
     }
   '';
 
@@ -51,8 +46,21 @@ let pkgs = rec {
     ASCII_PERCENT = "%";
     ASCII_AT = "@";
     TEST_inNixShell = if inNixShell then "true" else "false";
+    FOO = fooContents;
     inherit stdenv;
     outputs = ["dev" "out"];
+  } // {
+    shellHook = abort "Ignore non-drv shellHook attr";
+  };
+
+  # https://github.com/NixOS/nix/issues/5431
+  # See nix-shell.sh
+  polo = mkDerivation {
+    name = "polo";
+    inherit stdenv;
+    shellHook = ''
+      echo Polo
+    '';
   };
 
   # Used by nix-shell -p

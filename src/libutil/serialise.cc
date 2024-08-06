@@ -7,6 +7,11 @@
 
 #include <boost/coroutine2/coroutine.hpp>
 
+#ifdef _WIN32
+# include <fileapi.h>
+# include "windows-error.hh"
+#endif
+
 
 namespace nix {
 
@@ -126,6 +131,14 @@ bool BufferedSource::hasData()
 
 size_t FdSource::readUnbuffered(char * data, size_t len)
 {
+#ifdef _WIN32
+    DWORD n;
+    checkInterrupt();
+    if (!::ReadFile(fd, data, len, &n, NULL)) {
+        _good = false;
+        throw windows::WinError("ReadFile when FdSource::readUnbuffered");
+    }
+#else
     ssize_t n;
     do {
         checkInterrupt();
@@ -133,6 +146,7 @@ size_t FdSource::readUnbuffered(char * data, size_t len)
     } while (n == -1 && errno == EINTR);
     if (n == -1) { _good = false; throw SysError("reading from file"); }
     if (n == 0) { _good = false; throw EndOfFile(std::string(*endOfFileError)); }
+#endif
     read += n;
     return n;
 }
@@ -176,11 +190,11 @@ struct VirtualStackAllocator {
 class DefaultStackAllocator : public StackAllocator {
     boost::coroutines2::default_stack stack;
 
-    boost::context::stack_context allocate() {
+    boost::context::stack_context allocate() override {
         return stack.allocate();
     }
 
-    void deallocate(boost::context::stack_context sctx) {
+    void deallocate(boost::context::stack_context sctx) override {
         stack.deallocate(sctx);
     }
 };
@@ -246,7 +260,7 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
                 });
             }
 
-            if (!*coro) { abort(); }
+            if (!*coro) { unreachable(); }
 
             if (!cur.empty()) {
                 CoroutineContext ctx;
@@ -257,12 +271,12 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
         void finish() override
         {
             if (!coro) return;
-            if (!*coro) abort();
+            if (!*coro) unreachable();
             {
                 CoroutineContext ctx;
                 (*coro)(true);
             }
-            if (*coro) abort();
+            if (*coro) unreachable();
         }
     };
 
@@ -302,7 +316,7 @@ std::unique_ptr<Source> sinkToSource(
                 });
             }
 
-            if (!*coro) { eof(); abort(); }
+            if (!*coro) { eof(); unreachable(); }
 
             if (pos == cur.size()) {
                 if (!cur.empty()) {

@@ -7,6 +7,7 @@
 #include <sqlite3.h>
 
 #include <atomic>
+#include <thread>
 
 namespace nix {
 
@@ -256,10 +257,8 @@ void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
     /* Sleep for a while since retrying the transaction right away
        is likely to fail again. */
     checkInterrupt();
-    struct timespec t;
-    t.tv_sec = 0;
-    t.tv_nsec = (random() % 100) * 1000 * 1000; /* <= 0.1s */
-    nanosleep(&t, 0);
+    /* <= 0.1s */
+    std::this_thread::sleep_for(std::chrono::milliseconds { rand() % 100 });
 }
 
 }

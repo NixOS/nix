@@ -67,6 +67,9 @@ struct IndirectRootStore : public virtual LocalFSStore
      * The form this weak-reference takes is implementation-specific.
      */
     virtual void addIndirectRoot(const Path & path) = 0;
+
+protected:
+    void makeSymlink(const Path & link, const Path & target);
 };
 
 }

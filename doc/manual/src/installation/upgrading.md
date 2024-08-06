@@ -28,7 +28,7 @@ $ sudo su
 ## macOS multi-user
 
 ```console
-$ sudo nix-env --install --file '<nixpkgs>' --attr nix -I nixpkgs=channel:nixpkgs-unstable
+$ sudo nix-env --install --file '<nixpkgs>' --attr nix cacert -I nixpkgs=channel:nixpkgs-unstable
 $ sudo launchctl remove org.nixos.nix-daemon
 $ sudo launchctl load /Library/LaunchDaemons/org.nixos.nix-daemon.plist
 ```

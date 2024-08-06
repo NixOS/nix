@@ -8,7 +8,6 @@
 #include "signals.hh"
 
 #include <algorithm>
-#include <cctype>
 #include <exception>
 #include <iostream>
 
@@ -23,6 +22,8 @@
 
 #include <openssl/crypto.h>
 
+#include "exit.hh"
+#include "strings.hh"
 
 namespace nix {
 
@@ -108,10 +109,12 @@ std::string getArg(const std::string & opt,
     return *i;
 }
 
+#ifndef _WIN32
 static void sigHandler(int signo) { }
+#endif
 
 
-void initNix()
+void initNix(bool loadConfig)
 {
     /* Turn on buffering for cerr. */
 #if HAVE_PUBSETBUF
@@ -119,9 +122,10 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
-    initLibStore();
+    initLibStore(loadConfig);
 
-    startSignalHandlerThread();
+#ifndef _WIN32
+    unix::startSignalHandlerThread();
 
     /* Reset SIGCHLD to its default. */
     struct sigaction act;
@@ -135,6 +139,7 @@ void initNix()
     /* Install a dummy SIGUSR1 handler for use with pthread_kill(). */
     act.sa_handler = sigHandler;
     if (sigaction(SIGUSR1, &act, 0)) throw SysError("handling SIGUSR1");
+#endif
 
 #if __APPLE__
     /* HACK: on darwin, we need can’t use sigprocmask with SIGWINCH.
@@ -156,11 +161,13 @@ void initNix()
     if (sigaction(SIGTRAP, &act, 0)) throw SysError("handling SIGTRAP");
 #endif
 
+#ifndef _WIN32
     /* Register a SIGSEGV handler to detect stack overflows.
        Why not initLibExpr()? initGC() is essentially that, but
        detectStackOverflow is not an instance of the init function concept, as
        it may have to be invoked more than once per process. */
     detectStackOverflow();
+#endif
 
     /* There is no privacy in the Nix system ;-)  At least not for
        now.  In particular, store objects should be readable by
@@ -170,7 +177,11 @@ void initNix()
     /* Initialise the PRNG. */
     struct timeval tv;
     gettimeofday(&tv, 0);
+#ifndef _WIN32
     srandom(tv.tv_usec);
+#endif
+    srand(tv.tv_usec);
+
 
 }
 
@@ -308,8 +319,12 @@ void printVersion(const std::string & programName)
 void showManPage(const std::string & name)
 {
     restoreProcessContext();
-    setenv("MANPATH", settings.nixManDir.c_str(), 1);
+    setEnv("MANPATH", settings.nixManDir.c_str());
     execlp("man", "man", name.c_str(), nullptr);
+    if (errno == ENOENT) {
+        // Not SysError because we don't want to suffix the errno, aka No such file or directory.
+        throw Error("The '%1%' command was not found, but it is needed for '%2%' and some other '%3%' commands' help text. Perhaps you could install the '%1%' command?", "man", name.c_str(), "nix-*");
+    }
     throw SysError("command 'man %1%' failed", name.c_str());
 }
 
@@ -365,11 +380,14 @@ RunPager::RunPager()
     Pipe toPager;
     toPager.create();
 
+#ifdef _WIN32 // TODO re-enable on Windows, once we can start processes.
+    throw Error("Commit signature verification not implemented on Windows yet");
+#else
     pid = startProcess([&]() {
         if (dup2(toPager.readSide.get(), STDIN_FILENO) == -1)
             throw SysError("dupping stdin");
         if (!getenv("LESS"))
-            setenv("LESS", "FRSXMK", 1);
+            setEnv("LESS", "FRSXMK");
         restoreProcessContext();
         if (pager)
             execl("/bin/sh", "sh", "-c", pager, nullptr);
@@ -383,17 +401,20 @@ RunPager::RunPager()
     std_out = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
         throw SysError("dupping standard output");
+#endif
 }
 
 
 RunPager::~RunPager()
 {
     try {
+#ifndef _WIN32 // TODO re-enable on Windows, once we can start processes.
         if (pid != -1) {
             std::cout.flush();
             dup2(std_out, STDOUT_FILENO);
             pid.wait();
         }
+#endif
     } catch (...) {
         ignoreException();
     }

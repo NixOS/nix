@@ -68,6 +68,7 @@ include mk/patterns.mk
 include mk/templates.mk
 include mk/cxx-big-literal.mk
 include mk/tests.mk
+include mk/compilation-database.mk
 
 
 # Include all sub-Makefiles.
@@ -86,16 +87,22 @@ $(foreach script, $(bin-scripts), $(eval $(call install-program-in,$(script),$(b
 $(foreach script, $(bin-scripts), $(eval programs-list += $(script)))
 $(foreach script, $(noinst-scripts), $(eval programs-list += $(script)))
 $(foreach template, $(template-files), $(eval $(call instantiate-template,$(template))))
-install_test_init=tests/functional/init.sh
 $(foreach test, $(install-tests), \
-  $(eval $(call run-test,$(test),$(install_test_init))) \
+  $(eval $(call run-test,$(test))) \
   $(eval installcheck: $(test).test))
 $(foreach test-group, $(install-tests-groups), \
-  $(eval $(call run-test-group,$(test-group),$(install_test_init))) \
+  $(eval $(call run-test-group,$(test-group))) \
   $(eval installcheck: $(test-group).test-group) \
   $(foreach test, $($(test-group)-tests), \
-    $(eval $(call run-test,$(test),$(install_test_init))) \
+    $(eval $(call run-test,$(test))) \
     $(eval $(test-group).test-group: $(test).test)))
+
+# Compilation database.
+$(foreach lib, $(libraries), $(eval $(call write-compile-commands,$(lib))))
+$(foreach prog, $(programs), $(eval $(call write-compile-commands,$(prog))))
+
+compile_commands.json: $(compile-commands-json-files)
+	@jq --slurp '.' $^ >$@
 
 # Include makefiles requiring built programs.
 $(foreach mf, $(makefiles-late), $(eval $(call include-sub-makefile,$(mf))))

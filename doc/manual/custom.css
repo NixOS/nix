@@ -1,3 +1,25 @@
+:root {
+    --sidebar-width: 23em;
+}
+
+h1.menu-title::before {
+  content: "";
+  background-image: url("./favicon.svg");
+  padding: 1.25em;
+  background-position: center center;
+  background-size: 2em;
+  background-repeat: no-repeat;
+}
+
+
+h1.menu-title {
+  padding: 0.5em;
+}
+
+.sidebar .sidebar-scrollbox {
+  padding: 1em;
+}
+
 h1:not(:first-of-type) {
     margin-top: 1.3em;
 }

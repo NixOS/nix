@@ -11,7 +11,7 @@
   As the choice of hash formats is no longer binary, the `--base16` flag is also added
   to explicitly specify the Base16 format, which is still the default.
 
-* The special handling of an [installable](../command-ref/new-cli/nix.md#installables) with `.drv` suffix being interpreted as all of the given [store derivation](../glossary.md#gloss-store-derivation)'s output paths is removed, and instead taken as the literal store path that it represents.
+* The special handling of an [installable](../command-ref/new-cli/nix.md#installables) with `.drv` suffix being interpreted as all of the given [store derivation](@docroot@/glossary.md#gloss-store-derivation)'s output paths is removed, and instead taken as the literal store path that it represents.
 
   The new `^` syntax for store paths introduced in Nix 2.13 allows explicitly referencing output paths of a derivation.
   Using this is better and more clear than relying on the now-removed `.drv` special handling.

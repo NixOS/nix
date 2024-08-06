@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Test that we can successfully migrate from an older db schema
 
 source common.sh
@@ -7,6 +9,8 @@ source common.sh
 if [[ -z "${NIX_DAEMON_PACKAGE-}" ]]; then
     skipTest "not using the Nix daemon"
 fi
+
+TODO_NixOS
 
 killDaemon
 

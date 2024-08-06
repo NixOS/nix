@@ -8,4 +8,4 @@ libplugintest_ALLOW_UNDEFINED := 1
 
 libplugintest_EXCLUDE_FROM_LIBRARY_LIST := 1
 
-libplugintest_CXXFLAGS := -I src/libutil -I src/libstore -I src/libexpr -I src/libfetchers
+libplugintest_CXXFLAGS := $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libexpr) $(INCLUDE_libfetchers)

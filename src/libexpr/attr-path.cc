@@ -72,11 +72,11 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
             if (attr.empty())
                 throw Error("empty attribute name in selection path '%1%'", attrPath);
 
-            Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
-            if (a == v->attrs->end()) {
+            auto a = v->attrs()->get(state.symbols.create(attr));
+            if (!a) {
                 std::set<std::string> attrNames;
-                for (auto & attr : *v->attrs)
-                    attrNames.insert(state.symbols[attr.name]);
+                for (auto & attr : *v->attrs())
+                    attrNames.insert(std::string(state.symbols[attr.name]));
 
                 auto suggestions = Suggestions::bestMatches(attrNames, attr);
                 throw AttrPathNotFound(suggestions, "attribute '%1%' in selection path '%2%' not found", attr, attrPath);
@@ -134,7 +134,7 @@ std::pair<SourcePath, uint32_t> findPackageFilename(EvalState & state, Value & v
         return {SourcePath{path.accessor, CanonPath(fn.substr(0, colon))}, lineno};
     } catch (std::invalid_argument & e) {
         fail();
-        abort();
+        unreachable();
     }
 }
 

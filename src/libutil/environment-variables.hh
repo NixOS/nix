@@ -28,6 +28,21 @@ std::optional<std::string> getEnvNonEmpty(const std::string & key);
  */
 std::map<std::string, std::string> getEnv();
 
+#ifdef _WIN32
+/**
+ * Implementation of missing POSIX function.
+ */
+int unsetenv(const char * name);
+#endif
+
+/**
+ * Like POSIX `setenv`, but always overrides.
+ *
+ * We don't need the non-overriding version, and this is easier to
+ * reimplement on Windows.
+ */
+int setEnv(const char * name, const char * value);
+
 /**
  * Clear the environment.
  */

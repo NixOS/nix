@@ -5,7 +5,6 @@
 #include "symbol-table.hh"
 
 #include <algorithm>
-#include <optional>
 
 namespace nix {
 
@@ -28,9 +27,9 @@ struct Attr
     Attr(Symbol name, Value * value, PosIdx pos = noPos)
         : name(name), pos(pos), value(value) { };
     Attr() { };
-    bool operator < (const Attr & a) const
+    auto operator <=> (const Attr & a) const
     {
-        return name < a.name;
+        return name <=> a.name;
     }
 };
 
@@ -65,24 +64,26 @@ public:
 
     typedef Attr * iterator;
 
+    typedef const Attr * const_iterator;
+
     void push_back(const Attr & attr)
     {
         assert(size_ < capacity_);
         attrs[size_++] = attr;
     }
 
-    iterator find(Symbol name)
+    const_iterator find(Symbol name) const
     {
         Attr key(name, 0);
-        iterator i = std::lower_bound(begin(), end(), key);
+        const_iterator i = std::lower_bound(begin(), end(), key);
         if (i != end() && i->name == name) return i;
         return end();
     }
 
-    Attr * get(Symbol name)
+    const Attr * get(Symbol name) const
     {
         Attr key(name, 0);
-        iterator i = std::lower_bound(begin(), end(), key);
+        const_iterator i = std::lower_bound(begin(), end(), key);
         if (i != end() && i->name == name) return &*i;
         return nullptr;
     }
@@ -90,14 +91,22 @@ public:
     iterator begin() { return &attrs[0]; }
     iterator end() { return &attrs[size_]; }
 
+    const_iterator begin() const { return &attrs[0]; }
+    const_iterator end() const { return &attrs[size_]; }
+
     Attr & operator[](size_t pos)
+    {
+        return attrs[pos];
+    }
+
+    const Attr & operator[](size_t pos) const
     {
         return attrs[pos];
     }
 
     void sort();
 
-    size_t capacity() { return capacity_; }
+    size_t capacity() const { return capacity_; }
 
     /**
      * Returns the attributes in lexicographically sorted order.
@@ -166,6 +175,20 @@ public:
     {
         return bindings;
     }
+
+    size_t capacity()
+    {
+        return bindings->capacity();
+    }
+
+    void grow(Bindings * newBindings)
+    {
+        for (auto & i : *bindings)
+            newBindings->push_back(i);
+        bindings = newBindings;
+    }
+
+    friend struct ExprAttrs;
 };
 
 }

@@ -50,7 +50,7 @@ Supported systems:
 To explicitly instruct the installer to perform a multi-user installation on your system:
 
 ```console
-$ curl -L https://nixos.org/nix/install | sh -s -- --daemon
+$ bash <(curl -L https://nixos.org/nix/install) --daemon
 ```
 
 You can run this under your usual user account or `root`.
@@ -61,7 +61,7 @@ The script will invoke `sudo` as needed.
 To explicitly select a single-user installation on your system:
 
 ```console
-$ curl -L https://nixos.org/nix/install | sh -s -- --no-daemon
+$ bash <(curl -L https://nixos.org/nix/install) --no-daemon
 ```
 
 In a single-user installation, `/nix` is owned by the invoking user.
@@ -77,7 +77,7 @@ $ su root
 # Installing from a binary tarball
 
 You can also download a binary tarball that contains Nix and all its dependencies:
-- Choose a [version](https://releases.nixos.org/?prefix=nix/) and [system type](../contributing/hacking.md#platforms)
+- Choose a [version](https://releases.nixos.org/?prefix=nix/) and [system type](../development/building.md#platforms)
 - Download and unpack the tarball
 - Run the installer
 

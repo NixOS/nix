@@ -11,11 +11,13 @@
 
 #include "machines.hh"
 #include "shared.hh"
+#include "plugin.hh"
 #include "pathlocks.hh"
 #include "globals.hh"
 #include "serialise.hh"
 #include "build-result.hh"
 #include "store-api.hh"
+#include "strings.hh"
 #include "derivations.hh"
 #include "local-store.hh"
 #include "legacy.hh"
@@ -37,7 +39,7 @@ static std::string currentLoad;
 
 static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
 {
-    return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri), slot), true);
+    return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri.render()), slot), true);
 }
 
 static bool allSupportedLocally(Store & store, const std::set<std::string>& requiredFeatures) {
@@ -135,7 +137,7 @@ static int main_build_remote(int argc, char * * argv)
                 Machine * bestMachine = nullptr;
                 uint64_t bestLoad = 0;
                 for (auto & m : machines) {
-                    debug("considering building on remote machine '%s'", m.storeUri);
+                    debug("considering building on remote machine '%s'", m.storeUri.render());
 
                     if (m.enabled &&
                         m.systemSupported(neededSystem) &&
@@ -202,7 +204,7 @@ static int main_build_remote(int argc, char * * argv)
                         else
                             drvstr = "<unknown>";
 
-                        auto error = HintFmt(errorText);
+                        auto error = HintFmt::fromFormatString(errorText);
                         error
                             % drvstr
                             % neededSystem
@@ -232,17 +234,16 @@ static int main_build_remote(int argc, char * * argv)
                 lock = -1;
 
                 try {
+                    storeUri = bestMachine->storeUri.render();
 
-                    Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", bestMachine->storeUri));
+                    Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", storeUri));
 
                     sshStore = bestMachine->openStore();
                     sshStore->connect();
-                    storeUri = bestMachine->storeUri;
-
                 } catch (std::exception & e) {
                     auto msg = chomp(drainFD(5, false));
                     printError("cannot build on '%s': %s%s",
-                        bestMachine->storeUri, e.what(),
+                        storeUri, e.what(),
                         msg.empty() ? "" : ": " + msg);
                     bestMachine->enabled = false;
                     continue;
@@ -262,7 +263,20 @@ connected:
         auto inputs = readStrings<PathSet>(source);
         auto wantedOutputs = readStrings<StringSet>(source);
 
-        AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
+        AutoCloseFD uploadLock;
+        {
+            auto setUpdateLock = [&](auto && fileName){
+                uploadLock = openLockFile(currentLoad + "/" + escapeUri(fileName) + ".upload-lock", true);
+            };
+            try {
+                setUpdateLock(storeUri);
+            } catch (SysError & e) {
+                if (e.errNo != ENAMETOOLONG) throw;
+                // Try again hashing the store URL so we have a shorter path
+                auto h = hashString(HashAlgorithm::MD5, storeUri);
+                setUpdateLock(h.to_string(HashFormat::Base64, false));
+            }
+        }
 
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri));

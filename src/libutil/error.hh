@@ -16,16 +16,12 @@
  */
 
 #include "suggestions.hh"
-#include "ref.hh"
-#include "types.hh"
 #include "fmt.hh"
 
 #include <cstring>
 #include <list>
 #include <memory>
-#include <map>
 #include <optional>
-#include <compare>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -61,21 +57,36 @@ void printCodeLines(std::ostream & out,
     const Pos & errPos,
     const LinesOfCode & loc);
 
+/**
+ * When a stack frame is printed.
+ */
+enum struct TracePrint {
+    /**
+     * The default behavior; always printed when `--show-trace` is set.
+     */
+    Default,
+    /** Always printed. Produced by `builtins.addErrorContext`. */
+    Always,
+};
+
 struct Trace {
     std::shared_ptr<Pos> pos;
     HintFmt hint;
+    TracePrint print = TracePrint::Default;
 };
 
-inline bool operator<(const Trace& lhs, const Trace& rhs);
-inline bool operator> (const Trace& lhs, const Trace& rhs);
-inline bool operator<=(const Trace& lhs, const Trace& rhs);
-inline bool operator>=(const Trace& lhs, const Trace& rhs);
+inline std::strong_ordering operator<=>(const Trace& lhs, const Trace& rhs);
 
 struct ErrorInfo {
     Verbosity level;
     HintFmt msg;
     std::shared_ptr<Pos> pos;
     std::list<Trace> traces;
+    /**
+     * Some messages are generated directly by expressions; notably `builtins.warn`, `abort`, `throw`.
+     * These may be rendered differently, so that users can distinguish them.
+     */
+    bool isFromExpr = false;
 
     /**
      * Exit status.
@@ -109,6 +120,8 @@ protected:
 
 public:
     BaseError(const BaseError &) = default;
+    BaseError& operator=(const BaseError &) = default;
+    BaseError& operator=(BaseError &&) = default;
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
@@ -137,6 +150,11 @@ public:
         : err(e)
     { }
 
+    /** The error message without "error: " prefixed to it. */
+    std::string message() {
+        return err.msg.str();
+    }
+
     const char * what() const noexcept override { return calcWhat().c_str(); }
     const std::string & msg() const { return calcWhat(); }
     const ErrorInfo & info() const { calcWhat(); return err; }
@@ -161,7 +179,7 @@ public:
         addTrace(std::move(e), HintFmt(std::string(fs), args...));
     }
 
-    void addTrace(std::shared_ptr<Pos> && e, HintFmt hint);
+    void addTrace(std::shared_ptr<Pos> && e, HintFmt hint, TracePrint print = TracePrint::Default);
 
     bool hasTrace() const { return !err.traces.empty(); }
 
@@ -189,11 +207,11 @@ MakeError(SystemError, Error);
  *
  * Throw this, but prefer not to catch this, and catch `SystemError`
  * instead. This allows implementations to freely switch between this
- * and `WinError` without breaking catch blocks.
+ * and `windows::WinError` without breaking catch blocks.
  *
  * However, it is permissible to catch this and rethrow so long as
  * certain conditions are not met (e.g. to catch only if `errNo =
- * EFooBar`). In that case, try to also catch the equivalent `WinError`
+ * EFooBar`). In that case, try to also catch the equivalent `windows::WinError`
  * code.
  *
  * @todo Rename this to `PosixError` or similar. At this point Windows
@@ -230,10 +248,49 @@ public:
     }
 };
 
+#ifdef _WIN32
+namespace windows {
+    class WinError;
+}
+#endif
+
+/**
+ * Convenience alias for when we use a `errno`-based error handling
+ * function on Unix, and `GetLastError()`-based error handling on on
+ * Windows.
+ */
+using NativeSysError =
+#ifdef _WIN32
+    windows::WinError
+#else
+    SysError
+#endif
+    ;
+
 /**
  * Throw an exception for the purpose of checking that exception
  * handling works; see 'initLibUtil()'.
  */
 void throwExceptionSelfCheck();
+
+/**
+ * Print a message and abort().
+ */
+[[noreturn]]
+void panic(std::string_view msg);
+
+/**
+ * Print a basic error message with source position and abort().
+ * Use the unreachable() macro to call this.
+ */
+[[noreturn]]
+void panic(const char * file, int line, const char * func);
+
+/**
+ * Print a basic error message with source position and abort().
+ *
+ * @note: This assumes that the logger is operational
+ */
+#define unreachable() (::nix::panic(__FILE__, __LINE__, __func__))
 
 }

@@ -13,6 +13,17 @@ let
       '';
     };
 
+    install-both-profile-links = {
+      script = ''
+        tar -xf ./nix.tar.xz
+        mv ./nix-* nix
+        ln -s $HOME/.local/state/nix/profiles/a-profile $HOME/.nix-profile
+        mkdir -p $HOME/.local/state/nix
+        ln -s $HOME/.local/state/nix/profiles/b-profile $HOME/.local/state/nix/profile
+        ./nix/install --no-channel-add
+      '';
+    };
+
     install-force-no-daemon = {
       script = ''
         tar -xf ./nix.tar.xz

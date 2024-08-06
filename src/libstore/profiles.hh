@@ -8,6 +8,7 @@
 #include "types.hh"
 #include "pathlocks.hh"
 
+#include <optional>
 #include <time.h>
 
 

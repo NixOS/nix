@@ -1,3 +1,5 @@
+#include <nlohmann/json.hpp>
+
 #include "command.hh"
 #include "markdown.hh"
 #include "store-api.hh"
@@ -6,8 +8,7 @@
 #include "nixexpr.hh"
 #include "profiles.hh"
 #include "repl.hh"
-
-#include <nlohmann/json.hpp>
+#include "strings.hh"
 
 extern char * * environ __attribute__((weak));
 
@@ -127,12 +128,12 @@ ref<EvalState> EvalCommand::getEvalState()
     if (!evalState) {
         evalState =
             #if HAVE_BOEHMGC
-            std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
-                searchPath, getEvalStore(), getStore())
+            std::allocate_shared<EvalState>(
+                traceable_allocator<EvalState>(),
             #else
             std::make_shared<EvalState>(
-                searchPath, getEvalStore(), getStore())
             #endif
+                lookupPath, getEvalStore(), fetchSettings, evalSettings, getStore())
             ;
 
         evalState->repair = repair;
@@ -148,7 +149,7 @@ MixOperateOnOptions::MixOperateOnOptions()
 {
     addFlag({
         .longName = "derivation",
-        .description = "Operate on the [store derivation](../../glossary.md#gloss-store-derivation) rather than its outputs.",
+        .description = "Operate on the [store derivation](@docroot@/glossary.md#gloss-store-derivation) rather than its outputs.",
         .category = installablesCategory,
         .handler = {&operateOn, OperateOn::Derivation},
     });

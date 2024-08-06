@@ -11,6 +11,8 @@ use JSON::PP;
 use LWP::UserAgent;
 use Net::Amazon::S3;
 
+delete $ENV{'shell'}; # shut up a LWP::UserAgent.pm warning
+
 my $evalId = $ARGV[0] or die "Usage: $0 EVAL-ID\n";
 
 my $releasesBucketName = "nix-releases";
@@ -36,11 +38,11 @@ sub fetch {
 my $evalUrl = "https://hydra.nixos.org/eval/$evalId";
 my $evalInfo = decode_json(fetch($evalUrl, 'application/json'));
 #print Dumper($evalInfo);
-my $flakeUrl = $evalInfo->{flake} or die;
-my $flakeInfo = decode_json(`nix flake metadata --json "$flakeUrl"` or die);
-my $nixRev = $flakeInfo->{revision} or die;
+my $flakeUrl = $evalInfo->{flake};
+my $flakeInfo = decode_json(`nix flake metadata --json "$flakeUrl"` or die) if $flakeUrl;
+my $nixRev = ($flakeInfo ? $flakeInfo->{revision} : $evalInfo->{jobsetevalinputs}->{nix}->{revision}) or die;
 
-my $buildInfo = decode_json(fetch("$evalUrl/job/build.x86_64-linux", 'application/json'));
+my $buildInfo = decode_json(fetch("$evalUrl/job/build.nix.x86_64-linux", 'application/json'));
 #print Dumper($buildInfo);
 
 my $releaseName = $buildInfo->{nixname};
@@ -83,12 +85,19 @@ my $channelsBucket = $s3_us->bucket($channelsBucketName) or die;
 sub getStorePath {
     my ($jobName, $output) = @_;
     my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
-    return $buildInfo->{buildoutputs}->{$output or "out"}->{path} or die "cannot get store path for '$jobName'";
+    return $buildInfo->{buildoutputs}->{$output or "out"}->{path} // die "cannot get store path for '$jobName'";
 }
 
 sub copyManual {
-    my $manual = getStorePath("build.x86_64-linux", "doc");
-    print "$manual\n";
+    my $manual;
+    eval {
+        $manual = getStorePath("build.nix.x86_64-linux", "doc");
+    };
+    if ($@) {
+        warn "$@";
+        return;
+    }
+    print "Manual: $manual\n";
 
     my $manualNar = "$tmpDir/$releaseName-manual.nar.xz";
     print "$manualNar\n";
@@ -154,19 +163,34 @@ downloadFile("binaryTarball.x86_64-linux", "1");
 downloadFile("binaryTarball.aarch64-linux", "1");
 downloadFile("binaryTarball.x86_64-darwin", "1");
 downloadFile("binaryTarball.aarch64-darwin", "1");
-downloadFile("binaryTarballCross.x86_64-linux.armv6l-unknown-linux-gnueabihf", "1");
-downloadFile("binaryTarballCross.x86_64-linux.armv7l-unknown-linux-gnueabihf", "1");
+eval {
+    downloadFile("binaryTarballCross.x86_64-linux.armv6l-unknown-linux-gnueabihf", "1");
+};
+warn "$@" if $@;
+eval {
+    downloadFile("binaryTarballCross.x86_64-linux.armv7l-unknown-linux-gnueabihf", "1");
+};
+warn "$@" if $@;
+eval {
+    downloadFile("binaryTarballCross.x86_64-linux.riscv64-unknown-linux-gnu", "1");
+};
+warn "$@" if $@;
 downloadFile("installerScript", "1");
 
 # Upload docker images to dockerhub.
 my $dockerManifest = "";
 my $dockerManifestLatest = "";
+my $haveDocker = 0;
 
 for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
     my $system = $platforms->[0];
     my $dockerPlatform = $platforms->[1];
     my $fn = "nix-$version-docker-image-$dockerPlatform.tar.gz";
-    downloadFile("dockerImage.$system", "1", $fn);
+    eval {
+        downloadFile("dockerImage.$system", "1", $fn);
+    };
+    die "$@" if $@;
+    $haveDocker = 1;
 
     print STDERR "loading docker image for $dockerPlatform...\n";
     system("docker load -i $tmpDir/$fn") == 0 or die;
@@ -194,31 +218,34 @@ for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
     $dockerManifestLatest .= " --amend $latestTag"
 }
 
-print STDERR "creating multi-platform docker manifest...\n";
-system("docker manifest rm nixos/nix:$version");
-system("docker manifest create nixos/nix:$version $dockerManifest") == 0 or die;
-if ($isLatest) {
-    print STDERR "creating latest multi-platform docker manifest...\n";
-    system("docker manifest rm nixos/nix:latest");
-    system("docker manifest create nixos/nix:latest $dockerManifestLatest") == 0 or die;
-}
+if ($haveDocker) {
+    print STDERR "creating multi-platform docker manifest...\n";
+    system("docker manifest rm nixos/nix:$version");
+    system("docker manifest create nixos/nix:$version $dockerManifest") == 0 or die;
+    if ($isLatest) {
+        print STDERR "creating latest multi-platform docker manifest...\n";
+        system("docker manifest rm nixos/nix:latest");
+        system("docker manifest create nixos/nix:latest $dockerManifestLatest") == 0 or die;
+    }
 
-print STDERR "pushing multi-platform docker manifest...\n";
-system("docker manifest push nixos/nix:$version") == 0 or die;
+    print STDERR "pushing multi-platform docker manifest...\n";
+    system("docker manifest push nixos/nix:$version") == 0 or die;
 
-if ($isLatest) {
-    print STDERR "pushing latest multi-platform docker manifest...\n";
-    system("docker manifest push nixos/nix:latest") == 0 or die;
+    if ($isLatest) {
+        print STDERR "pushing latest multi-platform docker manifest...\n";
+        system("docker manifest push nixos/nix:latest") == 0 or die;
+    }
 }
 
 # Upload nix-fallback-paths.nix.
 write_file("$tmpDir/fallback-paths.nix",
     "{\n" .
-    "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
-    "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
-    "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
-    "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
-    "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
+    "  x86_64-linux = \"" . getStorePath("build.nix.x86_64-linux") . "\";\n" .
+    "  i686-linux = \"" . getStorePath("build.nix.i686-linux") . "\";\n" .
+    "  aarch64-linux = \"" . getStorePath("build.nix.aarch64-linux") . "\";\n" .
+    "  riscv64-linux = \"" . getStorePath("buildCross.nix.riscv64-unknown-linux-gnu.x86_64-linux") . "\";\n" .
+    "  x86_64-darwin = \"" . getStorePath("build.nix.x86_64-darwin") . "\";\n" .
+    "  aarch64-darwin = \"" . getStorePath("build.nix.aarch64-darwin") . "\";\n" .
     "}\n");
 
 # Upload release files to S3.

@@ -1,7 +1,10 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 enableFeatures "daemon-trust-override"
 
+TODO_NixOS
 restartDaemon
 
 # Remote doesn't trusts us, but this is fine because we are only

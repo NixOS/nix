@@ -9,8 +9,7 @@
 #include "pathlocks.hh"
 #include "processes.hh"
 #include "git.hh"
-#include "fs-input-accessor.hh"
-#include "mounted-input-accessor.hh"
+#include "mounted-source-accessor.hh"
 #include "git-utils.hh"
 #include "logging.hh"
 #include "finally.hh"
@@ -20,7 +19,10 @@
 #include <regex>
 #include <string.h>
 #include <sys/time.h>
-#include <sys/wait.h>
+
+#ifndef _WIN32
+#  include <sys/wait.h>
+#endif
 
 using namespace std::string_literals;
 
@@ -37,17 +39,6 @@ const std::string gitInitialBranch = "__nix_dummy_branch";
 bool isCacheFileWithinTtl(time_t now, const struct stat & st)
 {
     return st.st_mtime + settings.tarballTtl > now;
-}
-
-bool touchCacheFile(const Path & path, time_t touch_time)
-{
-    struct timeval times[2];
-    times[0].tv_sec = touch_time;
-    times[0].tv_usec = 0;
-    times[1].tv_sec = touch_time;
-    times[1].tv_usec = 0;
-
-    return lutimes(path.c_str(), times) == 0;
 }
 
 Path getCachePath(std::string_view key, bool shallow)
@@ -99,7 +90,15 @@ bool storeCachedHead(const std::string & actualUrl, const std::string & headRef)
     try {
         runProgram("git", true, { "-C", cacheDir, "--git-dir", ".", "symbolic-ref", "--", "HEAD", headRef });
     } catch (ExecError &e) {
-        if (!WIFEXITED(e.status)) throw;
+        if (
+#ifndef WIN32 // TODO abstract over exit status handling on Windows
+            !WIFEXITED(e.status)
+#else
+            e.status != 0
+#endif
+            )
+            throw;
+
         return false;
     }
     /* No need to touch refs/HEAD, because `git symbolic-ref` updates the mtime. */
@@ -147,9 +146,12 @@ std::vector<PublicKey> getPublicKeys(const Attrs & attrs)
 {
     std::vector<PublicKey> publicKeys;
     if (attrs.contains("publicKeys")) {
-        nlohmann::json publicKeysJson = nlohmann::json::parse(getStrAttr(attrs, "publicKeys"));
-        ensureType(publicKeysJson, nlohmann::json::value_t::array);
-        publicKeys = publicKeysJson.get<std::vector<PublicKey>>();
+        auto pubKeysJson = nlohmann::json::parse(getStrAttr(attrs, "publicKeys"));
+        auto & pubKeys = getArray(pubKeysJson);
+
+        for (auto & key : pubKeys) {
+            publicKeys.push_back(key);
+        }
     }
     if (attrs.contains("publicKey"))
         publicKeys.push_back(PublicKey{maybeGetStrAttr(attrs, "keytype").value_or("ssh-ed25519"),getStrAttr(attrs, "publicKey")});
@@ -162,7 +164,9 @@ static const Hash nullRev{HashAlgorithm::SHA1};
 
 struct GitInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
+    std::optional<Input> inputFromURL(
+        const Settings & settings,
+        const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "git" &&
             url.scheme != "git+http" &&
@@ -188,7 +192,7 @@ struct GitInputScheme : InputScheme
 
         attrs.emplace("url", url2.to_string());
 
-        return inputFromAttrs(attrs);
+        return inputFromAttrs(settings, attrs);
     }
 
 
@@ -221,7 +225,9 @@ struct GitInputScheme : InputScheme
         };
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
+    std::optional<Input> inputFromAttrs(
+        const Settings & settings,
+        const Attrs & attrs) const override
     {
         for (auto & [name, _] : attrs)
             if (name == "verifyCommit"
@@ -237,7 +243,7 @@ struct GitInputScheme : InputScheme
                 throw BadURL("invalid Git branch/tag name '%s'", *ref);
         }
 
-        Input input;
+        Input input{settings};
         input.attrs = attrs;
         auto url = fixGitURL(getStrAttr(attrs, "url"));
         parseURL(url);
@@ -328,7 +334,13 @@ struct GitInputScheme : InputScheme
             .program = "git",
             .args = {"-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "check-ignore", "--quiet", std::string(path.rel())},
         });
-        auto exitCode = WEXITSTATUS(result.first);
+        auto exitCode =
+#ifndef WIN32 // TODO abstract over exit status handling on Windows
+            WEXITSTATUS(result.first)
+#else
+            result.first
+#endif
+            ;
 
         if (exitCode != 0) {
             // The path is not `.gitignore`d, we can add the file.
@@ -341,7 +353,8 @@ struct GitInputScheme : InputScheme
                 logger->pause();
                 Finally restoreLogger([]() { logger->resume(); });
                 runProgram("git", true,
-                    { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-m", *commitMsg });
+                    { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-F", "-" },
+                    *commitMsg);
             }
         }
     }
@@ -358,13 +371,13 @@ struct GitInputScheme : InputScheme
         /* URL of the repo, or its path if isLocal. Never a `file` URL. */
         std::string url;
 
-        void warnDirty() const
+        void warnDirty(const Settings & settings) const
         {
             if (workdirInfo.isDirty) {
-                if (!fetchSettings.allowDirty)
+                if (!settings.allowDirty)
                     throw Error("Git tree '%s' is dirty", url);
 
-                if (fetchSettings.warnDirty)
+                if (settings.warnDirty)
                     warn("Git tree '%s' is dirty", url);
             }
         }
@@ -430,7 +443,7 @@ struct GitInputScheme : InputScheme
 
     uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        Attrs key{{"_what", "gitLastModified"}, {"rev", rev.gitRev()}};
+        Cache::Key key{"gitLastModified", {{"rev", rev.gitRev()}}};
 
         auto cache = getCache();
 
@@ -439,14 +452,14 @@ struct GitInputScheme : InputScheme
 
         auto lastModified = GitRepo::openRepo(repoDir)->getLastModified(rev);
 
-        cache->upsert(key, Attrs{{"lastModified", lastModified}});
+        cache->upsert(key, {{"lastModified", lastModified}});
 
         return lastModified;
     }
 
     uint64_t getRevCount(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        Attrs key{{"_what", "gitRevCount"}, {"rev", rev.gitRev()}};
+        Cache::Key key{"gitRevCount", {{"rev", rev.gitRev()}}};
 
         auto cache = getCache();
 
@@ -498,7 +511,7 @@ struct GitInputScheme : InputScheme
         }
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessorFromCommit(
+    std::pair<ref<SourceAccessor>, Input> getAccessorFromCommit(
         ref<Store> store,
         RepoInfo & repoInfo,
         Input && input) const
@@ -528,6 +541,9 @@ struct GitInputScheme : InputScheme
             PathLocks cacheDirLock({cacheDir});
 
             auto repo = GitRepo::openRepo(cacheDir, true, true);
+
+            // We need to set the origin so resolving submodule URLs works
+            repo->setRemote("origin", repoInfo.url);
 
             Path localRefFile =
                 ref.compare(0, 5, "refs/") == 0
@@ -573,8 +589,11 @@ struct GitInputScheme : InputScheme
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", repoInfo.url);
                 }
 
-                if (!touchCacheFile(localRefFile, now))
-                    warn("could not update mtime for file '%s': %s", localRefFile, strerror(errno));
+                try {
+                    setWriteTime(localRefFile, now, now);
+                } catch (Error & e) {
+                    warn("could not update mtime for file '%s': %s", localRefFile, e.msg());
+                }
                 if (!originalRef && !storeCachedHead(repoInfo.url, ref))
                     warn("could not update cached head '%s' for '%s'", ref, repoInfo.url);
             }
@@ -591,7 +610,7 @@ struct GitInputScheme : InputScheme
                         repoInfo.url
                         );
             } else
-                input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), HashAlgorithm::SHA1).gitRev());
+                input.attrs.insert_or_assign("rev", repo->resolveRef(ref).gitRev());
 
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
@@ -629,10 +648,10 @@ struct GitInputScheme : InputScheme
            input accessor consisting of the accessor for the top-level
            repo and the accessors for the submodules. */
         if (getSubmodulesAttr(input)) {
-            std::map<CanonPath, nix::ref<InputAccessor>> mounts;
+            std::map<CanonPath, nix::ref<SourceAccessor>> mounts;
 
             for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev, exportIgnore)) {
-                auto resolved = repo->resolveSubmoduleUrl(submodule.url, repoInfo.url);
+                auto resolved = repo->resolveSubmoduleUrl(submodule.url);
                 debug("Git submodule %s: %s %s %s -> %s",
                     submodule.path, submodule.url, submodule.branch, submoduleRev.gitRev(), resolved);
                 fetchers::Attrs attrs;
@@ -642,15 +661,18 @@ struct GitInputScheme : InputScheme
                     attrs.insert_or_assign("ref", submodule.branch);
                 attrs.insert_or_assign("rev", submoduleRev.gitRev());
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
-                auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
+                attrs.insert_or_assign("submodules", Explicit<bool>{ true });
+                attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
+                auto submoduleInput = fetchers::Input::fromAttrs(*input.settings, std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.getAccessor(store);
+                submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
                 mounts.insert_or_assign(submodule.path, submoduleAccessor);
             }
 
             if (!mounts.empty()) {
                 mounts.insert_or_assign(CanonPath::root, accessor);
-                accessor = makeMountedInputAccessor(std::move(mounts));
+                accessor = makeMountedSourceAccessor(std::move(mounts));
             }
         }
 
@@ -668,7 +690,7 @@ struct GitInputScheme : InputScheme
         return {accessor, std::move(input)};
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessorFromWorkdir(
+    std::pair<ref<SourceAccessor>, Input> getAccessorFromWorkdir(
         ref<Store> store,
         RepoInfo & repoInfo,
         Input && input) const
@@ -682,16 +704,18 @@ struct GitInputScheme : InputScheme
 
         auto exportIgnore = getExportIgnoreAttr(input);
 
-        ref<InputAccessor> accessor =
+        ref<SourceAccessor> accessor =
             repo->getAccessor(repoInfo.workdirInfo,
                 exportIgnore,
                 makeNotAllowedError(repoInfo.url));
+
+        accessor->setPathDisplay(repoInfo.url);
 
         /* If the repo has submodules, return a mounted input accessor
            consisting of the accessor for the top-level repo and the
            accessors for the submodule workdirs. */
         if (getSubmodulesAttr(input) && !repoInfo.workdirInfo.submodules.empty()) {
-            std::map<CanonPath, nix::ref<InputAccessor>> mounts;
+            std::map<CanonPath, nix::ref<SourceAccessor>> mounts;
 
             for (auto & submodule : repoInfo.workdirInfo.submodules) {
                 auto submodulePath = CanonPath(repoInfo.url) / submodule.path;
@@ -699,10 +723,14 @@ struct GitInputScheme : InputScheme
                 attrs.insert_or_assign("type", "git");
                 attrs.insert_or_assign("url", submodulePath.abs());
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
+                attrs.insert_or_assign("submodules", Explicit<bool>{ true });
+                // TODO: fall back to getAccessorFromCommit-like fetch when submodules aren't checked out
+                // attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
 
-                auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
+                auto submoduleInput = fetchers::Input::fromAttrs(*input.settings, std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.getAccessor(store);
+                submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
 
                 /* If the submodule is dirty, mark this repo dirty as
                    well. */
@@ -713,7 +741,7 @@ struct GitInputScheme : InputScheme
             }
 
             mounts.insert_or_assign(CanonPath::root, accessor);
-            accessor = makeMountedInputAccessor(std::move(mounts));
+            accessor = makeMountedSourceAccessor(std::move(mounts));
         }
 
         if (!repoInfo.workdirInfo.isDirty) {
@@ -731,7 +759,7 @@ struct GitInputScheme : InputScheme
 
             verifyCommit(input, repo);
         } else {
-            repoInfo.warnDirty();
+            repoInfo.warnDirty(*input.settings);
 
             if (repoInfo.workdirInfo.headRev) {
                 input.attrs.insert_or_assign("dirtyRev",
@@ -752,7 +780,7 @@ struct GitInputScheme : InputScheme
         return {accessor, std::move(input)};
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         Input input(_input);
 
@@ -772,8 +800,6 @@ struct GitInputScheme : InputScheme
             input.getRef() || input.getRev() || !repoInfo.isLocal
             ? getAccessorFromCommit(store, repoInfo, std::move(input))
             : getAccessorFromWorkdir(store, repoInfo, std::move(input));
-
-        accessor->fingerprint = final.getFingerprint(store);
 
         return {accessor, std::move(final)};
     }

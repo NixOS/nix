@@ -3,7 +3,7 @@
 ((NEW_NIX_FIRST_BUILD_UID=301))
 
 id_available(){
-	dscl . list /Users UniqueID | grep -E '\b'$1'\b' >/dev/null
+	dscl . list /Users UniqueID | grep -E '\b'"$1"'\b' >/dev/null
 }
 
 change_nixbld_names_and_ids(){
@@ -26,18 +26,18 @@ change_nixbld_names_and_ids(){
 			fi
 		done
 
-		if [[ $name == _* ]]; then
+		if [[ "$name" == _* ]]; then
 			echo "      It looks like $name has already been renamed--skipping."
 		else
 			# first 3 are cleanup, it's OK if they aren't here
-			sudo dscl . delete /Users/$name dsAttrTypeNative:_writers_passwd &>/dev/null || true
-			sudo dscl . change /Users/$name NFSHomeDirectory "/private/var/empty 1" "/var/empty" &>/dev/null || true
+			sudo dscl . delete "/Users/$name" dsAttrTypeNative:_writers_passwd &>/dev/null || true
+			sudo dscl . change "/Users/$name" NFSHomeDirectory "/private/var/empty 1" "/var/empty" &>/dev/null || true
 			# remove existing user from group
-			sudo dseditgroup -o edit -t user -d $name nixbld || true
-			sudo dscl . change /Users/$name UniqueID $uid $next_id
-			sudo dscl . change /Users/$name RecordName $name _$name
+			sudo dseditgroup -o edit -t user -d "$name" nixbld || true
+			sudo dscl . change "/Users/$name" UniqueID "$uid" "$next_id"
+			sudo dscl . change "/Users/$name" RecordName "$name" "_$name"
 			# add renamed user to group
-			sudo dseditgroup -o edit -t user -a _$name nixbld
+			sudo dseditgroup -o edit -t user -a "_$name" nixbld
 			echo "      $name migrated to _$name (uid: $next_id)"
 		fi
 	done < <(dscl . list /Users UniqueID | grep nixbld | sort -n -k2)

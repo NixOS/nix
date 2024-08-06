@@ -25,14 +25,30 @@
 #include "nixexpr.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
-#include "globals.hh"
 #include "parser-state.hh"
 
 #define YYLTYPE ::nix::ParserLocation
 #define YY_DECL int yylex \
     (YYSTYPE * yylval_param, YYLTYPE * yylloc_param, yyscan_t yyscanner, nix::ParserState * state)
 
+// For efficiency, we only track offsets; not line,column coordinates
+# define YYLLOC_DEFAULT(Current, Rhs, N)                                \
+    do                                                                  \
+      if (N)                                                            \
+        {                                                               \
+          (Current).beginOffset = YYRHSLOC (Rhs, 1).beginOffset;        \
+          (Current).endOffset  = YYRHSLOC (Rhs, N).endOffset;           \
+        }                                                               \
+      else                                                              \
+        {                                                               \
+          (Current).beginOffset = (Current).endOffset =                 \
+            YYRHSLOC (Rhs, 0).endOffset;                                \
+        }                                                               \
+    while (0)
+
 namespace nix {
+
+typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
 
 Expr * parseExprFromBuf(
     char * text,
@@ -40,8 +56,10 @@ Expr * parseExprFromBuf(
     Pos::Origin origin,
     const SourcePath & basePath,
     SymbolTable & symbols,
+    const EvalSettings & settings,
     PosTable & positions,
-    const ref<InputAccessor> rootFS,
+    DocCommentMap & docComments,
+    const ref<SourceAccessor> rootFS,
     const Expr::AstSymbols & astSymbols);
 
 }
@@ -64,10 +82,29 @@ using namespace nix;
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * error)
 {
+    if (std::string_view(error).starts_with("syntax error, unexpected end of file")) {
+        loc->beginOffset = loc->endOffset;
+    }
     throw ParseError({
         .msg = HintFmt(error),
         .pos = state->positions[state->at(*loc)]
     });
+}
+
+#define SET_DOC_POS(lambda, pos) setDocPosition(state->lexerState, lambda, state->at(pos))
+static void setDocPosition(const LexerState & lexerState, ExprLambda * lambda, PosIdx start) {
+    auto it = lexerState.positionToDocComment.find(start);
+    if (it != lexerState.positionToDocComment.end()) {
+        lambda->setDocComment(it->second);
+    }
+}
+
+static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
+    if (auto e2 = dynamic_cast<ExprCall *>(fn)) {
+        e2->args.push_back(arg);
+        return fn;
+    }
+    return new ExprCall(pos, fn, {arg});
 }
 
 
@@ -87,17 +124,20 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * 
   nix::StringToken uri;
   nix::StringToken str;
   std::vector<nix::AttrName> * attrNames;
+  std::vector<std::pair<nix::AttrName, nix::PosIdx>> * inheritAttrs;
   std::vector<std::pair<nix::PosIdx, nix::Expr *>> * string_parts;
   std::vector<std::pair<nix::PosIdx, std::variant<nix::Expr *, nix::StringToken>>> * ind_string_parts;
 }
 
 %type <e> start expr expr_function expr_if expr_op
 %type <e> expr_select expr_simple expr_app
+%type <e> expr_pipe_from expr_pipe_into
 %type <list> expr_list
 %type <attrs> binds
 %type <formals> formals
 %type <formal> formal
-%type <attrNames> attrs attrpath
+%type <attrNames> attrpath
+%type <inheritAttrs> attrs
 %type <string_parts> string_parts_interpolated
 %type <ind_string_parts> ind_string_parts
 %type <e> path_start string_parts string_attr
@@ -109,9 +149,11 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * 
 %token <path> PATH HPATH SPATH PATH_END
 %token <uri> URI
 %token IF THEN ELSE ASSERT WITH LET IN_KW REC INHERIT EQ NEQ AND OR IMPL OR_KW
+%token PIPE_FROM PIPE_INTO /* <| and |> */
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
 %token ELLIPSIS
+
 
 %right IMPL
 %left OR
@@ -134,18 +176,28 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, state->symbols.create($1), 0, $3); }
+    { auto me = new ExprLambda(CUR_POS, state->symbols.create($1), 0, $3);
+      $$ = me;
+      SET_DOC_POS(me, @1);
+    }
   | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, state->validateFormals($2), $5); }
+    { auto me = new ExprLambda(CUR_POS, state->validateFormals($2), $5);
+      $$ = me;
+      SET_DOC_POS(me, @1);
+    }
   | '{' formals '}' '@' ID ':' expr_function
     {
       auto arg = state->symbols.create($5);
-      $$ = new ExprLambda(CUR_POS, arg, state->validateFormals($2, CUR_POS, arg), $7);
+      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($2, CUR_POS, arg), $7);
+      $$ = me;
+      SET_DOC_POS(me, @1);
     }
   | ID '@' '{' formals '}' ':' expr_function
     {
       auto arg = state->symbols.create($1);
-      $$ = new ExprLambda(CUR_POS, arg, state->validateFormals($4, CUR_POS, arg), $7);
+      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($4, CUR_POS, arg), $7);
+      $$ = me;
+      SET_DOC_POS(me, @1);
     }
   | ASSERT expr ';' expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
@@ -164,7 +216,19 @@ expr_function
 
 expr_if
   : IF expr THEN expr ELSE expr { $$ = new ExprIf(CUR_POS, $2, $4, $6); }
+  | expr_pipe_from
+  | expr_pipe_into
   | expr_op
+  ;
+
+expr_pipe_from
+  : expr_op PIPE_FROM expr_pipe_from { $$ = makeCall(state->at(@2), $1, $3); }
+  | expr_op PIPE_FROM expr_op        { $$ = makeCall(state->at(@2), $1, $3); }
+  ;
+
+expr_pipe_into
+  : expr_pipe_into PIPE_INTO expr_op { $$ = makeCall(state->at(@2), $3, $1); }
+  | expr_op        PIPE_INTO expr_op { $$ = makeCall(state->at(@2), $3, $1); }
   ;
 
 expr_op
@@ -191,13 +255,7 @@ expr_op
   ;
 
 expr_app
-  : expr_app expr_select {
-      if (auto e2 = dynamic_cast<ExprCall *>($1)) {
-          e2->args.push_back($2);
-          $$ = $1;
-      } else
-          $$ = new ExprCall(CUR_POS, $1, {$2});
-  }
+  : expr_app expr_select { $$ = makeCall(CUR_POS, $1, $2); }
   | expr_select
   ;
 
@@ -285,17 +343,17 @@ path_start
     /* add back in the trailing '/' to the first segment */
     if ($1.p[$1.l-1] == '/' && $1.l > 1)
       path += "/";
-    $$ = new ExprPath(ref<InputAccessor>(state->rootFS), std::move(path));
+    $$ = new ExprPath(ref<SourceAccessor>(state->rootFS), std::move(path));
   }
   | HPATH {
-    if (evalSettings.pureEval) {
+    if (state->settings.pureEval) {
         throw Error(
             "the path '%s' can not be resolved in pure mode",
             std::string_view($1.p, $1.l)
         );
     }
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
-    $$ = new ExprPath(ref<InputAccessor>(state->rootFS), std::move(path));
+    $$ = new ExprPath(ref<SourceAccessor>(state->rootFS), std::move(path));
   }
   ;
 
@@ -306,16 +364,30 @@ ind_string_parts
   ;
 
 binds
-  : binds attrpath '=' expr ';' { $$ = $1; state->addAttr($$, std::move(*$2), $4, state->at(@2)); delete $2; }
+  : binds attrpath '=' expr ';' {
+      $$ = $1;
+
+      auto pos = state->at(@2);
+      auto exprPos = state->at(@4);
+      {
+        auto it = state->lexerState.positionToDocComment.find(pos);
+        if (it != state->lexerState.positionToDocComment.end()) {
+          $4->setDocComment(it->second);
+          state->lexerState.positionToDocComment.emplace(exprPos, it->second);
+        }
+      }
+
+      state->addAttr($$, std::move(*$2), $4, pos);
+      delete $2;
+    }
   | binds INHERIT attrs ';'
     { $$ = $1;
-      for (auto & i : *$3) {
+      for (auto & [i, iPos] : *$3) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              state->dupAttr(i.symbol, state->at(@3), $$->attrs[i.symbol].pos);
-          auto pos = state->at(@3);
+              state->dupAttr(i.symbol, iPos, $$->attrs[i.symbol].pos);
           $$->attrs.emplace(
               i.symbol,
-              ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, ExprAttrs::AttrDef::Kind::Inherited));
+              ExprAttrs::AttrDef(new ExprVar(iPos, i.symbol), iPos, ExprAttrs::AttrDef::Kind::Inherited));
       }
       delete $3;
     }
@@ -325,14 +397,14 @@ binds
           $$->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
       $$->inheritFromExprs->push_back($4);
       auto from = new nix::ExprInheritFrom(state->at(@4), $$->inheritFromExprs->size() - 1);
-      for (auto & i : *$6) {
+      for (auto & [i, iPos] : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              state->dupAttr(i.symbol, state->at(@6), $$->attrs[i.symbol].pos);
+              state->dupAttr(i.symbol, iPos, $$->attrs[i.symbol].pos);
           $$->attrs.emplace(
               i.symbol,
               ExprAttrs::AttrDef(
-                  new ExprSelect(CUR_POS, from, i.symbol),
-                  state->at(@6),
+                  new ExprSelect(iPos, from, i.symbol),
+                  iPos,
                   ExprAttrs::AttrDef::Kind::InheritedFrom));
       }
       delete $6;
@@ -341,12 +413,12 @@ binds
   ;
 
 attrs
-  : attrs attr { $$ = $1; $1->push_back(AttrName(state->symbols.create($2))); }
+  : attrs attr { $$ = $1; $1->emplace_back(AttrName(state->symbols.create($2)), state->at(@2)); }
   | attrs string_attr
     { $$ = $1;
       ExprString * str = dynamic_cast<ExprString *>($2);
       if (str) {
-          $$->push_back(AttrName(state->symbols.create(str->s)));
+          $$->emplace_back(AttrName(state->symbols.create(str->s)), state->at(@2));
           delete str;
       } else
           throw ParseError({
@@ -354,7 +426,7 @@ attrs
               .pos = state->positions[state->at(@2)]
           });
     }
-  | { $$ = new AttrPath; }
+  | { $$ = new std::vector<std::pair<AttrName, PosIdx>>; }
   ;
 
 attrpath
@@ -424,21 +496,30 @@ Expr * parseExprFromBuf(
     Pos::Origin origin,
     const SourcePath & basePath,
     SymbolTable & symbols,
+    const EvalSettings & settings,
     PosTable & positions,
-    const ref<InputAccessor> rootFS,
+    DocCommentMap & docComments,
+    const ref<SourceAccessor> rootFS,
     const Expr::AstSymbols & astSymbols)
 {
     yyscan_t scanner;
+    LexerState lexerState {
+        .positionToDocComment = docComments,
+        .positions = positions,
+        .origin = positions.addOrigin(origin, length),
+    };
     ParserState state {
+        .lexerState = lexerState,
         .symbols = symbols,
         .positions = positions,
         .basePath = basePath,
-        .origin = {origin},
+        .origin = lexerState.origin,
         .rootFS = rootFS,
         .s = astSymbols,
+        .settings = settings,
     };
 
-    yylex_init(&scanner);
+    yylex_init_extra(&lexerState, &scanner);
     Finally _destroy([&] { yylex_destroy(scanner); });
 
     yy_scan_buffer(text, length, scanner);

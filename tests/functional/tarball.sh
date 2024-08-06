@@ -1,6 +1,8 @@
+#!/usr/bin/env bash
+
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 rm -rf $TEST_HOME
 
@@ -52,8 +54,49 @@ test_tarball() {
     # with the content-addressing
     (! nix-instantiate --eval -E "fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; name = \"foo\"; }")
 
+    store_path=$(nix store prefetch-file --json "file://$tarball" | jq -r .storePath)
+    if ! cmp -s "$store_path" "$tarball"; then
+        echo "prefetched tarball differs from original: $store_path vs $tarball" >&2
+        exit 1
+    fi
+    store_path2=$(nix store prefetch-file --json --unpack "file://$tarball" | jq -r .storePath)
+    diff_output=$(diff -r "$store_path2" "$tarroot")
+    if [ -n "$diff_output" ]; then
+        echo "prefetched tarball differs from original: $store_path2 vs $tarroot" >&2
+        echo "$diff_output"
+        exit 1
+    fi
 }
 
 test_tarball '' cat
 test_tarball .xz xz
 test_tarball .gz gzip
+
+# Test hard links.
+# All entries in tree.tar.gz refer to the same file, and all have the same inode when unpacked by GNU tar.
+# We don't preserve the hard links, because that's an optimization we think is not worth the complexity,
+# so we only make sure that the contents are copied correctly.
+path="$(nix flake prefetch --json "tarball+file://$(pwd)/tree.tar.gz" | jq -r .storePath)"
+[[ $(cat "$path/a/b/foo") = bar ]]
+[[ $(cat "$path/a/b/xyzzy") = bar ]]
+[[ $(cat "$path/a/yyy") = bar ]]
+[[ $(cat "$path/a/zzz") = bar ]]
+[[ $(cat "$path/c/aap") = bar ]]
+[[ $(cat "$path/fnord") = bar ]]
+
+# Test a tarball that has multiple top-level directories.
+rm -rf "$TEST_ROOT/tar_root"
+mkdir -p "$TEST_ROOT/tar_root" "$TEST_ROOT/tar_root/foo" "$TEST_ROOT/tar_root/bar"
+tar cvf "$TEST_ROOT/tar.tar" -C "$TEST_ROOT/tar_root" .
+path="$(nix flake prefetch --json "tarball+file://$TEST_ROOT/tar.tar" | jq -r .storePath)"
+[[ -d "$path/foo" ]]
+[[ -d "$path/bar" ]]
+
+# Test a tarball that has a single regular file.
+rm -rf "$TEST_ROOT/tar_root"
+mkdir -p "$TEST_ROOT/tar_root"
+echo bar > "$TEST_ROOT/tar_root/foo"
+chmod +x "$TEST_ROOT/tar_root/foo"
+tar cvf "$TEST_ROOT/tar.tar" -C "$TEST_ROOT/tar_root" .
+path="$(nix flake prefetch --refresh --json "tarball+file://$TEST_ROOT/tar.tar" | jq -r .storePath)"
+[[ $(cat "$path/foo") = bar ]]

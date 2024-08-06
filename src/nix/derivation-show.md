@@ -50,7 +50,7 @@ By default, this command only shows top-level derivations, but with
 
 `nix derivation show` outputs a JSON map of [store path]s to derivations in the following format:
 
-[store path]: @docroot@/glossary.md#gloss-store-path
+[store path]: @docroot@/store/store-path.md
 
 {{#include ../../protocols/json/derivation.md}}
 

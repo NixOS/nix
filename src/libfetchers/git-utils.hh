@@ -1,14 +1,13 @@
 #pragma once
 
-#include "filtering-input-accessor.hh"
-#include "input-accessor.hh"
+#include "filtering-source-accessor.hh"
 #include "fs-sink.hh"
 
 namespace nix {
 
 namespace fetchers { struct PublicKey; }
 
-struct GitFileSystemObjectSink : FileSystemObjectSink
+struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
 {
     /**
      * Flush builder and return a final Git hash.
@@ -31,6 +30,8 @@ struct GitRepo
 
     /* Return the commit hash to which a ref points. */
     virtual Hash resolveRef(std::string ref) = 0;
+
+    virtual void setRemote(const std::string & name, const std::string & url) = 0;
 
     /**
      * Info about a submodule.
@@ -69,7 +70,7 @@ struct GitRepo
      */
     virtual std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) = 0;
 
-    //virtual void smudgeLfs() = 0;
+    virtual std::string resolveSubmoduleUrl(const std::string & url) = 0;
 
     virtual std::string resolveSubmoduleUrl(
         const std::string & url,
@@ -77,9 +78,9 @@ struct GitRepo
 
     virtual bool hasObject(const Hash & oid) = 0;
 
-    virtual ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
+    virtual ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
 
-    virtual ref<InputAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
+    virtual ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
 
     virtual ref<GitFileSystemObjectSink> getFileSystemObjectSink() = 0;
 
@@ -101,6 +102,13 @@ struct GitRepo
      * serialisation. This is memoised on-disk.
      */
     virtual Hash treeHashToNarHash(const Hash & treeHash) = 0;
+
+    /**
+     * If the specified Git object is a directory with a single entry
+     * that is a directory, return the ID of that object.
+     * Otherwise, return the passed ID unchanged.
+     */
+    virtual Hash dereferenceSingletonDirectory(const Hash & oid) = 0;
 };
 
 ref<GitRepo> getTarballCache();

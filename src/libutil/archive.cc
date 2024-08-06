@@ -6,8 +6,9 @@
 #include <strings.h> // for strcasecmp
 
 #include "archive.hh"
-#include "config.hh"
+#include "config-global.hh"
 #include "posix-source-accessor.hh"
+#include "source-path.hh"
 #include "file-system.hh"
 #include "signals.hh"
 
@@ -110,9 +111,9 @@ void SourceAccessor::dumpPath(
 
 time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
 {
-    auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(path);
-    accessor.dumpPath(canonPath, sink, filter);
-    return accessor.mtime;
+    auto path2 = PosixSourceAccessor::createAtRoot(path);
+    path2.dumpPath(sink, filter);
+    return path2.accessor.dynamic_pointer_cast<PosixSourceAccessor>()->mtime;
 }
 
 void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
@@ -164,7 +165,7 @@ struct CaseInsensitiveCompare
 };
 
 
-static void parse(FileSystemObjectSink & sink, Source & source, const Path & path)
+static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath & path)
 {
     std::string s;
 
@@ -245,7 +246,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const Path & pat
                                 }
                             } else if (s == "node") {
                                 if (name.empty()) throw badArchive("entry name missing");
-                                parse(sink, source, path + "/" + name);
+                                parse(sink, source, path / name);
                             } else
                                 throw badArchive("unknown field " + s);
                         }
@@ -289,11 +290,11 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
     }
     if (version != narVersionMagic1)
         throw badArchive("input doesn't look like a Nix archive");
-    parse(sink, source, "");
+    parse(sink, source, CanonPath::root);
 }
 
 
-void restorePath(const Path & path, Source & source)
+void restorePath(const std::filesystem::path & path, Source & source)
 {
     RestoreSink sink;
     sink.dstPath = path;
@@ -311,15 +312,6 @@ void copyNAR(Source & source, Sink & sink)
     TeeSource wrapper { source, sink };
 
     parseDump(parseSink, wrapper);
-}
-
-
-void copyPath(const Path & from, const Path & to)
-{
-    auto source = sinkToSource([&](Sink & sink) {
-        dumpPath(from, sink);
-    });
-    restorePath(to, *source);
 }
 
 

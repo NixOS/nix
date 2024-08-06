@@ -17,6 +17,10 @@
 # define FS_ROOT FS_SEP
 #endif
 
+#ifndef PATH_MAX
+# define PATH_MAX 4096
+#endif
+
 namespace nix {
 
 /* ----------- tests for util.hh ------------------------------------------------*/
@@ -151,6 +155,16 @@ namespace nix {
         ASSERT_EQ(p1, "dir");
     }
 
+    TEST(baseNameOf, trailingSlashes) {
+        auto p1 = baseNameOf("/dir//");
+        ASSERT_EQ(p1, "dir");
+    }
+
+    TEST(baseNameOf, absoluteNothingSlashNothing) {
+        auto p1 = baseNameOf("//");
+        ASSERT_EQ(p1, "");
+    }
+
     /* ----------------------------------------------------------------------------
      * isInDir
      * --------------------------------------------------------------------------*/
@@ -217,32 +231,32 @@ namespace nix {
     }
 
     /* ----------------------------------------------------------------------------
-     * concatStringsSep
+     * dropEmptyInitThenConcatStringsSep
      * --------------------------------------------------------------------------*/
 
-    TEST(concatStringsSep, buildCommaSeparatedString) {
+    TEST(dropEmptyInitThenConcatStringsSep, buildCommaSeparatedString) {
         Strings strings;
         strings.push_back("this");
         strings.push_back("is");
         strings.push_back("great");
 
-        ASSERT_EQ(concatStringsSep(",", strings), "this,is,great");
+        ASSERT_EQ(dropEmptyInitThenConcatStringsSep(",", strings), "this,is,great");
     }
 
-    TEST(concatStringsSep, buildStringWithEmptySeparator) {
+    TEST(dropEmptyInitThenConcatStringsSep, buildStringWithEmptySeparator) {
         Strings strings;
         strings.push_back("this");
         strings.push_back("is");
         strings.push_back("great");
 
-        ASSERT_EQ(concatStringsSep("", strings), "thisisgreat");
+        ASSERT_EQ(dropEmptyInitThenConcatStringsSep("", strings), "thisisgreat");
     }
 
-    TEST(concatStringsSep, buildSingleString) {
+    TEST(dropEmptyInitThenConcatStringsSep, buildSingleString) {
         Strings strings;
         strings.push_back("this");
 
-        ASSERT_EQ(concatStringsSep(",", strings), "this");
+        ASSERT_EQ(dropEmptyInitThenConcatStringsSep(",", strings), "this");
     }
 
     /* ----------------------------------------------------------------------------
@@ -412,6 +426,24 @@ namespace nix {
     }
 
     /* ----------------------------------------------------------------------------
+     * renderSize
+     * --------------------------------------------------------------------------*/
+
+    TEST(renderSize, misc) {
+        ASSERT_EQ(renderSize(0, true), "   0.0 KiB");
+        ASSERT_EQ(renderSize(100, true), "   0.1 KiB");
+        ASSERT_EQ(renderSize(100), "0.1 KiB");
+        ASSERT_EQ(renderSize(972, true), "   0.9 KiB");
+        ASSERT_EQ(renderSize(973, true), "   1.0 KiB"); // FIXME: should round down
+        ASSERT_EQ(renderSize(1024, true), "   1.0 KiB");
+        ASSERT_EQ(renderSize(1024 * 1024, true), "1024.0 KiB");
+        ASSERT_EQ(renderSize(1100 * 1024, true), "   1.1 MiB");
+        ASSERT_EQ(renderSize(2ULL * 1024 * 1024 * 1024, true), "   2.0 GiB");
+        ASSERT_EQ(renderSize(2100ULL * 1024 * 1024 * 1024, true), "   2.1 TiB");
+    }
+
+#ifndef _WIN32 // TODO re-enable on Windows, once we can start processes
+    /* ----------------------------------------------------------------------------
      * statusOk
      * --------------------------------------------------------------------------*/
 
@@ -419,6 +451,7 @@ namespace nix {
         ASSERT_EQ(statusOk(0), true);
         ASSERT_EQ(statusOk(1), false);
     }
+#endif
 
 
     /* ----------------------------------------------------------------------------

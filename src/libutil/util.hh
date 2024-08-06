@@ -5,12 +5,13 @@
 #include "error.hh"
 #include "logging.hh"
 
-#include <boost/lexical_cast.hpp>
 
 #include <functional>
 #include <map>
 #include <sstream>
 #include <optional>
+
+#include "strings.hh"
 
 namespace nix {
 
@@ -34,13 +35,26 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
 
 
 /**
- * Concatenate the given strings with a separator between the
- * elements.
+ * Ignore any empty strings at the start of the list, and then concatenate the
+ * given strings with a separator between the elements.
+ *
+ * @deprecated This function exists for historical reasons. You probably just
+ *             want to use `concatStringsSep`.
  */
 template<class C>
-std::string concatStringsSep(const std::string_view sep, const C & ss)
+[[deprecated("Consider removing the empty string dropping behavior. If acceptable, use concatStringsSep instead.")]]
+std::string dropEmptyInitThenConcatStringsSep(const std::string_view sep, const C & ss)
 {
     size_t size = 0;
+
+    // TODO? remove to make sure we don't rely on the empty item ignoring behavior,
+    //       or just get rid of this function by understanding the remaining calls.
+    // for (auto & i : ss) {
+    //     // Make sure we don't rely on the empty item ignoring behavior
+    //     assert(!i.empty());
+    //     break;
+    // }
+
     // need a cast to string_view since this is also called with Symbols
     for (const auto & s : ss) size += sep.size() + std::string_view(s).size();
     std::string s;
@@ -102,16 +116,7 @@ std::string rewriteStrings(std::string s, const StringMap & rewrites);
  * Parse a string into an integer.
  */
 template<class N>
-std::optional<N> string2Int(const std::string_view s)
-{
-    if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
-        return std::nullopt;
-    try {
-        return boost::lexical_cast<N>(s.data(), s.size());
-    } catch (const boost::bad_lexical_cast &) {
-        return std::nullopt;
-    }
-}
+std::optional<N> string2Int(const std::string_view s);
 
 /**
  * Like string2Int(), but support an optional suffix 'K', 'M', 'G' or
@@ -120,7 +125,7 @@ std::optional<N> string2Int(const std::string_view s)
 template<class N>
 N string2IntWithUnitPrefix(std::string_view s)
 {
-    N multiplier = 1;
+    uint64_t multiplier = 1;
     if (!s.empty()) {
         char u = std::toupper(*s.rbegin());
         if (std::isalpha(u)) {
@@ -138,17 +143,17 @@ N string2IntWithUnitPrefix(std::string_view s)
 }
 
 /**
+ * Pretty-print a byte value, e.g. 12433615056 is rendered as `11.6
+ * GiB`. If `align` is set, the number will be right-justified by
+ * padding with spaces on the left.
+ */
+std::string renderSize(uint64_t value, bool align = false);
+
+/**
  * Parse a string into a float.
  */
 template<class N>
-std::optional<N> string2Float(const std::string_view s)
-{
-    try {
-        return boost::lexical_cast<N>(s.data(), s.size());
-    } catch (const boost::bad_lexical_cast &) {
-        return std::nullopt;
-    }
-}
+std::optional<N> string2Float(const std::string_view s);
 
 
 /**

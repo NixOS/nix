@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "error.hh"
 #include "environment-variables.hh"
 #include "signals.hh"
@@ -11,14 +13,15 @@
 
 namespace nix {
 
-void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint)
+void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint, TracePrint print)
 {
-    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint });
+    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .print = print });
 }
 
-void throwExceptionSelfCheck(){
+void throwExceptionSelfCheck()
+{
     // This is meant to be caught in initLibUtil()
-    throw SysError("C++ exception handling is broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.");
+    throw Error("C++ exception handling is broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.");
 }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
@@ -45,27 +48,22 @@ std::ostream & operator <<(std::ostream & os, const HintFmt & hf)
 /**
  * An arbitrarily defined value comparison for the purpose of using traces in the key of a sorted container.
  */
-inline bool operator<(const Trace& lhs, const Trace& rhs)
+inline std::strong_ordering operator<=>(const Trace& lhs, const Trace& rhs)
 {
     // `std::shared_ptr` does not have value semantics for its comparison
     // functions, so we need to check for nulls and compare the dereferenced
     // values here.
     if (lhs.pos != rhs.pos) {
-        if (!lhs.pos)
-            return true;
-        if (!rhs.pos)
-            return false;
-        if (*lhs.pos != *rhs.pos)
-            return *lhs.pos < *rhs.pos;
+        if (auto cmp = bool{lhs.pos} <=> bool{rhs.pos}; cmp != 0)
+            return cmp;
+        if (auto cmp = *lhs.pos <=> *rhs.pos; cmp != 0)
+            return cmp;
     }
     // This formats a freshly formatted hint string and then throws it away, which
     // shouldn't be much of a problem because it only runs when pos is equal, and this function is
     // used for trace printing, which is infrequent.
-    return lhs.hint.str() < rhs.hint.str();
+    return lhs.hint.str() <=> rhs.hint.str();
 }
-inline bool operator> (const Trace& lhs, const Trace& rhs) { return rhs < lhs; }
-inline bool operator<=(const Trace& lhs, const Trace& rhs) { return !(lhs > rhs); }
-inline bool operator>=(const Trace& lhs, const Trace& rhs) { return !(lhs < rhs); }
 
 // print lines of code to the ostream, indicating the error column.
 void printCodeLines(std::ostream & out,
@@ -163,7 +161,7 @@ static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std
     return hasPos;
 }
 
-void printTrace(
+static void printTrace(
     std::ostream & output,
     const std::string_view & indent,
     size_t & count,
@@ -239,7 +237,10 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             break;
         }
         case Verbosity::lvlWarn: {
-            prefix = ANSI_WARNING "warning";
+            if (einfo.isFromExpr)
+                prefix = ANSI_WARNING "evaluation warning";
+            else
+                prefix = ANSI_WARNING "warning";
             break;
         }
         case Verbosity::lvlInfo: {
@@ -379,29 +380,39 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         // A consecutive sequence of stack traces that are all in `tracesSeen`.
         std::vector<Trace> skippedTraces;
         size_t count = 0;
+        bool truncate = false;
 
         for (const auto & trace : einfo.traces) {
             if (trace.hint.str().empty()) continue;
 
             if (!showTrace && count > 3) {
-                oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full trace)" ANSI_NORMAL << "\n";
-                break;
+                truncate = true;
             }
 
-            if (tracesSeen.count(trace)) {
-                skippedTraces.push_back(trace);
-                continue;
+            if (!truncate || trace.print == TracePrint::Always) {
+
+                if (tracesSeen.count(trace)) {
+                    skippedTraces.push_back(trace);
+                    continue;
+                }
+
+                tracesSeen.insert(trace);
+
+                printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
+
+                count++;
+
+                printTrace(oss, ellipsisIndent, count, trace);
             }
-            tracesSeen.insert(trace);
-
-            printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
-
-            count++;
-
-            printTrace(oss, ellipsisIndent, count, trace);
         }
 
+
         printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
+
+        if (truncate) {
+            oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full, detailed trace)" ANSI_NORMAL << "\n";
+        }
+
         oss << "\n" << prefix;
     }
 
@@ -419,6 +430,38 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     out << indent(prefix, std::string(filterANSIEscapes(prefix, true).size(), ' '), chomp(oss.str()));
 
     return out;
+}
+
+/** Write to stderr in a robust and minimal way, considering that the process
+ * may be in a bad state.
+ */
+static void writeErr(std::string_view buf)
+{
+    while (!buf.empty()) {
+        auto n = write(STDERR_FILENO, buf.data(), buf.size());
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            abort();
+        }
+        buf = buf.substr(n);
+    }
+}
+
+void panic(std::string_view msg)
+{
+    writeErr("\n\n" ANSI_RED "terminating due to unexpected unrecoverable internal error: " ANSI_NORMAL );
+    writeErr(msg);
+    writeErr("\n");
+    abort();
+}
+
+void panic(const char * file, int line, const char * func)
+{
+    char buf[512];
+    int n = snprintf(buf, sizeof(buf), "Unexpected condition in %s at %s:%d", func, file, line);
+    if (n < 0)
+        panic("Unexpected condition and could not format error message");
+    panic(std::string_view(buf, std::min(static_cast<int>(sizeof(buf)), n)));
 }
 
 }

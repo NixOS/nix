@@ -1,19 +1,22 @@
 #include "globals.hh"
+#include "config-global.hh"
 #include "current-process.hh"
 #include "archive.hh"
 #include "args.hh"
-#include "users.hh"
 #include "abstract-setting-to-json.hh"
 #include "compute-levels.hh"
+#include "signals.hh"
 
 #include <algorithm>
 #include <map>
 #include <mutex>
 #include <thread>
-#include <dlfcn.h>
-#include <sys/utsname.h>
 
 #include <nlohmann/json.hpp>
+
+#ifndef _WIN32
+# include <sys/utsname.h>
+#endif
 
 #ifdef __GLIBC__
 # include <gnu/lib-names.h>
@@ -31,6 +34,8 @@
 #include <sys/sysctl.h>
 #endif
 
+#include "strings.hh"
+
 namespace nix {
 
 
@@ -47,7 +52,13 @@ static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
     : nixPrefix(NIX_PREFIX)
-    , nixStore(canonPath(getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR))))
+    , nixStore(
+#ifndef _WIN32
+        // On Windows `/nix/store` is not a canonical path, but we dont'
+        // want to deal with that yet.
+        canonPath
+#endif
+        (getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR))))
     , nixDataDir(canonPath(getEnvNonEmpty("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
     , nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
     , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
@@ -57,7 +68,9 @@ Settings::Settings()
     , nixManDir(canonPath(NIX_MAN_DIR))
     , nixDaemonSocketFile(canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
-    buildUsersGroup = getuid() == 0 ? "nixbld" : "";
+#ifndef _WIN32
+    buildUsersGroup = isRootUser() ? "nixbld" : "";
+#endif
     allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
 
     auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
@@ -70,7 +83,7 @@ Settings::Settings()
         Strings ss;
         for (auto & p : tokenizeString<Strings>(*s, ":"))
             ss.push_back("@" + p);
-        builders = concatStringsSep(" ", ss);
+        builders = concatStringsSep("\n", ss);
     }
 
 #if defined(__linux__) && defined(SANDBOX_SHELL)
@@ -112,12 +125,12 @@ Settings::Settings()
     };
 }
 
-void loadConfFile()
+void loadConfFile(AbstractConfig & config)
 {
     auto applyConfigFile = [&](const Path & path) {
         try {
             std::string contents = readFile(path);
-            globalConfig.applyConfig(contents, path);
+            config.applyConfig(contents, path);
         } catch (SystemError &) { }
     };
 
@@ -125,7 +138,7 @@ void loadConfFile()
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
-    globalConfig.resetOverridden();
+    config.resetOverridden();
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
@@ -134,7 +147,7 @@ void loadConfFile()
 
     auto nixConfEnv = getEnv("NIX_CONFIG");
     if (nixConfEnv.has_value()) {
-        globalConfig.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
+        config.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
     }
 
 }
@@ -240,11 +253,15 @@ StringSet Settings::getDefaultExtraPlatforms()
 
 bool Settings::isWSL1()
 {
+#if __linux__
     struct utsname utsbuf;
     uname(&utsbuf);
     // WSL1 uses -Microsoft suffix
     // WSL2 uses -microsoft-standard suffix
     return hasSuffix(utsbuf.release, "-Microsoft");
+#else
+    return false;
+#endif
 }
 
 Path Settings::getDefaultSSLCertFile()
@@ -280,25 +297,28 @@ template<> std::string BaseSetting<SandboxMode>::to_string() const
     if (value == smEnabled) return "true";
     else if (value == smRelaxed) return "relaxed";
     else if (value == smDisabled) return "false";
-    else abort();
+    else unreachable();
 }
 
 template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({
         .longName = name,
+        .aliases = aliases,
         .description = "Enable sandboxing.",
         .category = category,
         .handler = {[this]() { override(smEnabled); }}
     });
     args.addFlag({
         .longName = "no-" + name,
+        .aliases = aliases,
         .description = "Disable sandboxing.",
         .category = category,
         .handler = {[this]() { override(smDisabled); }}
     });
     args.addFlag({
         .longName = "relaxed-" + name,
+        .aliases = aliases,
         .description = "Enable sandboxing, but allow builds to disable it.",
         .category = category,
         .handler = {[this]() { override(smRelaxed); }}
@@ -316,47 +336,6 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
     }
 }
 
-
-Paths PluginFilesSetting::parse(const std::string & str) const
-{
-    if (pluginsLoaded)
-        throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
-    return BaseSetting<Paths>::parse(str);
-}
-
-
-void initPlugins()
-{
-    assert(!settings.pluginFiles.pluginsLoaded);
-    for (const auto & pluginFile : settings.pluginFiles.get()) {
-        Paths pluginFiles;
-        try {
-            auto ents = readDirectory(pluginFile);
-            for (const auto & ent : ents)
-                pluginFiles.emplace_back(pluginFile + "/" + ent.name);
-        } catch (SysError & e) {
-            if (e.errNo != ENOTDIR)
-                throw;
-            pluginFiles.emplace_back(pluginFile);
-        }
-        for (const auto & file : pluginFiles) {
-            /* handle is purposefully leaked as there may be state in the
-               DSO needed by the action of the plugin. */
-            void *handle =
-                dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
-            if (!handle)
-                throw Error("could not dynamically open plugin file '%s': %s", file, dlerror());
-        }
-    }
-
-    /* Since plugins can add settings, try to re-apply previously
-       unknown settings. */
-    globalConfig.reapplyUnknownSettings();
-    globalConfig.warnUnknownSettings();
-
-    /* Tell the user if they try to set plugin-files after we've already loaded */
-    settings.pluginFiles.pluginsLoaded = true;
-}
 
 static void preloadNSS()
 {
@@ -403,11 +382,13 @@ void assertLibStoreInitialized() {
     };
 }
 
-void initLibStore() {
+void initLibStore(bool loadConfig) {
+    if (initLibStoreDone) return;
 
     initLibUtil();
 
-    loadConfFile();
+    if (loadConfig)
+        loadConfFile(globalConfig);
 
     preloadNSS();
 
@@ -415,7 +396,7 @@ void initLibStore() {
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */
 #if __APPLE__
-    if (hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
+    if (hasPrefix(defaultTempDir(), "/var/folders/"))
         unsetenv("TMPDIR");
 #endif
 

@@ -6,13 +6,19 @@ R""(
   reference:
 
   ```console
-  # nix profile upgrade '.*'
+  # nix profile upgrade --all
   ```
 
 * Upgrade a specific package by name:
 
   ```console
   # nix profile upgrade hello
+  ```
+
+* Upgrade all packages that include 'vim' in their name:
+
+  ```console
+  # nix profile upgrade --regex '.*vim.*'
   ```
 
 # Description

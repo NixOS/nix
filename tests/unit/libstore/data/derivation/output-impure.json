@@ -1,4 +1,5 @@
 {
-  "hashAlgo": "r:sha256",
-  "impure": true
+  "hashAlgo": "sha256",
+  "impure": true,
+  "method": "nar"
 }

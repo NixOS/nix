@@ -119,18 +119,18 @@ protected:
  */
 struct FdSink : BufferedSink
 {
-    int fd;
+    Descriptor fd;
     size_t written = 0;
 
-    FdSink() : fd(-1) { }
-    FdSink(int fd) : fd(fd) { }
+    FdSink() : fd(INVALID_DESCRIPTOR) { }
+    FdSink(Descriptor fd) : fd(fd) { }
     FdSink(FdSink&&) = default;
 
     FdSink & operator=(FdSink && s)
     {
         flush();
         fd = s.fd;
-        s.fd = -1;
+        s.fd = INVALID_DESCRIPTOR;
         written = s.written;
         return *this;
     }
@@ -151,21 +151,15 @@ private:
  */
 struct FdSource : BufferedSource
 {
-    int fd;
+    Descriptor fd;
     size_t read = 0;
     BackedStringView endOfFileError{"unexpected end-of-file"};
 
-    FdSource() : fd(-1) { }
-    FdSource(int fd) : fd(fd) { }
+    FdSource() : fd(INVALID_DESCRIPTOR) { }
+    FdSource(Descriptor fd) : fd(fd) { }
     FdSource(FdSource &&) = default;
 
-    FdSource & operator=(FdSource && s)
-    {
-        fd = s.fd;
-        s.fd = -1;
-        read = s.read;
-        return *this;
-    }
+    FdSource & operator=(FdSource && s) = default;
 
     bool good() override;
 protected:
@@ -210,7 +204,7 @@ struct TeeSink : Sink
 {
     Sink & sink1, & sink2;
     TeeSink(Sink & sink1, Sink & sink2) : sink1(sink1), sink2(sink2) { }
-    virtual void operator () (std::string_view data)
+    virtual void operator () (std::string_view data) override
     {
         sink1(data);
         sink2(data);
@@ -227,7 +221,7 @@ struct TeeSource : Source
     Sink & sink;
     TeeSource(Source & orig, Sink & sink)
         : orig(orig), sink(sink) { }
-    size_t read(char * data, size_t len)
+    size_t read(char * data, size_t len) override
     {
         size_t n = orig.read(data, len);
         sink({data, n});
@@ -244,7 +238,7 @@ struct SizedSource : Source
     size_t remain;
     SizedSource(Source & orig, size_t size)
         : orig(orig), remain(size) { }
-    size_t read(char * data, size_t len)
+    size_t read(char * data, size_t len) override
     {
         if (this->remain <= 0) {
             throw EndOfFile("sized: unexpected end-of-file");
@@ -280,6 +274,26 @@ struct LengthSink : Sink
     void operator () (std::string_view data) override
     {
         length += data.size();
+    }
+};
+
+/**
+ * A wrapper source that counts the number of bytes read from it.
+ */
+struct LengthSource : Source
+{
+    Source & next;
+
+    LengthSource(Source & next) : next(next)
+    { }
+
+    uint64_t total = 0;
+
+    size_t read(char * data, size_t len) override
+    {
+        auto n = next.read(data, len);
+        total += n;
+        return n;
     }
 };
 
@@ -469,13 +483,17 @@ struct FramedSource : Source
 
     ~FramedSource()
     {
-        if (!eof) {
-            while (true) {
-                auto n = readInt(from);
-                if (!n) break;
-                std::vector<char> data(n);
-                from(data.data(), n);
+        try {
+            if (!eof) {
+                while (true) {
+                    auto n = readInt(from);
+                    if (!n) break;
+                    std::vector<char> data(n);
+                    from(data.data(), n);
+                }
             }
+        } catch (...) {
+            ignoreException();
         }
     }
 

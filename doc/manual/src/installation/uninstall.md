@@ -1,16 +1,8 @@
 # Uninstalling Nix
 
-## Single User
-
-If you have a [single-user installation](./installing-binary.md#single-user-installation) of Nix, uninstall it by running:
-
-```console
-$ rm -rf /nix
-```
-
 ## Multi User
 
-Removing a [multi-user installation](./installing-binary.md#multi-user-installation) of Nix is more involved, and depends on the operating system.
+Removing a [multi-user installation](./installing-binary.md#multi-user-installation) depends on the operating system.
 
 ### Linux
 
@@ -51,7 +43,15 @@ which you may remove.
 
 ### macOS
 
-1. Edit `/etc/zshrc`, `/etc/bashrc`, and `/etc/bash.bashrc` to remove the lines sourcing `nix-daemon.sh`, which should look like this:
+1. If system-wide shell initialisation files haven't been altered since installing Nix, use the backups made by the installer:
+
+   ```console
+   sudo mv /etc/zshrc.backup-before-nix /etc/zshrc
+   sudo mv /etc/bashrc.backup-before-nix /etc/bashrc
+   sudo mv /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc
+   ```
+
+   Otherwise, edit `/etc/zshrc`, `/etc/bashrc`, and `/etc/bash.bashrc` to remove the lines sourcing `nix-daemon.sh`, which should look like this:
 
    ```bash
    # Nix
@@ -60,18 +60,6 @@ which you may remove.
    fi
    # End Nix
    ```
-
-   If these files haven't been altered since installing Nix you can simply put
-   the backups back in place:
-
-   ```console
-   sudo mv /etc/zshrc.backup-before-nix /etc/zshrc
-   sudo mv /etc/bashrc.backup-before-nix /etc/bashrc
-   sudo mv /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc
-   ```
-
-   This will stop shells from sourcing the file and bringing everything you
-   installed using Nix in scope.
 
 2. Stop and remove the Nix daemon services:
 
@@ -82,8 +70,7 @@ which you may remove.
    sudo rm /Library/LaunchDaemons/org.nixos.darwin-store.plist
    ```
 
-   This stops the Nix daemon and prevents it from being started next time you
-   boot the system.
+   This stops the Nix daemon and prevents it from being started next time you boot the system.
 
 3. Remove the `nixbld` group and the `_nixbuildN` users:
 
@@ -94,25 +81,42 @@ which you may remove.
 
    This will remove all the build users that no longer serve a purpose.
 
-4. Edit fstab using `sudo vifs` to remove the line mounting the Nix Store
-   volume on `/nix`, which looks like
-   `UUID=<uuid> /nix apfs rw,noauto,nobrowse,suid,owners` or
-   `LABEL=Nix\040Store /nix apfs rw,nobrowse`. This will prevent automatic
-   mounting of the Nix Store volume.
+4. Edit fstab using `sudo vifs` to remove the line mounting the Nix Store volume on `/nix`, which looks like
 
-5. Edit `/etc/synthetic.conf` to remove the `nix` line. If this is the only
-   line in the file you can remove it entirely, `sudo rm /etc/synthetic.conf`.
-   This will prevent the creation of the empty `/nix` directory to provide a
-   mountpoint for the Nix Store volume.
+   ```
+   UUID=<uuid> /nix apfs rw,noauto,nobrowse,suid,owners
+   ```
+   or
 
-6. Remove the files Nix added to your system:
+   ```
+   LABEL=Nix\040Store /nix apfs rw,nobrowse
+   ```
+
+   by setting the cursor on the respective line using the error keys, and pressing `dd`, and then `:wq` to save the file.
+
+   This will prevent automatic mounting of the Nix Store volume.
+
+5. Edit `/etc/synthetic.conf` to remove the `nix` line.
+   If this is the only line in the file you can remove it entirely:
+
+   ```bash
+   if [ -f /etc/synthetic.conf ]; then
+     if [ "$(cat /etc/synthetic.conf)" = "nix" ]; then
+       sudo rm /etc/synthetic.conf
+     else
+       sudo vi /etc/synthetic.conf
+     fi
+   fi
+   ```
+
+   This will prevent the creation of the empty `/nix` directory.
+
+6. Remove the files Nix added to your system, except for the store:
 
    ```console
    sudo rm -rf /etc/nix /var/root/.nix-profile /var/root/.nix-defexpr /var/root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
    ```
 
-   This gets rid of any data Nix may have created except for the store which is
-   removed next.
 
 7. Remove the Nix Store volume:
 
@@ -120,29 +124,32 @@ which you may remove.
    sudo diskutil apfs deleteVolume /nix
    ```
 
-   This will remove the Nix Store volume and everything that was added to the
-   store.
+   This will remove the Nix Store volume and everything that was added to the store.
 
-   If the output indicates that the command couldn't remove the volume, you should
-   make sure you don't have an _unmounted_ Nix Store volume. Look for a
-   "Nix Store" volume in the output of the following command:
+   If the output indicates that the command couldn't remove the volume, you should make sure you don't have an _unmounted_ Nix Store volume.
+   Look for a "Nix Store" volume in the output of the following command:
 
    ```console
    diskutil list
    ```
 
-   If you _do_ see a "Nix Store" volume, delete it by re-running the diskutil
-   deleteVolume command, but replace `/nix` with the store volume's `diskXsY`
-   identifier.
+   If you _do_ find a "Nix Store" volume, delete it by running `diskutil deleteVolume` with the store volume's `diskXsY` identifier.
 
 > **Note**
 >
-> After you complete the steps here, you will still have an empty `/nix`
-> directory. This is an expected sign of a successful uninstall. The empty
-> `/nix` directory will disappear the next time you reboot.
+> After you complete the steps here, you will still have an empty `/nix` directory.
+> This is an expected sign of a successful uninstall.
+> The empty `/nix` directory will disappear the next time you reboot.
 >
-> You do not have to reboot to finish uninstalling Nix. The uninstall is
-> complete. macOS (Catalina+) directly controls root directories and its
-> read-only root will prevent you from manually deleting the empty `/nix`
-> mountpoint.
+> You do not have to reboot to finish uninstalling Nix.
+> The uninstall is complete.
+> macOS (Catalina+) directly controls root directories, and its read-only root will prevent you from manually deleting the empty `/nix` mountpoint.
 
+## Single User
+
+To remove a [single-user installation](./installing-binary.md#single-user-installation) of Nix, run:
+
+```console
+$ rm -rf /nix ~/.nix-channels ~/.nix-defexpr ~/.nix-profile
+```
+You might also want to manually remove references to Nix from your `~/.profile`.

@@ -1,4 +1,8 @@
+#!/usr/bin/env bash
+
 source common.sh
+
+TODO_NixOS # can't enable a sandbox feature easily
 
 enableFeatures 'recursive-nix'
 restartDaemon

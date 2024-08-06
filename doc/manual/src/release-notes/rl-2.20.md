@@ -200,3 +200,9 @@
   while performing various operations (including `nix develop`, `nix flake
   update`, and so on). With several fixes to Nix's signal handlers, Nix
   commands will now exit quickly after Ctrl-C is pressed.
+
+- `nix copy` to a `ssh-ng` store now needs `--substitute-on-destination` (a.k.a. `-s`)
+  in order to substitute paths on the remote store instead of copying them.
+  The behavior is consistent with `nix copy` to a different kind of remote store.
+  Previously this behavior was controlled by the
+  `builders-use-substitutes` setting and `--substitute-on-destination` was ignored.

@@ -1,13 +1,20 @@
 #include <fcntl.h>
 
-#include "config.hh"
+#include "error.hh"
+#include "config-global.hh"
 #include "fs-sink.hh"
+
+#if _WIN32
+# include <fileapi.h>
+# include "file-path.hh"
+# include "windows-error.hh"
+#endif
 
 namespace nix {
 
 void copyRecursive(
     SourceAccessor & accessor, const CanonPath & from,
-    FileSystemObjectSink & sink, const Path & to)
+    FileSystemObjectSink & sink, const CanonPath & to)
 {
     auto stat = accessor.lstat(from);
 
@@ -36,7 +43,7 @@ void copyRecursive(
         for (auto & [name, _] : accessor.readDirectory(from)) {
             copyRecursive(
                 accessor, from / name,
-                sink, to + "/" + name);
+                sink, to / name);
             break;
         }
         break;
@@ -46,7 +53,7 @@ void copyRecursive(
         throw Error("file '%1%' has an unsupported type", from);
 
     default:
-        abort();
+        unreachable();
     }
 }
 
@@ -62,11 +69,9 @@ static RestoreSinkSettings restoreSinkSettings;
 static GlobalConfig::Register r1(&restoreSinkSettings);
 
 
-void RestoreSink::createDirectory(const Path & path)
+void RestoreSink::createDirectory(const CanonPath & path)
 {
-    Path p = dstPath + path;
-    if (mkdir(p.c_str(), 0777) == -1)
-        throw SysError("creating directory '%1%'", p);
+    std::filesystem::create_directory(dstPath / path.rel());
 };
 
 struct RestoreRegularFile : CreateRegularFileSink {
@@ -77,22 +82,41 @@ struct RestoreRegularFile : CreateRegularFileSink {
     void preallocateContents(uint64_t size) override;
 };
 
-void RestoreSink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
+static std::filesystem::path append(const std::filesystem::path & src, const CanonPath & path)
 {
-    Path p = dstPath + path;
+    auto dst = src;
+    if (!path.rel().empty())
+        dst /= path.rel();
+    return dst;
+}
+
+void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
+{
+    auto p = append(dstPath, path);
+
     RestoreRegularFile crf;
-    crf.fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
-    if (!crf.fd) throw SysError("creating file '%1%'", p);
+    crf.fd =
+#ifdef _WIN32
+        CreateFileW(p.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)
+#else
+        open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666)
+#endif
+        ;
+    if (!crf.fd) throw NativeSysError("creating file '%1%'", p);
     func(crf);
 }
 
 void RestoreRegularFile::isExecutable()
 {
+    // Windows doesn't have a notion of executable file permissions we
+    // care about here, right?
+#ifndef _WIN32
     struct stat st;
     if (fstat(fd.get(), &st) == -1)
         throw SysError("fstat");
     if (fchmod(fd.get(), st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
         throw SysError("fchmod");
+#endif
 }
 
 void RestoreRegularFile::preallocateContents(uint64_t len)
@@ -118,14 +142,14 @@ void RestoreRegularFile::operator () (std::string_view data)
     writeFull(fd.get(), data);
 }
 
-void RestoreSink::createSymlink(const Path & path, const std::string & target)
+void RestoreSink::createSymlink(const CanonPath & path, const std::string & target)
 {
-    Path p = dstPath + path;
-    nix::createSymlink(target, p);
+    auto p = append(dstPath, path);
+    nix::createSymlink(target, p.string());
 }
 
 
-void RegularFileSink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
+void RegularFileSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
     struct CRF : CreateRegularFileSink {
         RegularFileSink & back;
@@ -140,7 +164,7 @@ void RegularFileSink::createRegularFile(const Path & path, std::function<void(Cr
 }
 
 
-void NullFileSystemObjectSink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
+void NullFileSystemObjectSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
     struct : CreateRegularFileSink {
         void operator () (std::string_view data) override {}

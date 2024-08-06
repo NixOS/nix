@@ -8,7 +8,6 @@
 
 namespace nix {
 
-namespace {
 /**
  * A helper for writing `boost::format` expressions.
  *
@@ -35,13 +34,12 @@ inline void formatHelper(F & f, const T & x, const Args & ... args)
 /**
  * Set the correct exceptions for `fmt`.
  */
-void setExceptions(boost::format & fmt)
+inline void setExceptions(boost::format & fmt)
 {
     fmt.exceptions(
         boost::io::all_error_bits ^
         boost::io::too_many_args_bit ^
         boost::io::too_few_args_bit);
-}
 }
 
 /**
@@ -113,6 +111,8 @@ std::ostream & operator<<(std::ostream & out, const Magenta<T> & y)
 /**
  * Values wrapped in this class are printed without coloring.
  *
+ * Specifically, the color is reset to normal before printing the value.
+ *
  * By default, arguments to `HintFmt` are printed in magenta (see `Magenta`).
  */
 template <class T>
@@ -145,6 +145,10 @@ public:
     HintFmt(const std::string & literal)
         : HintFmt("%s", Uncolored(literal))
     { }
+
+    static HintFmt fromFormatString(const std::string & format) {
+        return HintFmt(boost::format(format));
+    }
 
     /**
      * Interpolate the given arguments into the format string.
@@ -179,6 +183,8 @@ public:
         fmt % value.value;
         return *this;
     }
+
+    HintFmt & operator=(HintFmt const & rhs) = default;
 
     std::string str() const
     {

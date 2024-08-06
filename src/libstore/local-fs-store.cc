@@ -8,6 +8,20 @@
 
 namespace nix {
 
+LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
+    : StoreConfig(params)
+    // Default `?root` from `rootDir` if non set
+    // FIXME don't duplicate description once we don't have root setting
+    , rootDir{
+        this,
+        !rootDir.empty() && params.count("root") == 0
+            ? (std::optional<Path>{rootDir})
+            : std::nullopt,
+        "root",
+        "Directory prefixed to all other paths."}
+{
+}
+
 LocalFSStore::LocalFSStore(const Params & params)
     : Store(params)
 {
@@ -33,6 +47,10 @@ struct LocalStoreAccessor : PosixSourceAccessor
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
+        /* Handle the case where `path` is (a parent of) the store. */
+        if (isDirOrInDir(store->storeDir, path.abs()))
+            return Stat{ .type = tDirectory };
+
         return PosixSourceAccessor::maybeLstat(toRealPath(path));
     }
 

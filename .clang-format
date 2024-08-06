@@ -15,7 +15,7 @@ SpaceAfterCStyleCast: true
 SpaceAfterTemplateKeyword: false
 AccessModifierOffset: -4
 AlignAfterOpenBracket: AlwaysBreak
-AlignEscapedNewlines: DontAlign
+AlignEscapedNewlines: Left
 ColumnLimit: 120
 BreakStringLiterals: false
 BitFieldColonSpacing: None
@@ -28,3 +28,6 @@ EmptyLineBeforeAccessModifier: Leave
 #PackConstructorInitializers: BinPack
 BreakBeforeBinaryOperators: NonAssignment
 AlwaysBreakBeforeMultilineStrings: true
+IndentPPDirectives: AfterHash
+PPIndentWidth: 2
+BinPackArguments: false

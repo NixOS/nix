@@ -1,10 +1,16 @@
+# shellcheck shell=bash
+
 set -eu -o pipefail
 
 if [[ -z "${COMMON_SH_SOURCED-}" ]]; then
 
 COMMON_SH_SOURCED=1
 
-source "$(readlink -f "$(dirname "${BASH_SOURCE[0]-$0}")")/common/vars-and-functions.sh"
+functionalTestsDir="$(readlink -f "$(dirname "${BASH_SOURCE[0]-$0}")")"
+
+source "$functionalTestsDir/common/vars-and-functions.sh"
+source "$functionalTestsDir/common/init.sh"
+
 if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
     startDaemon
 fi

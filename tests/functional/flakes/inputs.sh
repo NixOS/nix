@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source ./common.sh
 
 requireGit
@@ -6,12 +8,12 @@ requireGit
 test_subdir_self_path() {
     baseDir=$TEST_ROOT/$RANDOM
     flakeDir=$baseDir/b-low
-    mkdir -p $flakeDir
-    writeSimpleFlake $baseDir
-    writeSimpleFlake $flakeDir
+    mkdir -p "$flakeDir"
+    writeSimpleFlake "$baseDir"
+    writeSimpleFlake "$flakeDir"
 
-    echo all good > $flakeDir/message
-    cat > $flakeDir/flake.nix <<EOF
+    echo all good > "$flakeDir/message"
+    cat > "$flakeDir"/flake.nix <<EOF
 {
   outputs = inputs: rec {
     packages.$system = rec {
@@ -24,7 +26,7 @@ test_subdir_self_path() {
 }
 EOF
     (
-        nix build $baseDir?dir=b-low --no-link
+        nix build "$baseDir"?dir=b-low --no-link
     )
 }
 test_subdir_self_path
@@ -32,14 +34,14 @@ test_subdir_self_path
 
 test_git_subdir_self_path() {
     repoDir=$TEST_ROOT/repo-$RANDOM
-    createGitRepo $repoDir
+    createGitRepo "$repoDir"
     flakeDir=$repoDir/b-low
-    mkdir -p $flakeDir
-    writeSimpleFlake $repoDir
-    writeSimpleFlake $flakeDir
+    mkdir -p "$flakeDir"
+    writeSimpleFlake "$repoDir"
+    writeSimpleFlake "$flakeDir"
 
-    echo all good > $flakeDir/message
-    cat > $flakeDir/flake.nix <<EOF
+    echo all good > "$flakeDir/message"
+    cat > "$flakeDir"/flake.nix <<EOF
 {
   outputs = inputs: rec {
     packages.$system = rec {
@@ -53,15 +55,15 @@ test_git_subdir_self_path() {
 }
 EOF
     (
-        cd $flakeDir
+        cd "$flakeDir"
         git add .
         git commit -m init
         # nix build
     )
 
     clientDir=$TEST_ROOT/client-$RANDOM
-    mkdir -p $clientDir
-    cat > $clientDir/flake.nix <<EOF
+    mkdir -p "$clientDir"
+    cat > "$clientDir"/flake.nix <<EOF
 {
   inputs.inp = {
     type = "git";
@@ -74,7 +76,7 @@ EOF
   };
 }
 EOF
-    nix build $clientDir --no-link
+    nix build "$clientDir" --no-link
 
 }
 test_git_subdir_self_path

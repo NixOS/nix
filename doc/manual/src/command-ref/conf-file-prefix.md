@@ -66,5 +66,12 @@ Configuration options can be set on the command line, overriding the values set 
 
 The `extra-` prefix is supported for settings that take a list of items (e.g. `--extra-trusted users alice` or `--option extra-trusted-users alice`).
 
+## Integer settings
+
+Settings that have an integer type support the suffixes `K`, `M`, `G`
+and `T`. These cause the specified value to be multiplied by 2^10,
+2^20, 2^30 and 2^40, respectively. For instance, `--min-free 1M` is
+equivalent to `--min-free 1048576`.
+
 # Available settings
 

@@ -1,4 +1,5 @@
 #include "profiles.hh"
+#include "signals.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "users.hh"
@@ -34,12 +35,13 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
 {
     Generations gens;
 
-    Path profileDir = dirOf(profile);
+    std::filesystem::path profileDir = dirOf(profile);
     auto profileName = std::string(baseNameOf(profile));
 
-    for (auto & i : readDirectory(profileDir)) {
-        if (auto n = parseName(profileName, i.name)) {
-            auto path = profileDir + "/" + i.name;
+    for (auto & i : std::filesystem::directory_iterator{profileDir}) {
+        checkInterrupt();
+        if (auto n = parseName(profileName, i.path().filename().string())) {
+            auto path = i.path().string();
             gens.push_back({
                 .number = *n,
                 .path = path,
@@ -308,7 +310,7 @@ std::string optimisticLockProfile(const Path & profile)
 Path profilesDir()
 {
     auto profileRoot =
-        (getuid() == 0)
+        isRootUser()
         ? rootProfilesDir()
         : createNixStateDir() + "/profiles";
     createDirs(profileRoot);
@@ -332,11 +334,13 @@ Path getDefaultProfile()
         // Backwards compatibiliy measure: Make root's profile available as
         // `.../default` as it's what NixOS and most of the init scripts expect
         Path globalProfileLink = settings.nixStateDir + "/profiles/default";
-        if (getuid() == 0 && !pathExists(globalProfileLink)) {
+        if (isRootUser() && !pathExists(globalProfileLink)) {
             replaceSymlink(profile, globalProfileLink);
         }
         return absPath(readLink(profileLink), dirOf(profileLink));
     } catch (Error &) {
+        return profileLink;
+    } catch (std::filesystem::filesystem_error &) {
         return profileLink;
     }
 }

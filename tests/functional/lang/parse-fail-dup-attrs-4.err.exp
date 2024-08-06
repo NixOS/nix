@@ -3,3 +3,4 @@ error: attribute 'services.ssh.port' already defined at «stdin»:2:3
             2|   services.ssh.port = 22;
             3|   services.ssh.port = 23;
              |   ^
+            4| }

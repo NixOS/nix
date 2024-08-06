@@ -8,7 +8,7 @@ namespace nix {
 
 /* Very hacky way to parse $NIX_PATH, which is colon-separated, but
    can contain URLs (e.g. "nixpkgs=https://bla...:foo=https://"). */
-static Strings parseNixPath(const std::string & s)
+Strings EvalSettings::parseNixPath(const std::string & s)
 {
     Strings res;
 
@@ -44,10 +44,13 @@ static Strings parseNixPath(const std::string & s)
     return res;
 }
 
-EvalSettings::EvalSettings()
+EvalSettings::EvalSettings(bool & readOnlyMode, EvalSettings::LookupPathHooks lookupPathHooks)
+    : readOnlyMode{readOnlyMode}
+    , lookupPathHooks{lookupPathHooks}
 {
-    auto var = getEnv("NIX_PATH");
-    if (var) nixPath = parseNixPath(*var);
+    auto var = getEnv("NIX_ABORT_ON_WARN");
+    if (var && (var == "1" || var == "yes" || var == "true"))
+        builtinsAbortOnWarn = true;
 }
 
 Strings EvalSettings::getDefaultNixPath()
@@ -63,11 +66,9 @@ Strings EvalSettings::getDefaultNixPath()
         }
     };
 
-    if (!evalSettings.restrictEval && !evalSettings.pureEval) {
-        add(getNixDefExpr() + "/channels");
-        add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
-        add(rootChannelsDir());
-    }
+    add(getNixDefExpr() + "/channels");
+    add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
+    add(rootChannelsDir());
 
     return res;
 }
@@ -89,15 +90,11 @@ std::string EvalSettings::resolvePseudoUrl(std::string_view url)
         return std::string(url);
 }
 
-const std::string & EvalSettings::getCurrentSystem()
+const std::string & EvalSettings::getCurrentSystem() const
 {
     const auto & evalSystem = currentSystem.get();
     return evalSystem != "" ? evalSystem : settings.thisSystem.get();
 }
-
-EvalSettings evalSettings;
-
-static GlobalConfig::Register rEvalSettings(&evalSettings);
 
 Path getNixDefExpr()
 {

@@ -9,6 +9,29 @@
 namespace nix {
 
 /**
+ * How errors should be handled when printing values.
+ */
+enum class ErrorPrintBehavior {
+    /**
+     * Print the first line of the error in brackets: `«error: oh no!»`
+     */
+    Print,
+    /**
+     * Throw the error to the code that attempted to print the value, instead
+     * of suppressing it it.
+     */
+    Throw,
+    /**
+     * Only throw the error if encountered at the top level of the expression.
+     *
+     * This will cause expressions like `builtins.throw "uh oh!"` to throw
+     * errors, but will print attribute sets and other nested structures
+     * containing values that error (like `nixpkgs`) normally.
+     */
+    ThrowTopLevel,
+};
+
+/**
  * Options for printing Nix values.
  */
 struct PrintOptions
@@ -69,6 +92,11 @@ struct PrintOptions
     size_t prettyIndent = 0;
 
     /**
+     * How to handle errors encountered while printing values.
+     */
+    ErrorPrintBehavior errors = ErrorPrintBehavior::Print;
+
+    /**
      * True if pretty-printing is enabled.
      */
     inline bool shouldPrettyPrint()
@@ -86,7 +114,7 @@ static PrintOptions errorPrintOptions = PrintOptions {
     .maxDepth = 10,
     .maxAttrs = 10,
     .maxListItems = 10,
-    .maxStringLength = 1024
+    .maxStringLength = 1024,
 };
 
 }
