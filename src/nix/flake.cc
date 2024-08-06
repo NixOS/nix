@@ -1263,8 +1263,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             attrPath.size() >= 1 && attrPathS[0] == "hydraJobs" ? "derivation" :
                             "package";
                         if (description && !description->empty()) {
+                            // Maximum length to print
+                            size_t maxLength = getWindowSize().second;
+                            if (maxLength == 0)
+                                maxLength = 77;
                             // Trim the string and only display the first line of the description.
-                            const size_t maxLength = 77;
                             auto trimmed = nix::trim(*description);
                             auto newLinePos = trimmed.find('\n');
                             auto length = newLinePos != std::string::npos ? newLinePos : trimmed.length();
