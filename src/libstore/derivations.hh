@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "json-impls.hh"
 #include "path.hh"
 #include "types.hh"
 #include "hash.hh"
@@ -9,8 +10,11 @@
 #include "derived-path-map.hh"
 #include "sync.hh"
 #include "variant-wrapper.hh"
+#include <nlohmann/json.hpp>
+#include "derivation-options.hh"
 
 #include <map>
+#include <optional>
 #include <variant>
 
 namespace nix {
@@ -297,6 +301,8 @@ struct BasicDerivation
     StringPairs env;
     std::string name;
 
+    DerivationOptions options;
+
     BasicDerivation() = default;
     virtual ~BasicDerivation() { };
 
@@ -370,6 +376,16 @@ struct Derivation : BasicDerivation
      * allow.
      */
     void checkInvariants(Store & store, const StorePath & drvPath) const;
+
+    StringSet getRequiredSystemFeatures() const;
+
+    bool canBuildLocally(Store & localStore) const;
+
+    bool willBuildLocally(Store & localStore) const;
+
+    bool substitutesAllowed() const;
+
+    bool useUidRange() const;
 
     Derivation() = default;
     Derivation(const BasicDerivation & bd) : BasicDerivation(bd) { }
@@ -519,3 +535,6 @@ std::string hashPlaceholder(const OutputNameView outputName);
 extern const Hash impureOutputHash;
 
 }
+
+JSON_IMPL(DerivationOptions);
+JSON_IMPL(DerivationOptions::OutputChecks);

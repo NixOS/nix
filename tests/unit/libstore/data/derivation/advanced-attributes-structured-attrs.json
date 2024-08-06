@@ -26,6 +26,59 @@
   },
   "inputSrcs": [],
   "name": "advanced-attributes-structured-attrs",
+  "options": {
+    "additionalSandboxProfile": "sandcastle",
+    "allowLocalNetworking": true,
+    "allowSubstitutes": false,
+    "allowedReferences": null,
+    "allowedRequisites": null,
+    "disallowedReferences": null,
+    "disallowedRequisites": null,
+    "ignoreSelfRefs": false,
+    "impureEnvVars": [
+      "UNICORN"
+    ],
+    "impureHostDeps": [
+      "/usr/bin/ditto"
+    ],
+    "noChroot": true,
+    "outputChecks": {
+      "bin": {
+        "allowedReferences": null,
+        "allowedRequisites": null,
+        "disallowedReferences": [
+          "/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"
+        ],
+        "disallowedRequisites": [
+          "/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"
+        ],
+        "ignoreSelfRefs": false
+      },
+      "dev": {
+        "allowedReferences": null,
+        "allowedRequisites": null,
+        "disallowedReferences": null,
+        "disallowedRequisites": null,
+        "ignoreSelfRefs": false
+      },
+      "out": {
+        "allowedReferences": [
+          "/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"
+        ],
+        "allowedRequisites": [
+          "/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"
+        ],
+        "disallowedReferences": null,
+        "disallowedRequisites": null,
+        "ignoreSelfRefs": false
+      }
+    },
+    "preferLocalBuild": true,
+    "requiredSystemFeatures": [
+      "rainbow",
+      "uid-range"
+    ]
+  },
   "outputs": {
     "bin": {
       "path": "/nix/store/pbzb48v0ycf80jgligcp4n8z0rblna4n-advanced-attributes-structured-attrs-bin"
