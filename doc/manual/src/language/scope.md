@@ -13,7 +13,7 @@ Implicit definitions are only created by [with-expressions](./syntax.md#with-exp
 
 Every expression is *enclosed* by a scope.
 The outermost expression is enclosed by the [built-in, global scope](./builtins.md), which contains only explicit definitions.
-The respective definition types *extend* their enclosing scope by adding new definitions, or replacing existing ones with the same name.
+The expressions listed above *extend* their enclosing scope by adding new definitions, or replacing existing ones with the same name.
 An explicit definition can replace a definition of any type; an implicit definition can only replace another implicit definition.
 
 Each of the above expressions defines which of its subexpressions are enclosed by the extended scope.

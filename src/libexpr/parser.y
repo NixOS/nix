@@ -1,4 +1,4 @@
-%glr-parser
+%define api.location.type { ::nix::ParserLocation }
 %define api.pure
 %locations
 %define parse.error verbose
@@ -8,8 +8,7 @@
 %parse-param { nix::ParserState * state }
 %lex-param { void * scanner }
 %lex-param { nix::ParserState * state }
-%expect 1
-%expect-rr 1
+%expect 0
 
 %code requires {
 
@@ -27,7 +26,17 @@
 #include "eval-settings.hh"
 #include "parser-state.hh"
 
-#define YYLTYPE ::nix::ParserLocation
+// Bison seems to have difficulty growing the parser stack when using C++ with
+// a custom location type. This undocumented macro tells Bison that our
+// location type is "trivially copyable" in C++-ese, so it is safe to use the
+// same memcpy macro it uses to grow the stack that it uses with its own
+// default location type. Without this, we get "error: memory exhausted" when
+// parsing some large Nix files. Our other options are to increase the initial
+// stack size (200 by default) to be as large as we ever want to support (so
+// that growing the stack is unnecessary), or redefine the stack-relocation
+// macro ourselves (which is also undocumented).
+#define YYLTYPE_IS_TRIVIAL 1
+
 #define YY_DECL int yylex \
     (YYSTYPE * yylval_param, YYLTYPE * yylloc_param, yyscan_t yyscanner, nix::ParserState * state)
 
@@ -77,7 +86,7 @@ YY_DECL;
 
 using namespace nix;
 
-#define CUR_POS state->at(*yylocp)
+#define CUR_POS state->at(yyloc)
 
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * error)
@@ -133,8 +142,8 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
 %type <e> expr_select expr_simple expr_app
 %type <e> expr_pipe_from expr_pipe_into
 %type <list> expr_list
-%type <attrs> binds
-%type <formals> formals
+%type <attrs> binds binds1
+%type <formals> formals formal_set
 %type <formal> formal
 %type <attrNames> attrpath
 %type <inheritAttrs> attrs
@@ -180,22 +189,22 @@ expr_function
       $$ = me;
       SET_DOC_POS(me, @1);
     }
-  | '{' formals '}' ':' expr_function
-    { auto me = new ExprLambda(CUR_POS, state->validateFormals($2), $5);
+  | formal_set ':' expr_function[body]
+    { auto me = new ExprLambda(CUR_POS, state->validateFormals($formal_set), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
-  | '{' formals '}' '@' ID ':' expr_function
+  | formal_set '@' ID ':' expr_function[body]
     {
-      auto arg = state->symbols.create($5);
-      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($2, CUR_POS, arg), $7);
+      auto arg = state->symbols.create($ID);
+      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formal_set, CUR_POS, arg), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
-  | ID '@' '{' formals '}' ':' expr_function
+  | ID '@' formal_set ':' expr_function[body]
     {
-      auto arg = state->symbols.create($1);
-      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($4, CUR_POS, arg), $7);
+      auto arg = state->symbols.create($ID);
+      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formal_set, CUR_POS, arg), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -311,11 +320,13 @@ expr_simple
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $3->recursive = true; $$ = new ExprSelect(noPos, $3, state->s.body); }
+    { $3->recursive = true; $3->pos = CUR_POS; $$ = new ExprSelect(noPos, $3, state->s.body); }
   | REC '{' binds '}'
-    { $3->recursive = true; $$ = $3; }
-  | '{' binds '}'
-    { $$ = $2; }
+    { $3->recursive = true; $3->pos = CUR_POS; $$ = $3; }
+  | '{' binds1 '}'
+    { $2->pos = CUR_POS; $$ = $2; }
+  | '{' '}'
+    { $$ = new ExprAttrs(CUR_POS); }
   | '[' expr_list ']' { $$ = $2; }
   ;
 
@@ -364,52 +375,50 @@ ind_string_parts
   ;
 
 binds
-  : binds attrpath '=' expr ';' {
-      $$ = $1;
+  : binds1
+  | { $$ = new ExprAttrs; }
+  ;
 
-      auto pos = state->at(@2);
-      auto exprPos = state->at(@4);
-      {
-        auto it = state->lexerState.positionToDocComment.find(pos);
-        if (it != state->lexerState.positionToDocComment.end()) {
-          $4->setDocComment(it->second);
-          state->lexerState.positionToDocComment.emplace(exprPos, it->second);
-        }
-      }
-
-      state->addAttr($$, std::move(*$2), $4, pos);
-      delete $2;
+binds1
+  : binds1[accum] attrpath '=' expr ';'
+    { $$ = $accum;
+      state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
+      delete $attrpath;
     }
-  | binds INHERIT attrs ';'
-    { $$ = $1;
-      for (auto & [i, iPos] : *$3) {
-          if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              state->dupAttr(i.symbol, iPos, $$->attrs[i.symbol].pos);
-          $$->attrs.emplace(
+  | binds[accum] INHERIT attrs ';'
+    { $$ = $accum;
+      for (auto & [i, iPos] : *$attrs) {
+          if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
+              state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
+          $accum->attrs.emplace(
               i.symbol,
               ExprAttrs::AttrDef(new ExprVar(iPos, i.symbol), iPos, ExprAttrs::AttrDef::Kind::Inherited));
       }
-      delete $3;
+      delete $attrs;
     }
-  | binds INHERIT '(' expr ')' attrs ';'
-    { $$ = $1;
-      if (!$$->inheritFromExprs)
-          $$->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
-      $$->inheritFromExprs->push_back($4);
-      auto from = new nix::ExprInheritFrom(state->at(@4), $$->inheritFromExprs->size() - 1);
-      for (auto & [i, iPos] : *$6) {
-          if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              state->dupAttr(i.symbol, iPos, $$->attrs[i.symbol].pos);
-          $$->attrs.emplace(
+  | binds[accum] INHERIT '(' expr ')' attrs ';'
+    { $$ = $accum;
+      if (!$accum->inheritFromExprs)
+          $accum->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
+      $accum->inheritFromExprs->push_back($expr);
+      auto from = new nix::ExprInheritFrom(state->at(@expr), $accum->inheritFromExprs->size() - 1);
+      for (auto & [i, iPos] : *$attrs) {
+          if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
+              state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
+          $accum->attrs.emplace(
               i.symbol,
               ExprAttrs::AttrDef(
                   new ExprSelect(iPos, from, i.symbol),
                   iPos,
                   ExprAttrs::AttrDef::Kind::InheritedFrom));
       }
-      delete $6;
+      delete $attrs;
     }
-  | { $$ = new ExprAttrs(state->at(@0)); }
+  | attrpath '=' expr ';'
+    { $$ = new ExprAttrs;
+      state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
+      delete $attrpath;
+    }
   ;
 
 attrs
@@ -467,15 +476,19 @@ expr_list
   | { $$ = new ExprList; }
   ;
 
+formal_set
+  : '{' formals ',' ELLIPSIS '}' { $$ = $formals;    $$->ellipsis = true; }
+  | '{' ELLIPSIS '}'             { $$ = new Formals; $$->ellipsis = true; }
+  | '{' formals ',' '}'          { $$ = $formals;    $$->ellipsis = false; }
+  | '{' formals '}'              { $$ = $formals;    $$->ellipsis = false; }
+  | '{' '}'                      { $$ = new Formals; $$->ellipsis = false; }
+  ;
+
 formals
-  : formal ',' formals
-    { $$ = $3; $$->formals.emplace_back(*$1); delete $1; }
+  : formals[accum] ',' formal
+    { $$ = $accum; $$->formals.emplace_back(*$formal); delete $formal; }
   | formal
-    { $$ = new Formals; $$->formals.emplace_back(*$1); $$->ellipsis = false; delete $1; }
-  |
-    { $$ = new Formals; $$->ellipsis = false; }
-  | ELLIPSIS
-    { $$ = new Formals; $$->ellipsis = true; }
+    { $$ = new Formals; $$->formals.emplace_back(*$formal); delete $formal; }
   ;
 
 formal
