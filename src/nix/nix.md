@@ -48,11 +48,6 @@ manual](https://nixos.org/manual/nix/stable/).
 
 # Installables
 
-> **Warning** \
-> Installables are part of the unstable
-> [`nix-command` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-nix-command),
-> and subject to change without notice.
-
 Many `nix` subcommands operate on one or more *installables*.
 These are command line arguments that represent something that can be realised in the Nix store.
 
@@ -67,11 +62,6 @@ For most commands, if no installable is specified, `.` is assumed.
 That is, Nix will operate on the default flake output attribute of the flake in the current directory.
 
 ### Flake output attribute
-
-> **Warning** \
-> Flake output attribute installables depend on the
-> [`nix-command`](@docroot@/contributing/experimental-features.md#xp-feature-nix-command)
-> experimental feature, and subject to change without notice.
 
 Example: `nixpkgs#hello`
 

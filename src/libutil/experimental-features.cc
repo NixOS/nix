@@ -87,15 +87,6 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .trackingUrl = "https://github.com/NixOS/nix/milestone/31",
     },
     {
-        .tag = Xp::NixCommand,
-        .name = "nix-command",
-        .description = R"(
-            Enable the new `nix` subcommands. See the manual on
-            [`nix`](@docroot@/command-ref/new-cli/nix.md) for details.
-        )",
-        .trackingUrl = "https://github.com/NixOS/nix/milestone/28",
-    },
-    {
         .tag = Xp::GitHashing,
         .name = "git-hashing",
         .description = R"(
@@ -302,7 +293,7 @@ static_assert(
  * A set of previously experimental features that are now considered
  * stable. We don't warn if users have these in `experimental-features`.
  */
-std::set<std::string> stabilizedFeatures{"flakes"};
+std::set<std::string> stabilizedFeatures{"flakes", "nix-command"};
 
 const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::string_view & name)
 {

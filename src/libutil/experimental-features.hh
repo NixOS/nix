@@ -19,7 +19,6 @@ enum struct ExperimentalFeature
     CaDerivations,
     ImpureDerivations,
     FetchTree,
-    NixCommand,
     GitHashing,
     RecursiveNix,
     NoUrlLiterals,

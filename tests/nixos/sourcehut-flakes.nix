@@ -104,7 +104,6 @@ in
             virtualisation.memorySize = 4096;
             nix.settings.substituters = lib.mkForce [ ];
             nix.extraOptions = ''
-              experimental-features = nix-command
               flake-registry = https://git.sr.ht/~NixOS/flake-registry/blob/master/flake-registry.json
             '';
             environment.systemPackages = [ pkgs.jq ];

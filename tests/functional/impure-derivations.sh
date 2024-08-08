@@ -21,7 +21,7 @@ drvPath2=$(nix derivation add < $TEST_HOME/impure-drv.json)
 [[ "$drvPath" = "$drvPath2" ]]
 
 # But only with the experimental feature!
-expectStderr 1 nix derivation add < $TEST_HOME/impure-drv.json --experimental-features nix-command | grepQuiet "experimental Nix feature 'impure-derivations' is disabled"
+expectStderr 1 nix derivation add < $TEST_HOME/impure-drv.json --experimental-features '' | grepQuiet "experimental Nix feature 'impure-derivations' is disabled"
 
 nix build --dry-run --json --file ./impure-derivations.nix impure.all
 json=$(nix build -L --no-link --json --file ./impure-derivations.nix impure.all)

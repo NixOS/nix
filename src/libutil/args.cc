@@ -582,7 +582,7 @@ Strings argvToStrings(int argc, char * * argv)
 
 std::optional<ExperimentalFeature> Command::experimentalFeature ()
 {
-    return { Xp::NixCommand };
+    return {};
 }
 
 MultiCommand::MultiCommand(std::string_view commandName, const Commands & commands_)

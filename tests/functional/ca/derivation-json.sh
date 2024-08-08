@@ -19,7 +19,7 @@ drvPath3=$(nix derivation add --dry-run < "$TEST_HOME"/foo.json)
 [[ ! -e "$drvPath3" ]]
 
 # But the JSON is rejected without the experimental feature
-expectStderr 1 nix derivation add < "$TEST_HOME"/foo.json --experimental-features nix-command | grepQuiet "experimental Nix feature 'ca-derivations' is disabled"
+expectStderr 1 nix derivation add < "$TEST_HOME"/foo.json --experimental-features '' | grepQuiet "experimental Nix feature 'ca-derivations' is disabled"
 
 # Without --dry-run it is actually written
 drvPath4=$(nix derivation add < "$TEST_HOME"/foo.json)
