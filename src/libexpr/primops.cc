@@ -1608,7 +1608,10 @@ static std::string_view legacyBaseNameOf(std::string_view path)
 static void prim_baseNameOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
-    v.mkString(legacyBaseNameOf(*state.coerceToString(pos, *args[0], context,
+    if (v.type() == nPath)
+        v.mkString(baseNameOf(v.path().path.abs()), context);
+    else
+        v.mkString(legacyBaseNameOf(*state.coerceToString(pos, *args[0], context,
             "while evaluating the first argument passed to builtins.baseNameOf",
             false, false)), context);
 }
