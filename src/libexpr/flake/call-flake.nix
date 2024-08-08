@@ -37,29 +37,42 @@ let
     builtins.mapAttrs
       (key: node:
         let
-
-          sourceInfo =
+          # FIXME: remove obsolete node.info.
+          tree0 =
             if overrides ? ${key}
             then
               overrides.${key}.sourceInfo
             else
-              # FIXME: remove obsolete node.info.
-              let
-                tree = 
-                  fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
-              in tree // {
-                # TODO: return the path value without fetching to the store?
-                #       removing this will improve performance, but may break
-                #       one or two flakes, that rely on
-                #       `builtins.typeOf outPath` for some reason, or perhaps
-                #       something more subtle than that, despite our conservative
-                #       choice of lazy path semantics.
-                outPath = "${tree.outPath}";
-              };
+              fetchTree (node.info or {} // removeAttrs node.locked [
+                # attributes that are applied after fetching
+                "dir"
+                "outPathIsString"
+              ]);
+
+          # TODO: split this logic into stand-alone functions
+          getSourceInfo = coerceOutPathToString:
+            tree0 // {
+              # TODO: return the path value without fetching to the store?
+              #       removing this will improve performance, but may break
+              #       one or two flakes, that rely on
+              #       `builtins.typeOf outPath` for some reason, or perhaps
+              #       something more subtle than that, despite our conservative
+              #       choice of lazy path semantics.
+              outPath = if coerceOutPathToString then "${tree0.outPath}" else tree0.outPath;
+            };
 
           subdir = overrides.${key}.dir or node.locked.dir or "";
 
-          outPath = sourceInfo + ((if subdir == "" then "" else "/") + subdir);
+          getOutPath = coerceOutPathToString:
+            getSourceInfo coerceOutPathToString + ((if subdir == "" then "" else "/") + subdir);
+
+          outPath = getOutPath outPathIsString;
+          sourceInfo = getSourceInfo outPathIsString;
+
+          flake0 = import (getOutPath false + "/flake.nix");
+
+          # Users can opt in to the legacy behavior of outPath being a string.
+          outPathIsString = flake0.inputs.self.outPathIsString or false;
 
           flake = import (outPath + "/flake.nix");
 

@@ -118,6 +118,8 @@ static FlakeInput parseFlakeInput(
         }
     else {
         attrs.erase("url");
+        // TODO: if (isRoot) ...
+        attrs.erase("outPathIsString");
         if (!attrs.empty())
             throw Error("unexpected flake input attribute '%s', at %s", attrs.begin()->first, state.positions[pos]);
         if (url)
@@ -411,7 +413,16 @@ LockedFlake lockFlake(
                from what's in the lock file). */
             for (auto & [id, input2] : flakeInputs) {
                 auto inputPath(inputPathPrefix);
-                inputPath.push_back(id);
+                if (id == "self") {
+                    // TODO validate that it only has `outPathIsString` (for now)
+                    // TODO accept hints for fetching schemas such as `git` or `github`
+                    //      so that the fetching of the flake can be customized as
+                    //      needed in the flake itself.
+                    // TODO allow certain schemas to be rejected, e.g. inputs.self.hints."github" = throw "this flake must be fetch with the `git:` scheme in order to load submodules";
+                    continue;
+                } else {
+                    inputPath.push_back(id);
+                }
                 auto inputPathS = printInputPath(inputPath);
                 debug("computing input '%s'", inputPathS);
 
