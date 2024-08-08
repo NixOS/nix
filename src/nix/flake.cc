@@ -17,6 +17,7 @@
 #include "eval-cache.hh"
 #include "markdown.hh"
 #include "users.hh"
+#include "terminal.hh"
 
 #include <nlohmann/json.hpp>
 #include <iomanip>
@@ -1243,25 +1244,62 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 auto showDerivation = [&]()
                 {
                     auto name = visitor.getAttr(state->sName)->getString();
+                    std::optional<std::string> description;
+                    if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
+                        if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
+                            description = aDescription->getString();
+                    }
+                    
                     if (json) {
-                        std::optional<std::string> description;
-                        if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
-                            if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
-                                description = aDescription->getString();
-                        }
                         j.emplace("type", "derivation");
                         j.emplace("name", name);
                         if (description)
                             j.emplace("description", *description);
                     } else {
-                        logger->cout("%s: %s '%s'",
-                            headerPrefix,
+                        auto type =
                             attrPath.size() == 2 && attrPathS[0] == "devShell" ? "development environment" :
                             attrPath.size() >= 2 && attrPathS[0] == "devShells" ? "development environment" :
                             attrPath.size() == 3 && attrPathS[0] == "checks" ? "derivation" :
                             attrPath.size() >= 1 && attrPathS[0] == "hydraJobs" ? "derivation" :
-                            "package",
-                            name);
+                            "package";
+                        if (description && !description->empty()) {
+                            // Maximum length to print
+                            size_t maxLength = getWindowSize().second > 0 ? getWindowSize().second : 80;
+
+                            // Trim the description and only use the first line
+                            auto trimmed = trim(*description);
+                            auto newLinePos = trimmed.find('\n');
+                            auto length = newLinePos != std::string::npos ? newLinePos : trimmed.length();
+
+                            // Sanitize the description and calculate the two parts of the line
+                            // In order to get the length of the printable characters we need to
+                            // filter out escape sequences.
+                            auto beginningOfLine = fmt("%s: %s '%s'", headerPrefix, type, name);
+                            auto beginningOfLineLength = filterANSIEscapes(beginningOfLine, true).length();
+                            auto restOfLine = fmt(" - '%s'", filterANSIEscapes(trimmed, false, length));
+
+                            // If we are already over the maximum length then do not trim
+                            // and don't print the description (preserves existing behavior)
+                            if (beginningOfLineLength >= maxLength) {
+                                logger->cout("%s", beginningOfLine);
+                            }
+                            else {
+                                auto line = beginningOfLine + restOfLine;
+                                // FIXME: Specifying `true` here gives the correct length
+                                // BUT removes colors/bold so something is not quite right here.
+                                line = filterANSIEscapes(line, true, maxLength);
+
+                                // NOTE: This test might be incorrect since I get things like:
+                                // 168 or 161 > maxLength.
+                                if (line.length() > maxLength) {
+                                    line = line.replace(line.length() - 3, 3, "...");
+                                }
+                                logger->cout("%s", line);
+                            }
+                        }
+                        else {
+                            logger->cout("%s: %s '%s'", headerPrefix, type, name);
+                        }
                     }
                 };
 
