@@ -104,7 +104,15 @@ in
         builder.succeed("mkdir -p -m 700 /root/.ssh")
         builder.copy_from_host("key.pub", "/root/.ssh/authorized_keys")
         builder.wait_for_unit("sshd")
-        client.succeed(f"ssh -o StrictHostKeyChecking=no {builder.name} 'echo hello world'")
+        # Make sure the builder can handle our login correctly
+        builder.wait_for_unit("multi-user.target")
+        # Make sure there's no funny business on the client either
+        # (should not be necessary, but we have reason to be careful)
+        client.wait_for_unit("multi-user.target")
+        client.succeed(f"""
+          ssh -o StrictHostKeyChecking=no {builder.name} \
+            'echo hello world on $(hostname)' >&2
+        """)
 
       # Perform a build and check that it was performed on the builder.
       out = client.succeed(

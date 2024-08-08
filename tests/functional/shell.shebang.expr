@@ -1,0 +1,9 @@
+#! @ENV_PROG@ nix-shell
+#! nix-shell "{ script, path, ... }: assert path == ./shell.nix; script { }"
+#! nix-shell --no-substitute
+#! nix-shell --expr 
+#! nix-shell --arg script "import ./shell.nix"
+#! nix-shell --arg path "./shell.nix"
+#! nix-shell -A shellDrv
+#! nix-shell -i bash
+echo "$FOO"

@@ -140,6 +140,18 @@ nix build --impure -f multiple-outputs.nix --json e --no-link | jq --exit-status
     (.outputs | keys == ["a_a", "b"]))
 '
 
+# Make sure that the 3 types of aliases work
+# BaseSettings<T>, BaseSettings<bool>, and BaseSettings<SandboxMode>.
+nix build --impure -f multiple-outputs.nix --json e --no-link \
+    --build-max-jobs 3 \
+    --gc-keep-outputs \
+    --build-use-sandbox | \
+    jq --exit-status '
+  (.[0] |
+    (.drvPath | match(".*multiple-outputs-e.drv")) and
+    (.outputs | keys == ["a_a", "b"]))
+'
+
 # Make sure that `--stdin` works and does not apply any defaults
 printf "" | nix build --no-link --stdin --json | jq --exit-status '. == []'
 printf "%s\n" "$drv^*" | nix build --no-link --stdin --json | jq --exit-status '.[0]|has("drvPath")'

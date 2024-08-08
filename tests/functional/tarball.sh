@@ -83,3 +83,20 @@ path="$(nix flake prefetch --json "tarball+file://$(pwd)/tree.tar.gz" | jq -r .s
 [[ $(cat "$path/a/zzz") = bar ]]
 [[ $(cat "$path/c/aap") = bar ]]
 [[ $(cat "$path/fnord") = bar ]]
+
+# Test a tarball that has multiple top-level directories.
+rm -rf "$TEST_ROOT/tar_root"
+mkdir -p "$TEST_ROOT/tar_root" "$TEST_ROOT/tar_root/foo" "$TEST_ROOT/tar_root/bar"
+tar cvf "$TEST_ROOT/tar.tar" -C "$TEST_ROOT/tar_root" .
+path="$(nix flake prefetch --json "tarball+file://$TEST_ROOT/tar.tar" | jq -r .storePath)"
+[[ -d "$path/foo" ]]
+[[ -d "$path/bar" ]]
+
+# Test a tarball that has a single regular file.
+rm -rf "$TEST_ROOT/tar_root"
+mkdir -p "$TEST_ROOT/tar_root"
+echo bar > "$TEST_ROOT/tar_root/foo"
+chmod +x "$TEST_ROOT/tar_root/foo"
+tar cvf "$TEST_ROOT/tar.tar" -C "$TEST_ROOT/tar_root" .
+path="$(nix flake prefetch --refresh --json "tarball+file://$TEST_ROOT/tar.tar" | jq -r .storePath)"
+[[ $(cat "$path/foo") = bar ]]

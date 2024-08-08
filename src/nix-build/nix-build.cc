@@ -183,6 +183,9 @@ static void main_nix_build(int argc, char * * argv)
     struct MyArgs : LegacyArgs, MixEvalArgs
     {
         using LegacyArgs::LegacyArgs;
+        void setBaseDir(Path baseDir) {
+            commandBaseDir = baseDir;
+        }
     };
 
     MyArgs myArgs(myName, [&](Strings::iterator & arg, const Strings::iterator & end) {
@@ -290,6 +293,9 @@ static void main_nix_build(int argc, char * * argv)
     state->repair = myArgs.repair;
     if (myArgs.repair) buildMode = bmRepair;
 
+    if (inShebang && compatibilitySettings.nixShellShebangArgumentsRelativeToScript) {
+        myArgs.setBaseDir(absPath(dirOf(script)));
+    }
     auto autoArgs = myArgs.getAutoArgs(*state);
 
     auto autoArgsWithInNixShell = autoArgs;
@@ -334,8 +340,13 @@ static void main_nix_build(int argc, char * * argv)
         exprs = {state->parseStdin()};
     else
         for (auto i : remainingArgs) {
+            auto baseDir = inShebang && !packages ? absPath(dirOf(script)) : i;
+
             if (fromArgs)
-                exprs.push_back(state->parseExprFromString(std::move(i), state->rootPath(".")));
+                exprs.push_back(state->parseExprFromString(
+                    std::move(i),
+                    (inShebang && compatibilitySettings.nixShellShebangArgumentsRelativeToScript) ? lookupFileArg(*state, baseDir) : state->rootPath(".")
+                ));
             else {
                 auto absolute = i;
                 try {

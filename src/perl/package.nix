@@ -73,5 +73,5 @@ perl.pkgs.toPerlModule (mkMesonDerivation (finalAttrs: {
     "--print-errorlogs"
   ];
 
-  enableParallelBuilding = true;
+  strictDeps = false;
 }))

@@ -14,10 +14,10 @@
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
 
-#ifdef HAVE_BOEHMGC
-#include <mutex>
-#define GC_INCLUDE_NEW 1
-#include "gc_cpp.h"
+#if HAVE_BOEHMGC
+#  include <mutex>
+#  define GC_INCLUDE_NEW 1
+#  include "gc_cpp.h"
 #endif
 
 nix_err nix_libexpr_init(nix_c_context * context)
@@ -131,7 +131,7 @@ void nix_state_free(EvalState * state)
     delete state;
 }
 
-#ifdef HAVE_BOEHMGC
+#if HAVE_BOEHMGC
 std::unordered_map<
     const void *,
     unsigned int,
@@ -207,7 +207,7 @@ nix_err nix_value_decref(nix_c_context * context, nix_value *x)
 
 void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * obj, void * cd))
 {
-#ifdef HAVE_BOEHMGC
+#if HAVE_BOEHMGC
     GC_REGISTER_FINALIZER(obj, finalizer, cd, 0, 0);
 #endif
 }

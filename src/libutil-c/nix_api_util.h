@@ -56,47 +56,51 @@ extern "C" {
  * - NIX_ERR_KEY: A key error occurred (-3)
  * - NIX_ERR_NIX_ERROR: A generic Nix error occurred (-4)
  */
-typedef int nix_err;
+enum nix_err {
 
-/**
- * @brief No error occurred.
- *
- * This error code is returned when no error has occurred during the function
- * execution.
- */
-#define NIX_OK 0
+    /**
+     * @brief No error occurred.
+     *
+     * This error code is returned when no error has occurred during the function
+     * execution.
+     */
+    NIX_OK = 0,
 
-/**
- * @brief An unknown error occurred.
- *
- * This error code is returned when an unknown error occurred during the
- * function execution.
- */
-#define NIX_ERR_UNKNOWN -1
+    /**
+     * @brief An unknown error occurred.
+     *
+     * This error code is returned when an unknown error occurred during the
+     * function execution.
+     */
+    NIX_ERR_UNKNOWN = -1,
 
-/**
- * @brief An overflow error occurred.
- *
- * This error code is returned when an overflow error occurred during the
- * function execution.
- */
-#define NIX_ERR_OVERFLOW -2
+    /**
+     * @brief An overflow error occurred.
+     *
+     * This error code is returned when an overflow error occurred during the
+     * function execution.
+     */
+    NIX_ERR_OVERFLOW = -2,
 
-/**
- * @brief A key error occurred.
- *
- * This error code is returned when a key error occurred during the function
- * execution.
- */
-#define NIX_ERR_KEY -3
+    /**
+     * @brief A key error occurred.
+     *
+     * This error code is returned when a key error occurred during the function
+     * execution.
+     */
+    NIX_ERR_KEY = -3,
 
-/**
- * @brief A generic Nix error occurred.
- *
- * This error code is returned when a generic Nix error occurred during the
- * function execution.
- */
-#define NIX_ERR_NIX_ERROR -4
+    /**
+     * @brief A generic Nix error occurred.
+     *
+     * This error code is returned when a generic Nix error occurred during the
+     * function execution.
+     */
+    NIX_ERR_NIX_ERROR = -4,
+
+};
+
+typedef enum nix_err nix_err;
 
 /**
  * @brief This object stores error state.

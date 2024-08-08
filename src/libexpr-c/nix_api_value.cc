@@ -14,7 +14,7 @@
 #include "nix_api_value.h"
 #include "value/context.hh"
 
-#ifdef HAVE_BOEHMGC
+#if HAVE_BOEHMGC
 #  include "gc/gc.h"
 #  define GC_INCLUDE_NEW 1
 #  include "gc_cpp.h"
@@ -131,7 +131,7 @@ PrimOp * nix_alloc_primop(
     try {
         using namespace std::placeholders;
         auto p = new
-#ifdef HAVE_BOEHMGC
+#if HAVE_BOEHMGC
             (GC)
 #endif
                 nix::PrimOp{

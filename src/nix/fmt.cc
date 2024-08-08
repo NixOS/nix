@@ -1,5 +1,6 @@
 #include "command.hh"
 #include "installable-value.hh"
+#include "eval.hh"
 #include "run.hh"
 
 using namespace nix;
@@ -49,7 +50,11 @@ struct CmdFmt : SourceExprCommand {
             }
         }
 
-        runProgramInStore(store, UseLookupPath::DontUse, app.program, programArgs);
+        // Release our references to eval caches to ensure they are persisted to disk, because
+        // we are about to exec out of this process without running C++ destructors.
+        evalState->evalCaches.clear();
+
+        execProgramInStore(store, UseLookupPath::DontUse, app.program, programArgs);
     };
 };
 

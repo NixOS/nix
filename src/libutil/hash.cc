@@ -25,7 +25,7 @@ static size_t regularHashSize(HashAlgorithm type) {
     case HashAlgorithm::SHA256: return sha256HashSize;
     case HashAlgorithm::SHA512: return sha512HashSize;
     }
-    abort();
+    unreachable();
 }
 
 

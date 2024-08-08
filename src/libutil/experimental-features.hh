@@ -34,6 +34,7 @@ enum struct ExperimentalFeature
     ConfigurableImpureEnv,
     MountedSSHStore,
     VerifiedFetches,
+    PipeOperators,
 };
 
 extern std::set<std::string> stabilizedFeatures;
