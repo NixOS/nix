@@ -140,9 +140,16 @@ static FlakeInput parseFlakeInput(EvalState & state,
                     case nBool:
                         attrs.emplace(state.symbols[attr.name], Explicit<bool> { attr.value->boolean() });
                         break;
-                    case nInt:
-                        attrs.emplace(state.symbols[attr.name], (long unsigned int) attr.value->integer());
+                    case nInt: {
+                        auto intValue = attr.value->integer().value;
+
+                        if (intValue < 0) {
+                            state.error<EvalError>("negative value given for flake input attribute %1%: %2%", state.symbols[attr.name], intValue).debugThrow();
+                        }
+
+                        attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
                         break;
+                    }
                     default:
                         if (attr.name == state.symbols.create("publicKeys")) {
                             experimentalFeatureSettings.require(Xp::VerifiedFetches);
@@ -272,7 +279,7 @@ static Flake readFlake(
             else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    state.forceInt(*setting.value, setting.pos, ""));
+                    state.forceInt(*setting.value, setting.pos, "").value);
             else if (setting.value->type() == nBool)
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
@@ -904,8 +911,13 @@ static void prim_flakeRefToString(
     for (const auto & attr : *args[0]->attrs()) {
         auto t = attr.value->type();
         if (t == nInt) {
-            attrs.emplace(state.symbols[attr.name],
-                (uint64_t) attr.value->integer());
+            auto intValue = attr.value->integer().value;
+
+            if (intValue < 0) {
+                state.error<EvalError>("negative value given for flake ref attr %1%: %2%", state.symbols[attr.name], intValue).atPos(pos).debugThrow();
+            }
+
+            attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
         } else if (t == nBool) {
             attrs.emplace(state.symbols[attr.name],
                 Explicit<bool> { attr.value->boolean() });

@@ -587,9 +587,9 @@ struct CompareValues
     {
         try {
             if (v1->type() == nFloat && v2->type() == nInt)
-                return v1->fpoint() < v2->integer();
+                return v1->fpoint() < v2->integer().value;
             if (v1->type() == nInt && v2->type() == nFloat)
-                return v1->integer() < v2->fpoint();
+                return v1->integer().value < v2->fpoint();
             if (v1->type() != v2->type())
                 state.error<EvalError>("cannot compare %s with %s", showType(*v1), showType(*v2)).debugThrow();
             // Allow selecting a subset of enum values
@@ -2762,13 +2762,13 @@ static struct LazyPosAcessors {
     PrimOp primop_lineOfPos{
         .arity = 1,
         .fun = [] (EvalState & state, PosIdx pos, Value * * args, Value & v) {
-            v.mkInt(state.positions[PosIdx(args[0]->integer())].line);
+            v.mkInt(state.positions[PosIdx(args[0]->integer().value)].line);
         }
     };
     PrimOp primop_columnOfPos{
         .arity = 1,
         .fun = [] (EvalState & state, PosIdx pos, Value * * args, Value & v) {
-            v.mkInt(state.positions[PosIdx(args[0]->integer())].column);
+            v.mkInt(state.positions[PosIdx(args[0]->integer().value)].column);
         }
     };
 
@@ -3244,7 +3244,8 @@ static void elemAt(EvalState & state, const PosIdx pos, Value & list, int n, Val
 /* Return the n-1'th element of a list. */
 static void prim_elemAt(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    elemAt(state, pos, *args[0], state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.elemAt"), v);
+    NixInt::Inner elem = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.elemAt").value;
+    elemAt(state, pos, *args[0], elem, v);
 }
 
 static RegisterPrimOp primop_elemAt({
@@ -3538,10 +3539,12 @@ static RegisterPrimOp primop_all({
 
 static void prim_genList(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto len = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.genList");
+    auto len_ = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.genList").value;
 
-    if (len < 0)
-        state.error<EvalError>("cannot create list of size %1%", len).atPos(pos).debugThrow();
+    if (len_ < 0)
+        state.error<EvalError>("cannot create list of size %1%", len_).atPos(pos).debugThrow();
+
+    size_t len = size_t(len_);
 
     // More strict than striclty (!) necessary, but acceptable
     // as evaluating map without accessing any values makes little sense.
@@ -3798,9 +3801,17 @@ static void prim_add(EvalState & state, const PosIdx pos, Value * * args, Value 
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
         v.mkFloat(state.forceFloat(*args[0], pos, "while evaluating the first argument of the addition")
                 + state.forceFloat(*args[1], pos, "while evaluating the second argument of the addition"));
-    else
-        v.mkInt(  state.forceInt(*args[0], pos, "while evaluating the first argument of the addition")
-                + state.forceInt(*args[1], pos, "while evaluating the second argument of the addition"));
+    else {
+        auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument of the addition");
+        auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument of the addition");
+
+        auto result_ = i1 + i2;
+        if (auto result = result_.valueChecked(); result.has_value()) {
+            v.mkInt(*result);
+        } else {
+            state.error<EvalError>("integer overflow in adding %1% + %2%", i1, i2).atPos(pos).debugThrow();
+        }
+    }
 }
 
 static RegisterPrimOp primop_add({
@@ -3819,9 +3830,18 @@ static void prim_sub(EvalState & state, const PosIdx pos, Value * * args, Value 
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
         v.mkFloat(state.forceFloat(*args[0], pos, "while evaluating the first argument of the subtraction")
                 - state.forceFloat(*args[1], pos, "while evaluating the second argument of the subtraction"));
-    else
-        v.mkInt(  state.forceInt(*args[0], pos, "while evaluating the first argument of the subtraction")
-                - state.forceInt(*args[1], pos, "while evaluating the second argument of the subtraction"));
+    else {
+        auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument of the subtraction");
+        auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument of the subtraction");
+
+        auto result_ = i1 - i2;
+
+        if (auto result = result_.valueChecked(); result.has_value()) {
+            v.mkInt(*result);
+        } else {
+            state.error<EvalError>("integer overflow in subtracting %1% - %2%", i1, i2).atPos(pos).debugThrow();
+        }
+    }
 }
 
 static RegisterPrimOp primop_sub({
@@ -3840,9 +3860,18 @@ static void prim_mul(EvalState & state, const PosIdx pos, Value * * args, Value 
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
         v.mkFloat(state.forceFloat(*args[0], pos, "while evaluating the first of the multiplication")
                 * state.forceFloat(*args[1], pos, "while evaluating the second argument of the multiplication"));
-    else
-        v.mkInt(  state.forceInt(*args[0], pos, "while evaluating the first argument of the multiplication")
-                * state.forceInt(*args[1], pos, "while evaluating the second argument of the multiplication"));
+    else {
+        auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument of the multiplication");
+        auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument of the multiplication");
+
+        auto result_ = i1 * i2;
+
+        if (auto result = result_.valueChecked(); result.has_value()) {
+            v.mkInt(*result);
+        } else {
+            state.error<EvalError>("integer overflow in multiplying %1% * %2%", i1, i2).atPos(pos).debugThrow();
+        }
+    }
 }
 
 static RegisterPrimOp primop_mul({
@@ -3869,10 +3898,12 @@ static void prim_div(EvalState & state, const PosIdx pos, Value * * args, Value 
         NixInt i1 = state.forceInt(*args[0], pos, "while evaluating the first operand of the division");
         NixInt i2 = state.forceInt(*args[1], pos, "while evaluating the second operand of the division");
         /* Avoid division overflow as it might raise SIGFPE. */
-        if (i1 == std::numeric_limits<NixInt>::min() && i2 == -1)
-            state.error<EvalError>("overflow in integer division").atPos(pos).debugThrow();
-
-        v.mkInt(i1 / i2);
+        auto result_ = i1 / i2;
+        if (auto result = result_.valueChecked(); result.has_value()) {
+            v.mkInt(*result);
+        } else {
+            state.error<EvalError>("integer overflow in dividing %1% / %2%", i1, i2).atPos(pos).debugThrow();
+        }
     }
 }
 
@@ -3887,8 +3918,9 @@ static RegisterPrimOp primop_div({
 
 static void prim_bitAnd(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    v.mkInt(state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitAnd")
-            & state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitAnd"));
+    auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitAnd");
+    auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitAnd");
+    v.mkInt(i1.value & i2.value);
 }
 
 static RegisterPrimOp primop_bitAnd({
@@ -3902,8 +3934,10 @@ static RegisterPrimOp primop_bitAnd({
 
 static void prim_bitOr(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    v.mkInt(state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitOr")
-            | state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitOr"));
+    auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitOr");
+    auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitOr");
+
+    v.mkInt(i1.value | i2.value);
 }
 
 static RegisterPrimOp primop_bitOr({
@@ -3917,8 +3951,10 @@ static RegisterPrimOp primop_bitOr({
 
 static void prim_bitXor(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    v.mkInt(state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitXor")
-            ^ state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitXor"));
+    auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitXor");
+    auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitXor");
+
+    v.mkInt(i1.value ^ i2.value);
 }
 
 static RegisterPrimOp primop_bitXor({
@@ -3998,13 +4034,19 @@ static RegisterPrimOp primop_toString({
    non-negative. */
 static void prim_substring(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    int start = state.forceInt(*args[0], pos, "while evaluating the first argument (the start offset) passed to builtins.substring");
+    NixInt::Inner start = state.forceInt(*args[0], pos, "while evaluating the first argument (the start offset) passed to builtins.substring").value;
 
     if (start < 0)
         state.error<EvalError>("negative start position in 'substring'").atPos(pos).debugThrow();
 
 
-    int len = state.forceInt(*args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring");
+    NixInt::Inner len = state.forceInt(*args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring").value;
+
+    // Negative length may be idiomatically passed to builtins.substring to get
+    // the tail of the string.
+    if (len < 0) {
+        len = std::numeric_limits<NixInt::Inner>::max();
+    }
 
     // Special-case on empty substring to avoid O(n) strlen
     // This allows for the use of empty substrings to efficently capture string context
@@ -4047,7 +4089,7 @@ static void prim_stringLength(EvalState & state, const PosIdx pos, Value * * arg
 {
     NixStringContext context;
     auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.stringLength");
-    v.mkInt(s->size());
+    v.mkInt(NixInt::Inner(s->size()));
 }
 
 static RegisterPrimOp primop_stringLength({
@@ -4531,7 +4573,8 @@ static void prim_compareVersions(EvalState & state, const PosIdx pos, Value * * 
 {
     auto version1 = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.compareVersions");
     auto version2 = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.compareVersions");
-    v.mkInt(compareVersions(version1, version2));
+    auto result = compareVersions(version1, version2);
+    v.mkInt(result < 0 ? -1 : result > 0 ? 1 : 0);
 }
 
 static RegisterPrimOp primop_compareVersions({

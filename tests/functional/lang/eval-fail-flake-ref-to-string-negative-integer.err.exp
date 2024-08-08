@@ -1,0 +1,14 @@
+error:
+       … while calling the 'seq' builtin
+         at /pwd/lang/eval-fail-flake-ref-to-string-negative-integer.nix:1:16:
+            1| let n = -1; in builtins.seq n (builtins.flakeRefToString {
+             |                ^
+            2|   type  = "github";
+
+       … while calling the 'flakeRefToString' builtin
+         at /pwd/lang/eval-fail-flake-ref-to-string-negative-integer.nix:1:32:
+            1| let n = -1; in builtins.seq n (builtins.flakeRefToString {
+             |                                ^
+            2|   type  = "github";
+
+       error: negative value given for flake ref attr repo: -1

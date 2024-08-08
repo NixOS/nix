@@ -306,7 +306,7 @@ int64_t nix_get_int(nix_c_context * context, const nix_value * value)
     try {
         auto & v = check_value_in(value);
         assert(v.type() == nix::nInt);
-        return v.integer();
+        return v.integer().value;
     }
     NIXC_CATCH_ERRS_RES(0);
 }

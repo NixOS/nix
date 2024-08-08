@@ -85,7 +85,7 @@ namespace nix {
         if (arg.type() != nInt) {
             return false;
         }
-        return arg.integer() == v;
+        return arg.integer().value == v;
     }
 
     MATCHER_P(IsFloatEq, v, fmt("The float is equal to \"%1%\"", v)) {
