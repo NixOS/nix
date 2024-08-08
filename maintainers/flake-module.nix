@@ -275,7 +275,6 @@
             ''^src/libutil/current-process\.hh$''
             ''^src/libutil/english\.cc$''
             ''^src/libutil/english\.hh$''
-            ''^src/libutil/environment-variables\.cc$''
             ''^src/libutil/error\.cc$''
             ''^src/libutil/error\.hh$''
             ''^src/libutil/exit\.hh$''
@@ -357,7 +356,6 @@
             ''^src/libutil/util\.cc$''
             ''^src/libutil/util\.hh$''
             ''^src/libutil/variant-wrapper\.hh$''
-            ''^src/libutil/windows/environment-variables\.cc$''
             ''^src/libutil/windows/file-descriptor\.cc$''
             ''^src/libutil/windows/file-path\.cc$''
             ''^src/libutil/windows/processes\.cc$''
@@ -485,7 +483,6 @@
             ''^tests/unit/libutil/pool\.cc''
             ''^tests/unit/libutil/references\.cc''
             ''^tests/unit/libutil/suggestions\.cc''
-            ''^tests/unit/libutil/tests\.cc''
             ''^tests/unit/libutil/url\.cc''
             ''^tests/unit/libutil/xml-writer\.cc''
           ];
