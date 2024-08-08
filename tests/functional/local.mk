@@ -95,6 +95,7 @@ nix_tests = \
   ssh-relay.sh \
   build.sh \
   build-delete.sh \
+  load-limit.sh \
   output-normalization.sh \
   selfref-gc.sh \
   db-migration.sh \
