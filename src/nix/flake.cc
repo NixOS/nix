@@ -1264,22 +1264,38 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             "package";
                         if (description && !description->empty()) {
                             // Maximum length to print
-                            size_t maxLength = getWindowSize().second;
-                            if (maxLength == 0)
-                                maxLength = 77;
-                            // Trim the string and only display the first line of the description.
-                            auto trimmed = nix::trim(*description);
+                            size_t maxLength = getWindowSize().second > 0 ? getWindowSize().second : 80;
+
+                            // Trim the description and only use the first line
+                            auto trimmed = trim(*description);
                             auto newLinePos = trimmed.find('\n');
                             auto length = newLinePos != std::string::npos ? newLinePos : trimmed.length();
 
-                            // Resize/sanitize the string and if it's too long add ellipses
-                            std::string desc = filterANSIEscapes(trimmed, false, length);
-                            if (desc.length() > maxLength) {
-                                desc.resize(maxLength);
-                                desc = desc.append("...");
-                            }
+                            // Sanitize the description and calculate the two parts of the line
+                            // In order to get the length of the printable characters we need to
+                            // filter out escape sequences.
+                            auto beginningOfLine = fmt("%s: %s '%s'", headerPrefix, type, name);
+                            auto beginningOfLineLength = filterANSIEscapes(beginningOfLine, true).length();
+                            auto restOfLine = fmt(" - '%s'", filterANSIEscapes(trimmed, false, length));
 
-                            logger->cout("%s: %s '%s' - '%s'", headerPrefix, type, name, desc);
+                            // If we are already over the maximum length then do not trim
+                            // and don't print the description (preserves existing behavior)
+                            if (beginningOfLineLength >= maxLength) {
+                                logger->cout("%s", beginningOfLine);
+                            }
+                            else {
+                                auto line = beginningOfLine + restOfLine;
+                                // FIXME: Specifying `true` here gives the correct length
+                                // BUT removes colors/bold so something is not quite right here.
+                                line = filterANSIEscapes(line, true, maxLength);
+
+                                // NOTE: This test might be incorrect since I get things like:
+                                // 168 or 161 > maxLength.
+                                if (line.length() > maxLength) {
+                                    line = line.replace(line.length() - 3, 3, "...");
+                                }
+                                logger->cout("%s", line);
+                            }
                         }
                         else {
                             logger->cout("%s: %s '%s'", headerPrefix, type, name);
