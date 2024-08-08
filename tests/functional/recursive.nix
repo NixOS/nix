@@ -14,7 +14,7 @@ mkDerivation rec {
 
   buildCommand = ''
     mkdir $out
-    opts="--experimental-features nix-command ${if (NIX_TESTS_CA_BY_DEFAULT == "1") then "--extra-experimental-features ca-derivations" else ""}"
+    opts="${if (NIX_TESTS_CA_BY_DEFAULT == "1") then "--extra-experimental-features ca-derivations" else ""}"
 
     PATH=${builtins.getEnv "NIX_BIN_DIR"}:$PATH
 

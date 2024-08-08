@@ -23,7 +23,6 @@ in {
         { virtualisation.writableStore = true;
           virtualisation.additionalPaths = [ pkgA pkgD.drvPath ];
           nix.settings.substituters = lib.mkForce [ ];
-          nix.settings.experimental-features = [ "nix-command" ];
           services.getty.autologinUser = "root";
           programs.ssh.extraConfig = ''
             Host *

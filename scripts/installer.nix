@@ -25,7 +25,7 @@ runCommand "installer-script" {
       (tarball: let
           inherit (tarball.stdenv.hostPlatform) system;
         in '' \
-        --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${tarball}/*.tar.xz) \
+        --replace '@tarballHash_${system}@' $(nix hash-file --base16 --type sha256 ${tarball}/*.tar.xz) \
         --replace '@tarballPath_${system}@' $(tarballPath ${tarball}/*.tar.xz) \
         ''
       )

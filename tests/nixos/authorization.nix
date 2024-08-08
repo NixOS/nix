@@ -10,8 +10,6 @@
     users.users.alice.isNormalUser = true;
     users.users.bob.isNormalUser = true;
     users.users.mallory.isNormalUser = true;
-
-    nix.settings.experimental-features = "nix-command";
   };
 
   testScript =

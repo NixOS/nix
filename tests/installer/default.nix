@@ -224,7 +224,7 @@ let
           source /etc/bashrc || true
 
           nix-env --version
-          nix --extra-experimental-features nix-command store info
+          nix store info
 
           out=\$(nix-build --no-substitute -E 'derivation { name = "foo"; system = "x86_64-linux"; builder = "/bin/sh"; args = ["-c" "echo foobar > \$out"]; }')
           [[ \$(cat \$out) = foobar ]]

@@ -4,7 +4,7 @@ source common.sh
 
 requireDaemonNewerThan "2.4pre20210626"
 
-enableFeatures "ca-derivations nix-command"
+enableFeatures "ca-derivations"
 
 export NIX_TESTS_CA_BY_DEFAULT=1
 cd ..
