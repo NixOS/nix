@@ -351,6 +351,14 @@ public:
             actInfo.lastLine = getS(fields, 0);
             update(*state);
         }
+
+        else if (type == resUpdate) {
+            auto i = state->its.find(act);
+            assert(i != state->its.end());
+            ActInfo & actInfo = *i->second;
+            actInfo.s = getS(fields, 0);
+            update(*state);
+        }
     }
 
     void update(State & state)
