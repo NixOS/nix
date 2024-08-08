@@ -265,7 +265,7 @@ Path defaultTempDir();
 
 /**
  * Interpret `exe` as a location in the ambient file system and return
- * whether it exists AND is executable.
+ * whether it resolves to a file that is executable.
  */
 bool isExecutableFileAmbient(const std::filesystem::path & exe);
 

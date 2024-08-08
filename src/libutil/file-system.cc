@@ -688,6 +688,7 @@ void moveFile(const Path & oldName, const Path & newName)
 bool isExecutableFileAmbient(const fs::path & exe) {
     // Check file type, because directory being executable means
     // something completely different.
+    // `is_regular_file` follows symlinks before checking.
     return std::filesystem::is_regular_file(exe)
         && access(exe.string().c_str(),
 #ifdef WIN32
