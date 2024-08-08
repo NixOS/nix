@@ -484,8 +484,9 @@ struct curlFileTransfer : public FileTransfer
                         code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                     : FileTransferError(err,
                         std::move(response),
-                        "unable to %s '%s': %s (%d)",
-                        request.verb(), request.uri, curl_easy_strerror(code), code);
+                        "unable to %s '%s': %s (%d)%s",
+                        request.verb(), request.uri, curl_easy_strerror(code), code,
+                        code == CURLE_SSL_CONNECT_ERROR ? "\nRecommend checking your ssl-cert-file settings,\ncreating '/etc/ssl/certs/ca-certificates.crt', or\ninstalling the 'cacert' package into '/nix/var/nix/profiles/default'." : "");
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a
