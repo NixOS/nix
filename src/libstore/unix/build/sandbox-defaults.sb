@@ -49,6 +49,7 @@ R""(
 (if (param "_ALLOW_LOCAL_NETWORKING")
     (begin
       (allow network* (remote ip "localhost:*"))
+      (allow network-inbound (local ip "*:*")) ; required to bind and listen
 
       ; Allow access to /etc/resolv.conf (which is a symlink to
       ; /private/var/run/resolv.conf).
