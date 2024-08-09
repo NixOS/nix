@@ -55,6 +55,7 @@ let
     "nix-main-c"
     "nix-cmd"
     "nix-ng"
+    "nix-functional-tests"
   ];
 in
 {
@@ -68,8 +69,10 @@ in
     lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.nixComponents.${pkgName}));
 
   buildCross = forAllPackages (pkgName:
-    forAllCrossSystems (crossSystem:
-      lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName})));
+    # Hack to avoid non-evaling package
+    (if pkgName == "nix-functional-tests" then lib.flip builtins.removeAttrs ["x86_64-w64-mingw32"] else lib.id)
+    (forAllCrossSystems (crossSystem:
+      lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName}))));
 
   buildNoGc = forAllSystems (system:
     self.packages.${system}.nix.override { enableGC = false; }
