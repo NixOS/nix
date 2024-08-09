@@ -1993,7 +1993,7 @@ void LocalDerivationGoal::runChild()
             throw SysError("changing into '%1%'", tmpDir);
 
         /* Close all other file descriptors. */
-        unix::closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
+        unix::closeExtraFDs();
 
 #if __linux__
         linux::setPersonality(drv->platform);
