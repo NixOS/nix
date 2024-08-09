@@ -1,0 +1,10 @@
+# vim: filetype=meson
+
+option('state-dir', type : 'string', value : '/nix/var',
+  description : 'path to store state in for Nix',
+)
+
+# A relative path means it gets appended to prefix.
+option('profile-dir', type : 'string', value : 'etc/profile.d',
+  description : 'the path to install shell profile files',
+)

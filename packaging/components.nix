@@ -36,6 +36,9 @@ in
   # Will replace `nix` once the old build system is gone.
   nix-ng = callPackage ../src/nix/package.nix { };
 
+  nix-functional-tests = callPackage ../src/nix-functional-tests/package.nix { };
+
+  nix-manual = callPackage ../src/nix-manual/package.nix { };
   nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { };
   nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { };
 

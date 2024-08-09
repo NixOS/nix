@@ -3,7 +3,6 @@
 
 project('nix-dev-shell', 'cpp',
   version : files('.version'),
-  subproject_dir : 'src',
 )
 
 # Internal Libraries
@@ -21,6 +20,9 @@ subproject('nix')
 # Docs
 subproject('internal-api-docs')
 subproject('external-api-docs')
+if not meson.is_cross_build()
+  subproject('nix-manual')
+endif
 
 # External C wrapper libraries
 subproject('libutil-c')
@@ -42,3 +44,4 @@ subproject('nix-fetchers-tests')
 subproject('nix-expr-test-support')
 subproject('nix-expr-tests')
 subproject('nix-flake-tests')
+subproject('nix-functional-tests')
