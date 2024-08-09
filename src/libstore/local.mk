@@ -71,7 +71,6 @@ libstore_CXXFLAGS += \
  -DNIX_STATE_DIR=\"$(NIX_ROOT)$(localstatedir)/nix\" \
  -DNIX_LOG_DIR=\"$(NIX_ROOT)$(localstatedir)/log/nix\" \
  -DNIX_CONF_DIR=\"$(NIX_ROOT)$(sysconfdir)/nix\" \
- -DNIX_BIN_DIR=\"$(NIX_ROOT)$(bindir)\" \
  -DNIX_MAN_DIR=\"$(NIX_ROOT)$(mandir)\" \
  -DLSOF=\"$(NIX_ROOT)$(lsof)\"
 

@@ -4,6 +4,7 @@
 #include "file-system.hh"
 #include "child.hh"
 #include "strings.hh"
+#include "executable-path.hh"
 
 namespace nix {
 
@@ -16,11 +17,18 @@ HookInstance::HookInstance()
     if (buildHookArgs.empty())
         throw Error("'build-hook' setting is empty");
 
-    auto buildHook = canonPath(buildHookArgs.front());
+    std::filesystem::path buildHook = buildHookArgs.front();
     buildHookArgs.pop_front();
 
+    try {
+        buildHook = ExecutablePath::load().findPath(buildHook);
+    } catch (ExecutableLookupError & e) {
+        e.addTrace(nullptr, "while resolving the 'build-hook' setting'");
+        throw;
+    }
+
     Strings args;
-    args.push_back(std::string(baseNameOf(buildHook)));
+    args.push_back(buildHook.filename().string());
 
     for (auto & arg : buildHookArgs)
         args.push_back(arg);
@@ -59,7 +67,7 @@ HookInstance::HookInstance()
         if (dup2(builderOut.readSide.get(), 5) == -1)
             throw SysError("dupping builder's stdout/stderr");
 
-        execv(buildHook.c_str(), stringsToCharPtrs(args).data());
+        execv(buildHook.native().c_str(), stringsToCharPtrs(args).data());
 
         throw SysError("executing '%s'", buildHook);
     });
