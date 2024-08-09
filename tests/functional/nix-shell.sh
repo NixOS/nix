@@ -65,6 +65,25 @@ chmod a+rx $TEST_ROOT/shell.shebang.sh
 output=$($TEST_ROOT/shell.shebang.sh abc def)
 [ "$output" = "foo bar abc def" ]
 
+# Test nix-shell shebang mode with an alternate working directory
+sed -e "s|@ENV_PROG@|$(type -P env)|" shell.shebang.expr > $TEST_ROOT/shell.shebang.expr
+chmod a+rx $TEST_ROOT/shell.shebang.expr
+# Should fail due to expressions using relative path
+! $TEST_ROOT/shell.shebang.expr bar
+cp shell.nix config.nix $TEST_ROOT
+# Should succeed
+echo "cwd: $PWD"
+output=$($TEST_ROOT/shell.shebang.expr bar)
+[ "$output" = foo ]
+
+# Test nix-shell shebang mode with an alternate working directory
+sed -e "s|@ENV_PROG@|$(type -P env)|" shell.shebang.legacy.expr > $TEST_ROOT/shell.shebang.legacy.expr
+chmod a+rx $TEST_ROOT/shell.shebang.legacy.expr
+# Should fail due to expressions using relative path
+mkdir -p "$TEST_ROOT/somewhere-unrelated"
+output="$(cd "$TEST_ROOT/somewhere-unrelated"; $TEST_ROOT/shell.shebang.legacy.expr bar;)"
+[[ $(realpath "$output") = $(realpath "$TEST_ROOT/somewhere-unrelated") ]]
+
 # Test nix-shell shebang mode again with metacharacters in the filename.
 # First word of filename is chosen to not match any file in the test root.
 sed -e "s|@ENV_PROG@|$(type -P env)|" shell.shebang.sh > $TEST_ROOT/spaced\ \\\'\"shell.shebang.sh

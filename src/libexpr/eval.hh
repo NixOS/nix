@@ -130,7 +130,7 @@ struct Constant
     typedef std::map<std::string, Value *> ValMap;
 #endif
 
-typedef std::map<PosIdx, DocComment> DocCommentMap;
+typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
 
 struct Env
 {
@@ -335,7 +335,7 @@ private:
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
      * Grouped by file.
      */
-    std::map<SourcePath, DocCommentMap> positionToDocComment;
+    std::unordered_map<SourcePath, DocCommentMap> positionToDocComment;
 
     LookupPath lookupPath;
 
@@ -654,6 +654,15 @@ public:
      * elements and attributes are compared recursively.
      */
     bool eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx);
+
+    /**
+     * Like `eqValues`, but throws an `AssertionError` if not equal.
+     *
+     * WARNING:
+     * Callers should call `eqValues` first and report if `assertEqValues` behaves
+     * incorrectly. (e.g. if it doesn't throw if eqValues returns false or vice versa)
+     */
+    void assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx);
 
     bool isFunctor(Value & fun);
 

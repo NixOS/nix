@@ -15,3 +15,8 @@ libflake_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetcher
 libflake_LDFLAGS += $(THREAD_LDFLAGS)
 
 libflake_LIBS = libutil libstore libfetchers libexpr
+
+$(eval $(call install-file-in, $(buildprefix)$(d)/flake/nix-flake.pc, $(libdir)/pkgconfig, 0644))
+
+$(foreach i, $(wildcard src/libflake/flake/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix/flake, 0644)))

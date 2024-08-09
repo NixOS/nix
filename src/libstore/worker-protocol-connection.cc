@@ -5,6 +5,8 @@
 
 namespace nix {
 
+const std::set<WorkerProto::Feature> WorkerProto::allFeatures{};
+
 WorkerProto::BasicClientConnection::~BasicClientConnection()
 {
     try {
@@ -58,7 +60,7 @@ std::exception_ptr WorkerProto::BasicClientConnection::processStderrReturn(Sink 
         }
 
         else if (msg == STDERR_ERROR) {
-            if (GET_PROTOCOL_MINOR(daemonVersion) >= 26) {
+            if (GET_PROTOCOL_MINOR(protoVersion) >= 26) {
                 ex = std::make_exception_ptr(readError(from));
             } else {
                 auto error = readString(from);
@@ -114,7 +116,7 @@ std::exception_ptr WorkerProto::BasicClientConnection::processStderrReturn(Sink 
             // explain to users what's going on when their daemon is
             // older than #4628 (2023).
             if (experimentalFeatureSettings.isEnabled(Xp::DynamicDerivations)
-                && GET_PROTOCOL_MINOR(daemonVersion) <= 35) {
+                && GET_PROTOCOL_MINOR(protoVersion) <= 35) {
                 auto m = e.msg();
                 if (m.find("parsing derivation") != std::string::npos && m.find("expected string") != std::string::npos
                     && m.find("Derive([") != std::string::npos)
@@ -137,8 +139,21 @@ void WorkerProto::BasicClientConnection::processStderr(bool * daemonException, S
     }
 }
 
-WorkerProto::Version
-WorkerProto::BasicClientConnection::handshake(BufferedSink & to, Source & from, WorkerProto::Version localVersion)
+static std::set<WorkerProto::Feature>
+intersectFeatures(const std::set<WorkerProto::Feature> & a, const std::set<WorkerProto::Feature> & b)
+{
+    std::set<WorkerProto::Feature> res;
+    for (auto & x : a)
+        if (b.contains(x))
+            res.insert(x);
+    return res;
+}
+
+std::tuple<WorkerProto::Version, std::set<WorkerProto::Feature>> WorkerProto::BasicClientConnection::handshake(
+    BufferedSink & to,
+    Source & from,
+    WorkerProto::Version localVersion,
+    const std::set<WorkerProto::Feature> & supportedFeatures)
 {
     to << WORKER_MAGIC_1 << localVersion;
     to.flush();
@@ -152,13 +167,25 @@ WorkerProto::BasicClientConnection::handshake(BufferedSink & to, Source & from, 
         throw Error("Nix daemon protocol version not supported");
     if (GET_PROTOCOL_MINOR(daemonVersion) < 10)
         throw Error("the Nix daemon version is too old");
-    to << localVersion;
 
-    return std::min(daemonVersion, localVersion);
+    auto protoVersion = std::min(daemonVersion, localVersion);
+
+    /* Exchange features. */
+    std::set<WorkerProto::Feature> daemonFeatures;
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 38) {
+        to << supportedFeatures;
+        to.flush();
+        daemonFeatures = readStrings<std::set<WorkerProto::Feature>>(from);
+    }
+
+    return {protoVersion, intersectFeatures(daemonFeatures, supportedFeatures)};
 }
 
-WorkerProto::Version
-WorkerProto::BasicServerConnection::handshake(BufferedSink & to, Source & from, WorkerProto::Version localVersion)
+std::tuple<WorkerProto::Version, std::set<WorkerProto::Feature>> WorkerProto::BasicServerConnection::handshake(
+    BufferedSink & to,
+    Source & from,
+    WorkerProto::Version localVersion,
+    const std::set<WorkerProto::Feature> & supportedFeatures)
 {
     unsigned int magic = readInt(from);
     if (magic != WORKER_MAGIC_1)
@@ -166,22 +193,33 @@ WorkerProto::BasicServerConnection::handshake(BufferedSink & to, Source & from, 
     to << WORKER_MAGIC_2 << localVersion;
     to.flush();
     auto clientVersion = readInt(from);
-    return std::min(clientVersion, localVersion);
+
+    auto protoVersion = std::min(clientVersion, localVersion);
+
+    /* Exchange features. */
+    std::set<WorkerProto::Feature> clientFeatures;
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 38) {
+        clientFeatures = readStrings<std::set<WorkerProto::Feature>>(from);
+        to << supportedFeatures;
+        to.flush();
+    }
+
+    return {protoVersion, intersectFeatures(clientFeatures, supportedFeatures)};
 }
 
 WorkerProto::ClientHandshakeInfo WorkerProto::BasicClientConnection::postHandshake(const StoreDirConfig & store)
 {
     WorkerProto::ClientHandshakeInfo res;
 
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 14) {
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 14) {
         // Obsolete CPU affinity.
         to << 0;
     }
 
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 11)
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 11)
         to << false; // obsolete reserveSpace
 
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 33)
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 33)
         to.flush();
 
     return WorkerProto::Serialise<ClientHandshakeInfo>::read(store, *this);
@@ -189,12 +227,12 @@ WorkerProto::ClientHandshakeInfo WorkerProto::BasicClientConnection::postHandsha
 
 void WorkerProto::BasicServerConnection::postHandshake(const StoreDirConfig & store, const ClientHandshakeInfo & info)
 {
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from)) {
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 14 && readInt(from)) {
         // Obsolete CPU affinity.
         readInt(from);
     }
 
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 11)
         readInt(from); // obsolete reserveSpace
 
     WorkerProto::write(store, *this, info);
@@ -212,7 +250,7 @@ UnkeyedValidPathInfo WorkerProto::BasicClientConnection::queryPathInfo(
             throw InvalidPath(std::move(e.info()));
         throw;
     }
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 17) {
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 17) {
         bool valid;
         from >> valid;
         if (!valid)
@@ -224,10 +262,10 @@ UnkeyedValidPathInfo WorkerProto::BasicClientConnection::queryPathInfo(
 StorePathSet WorkerProto::BasicClientConnection::queryValidPaths(
     const StoreDirConfig & store, bool * daemonException, const StorePathSet & paths, SubstituteFlag maybeSubstitute)
 {
-    assert(GET_PROTOCOL_MINOR(daemonVersion) >= 12);
+    assert(GET_PROTOCOL_MINOR(protoVersion) >= 12);
     to << WorkerProto::Op::QueryValidPaths;
     WorkerProto::write(store, *this, paths);
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 27) {
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 27) {
         to << maybeSubstitute;
     }
     processStderr(daemonException);

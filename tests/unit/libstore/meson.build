@@ -25,6 +25,8 @@ deps_public_maybe_subproject = [
 ]
 subdir('build-utils-meson/subprojects')
 
+subdir('build-utils-meson/threads')
+
 subdir('build-utils-meson/export-all-symbols')
 
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
@@ -58,7 +60,11 @@ sources = files(
   'derivation.cc',
   'derived-path.cc',
   'downstream-placeholder.cc',
+  'http-binary-cache-store.cc',
   'legacy-ssh-store.cc',
+  'local-binary-cache-store.cc',
+  'local-overlay-store.cc',
+  'local-store.cc',
   'machines.cc',
   'nar-info-disk-cache.cc',
   'nar-info.cc',
@@ -67,9 +73,11 @@ sources = files(
   'path-info.cc',
   'path.cc',
   'references.cc',
+  's3-binary-cache-store.cc',
   'serve-protocol.cc',
   'ssh-store.cc',
   'store-reference.cc',
+  'uds-remote-store.cc',
   'worker-protocol.cc',
 )
 

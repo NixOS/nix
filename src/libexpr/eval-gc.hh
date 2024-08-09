@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include <cstddef>
+
 namespace nix {
 
 /**
@@ -13,4 +15,11 @@ void initGC();
  */
 void assertGCInitialized();
 
-}
+#ifdef HAVE_BOEHMGC
+/**
+ * The number of GC cycles since initGC().
+ */
+size_t getGCCycles();
+#endif
+
+} // namespace nix

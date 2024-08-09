@@ -1,4 +1,5 @@
 #!/usr/bin/env nix
+# vim: set filetype=bash:
 #!nix shell .#changelog-d --command bash
 
 # --- CONFIGURATION ---
@@ -151,6 +152,13 @@ section_title="Release $version_full ($DATE)"
   echo "# $section_title"
   echo
   changelog-d doc/manual/rl-next | sed -e 's/ *$//'
+
+  if ! $IS_PATCH; then
+    echo
+    echo "# Contributors"
+    echo
+    VERSION=$version_full ./maintainers/release-credits
+  fi
 ) | tee -a $file
 
 log "Wrote $file"

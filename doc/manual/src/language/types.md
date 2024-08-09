@@ -50,8 +50,37 @@ The function [`builtins.isString`](builtins.md#builtins-isString) can be used to
 
 ### Path {#type-path}
 
-<!-- TODO(@rhendric, #10970): Incorporate content from syntax.md#path-literal -->
+A _path_ in the Nix language is an immutable, finite-length sequence of bytes starting with `/`, representing a POSIX-style, canonical file system path.
+Path values are distinct from string values, even if they contain the same sequence of bytes.
+Operations that produce paths will simplify the result as the standard C function [`realpath`] would, except that there is no symbolic link resolution.
 
+[`realpath`]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/realpath.html
+
+Paths are suitable for referring to local files, and are often preferable over strings.
+- Path values do not contain trailing or duplicate slashes, `.`, or `..`.
+- Relative path literals are automatically resolved relative to their [base directory].
+- Tooling can recognize path literals and provide additional features, such as autocompletion, refactoring automation and jump-to-file.
+
+[base directory]: @docroot@/glossary.md#gloss-base-directory
+
+A file is not required to exist at a given path in order for that path value to be valid, but a path that is converted to a string with [string interpolation] or [string-and-path concatenation] must resolve to a readable file or directory which will be copied into the Nix store.
+For instance, evaluating `"${./foo.txt}"` will cause `foo.txt` from the same directory to be copied into the Nix store and result in the string `"/nix/store/<hash>-foo.txt"`.
+Operations such as [`import`] can also expect a path to resolve to a readable file or directory.
+
+[string interpolation]: string-interpolation.md#interpolated-expression
+[string-and-path concatenation]: operators.md#string-and-path-concatenation
+[`import`]: builtins.md#builtins-import
+
+> **Note**
+>
+> The Nix language assumes that all input files will remain _unchanged_ while evaluating a Nix expression.
+> For example, assume you used a file path in an interpolated string during a `nix repl` session.
+> Later in the same session, after having changed the file contents, evaluating the interpolated string with the file path again might not return a new [store path], since Nix might not re-read the file contents.
+> Use `:r` to reset the repl as needed.
+
+[store path]: @docroot@/store/store-path.md
+
+Path values can be expressed as [path literals](syntax.md#path-literal).
 The function [`builtins.isPath`](builtins.md#builtins-isPath) can be used to determine if a value is a path.
 
 ### Null {#type-null}

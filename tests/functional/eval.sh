@@ -58,3 +58,7 @@ fi
 # Test that unknown settings are warned about
 out="$(expectStderr 0 nix eval --option foobar baz --expr '""' --raw)"
 [[ "$(echo "$out" | grep foobar | wc -l)" = 1 ]]
+
+# Test flag alias
+out="$(nix eval --expr '{}' --build-cores 1)"
+[[ "$(echo "$out" | wc -l)" = 1 ]]

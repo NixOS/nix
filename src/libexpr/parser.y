@@ -48,7 +48,7 @@
 
 namespace nix {
 
-typedef std::map<PosIdx, DocComment> DocCommentMap;
+typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
 
 Expr * parseExprFromBuf(
     char * text,
@@ -99,6 +99,14 @@ static void setDocPosition(const LexerState & lexerState, ExprLambda * lambda, P
     }
 }
 
+static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
+    if (auto e2 = dynamic_cast<ExprCall *>(fn)) {
+        e2->args.push_back(arg);
+        return fn;
+    }
+    return new ExprCall(pos, fn, {arg});
+}
+
 
 %}
 
@@ -123,6 +131,7 @@ static void setDocPosition(const LexerState & lexerState, ExprLambda * lambda, P
 
 %type <e> start expr expr_function expr_if expr_op
 %type <e> expr_select expr_simple expr_app
+%type <e> expr_pipe_from expr_pipe_into
 %type <list> expr_list
 %type <attrs> binds
 %type <formals> formals
@@ -140,6 +149,7 @@ static void setDocPosition(const LexerState & lexerState, ExprLambda * lambda, P
 %token <path> PATH HPATH SPATH PATH_END
 %token <uri> URI
 %token IF THEN ELSE ASSERT WITH LET IN_KW REC INHERIT EQ NEQ AND OR IMPL OR_KW
+%token PIPE_FROM PIPE_INTO /* <| and |> */
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
 %token ELLIPSIS
@@ -206,7 +216,19 @@ expr_function
 
 expr_if
   : IF expr THEN expr ELSE expr { $$ = new ExprIf(CUR_POS, $2, $4, $6); }
+  | expr_pipe_from
+  | expr_pipe_into
   | expr_op
+  ;
+
+expr_pipe_from
+  : expr_op PIPE_FROM expr_pipe_from { $$ = makeCall(state->at(@2), $1, $3); }
+  | expr_op PIPE_FROM expr_op        { $$ = makeCall(state->at(@2), $1, $3); }
+  ;
+
+expr_pipe_into
+  : expr_pipe_into PIPE_INTO expr_op { $$ = makeCall(state->at(@2), $3, $1); }
+  | expr_op        PIPE_INTO expr_op { $$ = makeCall(state->at(@2), $3, $1); }
   ;
 
 expr_op
@@ -233,13 +255,7 @@ expr_op
   ;
 
 expr_app
-  : expr_app expr_select {
-      if (auto e2 = dynamic_cast<ExprCall *>($1)) {
-          e2->args.push_back($2);
-          $$ = $1;
-      } else
-          $$ = new ExprCall(CUR_POS, $1, {$2});
-  }
+  : expr_app expr_select { $$ = makeCall(CUR_POS, $1, $2); }
   | expr_select
   ;
 

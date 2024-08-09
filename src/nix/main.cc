@@ -161,7 +161,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         {"ls-store", { AliasStatus::Deprecated, {"store", "ls"}}},
         {"make-content-addressable", { AliasStatus::Deprecated, {"store", "make-content-addressed"}}},
         {"optimise-store", { AliasStatus::Deprecated, {"store", "optimise"}}},
-        {"ping-store", { AliasStatus::Deprecated, {"store", "ping"}}},
+        {"ping-store", { AliasStatus::Deprecated, {"store", "info"}}},
         {"sign-paths", { AliasStatus::Deprecated, {"store", "sign"}}},
         {"shell", { AliasStatus::AcceptedShorthand, {"env", "shell"}}},
         {"show-derivation", { AliasStatus::Deprecated, {"derivation", "show"}}},

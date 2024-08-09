@@ -217,7 +217,7 @@ ReplExitStatus NixRepl::mainLoop()
                 case ProcessLineResult::PromptAgain:
                     break;
                 default:
-                    abort();
+                    unreachable();
             }
         } catch (ParseError & e) {
             if (e.msg().find("unexpected end of file") != std::string::npos) {
@@ -644,9 +644,6 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 fallbackPos = attr->pos;
                 fallbackDoc = state->getDocCommentForPos(fallbackPos);
             }
-
-        } else {
-            evalString(arg, v);
         }
 
         evalString(arg, v);

@@ -7,6 +7,7 @@
 
 #include "types.hh"
 #include "chunked-vector.hh"
+#include "error.hh"
 
 namespace nix {
 
@@ -69,6 +70,8 @@ public:
 
     auto operator<=>(const Symbol other) const { return id <=> other.id; }
     bool operator==(const Symbol other) const { return id == other.id; }
+
+    friend class std::hash<Symbol>;
 };
 
 /**
@@ -113,7 +116,7 @@ public:
     SymbolStr operator[](Symbol s) const
     {
         if (s.id == 0 || s.id > store.size())
-            abort();
+            unreachable();
         return SymbolStr(store[s.id - 1]);
     }
 
@@ -132,3 +135,12 @@ public:
 };
 
 }
+
+template<>
+struct std::hash<nix::Symbol>
+{
+    std::size_t operator()(const nix::Symbol & s) const noexcept
+    {
+        return std::hash<decltype(s.id)>{}(s.id);
+    }
+};

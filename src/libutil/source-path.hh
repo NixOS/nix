@@ -8,8 +8,7 @@
 #include "ref.hh"
 #include "canon-path.hh"
 #include "source-accessor.hh"
-
-#include <boost/functional/hash.hpp> // for boost::hash_combine
+#include "std-hash.hh"
 
 namespace nix {
 

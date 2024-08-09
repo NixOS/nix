@@ -6,7 +6,7 @@
 
 namespace nix {
 
-struct WorkerProto::BasicClientConnection
+struct WorkerProto::BasicConnection
 {
     /**
      * Send with this.
@@ -19,46 +19,14 @@ struct WorkerProto::BasicClientConnection
     FdSource from;
 
     /**
-     * Worker protocol version used for the connection.
-     *
-     * Despite its name, it is actually the maximum version both
-     * sides support. (If the maximum doesn't exist, we would fail to
-     * establish a connection and produce a value of this type.)
+     * The protocol version agreed by both sides.
      */
-    WorkerProto::Version daemonVersion;
+    WorkerProto::Version protoVersion;
 
     /**
-     * Flush to direction
+     * The set of features that both sides support.
      */
-    virtual ~BasicClientConnection();
-
-    virtual void closeWrite() = 0;
-
-    std::exception_ptr processStderrReturn(Sink * sink = 0, Source * source = 0, bool flush = true);
-
-    void processStderr(bool * daemonException, Sink * sink = 0, Source * source = 0, bool flush = true);
-
-    /**
-     * Establishes connection, negotiating version.
-     *
-     * @return the version provided by the other side of the
-     * connection.
-     *
-     * @param to Taken by reference to allow for various error handling
-     * mechanisms.
-     *
-     * @param from Taken by reference to allow for various error
-     * handling mechanisms.
-     *
-     * @param localVersion Our version which is sent over
-     */
-    static Version handshake(BufferedSink & to, Source & from, WorkerProto::Version localVersion);
-
-    /**
-     * After calling handshake, must call this to exchange some basic
-     * information abou the connection.
-     */
-    ClientHandshakeInfo postHandshake(const StoreDirConfig & store);
+    std::set<Feature> features;
 
     /**
      * Coercion to `WorkerProto::ReadConn`. This makes it easy to use the
@@ -72,7 +40,7 @@ struct WorkerProto::BasicClientConnection
     {
         return WorkerProto::ReadConn{
             .from = from,
-            .version = daemonVersion,
+            .version = protoVersion,
         };
     }
 
@@ -88,9 +56,52 @@ struct WorkerProto::BasicClientConnection
     {
         return WorkerProto::WriteConn{
             .to = to,
-            .version = daemonVersion,
+            .version = protoVersion,
         };
     }
+};
+
+struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
+{
+    /**
+     * Flush to direction
+     */
+    virtual ~BasicClientConnection();
+
+    virtual void closeWrite() = 0;
+
+    std::exception_ptr processStderrReturn(Sink * sink = 0, Source * source = 0, bool flush = true);
+
+    void processStderr(bool * daemonException, Sink * sink = 0, Source * source = 0, bool flush = true);
+
+    /**
+     * Establishes connection, negotiating version.
+     *
+     * @return the minimum version supported by both sides and the set
+     * of protocol features supported by both sides.
+     *
+     * @param to Taken by reference to allow for various error handling
+     * mechanisms.
+     *
+     * @param from Taken by reference to allow for various error
+     * handling mechanisms.
+     *
+     * @param localVersion Our version which is sent over
+     *
+     * @param features The protocol features that we support
+     */
+    // FIXME: this should probably be a constructor.
+    static std::tuple<Version, std::set<Feature>> handshake(
+        BufferedSink & to,
+        Source & from,
+        WorkerProto::Version localVersion,
+        const std::set<Feature> & supportedFeatures);
+
+    /**
+     * After calling handshake, must call this to exchange some basic
+     * information abou the connection.
+     */
+    ClientHandshakeInfo postHandshake(const StoreDirConfig & store);
 
     void addTempRoot(const StoreDirConfig & remoteStore, bool * daemonException, const StorePath & path);
 
@@ -124,43 +135,8 @@ struct WorkerProto::BasicClientConnection
     void importPaths(const StoreDirConfig & store, bool * daemonException, Source & source);
 };
 
-struct WorkerProto::BasicServerConnection
+struct WorkerProto::BasicServerConnection : WorkerProto::BasicConnection
 {
-    /**
-     * Send with this.
-     */
-    FdSink & to;
-
-    /**
-     * Receive with this.
-     */
-    FdSource & from;
-
-    /**
-     * Worker protocol version used for the connection.
-     *
-     * Despite its name, it is actually the maximum version both
-     * sides support. (If the maximum doesn't exist, we would fail to
-     * establish a connection and produce a value of this type.)
-     */
-    WorkerProto::Version clientVersion;
-
-    operator WorkerProto::ReadConn()
-    {
-        return WorkerProto::ReadConn{
-            .from = from,
-            .version = clientVersion,
-        };
-    }
-
-    operator WorkerProto::WriteConn()
-    {
-        return WorkerProto::WriteConn{
-            .to = to,
-            .version = clientVersion,
-        };
-    }
-
     /**
      * Establishes connection, negotiating version.
      *
@@ -174,8 +150,15 @@ struct WorkerProto::BasicServerConnection
      * handling mechanisms.
      *
      * @param localVersion Our version which is sent over
+     *
+     * @param features The protocol features that we support
      */
-    static WorkerProto::Version handshake(BufferedSink & to, Source & from, WorkerProto::Version localVersion);
+    // FIXME: this should probably be a constructor.
+    static std::tuple<Version, std::set<Feature>> handshake(
+        BufferedSink & to,
+        Source & from,
+        WorkerProto::Version localVersion,
+        const std::set<Feature> & supportedFeatures);
 
     /**
      * After calling handshake, must call this to exchange some basic

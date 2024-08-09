@@ -23,21 +23,22 @@ nix_perl_conf.set('PACKAGE_VERSION', meson.project_version())
 # set error arguments
 #-------------------------------------------------
 error_args = [
-  '-Werror=unused-result',
   '-Wdeprecated-copy',
   '-Wdeprecated-declarations',
+  '-Werror=suggest-override',
+  '-Werror=unused-result',
   '-Wignored-qualifiers',
-  '-Wno-pedantic',
-  '-Wno-non-virtual-dtor',
-  '-Wno-unused-parameter',
-  '-Wno-variadic-macros',
-  '-Wno-missing-field-initializers',
-  '-Wno-unknown-warning-option',
-  '-Wno-unused-variable',
-  '-Wno-literal-suffix',
-  '-Wno-reserved-user-defined-literal',
   '-Wno-duplicate-decl-specifier',
+  '-Wno-literal-suffix',
+  '-Wno-missing-field-initializers',
+  '-Wno-non-virtual-dtor',
+  '-Wno-pedantic',
   '-Wno-pointer-bool-conversion',
+  '-Wno-reserved-user-defined-literal',
+  '-Wno-unknown-warning-option',
+  '-Wno-unused-parameter',
+  '-Wno-unused-variable',
+  '-Wno-variadic-macros',
 ]
 
 add_project_arguments(

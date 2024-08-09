@@ -1567,7 +1567,7 @@ void DerivationGoal::waiteeDone(GoalPtr waitee, ExitCode result)
 {
     Goal::waiteeDone(waitee, result);
 
-    if (!useDerivation) return;
+    if (!useDerivation || !drv) return;
     auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
     auto * dg = dynamic_cast<DerivationGoal *>(&*waitee);

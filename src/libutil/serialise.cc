@@ -190,11 +190,11 @@ struct VirtualStackAllocator {
 class DefaultStackAllocator : public StackAllocator {
     boost::coroutines2::default_stack stack;
 
-    boost::context::stack_context allocate() {
+    boost::context::stack_context allocate() override {
         return stack.allocate();
     }
 
-    void deallocate(boost::context::stack_context sctx) {
+    void deallocate(boost::context::stack_context sctx) override {
         stack.deallocate(sctx);
     }
 };
@@ -260,7 +260,7 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
                 });
             }
 
-            if (!*coro) { abort(); }
+            if (!*coro) { unreachable(); }
 
             if (!cur.empty()) {
                 CoroutineContext ctx;
@@ -271,12 +271,12 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
         void finish() override
         {
             if (!coro) return;
-            if (!*coro) abort();
+            if (!*coro) unreachable();
             {
                 CoroutineContext ctx;
                 (*coro)(true);
             }
-            if (*coro) abort();
+            if (*coro) unreachable();
         }
     };
 
@@ -316,7 +316,7 @@ std::unique_ptr<Source> sinkToSource(
                 });
             }
 
-            if (!*coro) { eof(); abort(); }
+            if (!*coro) { eof(); unreachable(); }
 
             if (pos == cur.size()) {
                 if (!cur.empty()) {

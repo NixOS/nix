@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cinttypes>
+#include <functional>
 
 namespace nix {
 
@@ -8,6 +9,7 @@ class PosIdx
 {
     friend struct LazyPosAcessors;
     friend class PosTable;
+    friend class std::hash<PosIdx>;
 
 private:
     uint32_t id;
@@ -37,8 +39,26 @@ public:
     {
         return id == other.id;
     }
+
+    size_t hash() const noexcept
+    {
+        return std::hash<uint32_t>{}(id);
+    }
 };
 
 inline PosIdx noPos = {};
 
 }
+
+namespace std {
+
+template<>
+struct hash<nix::PosIdx>
+{
+    std::size_t operator()(nix::PosIdx pos) const noexcept
+    {
+        return pos.hash();
+    }
+};
+
+} // namespace std

@@ -26,9 +26,12 @@ subproject('external-api-docs')
 subproject('libutil-c')
 subproject('libstore-c')
 subproject('libexpr-c')
+subproject('libmain-c')
 
 # Language Bindings
-subproject('perl')
+if not meson.is_cross_build()
+  subproject('perl')
+endif
 
 # Testing
 subproject('nix-util-test-support')

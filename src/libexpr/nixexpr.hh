@@ -186,7 +186,7 @@ struct ExprInheritFrom : ExprVar
         this->fromWith = nullptr;
     }
 
-    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
+    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override;
 };
 
 struct ExprSelect : Expr
@@ -203,7 +203,7 @@ struct ExprSelect : Expr
      *
      * @param[out] v The attribute set that should contain the last attribute name (if it exists).
      * @return The last attribute name in `attrPath`
-     * 
+     *
      * @note This does *not* evaluate the final attribute, and does not fail if that's the only attribute that does not exist.
      */
     Symbol evalExceptFinalSelect(EvalState & state, Env & env, Value & attrs);

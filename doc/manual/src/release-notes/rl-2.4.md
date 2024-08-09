@@ -23,7 +23,7 @@ more than 2800 commits from 195 contributors since release 2.3.
 * The **`nix` command** has seen a lot of work and is now almost at
   feature parity with the old command-line interface (the `nix-*`
   commands). It aims to be [more modern, consistent and pleasant to
-  use](../contributing/cli-guideline.md) than the old CLI. It is still
+  use](../development/cli-guideline.md) than the old CLI. It is still
   marked as experimental but its interface should not change much
   anymore in future releases.
 

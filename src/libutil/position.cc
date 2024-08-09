@@ -119,12 +119,12 @@ std::optional<std::string> Pos::getSnippetUpTo(const Pos & end) const {
     if (auto source = getSource()) {
 
         auto firstLine = LinesIterator(*source);
-        for (auto i = 1; i < this->line; ++i) {
+        for (uint32_t i = 1; i < this->line; ++i) {
             ++firstLine;
         }
 
         auto lastLine = LinesIterator(*source);
-        for (auto i = 1; i < end.line; ++i) {
+        for (uint32_t i = 1; i < end.line; ++i) {
             ++lastLine;
         }
 
