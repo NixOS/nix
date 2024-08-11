@@ -18,6 +18,7 @@
 #include "markdown.hh"
 #include "users.hh"
 
+#include <filesystem>
 #include <nlohmann/json.hpp>
 #include <iomanip>
 
@@ -870,27 +871,27 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 "If you've set '%s' to a string, try using a path instead.",
                 templateDir, templateDirAttr->getAttrPathStr()).debugThrow();
 
-        std::vector<Path> changedFiles;
-        std::vector<Path> conflictedFiles;
+        std::vector<std::filesystem::path> changedFiles;
+        std::vector<std::filesystem::path> conflictedFiles;
 
-        std::function<void(const Path & from, const Path & to)> copyDir;
-        copyDir = [&](const Path & from, const Path & to)
+        std::function<void(const std::filesystem::path & from, const std::filesystem::path & to)> copyDir;
+        copyDir = [&](const std::filesystem::path & from, const std::filesystem::path & to)
         {
             createDirs(to);
 
             for (auto & entry : std::filesystem::directory_iterator{from}) {
                 checkInterrupt();
-                auto from2 = entry.path().string();
-                auto to2 = to + "/" + entry.path().filename().string();
-                auto st = lstat(from2);
-                if (S_ISDIR(st.st_mode))
+                auto from2 = entry.path();
+                auto to2 = to / entry.path().filename();
+                auto st = entry.symlink_status();
+                if (std::filesystem::is_directory(st))
                     copyDir(from2, to2);
-                else if (S_ISREG(st.st_mode)) {
+                else if (std::filesystem::is_regular_file(st)) {
                     auto contents = readFile(from2);
                     if (pathExists(to2)) {
                         auto contents2 = readFile(to2);
                         if (contents != contents2) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2, from2);
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2.string());
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
@@ -899,11 +900,11 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     } else
                         writeFile(to2, contents);
                 }
-                else if (S_ISLNK(st.st_mode)) {
+                else if (std::filesystem::is_symlink(st)) {
                     auto target = readLink(from2);
                     if (pathExists(to2)) {
                         if (readLink(to2) != target) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2, from2);
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2.string());
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
