@@ -83,4 +83,4 @@ For larger changes see the [Nix reference manual](https://nix.dev/manual/nix/dev
 ## Getting help
 
 Whenever you're stuck or do not know how to proceed, you can always ask for help.
-The appropriate channels to do so can be found on the [NixOS Community](https://nixos.org/community/) page.
+We invite you to use our [Matrix room](https://matrix.to/#/#nix-dev:nixos.org) to ask questions.
