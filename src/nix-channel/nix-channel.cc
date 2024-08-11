@@ -17,7 +17,7 @@ using namespace nix;
 typedef std::map<std::string, std::string> Channels;
 
 static Channels channels;
-static Path channelsList;
+static std::filesystem::path channelsList;
 
 // Reads the list of channels.
 static void readChannels()
@@ -41,7 +41,7 @@ static void writeChannels()
 {
     auto channelsFD = AutoCloseFD{open(channelsList.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0644)};
     if (!channelsFD)
-        throw SysError("opening '%1%' for writing", channelsList);
+        throw SysError("opening '%1%' for writing", channelsList.string());
     for (const auto & channel : channels)
         writeFull(channelsFD.get(), channel.second + " " + channel.first + "\n");
 }
@@ -165,7 +165,7 @@ static int main_nix_channel(int argc, char ** argv)
     {
         // Figure out the name of the `.nix-channels' file to use
         auto home = getHome();
-        channelsList = settings.useXDGBaseDirectories ? createNixStateDir() + "/channels" : home + "/.nix-channels";
+        channelsList = settings.useXDGBaseDirectories ? createNixStateDir() + OS_STR("/channels") : home + OS_STR("/.nix-channels");
         nixDefExpr = getNixDefExpr();
 
         // Figure out the name of the channels profile.

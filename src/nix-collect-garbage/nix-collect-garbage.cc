@@ -21,7 +21,7 @@ bool dryRun = false;
  * Of course, this makes rollbacks to before this point in time
  * impossible. */
 
-void removeOldGenerations(std::string dir)
+void removeOldGenerations(std::filesystem::path dir)
 {
     if (access(dir.c_str(), R_OK) != 0) return;
 
@@ -81,7 +81,7 @@ static int main_nix_collect_garbage(int argc, char * * argv)
         });
 
         if (removeOld) {
-            std::set<Path> dirsToClean = {
+            std::set<std::filesystem::path> dirsToClean = {
                 profilesDir(), settings.nixStateDir + "/profiles", dirOf(getDefaultProfile())};
             for (auto & dir : dirsToClean)
                 removeOldGenerations(dir);
