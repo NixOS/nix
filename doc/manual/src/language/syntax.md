@@ -15,6 +15,13 @@ See [String literals](string-literals.md).
   Numbers, which can be *integers* (like `123`) or *floating point*
   (like `123.43` or `.27e13`).
 
+  Integers in the Nix language are 64-bit [two's complement] signed integers, with a range of -9223372036854775808 to 9223372036854775807, inclusive.
+
+  [two's complement]: https://en.wikipedia.org/wiki/Two%27s_complement
+
+  Note that negative numeric literals are actually parsed as unary negation of positive numeric literals.
+  This means that the minimum integer `-9223372036854775808` cannot be written as-is as a literal, since the positive number `9223372036854775808` is one past the maximum range.
+
   See [arithmetic] and [comparison] operators for semantics.
 
   [arithmetic]: ./operators.md#arithmetic

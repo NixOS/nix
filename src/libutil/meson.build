@@ -172,6 +172,7 @@ headers = [config_h] + files(
   'args/root.hh',
   'callback.hh',
   'canon-path.hh',
+  'checked-arithmetic.hh',
   'chunked-vector.hh',
   'closure.hh',
   'comparator.hh',

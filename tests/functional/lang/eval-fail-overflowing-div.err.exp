@@ -1,0 +1,23 @@
+error:
+       … while calling the 'seq' builtin
+         at /pwd/lang/eval-fail-overflowing-div.nix:7:4:
+            6|   b = -1;
+            7| in builtins.seq intMin (builtins.seq b (intMin / b))
+             |    ^
+            8|
+
+       … while calling the 'seq' builtin
+         at /pwd/lang/eval-fail-overflowing-div.nix:7:25:
+            6|   b = -1;
+            7| in builtins.seq intMin (builtins.seq b (intMin / b))
+             |                         ^
+            8|
+
+       … while calling the 'div' builtin
+         at /pwd/lang/eval-fail-overflowing-div.nix:7:48:
+            6|   b = -1;
+            7| in builtins.seq intMin (builtins.seq b (intMin / b))
+             |                                                ^
+            8|
+
+       error: integer overflow in dividing -9223372036854775808 / -1
