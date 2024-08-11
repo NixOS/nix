@@ -11,6 +11,7 @@
 #include "source-accessor.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
+#include <filesystem>
 
 #if __linux__
 # include <sys/mount.h>
@@ -169,7 +170,7 @@ void chrootHelper(int argc, char * * argv)
     if (!pathExists(storeDir)) {
         // FIXME: Use overlayfs?
 
-        Path tmpDir = createTempDir();
+        std::filesystem::path tmpDir = createTempDir();
 
         createDirs(tmpDir + storeDir);
 
@@ -178,16 +179,16 @@ void chrootHelper(int argc, char * * argv)
 
         for (auto entry : std::filesystem::directory_iterator{"/"}) {
             checkInterrupt();
-            auto src = entry.path().string();
-            Path dst = tmpDir + "/" + entry.path().filename().string();
+            auto src = entry.path();
+            Path dst = tmpDir / entry.path().filename();
             if (pathExists(dst)) continue;
-            auto st = lstat(src);
-            if (S_ISDIR(st.st_mode)) {
+            auto st = entry.symlink_status();
+            if (std::filesystem::is_directory(st)) {
                 if (mkdir(dst.c_str(), 0700) == -1)
                     throw SysError("creating directory '%s'", dst);
                 if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
                     throw SysError("mounting '%s' on '%s'", src, dst);
-            } else if (S_ISLNK(st.st_mode))
+            } else if (std::filesystem::is_symlink(st))
                 createSymlink(readLink(src), dst);
         }
 

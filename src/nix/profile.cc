@@ -122,9 +122,9 @@ struct ProfileManifest
 
     ProfileManifest() { }
 
-    ProfileManifest(EvalState & state, const Path & profile)
+    ProfileManifest(EvalState & state, const std::filesystem::path & profile)
     {
-        auto manifestPath = profile + "/manifest.json";
+        auto manifestPath = profile / "manifest.json";
 
         if (pathExists(manifestPath)) {
             auto json = nlohmann::json::parse(readFile(manifestPath));
@@ -176,12 +176,12 @@ struct ProfileManifest
             }
         }
 
-        else if (pathExists(profile + "/manifest.nix")) {
+        else if (pathExists(profile / "manifest.nix")) {
             // FIXME: needed because of pure mode; ugly.
-            state.allowPath(state.store->followLinksToStore(profile));
-            state.allowPath(state.store->followLinksToStore(profile + "/manifest.nix"));
+            state.allowPath(state.store->followLinksToStore(profile.string()));
+            state.allowPath(state.store->followLinksToStore((profile / "manifest.nix").string()));
 
-            auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profile));
+            auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profile.string()));
 
             for (auto & packageInfo : packageInfos) {
                 ProfileElement element;
