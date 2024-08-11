@@ -64,7 +64,7 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
      Co-authored-by: User Name <user@example.com>
      ```
 
-     Use the `git cherry-pick -x` flag, and amend the commits to link to forks when applicable.
+     When cherry-picking from a different repository, use the `-x` flag, and then amend the commits to turn the hashes into URLs.
 
    * Make sure to have [a clean history of commits on your branch by using rebase](https://www.digitalocean.com/community/tutorials/how-to-rebase-and-update-a-pull-request).
    * [Mark the pull request as draft](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request) if you're not done with the changes.
