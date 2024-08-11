@@ -52,6 +52,20 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
 
      Link related issues to inform interested parties and future contributors about your change.
      If your pull request closes one or multiple issues, mention that in the description using `Closes: #<number>`, as it will then happen automatically when your change is merged.
+   * Credit original authors when you're reusing or building on their work.
+   * Link to relevant changes in other projects, so that others can understand the full context of the change in the future when you or someone else will change or troubleshoot the code.
+     This is especially important when your change is based on work done in other repositories.
+
+     Example:
+     ```
+     This is based on the work of @user in <url>.
+     This solution took inspiration from <url>.
+
+     Co-authored-by: User Name <user@example.com>
+     ```
+
+     Use the `git cherry-pick -x` flag, and amend the commits to link to forks when applicable.
+
    * Make sure to have [a clean history of commits on your branch by using rebase](https://www.digitalocean.com/community/tutorials/how-to-rebase-and-update-a-pull-request).
    * [Mark the pull request as draft](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request) if you're not done with the changes.
 
