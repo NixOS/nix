@@ -331,7 +331,7 @@ private:
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
      * Grouped by file.
      */
-    std::unordered_map<SourcePath, DocCommentMap> positionToDocComment;
+    SharedSync<std::unordered_map<SourcePath, DocCommentMap>> positionToDocComment;
 
     LookupPath lookupPath;
 

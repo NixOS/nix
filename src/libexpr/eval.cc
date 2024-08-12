@@ -3191,10 +3191,10 @@ Expr * EvalState::parse(
     std::shared_ptr<StaticEnv> & staticEnv)
 {
     DocCommentMap tmpDocComments; // Only used when not origin is not a SourcePath
-    DocCommentMap *docComments = &tmpDocComments;
+    auto * docComments = &tmpDocComments;
 
     if (auto sourcePath = std::get_if<SourcePath>(&origin)) {
-        auto [it, _] = positionToDocComment.try_emplace(*sourcePath);
+        auto [it, _] = positionToDocComment.lock()->try_emplace(*sourcePath);
         docComments = &it->second;
     }
 
@@ -3212,8 +3212,10 @@ DocComment EvalState::getDocCommentForPos(PosIdx pos)
     if (!path)
         return {};
 
-    auto table = positionToDocComment.find(*path);
-    if (table == positionToDocComment.end())
+    auto positionToDocComment_ = positionToDocComment.readLock();
+
+    auto table = positionToDocComment_->find(*path);
+    if (table == positionToDocComment_->end())
         return {};
 
     auto it = table->second.find(pos);
