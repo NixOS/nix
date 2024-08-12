@@ -1263,6 +1263,46 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             attrPath.size() >= 1 && attrPathS[0] == "hydraJobs" ? "derivation" :
                             "package";
                         if (description && !description->empty()) {
+
+                            // Takes a string and returns the # of characters displayed
+                            auto columnLengthOfString = [](std::string_view s) -> unsigned int {
+                                unsigned int columnCount = 0;
+                                for (auto i = s.begin(); i < s.end();) {
+                                    // Test first character to determine if it is one of
+                                    // treeConn, treeLast, treeLine
+                                    if (*i == -30) {
+                                        i += 3;
+                                        ++columnCount;
+                                    }
+                                    // Escape sequences
+                                    // https://en.wikipedia.org/wiki/ANSI_escape_code
+                                    else if (*i == '\e') {
+                                        // Eat '['
+                                        if (*(++i) == '[') {
+                                            ++i;
+                                            // Eat parameter bytes
+                                            while(*i >= 0x30 && *i <= 0x3f) ++i;
+
+                                            // Eat intermediate bytes
+                                            while(*i >= 0x20 && *i <= 0x2f) ++i;
+
+                                            // Eat final byte
+                                            if(*i >= 0x40 && *i <= 0x73) ++i;
+                                        }
+                                        else {
+                                            // Eat Fe Escape sequence
+                                            if (*i >= 0x40 && *i <= 0x5f) ++i;
+                                        }
+                                    }
+                                    else {
+                                        ++i;
+                                        ++columnCount;
+                                    }
+                                }
+
+                                return columnCount;
+                            };
+
                             // Maximum length to print
                             size_t maxLength = getWindowSize().second > 0 ? getWindowSize().second : 80;
 
@@ -1271,29 +1311,25 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             auto newLinePos = trimmed.find('\n');
                             auto length = newLinePos != std::string::npos ? newLinePos : trimmed.length();
 
-                            // Sanitize the description and calculate the two parts of the line
-                            // In order to get the length of the printable characters we need to
-                            // filter out escape sequences.
                             auto beginningOfLine = fmt("%s: %s '%s'", headerPrefix, type, name);
-                            auto beginningOfLineLength = filterANSIEscapes(beginningOfLine, true).length();
-                            auto restOfLine = fmt(" - '%s'", filterANSIEscapes(trimmed, false, length));
+                            auto line = fmt("%s: %s '%s' - '%s'", headerPrefix, type, name, trimmed.substr(0, length));
 
                             // If we are already over the maximum length then do not trim
                             // and don't print the description (preserves existing behavior)
-                            if (beginningOfLineLength >= maxLength) {
+                            if (columnLengthOfString(beginningOfLine) >= maxLength) {
                                 logger->cout("%s", beginningOfLine);
                             }
+                            // If the entire line fits then print that
+                            else if (columnLengthOfString(line) < maxLength) {
+                                logger->cout("%s", line);
+                            }
+                            // Otherwise we need to truncate
                             else {
-                                auto line = beginningOfLine + restOfLine;
-                                // FIXME: Specifying `true` here gives the correct length
-                                // BUT removes colors/bold so something is not quite right here.
-                                line = filterANSIEscapes(line, true, maxLength);
+                                auto lineLength = columnLengthOfString(line);
+                                auto chopOff = lineLength - maxLength;
+                                line.resize(line.length() - chopOff);
+                                line = line.replace(line.length() - 3, 3, "...");
 
-                                // NOTE: This test might be incorrect since I get things like:
-                                // 168 or 161 > maxLength.
-                                if (line.length() > maxLength) {
-                                    line = line.replace(line.length() - 3, 3, "...");
-                                }
                                 logger->cout("%s", line);
                             }
                         }
