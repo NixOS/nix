@@ -9,6 +9,7 @@
 #include "names.hh"
 #include "progress-bar.hh"
 #include "executable-path.hh"
+#include "self-exe.hh"
 
 using namespace nix;
 
@@ -93,7 +94,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         {
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("installing '%s' into profile '%s'...", store->printStorePath(storePath), profileDir));
-            runProgram(settings.nixBinDir + "/nix-env", false,
+            runProgram(getNixBin("nix-env").string(), false,
                 {"--profile", profileDir, "-i", store->printStorePath(storePath), "--no-sandbox"});
         }
 
@@ -103,7 +104,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
     /* Return the profile in which Nix is installed. */
     Path getProfileDir(ref<Store> store)
     {
-        auto whereOpt = ExecutablePath::load().find(OS_STR("nix-env"));
+        auto whereOpt = ExecutablePath::load().findName(OS_STR("nix-env"));
         if (!whereOpt)
             throw Error("couldn't figure out how Nix is installed, so I can't upgrade it");
         auto & where = *whereOpt;

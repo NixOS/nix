@@ -328,7 +328,6 @@ prefix = get_option('prefix')
 path_opts = [
   # Meson built-ins.
   'datadir',
-  'bindir',
   'mandir',
   'libdir',
   'includedir',
@@ -373,7 +372,6 @@ cpp_str_defines = {
   'NIX_STATE_DIR': state_dir / 'nix',
   'NIX_LOG_DIR':   log_dir,
   'NIX_CONF_DIR':  sysconfdir / 'nix',
-  'NIX_BIN_DIR':   bindir,
   'NIX_MAN_DIR':   mandir,
 }
 

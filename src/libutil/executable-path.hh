@@ -5,6 +5,8 @@
 
 namespace nix {
 
+MakeError(ExecutableLookupError, Error);
+
 struct ExecutablePath
 {
     std::vector<std::filesystem::path> directories;
@@ -54,9 +56,20 @@ struct ExecutablePath
      *
      * @return path to a resolved executable
      */
-    std::optional<std::filesystem::path> find(
+    std::optional<std::filesystem::path> findName(
         const OsString & exe,
         std::function<bool(const std::filesystem::path &)> isExecutableFile = isExecutableFileAmbient) const;
+
+    /**
+     * Like the `findName` but also allows a file path as input.
+     *
+     * This implements the full POSIX spec: if the path is just a name,
+     * it searches like the above. Otherwise, it returns the path as is.
+     * If (in the name case) the search fails, an exception is thrown.
+     */
+    std::filesystem::path findPath(
+        const std::filesystem::path & exe,
+        std::function<bool(const std::filesystem::path &)> isExecutable = isExecutableFileAmbient) const;
 
     bool operator==(const ExecutablePath &) const = default;
 };

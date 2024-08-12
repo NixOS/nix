@@ -33,6 +33,21 @@ subdir('build-utils-meson/threads')
 
 subdir('build-utils-meson/export-all-symbols')
 
+configdata = configuration_data()
+
+fs = import('fs')
+
+bindir = get_option('bindir')
+if not fs.is_absolute(bindir)
+  bindir = get_option('prefix') / bindir
+endif
+configdata.set_quoted('NIX_BIN_DIR', bindir)
+
+config_h = configure_file(
+  configuration : configdata,
+  output : 'config-nix-cli.hh',
+)
+
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
@@ -42,15 +57,17 @@ add_project_arguments(
   #'-include', 'config-fetchers.hh',
   '-include', 'config-main.hh',
   '-include', 'config-cmd.hh',
+  '-include', 'config-nix-cli.hh',
   language : 'cpp',
 )
 
 subdir('build-utils-meson/diagnostics')
 subdir('build-utils-meson/generate-header')
 
-nix_sources = files(
+nix_sources = [config_h] + files(
   'add-to-store.cc',
   'app.cc',
+  'self-exe.cc',
   'build.cc',
   'bundle.cc',
   'cat.cc',

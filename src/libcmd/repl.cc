@@ -7,7 +7,6 @@
 
 #include "ansicolor.hh"
 #include "shared.hh"
-#include "config-global.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "attr-path.hh"
@@ -77,10 +76,14 @@ struct NixRepl
     int displ;
     StringSet varNames;
 
+    RunNix * runNixPtr;
+
+    void runNix(Path program, const Strings & args, const std::optional<std::string> & input = {});
+
     std::unique_ptr<ReplInteracter> interacter;
 
     NixRepl(const LookupPath & lookupPath, nix::ref<Store> store,ref<EvalState> state,
-            std::function<AnnotatedValues()> getValues);
+            std::function<AnnotatedValues()> getValues, RunNix * runNix);
     virtual ~NixRepl() = default;
 
     ReplExitStatus mainLoop() override;
@@ -125,30 +128,14 @@ std::string removeWhitespace(std::string s)
 
 
 NixRepl::NixRepl(const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalState> state,
-            std::function<NixRepl::AnnotatedValues()> getValues)
+            std::function<NixRepl::AnnotatedValues()> getValues, RunNix * runNix = nullptr)
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
     , getValues(getValues)
     , staticEnv(new StaticEnv(nullptr, state->staticBaseEnv.get()))
+    , runNixPtr{runNix}
     , interacter(make_unique<ReadlineLikeInteracter>(getDataDir() + "/nix/repl-history"))
 {
-}
-
-void runNix(Path program, const Strings & args,
-    const std::optional<std::string> & input = {})
-{
-    auto subprocessEnv = getEnv();
-    subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
-    //isInteractive avoid grabling interactive commands
-    runProgram2(RunOptions {
-        .program = settings.nixBinDir+ "/" + program,
-        .args = args,
-        .environment = subprocessEnv,
-        .input = input,
-        .isInteractive = true,
-    });
-
-    return;
 }
 
 static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positions, const DebugTrace & dt)
@@ -833,9 +820,18 @@ void NixRepl::evalString(std::string s, Value & v)
 }
 
 
+void NixRepl::runNix(Path program, const Strings & args, const std::optional<std::string> & input)
+{
+    if (runNixPtr)
+        (*runNixPtr)(program, args, input);
+    else
+        throw Error("Cannot run '%s', no method of calling the Nix CLI provided", program);
+}
+
+
 std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
    const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalState> state,
-   std::function<AnnotatedValues()> getValues)
+   std::function<AnnotatedValues()> getValues, RunNix * runNix)
 {
     return std::make_unique<NixRepl>(
         lookupPath,
