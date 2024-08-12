@@ -67,8 +67,12 @@ After evaluating *attrset* and *attrpath*, the computational complexity is O(log
 
 ## Arithmetic
 
-Numbers are type-compatible:
-Pure integer operations will always return integers, whereas any operation involving at least one floating point number return a floating point number.
+Numbers will retain their type unless mixed with other numeric types:
+Pure integer operations will always return integers, whereas any operation involving at least one floating point number returns a floating point number.
+
+Evaluation of the following numeric operations throws an evaluation error:
+- Division by zero
+- Integer overflow, that is, any operation yielding a result outside of the representable range of [Nix language integers](./syntax.md#number-literal)
 
 See also [Comparison] and [Equality].
 

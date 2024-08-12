@@ -415,7 +415,7 @@ struct Common : InstallableCommand, MixProfile
 
         if (buildEnvironment.providesStructuredAttrs()) {
             fixupStructuredAttrs(
-                PATHNG_LITERAL("sh"),
+                OS_STR("sh"),
                 "NIX_ATTRS_SH_FILE",
                 buildEnvironment.getAttrsSH(),
                 rewrites,
@@ -423,7 +423,7 @@ struct Common : InstallableCommand, MixProfile
                 tmpDir
             );
             fixupStructuredAttrs(
-                PATHNG_LITERAL("json"),
+                OS_STR("json"),
                 "NIX_ATTRS_JSON_FILE",
                 buildEnvironment.getAttrsJSON(),
                 rewrites,
@@ -447,7 +447,7 @@ struct Common : InstallableCommand, MixProfile
         const BuildEnvironment & buildEnvironment,
         const std::filesystem::path & tmpDir)
     {
-        auto targetFilePath = tmpDir / PATHNG_LITERAL(".attrs.");
+        auto targetFilePath = tmpDir / OS_STR(".attrs.");
         targetFilePath += ext;
 
         writeFile(targetFilePath.string(), content);

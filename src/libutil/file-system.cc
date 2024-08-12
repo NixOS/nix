@@ -92,7 +92,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
        arbitrary (but high) limit to prevent infinite loops. */
     unsigned int followCount = 0, maxFollow = 1024;
 
-    auto ret = canonPathInner<NativePathTrait>(
+    auto ret = canonPathInner<OsPathTrait<char>>(
         path,
         [&followCount, &temp, maxFollow, resolveSymlinks]
         (std::string & result, std::string_view & remaining) {
@@ -122,7 +122,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
 
 Path dirOf(const PathView path)
 {
-    Path::size_type pos = NativePathTrait::rfindPathSep(path);
+    Path::size_type pos = OsPathTrait<char>::rfindPathSep(path);
     if (pos == path.npos)
         return ".";
     return fs::path{path}.parent_path().string();
@@ -135,10 +135,10 @@ std::string_view baseNameOf(std::string_view path)
         return "";
 
     auto last = path.size() - 1;
-    while (last > 0 && NativePathTrait::isPathSep(path[last]))
+    while (last > 0 && OsPathTrait<char>::isPathSep(path[last]))
         last -= 1;
 
-    auto pos = NativePathTrait::rfindPathSep(path, last);
+    auto pos = OsPathTrait<char>::rfindPathSep(path, last);
     if (pos == path.npos)
         pos = 0;
     else
@@ -569,7 +569,7 @@ void replaceSymlink(const Path & target, const Path & link)
 }
 
 void setWriteTime(
-    const std::filesystem::path & path,
+    const fs::path & path,
     time_t accessedTime,
     time_t modificationTime,
     std::optional<bool> optIsSymlink)
@@ -684,5 +684,19 @@ void moveFile(const Path & oldName, const Path & newName)
 }
 
 //////////////////////////////////////////////////////////////////////
+
+bool isExecutableFileAmbient(const fs::path & exe) {
+    // Check file type, because directory being executable means
+    // something completely different.
+    // `is_regular_file` follows symlinks before checking.
+    return std::filesystem::is_regular_file(exe)
+        && access(exe.string().c_str(),
+#ifdef WIN32
+        0 // TODO do better
+#else
+        X_OK
+#endif
+        ) == 0;
+}
 
 }
