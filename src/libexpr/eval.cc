@@ -1526,12 +1526,12 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
     Value vCur(fun);
 
     auto makeAppChain = [&]() {
-        vRes = vCur;
         for (auto arg : args) {
             auto fun2 = allocValue();
-            *fun2 = vRes;
-            vRes.mkPrimOpApp(fun2, arg);
+            *fun2 = vCur;
+            vCur.mkPrimOpApp(fun2, arg);
         }
+        vRes = vCur;
     };
 
     const Attr * functor;
