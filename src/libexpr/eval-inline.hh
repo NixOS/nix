@@ -146,6 +146,8 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
     }
     else if (type == tPending || type == tAwaited)
         type = waitOnThunk(v, type == tAwaited);
+    else
+        abort();
 
  done:
     if (type == tFailed)
