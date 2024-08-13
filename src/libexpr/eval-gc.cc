@@ -158,7 +158,8 @@ static size_t getFreeMem()
         std::unordered_map<std::string, std::string> fields;
         for (auto & line : tokenizeString<std::vector<std::string>>(readFile("/proc/meminfo"), "\n")) {
             auto colon = line.find(':');
-            if (colon == line.npos) continue;
+            if (colon == line.npos)
+                continue;
             fields.emplace(line.substr(0, colon), trim(line.substr(colon + 1)));
         }
 
