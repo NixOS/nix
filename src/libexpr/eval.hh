@@ -819,6 +819,9 @@ private:
     unsigned long nrOpUpdates = 0;
     unsigned long nrOpUpdateValuesCopied = 0;
     unsigned long nrListConcats = 0;
+    std::map<int, int> nrMultiConcats;
+    std::map<int, int> nrMultiConcatCapacityPercent;
+    unsigned long nrMultiConcatCapacityTotalWaste = 0;
     unsigned long nrPrimOpCalls = 0;
     unsigned long nrFunctionCalls = 0;
 

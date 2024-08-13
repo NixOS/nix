@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 
+#include "gc-small-vector.hh"
 #include "value.hh"
 #include "symbol-table.hh"
 #include "eval-error.hh"
@@ -74,6 +75,7 @@ typedef std::vector<AttrName> AttrPath;
 
 std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath);
 
+using UpdateQueue = SmallVector<const Bindings *, 64>;
 
 /* Abstract syntax of Nix expressions. */
 
@@ -91,8 +93,25 @@ struct Expr
     virtual ~Expr() { };
     virtual void show(const SymbolTable & symbols, std::ostream & str) const;
     virtual void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
+
+    /** Normal evaluation, implemented directly by all subclasses. */
     virtual void eval(EvalState & state, Env & env, Value & v);
+
+    /**
+     * Create a thunk for the delayed computation of the given expression
+     * in the given environment.  But if the expression is a variable,
+     * then look it up right away.  This significantly reduces the number
+     * of thunks allocated.
+     */
     virtual Value * maybeThunk(EvalState & state, Env & env);
+
+    /**
+     * Only called when performing an attrset update: `//` or similar.
+     * Instead of writing to a Value &, this function writes to an UpdateQueue.
+     * This allows the expression to perform multiple updates in a delayed manner, gathering up all the updates before applying them.
+     */
+    virtual void evalForUpdate(EvalState & state, Env & env, UpdateQueue & q);
+
     virtual void setName(Symbol name);
     virtual void setDocComment(DocComment docComment) { };
     virtual PosIdx getPos() const { return noPos; }
@@ -430,8 +449,44 @@ MakeBinOp(ExprOpNEq, "!=")
 MakeBinOp(ExprOpAnd, "&&")
 MakeBinOp(ExprOpOr, "||")
 MakeBinOp(ExprOpImpl, "->")
-MakeBinOp(ExprOpUpdate, "//")
 MakeBinOp(ExprOpConcatLists, "++")
+
+struct ExprOpUpdate : Expr
+{
+    PosIdx pos;
+    Expr *e1, *e2;
+    ExprOpUpdate(Expr * e1, Expr * e2)
+        : e1(e1)
+        , e2(e2){};
+    ExprOpUpdate(const PosIdx & pos, Expr * e1, Expr * e2)
+        : pos(pos)
+        , e1(e1)
+        , e2(e2){};
+    void show(const SymbolTable & symbols, std ::ostream & str) const override
+    {
+        str << "(";
+        e1->show(symbols, str);
+        str << " "
+               "//"
+               " ";
+        e2->show(symbols, str);
+        str << ")";
+    }
+    void bindVars(EvalState & es, const std ::shared_ptr<const StaticEnv> & env) override
+    {
+        e1->bindVars(es, env);
+        e2->bindVars(es, env);
+    }
+    void eval(EvalState & state, Env & env, Value & v) override;
+    PosIdx getPos() const override
+    {
+        return pos;
+    }
+
+    virtual void evalForUpdate(EvalState & state, Env & env, UpdateQueue & q) override;
+
+};
+
 
 struct ExprConcatStrings : Expr
 {

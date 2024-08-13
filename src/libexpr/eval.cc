@@ -999,10 +999,6 @@ void EvalState::mkSingleDerivedPathString(
 }
 
 
-/* Create a thunk for the delayed computation of the given expression
-   in the given environment.  But if the expression is a variable,
-   then look it up right away.  This significantly reduces the number
-   of thunks allocated. */
 Value * Expr::maybeThunk(EvalState & state, Env & env)
 {
     Value * v = state.allocValue();
@@ -1899,6 +1895,112 @@ void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 {
+
+    UpdateQueue q;
+
+    e1->evalForUpdate(state, env, q);
+    e2->evalForUpdate(state, env, q);
+
+    // k-way merge
+
+    size_t capacity = 0;
+
+    struct BindingsCursor {
+        const Bindings * bindings;
+        Bindings::size_t offset;
+
+        const Attr & front() {
+            return (*bindings)[offset];
+        }
+        /**
+         * @return false if there are no more elements
+         */
+        bool pop_front() {
+            offset++;
+            return offset < bindings->size();
+        }
+    };
+    
+    // a nested queue where the key is equal to the first and lowest name
+    std::map<std::pair<Symbol, int>, BindingsCursor> next;
+
+    // first fill next
+    int bias = 0;
+    for (auto b : q) {
+        if (b->size() == 0) continue;
+        capacity += b->size();
+        next.insert_or_assign({b->begin()->name, bias}, BindingsCursor {b, 0});
+
+        // The `//` operator is "right-biased", which means `{ a = "L"; } // { a = "R"; }`
+        // will result in `{ a = "R"; }`.
+        // This means that we want to find the right most value first, so that
+        // we can then ignore the earlier attributes of the same name.
+        // Decreasing the bias integer achieves this.
+        bias--;
+    }
+
+    auto r = state.allocBindings(capacity);
+
+    {
+        auto it = state.nrMultiConcats.find(capacity);
+        if (it != state.nrMultiConcats.end()) {
+            it->second++;
+        } else {
+            state.nrMultiConcats[capacity] = 1;
+        }
+    }
+
+    // std::cerr << "capacity: " << r->capacity() << std::endl;
+
+    // Consume the lowest item until empty.
+    // This changes the order of next, so we need to reinsert it each time.
+
+    // The last inserted name, so that we can easily ignore all the values that aren't right-most in the sequence of `//` operations.
+    // Symbol() is a _null object_ that doesn't match any real symbols.
+    Symbol lastInsertedName;
+    while (true) {
+        auto cur = next.begin();
+        if (cur == next.end()) break;
+
+        // std::cerr << "size: " << r->size() << std::endl;
+
+        // std::cerr << "processing attr: " << state.symbols[cur->first] << std::endl;
+
+        // Grow `r`
+        if (lastInsertedName != cur->first.first) {
+            r->push_back(cur->second.front());
+            lastInsertedName = cur->first.first;
+        }
+
+        // Shrink `next`
+        int bias = cur->first.second;
+
+        if (cur->second.pop_front()) {
+            std::pair<Symbol, int> key = {cur->second.front().name, bias};
+            next.emplace(key, std::move(cur->second));
+        }
+        next.erase(cur);
+    }
+
+    // TODO check the size of the bindings. If significantly below capacity, shrink it.
+
+    if (capacity > 0) {
+        auto capacityFraction = (100 * r->size()) / capacity;
+        auto it = state.nrMultiConcatCapacityPercent.find(capacityFraction);
+        auto wastedAttrs = capacity - r->size();
+        if (it != state.nrMultiConcatCapacityPercent.end()) {
+            it->second += wastedAttrs;
+        } else {
+            state.nrMultiConcatCapacityPercent[capacityFraction] = wastedAttrs;
+        }
+        state.nrMultiConcatCapacityTotalWaste += wastedAttrs;
+    }
+
+
+    v.mkAttrs(r);
+
+
+#if 0
     Value v1, v2;
     state.evalAttrs(env, e1, v1, pos, "in the left operand of the update (//) operator");
     state.evalAttrs(env, e2, v2, pos, "in the right operand of the update (//) operator");
@@ -1932,6 +2034,22 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
     v.mkAttrs(attrs.alreadySorted());
 
     state.nrOpUpdateValuesCopied += v.attrs()->size();
+#endif
+}
+
+void Expr::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q)
+{
+    Value vTmp;
+    eval(state, env, vTmp);
+    // TODO add pos and errorCtx params
+    state.forceAttrs(vTmp, noPos, "while evaluating an attribute set merge operand");
+    q.push_back(vTmp.attrs());
+}
+
+void ExprOpUpdate::evalForUpdate(EvalState &state, Env &env, UpdateQueue &q)
+{
+    e1->evalForUpdate(state, env, q);
+    e2->evalForUpdate(state, env, q);
 }
 
 
@@ -2905,6 +3023,26 @@ void EvalState::printStatistics()
     };
     topObj["nrOpUpdates"] = nrOpUpdates;
     topObj["nrOpUpdateValuesCopied"] = nrOpUpdateValuesCopied;
+    topObj["nrOpMultiUpdate"] = {};
+    for (auto [k, n] : nrMultiConcats)
+        topObj["nrsKWayUpdate"][fmt("%05i", k)] = n;
+    topObj["nrMultiConcatCapacityPercent"] = {};
+    for (auto [k, n] : nrMultiConcatCapacityPercent)
+        topObj["nrMultiConcatCapacityPercent"][fmt("%03i", k)] = n;
+
+    topObj["nrMultiConcatCapacityCumulativePercent"] = {};
+    {
+        auto c = 0;
+        for (auto [k, n] : nrMultiConcatCapacityPercent) {
+            c += n;
+            topObj["nrMultiConcatCapacityCumulativePercent"][fmt("%03i", k)] = c;
+        }
+    }
+    topObj["nrMultiConcatCapacityTotalWaste"] = nrMultiConcatCapacityTotalWaste;
+#if HAVE_BOEHMGC
+    topObj["nrMultiConcatCapacityTotalWastePercent"] = nrMultiConcatCapacityTotalWaste * sizeof(Attr) * 100.0 / totalBytes;
+#endif
+
     topObj["nrThunks"] = nrThunks;
     topObj["nrAvoided"] = nrAvoided;
     topObj["nrLookups"] = nrLookups;
