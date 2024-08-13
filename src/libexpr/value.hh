@@ -207,7 +207,7 @@ public:
         auto type = v.internalType.load(std::memory_order_acquire);
         //debug("ASSIGN %x %d %d", this, internalType, type);
         if (!nix::isFinished(type)) {
-            printError("UNEXPECTED TYPE %x %s", this, showType(v));
+            printError("UNEXPECTED TYPE %x %x %d %s", this, &v, type, showType(v));
             abort();
         }
         finishValue(type, v.payload);
