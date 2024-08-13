@@ -979,10 +979,6 @@ void EvalState::mkSingleDerivedPathString(const SingleDerivedPath & p, Value & v
         });
 }
 
-/* Create a thunk for the delayed computation of the given expression
-   in the given environment.  But if the expression is a variable,
-   then look it up right away.  This significantly reduces the number
-   of thunks allocated. */
 Value * Expr::maybeThunk(EvalState & state, Env & env)
 {
     Value * v = state.allocValue();
