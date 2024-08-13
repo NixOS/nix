@@ -73,7 +73,7 @@ InternalType EvalState::waitOnThunk(Value & v, bool awaited)
             currentlyWaiting--;
             return type;
         }
-        printError("SPURIOUS %s", &v);
+        nrSpuriousWakeups++;
     }
 }
 

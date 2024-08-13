@@ -820,6 +820,7 @@ private:
     std::atomic<uint64_t> usWaiting{0};
     std::atomic<uint64_t> currentlyWaiting{0};
     std::atomic<uint64_t> maxWaiting{0};
+    std::atomic<uint64_t> nrSpuriousWakeups{0};
 
     bool countCalls;
 

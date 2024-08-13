@@ -2873,6 +2873,7 @@ void EvalState::maybePrintStats()
         printError("THUNKS AWAITED SLOW: %d", nrThunksAwaitedSlow);
         printError("WAITING TIME: %d μs", usWaiting);
         printError("MAX WAITING: %d", maxWaiting);
+        printError("SPURIOUS WAKEUPS: %d", nrSpuriousWakeups);
     }
 }
 
