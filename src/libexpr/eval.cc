@@ -1529,13 +1529,13 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
     auto makeAppChain = [&]()
     {
-        vRes = vCur;
         for (size_t i = 0; i < nrArgs; ++i) {
             auto fun2 = allocValue();
-            *fun2 = vRes;
-            vRes.reset();
-            vRes.mkPrimOpApp(fun2, args[i]);
+            *fun2 = vCur;
+            vCur.reset();
+            vCur.mkPrimOpApp(fun2, args[i]);
         }
+        vRes = vCur;
     };
 
     const Attr * functor;
@@ -1689,6 +1689,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             assert(primOp->isPrimOp());
             auto arity = primOp->primOp()->arity;
             auto argsLeft = arity - argsDone;
+            assert(argsLeft);
 
             if (nrArgs < argsLeft) {
                 /* We still don't have enough arguments, so extend the tPrimOpApp chain. */
