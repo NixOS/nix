@@ -2854,8 +2854,6 @@ bool EvalState::fullGC() {
 #endif
 }
 
-extern std::atomic<uint64_t> nrThunksAwaited, nrThunksAwaitedSlow, usWaiting, maxWaiting;
-
 void EvalState::maybePrintStats()
 {
     bool showStats = getEnv("NIX_SHOW_STATS").value_or("0") != "0";

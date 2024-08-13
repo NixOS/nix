@@ -16,8 +16,6 @@ static Sync<WaiterDomain> & getWaiterDomain(Value & v)
     return waiterDomains[domain];
 }
 
-std::atomic<uint64_t> nrThunksAwaited, nrThunksAwaitedSlow, usWaiting, currentlyWaiting, maxWaiting;
-
 InternalType EvalState::waitOnThunk(Value & v, bool awaited)
 {
     nrThunksAwaited++;

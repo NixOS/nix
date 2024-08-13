@@ -815,6 +815,12 @@ private:
     unsigned long nrPrimOpCalls = 0;
     unsigned long nrFunctionCalls = 0;
 
+    std::atomic<uint64_t> nrThunksAwaited{0};
+    std::atomic<uint64_t> nrThunksAwaitedSlow{0};
+    std::atomic<uint64_t> usWaiting{0};
+    std::atomic<uint64_t> currentlyWaiting{0};
+    std::atomic<uint64_t> maxWaiting{0};
+
     bool countCalls;
 
     typedef std::map<std::string, size_t> PrimOpCalls;
