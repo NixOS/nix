@@ -6,6 +6,7 @@
 , linux64BitSystems
 , nixpkgsFor
 , self
+, officialRelease
 }:
 let
   inherit (inputs) nixpkgs nixpkgs-regression;
@@ -16,7 +17,7 @@ let
     };
 
   testNixVersions = pkgs: client: daemon:
-    pkgs.callPackage ../package.nix {
+    pkgs.nixComponents.callPackage ../package.nix {
       pname =
         "nix-tests"
         + lib.optionalString
@@ -28,6 +29,12 @@ let
       test-daemon = daemon;
 
       doBuild = false;
+
+      # This could be more accurate, but a shorter version will match the
+      # fine version with rev. This functionality is already covered in
+      # the normal test, so it's fine.
+      version = pkgs.nixComponents.version;
+      versionSuffix = pkgs.nixComponents.versionSuffix;
     };
 
   # Technically we could just return `pkgs.nixComponents`, but for Hydra it's

@@ -26,12 +26,6 @@
 
       officialRelease = false;
 
-      version = lib.fileContents ./.version + versionSuffix;
-      versionSuffix =
-        if officialRelease
-        then ""
-        else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
-
       linux32BitSystems = [ "i686-linux" ];
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
       linuxSystems = linux32BitSystems ++ linux64BitSystems;
@@ -130,12 +124,16 @@
           # without "polluting" the top level "`pkgs`" attrset.
           # This also has the benefit of providing us with a distinct set of packages
           # we can iterate over.
-          nixComponents = lib.makeScope final.nixDependencies.newScope (import ./packaging/components.nix);
+          nixComponents = lib.makeScope final.nixDependencies.newScope (import ./packaging/components.nix {
+            inherit (final) lib;
+            inherit officialRelease;
+            src = self;
+          });
 
           # The dependencies are in their own scope, so that they don't have to be
           # in Nixpkgs top level `pkgs` or `nixComponents`.
           nixDependencies = lib.makeScope final.newScope (import ./packaging/dependencies.nix {
-            inherit inputs stdenv versionSuffix;
+            inherit inputs stdenv;
             pkgs = final;
           });
 
@@ -170,6 +168,7 @@
           linux64BitSystems
           nixpkgsFor
           self
+          officialRelease
           ;
       };
 
@@ -253,10 +252,10 @@
         dockerImage =
           let
             pkgs = nixpkgsFor.${system}.native;
-            image = import ./docker.nix { inherit pkgs; tag = version; };
+            image = import ./docker.nix { inherit pkgs; tag = pkgs.nix.version; };
           in
           pkgs.runCommand
-            "docker-image-tarball-${version}"
+            "docker-image-tarball-${pkgs.nix.version}"
             { meta.description = "Docker image with Nix for ${system}"; }
             ''
               mkdir -p $out/nix-support

@@ -8,7 +8,6 @@
   pkgs,
 
   stdenv,
-  versionSuffix,
 }:
 
 let
@@ -73,11 +72,9 @@ let
       strictDeps = prevAttrs.strictDeps or true;
       enableParallelBuilding = true;
     };
-
 in
 scope: {
-  inherit stdenv versionSuffix;
-  version = lib.fileContents ../.version + versionSuffix;
+  inherit stdenv;
 
   aws-sdk-cpp = (pkgs.aws-sdk-cpp.override {
     apis = [ "s3" "transfer" ];
