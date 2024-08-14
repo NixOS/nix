@@ -9,6 +9,7 @@
 #include "logging.hh"
 #include "environment-variables.hh"
 #include "util.hh"
+#include "signals.hh"
 
 #if HAVE_BOEHMGC
 #  include <gc.h>
@@ -140,7 +141,7 @@ struct FutureVector
         auto state(state_.lock());
         for (auto & future : futures)
             state->futures.push_back(std::move(future));
-    };
+    }
 
     void finishAll()
     {
@@ -153,12 +154,19 @@ struct FutureVector
             debug("got %d futures", futures.size());
             if (futures.empty())
                 break;
+            std::exception_ptr ex;
             for (auto & future : futures)
                 try {
                     future.get();
                 } catch (...) {
-                    ignoreException();
+                    if (ex) {
+                        if (!getInterrupted())
+                            ignoreException();
+                    } else
+                        ex = std::current_exception();
                 }
+            if (ex)
+                std::rethrow_exception(ex);
         }
     }
 };
