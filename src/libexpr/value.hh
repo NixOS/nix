@@ -66,6 +66,7 @@ inline bool isFinished(InternalType type)
  */
 typedef enum {
     nThunk,
+    nFailed,
     nInt,
     nFloat,
     nBool,
@@ -323,7 +324,8 @@ public:
             case tLambda: case tPrimOp: case tPrimOpApp: return nFunction;
             case tExternal: return nExternal;
             case tFloat: return nFloat;
-            case tThunk: case tApp: case tPending: case tAwaited: case tFailed: return nThunk;
+            case tFailed: return nFailed;
+            case tThunk: case tApp: case tPending: case tAwaited: return nThunk;
             case tUninitialized:
             default:
                 unreachable();

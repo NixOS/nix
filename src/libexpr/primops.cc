@@ -426,7 +426,9 @@ static void prim_typeOf(EvalState & state, const PosIdx pos, Value * * args, Val
             t = args[0]->external()->typeOf();
             break;
         case nFloat: t = "float"; break;
-        case nThunk: unreachable();
+        case nThunk:
+        case nFailed:
+            unreachable();
     }
     v.mkString(t);
 }

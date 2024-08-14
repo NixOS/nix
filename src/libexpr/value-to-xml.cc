@@ -152,6 +152,11 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
         case nThunk:
             doc.writeEmptyElement("unevaluated");
+            break;
+
+        case nFailed:
+            doc.writeEmptyElement("failed");
+            break;
     }
 }
 
