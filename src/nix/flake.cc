@@ -1135,10 +1135,14 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         auto flake = std::make_shared<LockedFlake>(lockFlake());
         auto localSystem = std::string(settings.thisSystem.get());
 
-        Executor executor;
-        FutureVector futures(executor);
+        auto cache = openEvalCache(*state, flake);
+
+        auto j = nlohmann::json::object();
 
         std::function<void(eval_cache::AttrCursor & visitor, nlohmann::json & result)> visit;
+
+        Executor executor;
+        FutureVector futures(executor);
 
         visit = [&](eval_cache::AttrCursor & visitor, nlohmann::json & j)
         {
@@ -1283,10 +1287,6 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     throw;
             }
         };
-
-        auto cache = openEvalCache(*state, flake);
-
-        auto j = nlohmann::json::object();
 
         futures.spawn({{[&]() { visit(*cache->getRoot(), j); }, 1}});
         futures.finishAll();
