@@ -56,8 +56,7 @@ in
 
   nix-cmd = callPackage ../src/libcmd/package.nix { };
 
-  # Will replace `nix` once the old build system is gone.
-  nix-ng = callPackage ../src/nix/package.nix { version = fineVersion; };
+  nix-cli = callPackage ../src/nix/package.nix { version = fineVersion; };
 
   nix-functional-tests = callPackage ../src/nix-functional-tests/package.nix { version = fineVersion; };
 
@@ -65,4 +64,7 @@ in
   nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { version = fineVersion; };
 
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
+
+  # Will replace `nix` once the old build system is gone.
+  nix-ng = callPackage ../packaging/everything.nix { };
 }

@@ -27,13 +27,13 @@ in
   };
 
   config = {
-    passthru.quickBuild = 
+    passthru.quickBuild =
       let withQuickBuild = extendModules { modules = [{ quickBuild = true; }]; };
       in withQuickBuild.config.test;
 
     defaults = { pkgs, ... }: {
       config = lib.mkIf test.config.quickBuild {
-        nix.package = pkgs.nix_noTests;
+        nix.package = pkgs.nixComponents.nix-cli;
 
         system.forbiddenDependenciesRegexes = [
           # This would indicate that the quickBuild feature is broken.
