@@ -177,6 +177,57 @@ namespace nix {
             )
     );
 
+// The following macros ultimately define 48 tests (16 variations on three
+// templates). Each template tests an expression that can be written in 2^4
+// different ways, by making four choices about whether to write a particular
+// attribute path segment as `x.y = ...;` (collapsed) or `x = { y = ...; };`
+// (expanded).
+//
+// The nestedAttrsetMergeXXXX tests check that the expression
+// `{ a.b.c = 1; a.b.d = 2; }` has the same value regardless of how it is
+// expanded. (That exact expression is exercised in test
+// nestedAttrsetMerge0000, because it is fully collapsed. The test
+// nestedAttrsetMerge1001 would instead examine
+// `{ a = { b.c = 1; }; a.b = { d = 2; }; }`.)
+//
+// The nestedAttrsetMergeDupXXXX tests check that the expression
+// `{ a.b.c = 1; a.b.c = 2; }` throws a duplicate attribute error, again
+// regardless of how it is expanded.
+//
+// The nestedAttrsetMergeLetXXXX tests check that the expression
+// `let a.b.c = 1; a.b.d = 2; in a` has the same value regardless of how it is
+// expanded.
+#define X_EXPAND_IF0(k, v) k "." v
+#define X_EXPAND_IF1(k, v) k " = { " v " };"
+#define X4(w, x, y, z) \
+    TEST_F(TrivialExpressionTest, nestedAttrsetMerge##w##x##y##z) { \
+        auto v = eval("{ a.b = { c = 1; d = 2; }; } == { " \
+                X_EXPAND_IF##w("a", X_EXPAND_IF##x("b", "c = 1;")) " " \
+                X_EXPAND_IF##y("a", X_EXPAND_IF##z("b", "d = 2;")) " }"); \
+        ASSERT_THAT(v, IsTrue()); \
+    }; \
+    TEST_F(TrivialExpressionTest, nestedAttrsetMergeDup##w##x##y##z) { \
+        ASSERT_THROW(eval("{ " \
+                X_EXPAND_IF##w("a", X_EXPAND_IF##x("b", "c = 1;")) " " \
+                X_EXPAND_IF##y("a", X_EXPAND_IF##z("b", "c = 2;")) " }"), Error); \
+    }; \
+    TEST_F(TrivialExpressionTest, nestedAttrsetMergeLet##w##x##y##z) { \
+        auto v = eval("{ b = { c = 1; d = 2; }; } == (let " \
+                X_EXPAND_IF##w("a", X_EXPAND_IF##x("b", "c = 1;")) " " \
+                X_EXPAND_IF##y("a", X_EXPAND_IF##z("b", "d = 2;")) " in a)"); \
+        ASSERT_THAT(v, IsTrue()); \
+    };
+#define X3(...) X4(__VA_ARGS__, 0) X4(__VA_ARGS__, 1)
+#define X2(...) X3(__VA_ARGS__, 0) X3(__VA_ARGS__, 1)
+#define X1(...) X2(__VA_ARGS__, 0) X2(__VA_ARGS__, 1)
+    X1(0) X1(1)
+#undef X_EXPAND_IF0
+#undef X_EXPAND_IF1
+#undef X1
+#undef X2
+#undef X3
+#undef X4
+
     TEST_F(TrivialExpressionTest, functor) {
         auto v = eval("{ __functor = self: arg: self.v + arg; v = 10; } 5");
         ASSERT_THAT(v, IsIntEq(15));
