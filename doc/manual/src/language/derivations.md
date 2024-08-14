@@ -264,7 +264,7 @@ The [`builder`](#attr-builder) is executed as follows:
   - `PATH` is set to `/path-not-set` to prevent shells from
     initialising it to their built-in default value.
 
-  - `HOME` is set to `/homeless-shelter` to prevent programs from
+  - `HOME` is set to `/proc/homeless-shelter` to prevent programs from
     using `/etc/passwd` or the like to find the user's home
     directory, which could cause impurity. Usually, when `HOME` is
     set, it is used as the location of the home directory, even if

@@ -102,7 +102,7 @@ void handleDiffHook(
     }
 }
 
-const Path LocalDerivationGoal::homeDir = "/homeless-shelter";
+const Path LocalDerivationGoal::homeDir = "/proc/homeless-shelter";
 
 
 LocalDerivationGoal::~LocalDerivationGoal()
