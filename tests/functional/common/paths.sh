@@ -1,14 +1,25 @@
 # shellcheck shell=bash
 
+set -eu -o pipefail
+
+if [[ -z "${COMMON_PATHS_SH_SOURCED-}" ]]; then
+
+COMMON_PATHS_SH_SOURCED=1
+
 commonDir="$(readlink -f "$(dirname "${BASH_SOURCE[0]-$0}")")"
 
-# Since this is a generated file
+# Since these are generated files
+# shellcheck disable=SC1091
+source "$commonDir/functions.sh"
 # shellcheck disable=SC1091
 source "$commonDir/subst-vars.sh"
 # Make sure shellcheck knows this will be defined by the above generated snippet
-: "${bindir?}"
+: "${bash?}" "${bindir?}"
 
-export PATH="$bindir:$PATH"
+if ! isTestOnNixOS; then
+  export SHELL="$bash"
+  export PATH="$bindir:$PATH"
+fi
 
 if [[ -n "${NIX_CLIENT_PACKAGE:-}" ]]; then
   export PATH="$NIX_CLIENT_PACKAGE/bin":$PATH
@@ -18,3 +29,5 @@ DAEMON_PATH="$PATH"
 if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
   DAEMON_PATH="${NIX_DAEMON_PACKAGE}/bin:$DAEMON_PATH"
 fi
+
+fi # COMMON_PATHS_SH_SOURCED
