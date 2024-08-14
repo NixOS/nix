@@ -1251,8 +1251,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         }
                         j.emplace("type", "derivation");
                         j.emplace("name", name);
-                        if (description)
-                            j.emplace("description", *description);
+                        j.emplace("description", description ? *description : "");
                     } else {
                         logger->cout("%s: %s '%s'",
                             headerPrefix,
@@ -1340,12 +1339,19 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     (attrPath.size() == 3 && attrPathS[0] == "apps"))
                 {
                     auto aType = visitor.maybeGetAttr("type");
+                    std::optional<std::string> description;
+                    if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
+                        if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
+                            description = aDescription->getString();
+                    }
                     if (!aType || aType->getString() != "app")
                         state->error<EvalError>("not an app definition").debugThrow();
                     if (json) {
                         j.emplace("type", "app");
+                        if (description)
+                            j.emplace("description", *description);
                     } else {
-                        logger->cout("%s: app", headerPrefix);
+                        logger->cout("%s: app: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description ? *description : "no description");
                     }
                 }
 
