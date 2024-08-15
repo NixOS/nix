@@ -320,7 +320,16 @@
 
       checks = forAllSystems (
         system:
-        (import ./ci/gha/tests {
+        let
+          pkgs = nixpkgsFor.${system}.native;
+        in
+        {
+          # https://nixos.org/manual/nixpkgs/stable/index.html#tester-lycheeLinkCheck
+          linkcheck = pkgs.testers.lycheeLinkCheck {
+            site = self.packages.${system}.nix-manual + "/share/doc/nix/manual";
+          };
+        }
+        // (import ./ci/gha/tests {
           inherit system;
           pkgs = nixpkgsFor.${system}.native;
           nixFlake = self;
