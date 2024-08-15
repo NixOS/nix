@@ -616,6 +616,20 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
                 strdup(ss.data()),
         };
     }
+    if (isFunctor(v)) {
+        try {
+            Value & functor = *v.attrs()->find(sFunctor)->value;
+            Value * vp = &v;
+            Value partiallyApplied;
+            callFunction(functor, 1, &vp, partiallyApplied, noPos);
+            auto _level = addCallDepth(noPos);
+            return getDoc(partiallyApplied);
+        }
+        catch (Error & e) {
+            e.addTrace(nullptr, "while partially calling '%1%' to retrieve documentation", "__functor");
+            throw;
+        }
+    }
     return {};
 }
 
