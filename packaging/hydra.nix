@@ -61,8 +61,9 @@ let
     "nix-main"
     "nix-main-c"
     "nix-cmd"
-    "nix-ng"
+    "nix-cli"
     "nix-functional-tests"
+    "nix-ng"
   ];
 in
 {
@@ -85,7 +86,7 @@ in
     self.packages.${system}.nix.override { enableGC = false; }
   );
 
-  buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nix_noTests);
+  buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-cli);
 
   # Toggles some settings for better coverage. Windows needs these
   # library combinations, and Debian build Nix with GNU readline too.

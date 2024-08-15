@@ -15,7 +15,7 @@
 
 , nix-store
 , nix-expr
-, nix-ng
+, nix-cli
 
 , rapidcheck
 , gtest
@@ -67,7 +67,7 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   nativeBuildInputs = finalAttrs.passthru.baseNativeBuildInputs ++ [
-    nix-ng
+    nix-cli
   ];
 
   buildInputs = [
@@ -105,7 +105,7 @@ mkMesonDerivation (finalAttrs: {
   doCheck = true;
 
   installPhase = ''
-    touch $out
+    mkdir $out
   '';
 
   meta = {

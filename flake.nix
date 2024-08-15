@@ -139,11 +139,6 @@
 
           nix = final.nixComponents.nix;
 
-          nix_noTests = final.nix.override {
-            doInstallCheck = false;
-            doCheck = false;
-          };
-
           # See https://github.com/NixOS/nixpkgs/pull/214409
           # Remove when fixed in this flake's nixpkgs
           pre-commit =
@@ -222,7 +217,7 @@
           # for which we don't apply the full build matrix such as cross or static.
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
-          default = self.packages.${system}.nix;
+          default = self.packages.${system}.nix-ng;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
         }
@@ -230,22 +225,48 @@
         // flatMapAttrs
           { # Components we'll iterate over in the upcoming lambda
             "nix" = { };
-            # Temporarily disabled because GitHub Actions OOM issues. Once
-            # the old build system is gone and we are back to one build
-            # system, we should reenable these.
-            #"nix-util" = { };
-            #"nix-store" = { };
-            #"nix-fetchers" = { };
+            "nix-util" = { };
+            "nix-util-c" = { };
+            "nix-util-test-support" = { };
+            "nix-util-tests" = { };
+
+            "nix-store" = { };
+            "nix-store-c" = { };
+            "nix-store-test-support" = { };
+            "nix-store-tests" = { };
+
+            "nix-fetchers" = { };
+            "nix-fetchers-tests" = { };
+
+            "nix-expr" = { };
+            "nix-expr-c" = { };
+            "nix-expr-test-support" = { };
+            "nix-expr-tests" = { };
+
+            "nix-flake" = { };
+            "nix-flake-tests" = { };
+
+            "nix-main" = { };
+            "nix-main-c" = { };
+
+            "nix-cmd" = { };
+
+            "nix-cli" = { };
+
+            "nix-functional-tests" = { supportsCross = false; };
+
+            "nix-perl-bindings" = { supportsCross = false; };
+            "nix-ng" = { };
           }
-          (pkgName: {}: {
+          (pkgName: { supportsCross ? true }: {
               # These attributes go right into `packages.<system>`.
               "${pkgName}" = nixpkgsFor.${system}.native.nixComponents.${pkgName};
               "${pkgName}-static" = nixpkgsFor.${system}.static.nixComponents.${pkgName};
             }
-            // flatMapAttrs (lib.genAttrs crossSystems (_: { })) (crossSystem: {}: {
+            // lib.optionalAttrs supportsCross (flatMapAttrs (lib.genAttrs crossSystems (_: { })) (crossSystem: {}: {
               # These attributes go right into `packages.<system>`.
               "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName};
-            })
+            }))
             // flatMapAttrs (lib.genAttrs stdenvs (_: { })) (stdenvName: {}: {
               # These attributes go right into `packages.<system>`.
               "${pkgName}-${stdenvName}" = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".nixComponents.${pkgName};
