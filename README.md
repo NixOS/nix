@@ -15,7 +15,7 @@ Full reference documentation can be found in the [Nix manual](https://nix.dev/re
 
 ## Building and developing
 
-Follow instructions in the Nix reference manual to [set up a development environment and build Nix from source](https://nix.dev/manual/nix/development/building.html).
+Follow instructions in the Nix reference manual to [set up a development environment and build Nix from source](https://nix.dev/manual/nix/development/development/building.html).
 
 ## Contributing
 
