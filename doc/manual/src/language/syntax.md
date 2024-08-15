@@ -218,7 +218,7 @@ a string), that attribute is simply not added to the set:
 
 This will evaluate to `{}` if `foo` evaluates to `false`.
 
-A set that has a `__functor` attribute whose value is callable (i.e. is
+A set that has a [`__functor`]{#attr-__functor} attribute whose value is callable (i.e. is
 itself a function or a set with a `__functor` attribute whose value is
 callable) can be applied as if it were a function, with the set itself
 passed in first , e.g.,
