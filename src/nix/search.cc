@@ -88,8 +88,8 @@ struct CmdSearch : InstallableValueCommand, MixJSON
 
         auto state = getEvalState();
 
-        std::optional<nlohmann::json> jsonOut;
-        if (json) jsonOut = json::object();
+        std::optional<Sync<nlohmann::json>> jsonOut;
+        if (json) jsonOut.emplace(json::object());
 
         std::atomic<uint64_t> results = 0;
 
@@ -169,9 +169,8 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                     if (found)
                     {
                         results++;
-                        // FIXME: locking
                         if (json) {
-                            (*jsonOut)[attrPath2] = {
+                            (*jsonOut->lock())[attrPath2] = {
                                 {"pname", name.name},
                                 {"version", name.version},
                                 {"description", description},
@@ -224,7 +223,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
         futures.finishAll();
 
         if (json)
-            logger->cout("%s", *jsonOut);
+            logger->cout("%s", *(jsonOut->lock()));
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");
