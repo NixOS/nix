@@ -54,7 +54,7 @@ If the attribute doesn’t exist, return the *expr* after `or` if provided, othe
 >
 > *func* *expr*
 
-Apply the callable value *func* to the argument *expr*. Note the absence of a visible operator symbol.
+Apply the callable value *func* to the argument *expr*. Note the absence of any visible operator symbol.
 A callable value is either:
 - a [user-defined function][function]
 - a [built-in][builtins] function
@@ -62,7 +62,7 @@ A callable value is either:
 
 > **Warning**
 >
-> This "operator" also separates [list] items, which means that calls in list items must be enclosed by parentheses.
+> [List][list] items are also separated by whitespace, which means that function calls in list items must be enclosed by parentheses.
 
 ## Has attribute
 
