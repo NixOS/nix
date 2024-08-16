@@ -49,6 +49,7 @@ jobs:
           done
         ) &
     - run: nix --experimental-features 'nix-command flakes' flake check -L
+    - run: nix --experimental-features 'nix-command flakes' flake show --all-systems --json
 
   # Steps to test CI automation in your own fork.
   # Cachix:
