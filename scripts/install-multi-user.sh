@@ -530,9 +530,8 @@ It seems the build group $NIX_BUILD_GROUP_NAME already exists, but
 with the UID $primary_group_id. This script can't really handle
 that right now, so I'm going to give up.
 
-You can fix this by editing this script and changing the
-NIX_BUILD_GROUP_ID variable near the top to from $NIX_BUILD_GROUP_ID
-to $primary_group_id and re-run.
+You can fix this by setting NIX_BUILD_GROUP_ID=$primary_group_id in
+your shell environment and re-running the installer.
 EOF
         else
             row "            Exists" "Yes"
