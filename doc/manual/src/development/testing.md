@@ -276,13 +276,11 @@ To ensure that characterisation testing doesn't make it harder to intentionally 
 We run the functional tests not just in the build, but also in VM tests.
 This helps us ensure that Nix works correctly on NixOS, and environments that have similar characteristics that are hard to reproduce in a build environment.
 
-The recommended way to run these tests during development is:
+These can be run with:
 
 ```shell
-nix build .#hydraJobs.tests.functional_user.quickBuild
+nix build .#hydraJobs.tests.functional_user
 ```
-
-The `quickBuild` attribute configures the test to use a `nix` package that's built without integration tests, so that you can iterate on the tests without performing recompilations due to the changed sources for `installCheck`.
 
 Generally, this build is sufficient, but in nightly or CI we also test the attributes `functional_root` and `functional_trusted`, in which the test suite is run with different levels of authorization.
 
@@ -293,8 +291,6 @@ These tests include everything that needs to interact with external services or 
 Because these tests are expensive and require more than what the standard github-actions setup provides, they only run on the master branch (on <https://hydra.nixos.org/jobset/nix/master>).
 
 You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-build -A hydraJobs.tests.{testName}`.
-
-If you are testing a build of `nix` that you haven't compiled yet, you may iterate faster by appending the `quickBuild` attribute: `nix build .#hydraJobs.tests.{testName}.quickBuild`.
 
 ## Installer tests
 
