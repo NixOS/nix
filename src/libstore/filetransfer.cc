@@ -7,6 +7,7 @@
 #include "finally.hh"
 #include "callback.hh"
 #include "signals.hh"
+#include "url.hh"
 
 #if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
@@ -86,13 +87,21 @@ struct curlFileTransfer : public FileTransfer
             return httpStatus;
         }
 
+        std::string formatActivity(const std::string & url)
+        {
+            // Strip query parameters for security.
+            auto parsedUrl = parseURL(url);
+            parsedUrl.query.clear();
+            return fmt(request.data ? "uploading '%s'" : "downloading '%s'", parsedUrl.to_string());
+        }
+
         TransferItem(curlFileTransfer & fileTransfer,
             const FileTransferRequest & request,
             Callback<FileTransferResult> && callback)
             : fileTransfer(fileTransfer)
             , request(request)
             , act(*logger, lvlTalkative, actFileTransfer,
-                fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
+                formatActivity(request.uri),
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
@@ -195,8 +204,10 @@ struct curlFileTransfer : public FileTransfer
         {
             char * effectiveUriCStr = nullptr;
             curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
-            if (effectiveUriCStr && *result.urls.rbegin() != effectiveUriCStr)
+            if (effectiveUriCStr && *result.urls.rbegin() != effectiveUriCStr) {
                 result.urls.push_back(effectiveUriCStr);
+                act.update(formatActivity(effectiveUriCStr));
+            }
         }
 
         size_t headerCallback(void * contents, size_t size, size_t nmemb)
@@ -381,7 +392,7 @@ struct curlFileTransfer : public FileTransfer
             auto httpStatus = getHTTPStatus();
 
             debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes, duration = %.2f s",
-                request.verb(), request.uri, code, httpStatus, result.bodySize,
+                request.verb(), result.urls.back(), code, httpStatus, result.bodySize,
                 std::chrono::duration_cast<std::chrono::milliseconds>(finishTime - startTime).count() / 1000.0f
                 );
 
@@ -475,17 +486,18 @@ struct curlFileTransfer : public FileTransfer
                     response = std::move(errorSink->s);
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && getInterrupted()
-                    ? FileTransferError(Interrupted, std::move(response), "%s of '%s' was interrupted", request.verb(), request.uri)
+                    ? FileTransferError(Interrupted, std::move(response), "%s of '%s' was interrupted",
+                        request.verb(), result.urls.back())
                     : httpStatus != 0
                     ? FileTransferError(err,
                         std::move(response),
                         "unable to %s '%s': HTTP error %d%s",
-                        request.verb(), request.uri, httpStatus,
+                        request.verb(), result.urls.back(), httpStatus,
                         code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                     : FileTransferError(err,
                         std::move(response),
                         "unable to %s '%s': %s (%d)",
-                        request.verb(), request.uri, curl_easy_strerror(code), code);
+                        request.verb(), result.urls.back(), curl_easy_strerror(code), code);
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a

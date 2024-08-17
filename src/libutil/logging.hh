@@ -35,6 +35,7 @@ typedef enum {
     resSetExpected = 106,
     resPostBuildLogLine = 107,
     resFetchStatus = 108,
+    resUpdate = 109,
 } ResultType;
 
 typedef uint64_t ActivityId;
@@ -167,6 +168,14 @@ struct Activity
     void result(ResultType type, const Logger::Fields & fields) const
     {
         logger.result(id, type, fields);
+    }
+
+    /**
+     * Update the main text of this activity.
+     */
+    void update(std::string s)
+    {
+        result(resUpdate, std::move(s));
     }
 
     friend class Logger;
