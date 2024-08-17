@@ -438,14 +438,39 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkApp = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
-                #if 0
-                // FIXME
-                auto app = App(*state, v);
-                for (auto & i : app.context) {
-                    auto [drvPathS, outputName] = NixStringContextElem::parse(i);
-                    store->parseStorePath(drvPathS);
+                Activity act(*logger, lvlInfo, actUnknown, fmt("checking app '%s'", attrPath));
+                state->forceAttrs(v, pos, "");
+                if (auto attr = v.attrs()->get(state->symbols.create("type")))
+                    state->forceStringNoCtx(*attr->value, attr->pos, "");
+                else
+                    throw Error("app '%s' lacks attribute 'type'", attrPath);
+
+                if (auto attr = v.attrs()->get(state->symbols.create("program"))) {
+                    if (attr->name == state->symbols.create("program")) {
+                        NixStringContext context;
+                        state->forceString(*attr->value, context, attr->pos, "");
+                    }
+                } else
+                    throw Error("app '%s' lacks attribute 'program'", attrPath);
+
+                if (auto attr = v.attrs()->get(state->symbols.create("meta"))) {
+                    state->forceAttrs(*attr->value, attr->pos, "");
+                    if (auto dAttr = attr->value->attrs()->get(state->symbols.create("description")))
+                        state->forceStringNoCtx(*dAttr->value, dAttr->pos, "");
+                    else
+                        logWarning({
+                            .msg = HintFmt("app '%s' lacks attribute 'meta.description'", attrPath),
+                        });
+                } else
+                    logWarning({
+                        .msg = HintFmt("app '%s' lacks attribute 'meta'", attrPath),
+                    });
+
+                for (auto & attr : *v.attrs()) {
+                    std::string_view name(state->symbols[attr.name]);
+                    if (name != "type" && name != "program" && name != "meta")
+                        throw Error("app '%s' has unsupported attribute '%s'", attrPath, name);
                 }
-                #endif
             } catch (Error & e) {
                 e.addTrace(resolve(pos), HintFmt("while checking the app definition '%s'", attrPath));
                 reportError(e);
@@ -630,7 +655,7 @@ struct CmdFlakeCheck : FlakeCommand
                                 const auto & attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
                                 if (checkSystemType(attr_name, attr.pos)) {
-                                    checkApp(
+                                    checkDerivation(
                                         fmt("%s.%s", name, attr_name),
                                         *attr.value, attr.pos);
                                 };
@@ -1252,8 +1277,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         }
                         j.emplace("type", "derivation");
                         j.emplace("name", name);
-                        if (description)
-                            j.emplace("description", *description);
+                        j.emplace("description", description ? *description : "");
                     } else {
                         logger->cout("%s: %s '%s'",
                             headerPrefix,
@@ -1341,12 +1365,19 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     (attrPath.size() == 3 && attrPathS[0] == "apps"))
                 {
                     auto aType = visitor.maybeGetAttr("type");
+                    std::optional<std::string> description;
+                    if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
+                        if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
+                            description = aDescription->getString();
+                    }
                     if (!aType || aType->getString() != "app")
                         state->error<EvalError>("not an app definition").debugThrow();
                     if (json) {
                         j.emplace("type", "app");
+                        if (description)
+                            j.emplace("description", *description);
                     } else {
-                        logger->cout("%s: app", headerPrefix);
+                        logger->cout("%s: app: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description ? *description : "no description");
                     }
                 }
 

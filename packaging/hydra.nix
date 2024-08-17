@@ -6,6 +6,7 @@
 , linux64BitSystems
 , nixpkgsFor
 , self
+, officialRelease
 }:
 let
   inherit (inputs) nixpkgs nixpkgs-regression;
@@ -16,7 +17,7 @@ let
     };
 
   testNixVersions = pkgs: client: daemon:
-    pkgs.callPackage ../package.nix {
+    pkgs.nixComponents.callPackage ../package.nix {
       pname =
         "nix-tests"
         + lib.optionalString
@@ -28,6 +29,12 @@ let
       test-daemon = daemon;
 
       doBuild = false;
+
+      # This could be more accurate, but a shorter version will match the
+      # fine version with rev. This functionality is already covered in
+      # the normal test, so it's fine.
+      version = pkgs.nixComponents.version;
+      versionSuffix = pkgs.nixComponents.versionSuffix;
     };
 
   # Technically we could just return `pkgs.nixComponents`, but for Hydra it's
@@ -54,6 +61,8 @@ let
     "nix-main"
     "nix-main-c"
     "nix-cmd"
+    "nix-cli"
+    "nix-functional-tests"
     "nix-ng"
   ];
 in
@@ -68,14 +77,16 @@ in
     lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.nixComponents.${pkgName}));
 
   buildCross = forAllPackages (pkgName:
-    forAllCrossSystems (crossSystem:
-      lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName})));
+    # Hack to avoid non-evaling package
+    (if pkgName == "nix-functional-tests" then lib.flip builtins.removeAttrs ["x86_64-w64-mingw32"] else lib.id)
+    (forAllCrossSystems (crossSystem:
+      lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName}))));
 
   buildNoGc = forAllSystems (system:
     self.packages.${system}.nix.override { enableGC = false; }
   );
 
-  buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nix_noTests);
+  buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-cli);
 
   # Toggles some settings for better coverage. Windows needs these
   # library combinations, and Debian build Nix with GNU readline too.

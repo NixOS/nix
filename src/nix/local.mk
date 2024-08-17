@@ -26,6 +26,8 @@ endif
 
 nix_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers) $(INCLUDE_libexpr) $(INCLUDE_libflake) $(INCLUDE_libmain) -I src/libcmd -I doc/manual $(INCLUDE_nix)
 
+nix_CXXFLAGS += -DNIX_BIN_DIR=\"$(NIX_ROOT)$(bindir)\"
+
 nix_LIBS = libexpr libmain libfetchers libflake libstore libutil libcmd
 
 nix_LDFLAGS = $(THREAD_LDFLAGS) $(SODIUM_LIBS) $(EDITLINE_LIBS) $(BOOST_LDFLAGS) $(LOWDOWN_LIBS)

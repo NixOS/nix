@@ -3088,7 +3088,9 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
     if (EvalSettings::isPseudoUrl(value)) {
         try {
             auto accessor = fetchers::downloadTarball(
-                EvalSettings::resolvePseudoUrl(value)).accessor;
+                store,
+                fetchSettings,
+                EvalSettings::resolvePseudoUrl(value));
             auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
             return finish(store->toRealPath(storePath));
         } catch (Error & e) {
