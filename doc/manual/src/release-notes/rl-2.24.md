@@ -261,12 +261,6 @@
 
   Author: [**Eelco Dolstra (@edolstra)**](https://github.com/edolstra)
 
-- Improve handling of tarballs that don't consist of a single top-level directory [#11195](https://github.com/NixOS/nix/pull/11195)
-
-  In previous Nix releases, the tarball fetcher (used by `builtins.fetchTarball`) erroneously merged top-level directories into a single directory, and silently discarded top-level files that are not directories. This is no longer the case.
-
-  Author: [**Eelco Dolstra (@edolstra)**](https://github.com/edolstra)
-
 - Setting to warn about large paths [#10778](https://github.com/NixOS/nix/pull/10778)
 
   Nix can now warn when evaluation of a Nix expression causes a large
