@@ -87,12 +87,8 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
                     // FIXME: disallow strings with contexts?
                     writeFile(path.string(), v.string_view());
                 else if (v.type() == nAttrs) {
-                    if (mkdir(path.c_str()
-#ifndef _WIN32 // TODO abstract mkdir perms for Windows
-                        , 0777
-#endif
-                        ) == -1)
-                        throw SysError("creating directory '%s'", path);
+                    // TODO abstract mkdir perms for Windows
+                    createDir(path.string(), 0777);
                     for (auto & attr : *v.attrs()) {
                         std::string_view name = state->symbols[attr.name];
                         try {

@@ -86,7 +86,7 @@ fs::path ExecutablePath::findPath(const fs::path & exe, std::function<bool(const
         if (resOpt)
             return *resOpt;
         else
-            throw ExecutableLookupError("Could not find executable '%s'", exe.native());
+            throw ExecutableLookupError("Could not find executable '%s'", exe.string());
     } else {
         return exe;
     }
