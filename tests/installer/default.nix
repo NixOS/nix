@@ -217,10 +217,16 @@ let
         $ssh <<EOF
           set -ex
 
+          # enable nounset while loading the profile
+          # this may or may not work on all distros, depending on the quality of their scripts
+          set -u
+
           # FIXME: get rid of this; ideally ssh should just work.
           source ~/.bash_profile || true
           source ~/.bash_login || true
           source ~/.profile || true
+          set +u
+
           source /etc/bashrc || true
 
           nix-env --version
