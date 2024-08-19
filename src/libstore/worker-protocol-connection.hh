@@ -70,9 +70,10 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
 
     virtual void closeWrite() = 0;
 
-    std::exception_ptr processStderrReturn(Sink * sink = 0, Source * source = 0, bool flush = true);
+    std::exception_ptr processStderrReturn(Sink * sink = 0, Source * source = 0, bool flush = true, bool block = true);
 
-    void processStderr(bool * daemonException, Sink * sink = 0, Source * source = 0, bool flush = true);
+    void
+    processStderr(bool * daemonException, Sink * sink = 0, Source * source = 0, bool flush = true, bool block = true);
 
     /**
      * Establishes connection, negotiating version.
