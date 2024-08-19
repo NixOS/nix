@@ -127,7 +127,14 @@ scope: {
   libgit2 = pkgs.libgit2.overrideAttrs (attrs: {
     src = inputs.libgit2;
     version = inputs.libgit2.lastModifiedDate;
+<<<<<<< HEAD
     cmakeFlags = attrs.cmakeFlags or [ ] ++ [ "-DUSE_SSH=exec" ];
+=======
+    cmakeFlags = attrs.cmakeFlags or []
+      ++ [ "-DUSE_SSH=exec" ];
+    patches = attrs.patches or []
+      ++ [ ./patches/libgit2-mempack-thin-packfile.patch ];
+>>>>>>> 5dd6c4f06 (libgit2, GitRepo: Write thin packfiles)
   });
 
   busybox-sandbox-shell =
