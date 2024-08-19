@@ -135,60 +135,52 @@ Functional tests are run during `installCheck` in the `nix` package build, as we
 
 ### Running the whole test suite
 
-The whole test suite can be run with:
+The whole test suite (functional and unit tests) can be run with:
 
 ```shell-session
-$ make install && make installcheck
-ran test tests/functional/foo.sh... [PASS]
-ran test tests/functional/bar.sh... [PASS]
-...
+$ mesonCheckPhase
 ```
 
 ### Grouping tests
 
 Sometimes it is useful to group related tests so they can be easily run together without running the entire test suite.
 Each test group is in a subdirectory of `tests`.
-For example, `tests/functional/ca/local.mk` defines a `ca` test group for content-addressed derivation outputs.
+For example, `tests/functional/ca/meson.build` defines a `ca` test group for content-addressed derivation outputs.
 
 That test group can be run like this:
 
 ```shell-session
-$ make ca.test-group -j50
-ran test tests/functional/ca/nix-run.sh... [PASS]
-ran test tests/functional/ca/import-derivation.sh... [PASS]
-...
-```
-
-The test group is defined in Make like this:
-```makefile
-$(test-group-name)-tests := \
-  $(d)/test0.sh \
-  $(d)/test1.sh \
-  ...
-
-install-tests-groups += $(test-group-name)
+$ meson test --suite ca
+ninja: Entering directory `/home/jcericson/src/nix/master/build'
+ninja: no work to do.
+[1-20/20] 🌑 nix-functional-tests:ca / ca/why-depends                                1/20 nix-functional-tests:ca / ca/nix-run                                  OK               0.16s
+[2-20/20] 🌒 nix-functional-tests:ca / ca/why-depends                                2/20 nix-functional-tests:ca / ca/import-derivation                        OK               0.17s
 ```
 
 ### Running individual tests
 
-Individual tests can be run with `make`:
+Individual tests can be run with `meson`:
 
 ```shell-session
-$ make tests/functional/${testName}.sh.test
-ran test tests/functional/${testName}.sh... [PASS]
+$ meson test ${testName}
+ninja: Entering directory `/home/jcericson/src/nix/master/build'
+ninja: no work to do.
+1/1 nix-functional-tests:main / ${testName}        OK               0.41s
+
+Ok:                 1
+Expected Fail:      0
+Fail:               0
+Unexpected Pass:    0
+Skipped:            0
+Timeout:            0
+
+Full log written to /home/jcericson/src/nix/master/build/meson-logs/testlog.txt
 ```
 
-or without `make`:
+or without `meson`, showing the output:
 
 ```shell-session
-$ ./mk/run-test.sh tests/functional/${testName}.sh
-ran test tests/functional/${testName}.sh... [PASS]
-```
-
-To see the complete output, one can also run:
-
-```shell-session
-$ ./mk/debug-test.sh tests/functional/${testName}.sh
+$ TEST_NAME=${testName} NIX_REMOTE='' PS4='+(${BASH_SOURCE[0]-$0}:$LINENO) tests/functional/${testName}.sh
 +(${testName}.sh:1) foo
 output from foo
 +(${testName}.sh:2) bar
@@ -254,7 +246,7 @@ It is frequently useful to regenerate the expected output.
 To do that, rerun the failed test(s) with `_NIX_TEST_ACCEPT=1`.
 For example:
 ```bash
-_NIX_TEST_ACCEPT=1 make tests/functional/lang.sh.test
+_NIX_TEST_ACCEPT=1 meson test lang
 ```
 This convention is shared with the [characterisation unit tests](#characterisation-testing-unit) too.
 
