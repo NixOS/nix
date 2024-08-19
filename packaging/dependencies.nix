@@ -115,6 +115,8 @@ scope: {
     version = inputs.libgit2.lastModifiedDate;
     cmakeFlags = attrs.cmakeFlags or []
       ++ [ "-DUSE_SSH=exec" ];
+    patches = attrs.patches or []
+      ++ [ ./patches/libgit2-mempack-thin-packfile.patch ];
   });
 
   busybox-sandbox-shell = pkgs.busybox-sandbox-shell or (pkgs.busybox.override {

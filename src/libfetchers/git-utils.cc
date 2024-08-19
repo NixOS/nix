@@ -13,13 +13,17 @@
 #include <git2/describe.h>
 #include <git2/errors.h>
 #include <git2/global.h>
+#include <git2/indexer.h>
 #include <git2/object.h>
+#include <git2/odb.h>
 #include <git2/refs.h>
 #include <git2/remote.h>
 #include <git2/repository.h>
 #include <git2/revparse.h>
 #include <git2/status.h>
 #include <git2/submodule.h>
+#include <git2/sys/odb_backend.h>
+#include <git2/sys/mempack.h>
 #include <git2/tree.h>
 
 #include <iostream>
@@ -76,6 +80,9 @@ typedef std::unique_ptr<git_status_list, Deleter<git_status_list_free>> StatusLi
 typedef std::unique_ptr<git_remote, Deleter<git_remote_free>> Remote;
 typedef std::unique_ptr<git_config, Deleter<git_config_free>> GitConfig;
 typedef std::unique_ptr<git_config_iterator, Deleter<git_config_iterator_free>> ConfigIterator;
+typedef std::unique_ptr<git_odb, Deleter<git_odb_free>> ObjectDb;
+typedef std::unique_ptr<git_packbuilder, Deleter<git_packbuilder_free>> PackBuilder;
+typedef std::unique_ptr<git_indexer, Deleter<git_indexer_free>> Indexer;
 
 // A helper to ensure that we don't leak objects returned by libgit2.
 template<typename T>
@@ -164,6 +171,11 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     /** Location of the repository on disk. */
     std::filesystem::path path;
     Repository repo;
+    /**
+     * In-memory object store for efficient batched writing to packfiles.
+     * Owned by `repo`.
+     */
+    git_odb_backend * mempack_backend;
 
     GitRepoImpl(std::filesystem::path _path, bool create, bool bare)
         : path(std::move(_path))
@@ -177,11 +189,54 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             if (git_repository_init(Setter(repo), path.string().c_str(), bare))
                 throw Error("creating Git repository '%s': %s", path, git_error_last()->message);
         }
+        git_odb * odb;
+        if (git_repository_odb(&odb, repo.get()))
+            throw Error("getting Git object database: %s", git_error_last()->message);
+
+        // TODO: release mempack_backend?
+        if (git_mempack_new(&mempack_backend))
+            throw Error("creating mempack backend: %s", git_error_last()->message);
+
+        if (git_odb_add_backend(odb, mempack_backend, 999))
+            throw Error("adding mempack backend to Git object database: %s", git_error_last()->message);
     }
 
     operator git_repository * ()
     {
         return repo.get();
+    }
+
+    void flush() override {
+        git_buf buf = GIT_BUF_INIT;
+        try {
+            PackBuilder packBuilder;
+            git_packbuilder_new(Setter(packBuilder), *this);
+            git_mempack_write_thin_pack(mempack_backend, packBuilder.get());
+            git_packbuilder_write_buf(&buf, packBuilder.get());
+
+            std::string repo_path = std::string(git_repository_path(repo.get()));
+            while (!repo_path.empty() && repo_path.back() == '/')
+                repo_path.pop_back();
+            std::string pack_dir_path = repo_path + "/objects/pack";
+
+            // TODO: could the indexing be done in a separate thread?
+            Indexer indexer;
+            git_indexer_progress stats;
+            if (git_indexer_new(Setter(indexer), pack_dir_path.c_str(), 0, nullptr, nullptr))
+                throw Error("creating git packfile indexer: %s", git_error_last()->message);
+            if (git_indexer_append(indexer.get(), buf.ptr, buf.size, &stats))
+                throw Error("appending to git packfile index: %s", git_error_last()->message);
+            if (git_indexer_commit(indexer.get(), &stats))
+                throw Error("committing git packfile index: %s", git_error_last()->message);
+
+            if (git_mempack_reset(mempack_backend))
+                throw Error("resetting git mempack backend: %s", git_error_last()->message);
+
+            git_buf_dispose(&buf);
+        } catch (...) {
+            git_buf_dispose(&buf);
+            throw;
+        }
     }
 
     uint64_t getRevCount(const Hash & rev) override
@@ -1007,6 +1062,8 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         updateBuilders({});
 
         auto [oid, _name] = popBuilder();
+
+        repo->flush();
 
         return toHash(oid);
     }

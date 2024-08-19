@@ -80,6 +80,8 @@ struct GitRepo
 
     virtual ref<GitFileSystemObjectSink> getFileSystemObjectSink() = 0;
 
+    virtual void flush() = 0;
+
     virtual void fetch(
         const std::string & url,
         const std::string & refspec,
