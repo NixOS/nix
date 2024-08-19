@@ -45,7 +45,7 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
             gens.push_back({
                 .number = *n,
                 .path = path,
-                .creationTime = lstat(path).st_mtime
+                .creationTime = unix::lstat(path).st_mtime
             });
         }
     }

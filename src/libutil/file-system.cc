@@ -1,5 +1,6 @@
 #include "environment-variables.hh"
 #include "file-system.hh"
+#include "error.hh"
 #include "file-path.hh"
 #include "file-path-impl.hh"
 #include "signals.hh"
@@ -163,33 +164,20 @@ bool isDirOrInDir(std::string_view path, std::string_view dir)
 }
 
 
-struct stat stat(const Path & path)
+#ifndef _WIN32
+struct stat unix::lstat(const Path & path)
 {
     struct stat st;
-    if (stat(path.c_str(), &st))
+    if (lstat(path.c_str(), &st))
         throw SysError("getting status of '%1%'", path);
     return st;
 }
 
-#ifdef _WIN32
-# define STAT stat
-#else
-# define STAT lstat
-#endif
-
-struct stat lstat(const Path & path)
-{
-    struct stat st;
-    if (STAT(path.c_str(), &st))
-        throw SysError("getting status of '%1%'", path);
-    return st;
-}
-
-
-std::optional<struct stat> maybeLstat(const Path & path)
+std::optional<struct stat> unix::maybeLstat(const Path & path)
 {
     std::optional<struct stat> st{std::in_place};
-    if (STAT(path.c_str(), &*st))
+
+    if (lstat(path.c_str(), &*st))
     {
         if (errno == ENOENT || errno == ENOTDIR)
             st.reset();
@@ -198,14 +186,27 @@ std::optional<struct stat> maybeLstat(const Path & path)
     }
     return st;
 }
+#endif
 
-
-bool pathExists(const Path & path)
+std::optional<fs::file_status> maybeSymlinkStat(const fs::path & path)
 {
-    return maybeLstat(path).has_value();
+    try {
+        auto st = fs::symlink_status(path);
+        if (st.type() == fs::file_type::not_found)
+            return std::nullopt;
+        return st;
+    } catch (fs::filesystem_error & e) {
+        throw SystemError(e.code().value(), "getting status of '%s'", path);
+    }
 }
 
-bool pathAccessible(const Path & path)
+
+bool pathExists(const fs::path & path)
+{
+    return maybeSymlinkStat(path).has_value();
+}
+
+bool pathAccessible(const fs::path & path)
 {
     try {
         return pathExists(path);
@@ -429,7 +430,7 @@ void createDirs(const Path & path)
     try {
         fs::create_directories(path);
     } catch (fs::filesystem_error & e) {
-        throw SysError("creating directory '%1%'", path);
+        throw SysError(e.code().value(), "creating directory '%1%'", path);
     }
 }
 
@@ -650,7 +651,7 @@ void copyFile(const fs::path & from, const fs::path & to, bool andDelete)
         throw Error("file '%s' has an unsupported type", from);
     }
 
-    setWriteTime(to, lstat(from.string().c_str()));
+    setWriteTime(to, unix::lstat(from.string().c_str()));
     if (andDelete) {
         if (!fs::is_symlink(fromStatus))
             fs::permissions(from, fs::perms::owner_write, fs::perm_options::add | fs::perm_options::nofollow);
