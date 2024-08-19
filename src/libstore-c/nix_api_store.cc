@@ -144,3 +144,15 @@ StorePath * nix_store_path_clone(const StorePath * p)
 {
     return new StorePath{p->path};
 }
+
+nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        nix::RealisedPath::Set paths;
+        paths.insert(path->path);
+        nix::copyClosure(*srcStore->ptr, *dstStore->ptr, paths);
+    }
+    NIXC_CATCH_ERRS
+}
