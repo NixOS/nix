@@ -10,6 +10,8 @@
 #ifdef _WIN32
 # include <fileapi.h>
 # include "windows-error.hh"
+#else
+# include <poll.h>
 #endif
 
 
@@ -155,6 +157,24 @@ size_t FdSource::readUnbuffered(char * data, size_t len)
 bool FdSource::good()
 {
     return _good;
+}
+
+
+bool FdSource::hasData()
+{
+    if (BufferedSource::hasData()) return true;
+
+    while (true) {
+        struct pollfd fds[1];
+        fds[0].fd = fd;
+        fds[0].events = POLLIN;
+        auto n = poll(fds, 1, 0);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            throw SysError("polling file descriptor");
+        }
+        return n == 1 && (fds[0].events & POLLIN);
+    }
 }
 
 
