@@ -69,7 +69,7 @@ mountOverlayfs () {
     || skipTest "overlayfs is not supported"
 
   cleanupOverlay () {
-    umount "$storeBRoot/nix/store"
+    umount -n "$storeBRoot/nix/store"
     rm -r $storeVolume/workdir
   }
   trap cleanupOverlay EXIT
