@@ -21,7 +21,7 @@ configdata = configuration_data()
 # TODO rename, because it will conflict with downstream projects
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
-configdata.set_quoted('SYSTEM', host_machine.system())
+configdata.set_quoted('SYSTEM', host_machine.cpu_family() + '-' + host_machine.system())
 
 deps_private_maybe_subproject = [
 ]
@@ -73,6 +73,7 @@ subdir('build-utils-meson/threads')
 boost = dependency(
   'boost',
   modules : ['container'],
+  include_type: 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
@@ -113,7 +114,7 @@ if aws_s3.found()
       '-laws-cpp-sdk-core',
       '-laws-crt-cpp',
     ],
-  )
+  ).as_system('system')
 endif
 deps_other += aws_s3
 
@@ -327,7 +328,6 @@ prefix = get_option('prefix')
 path_opts = [
   # Meson built-ins.
   'datadir',
-  'bindir',
   'mandir',
   'libdir',
   'includedir',
@@ -372,7 +372,6 @@ cpp_str_defines = {
   'NIX_STATE_DIR': state_dir / 'nix',
   'NIX_LOG_DIR':   log_dir,
   'NIX_CONF_DIR':  sysconfdir / 'nix',
-  'NIX_BIN_DIR':   bindir,
   'NIX_MAN_DIR':   mandir,
 }
 

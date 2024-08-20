@@ -3,7 +3,7 @@
 source common/test-root.sh
 source common/paths.sh
 
-set -o pipefail
+set -eu -o pipefail
 
 source characterisation/framework.sh
 

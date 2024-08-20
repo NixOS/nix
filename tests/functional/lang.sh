@@ -50,11 +50,25 @@ set +x
 badDiff=0
 badExitCode=0
 
+# Extra post-processing that's specific to each test case
+postprocess() {
+    if [[ -e "lang/$1.postprocess" ]]; then
+        (
+            # We could allow arbitrary interpreters in .postprocess, but that
+            # just exposes us to the complexity of not having /usr/bin/env in
+            # the sandbox. So let's just hardcode bash for now.
+            set -x;
+            bash "lang/$1.postprocess" "lang/$1"
+        )
+    fi
+}
+
 for i in lang/parse-fail-*.nix; do
     echo "parsing $i (should fail)";
     i=$(basename "$i" .nix)
     if expectStderr 1 nix-instantiate --parse - < "lang/$i.nix" > "lang/$i.err"
     then
+        postprocess "$i"
         diffAndAccept "$i" err err.exp
     else
         echo "FAIL: $i shouldn't parse"
@@ -71,6 +85,7 @@ for i in lang/parse-okay-*.nix; do
             2> "lang/$i.err"
     then
         sed "s!$(pwd)!/pwd!g" "lang/$i.out" "lang/$i.err"
+        postprocess "$i"
         diffAndAccept "$i" out exp
         diffAndAccept "$i" err err.exp
     else
@@ -94,6 +109,7 @@ for i in lang/eval-fail-*.nix; do
         expectStderr 1 nix-instantiate $flags "lang/$i.nix" \
             | sed "s!$(pwd)!/pwd!g" > "lang/$i.err"
     then
+        postprocess "$i"
         diffAndAccept "$i" err err.exp
     else
         echo "FAIL: $i shouldn't evaluate"
@@ -109,6 +125,7 @@ for i in lang/eval-okay-*.nix; do
         if expect 0 nix-instantiate --eval --xml --no-location --strict \
                 "lang/$i.nix" > "lang/$i.out.xml"
         then
+            postprocess "$i"
             diffAndAccept "$i" out.xml exp.xml
         else
             echo "FAIL: $i should evaluate"
@@ -129,6 +146,7 @@ for i in lang/eval-okay-*.nix; do
                 2> "lang/$i.err"
         then
             sed -i "s!$(pwd)!/pwd!g" "lang/$i.out" "lang/$i.err"
+            postprocess "$i"
             diffAndAccept "$i" out exp
             diffAndAccept "$i" err err.exp
         else

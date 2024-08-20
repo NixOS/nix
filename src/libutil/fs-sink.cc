@@ -53,7 +53,7 @@ void copyRecursive(
         throw Error("file '%1%' has an unsupported type", from);
 
     default:
-        abort();
+        unreachable();
     }
 }
 

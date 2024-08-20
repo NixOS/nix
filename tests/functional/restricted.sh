@@ -10,11 +10,11 @@ nix-instantiate --restrict-eval --eval -E '1 + 2'
 nix-instantiate --restrict-eval ./simple.nix -I src=.
 nix-instantiate --restrict-eval ./simple.nix -I src1=simple.nix -I src2=config.nix -I src3=./simple.builder.sh
 
+# no default NIX_PATH
+(unset NIX_PATH; ! nix-instantiate --restrict-eval --find-file .)
+
 (! nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix')
 nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix' -I src=../..
-
-(! nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../../src/nix-channel')
-nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../../src/nix-channel' -I src=../../src
 
 expectStderr 1 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' | grepQuiet "forbidden in restricted mode"
 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' -I src=.

@@ -67,6 +67,14 @@ static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
     return {result, size_t(t - result)};
 }
 
+static void requireExperimentalFeature(const ExperimentalFeature & feature, const Pos & pos)
+{
+    if (!experimentalFeatureSettings.isEnabled(feature))
+        throw ParseError(ErrorInfo{
+            .msg = HintFmt("experimental Nix feature '%1%' is disabled; add '--extra-experimental-features %1%' to enable it", showExperimentalFeature(feature)),
+            .pos = pos,
+        });
+}
 
 }
 
@@ -119,12 +127,18 @@ or          { return OR_KW; }
 \-\>        { return IMPL; }
 \/\/        { return UPDATE; }
 \+\+        { return CONCAT; }
+\<\|        { requireExperimentalFeature(Xp::PipeOperators, state->positions[CUR_POS]);
+              return PIPE_FROM;
+            }
+\|\>        { requireExperimentalFeature(Xp::PipeOperators, state->positions[CUR_POS]);
+              return PIPE_INTO;
+            }
 
 {ID}        { yylval->id = {yytext, (size_t) yyleng}; return ID; }
 {INT}       { errno = 0;
               std::optional<int64_t> numMay = string2Int<int64_t>(yytext);
               if (numMay.has_value()) {
-                  yylval->n = *numMay;
+                  yylval->n = NixInt{*numMay};
               } else {
                   throw ParseError(ErrorInfo{
                       .msg = HintFmt("invalid integer '%1%'", yytext),

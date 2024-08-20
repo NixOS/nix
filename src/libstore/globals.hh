@@ -85,11 +85,6 @@ public:
     std::vector<Path> nixUserConfFiles;
 
     /**
-     * The directory where the main programs are stored.
-     */
-    Path nixBinDir;
-
-    /**
      * The directory where the man pages are stored.
      */
     Path nixManDir;
@@ -246,7 +241,7 @@ public:
         )",
         {"build-timeout"}};
 
-    Setting<Strings> buildHook{this, {}, "build-hook",
+    Setting<Strings> buildHook{this, {"nix", "__build-remote"}, "build-hook",
         R"(
           The path to the helper program that executes remote builds.
 
@@ -286,7 +281,7 @@ public:
              For backward compatibility, `ssh://` may be omitted.
              The hostname may be an alias defined in `~/.ssh/config`.
 
-          2. A comma-separated list of [Nix system types](@docroot@/contributing/hacking.md#system-type).
+          2. A comma-separated list of [Nix system types](@docroot@/development/building.md#system-type).
              If omitted, this defaults to the local platform type.
 
              > **Example**
@@ -866,13 +861,13 @@ public:
 
           - `ca-derivations`
 
-            Included by default if the [`ca-derivations` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-ca-derivations) is enabled.
+            Included by default if the [`ca-derivations` experimental feature](@docroot@/development/experimental-features.md#xp-feature-ca-derivations) is enabled.
 
             This system feature is implicitly required by derivations with the [`__contentAddressed` attribute](@docroot@/language/advanced-attributes.md#adv-attr-__contentAddressed).
 
           - `recursive-nix`
 
-            Included by default if the [`recursive-nix` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-recursive-nix) is enabled.
+            Included by default if the [`recursive-nix` experimental feature](@docroot@/development/experimental-features.md#xp-feature-recursive-nix) is enabled.
 
           - `uid-range`
 
@@ -1131,7 +1126,10 @@ public:
         )"};
 
     Setting<uint64_t> maxFree{
-        this, std::numeric_limits<uint64_t>::max(), "max-free",
+        // n.b. this is deliberately int64 max rather than uint64 max because
+        // this goes through the Nix language JSON parser and thus needs to be
+        // representable in Nix language integers.
+        this, std::numeric_limits<int64_t>::max(), "max-free",
         R"(
           When a garbage collection is triggered by the `min-free` option, it
           stops as soon as `max-free` bytes are available. The default is
@@ -1221,7 +1219,10 @@ public:
 
     Setting<uint64_t> warnLargePathThreshold{
         this,
-        std::numeric_limits<uint64_t>::max(),
+        // n.b. this is deliberately int64 max rather than uint64 max because
+        // this goes through the Nix language JSON parser and thus needs to be
+        // representable in Nix language integers.
+        std::numeric_limits<int64_t>::max(),
         "warn-large-path-threshold",
         R"(
           Warn when copying a path larger than this number of bytes to the Nix store

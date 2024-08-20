@@ -1,6 +1,7 @@
 #include "config.hh"
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
+#include "environment-variables.hh"
 #include "experimental-features.hh"
 #include "util.hh"
 #include "file-system.hh"
@@ -170,9 +171,18 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
             set(name, value);
 
     // Then apply other settings
-    for (const auto & [name, value] : parsedContents)
-        if (name != "experimental-features" && name != "extra-experimental-features")
+    // XXX: NIX_PATH must override the regular setting! This is done in `initGC()`
+    // Environment variables overriding settings should probably be part of the Config mechanism,
+    // but at the time of writing it's not worth building that for just one thing
+    for (const auto & [name, value] : parsedContents) {
+        if (name != "experimental-features" && name != "extra-experimental-features") {
+            if ((name == "nix-path" || name == "extra-nix-path")
+                && getEnv("NIX_PATH").has_value()) {
+                continue;
+            }
             set(name, value);
+        }
+    }
 }
 
 void Config::resetOverridden()

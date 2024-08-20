@@ -1,24 +1,67 @@
-# Hacking
+# Building Nix
 
-This section provides some notes on how to hack on Nix. To get the
-latest version of Nix from GitHub:
+This section provides some notes on how to start hacking on Nix.
+To get the latest version of Nix from GitHub:
 
 ```console
 $ git clone https://github.com/NixOS/nix.git
 $ cd nix
 ```
 
-The following instructions assume you already have some version of Nix installed locally, so that you can use it to set up the development environment. If you don't have it installed, follow the [installation instructions].
+> **Note**
+>
+> The following instructions assume you already have some version of Nix installed locally, so that you can use it to set up the development environment.
+> If you don't have it installed, follow the [installation instructions](../installation/index.md).
 
-[installation instructions]: ../installation/index.md
+
+To build all dependencies and start a shell in which all environment variables are set up so that those dependencies can be found:
+
+```console
+$ nix-shell
+```
+
+To get a shell with one of the other [supported compilation environments](#compilation-environments):
+
+```console
+$ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
+```
+
+> **Note**
+>
+> You can use `native-ccacheStdenvPackages` to drastically improve rebuild time.
+> By default, [ccache](https://ccache.dev) keeps artifacts in `~/.cache/ccache/`.
+
+To build Nix itself in this shell:
+
+```console
+[nix-shell]$ autoreconfPhase
+[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
+[nix-shell]$ make -j $NIX_BUILD_CORES
+```
+
+To install it in `$(pwd)/outputs` and test it:
+
+```console
+[nix-shell]$ make install
+[nix-shell]$ make installcheck -j $NIX_BUILD_CORES
+[nix-shell]$ ./outputs/out/bin/nix --version
+nix (Nix) 2.12
+```
+
+To build a release version of Nix for the current operating system and CPU architecture:
+
+```console
+$ nix-build
+```
+
+You can also build Nix for one of the [supported platforms](#platforms).
 
 ## Building Nix with flakes
 
 This section assumes you are using Nix with the [`flakes`] and [`nix-command`] experimental features enabled.
-See the [Building Nix](#building-nix) section for equivalent instructions using stable Nix interfaces.
 
-[`flakes`]: @docroot@/contributing/experimental-features.md#xp-feature-flakes
-[`nix-command`]: @docroot@/contributing/experimental-features.md#xp-nix-command
+[`flakes`]: @docroot@/development/experimental-features.md#xp-feature-flakes
+[`nix-command`]: @docroot@/development/experimental-features.md#xp-nix-command
 
 To build all dependencies and start a shell in which all environment variables are set up so that those dependencies can be found:
 
@@ -63,50 +106,6 @@ To build a release version of Nix for the current operating system and CPU archi
 
 ```console
 $ nix build
-```
-
-You can also build Nix for one of the [supported platforms](#platforms).
-
-## Building Nix
-
-To build all dependencies and start a shell in which all environment variables are set up so that those dependencies can be found:
-
-```console
-$ nix-shell
-```
-
-To get a shell with one of the other [supported compilation environments](#compilation-environments):
-
-```console
-$ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
-```
-
-> **Note**
->
-> You can use `native-ccacheStdenvPackages` to drastically improve rebuild time.
-> By default, [ccache](https://ccache.dev) keeps artifacts in `~/.cache/ccache/`.
-
-To build Nix itself in this shell:
-
-```console
-[nix-shell]$ autoreconfPhase
-[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
-[nix-shell]$ make -j $NIX_BUILD_CORES
-```
-
-To install it in `$(pwd)/outputs` and test it:
-
-```console
-[nix-shell]$ make install
-[nix-shell]$ make installcheck -j $NIX_BUILD_CORES
-[nix-shell]$ ./outputs/out/bin/nix --version
-nix (Nix) 2.12
-```
-
-To build a release version of Nix for the current operating system and CPU architecture:
-
-```console
-$ nix-build
 ```
 
 You can also build Nix for one of the [supported platforms](#platforms).
@@ -294,81 +293,3 @@ If it fails, run `git add --patch` to approve the suggestions _and commit again_
 To refresh pre-commit hook's config file, do the following:
 1. Exit the development shell and start it again by running `nix develop`.
 2. If you also use the pre-commit hook, also run `pre-commit-hooks-install` again.
-
-## Add a release note
-
-`doc/manual/rl-next` contains release notes entries for all unreleased changes.
-
-User-visible changes should come with a release note.
-
-### Add an entry
-
-Here's what a complete entry looks like. The file name is not incorporated in the document.
-
-```
----
-synopsis: Basically a title
-issues: 1234
-prs: 1238
----
-
-Here's one or more paragraphs that describe the change.
-
-- It's markdown
-- Add references to the manual using @docroot@
-```
-
-Significant changes should add the following header, which moves them to the top.
-
-```
-significance: significant
-```
-
-<!-- Keep an eye on https://codeberg.org/fgaz/changelog-d/issues/1 -->
-See also the [format documentation](https://github.com/haskell/cabal/blob/master/CONTRIBUTING.md#changelog).
-
-### Build process
-
-Releases have a precomputed `rl-MAJOR.MINOR.md`, and no `rl-next.md`.
-
-## Branches
-
-- [`master`](https://github.com/NixOS/nix/commits/master)
-
-  The main development branch. All changes are approved and merged here.
-  When developing a change, create a branch based on the latest `master`.
-
-  Maintainers try to [keep it in a release-worthy state](#reverting).
-
-- [`maintenance-*.*`](https://github.com/NixOS/nix/branches/all?query=maintenance)
-
-  These branches are the subject of backports only, and are
-  also [kept](#reverting) in a release-worthy state.
-
-  See [`maintainers/backporting.md`](https://github.com/NixOS/nix/blob/master/maintainers/backporting.md)
-
-- [`latest-release`](https://github.com/NixOS/nix/tree/latest-release)
-
-  The latest patch release of the latest minor version.
-
-  See [`maintainers/release-process.md`](https://github.com/NixOS/nix/blob/master/maintainers/release-process.md)
-
-- [`backport-*-to-*`](https://github.com/NixOS/nix/branches/all?query=backport)
-
-  Generally branches created by the backport action.
-
-  See [`maintainers/backporting.md`](https://github.com/NixOS/nix/blob/master/maintainers/backporting.md)
-
-- [_other_](https://github.com/NixOS/nix/branches/all)
-
-  Branches that do not conform to the above patterns should be feature branches.
-
-## Reverting
-
-If a change turns out to be merged by mistake, or contain a regression, it may be reverted.
-A revert is not a rejection of the contribution, but merely part of an effective development process.
-It makes sure that development keeps running smoothly, with minimal uncertainty, and less overhead.
-If maintainers have to worry too much about avoiding reverts, they would not be able to merge as much.
-By embracing reverts as a good part of the development process, everyone wins.
-
-However, taking a step back may be frustrating, so maintainers will be extra supportive on the next try.

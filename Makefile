@@ -54,6 +54,7 @@ ifeq ($(ENABLE_FUNCTIONAL_TESTS), yes)
 ifdef HOST_UNIX
 makefiles += \
   tests/functional/local.mk \
+  tests/functional/flakes/local.mk \
   tests/functional/ca/local.mk \
   tests/functional/git-hashing/local.mk \
   tests/functional/dyn-drv/local.mk \
@@ -92,7 +93,7 @@ ifdef HOST_WINDOWS
   GLOBAL_LDFLAGS += -Wl,--export-all-symbols
 endif
 
-GLOBAL_CXXFLAGS += -g -Wall -Wdeprecated-copy -Wignored-qualifiers -Wimplicit-fallthrough -Werror=unused-result -include $(buildprefix)config.h -std=c++2a -I src
+GLOBAL_CXXFLAGS += -g -Wall -Wdeprecated-copy -Wignored-qualifiers -Wimplicit-fallthrough -Werror=unused-result -Werror=suggest-override -include $(buildprefix)config.h -std=c++2a -I src
 
 # Include the main lib, causing rules to be defined
 

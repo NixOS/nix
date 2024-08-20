@@ -149,7 +149,7 @@ std::string_view showType(ValueType type, bool withArticle)
         case nFloat: return WA("a", "float");
         case nThunk: return WA("a", "thunk");
     }
-    abort();
+    unreachable();
 }
 
 
@@ -215,7 +215,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 static constexpr size_t BASE_ENV_SIZE = 128;
 
 EvalState::EvalState(
-    const LookupPath & _lookupPath,
+    const LookupPath & lookupPathFromArguments,
     ref<Store> store,
     const fetchers::Settings & fetchSettings,
     const EvalSettings & settings,
@@ -331,12 +331,21 @@ EvalState::EvalState(
     vStringSymlink.mkString("symlink");
     vStringUnknown.mkString("unknown");
 
-    /* Initialise the Nix expression search path. */
+    /* Construct the Nix expression search path. */
+    assert(lookupPath.elements.empty());
     if (!settings.pureEval) {
-        for (auto & i : _lookupPath.elements)
+        for (auto & i : lookupPathFromArguments.elements) {
             lookupPath.elements.emplace_back(LookupPath::Elem {i});
-        for (auto & i : settings.nixPath.get())
+        }
+        /* $NIX_PATH overriding regular settings is implemented as a hack in `initGC()` */
+        for (auto & i : settings.nixPath.get()) {
             lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
+        }
+        if (!settings.restrictEval) {
+            for (auto & i : EvalSettings::getDefaultNixPath()) {
+                lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
+            }
+        }
     }
 
     /* Allow access to all paths in the search path. */
@@ -771,7 +780,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
             case ReplExitStatus::Continue:
                 break;
             default:
-                abort();
+                unreachable();
         }
     }
 }
@@ -1140,7 +1149,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx po
 
 void Expr::eval(EvalState & state, Env & env, Value & v)
 {
-    abort();
+    unreachable();
 }
 
 
@@ -1573,7 +1582,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                                 .withFrame(*fun.payload.lambda.env, lambda)
                                 .debugThrow();
                         }
-                    abort(); // can't happen
+                    unreachable();
                 }
             }
 
@@ -1970,7 +1979,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     NixStringContext context;
     std::vector<BackedStringView> s;
     size_t sSize = 0;
-    NixInt n = 0;
+    NixInt n{0};
     NixFloat nf = 0;
 
     bool first = !forceString;
@@ -2014,17 +2023,22 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
         if (firstType == nInt) {
             if (vTmp.type() == nInt) {
-                n += vTmp.integer();
+                auto newN = n + vTmp.integer();
+                if (auto checked = newN.valueChecked(); checked.has_value()) {
+                    n = NixInt(*checked);
+                } else {
+                    state.error<EvalError>("integer overflow in adding %1% + %2%", n, vTmp.integer()).atPos(i_pos).debugThrow();
+                }
             } else if (vTmp.type() == nFloat) {
                 // Upgrade the type from int to float;
                 firstType = nFloat;
-                nf = n;
+                nf = n.value;
                 nf += vTmp.fpoint();
             } else
                 state.error<EvalError>("cannot add %1% to an integer", showType(vTmp)).atPos(i_pos).withFrame(env, *this).debugThrow();
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
-                nf += vTmp.integer();
+                nf += vTmp.integer().value;
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint();
             } else
@@ -2149,7 +2163,7 @@ NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view err
     try {
         forceValue(v, pos);
         if (v.type() == nInt)
-            return v.integer();
+            return v.integer().value;
         else if (v.type() != nFloat)
             error<TypeError>(
                 "expected a float but found %1%: %2%",
@@ -2336,7 +2350,7 @@ BackedStringView EvalState::coerceToString(
            shell scripting convenience, just like `null'. */
         if (v.type() == nBool && v.boolean()) return "1";
         if (v.type() == nBool && !v.boolean()) return "";
-        if (v.type() == nInt) return std::to_string(v.integer());
+        if (v.type() == nInt) return std::to_string(v.integer().value);
         if (v.type() == nFloat) return std::to_string(v.fpoint());
         if (v.type() == nNull) return "";
 
@@ -2719,9 +2733,9 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
 
     // Special case type-compatibility between float and int
     if (v1.type() == nInt && v2.type() == nFloat)
-        return v1.integer() == v2.fpoint();
+        return v1.integer().value == v2.fpoint();
     if (v1.type() == nFloat && v2.type() == nInt)
-        return v1.fpoint() == v2.integer();
+        return v1.fpoint() == v2.integer().value;
 
     // All other types are not compatible with each other.
     if (v1.type() != v2.type()) return false;
@@ -2851,8 +2865,10 @@ void EvalState::printStatistics()
     topObj["cpuTime"] = cpuTime;
 #endif
     topObj["time"] = {
+#ifndef _WIN32 // TODO implement
         {"cpu", cpuTime},
-#ifdef HAVE_BOEHMGC
+#endif
+#if HAVE_BOEHMGC
         {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
         {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
 #endif
@@ -3072,7 +3088,9 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
     if (EvalSettings::isPseudoUrl(value)) {
         try {
             auto accessor = fetchers::downloadTarball(
-                EvalSettings::resolvePseudoUrl(value)).accessor;
+                store,
+                fetchSettings,
+                EvalSettings::resolvePseudoUrl(value));
             auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
             return finish(store->toRealPath(storePath));
         } catch (Error & e) {

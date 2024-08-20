@@ -1,11 +1,34 @@
+{
+  lib,
+  src,
+  officialRelease,
+}:
+
 scope:
+
 let
   inherit (scope) callPackage;
+
+  baseVersion = lib.fileContents ../.version;
+
+  versionSuffix = lib.optionalString (!officialRelease) "pre";
+
+  fineVersionSuffix = lib.optionalString
+    (!officialRelease)
+    "pre${builtins.substring 0 8 (src.lastModifiedDate or src.lastModified or "19700101")}_${src.shortRev or "dirty"}";
+
+  fineVersion = baseVersion + fineVersionSuffix;
 in
 
 # This becomes the pkgs.nixComponents attribute set
 {
-  nix = callPackage ../package.nix { };
+  version = baseVersion + versionSuffix;
+  inherit versionSuffix;
+
+  nix = callPackage ../package.nix {
+    version = fineVersion;
+    versionSuffix = fineVersionSuffix;
+  };
 
   nix-util = callPackage ../src/libutil/package.nix { };
   nix-util-c = callPackage ../src/libutil-c/package.nix { };
@@ -33,11 +56,15 @@ in
 
   nix-cmd = callPackage ../src/libcmd/package.nix { };
 
-  # Will replace `nix` once the old build system is gone.
-  nix-ng = callPackage ../src/nix/package.nix { };
+  nix-cli = callPackage ../src/nix/package.nix { version = fineVersion; };
 
-  nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { };
-  nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { };
+  nix-functional-tests = callPackage ../src/nix-functional-tests/package.nix { version = fineVersion; };
+
+  nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { version = fineVersion; };
+  nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { version = fineVersion; };
 
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
+
+  # Will replace `nix` once the old build system is gone.
+  nix-ng = callPackage ../packaging/everything.nix { };
 }

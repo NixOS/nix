@@ -32,7 +32,7 @@ If no substitutes are available and no store derivation is given, realisation fa
 [store objects]: @docroot@/store/store-object.md
 [closure]: @docroot@/glossary.md#gloss-closure
 [substituters]: @docroot@/command-ref/conf-file.md#conf-substituters
-[content-addressed derivations]: @docroot@/contributing/experimental-features.md#xp-feature-ca-derivations
+[content-addressed derivations]: @docroot@/development/experimental-features.md#xp-feature-ca-derivations
 [Nix database]: @docroot@/glossary.md#gloss-nix-database
 
 The resulting paths are printed on standard output.

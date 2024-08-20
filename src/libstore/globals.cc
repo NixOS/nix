@@ -64,7 +64,6 @@ Settings::Settings()
     , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
     , nixConfDir(canonPath(getEnvNonEmpty("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
     , nixUserConfFiles(getUserConfigFiles())
-    , nixBinDir(canonPath(getEnvNonEmpty("NIX_BIN_DIR").value_or(NIX_BIN_DIR)))
     , nixManDir(canonPath(NIX_MAN_DIR))
     , nixDaemonSocketFile(canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
@@ -95,34 +94,6 @@ Settings::Settings()
     sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
-
-    /* Set the build hook location
-
-       For builds we perform a self-invocation, so Nix has to be self-aware.
-       That is, it has to know where it is installed. We don't think it's sentient.
-
-       Normally, nix is installed according to `nixBinDir`, which is set at compile time,
-       but can be overridden. This makes for a great default that works even if this
-       code is linked as a library into some other program whose main is not aware
-       that it might need to be a build remote hook.
-
-       However, it may not have been installed at all. For example, if it's a static build,
-       there's a good chance that it has been moved out of its installation directory.
-       That makes `nixBinDir` useless. Instead, we'll query the OS for the path to the
-       current executable, using `getSelfExe()`.
-
-       As a last resort, we resort to `PATH`. Hopefully we find a `nix` there that's compatible.
-       If you're porting Nix to a new platform, that might be good enough for a while, but
-       you'll want to improve `getSelfExe()` to work on your platform.
-     */
-    std::string nixExePath = nixBinDir + "/nix";
-    if (!pathExists(nixExePath)) {
-        nixExePath = getSelfExe().value_or("nix");
-    }
-    buildHook = {
-        nixExePath,
-        "__build-remote",
-    };
 }
 
 void loadConfFile(AbstractConfig & config)
@@ -297,7 +268,7 @@ template<> std::string BaseSetting<SandboxMode>::to_string() const
     if (value == smEnabled) return "true";
     else if (value == smRelaxed) return "relaxed";
     else if (value == smDisabled) return "false";
-    else abort();
+    else unreachable();
 }
 
 template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)

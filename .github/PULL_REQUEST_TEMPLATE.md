@@ -1,3 +1,22 @@
+<!--
+
+IMPORTANT
+
+Nix is a non-trivial project, so for your contribution to be successful,
+it really is important to follow the contributing guidelines:
+
+https://github.com/NixOS/nix/blob/master/CONTRIBUTING.md
+
+Even if you've contributed to open source before, take a moment to read it,
+so you understand the process and the expectations.
+
+- what information to include in commit messages
+- proper attribution
+- volunteering contributions effectively
+- how to get help and our review process.
+
+-->
+
 # Motivation
 <!-- Briefly explain what the change is about and why it is desirable. -->
 

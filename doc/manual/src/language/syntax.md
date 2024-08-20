@@ -6,175 +6,7 @@ This section covers syntax and semantics of the Nix language.
 
 ### String {#string-literal}
 
-  *Strings* can be written in three ways.
-
-  The most common way is to enclose the string between double quotes, e.g., `"foo bar"`.
-  Strings can span multiple lines.
-  The results of other expressions can be included into a string by enclosing them in `${ }`, a feature known as [string interpolation].
-
-  [string interpolation]: ./string-interpolation.md
-
-  The following must be escaped to represent them within a string, by prefixing with a backslash (`\`):
-
-  - Double quote (`"`)
-
-    > **Example**
-    >
-    > ```nix
-    > "\""
-    > ```
-    >
-    >    "\""
-
-  - Backslash (`\`)
-
-    > **Example**
-    >
-    > ```nix
-    > "\\"
-    > ```
-    >
-    >    "\\"
-
-  - Dollar sign followed by an opening curly bracket (`${`) – "dollar-curly"
-
-    > **Example**
-    >
-    > ```nix
-    > "\${"
-    > ```
-    >
-    >    "\${"
-
-  The newline, carriage return, and tab characters can be written as `\n`, `\r` and `\t`, respectively.
-
-  A "double-dollar-curly" (`$${`) can be written literally.
-
-  > **Example**
-  >
-  > ```nix
-  > "$${"
-  > ```
-  >
-  >    "$\${"
-
-  String values are output on the terminal with Nix-specific escaping.
-  Strings written to files will contain the characters encoded by the escaping.
-
-  The second way to write string literals is as an *indented string*, which is enclosed between pairs of *double single-quotes* (`''`), like so:
-
-  ```nix
-  ''
-    This is the first line.
-    This is the second line.
-      This is the third line.
-  ''
-  ```
-
-  This kind of string literal intelligently strips indentation from
-  the start of each line. To be precise, it strips from each line a
-  number of spaces equal to the minimal indentation of the string as a
-  whole (disregarding the indentation of empty lines). For instance,
-  the first and second line are indented two spaces, while the third
-  line is indented four spaces. Thus, two spaces are stripped from
-  each line, so the resulting string is
-
-  ```nix
-  "This is the first line.\nThis is the second line.\n  This is the third line.\n"
-  ```
-
-  > **Note**
-  >
-  > Whitespace and newline following the opening `''` is ignored if there is no non-whitespace text on the initial line.
-
-  > **Warning**
-  >
-  > Prefixed tab characters are not stripped.
-  >
-  > > **Example**
-  > >
-  > > The following indented string is prefixed with tabs:
-  > >
-  > > ''
-  > > 	all:
-  > > 		@echo hello
-  > > ''
-  > >
-  > >     "\tall:\n\t\t@echo hello\n"
-
-  Indented strings support [string interpolation].
-
-  The following must be escaped to represent them in an indented string:
-
-  - `$` is escaped by prefixing it with two single quotes (`''`)
-
-    > **Example**
-    >
-    > ```nix
-    > ''
-    >   ''$
-    > ''
-    > ```
-    >
-    >     "$\n"
-
-  - `''` is escaped by prefixing it with one single quote (`'`)
-
-    > **Example**
-    >
-    > ```nix
-    > ''
-    >   '''
-    > ''
-    > ```
-    >
-    >     "''\n"
-
-  These special characters are escaped as follows:
-  - Linefeed (`\n`): `''\n`
-  - Carriage return (`\r`): `''\r`
-  - Tab (`\t`): `''\t`
-
-  `''\` escapes any other character.
-
-  A "double-dollar-curly" (`$${`) can be written literally.
-
-  > **Example**
-  >
-  > ```nix
-  > ''
-  >   $${
-  > ''
-  > ```
-  >
-  >     "$\${\n"
-
-  Indented strings are primarily useful in that they allow multi-line
-  string literals to follow the indentation of the enclosing Nix
-  expression, and that less escaping is typically necessary for
-  strings representing languages such as shell scripts and
-  configuration files because `''` is much less common than `"`.
-  Example:
-
-  ```nix
-  stdenv.mkDerivation {
-    ...
-    postInstall =
-      ''
-        mkdir $out/bin $out/etc
-        cp foo $out/bin
-        echo "Hello World" > $out/etc/foo.conf
-        ${if enableBar then "cp bar $out/bin" else ""}
-      '';
-    ...
-  }
-  ```
-
-  Finally, as a convenience, *URIs* as defined in appendix B of
-  [RFC 2396](http://www.ietf.org/rfc/rfc2396.txt) can be written *as
-  is*, without quotes. For instance, the string
-  `"http://example.org/foo.tar.bz2"` can also be written as
-  `http://example.org/foo.tar.bz2`.
+See [String literals](string-literals.md).
 
 ### Number {#number-literal}
 
@@ -182,6 +14,13 @@ This section covers syntax and semantics of the Nix language.
 
   Numbers, which can be *integers* (like `123`) or *floating point*
   (like `123.43` or `.27e13`).
+
+  Integers in the Nix language are 64-bit [two's complement] signed integers, with a range of -9223372036854775808 to 9223372036854775807, inclusive.
+
+  [two's complement]: https://en.wikipedia.org/wiki/Two%27s_complement
+
+  Note that negative numeric literals are actually parsed as unary negation of positive numeric literals.
+  This means that the minimum integer `-9223372036854775808` cannot be written as-is as a literal, since the positive number `9223372036854775808` is one past the maximum range.
 
   See [arithmetic] and [comparison] operators for semantics.
 
@@ -247,37 +86,76 @@ Elements in a list can be accessed using [`builtins.elemAt`](./builtins.md#built
 
 ## Attribute Set {#attrs-literal}
 
-An attribute set is a collection of name-value-pairs (called *attributes*) enclosed in curly brackets (`{ }`).
+An attribute set is a collection of name-value-pairs called *attributes*.
 
-An attribute name can be an identifier or a [string](#string).
-An identifier must start with a letter (`a-z`, `A-Z`) or underscore (`_`), and can otherwise contain letters (`a-z`, `A-Z`), numbers (`0-9`), underscores (`_`), apostrophes (`'`), or dashes (`-`).
+Attribute sets are written enclosed in curly brackets (`{ }`).
+Attribute names and attribute values are separated by an equal sign (`=`).
+Each value can be an arbitrary expression, terminated by a semicolon (`;`)
 
-> **Syntax**
->
-> *name* = *identifier* | *string* \
-> *identifier* ~ `[a-zA-Z_][a-zA-Z0-9_'-]*`
+An attribute name is a string without context, and is denoted by a [name] (an [identifier](./identifiers.md#identifiers) or [string literal](string-literals.md)).
 
-Names and values are separated by an equal sign (`=`).
-Each value is an arbitrary expression terminated by a semicolon (`;`).
+[name]: ./identifiers.md#names
 
 > **Syntax**
 >
-> *attrset* = `{` [ *name* `=` *expr* `;` ]... `}`
+> *attrset* → `{` { *name* `=` *expr* `;` } `}`
 
 Attributes can appear in any order.
-An attribute name may only occur once.
+An attribute name may only occur once in each attribute set.
 
-Example:
+> **Example**
+>
+> This defines an attribute set with attributes named:
+> - `x` with the value `123`, an integer
+> - `text` with the value `"Hello"`, a string
+> - `y` where the value is the result of applying the function `f` to the attribute set `{ bla = 456; }`
+>
+> ```nix
+> {
+>   x = 123;
+>   text = "Hello";
+>   y = f { bla = 456; };
+> }
+> ```
 
-```nix
-{
-  x = 123;
-  text = "Hello";
-  y = f { bla = 456; };
-}
-```
+Attributes in nested attribute sets can be written using *attribute paths*.
 
-This defines a set with attributes named `x`, `text`, `y`.
+> **Syntax**
+>
+> *attrset* → `{` { *attrpath* `=` *expr* `;` } `}`
+
+An attribute path is a dot-separated list of [names][name].
+
+> **Syntax**
+>
+> *attrpath* = *name* { `.` *name* }
+
+<!-- -->
+
+> **Example**
+>
+> ```nix
+> { a.b.c = 1; a.b.d = 2; }
+> ```
+>
+>     {
+>       a = {
+>         b = {
+>           c = 1;
+>           d = 2;
+>         };
+>       };
+>     }
+
+Attribute names can also be set implicitly by using the [`inherit` keyword](#inheriting-attributes).
+
+> **Example**
+>
+> ```nix
+> { inherit (builtins) true; }
+> ```
+>
+>     { true = true; }
 
 Attributes can be accessed with the [`.` operator](./operators.md#attribute-selection).
 
@@ -340,7 +218,7 @@ a string), that attribute is simply not added to the set:
 
 This will evaluate to `{}` if `foo` evaluates to `false`.
 
-A set that has a `__functor` attribute whose value is callable (i.e. is
+A set that has a [`__functor`]{#attr-__functor} attribute whose value is callable (i.e. is
 itself a function or a set with a `__functor` attribute whose value is
 callable) can be applied as if it were a function, with the set itself
 passed in first , e.g.,

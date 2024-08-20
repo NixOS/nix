@@ -1,5 +1,7 @@
 #include "error.hh"
 #include "environment-variables.hh"
+#include "eval-settings.hh"
+#include "config-global.hh"
 #include "serialise.hh"
 #include "eval-gc.hh"
 
@@ -97,6 +99,12 @@ void initGC()
 
     gcCyclesAfterInit = GC_get_gc_no();
 #endif
+
+    // NIX_PATH must override the regular setting
+    // See the comment in applyConfig
+    if (auto nixPathEnv = getEnv("NIX_PATH")) {
+        globalConfig.set("nix-path", concatStringsSep(" ", EvalSettings::parseNixPath(nixPathEnv.value())));
+    }
 
     gcInitialised = true;
 }

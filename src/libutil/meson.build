@@ -62,6 +62,7 @@ endif
 boost = dependency(
   'boost',
   modules : ['context', 'coroutine'],
+  include_type: 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
@@ -128,6 +129,7 @@ sources = files(
   'english.cc',
   'environment-variables.cc',
   'error.cc',
+  'executable-path.cc',
   'exit.cc',
   'experimental-features.cc',
   'file-content-address.cc',
@@ -170,6 +172,7 @@ headers = [config_h] + files(
   'args/root.hh',
   'callback.hh',
   'canon-path.hh',
+  'checked-arithmetic.hh',
   'chunked-vector.hh',
   'closure.hh',
   'comparator.hh',
@@ -182,6 +185,7 @@ headers = [config_h] + files(
   'english.hh',
   'environment-variables.hh',
   'error.hh',
+  'executable-path.hh',
   'exit.hh',
   'experimental-features.hh',
   'file-content-address.hh',
@@ -201,6 +205,7 @@ headers = [config_h] + files(
   'lru-cache.hh',
   'memory-source-accessor.hh',
   'muxable-pipe.hh',
+  'os-string.hh',
   'pool.hh',
   'position.hh',
   'posix-source-accessor.hh',

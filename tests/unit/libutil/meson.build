@@ -52,6 +52,7 @@ sources = files(
   'closure.cc',
   'compression.cc',
   'config.cc',
+  'executable-path.cc',
   'file-content-address.cc',
   'git.cc',
   'hash.cc',
@@ -61,11 +62,14 @@ sources = files(
   'lru-cache.cc',
   'nix_api_util.cc',
   'pool.cc',
+  'processes.cc',
   'references.cc',
   'spawn.cc',
+  'strings.cc',
   'suggestions.cc',
-  'tests.cc',
+  'terminal.cc',
   'url.cc',
+  'util.cc',
   'xml-writer.cc',
 )
 

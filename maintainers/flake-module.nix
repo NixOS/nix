@@ -2,7 +2,7 @@
 
 {
   imports = [
-    inputs.pre-commit-hooks.flakeModule
+    inputs.git-hooks-nix.flakeModule
   ];
 
   perSystem = { config, pkgs, ... }: {
@@ -275,7 +275,6 @@
             ''^src/libutil/current-process\.hh$''
             ''^src/libutil/english\.cc$''
             ''^src/libutil/english\.hh$''
-            ''^src/libutil/environment-variables\.cc$''
             ''^src/libutil/error\.cc$''
             ''^src/libutil/error\.hh$''
             ''^src/libutil/exit\.hh$''
@@ -357,7 +356,6 @@
             ''^src/libutil/util\.cc$''
             ''^src/libutil/util\.hh$''
             ''^src/libutil/variant-wrapper\.hh$''
-            ''^src/libutil/windows/environment-variables\.cc$''
             ''^src/libutil/windows/file-descriptor\.cc$''
             ''^src/libutil/windows/file-path\.cc$''
             ''^src/libutil/windows/processes\.cc$''
@@ -485,7 +483,6 @@
             ''^tests/unit/libutil/pool\.cc''
             ''^tests/unit/libutil/references\.cc''
             ''^tests/unit/libutil/suggestions\.cc''
-            ''^tests/unit/libutil/tests\.cc''
             ''^tests/unit/libutil/url\.cc''
             ''^tests/unit/libutil/xml-writer\.cc''
           ];
@@ -644,19 +641,8 @@
             ''^tests/functional/selfref-gc\.sh$''
             ''^tests/functional/shell\.sh$''
             ''^tests/functional/shell\.shebang\.sh$''
-            ''^tests/functional/signing\.sh$''
             ''^tests/functional/simple\.builder\.sh$''
-            ''^tests/functional/simple\.sh$''
-            ''^tests/functional/ssh-relay\.sh$''
-            ''^tests/functional/store-info\.sh$''
-            ''^tests/functional/structured-attrs\.sh$''
-            ''^tests/functional/substitute-with-invalid-ca\.sh$''
-            ''^tests/functional/suggestions\.sh$''
             ''^tests/functional/supplementary-groups\.sh$''
-            ''^tests/functional/tarball\.sh$''
-            ''^tests/functional/test-infra\.sh$''
-            ''^tests/functional/test-libstoreconsumer\.sh$''
-            ''^tests/functional/timeout\.sh$''
             ''^tests/functional/toString-path\.sh$''
             ''^tests/functional/user-envs-migration\.sh$''
             ''^tests/functional/user-envs-test-case\.sh$''

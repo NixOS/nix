@@ -34,6 +34,9 @@ int main (int argc, char **argv) {
     setEnv("_NIX_TEST_NO_SANDBOX", "1");
     #endif
 
+    // For pipe operator tests in trivial.cc
+    experimentalFeatureSettings.set("experimental-features", "pipe-operators");
+
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
