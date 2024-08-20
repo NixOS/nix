@@ -19,10 +19,13 @@
 #include "users.hh"
 #include "terminal.hh"
 
+#include <filesystem>
 #include <nlohmann/json.hpp>
 #include <iomanip>
 
 #include "strings-inline.hh"
+
+namespace fs = std::filesystem;
 
 using namespace nix;
 using namespace nix::flake;
@@ -896,47 +899,48 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 "If you've set '%s' to a string, try using a path instead.",
                 templateDir, templateDirAttr->getAttrPathStr()).debugThrow();
 
-        std::vector<Path> changedFiles;
-        std::vector<Path> conflictedFiles;
+        std::vector<fs::path> changedFiles;
+        std::vector<fs::path> conflictedFiles;
 
-        std::function<void(const Path & from, const Path & to)> copyDir;
-        copyDir = [&](const Path & from, const Path & to)
+        std::function<void(const fs::path & from, const fs::path & to)> copyDir;
+        copyDir = [&](const fs::path & from, const fs::path & to)
         {
-            createDirs(to);
+            fs::create_directories(to);
 
-            for (auto & entry : std::filesystem::directory_iterator{from}) {
+            for (auto & entry : fs::directory_iterator{from}) {
                 checkInterrupt();
-                auto from2 = entry.path().string();
-                auto to2 = to + "/" + entry.path().filename().string();
-                auto st = lstat(from2);
-                if (S_ISDIR(st.st_mode))
+                auto from2 = entry.path();
+                auto to2 = to / entry.path().filename();
+                auto st = entry.symlink_status();
+                auto to_st = fs::symlink_status(to2);
+                if (fs::is_directory(st))
                     copyDir(from2, to2);
-                else if (S_ISREG(st.st_mode)) {
-                    auto contents = readFile(from2);
-                    if (pathExists(to2)) {
-                        auto contents2 = readFile(to2);
+                else if (fs::is_regular_file(st)) {
+                    auto contents = readFile(from2.string());
+                    if (fs::exists(to_st)) {
+                        auto contents2 = readFile(to2.string());
                         if (contents != contents2) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2, from2);
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2.string());
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
                         }
                         continue;
                     } else
-                        writeFile(to2, contents);
+                        writeFile(to2.string(), contents);
                 }
-                else if (S_ISLNK(st.st_mode)) {
-                    auto target = readLink(from2);
-                    if (pathExists(to2)) {
-                        if (readLink(to2) != target) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2, from2);
+                else if (fs::is_symlink(st)) {
+                    auto target = fs::read_symlink(from2);
+                    if (fs::exists(to_st)) {
+                        if (fs::read_symlink(to2) != target) {
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2.string());
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
                         }
                         continue;
                     } else
-                          createSymlink(target, to2);
+                          fs::create_symlink(target, to2);
                 }
                 else
                     throw Error("file '%s' has unsupported type", from2);
@@ -947,9 +951,9 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         copyDir(templateDir, flakeDir);
 
-        if (!changedFiles.empty() && pathExists(flakeDir + "/.git")) {
+        if (!changedFiles.empty() && fs::exists(std::filesystem::path{flakeDir} / ".git")) {
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
-            for (auto & s : changedFiles) args.push_back(s);
+            for (auto & s : changedFiles) args.emplace_back(s.string());
             runProgram("git", true, args);
         }
         auto welcomeText = cursor->maybeGetAttr("welcomeText");
@@ -1274,7 +1278,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
                             description = aDescription->getString();
                     }
-                    
+
                     if (json) {
                         j.emplace("type", "derivation");
                         j.emplace("name", name);
