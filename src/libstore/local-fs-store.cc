@@ -1,5 +1,5 @@
 #include "archive.hh"
-#include "fs-accessor.hh"
+#include "posix-source-accessor.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
@@ -8,74 +8,76 @@
 
 namespace nix {
 
+LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
+    : StoreConfig(params)
+    // Default `?root` from `rootDir` if non set
+    // FIXME don't duplicate description once we don't have root setting
+    , rootDir{
+        this,
+        !rootDir.empty() && params.count("root") == 0
+            ? (std::optional<Path>{rootDir})
+            : std::nullopt,
+        "root",
+        "Directory prefixed to all other paths."}
+{
+}
+
 LocalFSStore::LocalFSStore(const Params & params)
     : Store(params)
 {
 }
 
-struct LocalStoreAccessor : public FSAccessor
+struct LocalStoreAccessor : PosixSourceAccessor
 {
     ref<LocalFSStore> store;
+    bool requireValidPath;
 
-    LocalStoreAccessor(ref<LocalFSStore> store) : store(store) { }
+    LocalStoreAccessor(ref<LocalFSStore> store, bool requireValidPath)
+        : store(store)
+        , requireValidPath(requireValidPath)
+    { }
 
-    Path toRealPath(const Path & path, bool requireValidPath = true)
+    CanonPath toRealPath(const CanonPath & path)
     {
-        auto storePath = store->toStorePath(path).first;
+        auto [storePath, rest] = store->toStorePath(path.abs());
         if (requireValidPath && !store->isValidPath(storePath))
             throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
-        return store->getRealStoreDir() + std::string(path, store->storeDir.size());
+        return CanonPath(store->getRealStoreDir()) / storePath.to_string() / CanonPath(rest);
     }
 
-    FSAccessor::Stat stat(const Path & path) override
+    std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
-        auto realPath = toRealPath(path);
+        /* Handle the case where `path` is (a parent of) the store. */
+        if (isDirOrInDir(store->storeDir, path.abs()))
+            return Stat{ .type = tDirectory };
 
-        struct stat st;
-        if (lstat(realPath.c_str(), &st)) {
-            if (errno == ENOENT || errno == ENOTDIR) return {Type::tMissing, 0, false};
-            throw SysError("getting status of '%1%'", path);
-        }
-
-        if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode) && !S_ISLNK(st.st_mode))
-            throw Error("file '%1%' has unsupported type", path);
-
-        return {
-            S_ISREG(st.st_mode) ? Type::tRegular :
-            S_ISLNK(st.st_mode) ? Type::tSymlink :
-            Type::tDirectory,
-            S_ISREG(st.st_mode) ? (uint64_t) st.st_size : 0,
-            S_ISREG(st.st_mode) && st.st_mode & S_IXUSR};
+        return PosixSourceAccessor::maybeLstat(toRealPath(path));
     }
 
-    StringSet readDirectory(const Path & path) override
+    DirEntries readDirectory(const CanonPath & path) override
     {
-        auto realPath = toRealPath(path);
-
-        auto entries = nix::readDirectory(realPath);
-
-        StringSet res;
-        for (auto & entry : entries)
-            res.insert(entry.name);
-
-        return res;
+        return PosixSourceAccessor::readDirectory(toRealPath(path));
     }
 
-    std::string readFile(const Path & path, bool requireValidPath = true) override
+    void readFile(
+        const CanonPath & path,
+        Sink & sink,
+        std::function<void(uint64_t)> sizeCallback) override
     {
-        return nix::readFile(toRealPath(path, requireValidPath));
+        return PosixSourceAccessor::readFile(toRealPath(path), sink, sizeCallback);
     }
 
-    std::string readLink(const Path & path) override
+    std::string readLink(const CanonPath & path) override
     {
-        return nix::readLink(toRealPath(path));
+        return PosixSourceAccessor::readLink(toRealPath(path));
     }
 };
 
-ref<FSAccessor> LocalFSStore::getFSAccessor()
+ref<SourceAccessor> LocalFSStore::getFSAccessor(bool requireValidPath)
 {
     return make_ref<LocalStoreAccessor>(ref<LocalFSStore>(
-            std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())));
+            std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())),
+        requireValidPath);
 }
 
 void LocalFSStore::narFromPath(const StorePath & path, Sink & sink)
@@ -87,20 +89,8 @@ void LocalFSStore::narFromPath(const StorePath & path, Sink & sink)
 
 const std::string LocalFSStore::drvsLogDir = "drvs";
 
-std::optional<std::string> LocalFSStore::getBuildLog(const StorePath & path_)
+std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path)
 {
-    auto path = path_;
-
-    if (!path.isDerivation()) {
-        try {
-            auto info = queryPathInfo(path);
-            if (!info->deriver) return std::nullopt;
-            path = *info->deriver;
-        } catch (InvalidPath &) {
-            return std::nullopt;
-        }
-    }
-
     auto baseName = path.to_string();
 
     for (int j = 0; j < 2; j++) {

@@ -1,4 +1,4 @@
-#include "binary-cache-store.hh"
+#include "http-binary-cache-store.hh"
 #include "filetransfer.hh"
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
@@ -8,18 +8,36 @@ namespace nix {
 
 MakeError(UploadToHTTP, Error);
 
-struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
-{
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
 
-    const std::string name() override { return "Http Binary Cache Store"; }
-};
+HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
+    std::string_view scheme,
+    std::string_view _cacheUri,
+    const Params & params)
+    : StoreConfig(params)
+    , BinaryCacheStoreConfig(params)
+    , cacheUri(
+        std::string { scheme }
+        + "://"
+        + (!_cacheUri.empty()
+            ? _cacheUri
+            : throw UsageError("`%s` Store requires a non-empty authority in Store URL", scheme)))
+{
+    while (!cacheUri.empty() && cacheUri.back() == '/')
+        cacheUri.pop_back();
+}
+
+
+std::string HttpBinaryCacheStoreConfig::doc()
+{
+    return
+      #include "http-binary-cache-store.md"
+      ;
+}
+
 
 class HttpBinaryCacheStore : public virtual HttpBinaryCacheStoreConfig, public virtual BinaryCacheStore
 {
 private:
-
-    Path cacheUri;
 
     struct State
     {
@@ -32,19 +50,15 @@ private:
 public:
 
     HttpBinaryCacheStore(
-        const std::string & scheme,
-        const Path & _cacheUri,
+        std::string_view scheme,
+        PathView cacheUri,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
-        , HttpBinaryCacheStoreConfig(params)
+        , HttpBinaryCacheStoreConfig(scheme, cacheUri, params)
         , Store(params)
         , BinaryCacheStore(params)
-        , cacheUri(scheme + "://" + _cacheUri)
     {
-        if (cacheUri.back() == '/')
-            cacheUri.pop_back();
-
         diskCache = getNarInfoDiskCache();
     }
 
@@ -56,7 +70,7 @@ public:
     void init() override
     {
         // FIXME: do this lazily?
-        if (auto cacheInfo = diskCache->cacheExists(cacheUri)) {
+        if (auto cacheInfo = diskCache->upToDateCacheExists(cacheUri)) {
             wantMassQuery.setDefault(cacheInfo->wantMassQuery);
             priority.setDefault(cacheInfo->priority);
         } else {
@@ -67,14 +81,6 @@ public:
             }
             diskCache->createCache(cacheUri, storeDir, wantMassQuery, priority);
         }
-    }
-
-    static std::set<std::string> uriSchemes()
-    {
-        static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
-        auto ret = std::set<std::string>({"http", "https"});
-        if (forceHttp) ret.insert("file");
-        return ret;
     }
 
 protected:
@@ -187,6 +193,18 @@ protected:
             }});
     }
 
+    /**
+     * This isn't actually necessary read only. We support "upsert" now, so we
+     * have a notion of authentication via HTTP POST/PUT.
+     *
+     * For now, we conservatively say we don't know.
+     *
+     * \todo try to expose our HTTP authentication status.
+     */
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return std::nullopt;
+    }
 };
 
 static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regHttpBinaryCacheStore;

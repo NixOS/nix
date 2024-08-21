@@ -1,11 +1,14 @@
 #pragma once
-
-#include "types.hh"
-#include "hash.hh"
-#include "config.hh"
+///@file
 
 #include <string>
 #include <future>
+
+#include "logging.hh"
+#include "types.hh"
+#include "ref.hh"
+#include "config.hh"
+#include "serialise.hh"
 
 namespace nix {
 
@@ -44,6 +47,12 @@ struct FileTransferSettings : Config
 
     Setting<unsigned int> tries{this, 5, "download-attempts",
         "How often Nix will attempt to download a file before giving up."};
+
+    Setting<size_t> downloadBufferSize{this, 64 * 1024 * 1024, "download-buffer-size",
+        R"(
+          The size of Nix's internal download buffer during `curl` transfers. If data is
+          not processed quickly enough to exceed the size of this buffer, downloads may stall.
+        )"};
 };
 
 extern FileTransferSettings fileTransferSettings;
@@ -74,11 +83,35 @@ struct FileTransferRequest
 
 struct FileTransferResult
 {
+    /**
+     * Whether this is a cache hit (i.e. the ETag supplied in the
+     * request is still valid). If so, `data` is empty.
+     */
     bool cached = false;
+
+    /**
+     * The ETag of the object.
+     */
     std::string etag;
-    std::string effectiveUri;
+
+    /**
+     * All URLs visited in the redirect chain.
+     */
+    std::vector<std::string> urls;
+
+    /**
+     * The response body.
+     */
     std::string data;
+
     uint64_t bodySize = 0;
+
+    /**
+     * An "immutable" URL for this resource (i.e. one whose contents
+     * will never change), as returned by the `Link: <url>;
+     * rel="immutable"` header.
+     */
+    std::optional<std::string> immutableUrl;
 };
 
 class Store;
@@ -87,39 +120,59 @@ struct FileTransfer
 {
     virtual ~FileTransfer() { }
 
-    /* Enqueue a data transfer request, returning a future to the result of
-       the download. The future may throw a FileTransferError
-       exception. */
+    /**
+     * Enqueue a data transfer request, returning a future to the result of
+     * the download. The future may throw a FileTransferError
+     * exception.
+     */
     virtual void enqueueFileTransfer(const FileTransferRequest & request,
         Callback<FileTransferResult> callback) = 0;
 
     std::future<FileTransferResult> enqueueFileTransfer(const FileTransferRequest & request);
 
-    /* Synchronously download a file. */
+    /**
+     * Synchronously download a file.
+     */
     FileTransferResult download(const FileTransferRequest & request);
 
-    /* Synchronously upload a file. */
+    /**
+     * Synchronously upload a file.
+     */
     FileTransferResult upload(const FileTransferRequest & request);
 
-    /* Download a file, writing its data to a sink. The sink will be
-       invoked on the thread of the caller. */
-    void download(FileTransferRequest && request, Sink & sink);
+    /**
+     * Download a file, writing its data to a sink. The sink will be
+     * invoked on the thread of the caller.
+     */
+    void download(
+        FileTransferRequest && request,
+        Sink & sink,
+        std::function<void(FileTransferResult)> resultCallback = {});
 
     enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
 };
 
-/* Return a shared FileTransfer object. Using this object is preferred
-   because it enables connection reuse and HTTP/2 multiplexing. */
+/**
+ * @return a shared FileTransfer object.
+ *
+ * Using this object is preferred because it enables connection reuse
+ * and HTTP/2 multiplexing.
+ */
 ref<FileTransfer> getFileTransfer();
 
-/* Return a new FileTransfer object. */
+/**
+ * @return a new FileTransfer object
+ *
+ * Prefer getFileTransfer() to this; see its docs for why.
+ */
 ref<FileTransfer> makeFileTransfer();
 
 class FileTransferError : public Error
 {
 public:
     FileTransfer::Error error;
-    std::optional<std::string> response; // intentionally optional
+    /// intentionally optional
+    std::optional<std::string> response;
 
     template<typename... Args>
     FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args & ... args);

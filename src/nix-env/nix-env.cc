@@ -1,3 +1,4 @@
+#include "users.hh"
 #include "attr-path.hh"
 #include "common-eval-args.hh"
 #include "derivations.hh"
@@ -11,10 +12,11 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "user-env.hh"
-#include "util.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
 #include "legacy.hh"
+#include "eval-settings.hh" // for defexpr
+#include "terminal.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -44,7 +46,7 @@ typedef enum {
 struct InstallSourceInfo
 {
     InstallSourceType type;
-    Path nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
+    std::shared_ptr<SourcePath> nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
     Path profile; /* for srcProfile */
     std::string systemFilter; /* for srcNixExprDrvs */
     Bindings * autoArgs;
@@ -92,9 +94,11 @@ static bool parseInstallSourceOptions(Globals & globals,
 }
 
 
-static bool isNixExpr(const Path & path, struct stat & st)
+static bool isNixExpr(const SourcePath & path, struct SourceAccessor::Stat & st)
 {
-    return S_ISREG(st.st_mode) || (S_ISDIR(st.st_mode) && pathExists(path + "/default.nix"));
+    return
+        st.type == SourceAccessor::tRegular
+        || (st.type == SourceAccessor::tDirectory && (path / "default.nix").resolveSymlinks().pathExists());
 }
 
 
@@ -102,10 +106,10 @@ static constexpr size_t maxAttrs = 1024;
 
 
 static void getAllExprs(EvalState & state,
-    const Path & path, StringSet & seen, BindingsBuilder & attrs)
+    const SourcePath & path, StringSet & seen, BindingsBuilder & attrs)
 {
     StringSet namesSorted;
-    for (auto & i : readDirectory(path)) namesSorted.insert(i.name);
+    for (auto & [name, _] : path.resolveSymlinks().readDirectory()) namesSorted.insert(name);
 
     for (auto & i : namesSorted) {
         /* Ignore the manifest.nix used by profiles.  This is
@@ -113,13 +117,16 @@ static void getAllExprs(EvalState & state,
            are implemented using profiles). */
         if (i == "manifest.nix") continue;
 
-        Path path2 = path + "/" + i;
+        auto path2 = (path / i).resolveSymlinks();
 
-        struct stat st;
-        if (stat(path2.c_str(), &st) == -1)
+        SourceAccessor::Stat st;
+        try {
+            st = path2.lstat();
+        } catch (Error &) {
             continue; // ignore dangling symlinks in ~/.nix-defexpr
+        }
 
-        if (isNixExpr(path2, st) && (!S_ISREG(st.st_mode) || hasSuffix(path2, ".nix"))) {
+        if (isNixExpr(path2, st) && (st.type != SourceAccessor::tRegular || hasSuffix(path2.baseName(), ".nix"))) {
             /* Strip off the `.nix' filename suffix (if applicable),
                otherwise the attribute cannot be selected with the
                `-A' option.  Useful if you want to stick a Nix
@@ -129,21 +136,20 @@ static void getAllExprs(EvalState & state,
                 attrName = std::string(attrName, 0, attrName.size() - 4);
             if (!seen.insert(attrName).second) {
                 std::string suggestionMessage = "";
-                if (path2.find("channels") != std::string::npos && path.find("channels") != std::string::npos) {
+                if (path2.path.abs().find("channels") != std::string::npos && path.path.abs().find("channels") != std::string::npos)
                     suggestionMessage = fmt("\nsuggestion: remove '%s' from either the root channels or the user channels", attrName);
-                }
                 printError("warning: name collision in input Nix expressions, skipping '%1%'"
                             "%2%", path2, suggestionMessage);
                 continue;
             }
             /* Load the expression on demand. */
             auto vArg = state.allocValue();
-            vArg->mkString(path2);
+            vArg->mkPath(path2);
             if (seen.size() == maxAttrs)
                 throw Error("too many Nix expressions in directory '%1%'", path);
             attrs.alloc(attrName).mkApp(&state.getBuiltin("import"), vArg);
         }
-        else if (S_ISDIR(st.st_mode))
+        else if (st.type == SourceAccessor::tDirectory)
             /* `path2' is a directory (with no default.nix in it);
                recurse into it. */
             getAllExprs(state, path2, seen, attrs);
@@ -152,11 +158,9 @@ static void getAllExprs(EvalState & state,
 
 
 
-static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
+static void loadSourceExpr(EvalState & state, const SourcePath & path, Value & v)
 {
-    struct stat st;
-    if (stat(path.c_str(), &st) == -1)
-        throw SysError("getting information about '%1%'", path);
+    auto st = path.resolveSymlinks().lstat();
 
     if (isNixExpr(path, st))
         state.evalFile(path, v);
@@ -167,9 +171,9 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
        set flat, not nested, to make it easier for a user to have a
        ~/.nix-defexpr directory that includes some system-wide
        directory). */
-    else if (S_ISDIR(st.st_mode)) {
+    else if (st.type == SourceAccessor::tDirectory) {
         auto attrs = state.buildBindings(maxAttrs);
-        attrs.alloc("_combineChannels").mkList(0);
+        attrs.insert(state.symbols.create("_combineChannels"), &state.vEmptyList);
         StringSet seen;
         getAllExprs(state, path, seen, attrs);
         v.mkAttrs(attrs);
@@ -179,9 +183,9 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
 }
 
 
-static void loadDerivations(EvalState & state, Path nixExprPath,
+static void loadDerivations(EvalState & state, const SourcePath & nixExprPath,
     std::string systemFilter, Bindings & autoArgs,
-    const std::string & pathPrefix, DrvInfos & elems)
+    const std::string & pathPrefix, PackageInfos & elems)
 {
     Value vRoot;
     loadSourceExpr(state, nixExprPath, vRoot);
@@ -192,7 +196,7 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
 
     /* Filter out all derivations not applicable to the current
        system. */
-    for (DrvInfos::iterator i = elems.begin(), j; i != elems.end(); i = j) {
+    for (PackageInfos::iterator i = elems.begin(), j; i != elems.end(); i = j) {
         j = i; j++;
         if (systemFilter != "*" && i->querySystem() != systemFilter)
             elems.erase(i);
@@ -200,21 +204,21 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
 }
 
 
-static long getPriority(EvalState & state, DrvInfo & drv)
+static NixInt getPriority(EvalState & state, PackageInfo & drv)
 {
-    return drv.queryMetaInt("priority", 0);
+    return drv.queryMetaInt("priority", NixInt(0));
 }
 
 
-static long comparePriorities(EvalState & state, DrvInfo & drv1, DrvInfo & drv2)
+static std::strong_ordering comparePriorities(EvalState & state, PackageInfo & drv1, PackageInfo & drv2)
 {
-    return getPriority(state, drv2) - getPriority(state, drv1);
+    return getPriority(state, drv2) <=> getPriority(state, drv1);
 }
 
 
 // FIXME: this function is rather slow since it checks a single path
 // at a time.
-static bool isPrebuilt(EvalState & state, DrvInfo & elem)
+static bool isPrebuilt(EvalState & state, PackageInfo & elem)
 {
     auto path = elem.queryOutPath();
     if (state.store->isValidPath(path)) return true;
@@ -233,11 +237,11 @@ static void checkSelectorUse(DrvNames & selectors)
 
 namespace {
 
-std::set<std::string> searchByPrefix(const DrvInfos & allElems, std::string_view prefix) {
+std::set<std::string> searchByPrefix(const PackageInfos & allElems, std::string_view prefix) {
     constexpr std::size_t maxResults = 3;
     std::set<std::string> result;
-    for (const auto & drvInfo : allElems) {
-        const auto drvName = DrvName { drvInfo.queryName() };
+    for (const auto & packageInfo : allElems) {
+        const auto drvName = DrvName { packageInfo.queryName() };
         if (hasPrefix(drvName.name, prefix)) {
             result.emplace(drvName.name);
 
@@ -251,11 +255,11 @@ std::set<std::string> searchByPrefix(const DrvInfos & allElems, std::string_view
 
 struct Match
 {
-    DrvInfo drvInfo;
+    PackageInfo packageInfo;
     std::size_t index;
 
-    Match(DrvInfo drvInfo_, std::size_t index_)
-    : drvInfo{std::move(drvInfo_)}
+    Match(PackageInfo packageInfo_, std::size_t index_)
+    : packageInfo{std::move(packageInfo_)}
     , index{index_}
     {}
 };
@@ -273,20 +277,20 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
     StringSet multiple;
 
     for (auto & match : matches) {
-        auto & oneDrv = match.drvInfo;
+        auto & oneDrv = match.packageInfo;
 
         const auto drvName = DrvName { oneDrv.queryName() };
-        long comparison = 1;
+        std::strong_ordering comparison = std::strong_ordering::greater;
 
         const auto itOther = newest.find(drvName.name);
 
         if (itOther != newest.end()) {
-            auto & newestDrv = itOther->second.drvInfo;
+            auto & newestDrv = itOther->second.packageInfo;
 
             comparison =
-                oneDrv.querySystem() == newestDrv.querySystem() ? 0 :
-                oneDrv.querySystem() == settings.thisSystem ? 1 :
-                newestDrv.querySystem() == settings.thisSystem ? -1 : 0;
+                oneDrv.querySystem() == newestDrv.querySystem() ? std::strong_ordering::equal :
+                oneDrv.querySystem() == settings.thisSystem ? std::strong_ordering::greater :
+                newestDrv.querySystem() == settings.thisSystem ? std::strong_ordering::less : std::strong_ordering::equal;
             if (comparison == 0)
                 comparison = comparePriorities(state, oneDrv, newestDrv);
             if (comparison == 0)
@@ -316,23 +320,23 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
 
 } // end namespace
 
-static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
+static PackageInfos filterBySelector(EvalState & state, const PackageInfos & allElems,
     const Strings & args, bool newestOnly)
 {
     DrvNames selectors = drvNamesFromArgs(args);
     if (selectors.empty())
         selectors.emplace_back("*");
 
-    DrvInfos elems;
+    PackageInfos elems;
     std::set<std::size_t> done;
 
     for (auto & selector : selectors) {
         std::vector<Match> matches;
-        for (const auto & [index, drvInfo] : enumerate(allElems)) {
-            const auto drvName = DrvName { drvInfo.queryName() };
+        for (const auto & [index, packageInfo] : enumerate(allElems)) {
+            const auto drvName = DrvName { packageInfo.queryName() };
             if (selector.matches(drvName)) {
                 ++selector.hits;
-                matches.emplace_back(drvInfo, index);
+                matches.emplace_back(packageInfo, index);
             }
         }
 
@@ -344,7 +348,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
            haven't inserted before. */
         for (auto & match : matches)
             if (done.insert(match.index).second)
-                elems.push_back(match.drvInfo);
+                elems.push_back(match.packageInfo);
 
         if (selector.hits == 0 && selector.fullName != "*") {
             const auto prefixHits = searchByPrefix(allElems, selector.name);
@@ -373,7 +377,7 @@ static bool isPath(std::string_view s)
 
 static void queryInstSources(EvalState & state,
     InstallSourceInfo & instSource, const Strings & args,
-    DrvInfos & elems, bool newestOnly)
+    PackageInfos & elems, bool newestOnly)
 {
     InstallSourceType type = instSource.type;
     if (type == srcUnknown && args.size() > 0 && isPath(args.front()))
@@ -389,8 +393,8 @@ static void queryInstSources(EvalState & state,
 
             /* Load the derivations from the (default or specified)
                Nix expression. */
-            DrvInfos allElems;
-            loadDerivations(state, instSource.nixExprPath,
+            PackageInfos allElems;
+            loadDerivations(state, *instSource.nixExprPath,
                 instSource.systemFilter, *instSource.autoArgs, "", allElems);
 
             elems = filterBySelector(state, allElems, args, newestOnly);
@@ -407,10 +411,10 @@ static void queryInstSources(EvalState & state,
         case srcNixExprs: {
 
             Value vArg;
-            loadSourceExpr(state, instSource.nixExprPath, vArg);
+            loadSourceExpr(state, *instSource.nixExprPath, vArg);
 
             for (auto & i : args) {
-                Expr * eFun = state.parseExprFromString(i, absPath("."));
+                Expr * eFun = state.parseExprFromString(i, state.rootPath("."));
                 Value vFun, vTmp;
                 state.eval(eFun, vFun);
                 vTmp.mkApp(&vFun, &vArg);
@@ -430,7 +434,7 @@ static void queryInstSources(EvalState & state,
 
                 std::string name(path.name());
 
-                DrvInfo elem(state, "", nullptr);
+                PackageInfo elem(state, "", nullptr);
                 elem.setName(name);
 
                 if (path.isDerivation()) {
@@ -462,7 +466,7 @@ static void queryInstSources(EvalState & state,
 
         case srcAttrPath: {
             Value vRoot;
-            loadSourceExpr(state, instSource.nixExprPath, vRoot);
+            loadSourceExpr(state, *instSource.nixExprPath, vRoot);
             for (auto & i : args) {
                 Value & v(*findAlongAttrPath(state, i, *instSource.autoArgs, vRoot).first);
                 getDerivations(state, v, "", *instSource.autoArgs, elems, true);
@@ -473,20 +477,25 @@ static void queryInstSources(EvalState & state,
 }
 
 
-static void printMissing(EvalState & state, DrvInfos & elems)
+static void printMissing(EvalState & state, PackageInfos & elems)
 {
     std::vector<DerivedPath> targets;
     for (auto & i : elems)
         if (auto drvPath = i.queryDrvPath())
-            targets.push_back(DerivedPath::Built{*drvPath});
+            targets.emplace_back(DerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(*drvPath),
+                .outputs = OutputsSpec::All { },
+            });
         else
-            targets.push_back(DerivedPath::Opaque{i.queryOutPath()});
+            targets.emplace_back(DerivedPath::Opaque{
+                .path = i.queryOutPath(),
+            });
 
     printMissing(state.store, targets);
 }
 
 
-static bool keep(DrvInfo & drv)
+static bool keep(PackageInfo & drv)
 {
     return drv.queryMetaBool("keep", false);
 }
@@ -495,10 +504,10 @@ static bool keep(DrvInfo & drv)
 static void installDerivations(Globals & globals,
     const Strings & args, const Path & profile)
 {
-    debug(format("installing derivations"));
+    debug("installing derivations");
 
     /* Get the set of user environment elements to be installed. */
-    DrvInfos newElems, newElemsTmp;
+    PackageInfos newElems, newElemsTmp;
     queryInstSources(*globals.state, globals.instSource, args, newElemsTmp, true);
 
     /* If --prebuilt-only is given, filter out source-only packages. */
@@ -521,12 +530,12 @@ static void installDerivations(Globals & globals,
     while (true) {
         auto lockToken = optimisticLockProfile(profile);
 
-        DrvInfos allElems(newElems);
+        PackageInfos allElems(newElems);
 
         /* Add in the already installed derivations, unless they have
            the same name as a to-be-installed element. */
         if (!globals.removeAll) {
-            DrvInfos installedElems = queryInstalled(*globals.state, profile);
+            PackageInfos installedElems = queryInstalled(*globals.state, profile);
 
             for (auto & i : installedElems) {
                 DrvName drvName(i.queryName());
@@ -574,7 +583,7 @@ typedef enum { utLt, utLeq, utEq, utAlways } UpgradeType;
 static void upgradeDerivations(Globals & globals,
     const Strings & args, UpgradeType upgradeType)
 {
-    debug(format("upgrading derivations"));
+    debug("upgrading derivations");
 
     /* Upgrade works as follows: we take all currently installed
        derivations, and for any derivation matching any selector, look
@@ -584,14 +593,14 @@ static void upgradeDerivations(Globals & globals,
     while (true) {
         auto lockToken = optimisticLockProfile(globals.profile);
 
-        DrvInfos installedElems = queryInstalled(*globals.state, globals.profile);
+        PackageInfos installedElems = queryInstalled(*globals.state, globals.profile);
 
         /* Fetch all derivations from the input file. */
-        DrvInfos availElems;
+        PackageInfos availElems;
         queryInstSources(*globals.state, globals.instSource, args, availElems, false);
 
         /* Go through all installed derivations. */
-        DrvInfos newElems;
+        PackageInfos newElems;
         for (auto & i : installedElems) {
             DrvName drvName(i.queryName());
 
@@ -609,20 +618,20 @@ static void upgradeDerivations(Globals & globals,
                    priority.  If there are still multiple matches,
                    take the one with the highest version.
                    Do not upgrade if it would decrease the priority. */
-                DrvInfos::iterator bestElem = availElems.end();
+                PackageInfos::iterator bestElem = availElems.end();
                 std::string bestVersion;
                 for (auto j = availElems.begin(); j != availElems.end(); ++j) {
                     if (comparePriorities(*globals.state, i, *j) > 0)
                         continue;
                     DrvName newName(j->queryName());
                     if (newName.name == drvName.name) {
-                        int d = compareVersions(drvName.version, newName.version);
+                        std::strong_ordering d = compareVersions(drvName.version, newName.version);
                         if ((upgradeType == utLt && d < 0) ||
                             (upgradeType == utLeq && d <= 0) ||
                             (upgradeType == utEq && d == 0) ||
                             upgradeType == utAlways)
                         {
-                            long d2 = -1;
+                            std::strong_ordering d2 = std::strong_ordering::less;
                             if (bestElem != availElems.end()) {
                                 d2 = comparePriorities(*globals.state, *bestElem, *j);
                                 if (d2 == 0) d2 = compareVersions(bestVersion, newName.version);
@@ -679,7 +688,7 @@ static void opUpgrade(Globals & globals, Strings opFlags, Strings opArgs)
 }
 
 
-static void setMetaFlag(EvalState & state, DrvInfo & drv,
+static void setMetaFlag(EvalState & state, PackageInfo & drv,
     const std::string & name, const std::string & value)
 {
     auto v = state.allocValue();
@@ -703,7 +712,7 @@ static void opSetFlag(Globals & globals, Strings opFlags, Strings opArgs)
     while (true) {
         std::string lockToken = optimisticLockProfile(globals.profile);
 
-        DrvInfos installedElems = queryInstalled(*globals.state, globals.profile);
+        PackageInfos installedElems = queryInstalled(*globals.state, globals.profile);
 
         /* Update all matching derivations. */
         for (auto & i : installedElems) {
@@ -737,13 +746,13 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
         else throw UsageError("unknown flag '%1%'", arg);
     }
 
-    DrvInfos elems;
+    PackageInfos elems;
     queryInstSources(*globals.state, globals.instSource, opArgs, elems, true);
 
     if (elems.size() != 1)
         throw Error("--set requires exactly one derivation");
 
-    DrvInfo & drv(elems.front());
+    PackageInfo & drv(elems.front());
 
     if (globals.forceName != "")
         drv.setName(globals.forceName);
@@ -751,16 +760,21 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     auto drvPath = drv.queryDrvPath();
     std::vector<DerivedPath> paths {
         drvPath
-        ? (DerivedPath) (DerivedPath::Built { *drvPath })
-        : (DerivedPath) (DerivedPath::Opaque { drv.queryOutPath() }),
+        ? (DerivedPath) (DerivedPath::Built {
+            .drvPath = makeConstantStorePathRef(*drvPath),
+            .outputs = OutputsSpec::All { },
+        })
+        : (DerivedPath) (DerivedPath::Opaque {
+            .path = drv.queryOutPath(),
+        }),
     };
     printMissing(globals.state->store, paths);
     if (globals.dryRun) return;
     globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
 
-    debug(format("switching to new user environment"));
+    debug("switching to new user environment");
     Path generation = createGeneration(
-        ref<LocalFSStore>(store2),
+        *store2,
         globals.profile,
         drv.queryOutPath());
     switchLink(globals.profile, generation);
@@ -773,10 +787,10 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
     while (true) {
         auto lockToken = optimisticLockProfile(profile);
 
-        DrvInfos workingElems = queryInstalled(*globals.state, profile);
+        PackageInfos workingElems = queryInstalled(*globals.state, profile);
 
         for (auto & selector : selectors) {
-            DrvInfos::iterator split = workingElems.begin();
+            PackageInfos::iterator split = workingElems.begin();
             if (isPath(selector)) {
                 StorePath selectorStorePath = globals.state->store->followLinksToStorePath(selector);
                 split = std::partition(
@@ -825,7 +839,7 @@ static bool cmpChars(char a, char b)
 }
 
 
-static bool cmpElemByName(const DrvInfo & a, const DrvInfo & b)
+static bool cmpElemByName(const PackageInfo & a, const PackageInfo & b)
 {
     auto a_name = a.queryName();
     auto b_name = b.queryName();
@@ -878,7 +892,7 @@ void printTable(Table & table)
 typedef enum { cvLess, cvEqual, cvGreater, cvUnavail } VersionDiff;
 
 static VersionDiff compareVersionAgainstSet(
-    const DrvInfo & elem, const DrvInfos & elems, std::string & version)
+    const PackageInfo & elem, const PackageInfos & elems, std::string & version)
 {
     DrvName name(elem.queryName());
 
@@ -888,7 +902,7 @@ static VersionDiff compareVersionAgainstSet(
     for (auto & i : elems) {
         DrvName name2(i.queryName());
         if (name.name == name2.name) {
-            int d = compareVersions(name.version, name2.version);
+            std::strong_ordering d = compareVersions(name.version, name2.version);
             if (d < 0) {
                 diff = cvGreater;
                 version = name2.version;
@@ -909,7 +923,7 @@ static VersionDiff compareVersionAgainstSet(
 }
 
 
-static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool printOutPath, bool printMeta)
+static void queryJSON(Globals & globals, std::vector<PackageInfo> & elems, bool printOutPath, bool printDrvPath, bool printMeta)
 {
     using nlohmann::json;
     json topObj = json::object();
@@ -929,7 +943,7 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
             };
 
             {
-                DrvInfo::Outputs outputs = i.queryOutputs(printOutPath);
+                PackageInfo::Outputs outputs = i.queryOutputs(printOutPath);
                 json &outputObj = pkgObj["outputs"];
                 outputObj = json::object();
                 for (auto & j : outputs) {
@@ -938,6 +952,11 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
                     else
                         outputObj[j.first] = nullptr;
                 }
+            }
+
+            if (printDrvPath) {
+                auto drvPath = i.queryDrvPath();
+                if (drvPath) pkgObj["drvPath"] = globals.state->store->printStorePath(*drvPath);
             }
 
             if (printMeta) {
@@ -950,7 +969,7 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
                         printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
                         metaObj[j] = nullptr;
                     } else {
-                        PathSet context;
+                        NixStringContext context;
                         metaObj[j] = printValueAsJSON(*globals.state, true, *v, noPos, context);
                     }
                 }
@@ -1014,26 +1033,26 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         throw UsageError("--attr-path(-P) only works with --available");
 
     /* Obtain derivation information from the specified source. */
-    DrvInfos availElems, installedElems;
+    PackageInfos availElems, installedElems;
 
     if (source == sInstalled || compareVersions || printStatus)
         installedElems = queryInstalled(*globals.state, globals.profile);
 
     if (source == sAvailable || compareVersions)
-        loadDerivations(*globals.state, globals.instSource.nixExprPath,
+        loadDerivations(*globals.state, *globals.instSource.nixExprPath,
             globals.instSource.systemFilter, *globals.instSource.autoArgs,
             attrPath, availElems);
 
-    DrvInfos elems_ = filterBySelector(*globals.state,
+    PackageInfos elems_ = filterBySelector(*globals.state,
         source == sInstalled ? installedElems : availElems,
         opArgs, false);
 
-    DrvInfos & otherElems(source == sInstalled ? availElems : installedElems);
+    PackageInfos & otherElems(source == sInstalled ? availElems : installedElems);
 
 
     /* Sort them by name. */
     /* !!! */
-    std::vector<DrvInfo> elems;
+    std::vector<PackageInfo> elems;
     for (auto & i : elems_) elems.push_back(i);
     sort(elems.begin(), elems.end(), cmpElemByName);
 
@@ -1066,12 +1085,12 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
     /* Print the desired columns, or XML output. */
     if (jsonOutput) {
-        queryJSON(globals, elems, printOutPath, printMeta);
+        queryJSON(globals, elems, printOutPath, printDrvPath, printMeta);
         cout << '\n';
         return;
     }
 
-    bool tty = isatty(STDOUT_FILENO);
+    bool tty = isTTY();
     RunPager pager;
 
     Table table;
@@ -1083,7 +1102,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         try {
             if (i.hasFailed()) continue;
 
-            //Activity act(*logger, lvlDebug, format("outputting query result '%1%'") % i.attrPath);
+            //Activity act(*logger, lvlDebug, "outputting query result '%1%'", i.attrPath);
 
             if (globals.prebuiltOnly &&
                 !validPaths.count(i.queryOutPath()) &&
@@ -1140,7 +1159,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                     case cvEqual: ch = '='; break;
                     case cvGreater: ch = '<'; break;
                     case cvUnavail: ch = '-'; break;
-                    default: abort();
+                    default: unreachable();
                 }
 
                 if (xmlOutput) {
@@ -1174,7 +1193,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                 attrs["outputName"] = i.queryOutputName();
 
             if (printOutPath && !xmlOutput) {
-                DrvInfo::Outputs outputs = i.queryOutputs();
+                PackageInfo::Outputs outputs = i.queryOutputs();
                 std::string s;
                 for (auto & j : outputs) {
                     if (!s.empty()) s += ';';
@@ -1194,7 +1213,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
             if (xmlOutput) {
                 XMLOpenElement item(xml, "item", attrs);
-                DrvInfo::Outputs outputs = i.queryOutputs(printOutPath);
+                PackageInfo::Outputs outputs = i.queryOutputs(printOutPath);
                 for (auto & j : outputs) {
                     XMLAttrs attrs2;
                     attrs2["name"] = j.first;
@@ -1215,19 +1234,19 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                         else {
                             if (v->type() == nString) {
                                 attrs2["type"] = "string";
-                                attrs2["value"] = v->string.s;
+                                attrs2["value"] = v->c_str();
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nInt) {
                                 attrs2["type"] = "int";
-                                attrs2["value"] = (format("%1%") % v->integer).str();
+                                attrs2["value"] = fmt("%1%", v->integer());
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nFloat) {
                                 attrs2["type"] = "float";
-                                attrs2["value"] = (format("%1%") % v->fpoint).str();
+                                attrs2["value"] = fmt("%1%", v->fpoint());
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nBool) {
                                 attrs2["type"] = "bool";
-                                attrs2["value"] = v->boolean ? "true" : "false";
+                                attrs2["value"] = v->boolean() ? "true" : "false";
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nList) {
                                 attrs2["type"] = "strings";
@@ -1235,19 +1254,17 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                 for (auto elem : v->listItems()) {
                                     if (elem->type() != nString) continue;
                                     XMLAttrs attrs3;
-                                    attrs3["value"] = elem->string.s;
+                                    attrs3["value"] = elem->c_str();
                                     xml.writeEmptyElement("string", attrs3);
                                 }
                             } else if (v->type() == nAttrs) {
                                 attrs2["type"] = "strings";
                                 XMLOpenElement m(xml, "meta", attrs2);
-                                Bindings & attrs = *v->attrs;
-                                for (auto &i : attrs) {
-                                    Attr & a(*attrs.find(i.name));
-                                    if(a.value->type() != nString) continue;
+                                for (auto & i : *v->attrs()) {
+                                    if (i.value->type() != nString) continue;
                                     XMLAttrs attrs3;
                                     attrs3["type"] = globals.state->symbols[i.name];
-                                    attrs3["value"] = a.value->string.s;
+                                    attrs3["value"] = i.value->c_str();
                                     xml.writeEmptyElement("string", attrs3);
                             }
                             }
@@ -1279,7 +1296,7 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
         throw UsageError("exactly one argument expected");
 
     Path profile = absPath(opArgs.front());
-    Path profileLink = getHome() + "/.nix-profile";
+    Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
 
     switchLink(profileLink, profile);
 }
@@ -1325,13 +1342,21 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
     RunPager pager;
 
     for (auto & i : gens) {
+#ifdef _WIN32 // TODO portable wrapper in libutil
+        tm * tp = localtime(&i.creationTime);
+        if (!tp)
+            throw Error("cannot convert time");
+        auto & t = *tp;
+#else
         tm t;
-        if (!localtime_r(&i.creationTime, &t)) throw Error("cannot convert time");
-        cout << format("%|4|   %|4|-%|02|-%|02| %|02|:%|02|:%|02|   %||\n")
-            % i.number
-            % (t.tm_year + 1900) % (t.tm_mon + 1) % t.tm_mday
-            % t.tm_hour % t.tm_min % t.tm_sec
-            % (i.number == curGen ? "(current)" : "");
+        if (!localtime_r(&i.creationTime, &t))
+            throw Error("cannot convert time");
+#endif
+        logger->cout("%|4|   %|4|-%|02|-%|02| %|02|:%|02|:%|02|   %||",
+            i.number,
+            t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
+            t.tm_hour, t.tm_min, t.tm_sec,
+            i.number == curGen ? "(current)" : "");
     }
 }
 
@@ -1344,13 +1369,14 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
     if (opArgs.size() == 1 && opArgs.front() == "old") {
         deleteOldGenerations(globals.profile, globals.dryRun);
     } else if (opArgs.size() == 1 && opArgs.front().find('d') != std::string::npos) {
-        deleteGenerationsOlderThan(globals.profile, opArgs.front(), globals.dryRun);
+        auto t = parseOlderThanTimeSpec(opArgs.front());
+        deleteGenerationsOlderThan(globals.profile, t, globals.dryRun);
     } else if (opArgs.size() == 1 && opArgs.front().find('+') != std::string::npos) {
         if (opArgs.front().size() < 2)
             throw Error("invalid number of generations '%1%'", opArgs.front());
         auto str_max = opArgs.front().substr(1);
         auto max = string2Int<GenerationNumber>(str_max);
-        if (!max || *max == 0)
+        if (!max)
             throw Error("invalid number of generations to keep '%1%'", opArgs.front());
         deleteGenerationsGreaterThan(globals.profile, *max, globals.dryRun);
     } else {
@@ -1377,25 +1403,27 @@ static int main_nix_env(int argc, char * * argv)
     {
         Strings opFlags, opArgs;
         Operation op = 0;
-        RepairFlag repair = NoRepair;
+        std::string opName;
+        bool showHelp = false;
         std::string file;
 
         Globals globals;
 
         globals.instSource.type = srcUnknown;
-        globals.instSource.nixExprPath = getHome() + "/.nix-defexpr";
         globals.instSource.systemFilter = "*";
 
-        if (!pathExists(globals.instSource.nixExprPath)) {
+        Path nixExprPath = getNixDefExpr();
+
+        if (!pathExists(nixExprPath)) {
             try {
-                createDirs(globals.instSource.nixExprPath);
+                createDirs(nixExprPath);
                 replaceSymlink(
-                    fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName()),
-                    globals.instSource.nixExprPath + "/channels");
-                if (getuid() != 0)
+                    defaultChannelsDir(),
+                    nixExprPath + "/channels");
+                if (!isRootUser())
                     replaceSymlink(
-                        fmt("%s/profiles/per-user/root/channels", settings.nixStateDir),
-                        globals.instSource.nixExprPath + "/channels_root");
+                        rootChannelsDir(),
+                        nixExprPath + "/channels_root");
             } catch (Error &) { }
         }
 
@@ -1413,37 +1441,59 @@ static int main_nix_env(int argc, char * * argv)
             Operation oldOp = op;
 
             if (*arg == "--help")
-                showManPage("nix-env");
+                showHelp = true;
             else if (*arg == "--version")
                 op = opVersion;
-            else if (*arg == "--install" || *arg == "-i")
+            else if (*arg == "--install" || *arg == "-i") {
                 op = opInstall;
+                opName = "-install";
+            }
             else if (*arg == "--force-name") // undocumented flag for nix-install-package
                 globals.forceName = getArg(*arg, arg, end);
-            else if (*arg == "--uninstall" || *arg == "-e")
+            else if (*arg == "--uninstall" || *arg == "-e") {
                 op = opUninstall;
-            else if (*arg == "--upgrade" || *arg == "-u")
+                opName = "-uninstall";
+            }
+            else if (*arg == "--upgrade" || *arg == "-u") {
                 op = opUpgrade;
-            else if (*arg == "--set-flag")
+                opName = "-upgrade";
+            }
+            else if (*arg == "--set-flag") {
                 op = opSetFlag;
-            else if (*arg == "--set")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--set") {
                 op = opSet;
-            else if (*arg == "--query" || *arg == "-q")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--query" || *arg == "-q") {
                 op = opQuery;
+                opName = "-query";
+            }
             else if (*arg == "--profile" || *arg == "-p")
                 globals.profile = absPath(getArg(*arg, arg, end));
             else if (*arg == "--file" || *arg == "-f")
                 file = getArg(*arg, arg, end);
-            else if (*arg == "--switch-profile" || *arg == "-S")
+            else if (*arg == "--switch-profile" || *arg == "-S") {
                 op = opSwitchProfile;
-            else if (*arg == "--switch-generation" || *arg == "-G")
+                opName = "-switch-profile";
+            }
+            else if (*arg == "--switch-generation" || *arg == "-G") {
                 op = opSwitchGeneration;
-            else if (*arg == "--rollback")
+                opName = "-switch-generation";
+            }
+            else if (*arg == "--rollback") {
                 op = opRollback;
-            else if (*arg == "--list-generations")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--list-generations") {
                 op = opListGenerations;
-            else if (*arg == "--delete-generations")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--delete-generations") {
                 op = opDeleteGenerations;
+                opName = arg->substr(1);
+            }
             else if (*arg == "--dry-run") {
                 printInfo("(dry run; not doing anything)");
                 globals.dryRun = true;
@@ -1452,8 +1502,6 @@ static int main_nix_env(int argc, char * * argv)
                 globals.instSource.systemFilter = getArg(*arg, arg, end);
             else if (*arg == "--prebuilt-only" || *arg == "-b")
                 globals.prebuiltOnly = true;
-            else if (*arg == "--repair")
-                repair = Repair;
             else if (*arg != "" && arg->at(0) == '-') {
                 opFlags.push_back(*arg);
                 /* FIXME: hacky */
@@ -1472,15 +1520,18 @@ static int main_nix_env(int argc, char * * argv)
 
         myArgs.parseCmdline(argvToStrings(argc, argv));
 
+        if (showHelp) showManPage("nix-env" + opName);
         if (!op) throw UsageError("no operation specified");
 
         auto store = openStore();
 
-        globals.state = std::shared_ptr<EvalState>(new EvalState(myArgs.searchPath, store));
-        globals.state->repair = repair;
+        globals.state = std::shared_ptr<EvalState>(new EvalState(myArgs.lookupPath, store, fetchSettings, evalSettings));
+        globals.state->repair = myArgs.repair;
 
-        if (file != "")
-            globals.instSource.nixExprPath = lookupFileArg(*globals.state, file);
+        globals.instSource.nixExprPath = std::make_shared<SourcePath>(
+            file != ""
+            ? lookupFileArg(*globals.state, file)
+            : globals.state->rootPath(CanonPath(nixExprPath)));
 
         globals.instSource.autoArgs = myArgs.getAutoArgs(*globals.state);
 
@@ -1492,7 +1543,7 @@ static int main_nix_env(int argc, char * * argv)
 
         op(globals, std::move(opFlags), std::move(opArgs));
 
-        globals.state->printStats();
+        globals.state->maybePrintStats();
 
         return 0;
     }

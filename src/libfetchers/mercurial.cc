@@ -1,10 +1,12 @@
 #include "fetchers.hh"
+#include "processes.hh"
+#include "users.hh"
 #include "cache.hh"
 #include "globals.hh"
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "url-parts.hh"
-
+#include "store-path-accessor.hh"
 #include "fetch-settings.hh"
 
 #include <sys/time.h>
@@ -21,7 +23,7 @@ static RunOptions hgOptions(const Strings & args)
 
     return {
         .program = "hg",
-        .searchPath = true,
+        .lookupPath = true,
         .args = args,
         .environment = env
     };
@@ -43,7 +45,9 @@ static std::string runHg(const Strings & args, const std::optional<std::string> 
 
 struct MercurialInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) const override
+    std::optional<Input> inputFromURL(
+        const Settings & settings,
+        const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "hg+http" &&
             url.scheme != "hg+https" &&
@@ -66,17 +70,30 @@ struct MercurialInputScheme : InputScheme
 
         attrs.emplace("url", url2.to_string());
 
-        return inputFromAttrs(attrs);
+        return inputFromAttrs(settings, attrs);
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
+    std::string_view schemeName() const override
     {
-        if (maybeGetStrAttr(attrs, "type") != "hg") return {};
+        return "hg";
+    }
 
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "revCount" && name != "narHash" && name != "name")
-                throw Error("unsupported Mercurial input attribute '%s'", name);
+    StringSet allowedAttrs() const override
+    {
+        return {
+            "url",
+            "ref",
+            "rev",
+            "revCount",
+            "narHash",
+            "name",
+        };
+    }
 
+    std::optional<Input> inputFromAttrs(
+        const Settings & settings,
+        const Attrs & attrs) const override
+    {
         parseURL(getStrAttr(attrs, "url"));
 
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {
@@ -84,7 +101,7 @@ struct MercurialInputScheme : InputScheme
                 throw BadURL("invalid Mercurial branch/tag name '%s'", *ref);
         }
 
-        Input input;
+        Input input{settings};
         input.attrs = attrs;
         return input;
     }
@@ -98,13 +115,6 @@ struct MercurialInputScheme : InputScheme
         return url;
     }
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        // FIXME: ugly, need to distinguish between dirty and clean
-        // default trees.
-        return input.getRef() == "default" || maybeGetIntAttr(input.attrs, "revCount");
-    }
-
     Input applyOverrides(
         const Input & input,
         std::optional<std::string> ref,
@@ -116,7 +126,7 @@ struct MercurialInputScheme : InputScheme
         return res;
     }
 
-    std::optional<Path> getSourcePath(const Input & input) override
+    std::optional<Path> getSourcePath(const Input & input) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         if (url.scheme == "file" && !input.getRef() && !input.getRev())
@@ -124,18 +134,27 @@ struct MercurialInputScheme : InputScheme
         return {};
     }
 
-    void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
+    void putFile(
+        const Input & input,
+        const CanonPath & path,
+        std::string_view contents,
+        std::optional<std::string> commitMsg) const override
     {
-        auto sourcePath = getSourcePath(input);
-        assert(sourcePath);
+        auto [isLocal, repoPath] = getActualUrl(input);
+        if (!isLocal)
+            throw Error("cannot commit '%s' to Mercurial repository '%s' because it's not a working tree", path, input.to_string());
+
+        auto absPath = CanonPath(repoPath) / path;
+
+        writeFile(absPath.abs(), contents);
 
         // FIXME: shut up if file is already tracked.
         runHg(
-            { "add", *sourcePath + "/" + std::string(file) });
+            { "add", absPath.abs() });
 
         if (commitMsg)
             runHg(
-                { "commit", *sourcePath + "/" + std::string(file), "-m", *commitMsg });
+                { "commit", absPath.abs(), "-m", *commitMsg });
     }
 
     std::pair<bool, std::string> getActualUrl(const Input & input) const
@@ -145,9 +164,9 @@ struct MercurialInputScheme : InputScheme
         return {isLocal, isLocal ? url.path : url.base};
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    StorePath fetchToStore(ref<Store> store, Input & input) const
     {
-        Input input(_input);
+        auto origRev = input.getRev();
 
         auto name = input.getName();
 
@@ -167,10 +186,10 @@ struct MercurialInputScheme : InputScheme
                 /* This is an unclean working tree. So copy all tracked
                    files. */
 
-                if (!fetchSettings.allowDirty)
+                if (!input.settings->allowDirty)
                     throw Error("Mercurial tree '%s' is unclean", actualUrl);
 
-                if (fetchSettings.warnDirty)
+                if (input.settings->warnDirty)
                     warn("Mercurial tree '%s' is unclean", actualUrl);
 
                 input.attrs.insert_or_assign("ref", chomp(runHg({ "branch", "-R", actualUrl })));
@@ -195,64 +214,56 @@ struct MercurialInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore(input.getName(), actualPath, FileIngestionMethod::Recursive, htSHA256, filter);
+                auto storePath = store->addToStore(
+                    input.getName(),
+                    {getFSSourceAccessor(), CanonPath(actualPath)},
+                    ContentAddressMethod::Raw::NixArchive, HashAlgorithm::SHA256, {},
+                    filter);
 
-                return {std::move(storePath), input};
+                return storePath;
             }
         }
 
         if (!input.getRef()) input.attrs.insert_or_assign("ref", "default");
 
-        auto checkHashType = [&](const std::optional<Hash> & hash)
+        auto revInfoKey = [&](const Hash & rev)
         {
-            if (hash.has_value() && hash->type != htSHA1)
-                throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", hash->to_string(Base16, true));
-        };
+            if (rev.algo != HashAlgorithm::SHA1)
+                throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", rev.to_string(HashFormat::Base16, true));
 
-
-        auto getLockedAttrs = [&]()
-        {
-            checkHashType(input.getRev());
-
-            return Attrs({
-                {"type", "hg"},
+            return Cache::Key{"hgRev", {
+                {"store", store->storeDir},
                 {"name", name},
-                {"rev", input.getRev()->gitRev()},
-            });
+                {"rev", input.getRev()->gitRev()}
+            }};
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
-            -> std::pair<StorePath, Input>
+        auto makeResult = [&](const Attrs & infoAttrs, const StorePath & storePath) -> StorePath
         {
             assert(input.getRev());
-            assert(!_input.getRev() || _input.getRev() == input.getRev());
+            assert(!origRev || origRev == input.getRev());
             input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
-            return {std::move(storePath), input};
+            return storePath;
         };
 
-        if (input.getRev()) {
-            if (auto res = getCache()->lookup(store, getLockedAttrs()))
-                return makeResult(res->first, std::move(res->second));
-        }
-
-        auto revOrRef = input.getRev() ? input.getRev()->gitRev() : *input.getRef();
-
-        Attrs unlockedAttrs({
-            {"type", "hg"},
-            {"name", name},
+        /* Check the cache for the most recent rev for this URL/ref. */
+        Cache::Key refToRevKey{"hgRefToRev", {
             {"url", actualUrl},
-            {"ref", *input.getRef()},
-        });
+            {"ref", *input.getRef()}
+        }};
 
-        if (auto res = getCache()->lookup(store, unlockedAttrs)) {
-            auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
-            if (!input.getRev() || input.getRev() == rev2) {
-                input.attrs.insert_or_assign("rev", rev2.gitRev());
-                return makeResult(res->first, std::move(res->second));
-            }
+        if (!input.getRev()) {
+            if (auto res = getCache()->lookupWithTTL(refToRevKey))
+                input.attrs.insert_or_assign("rev", getRevAttr(*res, "rev").gitRev());
         }
 
-        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(Base32, false));
+        /* If we have a rev, check if we have a cached store path. */
+        if (auto rev = input.getRev()) {
+            if (auto res = getCache()->lookupStorePath(revInfoKey(*rev), *store))
+                return makeResult(res->value, res->storePath);
+        }
+
+        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(HashAlgorithm::SHA256, actualUrl).to_string(HashFormat::Nix32, false));
 
         /* If this is a commit hash that we already have, we don't
            have to pull again. */
@@ -282,47 +293,70 @@ struct MercurialInputScheme : InputScheme
             }
         }
 
+        /* Fetch the remote rev or ref. */
         auto tokens = tokenizeString<std::vector<std::string>>(
-            runHg({ "log", "-R", cacheDir, "-r", revOrRef, "--template", "{node} {rev} {branch}" }));
+            runHg({
+                "log", "-R", cacheDir,
+                "-r", input.getRev() ? input.getRev()->gitRev() : *input.getRef(),
+                "--template", "{node} {rev} {branch}"
+            }));
         assert(tokens.size() == 3);
 
-        input.attrs.insert_or_assign("rev", Hash::parseAny(tokens[0], htSHA1).gitRev());
+        auto rev = Hash::parseAny(tokens[0], HashAlgorithm::SHA1);
+        input.attrs.insert_or_assign("rev", rev.gitRev());
         auto revCount = std::stoull(tokens[1]);
         input.attrs.insert_or_assign("ref", tokens[2]);
 
-        if (auto res = getCache()->lookup(store, getLockedAttrs()))
-            return makeResult(res->first, std::move(res->second));
+        /* Now that we have the rev, check the cache again for a
+           cached store path. */
+        if (auto res = getCache()->lookupStorePath(revInfoKey(rev), *store))
+            return makeResult(res->value, res->storePath);
 
         Path tmpDir = createTempDir();
         AutoDelete delTmpDir(tmpDir, true);
 
-        runHg({ "archive", "-R", cacheDir, "-r", input.getRev()->gitRev(), tmpDir });
+        runHg({ "archive", "-R", cacheDir, "-r", rev.gitRev(), tmpDir });
 
         deletePath(tmpDir + "/.hg_archival.txt");
 
-        auto storePath = store->addToStore(name, tmpDir);
+        auto storePath = store->addToStore(name, {getFSSourceAccessor(), CanonPath(tmpDir)});
 
         Attrs infoAttrs({
-            {"rev", input.getRev()->gitRev()},
             {"revCount", (uint64_t) revCount},
         });
 
-        if (!_input.getRev())
-            getCache()->add(
-                store,
-                unlockedAttrs,
-                infoAttrs,
-                storePath,
-                false);
+        if (!origRev)
+            getCache()->upsert(refToRevKey, {{"rev", rev.gitRev()}});
 
-        getCache()->add(
-            store,
-            getLockedAttrs(),
-            infoAttrs,
-            storePath,
-            true);
+        getCache()->upsert(revInfoKey(rev), *store, infoAttrs, storePath);
 
         return makeResult(infoAttrs, std::move(storePath));
+    }
+
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    {
+        Input input(_input);
+
+        auto storePath = fetchToStore(store, input);
+
+        auto accessor = makeStorePathAccessor(store, storePath);
+
+        accessor->setPathDisplay("«" + input.to_string() + "»");
+
+        return {accessor, input};
+    }
+
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getRev();
+    }
+
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        if (auto rev = input.getRev())
+            return rev->gitRev();
+        else
+            return std::nullopt;
     }
 };
 

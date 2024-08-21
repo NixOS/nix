@@ -1,9 +1,18 @@
 with builtins;
 
+let
+  lowerChars = stringToCharacters "abcdefghijklmnopqrstuvwxyz";
+  upperChars = stringToCharacters "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  stringToCharacters = s: genList (p: substring p 1 s) (stringLength s);
+in
+
 rec {
   splitLines = s: filter (x: !isList x) (split "\n" s);
 
   concatStrings = concatStringsSep "";
+
+  attrsToList = a:
+    map (name: { inherit name; value = a.${name}; }) (builtins.attrNames a);
 
   replaceStringsRec = from: to: string:
     # recursively replace occurrences of `from` with `to` within `string`
@@ -14,6 +23,8 @@ rec {
       replaced = replaceStrings [ from ] [ to ] string;
     in
       if replaced == string then string else replaceStringsRec from to replaced;
+
+  toLower = replaceStrings upperChars lowerChars;
 
   squash = replaceStringsRec "\n\n\n" "\n\n";
 
@@ -38,4 +49,9 @@ rec {
 
   filterAttrs = pred: set:
     listToAttrs (concatMap (name: let v = set.${name}; in if pred name v then [(nameValuePair name v)] else []) (attrNames set));
+
+  optionalString = cond: string: if cond then string else "";
+
+  indent = prefix: s:
+    concatStringsSep "\n" (map (x: if x == "" then x else "${prefix}${x}") (splitLines s));
 }

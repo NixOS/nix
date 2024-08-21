@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <list>
 #include <map>
@@ -6,18 +7,15 @@
 
 #include "types.hh"
 #include "chunked-vector.hh"
+#include "error.hh"
 
 namespace nix {
 
-/* Symbol table used by the parser and evaluator to represent and look
-   up identifiers and attributes efficiently.  SymbolTable::create()
-   converts a string into a symbol.  Symbols have the property that
-   they can be compared efficiently (using an equality test),
-   because the symbol table stores only one copy of each string. */
-
-/* This class mainly exists to give us an operator<< for ostreams. We could also
-   return plain strings from SymbolTable, but then we'd have to wrap every
-   instance of a symbol that is fmt()ed, which is inconvenient and error-prone. */
+/**
+ * This class mainly exists to give us an operator<< for ostreams. We could also
+ * return plain strings from SymbolTable, but then we'd have to wrap every
+ * instance of a symbol that is fmt()ed, which is inconvenient and error-prone.
+ */
 class SymbolStr
 {
     friend class SymbolTable;
@@ -33,9 +31,9 @@ public:
         return *s == s2;
     }
 
-    operator const std::string & () const
+    const char * c_str() const
     {
-        return *s;
+        return s->c_str();
     }
 
     operator const std::string_view () const
@@ -44,8 +42,18 @@ public:
     }
 
     friend std::ostream & operator <<(std::ostream & os, const SymbolStr & symbol);
+
+    bool empty() const
+    {
+        return s->empty();
+    }
 };
 
+/**
+ * Symbols have the property that they can be compared efficiently
+ * (using an equality test), because the symbol table stores only one
+ * copy of each string.
+ */
 class Symbol
 {
     friend class SymbolTable;
@@ -60,11 +68,16 @@ public:
 
     explicit operator bool() const { return id > 0; }
 
-    bool operator<(const Symbol other) const { return id < other.id; }
+    auto operator<=>(const Symbol other) const { return id <=> other.id; }
     bool operator==(const Symbol other) const { return id == other.id; }
-    bool operator!=(const Symbol other) const { return id != other.id; }
+
+    friend class std::hash<Symbol>;
 };
 
+/**
+ * Symbol table used by the parser and evaluator to represent and look
+ * up identifiers and attributes efficiently.
+ */
 class SymbolTable
 {
 private:
@@ -73,6 +86,9 @@ private:
 
 public:
 
+    /**
+     * converts a string into a symbol.
+     */
     Symbol create(std::string_view s)
     {
         // Most symbols are looked up more than once, so we trade off insertion performance
@@ -100,7 +116,7 @@ public:
     SymbolStr operator[](Symbol s) const
     {
         if (s.id == 0 || s.id > store.size())
-            abort();
+            unreachable();
         return SymbolStr(store[s.id - 1]);
     }
 
@@ -119,3 +135,12 @@ public:
 };
 
 }
+
+template<>
+struct std::hash<nix::Symbol>
+{
+    std::size_t operator()(const nix::Symbol & s) const noexcept
+    {
+        return std::hash<decltype(s.id)>{}(s.id);
+    }
+};

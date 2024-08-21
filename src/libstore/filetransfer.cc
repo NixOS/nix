@@ -1,14 +1,19 @@
 #include "filetransfer.hh"
-#include "util.hh"
 #include "globals.hh"
+#include "config-global.hh"
 #include "store-api.hh"
 #include "s3.hh"
 #include "compression.hh"
 #include "finally.hh"
 #include "callback.hh"
+#include "signals.hh"
 
 #if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
+#endif
+
+#if __linux__
+# include "namespaces.hh"
 #endif
 
 #include <unistd.h>
@@ -49,6 +54,8 @@ struct curlFileTransfer : public FileTransfer
         bool done = false; // whether either the success or failure function has been called
         Callback<FileTransferResult> callback;
         CURL * req = 0;
+        // buffer to accompany the `req` above
+        char errbuf[CURL_ERROR_SIZE];
         bool active = false; // whether the handle has been added to the multi object
         std::string statusMsg;
 
@@ -66,7 +73,10 @@ struct curlFileTransfer : public FileTransfer
 
         curl_off_t writtenToSink = 0;
 
+        std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+
         inline static const std::set<long> successfulStatuses {200, 201, 204, 206, 304, 0 /* other protocol */};
+
         /* Get the HTTP status code, or 0 for other protocols. */
         long getHTTPStatus()
         {
@@ -88,6 +98,10 @@ struct curlFileTransfer : public FileTransfer
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
+                if (errorSink) {
+                    (*errorSink)(data);
+                }
+
                 if (this->request.dataCallback) {
                     auto httpStatus = getHTTPStatus();
 
@@ -101,6 +115,9 @@ struct curlFileTransfer : public FileTransfer
                     this->result.data.append(data);
               })
         {
+            result.urls.push_back(request.uri);
+
+            requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
             if (!request.mimeType.empty())
@@ -162,8 +179,6 @@ struct curlFileTransfer : public FileTransfer
                     }
                 }
 
-                if (errorSink)
-                    (*errorSink)({(char *) contents, realSize});
                 (*decompressionSink)({(char *) contents, realSize});
 
                 return realSize;
@@ -178,24 +193,35 @@ struct curlFileTransfer : public FileTransfer
             return ((TransferItem *) userp)->writeCallback(contents, size, nmemb);
         }
 
+        void appendCurrentUrl()
+        {
+            char * effectiveUriCStr = nullptr;
+            curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
+            if (effectiveUriCStr && *result.urls.rbegin() != effectiveUriCStr)
+                result.urls.push_back(effectiveUriCStr);
+        }
+
         size_t headerCallback(void * contents, size_t size, size_t nmemb)
         {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
-            printMsg(lvlVomit, format("got header for '%s': %s") % request.uri % trim(line));
+            printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
+
             static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
-            std::smatch match;
-            if (std::regex_match(line, match, statusLine)) {
+            if (std::smatch match; std::regex_match(line, match, statusLine)) {
                 result.etag = "";
                 result.data.clear();
                 result.bodySize = 0;
                 statusMsg = trim(match.str(1));
                 acceptRanges = false;
                 encoding = "";
+                appendCurrentUrl();
             } else {
+
                 auto i = line.find(':');
                 if (i != std::string::npos) {
                     std::string name = toLower(trim(line.substr(0, i)));
+
                     if (name == "etag") {
                         result.etag = trim(line.substr(i + 1));
                         /* Hack to work around a GitHub bug: it sends
@@ -206,13 +232,25 @@ struct curlFileTransfer : public FileTransfer
                         long httpStatus = 0;
                         curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
                         if (result.etag == request.expectedETag && httpStatus == 200) {
-                            debug(format("shutting down on 200 HTTP response with expected ETag"));
+                            debug("shutting down on 200 HTTP response with expected ETag");
                             return 0;
                         }
-                    } else if (name == "content-encoding")
+                    }
+
+                    else if (name == "content-encoding")
                         encoding = trim(line.substr(i + 1));
+
                     else if (name == "accept-ranges" && toLower(trim(line.substr(i + 1))) == "bytes")
                         acceptRanges = true;
+
+                    else if (name == "link" || name == "x-amz-meta-link") {
+                        auto value = trim(line.substr(i + 1));
+                        static std::regex linkRegex("<([^>]*)>; rel=\"immutable\"", std::regex::extended | std::regex::icase);
+                        if (std::smatch match; std::regex_match(value, match, linkRegex))
+                            result.immutableUrl = match.str(1);
+                        else
+                            debug("got invalid link header '%s'", value);
+                    }
                 }
             }
             return realSize;
@@ -226,11 +264,11 @@ struct curlFileTransfer : public FileTransfer
         int progressCallback(double dltotal, double dlnow)
         {
             try {
-              act.progress(dlnow, dltotal);
+                act.progress(dlnow, dltotal);
             } catch (nix::Interrupted &) {
-              assert(_isInterrupted);
+                assert(getInterrupted());
             }
-            return _isInterrupted;
+            return getInterrupted();
         }
 
         static int progressCallbackWrapper(void * userp, double dltotal, double dlnow, double ultotal, double ulnow)
@@ -315,7 +353,7 @@ struct curlFileTransfer : public FileTransfer
 
             if (request.verifyTLS) {
                 if (settings.caFile != "")
-                    curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.c_str());
+                    curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.get().c_str());
             } else {
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, 0);
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
@@ -334,21 +372,25 @@ struct curlFileTransfer : public FileTransfer
             if (writtenToSink)
                 curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);
 
+            curl_easy_setopt(req, CURLOPT_ERRORBUFFER, errbuf);
+            errbuf[0] = 0;
+
             result.data.clear();
             result.bodySize = 0;
         }
 
         void finish(CURLcode code)
         {
+            auto finishTime = std::chrono::steady_clock::now();
+
             auto httpStatus = getHTTPStatus();
 
-            char * effectiveUriCStr;
-            curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
-            if (effectiveUriCStr)
-                result.effectiveUri = effectiveUriCStr;
+            debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes, duration = %.2f s",
+                request.verb(), request.uri, code, httpStatus, result.bodySize,
+                std::chrono::duration_cast<std::chrono::milliseconds>(finishTime - startTime).count() / 1000.0f
+                );
 
-            debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
-                request.verb(), request.uri, code, httpStatus, result.bodySize);
+            appendCurrentUrl();
 
             if (decompressionSink) {
                 try {
@@ -404,6 +446,10 @@ struct curlFileTransfer : public FileTransfer
                     err = Misc;
                 } else {
                     // Don't bother retrying on certain cURL errors either
+
+                    // Allow selecting a subset of enum values
+                    #pragma GCC diagnostic push
+                    #pragma GCC diagnostic ignored "-Wswitch-enum"
                     switch (code) {
                         case CURLE_FAILED_INIT:
                         case CURLE_URL_MALFORMAT:
@@ -424,6 +470,7 @@ struct curlFileTransfer : public FileTransfer
                         default: // Shut up warnings
                             break;
                     }
+                    #pragma GCC diagnostic pop
                 }
 
                 attempt++;
@@ -432,7 +479,7 @@ struct curlFileTransfer : public FileTransfer
                 if (errorSink)
                     response = std::move(errorSink->s);
                 auto exc =
-                    code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
+                    code == CURLE_ABORTED_BY_CALLBACK && getInterrupted()
                     ? FileTransferError(Interrupted, std::move(response), "%s of '%s' was interrupted", request.verb(), request.uri)
                     : httpStatus != 0
                     ? FileTransferError(err,
@@ -442,8 +489,8 @@ struct curlFileTransfer : public FileTransfer
                         code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                     : FileTransferError(err,
                         std::move(response),
-                        "unable to %s '%s': %s (%d)",
-                        request.verb(), request.uri, curl_easy_strerror(code), code);
+                        "unable to %s '%s': %s (%d) %s",
+                        request.verb(), request.uri, curl_easy_strerror(code), code, errbuf);
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a
@@ -482,10 +529,12 @@ struct curlFileTransfer : public FileTransfer
 
     Sync<State> state_;
 
+    #ifndef _WIN32 // TODO need graceful async exit support on Windows?
     /* We can't use a std::condition_variable to wake up the curl
        thread, because it only monitors file descriptors. So use a
        pipe instead. */
     Pipe wakeupPipe;
+    #endif
 
     std::thread workerThread;
 
@@ -505,8 +554,10 @@ struct curlFileTransfer : public FileTransfer
             fileTransferSettings.httpConnections.get());
         #endif
 
+        #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         wakeupPipe.create();
         fcntl(wakeupPipe.readSide.get(), F_SETFL, O_NONBLOCK);
+        #endif
 
         workerThread = std::thread([&]() { workerThreadEntry(); });
     }
@@ -527,17 +578,28 @@ struct curlFileTransfer : public FileTransfer
             auto state(state_.lock());
             state->quit = true;
         }
+        #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         writeFull(wakeupPipe.writeSide.get(), " ", false);
+        #endif
     }
 
     void workerThreadMain()
     {
         /* Cause this thread to be notified on SIGINT. */
+        #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         auto callback = createInterruptCallback([&]() {
             stopWorkerThread();
         });
+        #endif
 
-        unshareFilesystem();
+        #if __linux__
+        try {
+            tryUnshareFilesystem();
+        } catch (nix::Error & e) {
+            e.addTrace({}, "in download thread");
+            throw;
+        }
+        #endif
 
         std::map<CURL *, std::shared_ptr<TransferItem>> items;
 
@@ -571,9 +633,11 @@ struct curlFileTransfer : public FileTransfer
             /* Wait for activity, including wakeup events. */
             int numfds = 0;
             struct curl_waitfd extraFDs[1];
+            #ifndef _WIN32 // TODO need graceful async exit support on Windows?
             extraFDs[0].fd = wakeupPipe.readSide.get();
             extraFDs[0].events = CURL_WAIT_POLLIN;
             extraFDs[0].revents = 0;
+            #endif
             long maxSleepTimeMs = items.empty() ? 10000 : 100;
             auto sleepTimeMs =
                 nextWakeup != std::chrono::steady_clock::time_point()
@@ -657,7 +721,9 @@ struct curlFileTransfer : public FileTransfer
                 throw nix::Error("cannot enqueue download request because the download thread is shutting down");
             state->incoming.push(item);
         }
+        #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         writeFull(wakeupPipe.writeSide.get(), " ");
+        #endif
     }
 
 #if ENABLE_S3
@@ -756,7 +822,10 @@ FileTransferResult FileTransfer::upload(const FileTransferRequest & request)
     return enqueueFileTransfer(request).get();
 }
 
-void FileTransfer::download(FileTransferRequest && request, Sink & sink)
+void FileTransfer::download(
+    FileTransferRequest && request,
+    Sink & sink,
+    std::function<void(FileTransferResult)> resultCallback)
 {
     /* Note: we can't call 'sink' via request.dataCallback, because
        that would cause the sink to execute on the fileTransfer
@@ -794,8 +863,10 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
            buffer). We don't wait forever to prevent stalling the
            download thread. (Hopefully sleeping will throttle the
            sender.) */
-        if (state->data.size() > 1024 * 1024) {
+        if (state->data.size() > fileTransferSettings.downloadBufferSize) {
             debug("download buffer is full; going to sleep");
+            static bool haveWarned = false;
+            warnOnce(haveWarned, "download buffer is full; consider increasing the 'download-buffer-size' setting");
             state.wait_for(state->request, std::chrono::seconds(10));
         }
 
@@ -806,11 +877,13 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
     };
 
     enqueueFileTransfer(request,
-        {[_state](std::future<FileTransferResult> fut) {
+        {[_state, resultCallback{std::move(resultCallback)}](std::future<FileTransferResult> fut) {
             auto state(_state->lock());
             state->quit = true;
             try {
-                fut.get();
+                auto res = fut.get();
+                if (resultCallback)
+                    resultCallback(std::move(res));
             } catch (...) {
                 state->exc = std::current_exception();
             }
@@ -828,7 +901,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
         {
             auto state(_state->lock());
 
-            while (state->data.empty()) {
+            if (state->data.empty()) {
 
                 if (state->quit) {
                     if (state->exc) std::rethrow_exception(state->exc);
@@ -836,9 +909,13 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
                 }
 
                 state.wait(state->avail);
+
+                if (state->data.empty()) continue;
             }
 
             chunk = std::move(state->data);
+            /* Reset state->data after the move, since we check data.empty() */
+            state->data = "";
 
             state->request.notify_one();
         }
@@ -855,12 +932,12 @@ template<typename... Args>
 FileTransferError::FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args & ... args)
     : Error(args...), error(error), response(response)
 {
-    const auto hf = hintfmt(args...);
+    const auto hf = HintFmt(args...);
     // FIXME: Due to https://github.com/NixOS/nix/issues/3841 we don't know how
     // to print different messages for different verbosity levels. For now
     // we add some heuristics for detecting when we want to show the response.
     if (response && (response->size() < 1024 || response->find("<html>") != std::string::npos))
-        err.msg = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), chomp(*response));
+        err.msg = HintFmt("%1%\n\nresponse body:\n\n%2%", Uncolored(hf.str()), chomp(*response));
     else
         err.msg = hf;
 }

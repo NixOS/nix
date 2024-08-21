@@ -1,19 +1,22 @@
 #include "fetchers.hh"
 #include "store-api.hh"
 #include "archive.hh"
+#include "store-path-accessor.hh"
 
 namespace nix::fetchers {
 
 struct PathInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) const override
+    std::optional<Input> inputFromURL(
+        const Settings & settings,
+        const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "path") return {};
 
         if (url.authority && *url.authority != "")
             throw Error("path URL '%s' should not have an authority ('%s')", url.url, *url.authority);
 
-        Input input;
+        Input input{settings};
         input.attrs.insert_or_assign("type", "path");
         input.attrs.insert_or_assign("path", url.path);
 
@@ -32,24 +35,34 @@ struct PathInputScheme : InputScheme
         return input;
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
+    std::string_view schemeName() const override
     {
-        if (maybeGetStrAttr(attrs, "type") != "path") return {};
+        return "path";
+    }
 
+    StringSet allowedAttrs() const override
+    {
+        return {
+            "path",
+            /* Allow the user to pass in "fake" tree info
+               attributes. This is useful for making a pinned tree work
+               the same as the repository from which is exported (e.g.
+               path:/nix/store/...-source?lastModified=1585388205&rev=b0c285...).
+             */
+            "rev",
+            "revCount",
+            "lastModified",
+            "narHash",
+        };
+    }
+
+    std::optional<Input> inputFromAttrs(
+        const Settings & settings,
+        const Attrs & attrs) const override
+    {
         getStrAttr(attrs, "path");
 
-        for (auto & [name, value] : attrs)
-            /* Allow the user to pass in "fake" tree info
-               attributes. This is useful for making a pinned tree
-               work the same as the repository from which is exported
-               (e.g. path:/nix/store/...-source?lastModified=1585388205&rev=b0c285...). */
-            if (name == "type" || name == "rev" || name == "revCount" || name == "lastModified" || name == "narHash" || name == "path")
-                // checked in Input::fromAttrs
-                ;
-            else
-                throw Error("unsupported path input attribute '%s'", name);
-
-        Input input;
+        Input input{settings};
         input.attrs = attrs;
         return input;
     }
@@ -66,22 +79,45 @@ struct PathInputScheme : InputScheme
         };
     }
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        return true;
-    }
-
-    std::optional<Path> getSourcePath(const Input & input) override
+    std::optional<Path> getSourcePath(const Input & input) const override
     {
         return getStrAttr(input.attrs, "path");
     }
 
-    void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
+    void putFile(
+        const Input & input,
+        const CanonPath & path,
+        std::string_view contents,
+        std::optional<std::string> commitMsg) const override
     {
-        // nothing to do
+        writeFile((CanonPath(getAbsPath(input)) / path).abs(), contents);
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    std::optional<std::string> isRelative(const Input & input) const
+    {
+        auto path = getStrAttr(input.attrs, "path");
+        if (hasPrefix(path, "/"))
+            return std::nullopt;
+        else
+            return path;
+    }
+
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getNarHash();
+    }
+
+    CanonPath getAbsPath(const Input & input) const
+    {
+        auto path = getStrAttr(input.attrs, "path");
+
+        if (path[0] == '/')
+            return CanonPath(path);
+
+        throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
+    }
+
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         Input input(_input);
         std::string absPath;
@@ -123,7 +159,29 @@ struct PathInputScheme : InputScheme
         }
         input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
 
-        return {std::move(*storePath), input};
+        return {makeStorePathAccessor(store, *storePath), std::move(input)};
+    }
+
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        if (isRelative(input))
+            return std::nullopt;
+
+        /* If this path is in the Nix store, use the hash of the
+           store object and the subpath. */
+        auto path = getAbsPath(input);
+        try {
+            auto [storePath, subPath] = store->toStorePath(path.abs());
+            auto info = store->queryPathInfo(storePath);
+            return fmt("path:%s:%s", info->narHash.to_string(HashFormat::Base16, false), subPath);
+        } catch (Error &) {
+            return std::nullopt;
+        }
+    }
+
+    std::optional<ExperimentalFeature> experimentalFeature() const override
+    {
+        return Xp::Flakes;
     }
 };
 

@@ -1,6 +1,6 @@
 #include "loggers.hh"
+#include "environment-variables.hh"
 #include "progress-bar.hh"
-#include "util.hh"
 
 namespace nix {
 
@@ -36,7 +36,7 @@ Logger * makeDefaultLogger() {
         return logger;
     }
     default:
-        abort();
+        unreachable();
     }
 }
 

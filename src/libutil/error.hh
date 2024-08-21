@@ -1,47 +1,34 @@
 #pragma once
+/**
+ * @file
+ *
+ * @brief This file defines two main structs/classes used in nix error handling.
+ *
+ * ErrorInfo provides a standard payload of error information, with conversion to string
+ * happening in the logger rather than at the call site.
+ *
+ * BaseError is the ancestor of nix specific exceptions (and Interrupted), and contains
+ * an ErrorInfo.
+ *
+ * ErrorInfo structs are sent to the logger as part of an exception, or directly with the
+ * logError or logWarning macros.
+ * See libutil/tests/logging.cc for usage examples.
+ */
 
 #include "suggestions.hh"
-#include "ref.hh"
-#include "types.hh"
 #include "fmt.hh"
 
 #include <cstring>
 #include <list>
 #include <memory>
-#include <map>
 #include <optional>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
-/* Before 4.7, gcc's std::exception uses empty throw() specifiers for
- * its (virtual) destructor and what() in c++11 mode, in violation of spec
- */
-#ifdef __GNUC__
-#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 7)
-#define EXCEPTION_NEEDS_THROW_SPEC
-#endif
-#endif
-
 namespace nix {
 
-/*
-
-   This file defines two main structs/classes used in nix error handling.
-
-   ErrorInfo provides a standard payload of error information, with conversion to string
-   happening in the logger rather than at the call site.
-
-   BaseError is the ancestor of nix specific exceptions (and Interrupted), and contains
-   an ErrorInfo.
-
-   ErrorInfo structs are sent to the logger as part of an exception, or directly with the
-   logError or logWarning macros.
-
-   See libutil/tests/logging.cc for usage examples.
-
- */
 
 typedef enum {
     lvlError = 0,
@@ -54,45 +41,57 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
-// the lines of code surrounding an error.
+/**
+ * The lines of code surrounding an error.
+ */
 struct LinesOfCode {
     std::optional<std::string> prevLineOfCode;
     std::optional<std::string> errLineOfCode;
     std::optional<std::string> nextLineOfCode;
 };
 
-/* An abstract type that represents a location in a source file. */
-struct AbstractPos
-{
-    uint32_t line = 0;
-    uint32_t column = 0;
-
-    /* Return the contents of the source file. */
-    virtual std::optional<std::string> getSource() const
-    { return std::nullopt; };
-
-    virtual void print(std::ostream & out) const = 0;
-
-    std::optional<LinesOfCode> getCodeLines() const;
-};
-
-std::ostream & operator << (std::ostream & str, const AbstractPos & pos);
+struct Pos;
 
 void printCodeLines(std::ostream & out,
     const std::string & prefix,
-    const AbstractPos & errPos,
+    const Pos & errPos,
     const LinesOfCode & loc);
 
-struct Trace {
-    std::shared_ptr<AbstractPos> pos;
-    hintformat hint;
+/**
+ * When a stack frame is printed.
+ */
+enum struct TracePrint {
+    /**
+     * The default behavior; always printed when `--show-trace` is set.
+     */
+    Default,
+    /** Always printed. Produced by `builtins.addErrorContext`. */
+    Always,
 };
+
+struct Trace {
+    std::shared_ptr<Pos> pos;
+    HintFmt hint;
+    TracePrint print = TracePrint::Default;
+};
+
+inline std::strong_ordering operator<=>(const Trace& lhs, const Trace& rhs);
 
 struct ErrorInfo {
     Verbosity level;
-    hintformat msg;
-    std::shared_ptr<AbstractPos> errPos;
+    HintFmt msg;
+    std::shared_ptr<Pos> pos;
     std::list<Trace> traces;
+    /**
+     * Some messages are generated directly by expressions; notably `builtins.warn`, `abort`, `throw`.
+     * These may be rendered differently, so that users can distinguish them.
+     */
+    bool isFromExpr = false;
+
+    /**
+     * Exit status.
+     */
+    unsigned int status = 1;
 
     Suggestions suggestions;
 
@@ -101,36 +100,45 @@ struct ErrorInfo {
 
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace);
 
-/* BaseError should generally not be caught, as it has Interrupted as
-   a subclass. Catch Error instead. */
+/**
+ * BaseError should generally not be caught, as it has Interrupted as
+ * a subclass. Catch Error instead.
+ */
 class BaseError : public std::exception
 {
 protected:
     mutable ErrorInfo err;
 
+    /**
+     * Cached formatted contents of `err.msg`.
+     */
     mutable std::optional<std::string> what_;
+    /**
+     * Format `err.msg` and set `what_` to the resulting value.
+     */
     const std::string & calcWhat() const;
 
 public:
-    unsigned int status = 1; // exit status
+    BaseError(const BaseError &) = default;
+    BaseError& operator=(const BaseError &) = default;
+    BaseError& operator=(BaseError &&) = default;
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
-        : err { .level = lvlError, .msg = hintfmt(args...) }
-        , status(status)
+        : err { .level = lvlError, .msg = HintFmt(args...), .status = status }
     { }
 
     template<typename... Args>
     explicit BaseError(const std::string & fs, const Args & ... args)
-        : err { .level = lvlError, .msg = hintfmt(fs, args...) }
+        : err { .level = lvlError, .msg = HintFmt(fs, args...) }
     { }
 
     template<typename... Args>
     BaseError(const Suggestions & sug, const Args & ... args)
-        : err { .level = lvlError, .msg = hintfmt(args...), .suggestions = sug }
+        : err { .level = lvlError, .msg = HintFmt(args...), .suggestions = sug }
     { }
 
-    BaseError(hintformat hint)
+    BaseError(HintFmt hint)
         : err { .level = lvlError, .msg = hint }
     { }
 
@@ -142,25 +150,40 @@ public:
         : err(e)
     { }
 
-#ifdef EXCEPTION_NEEDS_THROW_SPEC
-    ~BaseError() throw () { };
-    const char * what() const throw () { return calcWhat().c_str(); }
-#else
-    const char * what() const noexcept override { return calcWhat().c_str(); }
-#endif
+    /** The error message without "error: " prefixed to it. */
+    std::string message() {
+        return err.msg.str();
+    }
 
+    const char * what() const noexcept override { return calcWhat().c_str(); }
     const std::string & msg() const { return calcWhat(); }
     const ErrorInfo & info() const { calcWhat(); return err; }
 
-    template<typename... Args>
-    void addTrace(std::shared_ptr<AbstractPos> && e, const std::string & fs, const Args & ... args)
+    void withExitStatus(unsigned int status)
     {
-        addTrace(std::move(e), hintfmt(fs, args...));
+        err.status = status;
     }
 
-    void addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint);
+    void atPos(std::shared_ptr<Pos> pos) {
+        err.pos = pos;
+    }
+
+    void pushTrace(Trace trace)
+    {
+        err.traces.push_front(trace);
+    }
+
+    template<typename... Args>
+    void addTrace(std::shared_ptr<Pos> && e, std::string_view fs, const Args & ... args)
+    {
+        addTrace(std::move(e), HintFmt(std::string(fs), args...));
+    }
+
+    void addTrace(std::shared_ptr<Pos> && e, HintFmt hint, TracePrint print = TracePrint::Default);
 
     bool hasTrace() const { return !err.traces.empty(); }
+
+    const ErrorInfo & info() { return err; };
 };
 
 #define MakeError(newClass, superClass) \
@@ -174,25 +197,100 @@ MakeError(Error, BaseError);
 MakeError(UsageError, Error);
 MakeError(UnimplementedError, Error);
 
-class SysError : public Error
+/**
+ * To use in catch-blocks.
+ */
+MakeError(SystemError, Error);
+
+/**
+ * POSIX system error, created using `errno`, `strerror` friends.
+ *
+ * Throw this, but prefer not to catch this, and catch `SystemError`
+ * instead. This allows implementations to freely switch between this
+ * and `windows::WinError` without breaking catch blocks.
+ *
+ * However, it is permissible to catch this and rethrow so long as
+ * certain conditions are not met (e.g. to catch only if `errNo =
+ * EFooBar`). In that case, try to also catch the equivalent `windows::WinError`
+ * code.
+ *
+ * @todo Rename this to `PosixError` or similar. At this point Windows
+ * support is too WIP to justify the code churn, but if it is finished
+ * then a better identifier becomes moe worth it.
+ */
+class SysError : public SystemError
 {
 public:
     int errNo;
 
+    /**
+     * Construct using the explicitly-provided error number. `strerror`
+     * will be used to try to add additional information to the message.
+     */
     template<typename... Args>
-    SysError(int errNo_, const Args & ... args)
-        : Error("")
+    SysError(int errNo, const Args & ... args)
+        : SystemError(""), errNo(errNo)
     {
-        errNo = errNo_;
-        auto hf = hintfmt(args...);
-        err.msg = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
+        auto hf = HintFmt(args...);
+        err.msg = HintFmt("%1%: %2%", Uncolored(hf.str()), strerror(errNo));
     }
 
+    /**
+     * Construct using the ambient `errno`.
+     *
+     * Be sure to not perform another `errno`-modifying operation before
+     * calling this constructor!
+     */
     template<typename... Args>
     SysError(const Args & ... args)
         : SysError(errno, args ...)
     {
     }
 };
+
+#ifdef _WIN32
+namespace windows {
+    class WinError;
+}
+#endif
+
+/**
+ * Convenience alias for when we use a `errno`-based error handling
+ * function on Unix, and `GetLastError()`-based error handling on on
+ * Windows.
+ */
+using NativeSysError =
+#ifdef _WIN32
+    windows::WinError
+#else
+    SysError
+#endif
+    ;
+
+/**
+ * Throw an exception for the purpose of checking that exception
+ * handling works; see 'initLibUtil()'.
+ */
+void throwExceptionSelfCheck();
+
+/**
+ * Print a message and abort().
+ */
+[[noreturn]]
+void panic(std::string_view msg);
+
+/**
+ * Print a basic error message with source position and abort().
+ * Use the unreachable() macro to call this.
+ */
+[[noreturn]]
+void panic(const char * file, int line, const char * func);
+
+/**
+ * Print a basic error message with source position and abort().
+ *
+ * @note: This assumes that the logger is operational
+ */
+#define unreachable() (::nix::panic(__FILE__, __LINE__, __func__))
 
 }

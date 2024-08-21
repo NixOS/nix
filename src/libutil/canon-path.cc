@@ -1,17 +1,34 @@
 #include "canon-path.hh"
 #include "util.hh"
+#include "file-path-impl.hh"
+#include "strings-inline.hh"
 
 namespace nix {
 
 CanonPath CanonPath::root = CanonPath("/");
 
+static std::string absPathPure(std::string_view path)
+{
+    return canonPathInner<UnixPathTrait>(path, [](auto &, auto &){});
+}
+
 CanonPath::CanonPath(std::string_view raw)
-    : path(absPath((Path) raw, "/"))
+    : path(absPathPure(concatStrings("/", raw)))
 { }
 
 CanonPath::CanonPath(std::string_view raw, const CanonPath & root)
-    : path(absPath((Path) raw, root.abs()))
+    : path(absPathPure(
+        raw.size() > 0 && raw[0] == '/'
+            ? raw
+            : concatStrings(root.abs(), "/", raw)))
 { }
+
+CanonPath::CanonPath(const std::vector<std::string> & elems)
+    : path("/")
+{
+    for (auto & s : elems)
+        push(s);
+}
 
 std::optional<CanonPath> CanonPath::parent() const
 {
@@ -51,7 +68,7 @@ void CanonPath::extend(const CanonPath & x)
         path += x.abs();
 }
 
-CanonPath CanonPath::operator + (const CanonPath & x) const
+CanonPath CanonPath::operator / (const CanonPath & x) const
 {
     auto res = *this;
     res.extend(x);
@@ -66,7 +83,7 @@ void CanonPath::push(std::string_view c)
     path += c;
 }
 
-CanonPath CanonPath::operator + (std::string_view c) const
+CanonPath CanonPath::operator / (std::string_view c) const
 {
     auto res = *this;
     res.push(c);
@@ -98,6 +115,32 @@ std::ostream & operator << (std::ostream & stream, const CanonPath & path)
 {
     stream << path.abs();
     return stream;
+}
+
+std::string CanonPath::makeRelative(const CanonPath & path) const
+{
+    auto p1 = begin();
+    auto p2 = path.begin();
+
+    for (; p1 != end() && p2 != path.end() && *p1 == *p2; ++p1, ++p2) ;
+
+    if (p1 == end() && p2 == path.end())
+        return ".";
+    else if (p1 == end())
+        return std::string(p2.remaining);
+    else {
+        std::string res;
+        while (p1 != end()) {
+            ++p1;
+            if (!res.empty()) res += '/';
+            res += "..";
+        }
+        if (p2 != path.end()) {
+            if (!res.empty()) res += '/';
+            res += p2.remaining;
+        }
+        return res;
+    }
 }
 
 }

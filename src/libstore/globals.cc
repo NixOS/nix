@@ -1,18 +1,40 @@
 #include "globals.hh"
-#include "util.hh"
+#include "config-global.hh"
+#include "current-process.hh"
 #include "archive.hh"
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
 #include "compute-levels.hh"
+#include "signals.hh"
 
 #include <algorithm>
 #include <map>
+#include <mutex>
 #include <thread>
-#include <dlfcn.h>
-#include <sys/utsname.h>
 
 #include <nlohmann/json.hpp>
 
+#ifndef _WIN32
+# include <sys/utsname.h>
+#endif
+
+#ifdef __GLIBC__
+# include <gnu/lib-names.h>
+# include <nss.h>
+# include <dlfcn.h>
+#endif
+
+#if __APPLE__
+# include "processes.hh"
+#endif
+
+#include "config-impl.hh"
+
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
+
+#include "strings.hh"
 
 namespace nix {
 
@@ -30,28 +52,29 @@ static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
     : nixPrefix(NIX_PREFIX)
-    , nixStore(canonPath(getEnv("NIX_STORE_DIR").value_or(getEnv("NIX_STORE").value_or(NIX_STORE_DIR))))
-    , nixDataDir(canonPath(getEnv("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
-    , nixLogDir(canonPath(getEnv("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
-    , nixStateDir(canonPath(getEnv("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
-    , nixConfDir(canonPath(getEnv("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
+    , nixStore(
+#ifndef _WIN32
+        // On Windows `/nix/store` is not a canonical path, but we dont'
+        // want to deal with that yet.
+        canonPath
+#endif
+        (getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR))))
+    , nixDataDir(canonPath(getEnvNonEmpty("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
+    , nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
+    , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
+    , nixConfDir(canonPath(getEnvNonEmpty("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
     , nixUserConfFiles(getUserConfigFiles())
-    , nixBinDir(canonPath(getEnv("NIX_BIN_DIR").value_or(NIX_BIN_DIR)))
     , nixManDir(canonPath(NIX_MAN_DIR))
-    , nixDaemonSocketFile(canonPath(getEnv("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
+    , nixDaemonSocketFile(canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
-    buildUsersGroup = getuid() == 0 ? "nixbld" : "";
-    lockCPU = getEnv("NIX_AFFINITY_HACK") == "1";
+#ifndef _WIN32
+    buildUsersGroup = isRootUser() ? "nixbld" : "";
+#endif
     allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
 
-    caFile = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
-    if (caFile == "") {
-        for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
-            if (pathExists(fn)) {
-                caFile = fn;
-                break;
-            }
-    }
+    auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
+    if (sslOverride != "")
+        caFile = sslOverride;
 
     /* Backwards compatibility. */
     auto s = getEnv("NIX_REMOTE_SYSTEMS");
@@ -59,7 +82,7 @@ Settings::Settings()
         Strings ss;
         for (auto & p : tokenizeString<Strings>(*s, ":"))
             ss.push_back("@" + p);
-        builders = concatStringsSep(" ", ss);
+        builders = concatStringsSep("\n", ss);
     }
 
 #if defined(__linux__) && defined(SANDBOX_SHELL)
@@ -71,26 +94,31 @@ Settings::Settings()
     sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
-
-    buildHook = getSelfExe().value_or("nix") + " __build-remote";
 }
 
-void loadConfFile()
+void loadConfFile(AbstractConfig & config)
 {
-    globalConfig.applyConfigFile(settings.nixConfDir + "/nix.conf");
+    auto applyConfigFile = [&](const Path & path) {
+        try {
+            std::string contents = readFile(path);
+            config.applyConfig(contents, path);
+        } catch (SystemError &) { }
+    };
+
+    applyConfigFile(settings.nixConfDir + "/nix.conf");
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
-    globalConfig.resetOverridden();
+    config.resetOverridden();
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
-        globalConfig.applyConfigFile(*file);
+        applyConfigFile(*file);
     }
 
     auto nixConfEnv = getEnv("NIX_CONFIG");
     if (nixConfEnv.has_value()) {
-        globalConfig.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
+        config.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
     }
 
 }
@@ -123,6 +151,29 @@ unsigned int Settings::getDefaultCores()
       return concurrency;
 }
 
+#if __APPLE__
+static bool hasVirt() {
+
+    int hasVMM;
+    int hvSupport;
+    size_t size;
+
+    size = sizeof(hasVMM);
+    if (sysctlbyname("kern.hv_vmm_present", &hasVMM, &size, NULL, 0) == 0) {
+        if (hasVMM)
+            return false;
+    }
+
+    // whether the kernel and hardware supports virt
+    size = sizeof(hvSupport);
+    if (sysctlbyname("kern.hv_support", &hvSupport, &size, NULL, 0) == 0) {
+        return hvSupport == 1;
+    } else {
+        return false;
+    }
+}
+#endif
+
 StringSet Settings::getDefaultSystemFeatures()
 {
     /* For backwards compatibility, accept some "features" that are
@@ -137,6 +188,11 @@ StringSet Settings::getDefaultSystemFeatures()
     #if __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
         features.insert("kvm");
+    #endif
+
+    #if __APPLE__
+    if (hasVirt())
+        features.insert("apple-virt");
     #endif
 
     return features;
@@ -166,25 +222,24 @@ StringSet Settings::getDefaultExtraPlatforms()
     return extraPlatforms;
 }
 
-bool Settings::isExperimentalFeatureEnabled(const ExperimentalFeature & feature)
-{
-    auto & f = experimentalFeatures.get();
-    return std::find(f.begin(), f.end(), feature) != f.end();
-}
-
-void Settings::requireExperimentalFeature(const ExperimentalFeature & feature)
-{
-    if (!isExperimentalFeatureEnabled(feature))
-        throw MissingExperimentalFeature(feature);
-}
-
 bool Settings::isWSL1()
 {
+#if __linux__
     struct utsname utsbuf;
     uname(&utsbuf);
     // WSL1 uses -Microsoft suffix
     // WSL2 uses -microsoft-standard suffix
     return hasSuffix(utsbuf.release, "-Microsoft");
+#else
+    return false;
+#endif
+}
+
+Path Settings::getDefaultSSLCertFile()
+{
+    for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
+        if (pathAccessible(fn)) return fn;
+    return "";
 }
 
 const std::string nixVersion = PACKAGE_VERSION;
@@ -195,100 +250,129 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
     {SandboxMode::smDisabled, false},
 });
 
-template<> void BaseSetting<SandboxMode>::set(const std::string & str, bool append)
+template<> SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const
 {
-    if (str == "true") value = smEnabled;
-    else if (str == "relaxed") value = smRelaxed;
-    else if (str == "false") value = smDisabled;
+    if (str == "true") return smEnabled;
+    else if (str == "relaxed") return smRelaxed;
+    else if (str == "false") return smDisabled;
     else throw UsageError("option '%s' has invalid value '%s'", name, str);
 }
 
-template<> bool BaseSetting<SandboxMode>::isAppendable()
+template<> struct BaseSetting<SandboxMode>::trait
 {
-    return false;
-}
+    static constexpr bool appendable = false;
+};
 
 template<> std::string BaseSetting<SandboxMode>::to_string() const
 {
     if (value == smEnabled) return "true";
     else if (value == smRelaxed) return "relaxed";
     else if (value == smDisabled) return "false";
-    else abort();
+    else unreachable();
 }
 
 template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({
         .longName = name,
+        .aliases = aliases,
         .description = "Enable sandboxing.",
         .category = category,
-        .handler = {[=]() { override(smEnabled); }}
+        .handler = {[this]() { override(smEnabled); }}
     });
     args.addFlag({
         .longName = "no-" + name,
+        .aliases = aliases,
         .description = "Disable sandboxing.",
         .category = category,
-        .handler = {[=]() { override(smDisabled); }}
+        .handler = {[this]() { override(smDisabled); }}
     });
     args.addFlag({
         .longName = "relaxed-" + name,
+        .aliases = aliases,
         .description = "Enable sandboxing, but allow builds to disable it.",
         .category = category,
-        .handler = {[=]() { override(smRelaxed); }}
+        .handler = {[this]() { override(smRelaxed); }}
     });
 }
 
-void MaxBuildJobsSetting::set(const std::string & str, bool append)
+unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
 {
-    if (str == "auto") value = std::max(1U, std::thread::hardware_concurrency());
+    if (str == "auto") return std::max(1U, std::thread::hardware_concurrency());
     else {
         if (auto n = string2Int<decltype(value)>(str))
-            value = *n;
+            return *n;
         else
             throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
     }
 }
 
 
-void PluginFilesSetting::set(const std::string & str, bool append)
+static void preloadNSS()
 {
-    if (pluginsLoaded)
-        throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
-    BaseSetting<Paths>::set(str, append);
+    /* builtin:fetchurl can trigger a DNS lookup, which with glibc can trigger a dynamic library load of
+       one of the glibc NSS libraries in a sandboxed child, which will fail unless the library's already
+       been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
+       load its lookup libraries in the parent before any child gets a chance to. */
+    static std::once_flag dns_resolve_flag;
+
+    std::call_once(dns_resolve_flag, []() {
+#ifdef __GLIBC__
+        /* On linux, glibc will run every lookup through the nss layer.
+         * That means every lookup goes, by default, through nscd, which acts as a local
+         * cache.
+         * Because we run builds in a sandbox, we also remove access to nscd otherwise
+         * lookups would leak into the sandbox.
+         *
+         * But now we have a new problem, we need to make sure the nss_dns backend that
+         * does the dns lookups when nscd is not available is loaded or available.
+         *
+         * We can't make it available without leaking nix's environment, so instead we'll
+         * load the backend, and configure nss so it does not try to run dns lookups
+         * through nscd.
+         *
+         * This is technically only used for builtins:fetch* functions so we only care
+         * about dns.
+         *
+         * All other platforms are unaffected.
+         */
+        if (!dlopen(LIBNSS_DNS_SO, RTLD_NOW))
+            warn("unable to load nss_dns backend");
+        // FIXME: get hosts entry from nsswitch.conf.
+        __nss_configure_lookup("hosts", "files dns");
+#endif
+    });
 }
 
+static bool initLibStoreDone = false;
 
-void initPlugins()
-{
-    assert(!settings.pluginFiles.pluginsLoaded);
-    for (const auto & pluginFile : settings.pluginFiles.get()) {
-        Paths pluginFiles;
-        try {
-            auto ents = readDirectory(pluginFile);
-            for (const auto & ent : ents)
-                pluginFiles.emplace_back(pluginFile + "/" + ent.name);
-        } catch (SysError & e) {
-            if (e.errNo != ENOTDIR)
-                throw;
-            pluginFiles.emplace_back(pluginFile);
-        }
-        for (const auto & file : pluginFiles) {
-            /* handle is purposefully leaked as there may be state in the
-               DSO needed by the action of the plugin. */
-            void *handle =
-                dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
-            if (!handle)
-                throw Error("could not dynamically open plugin file '%s': %s", file, dlerror());
-        }
-    }
-
-    /* Since plugins can add settings, try to re-apply previously
-       unknown settings. */
-    globalConfig.reapplyUnknownSettings();
-    globalConfig.warnUnknownSettings();
-
-    /* Tell the user if they try to set plugin-files after we've already loaded */
-    settings.pluginFiles.pluginsLoaded = true;
+void assertLibStoreInitialized() {
+    if (!initLibStoreDone) {
+        printError("The program must call nix::initNix() before calling any libstore library functions.");
+        abort();
+    };
 }
+
+void initLibStore(bool loadConfig) {
+    if (initLibStoreDone) return;
+
+    initLibUtil();
+
+    if (loadConfig)
+        loadConfFile(globalConfig);
+
+    preloadNSS();
+
+    /* On macOS, don't use the per-session TMPDIR (as set e.g. by
+       sshd). This breaks build users because they don't have access
+       to the TMPDIR, in particular in ‘nix-store --serve’. */
+#if __APPLE__
+    if (hasPrefix(defaultTempDir(), "/var/folders/"))
+        unsetenv("TMPDIR");
+#endif
+
+    initLibStoreDone = true;
+}
+
 
 }

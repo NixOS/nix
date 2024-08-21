@@ -20,7 +20,7 @@ struct CmdDumpPath : StorePathCommand
 
     void run(ref<Store> store, const StorePath & storePath) override
     {
-        FdSink sink(STDOUT_FILENO);
+        FdSink sink(getStandardOut());
         store->narFromPath(storePath, sink);
         sink.flush();
     }
@@ -55,10 +55,18 @@ struct CmdDumpPath2 : Command
 
     void run() override
     {
-        FdSink sink(STDOUT_FILENO);
+        FdSink sink(getStandardOut());
         dumpPath(path, sink);
         sink.flush();
     }
 };
 
-static auto rDumpPath2 = registerCommand2<CmdDumpPath2>({"nar", "dump-path"});
+struct CmdNarDumpPath : CmdDumpPath2 {
+    void run() override {
+        warn("'nix nar dump-path' is a deprecated alias for 'nix nar pack'");
+        CmdDumpPath2::run();
+    }
+};
+
+static auto rCmdNarPack = registerCommand2<CmdDumpPath2>({"nar", "pack"});
+static auto rCmdNarDumpPath = registerCommand2<CmdNarDumpPath>({"nar", "dump-path"});

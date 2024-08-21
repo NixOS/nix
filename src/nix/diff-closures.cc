@@ -6,6 +6,8 @@
 
 #include <regex>
 
+#include "strings.hh"
+
 namespace nix {
 
 struct Info
@@ -23,15 +25,17 @@ GroupedPaths getClosureInfo(ref<Store> store, const StorePath & toplevel)
 
     GroupedPaths groupedPaths;
 
-    for (auto & path : closure) {
+    for (auto const & path : closure) {
         /* Strip the output name. Unfortunately this is ambiguous (we
            can't distinguish between output names like "bin" and
            version suffixes like "unstable"). */
         static std::regex regex("(.*)-([a-z]+|lib32|lib64)");
-        std::smatch match;
-        std::string name(path.name());
+        std::cmatch match;
+        std::string name{path.name()};
+        std::string_view const origName = path.name();
         std::string outputName;
-        if (std::regex_match(name, match, regex)) {
+
+        if (std::regex_match(origName.begin(), origName.end(), match, regex)) {
             name = match[1];
             outputName = match[2];
         }
@@ -97,7 +101,7 @@ void printClosureDiff(
                 items.push_back(fmt("%s → %s", showVersions(removed), showVersions(added)));
             if (showDelta)
                 items.push_back(fmt("%s%+.1f KiB" ANSI_NORMAL, sizeDelta > 0 ? ANSI_RED : ANSI_GREEN, sizeDelta / 1024.0));
-            std::cout << fmt("%s%s: %s\n", indent, name, concatStringsSep(", ", items));
+            logger->cout("%s%s: %s", indent, name, concatStringsSep(", ", items));
         }
     }
 }
@@ -106,7 +110,7 @@ void printClosureDiff(
 
 using namespace nix;
 
-struct CmdDiffClosures : SourceExprCommand
+struct CmdDiffClosures : SourceExprCommand, MixOperateOnOptions
 {
     std::string _before, _after;
 

@@ -122,7 +122,7 @@ bool ParsedDerivation::willBuildLocally(Store & localStore) const
 
 bool ParsedDerivation::substitutesAllowed() const
 {
-    return getBoolAttr("allowSubstitutes", true);
+    return settings.alwaysAllowSubstitutes ? true : getBoolAttr("allowSubstitutes", true);
 }
 
 bool ParsedDerivation::useUidRange() const
@@ -131,6 +131,60 @@ bool ParsedDerivation::useUidRange() const
 }
 
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
+
+/**
+ * Write a JSON representation of store object metadata, such as the
+ * hash and the references.
+ *
+ * @note Do *not* use `ValidPathInfo::toJSON` because this function is
+ * subject to stronger stability requirements since it is used to
+ * prepare build environments. Perhaps someday we'll have a versionining
+ * mechanism to allow this to evolve again and get back in sync, but for
+ * now we must not change - not even extend - the behavior.
+ */
+static nlohmann::json pathInfoToJSON(
+    Store & store,
+    const StorePathSet & storePaths)
+{
+    using nlohmann::json;
+
+    nlohmann::json::array_t jsonList = json::array();
+
+    for (auto & storePath : storePaths) {
+        auto info = store.queryPathInfo(storePath);
+
+        auto & jsonPath = jsonList.emplace_back(json::object());
+
+        jsonPath["narHash"] = info->narHash.to_string(HashFormat::Nix32, true);
+        jsonPath["narSize"] = info->narSize;
+
+        {
+            auto & jsonRefs = jsonPath["references"] = json::array();
+            for (auto & ref : info->references)
+                jsonRefs.emplace_back(store.printStorePath(ref));
+        }
+
+        if (info->ca)
+            jsonPath["ca"] = renderContentAddress(info->ca);
+
+        // Add the path to the object whose metadata we are including.
+        jsonPath["path"] = store.printStorePath(storePath);
+
+        jsonPath["valid"] = true;
+
+        jsonPath["closureSize"] = ({
+            uint64_t totalNarSize = 0;
+            StorePathSet closure;
+            store.computeFSClosure(info->path, closure, false, false);
+            for (auto & p : closure) {
+                auto info = store.queryPathInfo(p);
+                totalNarSize += info->narSize;
+            }
+            totalNarSize;
+        });
+    }
+    return jsonList;
+}
 
 std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths)
 {
@@ -151,9 +205,9 @@ std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & s
         for (auto i = e->begin(); i != e->end(); ++i) {
             StorePathSet storePaths;
             for (auto & p : *i)
-                storePaths.insert(store.parseStorePath(p.get<std::string>()));
-            json[i.key()] = store.pathInfoToJSON(
-                store.exportReferences(storePaths, inputPaths), false, true);
+                storePaths.insert(store.toStorePath(p.get<std::string>()).first);
+            json[i.key()] = pathInfoToJSON(store,
+                store.exportReferences(storePaths, inputPaths));
         }
     }
 

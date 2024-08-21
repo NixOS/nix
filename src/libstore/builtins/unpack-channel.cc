@@ -3,7 +3,9 @@
 
 namespace nix {
 
-void builtinUnpackChannel(const BasicDerivation & drv)
+void builtinUnpackChannel(
+    const BasicDerivation & drv,
+    const std::map<std::string, Path> & outputs)
 {
     auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);
@@ -11,7 +13,7 @@ void builtinUnpackChannel(const BasicDerivation & drv)
         return i->second;
     };
 
-    Path out = getAttr("out");
+    auto out = outputs.at("out");
     auto channelName = getAttr("channelName");
     auto src = getAttr("src");
 
@@ -19,10 +21,13 @@ void builtinUnpackChannel(const BasicDerivation & drv)
 
     unpackTarfile(src, out);
 
-    auto entries = readDirectory(out);
-    if (entries.size() != 1)
+    auto entries = std::filesystem::directory_iterator{out};
+    auto fileName = entries->path().string();
+    auto fileCount = std::distance(std::filesystem::begin(entries), std::filesystem::end(entries));
+
+    if (fileCount != 1)
         throw Error("channel tarball '%s' contains more than one file", src);
-    renameFile((out + "/" + entries[0].name), (out + "/" + channelName));
+    std::filesystem::rename(fileName, (out + "/" + channelName));
 }
 
 }

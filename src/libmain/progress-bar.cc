@@ -1,5 +1,5 @@
 #include "progress-bar.hh"
-#include "util.hh"
+#include "terminal.hh"
 #include "sync.hh"
 #include "store-api.hh"
 #include "names.hh"
@@ -7,6 +7,7 @@
 #include <atomic>
 #include <map>
 #include <thread>
+#include <sstream>
 #include <iostream>
 #include <chrono>
 
@@ -72,6 +73,7 @@ private:
         uint64_t corruptedPaths = 0, untrustedPaths = 0;
 
         bool active = true;
+        bool paused = false;
         bool haveUpdate = true;
     };
 
@@ -107,7 +109,8 @@ public:
         stop();
     }
 
-    void stop() override
+    /* Called by destructor, can't be overridden */
+    void stop() override final
     {
         {
             auto state(state_.lock());
@@ -120,16 +123,32 @@ public:
         updateThread.join();
     }
 
+    void pause() override {
+        auto state (state_.lock());
+        state->paused = true;
+        if (state->active)
+            writeToStderr("\r\e[K");
+    }
+
+    void resume() override {
+        auto state (state_.lock());
+        state->paused = false;
+        if (state->active)
+            writeToStderr("\r\e[K");
+        state->haveUpdate = true;
+        updateCV.notify_one();
+    }
+
     bool isVerbose() override
     {
         return printBuildLogs;
     }
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, std::string_view s) override
     {
         if (lvl > verbosity) return;
         auto state(state_.lock());
-        log(*state, lvl, fs.s);
+        log(*state, lvl, s);
     }
 
     void logEI(const ErrorInfo & ei) override
@@ -142,15 +161,13 @@ public:
         log(*state, ei.level, oss.str());
     }
 
-    void log(State & state, Verbosity lvl, const std::string & s)
+    void log(State & state, Verbosity lvl, std::string_view s)
     {
         if (state.active) {
             writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
             draw(state);
         } else {
-            auto s2 = s + ANSI_NORMAL "\n";
-            if (!isTTY) s2 = filterANSIEscapes(s2, true);
-            writeToStderr(s2);
+            writeToStderr(filterANSIEscapes(s, !isTTY) + "\n");
         }
     }
 
@@ -326,6 +343,14 @@ public:
             state->activitiesByType[type].expected += j;
             update(*state);
         }
+
+        else if (type == resFetchStatus) {
+            auto i = state->its.find(act);
+            assert(i != state->its.end());
+            ActInfo & actInfo = *i->second;
+            actInfo.lastLine = getS(fields, 0);
+            update(*state);
+        }
     }
 
     void update(State & state)
@@ -339,7 +364,7 @@ public:
         auto nextWakeup = std::chrono::milliseconds::max();
 
         state.haveUpdate = false;
-        if (!state.active) return nextWakeup;
+        if (state.paused || !state.active) return nextWakeup;
 
         std::string line;
 
@@ -497,7 +522,7 @@ public:
     std::optional<char> ask(std::string_view msg) override
     {
         auto state(state_.lock());
-        if (!state->active || !isatty(STDIN_FILENO)) return {};
+        if (!state->active) return {};
         std::cerr << fmt("\r\e[K%s ", msg);
         auto s = trim(readLine(STDIN_FILENO));
         if (s.size() != 1) return {};
@@ -513,7 +538,7 @@ public:
 
 Logger * makeProgressBar()
 {
-    return new ProgressBar(shouldANSI());
+    return new ProgressBar(isTTY());
 }
 
 void startProgressBar()

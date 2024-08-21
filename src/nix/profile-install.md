@@ -29,6 +29,6 @@ R""(
 
 # Description
 
-This command adds *installables* to a Nix profile.
+This command adds [*installables*](./nix.md#installables) to a Nix profile.
 
 )""

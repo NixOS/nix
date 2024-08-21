@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include <set>
 #include <future>
 #include "sync.hh"

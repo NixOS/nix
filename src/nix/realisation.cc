@@ -5,9 +5,9 @@
 
 using namespace nix;
 
-struct CmdRealisation : virtual NixMultiCommand
+struct CmdRealisation : NixMultiCommand
 {
-    CmdRealisation() : MultiCommand(RegisterCommand::getCommandsFor({"realisation"}))
+    CmdRealisation() : NixMultiCommand("realisation", RegisterCommand::getCommandsFor({"realisation"}))
     { }
 
     std::string description() override
@@ -16,14 +16,6 @@ struct CmdRealisation : virtual NixMultiCommand
     }
 
     Category category() override { return catUtility; }
-
-    void run() override
-    {
-        if (!command)
-            throw UsageError("'nix realisation' requires a sub-command.");
-        command->second->prepare();
-        command->second->run();
-    }
 };
 
 static auto rCmdRealisation = registerCommand<CmdRealisation>("realisation");
@@ -46,7 +38,7 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
 
     void run(ref<Store> store, BuiltPaths && paths) override
     {
-        settings.requireExperimentalFeature(Xp::CaDerivations);
+        experimentalFeatureSettings.require(Xp::CaDerivations);
         RealisedPath::Set realisations;
 
         for (auto & builtPath : paths) {
@@ -65,18 +57,16 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
 
                 res.push_back(currentPath);
             }
-            std::cout << res.dump();
+            logger->cout("%s", res);
         }
         else {
             for (auto & path : realisations) {
                 if (auto realisation = std::get_if<Realisation>(&path.raw)) {
-                    std::cout <<
-                        realisation->id.to_string() << " " <<
-                        store->printStorePath(realisation->outPath);
+                    logger->cout("%s %s",
+                        realisation->id.to_string(),
+                        store->printStorePath(realisation->outPath));
                 } else
-                    std::cout << store->printStorePath(path.path());
-
-                std::cout << std::endl;
+                    logger->cout("%s", store->printStorePath(path.path()));
             }
         }
     }
