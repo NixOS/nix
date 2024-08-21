@@ -7,6 +7,9 @@
 #include "nix/util/file-path.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/ansicolor.hh"
+#include "nix/util/os-string.hh"
+
+#include <filesystem>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -105,17 +108,17 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
  * shell backtick operator).
  */
 std::string runProgram(
-    Path program,
+    std::filesystem::path program,
     bool lookupPath = false,
-    const Strings & args = Strings(),
+    const OsStrings & args = OsStrings(),
     const std::optional<std::string> & input = {},
     bool isInteractive = false);
 
 struct RunOptions
 {
-    Path program;
+    std::filesystem::path program;
     bool lookupPath = true;
-    Strings args;
+    OsStrings args;
 #ifndef _WIN32
     std::optional<uid_t> uid;
     std::optional<uid_t> gid;

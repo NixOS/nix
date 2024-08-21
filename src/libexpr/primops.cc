@@ -11,6 +11,7 @@
 #include "nix/store/path-references.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/util.hh"
+#include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
 #include "nix/expr/value-to-json.hh"
 #include "nix/expr/value-to-xml.hh"
@@ -508,7 +509,7 @@ void prim_exec(EvalState & state, const PosIdx pos, Value ** args, Value & v)
             .debugThrow();
     }
 
-    auto output = runProgram(program, true, commandArgs);
+    auto output = runProgram(program, true, toOsStrings(std::move(commandArgs)));
     Expr * parsed;
     try {
         parsed = state.parseExprFromString(std::move(output), state.rootPath(CanonPath::root));

@@ -407,7 +407,7 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
 struct MixOutLinkBase : virtual Args
 {
     /** Prefix for any output symlinks. Empty means do not write an output symlink. */
-    Path outLink;
+    std::filesystem::path outLink;
 
     MixOutLinkBase(const std::string & defaultOutLink)
         : outLink(defaultOutLink)
@@ -435,7 +435,7 @@ struct MixOutLinkByDefault : MixOutLinkBase, virtual Args
         addFlag({
             .longName = "no-link",
             .description = "Do not create symlinks to the build results.",
-            .handler = {&outLink, Path("")},
+            .handler = {&outLink, std::filesystem::path{}},
         });
     }
 };

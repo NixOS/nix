@@ -6,6 +6,7 @@
 #include "nix/cmd/legacy.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/expr/eval-settings.hh" // for defexpr
+#include "nix/util/os-string.hh"
 #include "nix/util/users.hh"
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/fetch-settings.hh"
@@ -69,7 +70,7 @@ static void addChannel(const std::string & url, const std::string & name)
     writeChannels();
 }
 
-static Path profile;
+static std::filesystem::path profile;
 
 // Remove a channel.
 static void removeChannel(const std::string & name)
@@ -78,10 +79,18 @@ static void removeChannel(const std::string & name)
     channels.erase(name);
     writeChannels();
 
-    runProgram(getNixBin("nix-env").string(), true, {"--profile", profile, "--uninstall", name});
+    runProgram(
+        getNixBin("nix-env"),
+        true,
+        {
+            OS_STR("--profile"),
+            profile.native(),
+            OS_STR("--uninstall"),
+            string_to_os_string(name),
+        });
 }
 
-static Path nixDefExpr;
+static std::filesystem::path nixDefExpr;
 
 // Fetch Nix expressions and binary cache URLs from the subscribed channels.
 static void update(const StringSet & channelNames)
@@ -117,12 +126,12 @@ static void update(const StringSet & channelNames)
 
         if (!(channelNames.empty() || channelNames.count(name))) {
             // no need to update this channel, reuse the existing store path
-            Path symlink = profile + "/" + name;
-            Path storepath = dirOf(readLink(symlink));
+            std::filesystem::path symlink = profile / name;
+            std::filesystem::path storepath = readLink(symlink).parent_path();
             exprs.push_back(
                 "f: rec { name = \"" + cname
                 + "\"; type = \"derivation\"; outputs = [\"out\"]; system = \"builtin\"; outPath = builtins.storePath \""
-                + storepath + "\"; out = { inherit outPath; };}");
+                + storepath.string() + "\"; out = { inherit outPath; };}");
         } else {
             // We want to download the url to a file to see if it's a tarball while also checking if we
             // got redirected in the process, so that we can grab the various parts of a nix channel
@@ -133,12 +142,15 @@ static void update(const StringSet & channelNames)
             bool unpacked = false;
             if (std::regex_search(std::string{result.storePath.to_string()}, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
                 runProgram(
-                    getNixBin("nix-build").string(),
+                    getNixBin("nix-build"),
                     false,
-                    {"--no-out-link",
-                     "--expr",
-                     "import " + unpackChannelPath + "{ name = \"" + cname + "\"; channelName = \"" + name
-                         + "\"; src = builtins.storePath \"" + store->printStorePath(result.storePath) + "\"; }"});
+                    {
+                        OS_STR("--no-out-link"),
+                        OS_STR("--expr"),
+                        string_to_os_string(
+                            "import " + unpackChannelPath + "{ name = \"" + cname + "\"; channelName = \"" + name
+                            + "\"; src = builtins.storePath \"" + store->printStorePath(result.storePath) + "\"; }"),
+                    });
                 unpacked = true;
             }
 
@@ -161,12 +173,18 @@ static void update(const StringSet & channelNames)
     // Unpack the channel tarballs into the Nix store and install them
     // into the channels profile.
     std::cerr << "unpacking " << exprs.size() << " channels...\n";
-    Strings envArgs{
-        "--profile", profile, "--file", unpackChannelPath, "--install", "--remove-all", "--from-expression"};
+    OsStrings envArgs{
+        OS_STR("--profile"),
+        profile.native(),
+        OS_STR("--file"),
+        string_to_os_string(unpackChannelPath),
+        OS_STR("--install"),
+        OS_STR("--remove-all"),
+        OS_STR("--from-expression")};
     for (auto & expr : exprs)
-        envArgs.push_back(std::move(expr));
-    envArgs.push_back("--quiet");
-    runProgram(getNixBin("nix-env").string(), false, envArgs);
+        envArgs.push_back(string_to_os_string(std::move(expr)));
+    envArgs.push_back(OS_STR("--quiet"));
+    runProgram(getNixBin("nix-env"), false, envArgs);
 
     // Make the channels appear in nix-env.
     PosixStat st;
@@ -174,12 +192,12 @@ static void update(const StringSet & channelNames)
         if (S_ISLNK(st.st_mode))
             // old-skool ~/.nix-defexpr
             if (unlink(nixDefExpr.c_str()) == -1)
-                throw SysError("unlinking %1%", nixDefExpr);
+                throw SysError("unlinking %1%", PathFmt(nixDefExpr));
     } else if (errno != ENOENT) {
-        throw SysError("getting status of %1%", nixDefExpr);
+        throw SysError("getting status of %1%", PathFmt(nixDefExpr));
     }
     createDirs(nixDefExpr);
-    auto channelLink = nixDefExpr + "/channels";
+    auto channelLink = nixDefExpr / "channels";
     replaceSymlink(profile, channelLink);
 }
 
@@ -193,8 +211,8 @@ static int main_nix_channel(int argc, char ** argv)
         nixDefExpr = getNixDefExpr();
 
         // Figure out the name of the channels profile.
-        profile = (profilesDir(settings.getProfileDirsOptions()) / "channels").string();
-        createDirs(dirOf(profile));
+        profile = profilesDir(settings.getProfileDirsOptions()) / "channels";
+        createDirs(profile.parent_path());
 
         enum { cNone, cAdd, cRemove, cList, cUpdate, cListGenerations, cRollback } cmd = cNone;
 
@@ -261,20 +279,26 @@ static int main_nix_channel(int argc, char ** argv)
         case cListGenerations:
             if (!args.empty())
                 throw UsageError("'--list-generations' expects no arguments");
-            std::cout << runProgram(getNixBin("nix-env").string(), false, {"--profile", profile, "--list-generations"})
-                      << std::flush;
+            std::cout << runProgram(
+                getNixBin("nix-env"),
+                false,
+                {
+                    OS_STR("--profile"),
+                    profile.native(),
+                    OS_STR("--list-generations"),
+                }) << std::flush;
             break;
         case cRollback:
             if (args.size() > 1)
                 throw UsageError("'--rollback' has at most one argument");
-            Strings envArgs{"--profile", profile};
+            OsStrings envArgs{OS_STR("--profile"), profile.native()};
             if (args.size() == 1) {
-                envArgs.push_back("--switch-generation");
-                envArgs.push_back(args[0]);
+                envArgs.push_back(OS_STR("--switch-generation"));
+                envArgs.push_back(string_to_os_string(args[0]));
             } else {
-                envArgs.push_back("--rollback");
+                envArgs.push_back(OS_STR("--rollback"));
             }
-            runProgram(getNixBin("nix-env").string(), false, envArgs);
+            runProgram(getNixBin("nix-env"), false, envArgs);
             break;
         }
 

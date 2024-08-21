@@ -4,6 +4,7 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/base-n.hh"
 #include "nix/util/finally.hh"
+#include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/users.hh"
@@ -637,12 +638,24 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         //       then use code that was removed in this commit (see blame)
 
         auto dir = this->path;
-        Strings gitArgs{"-C", dir.string(), "--git-dir", ".", "fetch", "--progress", "--force"};
-        if (shallow)
-            append(gitArgs, {"--depth", "1"});
-        append(gitArgs, {std::string("--"), url, refspec});
+        OsStrings gitArgs = {
+            OS_STR("-C"),
+            dir.native(),
+            OS_STR("--git-dir"),
+            OS_STR("."),
+            OS_STR("fetch"),
+            OS_STR("--progress"),
+            OS_STR("--force"),
+        };
+        if (shallow) {
+            gitArgs.push_back(OS_STR("--depth"));
+            gitArgs.push_back(OS_STR("1"));
+        }
+        gitArgs.push_back(OS_STR("--"));
+        gitArgs.push_back(string_to_os_string(url));
+        gitArgs.push_back(string_to_os_string(refspec));
 
-        auto status = runProgram(RunOptions{.program = "git", .args = gitArgs, .isInteractive = true}).first;
+        auto status = runProgram({.program = "git", .args = gitArgs, .isInteractive = true}).first;
 
         if (status > 0)
             throw Error("Failed to fetch git repository '%s'", url);
@@ -682,18 +695,18 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         writeFile(allowedSignersFile, allowedSigners);
 
         // Run verification command
-        auto [status, output] = runProgram(
-            RunOptions{
-                .program = "git",
-                .args =
-                    {"-c",
-                     "gpg.ssh.allowedSignersFile=" + allowedSignersFile,
-                     "-C",
-                     path.string(),
-                     "verify-commit",
-                     rev.gitRev()},
-                .mergeStderrToStdout = true,
-            });
+        auto [status, output] = runProgram({
+            .program = "git",
+            .args{
+                OS_STR("-c"),
+                string_to_os_string("gpg.ssh.allowedSignersFile=" + allowedSignersFile),
+                OS_STR("-C"),
+                path.native(),
+                OS_STR("verify-commit"),
+                string_to_os_string(rev.gitRev()),
+            },
+            .mergeStderrToStdout = true,
+        });
 
         /* Evaluate result through status code and checking if public
            key fingerprints appear on stderr. This is necessary

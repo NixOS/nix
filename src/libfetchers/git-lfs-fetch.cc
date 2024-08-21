@@ -1,9 +1,11 @@
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/url.hh"
 #include "nix/util/users.hh"
+#include "nix/util/util.hh"
 #include "nix/util/hash.hh"
 #include "nix/store/ssh.hh"
 
@@ -73,10 +75,12 @@ static LfsApiInfo getLfsApi(const ParsedURL & url)
         args.push_back(url.renderPath(/*encode=*/false));
         args.push_back("download");
 
-        auto [status, output] = runProgram({.program = "ssh", .args = args});
+        auto [status, output] = runProgram({.program = "ssh", .args = toOsStrings(args)});
 
         if (output.empty())
-            throw Error("git-lfs-authenticate: no output (cmd: 'ssh %s')", concatStringsSep(" ", args));
+            throw Error(
+                "git-lfs-authenticate: no output (cmd: 'ssh %s')",
+                concatMapStringsSep(" ", args, escapeShellArgAlways));
 
         auto queryResp = nlohmann::json::parse(output);
         auto headerIt = queryResp.find("header");

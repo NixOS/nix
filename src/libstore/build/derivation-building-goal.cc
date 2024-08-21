@@ -1061,7 +1061,7 @@ static void runPostBuildHook(
     LogSink sink(act);
 
     runProgram2({
-        .program = workerSettings.postBuildHook,
+        .program = workerSettings.postBuildHook.get(),
         .environment = hookEnvironment,
         .standardOut = &sink,
         .mergeStderrToStdout = true,

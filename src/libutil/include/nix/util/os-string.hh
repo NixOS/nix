@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <list>
 #include <map>
 #include <optional>
 #include <string>
@@ -42,9 +43,57 @@ using OsStringView = std::basic_string_view<OsChar>;
  */
 using OsStringMap = std::map<OsString, OsString, std::less<>>;
 
-std::string os_string_to_string(OsStringView path);
+/**
+ * `nix::Strings` counterpart for `OsString`
+ */
+using OsStrings = std::list<OsString>;
+
+std::string os_string_to_string(OsStringView s);
+std::string os_string_to_string(OsString s);
 
 OsString string_to_os_string(std::string_view s);
+OsString string_to_os_string(std::string s);
+
+#ifndef _WIN32
+
+inline std::string os_string_to_string(OsStringView s)
+{
+    return std::string(s);
+}
+
+inline std::string os_string_to_string(OsString s)
+{
+    return s;
+}
+
+inline OsString string_to_os_string(std::string_view s)
+{
+    return std::string(s);
+}
+
+inline OsString string_to_os_string(std::string s)
+{
+    return s;
+}
+
+#endif
+
+/**
+ * Convert a list of `std::string` to `OsStrings`.
+ * Takes ownership to enable moves on Unix.
+ */
+inline OsStrings toOsStrings(std::list<std::string> ss)
+{
+#ifndef _WIN32
+    // On Unix, OsStrings is std::list<std::string>, so just move
+    return ss;
+#else
+    OsStrings result;
+    for (auto & s : ss)
+        result.push_back(string_to_os_string(std::move(s)));
+    return result;
+#endif
+}
 
 /**
  * Create string literals with the native character width of paths

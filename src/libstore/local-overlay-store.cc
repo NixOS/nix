@@ -2,6 +2,7 @@
 
 #include "nix/store/local-overlay-store.hh"
 #include "nix/util/callback.hh"
+#include "nix/util/os-string.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/url.hh"
@@ -283,7 +284,7 @@ void LocalOverlayStore::remountIfNecessary()
     if (config->remountHook.get().empty()) {
         warn("'%s' needs remounting, set remount-hook to do this automatically", config->realStoreDir.get());
     } else {
-        runProgram(config->remountHook, false, {config->realStoreDir});
+        runProgram(config->remountHook, false, {string_to_os_string(config->realStoreDir.get())});
     }
 
     _remountRequired = false;

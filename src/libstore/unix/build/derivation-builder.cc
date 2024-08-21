@@ -925,7 +925,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
         enum BuildHookState { stBegin, stExtraChrootDirs };
 
         auto state = stBegin;
-        auto lines = runProgram(localSettings.preBuildHook, false, getPreBuildHookArgs());
+        auto lines = runProgram(localSettings.preBuildHook.get(), false, getPreBuildHookArgs());
         auto lastPos = std::string::size_type{0};
         for (auto nlPos = lines.find('\n'); nlPos != std::string::npos; nlPos = lines.find('\n', lastPos)) {
             auto line = lines.substr(lastPos, nlPos - lastPos);

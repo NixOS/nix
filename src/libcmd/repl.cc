@@ -28,6 +28,8 @@
 #include "nix/util/ref.hh"
 #include "nix/expr/value.hh"
 
+#include "nix/util/os-string.hh"
+#include "nix/util/processes.hh"
 #include "nix/util/strings.hh"
 
 namespace nix {
@@ -71,7 +73,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
 
     RunNix * runNixPtr;
 
-    void runNix(const std::string & program, const Strings & args, const std::optional<std::string> & input = {});
+    void runNix(const std::string & program, OsStrings args, const std::optional<std::string> & input = {});
 
     std::unique_ptr<ReplInteracter> interacter;
 
@@ -508,7 +510,12 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
         // runProgram redirects stdout to a StringSink,
         // using runProgram2 to allow editors to display their UI
-        runProgram2(RunOptions{.program = editor, .lookupPath = true, .args = args, .isInteractive = true});
+        runProgram2({
+            .program = editor,
+            .lookupPath = true,
+            .args = toOsStrings(std::move(args)),
+            .isInteractive = true,
+        });
 
         // Reload right after exiting the editor
         state->resetFileCache();
@@ -528,7 +535,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         state->callFunction(f, v, result, PosIdx());
 
         StorePath drvPath = getDerivationPath(result);
-        runNix("nix-shell", {state->store->printStorePath(drvPath)});
+        runNix("nix-shell", toOsStrings({state->store->printStorePath(drvPath)}));
     }
 
     else if (command == ":b" || command == ":bl" || command == ":i" || command == ":sh" || command == ":log") {
@@ -559,7 +566,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 }
             }
         } else if (command == ":i") {
-            runNix("nix-env", {"-i", drvPathRaw});
+            runNix("nix-env", toOsStrings({"-i", drvPathRaw}));
         } else if (command == ":log") {
             settings.readOnlyMode = true;
             Finally roModeReset([&]() { settings.readOnlyMode = false; });
@@ -567,7 +574,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
             auto log = fetchBuildLog(state->store, drvPath, drvPathRaw);
             logger->writeToStdout(log);
         } else {
-            runNix("nix-shell", {drvPathRaw});
+            runNix("nix-shell", toOsStrings({drvPathRaw}));
         }
     }
 
@@ -872,10 +879,10 @@ void NixRepl::evalString(std::string s, Value & v)
     state->forceValue(v, v.determinePos(noPos));
 }
 
-void NixRepl::runNix(const std::string & program, const Strings & args, const std::optional<std::string> & input)
+void NixRepl::runNix(const std::string & program, OsStrings args, const std::optional<std::string> & input)
 {
     if (runNixPtr)
-        (*runNixPtr)(program, args, input);
+        (*runNixPtr)(program, std::move(args), input);
     else
         throw Error(
             "Cannot run '%s' because no method of calling the Nix CLI was provided. This is a configuration problem pertaining to how this program was built. See Nix 2.25 release notes",

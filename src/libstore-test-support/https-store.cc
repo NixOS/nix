@@ -1,4 +1,5 @@
 #include "nix/store/tests/https-store.hh"
+#include "nix/util/os-string.hh"
 
 #include <thread>
 
@@ -21,7 +22,7 @@ ref<TestHttpBinaryCacheStore> TestHttpBinaryCacheStoreConfig::openTestStore(ref<
 
 void HttpsBinaryCacheStoreTest::openssl(Strings args)
 {
-    runProgram("openssl", /*lookupPath=*/true, args);
+    runProgram("openssl", /*lookupPath=*/true, toOsStrings(std::move(args)));
 }
 
 void HttpsBinaryCacheStoreTest::SetUp()

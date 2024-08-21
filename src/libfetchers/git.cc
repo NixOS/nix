@@ -7,6 +7,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/url-parts.hh"
 #include "nix/store/pathlocks.hh"
+#include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/git.hh"
 #include "nix/fetchers/git-utils.hh"
@@ -62,7 +63,7 @@ std::optional<std::string> readHead(const std::filesystem::path & path)
         RunOptions{
             .program = "git",
             // FIXME: use 'HEAD' to avoid returning all refs
-            .args = {"ls-remote", "--symref", path.string()},
+            .args = {OS_STR("ls-remote"), OS_STR("--symref"), path.native()},
             .isInteractive = true,
         });
     if (status != 0)
@@ -89,7 +90,19 @@ bool storeCachedHead(const std::string & actualUrl, bool shallow, const std::str
 {
     std::filesystem::path cacheDir = getCachePath(actualUrl, shallow);
     try {
-        runProgram("git", true, {"-C", cacheDir.string(), "--git-dir", ".", "symbolic-ref", "--", "HEAD", headRef});
+        runProgram(
+            "git",
+            true,
+            {
+                OS_STR("-C"),
+                cacheDir.native(),
+                OS_STR("--git-dir"),
+                OS_STR("."),
+                OS_STR("symbolic-ref"),
+                OS_STR("--"),
+                OS_STR("HEAD"),
+                string_to_os_string(headRef),
+            });
     } catch (ExecError & e) {
         if (
 #ifndef WIN32 // TODO abstract over exit status handling on Windows
@@ -439,19 +452,19 @@ struct GitInputScheme : InputScheme
     {
         auto repoInfo = getRepoInfo(input);
 
-        Strings args = {"clone"};
+        OsStrings args = {OS_STR("clone")};
 
-        args.push_back(repoInfo.locationToArg());
+        args.push_back(string_to_os_string(repoInfo.locationToArg()));
 
         if (auto ref = input.getRef()) {
-            args.push_back("--branch");
-            args.push_back(*ref);
+            args.push_back(OS_STR("--branch"));
+            args.push_back(string_to_os_string(*ref));
         }
 
         if (input.getRev())
             throw UnimplementedError("cloning a specific revision is not implemented");
 
-        args.push_back(destDir.string());
+        args.push_back(destDir.native());
 
         runProgram("git", true, args, {}, true);
     }
@@ -478,14 +491,15 @@ struct GitInputScheme : InputScheme
         auto result = runProgram(
             RunOptions{
                 .program = "git",
-                .args =
-                    {"-C",
-                     repoPath->string(),
-                     "--git-dir",
-                     repoInfo.gitDir,
-                     "check-ignore",
-                     "--quiet",
-                     std::string(path.rel())},
+                .args{
+                    OS_STR("-C"),
+                    repoPath->native(),
+                    OS_STR("--git-dir"),
+                    string_to_os_string(repoInfo.gitDir),
+                    OS_STR("check-ignore"),
+                    OS_STR("--quiet"),
+                    string_to_os_string(std::string(path.rel())),
+                },
             });
         auto exitCode =
 #ifndef WIN32 // TODO abstract over exit status handling on Windows
@@ -500,14 +514,16 @@ struct GitInputScheme : InputScheme
             runProgram(
                 "git",
                 true,
-                {"-C",
-                 repoPath->string(),
-                 "--git-dir",
-                 repoInfo.gitDir,
-                 "add",
-                 "--intent-to-add",
-                 "--",
-                 std::string(path.rel())});
+                {
+                    OS_STR("-C"),
+                    repoPath->native(),
+                    OS_STR("--git-dir"),
+                    string_to_os_string(repoInfo.gitDir),
+                    OS_STR("add"),
+                    OS_STR("--intent-to-add"),
+                    OS_STR("--"),
+                    string_to_os_string(std::string(path.rel())),
+                });
 
             if (commitMsg) {
                 // Pause the logger to allow for user input (such as a gpg passphrase) in `git commit`
@@ -515,14 +531,16 @@ struct GitInputScheme : InputScheme
                 runProgram(
                     "git",
                     true,
-                    {"-C",
-                     repoPath->string(),
-                     "--git-dir",
-                     repoInfo.gitDir,
-                     "commit",
-                     std::string(path.rel()),
-                     "-F",
-                     "-"},
+                    {
+                        OS_STR("-C"),
+                        repoPath->native(),
+                        OS_STR("--git-dir"),
+                        string_to_os_string(repoInfo.gitDir),
+                        OS_STR("commit"),
+                        string_to_os_string(std::string(path.rel())),
+                        OS_STR("-F"),
+                        OS_STR("-"),
+                    },
                     *commitMsg);
             }
         }
