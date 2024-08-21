@@ -117,8 +117,6 @@ struct CmdBundle : InstallableValueCommand
             },
         });
 
-        auto outPathS = store->printStorePath(outPath);
-
         if (!outLink) {
             auto * attr = vRes->attrs()->get(evalState->sName);
             if (!attr)

@@ -8,6 +8,7 @@
 #include "value/context.hh"
 #include "source-path.hh"
 #include "print-options.hh"
+#include "checked-arithmetic.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
@@ -73,8 +74,8 @@ class EvalState;
 class XMLWriter;
 class Printer;
 
-typedef int64_t NixInt;
-typedef double NixFloat;
+using NixInt = checked::Checked<int64_t>;
+using NixFloat = double;
 
 /**
  * External values must descend from ExternalValueBase, so that
@@ -304,6 +305,11 @@ public:
         return internalType != tUninitialized;
     }
 
+    inline void mkInt(NixInt::Inner n)
+    {
+        mkInt(NixInt{n});
+    }
+
     inline void mkInt(NixInt n)
     {
         finishValue(tInt, { .integer = n });
@@ -325,9 +331,9 @@ public:
 
     void mkStringMove(const char * s, const NixStringContext & context);
 
-    inline void mkString(const Symbol & s)
+    inline void mkString(const SymbolStr & s)
     {
-        mkString(((const std::string &) s).c_str());
+        mkString(s.c_str());
     }
 
     void mkPath(const SourcePath & path);

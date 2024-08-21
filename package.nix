@@ -47,7 +47,8 @@
 
 , pname ? "nix"
 
-, versionSuffix ? ""
+, version
+, versionSuffix
 
 # Whether to build Nix. Useful to skip for tasks like testing existing pre-built versions of Nix
 , doBuild ? true
@@ -111,8 +112,6 @@
 
 let
   inherit (lib) fileset;
-
-  version = lib.fileContents ./.version + versionSuffix;
 
   # selected attributes with defaults, will be used to define some
   # things which should instead be gotten via `finalAttrs` in order to

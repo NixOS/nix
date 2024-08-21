@@ -29,6 +29,7 @@
     - [String context](language/string-context.md)
   - [Syntax and semantics](language/syntax.md)
     - [Variables](language/variables.md)
+    - [String literals](language/string-literals.md)
     - [Identifiers](language/identifiers.md)
     - [Scoping rules](language/scope.md)
     - [String interpolation](language/string-interpolation.md)

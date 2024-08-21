@@ -1,5 +1,6 @@
 #include "util.hh"
 #include "fmt.hh"
+#include "file-path.hh"
 
 #include <array>
 #include <cctype>
@@ -51,24 +52,6 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 
 
 //////////////////////////////////////////////////////////////////////
-
-
-template<class C> C tokenizeString(std::string_view s, std::string_view separators)
-{
-    C result;
-    auto pos = s.find_first_not_of(separators, 0);
-    while (pos != s.npos) {
-        auto end = s.find_first_of(separators, pos + 1);
-        if (end == s.npos) end = s.size();
-        result.insert(result.end(), std::string(s, pos, end - pos));
-        pos = s.find_first_not_of(separators, end);
-    }
-    return result;
-}
-
-template Strings tokenizeString(std::string_view s, std::string_view separators);
-template StringSet tokenizeString(std::string_view s, std::string_view separators);
-template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
 
 
 std::string chomp(std::string_view s)

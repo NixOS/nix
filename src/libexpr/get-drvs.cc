@@ -246,8 +246,8 @@ NixInt PackageInfo::queryMetaInt(const std::string & name, NixInt def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            integer meta fields. */
-        if (auto n = string2Int<NixInt>(v->c_str()))
-            return *n;
+        if (auto n = string2Int<NixInt::Inner>(v->c_str()))
+            return NixInt{*n};
     }
     return def;
 }
