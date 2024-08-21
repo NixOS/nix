@@ -12,7 +12,7 @@ using namespace nix;
 struct CmdBundle : InstallableValueCommand
 {
     std::string bundler = "github:NixOS/bundlers";
-    std::optional<Path> outLink;
+    std::optional<std::filesystem::path> outLink;
 
     CmdBundle()
     {
@@ -126,7 +126,7 @@ struct CmdBundle : InstallableValueCommand
         }
 
         // TODO: will crash if not a localFSStore?
-        store.dynamic_pointer_cast<LocalFSStore>()->addPermRoot(outPath, absPath(*outLink));
+        store.dynamic_pointer_cast<LocalFSStore>()->addPermRoot(outPath, absPath(*outLink).string());
     }
 };
 

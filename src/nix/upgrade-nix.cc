@@ -151,13 +151,16 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         auto profileDir = where.parent_path();
 
         // Resolve profile to /nix/var/nix/profiles/<name> link.
-        while (canonPath(profileDir.string()).find("/profiles/") == std::string::npos
-               && std::filesystem::is_symlink(profileDir))
-            profileDir = readLink(profileDir.string());
+        while ([&] {
+            auto normalized = profileDir.lexically_normal();
+            return std::find(normalized.begin(), normalized.end(), "profiles") == normalized.end()
+                   && std::filesystem::is_symlink(profileDir);
+        }())
+            profileDir = std::filesystem::read_symlink(profileDir);
 
         printInfo("found profile %s", PathFmt(profileDir));
 
-        Path userEnv = canonPath(profileDir.string(), true);
+        auto userEnv = canonPath(profileDir);
 
         if (std::filesystem::exists(profileDir / "manifest.json"))
             throw Error(
@@ -167,8 +170,8 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         if (!std::filesystem::exists(profileDir / "manifest.nix"))
             throw Error("directory %s does not appear to be part of a Nix profile", PathFmt(profileDir));
 
-        if (!store->isValidPath(store->parseStorePath(userEnv)))
-            throw Error("directory '%s' is not in the Nix store", userEnv);
+        if (!store->isValidPath(store->parseStorePath(userEnv.string())))
+            throw Error("directory %s is not in the Nix store", PathFmt(userEnv));
 
         return profileDir;
     }
