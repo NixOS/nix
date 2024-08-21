@@ -165,15 +165,20 @@ bool FdSource::hasData()
     if (BufferedSource::hasData()) return true;
 
     while (true) {
-        struct pollfd fds[1];
-        fds[0].fd = fd;
-        fds[0].events = POLLIN;
-        auto n = poll(fds, 1, 0);
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(fd, &fds);
+
+        struct timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 0;
+
+        auto n = select(fd + 1, &fds, nullptr, nullptr, &timeout);
         if (n < 0) {
             if (errno == EINTR) continue;
             throw SysError("polling file descriptor");
         }
-        return n == 1 && (fds[0].events & POLLIN);
+        return FD_ISSET(fd, &fds);
     }
 }
 
