@@ -166,3 +166,6 @@ result-*
 
 # Mac OS
 .DS_Store
+
+# direnv
+.direnv
