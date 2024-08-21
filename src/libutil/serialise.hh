@@ -533,7 +533,7 @@ struct FramedSource : Source
  * Write as chunks in the format expected by FramedSource.
  *
  * The `checkError` function can be used to terminate the stream when you
- * detect that an error has occurred.
+ * detect that an error has occurred. It does so by throwing an exception.
  */
 struct FramedSink : nix::BufferedSink
 {
