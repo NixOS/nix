@@ -410,6 +410,7 @@ public:
         "Whether SQLite should use WAL mode."};
 
 #ifndef _WIN32
+    // FIXME: remove this option, `fsync-store-paths` is faster.
     Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
         "Whether to call `sync()` before registering a path as valid."};
 #endif
