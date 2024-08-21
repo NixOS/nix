@@ -373,8 +373,6 @@ private:
 
     void updatePathInfo(State & state, const ValidPathInfo & info);
 
-    void upgradeStore6();
-    void upgradeStore7();
     PathSet queryValidPathsOld();
     ValidPathInfo queryPathInfoOld(const Path & path);
 
