@@ -1,7 +1,7 @@
 # Nix
 
 [![Open Collective supporters](https://opencollective.com/nixos/tiers/supporter/badge.svg?label=Supporters&color=brightgreen)](https://opencollective.com/nixos)
-[![Test](https://github.com/NixOS/nix/workflows/Test/badge.svg)](https://github.com/NixOS/nix/actions)
+[![CI](https://github.com/NixOS/nix/workflows/CI/badge.svg)](https://github.com/NixOS/nix/actions/workflows/ci.yml)
 
 Nix is a powerful package manager for Linux and other Unix systems that makes package
 management reliable and reproducible. Please refer to the [Nix manual](https://nix.dev/reference/nix-manual)
