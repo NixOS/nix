@@ -339,7 +339,7 @@ void recursiveSync(const Path & path)
     while (!dirsToEnumerate.empty()) {
         auto currentDir = dirsToEnumerate.back();
         dirsToEnumerate.pop_back();
-        for (auto & entry : std::filesystem::directory_iterator(path)) {
+        for (auto & entry : std::filesystem::directory_iterator(currentDir)) {
             auto st = entry.symlink_status();
             if (fs::is_directory(st)) {
                 dirsToEnumerate.emplace_back(entry.path());
