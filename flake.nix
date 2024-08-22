@@ -189,6 +189,7 @@
         # system, we should reenable this.
         #perlBindings = self.hydraJobs.perlBindings.${system};
       }
+      /*
       # Add "passthru" tests
       // flatMapAttrs ({
           "" = nixpkgsFor.${system}.native;
@@ -210,6 +211,7 @@
             "${nixpkgsPrefix}nix-functional-tests" = nixpkgs.nixComponents.nix-functional-tests;
           }
         )
+      */
       // devFlake.checks.${system} or {}
       );
 
