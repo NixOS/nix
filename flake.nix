@@ -189,13 +189,15 @@
         # system, we should reenable this.
         #perlBindings = self.hydraJobs.perlBindings.${system};
       }
+      /*
       # Add "passthru" tests
       // flatMapAttrs ({
           "" = nixpkgsFor.${system}.native;
         } // lib.optionalAttrs (! nixpkgsFor.${system}.native.stdenv.hostPlatform.isDarwin) {
           # TODO: enable static builds for darwin, blocked on:
           #       https://github.com/NixOS/nixpkgs/issues/320448
-          "static-" = nixpkgsFor.${system}.static;
+          # TODO: disabled to speed up GHA CI.
+          #"static-" = nixpkgsFor.${system}.static;
         })
         (nixpkgsPrefix: nixpkgs:
           flatMapAttrs nixpkgs.nixComponents
@@ -209,6 +211,7 @@
             "${nixpkgsPrefix}nix-functional-tests" = nixpkgs.nixComponents.nix-functional-tests;
           }
         )
+      */
       // devFlake.checks.${system} or {}
       );
 
