@@ -134,9 +134,14 @@ void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, bool s
 void writeFile(const Path & path, Source & source, mode_t mode = 0666, bool sync = false);
 
 /**
- * Flush a file's parent directory to disk
+ * Flush a path's parent directory to disk.
  */
 void syncParent(const Path & path);
+
+/**
+ * Flush a file or entire directory tree to disk.
+ */
+void recursiveSync(const Path & path);
 
 /**
  * Delete a path; i.e., in the case of a directory, it is deleted

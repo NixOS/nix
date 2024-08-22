@@ -76,6 +76,17 @@ void RestoreSink::createDirectory(const CanonPath & path)
 
 struct RestoreRegularFile : CreateRegularFileSink {
     AutoCloseFD fd;
+    bool startFsync = false;
+
+    ~RestoreRegularFile()
+    {
+        /* Initiate an fsync operation without waiting for the
+           result. The real fsync should be run before registering a
+           store path, but this is a performance optimization to allow
+           the disk write to start early. */
+        if (fd && startFsync)
+            fd.startFsync();
+    }
 
     void operator () (std::string_view data) override;
     void isExecutable() override;
@@ -95,6 +106,7 @@ void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(C
     auto p = append(dstPath, path);
 
     RestoreRegularFile crf;
+    crf.startFsync = startFsync;
     crf.fd =
 #ifdef _WIN32
         CreateFileW(p.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)

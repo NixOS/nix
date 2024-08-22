@@ -399,10 +399,18 @@ public:
           default is `true`.
         )"};
 
+    Setting<bool> fsyncStorePaths{this, false, "fsync-store-paths",
+        R"(
+          Whether to call `fsync()` on store paths before registering them, to
+          flush them to disk. This improves robustness in case of system crashes,
+          but reduces performance. The default is `false`.
+        )"};
+
     Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal",
         "Whether SQLite should use WAL mode."};
 
 #ifndef _WIN32
+    // FIXME: remove this option, `fsync-store-paths` is faster.
     Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
         "Whether to call `sync()` before registering a path as valid."};
 #endif

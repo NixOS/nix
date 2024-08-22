@@ -1137,7 +1137,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             TeeSource wrapperSource { source, hashSink };
 
             narRead = true;
-            restorePath(realPath, wrapperSource);
+            restorePath(realPath, wrapperSource, settings.fsyncStorePaths);
 
             auto hashResult = hashSink.finish();
 
@@ -1190,6 +1190,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             canonicalisePathMetaData(realPath);
 
             optimisePath(realPath, repair); // FIXME: combine with hashPath()
+
+            if (settings.fsyncStorePaths) {
+                recursiveSync(realPath);
+                syncParent(realPath);
+            }
 
             registerValidPath(info);
         }
@@ -1271,7 +1276,7 @@ StorePath LocalStore::addToStoreFromDump(
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir / "x";
 
-        restorePath(tempPath.string(), bothSource, dumpMethod);
+        restorePath(tempPath.string(), bothSource, dumpMethod, settings.fsyncStorePaths);
 
         dumpBuffer.reset();
         dump = {};
@@ -1318,7 +1323,7 @@ StorePath LocalStore::addToStoreFromDump(
                 switch (fim) {
                 case FileIngestionMethod::Flat:
                 case FileIngestionMethod::NixArchive:
-                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim);
+                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim, settings.fsyncStorePaths);
                     break;
                 case FileIngestionMethod::Git:
                     // doesn't correspond to serialization method, so
@@ -1342,6 +1347,11 @@ StorePath LocalStore::addToStoreFromDump(
             canonicalisePathMetaData(realPath); // FIXME: merge into restorePath
 
             optimisePath(realPath, repair);
+
+            if (settings.fsyncStorePaths) {
+                recursiveSync(realPath);
+                syncParent(realPath);
+            }
 
             ValidPathInfo info {
                 *this,

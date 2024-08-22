@@ -128,7 +128,18 @@ public:
     explicit operator bool() const;
     Descriptor release();
     void close();
-    void fsync();
+
+    /**
+     * Perform a blocking fsync operation.
+     */
+    void fsync() const;
+
+    /**
+     * Asynchronously flush to disk without blocking, if available on
+     * the platform. This is just a performance optimization, and
+     * fsync must be run later even if this is called.
+     */
+    void startFsync() const;
 };
 
 class Pipe
