@@ -49,7 +49,7 @@ struct RemoteStore::ConnectionHandle
     RemoteStore::Connection & operator * () { return *handle; }
     RemoteStore::Connection * operator -> () { return &*handle; }
 
-    void processStderr(Sink * sink = 0, Source * source = 0, bool flush = true);
+    void processStderr(Sink * sink = 0, Source * source = 0, bool flush = true, bool block = true);
 
     void withFramedSink(std::function<void(Sink & sink)> fun);
 };
