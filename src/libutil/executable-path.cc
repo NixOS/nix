@@ -60,7 +60,7 @@ OsString ExecutablePath::render() const
 }
 
 std::optional<fs::path>
-ExecutablePath::find(const OsString & exe, std::function<bool(const fs::path &)> isExecutable) const
+ExecutablePath::findName(const OsString & exe, std::function<bool(const fs::path &)> isExecutable) const
 {
     // "If the pathname being sought contains a <slash>, the search
     // through the path prefixes shall not be performed."
@@ -74,6 +74,22 @@ ExecutablePath::find(const OsString & exe, std::function<bool(const fs::path &)>
     }
 
     return std::nullopt;
+}
+
+fs::path ExecutablePath::findPath(const fs::path & exe, std::function<bool(const fs::path &)> isExecutable) const
+{
+    // "If the pathname being sought contains a <slash>, the search
+    // through the path prefixes shall not be performed."
+    // https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03
+    if (exe.filename() == exe) {
+        auto resOpt = findName(exe, isExecutable);
+        if (resOpt)
+            return *resOpt;
+        else
+            throw ExecutableLookupError("Could not find executable '%s'", exe.string());
+    } else {
+        return exe;
+    }
 }
 
 } // namespace nix

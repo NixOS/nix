@@ -141,6 +141,8 @@ more than 2800 commits from 195 contributors since release 2.3.
   the evaluation cache. This is made possible by the hermetic
   evaluation model of flakes.
 
+  Intermediate results are not cached.
+
 * The new `--offline` flag disables substituters and causes all
   locally cached tarballs and repositories to be considered
   up-to-date.

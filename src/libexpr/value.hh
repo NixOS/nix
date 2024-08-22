@@ -423,9 +423,9 @@ public:
 
     void mkStringMove(const char * s, const NixStringContext & context);
 
-    inline void mkString(const Symbol & s)
+    inline void mkString(const SymbolStr & s)
     {
-        mkString(((const std::string &) s).c_str());
+        mkString(s.c_str());
     }
 
     void mkPath(const SourcePath & path);

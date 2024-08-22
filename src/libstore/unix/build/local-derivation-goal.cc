@@ -102,7 +102,14 @@ void handleDiffHook(
     }
 }
 
+// We want $HOME to be un-creatable in the sandbox. On Linux,
+// you can't create anything inside /proc since it's a virtual filesystem.
+// On Darwin it seems that `/homeless-shelter` is good enough.
+#if __linux__
+const Path LocalDerivationGoal::homeDir = "/proc/homeless-shelter";
+#else
 const Path LocalDerivationGoal::homeDir = "/homeless-shelter";
+#endif
 
 
 LocalDerivationGoal::~LocalDerivationGoal()

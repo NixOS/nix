@@ -17,12 +17,16 @@
 #include "eval-cache.hh"
 #include "markdown.hh"
 #include "users.hh"
+#include "terminal.hh"
 #include "parallel-eval.hh"
 
+#include <filesystem>
 #include <nlohmann/json.hpp>
 #include <iomanip>
 
 #include "strings-inline.hh"
+
+namespace fs = std::filesystem;
 
 using namespace nix;
 using namespace nix::flake;
@@ -438,14 +442,39 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkApp = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
-                #if 0
-                // FIXME
-                auto app = App(*state, v);
-                for (auto & i : app.context) {
-                    auto [drvPathS, outputName] = NixStringContextElem::parse(i);
-                    store->parseStorePath(drvPathS);
+                Activity act(*logger, lvlInfo, actUnknown, fmt("checking app '%s'", attrPath));
+                state->forceAttrs(v, pos, "");
+                if (auto attr = v.attrs()->get(state->symbols.create("type")))
+                    state->forceStringNoCtx(*attr->value, attr->pos, "");
+                else
+                    throw Error("app '%s' lacks attribute 'type'", attrPath);
+
+                if (auto attr = v.attrs()->get(state->symbols.create("program"))) {
+                    if (attr->name == state->symbols.create("program")) {
+                        NixStringContext context;
+                        state->forceString(*attr->value, context, attr->pos, "");
+                    }
+                } else
+                    throw Error("app '%s' lacks attribute 'program'", attrPath);
+
+                if (auto attr = v.attrs()->get(state->symbols.create("meta"))) {
+                    state->forceAttrs(*attr->value, attr->pos, "");
+                    if (auto dAttr = attr->value->attrs()->get(state->symbols.create("description")))
+                        state->forceStringNoCtx(*dAttr->value, dAttr->pos, "");
+                    else
+                        logWarning({
+                            .msg = HintFmt("app '%s' lacks attribute 'meta.description'", attrPath),
+                        });
+                } else
+                    logWarning({
+                        .msg = HintFmt("app '%s' lacks attribute 'meta'", attrPath),
+                    });
+
+                for (auto & attr : *v.attrs()) {
+                    std::string_view name(state->symbols[attr.name]);
+                    if (name != "type" && name != "program" && name != "meta")
+                        throw Error("app '%s' has unsupported attribute '%s'", attrPath, name);
                 }
-                #endif
             } catch (Error & e) {
                 e.addTrace(resolve(pos), HintFmt("while checking the app definition '%s'", attrPath));
                 reportError(e);
@@ -630,7 +659,7 @@ struct CmdFlakeCheck : FlakeCommand
                                 const auto & attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
                                 if (checkSystemType(attr_name, attr.pos)) {
-                                    checkApp(
+                                    checkDerivation(
                                         fmt("%s.%s", name, attr_name),
                                         *attr.value, attr.pos);
                                 };
@@ -871,47 +900,48 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 "If you've set '%s' to a string, try using a path instead.",
                 templateDir, templateDirAttr->getAttrPathStr()).debugThrow();
 
-        std::vector<Path> changedFiles;
-        std::vector<Path> conflictedFiles;
+        std::vector<fs::path> changedFiles;
+        std::vector<fs::path> conflictedFiles;
 
-        std::function<void(const Path & from, const Path & to)> copyDir;
-        copyDir = [&](const Path & from, const Path & to)
+        std::function<void(const fs::path & from, const fs::path & to)> copyDir;
+        copyDir = [&](const fs::path & from, const fs::path & to)
         {
-            createDirs(to);
+            fs::create_directories(to);
 
-            for (auto & entry : std::filesystem::directory_iterator{from}) {
+            for (auto & entry : fs::directory_iterator{from}) {
                 checkInterrupt();
-                auto from2 = entry.path().string();
-                auto to2 = to + "/" + entry.path().filename().string();
-                auto st = lstat(from2);
-                if (S_ISDIR(st.st_mode))
+                auto from2 = entry.path();
+                auto to2 = to / entry.path().filename();
+                auto st = entry.symlink_status();
+                auto to_st = fs::symlink_status(to2);
+                if (fs::is_directory(st))
                     copyDir(from2, to2);
-                else if (S_ISREG(st.st_mode)) {
-                    auto contents = readFile(from2);
-                    if (pathExists(to2)) {
-                        auto contents2 = readFile(to2);
+                else if (fs::is_regular_file(st)) {
+                    auto contents = readFile(from2.string());
+                    if (fs::exists(to_st)) {
+                        auto contents2 = readFile(to2.string());
                         if (contents != contents2) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2, from2);
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2.string());
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
                         }
                         continue;
                     } else
-                        writeFile(to2, contents);
+                        writeFile(to2.string(), contents);
                 }
-                else if (S_ISLNK(st.st_mode)) {
-                    auto target = readLink(from2);
-                    if (pathExists(to2)) {
-                        if (readLink(to2) != target) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2, from2);
+                else if (fs::is_symlink(st)) {
+                    auto target = fs::read_symlink(from2);
+                    if (fs::exists(to_st)) {
+                        if (fs::read_symlink(to2) != target) {
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2.string());
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
                         }
                         continue;
                     } else
-                          createSymlink(target, to2);
+                          fs::create_symlink(target, to2);
                 }
                 else
                     throw Error("file '%s' has unsupported type", from2);
@@ -922,9 +952,9 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         copyDir(templateDir, flakeDir);
 
-        if (!changedFiles.empty() && pathExists(flakeDir + "/.git")) {
+        if (!changedFiles.empty() && fs::exists(std::filesystem::path{flakeDir} / ".git")) {
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
-            for (auto & s : changedFiles) args.push_back(s);
+            for (auto & s : changedFiles) args.emplace_back(s.string());
             runProgram("git", true, args);
         }
         auto welcomeText = cursor->maybeGetAttr("welcomeText");
@@ -1096,6 +1126,46 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
     }
 };
 
+// Takes a string and returns the # of characters displayed
+static unsigned int columnLengthOfString(std::string_view s)
+{
+    unsigned int columnCount = 0;
+    for (auto i = s.begin(); i < s.end();) {
+        // Test first character to determine if it is one of
+        // treeConn, treeLast, treeLine
+        if (*i == -30) {
+            i += 3;
+            ++columnCount;
+        }
+        // Escape sequences
+        // https://en.wikipedia.org/wiki/ANSI_escape_code
+        else if (*i == '\e') {
+            // Eat '['
+            if (*(++i) == '[') {
+                ++i;
+                // Eat parameter bytes
+                while(*i >= 0x30 && *i <= 0x3f) ++i;
+
+                // Eat intermediate bytes
+                while(*i >= 0x20 && *i <= 0x2f) ++i;
+
+                // Eat final byte
+                if(*i >= 0x40 && *i <= 0x73) ++i;
+            }
+            else {
+                // Eat Fe Escape sequence
+                if (*i >= 0x40 && *i <= 0x5f) ++i;
+            }
+        }
+        else {
+            ++i;
+            ++columnCount;
+        }
+    }
+
+    return columnCount;
+}
+
 struct CmdFlakeShow : FlakeCommand, MixJSON
 {
     bool showLegacy = false;
@@ -1257,9 +1327,16 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     (attrPath.size() == 3 && attrPathS[0] == "apps"))
                 {
                     auto aType = visitor.maybeGetAttr("type");
+                    std::optional<std::string> description;
+                    if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
+                        if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
+                            description = aDescription->getString();
+                    }
                     if (!aType || aType->getString() != "app")
                         state->error<EvalError>("not an app definition").debugThrow();
                     j.emplace("type", "app");
+                    if (description)
+                        j.emplace("description", *description);
                 }
 
                 else if (
@@ -1322,16 +1399,55 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             render = [&](nlohmann::json j, const std::string & headerPrefix, const std::string & nextPrefix)
             {
                 if (j.find("type") != j.end()) {
+                    std::string s;
+
                     std::string type = j["type"];
                     if (type == "omitted") {
-                        logger->cout(headerPrefix + " " + (std::string) j["message"]);
+                        s = j["message"];
                     } else if (type == "derivation") {
-                        logger->cout(headerPrefix + ": " + (std::string) j["subtype"] + " '" + (std::string) j["name"] + "'");
-                    } else if (j.find("description") != j.end()) {
-                        logger->cout("%s: template: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, (std::string) j["description"]);
+                        s = (std::string) j["subtype"] + " '" + (std::string) j["name"] + "'";
                     } else {
-                        logger->cout(headerPrefix + ": " + type);
+                        s = type;
                     }
+
+                    std::string description =
+                        j.find("description") != j.end()
+                        ? j["description"]
+                        : "";
+
+                    if (description != "") {
+                        // Maximum length to print
+                        size_t maxLength = getWindowSize().second > 0 ? getWindowSize().second : 80;
+
+                        // Trim the description and only use the first line
+                        auto trimmed = trim((std::string) j["description"]);
+                        auto newLinePos = trimmed.find('\n');
+                        auto length = newLinePos != std::string::npos ? newLinePos : trimmed.length();
+
+                        auto beginningOfLine = fmt("%s: %s", headerPrefix, s);
+                        auto line = fmt("%s: %s - '%s'", headerPrefix, s, trimmed.substr(0, length));
+
+                        // If we are already over the maximum length then do not trim
+                        // and don't print the description (preserves existing behavior)
+                        if (columnLengthOfString(beginningOfLine) >= maxLength) {
+                            logger->cout("%s", beginningOfLine);
+                        }
+                        // If the entire line fits then print that
+                        else if (columnLengthOfString(line) < maxLength) {
+                            logger->cout("%s", line);
+                        }
+                        // Otherwise we need to truncate
+                        else {
+                            auto lineLength = columnLengthOfString(line);
+                            auto chopOff = lineLength - maxLength;
+                            line.resize(line.length() - chopOff);
+                            line = line.replace(line.length() - 3, 3, "…");
+
+                            logger->cout("%s", line);
+                        }
+                    } else
+                        logger->cout(headerPrefix + ": " + s);
+
                     return;
                 }
 

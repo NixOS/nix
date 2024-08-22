@@ -10,6 +10,8 @@
 #ifdef _WIN32
 # include <fileapi.h>
 # include "windows-error.hh"
+#else
+# include <poll.h>
 #endif
 
 
@@ -158,6 +160,29 @@ bool FdSource::good()
 }
 
 
+bool FdSource::hasData()
+{
+    if (BufferedSource::hasData()) return true;
+
+    while (true) {
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(fd, &fds);
+
+        struct timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 0;
+
+        auto n = select(fd + 1, &fds, nullptr, nullptr, &timeout);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            throw SysError("polling file descriptor");
+        }
+        return FD_ISSET(fd, &fds);
+    }
+}
+
+
 size_t StringSource::read(char * data, size_t len)
 {
     if (pos == s.size()) throw EndOfFile("end of string reached");
@@ -170,55 +195,6 @@ size_t StringSource::read(char * data, size_t len)
 #if BOOST_VERSION >= 106300 && BOOST_VERSION < 106600
 #error Coroutines are broken in this version of Boost!
 #endif
-
-/* A concrete datatype allow virtual dispatch of stack allocation methods. */
-struct VirtualStackAllocator {
-    StackAllocator *allocator = StackAllocator::defaultAllocator;
-
-    boost::context::stack_context allocate() {
-        return allocator->allocate();
-    }
-
-    void deallocate(boost::context::stack_context sctx) {
-        allocator->deallocate(sctx);
-    }
-};
-
-
-/* This class reifies the default boost coroutine stack allocation strategy with
-   a virtual interface. */
-class DefaultStackAllocator : public StackAllocator {
-    boost::coroutines2::default_stack stack;
-
-    boost::context::stack_context allocate() override {
-        return stack.allocate();
-    }
-
-    void deallocate(boost::context::stack_context sctx) override {
-        stack.deallocate(sctx);
-    }
-};
-
-static DefaultStackAllocator defaultAllocatorSingleton;
-
-StackAllocator *StackAllocator::defaultAllocator = &defaultAllocatorSingleton;
-
-
-std::shared_ptr<void> (*create_coro_gc_hook)() = []() -> std::shared_ptr<void> {
-    return {};
-};
-
-/* This class is used for entry and exit hooks on coroutines */
-class CoroutineContext {
-    /* Disable GC when entering the coroutine without the boehm patch,
-     * since it doesn't find the main thread stack in this case.
-     * std::shared_ptr<void> performs type-erasure, so it will call the right
-     * deleter. */
-    const std::shared_ptr<void> coro_gc_hook = create_coro_gc_hook();
-public:
-    CoroutineContext() {};
-    ~CoroutineContext() {};
-};
 
 std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
 {
@@ -241,14 +217,12 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
             cur = in;
 
             if (!coro) {
-                CoroutineContext ctx;
-                coro = coro_t::push_type(VirtualStackAllocator{}, [&](coro_t::pull_type & yield) {
-                    LambdaSource source([&](char *out, size_t out_len) {
+                coro = coro_t::push_type([&](coro_t::pull_type & yield) {
+                    LambdaSource source([&](char * out, size_t out_len) {
                         if (cur.empty()) {
                             yield();
-                            if (yield.get()) {
-                                return (size_t)0;
-                            }
+                            if (yield.get())
+                                throw EndOfFile("coroutine has finished");
                         }
 
                         size_t n = std::min(cur.size(), out_len);
@@ -263,20 +237,14 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
             if (!*coro) { unreachable(); }
 
             if (!cur.empty()) {
-                CoroutineContext ctx;
                 (*coro)(false);
             }
         }
 
         void finish() override
         {
-            if (!coro) return;
-            if (!*coro) unreachable();
-            {
-                CoroutineContext ctx;
+            if (coro && *coro)
                 (*coro)(true);
-            }
-            if (*coro) unreachable();
         }
     };
 
@@ -307,8 +275,7 @@ std::unique_ptr<Source> sinkToSource(
         size_t read(char * data, size_t len) override
         {
             if (!coro) {
-                CoroutineContext ctx;
-                coro = coro_t::pull_type(VirtualStackAllocator{}, [&](coro_t::push_type & yield) {
+                coro = coro_t::pull_type([&](coro_t::push_type & yield) {
                     LambdaSink sink([&](std::string_view data) {
                         if (!data.empty()) yield(std::string(data));
                     });
@@ -320,7 +287,6 @@ std::unique_ptr<Source> sinkToSource(
 
             if (pos == cur.size()) {
                 if (!cur.empty()) {
-                    CoroutineContext ctx;
                     (*coro)();
                 }
                 cur = coro->get();

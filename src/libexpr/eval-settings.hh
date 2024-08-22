@@ -185,7 +185,11 @@ struct EvalSettings : Config
         )"};
 
     Setting<bool> useEvalCache{this, true, "eval-cache",
-        "Whether to use the flake evaluation cache."};
+        R"(
+            Whether to use the flake evaluation cache.
+            Certain commands won't have to evaluate when invoked for the second time with a particular version of a flake.
+            Intermediate results are not cached.
+        )"};
 
     Setting<bool> ignoreExceptionsDuringTry{this, false, "ignore-try",
         R"(

@@ -85,11 +85,6 @@ public:
     std::vector<Path> nixUserConfFiles;
 
     /**
-     * The directory where the main programs are stored.
-     */
-    Path nixBinDir;
-
-    /**
      * The directory where the man pages are stored.
      */
     Path nixManDir;
@@ -246,7 +241,7 @@ public:
         )",
         {"build-timeout"}};
 
-    Setting<Strings> buildHook{this, {}, "build-hook",
+    Setting<Strings> buildHook{this, {"nix", "__build-remote"}, "build-hook",
         R"(
           The path to the helper program that executes remote builds.
 

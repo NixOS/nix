@@ -5,7 +5,6 @@ use Nix::Store;
 
 $version = "@PACKAGE_VERSION@";
 
-$binDir = Nix::Store::getBinDir;
 $storeDir = Nix::Store::getStoreDir;
 
 %config = ();
