@@ -39,8 +39,6 @@
     `pkgconfig` and the Boehm garbage collector, and pass the flag
     `--enable-gc` to `configure`.
 
-    For `bdw-gc` <= 8.2.4 Nix needs a [small patch](https://github.com/NixOS/nix/blob/ac4d2e7b857acdfeac35ac8a592bdecee2d29838/boehmgc-traceable_allocator-public.diff) to be applied.
-
   - The `boost` library of version 1.66.0 or higher. It can be obtained
     from the official web site <https://www.boost.org/>.
 

@@ -557,27 +557,4 @@ struct FramedSink : nix::BufferedSink
     };
 };
 
-/**
- * Stack allocation strategy for sinkToSource.
- * Mutable to avoid a boehm gc dependency in libutil.
- *
- * boost::context doesn't provide a virtual class, so we define our own.
- */
-struct StackAllocator {
-    virtual boost::context::stack_context allocate() = 0;
-    virtual void deallocate(boost::context::stack_context sctx) = 0;
-
-    /**
-     * The stack allocator to use in sinkToSource and potentially elsewhere.
-     * It is reassigned by the initGC() method in libexpr.
-     */
-    static StackAllocator *defaultAllocator;
-};
-
-/* Disabling GC when entering a coroutine (without the boehm patch).
-   mutable to avoid boehm gc dependency in libutil.
- */
-extern std::shared_ptr<void> (*create_coro_gc_hook)();
-
-
 }
