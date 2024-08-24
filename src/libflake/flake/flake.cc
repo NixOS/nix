@@ -19,25 +19,6 @@ using namespace flake;
 
 namespace flake {
 
-typedef std::pair<ref<SourceAccessor>, FlakeRef> FetchedFlake;
-typedef std::vector<std::pair<FlakeRef, FetchedFlake>> FlakeCache;
-
-static std::optional<FetchedFlake> lookupInFlakeCache(
-    const FlakeCache & flakeCache,
-    const FlakeRef & flakeRef)
-{
-    // FIXME: inefficient.
-    for (auto & i : flakeCache) {
-        if (flakeRef == i.first) {
-            debug("mapping '%s' to previously seen input '%s' -> '%s",
-                flakeRef, i.first, i.second.second);
-            return i.second;
-        }
-    }
-
-    return std::nullopt;
-}
-
 static FlakeRef maybeResolve(
     EvalState & state,
     const FlakeRef & originalRef,
@@ -290,7 +271,6 @@ static Flake getFlake(
     EvalState & state,
     const FlakeRef & originalRef,
     bool allowLookup,
-    FlakeCache & flakeCache,
     InputPath lockRootPath)
 {
     auto resolvedRef = maybeResolve(state, originalRef, allowLookup);
@@ -301,15 +281,9 @@ static Flake getFlake(
     return readFlake(state, originalRef, resolvedRef, lockedRef, SourcePath {accessor, CanonPath::root}, lockRootPath);
 }
 
-Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup, FlakeCache & flakeCache)
-{
-    return getFlake(state, originalRef, allowLookup, flakeCache, {});
-}
-
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup)
 {
-    FlakeCache flakeCache;
-    return getFlake(state, originalRef, allowLookup, flakeCache);
+    return getFlake(state, originalRef, allowLookup, {});
 }
 
 static LockFile readLockFile(
@@ -331,11 +305,9 @@ LockedFlake lockFlake(
 {
     experimentalFeatureSettings.require(Xp::Flakes);
 
-    FlakeCache flakeCache;
-
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
 
-    auto flake = getFlake(state, topRef, useRegistries, flakeCache);
+    auto flake = getFlake(state, topRef, useRegistries);
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
@@ -529,7 +501,7 @@ LockedFlake lockFlake(
                         }
 
                         if (mustRefetch) {
-                            auto inputFlake = getFlake(state, oldLock->lockedRef, false, flakeCache, inputPath);
+                            auto inputFlake = getFlake(state, oldLock->lockedRef, false, inputPath);
                             nodePaths.emplace(childNode, inputFlake.path.parent());
                             computeLocks(inputFlake.inputs, childNode, inputPath, oldLock, lockRootPath, parentPath, false);
                         } else {
@@ -562,7 +534,7 @@ LockedFlake lockFlake(
                             if (localRef.input.getType() == "path")
                                 localPath = absPath(*input.ref->input.getSourcePath(), parentPath);
 
-                            auto inputFlake = getFlake(state, localRef, useRegistries, flakeCache, inputPath);
+                            auto inputFlake = getFlake(state, localRef, useRegistries, inputPath);
 
                             auto childNode = make_ref<LockedNode>(inputFlake.lockedRef, ref);
 
@@ -704,8 +676,7 @@ LockedFlake lockFlake(
                            repo, so we should re-read it. FIXME: we could
                            also just clear the 'rev' field... */
                         auto prevLockedRef = flake.lockedRef;
-                        FlakeCache dummyCache;
-                        flake = getFlake(state, topRef, useRegistries, dummyCache);
+                        flake = getFlake(state, topRef, useRegistries);
 
                         if (lockFlags.commitLockFile &&
                             flake.lockedRef.input.getRev() &&
