@@ -19,7 +19,7 @@ using namespace flake;
 
 namespace flake {
 
-typedef std::pair<StorePath, FlakeRef> FetchedFlake;
+typedef std::pair<ref<SourceAccessor>, FlakeRef> FetchedFlake;
 typedef std::vector<std::pair<FlakeRef, FetchedFlake>> FlakeCache;
 
 static std::optional<FetchedFlake> lookupInFlakeCache(
@@ -38,43 +38,17 @@ static std::optional<FetchedFlake> lookupInFlakeCache(
     return std::nullopt;
 }
 
-static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
+static FlakeRef maybeResolve(
     EvalState & state,
     const FlakeRef & originalRef,
-    bool allowLookup,
-    FlakeCache & flakeCache)
+    bool useRegistries)
 {
-    auto fetched = lookupInFlakeCache(flakeCache, originalRef);
-    FlakeRef resolvedRef = originalRef;
-
-    if (!fetched) {
         if (originalRef.input.isDirect()) {
-            fetched.emplace(originalRef.fetchTree(state.store));
-        } else {
-            if (allowLookup) {
-                resolvedRef = originalRef.resolve(state.store);
-                auto fetchedResolved = lookupInFlakeCache(flakeCache, originalRef);
-                if (!fetchedResolved) fetchedResolved.emplace(resolvedRef.fetchTree(state.store));
-                flakeCache.push_back({resolvedRef, *fetchedResolved});
-                fetched.emplace(*fetchedResolved);
-            }
-            else {
+            if (!useRegistries)
                 throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalRef);
-            }
-        }
-        flakeCache.push_back({originalRef, *fetched});
-    }
-
-    auto [storePath, lockedRef] = *fetched;
-
-    debug("got tree '%s' from '%s'",
-        state.store->printStorePath(storePath), lockedRef);
-
-    state.allowPath(storePath);
-
-    assert(!originalRef.input.getNarHash() || storePath == originalRef.input.computeStorePath(*state.store));
-
-    return {std::move(storePath), resolvedRef, lockedRef};
+            return originalRef.resolve(state.store);
+        } else
+            return originalRef;
 }
 
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
@@ -319,10 +293,12 @@ static Flake getFlake(
     FlakeCache & flakeCache,
     InputPath lockRootPath)
 {
-    auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-        state, originalRef, allowLookup, flakeCache);
+    auto resolvedRef = maybeResolve(state, originalRef, allowLookup);
+    auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
 
-    return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->toRealPath(storePath)), lockRootPath);
+    state.registerAccessor(accessor);
+
+    return readFlake(state, originalRef, resolvedRef, lockedRef, SourcePath {accessor, CanonPath::root}, lockRootPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup, FlakeCache & flakeCache)
@@ -615,12 +591,17 @@ LockedFlake lockFlake(
                         }
 
                         else {
-                            auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-                                state, *input.ref, useRegistries, flakeCache);
+                            auto [path, lockedRef] = [&]() -> std::tuple<SourcePath, FlakeRef>
+                            {
+                                auto resolvedRef = maybeResolve(state, *input.ref, useRegistries);
+                                auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
+                                state.registerAccessor(accessor);
+                                return {SourcePath(accessor), lockedRef};
+                            }();
 
                             auto childNode = make_ref<LockedNode>(lockedRef, ref, false);
 
-                            nodePaths.emplace(childNode, state.rootPath(state.store->toRealPath(storePath)));
+                            nodePaths.emplace(childNode, path);
 
                             node->inputs.insert_or_assign(id, childNode);
                         }
@@ -768,21 +749,23 @@ void callFlake(EvalState & state,
 
         auto lockedNode = node.dynamic_pointer_cast<const LockedNode>();
 
+        /*
         // FIXME: This is a hack to support chroot stores. Remove this
         // once we can pass a sourcePath rather than a storePath to
         // call-flake.nix.
-        auto path = sourcePath.path.abs();
-        if (auto store = state.store.dynamic_pointer_cast<LocalFSStore>()) {
-            auto realStoreDir = store->getRealStoreDir();
-            if (isInDir(path, realStoreDir))
-                path = store->storeDir + path.substr(realStoreDir.size());
-        }
-
-        auto [storePath, subdir] = state.store->toStorePath(path);
+        // auto path = sourcePath.path.abs();
+        // if (auto store = state.store.dynamic_pointer_cast<LocalFSStore>()) {
+        //    auto realStoreDir = store->getRealStoreDir();
+        //    if (isInDir(path, realStoreDir))
+        //        path = store->storeDir + path.substr(realStoreDir.size());
+        // }
+        //
+        // auto [storePath, subdir] = state.store->toStorePath(path);
+        */
 
         emitTreeAttrs(
             state,
-            storePath,
+            SourcePath(sourcePath.accessor),
             lockedNode ? lockedNode->lockedRef.input : lockedFlake.flake.lockedRef.input,
             vSourceInfo,
             false,
@@ -793,7 +776,7 @@ void callFlake(EvalState & state,
 
         override
             .alloc(state.symbols.create("dir"))
-            .mkString(CanonPath(subdir).rel());
+            .mkString(sourcePath.path.rel());
 
         overrides.alloc(state.symbols.create(key->second)).mkAttrs(override);
     }

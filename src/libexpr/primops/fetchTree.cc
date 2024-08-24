@@ -19,21 +19,20 @@ namespace nix {
 
 void emitTreeAttrs(
     EvalState & state,
-    const StorePath & storePath,
     const fetchers::Input & input,
     Value & v,
+    std::function<void(Value &)> setOutPath,
     bool emptyRevFallback,
     bool forceDirty)
 {
     auto attrs = state.buildBindings(100);
 
-    state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
+    setOutPath(attrs.alloc(state.sOutPath));
 
     // FIXME: support arbitrary input attributes.
 
-    auto narHash = input.getNarHash();
-    assert(narHash);
-    attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
+    if (auto narHash = input.getNarHash())
+        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
 
     if (input.getType() == "git")
         attrs.alloc("submodules").mkBool(
@@ -72,10 +71,28 @@ void emitTreeAttrs(
     v.mkAttrs(attrs);
 }
 
+void emitTreeAttrs(
+    EvalState & state,
+    const SourcePath & storePath,
+    const fetchers::Input & input,
+    Value & v,
+    bool emptyRevFallback,
+    bool forceDirty)
+{
+    emitTreeAttrs(state, input, v,
+        [&](Value & vOutPath) {
+            state.registerAccessor(storePath.accessor);
+            vOutPath.mkPath(storePath);
+        },
+        emptyRevFallback,
+        forceDirty);
+}
+
 struct FetchTreeParams {
     bool emptyRevFallback = false;
     bool allowNameArgument = false;
     bool isFetchGit = false;
+    bool returnPath = true; // whether to return a SourcePath or a StorePath
 };
 
 static void fetchTree(
@@ -112,7 +129,9 @@ static void fetchTree(
 
         for (auto & attr : *args[0]->attrs()) {
             if (attr.name == state.sType) continue;
+
             state.forceValue(*attr.value, attr.pos);
+
             if (attr.value->type() == nPath || attr.value->type() == nString) {
                 auto s = state.coerceToString(attr.pos, *attr.value, context, "", false, false).toOwned();
                 attrs.emplace(state.symbols[attr.name],
@@ -197,7 +216,14 @@ static void fetchTree(
 
     state.allowPath(storePath);
 
-    emitTreeAttrs(state, storePath, input2, v, params.emptyRevFallback, false);
+    emitTreeAttrs(state, input2, v,
+        [&](Value & vOutPath) {
+            if (params.returnPath)
+                vOutPath.mkPath(state.rootPath(state.store->toRealPath(storePath)));
+            else
+                state.mkStorePathString(storePath, vOutPath);
+        },
+        params.emptyRevFallback, false);
 }
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
@@ -614,7 +640,8 @@ static void prim_fetchGit(EvalState & state, const PosIdx pos, Value * * args, V
         FetchTreeParams {
             .emptyRevFallback = true,
             .allowNameArgument = true,
-            .isFetchGit = true
+            .isFetchGit = true,
+            .returnPath = false,
         });
 }
 
