@@ -3087,7 +3087,7 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
         if (!rOpt) continue;
         auto r = *rOpt;
 
-        auto res = r / suffix;
+        auto res = r / CanonPath(suffix);
         if (res.pathExists()) return res;
     }
 
