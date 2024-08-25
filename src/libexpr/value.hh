@@ -20,10 +20,16 @@ namespace nix {
 struct Value;
 class BindingsBuilder;
 
-
 typedef enum {
+    /* Unfinished values. */
     tUninitialized = 0,
-    tInt = 1,
+    tThunk,
+    tApp,
+    tPending,
+    tAwaited,
+
+    /* Finished values. */
+    tInt = 32, // Do not move tInt (see isFinished()).
     tBool,
     tString,
     tPath,
@@ -32,14 +38,26 @@ typedef enum {
     tList1,
     tList2,
     tListN,
-    tThunk,
-    tApp,
     tLambda,
     tPrimOp,
     tPrimOpApp,
     tExternal,
-    tFloat
+    tFloat,
+    tFailed,
 } InternalType;
+
+/**
+ * Return true if `type` denotes a "finished" value, i.e. a weak-head
+ * normal form.
+ *
+ * Note that tPrimOpApp is considered "finished" because it represents
+ * a primop call with an incomplete number of arguments, and therefore
+ * cannot be evaluated further.
+ */
+inline bool isFinished(InternalType type)
+{
+    return type >= tInt;
+}
 
 /**
  * This type abstracts over all actual value types in the language,
@@ -48,6 +66,7 @@ typedef enum {
  */
 typedef enum {
     nThunk,
+    nFailed,
     nInt,
     nFloat,
     nBool,
@@ -166,21 +185,43 @@ public:
 struct Value
 {
 private:
-    InternalType internalType = tUninitialized;
+    std::atomic<InternalType> internalType{tUninitialized};
 
     friend std::string showType(const Value & v);
+    friend class EvalState;
 
 public:
 
+    Value()
+        : internalType(tUninitialized)
+    { }
+
+    Value(const Value & v)
+    { *this = v; }
+
+    /**
+     * Copy a value. This is not allowed to be a thunk to avoid
+     * accidental work duplication.
+     */
+    Value & operator =(const Value & v)
+    {
+        auto type = v.internalType.load(std::memory_order_acquire);
+        //debug("ASSIGN %x %d %d", this, internalType, type);
+        if (!nix::isFinished(type)) {
+            printError("UNEXPECTED TYPE %x %x %d %s", this, &v, type, showType(v));
+            abort();
+        }
+        finishValue(type, v.payload);
+        return *this;
+    }
+
     void print(EvalState &state, std::ostream &str, PrintOptions options = PrintOptions {});
 
-    // Functions needed to distinguish the type
-    // These should be removed eventually, by putting the functionality that's
-    // needed by callers into methods of this type
+    inline bool isFinished() const
+    {
+        return nix::isFinished(internalType.load(std::memory_order_acquire));
+    }
 
-    // type() == nThunk
-    inline bool isThunk() const { return internalType == tThunk; };
-    inline bool isApp() const { return internalType == tApp; };
     inline bool isBlackhole() const;
 
     // type() == nFunction
@@ -234,6 +275,11 @@ public:
         ExprLambda * fun;
     };
 
+    struct Failed
+    {
+        std::exception_ptr ex;
+    };
+
     using Payload = union
     {
         NixInt integer;
@@ -256,6 +302,7 @@ public:
         FunctionApplicationThunk primOpApp;
         ExternalValueBase * external;
         NixFloat fpoint;
+        Failed * failed;
     };
 
     Payload payload;
@@ -263,14 +310,10 @@ public:
     /**
      * Returns the normal type of a Value. This only returns nThunk if
      * the Value hasn't been forceValue'd
-     *
-     * @param invalidIsThunk Instead of aborting an an invalid (probably
-     * 0, so uninitialized) internal type, return `nThunk`.
      */
-    inline ValueType type(bool invalidIsThunk = false) const
+    inline ValueType type() const
     {
         switch (internalType) {
-            case tUninitialized: break;
             case tInt: return nInt;
             case tBool: return nBool;
             case tString: return nString;
@@ -281,18 +324,61 @@ public:
             case tLambda: case tPrimOp: case tPrimOpApp: return nFunction;
             case tExternal: return nExternal;
             case tFloat: return nFloat;
-            case tThunk: case tApp: return nThunk;
+            case tFailed: return nFailed;
+            case tThunk: case tApp: case tPending: case tAwaited: return nThunk;
+            case tUninitialized:
+            default:
+                unreachable();
         }
-        if (invalidIsThunk)
-            return nThunk;
-        else
-            unreachable();
     }
 
+    /**
+     * Finish a pending thunk, waking up any threads that are waiting
+     * on it.
+     */
     inline void finishValue(InternalType newType, Payload newPayload)
     {
+        debug("FINISH %x %d %d", this, internalType, newType);
         payload = newPayload;
-        internalType = newType;
+
+        auto oldType = internalType.exchange(newType, std::memory_order_release);
+
+        if (oldType == tUninitialized)
+            // Uninitialized value; nothing to do.
+            ;
+        else if (oldType == tPending)
+            // Nothing to do; no thread is waiting on this thunk.
+            ;
+        else if (oldType == tAwaited)
+            // Slow path: wake up the threads that are waiting on this
+            // thunk.
+            notifyWaiters();
+        else {
+            printError("BAD FINISH %x %d %d", this, oldType, newType);
+            abort();
+        }
+    }
+
+    inline void setThunk(InternalType newType, Payload newPayload)
+    {
+        payload = newPayload;
+
+        auto oldType = internalType.exchange(newType, std::memory_order_release);
+
+        if (oldType != tUninitialized) {
+            printError("BAD SET THUNK %x %d %d", this, oldType, newType);
+            abort();
+        }
+    }
+
+    inline void reset()
+    {
+        auto oldType = internalType.exchange(tUninitialized, std::memory_order_relaxed);
+        debug("RESET %x %d", this, oldType);
+        if (oldType == tPending || oldType == tAwaited) {
+            printError("BAD RESET %x %d", this, oldType);
+            abort();
+        }
     }
 
     /**
@@ -305,14 +391,20 @@ public:
         return internalType != tUninitialized;
     }
 
-    inline void mkInt(NixInt::Inner n)
-    {
-        mkInt(NixInt{n});
-    }
+    /**
+     * Wake up any threads that are waiting on this value.
+     * FIXME: this should be in EvalState.
+     */
+    void notifyWaiters();
 
     inline void mkInt(NixInt n)
     {
         finishValue(tInt, { .integer = n });
+    }
+
+    inline void mkInt(NixInt::Inner n)
+    {
+        mkInt(NixInt{n});
     }
 
     inline void mkBool(bool b)
@@ -368,12 +460,12 @@ public:
 
     inline void mkThunk(Env * e, Expr * ex)
     {
-        finishValue(tThunk, { .thunk = { .env = e, .expr = ex } });
+        setThunk(tThunk, { .thunk = { .env = e, .expr = ex } });
     }
 
     inline void mkApp(Value * l, Value * r)
     {
-        finishValue(tApp, { .app = { .left = l, .right = r } });
+        setThunk(tApp, { .app = { .left = l, .right = r } });
     }
 
     inline void mkLambda(Env * e, ExprLambda * f)
@@ -403,6 +495,11 @@ public:
     inline void mkFloat(NixFloat n)
     {
         finishValue(tFloat, { .fpoint = n });
+    }
+
+    void mkFailed()
+    {
+        finishValue(tFailed, { .failed = new Value::Failed { .ex = std::current_exception() } });
     }
 
     bool isList() const
@@ -435,8 +532,11 @@ public:
 
     /**
      * Check whether forcing this value requires a trivial amount of
-     * computation. In particular, function applications are
-     * non-trivial.
+     * computation. A value is trivial if it's finished or if it's a
+     * thunk whose expression is an attrset with no dynamic
+     * attributes, a lambda or a list. Note that it's up to the caller
+     * to check whether the members of those attrsets or lists must be
+     * trivial.
      */
     bool isTrivial() const;
 

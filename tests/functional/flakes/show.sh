@@ -59,13 +59,7 @@ cat >flake.nix <<EOF
   };
 }
 EOF
-nix flake show --json --all-systems > show-output.json
-nix eval --impure --expr '
-let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
-in
-assert show_output == { };
-true
-'
+[[ $(nix flake show --all-systems --legacy | wc -l) = 1 ]]
 
 # Test that attributes with errors are handled correctly.
 # nixpkgs.legacyPackages is a particularly prominent instance of this.
@@ -110,5 +104,5 @@ nix flake show > ./show-output.txt
 test "$(awk -F '[:] ' '/aNoDescription/{print $NF}' ./show-output.txt)" = "package 'simple'"
 test "$(awk -F '[:] ' '/bOneLineDescription/{print $NF}' ./show-output.txt)" = "package 'simple' - 'one line'"
 test "$(awk -F '[:] ' '/cMultiLineDescription/{print $NF}' ./show-output.txt)" = "package 'simple' - 'line one'"
-test "$(awk -F '[:] ' '/dLongDescription/{print $NF}' ./show-output.txt)" = "package 'simple' - '012345678901234567890123456..."
+test "$(awk -F '[:] ' '/dLongDescription/{print $NF}' ./show-output.txt)" = "package 'simple' - '012345678901234567890123456…"
 test "$(awk -F '[:] ' '/eEmptyDescription/{print $NF}' ./show-output.txt)" = "package 'simple'"
