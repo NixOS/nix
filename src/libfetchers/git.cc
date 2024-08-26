@@ -679,7 +679,7 @@ struct GitInputScheme : InputScheme
         if (getLfsAttr(input)) {
             warn("lfs attr set on %s", input.to_string());
             // urlencoded `?lfs=1` param is set,
-            //repo->smudgeLfs();
+            repo->smudgeLfs();
         }
 
         assert(!origRev || origRev == rev);

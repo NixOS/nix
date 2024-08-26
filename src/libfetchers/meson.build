@@ -73,6 +73,7 @@ headers = files(
   'fetch-to-store.hh',
   'filtering-source-accessor.hh',
   'git-utils.hh',
+  'git-lfs-fetch.hh',
   'mounted-source-accessor.hh',
   'fetchers.hh',
   'registry.hh',

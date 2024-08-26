@@ -1,4 +1,5 @@
 #include "git-utils.hh"
+#include "git-lfs-fetch.hh"
 #include "cache.hh"
 #include "finally.hh"
 #include "processes.hh"
@@ -1101,14 +1102,19 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     return result;
 }
 
-//void GitRepoImpl::smudgeLfs() {
-//    runProgram(RunOptions{
-//            .program = "git",
-//            .searchPath = true,
-//            .args = { "lfs", "pull" },
-//            .chdir = std::make_optional(this->path)
-//            });
-//}
+void GitRepoImpl::smudgeLfs() {
+    const auto metadatas = lfs::parse_lfs_files(this->repo);
+    const auto [url, host, path] = lfs::get_lfs_endpoint_url(this->repo);
+    // TODO: handle public lfs repos without ssh?
+    const auto token = lfs::get_lfs_api_token(host, path);
+    auto urls = lfs::fetch_urls(url, token, metadatas);
+    std::cerr << "Got urls! ";
+    for (const auto &url : urls) {
+      std::cerr << url << std::endl;
+    }
+    std::cerr << "Fetching actual data" << std::endl;
+    lfs::download_files(urls, this->path);
+}
 
 ref<GitRepo> getTarballCache()
 {
