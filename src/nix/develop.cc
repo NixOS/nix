@@ -21,10 +21,6 @@
 
 #include "nix/util/strings.hh"
 
-namespace nix::fs {
-using namespace std::filesystem;
-}
-
 using namespace nix;
 
 struct DevelopSettings : Config

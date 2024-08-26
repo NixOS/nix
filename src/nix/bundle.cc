@@ -7,10 +7,6 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/globals.hh"
 
-namespace nix::fs {
-using namespace std::filesystem;
-}
-
 using namespace nix;
 
 struct CmdBundle : InstallableValueCommand

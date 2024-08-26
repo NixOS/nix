@@ -11,10 +11,6 @@
 #include "nix/util/executable-path.hh"
 #include "nix/store/globals.hh"
 
-namespace nix::fs {
-using namespace std::filesystem;
-}
-
 using namespace nix;
 
 namespace {

@@ -293,8 +293,7 @@ std::string optimisticLockProfile(const std::filesystem::path & profile)
 
 std::filesystem::path profilesDir(ProfileDirsOptions settings)
 {
-    auto profileRoot =
-        isRootUser() ? rootProfilesDir(settings) : std::filesystem::path{createNixStateDir()} / "profiles";
+    auto profileRoot = isRootUser() ? rootProfilesDir(settings) : createNixStateDir() / "profiles";
     createDirs(profileRoot);
     return profileRoot;
 }
@@ -306,9 +305,8 @@ std::filesystem::path rootProfilesDir(ProfileDirsOptions settings)
 
 std::filesystem::path getDefaultProfile(ProfileDirsOptions settings)
 {
-    std::filesystem::path profileLink = settings.useXDGBaseDirectories
-                                            ? std::filesystem::path{createNixStateDir()} / "profile"
-                                            : std::filesystem::path{getHome()} / ".nix-profile";
+    std::filesystem::path profileLink =
+        settings.useXDGBaseDirectories ? createNixStateDir() / "profile" : getHome() / ".nix-profile";
     try {
         auto profile = profilesDir(settings) / "profile";
         if (!pathExists(profileLink)) {

@@ -268,10 +268,10 @@ void Fetch::fetch(
         return;
     }
 
-    std::filesystem::path cacheDir = getCacheDir() / "git-lfs";
+    auto cacheDir = getCacheDir() / "git-lfs";
     std::string key = hashString(HashAlgorithm::SHA256, pointerFilePath.rel()).to_string(HashFormat::Base16, false)
                       + "/" + pointer->oid;
-    std::filesystem::path cachePath = cacheDir / key;
+    auto cachePath = cacheDir / key;
     if (pathExists(cachePath)) {
         debug("using cache entry %s -> %s", key, PathFmt(cachePath));
         sink(readFile(cachePath));

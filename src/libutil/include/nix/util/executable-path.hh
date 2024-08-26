@@ -34,6 +34,12 @@ struct ExecutablePath
     static ExecutablePath parse(const OsString & path);
 
     /**
+     * Like `parse` but appends new entries to the end of an existing
+     * `ExecutablePath`.
+     */
+    void parseAppend(const OsString & path);
+
+    /**
      * Load the `PATH` environment variable and `parse` it.
      */
     static ExecutablePath load();

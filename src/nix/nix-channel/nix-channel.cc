@@ -188,11 +188,12 @@ static int main_nix_channel(int argc, char ** argv)
     {
         // Figure out the name of the `.nix-channels' file to use
         auto home = getHome();
-        channelsList = settings.useXDGBaseDirectories ? createNixStateDir() + "/channels" : home + "/.nix-channels";
+        channelsList =
+            settings.useXDGBaseDirectories ? (createNixStateDir() / "channels").string() : home + "/.nix-channels";
         nixDefExpr = getNixDefExpr();
 
         // Figure out the name of the channels profile.
-        profile = profilesDir(settings.getProfileDirsOptions()) + "/channels";
+        profile = (profilesDir(settings.getProfileDirsOptions()) / "channels").string();
         createDirs(dirOf(profile));
 
         enum { cNone, cAdd, cRemove, cList, cUpdate, cListGenerations, cRollback } cmd = cNone;

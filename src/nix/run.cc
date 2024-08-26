@@ -24,10 +24,6 @@
 
 extern char ** environ __attribute__((weak));
 
-namespace nix::fs {
-using namespace std::filesystem;
-}
-
 using namespace nix;
 
 std::string chrootHelperName = "__run_in_chroot";

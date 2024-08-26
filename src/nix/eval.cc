@@ -10,10 +10,6 @@
 
 using namespace nix;
 
-namespace nix::fs {
-using namespace std::filesystem;
-}
-
 struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 {
     bool raw = false;

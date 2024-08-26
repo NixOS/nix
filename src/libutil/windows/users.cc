@@ -37,9 +37,9 @@ std::string getUserName()
 std::filesystem::path getHome()
 {
     static std::filesystem::path homeDir = []() {
-        std::filesystem::path homeDir = getEnv("USERPROFILE").value_or("C:\\Users\\Default");
+        std::filesystem::path homeDir = getEnvOs(L"USERPROFILE").value_or(L"C:\\Users\\Default");
         assert(!homeDir.empty());
-        return canonPath(homeDir.string());
+        return std::filesystem::path{canonPath(homeDir.string())};
     }();
     return homeDir;
 }

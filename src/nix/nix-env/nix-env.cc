@@ -1294,7 +1294,7 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
     if (opArgs.size() != 1)
         throw UsageError("exactly one argument expected");
 
-    Path profile = absPath(opArgs.front());
+    auto profile = absPath(std::filesystem::path{opArgs.front()});
     auto profileLink = settings.useXDGBaseDirectories ? createNixStateDir() / "profile" : getHome() / ".nix-profile";
 
     switchLink(profileLink, profile);
