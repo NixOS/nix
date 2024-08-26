@@ -1,5 +1,7 @@
 #pragma once
 
+#include "os-string.hh"
+
 namespace nix {
 
 /**
@@ -8,6 +10,9 @@ namespace nix {
  *
  * We use our own implementation unconditionally for consistency.
  */
-int execvpe(const char * file0, char * const argv[], char * const envp[]);
+int execvpe(
+    const OsString::value_type * file0,
+    const OsString::value_type * const argv[],
+    const OsString::value_type * const envp[]);
 
 }
