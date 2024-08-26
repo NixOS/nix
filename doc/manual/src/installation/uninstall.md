@@ -43,15 +43,7 @@ which you may remove.
 
 ### macOS
 
-1. If system-wide shell initialisation files haven't been altered since installing Nix, use the backups made by the installer:
-
-   ```console
-   sudo mv /etc/zshrc.backup-before-nix /etc/zshrc
-   sudo mv /etc/bashrc.backup-before-nix /etc/bashrc
-   sudo mv /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc
-   ```
-
-   Otherwise, edit `/etc/zshrc`, `/etc/bashrc`, and `/etc/bash.bashrc` to remove the lines sourcing `nix-daemon.sh`, which should look like this:
+1. Edit `/etc/zshrc`, `/etc/bashrc`, and `/etc/bash.bashrc` to remove the lines sourcing `nix-daemon.sh`, which should look like this:
 
    ```bash
    # Nix
@@ -133,7 +125,9 @@ which you may remove.
    diskutil list
    ```
 
-   If you _do_ find a "Nix Store" volume, delete it by running `diskutil deleteVolume` with the store volume's `diskXsY` identifier.
+   If you _do_ find a "Nix Store" volume, delete it by running `diskutil apfs deleteVolume` with the store volume's `diskXsY` identifier.
+
+   If you get an error that the volume is in use by the kernel you might have to reboot and immediately delete the volume before atrting any other process.
 
 > **Note**
 >
