@@ -6,6 +6,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <mutex>
 #include <regex>
 #include <unordered_set>
 #include <thread>
@@ -142,6 +143,37 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
 CgroupStats destroyCgroup(const Path & cgroup)
 {
     return destroyCgroup(cgroup, true);
+}
+
+std::string getCurrentCgroup()
+{
+    auto cgroupFS = getCgroupFS();
+    if (!cgroupFS)
+        throw Error("cannot determine the cgroups file system");
+
+    auto ourCgroups = getCgroups("/proc/self/cgroup");
+    auto ourCgroup = ourCgroups[""];
+    if (ourCgroup == "")
+        throw Error("cannot determine cgroup name from /proc/self/cgroup");
+    return ourCgroup;
+}
+
+static std::optional<std::string> rootCgroup;
+static std::mutex rootCgroupMutex;
+
+std::string getRootCgroup()
+{
+    {
+        std::lock_guard<std::mutex> guard(rootCgroupMutex);
+        if (rootCgroup)
+            return *rootCgroup;
+    }
+    auto current = getCurrentCgroup();
+    std::lock_guard<std::mutex> guard(rootCgroupMutex);
+    if (rootCgroup)
+        return *rootCgroup;
+    rootCgroup = current;
+    return current;
 }
 
 }
