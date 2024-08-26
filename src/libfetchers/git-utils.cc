@@ -211,8 +211,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         try {
             PackBuilder packBuilder;
             git_packbuilder_new(Setter(packBuilder), *this);
+            checkInterrupt();
             git_mempack_write_thin_pack(mempack_backend, packBuilder.get());
+            checkInterrupt();
+            // TODO make git_packbuilder_write_buf() interruptible
             git_packbuilder_write_buf(&buf, packBuilder.get());
+            checkInterrupt();
 
             std::string repo_path = std::string(git_repository_path(repo.get()));
             while (!repo_path.empty() && repo_path.back() == '/')
@@ -224,8 +228,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             git_indexer_progress stats;
             if (git_indexer_new(Setter(indexer), pack_dir_path.c_str(), 0, nullptr, nullptr))
                 throw Error("creating git packfile indexer: %s", git_error_last()->message);
+            // TODO: feed buf in (fairly large) chunk to make this interruptible
             if (git_indexer_append(indexer.get(), buf.ptr, buf.size, &stats))
                 throw Error("appending to git packfile index: %s", git_error_last()->message);
+            checkInterrupt();
             if (git_indexer_commit(indexer.get(), &stats))
                 throw Error("committing git packfile index: %s", git_error_last()->message);
 
@@ -237,6 +243,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             git_buf_dispose(&buf);
             throw;
         }
+        checkInterrupt();
     }
 
     uint64_t getRevCount(const Hash & rev) override
