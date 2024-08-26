@@ -26,9 +26,9 @@
 
 #include "strings-inline.hh"
 
-namespace fs = std::filesystem;
-
 namespace nix {
+
+namespace fs { using namespace std::filesystem; }
 
 /**
  * Treat the string as possibly an absolute path, by inspecting the
@@ -73,6 +73,10 @@ Path absPath(PathView path, std::optional<PathView> dir, bool resolveSymlinks)
     return canonPath(path, resolveSymlinks);
 }
 
+std::filesystem::path absPath(const std::filesystem::path & path, bool resolveSymlinks)
+{
+    return absPath(path.string(), std::nullopt, resolveSymlinks);
+}
 
 Path canonPath(PathView path, bool resolveSymlinks)
 {
@@ -206,10 +210,10 @@ bool pathExists(const Path & path)
     return maybeLstat(path).has_value();
 }
 
-bool pathAccessible(const Path & path)
+bool pathAccessible(const std::filesystem::path & path)
 {
     try {
-        return pathExists(path);
+        return pathExists(path.string());
     } catch (SysError & e) {
         // swallow EPERM
         if (e.errNo == EPERM) return false;
@@ -236,6 +240,11 @@ std::string readFile(const Path & path)
     if (!fd)
         throw SysError("opening file '%1%'", path);
     return readFile(fd.get());
+}
+
+std::string readFile(const std::filesystem::path & path)
+{
+    return readFile(os_string_to_string(PathViewNG { path }));
 }
 
 
@@ -324,7 +333,7 @@ void recursiveSync(const Path & path)
     /* If it's a file, just fsync and return. */
     auto st = lstat(path);
     if (S_ISREG(st.st_mode)) {
-        AutoCloseFD fd = open(path.c_str(), O_RDONLY, 0);
+        AutoCloseFD fd = toDescriptor(open(path.c_str(), O_RDONLY, 0));
         if (!fd)
             throw SysError("opening file '%1%'", path);
         fd.fsync();
@@ -344,7 +353,7 @@ void recursiveSync(const Path & path)
             if (fs::is_directory(st)) {
                 dirsToEnumerate.emplace_back(entry.path());
             } else if (fs::is_regular_file(st)) {
-                AutoCloseFD fd = open(entry.path().c_str(), O_RDONLY, 0);
+                AutoCloseFD fd = toDescriptor(open(entry.path().string().c_str(), O_RDONLY, 0));
                 if (!fd)
                     throw SysError("opening file '%1%'", entry.path());
                 fd.fsync();
@@ -355,7 +364,7 @@ void recursiveSync(const Path & path)
 
     /* Fsync all the directories. */
     for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
-        AutoCloseFD fd = open(dir->c_str(), O_RDONLY, 0);
+        AutoCloseFD fd = toDescriptor(open(dir->string().c_str(), O_RDONLY, 0));
         if (!fd)
             throw SysError("opening directory '%1%'", *dir);
         fd.fsync();
@@ -595,19 +604,20 @@ void createSymlink(const Path & target, const Path & link)
     fs::create_symlink(target, link);
 }
 
-void replaceSymlink(const Path & target, const Path & link)
+void replaceSymlink(const fs::path & target, const fs::path & link)
 {
     for (unsigned int n = 0; true; n++) {
-        Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
+        auto tmp = link.parent_path() / fs::path{fmt(".%d_%s", n, link.filename().string())};
+        tmp = tmp.lexically_normal();
 
         try {
-            createSymlink(target, tmp);
+            fs::create_symlink(target, tmp);
         } catch (fs::filesystem_error & e) {
             if (e.code() == std::errc::file_exists) continue;
             throw;
         }
 
-        std::filesystem::rename(tmp, link);
+        fs::rename(tmp, link);
 
         break;
     }

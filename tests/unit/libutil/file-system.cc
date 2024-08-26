@@ -12,8 +12,8 @@
 #include <numeric>
 
 #ifdef _WIN32
-#  define FS_SEP "\\"
-#  define FS_ROOT "C:" FS_SEP // Need a mounted one, C drive is likely
+#  define FS_SEP L"\\"
+#  define FS_ROOT L"C:" FS_SEP // Need a mounted one, C drive is likely
 #else
 #  define FS_SEP "/"
 #  define FS_ROOT FS_SEP
@@ -21,6 +21,12 @@
 
 #ifndef PATH_MAX
 #  define PATH_MAX 4096
+#endif
+
+#ifdef _WIN32
+#  define GET_CWD _wgetcwd
+#else
+#  define GET_CWD getcwd
 #endif
 
 namespace nix {
@@ -33,34 +39,34 @@ namespace nix {
 
 TEST(absPath, doesntChangeRoot)
 {
-    auto p = absPath(FS_ROOT);
+    auto p = absPath(std::filesystem::path{FS_ROOT});
 
     ASSERT_EQ(p, FS_ROOT);
 }
 
 TEST(absPath, turnsEmptyPathIntoCWD)
 {
-    char cwd[PATH_MAX + 1];
-    auto p = absPath("");
+    OsChar cwd[PATH_MAX + 1];
+    auto p = absPath(std::filesystem::path{""});
 
-    ASSERT_EQ(p, getcwd((char *) &cwd, PATH_MAX));
+    ASSERT_EQ(p, GET_CWD((OsChar *) &cwd, PATH_MAX));
 }
 
 TEST(absPath, usesOptionalBasePathWhenGiven)
 {
-    char _cwd[PATH_MAX + 1];
-    char * cwd = getcwd((char *) &_cwd, PATH_MAX);
+    OsChar _cwd[PATH_MAX + 1];
+    OsChar * cwd = GET_CWD((OsChar *) &_cwd, PATH_MAX);
 
-    auto p = absPath("", cwd);
+    auto p = absPath(std::filesystem::path{""}.string(), std::filesystem::path{cwd}.string());
 
-    ASSERT_EQ(p, cwd);
+    ASSERT_EQ(p, std::filesystem::path{cwd}.string());
 }
 
 TEST(absPath, isIdempotent)
 {
-    char _cwd[PATH_MAX + 1];
-    char * cwd = getcwd((char *) &_cwd, PATH_MAX);
-    auto p1 = absPath(cwd);
+    OsChar _cwd[PATH_MAX + 1];
+    OsChar * cwd = GET_CWD((OsChar *) &_cwd, PATH_MAX);
+    auto p1 = absPath(std::filesystem::path{cwd});
     auto p2 = absPath(p1);
 
     ASSERT_EQ(p1, p2);
@@ -68,8 +74,8 @@ TEST(absPath, isIdempotent)
 
 TEST(absPath, pathIsCanonicalised)
 {
-    auto path = FS_ROOT "some/path/with/trailing/dot/.";
-    auto p1 = absPath(path);
+    auto path = FS_ROOT OS_STR("some/path/with/trailing/dot/.");
+    auto p1 = absPath(std::filesystem::path{path});
     auto p2 = absPath(p1);
 
     ASSERT_EQ(p1, FS_ROOT "some" FS_SEP "path" FS_SEP "with" FS_SEP "trailing" FS_SEP "dot");
@@ -82,26 +88,26 @@ TEST(absPath, pathIsCanonicalised)
 
 TEST(canonPath, removesTrailingSlashes)
 {
-    auto path = FS_ROOT "this/is/a/path//";
-    auto p = canonPath(path);
+    std::filesystem::path path = FS_ROOT "this/is/a/path//";
+    auto p = canonPath(path.string());
 
-    ASSERT_EQ(p, FS_ROOT "this" FS_SEP "is" FS_SEP "a" FS_SEP "path");
+    ASSERT_EQ(p, std::filesystem::path{FS_ROOT "this" FS_SEP "is" FS_SEP "a" FS_SEP "path"}.string());
 }
 
 TEST(canonPath, removesDots)
 {
-    auto path = FS_ROOT "this/./is/a/path/./";
-    auto p = canonPath(path);
+    std::filesystem::path path = FS_ROOT "this/./is/a/path/./";
+    auto p = canonPath(path.string());
 
-    ASSERT_EQ(p, FS_ROOT "this" FS_SEP "is" FS_SEP "a" FS_SEP "path");
+    ASSERT_EQ(p, std::filesystem::path{FS_ROOT "this" FS_SEP "is" FS_SEP "a" FS_SEP "path"}.string());
 }
 
 TEST(canonPath, removesDots2)
 {
-    auto path = FS_ROOT "this/a/../is/a////path/foo/..";
-    auto p = canonPath(path);
+    std::filesystem::path path = FS_ROOT "this/a/../is/a////path/foo/..";
+    auto p = canonPath(path.string());
 
-    ASSERT_EQ(p, FS_ROOT "this" FS_SEP "is" FS_SEP "a" FS_SEP "path");
+    ASSERT_EQ(p, std::filesystem::path{FS_ROOT "this" FS_SEP "is" FS_SEP "a" FS_SEP "path"}.string());
 }
 
 TEST(canonPath, requiresAbsolutePath)
@@ -243,7 +249,7 @@ TEST(isDirOrInDir, DISABLED_shouldWork)
 
 TEST(pathExists, rootExists)
 {
-    ASSERT_TRUE(pathExists(FS_ROOT));
+    ASSERT_TRUE(pathExists(std::filesystem::path{FS_ROOT}.string()));
 }
 
 TEST(pathExists, cwdExists)

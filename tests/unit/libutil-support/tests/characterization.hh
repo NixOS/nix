@@ -13,7 +13,7 @@ namespace nix {
  * The path to the unit test data directory. See the contributing guide
  * in the manual for further details.
  */
-static inline Path getUnitTestData() {
+static inline std::filesystem::path getUnitTestData() {
     return getEnv("_NIX_TEST_UNIT_DATA").value();
 }
 
@@ -36,7 +36,7 @@ protected:
      * While the "golden master" for this characterization test is
      * located. It should not be shared with any other test.
      */
-    virtual Path goldenMaster(PathView testStem) const = 0;
+    virtual std::filesystem::path goldenMaster(PathView testStem) const = 0;
 
 public:
     /**
@@ -77,7 +77,7 @@ public:
 
         if (testAccept())
         {
-            createDirs(dirOf(file));
+            std::filesystem::create_directories(file.parent_path());
             writeFile2(file, got);
             GTEST_SKIP()
                 << "Updating golden master "
@@ -97,10 +97,10 @@ public:
     {
         writeTest(
             testStem, test,
-            [](const Path & f) -> std::string {
+            [](const std::filesystem::path & f) -> std::string {
                 return readFile(f);
             },
-            [](const Path & f, const std::string & c) {
+            [](const std::filesystem::path & f, const std::string & c) {
                 return writeFile(f, c);
             });
     }

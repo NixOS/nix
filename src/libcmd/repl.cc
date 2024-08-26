@@ -622,7 +622,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 // When missing, trigger the normal exception
                 // e.g. :doc builtins.foo
                 // behaves like
-                // nix-repl> builtins.foo      
+                // nix-repl> builtins.foo<tab>
                 // error: attribute 'foo' missing
                 evalString(arg, v);
                 assert(false);
@@ -720,7 +720,7 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
     if (flakeRefS.empty())
         throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
 
-    auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, absPath("."), true);
+    auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, std::filesystem::current_path().string(), true);
     if (evalSettings.pureEval && !flakeRef.input.isLocked())
         throw Error("cannot use ':load-flake' on locked flake reference '%s' (use --impure to override)", flakeRefS);
 

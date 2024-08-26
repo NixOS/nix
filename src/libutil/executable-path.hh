@@ -7,11 +7,15 @@ namespace nix {
 
 MakeError(ExecutableLookupError, Error);
 
+/**
+ * @todo rename, it is not just good for execuatable paths, but also
+ * other lists of paths.
+ */
 struct ExecutablePath
 {
     std::vector<std::filesystem::path> directories;
 
-    constexpr static const OsString::value_type separator =
+    constexpr static const OsChar separator =
 #ifdef WIN32
         L';'
 #else

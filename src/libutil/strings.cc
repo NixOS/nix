@@ -14,8 +14,8 @@ template std::list<std::string> splitString(std::string_view s, std::string_view
 template std::set<std::string> splitString(std::string_view s, std::string_view separators);
 template std::vector<std::string> splitString(std::string_view s, std::string_view separators);
 
-template std::list<OsString> basicSplitString(
-    std::basic_string_view<OsString::value_type> s, std::basic_string_view<OsString::value_type> separators);
+template std::list<OsString>
+basicSplitString(std::basic_string_view<OsChar> s, std::basic_string_view<OsChar> separators);
 
 template std::string concatStringsSep(std::string_view, const std::list<std::string> &);
 template std::string concatStringsSep(std::string_view, const std::set<std::string> &);
