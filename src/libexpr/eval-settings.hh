@@ -7,6 +7,7 @@
 namespace nix {
 
 class Store;
+struct SourcePath;
 
 struct EvalSettings : Config
 {
@@ -22,7 +23,7 @@ struct EvalSettings : Config
      * @todo Return (`std::optional` of) `SourceAccssor` or something
      * more structured instead of mere `std::string`?
      */
-    using LookupPathHook = std::optional<std::string>(ref<Store> store, std::string_view);
+    using LookupPathHook = std::optional<SourcePath>(ref<Store> store, std::string_view);
 
     /**
      * Map from "scheme" to a `LookupPathHook`.

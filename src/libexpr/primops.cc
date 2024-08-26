@@ -178,7 +178,6 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
     auto path = realisePath(state, pos, vPath, std::nullopt);
     auto path2 = path.path.abs();
 
-    // FIXME
     auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
         if (!state.store->isStorePath(path2))
             return std::nullopt;
@@ -216,9 +215,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
         state.forceFunction(**state.vImportedDrvToDerivation, pos, "while evaluating imported-drv-to-derivation.nix.gen.hh");
         v.mkApp(*state.vImportedDrvToDerivation, w);
         state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix.gen.hh");
-    }
-
-    else {
+    } else {
         if (!vScope)
             state.evalFile(path, v);
         else {
@@ -1700,7 +1697,10 @@ static std::string_view legacyBaseNameOf(std::string_view path)
 static void prim_baseNameOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
-    v.mkString(legacyBaseNameOf(*state.coerceToString(pos, *args[0], context,
+    if (v.type() == nPath)
+        v.mkString(baseNameOf(v.path().path.abs()), context);
+    else
+        v.mkString(legacyBaseNameOf(*state.coerceToString(pos, *args[0], context,
             "while evaluating the first argument passed to builtins.baseNameOf",
             false, false)), context);
 }

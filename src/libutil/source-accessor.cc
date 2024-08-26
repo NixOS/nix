@@ -64,7 +64,9 @@ void SourceAccessor::setPathDisplay(std::string displayPrefix, std::string displ
 
 std::string SourceAccessor::showPath(const CanonPath & path)
 {
-    return displayPrefix + path.abs() + displaySuffix;
+    return displayPrefix
+        + ((displayPrefix.empty() || displayPrefix.ends_with("/")) ? "" : ":") + path.rel()
+        + displaySuffix;
 }
 
 CanonPath SourceAccessor::resolveSymlinks(
@@ -103,6 +105,10 @@ CanonPath SourceAccessor::resolveSymlinks(
     }
 
     return res;
+}
+
+bool SourceAccessor::toStringReturnsStorePath() const {
+    return true;
 }
 
 }

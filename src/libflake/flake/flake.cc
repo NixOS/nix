@@ -19,62 +19,17 @@ using namespace flake;
 
 namespace flake {
 
-typedef std::pair<StorePath, FlakeRef> FetchedFlake;
-typedef std::vector<std::pair<FlakeRef, FetchedFlake>> FlakeCache;
-
-static std::optional<FetchedFlake> lookupInFlakeCache(
-    const FlakeCache & flakeCache,
-    const FlakeRef & flakeRef)
-{
-    // FIXME: inefficient.
-    for (auto & i : flakeCache) {
-        if (flakeRef == i.first) {
-            debug("mapping '%s' to previously seen input '%s' -> '%s",
-                flakeRef, i.first, i.second.second);
-            return i.second;
-        }
-    }
-
-    return std::nullopt;
-}
-
-static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
+static FlakeRef maybeResolve(
     EvalState & state,
     const FlakeRef & originalRef,
-    bool allowLookup,
-    FlakeCache & flakeCache)
+    bool useRegistries)
 {
-    auto fetched = lookupInFlakeCache(flakeCache, originalRef);
-    FlakeRef resolvedRef = originalRef;
-
-    if (!fetched) {
         if (originalRef.input.isDirect()) {
-            fetched.emplace(originalRef.fetchTree(state.store));
-        } else {
-            if (allowLookup) {
-                resolvedRef = originalRef.resolve(state.store);
-                auto fetchedResolved = lookupInFlakeCache(flakeCache, originalRef);
-                if (!fetchedResolved) fetchedResolved.emplace(resolvedRef.fetchTree(state.store));
-                flakeCache.push_back({resolvedRef, *fetchedResolved});
-                fetched.emplace(*fetchedResolved);
-            }
-            else {
+            if (!useRegistries)
                 throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalRef);
-            }
-        }
-        flakeCache.push_back({originalRef, *fetched});
-    }
-
-    auto [storePath, lockedRef] = *fetched;
-
-    debug("got tree '%s' from '%s'",
-        state.store->printStorePath(storePath), lockedRef);
-
-    state.allowPath(storePath);
-
-    assert(!originalRef.input.getNarHash() || storePath == originalRef.input.computeStorePath(*state.store));
-
-    return {std::move(storePath), resolvedRef, lockedRef};
+            return originalRef.resolve(state.store);
+        } else
+            return originalRef;
 }
 
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
@@ -316,24 +271,19 @@ static Flake getFlake(
     EvalState & state,
     const FlakeRef & originalRef,
     bool allowLookup,
-    FlakeCache & flakeCache,
     InputPath lockRootPath)
 {
-    auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-        state, originalRef, allowLookup, flakeCache);
+    auto resolvedRef = maybeResolve(state, originalRef, allowLookup);
+    auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
 
-    return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->toRealPath(storePath)), lockRootPath);
-}
+    state.registerAccessor(accessor);
 
-Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup, FlakeCache & flakeCache)
-{
-    return getFlake(state, originalRef, allowLookup, flakeCache, {});
+    return readFlake(state, originalRef, resolvedRef, lockedRef, SourcePath {accessor, CanonPath::root}, lockRootPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup)
 {
-    FlakeCache flakeCache;
-    return getFlake(state, originalRef, allowLookup, flakeCache);
+    return getFlake(state, originalRef, allowLookup, {});
 }
 
 static LockFile readLockFile(
@@ -355,11 +305,9 @@ LockedFlake lockFlake(
 {
     experimentalFeatureSettings.require(Xp::Flakes);
 
-    FlakeCache flakeCache;
-
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
 
-    auto flake = getFlake(state, topRef, useRegistries, flakeCache);
+    auto flake = getFlake(state, topRef, useRegistries);
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
@@ -553,7 +501,7 @@ LockedFlake lockFlake(
                         }
 
                         if (mustRefetch) {
-                            auto inputFlake = getFlake(state, oldLock->lockedRef, false, flakeCache, inputPath);
+                            auto inputFlake = getFlake(state, oldLock->lockedRef, false, inputPath);
                             nodePaths.emplace(childNode, inputFlake.path.parent());
                             computeLocks(inputFlake.inputs, childNode, inputPath, oldLock, lockRootPath, parentPath, false);
                         } else {
@@ -586,7 +534,7 @@ LockedFlake lockFlake(
                             if (localRef.input.getType() == "path")
                                 localPath = absPath(*input.ref->input.getSourcePath(), parentPath);
 
-                            auto inputFlake = getFlake(state, localRef, useRegistries, flakeCache, inputPath);
+                            auto inputFlake = getFlake(state, localRef, useRegistries, inputPath);
 
                             auto childNode = make_ref<LockedNode>(inputFlake.lockedRef, ref);
 
@@ -615,12 +563,17 @@ LockedFlake lockFlake(
                         }
 
                         else {
-                            auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-                                state, *input.ref, useRegistries, flakeCache);
+                            auto [path, lockedRef] = [&]() -> std::tuple<SourcePath, FlakeRef>
+                            {
+                                auto resolvedRef = maybeResolve(state, *input.ref, useRegistries);
+                                auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
+                                state.registerAccessor(accessor);
+                                return {SourcePath(accessor), lockedRef};
+                            }();
 
                             auto childNode = make_ref<LockedNode>(lockedRef, ref, false);
 
-                            nodePaths.emplace(childNode, state.rootPath(state.store->toRealPath(storePath)));
+                            nodePaths.emplace(childNode, path);
 
                             node->inputs.insert_or_assign(id, childNode);
                         }
@@ -723,8 +676,7 @@ LockedFlake lockFlake(
                            repo, so we should re-read it. FIXME: we could
                            also just clear the 'rev' field... */
                         auto prevLockedRef = flake.lockedRef;
-                        FlakeCache dummyCache;
-                        flake = getFlake(state, topRef, useRegistries, dummyCache);
+                        flake = getFlake(state, topRef, useRegistries);
 
                         if (lockFlags.commitLockFile &&
                             flake.lockedRef.input.getRev() &&
@@ -768,21 +720,23 @@ void callFlake(EvalState & state,
 
         auto lockedNode = node.dynamic_pointer_cast<const LockedNode>();
 
+        /*
         // FIXME: This is a hack to support chroot stores. Remove this
         // once we can pass a sourcePath rather than a storePath to
         // call-flake.nix.
-        auto path = sourcePath.path.abs();
-        if (auto store = state.store.dynamic_pointer_cast<LocalFSStore>()) {
-            auto realStoreDir = store->getRealStoreDir();
-            if (isInDir(path, realStoreDir))
-                path = store->storeDir + path.substr(realStoreDir.size());
-        }
-
-        auto [storePath, subdir] = state.store->toStorePath(path);
+        // auto path = sourcePath.path.abs();
+        // if (auto store = state.store.dynamic_pointer_cast<LocalFSStore>()) {
+        //    auto realStoreDir = store->getRealStoreDir();
+        //    if (isInDir(path, realStoreDir))
+        //        path = store->storeDir + path.substr(realStoreDir.size());
+        // }
+        //
+        // auto [storePath, subdir] = state.store->toStorePath(path);
+        */
 
         emitTreeAttrs(
             state,
-            storePath,
+            SourcePath(sourcePath.accessor),
             lockedNode ? lockedNode->lockedRef.input : lockedFlake.flake.lockedRef.input,
             vSourceInfo,
             false,
@@ -793,7 +747,7 @@ void callFlake(EvalState & state,
 
         override
             .alloc(state.symbols.create("dir"))
-            .mkString(CanonPath(subdir).rel());
+            .mkString(sourcePath.path.rel());
 
         overrides.alloc(state.symbols.create(key->second)).mkAttrs(override);
     }

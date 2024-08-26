@@ -162,6 +162,15 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
     virtual std::string showPath(const CanonPath & path);
 
     /**
+     * System paths: `toString /foo/bar = "/foo/bar"`
+     * Virtual paths: fetched to the store
+     *
+     * In both cases, the returned string functionally identifies the path,
+     * and can still be read.
+     */
+    virtual bool toStringReturnsStorePath() const;
+
+    /**
      * Resolve any symlinks in `path` according to the given
      * resolution mode.
      *
