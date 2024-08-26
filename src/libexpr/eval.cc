@@ -364,6 +364,36 @@ EvalState::EvalState(
 
 EvalState::~EvalState()
 {
+  auto profileFile = getEnv("NIX_PROFILE_FILE");
+
+  std::map<PosIdx, std::string> cachedPositions;
+
+  if (!profileFile.has_value()) {
+        return;
+  }
+  std::ofstream profileStream(profileFile.value());
+  if (!profileStream) {
+      return;
+  }
+  for (auto & [stack, count] : callCount) {
+      auto first = true;
+      for (auto & pos : stack) {
+          if (first) {
+              first = false;
+          } else {
+              profileStream << ";";
+          }
+          if (auto it = cachedPositions.find(pos); it != cachedPositions.end()) {
+              profileStream << it->second;
+          } else {
+              std::stringstream posStr;
+              posStr << positions[pos];
+              cachedPositions[pos] = posStr.str();
+              profileStream << posStr.str();
+          }
+      }
+      profileStream << " " << count << std::endl;
+  }
 }
 
 
@@ -1484,15 +1514,36 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     v.mkBool(true);
 }
 
-
 void ExprLambda::eval(EvalState & state, Env & env, Value & v)
 {
     v.mkLambda(&env, this);
 }
 
+static const std::chrono::duration SAMPLE_INTERVAL = std::chrono::microseconds(10);
+namespace {
+class SampleStack {
+    EvalState & state;
+public:
+    SampleStack(EvalState & state, const PosIdx pos) : state(state) {
+        state.stack.push_back(pos);
+    }
+    ~SampleStack() {
+        auto now = std::chrono::high_resolution_clock::now();
+        if (now - state.lastStackSample > SAMPLE_INTERVAL) {
+            state.callCount[state.stack] += 1;
+            state.lastStackSample = now;
+        }
+        if (state.stack.size() > 0) {
+            state.stack.pop_back();
+        }
+    }
+};
+};
+
 void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos)
 {
     auto _level = addCallDepth(pos);
+    SampleStack _sample(*this, pos);
 
     auto trace = settings.traceFunctionCalls
         ? std::make_unique<FunctionCallTrace>(positions[pos])

@@ -15,6 +15,7 @@
 #include "search-path.hh"
 #include "repl-exit-status.hh"
 #include "ref.hh"
+#include "pos-idx.hh"
 
 #include <map>
 #include <optional>
@@ -374,6 +375,10 @@ private:
 #endif
 
 public:
+
+    std::vector<PosIdx> stack = {};
+    std::map<std::vector<PosIdx>, int> callCount = {};
+    std::chrono::time_point<std::chrono::high_resolution_clock> lastStackSample = std::chrono::high_resolution_clock::now();
 
     EvalState(
         const LookupPath & _lookupPath,
@@ -849,6 +854,7 @@ private:
     unsigned long nrFunctionCalls = 0;
 
     bool countCalls;
+
 
     typedef std::map<std::string, size_t> PrimOpCalls;
     PrimOpCalls primOpCalls;
