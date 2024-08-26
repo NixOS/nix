@@ -297,7 +297,7 @@ void MixProfile::updateProfile(const BuiltPaths & buildables)
 
 MixDefaultProfile::MixDefaultProfile()
 {
-    profile = getDefaultProfile();
+    profile = getDefaultProfile().string();
 }
 
 MixEnvironment::MixEnvironment()

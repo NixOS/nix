@@ -161,14 +161,14 @@ bool createUserEnv(
         PathLocks lock;
         lockProfile(lock, profile);
 
-        Path lockTokenCur = optimisticLockProfile(profile);
+        std::filesystem::path lockTokenCur = optimisticLockProfile(profile);
         if (lockToken != lockTokenCur) {
             printInfo("profile '%1%' changed while we were busy; restarting", profile);
             return false;
         }
 
         debug("switching to new user environment");
-        Path generation = createGeneration(*store2, profile, topLevelOut);
+        std::filesystem::path generation = createGeneration(*store2, profile, topLevelOut);
         switchLink(profile, generation);
     }
 

@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include <filesystem>
+
 #include "nix/util/file-descriptor.hh"
 
 namespace nix {
@@ -10,12 +12,12 @@ namespace nix {
  * -1 is returned if create is false and the lock could not be opened
  * because it doesn't exist.  Any other error throws an exception.
  */
-AutoCloseFD openLockFile(const Path & path, bool create);
+AutoCloseFD openLockFile(const std::filesystem::path & path, bool create);
 
 /**
  * Delete an open lock file.
  */
-void deleteLockFile(const Path & path, Descriptor desc);
+void deleteLockFile(const std::filesystem::path & path, Descriptor desc);
 
 enum LockType { ltRead, ltWrite, ltNone };
 
@@ -24,14 +26,14 @@ bool lockFile(Descriptor desc, LockType lockType, bool wait);
 class PathLocks
 {
 private:
-    typedef std::pair<Descriptor, Path> FDPair;
+    typedef std::pair<Descriptor, std::filesystem::path> FDPair;
     std::list<FDPair> fds;
     bool deletePaths;
 
 public:
     PathLocks();
-    PathLocks(const PathSet & paths, const std::string & waitMsg = "");
-    bool lockPaths(const PathSet & _paths, const std::string & waitMsg = "", bool wait = true);
+    PathLocks(const std::set<std::filesystem::path> & paths, const std::string & waitMsg = "");
+    bool lockPaths(const std::set<std::filesystem::path> & _paths, const std::string & waitMsg = "", bool wait = true);
     ~PathLocks();
     void unlock();
     void setDeletion(bool deletePaths);

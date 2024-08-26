@@ -849,7 +849,10 @@ struct CmdProfileDiffClosures : virtual StoreCommand, MixDefaultProfile
                 first = false;
                 logger->cout("Version %d -> %d:", prevGen->number, gen.number);
                 printClosureDiff(
-                    store, store->followLinksToStorePath(prevGen->path), store->followLinksToStorePath(gen.path), "  ");
+                    store,
+                    store->followLinksToStorePath(prevGen->path.string()),
+                    store->followLinksToStorePath(gen.path.string()),
+                    "  ");
             }
 
             prevGen = gen;
