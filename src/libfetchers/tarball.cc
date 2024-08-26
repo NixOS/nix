@@ -170,7 +170,7 @@ static DownloadTarballResult downloadTarball_(
     auto tarballCache = getTarballCache();
     auto parseSink = tarballCache->getFileSystemObjectSink();
     auto lastModified = unpackTarfileToSink(archive, *parseSink);
-    auto tree = parseSink->sync();
+    auto tree = parseSink->flush();
 
     act.reset();
 

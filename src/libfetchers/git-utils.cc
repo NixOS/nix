@@ -170,6 +170,11 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
     /** Location of the repository on disk. */
     std::filesystem::path path;
+    /**
+     * libgit2 repository. Note that new objects are not written to disk,
+     * because we are using a mempack backend. For writing to disk, see
+     * `flush()`, which is also called by `GitFileSystemObjectSink::sync()`.
+     */
     Repository repo;
     /**
      * In-memory object store for efficient batched writing to packfiles.
@@ -1064,7 +1069,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             git_tree_entry_filemode(entry));
     }
 
-    Hash sync() override
+    Hash flush() override
     {
         updateBuilders({});
 
