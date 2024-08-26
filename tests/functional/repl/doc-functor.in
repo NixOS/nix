@@ -1,0 +1,10 @@
+:l doc-functor.nix
+:doc multiplier
+:doc doubler
+:doc recursive
+:doc recursive2
+:doc diverging
+:doc helper
+:doc helper2
+:doc lib.helper3
+:doc helper3

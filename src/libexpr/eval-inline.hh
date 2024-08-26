@@ -4,6 +4,7 @@
 #include "print.hh"
 #include "eval.hh"
 #include "eval-error.hh"
+#include "eval-settings.hh"
 
 namespace nix {
 
@@ -138,5 +139,12 @@ inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view e
     }
 }
 
+[[gnu::always_inline]]
+inline CallDepth EvalState::addCallDepth(const PosIdx pos) {
+    if (callDepth > settings.maxCallDepth)
+        error<EvalError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
+
+    return CallDepth(callDepth);
+};
 
 }
