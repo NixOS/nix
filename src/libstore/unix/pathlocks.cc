@@ -13,7 +13,7 @@
 
 namespace nix {
 
-AutoCloseFD openLockFile(const Path & path, bool create)
+AutoCloseFD openLockFile(const std::filesystem::path & path, bool create)
 {
     AutoCloseFD fd;
 
@@ -24,7 +24,7 @@ AutoCloseFD openLockFile(const Path & path, bool create)
     return fd;
 }
 
-void deleteLockFile(const Path & path, Descriptor desc)
+void deleteLockFile(const std::filesystem::path & path, Descriptor desc)
 {
     /* Get rid of the lock file.  Have to be careful not to introduce
        races.  Write a (meaningless) token to the file to indicate to
@@ -69,7 +69,7 @@ bool lockFile(Descriptor desc, LockType lockType, bool wait)
     return true;
 }
 
-bool PathLocks::lockPaths(const PathSet & paths, const std::string & waitMsg, bool wait)
+bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const std::string & waitMsg, bool wait)
 {
     assert(fds.empty());
 
@@ -81,7 +81,7 @@ bool PathLocks::lockPaths(const PathSet & paths, const std::string & waitMsg, bo
        preventing deadlocks. */
     for (auto & path : paths) {
         checkInterrupt();
-        Path lockPath = path + ".lock";
+        std::filesystem::path lockPath = path + ".lock";
 
         debug("locking path '%1%'", path);
 

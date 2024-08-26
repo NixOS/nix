@@ -55,7 +55,8 @@ inline Path absPath(const Path & path, std::optional<PathView> dir = {}, bool re
     return absPath(PathView{path}, dir, resolveSymlinks);
 }
 
-std::filesystem::path absPath(const std::filesystem::path & path, bool resolveSymlinks = false);
+std::filesystem::path
+absPath(const std::filesystem::path & path, const std::filesystem::path * dir = nullptr, bool resolveSymlinks = false);
 
 /**
  * Canonicalise a path by removing all `.` or `..` components and
@@ -151,6 +152,12 @@ bool pathAccessible(const std::filesystem::path & path);
  * `std::filesystem::read_symlink`.
  */
 Path readLink(const Path & path);
+
+/**
+ * Read the contents (target) of a symbolic link.  The result is not
+ * in any way canonicalised.
+ */
+std::filesystem::path readLink(const std::filesystem::path & path);
 
 /**
  * Open a `Descriptor` with read-only access to the given directory.
