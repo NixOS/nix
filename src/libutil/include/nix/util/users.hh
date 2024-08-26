@@ -2,12 +2,11 @@
 ///@file
 
 #include <filesystem>
-
-#include "nix/util/types.hh"
-
 #ifndef _WIN32
 #  include <sys/types.h>
 #endif
+
+#include "nix/util/types.hh"
 
 namespace nix {
 

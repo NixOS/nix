@@ -1,6 +1,7 @@
 #include "nix/util/util.hh"
 #include "nix/util/users.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/executable-path.hh"
 #include "nix/util/file-system.hh"
 
 #ifndef _WIN32
@@ -13,7 +14,7 @@ namespace nix {
 
 std::filesystem::path getCacheDir()
 {
-    auto dir = getEnv("NIX_CACHE_HOME");
+    auto dir = getEnvOs(OS_STR("NIX_CACHE_HOME"));
     if (dir)
         return *dir;
 #ifndef _WIN32
@@ -25,7 +26,7 @@ std::filesystem::path getCacheDir()
 
 std::filesystem::path getConfigDir()
 {
-    auto dir = getEnv("NIX_CONFIG_HOME");
+    auto dir = getEnvOs(OS_STR("NIX_CONFIG_HOME"));
     if (dir)
         return *dir;
 #ifndef _WIN32
@@ -51,7 +52,7 @@ std::vector<std::filesystem::path> getConfigDirs()
 
 std::filesystem::path getDataDir()
 {
-    auto dir = getEnv("NIX_DATA_HOME");
+    auto dir = getEnvOs(OS_STR("NIX_DATA_HOME"));
     if (dir)
         return *dir;
 #ifndef _WIN32
@@ -63,7 +64,7 @@ std::filesystem::path getDataDir()
 
 std::filesystem::path getStateDir()
 {
-    auto dir = getEnv("NIX_STATE_HOME");
+    auto dir = getEnvOs(OS_STR("NIX_STATE_HOME"));
     if (dir)
         return *dir;
 #ifndef _WIN32
@@ -84,9 +85,10 @@ std::string expandTilde(std::string_view path)
 {
     // TODO: expand ~user ?
     auto tilde = path.substr(0, 2);
-    if (tilde == "~/" || tilde == "~")
-        return getHome().string() + std::string(path.substr(1));
-    else
+    if (tilde == "~/" || tilde == "~") {
+        auto suffix = path.size() >= 2 ? std::string(path.substr(2)) : std::string{};
+        return (getHome() / suffix).string();
+    } else
         return std::string(path);
 }
 
