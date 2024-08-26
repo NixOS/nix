@@ -194,15 +194,16 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             if (git_repository_init(Setter(repo), path.string().c_str(), bare))
                 throw Error("creating Git repository '%s': %s", path, git_error_last()->message);
         }
-        git_odb * odb;
-        if (git_repository_odb(&odb, repo.get()))
+
+        ObjectDb odb;
+        if (git_repository_odb(Setter(odb), repo.get()))
             throw Error("getting Git object database: %s", git_error_last()->message);
 
-        // TODO: release mempack_backend?
+        // mempack_backend will be owned by the repository, so we are not expected to free it ourselves.
         if (git_mempack_new(&mempack_backend))
             throw Error("creating mempack backend: %s", git_error_last()->message);
 
-        if (git_odb_add_backend(odb, mempack_backend, 999))
+        if (git_odb_add_backend(odb.get(), mempack_backend, 999))
             throw Error("adding mempack backend to Git object database: %s", git_error_last()->message);
     }
 
