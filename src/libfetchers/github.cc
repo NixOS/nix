@@ -261,11 +261,12 @@ struct GitArchiveInputScheme : InputScheme
         auto tarballCache = getTarballCache();
         auto parseSink = tarballCache->getFileSystemObjectSink();
         auto lastModified = unpackTarfileToSink(archive, *parseSink);
+        auto tree = parseSink->sync();
 
         act.reset();
 
         TarballInfo tarballInfo {
-            .treeHash = tarballCache->dereferenceSingletonDirectory(parseSink->sync()),
+            .treeHash = tarballCache->dereferenceSingletonDirectory(tree),
             .lastModified = lastModified
         };
 
