@@ -129,6 +129,7 @@ sources = files(
   'english.cc',
   'environment-variables.cc',
   'error.cc',
+  'exec.hh',
   'executable-path.cc',
   'exit.cc',
   'experimental-features.cc',

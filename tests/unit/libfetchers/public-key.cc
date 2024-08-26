@@ -10,11 +10,11 @@ using nlohmann::json;
 
 class PublicKeyTest : public CharacterizationTest
 {
-    Path unitTestData = getUnitTestData() + "/public-key";
+    std::filesystem::path unitTestData = getUnitTestData() / "public-key";
 
 public:
-    Path goldenMaster(std::string_view testStem) const override {
-        return unitTestData + "/" + testStem;
+    std::filesystem::path goldenMaster(std::string_view testStem) const override {
+        return unitTestData / testStem;
     }
 };
 

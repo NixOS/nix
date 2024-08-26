@@ -25,7 +25,7 @@
 
 #include "strings-inline.hh"
 
-namespace fs = std::filesystem;
+namespace nix::fs { using namespace std::filesystem; }
 
 using namespace nix;
 using namespace nix::flake;
@@ -53,7 +53,7 @@ public:
 
     FlakeRef getFlakeRef()
     {
-        return parseFlakeRef(fetchSettings, flakeUrl, absPath(".")); //FIXME
+        return parseFlakeRef(fetchSettings, flakeUrl, fs::current_path().string()); //FIXME
     }
 
     LockedFlake lockFlake()
@@ -65,7 +65,7 @@ public:
     {
         return {
             // Like getFlakeRef but with expandTilde calld first
-            parseFlakeRef(fetchSettings, expandTilde(flakeUrl), absPath("."))
+            parseFlakeRef(fetchSettings, expandTilde(flakeUrl), fs::current_path().string())
         };
     }
 };
@@ -880,7 +880,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto evalState = getEvalState();
 
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(
-            fetchSettings, templateUrl, absPath("."));
+            fetchSettings, templateUrl, fs::current_path().string());
 
         auto installable = InstallableFlake(nullptr,
             evalState, std::move(templateFlakeRef), templateName, ExtendedOutputsSpec::Default(),
@@ -927,7 +927,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                         }
                         continue;
                     } else
-                        writeFile(to2.string(), contents);
+                        writeFile(to2, contents);
                 }
                 else if (fs::is_symlink(st)) {
                     auto target = fs::read_symlink(from2);

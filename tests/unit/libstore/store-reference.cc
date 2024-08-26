@@ -13,11 +13,11 @@ using nlohmann::json;
 
 class StoreReferenceTest : public CharacterizationTest, public LibStoreTest
 {
-    Path unitTestData = getUnitTestData() + "/store-reference";
+    std::filesystem::path unitTestData = getUnitTestData() / "store-reference";
 
-    Path goldenMaster(PathView testStem) const override
+    std::filesystem::path goldenMaster(PathView testStem) const override
     {
-        return unitTestData + "/" + testStem + ".txt";
+        return unitTestData / (testStem + ".txt");
     }
 };
 

@@ -420,10 +420,12 @@ bool statusOk(int status)
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
-int execvpe(const char * file0, char * const argv[], char * const envp[])
+int execvpe(const char * file0, const char * const argv[], const char * const envp[])
 {
-    auto file = ExecutablePath::load().findPath(file0).string();
-    return execve(file.c_str(), argv, envp);
+    auto file = ExecutablePath::load().findPath(file0);
+    // `const_cast` is safe. See the note in
+    // https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html
+    return execve(file.c_str(), const_cast<char *const *>(argv), const_cast<char *const *>(envp));
 }
 
 }

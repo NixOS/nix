@@ -13,7 +13,6 @@ sources += files(
 include_dirs += include_directories('.')
 
 headers += files(
-  'exec.hh',
   'monitor-fd.hh',
   'signals-impl.hh',
 )

@@ -350,7 +350,7 @@ string_parts_interpolated
 
 path_start
   : PATH {
-    Path path(absPath({$1.p, $1.l}, state->basePath.path.abs()));
+    Path path(absPath(std::string_view{$1.p, $1.l}, state->basePath.path.abs()));
     /* add back in the trailing '/' to the first segment */
     if ($1.p[$1.l-1] == '/' && $1.l > 1)
       path += "/";
