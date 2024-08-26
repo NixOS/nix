@@ -621,6 +621,11 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             Value & functor = *v.attrs()->find(sFunctor)->value;
             Value * vp = &v;
             Value partiallyApplied;
+            // The first paramater is not user-provided, and may be
+            // handled by code that is opaque to the user, like lib.const = x: y: y;
+            // So preferably we show docs that are relevant to the
+            // "partially applied" function returned by e.g. `const`.
+            // We apply the first argument:
             callFunction(functor, 1, &vp, partiallyApplied, noPos);
             auto _level = addCallDepth(noPos);
             return getDoc(partiallyApplied);
