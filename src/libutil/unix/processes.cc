@@ -1,5 +1,6 @@
 #include "current-process.hh"
 #include "environment-variables.hh"
+#include "executable-path.hh"
 #include "signals.hh"
 #include "processes.hh"
 #include "finally.hh"
@@ -417,6 +418,12 @@ std::string statusToString(int status)
 bool statusOk(int status)
 {
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+int execvpe(const char * file0, char * const argv[], char * const envp[])
+{
+    auto file = ExecutablePath::load().findPath(file0).string();
+    return execve(file.c_str(), argv, envp);
 }
 
 }
