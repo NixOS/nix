@@ -2,7 +2,7 @@
 
 set -x
 
-((NEW_NIX_FIRST_BUILD_UID=350))
+((NEW_NIX_FIRST_BUILD_UID=351))
 ((TEMP_NIX_FIRST_BUILD_UID=31000))
 
 nix_user_n() {
