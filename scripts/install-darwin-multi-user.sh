@@ -9,11 +9,11 @@ set -o pipefail
 # - we changed UID to 301 because Big Sur updates failed into recovery mode
 #   we're targeting the 200-400 UID range for role users mentioned in the
 #   usage note for sysadminctl
-# - we changed UID to 350 because Sequoia now uses UIDs 300-304 for its own
+# - we changed UID to 351 because Sequoia now uses UIDs 300-304 for its own
 #   daemon users
 # - we changed GID to 350 alongside above just because it hides the nixbld
 #   group from the Users & Groups settings panel :)
-export NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-350}"
+export NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-351}"
 export NIX_BUILD_GROUP_ID="${NIX_BUILD_GROUP_ID:-350}"
 export NIX_BUILD_USER_NAME_TEMPLATE="_nixbld%d"
 
