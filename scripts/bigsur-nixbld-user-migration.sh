@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-((NEW_NIX_FIRST_BUILD_UID=350))
+((NEW_NIX_FIRST_BUILD_UID=351))
 
 id_available(){
 	dscl . list /Users UniqueID | grep -E '\b'$1'\b' >/dev/null
