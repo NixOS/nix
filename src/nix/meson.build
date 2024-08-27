@@ -7,6 +7,7 @@ project('nix', 'cpp',
     'debug=true',
     'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
+    'localstatedir=/nix/var',
   ],
   meson_version : '>= 1.1',
   license : 'LGPL-2.1-or-later',
@@ -16,9 +17,11 @@ cxx = meson.get_compiler('cpp')
 
 subdir('build-utils-meson/deps-lists')
 
+nix_store = dependency('nix-store')
+
 deps_private_maybe_subproject = [
   dependency('nix-util'),
-  dependency('nix-store'),
+  nix_store,
   dependency('nix-expr'),
   dependency('nix-flake'),
   dependency('nix-fetchers'),
@@ -244,3 +247,12 @@ custom_target(
 )
 # TODO(Ericson3214): Dosen't yet work
 #meson.override_find_program(linkname, t)
+
+localstatedir = nix_store.get_variable(
+  'localstatedir',
+  default_value : get_option('localstatedir'),
+)
+assert(localstatedir == get_option('localstatedir'))
+store_dir = nix_store.get_variable('storedir')
+subdir('scripts')
+subdir('misc')

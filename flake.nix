@@ -295,6 +295,7 @@
       devShells = let
         makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs:
         let
+          buildCanExecuteHost = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
           modular = devFlake.getSystem stdenv.buildPlatform.system;
           transformFlag = prefix: flag:
             assert builtins.isString flag;
@@ -352,7 +353,7 @@
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
             ++ pkgs.nixComponents.nix-functional-tests.baseNativeBuildInputs
             ++ lib.optional
-              (!stdenv.buildPlatform.canExecute stdenv.hostPlatform
+              (!buildCanExecuteHost
                  # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
                  && !(stdenv.hostPlatform.isWindows && stdenv.buildPlatform.isDarwin)
                  && stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages
