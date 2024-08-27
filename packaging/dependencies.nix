@@ -115,8 +115,24 @@ scope: {
     version = inputs.libgit2.lastModifiedDate;
     cmakeFlags = attrs.cmakeFlags or []
       ++ [ "-DUSE_SSH=exec" ];
+    nativeBuildInputs = attrs.nativeBuildInputs or []
+      ++ [
+        # Needed for `git apply`; see `prePatch`
+        pkgs.buildPackages.gitMinimal
+      ];
+    # Only `git apply` can handle git binary patches
+    prePatch = ''
+      patch() {
+        git apply
+      }
+    '';
     patches = attrs.patches or []
-      ++ [ ./patches/libgit2-mempack-thin-packfile.patch ];
+      ++ [
+        ./patches/libgit2-mempack-thin-packfile.patch
+
+        # binary patch; see `prePatch`
+        ./patches/libgit2-packbuilder-callback-interruptible.patch
+      ];
   });
 
   busybox-sandbox-shell = pkgs.busybox-sandbox-shell or (pkgs.busybox.override {
