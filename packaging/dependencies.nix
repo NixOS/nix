@@ -132,9 +132,29 @@ scope: {
 =======
     cmakeFlags = attrs.cmakeFlags or []
       ++ [ "-DUSE_SSH=exec" ];
+    nativeBuildInputs = attrs.nativeBuildInputs or []
+      ++ [
+        # Needed for `git apply`; see `prePatch`
+        pkgs.buildPackages.gitMinimal
+      ];
+    # Only `git apply` can handle git binary patches
+    prePatch = ''
+      patch() {
+        git apply
+      }
+    '';
     patches = attrs.patches or []
+<<<<<<< HEAD
       ++ [ ./patches/libgit2-mempack-thin-packfile.patch ];
 >>>>>>> 5dd6c4f06 (libgit2, GitRepo: Write thin packfiles)
+=======
+      ++ [
+        ./patches/libgit2-mempack-thin-packfile.patch
+
+        # binary patch; see `prePatch`
+        ./patches/libgit2-packbuilder-callback-interruptible.patch
+      ];
+>>>>>>> c1fe3546e (libgit2: Add libgit2-packbuilder-callback-interruptible.patch)
   });
 
   busybox-sandbox-shell =
