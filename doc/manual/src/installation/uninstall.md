@@ -43,8 +43,15 @@ which you may remove.
 
 ### macOS
 
-1. Edit `/etc/zshrc`, `/etc/bashrc`, and `/etc/bash.bashrc` to remove the lines sourcing `nix-daemon.sh`, which should look like this:
+1. If system-wide shell initialisation files haven't been altered since installing Nix, use the backups made by the installer:
 
+   ```console
+   sudo mv /etc/zshrc.backup-before-nix /etc/zshrc
+   sudo mv /etc/bashrc.backup-before-nix /etc/bashrc
+   sudo mv /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc
+   ```
+
+   Otherwise, edit `/etc/zshrc`, `/etc/bashrc`, and `/etc/bash.bashrc` to remove the lines sourcing `nix-daemon.sh`, which should look like this:
    ```bash
    # Nix
    if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
@@ -53,7 +60,7 @@ which you may remove.
    # End Nix
    ```
 
-2. Stop and remove the Nix daemon services:
+3. Stop and remove the Nix daemon services:
 
    ```console
    sudo launchctl unload /Library/LaunchDaemons/org.nixos.nix-daemon.plist
@@ -64,7 +71,7 @@ which you may remove.
 
    This stops the Nix daemon and prevents it from being started next time you boot the system.
 
-3. Remove the `nixbld` group and the `_nixbuildN` users:
+4. Remove the `nixbld` group and the `_nixbuildN` users:
 
    ```console
    sudo dscl . -delete /Groups/nixbld
@@ -73,7 +80,7 @@ which you may remove.
 
    This will remove all the build users that no longer serve a purpose.
 
-4. Edit fstab using `sudo vifs` to remove the line mounting the Nix Store volume on `/nix`, which looks like
+5. Edit fstab using `sudo vifs` to remove the line mounting the Nix Store volume on `/nix`, which looks like
 
    ```
    UUID=<uuid> /nix apfs rw,noauto,nobrowse,suid,owners
@@ -88,7 +95,7 @@ which you may remove.
 
    This will prevent automatic mounting of the Nix Store volume.
 
-5. Edit `/etc/synthetic.conf` to remove the `nix` line.
+6. Edit `/etc/synthetic.conf` to remove the `nix` line.
    If this is the only line in the file you can remove it entirely:
 
    ```bash
@@ -103,14 +110,14 @@ which you may remove.
 
    This will prevent the creation of the empty `/nix` directory.
 
-6. Remove the files Nix added to your system, except for the store:
+7. Remove the files Nix added to your system, except for the store:
 
    ```console
    sudo rm -rf /etc/nix /var/root/.nix-profile /var/root/.nix-defexpr /var/root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
    ```
 
 
-7. Remove the Nix Store volume:
+8. Remove the Nix Store volume:
 
    ```console
    sudo diskutil apfs deleteVolume /nix
