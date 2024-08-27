@@ -135,7 +135,7 @@ which you may remove.
 
    If you _do_ find a "Nix Store" volume, delete it by running `diskutil apfs deleteVolume` with the store volume's `diskXsY` identifier.
 
-   If you get an error that the volume is in use by the kernel you might have to reboot and immediately delete the volume before atrting any other process.
+   If you get an error that the volume is in use by the kernel, reboot and immediately delete the volume before starting any other process.
 
 > **Note**
 >
