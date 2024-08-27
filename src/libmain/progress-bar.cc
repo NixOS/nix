@@ -75,6 +75,9 @@ private:
         bool active = true;
         bool paused = false;
         bool haveUpdate = true;
+
+        /** Helps avoid unnecessary redraws, see `draw()` */
+        std::string lastOutput;
     };
 
     Sync<State> state_;
@@ -361,6 +364,31 @@ public:
 
     std::chrono::milliseconds draw(State & state)
     {
+        // Call draw() and render if the output has changed.
+
+        // Excessive redrawing is noticable on slow terminals, and it interferes
+        // with text selection in some terminals, including libvte-based terminal
+        // emulators.
+
+        std::optional<std::string> newOutput;
+        auto nextWakeup = draw(state, newOutput);
+        {
+            auto state(state_.lock());
+            if (newOutput && *newOutput != state->lastOutput) {
+                writeToStderr(*newOutput);
+                state->lastOutput = std::move(*newOutput);
+            }
+        }
+        return nextWakeup;
+    }
+
+    /**
+     * @param output[out] `nullopt` if nothing is to be drawn. Otherwise, a
+     *                    string of ANSI terminal output that can be used to 
+     *                    render the progress bar.
+     */
+    std::chrono::milliseconds draw(State & state, std::optional<std::string> & output)
+    {
         auto nextWakeup = std::chrono::milliseconds::max();
 
         state.haveUpdate = false;
@@ -412,7 +440,7 @@ public:
         auto width = getWindowSize().second;
         if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
 
-        writeToStderr("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");
+        output = "\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K";
 
         return nextWakeup;
     }
