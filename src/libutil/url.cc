@@ -81,7 +81,7 @@ std::map<std::string, std::string> decodeQuery(const std::string & query)
         auto e = s.find('=');
 
         if (e == std::string::npos) {
-            warn("invalid URI query '%s', did you forget an equals sign `=`?", s);
+            warn("dubious URI query '%s' is missing equal sign '%s'", s, "=");
             continue;
         }
 
