@@ -120,7 +120,7 @@ Contrary to URL-like references, path-like flake references can contain arbitrar
 
 ### Examples
 
-* `.`: The flake to which the current directory belongs to.
+* `.`: The flake to which the current directory belongs.
 * `/home/alice/src/patchelf`: A flake in some other directory.
 * `./../sub directory/with Ûñî©ôδ€`: A flake in another relative directory that
   has Unicode characters in its name.
