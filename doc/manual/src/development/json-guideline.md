@@ -90,7 +90,7 @@ This representation is extensible and preserves the ordering:
 
 ## Self-describing values
 
-As described in the previous section, it's crucial that schemas can be extended with with new fields without breaking compatibility.
+As described in the previous section, it's crucial that schemas can be extended with new fields without breaking compatibility.
 However, that should *not* mean we use the presence/absence of fields to indicate optional information *within* a version of the schema.
 Instead, always include the field, and use `null` to indicate the "nothing" case.
 
