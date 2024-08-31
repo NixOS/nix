@@ -35,7 +35,7 @@ To build Nix itself in this shell:
 
 ```console
 [nix-shell]$ mesonFlags+=" --prefix=$(pwd)/outputs/out"
-[nix-shell]$ dontAddPrefix=1 mesonConfigurePhase
+[nix-shell]$ mesonConfigurePhase
 [nix-shell]$ ninjaBuildPhase
 ```
 
