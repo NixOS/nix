@@ -22,7 +22,7 @@ Key::Key(std::string_view s)
     key = ss.payload;
 
     if (name == "" || key == "")
-        throw Error("secret key is corrupt");
+        throw Error("key is corrupt");
 
     key = base64Decode(key);
 }
