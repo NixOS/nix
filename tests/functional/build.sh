@@ -152,10 +152,10 @@ nix build --impure -f multiple-outputs.nix --json e --no-link \
     (.outputs | keys == ["a_a", "b"]))
 '
 
-# Make sure that `mkdir $HOME fails with a "Permission denied" error`
+# Make sure that `mkdir $HOME` fails with a "Permission denied" or "Operation not permitted" error
 out="$(nix build -f mkdir-home-failing.nix -L 2>&1)" && status=0 || status=$?
 test "$status" = 1
-<<<"$out" grepQuiet -E "Permission denied"
+<<<"$out" grepQuiet -E "Permission denied" || <<<"$out" grepQuiet -E "Operation not permitted"
 
 # Make sure that `--stdin` works and does not apply any defaults
 printf "" | nix build --no-link --stdin --json | jq --exit-status '. == []'
