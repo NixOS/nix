@@ -2,6 +2,7 @@
 #include "derivations.hh"
 #include "dotgraph.hh"
 #include "globals.hh"
+#include "store-open.hh"
 #include "store-cast.hh"
 #include "local-fs-store.hh"
 #include "log-store.hh"

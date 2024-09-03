@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "config-abstract.hh"
 #include "error.hh"
 #include "json-utils.hh"
 #include "types.hh"

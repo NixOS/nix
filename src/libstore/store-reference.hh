@@ -2,6 +2,7 @@
 ///@file
 
 #include <variant>
+#include <nlohmann/json_fwd.hpp>
 
 #include "types.hh"
 
@@ -41,7 +42,7 @@ namespace nix {
  */
 struct StoreReference
 {
-    using Params = std::map<std::string, std::string>;
+    using Params = nlohmann::json::object_t;
 
     /**
      * Special store reference `""` or `"auto"`

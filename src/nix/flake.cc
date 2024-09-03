@@ -8,7 +8,7 @@
 #include "flake/flake.hh"
 #include "get-drvs.hh"
 #include "signals.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "derivations.hh"
 #include "outputs-spec.hh"
 #include "attr-path.hh"

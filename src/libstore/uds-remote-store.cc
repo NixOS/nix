@@ -1,6 +1,7 @@
 #include "uds-remote-store.hh"
 #include "unix-domain-socket.hh"
 #include "worker-protocol.hh"
+#include "store-registration.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -17,16 +18,26 @@
 
 namespace nix {
 
+config::SettingDescriptionMap UDSRemoteStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(LocalFSStoreConfig::descriptions());
+    ret.merge(RemoteStoreConfig::descriptions());
+    return ret;
+}
+
+
 UDSRemoteStoreConfig::UDSRemoteStoreConfig(
     std::string_view scheme,
     std::string_view authority,
-    const Params & params)
-    : StoreConfig(params)
-    , LocalFSStoreConfig(params)
-    , RemoteStoreConfig(params)
+    const StoreReference::Params & params)
+    : Store::Config{params}
+    , LocalFSStore::Config{*this, params}
+    , RemoteStore::Config{*this, params}
     , path{authority.empty() ? settings.nixDaemonSocketFile : authority}
 {
-    if (scheme != UDSRemoteStoreConfig::scheme) {
+    if (uriSchemes().count(std::string{scheme}) == 0) {
         throw UsageError("Scheme must be 'unix'");
     }
 }
@@ -40,36 +51,24 @@ std::string UDSRemoteStoreConfig::doc()
 }
 
 
-// A bit gross that we now pass empty string but this is knowing that
-// empty string will later default to the same nixDaemonSocketFile. Why
-// don't we just wire it all through? I believe there are cases where it
-// will live reload so we want to continue to account for that.
-UDSRemoteStore::UDSRemoteStore(const Params & params)
-    : UDSRemoteStore(scheme, "", params)
-{}
-
-
-UDSRemoteStore::UDSRemoteStore(std::string_view scheme, std::string_view authority, const Params & params)
-    : StoreConfig(params)
-    , LocalFSStoreConfig(params)
-    , RemoteStoreConfig(params)
-    , UDSRemoteStoreConfig(scheme, authority, params)
-    , Store(params)
-    , LocalFSStore(params)
-    , RemoteStore(params)
+UDSRemoteStore::UDSRemoteStore(ref<const Config> config)
+    : Store{*config}
+    , LocalFSStore{*config}
+    , RemoteStore{*config}
+    , config{config}
 {
 }
 
 
 std::string UDSRemoteStore::getUri()
 {
-    return path == settings.nixDaemonSocketFile
+    return config->path == settings.nixDaemonSocketFile
         ? // FIXME: Not clear why we return daemon here and not default
           // to settings.nixDaemonSocketFile
           //
           // unix:// with no path also works. Change what we return?
           "daemon"
-        : std::string(scheme) + "://" + path;
+        : std::string(*Config::uriSchemes().begin()) + "://" + config->path;
 }
 
 
@@ -86,7 +85,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     /* Connect to a daemon that does the privileged work for us. */
     conn->fd = createUnixDomainSocket();
 
-    nix::connect(toSocket(conn->fd.get()), path);
+    nix::connect(toSocket(conn->fd.get()), config->path);
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();
@@ -106,6 +105,11 @@ void UDSRemoteStore::addIndirectRoot(const Path & path)
 }
 
 
-static RegisterStoreImplementation<UDSRemoteStore, UDSRemoteStoreConfig> regUDSRemoteStore;
+ref<Store> UDSRemoteStore::Config::openStore() const {
+    return make_ref<UDSRemoteStore>(ref{shared_from_this()});
+}
+
+
+static RegisterStoreImplementation<UDSRemoteStore::Config> regUDSRemoteStore;
 
 }

@@ -3,7 +3,6 @@
 
 #include "path.hh"
 #include "outputs-spec.hh"
-#include "config.hh"
 #include "ref.hh"
 
 #include <variant>

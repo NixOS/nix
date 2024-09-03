@@ -6,7 +6,7 @@
 #include <strings.h> // for strcasecmp
 
 #include "signals.hh"
-#include "config.hh"
+#include "config-abstract.hh"
 #include "hash.hh"
 
 #include "git.hh"

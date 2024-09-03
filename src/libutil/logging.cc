@@ -3,7 +3,6 @@
 #include "environment-variables.hh"
 #include "terminal.hh"
 #include "util.hh"
-#include "config-global.hh"
 #include "source-path.hh"
 #include "position.hh"
 
@@ -14,9 +13,13 @@
 
 namespace nix {
 
-LoggerSettings loggerSettings;
+const extern LoggerSettings<JustValue> loggerSettingsDefaults = {
+    .showTrace = {
+        .value = false
+    },
+};
 
-static GlobalConfig::Register rLoggerSettings(&loggerSettings);
+LoggerSettings<JustValue> loggerSettings = loggerSettingsDefaults;
 
 static thread_local ActivityId curActivity = 0;
 

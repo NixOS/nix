@@ -9,7 +9,7 @@
 #include "profiles.hh"
 #include "path-with-outputs.hh"
 #include "shared.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "local-fs-store.hh"
 #include "user-env.hh"
 #include "value-to-json.hh"

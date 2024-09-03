@@ -1,11 +1,19 @@
 #pragma once
 ///@file
 
+#include "config-abstract.hh"
 #include "serialise.hh"
 #include "source-accessor.hh"
 #include "file-system.hh"
 
 namespace nix {
+
+template<template<typename> class R>
+struct RestoreSinkSettings
+{
+    R<bool> preallocateContents;
+};
+
 
 /**
  * Actions on an open regular file in the process of creating it.
@@ -22,6 +30,8 @@ struct CreateRegularFileSink : Sink
     virtual void preallocateContents(uint64_t size) { };
 };
 
+// FIXME: don't use a global variable.
+extern RestoreSinkSettings<JustValue> restoreSinkSettings;
 
 struct FileSystemObjectSink
 {
