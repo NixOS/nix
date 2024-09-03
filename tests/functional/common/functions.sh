@@ -62,6 +62,8 @@ clearCacheCache() {
     rm -f "$TEST_HOME/.cache/nix/binary-cache"*
 }
 
+extraDaemonFlags=()
+
 startDaemon() {
     if isTestOnNixOS; then
       die "startDaemon: not supported when testing on NixOS. Is it really needed? If so add conditionals; e.g. if ! isTestOnNixOS; then ..."
