@@ -8,7 +8,7 @@ foreach config : [ 'nix-daemon.socket', 'nix-daemon.service' ]
     configuration : {
       'storedir' : store_dir,
       'localstatedir' : localstatedir,
-      'bindir' : get_option('datadir'),
+      'bindir' : bindir,
     },
   )
 endforeach
