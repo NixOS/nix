@@ -37,7 +37,7 @@ cmp $TEST_ROOT/d1 $TEST_ROOT/d2
 
 killDaemon
 
-# Test 'unforwarded-settings'.
+# Test 'client-only-settings'.
 extraDaemonFlags=("--trusted-users" "")
 startDaemon
 nix store info --netrc-file /foo 2>&1 | grepQuiet "ignoring the client-specified setting 'netrc-file'"
