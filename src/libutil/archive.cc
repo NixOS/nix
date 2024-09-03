@@ -294,9 +294,9 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
 }
 
 
-void restorePath(const std::filesystem::path & path, Source & source)
+void restorePath(const std::filesystem::path & path, Source & source, bool startFsync)
 {
-    RestoreSink sink;
+    RestoreSink sink{startFsync};
     sink.dstPath = path;
     parseDump(sink, source);
 }

@@ -16,13 +16,14 @@ An *identifier* is an [ASCII](https://en.wikipedia.org/wiki/ASCII) character seq
 
 # Names
 
-A name can be an [identifier](#identifier) or a [string literal](./syntax.md#string-literal).
+A *name* can be written as an [identifier](#identifier) or a [string literal](./string-literals.md).
 
 > **Syntax**
 >
 > *name* → *identifier* | *string*
 
-Names are used in [attribute sets](./syntax.md#attrs-literal), [`let` bindings](./syntax.md#let-expressions), and [`inherit`](./syntax.md#inheriting attributes).
+Names are used in [attribute sets](./syntax.md#attrs-literal), [`let` bindings](./syntax.md#let-expressions), and [`inherit`](./syntax.md#inheriting-attributes).
+Two names are the same if they represent the same sequence of characters, regardless of whether they are written as identifiers or strings.
 
 # Keywords
 

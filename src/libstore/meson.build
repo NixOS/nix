@@ -7,6 +7,7 @@ project('nix-store', 'cpp',
     'debug=true',
     'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
+    'localstatedir=/nix/var',
   ],
   meson_version : '>= 1.1',
   license : 'LGPL-2.1-or-later',
@@ -21,7 +22,7 @@ configdata = configuration_data()
 # TODO rename, because it will conflict with downstream projects
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
-configdata.set_quoted('SYSTEM', host_machine.system())
+configdata.set_quoted('SYSTEM', host_machine.cpu_family() + '-' + host_machine.system())
 
 deps_private_maybe_subproject = [
 ]
@@ -324,24 +325,23 @@ fs = import('fs')
 
 prefix = get_option('prefix')
 # For each of these paths, assume that it is relative to the prefix unless
-# it is already an absolute path (which is the default for store-dir, state-dir, and log-dir).
+# it is already an absolute path (which is the default for store-dir, localstatedir, and log-dir).
 path_opts = [
   # Meson built-ins.
   'datadir',
-  'bindir',
   'mandir',
   'libdir',
   'includedir',
   'libexecdir',
   # Homecooked Nix directories.
   'store-dir',
-  'state-dir',
+  'localstatedir',
   'log-dir',
 ]
 # For your grepping pleasure, this loop sets the following variables that aren't mentioned
 # literally above:
 # store_dir
-# state_dir
+# localstatedir
 # log_dir
 # profile_dir
 foreach optname : path_opts
@@ -365,15 +365,14 @@ lsof = find_program('lsof', required : false)
 
 # Aside from prefix itself, each of these was made into an absolute path
 # by joining it with prefix, unless it was already an absolute path
-# (which is the default for store-dir, state-dir, and log-dir).
+# (which is the default for store-dir, localstatedir, and log-dir).
 cpp_str_defines = {
   'NIX_PREFIX':    prefix,
   'NIX_STORE_DIR': store_dir,
   'NIX_DATA_DIR':  datadir,
-  'NIX_STATE_DIR': state_dir / 'nix',
+  'NIX_STATE_DIR': localstatedir / 'nix',
   'NIX_LOG_DIR':   log_dir,
   'NIX_CONF_DIR':  sysconfdir / 'nix',
-  'NIX_BIN_DIR':   bindir,
   'NIX_MAN_DIR':   mandir,
 }
 
@@ -422,5 +421,16 @@ this_library = library(
 install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
+
+extra_pkg_config_variables = {
+  'storedir' : get_option('store-dir'),
+}
+
+# Working around https://github.com/mesonbuild/meson/issues/13584
+if host_machine.system() != 'macos'
+  extra_pkg_config_variables += {
+    'localstatedir' : get_option('localstatedir'),
+  }
+endif
 
 subdir('build-utils-meson/export')

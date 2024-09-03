@@ -11,7 +11,9 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION (1 << 8 | 37)
+/* Note: you generally shouldn't change the protocol version. Define a
+   new `WorkerProto::Feature` instead. */
+#define PROTOCOL_VERSION (1 << 8 | 38)
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -131,6 +133,10 @@ struct WorkerProto
     {
         WorkerProto::Serialise<T>::write(store, conn, t);
     }
+
+    using Feature = std::string;
+
+    static const std::set<Feature> allFeatures;
 };
 
 enum struct WorkerProto::Op : uint64_t

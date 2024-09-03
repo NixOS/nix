@@ -8,6 +8,10 @@ Such a construct is called *interpolated string*, and the expression inside is a
 [path]: ./types.md#type-path
 [attribute set]: ./types.md#attribute-set
 
+> **Syntax**
+>
+> *interpolation_element* → `${` *expression* `}`
+
 ## Examples
 
 ### String

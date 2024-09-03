@@ -3,7 +3,7 @@
 | Name                                   | Syntax                                     | Associativity | Precedence |
 |----------------------------------------|--------------------------------------------|---------------|------------|
 | [Attribute selection]                  | *attrset* `.` *attrpath* \[ `or` *expr* \] | none          | 1          |
-| Function application                   | *func* *expr*                              | left          | 2          |
+| [Function application]                 | *func* *expr*                              | left          | 2          |
 | [Arithmetic negation][arithmetic]      | `-` *number*                               | none          | 3          |
 | [Has attribute]                        | *attrset* `?` *attrpath*                   | none          | 4          |
 | List concatenation                     | *list* `++` *list*                         | right         | 5          |
@@ -32,7 +32,7 @@
 [string]: ./types.md#type-string
 [path]: ./types.md#type-path
 [number]: ./types.md#type-float
-[list]: ./types.md#list
+[list]: ./types.md#type-list
 [attribute set]: ./types.md#attribute-set
 
 <!-- TODO(@rhendric, #10970): ^ rationalize number -> int/float -->
@@ -47,6 +47,22 @@ Select the attribute denoted by attribute path *attrpath* from [attribute set] *
 If the attribute doesn’t exist, return the *expr* after `or` if provided, otherwise abort evaluation.
 
 [Attribute selection]: #attribute-selection
+
+## Function application
+
+> **Syntax**
+>
+> *func* *expr*
+
+Apply the callable value *func* to the argument *expr*. Note the absence of any visible operator symbol.
+A callable value is either:
+- a [user-defined function][function]
+- a [built-in][builtins] function
+- an attribute set with a [`__functor` attribute](./syntax.md#attr-__functor)
+
+> **Warning**
+>
+> [List][list] items are also separated by whitespace, which means that function calls in list items must be enclosed by parentheses.
 
 ## Has attribute
 
@@ -67,8 +83,12 @@ After evaluating *attrset* and *attrpath*, the computational complexity is O(log
 
 ## Arithmetic
 
-Numbers are type-compatible:
-Pure integer operations will always return integers, whereas any operation involving at least one floating point number return a floating point number.
+Numbers will retain their type unless mixed with other numeric types:
+Pure integer operations will always return integers, whereas any operation involving at least one floating point number returns a floating point number.
+
+Evaluation of the following numeric operations throws an evaluation error:
+- Division by zero
+- Integer overflow, that is, any operation yielding a result outside of the representable range of [Nix language integers](./syntax.md#number-literal)
 
 See also [Comparison] and [Equality].
 
@@ -211,3 +231,5 @@ Equivalent to `!`*b1* `||` *b2*.
 > ```
 
 [Pipe operator]: #pipe-operators
+[builtins]: ./builtins.md
+[Function application]: #function-application

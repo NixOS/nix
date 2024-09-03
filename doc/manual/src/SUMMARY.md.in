@@ -28,6 +28,8 @@
   - [Data Types](language/types.md)
     - [String context](language/string-context.md)
   - [Syntax and semantics](language/syntax.md)
+    - [Variables](language/variables.md)
+    - [String literals](language/string-literals.md)
     - [Identifiers](language/identifiers.md)
     - [Scoping rules](language/scope.md)
     - [String interpolation](language/string-interpolation.md)
@@ -127,6 +129,7 @@
   - [Contributing](development/contributing.md)
 - [Releases](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
+  - [Release 2.24 (2024-07-31)](release-notes/rl-2.24.md)
   - [Release 2.23 (2024-06-03)](release-notes/rl-2.23.md)
   - [Release 2.22 (2024-04-23)](release-notes/rl-2.22.md)
   - [Release 2.21 (2024-03-11)](release-notes/rl-2.21.md)

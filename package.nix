@@ -47,7 +47,8 @@
 
 , pname ? "nix"
 
-, versionSuffix ? ""
+, version
+, versionSuffix
 
 # Whether to build Nix. Useful to skip for tasks like testing existing pre-built versions of Nix
 , doBuild ? true
@@ -59,7 +60,7 @@
 # Run the functional tests as part of the build.
 , doInstallCheck ? test-client != null || __forDefaults.canRunInstalled
 
-# Check test coverage of Nix. Probably want to use with with at least
+# Check test coverage of Nix. Probably want to use with at least
 # one of `doCHeck` or `doInstallCheck` enabled.
 , withCoverageChecks ? false
 
@@ -111,8 +112,6 @@
 
 let
   inherit (lib) fileset;
-
-  version = lib.fileContents ./.version + versionSuffix;
 
   # selected attributes with defaults, will be used to define some
   # things which should instead be gotten via `finalAttrs` in order to

@@ -3,7 +3,9 @@
 
 project('nix-dev-shell', 'cpp',
   version : files('.version'),
-  subproject_dir : 'src',
+  default_options : [
+    'localstatedir=/nix/var',
+  ]
 )
 
 # Internal Libraries
@@ -42,3 +44,4 @@ subproject('nix-fetchers-tests')
 subproject('nix-expr-test-support')
 subproject('nix-expr-tests')
 subproject('nix-flake-tests')
+subproject('nix-functional-tests')

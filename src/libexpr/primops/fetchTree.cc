@@ -122,9 +122,15 @@ static void fetchTree(
             }
             else if (attr.value->type() == nBool)
                 attrs.emplace(state.symbols[attr.name], Explicit<bool>{attr.value->boolean()});
-            else if (attr.value->type() == nInt)
-                attrs.emplace(state.symbols[attr.name], uint64_t(attr.value->integer()));
-            else if (state.symbols[attr.name] == "publicKeys") {
+            else if (attr.value->type() == nInt) {
+                auto intValue = attr.value->integer().value;
+
+                if (intValue < 0) {
+                    state.error<EvalError>("negative value given for fetchTree attr %1%: %2%", state.symbols[attr.name], intValue).atPos(pos).debugThrow();
+                }
+
+                attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
+            } else if (state.symbols[attr.name] == "publicKeys") {
                 experimentalFeatureSettings.require(Xp::VerifiedFetches);
                 attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, context).dump());
             }
@@ -501,7 +507,11 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     //       https://github.com/NixOS/nix/issues/4313
     auto storePath =
         unpack
-        ? fetchToStore(*state.store, fetchers::downloadTarball(*url).accessor, FetchMode::Copy, name)
+        ? fetchToStore(
+            *state.store,
+            fetchers::downloadTarball(state.store, state.fetchSettings, *url),
+            FetchMode::Copy,
+            name)
         : fetchers::downloadFile(state.store, *url, name).storePath;
 
     if (expectedHash) {

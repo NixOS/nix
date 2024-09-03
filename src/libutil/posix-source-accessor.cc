@@ -20,7 +20,7 @@ PosixSourceAccessor::PosixSourceAccessor()
 
 SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
 {
-    std::filesystem::path path2 = absPath(path.string());
+    std::filesystem::path path2 = absPath(path);
     return {
         make_ref<PosixSourceAccessor>(path2.root_path()),
         CanonPath { path2.relative_path().string() },

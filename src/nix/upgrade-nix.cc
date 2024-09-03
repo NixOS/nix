@@ -8,6 +8,8 @@
 #include "attr-path.hh"
 #include "names.hh"
 #include "progress-bar.hh"
+#include "executable-path.hh"
+#include "self-exe.hh"
 
 using namespace nix;
 
@@ -92,7 +94,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         {
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("installing '%s' into profile '%s'...", store->printStorePath(storePath), profileDir));
-            runProgram(settings.nixBinDir + "/nix-env", false,
+            runProgram(getNixBin("nix-env").string(), false,
                 {"--profile", profileDir, "-i", store->printStorePath(storePath), "--no-sandbox"});
         }
 
@@ -102,23 +104,17 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
     /* Return the profile in which Nix is installed. */
     Path getProfileDir(ref<Store> store)
     {
-        Path where;
-
-        for (auto & dir : tokenizeString<Strings>(getEnv("PATH").value_or(""), ":"))
-            if (pathExists(dir + "/nix-env")) {
-                where = dir;
-                break;
-            }
-
-        if (where == "")
+        auto whereOpt = ExecutablePath::load().findName(OS_STR("nix-env"));
+        if (!whereOpt)
             throw Error("couldn't figure out how Nix is installed, so I can't upgrade it");
+        auto & where = *whereOpt;
 
         printInfo("found Nix in '%s'", where);
 
-        if (hasPrefix(where, "/run/current-system"))
+        if (hasPrefix(where.string(), "/run/current-system"))
             throw Error("Nix on NixOS must be upgraded via 'nixos-rebuild'");
 
-        Path profileDir = dirOf(where);
+        Path profileDir = where.parent_path().string();
 
         // Resolve profile to /nix/var/nix/profiles/<name> link.
         while (canonPath(profileDir).find("/profiles/") == std::string::npos && std::filesystem::is_symlink(profileDir))
@@ -128,7 +124,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         Path userEnv = canonPath(profileDir, true);
 
-        if (baseNameOf(where) != "bin" ||
+        if (where.filename() != "bin" ||
             !hasSuffix(userEnv, "user-environment"))
             throw Error("directory '%s' does not appear to be part of a Nix profile", where);
 

@@ -13,11 +13,11 @@ using nlohmann::json;
 
 class DerivationTest : public CharacterizationTest, public LibStoreTest
 {
-    Path unitTestData = getUnitTestData() + "/derivation";
+    std::filesystem::path unitTestData = getUnitTestData() / "derivation";
 
 public:
-    Path goldenMaster(std::string_view testStem) const override {
-        return unitTestData + "/" + testStem;
+    std::filesystem::path goldenMaster(std::string_view testStem) const override {
+        return unitTestData / testStem;
     }
 
     /**

@@ -46,9 +46,21 @@ struct Source;
  * @return An absolutized path, resolving paths relative to the
  * specified directory, or the current directory otherwise.  The path
  * is also canonicalised.
+ *
+ * In the process of being deprecated for `std::filesystem::absolute`.
  */
 Path absPath(PathView path,
     std::optional<PathView> dir = {},
+    bool resolveSymlinks = false);
+
+inline Path absPath(const Path & path,
+    std::optional<PathView> dir = {},
+    bool resolveSymlinks = false)
+{
+    return absPath(PathView{path}, dir, resolveSymlinks);
+}
+
+std::filesystem::path absPath(const std::filesystem::path & path,
     bool resolveSymlinks = false);
 
 /**
@@ -56,6 +68,11 @@ Path absPath(PathView path,
  * double or trailing slashes.  Optionally resolves all symlink
  * components such that each component of the resulting path is *not*
  * a symbolic link.
+ *
+ * In the process of being deprecated for
+ * `std::filesystem::path::lexically_normal` (for the `resolveSymlinks =
+ * false` case), and `std::filesystem::weakly_canonical` (for the
+ * `resolveSymlinks = true` case).
  */
 Path canonPath(PathView path, bool resolveSymlinks = false);
 
@@ -64,12 +81,18 @@ Path canonPath(PathView path, bool resolveSymlinks = false);
  * everything before the final `/`.  If the path is the root or an
  * immediate child thereof (e.g., `/foo`), this means `/`
  * is returned.
+ *
+ * In the process of being deprecated for
+ * `std::filesystem::path::parent_path`.
  */
 Path dirOf(const PathView path);
 
 /**
  * @return the base name of the given canonical path, i.e., everything
  * following the final `/` (trailing slashes are removed).
+ *
+ * In the process of being deprecated for
+ * `std::filesystem::path::filename`.
  */
 std::string_view baseNameOf(std::string_view path);
 
@@ -98,8 +121,27 @@ std::optional<struct stat> maybeLstat(const Path & path);
 
 /**
  * @return true iff the given path exists.
+ *
+ * In the process of being deprecated for `fs::symlink_exists`.
  */
 bool pathExists(const Path & path);
+
+namespace fs {
+
+/**
+ *  ```
+ *  symlink_exists(p) = std::filesystem::exists(std::filesystem::symlink_status(p))
+ *  ```
+ *  Missing convenience analogous to
+ *  ```
+ *  std::filesystem::exists(p) = std::filesystem::exists(std::filesystem::status(p))
+ *  ```
+ */
+inline bool symlink_exists(const std::filesystem::path & path) {
+    return std::filesystem::exists(std::filesystem::symlink_status(path));
+}
+
+} // namespace fs
 
 /**
  * A version of pathExists that returns false on a permission error.
@@ -107,11 +149,14 @@ bool pathExists(const Path & path);
  * be readable.
  * @return true iff the given path can be accessed and exists
  */
-bool pathAccessible(const Path & path);
+bool pathAccessible(const std::filesystem::path & path);
 
 /**
  * Read the contents (target) of a symbolic link.  The result is not
  * in any way canonicalised.
+ *
+ * In the process of being deprecated for
+ * `std::filesystem::read_symlink`.
  */
 Path readLink(const Path & path);
 
@@ -124,19 +169,33 @@ Descriptor openDirectory(const std::filesystem::path & path);
  * Read the contents of a file into a string.
  */
 std::string readFile(const Path & path);
+std::string readFile(const std::filesystem::path & path);
 void readFile(const Path & path, Sink & sink);
 
 /**
  * Write a string to a file.
  */
 void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, bool sync = false);
+static inline void writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode = 0666, bool sync = false)
+{
+    return writeFile(path.string(), s, mode, sync);
+}
 
 void writeFile(const Path & path, Source & source, mode_t mode = 0666, bool sync = false);
+static inline void writeFile(const std::filesystem::path & path, Source & source, mode_t mode = 0666, bool sync = false)
+{
+    return writeFile(path.string(), source, mode, sync);
+}
 
 /**
- * Flush a file's parent directory to disk
+ * Flush a path's parent directory to disk.
  */
 void syncParent(const Path & path);
+
+/**
+ * Flush a file or entire directory tree to disk.
+ */
+void recursiveSync(const Path & path);
 
 /**
  * Delete a path; i.e., in the case of a directory, it is deleted
@@ -149,6 +208,9 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed);
 
 /**
  * Create a directory and all its parents, if necessary.
+ *
+ * In the process of being deprecated for
+ * `std::filesystem::create_directories`.
  */
 void createDirs(const Path & path);
 inline void createDirs(PathView path)
@@ -187,13 +249,21 @@ void setWriteTime(const std::filesystem::path & path, const struct stat & st);
 
 /**
  * Create a symlink.
+ *
+ * In the process of being deprecated for
+ * `std::filesystem::create_symlink`.
  */
 void createSymlink(const Path & target, const Path & link);
 
 /**
  * Atomically create or replace a symlink.
  */
-void replaceSymlink(const Path & target, const Path & link);
+void replaceSymlink(const std::filesystem::path & target, const std::filesystem::path & link);
+
+inline void replaceSymlink(const Path & target, const Path & link)
+{
+    return replaceSymlink(std::filesystem::path{target}, std::filesystem::path{link});
+}
 
 /**
  * Similar to 'renameFile', but fallback to a copy+remove if `src` and `dst`
@@ -262,6 +332,12 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
  * Return `TMPDIR`, or the default temporary directory if unset or empty.
  */
 Path defaultTempDir();
+
+/**
+ * Interpret `exe` as a location in the ambient file system and return
+ * whether it resolves to a file that is executable.
+ */
+bool isExecutableFileAmbient(const std::filesystem::path & exe);
 
 /**
  * Used in various places.

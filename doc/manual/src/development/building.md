@@ -34,16 +34,21 @@ $ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ autoreconfPhase
-[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
-[nix-shell]$ make -j $NIX_BUILD_CORES
+[nix-shell]$ mesonFlags+=" --prefix=$(pwd)/outputs/out"
+[nix-shell]$ dontAddPrefix=1 mesonConfigurePhase
+[nix-shell]$ ninjaBuildPhase
 ```
 
-To install it in `$(pwd)/outputs` and test it:
+To test it:
 
 ```console
-[nix-shell]$ make install
-[nix-shell]$ make installcheck -j $NIX_BUILD_CORES
+[nix-shell]$ mesonCheckPhase
+```
+
+To install it in `$(pwd)/outputs`:
+
+```console
+[nix-shell]$ ninjaInstallPhase
 [nix-shell]$ ./outputs/out/bin/nix --version
 nix (Nix) 2.12
 ```
@@ -85,16 +90,20 @@ $ nix develop .#native-clangStdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ autoreconfPhase
-[nix-shell]$ configurePhase
-[nix-shell]$ make -j $NIX_BUILD_CORES OPTIMIZE=0
+[nix-shell]$ mesonConfigurePhase
+[nix-shell]$ ninjaBuildPhase
 ```
 
-To install it in `$(pwd)/outputs` and test it:
+To test it:
 
 ```console
-[nix-shell]$ make install OPTIMIZE=0
-[nix-shell]$ make installcheck check -j $NIX_BUILD_CORES
+[nix-shell]$ mesonCheckPhase
+```
+
+To install it in `$(pwd)/outputs`:
+
+```console
+[nix-shell]$ ninjaInstallPhase
 [nix-shell]$ nix --version
 nix (Nix) 2.12
 ```
@@ -109,25 +118,6 @@ $ nix build
 ```
 
 You can also build Nix for one of the [supported platforms](#platforms).
-
-## Makefile variables
-
-You may need `profiledir=$out/etc/profile.d` and `sysconfdir=$out/etc` to run `make install`.
-
-Run `make` with [`-e` / `--environment-overrides`](https://www.gnu.org/software/make/manual/make.html#index-_002de) to allow environment variables to override `Makefile` variables:
-
-- `ENABLE_BUILD=yes` to enable building the C++ code.
-- `ENABLE_DOC_GEN=yes` to enable building the documentation (manual, man pages, etc.).
-
-  The docs can take a while to build, so you may want to disable this for local development.
-- `ENABLE_FUNCTIONAL_TESTS=yes` to enable building the functional tests.
-- `OPTIMIZE=1` to enable optimizations.
-- `libraries=libutil programs=` to only build a specific library.
-
-  This will fail in the linking phase if the other libraries haven't been built, but is useful for checking types.
-- `libraries= programs=nix` to only build a specific program.
-
-  This will not work in general, because the programs need the libraries.
 
 ## Platforms
 
@@ -175,26 +165,37 @@ Add more [system types](#system-type) to `crossSystems` in `flake.nix` to bootst
 
 It is useful to perform multiple cross and native builds on the same source tree,
 for example to ensure that better support for one platform doesn't break the build for another.
-In order to facilitate this, Nix has some support for being built out of tree – that is, placing build artefacts in a different directory than the source code:
+Meson thankfully makes this very easy by confining all build products to the build directory --- one simple shares the source directory between multiple build directories, each of which contains the build for Nix to a different platform.
 
-1. Create a directory for the build, e.g.
+Nixpkgs's `mesonConfigurePhase` always chooses `build` in the current directory as the name and location of the build.
+This makes having multiple build directories slightly more inconvenient.
+The good news is that Meson/Ninja seem to cope well with relocating the build directory after it is created.
 
-   ```bash
-   mkdir build
-   ```
+Here's how to do that
 
-2. Run the configure script from that directory, e.g.
-
-   ```bash
-   cd build
-   ../configure <configure flags>
-   ```
-
-3. Run make from the source directory, but with the build directory specified, e.g.
+1. Configure as usual
 
    ```bash
-   make builddir=build <make flags>
+   mesonConfigurePhase
    ```
+
+2. Rename the build directory
+
+   ```bash
+   cd .. # since `mesonConfigurePhase` cd'd inside
+   mv build build-linux # or whatever name we want
+   cd build-linux
+   ```
+
+3. Build as usual
+
+   ```bash
+   ninjaBuildPhase
+   ```
+
+> **N.B.**
+> [`nixpkgs#335818`](https://github.com/NixOS/nixpkgs/issues/335818) tracks giving `mesonConfigurePhase` proper support for custom build directories.
+> When it is fixed, we can simplify these instructions and then remove this notice.
 
 ## System type
 
@@ -257,11 +258,8 @@ You can use any of the other supported environments in place of `nix-ccacheStden
 The `clangd` LSP server is installed by default on the `clang`-based `devShell`s.
 See [supported compilation environments](#compilation-environments) and instructions how to set up a shell [with flakes](#nix-with-flakes) or in [classic Nix](#classic-nix).
 
-To use the LSP with your editor, you first need to [set up `clangd`](https://clangd.llvm.org/installation#project-setup) by running:
-
-```console
-make compile_commands.json
-```
+To use the LSP with your editor, you will want a `compile_commands.json` file telling `clangd` how we are compiling the code.
+Meson's configure always produces this inside the build directory.
 
 Configure your editor to use the `clangd` from the `.#native-clangStdenvPackages` shell. You can do that either by running it inside the development shell, or by using [nix-direnv](https://github.com/nix-community/nix-direnv) and [the appropriate editor plugin](https://github.com/direnv/direnv/wiki#editor-integration).
 
@@ -276,7 +274,7 @@ Configure your editor to use the `clangd` from the `.#native-clangStdenvPackages
 You may run the formatters as a one-off using:
 
 ```console
-make format
+./maintainers/format.sh
 ```
 
 If you'd like to run the formatters before every commit, install the hooks:

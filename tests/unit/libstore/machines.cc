@@ -13,6 +13,8 @@ using testing::Eq;
 using testing::Field;
 using testing::SizeIs;
 
+namespace nix::fs { using namespace std::filesystem; }
+
 using namespace nix;
 
 TEST(machines, getMachinesWithEmptyBuilders) {
@@ -135,10 +137,10 @@ TEST(machines, getMachinesWithIncorrectFormat) {
 }
 
 TEST(machines, getMachinesWithCorrectFileReference) {
-    auto path = absPath(getUnitTestData() + "/machines/valid");
-    ASSERT_TRUE(pathExists(path));
+    auto path = fs::weakly_canonical(getUnitTestData() / "machines/valid");
+    ASSERT_TRUE(fs::exists(path));
 
-    auto actual = Machine::parseConfig({}, "@" + path);
+    auto actual = Machine::parseConfig({}, "@" + path.string());
     ASSERT_THAT(actual, SizeIs(3));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
@@ -146,20 +148,22 @@ TEST(machines, getMachinesWithCorrectFileReference) {
 }
 
 TEST(machines, getMachinesWithCorrectFileReferenceToEmptyFile) {
-    auto path = "/dev/null";
-    ASSERT_TRUE(pathExists(path));
+    fs::path path = "/dev/null";
+    ASSERT_TRUE(fs::exists(path));
 
-    auto actual = Machine::parseConfig({}, std::string{"@"} + path);
+    auto actual = Machine::parseConfig({}, "@" + path.string());
     ASSERT_THAT(actual, SizeIs(0));
 }
 
 TEST(machines, getMachinesWithIncorrectFileReference) {
-    auto actual = Machine::parseConfig({}, "@" + absPath("/not/a/file"));
+    auto path = fs::weakly_canonical("/not/a/file");
+    ASSERT_TRUE(!fs::exists(path));
+    auto actual = Machine::parseConfig({}, "@" + path.string());
     ASSERT_THAT(actual, SizeIs(0));
 }
 
 TEST(machines, getMachinesWithCorrectFileReferenceToIncorrectFile) {
     EXPECT_THROW(
-        Machine::parseConfig({}, "@" + absPath(getUnitTestData() + "/machines/bad_format")),
+        Machine::parseConfig({}, "@" + fs::weakly_canonical(getUnitTestData() / "machines" / "bad_format").string()),
         FormatError);
 }

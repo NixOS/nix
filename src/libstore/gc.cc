@@ -333,7 +333,7 @@ static std::string quoteRegexChars(const std::string & raw)
 }
 
 #if __linux__
-static void readFileRoots(const char * path, UncheckedRoots & roots)
+static void readFileRoots(const std::filesystem::path & path, UncheckedRoots & roots)
 {
     try {
         roots[readFile(path)].emplace(path);
@@ -891,7 +891,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
 void LocalStore::autoGC(bool sync)
 {
-#ifdef HAVE_STATVFS
+#if HAVE_STATVFS
     static auto fakeFreeSpaceFile = getEnv("_NIX_TEST_FREE_SPACE_FILE");
 
     auto getAvail = [this]() -> uint64_t {

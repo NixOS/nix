@@ -5,6 +5,8 @@
 
 namespace nix {
 
+const std::set<WorkerProto::Feature> WorkerProto::allFeatures{};
+
 WorkerProto::BasicClientConnection::~BasicClientConnection()
 {
     try {
@@ -30,7 +32,8 @@ static Logger::Fields readFields(Source & from)
     return fields;
 }
 
-std::exception_ptr WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * source, bool flush)
+std::exception_ptr
+WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * source, bool flush, bool block)
 {
     if (flush)
         to.flush();
@@ -38,6 +41,9 @@ std::exception_ptr WorkerProto::BasicClientConnection::processStderrReturn(Sink 
     std::exception_ptr ex;
 
     while (true) {
+
+        if (!block && !from.hasData())
+            break;
 
         auto msg = readNum<uint64_t>(from);
 
@@ -93,8 +99,10 @@ std::exception_ptr WorkerProto::BasicClientConnection::processStderrReturn(Sink 
             logger->result(act, type, fields);
         }
 
-        else if (msg == STDERR_LAST)
+        else if (msg == STDERR_LAST) {
+            assert(block);
             break;
+        }
 
         else
             throw Error("got unknown message type %x from Nix daemon", msg);
@@ -128,17 +136,31 @@ std::exception_ptr WorkerProto::BasicClientConnection::processStderrReturn(Sink 
     }
 }
 
-void WorkerProto::BasicClientConnection::processStderr(bool * daemonException, Sink * sink, Source * source, bool flush)
+void WorkerProto::BasicClientConnection::processStderr(
+    bool * daemonException, Sink * sink, Source * source, bool flush, bool block)
 {
-    auto ex = processStderrReturn(sink, source, flush);
+    auto ex = processStderrReturn(sink, source, flush, block);
     if (ex) {
         *daemonException = true;
         std::rethrow_exception(ex);
     }
 }
 
-WorkerProto::Version
-WorkerProto::BasicClientConnection::handshake(BufferedSink & to, Source & from, WorkerProto::Version localVersion)
+static std::set<WorkerProto::Feature>
+intersectFeatures(const std::set<WorkerProto::Feature> & a, const std::set<WorkerProto::Feature> & b)
+{
+    std::set<WorkerProto::Feature> res;
+    for (auto & x : a)
+        if (b.contains(x))
+            res.insert(x);
+    return res;
+}
+
+std::tuple<WorkerProto::Version, std::set<WorkerProto::Feature>> WorkerProto::BasicClientConnection::handshake(
+    BufferedSink & to,
+    Source & from,
+    WorkerProto::Version localVersion,
+    const std::set<WorkerProto::Feature> & supportedFeatures)
 {
     to << WORKER_MAGIC_1 << localVersion;
     to.flush();
@@ -153,11 +175,24 @@ WorkerProto::BasicClientConnection::handshake(BufferedSink & to, Source & from, 
     if (GET_PROTOCOL_MINOR(daemonVersion) < 10)
         throw Error("the Nix daemon version is too old");
 
-    return std::min(daemonVersion, localVersion);
+    auto protoVersion = std::min(daemonVersion, localVersion);
+
+    /* Exchange features. */
+    std::set<WorkerProto::Feature> daemonFeatures;
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 38) {
+        to << supportedFeatures;
+        to.flush();
+        daemonFeatures = readStrings<std::set<WorkerProto::Feature>>(from);
+    }
+
+    return {protoVersion, intersectFeatures(daemonFeatures, supportedFeatures)};
 }
 
-WorkerProto::Version
-WorkerProto::BasicServerConnection::handshake(BufferedSink & to, Source & from, WorkerProto::Version localVersion)
+std::tuple<WorkerProto::Version, std::set<WorkerProto::Feature>> WorkerProto::BasicServerConnection::handshake(
+    BufferedSink & to,
+    Source & from,
+    WorkerProto::Version localVersion,
+    const std::set<WorkerProto::Feature> & supportedFeatures)
 {
     unsigned int magic = readInt(from);
     if (magic != WORKER_MAGIC_1)
@@ -165,7 +200,18 @@ WorkerProto::BasicServerConnection::handshake(BufferedSink & to, Source & from, 
     to << WORKER_MAGIC_2 << localVersion;
     to.flush();
     auto clientVersion = readInt(from);
-    return std::min(clientVersion, localVersion);
+
+    auto protoVersion = std::min(clientVersion, localVersion);
+
+    /* Exchange features. */
+    std::set<WorkerProto::Feature> clientFeatures;
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 38) {
+        clientFeatures = readStrings<std::set<WorkerProto::Feature>>(from);
+        to << supportedFeatures;
+        to.flush();
+    }
+
+    return {protoVersion, intersectFeatures(clientFeatures, supportedFeatures)};
 }
 
 WorkerProto::ClientHandshakeInfo WorkerProto::BasicClientConnection::postHandshake(const StoreDirConfig & store)

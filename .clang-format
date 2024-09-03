@@ -31,3 +31,4 @@ AlwaysBreakBeforeMultilineStrings: true
 IndentPPDirectives: AfterHash
 PPIndentWidth: 2
 BinPackArguments: false
+BreakBeforeTernaryOperators: true

@@ -344,6 +344,7 @@ const redirects = {
   },
   "language/syntax.html": {
     "scoping-rules": "scoping.html",
+    "string-literal": "string-literals.html",
   },
   "installation/installing-binary.html": {
     "linux": "uninstall.html#linux",

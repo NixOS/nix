@@ -4,20 +4,24 @@ let
 
   nixos-lib = import (nixpkgs + "/nixos/lib") { };
 
+  noTests = pkg: pkg.overrideAttrs (
+            finalAttrs: prevAttrs: {
+              doCheck = false;
+              doInstallCheck = false;
+            });
+
   # https://nixos.org/manual/nixos/unstable/index.html#sec-calling-nixos-tests
   runNixOSTestFor = system: test:
     (nixos-lib.runTest {
       imports = [
         test
-
-        # Add the quickBuild attribute to the check packages
-        ./quick-build.nix
       ];
 
       hostPkgs = nixpkgsFor.${system}.native;
       defaults = {
         nixpkgs.pkgs = nixpkgsFor.${system}.native;
         nix.checkAllErrors = false;
+        nix.package = noTests nixpkgsFor.${system}.native.nix;
       };
       _module.args.nixpkgs = nixpkgs;
       _module.args.system = system;
@@ -29,6 +33,9 @@ let
       forNix = nixVersion: runNixOSTestFor system {
         imports = [test];
         defaults.nixpkgs.overlays = [(curr: prev: {
+          # NOTE: noTests pkg might not have been built yet for some older versions of the package
+          #       and in versions before 2.25, the untested build wasn't shared with the tested build yet
+          #       Add noTests here when those versions become irrelevant.
           nix = (builtins.getFlake "nix/${nixVersion}").packages.${system}.nix;
         })];
       };
@@ -146,4 +153,8 @@ in
   functional_root = runNixOSTestFor "x86_64-linux" ./functional/as-root.nix;
 
   user-sandboxing = runNixOSTestFor "x86_64-linux" ./user-sandboxing;
+
+  s3-binary-cache-store = runNixOSTestFor "x86_64-linux" ./s3-binary-cache-store.nix;
+
+  fsync = runNixOSTestFor "x86_64-linux" ./fsync.nix;
 }

@@ -8,6 +8,9 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "worker-protocol.hh"
+#include "executable-path.hh"
+
+namespace nix::fs { using namespace std::filesystem; }
 
 using namespace nix;
 
@@ -75,11 +78,13 @@ struct CmdConfigCheck : StoreCommand
 
     bool checkNixInPath()
     {
-        PathSet dirs;
+        std::set<fs::path> dirs;
 
-        for (auto & dir : tokenizeString<Strings>(getEnv("PATH").value_or(""), ":"))
-            if (pathExists(dir + "/nix-env"))
-                dirs.insert(dirOf(canonPath(dir + "/nix-env", true)));
+        for (auto & dir : ExecutablePath::load().directories) {
+            auto candidate = dir / "nix-env";
+            if (fs::exists(candidate))
+                dirs.insert(fs::canonical(candidate).parent_path() );
+        }
 
         if (dirs.size() != 1) {
             std::stringstream ss;
@@ -94,18 +99,25 @@ struct CmdConfigCheck : StoreCommand
 
     bool checkProfileRoots(ref<Store> store)
     {
-        PathSet dirs;
+        std::set<fs::path> dirs;
 
-        for (auto & dir : tokenizeString<Strings>(getEnv("PATH").value_or(""), ":")) {
-            Path profileDir = dirOf(dir);
+        for (auto & dir : ExecutablePath::load().directories) {
+            auto profileDir = dir.parent_path();
             try {
-                Path userEnv = canonPath(profileDir, true);
+                auto userEnv = fs::weakly_canonical(profileDir);
 
-                if (store->isStorePath(userEnv) && hasSuffix(userEnv, "user-environment")) {
-                    while (profileDir.find("/profiles/") == std::string::npos && std::filesystem::is_symlink(profileDir))
-                        profileDir = absPath(readLink(profileDir), dirOf(profileDir));
+                auto noContainsProfiles = [&]{
+                    for (auto && part : profileDir)
+                        if (part == "profiles") return false;
+                    return true;
+                };
 
-                    if (profileDir.find("/profiles/") == std::string::npos)
+                if (store->isStorePath(userEnv.string()) && hasSuffix(userEnv.string(), "user-environment")) {
+                    while (noContainsProfiles() && std::filesystem::is_symlink(profileDir))
+                        profileDir = fs::weakly_canonical(
+                            profileDir.parent_path() / fs::read_symlink(profileDir));
+
+                    if (noContainsProfiles())
                         dirs.insert(dir);
                 }
             } catch (SystemError &) {

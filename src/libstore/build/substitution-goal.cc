@@ -145,8 +145,10 @@ Goal::Co PathSubstitutionGoal::init()
     /* None left.  Terminate this goal and let someone else deal
        with it. */
 
-    worker.failedSubstitutions++;
-    worker.updateProgress();
+    if (substituterFailed) {
+        worker.failedSubstitutions++;
+        worker.updateProgress();
+    }
 
     /* Hack: don't indicate failure if there were no substituters.
        In that case the calling derivation should just do a
@@ -158,7 +160,7 @@ Goal::Co PathSubstitutionGoal::init()
 }
 
 
-Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool& substituterFailed)
+Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool & substituterFailed)
 {
     trace("all references realised");
 
@@ -181,7 +183,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
     /* Make sure that we are allowed to start a substitution.  Note that even
        if maxSubstitutionJobs == 0, we still allow a substituter to run. This
        prevents infinite waiting. */
-    if (worker.getNrSubstitutions() >= std::max(1U, (unsigned int) settings.maxSubstitutionJobs)) {
+    while (worker.getNrSubstitutions() >= std::max(1U, (unsigned int) settings.maxSubstitutionJobs)) {
         worker.waitForBuildSlot(shared_from_this());
         co_await Suspend{};
     }

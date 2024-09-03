@@ -37,7 +37,7 @@ Most Nix commands accept the following command-line options:
     Print even more informational messages.
 
   - `4` “Debug”
-   
+
     Print debug information.
 
   - `5` “Vomit”
@@ -187,11 +187,12 @@ Most Nix commands accept the following command-line options:
   For `nix-shell`, this option is commonly used to give you a shell in which you can build the packages returned by the expression.
   If you want to get a shell which contain the *built* packages ready for use, give your expression to the `nix-shell --packages ` convenience flag instead.
 
-- <span id="opt-I">[`-I`](#opt-I)</span> *path*
+- <span id="opt-I">[`-I` / `--include`](#opt-I)</span> *path*
 
-  Add an entry to the [Nix expression search path](@docroot@/command-ref/conf-file.md#conf-nix-path).
+  Add an entry to the list of search paths used to resolve [lookup paths](@docroot@/language/constructs/lookup-path.md).
   This option may be given multiple times.
-  Paths added through `-I` take precedence over [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH).
+
+  Paths added through `-I` take precedence over the [`nix-path` configuration setting](@docroot@/command-ref/conf-file.md#conf-nix-path) and the [`NIX_PATH` environment variable](@docroot@/command-ref/env-common.md#env-NIX_PATH).
 
 - <span id="opt-option">[`--option`](#opt-option)</span> *name* *value*
 

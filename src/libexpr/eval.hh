@@ -42,6 +42,21 @@ namespace eval_cache {
 }
 
 /**
+ * Increments a count on construction and decrements on destruction.
+ */
+class CallDepth {
+  size_t & count;
+
+public:
+  CallDepth(size_t & count) : count(count) {
+    ++count;
+  }
+  ~CallDepth() {
+    --count;
+  }
+};
+
+/**
  * Function that implements a primop.
  */
 using PrimOpFun = void(EvalState & state, const PosIdx pos, Value * * args, Value & v);
@@ -625,6 +640,12 @@ public:
         const char * doc;
     };
 
+    /**
+     * Retrieve the documentation for a value. This will evaluate the value if
+     * it is a thunk, and it will partially apply __functor if applicable.
+     *
+     * @param v The value to get the documentation for.
+     */
     std::optional<Doc> getDoc(Value & v);
 
 private:
@@ -648,6 +669,11 @@ private:
     size_t callDepth = 0;
 
 public:
+
+    /**
+     * Check that the call depth is within limits, and increment it, until the returned object is destroyed.
+     */
+    inline CallDepth addCallDepth(const PosIdx pos);
 
     /**
      * Do a deep equality test between two values.  That is, list

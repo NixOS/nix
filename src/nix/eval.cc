@@ -78,27 +78,23 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
             if (pathExists(*writeTo))
                 throw Error("path '%s' already exists", *writeTo);
 
-            std::function<void(Value & v, const PosIdx pos, const Path & path)> recurse;
+            std::function<void(Value & v, const PosIdx pos, const std::filesystem::path & path)> recurse;
 
-            recurse = [&](Value & v, const PosIdx pos, const Path & path)
+            recurse = [&](Value & v, const PosIdx pos, const std::filesystem::path & path)
             {
                 state->forceValue(v, pos);
                 if (v.type() == nString)
                     // FIXME: disallow strings with contexts?
-                    writeFile(path, v.string_view());
+                    writeFile(path.string(), v.string_view());
                 else if (v.type() == nAttrs) {
-                    if (mkdir(path.c_str()
-#ifndef _WIN32 // TODO abstract mkdir perms for Windows
-                        , 0777
-#endif
-                        ) == -1)
-                        throw SysError("creating directory '%s'", path);
+                    // TODO abstract mkdir perms for Windows
+                    createDir(path.string(), 0777);
                     for (auto & attr : *v.attrs()) {
                         std::string_view name = state->symbols[attr.name];
                         try {
                             if (name == "." || name == "..")
                                 throw Error("invalid file name '%s'", name);
-                            recurse(*attr.value, attr.pos, concatStrings(path, "/", name));
+                            recurse(*attr.value, attr.pos, path / name);
                         } catch (Error & e) {
                             e.addTrace(
                                 state->positions[attr.pos],
