@@ -1204,7 +1204,7 @@ public:
 
           If the user is trusted (see `trusted-users` option), when building
           a fixed-output derivation, environment variables set in this option
-          will be passed to the builder if they are listed in [`impureEnvVars`](@docroot@/language/advanced-attributes.md##adv-attr-impureEnvVars).
+          will be passed to the builder if they are listed in [`impureEnvVars`](@docroot@/language/advanced-attributes.md#adv-attr-impureEnvVars).
 
           This option is useful for, e.g., setting `https_proxy` for
           fixed-output derivations and in a multi-user Nix installation, or
