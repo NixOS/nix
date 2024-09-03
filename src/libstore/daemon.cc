@@ -238,8 +238,12 @@ struct ClientSettings
                 return true;
             };
 
+            auto clientOnlySettings = settings.clientOnlySettings.get();
+
             try {
                 if (name == "ssh-auth-sock") // obsolete
+                    ;
+                else if (clientOnlySettings.contains(name))
                     ;
                 else if (name == experimentalFeatureSettings.experimentalFeatures.name) {
                     // We don’t want to forward the experimental features to

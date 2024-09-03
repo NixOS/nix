@@ -37,11 +37,19 @@ cmp $TEST_ROOT/d1 $TEST_ROOT/d2
 
 killDaemon
 
-# Test 'client-only-settings'.
+# Test 'client-only-settings' on the client.
 extraDaemonFlags=("--trusted-users" "")
 startDaemon
 nix store info --netrc-file /foo 2>&1 | grepQuiet "ignoring the client-specified setting 'netrc-file'"
 if nix store info --netrc-file /foo --client-only-settings netrc-file 2>&1 | grep "ignoring the client-specified setting 'netrc-file'"; then
+    exit 1
+fi
+killDaemon
+
+# Test 'client-only-settings' on the daemon.
+extraDaemonFlags=("--trusted-users" "" "--option" "client-only-settings" "netrc-file")
+startDaemon
+if nix store info --netrc-file /foo 2>&1 | grep "ignoring the client-specified setting 'netrc-file'"; then
     exit 1
 fi
 killDaemon
