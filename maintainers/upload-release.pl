@@ -112,7 +112,7 @@ sub copyManual {
         system("xz -d < '$manualNar' | nix-store --restore $tmpDir/manual.tmp") == 0
             or die "unable to unpack $manualNar\n";
         rename("$tmpDir/manual.tmp/share/doc/nix/manual", "$tmpDir/manual") or die;
-        system("rm -rf '$tmpDir/manual.tmp'") == 0 or die;
+        File::Path::remove_tree("$tmpDir/manual.tmp", {safe => 1});
     }
 
     system("aws s3 sync '$tmpDir/manual' s3://$releasesBucketName/$releaseDir/manual") == 0
@@ -283,3 +283,6 @@ system("git remote update origin") == 0 or die;
 system("git tag --force --sign $version $nixRev -m 'Tagging release $version'") == 0 or die;
 system("git push --tags") == 0 or die;
 system("git push --force-with-lease origin $nixRev:refs/heads/latest-release") == 0 or die if $isLatest;
+
+File::Path::remove_tree($narCache, {safe => 1});
+File::Path::remove_tree($tmpDir, {safe => 1});
