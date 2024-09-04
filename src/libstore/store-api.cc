@@ -838,7 +838,7 @@ StorePathSet Store::queryValidPaths(const StorePathSet & paths, SubstituteFlag m
             if (exists)
                 state->valid.insert(path);
 
-            if (newExc != nullptr)
+            if (newExc)
                 state->exc = newExc;
 
             assert(state->left);
