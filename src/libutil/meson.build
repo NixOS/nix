@@ -202,6 +202,7 @@ headers = [config_h] + files(
   'hilite.hh',
   'json-impls.hh',
   'json-utils.hh',
+  'lazy-source-accessor.hh',
   'logging.hh',
   'lru-cache.hh',
   'memory-source-accessor.hh',
