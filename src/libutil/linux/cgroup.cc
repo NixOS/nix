@@ -6,7 +6,6 @@
 
 #include <chrono>
 #include <cmath>
-#include <mutex>
 #include <regex>
 #include <unordered_set>
 #include <thread>
@@ -158,22 +157,10 @@ std::string getCurrentCgroup()
     return ourCgroup;
 }
 
-static std::optional<std::string> rootCgroup;
-static std::mutex rootCgroupMutex;
-
 std::string getRootCgroup()
 {
-    {
-        std::lock_guard<std::mutex> guard(rootCgroupMutex);
-        if (rootCgroup)
-            return *rootCgroup;
-    }
-    auto current = getCurrentCgroup();
-    std::lock_guard<std::mutex> guard(rootCgroupMutex);
-    if (rootCgroup)
-        return *rootCgroup;
-    rootCgroup = current;
-    return current;
+    static std::string rootCgroup = getCurrentCgroup();
+    return rootCgroup;
 }
 
 }
