@@ -214,11 +214,13 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
             else if (t == "directory") {
                 sink.createDirectory(path);
 
+                std::string prevName;
+
                 while (1) {
                     s = getString();
 
                     if (s == "entry") {
-                        std::string name, prevName;
+                        std::string name;
 
                         s = getString();
                         if (s != "(") throw badArchive("expected open tag");
