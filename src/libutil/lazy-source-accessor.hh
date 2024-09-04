@@ -33,7 +33,6 @@ struct LazySourceAccessor : SourceAccessor
             *next = acc;
             return acc;
         }
-        abort();
     }
 
     std::string readFile(const CanonPath & path) override
