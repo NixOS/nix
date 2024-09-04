@@ -42,6 +42,12 @@ done
 # finding something that's not in any of the default paths fails
 ( ! $(nix-instantiate --find-file test) )
 
+# setting anything overrides the default paths
+# this ensures we can force an empty search path
+[[ $(NIX_PATH= nix-instantiate --eval -E 'with builtins; length nixPath') = 0 ]]
+[[ $(nix-instantiate --nix-path "" --eval -E 'with builtins; length nixPath') = 0 ]]
+[[ $(nix-instantiate -I "" --eval -E 'with builtins; length nixPath') = 1 ]]
+
 echo "nix-path = test=$TEST_ROOT/from-nix-path-file" >> "$test_nix_conf"
 
 # Use nix.conf in absence of NIX_PATH
