@@ -119,7 +119,7 @@
   A store object consists of a [file system object], [references][reference] to other store objects, and other metadata.
   It can be referred to by a [store path].
 
-  See [Store Object](@docroot@/store/index.md#store-object) for details.
+  See [Store Object](@docroot@/store/store-object.md) for details.
 
   [store object]: #gloss-store-object
 
