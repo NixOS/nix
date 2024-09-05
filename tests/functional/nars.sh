@@ -43,3 +43,14 @@ touch "$TEST_ROOT/case/xt_CONNMARK.h~nix~case~hack~3"
 # 'Test~nix~case~hack~1' and 'test').
 rm -rf "$TEST_ROOT/case"
 expectStderr 1 nix-store "${opts[@]}" --restore "$TEST_ROOT/case" < case-collision.nar | grepQuiet "NAR contains file name 'test' that collides with case-hacked file name 'Test~nix~case~hack~1'"
+
+# Deserializing a NAR that contains file names that Unicode-normalize
+# to the same name should fail on macOS but succeed on Linux.
+rm -rf "$TEST_ROOT/out"
+if [[ $(uname) = Darwin ]]; then
+    expectStderr 1 nix-store --restore "$TEST_ROOT/out" < unnormalized.nar | grepQuiet "cannot create directory.*File exists"
+else
+    nix-store --restore "$TEST_ROOT/out" < unnormalized.nar
+    [[ -e $TEST_ROOT/out/â ]]
+    [[ -e $TEST_ROOT/out/â ]]
+fi
