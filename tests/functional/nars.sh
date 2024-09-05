@@ -34,4 +34,10 @@ cmp case.nar "$TEST_ROOT/case.nar"
 # Check whether we detect true collisions (e.g. those remaining after
 # removal of the suffix).
 touch "$TEST_ROOT/case/xt_CONNMARK.h~nix~case~hack~3"
-(! nix-store $opts --dump $TEST_ROOT/case > /dev/null)
+(! nix-store "${opts[@]}" --dump "$TEST_ROOT/case" > /dev/null)
+
+# Detect NARs that have a directory entry that after case-hacking
+# collides with another entry (e.g. a directory containing 'Test',
+# 'Test~nix~case~hack~1' and 'test').
+rm -rf "$TEST_ROOT/case"
+expectStderr 1 nix-store "${opts[@]}" --restore "$TEST_ROOT/case" < case-collision.nar | grepQuiet "NAR contains file name 'test' that collides with case-hacked file name 'Test~nix~case~hack~1'"
