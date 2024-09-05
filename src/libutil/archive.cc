@@ -243,6 +243,9 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
                                         debug("case collision between '%1%' and '%2%'", i->first, name);
                                         name += caseHackSuffix;
                                         name += std::to_string(++i->second);
+                                        auto j = names.find(name);
+                                        if (j != names.end())
+                                            throw Error("NAR contains file name '%s' that collides with case-hacked file name '%s'", prevName, j->first);
                                     } else
                                         names[name] = 0;
                                 }
