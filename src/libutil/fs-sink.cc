@@ -71,7 +71,8 @@ static GlobalConfig::Register r1(&restoreSinkSettings);
 
 void RestoreSink::createDirectory(const CanonPath & path)
 {
-    std::filesystem::create_directory(dstPath / path.rel());
+    if (!std::filesystem::create_directory(dstPath / path.rel()))
+        throw Error("path '%s' already exists", (dstPath / path.rel()).string());
 };
 
 struct RestoreRegularFile : CreateRegularFileSink {

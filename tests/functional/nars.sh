@@ -10,6 +10,9 @@ clearStore
 rm -rf "$TEST_ROOT/out"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "NAR directory is not sorted"
 
+# Check that nix-store --restore fails if the output already exists.
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "path '.*/out/' already exists"
+
 # Check whether restoring and dumping a NAR that contains case
 # collisions is round-tripping, even on a case-insensitive system.
 rm -rf "$TEST_ROOT/case"
