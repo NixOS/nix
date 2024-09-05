@@ -13,21 +13,37 @@ void builtinUnpackChannel(
         return i->second;
     };
 
-    auto out = outputs.at("out");
-    auto channelName = getAttr("channelName");
+    std::filesystem::path out(outputs.at("out"));
+    std::filesystem::path channelName(getAttr("channelName"));
     auto src = getAttr("src");
+
+    if (channelName.filename() != channelName) {
+        throw Error("channelName is not allowed to contain filesystem seperators, got %1%", channelName);
+    }
 
     createDirs(out);
 
     unpackTarfile(src, out);
 
-    auto entries = std::filesystem::directory_iterator{out};
-    auto fileName = entries->path().string();
-    auto fileCount = std::distance(std::filesystem::begin(entries), std::filesystem::end(entries));
+    size_t fileCount;
+    std::string fileName;
+    try {
+        auto entries = std::filesystem::directory_iterator{out};
+        fileName = entries->path().string();
+        fileCount = std::distance(std::filesystem::begin(entries), std::filesystem::end(entries));
+    } catch (std::filesystem::filesystem_error &e) {
+        throw SysError("failed to read directory %1%", out);
+    }
+
 
     if (fileCount != 1)
         throw Error("channel tarball '%s' contains more than one file", src);
-    std::filesystem::rename(fileName, (out + "/" + channelName));
+    std::filesystem::path target(out / channelName);
+    try {
+        std::filesystem::rename(fileName, target);
+    } catch (std::filesystem::filesystem_error &e) {
+        throw SysError("failed to rename %1% to %2%", fileName, target);
+    }
 }
 
 }
