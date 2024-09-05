@@ -1,1 +1,2 @@
-echo Formatting: "${@}"
+#!/usr/bin/env bash
+echo "Formatting(${#}):" "${@}"
