@@ -1,6 +1,6 @@
 # Name
 
-`nix-channel` - manage Nix channels
+`nix-channel` - manage [channels](#channels)
 
 # Synopsis
 
@@ -8,24 +8,12 @@
 
 # Description
 
-Channels are a mechanism for referencing remote Nix expressions and conveniently retrieving their latest version.
+This command allows
+- Managing a list of [subscribed channels](#subscribed-channels)
+- Retrieval of the [contents](#channel-contents) of subscribed channels
+- Restoring the contents of channels to previously retrieved versions
 
-The moving parts of channels are:
-- The official channels listed at <https://nixos.org/channels>
-- The user-specific list of [subscribed channels](#subscribed-channels)
-- The [downloaded channel contents](#channels)
-- The [Nix expression search path](@docroot@/command-ref/conf-file.md#conf-nix-path), set with the [`-I` option](#opt-i) or the [`NIX_PATH` environment variable](#env-NIX_PATH)
-
-> **Note**
->
-> The state of a subscribed channel is external to the Nix expressions relying on it.
-> This may limit reproducibility.
->
-> Dependencies on other Nix expressions can be declared explicitly with:
-> - [`fetchurl`](@docroot@/language/builtins.md#builtins-fetchurl), [`fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball), or [`fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) in Nix expressions
-> - the [`-I` option](@docroot@/command-ref/opt-common.md#opt-I) in command line invocations
-
-This command has the following operations:
+It has the following operations:
 
 - `--add` *url* \[*name*\]
 
