@@ -48,7 +48,7 @@ expectStderr 1 nix-store "${opts[@]}" --restore "$TEST_ROOT/case" < case-collisi
 # to the same name should fail on macOS but succeed on Linux.
 rm -rf "$TEST_ROOT/out"
 if [[ $(uname) = Darwin ]]; then
-    expectStderr 1 nix-store --restore "$TEST_ROOT/out" < unnormalized.nar | grepQuiet "cannot create directory.*File exists"
+    expectStderr 1 nix-store --restore "$TEST_ROOT/out" < unnormalized.nar | grepQuiet "path '.*/out/â' already exists"
 else
     nix-store --restore "$TEST_ROOT/out" < unnormalized.nar
     [[ -e $TEST_ROOT/out/â ]]
