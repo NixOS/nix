@@ -68,11 +68,19 @@ static RestoreSinkSettings restoreSinkSettings;
 
 static GlobalConfig::Register r1(&restoreSinkSettings);
 
+static std::filesystem::path append(const std::filesystem::path & src, const CanonPath & path)
+{
+    auto dst = src;
+    if (!path.rel().empty())
+        dst /= path.rel();
+    return dst;
+}
 
 void RestoreSink::createDirectory(const CanonPath & path)
 {
-    if (!std::filesystem::create_directory(dstPath / path.rel()))
-        throw Error("path '%s' already exists", (dstPath / path.rel()).string());
+    auto p = append(dstPath, path);
+    if (!std::filesystem::create_directory(p))
+        throw Error("path '%s' already exists", p.string());
 };
 
 struct RestoreRegularFile : CreateRegularFileSink {
@@ -93,14 +101,6 @@ struct RestoreRegularFile : CreateRegularFileSink {
     void isExecutable() override;
     void preallocateContents(uint64_t size) override;
 };
-
-static std::filesystem::path append(const std::filesystem::path & src, const CanonPath & path)
-{
-    auto dst = src;
-    if (!path.rel().empty())
-        dst /= path.rel();
-    return dst;
-}
 
 void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
