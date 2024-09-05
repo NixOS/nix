@@ -182,13 +182,18 @@
 
 - [Nix expression]{#gloss-nix-expression}
 
-  1. Commonly, a high-level description of software packages and compositions
-    thereof. Deploying software using Nix entails writing Nix
-    expressions for your packages. Nix expressions specify [derivations][derivation],
-    which are [instantiated][instantiate] into the Nix store as [store derivations][store derivation].
-    These derivations can then be [realised][realise] to produce [outputs][output].
+  A syntactically valid use of the [Nix language].
 
-  2. A syntactically valid use of the [Nix language]. For example, the contents of a `.nix` file form an expression.
+  > **Example**
+  >
+  > The contents of a `.nix` file form a Nix expression.
+
+  Nix expressions specify [derivations][derivation], which are [instantiated][instantiate] into the Nix store as [store derivations][store derivation].
+  These derivations can then be [realised][realise] to produce [outputs][output].
+
+  > **Example**
+  >
+  > Building and deploying software using Nix entails writing Nix expressions as a high-level description of packages and compositions thereof.
 
 - [reference]{#gloss-reference}
 
