@@ -6,13 +6,14 @@ TODO_NixOS
 
 clearStore
 
-rm -rf "$TEST_ROOT/case"
-
-opts=("--option" "use-case-hack" "true")
+# Check that NARs with duplicate directory entries are rejected.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "NAR directory is not sorted"
 
 # Check whether restoring and dumping a NAR that contains case
 # collisions is round-tripping, even on a case-insensitive system.
-
+rm -rf "$TEST_ROOT/case"
+opts=("--option" "use-case-hack" "true")
 nix-store "${opts[@]}" --restore "$TEST_ROOT/case" < case.nar
 nix-store "${opts[@]}" --dump "$TEST_ROOT/case" > "$TEST_ROOT/case.nar"
 cmp case.nar "$TEST_ROOT/case.nar"
