@@ -13,13 +13,13 @@ Incremental refactorings of the documentation build setup to make it faster or e
 Build the manual from scratch:
 
 ```console
-nix-build $(nix-instantiate)'!doc'
+nix-build -E '(import ./.).packages.${builtins.currentSystem}.nix.doc'
 ```
 
 or
 
 ```console
-nix build .#^doc
+nix build .#nix^doc
 ```
 
 and open `./result-doc/share/doc/nix/manual/index.html`.
