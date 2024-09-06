@@ -24,6 +24,44 @@ expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 
 mkdir -p "$TEST_ROOT/out2"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "path '.*/out' already exists"
 
+# The same, but for a regular file.
+nix-store --dump ./nars.sh > "$TEST_ROOT/tmp.nar"
+
+rm -rf "$TEST_ROOT/out"
+nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
+
+rm -rf "$TEST_ROOT/out"
+mkdir -p "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
+
+rm -rf "$TEST_ROOT/out"
+ln -s "$TEST_ROOT/out2" "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
+
+mkdir -p "$TEST_ROOT/out2"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
+
+# The same, but for a symlink
+ln -sfn foo "$TEST_ROOT/symlink"
+nix-store --dump "$TEST_ROOT/symlink" > "$TEST_ROOT/tmp.nar"
+
+rm -rf "$TEST_ROOT/out"
+nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar"
+[[ -L "$TEST_ROOT/out" ]]
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
+
+rm -rf "$TEST_ROOT/out"
+mkdir -p "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
+
+rm -rf "$TEST_ROOT/out"
+ln -s "$TEST_ROOT/out2" "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
+
+mkdir -p "$TEST_ROOT/out2"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
+
 # Check whether restoring and dumping a NAR that contains case
 # collisions is round-tripping, even on a case-insensitive system.
 rm -rf "$TEST_ROOT/case"
