@@ -362,23 +362,28 @@ public:
         updateCV.notify_one();
     }
 
+    /**
+     * Redraw, if the output has changed.
+     *
+     * Excessive redrawing is noticable on slow terminals, and it interferes
+     * with text selection in some terminals, including libvte-based terminal
+     * emulators.
+     */
+    void redraw(std::string newOutput)
+    {
+        auto state(state_.lock());
+        if (newOutput != state->lastOutput) {
+            writeToStderr(newOutput);
+            state->lastOutput = std::move(newOutput);
+        }
+    }
+
     std::chrono::milliseconds draw(State & state)
     {
-        // Call draw() and render if the output has changed.
-
-        // Excessive redrawing is noticable on slow terminals, and it interferes
-        // with text selection in some terminals, including libvte-based terminal
-        // emulators.
-
         std::optional<std::string> newOutput;
         auto nextWakeup = draw(state, newOutput);
-        {
-            auto state(state_.lock());
-            if (newOutput && *newOutput != state->lastOutput) {
-                writeToStderr(*newOutput);
-                state->lastOutput = std::move(*newOutput);
-            }
-        }
+        if (newOutput)
+            redraw(*newOutput);
         return nextWakeup;
     }
 
