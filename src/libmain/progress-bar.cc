@@ -380,20 +380,6 @@ public:
 
     std::chrono::milliseconds draw(State & state)
     {
-        std::optional<std::string> newOutput;
-        auto nextWakeup = draw(state, newOutput);
-        if (newOutput)
-            redraw(*newOutput);
-        return nextWakeup;
-    }
-
-    /**
-     * @param output[out] `nullopt` if nothing is to be drawn. Otherwise, a
-     *                    string of ANSI terminal output that can be used to 
-     *                    render the progress bar.
-     */
-    std::chrono::milliseconds draw(State & state, std::optional<std::string> & output)
-    {
         auto nextWakeup = std::chrono::milliseconds::max();
 
         state.haveUpdate = false;
@@ -445,7 +431,7 @@ public:
         auto width = getWindowSize().second;
         if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
 
-        output = "\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K";
+        redraw("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");
 
         return nextWakeup;
     }
