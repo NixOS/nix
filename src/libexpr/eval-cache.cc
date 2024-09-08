@@ -6,9 +6,9 @@
 
 namespace nix::eval_cache {
 
-CachedEvalError::CachedEvalError(ref<AttrCursor> cursor, Symbol attr)
+CachedEvalError::CachedEvalError(ref<EvalState> state, ref<AttrCursor> cursor, Symbol attr)
     : EvalError("cached failure of attribute '%s'", cursor->getAttrPathStr(attr))
-    , cursor(cursor), attr(attr)
+    , state(state), cursor(cursor), attr(attr)
 { }
 
 void CachedEvalError::force()
@@ -18,7 +18,7 @@ void CachedEvalError::force()
     if (v.type() == nAttrs) {
         auto a = v.attrs->get(this->attr);
 
-        state.forceValue(*a->value, a->pos);
+        state->forceValue(*a->value, a->pos);
     }
 
     // Shouldn't happen.
@@ -506,7 +506,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
                     if (std::get_if<missing_t>(&attr->second))
                         return nullptr;
                     else if (std::get_if<failed_t>(&attr->second))
-                        throw CachedEvalError(ref(shared_from_this()), name);
+                        throw CachedEvalError(ref(root->state.shared_from_this()), ref(shared_from_this()), name);
                     else
                         return std::make_shared<AttrCursor>(root,
                             std::make_pair(shared_from_this(), name), nullptr, std::move(attr));

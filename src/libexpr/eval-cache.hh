@@ -15,10 +15,11 @@ class AttrCursor;
 
 struct CachedEvalError : EvalError
 {
+    const ref<EvalState> state;
     const ref<AttrCursor> cursor;
     const Symbol attr;
 
-    CachedEvalError(ref<AttrCursor> cursor, Symbol attr);
+    CachedEvalError(ref<EvalState>, ref<AttrCursor> cursor, Symbol attr);
 
     /**
      * Evaluate this attribute, which should result in a regular
