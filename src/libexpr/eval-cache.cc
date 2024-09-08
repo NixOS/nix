@@ -7,7 +7,7 @@
 namespace nix::eval_cache {
 
 CachedEvalError::CachedEvalError(ref<AttrCursor> cursor, Symbol attr)
-    : EvalError(cursor->root->state, "cached failure of attribute '%s'", cursor->getAttrPathStr(attr))
+    : EvalError("cached failure of attribute '%s'", cursor->getAttrPathStr(attr))
     , cursor(cursor), attr(attr)
 { }
 
@@ -16,13 +16,13 @@ void CachedEvalError::force()
     auto & v = cursor->forceValue();
 
     if (v.type() == nAttrs) {
-        auto a = v.attrs()->get(this->attr);
+        auto a = v.attrs->get(this->attr);
 
         state.forceValue(*a->value, a->pos);
     }
 
     // Shouldn't happen.
-    throw EvalError(state, "evaluation of cached failed attribute '%s' unexpectedly succeeded", cursor->getAttrPathStr(attr));
+    throw EvalError("evaluation of cached failed attribute '%s' unexpectedly succeeded", cursor->getAttrPathStr(attr));
 }
 
 static const char * schema = R"sql(
