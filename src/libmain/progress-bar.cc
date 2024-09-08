@@ -75,10 +75,10 @@ private:
         bool active = true;
         bool paused = false;
         bool haveUpdate = true;
-
-        /** Helps avoid unnecessary redraws, see `draw()` */
-        std::string lastOutput;
     };
+
+    /** Helps avoid unnecessary redraws, see `redraw()` */
+    Sync<std::string> lastOutput_;
 
     Sync<State> state_;
 
@@ -371,10 +371,10 @@ public:
      */
     void redraw(std::string newOutput)
     {
-        auto state(state_.lock());
-        if (newOutput != state->lastOutput) {
+        auto lastOutput(lastOutput_.lock());
+        if (newOutput != *lastOutput) {
             writeToStderr(newOutput);
-            state->lastOutput = std::move(newOutput);
+            *lastOutput = std::move(newOutput);
         }
     }
 
