@@ -15,7 +15,7 @@ The moving parts of channels are:
 >
 > Dependencies on other Nix expressions can be declared explicitly with:
 > - [`fetchurl`](@docroot@/language/builtins.md#builtins-fetchurl), [`fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball), or [`fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) in Nix expressions
-> - the [`-I` option](@docroot@/command-ref/opt-common.md#opt-I) in command line invocations for explicitly determining the value of [lookup paths](@docroot@/language/constructs/lookup-path.md)
+> - the [`-I` option](@docroot@/command-ref/opt-common.md#opt-I) in command line invocations for explicitly modifying the value of [lookup paths](@docroot@/language/constructs/lookup-path.md)
 
 ## Subscribed channels
 
