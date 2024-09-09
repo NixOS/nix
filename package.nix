@@ -60,7 +60,7 @@
 # Run the functional tests as part of the build.
 , doInstallCheck ? test-client != null || __forDefaults.canRunInstalled
 
-# Check test coverage of Nix. Probably want to use with with at least
+# Check test coverage of Nix. Probably want to use with at least
 # one of `doCHeck` or `doInstallCheck` enabled.
 , withCoverageChecks ? false
 

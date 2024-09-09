@@ -10,6 +10,8 @@
 #include "worker-protocol.hh"
 #include "executable-path.hh"
 
+namespace nix::fs { using namespace std::filesystem; }
+
 using namespace nix;
 
 namespace {
@@ -39,8 +41,6 @@ void checkInfo(const std::string & msg) {
 }
 
 }
-
-namespace fs = std::filesystem;
 
 struct CmdConfigCheck : StoreCommand
 {

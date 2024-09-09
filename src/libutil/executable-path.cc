@@ -6,7 +6,9 @@
 
 namespace nix {
 
-namespace fs = std::filesystem;
+namespace fs {
+using namespace std::filesystem;
+}
 
 constexpr static const OsStringView path_var_separator{
     &ExecutablePath::separator,
@@ -24,7 +26,7 @@ ExecutablePath ExecutablePath::load()
 ExecutablePath ExecutablePath::parse(const OsString & path)
 {
     auto strings = path.empty() ? (std::list<OsString>{})
-                                : basicSplitString<std::list<OsString>, OsString::value_type>(path, path_var_separator);
+                                : basicSplitString<std::list<OsString>, OsChar>(path, path_var_separator);
 
     std::vector<fs::path> ret;
     ret.reserve(strings.size());

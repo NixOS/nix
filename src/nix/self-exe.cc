@@ -5,7 +5,9 @@
 
 namespace nix {
 
-namespace fs = std::filesystem;
+namespace fs {
+using namespace std::filesystem;
+}
 
 fs::path getNixBin(std::optional<std::string_view> binaryNameOpt)
 {

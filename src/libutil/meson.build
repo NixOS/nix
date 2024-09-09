@@ -185,6 +185,7 @@ headers = [config_h] + files(
   'english.hh',
   'environment-variables.hh',
   'error.hh',
+  'exec.hh',
   'executable-path.hh',
   'exit.hh',
   'experimental-features.hh',

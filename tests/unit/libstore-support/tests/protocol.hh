@@ -12,10 +12,10 @@ namespace nix {
 template<class Proto, const char * protocolDir>
 class ProtoTest : public CharacterizationTest, public LibStoreTest
 {
-    Path unitTestData = getUnitTestData() + "/" + protocolDir;
+    std::filesystem::path unitTestData = getUnitTestData() / protocolDir;
 
-    Path goldenMaster(std::string_view testStem) const override {
-        return unitTestData + "/" + testStem + ".bin";
+    std::filesystem::path goldenMaster(std::string_view testStem) const override {
+        return unitTestData / (std::string { testStem + ".bin" });
     }
 };
 

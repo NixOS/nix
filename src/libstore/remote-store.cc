@@ -153,9 +153,9 @@ RemoteStore::ConnectionHandle::~ConnectionHandle()
     }
 }
 
-void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, bool flush)
+void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, bool flush, bool block)
 {
-    handle->processStderr(&daemonException, sink, source, flush);
+    handle->processStderr(&daemonException, sink, source, flush, block);
 }
 
 
@@ -926,43 +926,17 @@ void RemoteStore::ConnectionHandle::withFramedSink(std::function<void(Sink & sin
 {
     (*this)->to.flush();
 
-    std::exception_ptr ex;
-
-    /* Handle log messages / exceptions from the remote on a separate
-       thread. */
-    std::thread stderrThread([&]()
     {
-        try {
-            ReceiveInterrupts receiveInterrupts;
-            processStderr(nullptr, nullptr, false);
-        } catch (...) {
-            ex = std::current_exception();
-        }
-    });
-
-    Finally joinStderrThread([&]()
-    {
-        if (stderrThread.joinable()) {
-            stderrThread.join();
-            if (ex) {
-                try {
-                    std::rethrow_exception(ex);
-                } catch (...) {
-                    ignoreException();
-                }
-            }
-        }
-    });
-
-    {
-        FramedSink sink((*this)->to, ex);
+        FramedSink sink((*this)->to, [&]() {
+            /* Periodically process stderr messages and exceptions
+               from the daemon. */
+            processStderr(nullptr, nullptr, false, false);
+        });
         fun(sink);
         sink.flush();
     }
 
-    stderrThread.join();
-    if (ex)
-        std::rethrow_exception(ex);
+    processStderr(nullptr, nullptr, false);
 }
 
 }

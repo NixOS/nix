@@ -20,6 +20,8 @@
 
 #include <queue>
 
+namespace nix::fs { using namespace std::filesystem; }
+
 using namespace nix;
 
 std::string chrootHelperName = "__run_in_chroot";
@@ -170,25 +172,25 @@ void chrootHelper(int argc, char * * argv)
     if (!pathExists(storeDir)) {
         // FIXME: Use overlayfs?
 
-        std::filesystem::path tmpDir = createTempDir();
+        fs::path tmpDir = createTempDir();
 
         createDirs(tmpDir + storeDir);
 
         if (mount(realStoreDir.c_str(), (tmpDir + storeDir).c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-        for (auto entry : std::filesystem::directory_iterator{"/"}) {
+        for (auto entry : fs::directory_iterator{"/"}) {
             checkInterrupt();
             auto src = entry.path();
-            Path dst = tmpDir / entry.path().filename();
+            fs::path dst = tmpDir / entry.path().filename();
             if (pathExists(dst)) continue;
             auto st = entry.symlink_status();
-            if (std::filesystem::is_directory(st)) {
+            if (fs::is_directory(st)) {
                 if (mkdir(dst.c_str(), 0700) == -1)
                     throw SysError("creating directory '%s'", dst);
                 if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
                     throw SysError("mounting '%s' on '%s'", src, dst);
-            } else if (std::filesystem::is_symlink(st))
+            } else if (fs::is_symlink(st))
                 createSymlink(readLink(src), dst);
         }
 
@@ -205,9 +207,9 @@ void chrootHelper(int argc, char * * argv)
         if (mount(realStoreDir.c_str(), storeDir.c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-    writeFile("/proc/self/setgroups", "deny");
-    writeFile("/proc/self/uid_map", fmt("%d %d %d", uid, uid, 1));
-    writeFile("/proc/self/gid_map", fmt("%d %d %d", gid, gid, 1));
+    writeFile(fs::path{"/proc/self/setgroups"}, "deny");
+    writeFile(fs::path{"/proc/self/uid_map"}, fmt("%d %d %d", uid, uid, 1));
+    writeFile(fs::path{"/proc/self/gid_map"}, fmt("%d %d %d", gid, gid, 1));
 
 #if __linux__
     if (system != "")

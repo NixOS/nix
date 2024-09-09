@@ -77,6 +77,9 @@ private:
         bool haveUpdate = true;
     };
 
+    /** Helps avoid unnecessary redraws, see `redraw()` */
+    Sync<std::string> lastOutput_;
+
     Sync<State> state_;
 
     std::thread updateThread;
@@ -359,6 +362,22 @@ public:
         updateCV.notify_one();
     }
 
+    /**
+     * Redraw, if the output has changed.
+     *
+     * Excessive redrawing is noticable on slow terminals, and it interferes
+     * with text selection in some terminals, including libvte-based terminal
+     * emulators.
+     */
+    void redraw(std::string newOutput)
+    {
+        auto lastOutput(lastOutput_.lock());
+        if (newOutput != *lastOutput) {
+            writeToStderr(newOutput);
+            *lastOutput = std::move(newOutput);
+        }
+    }
+
     std::chrono::milliseconds draw(State & state)
     {
         auto nextWakeup = std::chrono::milliseconds::max();
@@ -412,7 +431,7 @@ public:
         auto width = getWindowSize().second;
         if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
 
-        writeToStderr("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");
+        redraw("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");
 
         return nextWakeup;
     }

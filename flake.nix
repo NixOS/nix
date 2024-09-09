@@ -189,13 +189,15 @@
         # system, we should reenable this.
         #perlBindings = self.hydraJobs.perlBindings.${system};
       }
+      /*
       # Add "passthru" tests
       // flatMapAttrs ({
           "" = nixpkgsFor.${system}.native;
         } // lib.optionalAttrs (! nixpkgsFor.${system}.native.stdenv.hostPlatform.isDarwin) {
           # TODO: enable static builds for darwin, blocked on:
           #       https://github.com/NixOS/nixpkgs/issues/320448
-          "static-" = nixpkgsFor.${system}.static;
+          # TODO: disabled to speed up GHA CI.
+          #"static-" = nixpkgsFor.${system}.static;
         })
         (nixpkgsPrefix: nixpkgs:
           flatMapAttrs nixpkgs.nixComponents
@@ -209,6 +211,7 @@
             "${nixpkgsPrefix}nix-functional-tests" = nixpkgs.nixComponents.nix-functional-tests;
           }
         )
+      */
       // devFlake.checks.${system} or {}
       );
 
@@ -292,6 +295,7 @@
       devShells = let
         makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs:
         let
+          buildCanExecuteHost = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
           modular = devFlake.getSystem stdenv.buildPlatform.system;
           transformFlag = prefix: flag:
             assert builtins.isString flag;
@@ -349,7 +353,7 @@
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
             ++ pkgs.nixComponents.nix-functional-tests.baseNativeBuildInputs
             ++ lib.optional
-              (!stdenv.buildPlatform.canExecute stdenv.hostPlatform
+              (!buildCanExecuteHost
                  # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
                  && !(stdenv.hostPlatform.isWindows && stdenv.buildPlatform.isDarwin)
                  && stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages

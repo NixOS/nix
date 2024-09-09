@@ -128,7 +128,18 @@ public:
     explicit operator bool() const;
     Descriptor release();
     void close();
-    void fsync();
+
+    /**
+     * Perform a blocking fsync operation.
+     */
+    void fsync() const;
+
+    /**
+     * Asynchronously flush to disk without blocking, if available on
+     * the platform. This is just a performance optimization, and
+     * fsync must be run later even if this is called.
+     */
+    void startFsync() const;
 };
 
 class Pipe
@@ -143,10 +154,10 @@ public:
 namespace unix {
 
 /**
- * Close all file descriptors except those listed in the given set.
+ * Close all file descriptors except stdio fds (ie 0, 1, 2).
  * Good practice in child processes.
  */
-void closeMostFDs(const std::set<Descriptor> & exceptions);
+void closeExtraFDs();
 
 /**
  * Set the close-on-exec flag for the given file descriptor.

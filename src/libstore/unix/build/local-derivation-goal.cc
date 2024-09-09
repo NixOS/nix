@@ -102,14 +102,7 @@ void handleDiffHook(
     }
 }
 
-// We want $HOME to be un-creatable in the sandbox. On Linux,
-// you can't create anything inside /proc since it's a virtual filesystem.
-// On Darwin it seems that `/homeless-shelter` is good enough.
-#if __linux__
-const Path LocalDerivationGoal::homeDir = "/proc/homeless-shelter";
-#else
 const Path LocalDerivationGoal::homeDir = "/homeless-shelter";
-#endif
 
 
 LocalDerivationGoal::~LocalDerivationGoal()
@@ -451,25 +444,22 @@ void LocalDerivationGoal::startBuilder()
         #if __linux__
         experimentalFeatureSettings.require(Xp::Cgroups);
 
+        /* If we're running from the daemon, then this will return the
+           root cgroup of the service. Otherwise, it will return the
+           current cgroup. */
+        auto rootCgroup = getRootCgroup();
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS)
             throw Error("cannot determine the cgroups file system");
-
-        auto ourCgroups = getCgroups("/proc/self/cgroup");
-        auto ourCgroup = ourCgroups[""];
-        if (ourCgroup == "")
-            throw Error("cannot determine cgroup name from /proc/self/cgroup");
-
-        auto ourCgroupPath = canonPath(*cgroupFS + "/" + ourCgroup);
-
-        if (!pathExists(ourCgroupPath))
-            throw Error("expected cgroup directory '%s'", ourCgroupPath);
+        auto rootCgroupPath = canonPath(*cgroupFS + "/" + rootCgroup);
+        if (!pathExists(rootCgroupPath))
+            throw Error("expected cgroup directory '%s'", rootCgroupPath);
 
         static std::atomic<unsigned int> counter{0};
 
         cgroup = buildUser
-            ? fmt("%s/nix-build-uid-%d", ourCgroupPath, buildUser->getUID())
-            : fmt("%s/nix-build-pid-%d-%d", ourCgroupPath, getpid(), counter++);
+            ? fmt("%s/nix-build-uid-%d", rootCgroupPath, buildUser->getUID())
+            : fmt("%s/nix-build-pid-%d-%d", rootCgroupPath, getpid(), counter++);
 
         debug("using cgroup '%s'", *cgroup);
 
@@ -1993,7 +1983,7 @@ void LocalDerivationGoal::runChild()
             throw SysError("changing into '%1%'", tmpDir);
 
         /* Close all other file descriptors. */
-        unix::closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
+        unix::closeExtraFDs();
 
 #if __linux__
         linux::setPersonality(drv->platform);

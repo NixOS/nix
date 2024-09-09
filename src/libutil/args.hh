@@ -113,6 +113,16 @@ protected:
             , arity(1)
         { }
 
+        Handler(std::filesystem::path * dest)
+            : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
+            , arity(1)
+        { }
+
+        Handler(std::optional<std::filesystem::path> * dest)
+            : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
+            , arity(1)
+        { }
+
         template<class T>
         Handler(T * dest, const T & val)
             : fun([dest, val](std::vector<std::string> ss) { *dest = val; })
@@ -275,6 +285,18 @@ public:
      * Expect a string argument.
      */
     void expectArg(const std::string & label, std::string * dest, bool optional = false)
+    {
+        expectArgs({
+            .label = label,
+            .optional = optional,
+            .handler = {dest}
+        });
+    }
+
+    /**
+     * Expect a path argument.
+     */
+    void expectArg(const std::string & label, std::filesystem::path * dest, bool optional = false)
     {
         expectArgs({
             .label = label,

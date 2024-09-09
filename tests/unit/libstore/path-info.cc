@@ -12,10 +12,10 @@ using nlohmann::json;
 
 class PathInfoTest : public CharacterizationTest, public LibStoreTest
 {
-    Path unitTestData = getUnitTestData() + "/path-info";
+    std::filesystem::path unitTestData = getUnitTestData() / "path-info";
 
-    Path goldenMaster(PathView testStem) const override {
-        return unitTestData + "/" + testStem + ".json";
+    std::filesystem::path goldenMaster(PathView testStem) const override {
+        return unitTestData / (testStem + ".json");
     }
 };
 

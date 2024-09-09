@@ -32,7 +32,8 @@ static Logger::Fields readFields(Source & from)
     return fields;
 }
 
-std::exception_ptr WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * source, bool flush)
+std::exception_ptr
+WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * source, bool flush, bool block)
 {
     if (flush)
         to.flush();
@@ -40,6 +41,9 @@ std::exception_ptr WorkerProto::BasicClientConnection::processStderrReturn(Sink 
     std::exception_ptr ex;
 
     while (true) {
+
+        if (!block && !from.hasData())
+            break;
 
         auto msg = readNum<uint64_t>(from);
 
@@ -95,8 +99,10 @@ std::exception_ptr WorkerProto::BasicClientConnection::processStderrReturn(Sink 
             logger->result(act, type, fields);
         }
 
-        else if (msg == STDERR_LAST)
+        else if (msg == STDERR_LAST) {
+            assert(block);
             break;
+        }
 
         else
             throw Error("got unknown message type %x from Nix daemon", msg);
@@ -130,9 +136,10 @@ std::exception_ptr WorkerProto::BasicClientConnection::processStderrReturn(Sink 
     }
 }
 
-void WorkerProto::BasicClientConnection::processStderr(bool * daemonException, Sink * sink, Source * source, bool flush)
+void WorkerProto::BasicClientConnection::processStderr(
+    bool * daemonException, Sink * sink, Source * source, bool flush, bool block)
 {
-    auto ex = processStderrReturn(sink, source, flush);
+    auto ex = processStderrReturn(sink, source, flush, block);
     if (ex) {
         *daemonException = true;
         std::rethrow_exception(ex);

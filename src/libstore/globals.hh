@@ -399,10 +399,18 @@ public:
           default is `true`.
         )"};
 
+    Setting<bool> fsyncStorePaths{this, false, "fsync-store-paths",
+        R"(
+          Whether to call `fsync()` on store paths before registering them, to
+          flush them to disk. This improves robustness in case of system crashes,
+          but reduces performance. The default is `false`.
+        )"};
+
     Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal",
         "Whether SQLite should use WAL mode."};
 
 #ifndef _WIN32
+    // FIXME: remove this option, `fsync-store-paths` is faster.
     Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
         "Whether to call `sync()` before registering a path as valid."};
 #endif
@@ -1196,7 +1204,7 @@ public:
 
           If the user is trusted (see `trusted-users` option), when building
           a fixed-output derivation, environment variables set in this option
-          will be passed to the builder if they are listed in [`impureEnvVars`](@docroot@/language/advanced-attributes.md##adv-attr-impureEnvVars).
+          will be passed to the builder if they are listed in [`impureEnvVars`](@docroot@/language/advanced-attributes.md#adv-attr-impureEnvVars).
 
           This option is useful for, e.g., setting `https_proxy` for
           fixed-output derivations and in a multi-user Nix installation, or
