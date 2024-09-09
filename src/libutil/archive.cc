@@ -23,7 +23,7 @@ struct ArchiveSettings : Config
             false,
         #endif
         "use-case-hack",
-        "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
+        "Whether to enable a macOS-specific hack for dealing with file name case collisions."};
 };
 
 static ArchiveSettings archiveSettings;
