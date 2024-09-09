@@ -771,9 +771,6 @@ void LocalDerivationGoal::startBuilder()
                 pathsInChroot.erase(worker.store.printStorePath(*i.second.second));
         }
 
-        // Make build root read-only, so `mkdir /homeless-shelter` would fail.
-        chmod_(chrootRootDir, 01555);
-
         if (cgroup) {
             if (mkdir(cgroup->c_str(), 0755) != 0)
                 throw SysError("creating cgroup '%s'", *cgroup);
@@ -1972,6 +1969,9 @@ void LocalDerivationGoal::runChild()
 
             if (rmdir("real-root") == -1)
                 throw SysError("cannot remove real-root directory");
+
+            // Make build root read-only, so `mkdir /homeless-shelter` would fail.
+            chmod_(chrootRootDir, 01555);
 
             /* Switch to the sandbox uid/gid in the user namespace,
                which corresponds to the build user or calling user in
