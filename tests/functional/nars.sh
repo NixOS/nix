@@ -42,7 +42,7 @@ expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | gre
 mkdir -p "$TEST_ROOT/out2"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
 
-# The same, but for a symlink
+# The same, but for a symlink.
 ln -sfn foo "$TEST_ROOT/symlink"
 nix-store --dump "$TEST_ROOT/symlink" > "$TEST_ROOT/tmp.nar"
 
