@@ -501,7 +501,11 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     //       https://github.com/NixOS/nix/issues/4313
     auto storePath =
         unpack
-        ? fetchToStore(*state.store, fetchers::downloadTarball(*url).accessor, FetchMode::Copy, name)
+        ? fetchToStore(
+            *state.store,
+            fetchers::downloadTarball(state.store, state.fetchSettings, *url),
+            FetchMode::Copy,
+            name)
         : fetchers::downloadFile(state.store, *url, name).storePath;
 
     if (expectedHash) {
