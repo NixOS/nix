@@ -32,11 +32,7 @@ unsigned int getMaxCPU()
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS) return 0;
 
-        auto cgroups = getCgroups("/proc/self/cgroup");
-        auto cgroup = cgroups[""];
-        if (cgroup == "") return 0;
-
-        auto cpuFile = *cgroupFS + "/" + cgroup + "/cpu.max";
+        auto cpuFile = *cgroupFS + "/" + getCurrentCgroup() + "/cpu.max";
 
         auto cpuMax = readFile(cpuFile);
         auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
