@@ -1971,7 +1971,7 @@ void LocalDerivationGoal::runChild()
                 throw SysError("cannot remove real-root directory");
 
             // Make build root read-only, so `mkdir /homeless-shelter` would fail.
-            chmod_(chrootRootDir, 01555);
+            chmod_("/", 0555);
 
             /* Switch to the sandbox uid/gid in the user namespace,
                which corresponds to the build user or calling user in
