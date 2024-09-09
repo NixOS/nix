@@ -138,6 +138,19 @@ The following environment variables are used to determine locations of various s
 - [`XDG_STATE_HOME`]{#env-XDG_STATE_HOME} (default `~/.local/state`)
 - [`XDG_CACHE_HOME`]{#env-XDG_CACHE_HOME} (default `~/.cache`)
 
-
 [XDG Base Directory Specification]: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
 [`use-xdg-base-directories`]: @docroot@/command-ref/conf-file.md#conf-use-xdg-base-directories
+
+In addition, the following environment variables can be used to override the XDG base directories:
+
+- [`NIX_CONFIG_HOME`]{#env-NIX_CONFIG_HOME} (default `$XDG_CONFIG_HOME/nix`)
+- [`NIX_STATE_HOME`]{#env-NIX_STATE_HOME} (default `$XDG_STATE_HOME/nix`)
+- [`NIX_CACHE_HOME`]{#env-NIX_CACHE_HOME} (default `$XDG_CACHE_HOME/nix`)
+
+So, when [`use-xdg-base-directories`] is enabled, the configuration directory is:
+
+1. `$NIX_CONFIG_HOME`, if it is defined
+2. Otherwise, `$XDG_CONFIG_HOME/nix`, if `XDG_CONFIG_HOME` is defined
+3. Otherwise, `~/.config/nix`.
+
+And likewise for the state and cache directories.
