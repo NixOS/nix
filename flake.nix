@@ -551,8 +551,32 @@
         # to https://nixos.org/nix/install. It downloads the binary
         # tarball for the user's system and calls the second half of the
         # installation script.
+<<<<<<< HEAD
         installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" "armv6l-linux" "armv7l-linux" ];
         installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" "armv6l-linux" "armv7l-linux"];
+=======
+        installerScript = installScriptFor [
+          # Native
+          self.hydraJobs.binaryTarball."x86_64-linux"
+          self.hydraJobs.binaryTarball."i686-linux"
+          self.hydraJobs.binaryTarball."aarch64-linux"
+          self.hydraJobs.binaryTarball."x86_64-darwin"
+          self.hydraJobs.binaryTarball."aarch64-darwin"
+          # Cross
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."riscv64-unknown-linux-gnu"
+        ];
+        installerScriptForGHA = installScriptFor [
+          # Native
+          self.hydraJobs.binaryTarball."x86_64-linux"
+          self.hydraJobs.binaryTarball."aarch64-darwin"
+          # Cross
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."riscv64-unknown-linux-gnu"
+        ];
+>>>>>>> c2a428eac (installerScriptForGHA: aarch64-darwin)
 
         # docker image with Nix inside
         dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
