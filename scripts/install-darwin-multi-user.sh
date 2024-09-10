@@ -4,7 +4,17 @@ set -eu
 set -o pipefail
 
 # System specific settings
-export NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-301}"
+# Notes:
+# - up to macOS Big Sur we used the same GID/UIDs as Linux (30000:30001-32)
+# - we changed UID to 301 because Big Sur updates failed into recovery mode
+#   we're targeting the 200-400 UID range for role users mentioned in the
+#   usage note for sysadminctl
+# - we changed UID to 351 because Sequoia now uses UIDs 300-304 for its own
+#   daemon users
+# - we changed GID to 350 alongside above just because it hides the nixbld
+#   group from the Users & Groups settings panel :)
+export NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-351}"
+export NIX_BUILD_GROUP_ID="${NIX_BUILD_GROUP_ID:-350}"
 export NIX_BUILD_USER_NAME_TEMPLATE="_nixbld%d"
 
 readonly NIX_DAEMON_DEST=/Library/LaunchDaemons/org.nixos.nix-daemon.plist
