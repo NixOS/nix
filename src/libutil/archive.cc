@@ -23,7 +23,7 @@ struct ArchiveSettings : Config
             false,
         #endif
         "use-case-hack",
-        "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
+        "Whether to enable a macOS-specific hack for dealing with file name case collisions."};
 };
 
 static ArchiveSettings archiveSettings;
@@ -214,11 +214,13 @@ static void parse(FileSystemObjectSink & sink, Source & source, const Path & pat
             else if (t == "directory") {
                 sink.createDirectory(path);
 
+                std::string prevName;
+
                 while (1) {
                     s = getString();
 
                     if (s == "entry") {
-                        std::string name, prevName;
+                        std::string name;
 
                         s = getString();
                         if (s != "(") throw badArchive("expected open tag");
@@ -241,6 +243,9 @@ static void parse(FileSystemObjectSink & sink, Source & source, const Path & pat
                                         debug("case collision between '%1%' and '%2%'", i->first, name);
                                         name += caseHackSuffix;
                                         name += std::to_string(++i->second);
+                                        auto j = names.find(name);
+                                        if (j != names.end())
+                                            throw Error("NAR contains file name '%s' that collides with case-hacked file name '%s'", prevName, j->first);
                                     } else
                                         names[name] = 0;
                                 }
