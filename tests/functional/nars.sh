@@ -9,18 +9,18 @@ rm -rf "$TEST_ROOT/out"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "NAR directory is not sorted"
 
 # Check that nix-store --restore fails if the output already exists.
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "path '.*/out/' already exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "creating directory '.*/out': File exists"
 
 rm -rf "$TEST_ROOT/out"
 echo foo > "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "cannot create directory.*File exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "creating directory '.*/out': File exists"
 
 rm -rf "$TEST_ROOT/out"
 ln -s "$TEST_ROOT/out2" "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "cannot create directory.*File exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "creating directory '.*/out': File exists"
 
 mkdir -p "$TEST_ROOT/out2"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "path '.*/out/' already exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "creating directory '.*/out': File exists"
 
 # The same, but for a regular file.
 nix-store --dump ./nars.sh > "$TEST_ROOT/tmp.nar"
@@ -84,7 +84,7 @@ expectStderr 1 nix-store "${opts[@]}" --restore "$TEST_ROOT/case" < case-collisi
 # to the same name should fail on macOS but succeed on Linux.
 rm -rf "$TEST_ROOT/out"
 if [[ $(uname) = Darwin ]]; then
-    expectStderr 1 nix-store --restore "$TEST_ROOT/out" < unnormalized.nar | grepQuiet "path '.*/out/â' already exists"
+    expectStderr 1 nix-store --restore "$TEST_ROOT/out" < unnormalized.nar | grepQuiet "File exists"
 else
     nix-store --restore "$TEST_ROOT/out" < unnormalized.nar
     [[ -e $TEST_ROOT/out/â ]]
