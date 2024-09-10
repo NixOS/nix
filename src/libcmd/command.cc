@@ -2,7 +2,7 @@
 
 #include "command.hh"
 #include "markdown.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "local-fs-store.hh"
 #include "derivations.hh"
 #include "nixexpr.hh"

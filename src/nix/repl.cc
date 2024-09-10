@@ -2,6 +2,7 @@
 #include "eval-settings.hh"
 #include "config-global.hh"
 #include "globals.hh"
+#include "store-open.hh"
 #include "command.hh"
 #include "installable-value.hh"
 #include "repl.hh"

@@ -2,63 +2,33 @@
 
 namespace nix {
 
+
+template<template<typename> class F>
+struct LocalOverlayStoreConfigT
+{
+    const F<ref<const StoreConfig>> lowerStoreConfig;
+    const F<Path> upperLayer;
+    const F<bool> checkMount;
+    const F<Path> remountHook;
+};
+
 /**
  * Configuration for `LocalOverlayStore`.
  */
-struct LocalOverlayStoreConfig : virtual LocalStoreConfig
+struct LocalOverlayStoreConfig :
+    LocalStoreConfig,
+    LocalOverlayStoreConfigT<config::JustValue>
 {
-    LocalOverlayStoreConfig(const StringMap & params)
-        : LocalOverlayStoreConfig("local-overlay", "", params)
-    { }
+    static config::SettingDescriptionMap descriptions();
 
-    LocalOverlayStoreConfig(std::string_view scheme, PathView path, const Params & params)
-        : StoreConfig(params)
-        , LocalFSStoreConfig(path, params)
-        , LocalStoreConfig(scheme, path, params)
-    {
-    }
+    LocalOverlayStoreConfig(
+        std::string_view scheme,
+        PathView path,
+        const StoreReference::Params & params);
 
-    const Setting<std::string> lowerStoreUri{(StoreConfig*) this, "", "lower-store",
-        R"(
-          [Store URL](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
-          for the lower store. The default is `auto` (i.e. use the Nix daemon or `/nix/store` directly).
+    static const std::string name() { return "Experimental Local Overlay Store"; }
 
-          Must be a store with a store dir on the file system.
-          Must be used as OverlayFS lower layer for this store's store dir.
-        )"};
-
-    const PathSetting upperLayer{(StoreConfig*) this, "", "upper-layer",
-        R"(
-          Directory containing the OverlayFS upper layer for this store's store dir.
-        )"};
-
-    Setting<bool> checkMount{(StoreConfig*) this, true, "check-mount",
-        R"(
-          Check that the overlay filesystem is correctly mounted.
-
-          Nix does not manage the overlayfs mount point itself, but the correct
-          functioning of the overlay store does depend on this mount point being set up
-          correctly. Rather than just assume this is the case, check that the lowerdir
-          and upperdir options are what we expect them to be. This check is on by
-          default, but can be disabled if needed.
-        )"};
-
-    const PathSetting remountHook{(StoreConfig*) this, "", "remount-hook",
-        R"(
-          Script or other executable to run when overlay filesystem needs remounting.
-
-          This is occasionally necessary when deleting a store path that exists in both upper and lower layers.
-          In such a situation, bypassing OverlayFS and deleting the path in the upper layer directly
-          is the only way to perform the deletion without creating a "whiteout".
-          However this causes the OverlayFS kernel data structures to get out-of-sync,
-          and can lead to 'stale file handle' errors; remounting solves the problem.
-
-          The store directory is passed as an argument to the invoked executable.
-        )"};
-
-    const std::string name() override { return "Experimental Local Overlay Store"; }
-
-    std::optional<ExperimentalFeature> experimentalFeature() const override
+    static std::optional<ExperimentalFeature> experimentalFeature()
     {
         return ExperimentalFeature::LocalOverlayStore;
     }
@@ -68,7 +38,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
         return { "local-overlay" };
     }
 
-    std::string doc() override;
+    static std::string doc();
 
 protected:
     /**
@@ -79,7 +49,9 @@ protected:
      * at that file path. It might be stored in the lower layer instead,
      * or it might not be part of this store at all.
      */
-    Path toUpperPath(const StorePath & path);
+    Path toUpperPath(const StorePath & path) const;
+
+    friend struct LocalOverlayStore;
 };
 
 /**
@@ -88,8 +60,20 @@ protected:
  * Documentation on overridden methods states how they differ from their
  * `LocalStore` counterparts.
  */
-class LocalOverlayStore : public virtual LocalOverlayStoreConfig, public virtual LocalStore
+struct LocalOverlayStore : virtual LocalStore
 {
+    using Config = LocalOverlayStoreConfig;
+
+    ref<const Config> config;
+
+    LocalOverlayStore(ref<const Config>);
+
+    std::string getUri() override
+    {
+        return "local-overlay://";
+    }
+
+private:
     /**
      * The store beneath us.
      *
@@ -99,20 +83,6 @@ class LocalOverlayStore : public virtual LocalOverlayStoreConfig, public virtual
      */
     ref<LocalFSStore> lowerStore;
 
-public:
-    LocalOverlayStore(const Params & params)
-        : LocalOverlayStore("local-overlay", "", params)
-    {
-    }
-
-    LocalOverlayStore(std::string_view scheme, PathView path, const Params & params);
-
-    std::string getUri() override
-    {
-        return "local-overlay://";
-    }
-
-private:
     /**
      * First copy up any lower store realisation with the same key, so we
      * merge rather than mask it.

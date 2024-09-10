@@ -12,17 +12,75 @@
 #include "ssh.hh"
 #include "derivations.hh"
 #include "callback.hh"
+#include "config-parse-impl.hh"
+#include "store-registration.hh"
 
 namespace nix {
 
-LegacySSHStoreConfig::LegacySSHStoreConfig(
+static const LegacySSHStoreConfigT<config::SettingInfo> legacySSHStoreConfigDescriptions = {
+    .remoteProgram{
+        .name = "remote-program",
+        .description = "Path to the `nix-store` executable on the remote machine.",
+    },
+    .maxConnections{
+        .name = "max-connections",
+        .description = "Maximum number of concurrent SSH connections.",
+    },
+};
+
+
+#define LEGACY_SSH_STORE_CONFIG_FIELDS(X) \
+    X(remoteProgram), \
+    X(maxConnections)
+
+
+MAKE_PARSE(LegacySSHStoreConfig, legacySSHStoreConfig, LEGACY_SSH_STORE_CONFIG_FIELDS)
+
+
+static LegacySSHStoreConfigT<config::JustValue> legacySSHStoreConfigDefaults()
+{
+    return {
+        .remoteProgram = {{"nix-store"}},
+        .maxConnections = {1},
+    };
+}
+
+
+MAKE_APPLY_PARSE(LegacySSHStoreConfig, legacySSHStoreConfig, LEGACY_SSH_STORE_CONFIG_FIELDS)
+
+
+config::SettingDescriptionMap LegacySSHStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(CommonSSHStoreConfig::descriptions());
+    ret.merge(RemoteStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = legacySSHStoreConfigDescriptions;
+        auto defaults = legacySSHStoreConfigDefaults();
+        ret.merge(decltype(ret){
+            LEGACY_SSH_STORE_CONFIG_FIELDS(DESC_ROW)
+        });
+    }
+    return ret;
+}
+
+
+LegacySSHStore::Config::LegacySSHStoreConfig(
     std::string_view scheme,
     std::string_view authority,
-    const Params & params)
-    : StoreConfig(params)
-    , CommonSSHStoreConfig(scheme, authority, params)
+    const StoreReference::Params & params)
+    : Store::Config{params}
+    , CommonSSHStoreConfig{scheme, authority, params}
+    , LegacySSHStoreConfigT<config::JustValue>{legacySSHStoreConfigApplyParse(params)}
 {
+#ifndef _WIN32
+    if (auto * p = get(params, "log-fd")) {
+        logFD = p->get<decltype(logFD)>();
+    }
+#endif
 }
+
 
 std::string LegacySSHStoreConfig::doc()
 {
@@ -38,23 +96,19 @@ struct LegacySSHStore::Connection : public ServeProto::BasicClientConnection
     bool good = true;
 };
 
-LegacySSHStore::LegacySSHStore(
-    std::string_view scheme,
-    std::string_view host,
-    const Params & params)
-    : StoreConfig(params)
-    , CommonSSHStoreConfig(scheme, host, params)
-    , LegacySSHStoreConfig(scheme, host, params)
-    , Store(params)
+
+LegacySSHStore::LegacySSHStore(ref<const Config> config)
+    : Store{*config}
+    , config{config}
     , connections(make_ref<Pool<Connection>>(
-        std::max(1, (int) maxConnections),
+        std::max(1, (int) config->maxConnections),
         [this]() { return openConnection(); },
         [](const ref<Connection> & r) { return r->good; }
         ))
-    , master(createSSHMaster(
+    , master(config->createSSHMaster(
         // Use SSH master only if using more than 1 connection.
         connections->capacity() > 1,
-        logFD))
+        config->logFD))
 {
 }
 
@@ -62,12 +116,12 @@ LegacySSHStore::LegacySSHStore(
 ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-    Strings command = remoteProgram.get();
+    Strings command = config->remoteProgram.get();
     command.push_back("--serve");
     command.push_back("--write");
-    if (remoteStore.get() != "") {
+    if (config->remoteStore.get() != "") {
         command.push_back("--store");
-        command.push_back(remoteStore.get());
+        command.push_back(config->remoteStore.get());
     }
     conn->sshConn = master.startCommand(std::move(command));
     conn->to = FdSink(conn->sshConn->in.get());
@@ -77,7 +131,7 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
     TeeSource tee(conn->from, saved);
     try {
         conn->remoteVersion = ServeProto::BasicClientConnection::handshake(
-            conn->to, tee, SERVE_PROTOCOL_VERSION, host);
+            conn->to, tee, SERVE_PROTOCOL_VERSION, config->host);
     } catch (SerialisationError & e) {
         // in.close(): Don't let the remote block on us not writing.
         conn->sshConn->in.close();
@@ -86,9 +140,9 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
             tee.drainInto(nullSink);
         }
         throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
-            host, chomp(saved.s));
+            config->host, chomp(saved.s));
     } catch (EndOfFile & e) {
-        throw Error("cannot connect to '%1%'", host);
+        throw Error("cannot connect to '%1%'", config->host);
     }
 
     return conn;
@@ -97,7 +151,7 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
 
 std::string LegacySSHStore::getUri()
 {
-    return *uriSchemes().begin() + "://" + host;
+    return *Config::uriSchemes().begin() + "://" + config->host;
 }
 
 
@@ -110,7 +164,7 @@ void LegacySSHStore::queryPathInfoUncached(const StorePath & path,
         /* No longer support missing NAR hash */
         assert(GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4);
 
-        debug("querying remote host '%s' for info on '%s'", host, printStorePath(path));
+        debug("querying remote host '%s' for info on '%s'", config->host, printStorePath(path));
 
         auto infos = conn->queryPathInfos(*this, {path});
 
@@ -139,7 +193,7 @@ void LegacySSHStore::queryPathInfoUncached(const StorePath & path,
 void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    debug("adding path '%s' to remote host '%s'", printStorePath(info.path), host);
+    debug("adding path '%s' to remote host '%s'", printStorePath(info.path), config->host);
 
     auto conn(connections->get());
 
@@ -166,7 +220,7 @@ void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source,
         conn->to.flush();
 
         if (readInt(conn->from) != 1)
-            throw Error("failed to add path '%s' to remote host '%s'", printStorePath(info.path), host);
+            throw Error("failed to add path '%s' to remote host '%s'", printStorePath(info.path), config->host);
 
     } else {
 
@@ -311,12 +365,17 @@ unsigned int LegacySSHStore::getProtocol()
  * The legacy ssh protocol doesn't support checking for trusted-user.
  * Try using ssh-ng:// instead if you want to know.
  */
-std::optional<TrustedFlag> isTrustedClient()
+std::optional<TrustedFlag> LegacySSHStore::isTrustedClient()
 {
     return std::nullopt;
 }
 
 
-static RegisterStoreImplementation<LegacySSHStore, LegacySSHStoreConfig> regLegacySSHStore;
+ref<Store> LegacySSHStore::Config::openStore() const {
+    return make_ref<LegacySSHStore>(ref{shared_from_this()});
+}
+
+
+static RegisterStoreImplementation<LegacySSHStore::Config> regLegacySSHStore;
 
 }

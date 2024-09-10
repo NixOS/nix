@@ -110,7 +110,7 @@ bool ParsedDerivation::canBuildLocally(Store & localStore) const
         return false;
 
     for (auto & feature : getRequiredSystemFeatures())
-        if (!localStore.systemFeatures.get().count(feature)) return false;
+        if (!localStore.config.systemFeatures.get().count(feature)) return false;
 
     return true;
 }

@@ -19,7 +19,7 @@ class RemoteFSAccessor : public SourceAccessor
 
     std::pair<ref<SourceAccessor>, CanonPath> fetch(const CanonPath & path);
 
-    friend class BinaryCacheStore;
+    friend struct BinaryCacheStore;
 
     Path makeCacheFile(std::string_view hashPart, const std::string & ext);
 

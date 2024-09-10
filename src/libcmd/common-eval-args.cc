@@ -9,7 +9,7 @@
 #include "registry.hh"
 #include "flake/flakeref.hh"
 #include "flake/settings.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "command.hh"
 #include "tarball.hh"
 #include "fetch-to-store.hh"
