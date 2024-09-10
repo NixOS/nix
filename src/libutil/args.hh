@@ -2,6 +2,7 @@
 ///@file
 
 #include <functional>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <optional>
