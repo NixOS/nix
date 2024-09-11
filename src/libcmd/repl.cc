@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "error.hh"
 #include "repl-interacter.hh"
 #include "repl.hh"
 
@@ -720,7 +721,14 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
     if (flakeRefS.empty())
         throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
 
-    auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, std::filesystem::current_path().string(), true);
+    std::filesystem::path cwd;
+    try {
+        cwd = std::filesystem::current_path();
+    } catch (std::filesystem::filesystem_error & e) {
+        throw SysError("cannot determine current working directory");
+    }
+
+    auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, cwd.string(), true);
     if (evalSettings.pureEval && !flakeRef.input.isLocked())
         throw Error("cannot use ':load-flake' on locked flake reference '%s' (use --impure to override)", flakeRefS);
 
