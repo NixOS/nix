@@ -201,13 +201,17 @@ release:
 
 ## Security releases
 
+> See also the instructions for [handling security reports](./security-reports.md).
+
 Once a security fix is ready for merging:
+
+1. Summarize *all* past communication in the report.
 
 1. Request a CVE in the [GitHub security advisory](https://github.com/NixOS/nix/security/advisories) for the security fix.
 
 1. Notify all collaborators on the advisory with a timeline for the release.
 
-1. Merge the fix.
+1. Merge the fix. Publish the advisory.
 
 1. [Make point releases](#creating-point-releases) for all affected versions.
 
