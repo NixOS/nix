@@ -1,124 +1,46 @@
 #include "nixexpr.hh"
-#include "derivations.hh"
 #include "eval.hh"
 #include "symbol-table.hh"
 #include "util.hh"
+#include "print.hh"
 
 #include <cstdlib>
+#include <sstream>
+
+#include "strings-inline.hh"
 
 namespace nix {
 
-struct PosAdapter : AbstractPos
-{
-    Pos::Origin origin;
+unsigned long Expr::nrExprs = 0;
 
-    PosAdapter(Pos::Origin origin)
-        : origin(std::move(origin))
-    {
-    }
+ExprBlackHole eBlackHole;
 
-    std::optional<std::string> getSource() const override
-    {
-        return std::visit(overloaded {
-            [](const Pos::none_tag &) -> std::optional<std::string> {
-                return std::nullopt;
-            },
-            [](const Pos::Stdin & s) -> std::optional<std::string> {
-                // Get rid of the null terminators added by the parser.
-                return std::string(s.source->c_str());
-            },
-            [](const Pos::String & s) -> std::optional<std::string> {
-                // Get rid of the null terminators added by the parser.
-                return std::string(s.source->c_str());
-            },
-            [](const Path & path) -> std::optional<std::string> {
-                try {
-                    return readFile(path);
-                } catch (Error &) {
-                    return std::nullopt;
-                }
-            }
-        }, origin);
-    }
-
-    void print(std::ostream & out) const override
-    {
-        std::visit(overloaded {
-            [&](const Pos::none_tag &) { out << "«none»"; },
-            [&](const Pos::Stdin &) { out << "«stdin»"; },
-            [&](const Pos::String & s) { out << "«string»"; },
-            [&](const Path & path) { out << path; }
-        }, origin);
-    }
-};
-
-Pos::operator std::shared_ptr<AbstractPos>() const
-{
-    auto pos = std::make_shared<PosAdapter>(origin);
-    pos->line = line;
-    pos->column = column;
-    return pos;
-}
-
-/* Displaying abstract syntax trees. */
-
-static void showString(std::ostream & str, std::string_view s)
-{
-    str << '"';
-    for (auto c : s)
-        if (c == '"' || c == '\\' || c == '$') str << "\\" << c;
-        else if (c == '\n') str << "\\n";
-        else if (c == '\r') str << "\\r";
-        else if (c == '\t') str << "\\t";
-        else str << c;
-    str << '"';
-}
-
+// FIXME: remove, because *symbols* are abstract and do not have a single
+//        textual representation; see printIdentifier()
 std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)
 {
     std::string_view s = symbol;
-
-    if (s.empty())
-        str << "\"\"";
-    else if (s == "if") // FIXME: handle other keywords
-        str << '"' << s << '"';
-    else {
-        char c = s[0];
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')) {
-            showString(str, s);
-            return str;
-        }
-        for (auto c : s)
-            if (!((c >= 'a' && c <= 'z') ||
-                  (c >= 'A' && c <= 'Z') ||
-                  (c >= '0' && c <= '9') ||
-                  c == '_' || c == '\'' || c == '-')) {
-                showString(str, s);
-                return str;
-            }
-        str << s;
-    }
-    return str;
+    return printIdentifier(str, s);
 }
 
 void Expr::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    abort();
+    unreachable();
 }
 
 void ExprInt::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << n;
+    str << v.integer();
 }
 
 void ExprFloat::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << nf;
+    str << v.fpoint();
 }
 
 void ExprString::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    showString(str, s);
+    printLiteralString(str, s);
 }
 
 void ExprPath::show(const SymbolTable & symbols, std::ostream & str) const
@@ -150,10 +72,8 @@ void ExprOpHasAttr::show(const SymbolTable & symbols, std::ostream & str) const
     str << ") ? " << showAttrPath(symbols, attrPath) << ")";
 }
 
-void ExprAttrs::show(const SymbolTable & symbols, std::ostream & str) const
+void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) const
 {
-    if (recursive) str << "rec ";
-    str << "{ ";
     typedef const decltype(attrs)::value_type * Attr;
     std::vector<Attr> sorted;
     for (auto & i : attrs) sorted.push_back(&i);
@@ -161,10 +81,39 @@ void ExprAttrs::show(const SymbolTable & symbols, std::ostream & str) const
         std::string_view sa = symbols[a->first], sb = symbols[b->first];
         return sa < sb;
     });
+    std::vector<Symbol> inherits;
+    // We can use the displacement as a proxy for the order in which the symbols were parsed.
+    // The assignment of displacements should be deterministic, so that showBindings is deterministic.
+    std::map<Displacement, std::vector<Symbol>> inheritsFrom;
     for (auto & i : sorted) {
-        if (i->second.inherited)
-            str << "inherit " << symbols[i->first] << " " << "; ";
-        else {
+        switch (i->second.kind) {
+        case AttrDef::Kind::Plain:
+            break;
+        case AttrDef::Kind::Inherited:
+            inherits.push_back(i->first);
+            break;
+        case AttrDef::Kind::InheritedFrom: {
+            auto & select = dynamic_cast<ExprSelect &>(*i->second.e);
+            auto & from = dynamic_cast<ExprInheritFrom &>(*select.e);
+            inheritsFrom[from.displ].push_back(i->first);
+            break;
+        }
+        }
+    }
+    if (!inherits.empty()) {
+        str << "inherit";
+        for (auto sym : inherits) str << " " << symbols[sym];
+        str << "; ";
+    }
+    for (const auto & [from, syms] : inheritsFrom) {
+        str << "inherit (";
+        (*inheritFromExprs)[from]->show(symbols, str);
+        str << ")";
+        for (auto sym : syms) str << " " << symbols[sym];
+        str << "; ";
+    }
+    for (auto & i : sorted) {
+        if (i->second.kind == AttrDef::Kind::Plain) {
             str << symbols[i->first] << " = ";
             i->second.e->show(symbols, str);
             str << "; ";
@@ -177,6 +126,13 @@ void ExprAttrs::show(const SymbolTable & symbols, std::ostream & str) const
         i.valueExpr->show(symbols, str);
         str << "; ";
     }
+}
+
+void ExprAttrs::show(const SymbolTable & symbols, std::ostream & str) const
+{
+    if (recursive) str << "rec ";
+    str << "{ ";
+    showBindings(symbols, str);
     str << "}";
 }
 
@@ -197,7 +153,10 @@ void ExprLambda::show(const SymbolTable & symbols, std::ostream & str) const
     if (hasFormals()) {
         str << "{ ";
         bool first = true;
-        for (auto & i : formals->formals) {
+        // the natural Symbol ordering is by creation time, which can lead to the
+        // same expression being printed in two different ways depending on its
+        // context. always use lexicographic ordering to avoid this.
+        for (auto & i : formals->lexicographicOrder(symbols)) {
             if (first) first = false; else str << ", ";
             str << symbols[i.name];
             if (i.def) {
@@ -232,15 +191,7 @@ void ExprCall::show(const SymbolTable & symbols, std::ostream & str) const
 void ExprLet::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << "(let ";
-    for (auto & i : attrs->attrs)
-        if (i.second.inherited) {
-            str << "inherit " << symbols[i.first] << "; ";
-        }
-        else {
-            str << symbols[i.first] << " = ";
-            i.second.e->show(symbols, str);
-            str << "; ";
-        }
+    attrs->showBindings(symbols, str);
     str << "in ";
     body->show(symbols, str);
     str << ")";
@@ -298,17 +249,6 @@ void ExprPos::show(const SymbolTable & symbols, std::ostream & str) const
 }
 
 
-std::ostream & operator << (std::ostream & str, const Pos & pos)
-{
-    if (auto pos2 = (std::shared_ptr<AbstractPos>) pos) {
-        str << *pos2;
-    } else
-        str << "undefined position";
-
-    return str;
-}
-
-
 std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 {
     std::ostringstream out;
@@ -331,7 +271,7 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 
 void Expr::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
-    abort();
+    unreachable();
 }
 
 void ExprInt::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
@@ -363,6 +303,8 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
+    fromWith = nullptr;
+
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
     const StaticEnv * curEnv;
@@ -374,7 +316,6 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
         } else {
             auto i = curEnv->find(name);
             if (i != curEnv->vars.end()) {
-                fromWith = false;
                 this->level = level;
                 displ = i->second;
                 return;
@@ -386,12 +327,19 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
        enclosing `with'.  If there is no `with', then we can issue an
        "undefined variable" error now. */
     if (withLevel == -1)
-        throw UndefinedVarError({
-            .msg = hintfmt("undefined variable '%1%'", es.symbols[name]),
-            .errPos = es.positions[pos]
-        });
-    fromWith = true;
+        es.error<UndefinedVarError>(
+            "undefined variable '%1%'",
+            es.symbols[name]
+        ).atPos(pos).debugThrow();
+    for (auto * e = env.get(); e && !fromWith; e = e->up)
+        fromWith = e->isWith;
     this->level = withLevel;
+}
+
+void ExprInheritFrom::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
+{
+    if (es.debugRepl)
+        es.exprEnvs.insert(std::make_pair(this, env));
 }
 
 void ExprSelect::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
@@ -417,22 +365,47 @@ void ExprOpHasAttr::bindVars(EvalState & es, const std::shared_ptr<const StaticE
             i.expr->bindVars(es, env);
 }
 
+std::shared_ptr<const StaticEnv> ExprAttrs::bindInheritSources(
+    EvalState & es, const std::shared_ptr<const StaticEnv> & env)
+{
+    if (!inheritFromExprs)
+        return nullptr;
+
+    // the inherit (from) source values are inserted into an env of its own, which
+    // does not introduce any variable names.
+    // analysis must see an empty env, or an env that contains only entries with
+    // otherwise unused names to not interfere with regular names. the parser
+    // has already filled all exprs that access this env with appropriate level
+    // and displacement, and nothing else is allowed to access it. ideally we'd
+    // not even *have* an expr that grabs anything from this env since it's fully
+    // invisible, but the evaluator does not allow for this yet.
+    auto inner = std::make_shared<StaticEnv>(nullptr, env.get(), 0);
+    for (auto from : *inheritFromExprs)
+        from->bindVars(es, env);
+
+    return inner;
+}
+
 void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
     if (recursive) {
-        auto newEnv = std::make_shared<StaticEnv>(false, env.get(), recursive ? attrs.size() : 0);
+        auto newEnv = [&] () -> std::shared_ptr<const StaticEnv> {
+            auto newEnv = std::make_shared<StaticEnv>(nullptr, env.get(), attrs.size());
 
-        Displacement displ = 0;
-        for (auto & i : attrs)
-            newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
+            Displacement displ = 0;
+            for (auto & i : attrs)
+                newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
+            return newEnv;
+        }();
 
         // No need to sort newEnv since attrs is in sorted order.
 
+        auto inheritFromEnv = bindInheritSources(es, newEnv);
         for (auto & i : attrs)
-            i.second.e->bindVars(es, i.second.inherited ? env : newEnv);
+            i.second.e->bindVars(es, i.second.chooseByKind(newEnv, env, inheritFromEnv));
 
         for (auto & i : dynamicAttrs) {
             i.nameExpr->bindVars(es, newEnv);
@@ -440,8 +413,10 @@ void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> 
         }
     }
     else {
+        auto inheritFromEnv = bindInheritSources(es, env);
+
         for (auto & i : attrs)
-            i.second.e->bindVars(es, env);
+            i.second.e->bindVars(es, i.second.chooseByKind(env, env, inheritFromEnv));
 
         for (auto & i : dynamicAttrs) {
             i.nameExpr->bindVars(es, env);
@@ -465,7 +440,7 @@ void ExprLambda::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv>
         es.exprEnvs.insert(std::make_pair(this, env));
 
     auto newEnv = std::make_shared<StaticEnv>(
-        false, env.get(),
+        nullptr, env.get(),
         (hasFormals() ? formals->formals.size() : 0) +
         (!arg ? 0 : 1));
 
@@ -498,19 +473,23 @@ void ExprCall::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
 
 void ExprLet::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
-    if (es.debugRepl)
-        es.exprEnvs.insert(std::make_pair(this, env));
+    auto newEnv = [&] () -> std::shared_ptr<const StaticEnv> {
+        auto newEnv = std::make_shared<StaticEnv>(nullptr, env.get(), attrs->attrs.size());
 
-    auto newEnv = std::make_shared<StaticEnv>(false, env.get(), attrs->attrs.size());
-
-    Displacement displ = 0;
-    for (auto & i : attrs->attrs)
-        newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
+        Displacement displ = 0;
+        for (auto & i : attrs->attrs)
+            newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
+        return newEnv;
+    }();
 
     // No need to sort newEnv since attrs->attrs is in sorted order.
 
+    auto inheritFromEnv = attrs->bindInheritSources(es, newEnv);
     for (auto & i : attrs->attrs)
-        i.second.e->bindVars(es, i.second.inherited ? env : newEnv);
+        i.second.e->bindVars(es, i.second.chooseByKind(newEnv, env, inheritFromEnv));
+
+    if (es.debugRepl)
+        es.exprEnvs.insert(std::make_pair(this, newEnv));
 
     body->bindVars(es, newEnv);
 }
@@ -519,6 +498,10 @@ void ExprWith::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
 {
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
+
+    parentWith = nullptr;
+    for (auto * e = env.get(); e && !parentWith; e = e->up)
+        parentWith = e->isWith;
 
     /* Does this `with' have an enclosing `with'?  If so, record its
        level so that `lookupVar' can look up variables in the previous
@@ -532,11 +515,8 @@ void ExprWith::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
             break;
         }
 
-    if (es.debugRepl)
-        es.exprEnvs.insert(std::make_pair(this, env));
-
     attrs->bindVars(es, env);
-    auto newEnv = std::make_shared<StaticEnv>(true, env.get());
+    auto newEnv = std::make_shared<StaticEnv>(this, env.get());
     body->bindVars(es, newEnv);
 }
 
@@ -605,6 +585,55 @@ std::string ExprLambda::showNamePos(const EvalState & state) const
     return fmt("%1% at %2%", id, state.positions[pos]);
 }
 
+void ExprLambda::setDocComment(DocComment docComment) {
+    // RFC 145 specifies that the innermost doc comment wins.
+    // See https://github.com/NixOS/rfcs/blob/master/rfcs/0145-doc-strings.md#ambiguous-placement
+    if (!this->docComment) {
+        this->docComment = docComment;
+
+        // Curried functions are defined by putting a function directly
+        // in the body of another function. To render docs for those, we
+        // need to propagate the doc comment to the innermost function.
+        //
+        // If we have our own comment, we've already propagated it, so this
+        // belongs in the same conditional.
+        body->setDocComment(docComment);
+    }
+};
+
+
+
+/* Position table. */
+
+Pos PosTable::operator[](PosIdx p) const
+{
+    auto origin = resolve(p);
+    if (!origin)
+        return {};
+
+    const auto offset = origin->offsetOf(p);
+
+    Pos result{0, 0, origin->origin};
+    auto lines = this->lines.lock();
+    auto linesForInput = (*lines)[origin->offset];
+
+    if (linesForInput.empty()) {
+        auto source = result.getSource().value_or("");
+        const char * begin = source.data();
+        for (Pos::LinesIterator it(source), end; it != end; it++)
+            linesForInput.push_back(it->data() - begin);
+        if (linesForInput.empty())
+            linesForInput.push_back(0);
+    }
+    // as above: the first line starts at byte 0 and is always present
+    auto lineStartOffset = std::prev(
+        std::upper_bound(linesForInput.begin(), linesForInput.end(), offset));
+
+    result.line = 1 + (lineStartOffset - linesForInput.begin());
+    result.column = 1 + (offset - *lineStartOffset);
+    return result;
+}
+
 
 
 /* Symbol table. */
@@ -614,6 +643,24 @@ size_t SymbolTable::totalSize() const
     size_t n = 0;
     dump([&] (const std::string & s) { n += s.size(); });
     return n;
+}
+
+std::string DocComment::getInnerText(const PosTable & positions) const {
+    auto beginPos = positions[begin];
+    auto endPos = positions[end];
+    auto docCommentStr = beginPos.getSnippetUpTo(endPos).value_or("");
+
+    // Strip "/**" and "*/"
+    constexpr size_t prefixLen = 3;
+    constexpr size_t suffixLen = 2;
+    std::string docStr = docCommentStr.substr(prefixLen, docCommentStr.size() - prefixLen - suffixLen);
+    if (docStr.empty())
+        return {};
+    // Turn the now missing "/**" into indentation
+    docStr = "   " + docStr;
+    // Strip indentation (for the whole, potentially multi-line string)
+    docStr = stripIndentation(docStr);
+    return docStr;
 }
 
 }

@@ -1,11 +1,14 @@
+#include <nlohmann/json.hpp>
+
 #include "command.hh"
+#include "markdown.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "derivations.hh"
 #include "nixexpr.hh"
 #include "profiles.hh"
-
-#include <nlohmann/json.hpp>
+#include "repl.hh"
+#include "strings.hh"
 
 extern char * * environ __attribute__((weak));
 
@@ -31,6 +34,19 @@ nlohmann::json NixMultiCommand::toJSON()
 {
     // FIXME: use Command::toJSON() as well.
     return MultiCommand::toJSON();
+}
+
+void NixMultiCommand::run()
+{
+    if (!command) {
+        std::set<std::string> subCommandTextLines;
+        for (auto & [name, _] : commands)
+            subCommandTextLines.insert(fmt("- `%s`", name));
+        std::string markdownError = fmt("`nix %s` requires a sub-command. Available sub-commands:\n\n%s\n",
+                commandName, concatStringsSep("\n", subCommandTextLines));
+        throw UsageError(renderMarkdownToTerminal(markdownError));
+    }
+    command->second->run();
 }
 
 StoreCommand::StoreCommand()
@@ -97,7 +113,7 @@ EvalCommand::EvalCommand()
 EvalCommand::~EvalCommand()
 {
     if (evalState)
-        evalState->printStats();
+        evalState->maybePrintStats();
 }
 
 ref<Store> EvalCommand::getEvalStore()
@@ -112,16 +128,18 @@ ref<EvalState> EvalCommand::getEvalState()
     if (!evalState) {
         evalState =
             #if HAVE_BOEHMGC
-            std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
-                searchPath, getEvalStore(), getStore())
+            std::allocate_shared<EvalState>(
+                traceable_allocator<EvalState>(),
             #else
             std::make_shared<EvalState>(
-                searchPath, getEvalStore(), getStore())
             #endif
+                lookupPath, getEvalStore(), fetchSettings, evalSettings, getStore())
             ;
 
+        evalState->repair = repair;
+
         if (startReplOnEvalErrors) {
-            evalState->debugRepl = &runRepl;
+            evalState->debugRepl = &AbstractNixRepl::runSimple;
         };
     }
     return ref<EvalState>(evalState);
@@ -131,7 +149,7 @@ MixOperateOnOptions::MixOperateOnOptions()
 {
     addFlag({
         .longName = "derivation",
-        .description = "Operate on the [store derivation](../../glossary.md#gloss-store-derivation) rather than its outputs.",
+        .description = "Operate on the [store derivation](@docroot@/glossary.md#gloss-store-derivation) rather than its outputs.",
         .category = installablesCategory,
         .handler = {&operateOn, OperateOn::Derivation},
     });
@@ -164,7 +182,7 @@ BuiltPathsCommand::BuiltPathsCommand(bool recursive)
     });
 }
 
-void BuiltPathsCommand::run(ref<Store> store)
+void BuiltPathsCommand::run(ref<Store> store, Installables && installables)
 {
     BuiltPaths paths;
     if (all) {
@@ -172,7 +190,7 @@ void BuiltPathsCommand::run(ref<Store> store)
             throw UsageError("'--all' does not expect arguments");
         // XXX: Only uses opaque paths, ignores all the realisations
         for (auto & p : store->queryAllValidPaths())
-            paths.push_back(BuiltPath::Opaque{p});
+            paths.emplace_back(BuiltPath::Opaque{p});
     } else {
         paths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
         if (recursive) {
@@ -185,7 +203,7 @@ void BuiltPathsCommand::run(ref<Store> store)
             }
             store->computeFSClosure(pathsRoots, pathsClosure);
             for (auto & path : pathsClosure)
-                paths.push_back(BuiltPath::Opaque{path});
+                paths.emplace_back(BuiltPath::Opaque{path});
         }
     }
 
@@ -210,26 +228,12 @@ void StorePathsCommand::run(ref<Store> store, BuiltPaths && paths)
     run(store, std::move(sorted));
 }
 
-void StorePathCommand::run(ref<Store> store, std::vector<StorePath> && storePaths)
+void StorePathCommand::run(ref<Store> store, StorePaths && storePaths)
 {
     if (storePaths.size() != 1)
         throw UsageError("this command requires exactly one store path");
 
     run(store, *storePaths.begin());
-}
-
-Strings editorFor(const Path & file, uint32_t line)
-{
-    auto editor = getEnv("EDITOR").value_or("cat");
-    auto args = tokenizeString<Strings>(editor);
-    if (line > 0 && (
-        editor.find("emacs") != std::string::npos ||
-        editor.find("nano") != std::string::npos ||
-        editor.find("vim") != std::string::npos ||
-        editor.find("kak") != std::string::npos))
-        args.push_back(fmt("+%d", line));
-    args.push_back(file);
-    return args;
 }
 
 MixProfile::MixProfile()
@@ -250,16 +254,14 @@ void MixProfile::updateProfile(const StorePath & storePath)
     if (!store) throw Error("'--profile' is not supported for this Nix store");
     auto profile2 = absPath(*profile);
     switchLink(profile2,
-        createGeneration(
-            ref<LocalFSStore>(store),
-            profile2, storePath));
+        createGeneration(*store, profile2, storePath));
 }
 
 void MixProfile::updateProfile(const BuiltPaths & buildables)
 {
     if (!profile) return;
 
-    std::vector<StorePath> result;
+    StorePaths result;
 
     for (auto & buildable : buildables) {
         std::visit(overloaded {

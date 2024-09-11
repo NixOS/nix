@@ -17,7 +17,7 @@ R""(
 # Description
 
 This command attempts to "repair" the store paths specified by
-*installables* by redownloading them using the available
+[*installables*](./nix.md#installables) by redownloading them using the available
 substituters. If no substitutes are available, then repair is not
 possible.
 

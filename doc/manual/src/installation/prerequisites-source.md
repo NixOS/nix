@@ -10,7 +10,7 @@
   - Bash Shell. The `./configure` script relies on bashisms, so Bash is
     required.
 
-  - A version of GCC or Clang that supports C++17.
+  - A version of GCC or Clang that supports C++20.
 
   - `pkg-config` to locate dependencies. If your distribution does not
     provide it, you can get it from
@@ -32,8 +32,10 @@
     your distribution does not provide it, please install it from
     <http://www.sqlite.org/>.
 
-  - The [Boehm garbage collector](http://www.hboehm.info/gc/) to reduce
-    the evaluator’s memory consumption (optional). To enable it, install
+  - The [Boehm garbage collector (`bdw-gc`)](http://www.hboehm.info/gc/) to reduce
+    the evaluator’s memory consumption (optional).
+
+    To enable it, install
     `pkgconfig` and the Boehm garbage collector, and pass the flag
     `--enable-gc` to `configure`.
 
@@ -71,3 +73,8 @@
     <http://libcpuid.sourceforge.net>.
     This is an optional dependency and can be disabled
     by providing a `--disable-cpuid` to the `configure` script.
+
+  - Unless `./configure --disable-unit-tests` is specified, GoogleTest (GTest) and
+    RapidCheck are required, which are available at
+    <https://google.github.io/googletest/> and
+    <https://github.com/emil-e/rapidcheck> respectively.

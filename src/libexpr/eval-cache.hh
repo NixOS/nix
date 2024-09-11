@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "sync.hh"
 #include "hash.hh"
@@ -9,14 +10,28 @@
 
 namespace nix::eval_cache {
 
-MakeError(CachedEvalError, EvalError);
-
 struct AttrDb;
 class AttrCursor;
+
+struct CachedEvalError : EvalError
+{
+    const ref<AttrCursor> cursor;
+    const Symbol attr;
+
+    CachedEvalError(ref<AttrCursor> cursor, Symbol attr);
+
+    /**
+     * Evaluate this attribute, which should result in a regular
+     * `EvalError` exception being thrown.
+     */
+    [[noreturn]]
+    void force();
+};
 
 class EvalCache : public std::enable_shared_from_this<EvalCache>
 {
     friend class AttrCursor;
+    friend struct CachedEvalError;
 
     std::shared_ptr<AttrDb> db;
     EvalState & state;
@@ -72,6 +87,7 @@ typedef std::variant<
 class AttrCursor : public std::enable_shared_from_this<AttrCursor>
 {
     friend class EvalCache;
+    friend struct CachedEvalError;
 
     ref<EvalCache> root;
     typedef std::optional<std::pair<std::shared_ptr<AttrCursor>, Symbol>> Parent;
@@ -101,17 +117,19 @@ public:
 
     Suggestions getSuggestionsForAttr(Symbol name);
 
-    std::shared_ptr<AttrCursor> maybeGetAttr(Symbol name, bool forceErrors = false);
+    std::shared_ptr<AttrCursor> maybeGetAttr(Symbol name);
 
     std::shared_ptr<AttrCursor> maybeGetAttr(std::string_view name);
 
-    ref<AttrCursor> getAttr(Symbol name, bool forceErrors = false);
+    ref<AttrCursor> getAttr(Symbol name);
 
     ref<AttrCursor> getAttr(std::string_view name);
 
-    /* Get an attribute along a chain of attrsets. Note that this does
-       not auto-call functors or functions. */
-    OrSuggestions<ref<AttrCursor>> findAlongAttrPath(const std::vector<Symbol> & attrPath, bool force = false);
+    /**
+     * Get an attribute along a chain of attrsets. Note that this does
+     * not auto-call functors or functions.
+     */
+    OrSuggestions<ref<AttrCursor>> findAlongAttrPath(const std::vector<Symbol> & attrPath);
 
     std::string getString();
 
@@ -129,7 +147,9 @@ public:
 
     Value & forceValue();
 
-    /* Force creation of the .drv file in the Nix store. */
+    /**
+     * Force creation of the .drv file in the Nix store.
+     */
     StorePath forceDerivation();
 };
 

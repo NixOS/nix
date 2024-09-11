@@ -13,11 +13,22 @@ let
       '';
     };
 
+    install-both-profile-links = {
+      script = ''
+        tar -xf ./nix.tar.xz
+        mv ./nix-* nix
+        ln -s $HOME/.local/state/nix/profiles/a-profile $HOME/.nix-profile
+        mkdir -p $HOME/.local/state/nix
+        ln -s $HOME/.local/state/nix/profiles/b-profile $HOME/.local/state/nix/profile
+        ./nix/install --no-channel-add
+      '';
+    };
+
     install-force-no-daemon = {
       script = ''
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
-        ./nix/install --no-daemon
+        ./nix/install --no-daemon --no-channel-add
       '';
     };
 
@@ -29,6 +40,14 @@ let
       '';
     };
   };
+
+  mockChannel = pkgs:
+    pkgs.runCommandNoCC "mock-channel" {} ''
+      mkdir nixexprs
+      mkdir -p $out/channel
+      echo -n 'someContent' > nixexprs/someFile
+      tar cvf - nixexprs | bzip2 > $out/channel/nixexprs.tar.bz2
+    '';
 
   disableSELinux = "sudo setenforce 0";
 
@@ -120,7 +139,7 @@ let
 
   makeTest = imageName: testName:
     let image = images.${imageName}; in
-    with nixpkgsFor.${image.system};
+    with nixpkgsFor.${image.system}.native;
     runCommand
       "installer-test-${imageName}-${testName}"
       { buildInputs = [ qemu_kvm openssh ];
@@ -189,21 +208,43 @@ let
         echo "Running installer..."
         $ssh "set -eux; $installScript"
 
+        echo "Copying the mock channel"
+        # `scp -r` doesn't seem to work properly on some rhel instances, so let's
+        # use a plain tarpipe instead
+        tar -C ${mockChannel pkgs} -c channel | ssh -p 20022 $ssh_opts vagrant@localhost tar x -f-
+
         echo "Testing Nix installation..."
         $ssh <<EOF
           set -ex
+
+          # enable nounset while loading the profile
+          # this may or may not work on all distros, depending on the quality of their scripts
+          set -u
 
           # FIXME: get rid of this; ideally ssh should just work.
           source ~/.bash_profile || true
           source ~/.bash_login || true
           source ~/.profile || true
+          set +u
+
           source /etc/bashrc || true
 
           nix-env --version
-          nix --extra-experimental-features nix-command store ping
+          nix --extra-experimental-features nix-command store info
 
           out=\$(nix-build --no-substitute -E 'derivation { name = "foo"; system = "x86_64-linux"; builder = "/bin/sh"; args = ["-c" "echo foobar > \$out"]; }')
           [[ \$(cat \$out) = foobar ]]
+
+          if pgrep nix-daemon; then
+            MAYBESUDO="sudo"
+          else
+            MAYBESUDO=""
+          fi
+
+
+          $MAYBESUDO \$(which nix-channel) --add file://\$HOME/channel myChannel
+          $MAYBESUDO \$(which nix-channel) --update
+          [[ \$(nix-instantiate --eval --expr 'builtins.readFile <myChannel/someFile>') = '"someContent"' ]]
         EOF
 
         echo "Done!"

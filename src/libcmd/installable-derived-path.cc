@@ -10,19 +10,15 @@ std::string InstallableDerivedPath::what() const
 
 DerivedPathsWithInfo InstallableDerivedPath::toDerivedPaths()
 {
-    return {{.path = derivedPath, .info = {} }};
+    return {{
+        .path = derivedPath,
+        .info = make_ref<ExtraPathInfo>(),
+    }};
 }
 
 std::optional<StorePath> InstallableDerivedPath::getStorePath()
 {
-    return std::visit(overloaded {
-        [&](const DerivedPath::Built & bfd) {
-            return bfd.drvPath;
-        },
-        [&](const DerivedPath::Opaque & bo) {
-            return bo.path;
-        },
-    }, derivedPath.raw());
+    return derivedPath.getBaseStorePath();
 }
 
 InstallableDerivedPath InstallableDerivedPath::parse(
@@ -31,36 +27,35 @@ InstallableDerivedPath InstallableDerivedPath::parse(
     ExtendedOutputsSpec extendedOutputsSpec)
 {
     auto derivedPath = std::visit(overloaded {
-        // If the user did not use ^, we treat the output more liberally.
+        // If the user did not use ^, we treat the output more
+        // liberally: we accept a symlink chain or an actual
+        // store path.
         [&](const ExtendedOutputsSpec::Default &) -> DerivedPath {
-            // First, we accept a symlink chain or an actual store path.
             auto storePath = store->followLinksToStorePath(prefix);
-            // Second, we see if the store path ends in `.drv` to decide what sort
-            // of derived path they want.
-            //
-            // This handling predates the `^` syntax. The `^*` in
-            // `/nix/store/hash-foo.drv^*` unambiguously means "do the
-            // `DerivedPath::Built` case", so plain `/nix/store/hash-foo.drv` could
-            // also unambiguously mean "do the DerivedPath::Opaque` case".
-            //
-            // Issue #7261 tracks reconsidering this `.drv` dispatching.
-            return storePath.isDerivation()
-                ? (DerivedPath) DerivedPath::Built {
-                    .drvPath = std::move(storePath),
-                    .outputs = OutputsSpec::All {},
-                }
-                : (DerivedPath) DerivedPath::Opaque {
-                    .path = std::move(storePath),
+            // Remove this prior to stabilizing the new CLI.
+            if (storePath.isDerivation()) {
+                auto oldDerivedPath = DerivedPath::Built {
+                    .drvPath = makeConstantStorePathRef(storePath),
+                    .outputs = OutputsSpec::All { },
                 };
+                warn(
+                    "The interpretation of store paths arguments ending in `.drv` recently changed. If this command is now failing try again with '%s'",
+                    oldDerivedPath.to_string(*store));
+            };
+            return DerivedPath::Opaque {
+                .path = std::move(storePath),
+            };
         },
         // If the user did use ^, we just do exactly what is written.
         [&](const ExtendedOutputsSpec::Explicit & outputSpec) -> DerivedPath {
+            auto drv = make_ref<SingleDerivedPath>(SingleDerivedPath::parse(*store, prefix));
+            drvRequireExperiment(*drv);
             return DerivedPath::Built {
-                .drvPath = store->parseStorePath(prefix),
+                .drvPath = std::move(drv),
                 .outputs = outputSpec,
             };
         },
-    }, extendedOutputsSpec.raw());
+    }, extendedOutputsSpec.raw);
     return InstallableDerivedPath {
         store,
         std::move(derivedPath),

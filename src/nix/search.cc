@@ -1,7 +1,8 @@
-#include "command.hh"
+#include "command-installable-value.hh"
 #include "globals.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "names.hh"
 #include "get-drvs.hh"
 #include "common-args.hh"
@@ -9,10 +10,13 @@
 #include "eval-cache.hh"
 #include "attr-path.hh"
 #include "hilite.hh"
+#include "strings-inline.hh"
 
 #include <regex>
 #include <fstream>
 #include <nlohmann/json.hpp>
+
+#include "strings.hh"
 
 using namespace nix;
 using json = nlohmann::json;
@@ -22,7 +26,7 @@ std::string wrap(std::string prefix, std::string s)
     return concatStrings(prefix, s, ANSI_NORMAL);
 }
 
-struct CmdSearch : InstallableCommand, MixJSON
+struct CmdSearch : InstallableValueCommand, MixJSON
 {
     std::vector<std::string> res;
     std::vector<std::string> excludeRes;
@@ -61,16 +65,14 @@ struct CmdSearch : InstallableCommand, MixJSON
         };
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         settings.readOnlyMode = true;
         evalSettings.enableImportFromDerivation.setDefault(false);
 
-        // Empty search string should match all packages
-        // Use "^" here instead of ".*" due to differences in resulting highlighting
-        // (see #1893 -- libc++ claims empty search string is not in POSIX grammar)
+        // Recommend "^" here instead of ".*" due to differences in resulting highlighting
         if (res.empty())
-            res.push_back("^");
+            throw UsageError("Must provide at least one regex! To match all packages, use '%s'.", "nix search <installable> ^");
 
         std::vector<std::regex> regexes;
         std::vector<std::regex> excludeRegexes;
@@ -196,9 +198,8 @@ struct CmdSearch : InstallableCommand, MixJSON
         for (auto & cursor : installable->getCursors(*state))
             visit(*cursor, cursor->getAttrPath(), true);
 
-        if (json) {
-            std::cout << jsonOut->dump() << std::endl;
-        }
+        if (json)
+            logger->cout("%s", *jsonOut);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");

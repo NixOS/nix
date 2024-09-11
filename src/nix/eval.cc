@@ -1,4 +1,4 @@
-#include "command.hh"
+#include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
@@ -11,13 +11,13 @@
 
 using namespace nix;
 
-struct CmdEval : MixJSON, InstallableCommand
+struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 {
     bool raw = false;
     std::optional<std::string> apply;
     std::optional<Path> writeTo;
 
-    CmdEval() : InstallableCommand(true /* supportReadOnlyMode */)
+    CmdEval() : InstallableValueCommand()
     {
         addFlag({
             .longName = "raw",
@@ -54,7 +54,7 @@ struct CmdEval : MixJSON, InstallableCommand
 
     Category category() override { return catSecondary; }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         if (raw && json)
             throw UsageError("--raw and --json are mutually exclusive");
@@ -62,11 +62,11 @@ struct CmdEval : MixJSON, InstallableCommand
         auto state = getEvalState();
 
         auto [v, pos] = installable->toValue(*state);
-        PathSet context;
+        NixStringContext context;
 
         if (apply) {
             auto vApply = state->allocValue();
-            state->eval(state->parseExprFromString(*apply, absPath(".")), *vApply);
+            state->eval(state->parseExprFromString(*apply, state->rootPath(".")), *vApply);
             auto vRes = state->allocValue();
             state->callFunction(*vApply, *v, *vRes, noPos);
             v = vRes;
@@ -78,33 +78,33 @@ struct CmdEval : MixJSON, InstallableCommand
             if (pathExists(*writeTo))
                 throw Error("path '%s' already exists", *writeTo);
 
-            std::function<void(Value & v, const PosIdx pos, const Path & path)> recurse;
+            std::function<void(Value & v, const PosIdx pos, const std::filesystem::path & path)> recurse;
 
-            recurse = [&](Value & v, const PosIdx pos, const Path & path)
+            recurse = [&](Value & v, const PosIdx pos, const std::filesystem::path & path)
             {
                 state->forceValue(v, pos);
                 if (v.type() == nString)
                     // FIXME: disallow strings with contexts?
-                    writeFile(path, v.string.s);
+                    writeFile(path.string(), v.string_view());
                 else if (v.type() == nAttrs) {
-                    if (mkdir(path.c_str(), 0777) == -1)
-                        throw SysError("creating directory '%s'", path);
-                    for (auto & attr : *v.attrs) {
+                    // TODO abstract mkdir perms for Windows
+                    createDir(path.string(), 0777);
+                    for (auto & attr : *v.attrs()) {
                         std::string_view name = state->symbols[attr.name];
                         try {
                             if (name == "." || name == "..")
                                 throw Error("invalid file name '%s'", name);
-                            recurse(*attr.value, attr.pos, concatStrings(path, "/", name));
+                            recurse(*attr.value, attr.pos, path / name);
                         } catch (Error & e) {
                             e.addTrace(
                                 state->positions[attr.pos],
-                                hintfmt("while evaluating the attribute '%s'", name));
+                                HintFmt("while evaluating the attribute '%s'", name));
                             throw;
                         }
                     }
                 }
                 else
-                    throw TypeError("value at '%s' is not a string or an attribute set", state->positions[pos]);
+                    state->error<TypeError>("value at '%s' is not a string or an attribute set", state->positions[pos]).debugThrow();
             };
 
             recurse(*v, pos, *writeTo);
@@ -112,16 +112,25 @@ struct CmdEval : MixJSON, InstallableCommand
 
         else if (raw) {
             stopProgressBar();
-            std::cout << *state->coerceToString(noPos, *v, context, "while generating the eval command output");
+            writeFull(getStandardOut(), *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
         }
 
         else if (json) {
-            std::cout << printValueAsJSON(*state, true, *v, pos, context, false).dump() << std::endl;
+            logger->cout("%s", printValueAsJSON(*state, true, *v, pos, context, false));
         }
 
         else {
-            state->forceValueDeep(*v);
-            logger->cout("%s", printValue(*state, *v));
+            logger->cout(
+                "%s",
+                ValuePrinter(
+                    *state,
+                    *v,
+                    PrintOptions {
+                        .force = true,
+                        .derivationPaths = true
+                    }
+                )
+            );
         }
     }
 };

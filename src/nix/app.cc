@@ -1,11 +1,13 @@
 #include "installables.hh"
 #include "installable-derived-path.hh"
+#include "installable-value.hh"
 #include "store-api.hh"
 #include "eval-inline.hh"
 #include "eval-cache.hh"
 #include "names.hh"
 #include "command.hh"
 #include "derivations.hh"
+#include "downstream-placeholder.hh"
 
 namespace nix {
 
@@ -18,13 +20,26 @@ StringPairs resolveRewrites(
     const std::vector<BuiltPathWithResult> & dependencies)
 {
     StringPairs res;
-    for (auto & dep : dependencies)
-        if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path))
-            for (auto & [ outputName, outputPath ] : drvDep->outputs)
-                res.emplace(
-                    downstreamPlaceholder(store, drvDep->drvPath, outputName),
-                    store.printStorePath(outputPath)
-                );
+    if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+        return res;
+    }
+    for (auto &dep: dependencies) {
+        auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path);
+        if (!drvDep) {
+            continue;
+        }
+
+        for (const auto & [ outputName, outputPath ] : drvDep->outputs) {
+            res.emplace(
+                DownstreamPlaceholder::fromSingleDerivedPathBuilt(
+                    SingleDerivedPath::Built {
+                        .drvPath = make_ref<SingleDerivedPath>(drvDep->drvPath->discardOutputPath()),
+                        .output = outputName,
+                    }).render(),
+                store.printStorePath(outputPath)
+            );
+        }
+    }
     return res;
 }
 
@@ -40,18 +55,18 @@ std::string resolveString(
     return rewriteStrings(toResolve, rewrites);
 }
 
-UnresolvedApp Installable::toApp(EvalState & state)
+UnresolvedApp InstallableValue::toApp(EvalState & state)
 {
     auto cursor = getCursor(state);
     auto attrPath = cursor->getAttrPath();
 
     auto type = cursor->getAttr("type")->getString();
 
-    std::string expected = !attrPath.empty() &&
+    std::string expectedType = !attrPath.empty() &&
         (state.symbols[attrPath[0]] == "apps" || state.symbols[attrPath[0]] == "defaultApp")
         ? "app" : "derivation";
-    if (type != expected)
-        throw Error("attribute '%s' should have type '%s'", cursor->getAttrPathStr(), expected);
+    if (type != expectedType)
+        throw Error("attribute '%s' should have type '%s'", cursor->getAttrPathStr(), expectedType);
 
     if (type == "app") {
         auto [program, context] = cursor->getAttr("program")->getStringWithContext();
@@ -62,7 +77,7 @@ UnresolvedApp Installable::toApp(EvalState & state)
                 [&](const NixStringContextElem::DrvDeep & d) -> DerivedPath {
                     /* We want all outputs of the drv */
                     return DerivedPath::Built {
-                        .drvPath = d.drvPath,
+                        .drvPath = makeConstantStorePathRef(d.drvPath),
                         .outputs = OutputsSpec::All {},
                     };
                 },
@@ -77,10 +92,10 @@ UnresolvedApp Installable::toApp(EvalState & state)
                         .path = o.path,
                     };
                 },
-            }, c.raw()));
+            }, c.raw));
         }
 
-        return UnresolvedApp{App {
+        return UnresolvedApp { App {
             .context = std::move(context2),
             .program = program,
         }};
@@ -103,7 +118,7 @@ UnresolvedApp Installable::toApp(EvalState & state)
         auto program = outPath + "/bin/" + mainProgram;
         return UnresolvedApp { App {
             .context = { DerivedPath::Built {
-                .drvPath = drvPath,
+                .drvPath = makeConstantStorePathRef(drvPath),
                 .outputs = OutputsSpec::Names { outputName },
             } },
             .program = program,
@@ -119,11 +134,11 @@ App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
 {
     auto res = unresolved;
 
-    std::vector<std::shared_ptr<Installable>> installableContext;
+    Installables installableContext;
 
     for (auto & ctxElt : unresolved.context)
         installableContext.push_back(
-            std::make_shared<InstallableDerivedPath>(store, DerivedPath { ctxElt }));
+            make_ref<InstallableDerivedPath>(store, DerivedPath { ctxElt }));
 
     auto builtContext = Installable::build(evalStore, store, Realise::Outputs, installableContext);
     res.program = resolveString(*store, unresolved.program, builtContext);

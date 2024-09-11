@@ -35,7 +35,9 @@ R""(
 # Description
 
 This command converts the closure of the store paths specified by
-*installables* to content-addressed form. Nix store paths are usually
+[*installables*](./nix.md#installables) to content-addressed form.
+
+Nix store paths are usually
 *input-addressed*, meaning that the hash part of the store path is
 computed from the contents of the derivation (i.e., the build-time
 dependency graph). Input-addressed paths need to be signed by a

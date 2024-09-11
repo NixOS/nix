@@ -11,11 +11,12 @@ use JSON::PP;
 use LWP::UserAgent;
 use Net::Amazon::S3;
 
+delete $ENV{'shell'}; # shut up a LWP::UserAgent.pm warning
+
 my $evalId = $ARGV[0] or die "Usage: $0 EVAL-ID\n";
 
 my $releasesBucketName = "nix-releases";
 my $channelsBucketName = "nix-channels";
-my $nixpkgsDir = "/home/eelco/Dev/nixpkgs-pristine";
 
 my $TMPDIR = $ENV{'TMPDIR'} // "/tmp";
 
@@ -37,11 +38,11 @@ sub fetch {
 my $evalUrl = "https://hydra.nixos.org/eval/$evalId";
 my $evalInfo = decode_json(fetch($evalUrl, 'application/json'));
 #print Dumper($evalInfo);
-my $flakeUrl = $evalInfo->{flake} or die;
-my $flakeInfo = decode_json(`nix flake metadata --json "$flakeUrl"` or die);
-my $nixRev = $flakeInfo->{revision} or die;
+my $flakeUrl = $evalInfo->{flake};
+my $flakeInfo = decode_json(`nix flake metadata --json "$flakeUrl"` or die) if $flakeUrl;
+my $nixRev = ($flakeInfo ? $flakeInfo->{revision} : $evalInfo->{jobsetevalinputs}->{nix}->{revision}) or die;
 
-my $buildInfo = decode_json(fetch("$evalUrl/job/build.x86_64-linux", 'application/json'));
+my $buildInfo = decode_json(fetch("$evalUrl/job/build.nix.x86_64-linux", 'application/json'));
 #print Dumper($buildInfo);
 
 my $releaseName = $buildInfo->{nixname};
@@ -80,6 +81,45 @@ my $s3_us = Net::Amazon::S3->new(
     });
 
 my $channelsBucket = $s3_us->bucket($channelsBucketName) or die;
+
+sub getStorePath {
+    my ($jobName, $output) = @_;
+    my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
+    return $buildInfo->{buildoutputs}->{$output or "out"}->{path} // die "cannot get store path for '$jobName'";
+}
+
+sub copyManual {
+    my $manual;
+    eval {
+        $manual = getStorePath("build.nix.x86_64-linux", "doc");
+    };
+    if ($@) {
+        warn "$@";
+        return;
+    }
+    print "Manual: $manual\n";
+
+    my $manualNar = "$tmpDir/$releaseName-manual.nar.xz";
+    print "$manualNar\n";
+
+    unless (-e $manualNar) {
+        system("NIX_REMOTE=$binaryCache nix store dump-path '$manual' | xz > '$manualNar'.tmp") == 0
+            or die "unable to fetch $manual\n";
+        rename("$manualNar.tmp", $manualNar) or die;
+    }
+
+    unless (-e "$tmpDir/manual") {
+        system("xz -d < '$manualNar' | nix-store --restore $tmpDir/manual.tmp") == 0
+            or die "unable to unpack $manualNar\n";
+        rename("$tmpDir/manual.tmp/share/doc/nix/manual", "$tmpDir/manual") or die;
+        File::Path::remove_tree("$tmpDir/manual.tmp", {safe => 1});
+    }
+
+    system("aws s3 sync '$tmpDir/manual' s3://$releasesBucketName/$releaseDir/manual") == 0
+        or die "syncing manual to S3\n";
+}
+
+copyManual;
 
 sub downloadFile {
     my ($jobName, $productNr, $dstName) = @_;
@@ -123,19 +163,34 @@ downloadFile("binaryTarball.x86_64-linux", "1");
 downloadFile("binaryTarball.aarch64-linux", "1");
 downloadFile("binaryTarball.x86_64-darwin", "1");
 downloadFile("binaryTarball.aarch64-darwin", "1");
-downloadFile("binaryTarballCross.x86_64-linux.armv6l-linux", "1");
-downloadFile("binaryTarballCross.x86_64-linux.armv7l-linux", "1");
+eval {
+    downloadFile("binaryTarballCross.x86_64-linux.armv6l-unknown-linux-gnueabihf", "1");
+};
+warn "$@" if $@;
+eval {
+    downloadFile("binaryTarballCross.x86_64-linux.armv7l-unknown-linux-gnueabihf", "1");
+};
+warn "$@" if $@;
+eval {
+    downloadFile("binaryTarballCross.x86_64-linux.riscv64-unknown-linux-gnu", "1");
+};
+warn "$@" if $@;
 downloadFile("installerScript", "1");
 
 # Upload docker images to dockerhub.
 my $dockerManifest = "";
 my $dockerManifestLatest = "";
+my $haveDocker = 0;
 
 for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
     my $system = $platforms->[0];
     my $dockerPlatform = $platforms->[1];
     my $fn = "nix-$version-docker-image-$dockerPlatform.tar.gz";
-    downloadFile("dockerImage.$system", "1", $fn);
+    eval {
+        downloadFile("dockerImage.$system", "1", $fn);
+    };
+    die "$@" if $@;
+    $haveDocker = 1;
 
     print STDERR "loading docker image for $dockerPlatform...\n";
     system("docker load -i $tmpDir/$fn") == 0 or die;
@@ -163,26 +218,40 @@ for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
     $dockerManifestLatest .= " --amend $latestTag"
 }
 
-print STDERR "creating multi-platform docker manifest...\n";
-system("docker manifest rm nixos/nix:$version");
-system("docker manifest create nixos/nix:$version $dockerManifest") == 0 or die;
-if ($isLatest) {
-    print STDERR "creating latest multi-platform docker manifest...\n";
-    system("docker manifest rm nixos/nix:latest");
-    system("docker manifest create nixos/nix:latest $dockerManifestLatest") == 0 or die;
+if ($haveDocker) {
+    print STDERR "creating multi-platform docker manifest...\n";
+    system("docker manifest rm nixos/nix:$version");
+    system("docker manifest create nixos/nix:$version $dockerManifest") == 0 or die;
+    if ($isLatest) {
+        print STDERR "creating latest multi-platform docker manifest...\n";
+        system("docker manifest rm nixos/nix:latest");
+        system("docker manifest create nixos/nix:latest $dockerManifestLatest") == 0 or die;
+    }
+
+    print STDERR "pushing multi-platform docker manifest...\n";
+    system("docker manifest push nixos/nix:$version") == 0 or die;
+
+    if ($isLatest) {
+        print STDERR "pushing latest multi-platform docker manifest...\n";
+        system("docker manifest push nixos/nix:latest") == 0 or die;
+    }
 }
 
-print STDERR "pushing multi-platform docker manifest...\n";
-system("docker manifest push nixos/nix:$version") == 0 or die;
-
-if ($isLatest) {
-    print STDERR "pushing latest multi-platform docker manifest...\n";
-    system("docker manifest push nixos/nix:latest") == 0 or die;
-}
+# Upload nix-fallback-paths.nix.
+write_file("$tmpDir/fallback-paths.nix",
+    "{\n" .
+    "  x86_64-linux = \"" . getStorePath("build.nix.x86_64-linux") . "\";\n" .
+    "  i686-linux = \"" . getStorePath("build.nix.i686-linux") . "\";\n" .
+    "  aarch64-linux = \"" . getStorePath("build.nix.aarch64-linux") . "\";\n" .
+    "  riscv64-linux = \"" . getStorePath("buildCross.nix.riscv64-unknown-linux-gnu.x86_64-linux") . "\";\n" .
+    "  x86_64-darwin = \"" . getStorePath("build.nix.x86_64-darwin") . "\";\n" .
+    "  aarch64-darwin = \"" . getStorePath("build.nix.aarch64-darwin") . "\";\n" .
+    "}\n");
 
 # Upload release files to S3.
 for my $fn (glob "$tmpDir/*") {
     my $name = basename($fn);
+    next if $name eq "manual";
     my $dstKey = "$releaseDir/" . $name;
     unless (defined $releasesBucket->head_key($dstKey)) {
         print STDERR "uploading $fn to s3://$releasesBucketName/$dstKey...\n";
@@ -190,36 +259,13 @@ for my $fn (glob "$tmpDir/*") {
         my $configuration = ();
         $configuration->{content_type} = "application/octet-stream";
 
-        if ($fn =~ /.sha256|install/) {
-            # Text files
+        if ($fn =~ /.sha256|install|\.nix$/) {
             $configuration->{content_type} = "text/plain";
         }
 
         $releasesBucket->add_key_filename($dstKey, $fn, $configuration)
             or die $releasesBucket->err . ": " . $releasesBucket->errstr;
     }
-}
-
-# Update nix-fallback-paths.nix.
-if ($isLatest) {
-    system("cd $nixpkgsDir && git pull") == 0 or die;
-
-    sub getStorePath {
-        my ($jobName) = @_;
-        my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
-        return $buildInfo->{buildoutputs}->{out}->{path} or die "cannot get store path for '$jobName'";
-    }
-
-    write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
-               "{\n" .
-               "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
-               "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
-               "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
-               "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
-               "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
-               "}\n");
-
-    system("cd $nixpkgsDir && git commit -a -m 'nix-fallback-paths.nix: Update to $version'") == 0 or die;
 }
 
 # Update the "latest" symlink.
@@ -235,3 +281,6 @@ system("git remote update origin") == 0 or die;
 system("git tag --force --sign $version $nixRev -m 'Tagging release $version'") == 0 or die;
 system("git push --tags") == 0 or die;
 system("git push --force-with-lease origin $nixRev:refs/heads/latest-release") == 0 or die if $isLatest;
+
+File::Path::remove_tree($narCache, {safe => 1});
+File::Path::remove_tree($tmpDir, {safe => 1});

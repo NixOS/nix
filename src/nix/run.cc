@@ -1,21 +1,26 @@
+#include "current-process.hh"
 #include "run.hh"
-#include "command.hh"
+#include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
+#include "signals.hh"
 #include "store-api.hh"
 #include "derivations.hh"
-#include "local-store.hh"
+#include "local-fs-store.hh"
 #include "finally.hh"
-#include "fs-accessor.hh"
+#include "source-accessor.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
-#include "build/personality.hh"
+#include <filesystem>
 
 #if __linux__
-#include <sys/mount.h>
+# include <sys/mount.h>
+# include "personality.hh"
 #endif
 
 #include <queue>
+
+namespace nix::fs { using namespace std::filesystem; }
 
 using namespace nix;
 
@@ -23,7 +28,8 @@ std::string chrootHelperName = "__run_in_chroot";
 
 namespace nix {
 
-void runProgramInStore(ref<Store> store,
+void execProgramInStore(ref<Store> store,
+    UseLookupPath useLookupPath,
     const std::string & program,
     const Strings & args,
     std::optional<std::string_view> system)
@@ -54,90 +60,22 @@ void runProgramInStore(ref<Store> store,
         throw SysError("could not execute chroot helper");
     }
 
+#if __linux__
     if (system)
-        setPersonality(*system);
+        linux::setPersonality(*system);
+#endif
 
-    execvp(program.c_str(), stringsToCharPtrs(args).data());
+    if (useLookupPath == UseLookupPath::Use)
+        execvp(program.c_str(), stringsToCharPtrs(args).data());
+    else
+        execv(program.c_str(), stringsToCharPtrs(args).data());
 
     throw SysError("unable to execute '%s'", program);
 }
 
 }
 
-struct CmdShell : InstallablesCommand, MixEnvironment
-{
-
-    using InstallablesCommand::run;
-
-    std::vector<std::string> command = { getEnv("SHELL").value_or("bash") };
-
-    CmdShell()
-    {
-        addFlag({
-            .longName = "command",
-            .shortName = 'c',
-            .description = "Command and arguments to be executed, defaulting to `$SHELL`",
-            .labels = {"command", "args"},
-            .handler = {[&](std::vector<std::string> ss) {
-                if (ss.empty()) throw UsageError("--command requires at least one argument");
-                command = ss;
-            }}
-        });
-    }
-
-    std::string description() override
-    {
-        return "run a shell in which the specified packages are available";
-    }
-
-    std::string doc() override
-    {
-        return
-          #include "shell.md"
-          ;
-    }
-
-    void run(ref<Store> store) override
-    {
-        auto outPaths = Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, installables);
-
-        auto accessor = store->getFSAccessor();
-
-        std::unordered_set<StorePath> done;
-        std::queue<StorePath> todo;
-        for (auto & path : outPaths) todo.push(path);
-
-        setEnviron();
-
-        auto unixPath = tokenizeString<Strings>(getEnv("PATH").value_or(""), ":");
-
-        while (!todo.empty()) {
-            auto path = todo.front();
-            todo.pop();
-            if (!done.insert(path).second) continue;
-
-            if (true)
-                unixPath.push_front(store->printStorePath(path) + "/bin");
-
-            auto propPath = store->printStorePath(path) + "/nix-support/propagated-user-env-packages";
-            if (accessor->stat(propPath).type == FSAccessor::tRegular) {
-                for (auto & p : tokenizeString<Paths>(readFile(propPath)))
-                    todo.push(store->parseStorePath(p));
-            }
-        }
-
-        setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
-
-        Strings args;
-        for (auto & arg : command) args.push_back(arg);
-
-        runProgramInStore(store, *command.begin(), args);
-    }
-};
-
-static auto rCmdShell = registerCommand<CmdShell>("shell");
-
-struct CmdRun : InstallableCommand
+struct CmdRun : InstallableValueCommand
 {
     using InstallableCommand::run;
 
@@ -183,7 +121,7 @@ struct CmdRun : InstallableCommand
         return res;
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         auto state = getEvalState();
 
@@ -193,7 +131,11 @@ struct CmdRun : InstallableCommand
         Strings allArgs{app.program};
         for (auto & i : args) allArgs.push_back(i);
 
-        runProgramInStore(store, app.program, allArgs);
+        // Release our references to eval caches to ensure they are persisted to disk, because
+        // we are about to exec out of this process without running C++ destructors.
+        state->evalCaches.clear();
+
+        execProgramInStore(store, UseLookupPath::DontUse, app.program, allArgs);
     }
 };
 
@@ -230,24 +172,25 @@ void chrootHelper(int argc, char * * argv)
     if (!pathExists(storeDir)) {
         // FIXME: Use overlayfs?
 
-        Path tmpDir = createTempDir();
+        fs::path tmpDir = createTempDir();
 
         createDirs(tmpDir + storeDir);
 
         if (mount(realStoreDir.c_str(), (tmpDir + storeDir).c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-        for (auto entry : readDirectory("/")) {
-            auto src = "/" + entry.name;
-            Path dst = tmpDir + "/" + entry.name;
+        for (auto entry : fs::directory_iterator{"/"}) {
+            checkInterrupt();
+            auto src = entry.path();
+            fs::path dst = tmpDir / entry.path().filename();
             if (pathExists(dst)) continue;
-            auto st = lstat(src);
-            if (S_ISDIR(st.st_mode)) {
+            auto st = entry.symlink_status();
+            if (fs::is_directory(st)) {
                 if (mkdir(dst.c_str(), 0700) == -1)
                     throw SysError("creating directory '%s'", dst);
                 if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
                     throw SysError("mounting '%s' on '%s'", src, dst);
-            } else if (S_ISLNK(st.st_mode))
+            } else if (fs::is_symlink(st))
                 createSymlink(readLink(src), dst);
         }
 
@@ -264,12 +207,14 @@ void chrootHelper(int argc, char * * argv)
         if (mount(realStoreDir.c_str(), storeDir.c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-    writeFile("/proc/self/setgroups", "deny");
-    writeFile("/proc/self/uid_map", fmt("%d %d %d", uid, uid, 1));
-    writeFile("/proc/self/gid_map", fmt("%d %d %d", gid, gid, 1));
+    writeFile(fs::path{"/proc/self/setgroups"}, "deny");
+    writeFile(fs::path{"/proc/self/uid_map"}, fmt("%d %d %d", uid, uid, 1));
+    writeFile(fs::path{"/proc/self/gid_map"}, fmt("%d %d %d", gid, gid, 1));
 
+#if __linux__
     if (system != "")
-        setPersonality(system);
+        linux::setPersonality(system);
+#endif
 
     execvp(cmd.c_str(), stringsToCharPtrs(args).data());
 

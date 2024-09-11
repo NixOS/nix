@@ -1,7 +1,9 @@
-// redirect rules for anchors ensure backwards compatibility of URLs.
-// this must be done on the client side, as web servers do not see the anchor part of the URL.
+// redirect rules for URL fragments (client-side) to prevent link rot.
+// this must be done on the client side, as web servers do not see the fragment part of the URL.
+// it will only work with JavaScript enabled in the browser, but this is the best we can do here.
+// see src/_redirects for path redirects (server-side)
 
-// redirections are declared as follows:
+// redirects are declared as follows:
 // each entry has as its key a path matching the requested URL path, relative to the mdBook document root.
 //
 //     IMPORTANT: it must specify the full path with file name and suffix
@@ -12,14 +14,15 @@
 
 const redirects = {
  "index.html": {
-    "part-advanced-topics": "advanced-topics/advanced-topics.html",
+    "part-advanced-topics": "advanced-topics/index.html",
     "chap-tuning-cores-and-jobs": "advanced-topics/cores-vs-jobs.html",
     "chap-diff-hook": "advanced-topics/diff-hook.html",
     "check-dirs-are-unregistered": "advanced-topics/diff-hook.html#check-dirs-are-unregistered",
-    "chap-distributed-builds": "advanced-topics/distributed-builds.html",
+    "chap-distributed-builds": "command-ref/conf-file.html#conf-builders",
     "chap-post-build-hook": "advanced-topics/post-build-hook.html",
     "chap-post-build-hook-caveats": "advanced-topics/post-build-hook.html#implementation-caveats",
-    "part-command-ref": "command-ref/command-ref.html",
+    "chap-writing-nix-expressions": "language/index.html",
+    "part-command-ref": "command-ref/index.html",
     "conf-allow-import-from-derivation": "command-ref/conf-file.html#conf-allow-import-from-derivation",
     "conf-allow-new-privileges": "command-ref/conf-file.html#conf-allow-new-privileges",
     "conf-allowed-uris": "command-ref/conf-file.html#conf-allowed-uris",
@@ -140,7 +143,7 @@ const redirects = {
     "opt-timeout": "command-ref/opt-common.html#opt-timeout",
     "sec-common-options": "command-ref/opt-common.html",
     "ch-utilities": "command-ref/utilities.html",
-    "chap-hacking": "contributing/hacking.html",
+    "chap-hacking": "development/building.html",
     "adv-attr-allowSubstitutes": "language/advanced-attributes.html#adv-attr-allowSubstitutes",
     "adv-attr-allowedReferences": "language/advanced-attributes.html#adv-attr-allowedReferences",
     "adv-attr-allowedRequisites": "language/advanced-attributes.html#adv-attr-allowedRequisites",
@@ -235,12 +238,12 @@ const redirects = {
     "attr-system": "language/derivations.html#attr-system",
     "ssec-derivation": "language/derivations.html",
     "ch-expression-language": "language/index.html",
-    "sec-constructs": "language/constructs.html",
-    "sect-let-language": "language/constructs.html#let-language",
-    "ss-functions": "language/constructs.html#functions",
+    "sec-constructs": "language/syntax.html",
+    "sect-let-language": "language/syntax.html#let-expressions",
+    "ss-functions": "language/syntax.html#functions",
     "sec-language-operators": "language/operators.html",
     "table-operators": "language/operators.html",
-    "ssec-values": "language/values.html",
+    "ssec-values": "language/types.html",
     "gloss-closure": "glossary.html#gloss-closure",
     "gloss-derivation": "glossary.html#gloss-derivation",
     "gloss-deriver": "glossary.html#gloss-deriver",
@@ -258,7 +261,7 @@ const redirects = {
     "sec-installer-proxy-settings": "installation/env-variables.html#proxy-environment-variables",
     "sec-nix-ssl-cert-file": "installation/env-variables.html#nix_ssl_cert_file",
     "sec-nix-ssl-cert-file-with-nix-daemon-and-macos": "installation/env-variables.html#nix_ssl_cert_file-with-macos-and-the-nix-daemon",
-    "chap-installation": "installation/installation.html",
+    "chap-installation": "installation/index.html",
     "ch-installing-binary": "installation/installing-binary.html",
     "sect-macos-installation": "installation/installing-binary.html#macos-installation",
     "sect-macos-installation-change-store-prefix": "installation/installing-binary.html#macos-installation",
@@ -281,20 +284,20 @@ const redirects = {
     "chap-introduction": "introduction.html",
     "ch-basic-package-mgmt": "package-management/basic-package-mgmt.html",
     "ssec-binary-cache-substituter": "package-management/binary-cache-substituter.html",
-    "sec-channels": "package-management/channels.html",
-    "ssec-copy-closure": "package-management/copy-closure.html",
+    "sec-channels": "command-ref/nix-channel.html",
+    "ssec-copy-closure": "command-ref/nix-copy-closure.html",
     "sec-garbage-collection": "package-management/garbage-collection.html",
     "ssec-gc-roots": "package-management/garbage-collector-roots.html",
-    "chap-package-management": "package-management/package-management.html",
+    "chap-package-management": "package-management/index.html",
     "sec-profiles": "package-management/profiles.html",
-    "ssec-s3-substituter": "package-management/s3-substituter.html",
-    "ssec-s3-substituter-anonymous-reads": "package-management/s3-substituter.html#anonymous-reads-to-your-s3-compatible-binary-cache",
-    "ssec-s3-substituter-authenticated-reads": "package-management/s3-substituter.html#authenticated-reads-to-your-s3-binary-cache",
-    "ssec-s3-substituter-authenticated-writes": "package-management/s3-substituter.html#authenticated-writes-to-your-s3-compatible-binary-cache",
+    "ssec-s3-substituter": "store/types/s3-substituter.html",
+    "ssec-s3-substituter-anonymous-reads": "store/types/s3-substituter.html#anonymous-reads-to-your-s3-compatible-binary-cache",
+    "ssec-s3-substituter-authenticated-reads": "store/types/s3-substituter.html#authenticated-reads-to-your-s3-binary-cache",
+    "ssec-s3-substituter-authenticated-writes": "store/types/s3-substituter.html#authenticated-writes-to-your-s3-compatible-binary-cache",
     "sec-sharing-packages": "package-management/sharing-packages.html",
     "ssec-ssh-substituter": "package-management/ssh-substituter.html",
     "chap-quick-start": "quick-start.html",
-    "sec-relnotes": "release-notes/release-notes.html",
+    "sec-relnotes": "release-notes/index.html",
     "ch-relnotes-0.10.1": "release-notes/rl-0.10.1.html",
     "ch-relnotes-0.10": "release-notes/rl-0.10.html",
     "ssec-relnotes-0.11": "release-notes/rl-0.11.html",
@@ -330,15 +333,46 @@ const redirects = {
     "ssec-relnotes-2.0": "release-notes/rl-2.0.html",
     "ssec-relnotes-2.1": "release-notes/rl-2.1.html",
     "ssec-relnotes-2.2": "release-notes/rl-2.2.html",
-    "ssec-relnotes-2.3": "release-notes/rl-2.3.html"
+    "ssec-relnotes-2.3": "release-notes/rl-2.3.html",
   },
-  "language/values.html": {
+  "language/types.html": {
     "simple-values": "#primitives",
     "lists": "#list",
     "strings": "#string",
-    "lists": "#list",
-    "attribute-sets": "#attribute-set"
-  }
+    "attribute-sets": "#attribute-set",
+    "type-number": "#type-int",
+  },
+  "language/syntax.html": {
+    "scoping-rules": "scoping.html",
+    "string-literal": "string-literals.html",
+  },
+  "installation/installing-binary.html": {
+    "linux": "uninstall.html#linux",
+    "macos": "uninstall.html#macos",
+    "uninstalling": "uninstall.html",
+  },
+  "development/building.html": {
+    "nix-with-flakes": "#building-nix-with-flakes",
+    "classic-nix": "#building-nix",
+    "running-tests": "testing.html#running-tests",
+    "unit-tests": "testing.html#unit-tests",
+    "functional-tests": "testing.html#functional-tests",
+    "debugging-failing-functional-tests": "testing.html#debugging-failing-functional-tests",
+    "integration-tests": "testing.html#integration-tests",
+    "installer-tests": "testing.html#installer-tests",
+    "one-time-setup": "testing.html#one-time-setup",
+    "using-the-ci-generated-installer-for-manual-testing": "testing.html#using-the-ci-generated-installer-for-manual-testing",
+    "characterization-testing": "testing.html#characterisation-testing-unit",
+    "add-a-release-note": "contributing.html#add-a-release-note",
+    "add-an-entry": "contributing.html#add-an-entry",
+    "build-process": "contributing.html#build-process",
+    "reverting": "contributing.html#reverting",
+    "branches": "contributing.html#branches",
+  },
+  "glossary.html": {
+    "gloss-local-store": "store/types/local-store.html",
+    "gloss-chroot-store": "store/types/local-store.html",
+  },
 };
 
 // the following code matches the current page's URL against the set of redirects.

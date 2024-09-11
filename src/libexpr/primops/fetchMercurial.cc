@@ -1,5 +1,6 @@
 #include "primops.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "store-api.hh"
 #include "fetchers.hh"
 #include "url.hh"
@@ -13,13 +14,13 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     std::optional<Hash> rev;
     std::optional<std::string> ref;
     std::string_view name = "source";
-    PathSet context;
+    NixStringContext context;
 
     state.forceValue(*args[0], pos);
 
     if (args[0]->type() == nAttrs) {
 
-        for (auto & attr : *args[0]->attrs) {
+        for (auto & attr : *args[0]->attrs()) {
             std::string_view n(state.symbols[attr.name]);
             if (n == "url")
                 url = state.coerceToString(attr.pos, *attr.value, context,
@@ -30,24 +31,18 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
                 // be both a revision or a branch/tag name.
                 auto value = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `rev` attribute passed to builtins.fetchMercurial");
                 if (std::regex_match(value.begin(), value.end(), revRegex))
-                    rev = Hash::parseAny(value, htSHA1);
+                    rev = Hash::parseAny(value, HashAlgorithm::SHA1);
                 else
                     ref = value;
             }
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `name` attribute passed to builtins.fetchMercurial");
             else
-                throw EvalError({
-                    .msg = hintfmt("unsupported argument '%s' to 'fetchMercurial'", state.symbols[attr.name]),
-                    .errPos = state.positions[attr.pos]
-                });
+                state.error<EvalError>("unsupported argument '%s' to 'fetchMercurial'", state.symbols[attr.name]).atPos(attr.pos).debugThrow();
         }
 
         if (url.empty())
-            throw EvalError({
-                .msg = hintfmt("'url' argument required"),
-                .errPos = state.positions[pos]
-            });
+            state.error<EvalError>("'url' argument required").atPos(pos).debugThrow();
 
     } else
         url = state.coerceToString(pos, *args[0], context,
@@ -58,7 +53,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     // whitelist. Ah well.
     state.checkURI(url);
 
-    if (evalSettings.pureEval && !rev)
+    if (state.settings.pureEval && !rev)
         throw Error("in pure evaluation mode, 'fetchMercurial' requires a Mercurial revision");
 
     fetchers::Attrs attrs;
@@ -67,28 +62,30 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     attrs.insert_or_assign("name", std::string(name));
     if (ref) attrs.insert_or_assign("ref", *ref);
     if (rev) attrs.insert_or_assign("rev", rev->gitRev());
-    auto input = fetchers::Input::fromAttrs(std::move(attrs));
+    auto input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
 
-    // FIXME: use name
-    auto [tree, input2] = input.fetch(state.store);
+    auto [storePath, input2] = input.fetchToStore(state.store);
 
     auto attrs2 = state.buildBindings(8);
-    auto storePath = state.store->printStorePath(tree.storePath);
-    attrs2.alloc(state.sOutPath).mkString(storePath, {storePath});
+    state.mkStorePathString(storePath, attrs2.alloc(state.sOutPath));
     if (input2.getRef())
         attrs2.alloc("branch").mkString(*input2.getRef());
     // Backward compatibility: set 'rev' to
     // 0000000000000000000000000000000000000000 for a dirty tree.
-    auto rev2 = input2.getRev().value_or(Hash(htSHA1));
+    auto rev2 = input2.getRev().value_or(Hash(HashAlgorithm::SHA1));
     attrs2.alloc("rev").mkString(rev2.gitRev());
     attrs2.alloc("shortRev").mkString(rev2.gitRev().substr(0, 12));
     if (auto revCount = input2.getRevCount())
         attrs2.alloc("revCount").mkInt(*revCount);
     v.mkAttrs(attrs2);
 
-    state.allowPath(tree.storePath);
+    state.allowPath(storePath);
 }
 
-static RegisterPrimOp r_fetchMercurial("fetchMercurial", 1, prim_fetchMercurial);
+static RegisterPrimOp r_fetchMercurial({
+    .name = "fetchMercurial",
+    .arity = 1,
+    .fun = prim_fetchMercurial
+});
 
 }

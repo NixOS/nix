@@ -3,14 +3,14 @@
 To run the latest stable release of Nix with Docker run the following command:
 
 ```console
-$ docker run -ti nixos/nix
-Unable to find image 'nixos/nix:latest' locally
-latest: Pulling from nixos/nix
+$ docker run -ti ghcr.io/nixos/nix
+Unable to find image 'ghcr.io/nixos/nix:latest' locally
+latest: Pulling from ghcr.io/nixos/nix
 5843afab3874: Pull complete
 b52bf13f109c: Pull complete
 1e2415612aa3: Pull complete
 Digest: sha256:27f6e7f60227e959ee7ece361f75d4844a40e1cc6878b6868fe30140420031ff
-Status: Downloaded newer image for nixos/nix:latest
+Status: Downloaded newer image for ghcr.io/nixos/nix:latest
 35ca4ada6e96:/# nix --version
 nix (Nix) 2.3.12
 35ca4ada6e96:/# exit

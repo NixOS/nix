@@ -1,0 +1,24 @@
+package Nix::Config;
+
+use MIME::Base64;
+use Nix::Store;
+
+$version = "@PACKAGE_VERSION@";
+
+$storeDir = Nix::Store::getStoreDir;
+
+%config = ();
+
+sub readConfig {
+    my $config = "$confDir/nix.conf";
+    return unless -f $config;
+
+    open CONFIG, "<$config" or die "cannot open '$config'";
+    while (<CONFIG>) {
+        /^\s*([\w\-\.]+)\s*=\s*(.*)$/ or next;
+        $config{$1} = $2;
+    }
+    close CONFIG;
+}
+
+return 1;

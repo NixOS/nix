@@ -75,5 +75,20 @@
       su --login bob -c '(! nix-store --verify --repair 2>&1)' | tee diag 1>&2
       grep -F "you are not privileged to repair paths" diag
     """)
+
+    machine.succeed("""
+        set -x
+        su --login mallory -c '
+          nix-store --generate-binary-cache-key cache1.example.org sk1 pk1
+          (! nix store sign --key-file sk1 ${pathFour} 2>&1)' | tee diag 1>&2
+        grep -F "cannot open connection to remote store 'daemon'" diag
+    """)
+
+    machine.succeed("""
+        su --login bob -c '
+          nix-store --generate-binary-cache-key cache1.example.org sk1 pk1
+          nix store sign --key-file sk1 ${pathFour}
+        '
+    """)
   '';
 }

@@ -1,35 +1,52 @@
 #pragma once
+///@file
 
 #include <string>
 #include <optional>
 #include <cassert>
 #include <iostream>
 #include <set>
+#include <vector>
 
 namespace nix {
 
-/* A canonical representation of a path. It ensures the following:
-
-   - It always starts with a slash.
-
-   - It never ends with a slash, except if the path is "/".
-
-   - A slash is never followed by a slash (i.e. no empty components).
-
-   - There are no components equal to '.' or '..'.
-
-   Note that the path does not need to correspond to an actually
-   existing path, and there is no guarantee that symlinks are
-   resolved.
-*/
+/**
+ * A canonical representation of a path. It ensures the following:
+ *
+ * - It always starts with a slash.
+ *
+ * - It never ends with a slash, except if the path is "/".
+ *
+ * - A slash is never followed by a slash (i.e. no empty components).
+ *
+ * - There are no components equal to '.' or '..'.
+ *
+ * `CanonPath` are "virtual" Nix paths for abstract file system objects;
+ * they are always Unix-style paths, regardless of what OS Nix is
+ * running on. The `/` root doesn't denote the ambient host file system
+ * root, but some virtual FS root.
+ *
+ * @note It might be useful to compare `openat(some_fd, "foo/bar")` on
+ * Unix. `"foo/bar"` is a relative path because an absolute path would
+ * "override" the `some_fd` directory file descriptor and escape to the
+ * "system root". Conversely, Nix's abstract file operations *never* escape the
+ * designated virtual file system (i.e. `SourceAccessor` or
+ * `ParseSink`), so `CanonPath` does not need an absolute/relative
+ * distinction.
+ *
+ * @note The path does not need to correspond to an actually existing
+ * path, and the path may or may not have unresolved symlinks.
+ */
 class CanonPath
 {
     std::string path;
 
 public:
 
-    /* Construct a canon path from a non-canonical path. Any '.', '..'
-       or empty components are removed. */
+    /**
+     * Construct a canon path from a non-canonical path. Any '.', '..'
+     * or empty components are removed.
+     */
     CanonPath(std::string_view raw);
 
     explicit CanonPath(const char * raw)
@@ -42,11 +59,18 @@ public:
         : path(std::move(path))
     { }
 
+    /**
+     * Construct a canon path from a vector of elements.
+     */
+    CanonPath(const std::vector<std::string> & elems);
+
     static CanonPath root;
 
-    /* If `raw` starts with a slash, return
-       `CanonPath(raw)`. Otherwise return a `CanonPath` representing
-       `root + "/" + raw`. */
+    /**
+     * If `raw` starts with a slash, return
+     * `CanonPath(raw)`. Otherwise return a `CanonPath` representing
+     * `root + "/" + raw`.
+     */
     CanonPath(std::string_view raw, const CanonPath & root);
 
     bool isRoot() const
@@ -58,8 +82,10 @@ public:
     const std::string & abs() const
     { return path; }
 
-    /* Like abs(), but return an empty string if this path is
-       '/'. Thus the returned string never ends in a slash. */
+    /**
+     * Like abs(), but return an empty string if this path is
+     * '/'. Thus the returned string never ends in a slash.
+     */
     const std::string & absOrEmpty() const
     {
         const static std::string epsilon;
@@ -71,6 +97,13 @@ public:
 
     std::string_view rel() const
     { return ((std::string_view) path).substr(1); }
+
+    const char * rel_c_str() const
+    {
+        auto cs = path.c_str();
+        assert(cs[0]); // for safety if invariant is broken
+        return &cs[1];
+    }
 
     struct Iterator
     {
@@ -84,6 +117,9 @@ public:
 
         bool operator != (const Iterator & x) const
         { return remaining.data() != x.remaining.data(); }
+
+        bool operator == (const Iterator & x) const
+        { return !(*this != x); }
 
         const std::string_view operator * () const
         { return remaining.substr(0, slash); }
@@ -104,7 +140,9 @@ public:
 
     std::optional<CanonPath> parent() const;
 
-    /* Remove the last component. Panics if this path is the root.  */
+    /**
+     * Remove the last component. Panics if this path is the root.
+     */
     void pop();
 
     std::optional<std::string_view> dirOf() const
@@ -125,11 +163,13 @@ public:
     bool operator != (const CanonPath & x) const
     { return path != x.path; }
 
-    /* Compare paths lexicographically except that path separators
-       are sorted before any other character. That is, in the sorted order
-       a directory is always followed directly by its children. For
-       instance, 'foo' < 'foo/bar' < 'foo!'. */
-    bool operator < (const CanonPath & x) const
+    /**
+     * Compare paths lexicographically except that path separators
+     * are sorted before any other character. That is, in the sorted order
+     * a directory is always followed directly by its children. For
+     * instance, 'foo' < 'foo/bar' < 'foo!'.
+     */
+    auto operator <=> (const CanonPath & x) const
     {
         auto i = path.begin();
         auto j = x.path.begin();
@@ -138,36 +178,62 @@ public:
             if (c_i == '/') c_i = 0;
             auto c_j = *j;
             if (c_j == '/') c_j = 0;
-            if (c_i < c_j) return true;
-            if (c_i > c_j) return false;
+            if (auto cmp = c_i <=> c_j; cmp != 0) return cmp;
         }
-        return i == path.end() && j != x.path.end();
+        return (i != path.end()) <=> (j != x.path.end());
     }
 
-    /* Return true if `this` is equal to `parent` or a child of
-       `parent`. */
+    /**
+     * Return true if `this` is equal to `parent` or a child of
+     * `parent`.
+     */
     bool isWithin(const CanonPath & parent) const;
 
     CanonPath removePrefix(const CanonPath & prefix) const;
 
-    /* Append another path to this one. */
+    /**
+     * Append another path to this one.
+     */
     void extend(const CanonPath & x);
 
-    /* Concatenate two paths. */
-    CanonPath operator + (const CanonPath & x) const;
+    /**
+     * Concatenate two paths.
+     */
+    CanonPath operator / (const CanonPath & x) const;
 
-    /* Add a path component to this one. It must not contain any slashes. */
+    /**
+     * Add a path component to this one. It must not contain any slashes.
+     */
     void push(std::string_view c);
 
-    CanonPath operator + (std::string_view c) const;
+    CanonPath operator / (std::string_view c) const;
 
-    /* Check whether access to this path is allowed, which is the case
-       if 1) `this` is within any of the `allowed` paths; or 2) any of
-       the `allowed` paths are within `this`. (The latter condition
-       ensures access to the parents of allowed paths.) */
+    /**
+     * Check whether access to this path is allowed, which is the case
+     * if 1) `this` is within any of the `allowed` paths; or 2) any of
+     * the `allowed` paths are within `this`. (The latter condition
+     * ensures access to the parents of allowed paths.)
+     */
     bool isAllowed(const std::set<CanonPath> & allowed) const;
+
+    /**
+     * Return a representation `x` of `path` relative to `this`, i.e.
+     * `CanonPath(this.makeRelative(x), this) == path`.
+     */
+    std::string makeRelative(const CanonPath & path) const;
+
+    friend class std::hash<CanonPath>;
 };
 
 std::ostream & operator << (std::ostream & stream, const CanonPath & path);
 
 }
+
+template<>
+struct std::hash<nix::CanonPath>
+{
+    std::size_t operator ()(const nix::CanonPath & s) const noexcept
+    {
+        return std::hash<std::string>{}(s.path);
+    }
+};

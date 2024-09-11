@@ -76,7 +76,7 @@ there after an upgrade.  This means that you can _roll back_ to the
 old version:
 
 ```console
-$ nix-env --upgrade -A nixpkgs.some-package
+$ nix-env --upgrade --attr nixpkgs.some-package
 $ nix-env --rollback
 ```
 
@@ -122,7 +122,7 @@ Nix expressions generally describe how to build a package from
 source, so an installation action like
 
 ```console
-$ nix-env --install -A nixpkgs.firefox
+$ nix-env --install --attr nixpkgs.firefox
 ```
 
 _could_ cause quite a bit of build activity, as not only Firefox but
@@ -158,7 +158,7 @@ Pan newsreader, as described by [its
 Nix expression](https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/networking/newsreaders/pan/default.nix):
 
 ```console
-$ nix-shell '<nixpkgs>' -A pan
+$ nix-shell '<nixpkgs>' --attr pan
 ```
 
 You’re then dropped into a shell where you can edit, build and test

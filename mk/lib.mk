@@ -10,25 +10,9 @@ bin-scripts :=
 noinst-scripts :=
 man-pages :=
 install-tests :=
+install-tests-groups :=
 
-ifdef HOST_OS
-  HOST_KERNEL = $(firstword $(subst -, ,$(HOST_OS)))
-  ifeq ($(HOST_KERNEL), cygwin)
-    HOST_CYGWIN = 1
-  endif
-  ifeq ($(patsubst darwin%,,$(HOST_KERNEL)),)
-    HOST_DARWIN = 1
-  endif
-  ifeq ($(patsubst freebsd%,,$(HOST_KERNEL)),)
-    HOST_FREEBSD = 1
-  endif
-  ifeq ($(HOST_KERNEL), linux)
-    HOST_LINUX = 1
-  endif
-  ifeq ($(patsubst solaris%,,$(HOST_KERNEL)),)
-    HOST_SOLARIS = 1
-  endif
-endif
+include mk/platform.mk
 
 # Hack to define a literal space.
 space :=
@@ -40,27 +24,6 @@ define newline
 
 
 endef
-
-
-# Default installation paths.
-prefix ?= /usr/local
-libdir ?= $(prefix)/lib
-bindir ?= $(prefix)/bin
-libexecdir ?= $(prefix)/libexec
-datadir ?= $(prefix)/share
-localstatedir ?= $(prefix)/var
-sysconfdir ?= $(prefix)/etc
-mandir ?= $(prefix)/share/man
-
-
-# Initialise support for build directories.
-builddir ?=
-
-ifdef builddir
-  buildprefix = $(builddir)/
-else
-  buildprefix =
-endif
 
 
 # Pass -fPIC if we're building dynamic libraries.
@@ -93,6 +56,8 @@ ifeq ($(BUILD_DEBUG), 1)
 endif
 
 
+include mk/build-dir.mk
+include mk/install-dirs.mk
 include mk/functions.mk
 include mk/tracing.mk
 include mk/clean.mk
@@ -101,7 +66,9 @@ include mk/libraries.mk
 include mk/programs.mk
 include mk/patterns.mk
 include mk/templates.mk
+include mk/cxx-big-literal.mk
 include mk/tests.mk
+include mk/compilation-database.mk
 
 
 # Include all sub-Makefiles.
@@ -110,7 +77,7 @@ define include-sub-makefile
   include $(1)
 endef
 
-$(foreach mf, $(makefiles), $(eval $(call include-sub-makefile, $(mf))))
+$(foreach mf, $(makefiles), $(eval $(call include-sub-makefile,$(mf))))
 
 
 # Instantiate stuff.
@@ -120,7 +87,27 @@ $(foreach script, $(bin-scripts), $(eval $(call install-program-in,$(script),$(b
 $(foreach script, $(bin-scripts), $(eval programs-list += $(script)))
 $(foreach script, $(noinst-scripts), $(eval programs-list += $(script)))
 $(foreach template, $(template-files), $(eval $(call instantiate-template,$(template))))
-$(foreach test, $(install-tests), $(eval $(call run-install-test,$(test))))
+$(foreach test, $(install-tests), \
+  $(eval $(call run-test,$(test))) \
+  $(eval installcheck: $(test).test))
+$(foreach test-group, $(install-tests-groups), \
+  $(eval $(call run-test-group,$(test-group))) \
+  $(eval installcheck: $(test-group).test-group) \
+  $(foreach test, $($(test-group)-tests), \
+    $(eval $(call run-test,$(test))) \
+    $(eval $(test-group).test-group: $(test).test)))
+
+# Compilation database.
+$(foreach lib, $(libraries), $(eval $(call write-compile-commands,$(lib))))
+$(foreach prog, $(programs), $(eval $(call write-compile-commands,$(prog))))
+
+compile_commands.json: $(compile-commands-json-files)
+	@jq --slurp '.' $^ >$@
+
+# Include makefiles requiring built programs.
+$(foreach mf, $(makefiles-late), $(eval $(call include-sub-makefile,$(mf))))
+
+
 $(foreach file, $(man-pages), $(eval $(call install-data-in, $(file), $(mandir)/man$(patsubst .%,%,$(suffix $(file))))))
 
 
@@ -150,6 +137,14 @@ ifdef libs-list
 	@echo "The following libraries can be built:"
 	@echo ""
 	@for i in $(libs-list); do echo "  $$i"; done
+endif
+ifdef install-tests-groups
+	@echo ""
+	@echo "The following groups of functional tests can be run:"
+	@echo ""
+	@for i in $(install-tests-groups); do echo "  $$i.test-group"; done
+	@echo ""
+	@echo "(installcheck includes tests in test groups too.)"
 endif
 	@echo ""
 	@echo "The following variables control the build:"

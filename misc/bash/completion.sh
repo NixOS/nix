@@ -12,9 +12,16 @@ function _complete_nix {
             elif [[ $completion == attrs ]]; then
                 compopt -o nospace
             fi
-        else
-            COMPREPLY+=("$completion")
+            continue
         fi
+
+        if [[ "${cur}" =~ "=" ]]; then
+            # drop everything up to the first =. if a = is included, bash assumes this to be
+            # an arg=value argument and the completion gets mangled (see #11208)
+            completion="${completion#*=}"
+        fi
+
+        COMPREPLY+=("${completion}")
     done < <(NIX_GET_COMPLETIONS=$cword "${words[@]}" 2>/dev/null)
     __ltrim_colon_completions "$cur"
 }

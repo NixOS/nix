@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "eval.hh"
 #include "path.hh"
@@ -9,8 +10,10 @@
 
 namespace nix {
 
-
-struct DrvInfo
+/**
+ * A "parsed" package attribute set.
+ */
+struct PackageInfo
 {
 public:
     typedef std::map<std::string, std::optional<StorePath>> Outputs;
@@ -25,20 +28,26 @@ private:
     mutable std::string outputName;
     Outputs outputs;
 
-    bool failed = false; // set if we get an AssertionError
+    /**
+     * Set if we get an AssertionError
+     */
+    bool failed = false;
 
-    Bindings * attrs = nullptr, * meta = nullptr;
+    const Bindings * attrs = nullptr, * meta = nullptr;
 
-    Bindings * getMeta();
+    const Bindings * getMeta();
 
     bool checkMeta(Value & v);
 
 public:
-    std::string attrPath; /* path towards the derivation */
+    /**
+     * path towards the derivation
+     */
+    std::string attrPath;
 
-    DrvInfo(EvalState & state) : state(&state) { };
-    DrvInfo(EvalState & state, std::string attrPath, Bindings * attrs);
-    DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs);
+    PackageInfo(EvalState & state) : state(&state) { };
+    PackageInfo(EvalState & state, std::string attrPath, const Bindings * attrs);
+    PackageInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs);
 
     std::string queryName() const;
     std::string querySystem() const;
@@ -46,8 +55,10 @@ public:
     StorePath requireDrvPath() const;
     StorePath queryOutPath() const;
     std::string queryOutputName() const;
-    /** Return the unordered map of output names to (optional) output paths.
-     * The "outputs to install" are determined by `meta.outputsToInstall`. */
+    /**
+     * Return the unordered map of output names to (optional) output paths.
+     * The "outputs to install" are determined by `meta.outputsToInstall`.
+     */
     Outputs queryOutputs(bool withPaths = true, bool onlyOutputsToInstall = false);
 
     StringSet queryMetaNames();
@@ -73,19 +84,21 @@ public:
 
 
 #if HAVE_BOEHMGC
-typedef std::list<DrvInfo, traceable_allocator<DrvInfo>> DrvInfos;
+typedef std::list<PackageInfo, traceable_allocator<PackageInfo>> PackageInfos;
 #else
-typedef std::list<DrvInfo> DrvInfos;
+typedef std::list<PackageInfo> PackageInfos;
 #endif
 
 
-/* If value `v' denotes a derivation, return a DrvInfo object
-   describing it. Otherwise return nothing. */
-std::optional<DrvInfo> getDerivation(EvalState & state,
+/**
+ * If value `v` denotes a derivation, return a PackageInfo object
+ * describing it. Otherwise return nothing.
+ */
+std::optional<PackageInfo> getDerivation(EvalState & state,
     Value & v, bool ignoreAssertionFailures);
 
 void getDerivations(EvalState & state, Value & v, const std::string & pathPrefix,
-    Bindings & autoArgs, DrvInfos & drvs,
+    Bindings & autoArgs, PackageInfos & drvs,
     bool ignoreAssertionFailures);
 
 

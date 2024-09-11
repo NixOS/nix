@@ -1,11 +1,23 @@
-TESTS_ENVIRONMENT=("TEST_NAME=${test%.*}" 'NIX_REMOTE=')
+# shellcheck shell=bash
 
-: ${BASH:=/usr/bin/env bash}
+# Remove overall test dir (at most one of the two should match) and
+# remove file extension.
 
-init_test () {
-   cd tests && env "${TESTS_ENVIRONMENT[@]}" $BASH -e init.sh 2>/dev/null > /dev/null
-}
+test_name=$(echo -n "${test?must be defined by caller (test runner)}" | sed \
+    -e "s|^src/[^/]*-test/data/||" \
+    -e "s|^tests/functional/||" \
+    -e "s|\.sh$||" \
+    )
 
-run_test_proper () {
-   cd $(dirname $test) && env "${TESTS_ENVIRONMENT[@]}" $BASH -e $(basename $test)
+# shellcheck disable=SC2016
+TESTS_ENVIRONMENT=(
+    "TEST_NAME=$test_name"
+    'NIX_REMOTE='
+    'PS4=+(${BASH_SOURCE[0]-$0}:$LINENO) '
+)
+
+read -r -a bash <<< "${BASH:-/usr/bin/env bash}"
+
+run () {
+   cd "$(dirname "$1")" && env "${TESTS_ENVIRONMENT[@]}" "${bash[@]}" -x -e -u -o pipefail "$(basename "$1")"
 }
