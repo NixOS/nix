@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -x
-
 ((NEW_NIX_FIRST_BUILD_UID=351))
 ((TEMP_NIX_FIRST_BUILD_UID=31000))
 
