@@ -147,10 +147,10 @@ In addition, setting the following environment variables overrides the XDG base 
 - [`NIX_STATE_HOME`]{#env-NIX_STATE_HOME} (default `$XDG_STATE_HOME/nix`)
 - [`NIX_CACHE_HOME`]{#env-NIX_CACHE_HOME} (default `$XDG_CACHE_HOME/nix`)
 
-So, when [`use-xdg-base-directories`] is enabled, the configuration directory is:
+When [`use-xdg-base-directories`] is enabled, the configuration directory is:
 
 1. `$NIX_CONFIG_HOME`, if it is defined
 2. Otherwise, `$XDG_CONFIG_HOME/nix`, if `XDG_CONFIG_HOME` is defined
 3. Otherwise, `~/.config/nix`.
 
-And likewise for the state and cache directories.
+Likewise for the state and cache directories.
