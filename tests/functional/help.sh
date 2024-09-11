@@ -1,6 +1,6 @@
-source common.sh
+#!/usr/bin/env bash
 
-clearStore
+source common.sh
 
 # test help output
 

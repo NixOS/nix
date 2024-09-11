@@ -1,6 +1,8 @@
+#!/usr/bin/env bash
+
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 outPath=$(nix-build --no-out-link -E "
 with import ./config.nix;

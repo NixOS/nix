@@ -5,7 +5,7 @@
 %option stack
 %option nodefault
 %option nounput noyy_top_state
-
+%option extra-type="::nix::LexerState *"
 
 %s DEFAULT
 %x STRING
@@ -14,37 +14,30 @@
 %x INPATH_SLASH
 %x PATH_START
 
+%top {
+#include "parser-tab.hh" // YYSTYPE
+#include "parser-state.hh"
+}
 
 %{
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wunneeded-internal-declaration"
 #endif
 
-#include <boost/lexical_cast.hpp>
-
 #include "nixexpr.hh"
 #include "parser-tab.hh"
+#include "lexer-helpers.hh"
+
+namespace nix {
+  struct LexerState;
+}
 
 using namespace nix;
+using namespace nix::lexer::internal;
 
 namespace nix {
 
 #define CUR_POS state->at(*yylloc)
-
-static void initLoc(YYLTYPE * loc)
-{
-    loc->first_line = loc->last_line = 0;
-    loc->first_column = loc->last_column = 0;
-}
-
-static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
-{
-    loc->stash();
-
-    loc->first_column = loc->last_column;
-    loc->last_column += len;
-}
-
 
 // we make use of the fact that the parser receives a private copy of the input
 // string and can munge around in it.
@@ -74,6 +67,14 @@ static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
     return {result, size_t(t - result)};
 }
 
+static void requireExperimentalFeature(const ExperimentalFeature & feature, const Pos & pos)
+{
+    if (!experimentalFeatureSettings.isEnabled(feature))
+        throw ParseError(ErrorInfo{
+            .msg = HintFmt("experimental Nix feature '%1%' is disabled; add '--extra-experimental-features %1%' to enable it", showExperimentalFeature(feature)),
+            .pos = pos,
+        });
+}
 
 }
 
@@ -81,7 +82,7 @@ static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 
 #define YY_USER_INIT initLoc(yylloc)
-#define YY_USER_ACTION adjustLoc(yylloc, yytext, yyleng);
+#define YY_USER_ACTION adjustLoc(yyscanner, yylloc, yytext, yyleng);
 
 #define PUSH_STATE(state) yy_push_state(state, yyscanner)
 #define POP_STATE() yy_pop_state(yyscanner)
@@ -126,12 +127,19 @@ or          { return OR_KW; }
 \-\>        { return IMPL; }
 \/\/        { return UPDATE; }
 \+\+        { return CONCAT; }
+\<\|        { requireExperimentalFeature(Xp::PipeOperators, state->positions[CUR_POS]);
+              return PIPE_FROM;
+            }
+\|\>        { requireExperimentalFeature(Xp::PipeOperators, state->positions[CUR_POS]);
+              return PIPE_INTO;
+            }
 
 {ID}        { yylval->id = {yytext, (size_t) yyleng}; return ID; }
 {INT}       { errno = 0;
-              try {
-                  yylval->n = boost::lexical_cast<int64_t>(yytext);
-              } catch (const boost::bad_lexical_cast &) {
+              std::optional<int64_t> numMay = string2Int<int64_t>(yytext);
+              if (numMay.has_value()) {
+                  yylval->n = NixInt{*numMay};
+              } else {
                   throw ParseError(ErrorInfo{
                       .msg = HintFmt("invalid integer '%1%'", yytext),
                       .pos = state->positions[CUR_POS],
@@ -280,9 +288,32 @@ or          { return OR_KW; }
 {SPATH}     { yylval->path = {yytext, (size_t) yyleng}; return SPATH; }
 {URI}       { yylval->uri = {yytext, (size_t) yyleng}; return URI; }
 
-[ \t\r\n]+    /* eat up whitespace */
-\#[^\r\n]*    /* single-line comments */
-\/\*([^*]|\*+[^*/])*\*+\/  /* long comments */
+%{
+// Doc comment rule
+//
+//   \/\*\*                            /**
+//         [^/*]                       reject /**/ (empty comment) and /***
+//              ([^*]|\*+[^*/])*\*+\/  same as the long comment rule
+//              (             )*       zero or more non-ending sequences
+//                              \*     end(1)
+//                                 \/  end(2)
+%}
+\/\*\*[^/*]([^*]|\*+[^*/])*\*+\/  /* doc comments */ {
+    LexerState & lexerState = *yyget_extra(yyscanner);
+    lexerState.docCommentDistance = 0;
+    lexerState.lastDocCommentLoc.beginOffset = yylloc->beginOffset;
+    lexerState.lastDocCommentLoc.endOffset = yylloc->endOffset;
+}
+
+
+%{
+// The following rules have docCommentDistance--
+// This compensates for the docCommentDistance++ which happens by default to
+// make all the other rules invalidate the doc comment.
+%}
+[ \t\r\n]+    /* eat up whitespace */ { yyget_extra(yyscanner)->docCommentDistance--; }
+\#[^\r\n]*    /* single-line comments */ { yyget_extra(yyscanner)->docCommentDistance--; }
+\/\*([^*]|\*+[^*/])*\*+\/  /* long comments */ { yyget_extra(yyscanner)->docCommentDistance--; }
 
 {ANY}       {
               /* Don't return a negative number, as this will cause

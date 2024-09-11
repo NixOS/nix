@@ -9,6 +9,8 @@
 
 namespace nix {
 
+using namespace nix::windows;
+
 std::string getUserName()
 {
     // Get the required buffer size

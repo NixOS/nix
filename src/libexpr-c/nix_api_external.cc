@@ -14,7 +14,7 @@
 
 #include <nlohmann/json.hpp>
 
-#ifdef HAVE_BOEHMGC
+#if HAVE_BOEHMGC
 # include "gc/gc.h"
 # define GC_INCLUDE_NEW 1
 # include "gc_cpp.h"
@@ -115,7 +115,7 @@ public:
     /**
      * Compare to another value of the same type.
      */
-    virtual bool operator==(const ExternalValueBase & b) const override
+    virtual bool operator==(const ExternalValueBase & b) const noexcept override
     {
         if (!desc.equal) {
             return false;
@@ -174,7 +174,7 @@ ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalV
         context->last_err_code = NIX_OK;
     try {
         auto ret = new
-#ifdef HAVE_BOEHMGC
+#if HAVE_BOEHMGC
             (GC)
 #endif
                 NixCExternalValue(*desc, v);

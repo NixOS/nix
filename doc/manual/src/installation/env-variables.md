@@ -53,7 +53,8 @@ ssl-cert-file = /etc/ssl/my-certificate-bundle.crt
 
 The Nix installer has special handling for these proxy-related
 environment variables: `http_proxy`, `https_proxy`, `ftp_proxy`,
-`no_proxy`, `HTTP_PROXY`, `HTTPS_PROXY`, `FTP_PROXY`, `NO_PROXY`.
+`all_proxy`, `no_proxy`, `HTTP_PROXY`, `HTTPS_PROXY`, `FTP_PROXY`,
+`ALL_PROXY`, `NO_PROXY`.
 
 If any of these variables are set when running the Nix installer, then
 the installer will create an override file at

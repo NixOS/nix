@@ -1,5 +1,5 @@
 # redirect rules for paths (server-side) to prevent link rot.
-# see ./redirects.js for redirects based on URL fragments (client-side)
+# see ../redirects.js for redirects based on URL fragments (client-side)
 #
 # concrete user story this supports:
 # - user finds URL to the manual for Nix x.y
@@ -20,13 +20,24 @@
 
 /command-ref/command-ref /command-ref 301!
 
-/contributing/contributing /contributing 301!
+/contributing/contributing /development 301!
+/contributing /development 301!
+/contributing/hacking /development/building 301!
+/contributing/testing /development/testing 301!
+/contributing/documentation /development/documentation 301!
+/contributing/experimental-features /development/experimental-features 301!
+/contributing/cli-guideline /development/cli-guideline 301!
+/contributing/json-guideline /development/json-guideline 301!
+/contributing/cxx /development/cxx 301!
 
 /expressions/expression-language /language/ 301!
 /expressions/language-constructs /language/constructs 301!
 /expressions/language-operators /language/operators 301!
 /expressions/language-values /language/values 301!
 /expressions/* /language/:splat 301!
+/language/values /language/types 301!
+/language/constructs /language/syntax 301!
+/language/builtin-constants /language/builtins 301!
 
 /installation/installation /installation 301!
 
@@ -39,3 +50,5 @@
 /json/* /protocols/json/:splat 301!
 
 /release-notes/release-notes /release-notes 301!
+
+/package-management/copy-closure /command-ref/nix-copy-closure 301!

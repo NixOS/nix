@@ -2,6 +2,7 @@
 #include "value.hh"
 #include "eval.hh"
 
+#include <limits>
 #include <variant>
 #include <nlohmann/json.hpp>
 
@@ -42,7 +43,7 @@ class JSONSax : nlohmann::json_sax<json> {
             auto attrs2 = state.buildBindings(attrs.size());
             for (auto & i : attrs)
                 attrs2.insert(i.first, i.second);
-            parent->value(state).mkAttrs(attrs2.alreadySorted());
+            parent->value(state).mkAttrs(attrs2);
             return std::move(parent);
         }
         void add() override { v = nullptr; }
@@ -80,42 +81,46 @@ class JSONSax : nlohmann::json_sax<json> {
 public:
     JSONSax(EvalState & state, Value & v) : state(state), rs(new JSONState(&v)) {};
 
-    bool null()
+    bool null() override
     {
         rs->value(state).mkNull();
         rs->add();
         return true;
     }
 
-    bool boolean(bool val)
+    bool boolean(bool val) override
     {
         rs->value(state).mkBool(val);
         rs->add();
         return true;
     }
 
-    bool number_integer(number_integer_t val)
+    bool number_integer(number_integer_t val) override
     {
         rs->value(state).mkInt(val);
         rs->add();
         return true;
     }
 
-    bool number_unsigned(number_unsigned_t val)
+    bool number_unsigned(number_unsigned_t val_) override
     {
+        if (val_ > std::numeric_limits<NixInt::Inner>::max()) {
+            throw Error("unsigned json number %1% outside of Nix integer range", val_);
+        }
+        NixInt::Inner val = val_;
         rs->value(state).mkInt(val);
         rs->add();
         return true;
     }
 
-    bool number_float(number_float_t val, const string_t & s)
+    bool number_float(number_float_t val, const string_t & s) override
     {
         rs->value(state).mkFloat(val);
         rs->add();
         return true;
     }
 
-    bool string(string_t & val)
+    bool string(string_t & val) override
     {
         rs->value(state).mkString(val);
         rs->add();
@@ -123,7 +128,7 @@ public:
     }
 
 #if NLOHMANN_JSON_VERSION_MAJOR >= 3 && NLOHMANN_JSON_VERSION_MINOR >= 8
-    bool binary(binary_t&)
+    bool binary(binary_t&) override
     {
         // This function ought to be unreachable
         assert(false);
@@ -131,35 +136,35 @@ public:
     }
 #endif
 
-    bool start_object(std::size_t len)
+    bool start_object(std::size_t len) override
     {
         rs = std::make_unique<JSONObjectState>(std::move(rs));
         return true;
     }
 
-    bool key(string_t & name)
+    bool key(string_t & name) override
     {
         dynamic_cast<JSONObjectState*>(rs.get())->key(name, state);
         return true;
     }
 
-    bool end_object() {
+    bool end_object() override {
         rs = rs->resolve(state);
         rs->add();
         return true;
     }
 
-    bool end_array() {
+    bool end_array() override {
         return end_object();
     }
 
-    bool start_array(size_t len) {
+    bool start_array(size_t len) override {
         rs = std::make_unique<JSONListState>(std::move(rs),
             len != std::numeric_limits<size_t>::max() ? len : 128);
         return true;
     }
 
-    bool parse_error(std::size_t, const std::string&, const nlohmann::detail::exception& ex) {
+    bool parse_error(std::size_t, const std::string&, const nlohmann::detail::exception& ex) override {
         throw JSONParseError("%s", ex.what());
     }
 };

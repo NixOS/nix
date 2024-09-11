@@ -10,7 +10,7 @@
 #include <filesystem>
 #include <gtest/gtest.h>
 
-namespace fs = std::filesystem;
+namespace fs { using namespace std::filesystem; }
 
 namespace nixC {
 class nix_api_store_test : public nix_api_util_context

@@ -1,9 +1,9 @@
 #include "primops.hh"
 #include "eval-inline.hh"
 
-#include "../../toml11/toml.hpp"
-
 #include <sstream>
+
+#include <toml.hpp>
 
 namespace nix {
 

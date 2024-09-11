@@ -14,8 +14,11 @@ static void prim_unsafeDiscardStringContext(EvalState & state, const PosIdx pos,
 
 static RegisterPrimOp primop_unsafeDiscardStringContext({
     .name = "__unsafeDiscardStringContext",
-    .arity = 1,
-    .fun = prim_unsafeDiscardStringContext
+    .args = {"s"},
+    .doc = R"(
+        Discard the [string context](@docroot@/language/string-context.md) from a value that can be coerced to a string.
+    )",
+    .fun = prim_unsafeDiscardStringContext,
 });
 
 
@@ -75,7 +78,11 @@ static RegisterPrimOp primop_unsafeDiscardOutputDependency({
     .name = "__unsafeDiscardOutputDependency",
     .args = {"s"},
     .doc = R"(
-      Create a copy of the given string where every "derivation deep" string context element is turned into a constant string context element.
+      Create a copy of the given string where every
+      [derivation deep](@docroot@/language/string-context.md#string-context-element-derivation-deep)
+      string context element is turned into a
+      [constant](@docroot@/language/string-context.md#string-context-element-constant)
+      string context element.
 
       This is the opposite of [`builtins.addDrvOutputDependencies`](#builtins-addDrvOutputDependencies).
 
@@ -137,7 +144,11 @@ static RegisterPrimOp primop_addDrvOutputDependencies({
     .name = "__addDrvOutputDependencies",
     .args = {"s"},
     .doc = R"(
-      Create a copy of the given string where a single constant string context element is turned into a "derivation deep" string context element.
+      Create a copy of the given string where a single
+      [constant](@docroot@/language/string-context.md#string-context-element-constant)
+      string context element is turned into a
+      [derivation deep](@docroot@/language/string-context.md#string-context-element-derivation-deep)
+      string context element.
 
       The store path that is the constant string context element should point to a valid derivation, and end in `.drv`.
 

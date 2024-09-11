@@ -120,7 +120,7 @@ Contrary to URL-like references, path-like flake references can contain arbitrar
 
 ### Examples
 
-* `.`: The flake to which the current directory belongs to.
+* `.`: The flake to which the current directory belongs.
 * `/home/alice/src/patchelf`: A flake in some other directory.
 * `./../sub directory/with Ûñî©ôδ€`: A flake in another relative directory that
   has Unicode characters in its name.
@@ -134,7 +134,9 @@ The following generic flake reference attributes are supported:
   repository or tarball. The default is the root directory of the
   flake.
 
-* `narHash`: The hash of the NAR serialisation (in SRI format) of the
+* `narHash`: The hash of the
+  [Nix Archive (NAR) serialisation][Nix Archive]
+  (in SRI format) of the
   contents of the flake. This is useful for flake types such as
   tarballs that lack a unique content identifier such as a Git commit
   hash.
@@ -256,6 +258,8 @@ Currently the `type` attribute can be one of the following:
   If the extension corresponds to a known archive format (`.zip`, `.tar`,
   `.tgz`, `.tar.gz`, `.tar.xz`, `.tar.bz2` or `.tar.zst`), then the `tarball+`
   can be dropped.
+
+  This can also be used to set the location of gitea/forgejo branches. [See here](@docroot@/protocols/tarball-fetcher.md#gitea-and-forgejo-support)
 
 * `file`: Plain files or directory tarballs, either over http(s) or from the local
   disk.
@@ -423,8 +427,9 @@ The following attributes are supported in `flake.nix`:
   * `lastModified`: The commit time of the revision `rev` as an integer
     denoting the number of seconds since 1970.
 
-  * `narHash`: The SHA-256 (in SRI format) of the NAR serialization of
-    the flake's source tree.
+  * `narHash`: The SHA-256 (in SRI format) of the
+    [Nix Archive (NAR) serialisation][Nix Archive]
+    NAR serialization of the flake's source tree.
 
   The value returned by the `outputs` function must be an attribute
   set. The attributes can have arbitrary values; however, various
@@ -439,7 +444,7 @@ The following attributes are supported in `flake.nix`:
    - [`bash-prompt-prefix`](@docroot@/command-ref/conf-file.md#conf-bash-prompt-prefix)
    - [`bash-prompt-suffix`](@docroot@/command-ref/conf-file.md#conf-bash-prompt-suffix)
    - [`flake-registry`](@docroot@/command-ref/conf-file.md#conf-flake-registry)
-   - [`commit-lockfile-summary`](@docroot@/command-ref/conf-file.md#conf-commit-lockfile-summary)
+   - [`commit-lock-file-summary`](@docroot@/command-ref/conf-file.md#conf-commit-lock-file-summary)
 
 ## Flake inputs
 
@@ -703,4 +708,5 @@ will not look at the lock files of dependencies. However, lock file
 generation itself *does* use the lock files of dependencies by
 default.
 
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 )""

@@ -110,8 +110,8 @@ void Pipe::create()
     if (pipe2(fds, O_CLOEXEC) != 0) throw SysError("creating pipe");
 #else
     if (pipe(fds) != 0) throw SysError("creating pipe");
-    closeOnExec(fds[0]);
-    closeOnExec(fds[1]);
+    unix::closeOnExec(fds[0]);
+    unix::closeOnExec(fds[1]);
 #endif
     readSide = fds[0];
     writeSide = fds[1];
@@ -120,31 +120,55 @@ void Pipe::create()
 
 //////////////////////////////////////////////////////////////////////
 
-void closeMostFDs(const std::set<int> & exceptions)
+#if __linux__ || __FreeBSD__
+// In future we can use a syscall wrapper, but at the moment musl and older glibc version don't support it.
+static int unix_close_range(unsigned int first, unsigned int last, int flags)
 {
+    return syscall(SYS_close_range, first, last, (unsigned int)flags);
+}
+#endif
+
+void unix::closeExtraFDs()
+{
+    constexpr int MAX_KEPT_FD = 2;
+    static_assert(std::max({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO}) == MAX_KEPT_FD);
+
+#if __linux__ || __FreeBSD__
+    // first try to close_range everything we don't care about. if this
+    // returns an error with these parameters we're running on a kernel
+    // that does not implement close_range (i.e. pre 5.9) and fall back
+    // to the old method. we should remove that though, in some future.
+    if (unix_close_range(MAX_KEPT_FD + 1, ~0U, 0) == 0) {
+        return;
+    }
+#endif
+
 #if __linux__
     try {
-        for (auto & s : readDirectory("/proc/self/fd")) {
-            auto fd = std::stoi(s.name);
-            if (!exceptions.count(fd)) {
+        for (auto & s : std::filesystem::directory_iterator{"/proc/self/fd"}) {
+            checkInterrupt();
+            auto fd = std::stoi(s.path().filename());
+            if (fd > MAX_KEPT_FD) {
                 debug("closing leaked FD %d", fd);
                 close(fd);
             }
         }
         return;
     } catch (SysError &) {
+    } catch (std::filesystem::filesystem_error &) {
     }
 #endif
 
     int maxFD = 0;
+#if HAVE_SYSCONF
     maxFD = sysconf(_SC_OPEN_MAX);
-    for (int fd = 0; fd < maxFD; ++fd)
-        if (!exceptions.count(fd))
-            close(fd); /* ignore result */
+#endif
+    for (int fd = MAX_KEPT_FD + 1; fd < maxFD; ++fd)
+        close(fd); /* ignore result */
 }
 
 
-void closeOnExec(int fd)
+void unix::closeOnExec(int fd)
 {
     int prev;
     if ((prev = fcntl(fd, F_GETFD, 0)) == -1 ||

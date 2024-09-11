@@ -17,8 +17,8 @@
 
 - `nix-shell` shebang lines now support single-quoted arguments.
 
-- `builtins.fetchTree` is now its own experimental feature, [`fetch-tree`](@docroot@/contributing/experimental-features.md#xp-fetch-tree).
-  This allows stabilising it independently of the rest of what is encompassed by [`flakes`](@docroot@/contributing/experimental-features.md#xp-fetch-tree).
+- `builtins.fetchTree` is now its own experimental feature, [`fetch-tree`](@docroot@/development/experimental-features.md#xp-fetch-tree).
+  This allows stabilising it independently of the rest of what is encompassed by [`flakes`](@docroot@/development/experimental-features.md#xp-fetch-tree).
 
 - The interface for creating and updating lock files has been overhauled:
 
@@ -33,7 +33,7 @@
   - The flake-specific flags `--recreate-lock-file` and `--update-input` have been removed from all commands operating on installables.
     They are superceded by `nix flake update`.
 
-- Commit signature verification for the [`builtins.fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) is added as the new [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+- Commit signature verification for the [`builtins.fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) is added as the new [`verified-fetches` experimental feature](@docroot@/development/experimental-features.md#xp-feature-verified-fetches).
 
 - [`nix path-info --json`](@docroot@/command-ref/new-cli/nix3-path-info.md)
   (experimental) now returns a JSON map rather than JSON list.

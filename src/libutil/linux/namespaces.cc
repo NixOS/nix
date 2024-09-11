@@ -118,7 +118,7 @@ void saveMountNamespace()
 void restoreMountNamespace()
 {
     try {
-        auto savedCwd = absPath(".");
+        auto savedCwd = std::filesystem::current_path();
 
         if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
             throw SysError("restoring parent mount namespace");
@@ -137,10 +137,10 @@ void restoreMountNamespace()
     }
 }
 
-void unshareFilesystem()
+void tryUnshareFilesystem()
 {
-    if (unshare(CLONE_FS) != 0 && errno != EPERM)
-        throw SysError("unsharing filesystem state in download thread");
+    if (unshare(CLONE_FS) != 0 && errno != EPERM && errno != ENOSYS)
+        throw SysError("unsharing filesystem state");
 }
 
 }

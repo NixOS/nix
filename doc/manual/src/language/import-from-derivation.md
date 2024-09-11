@@ -2,9 +2,9 @@
 
 The value of a Nix expression can depend on the contents of a [store object].
 
-[store object]: @docroot@/glossary.md#gloss-store-object
+[store object]: @docroot@/store/store-object.md
 
-Passing an expression `expr` that evaluates to a [store path](@docroot@/glossary.md#gloss-store-path) to any built-in function which reads from the filesystem constitutes Import From Derivation (IFD):
+Passing an expression `expr` that evaluates to a [store path](@docroot@/store/store-path.md) to any built-in function which reads from the filesystem constitutes Import From Derivation (IFD):
 
 - [`import`](./builtins.md#builtins-import)` expr`
 - [`builtins.readFile`](./builtins.md#builtins-readFile)` expr`

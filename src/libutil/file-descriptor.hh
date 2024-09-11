@@ -128,7 +128,18 @@ public:
     explicit operator bool() const;
     Descriptor release();
     void close();
-    void fsync();
+
+    /**
+     * Perform a blocking fsync operation.
+     */
+    void fsync() const;
+
+    /**
+     * Asynchronously flush to disk without blocking, if available on
+     * the platform. This is just a performance optimization, and
+     * fsync must be run later even if this is called.
+     */
+    void startFsync() const;
 };
 
 class Pipe
@@ -140,25 +151,29 @@ public:
 };
 
 #ifndef _WIN32 // Not needed on Windows, where we don't fork
+namespace unix {
 
 /**
- * Close all file descriptors except those listed in the given set.
+ * Close all file descriptors except stdio fds (ie 0, 1, 2).
  * Good practice in child processes.
  */
-void closeMostFDs(const std::set<Descriptor> & exceptions);
+void closeExtraFDs();
 
 /**
  * Set the close-on-exec flag for the given file descriptor.
  */
 void closeOnExec(Descriptor fd);
 
+} // namespace unix
 #endif
 
-#ifdef _WIN32
-# if _WIN32_WINNT >= 0x0600
+#if defined(_WIN32) && _WIN32_WINNT >= 0x0600
+namespace windows {
+
 Path handleToPath(Descriptor handle);
 std::wstring handleToFileName(Descriptor handle);
-# endif
+
+} // namespace windows
 #endif
 
 MakeError(EndOfFile, Error);

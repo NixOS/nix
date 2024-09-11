@@ -1,6 +1,5 @@
 #include "fetchers.hh"
 #include "store-api.hh"
-#include "input-accessor.hh"
 #include "source-path.hh"
 #include "fetch-to-store.hh"
 #include "json-utils.hh"
@@ -36,9 +35,11 @@ nlohmann::json dumpRegisterInputSchemeInfo() {
     return res;
 }
 
-Input Input::fromURL(const std::string & url, bool requireTree)
+Input Input::fromURL(
+    const Settings & settings,
+    const std::string & url, bool requireTree)
 {
-    return fromURL(parseURL(url), requireTree);
+    return fromURL(settings, parseURL(url), requireTree);
 }
 
 static void fixupInput(Input & input)
@@ -50,10 +51,12 @@ static void fixupInput(Input & input)
     input.getLastModified();
 }
 
-Input Input::fromURL(const ParsedURL & url, bool requireTree)
+Input Input::fromURL(
+    const Settings & settings,
+    const ParsedURL & url, bool requireTree)
 {
     for (auto & [_, inputScheme] : *inputSchemes) {
-        auto res = inputScheme->inputFromURL(url, requireTree);
+        auto res = inputScheme->inputFromURL(settings, url, requireTree);
         if (res) {
             experimentalFeatureSettings.require(inputScheme->experimentalFeature());
             res->scheme = inputScheme;
@@ -65,7 +68,7 @@ Input Input::fromURL(const ParsedURL & url, bool requireTree)
     throw Error("input '%s' is unsupported", url.url);
 }
 
-Input Input::fromAttrs(Attrs && attrs)
+Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
 {
     auto schemeName = ({
         auto schemeNameOpt = maybeGetStrAttr(attrs, "type");
@@ -79,7 +82,7 @@ Input Input::fromAttrs(Attrs && attrs)
         // but not all of them. Doing this is to support those other
         // operations which are supposed to be robust on
         // unknown/uninterpretable inputs.
-        Input input;
+        Input input { settings };
         input.attrs = attrs;
         fixupInput(input);
         return input;
@@ -100,7 +103,7 @@ Input Input::fromAttrs(Attrs && attrs)
         if (name != "type" && allowedAttrs.count(name) == 0)
             throw Error("input attribute '%s' not supported by scheme '%s'", name, schemeName);
 
-    auto res = inputScheme->inputFromAttrs(attrs);
+    auto res = inputScheme->inputFromAttrs(settings, attrs);
     if (!res) return raw();
     res->scheme = inputScheme;
     fixupInput(*res);
@@ -147,7 +150,7 @@ Attrs Input::toAttrs() const
     return attrs;
 }
 
-bool Input::operator ==(const Input & other) const
+bool Input::operator ==(const Input & other) const noexcept
 {
     return attrs == other.attrs;
 }
@@ -220,7 +223,7 @@ void InputScheme::checkLocks(const Input & specified, const Input & final) const
     }
 }
 
-std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
+std::pair<ref<SourceAccessor>, Input> Input::getAccessor(ref<Store> store) const
 {
     try {
         auto [accessor, final] = getAccessorUnchecked(store);
@@ -234,7 +237,7 @@ std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
     }
 }
 
-std::pair<ref<InputAccessor>, Input> Input::getAccessorUnchecked(ref<Store> store) const
+std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> store) const
 {
     // FIXME: cache the accessor
 
@@ -243,6 +246,7 @@ std::pair<ref<InputAccessor>, Input> Input::getAccessorUnchecked(ref<Store> stor
 
     auto [accessor, final] = scheme->getAccessor(store, *this);
 
+    assert(!accessor->fingerprint);
     accessor->fingerprint = scheme->getFingerprint(store, final);
 
     return {accessor, std::move(final)};
@@ -288,7 +292,7 @@ StorePath Input::computeStorePath(Store & store) const
     if (!narHash)
         throw Error("cannot compute store path for unlocked input '%s'", to_string());
     return store.makeFixedOutputPath(getName(), FixedOutputInfo {
-        .method = FileIngestionMethod::Recursive,
+        .method = FileIngestionMethod::NixArchive,
         .hash = *narHash,
         .references = {},
     });
@@ -401,7 +405,7 @@ namespace nlohmann {
 using namespace nix;
 
 fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json) {
-    fetchers::PublicKey res = {  };
+    fetchers::PublicKey res = { };
     if (auto type = optionalValueAt(json, "type"))
         res.type = getString(*type);
 

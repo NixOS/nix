@@ -1,14 +1,13 @@
 #pragma once
 
-#include "filtering-input-accessor.hh"
-#include "input-accessor.hh"
+#include "filtering-source-accessor.hh"
 #include "fs-sink.hh"
 
 namespace nix {
 
 namespace fetchers { struct PublicKey; }
 
-struct GitFileSystemObjectSink : FileSystemObjectSink
+struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
 {
     /**
      * Flush builder and return a final Git hash.
@@ -75,9 +74,9 @@ struct GitRepo
 
     virtual bool hasObject(const Hash & oid) = 0;
 
-    virtual ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
+    virtual ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
 
-    virtual ref<InputAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
+    virtual ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
 
     virtual ref<GitFileSystemObjectSink> getFileSystemObjectSink() = 0;
 
@@ -99,6 +98,13 @@ struct GitRepo
      * serialisation. This is memoised on-disk.
      */
     virtual Hash treeHashToNarHash(const Hash & treeHash) = 0;
+
+    /**
+     * If the specified Git object is a directory with a single entry
+     * that is a directory, return the ID of that object.
+     * Otherwise, return the passed ID unchanged.
+     */
+    virtual Hash dereferenceSingletonDirectory(const Hash & oid) = 0;
 };
 
 ref<GitRepo> getTarballCache();

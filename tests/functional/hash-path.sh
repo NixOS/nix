@@ -1,7 +1,9 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 try () {
-    printf "%s" "$2" > $TEST_ROOT/vector
+    printf "%s" "$2" > "$TEST_ROOT/vector"
     hash="$(nix-hash --flat ${FORMAT+--$FORMAT} --type "$1" "$TEST_ROOT/vector")"
     if ! (( "${NO_TEST_CLASSIC-}" )) && test "$hash" != "$3"; then
         echo "try nix-hash: hash $1, expected $3, got $hash"
@@ -59,7 +61,7 @@ NO_TEST_NIX_COMMAND=1 try sha512 "abc" "ddaf35a193617abacc417349ae20413112e6fa4e
 NO_TEST_CLASSIC=1 try sha512 "abc" "sha512-3a81oZNherrMQXNJriBBMRLm+k6JqX6iCp7u5ktV05ohkpkqJ0/BqDa6PCOj/uu9RU1EI2Q86A4qmslPpUyknw=="
 
 try2 () {
-    hash=$(nix-hash --type "$1" $TEST_ROOT/hash-path)
+    hash=$(nix-hash --type "$1" "$TEST_ROOT/hash-path")
     if test "$hash" != "$2"; then
         echo "try nix-hash; hash $1, expected $2, got $hash"
         exit 1
@@ -71,22 +73,22 @@ try2 () {
     fi
 }
 
-rm -rf $TEST_ROOT/hash-path
-mkdir $TEST_ROOT/hash-path
-echo "Hello World" > $TEST_ROOT/hash-path/hello
+rm -rf "$TEST_ROOT/hash-path"
+mkdir "$TEST_ROOT/hash-path"
+echo "Hello World" > "$TEST_ROOT/hash-path/hello"
 
 try2 md5 "ea9b55537dd4c7e104515b2ccfaf4100"
 
 # Execute bit matters.
-chmod +x $TEST_ROOT/hash-path/hello
+chmod +x "$TEST_ROOT/hash-path/hello"
 try2 md5 "20f3ffe011d4cfa7d72bfabef7882836"
 
 # Mtime and other bits don't.
-touch -r . $TEST_ROOT/hash-path/hello
-chmod 744 $TEST_ROOT/hash-path/hello
+touch -r . "$TEST_ROOT/hash-path/hello"
+chmod 744 "$TEST_ROOT/hash-path/hello"
 try2 md5 "20f3ffe011d4cfa7d72bfabef7882836"
 
 # File type (e.g., symlink) does.
-rm $TEST_ROOT/hash-path/hello
-ln -s x $TEST_ROOT/hash-path/hello
+rm "$TEST_ROOT/hash-path/hello"
+ln -s x "$TEST_ROOT/hash-path/hello"
 try2 md5 "f78b733a68f5edbdf9413899339eaa4a"

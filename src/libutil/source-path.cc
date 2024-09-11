@@ -18,13 +18,13 @@ std::string SourcePath::readFile() const
 bool SourcePath::pathExists() const
 { return accessor->pathExists(path); }
 
-InputAccessor::Stat SourcePath::lstat() const
+SourceAccessor::Stat SourcePath::lstat() const
 { return accessor->lstat(path); }
 
-std::optional<InputAccessor::Stat> SourcePath::maybeLstat() const
+std::optional<SourceAccessor::Stat> SourcePath::maybeLstat() const
 { return accessor->maybeLstat(path); }
 
-InputAccessor::DirEntries SourcePath::readDirectory() const
+SourceAccessor::DirEntries SourcePath::readDirectory() const
 { return accessor->readDirectory(path); }
 
 std::string SourcePath::readLink() const
@@ -47,19 +47,14 @@ SourcePath SourcePath::operator / (const CanonPath & x) const
 SourcePath SourcePath::operator / (std::string_view c) const
 { return {accessor, path / c}; }
 
-bool SourcePath::operator==(const SourcePath & x) const
+bool SourcePath::operator==(const SourcePath & x) const noexcept
 {
     return std::tie(*accessor, path) == std::tie(*x.accessor, x.path);
 }
 
-bool SourcePath::operator!=(const SourcePath & x) const
+std::strong_ordering SourcePath::operator<=>(const SourcePath & x) const noexcept
 {
-    return std::tie(*accessor, path) != std::tie(*x.accessor, x.path);
-}
-
-bool SourcePath::operator<(const SourcePath & x) const
-{
-    return std::tie(*accessor, path) < std::tie(*x.accessor, x.path);
+    return std::tie(*accessor, path) <=> std::tie(*x.accessor, x.path);
 }
 
 std::ostream & operator<<(std::ostream & str, const SourcePath & path)

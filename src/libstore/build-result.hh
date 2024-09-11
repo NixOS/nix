@@ -3,7 +3,6 @@
 
 #include "realisation.hh"
 #include "derived-path.hh"
-#include "comparator.hh"
 
 #include <string>
 #include <chrono>
@@ -101,7 +100,8 @@ struct BuildResult
      */
     std::optional<std::chrono::microseconds> cpuUser, cpuSystem;
 
-    DECLARE_CMP(BuildResult);
+    bool operator ==(const BuildResult &) const noexcept;
+    std::strong_ordering operator <=>(const BuildResult &) const noexcept;
 
     bool success()
     {

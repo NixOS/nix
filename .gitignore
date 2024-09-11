@@ -11,6 +11,8 @@ perl/Makefile.config
 /svn-revision
 /libtool
 /config/config.*
+# Default meson build dir
+/build
 
 # /doc/manual/
 /doc/manual/*.1
@@ -52,6 +54,9 @@ perl/Makefile.config
 # /src/libfetchers
 /tests/unit/libfetchers/libnixfetchers-tests
 
+# /src/libflake
+/tests/unit/libflake/libnixflake-tests
+
 # /src/libstore/
 *.gen.*
 /src/libstore/tests
@@ -92,7 +97,7 @@ perl/Makefile.config
 
 # /tests/functional/
 /tests/functional/test-tmp
-/tests/functional/common/vars-and-functions.sh
+/tests/functional/common/subst-vars.sh
 /tests/functional/result*
 /tests/functional/restricted-innocent
 /tests/functional/shell

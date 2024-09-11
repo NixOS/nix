@@ -13,7 +13,7 @@
 
 "documentation":
   - changed-files:
-    - any-glob-to-any-file: "doc/manual/*"
+    - any-glob-to-any-file: "doc/manual/**/*"
     - any-glob-to-any-file: "src/nix/**/*.md"
 
 "store":
@@ -40,4 +40,4 @@
     - any-glob-to-any-file: "src/*/tests/**/*"
     # Functional and integration tests
     - any-glob-to-any-file: "tests/functional/**/*"
-    
+

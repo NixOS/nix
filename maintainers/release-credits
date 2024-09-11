@@ -1,0 +1,184 @@
+#!/usr/bin/env nix
+# vim: set filetype=python:
+#!nix develop --impure --expr
+#!nix ``
+#!nix   let flake = builtins.getFlake ("git+file://" + toString ../.);
+#!nix       pkgs = flake.inputs.nixpkgs.legacyPackages.${builtins.currentSystem};
+#!nix   in pkgs.mkShell { nativeBuildInputs = [ 
+#!nix        (pkgs.python3.withPackages (ps: with ps; [ requests ]))
+#!nix   ]; }
+#!nix `` --command python3
+
+# This script lists out the contributors for a given release.
+# It must be run from the root of the Nix repository.
+
+import os
+import sys
+import json
+import requests
+
+github_token = os.environ.get("GITHUB_TOKEN")
+if not github_token:
+    print("GITHUB_TOKEN is not set. If you hit the rate limit, set it", file=sys.stderr)
+    # Might be ok, as we have a cache.
+    # raise ValueError("GITHUB_TOKEN must be set")
+
+# 1. Read the current version in .version
+version = os.environ.get("VERSION")
+if not version:
+    version = open(".version").read().strip()
+
+print(f"Generating release credits for Nix {version}", file=sys.stderr)
+
+# 2. Compute previous version
+vcomponents = version.split(".")
+if len(vcomponents) >= 2:
+    prev_version = f"{vcomponents[0]}.{int(vcomponents[1])-1}.0"
+else:
+    raise ValueError(".version must have at least two components")
+
+# For unreleased versions
+endref = "HEAD"
+# For older releases
+# endref = version
+
+# 2. Find the merge base between the current version and the previous version
+mergeBase = os.popen(f"git merge-base {prev_version} {endref}").read().strip()
+print(f"Merge base between {prev_version} and {endref} is {mergeBase}", file=sys.stderr)
+
+# 3. Find the date of the merge base
+mergeBaseDate = os.popen(f"git show -s --format=%ci {mergeBase}").read().strip()[0:10]
+print(f"Merge base date is {mergeBaseDate}", file=sys.stderr)
+
+# 4. Get the commits between the merge base and the current version
+
+def get_commits():
+    raw = os.popen(f"git log --pretty=format:'%H\t%an\t%ae' {mergeBase}..{endref}").read().strip()
+    lines = raw.split("\n")
+    return [ { "hash": items[0], "author": items[1], "email": items[2] }
+        for line in lines
+        for items in (line.split("\t"),)
+    ]
+
+def commits_to_first_commit_by_email(commits):
+    by_email = dict()
+    for commit in commits:
+        email = commit["email"]
+        if email not in by_email:
+            by_email[email] = commit
+    return by_email
+
+
+samples = commits_to_first_commit_by_email(get_commits())
+
+# For quick testing, only pick two samples from the dict
+# samples = dict(list(samples.items())[:2])
+
+# Query the GitHub API to get handle
+def get_github_commit(commit):
+    url = f"https://api.github.com/repos/NixOS/nix/commits/{commit['hash']}"
+    headers = {'Authorization': f'token {github_token}'}
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
+class Cache:
+    def __init__(self, filename, require = True):
+        self.filename = filename
+        try:
+            with open(filename, "r") as f:
+                self.values = json.load(f)
+        except FileNotFoundError:
+            if require:
+                raise
+            self.values = dict()
+    def save(self):
+        with open(self.filename, "w") as f:
+            json.dump(self.values, f, indent=4)
+        print(f"Saved cache to {self.filename}", file=sys.stderr)
+
+# The email to handle cache maps email addresses to either
+#  - a handle (string)
+#  - None (if no handle was found)
+email_to_handle_cache = Cache("maintainers/data/release-credits-email-to-handle.json")
+
+handles = set()
+emails = dict()
+
+for sample in samples:
+    s = samples[sample]
+    email = s["email"]
+    if not email in email_to_handle_cache.values:
+        print(f"Querying GitHub API for {s['hash']}, to get handle for {s['email']}")
+        ghc = get_github_commit(samples[sample])
+        gha = ghc["author"]
+        if gha and gha["login"]:
+            handle = gha["login"]
+            print(f"Handle: {handle}")
+            email_to_handle_cache.values[email] = handle
+        else:
+            print(f"Found no handle for {s['email']}")
+            email_to_handle_cache.values[email] = None
+    handle = email_to_handle_cache.values[email]
+    if handle is not None:
+        handles.add(handle)
+    else:
+        emails[email] = s["author"]
+
+# print(email_to_handle_cache.values)
+
+email_to_handle_cache.save()
+
+handle_to_name_cache = Cache("maintainers/data/release-credits-handle-to-name.json")
+
+print(f"Found {len(handles)} handles", file=sys.stderr)
+
+for handle in handles:
+    if not handle in handle_to_name_cache.values:
+        print(f"Querying GitHub API for {handle}, to get name", file=sys.stderr)
+        url = f"https://api.github.com/users/{handle}"
+        headers = {'Authorization': f'token {github_token}'}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        user = response.json()
+        name = user["name"]
+        print(f"Name: {name}", file=sys.stderr)
+        handle_to_name_cache.values[handle] = name
+
+handle_to_name_cache.save()
+
+entries = list()
+
+def is_bot(handle):
+    return handle.endswith("[bot]")
+
+for handle in handles:
+    name = handle_to_name_cache.values[handle]
+    if name is None:
+        # This way it looks more regular
+        name = handle
+
+    # Note to bots: I'm only doing this because it would distract humans, and
+    # therefore delay your creation. I'm sorry; it's for your benefit.
+    if not is_bot(handle):
+        entries += [ f"- {name} [**(@{handle})**](https://github.com/{handle})" ]
+
+def shuffle(entries):
+    salt = os.urandom(16)
+    return sorted(entries, key=lambda x: hash((x, salt)))
+
+# Fair ordering is undecidable
+entries = shuffle(entries)
+
+# For a sanity check, we could sort the entries by handle instead.
+# entries = sorted(entries)
+
+print("")
+print(f"This release was made possible by the following {len(entries)} contributors:")
+print("")
+
+for entry in entries:
+    print(entry)
+
+for email in emails:
+    print(f"- {emails[email]}")

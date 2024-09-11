@@ -1,0 +1,15 @@
+# vim: filetype=meson
+
+option(
+  'markdown',
+  type: 'feature',
+  description: 'Enable Markdown rendering in the Nix binary (requires lowdown)',
+)
+
+option(
+  'readline-flavor',
+  type : 'combo',
+  choices : ['editline', 'readline'],
+  value : 'editline',
+  description : 'Which library to use for nice line editing with the Nix language REPL',
+)

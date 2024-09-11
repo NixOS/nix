@@ -1,5 +1,24 @@
 # Glossary
 
+- [content address]{#gloss-content-address}
+
+  A
+  [*content address*](https://en.wikipedia.org/wiki/Content-addressable_storage)
+  is a secure way to reference immutable data.
+  The reference is calculated directly from the content of the data being referenced, which means the reference is
+  [*tamper proof*](https://en.wikipedia.org/wiki/Tamperproofing)
+  --- variations of the data should always calculate to distinct content addresses.
+
+  For how Nix uses content addresses, see:
+
+    - [Content-Addressing File System Objects](@docroot@/store/file-system-object/content-address.md)
+    - [Content-Addressing Store Objects](@docroot@/store/store-object/content-address.md)
+    - [content-addressed derivation](#gloss-content-addressed-derivation)
+
+  Software Heritage's writing on [*Intrinsic and Extrinsic identifiers*](https://www.softwareheritage.org/2020/07/09/intrinsic-vs-extrinsic-identifiers) is also a good introduction to the value of content-addressing over other referencing schemes.
+
+  Besides content addressing, the Nix store also uses [input addressing](#gloss-input-addressed-store-object).
+
 - [derivation]{#gloss-derivation}
 
   A description of a build task. The result of a derivation is a
@@ -52,10 +71,9 @@
   [`__contentAddressed`](./language/advanced-attributes.md#adv-attr-__contentAddressed)
   attribute set to `true`.
 
-- [fixed-output derivation]{#gloss-fixed-output-derivation}
+- [fixed-output derivation]{#gloss-fixed-output-derivation} (FOD)
 
-  A derivation which includes the
-  [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute.
+  A [derivation] where a cryptographic hash of the [output] is determined in advance using the [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute, and where the [`builder`](@docroot@/language/derivations.md#attr-builder) executable has access to the network.
 
 - [store]{#gloss-store}
 
@@ -101,7 +119,7 @@
   A store object consists of a [file system object], [references][reference] to other store objects, and other metadata.
   It can be referred to by a [store path].
 
-  See [Store Object](@docroot@/store/index.md#store-object) for details.
+  See [Store Object](@docroot@/store/store-object.md) for details.
 
   [store object]: #gloss-store-object
 
@@ -118,8 +136,11 @@
 
 - [content-addressed store object]{#gloss-content-addressed-store-object}
 
-  A [store object] whose [store path] is determined by its contents.
+  A [store object] which is [content-addressed](#gloss-content-address),
+  i.e. whose [store path] is determined by its contents.
   This includes derivations, the outputs of [content-addressed derivations](#gloss-content-addressed-derivation), and the outputs of [fixed-output derivations](#gloss-fixed-output-derivation).
+
+  See [Content-Addressing Store Objects](@docroot@/store/store-object/content-address.md) for details.
 
 - [substitute]{#gloss-substitute}
 
@@ -147,7 +168,7 @@
 
 - [impure derivation]{#gloss-impure-derivation}
 
-  [An experimental feature](#@docroot@/contributing/experimental-features.md#xp-feature-impure-derivations) that allows derivations to be explicitly marked as impure,
+  [An experimental feature](#@docroot@/development/experimental-features.md#xp-feature-impure-derivations) that allows derivations to be explicitly marked as impure,
   so that they are always rebuilt, and their outputs not reused by subsequent calls to realise them.
 
 - [Nix database]{#gloss-nix-database}
@@ -161,13 +182,18 @@
 
 - [Nix expression]{#gloss-nix-expression}
 
-  1. Commonly, a high-level description of software packages and compositions
-    thereof. Deploying software using Nix entails writing Nix
-    expressions for your packages. Nix expressions specify [derivations][derivation],
-    which are [instantiated][instantiate] into the Nix store as [store derivations][store derivation].
-    These derivations can then be [realised][realise] to produce [outputs][output].
+  A syntactically valid use of the [Nix language].
 
-  2. A syntactically valid use of the [Nix language]. For example, the contents of a `.nix` file form an expression.
+  > **Example**
+  >
+  > The contents of a `.nix` file form a Nix expression.
+
+  Nix expressions specify [derivations][derivation], which are [instantiated][instantiate] into the Nix store as [store derivations][store derivation].
+  These derivations can then be [realised][realise] to produce [outputs][output].
+
+  > **Example**
+  >
+  > Building and deploying software using Nix entails writing Nix expressions as a high-level description of packages and compositions thereof.
 
 - [reference]{#gloss-reference}
 
@@ -218,6 +244,17 @@
 - [output closure]{#gloss-output-closure}\
   The [closure] of an [output path]. It only contains what is [reachable] from the output.
 
+- [deriving path]{#gloss-deriving-path}
+
+  Deriving paths are a way to refer to [store objects][store object] that ar not yet [realised][realise].
+  This is necessary because, in general and particularly for [content-addressed derivations][content-addressed derivation], the [output path] of an [output] is not known in advance.
+  There are two forms:
+
+  - *constant*: just a [store path]
+    It can be made [valid][validity] by copying it into the store: from the evaluator, command line interface or another store.
+
+  - *output*: a pair of a [store path] to a [derivation] and an [output] name.
+
 - [deriver]{#gloss-deriver}
 
   The [store derivation] that produced an [output path].
@@ -255,12 +292,14 @@
 
   See [installables](./command-ref/new-cli/nix.md#installables) for [`nix` commands](./command-ref/new-cli/nix.md) (experimental) for details.
 
-- [NAR]{#gloss-nar}
+- [Nix Archive (NAR)]{#gloss-nar}
 
   A *N*ix *AR*chive. This is a serialisation of a path in the Nix
   store. It can contain regular files, directories and symbolic
   links.  NARs are generated and unpacked using `nix-store --dump`
   and `nix-store --restore`.
+
+  See [Nix Archive](store/file-system-object/content-address.html#serial-nix-archive) for details.
 
 - [`∅`]{#gloss-emtpy-set}
 
@@ -278,7 +317,7 @@
 
 - [package attribute set]{#package-attribute-set}
 
-  An [attribute set](@docroot@/language/values.md#attribute-set) containing the attribute `type = "derivation";` (derivation for historical reasons), as well as other attributes, such as
+  An [attribute set](@docroot@/language/types.md#attribute-set) containing the attribute `type = "derivation";` (derivation for historical reasons), as well as other attributes, such as
   - attributes that refer to the files of a [package], typically in the form of [derivation outputs](#output),
   - attributes that declare something about how the package is supposed to be installed or used,
   - other metadata or arbitrary attributes.
@@ -291,9 +330,9 @@
 
   See [String interpolation](./language/string-interpolation.md) for details.
 
-  [string]: ./language/values.md#type-string
-  [path]: ./language/values.md#type-path
-  [attribute name]: ./language/values.md#attribute-set
+  [string]: ./language/types.md#type-string
+  [path]: ./language/types.md#type-path
+  [attribute name]: ./language/types.md#attribute-set
 
 - [base directory]{#gloss-base-directory}
 
@@ -319,7 +358,7 @@
   Not yet stabilized functionality guarded by named experimental feature flags.
   These flags are enabled or disabled with the [`experimental-features`](./command-ref/conf-file.html#conf-experimental-features) setting.
 
-  See the contribution guide on the [purpose and lifecycle of experimental feaures](@docroot@/contributing/experimental-features.md).
+  See the contribution guide on the [purpose and lifecycle of experimental feaures](@docroot@/development/experimental-features.md).
 
 
 [Nix language]: ./language/index.md

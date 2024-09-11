@@ -4,9 +4,9 @@ libstore_NAME = libnixstore
 
 libstore_DIR := $(d)
 
-libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc)
+libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/build/*.cc)
 ifdef HOST_UNIX
-  libstore_SOURCES += $(wildcard $(d)/unix/*.cc $(d)/unix/builtins/*.cc $(d)/unix/build/*.cc)
+  libstore_SOURCES += $(wildcard $(d)/unix/*.cc $(d)/unix/build/*.cc)
 endif
 ifdef HOST_LINUX
   libstore_SOURCES += $(wildcard $(d)/linux/*.cc)
@@ -20,6 +20,9 @@ libstore_LIBS = libutil
 libstore_LDFLAGS += $(SQLITE3_LIBS) $(LIBCURL_LIBS) $(THREAD_LDFLAGS)
 ifdef HOST_LINUX
   libstore_LDFLAGS += -ldl
+endif
+ifdef HOST_WINDOWS
+  libstore_LDFLAGS += -lws2_32
 endif
 
 $(foreach file,$(libstore_FILES),$(eval $(call install-data-in,$(d)/$(file),$(datadir)/nix/sandbox)))
@@ -40,7 +43,7 @@ endif
 
 INCLUDE_libstore := -I $(d) -I $(d)/build
 ifdef HOST_UNIX
-  INCLUDE_libstore += -I $(d)/unix
+  INCLUDE_libstore += -I $(d)/unix -I $(d)/unix/build
 endif
 ifdef HOST_LINUX
   INCLUDE_libstore += -I $(d)/linux
@@ -68,7 +71,6 @@ libstore_CXXFLAGS += \
  -DNIX_STATE_DIR=\"$(NIX_ROOT)$(localstatedir)/nix\" \
  -DNIX_LOG_DIR=\"$(NIX_ROOT)$(localstatedir)/log/nix\" \
  -DNIX_CONF_DIR=\"$(NIX_ROOT)$(sysconfdir)/nix\" \
- -DNIX_BIN_DIR=\"$(NIX_ROOT)$(bindir)\" \
  -DNIX_MAN_DIR=\"$(NIX_ROOT)$(mandir)\" \
  -DLSOF=\"$(NIX_ROOT)$(lsof)\"
 
@@ -86,11 +88,11 @@ else
   endif
 endif
 
-$(d)/unix/local-store.cc: $(d)/unix/schema.sql.gen.hh $(d)/unix/ca-specific-schema.sql.gen.hh
+$(d)/local-store.cc: $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
 $(d)/unix/build.cc:
 
-clean-files += $(d)/unix/schema.sql.gen.hh $(d)/unix/ca-specific-schema.sql.gen.hh
+clean-files += $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
 $(eval $(call install-file-in, $(buildprefix)$(d)/nix-store.pc, $(libdir)/pkgconfig, 0644))
 

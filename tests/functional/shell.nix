@@ -26,6 +26,9 @@ let pkgs = rec {
     fun() {
       echo blabla
     }
+    runHook() {
+      eval "''${!1}"
+    }
   '';
 
   stdenv = mkDerivation {
@@ -43,8 +46,21 @@ let pkgs = rec {
     ASCII_PERCENT = "%";
     ASCII_AT = "@";
     TEST_inNixShell = if inNixShell then "true" else "false";
+    FOO = fooContents;
     inherit stdenv;
     outputs = ["dev" "out"];
+  } // {
+    shellHook = abort "Ignore non-drv shellHook attr";
+  };
+
+  # https://github.com/NixOS/nix/issues/5431
+  # See nix-shell.sh
+  polo = mkDerivation {
+    name = "polo";
+    inherit stdenv;
+    shellHook = ''
+      echo Polo
+    '';
   };
 
   # Used by nix-shell -p

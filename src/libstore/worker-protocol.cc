@@ -14,6 +14,34 @@ namespace nix {
 
 /* protocol-specific definitions */
 
+BuildMode WorkerProto::Serialise<BuildMode>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
+{
+    auto temp = readNum<uint8_t>(conn.from);
+    switch (temp) {
+    case 0: return bmNormal;
+    case 1: return bmRepair;
+    case 2: return bmCheck;
+    default: throw Error("Invalid build mode");
+    }
+}
+
+void WorkerProto::Serialise<BuildMode>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const BuildMode & buildMode)
+{
+    switch (buildMode) {
+    case bmNormal:
+        conn.to << uint8_t{0};
+        break;
+    case bmRepair:
+        conn.to << uint8_t{1};
+        break;
+    case bmCheck:
+        conn.to << uint8_t{2};
+        break;
+    default:
+        assert(false);
+    };
+}
+
 std::optional<TrustedFlag> WorkerProto::Serialise<std::optional<TrustedFlag>>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     auto temp = readNum<uint8_t>(conn.from);
@@ -219,6 +247,37 @@ void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(const StoreDirConfig & 
             << pathInfo.ultimate
             << pathInfo.sigs
             << renderContentAddress(pathInfo.ca);
+    }
+}
+
+
+WorkerProto::ClientHandshakeInfo WorkerProto::Serialise<WorkerProto::ClientHandshakeInfo>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    WorkerProto::ClientHandshakeInfo res;
+
+    if (GET_PROTOCOL_MINOR(conn.version) >= 33) {
+        res.daemonNixVersion = readString(conn.from);
+    }
+
+    if (GET_PROTOCOL_MINOR(conn.version) >= 35) {
+        res.remoteTrustsUs = WorkerProto::Serialise<std::optional<    TrustedFlag>>::read(store, conn);
+    } else {
+        // We don't know the answer; protocol to old.
+        res.remoteTrustsUs = std::nullopt;
+    }
+
+    return res;
+}
+
+void WorkerProto::Serialise<WorkerProto::ClientHandshakeInfo>::write(const StoreDirConfig & store, WriteConn conn, const WorkerProto::ClientHandshakeInfo & info)
+{
+    if (GET_PROTOCOL_MINOR(conn.version) >= 33) {
+        assert(info.daemonNixVersion);
+        conn.to << *info.daemonNixVersion;
+    }
+
+    if (GET_PROTOCOL_MINOR(conn.version) >= 35) {
+        WorkerProto::write(store, conn, info.remoteTrustsUs);
     }
 }
 
