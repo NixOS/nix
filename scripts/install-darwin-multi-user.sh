@@ -3,8 +3,6 @@
 set -eu
 set -o pipefail
 
-<<<<<<< HEAD
-=======
 # System specific settings
 # Notes:
 # - up to macOS Big Sur we used the same GID/UIDs as Linux (30000:30001-32)
@@ -19,12 +17,10 @@ export NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-351}"
 export NIX_BUILD_GROUP_ID="${NIX_BUILD_GROUP_ID:-350}"
 export NIX_BUILD_USER_NAME_TEMPLATE="_nixbld%d"
 
->>>>>>> df36ff0d1 (install-darwin: fix _nixbld uids for macOS sequoia)
+
 readonly NIX_DAEMON_DEST=/Library/LaunchDaemons/org.nixos.nix-daemon.plist
 # create by default; set 0 to DIY, use a symlink, etc.
 readonly NIX_VOLUME_CREATE=${NIX_VOLUME_CREATE:-1} # now default
-NIX_FIRST_BUILD_UID="301"
-NIX_BUILD_USER_NAME_TEMPLATE="_nixbld%d"
 
 # caution: may update times on / if not run as normal non-root user
 read_only_root() {
