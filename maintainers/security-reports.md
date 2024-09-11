@@ -15,6 +15,8 @@ In case a vulnerability is reported:
 
 1. Communicate with the reporter which team members are assigned and when they are available.
 
+1. Consider which immediate preliminary measures should be taken before working on a fix.
+
 1. Prioritize fixing the security issue over ongoing work.
 
 1. Keep everyone involved up to date on progress and the estimated timeline for releasing the fix.
