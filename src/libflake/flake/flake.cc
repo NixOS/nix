@@ -751,6 +751,21 @@ LockedFlake lockFlake(
     }
 }
 
+std::pair<StorePath, Path> sourcePathToStorePath(
+    ref<Store> store,
+    const SourcePath & _path)
+{
+    auto path = _path.path.abs();
+
+    if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
+        auto realStoreDir = store2->getRealStoreDir();
+        if (isInDir(path, realStoreDir))
+            path = store2->storeDir + path.substr(realStoreDir.size());
+    }
+
+    return store->toStorePath(path);
+}
+
 void callFlake(EvalState & state,
     const LockedFlake & lockedFlake,
     Value & vRes)
@@ -768,17 +783,7 @@ void callFlake(EvalState & state,
 
         auto lockedNode = node.dynamic_pointer_cast<const LockedNode>();
 
-        // FIXME: This is a hack to support chroot stores. Remove this
-        // once we can pass a sourcePath rather than a storePath to
-        // call-flake.nix.
-        auto path = sourcePath.path.abs();
-        if (auto store = state.store.dynamic_pointer_cast<LocalFSStore>()) {
-            auto realStoreDir = store->getRealStoreDir();
-            if (isInDir(path, realStoreDir))
-                path = store->storeDir + path.substr(realStoreDir.size());
-        }
-
-        auto [storePath, subdir] = state.store->toStorePath(path);
+        auto [storePath, subdir] = sourcePathToStorePath(state.store, sourcePath);
 
         emitTreeAttrs(
             state,
