@@ -625,6 +625,9 @@ public:
           `__darwinAllowLocalNetworking` attribute set to `true` will have a
           sandbox exception added to allow it.
 
+          The macOS sandbox has known limitations, and should not be
+          considered a strong security boundary.
+
           Currently, sandboxing only work on Linux and macOS. The use of a
           sandbox requires that Nix is run as root (so you should use the
           “build users” feature to perform the actual builds under different
