@@ -1083,7 +1083,7 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
 
 ref<GitRepo> getTarballCache()
 {
-    static auto repoDir = std::filesystem::path(getCacheDir()) / "nix" / "tarball-cache";
+    static auto repoDir = std::filesystem::path(getCacheDir()) / "tarball-cache";
 
     return GitRepo::openRepo(repoDir, true, true);
 }

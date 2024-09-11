@@ -135,7 +135,7 @@ std::vector<Path> getUserConfigFiles()
     std::vector<Path> files;
     auto dirs = getConfigDirs();
     for (auto & dir : dirs) {
-        files.insert(files.end(), dir + "/nix/nix.conf");
+        files.insert(files.end(), dir + "/nix.conf");
     }
     return files;
 }
