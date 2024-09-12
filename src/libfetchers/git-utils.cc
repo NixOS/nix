@@ -601,12 +601,16 @@ struct GitSourceAccessor : SourceAccessor
         return readBlob(path, true);
     }
 
-    Hash getSubmoduleRev(const CanonPath & path)
+    /**
+     * If `path` exists and is a submodule, return its
+     * revision. Otherwise return nothing.
+     */
+    std::optional<Hash> getSubmoduleRev(const CanonPath & path)
     {
-        auto entry = need(path);
+        auto entry = lookup(path);
 
-        if (git_tree_entry_type(entry) != GIT_OBJECT_COMMIT)
-            throw Error("'%s' is not a submodule", showPath(path));
+        if (!entry || git_tree_entry_type(entry) != GIT_OBJECT_COMMIT)
+            return std::nullopt;
 
         return toHash(*git_tree_entry_id(entry));
     }
@@ -1074,8 +1078,10 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     auto rawAccessor = getRawAccessor(rev);
 
     for (auto & submodule : parseSubmodules(pathTemp)) {
-        auto rev = rawAccessor->getSubmoduleRev(submodule.path);
-        result.push_back({std::move(submodule), rev});
+        /* Filter out .gitmodules entries that don't exist or are not
+           submodules. */
+        if (auto rev = rawAccessor->getSubmoduleRev(submodule.path))
+            result.push_back({std::move(submodule), *rev});
     }
 
     return result;
