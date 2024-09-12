@@ -47,9 +47,9 @@ echo "\$ENVVAR"
 EOF
 )" = "a" ]]
 
-# Test whether `nix develop --ignore-environment` does _not_ pass through environment variables.
+# Test whether `nix develop --ignore-env` does _not_ pass through environment variables.
 [[ -z "$(
-    ENVVAR=a nix develop --ignore-environment --no-write-lock-file .#hello <<EOF
+    ENVVAR=a nix develop --ignore-env --no-write-lock-file .#hello <<EOF
 echo "\$ENVVAR"
 EOF
 )" ]]
@@ -67,7 +67,7 @@ EOF
 
 # Test whether `nix develop` with ignore environment sets `SHELL` to nixpkgs#bashInteractive shell.
 [[ "$(
-    SHELL=custom nix develop --ignore-environment --no-write-lock-file .#hello <<EOF
+    SHELL=custom nix develop --ignore-env --no-write-lock-file .#hello <<EOF
 echo "\$SHELL"
 EOF
 )" -ef "$BASH_INTERACTIVE_EXECUTABLE" ]]

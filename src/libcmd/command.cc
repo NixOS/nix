@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <nlohmann/json.hpp>
 
 #include "command.hh"
@@ -9,8 +10,7 @@
 #include "profiles.hh"
 #include "repl.hh"
 #include "strings.hh"
-
-extern char * * environ __attribute__((weak));
+#include "environment-variables.hh"
 
 namespace nix {
 
@@ -285,48 +285,88 @@ MixDefaultProfile::MixDefaultProfile()
 MixEnvironment::MixEnvironment() : ignoreEnvironment(false)
 {
     addFlag({
-        .longName = "ignore-environment",
+        .longName = "ignore-env",
+        .aliases = {"ignore-environment"},
         .shortName = 'i',
-        .description = "Clear the entire environment (except those specified with `--keep`).",
+        .description = "Clear the entire environment, except for those specified with `--keep-env-var`.",
+        .category = environmentVariablesCategory,
         .handler = {&ignoreEnvironment, true},
     });
 
     addFlag({
-        .longName = "keep",
+        .longName = "keep-env-var",
+        .aliases = {"keep"},
         .shortName = 'k',
-        .description = "Keep the environment variable *name*.",
+        .description = "Keep the environment variable *name*, when using `--ignore-env`.",
+        .category = environmentVariablesCategory,
         .labels = {"name"},
-        .handler = {[&](std::string s) { keep.insert(s); }},
+        .handler = {[&](std::string s) { keepVars.insert(s); }},
     });
 
     addFlag({
-        .longName = "unset",
+        .longName = "unset-env-var",
+        .aliases = {"unset"},
         .shortName = 'u',
         .description = "Unset the environment variable *name*.",
+        .category = environmentVariablesCategory,
         .labels = {"name"},
-        .handler = {[&](std::string s) { unset.insert(s); }},
+        .handler = {[&](std::string name) {
+            if (setVars.contains(name))
+                throw UsageError("Cannot unset environment variable '%s' that is set with '%s'", name, "--set-env-var");
+
+            unsetVars.insert(name);
+        }},
+    });
+
+    addFlag({
+        .longName = "set-env-var",
+        .shortName = 's',
+        .description = "Add/override an environment variable *name* with *value*.\n\n"
+                       "> **Notes**\n"
+                       ">\n"
+                       "> Duplicate definitions will be overwritten, last one wins.\n\n"
+                       "> Cancles out with `--unset-env-var`.\n\n",
+        .category = environmentVariablesCategory,
+        .labels = {"name", "value"},
+        .handler = {[&](std::string name, std::string value) {
+            if (unsetVars.contains(name))
+                throw UsageError(
+                    "Cannot set environment variable '%s' that is unset with '%s'", name, "--unset-env-var");
+
+            if (setVars.contains(name))
+                throw UsageError(
+                    "Duplicate definition of environment variable '%s' with '%s' is ambiguous", name, "--set-env-var");
+
+            setVars.insert_or_assign(name, value);
+        }},
     });
 }
 
 void MixEnvironment::setEnviron() {
-    if (ignoreEnvironment) {
-        if (!unset.empty())
-            throw UsageError("--unset does not make sense with --ignore-environment");
+    if (ignoreEnvironment && !unsetVars.empty())
+        throw UsageError("--unset-env-var does not make sense with --ignore-env");
 
-        for (const auto & var : keep) {
-            auto val = getenv(var.c_str());
-            if (val) stringsEnv.emplace_back(fmt("%s=%s", var.c_str(), val));
-        }
+    if (!ignoreEnvironment && !keepVars.empty())
+        throw UsageError("--keep-env-var does not make sense without --ignore-env");
 
-        vectorEnv = stringsToCharPtrs(stringsEnv);
-        environ = vectorEnv.data();
-    } else {
-        if (!keep.empty())
-            throw UsageError("--keep does not make sense without --ignore-environment");
+    auto env = getEnv();
 
-        for (const auto & var : unset)
-            unsetenv(var.c_str());
-    }
+    if (ignoreEnvironment)
+        std::erase_if(env, [&](const auto & var) {
+            return !keepVars.contains(var.first);
+        });
+
+    for (const auto & [name, value] : setVars)
+        env[name] = value;
+
+    if (!unsetVars.empty())
+        std::erase_if(env, [&](const auto & var) {
+            return unsetVars.contains(var.first);
+        });
+
+    replaceEnv(env);
+
+    return;
 }
 
 }
