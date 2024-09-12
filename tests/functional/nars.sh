@@ -67,6 +67,12 @@ expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | gre
 rm -rf "$TEST_ROOT/case"
 opts=("--option" "use-case-hack" "true")
 nix-store "${opts[@]}" --restore "$TEST_ROOT/case" < case.nar
+[[ -e "$TEST_ROOT/case/xt_CONNMARK.h" ]]
+[[ -e "$TEST_ROOT/case/xt_CONNmark.h~nix~case~hack~1" ]]
+[[ -e "$TEST_ROOT/case/xt_connmark.h~nix~case~hack~2" ]]
+[[ -e "$TEST_ROOT/case/x/FOO" ]]
+[[ -d "$TEST_ROOT/case/x/Foo~nix~case~hack~1" ]]
+[[ -e "$TEST_ROOT/case/x/foo~nix~case~hack~2/a~nix~case~hack~1/foo" ]]
 nix-store "${opts[@]}" --dump "$TEST_ROOT/case" > "$TEST_ROOT/case.nar"
 cmp case.nar "$TEST_ROOT/case.nar"
 [ "$(nix-hash "${opts[@]}" --type sha256 "$TEST_ROOT/case")" = "$(nix-hash --flat --type sha256 case.nar)" ]
