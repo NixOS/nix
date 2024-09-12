@@ -173,8 +173,6 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
     s = readString(source);
     if (s != "(") throw badArchive("expected open tag");
 
-    std::map<Path, int, CaseInsensitiveCompare> names;
-
     auto getString = [&]() {
         checkInterrupt();
         return readString(source);
@@ -214,6 +212,8 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
 
             else if (t == "directory") {
                 sink.createDirectory(path);
+
+                std::map<Path, int, CaseInsensitiveCompare> names;
 
                 std::string prevName;
 
