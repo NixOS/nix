@@ -128,9 +128,10 @@ void dumpString(std::string_view s, Sink & sink)
 }
 
 
-static SerialisationError badArchive(const std::string & s)
+template<typename... Args>
+static SerialisationError badArchive(std::string_view s, const Args & ... args)
 {
-    return SerialisationError("bad archive: " + s);
+    return SerialisationError("bad archive: " + s, args...);
 }
 
 
@@ -223,7 +224,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
                         std::string name;
 
                         s = getString();
-                        if (s != "(") throw badArchive("expected open tag");
+                        if (s != "(") throw badArchive("expected open tag '%s'", s);
 
                         while (1) {
                             s = getString();
@@ -233,9 +234,9 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
                             } else if (s == "name") {
                                 name = getString();
                                 if (name.empty() || name == "." || name == ".." || name.find('/') != std::string::npos || name.find((char) 0) != std::string::npos)
-                                    throw Error("NAR contains invalid file name '%1%'", name);
+                                    throw badArchive("NAR contains invalid file name '%1%'", name);
                                 if (name <= prevName)
-                                    throw Error("NAR directory is not sorted");
+                                    throw badArchive("NAR directory is not sorted");
                                 prevName = name;
                                 if (archiveSettings.useCaseHack) {
                                     auto i = names.find(name);
@@ -245,7 +246,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
                                         name += std::to_string(++i->second);
                                         auto j = names.find(name);
                                         if (j != names.end())
-                                            throw Error("NAR contains file name '%s' that collides with case-hacked file name '%s'", prevName, j->first);
+                                            throw badArchive("NAR contains file name '%s' that collides with case-hacked file name '%s'", prevName, j->first);
                                     } else
                                         names[name] = 0;
                                 }
@@ -253,7 +254,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
                                 if (name.empty()) throw badArchive("entry name missing");
                                 parse(sink, source, path / name);
                             } else
-                                throw badArchive("unknown field " + s);
+                                throw badArchive("unknown field '%s'", s);
                         }
                     }
 
@@ -265,7 +266,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
                 s = getString();
 
                 if (s != "target")
-                    throw badArchive("expected 'target' got " + s);
+                    throw badArchive("expected 'target', got '%s'", s);
 
                 std::string target = getString();
                 sink.createSymlink(path, target);
@@ -274,12 +275,12 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
                 s = getString();
             }
 
-            else throw badArchive("unknown file type " + t);
+            else throw badArchive("unknown file type '%s'", t);
 
         }
 
         else
-            throw badArchive("unknown field " + s);
+            throw badArchive("unknown field '%s'", s);
     }
 }
 
