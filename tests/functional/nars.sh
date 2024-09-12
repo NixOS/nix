@@ -92,3 +92,23 @@ else
     [[ -e $TEST_ROOT/out/â ]]
     [[ -e $TEST_ROOT/out/â ]]
 fi
+
+# Unpacking a NAR with a NUL character in a file name should fail.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < nul.nar | grepQuiet "NAR contains invalid file name 'f"
+
+# Likewise for a '.' filename.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < dot.nar | grepQuiet "NAR contains invalid file name '.'"
+
+# Likewise for a '..' filename.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < dotdot.nar | grepQuiet "NAR contains invalid file name '..'"
+
+# Likewise for a filename containing a slash.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < slash.nar | grepQuiet "NAR contains invalid file name 'x/y'"
+
+# Likewise for an empty filename.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < empty.nar | grepQuiet "NAR contains invalid file name ''"
