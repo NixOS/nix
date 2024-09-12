@@ -315,17 +315,18 @@ struct MixDefaultProfile : MixProfile
 
 struct MixEnvironment : virtual Args {
 
-    StringSet keep, unset;
-    Strings stringsEnv;
-    std::vector<char*> vectorEnv;
+    StringSet keepVars;
+    StringSet unsetVars;
+    std::map<std::string, std::string> setVars;
     bool ignoreEnvironment;
 
     MixEnvironment();
 
     /***
-     * Modify global environ based on `ignoreEnvironment`, `keep`, and
-     * `unset`. It's expected that exec will be called before this class
-     * goes out of scope, otherwise `environ` will become invalid.
+     * Modify global environ based on `ignoreEnvironment`, `keep`,
+     * `unset`, and `added`. It's expected that exec will be called
+     * before this class goes out of scope, otherwise `environ` will
+     * become invalid.
      */
     void setEnviron();
 };
