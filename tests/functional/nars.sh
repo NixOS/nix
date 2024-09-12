@@ -112,3 +112,11 @@ expectStderr 1 nix-store --restore "$TEST_ROOT/out" < slash.nar | grepQuiet "NAR
 # Likewise for an empty filename.
 rm -rf "$TEST_ROOT/out"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < empty.nar | grepQuiet "NAR contains invalid file name ''"
+
+# Test that the 'executable' field cannot come before the 'contents' field.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < executable-after-contents.nar | grepQuiet "expected tag ')', got 'executable'"
+
+# Test that the 'name' field cannot come before the 'node' field in a directory entry.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < name-after-node.nar | grepQuiet "expected tag 'name'"
