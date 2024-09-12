@@ -82,7 +82,7 @@ void SourceAccessor::dumpPath(
                         name.erase(pos);
                     }
                     if (!unhacked.emplace(name, i.first).second)
-                        throw Error("file name collision in between '%s' and '%s'",
+                        throw Error("file name collision between '%s' and '%s'",
                             (path / unhacked[name]),
                             (path / i.first));
                 } else
