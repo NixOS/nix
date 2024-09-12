@@ -67,6 +67,12 @@ expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | gre
 rm -rf "$TEST_ROOT/case"
 opts=("--option" "use-case-hack" "true")
 nix-store "${opts[@]}" --restore "$TEST_ROOT/case" < case.nar
+[[ -e "$TEST_ROOT/case/xt_CONNMARK.h" ]]
+[[ -e "$TEST_ROOT/case/xt_CONNmark.h~nix~case~hack~1" ]]
+[[ -e "$TEST_ROOT/case/xt_connmark.h~nix~case~hack~2" ]]
+[[ -e "$TEST_ROOT/case/x/FOO" ]]
+[[ -d "$TEST_ROOT/case/x/Foo~nix~case~hack~1" ]]
+[[ -e "$TEST_ROOT/case/x/foo~nix~case~hack~2/a~nix~case~hack~1/foo" ]]
 nix-store "${opts[@]}" --dump "$TEST_ROOT/case" > "$TEST_ROOT/case.nar"
 cmp case.nar "$TEST_ROOT/case.nar"
 [ "$(nix-hash "${opts[@]}" --type sha256 "$TEST_ROOT/case")" = "$(nix-hash --flat --type sha256 case.nar)" ]
@@ -92,3 +98,31 @@ else
     [[ -e $TEST_ROOT/out/â ]]
     [[ -e $TEST_ROOT/out/â ]]
 fi
+
+# Unpacking a NAR with a NUL character in a file name should fail.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < nul.nar | grepQuiet "NAR contains invalid file name 'f"
+
+# Likewise for a '.' filename.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < dot.nar | grepQuiet "NAR contains invalid file name '.'"
+
+# Likewise for a '..' filename.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < dotdot.nar | grepQuiet "NAR contains invalid file name '..'"
+
+# Likewise for a filename containing a slash.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < slash.nar | grepQuiet "NAR contains invalid file name 'x/y'"
+
+# Likewise for an empty filename.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < empty.nar | grepQuiet "NAR contains invalid file name ''"
+
+# Test that the 'executable' field cannot come before the 'contents' field.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < executable-after-contents.nar | grepQuiet "expected tag ')', got 'executable'"
+
+# Test that the 'name' field cannot come before the 'node' field in a directory entry.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < name-after-node.nar | grepQuiet "expected tag 'name'"
