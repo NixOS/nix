@@ -261,7 +261,7 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
 
     if [ -d "$HOME/.config/nushell" ]; then
         fn="$HOME/.config/nushell/env.nu"
-        printf '\nif ("%s" | path exists) { source "%s"; } # added by Nix installer\n' "$p_nu" "$p_nu" >> "$fn"
+        printf '\nif ("%s" | path exists) { use %s } # added by Nix installer\n' "$p_nu" "$p_nu" >> "$fn"
         added=1
         p=${p_nu}
     fi
