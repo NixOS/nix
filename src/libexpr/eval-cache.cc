@@ -491,7 +491,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErro
                         if (forceErrors)
                             debug("reevaluating failed cached attribute '%s'", getAttrPathStr(name));
                         else
-                            throw CachedEvalError("cached failure of attribute '%s'", getAttrPathStr(name));
+                            throw CachedEvalError("cached failure of attribute '%s'. Disable cache with --no-eval-cache", getAttrPathStr(name));
                     } else
                         return std::make_shared<AttrCursor>(root,
                             std::make_pair(shared_from_this(), name), nullptr, std::move(attr));
