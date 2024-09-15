@@ -68,6 +68,7 @@ subdir('build-utils-meson/diagnostics')
 subdir('build-utils-meson/generate-header')
 
 nix_sources = [config_h] + files(
+  'add-root.cc',
   'add-to-store.cc',
   'app.cc',
   'self-exe.cc',
