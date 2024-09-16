@@ -404,7 +404,7 @@ LockedFlake lockFlake(
         {
             FlakeInput input;
             SourcePath sourcePath;
-            std::optional<InputPath> parentPath; // FIXME: rename to inputPathPrefix?
+            std::optional<InputPath> parentInputPath; // FIXME: rename to inputPathPrefix?
         };
 
         std::map<InputPath, Override> overrides;
@@ -469,7 +469,7 @@ LockedFlake lockFlake(
                         Override {
                             .input = inputOverride,
                             .sourcePath = sourcePath,
-                            .parentPath = inputPathPrefix // FIXME: should this be inputPath?
+                            .parentInputPath = inputPathPrefix // FIXME: should this be inputPath?
                         });
                 }
             }
@@ -531,7 +531,7 @@ LockedFlake lockFlake(
 
                     auto overridenParentPath =
                         input.ref->input.isRelative()
-                        ? std::optional<InputPath>(hasOverride ? i->second.parentPath : inputPathPrefix)
+                        ? std::optional<InputPath>(hasOverride ? i->second.parentInputPath : inputPathPrefix)
                         : std::nullopt;
 
                     auto resolveRelativePath = [&]() -> std::optional<SourcePath>
