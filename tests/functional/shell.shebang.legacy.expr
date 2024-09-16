@@ -1,0 +1,10 @@
+#! @ENV_PROG@ nix-shell
+#! nix-shell "{ script, path, ... }: assert path == ./shell.nix; script { fooContents = toString ./.; }"
+#! nix-shell --no-substitute
+#! nix-shell --expr
+#! nix-shell --arg script "import ((builtins.getEnv ''TEST_ROOT'')+''/shell.nix'')"
+#! nix-shell --arg path "./shell.nix"
+#! nix-shell -A shellDrv
+#! nix-shell -i bash
+#! nix-shell --option nix-shell-shebang-arguments-relative-to-script false
+echo "$FOO"

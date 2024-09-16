@@ -2,12 +2,10 @@
 #include "fetchers.hh"
 #include "cache.hh"
 #include "filetransfer.hh"
-#include "globals.hh"
 #include "store-api.hh"
 #include "archive.hh"
 #include "tarfile.hh"
 #include "types.hh"
-#include "split.hh"
 #include "store-path-accessor.hh"
 #include "store-api.hh"
 #include "git-utils.hh"
@@ -104,7 +102,7 @@ DownloadFileResult downloadFile(
     };
 }
 
-DownloadTarballResult downloadTarball(
+static DownloadTarballResult downloadTarball_(
     const std::string & url,
     const Headers & headers)
 {
@@ -145,11 +143,35 @@ DownloadTarballResult downloadTarball(
 
     // TODO: fall back to cached value if download fails.
 
+    auto act = std::make_unique<Activity>(*logger, lvlInfo, actUnknown,
+        fmt("unpacking '%s' into the Git cache", url));
+
+    AutoDelete cleanupTemp;
+
     /* Note: if the download is cached, `importTarball()` will receive
        no data, which causes it to import an empty tarball. */
-    TarArchive archive { *source };
-    auto parseSink = getTarballCache()->getFileSystemObjectSink();
+    auto archive =
+        hasSuffix(toLower(parseURL(url).path), ".zip")
+        ? ({
+                /* In streaming mode, libarchive doesn't handle
+                   symlinks in zip files correctly (#10649). So write
+                   the entire file to disk so libarchive can access it
+                   in random-access mode. */
+                auto [fdTemp, path] = createTempFile("nix-zipfile");
+                cleanupTemp.reset(path);
+                debug("downloading '%s' into '%s'...", url, path);
+                {
+                    FdSink sink(fdTemp.get());
+                    source->drainInto(sink);
+                }
+                TarArchive{path};
+          })
+        : TarArchive{*source};
+    auto tarballCache = getTarballCache();
+    auto parseSink = tarballCache->getFileSystemObjectSink();
     auto lastModified = unpackTarfileToSink(archive, *parseSink);
+
+    act.reset();
 
     auto res(_res->lock());
 
@@ -161,7 +183,8 @@ DownloadTarballResult downloadTarball(
         infoAttrs = cached->value;
     } else {
         infoAttrs.insert_or_assign("etag", res->etag);
-        infoAttrs.insert_or_assign("treeHash", parseSink->sync().gitRev());
+        infoAttrs.insert_or_assign("treeHash",
+            tarballCache->dereferenceSingletonDirectory(parseSink->sync()).gitRev());
         infoAttrs.insert_or_assign("lastModified", uint64_t(lastModified));
         if (res->immutableUrl)
             infoAttrs.insert_or_assign("immutableUrl", *res->immutableUrl);
@@ -179,12 +202,28 @@ DownloadTarballResult downloadTarball(
     return attrsToResult(infoAttrs);
 }
 
+ref<SourceAccessor> downloadTarball(
+    ref<Store> store,
+    const Settings & settings,
+    const std::string & url)
+{
+    /* Go through Input::getAccessor() to ensure that the resulting
+       accessor has a fingerprint. */
+    fetchers::Attrs attrs;
+    attrs.insert_or_assign("type", "tarball");
+    attrs.insert_or_assign("url", url);
+
+    auto input = Input::fromAttrs(settings, std::move(attrs));
+
+    return input.getAccessor(store).first;
+}
+
 // An input scheme corresponding to a curl-downloadable resource.
 struct CurlInputScheme : InputScheme
 {
     const std::set<std::string> transportUrlSchemes = {"file", "http", "https"};
 
-    const bool hasTarballExtension(std::string_view path) const
+    bool hasTarballExtension(std::string_view path) const
     {
         return hasSuffix(path, ".zip") || hasSuffix(path, ".tar")
             || hasSuffix(path, ".tgz") || hasSuffix(path, ".tar.gz")
@@ -196,12 +235,14 @@ struct CurlInputScheme : InputScheme
 
     static const std::set<std::string> specialParams;
 
-    std::optional<Input> inputFromURL(const ParsedURL & _url, bool requireTree) const override
+    std::optional<Input> inputFromURL(
+        const Settings & settings,
+        const ParsedURL & _url, bool requireTree) const override
     {
         if (!isValidURL(_url, requireTree))
             return std::nullopt;
 
-        Input input;
+        Input input{settings};
 
         auto url = _url;
 
@@ -249,9 +290,11 @@ struct CurlInputScheme : InputScheme
         };
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
+    std::optional<Input> inputFromAttrs(
+        const Settings & settings,
+        const Attrs & attrs) const override
     {
-        Input input;
+        Input input{settings};
         input.attrs = attrs;
 
         //input.locked = (bool) maybeGetStrAttr(input.attrs, "hash");
@@ -326,12 +369,12 @@ struct TarballInputScheme : CurlInputScheme
     {
         auto input(_input);
 
-        auto result = downloadTarball(getStrAttr(input.attrs, "url"), {});
+        auto result = downloadTarball_(getStrAttr(input.attrs, "url"), {});
 
         result.accessor->setPathDisplay("«" + input.to_string() + "»");
 
         if (result.immutableUrl) {
-            auto immutableInput = Input::fromURL(*result.immutableUrl);
+            auto immutableInput = Input::fromURL(*input.settings, *result.immutableUrl);
             // FIXME: would be nice to support arbitrary flakerefs
             // here, e.g. git flakes.
             if (immutableInput.getType() != "tarball")
@@ -346,6 +389,16 @@ struct TarballInputScheme : CurlInputScheme
             getTarballCache()->treeHashToNarHash(result.treeHash).to_string(HashFormat::SRI, true));
 
         return {result.accessor, input};
+    }
+
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        if (auto narHash = input.getNarHash())
+            return narHash->to_string(HashFormat::SRI, true);
+        else if (auto rev = input.getRev())
+            return rev->gitRev();
+        else
+            return std::nullopt;
     }
 };
 

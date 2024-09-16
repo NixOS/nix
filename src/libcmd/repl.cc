@@ -1,16 +1,14 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
-#include <climits>
 
-#include "libcmd/repl-interacter.hh"
+#include "error.hh"
+#include "repl-interacter.hh"
 #include "repl.hh"
 
 #include "ansicolor.hh"
 #include "shared.hh"
 #include "eval.hh"
-#include "eval-cache.hh"
-#include "eval-inline.hh"
 #include "eval-settings.hh"
 #include "attr-path.hh"
 #include "signals.hh"
@@ -28,11 +26,15 @@
 #include "markdown.hh"
 #include "local-fs-store.hh"
 #include "print.hh"
+#include "ref.hh"
+#include "value.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
 #include <gc/gc_cpp.h>
 #endif
+
+#include "strings.hh"
 
 namespace nix {
 
@@ -75,10 +77,14 @@ struct NixRepl
     int displ;
     StringSet varNames;
 
+    RunNix * runNixPtr;
+
+    void runNix(Path program, const Strings & args, const std::optional<std::string> & input = {});
+
     std::unique_ptr<ReplInteracter> interacter;
 
     NixRepl(const LookupPath & lookupPath, nix::ref<Store> store,ref<EvalState> state,
-            std::function<AnnotatedValues()> getValues);
+            std::function<AnnotatedValues()> getValues, RunNix * runNix);
     virtual ~NixRepl() = default;
 
     ReplExitStatus mainLoop() override;
@@ -123,29 +129,14 @@ std::string removeWhitespace(std::string s)
 
 
 NixRepl::NixRepl(const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalState> state,
-            std::function<NixRepl::AnnotatedValues()> getValues)
+            std::function<NixRepl::AnnotatedValues()> getValues, RunNix * runNix = nullptr)
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
     , getValues(getValues)
     , staticEnv(new StaticEnv(nullptr, state->staticBaseEnv.get()))
-    , interacter(make_unique<ReadlineLikeInteracter>(getDataDir() + "/nix/repl-history"))
+    , runNixPtr{runNix}
+    , interacter(make_unique<ReadlineLikeInteracter>(getDataDir() + "/repl-history"))
 {
-}
-
-void runNix(Path program, const Strings & args,
-    const std::optional<std::string> & input = {})
-{
-    auto subprocessEnv = getEnv();
-    subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
-
-    runProgram2(RunOptions {
-        .program = settings.nixBinDir+ "/" + program,
-        .args = args,
-        .environment = subprocessEnv,
-        .input = input,
-    });
-
-    return;
 }
 
 static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positions, const DebugTrace & dt)
@@ -214,7 +205,7 @@ ReplExitStatus NixRepl::mainLoop()
                 case ProcessLineResult::PromptAgain:
                     break;
                 default:
-                    abort();
+                    unreachable();
             }
         } catch (ParseError & e) {
             if (e.msg().find("unexpected end of file") != std::string::npos) {
@@ -260,6 +251,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             auto dir = std::string(cur, 0, slash);
             auto prefix2 = std::string(cur, slash + 1);
             for (auto & entry : std::filesystem::directory_iterator{dir == "" ? "/" : dir}) {
+                checkInterrupt();
                 auto name = entry.path().filename().string();
                 if (name[0] != '.' && hasPrefix(name, prefix2))
                     completions.insert(prev + entry.path().string());
@@ -304,6 +296,8 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             // Quietly ignore evaluation errors.
         } catch (BadURL & e) {
             // Quietly ignore BadURL flake-related errors.
+        } catch (FileNotFound & e) {
+            // Quietly ignore non-existent file beeing `import`-ed.
         }
     }
 
@@ -508,13 +502,9 @@ ProcessLineResult NixRepl::processLine(std::string line)
         auto editor = args.front();
         args.pop_front();
 
-        // avoid garbling the editor with the progress bar
-        logger->pause();
-        Finally resume([&]() { logger->resume(); });
-
         // runProgram redirects stdout to a StringSink,
         // using runProgram2 to allow editors to display their UI
-        runProgram2(RunOptions { .program = editor, .lookupPath = true, .args = args });
+        runProgram2(RunOptions { .program = editor, .lookupPath = true, .args = args , .isInteractive = true });
 
         // Reload right after exiting the editor
         state->resetFileCache();
@@ -615,6 +605,35 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
     else if (command == ":doc") {
         Value v;
+
+        auto expr = parseString(arg);
+        std::string fallbackName;
+        PosIdx fallbackPos;
+        DocComment fallbackDoc;
+        if (auto select = dynamic_cast<ExprSelect *>(expr)) {
+            Value vAttrs;
+            auto name = select->evalExceptFinalSelect(*state, *env, vAttrs);
+            fallbackName = state->symbols[name];
+
+            state->forceAttrs(vAttrs, noPos, "while evaluating an attribute set to look for documentation");
+            auto attrs = vAttrs.attrs();
+            assert(attrs);
+            auto attr = attrs->get(name);
+            if (!attr) {
+                // When missing, trigger the normal exception
+                // e.g. :doc builtins.foo
+                // behaves like
+                // nix-repl> builtins.foo<tab>
+                // error: attribute 'foo' missing
+                evalString(arg, v);
+                assert(false);
+            }
+            if (attr->pos) {
+                fallbackPos = attr->pos;
+                fallbackDoc = state->getDocCommentForPos(fallbackPos);
+            }
+        }
+
         evalString(arg, v);
         if (auto doc = state->getDoc(v)) {
             std::string markdown;
@@ -632,6 +651,19 @@ ProcessLineResult NixRepl::processLine(std::string line)
             markdown += stripIndentation(doc->doc);
 
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
+        } else if (fallbackPos) {
+            std::stringstream ss;
+            ss << "Attribute `" << fallbackName << "`\n\n";
+            ss << "  … defined at " << state->positions[fallbackPos] << "\n\n";
+            if (fallbackDoc) {
+                ss << fallbackDoc.getInnerText(state->positions);
+            } else {
+                ss << "No documentation found.\n\n";
+            }
+
+            auto markdown = ss.str();
+            logger->cout(trim(renderMarkdownToTerminal(markdown)));
+
         } else
             throw Error("value does not have documentation");
     }
@@ -689,14 +721,21 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
     if (flakeRefS.empty())
         throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
 
-    auto flakeRef = parseFlakeRef(flakeRefS, absPath("."), true);
+    std::filesystem::path cwd;
+    try {
+        cwd = std::filesystem::current_path();
+    } catch (std::filesystem::filesystem_error & e) {
+        throw SysError("cannot determine current working directory");
+    }
+
+    auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, cwd.string(), true);
     if (evalSettings.pureEval && !flakeRef.input.isLocked())
         throw Error("cannot use ':load-flake' on locked flake reference '%s' (use --impure to override)", flakeRefS);
 
     Value v;
 
     flake::callFlake(*state,
-        flake::lockFlake(*state, flakeRef,
+        flake::lockFlake(flakeSettings, *state, flakeRef,
             flake::LockFlags {
                 .updateLockFile = false,
                 .useRegistries = !evalSettings.pureEval,
@@ -789,9 +828,18 @@ void NixRepl::evalString(std::string s, Value & v)
 }
 
 
+void NixRepl::runNix(Path program, const Strings & args, const std::optional<std::string> & input)
+{
+    if (runNixPtr)
+        (*runNixPtr)(program, args, input);
+    else
+        throw Error("Cannot run '%s', no method of calling the Nix CLI provided", program);
+}
+
+
 std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
    const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalState> state,
-   std::function<AnnotatedValues()> getValues)
+   std::function<AnnotatedValues()> getValues, RunNix * runNix)
 {
     return std::make_unique<NixRepl>(
         lookupPath,

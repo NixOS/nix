@@ -1,11 +1,13 @@
 #include "nixexpr.hh"
-#include "derivations.hh"
 #include "eval.hh"
 #include "symbol-table.hh"
 #include "util.hh"
 #include "print.hh"
 
 #include <cstdlib>
+#include <sstream>
+
+#include "strings-inline.hh"
 
 namespace nix {
 
@@ -23,7 +25,7 @@ std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)
 
 void Expr::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    abort();
+    unreachable();
 }
 
 void ExprInt::show(const SymbolTable & symbols, std::ostream & str) const
@@ -80,7 +82,9 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
         return sa < sb;
     });
     std::vector<Symbol> inherits;
-    std::map<ExprInheritFrom *, std::vector<Symbol>> inheritsFrom;
+    // We can use the displacement as a proxy for the order in which the symbols were parsed.
+    // The assignment of displacements should be deterministic, so that showBindings is deterministic.
+    std::map<Displacement, std::vector<Symbol>> inheritsFrom;
     for (auto & i : sorted) {
         switch (i->second.kind) {
         case AttrDef::Kind::Plain:
@@ -91,7 +95,7 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
         case AttrDef::Kind::InheritedFrom: {
             auto & select = dynamic_cast<ExprSelect &>(*i->second.e);
             auto & from = dynamic_cast<ExprInheritFrom &>(*select.e);
-            inheritsFrom[&from].push_back(i->first);
+            inheritsFrom[from.displ].push_back(i->first);
             break;
         }
         }
@@ -103,7 +107,7 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
     }
     for (const auto & [from, syms] : inheritsFrom) {
         str << "inherit (";
-        (*inheritFromExprs)[from->displ]->show(symbols, str);
+        (*inheritFromExprs)[from]->show(symbols, str);
         str << ")";
         for (auto sym : syms) str << " " << symbols[sym];
         str << "; ";
@@ -267,7 +271,7 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 
 void Expr::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
-    abort();
+    unreachable();
 }
 
 void ExprInt::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
@@ -581,6 +585,22 @@ std::string ExprLambda::showNamePos(const EvalState & state) const
     return fmt("%1% at %2%", id, state.positions[pos]);
 }
 
+void ExprLambda::setDocComment(DocComment docComment) {
+    // RFC 145 specifies that the innermost doc comment wins.
+    // See https://github.com/NixOS/rfcs/blob/master/rfcs/0145-doc-strings.md#ambiguous-placement
+    if (!this->docComment) {
+        this->docComment = docComment;
+
+        // Curried functions are defined by putting a function directly
+        // in the body of another function. To render docs for those, we
+        // need to propagate the doc comment to the innermost function.
+        //
+        // If we have our own comment, we've already propagated it, so this
+        // belongs in the same conditional.
+        body->setDocComment(docComment);
+    }
+};
+
 
 
 /* Position table. */
@@ -623,6 +643,24 @@ size_t SymbolTable::totalSize() const
     size_t n = 0;
     dump([&] (const std::string & s) { n += s.size(); });
     return n;
+}
+
+std::string DocComment::getInnerText(const PosTable & positions) const {
+    auto beginPos = positions[begin];
+    auto endPos = positions[end];
+    auto docCommentStr = beginPos.getSnippetUpTo(endPos).value_or("");
+
+    // Strip "/**" and "*/"
+    constexpr size_t prefixLen = 3;
+    constexpr size_t suffixLen = 2;
+    std::string docStr = docCommentStr.substr(prefixLen, docCommentStr.size() - prefixLen - suffixLen);
+    if (docStr.empty())
+        return {};
+    // Turn the now missing "/**" into indentation
+    docStr = "   " + docStr;
+    // Strip indentation (for the whole, potentially multi-line string)
+    docStr = stripIndentation(docStr);
+    return docStr;
 }
 
 }

@@ -13,6 +13,17 @@ let
       '';
     };
 
+    install-both-profile-links = {
+      script = ''
+        tar -xf ./nix.tar.xz
+        mv ./nix-* nix
+        ln -s $HOME/.local/state/nix/profiles/a-profile $HOME/.nix-profile
+        mkdir -p $HOME/.local/state/nix
+        ln -s $HOME/.local/state/nix/profiles/b-profile $HOME/.local/state/nix/profile
+        ./nix/install --no-channel-add
+      '';
+    };
+
     install-force-no-daemon = {
       script = ''
         tar -xf ./nix.tar.xz
@@ -206,10 +217,16 @@ let
         $ssh <<EOF
           set -ex
 
+          # enable nounset while loading the profile
+          # this may or may not work on all distros, depending on the quality of their scripts
+          set -u
+
           # FIXME: get rid of this; ideally ssh should just work.
           source ~/.bash_profile || true
           source ~/.bash_login || true
           source ~/.profile || true
+          set +u
+
           source /etc/bashrc || true
 
           nix-env --version

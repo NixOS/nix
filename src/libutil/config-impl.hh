@@ -81,6 +81,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({
         .longName = name,
+        .aliases = aliases,
         .description = fmt("Set the `%s` setting.", name),
         .category = category,
         .labels = {"value"},
@@ -91,6 +92,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
     if (isAppendable())
         args.addFlag({
             .longName = "extra-" + name,
+            .aliases = aliases,
             .description = fmt("Append to the `%s` setting.", name),
             .category = category,
             .labels = {"value"},

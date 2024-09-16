@@ -40,7 +40,7 @@ struct ExtraPathInfoValue : ExtraPathInfo
         /**
          * An optional priority for use with "build envs". See Package
          */
-        std::optional<NixInt> priority;
+        std::optional<NixInt::Inner> priority;
 
         /**
          * The attribute path associated with this value. The idea is
@@ -66,7 +66,7 @@ struct ExtraPathInfoValue : ExtraPathInfo
 };
 
 /**
- * An Installable which corresponds a Nix langauge value, in addition to
+ * An Installable which corresponds a Nix language value, in addition to
  * a collection of \ref DerivedPath "derived paths".
  */
 struct InstallableValue : Installable

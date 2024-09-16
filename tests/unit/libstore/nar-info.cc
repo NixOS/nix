@@ -13,10 +13,10 @@ using nlohmann::json;
 
 class NarInfoTest : public CharacterizationTest, public LibStoreTest
 {
-    Path unitTestData = getUnitTestData() + "/nar-info";
+    std::filesystem::path unitTestData = getUnitTestData() / "nar-info";
 
-    Path goldenMaster(PathView testStem) const override {
-        return unitTestData + "/" + testStem + ".json";
+    std::filesystem::path goldenMaster(PathView testStem) const override {
+        return unitTestData / (testStem + ".json");
     }
 };
 
@@ -25,7 +25,7 @@ static NarInfo makeNarInfo(const Store & store, bool includeImpureInfo) {
         store,
         "foo",
         FixedOutputInfo {
-            .method = FileIngestionMethod::Recursive,
+            .method = FileIngestionMethod::NixArchive,
             .hash = hashString(HashAlgorithm::SHA256, "(...)"),
 
             .references = {

@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "ssh-store-config.hh"
+#include "common-ssh-store-config.hh"
 #include "store-api.hh"
 #include "ssh.hh"
 #include "callback.hh"
@@ -13,6 +13,11 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 {
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
+    LegacySSHStoreConfig(
+        std::string_view scheme,
+        std::string_view authority,
+        const Params & params);
+
     const Setting<Strings> remoteProgram{this, {"nix-store"}, "remote-program",
         "Path to the `nix-store` executable on the remote machine."};
 
@@ -21,27 +26,32 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 
     const std::string name() override { return "SSH Store"; }
 
+    static std::set<std::string> uriSchemes() { return {"ssh"}; }
+
     std::string doc() override;
 };
 
 struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Store
 {
+#ifndef _WIN32
     // Hack for getting remote build log output.
     // Intentionally not in `LegacySSHStoreConfig` so that it doesn't appear in
     // the documentation
-    const Setting<int> logFD{this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
+    const Setting<int> logFD{this, INVALID_DESCRIPTOR, "log-fd", "file descriptor to which SSH's stderr is connected"};
+#else
+    Descriptor logFD = INVALID_DESCRIPTOR;
+#endif
 
     struct Connection;
-
-    std::string host;
 
     ref<Pool<Connection>> connections;
 
     SSHMaster master;
 
-    static std::set<std::string> uriSchemes() { return {"ssh"}; }
-
-    LegacySSHStore(const std::string & scheme, const std::string & host, const Params & params);
+    LegacySSHStore(
+        std::string_view scheme,
+        std::string_view host,
+        const Params & params);
 
     ref<Connection> openConnection();
 
@@ -71,8 +81,8 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     virtual StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
-        FileSerialisationMethod dumpMethod = FileSerialisationMethod::Recursive,
-        ContentAddressMethod hashMethod = FileIngestionMethod::Recursive,
+        FileSerialisationMethod dumpMethod = FileSerialisationMethod::NixArchive,
+        ContentAddressMethod hashMethod = FileIngestionMethod::NixArchive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) override

@@ -1,5 +1,6 @@
 #include "command.hh"
 #include "installable-value.hh"
+#include "eval.hh"
 #include "run.hh"
 
 using namespace nix;
@@ -39,17 +40,15 @@ struct CmdFmt : SourceExprCommand {
         Strings programArgs{app.program};
 
         // Propagate arguments from the CLI
-        if (args.empty()) {
-            // Format the current flake out of the box
-            programArgs.push_back(".");
-        } else {
-            // User wants more power, let them decide which paths to include/exclude
-            for (auto &i : args) {
-                programArgs.push_back(i);
-            }
+        for (auto &i : args) {
+            programArgs.push_back(i);
         }
 
-        runProgramInStore(store, UseLookupPath::DontUse, app.program, programArgs);
+        // Release our references to eval caches to ensure they are persisted to disk, because
+        // we are about to exec out of this process without running C++ destructors.
+        evalState->evalCaches.clear();
+
+        execProgramInStore(store, UseLookupPath::DontUse, app.program, programArgs);
     };
 };
 

@@ -25,7 +25,7 @@ protected:
     }
 
     EvalState * state;
-    Value * value;
+    nix_value * value;
 };
 
 }

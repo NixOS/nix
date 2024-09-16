@@ -1,5 +1,6 @@
 #include <limits>
 #include <unordered_set>
+#include <sstream>
 
 #include "print.hh"
 #include "ansicolor.hh"
@@ -162,8 +163,8 @@ private:
     EvalState & state;
     PrintOptions options;
     std::optional<ValuesSeen> seen;
-    size_t attrsPrinted = 0;
-    size_t listItemsPrinted = 0;
+    size_t totalAttrsPrinted = 0;
+    size_t totalListItemsPrinted = 0;
     std::string indent;
 
     void increaseIndent()
@@ -271,22 +272,36 @@ private:
 
     void printDerivation(Value & v)
     {
-        NixStringContext context;
-        std::string storePath;
-        if (auto i = v.attrs()->get(state.sDrvPath))
-            storePath = state.store->printStorePath(state.coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
+        std::optional<StorePath> storePath;
+        if (auto i = v.attrs()->get(state.sDrvPath)) {
+            NixStringContext context;
+            storePath = state.coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation");
+        }
+
+        /* This unfortunately breaks printing nested values because of
+           how the pretty printer is used (when pretting printing and warning
+           to same terminal / std stream). */
+#if 0
+        if (storePath && !storePath->isDerivation())
+            warn(
+                "drvPath attribute '%s' is not a valid store path to a derivation, this value not work properly",
+                state.store->printStorePath(*storePath));
+#endif
 
         if (options.ansiColors)
             output << ANSI_GREEN;
         output << "«derivation";
-        if (!storePath.empty()) {
-            output << " " << storePath;
+        if (storePath) {
+            output << " " << state.store->printStorePath(*storePath);
         }
         output << "»";
         if (options.ansiColors)
             output << ANSI_NORMAL;
     }
 
+    /**
+     * @note This may force items.
+     */
     bool shouldPrettyPrintAttrs(AttrVec & v)
     {
         if (!options.shouldPrettyPrint() || v.empty()) {
@@ -302,6 +317,9 @@ private:
         if (!item) {
             return true;
         }
+
+        // It is ok to force the item(s) here, because they will be printed anyway.
+        state.forceValue(*item, item->determinePos(noPos));
 
         // Pretty-print single-item attrsets only if they contain nested
         // structures.
@@ -333,11 +351,13 @@ private:
 
             auto prettyPrint = shouldPrettyPrintAttrs(sorted);
 
+            size_t currentAttrsPrinted = 0;
+
             for (auto & i : sorted) {
                 printSpace(prettyPrint);
 
-                if (attrsPrinted >= options.maxAttrs) {
-                    printElided(sorted.size() - attrsPrinted, "attribute", "attributes");
+                if (totalAttrsPrinted >= options.maxAttrs) {
+                    printElided(sorted.size() - currentAttrsPrinted, "attribute", "attributes");
                     break;
                 }
 
@@ -345,7 +365,8 @@ private:
                 output << " = ";
                 print(*i.second, depth + 1);
                 output << ";";
-                attrsPrinted++;
+                totalAttrsPrinted++;
+                currentAttrsPrinted++;
             }
 
             decreaseIndent();
@@ -356,6 +377,9 @@ private:
         }
     }
 
+    /**
+     * @note This may force items.
+     */
     bool shouldPrettyPrintList(std::span<Value * const> list)
     {
         if (!options.shouldPrettyPrint() || list.empty()) {
@@ -371,6 +395,9 @@ private:
         if (!item) {
             return true;
         }
+
+        // It is ok to force the item(s) here, because they will be printed anyway.
+        state.forceValue(*item, item->determinePos(noPos));
 
         // Pretty-print single-item lists only if they contain nested
         // structures.
@@ -390,11 +417,14 @@ private:
             output << "[";
             auto listItems = v.listItems();
             auto prettyPrint = shouldPrettyPrintList(listItems);
+
+            size_t currentListItemsPrinted = 0;
+
             for (auto elem : listItems) {
                 printSpace(prettyPrint);
 
-                if (listItemsPrinted >= options.maxListItems) {
-                    printElided(listItems.size() - listItemsPrinted, "item", "items");
+                if (totalListItemsPrinted >= options.maxListItems) {
+                    printElided(listItems.size() - currentListItemsPrinted, "item", "items");
                     break;
                 }
 
@@ -403,7 +433,8 @@ private:
                 } else {
                     printNullptr();
                 }
-                listItemsPrinted++;
+                totalListItemsPrinted++;
+                currentListItemsPrinted++;
             }
 
             decreaseIndent();
@@ -444,7 +475,7 @@ private:
             else
                 output << "primop";
         } else {
-            abort();
+            unreachable();
         }
 
         output << "»";
@@ -473,7 +504,7 @@ private:
             if (options.ansiColors)
                     output << ANSI_NORMAL;
         } else {
-            abort();
+            unreachable();
         }
     }
 
@@ -576,8 +607,8 @@ public:
 
     void print(Value & v)
     {
-        attrsPrinted = 0;
-        listItemsPrinted = 0;
+        totalAttrsPrinted = 0;
+        totalListItemsPrinted = 0;
         indent.clear();
 
         if (options.trackRepeated) {

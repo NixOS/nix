@@ -1,4 +1,5 @@
 #include "cgroup.hh"
+#include "signals.hh"
 #include "util.hh"
 #include "file-system.hh"
 #include "finally.hh"
@@ -65,6 +66,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
     /* Otherwise, manually kill every process in the subcgroups and
        this cgroup. */
     for (auto & entry : std::filesystem::directory_iterator{cgroup}) {
+        checkInterrupt();
         if (entry.symlink_status().type() != std::filesystem::file_type::directory) continue;
         destroyCgroup(cgroup / entry.path().filename(), false);
     }
@@ -140,6 +142,25 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
 CgroupStats destroyCgroup(const Path & cgroup)
 {
     return destroyCgroup(cgroup, true);
+}
+
+std::string getCurrentCgroup()
+{
+    auto cgroupFS = getCgroupFS();
+    if (!cgroupFS)
+        throw Error("cannot determine the cgroups file system");
+
+    auto ourCgroups = getCgroups("/proc/self/cgroup");
+    auto ourCgroup = ourCgroups[""];
+    if (ourCgroup == "")
+        throw Error("cannot determine cgroup name from /proc/self/cgroup");
+    return ourCgroup;
+}
+
+std::string getRootCgroup()
+{
+    static std::string rootCgroup = getCurrentCgroup();
+    return rootCgroup;
 }
 
 }

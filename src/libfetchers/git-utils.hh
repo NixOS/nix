@@ -7,7 +7,7 @@ namespace nix {
 
 namespace fetchers { struct PublicKey; }
 
-struct GitFileSystemObjectSink : FileSystemObjectSink
+struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
 {
     /**
      * Flush builder and return a final Git hash.
@@ -98,6 +98,13 @@ struct GitRepo
      * serialisation. This is memoised on-disk.
      */
     virtual Hash treeHashToNarHash(const Hash & treeHash) = 0;
+
+    /**
+     * If the specified Git object is a directory with a single entry
+     * that is a directory, return the ID of that object.
+     * Otherwise, return the passed ID unchanged.
+     */
+    virtual Hash dereferenceSingletonDirectory(const Hash & oid) = 0;
 };
 
 ref<GitRepo> getTarballCache();

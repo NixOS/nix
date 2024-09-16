@@ -19,7 +19,7 @@ If you are on Linux with systemd:
 Remove files created by Nix:
 
 ```console
-sudo rm -rf /etc/nix /etc/profile.d/nix.sh /etc/tmpfiles.d/nix-daemon.conf /nix ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile
+sudo rm -rf /etc/nix /etc/profile.d/nix.sh /etc/tmpfiles.d/nix-daemon.conf /nix ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile ~root/.cache/nix
 ```
 
 Remove build users and their group:
@@ -42,6 +42,14 @@ There may also be references to Nix in
 which you may remove.
 
 ### macOS
+
+> **Updating to macOS 15 Sequoia**
+>
+> If you recently updated to macOS 15 Sequoia and are getting
+> ```console
+> error: the user '_nixbld1' in the group 'nixbld' does not exist
+> ```
+> when running Nix commands, refer to GitHub issue [NixOS/nix#10892](https://github.com/NixOS/nix/issues/10892) for instructions to fix your installation without reinstalling.
 
 1. If system-wide shell initialisation files haven't been altered since installing Nix, use the backups made by the installer:
 
@@ -133,7 +141,9 @@ which you may remove.
    diskutil list
    ```
 
-   If you _do_ find a "Nix Store" volume, delete it by running `diskutil deleteVolume` with the store volume's `diskXsY` identifier.
+   If you _do_ find a "Nix Store" volume, delete it by running `diskutil apfs deleteVolume` with the store volume's `diskXsY` identifier.
+
+   If you get an error that the volume is in use by the kernel, reboot and immediately delete the volume before starting any other process.
 
 > **Note**
 >

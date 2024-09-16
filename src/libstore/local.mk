@@ -4,9 +4,9 @@ libstore_NAME = libnixstore
 
 libstore_DIR := $(d)
 
-libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc)
+libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/build/*.cc)
 ifdef HOST_UNIX
-  libstore_SOURCES += $(wildcard $(d)/unix/*.cc $(d)/unix/builtins/*.cc $(d)/unix/build/*.cc)
+  libstore_SOURCES += $(wildcard $(d)/unix/*.cc $(d)/unix/build/*.cc)
 endif
 ifdef HOST_LINUX
   libstore_SOURCES += $(wildcard $(d)/linux/*.cc)
@@ -43,7 +43,7 @@ endif
 
 INCLUDE_libstore := -I $(d) -I $(d)/build
 ifdef HOST_UNIX
-  INCLUDE_libstore += -I $(d)/unix
+  INCLUDE_libstore += -I $(d)/unix -I $(d)/unix/build
 endif
 ifdef HOST_LINUX
   INCLUDE_libstore += -I $(d)/linux
@@ -71,7 +71,6 @@ libstore_CXXFLAGS += \
  -DNIX_STATE_DIR=\"$(NIX_ROOT)$(localstatedir)/nix\" \
  -DNIX_LOG_DIR=\"$(NIX_ROOT)$(localstatedir)/log/nix\" \
  -DNIX_CONF_DIR=\"$(NIX_ROOT)$(sysconfdir)/nix\" \
- -DNIX_BIN_DIR=\"$(NIX_ROOT)$(bindir)\" \
  -DNIX_MAN_DIR=\"$(NIX_ROOT)$(mandir)\" \
  -DLSOF=\"$(NIX_ROOT)$(lsof)\"
 

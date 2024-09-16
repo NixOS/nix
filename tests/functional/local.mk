@@ -1,27 +1,12 @@
 nix_tests = \
   test-infra.sh \
-  flakes/flakes.sh \
-  flakes/develop.sh \
-  flakes/run.sh \
-  flakes/mercurial.sh \
-  flakes/circular.sh \
-  flakes/init.sh \
-  flakes/inputs.sh \
-  flakes/relative-paths.sh \
-  flakes/follow-paths.sh \
-  flakes/bundle.sh \
-  flakes/check.sh \
-  flakes/unlocked-override.sh \
-  flakes/absolute-paths.sh \
-  flakes/absolute-attr-paths.sh \
-  flakes/build-paths.sh \
-  flakes/flake-in-submodule.sh \
   gc.sh \
   nix-collect-garbage-d.sh \
   remote-store.sh \
   legacy-ssh-store.sh \
   lang.sh \
-  lang-test-infra.sh \
+  lang-gc.sh \
+  characterisation-test-infra.sh \
   experimental-features.sh \
   fetchMercurial.sh \
   gc-auto.sh \
@@ -58,7 +43,6 @@ nix_tests = \
   restricted.sh \
   fetchGitSubmodules.sh \
   fetchGitVerification.sh \
-  flakes/search-root.sh \
   readfile-context.sh \
   nix-channel.sh \
   recursive.sh \
@@ -99,14 +83,14 @@ nix_tests = \
   nix-copy-ssh-ng.sh \
   post-hook.sh \
   function-trace.sh \
-  flakes/config.sh \
   fmt.sh \
   eval-store.sh \
   why-depends.sh \
   derivation-json.sh \
+  derivation-advanced-attributes.sh \
   import-derivation.sh \
   nix_path.sh \
-  case-hack.sh \
+  nars.sh \
   placeholders.sh \
   ssh-relay.sh \
   build.sh \
@@ -121,7 +105,6 @@ nix_tests = \
   store-info.sh \
   fetchClosure.sh \
   completions.sh \
-  flakes/show.sh \
   impure-derivations.sh \
   path-from-hash-part.sh \
   path-info.sh \
@@ -153,7 +136,7 @@ $(d)/plugins.sh.test $(d)/plugins.sh.test-debug: \
 install-tests += $(foreach x, $(nix_tests), $(d)/$(x))
 
 test-clean-files := \
-  $(d)/common/vars-and-functions.sh \
+  $(d)/common/subst-vars.sh \
   $(d)/config.nix
 
 clean-files += $(test-clean-files)

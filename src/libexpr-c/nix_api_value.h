@@ -35,8 +35,11 @@ typedef enum {
 } ValueType;
 
 // forward declarations
-typedef void Value;
+typedef struct nix_value nix_value;
 typedef struct EvalState EvalState;
+
+[[deprecated("use nix_value instead")]] typedef nix_value Value;
+
 // type defs
 /** @brief Stores an under-construction set of bindings
  * @ingroup value_manip
@@ -79,6 +82,7 @@ typedef struct nix_realised_string nix_realised_string;
  * @{
  */
 /** @brief Function pointer for primops
+ *
  * When you want to return an error, call nix_set_err_msg(context, NIX_ERR_UNKNOWN, "your error message here").
  *
  * @param[in] user_data Arbitrary data that was initially supplied to nix_alloc_primop
@@ -89,7 +93,8 @@ typedef struct nix_realised_string nix_realised_string;
  * @param[out] ret return value
  * @see nix_alloc_primop, nix_init_primop
  */
-typedef void (*PrimOpFun)(void * user_data, nix_c_context * context, EvalState * state, Value ** args, Value * ret);
+typedef void (*PrimOpFun)(
+    void * user_data, nix_c_context * context, EvalState * state, nix_value ** args, nix_value * ret);
 
 /** @brief Allocate a PrimOp
  *
@@ -141,13 +146,33 @@ nix_err nix_register_primop(nix_c_context * context, PrimOp * primOp);
  * @return value, or null in case of errors
  *
  */
-Value * nix_alloc_value(nix_c_context * context, EvalState * state);
+nix_value * nix_alloc_value(nix_c_context * context, EvalState * state);
+
+/**
+ * @brief Increment the garbage collector reference counter for the given `nix_value`.
+ *
+ * The Nix language evaluator C API keeps track of alive objects by reference counting.
+ * When you're done with a refcounted pointer, call nix_value_decref().
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] value The object to keep alive
+ */
+nix_err nix_value_incref(nix_c_context * context, nix_value * value);
+
+/**
+ * @brief Decrement the garbage collector reference counter for the given object
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] value The object to stop referencing
+ */
+nix_err nix_value_decref(nix_c_context * context, nix_value * value);
 
 /** @addtogroup value_manip Manipulating values
- * @brief Functions to inspect and change Nix language values, represented by Value.
+ * @brief Functions to inspect and change Nix language values, represented by nix_value.
  * @{
  */
-/** @name Getters
+/** @anchor getters
+ * @name Getters
  */
 /**@{*/
 /** @brief Get value type
@@ -155,7 +180,7 @@ Value * nix_alloc_value(nix_c_context * context, EvalState * state);
  * @param[in] value Nix value to inspect
  * @return type of nix value
  */
-ValueType nix_get_type(nix_c_context * context, const Value * value);
+ValueType nix_get_type(nix_c_context * context, const nix_value * value);
 
 /** @brief Get type name of value as defined in the evaluator
  * @param[out] context Optional, stores error information
@@ -163,14 +188,14 @@ ValueType nix_get_type(nix_c_context * context, const Value * value);
  * @return type name, owned string
  * @todo way to free the result
  */
-const char * nix_get_typename(nix_c_context * context, const Value * value);
+const char * nix_get_typename(nix_c_context * context, const nix_value * value);
 
 /** @brief Get boolean value
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @return true or false, error info via context
  */
-bool nix_get_bool(nix_c_context * context, const Value * value);
+bool nix_get_bool(nix_c_context * context, const nix_value * value);
 
 /** @brief Get the raw string
  *
@@ -184,7 +209,7 @@ bool nix_get_bool(nix_c_context * context, const Value * value);
  * @return error code, NIX_OK on success.
  */
 nix_err
-nix_get_string(nix_c_context * context, const Value * value, nix_get_string_callback callback, void * user_data);
+nix_get_string(nix_c_context * context, const nix_value * value, nix_get_string_callback callback, void * user_data);
 
 /** @brief Get path as string
  * @param[out] context Optional, stores error information
@@ -192,42 +217,42 @@ nix_get_string(nix_c_context * context, const Value * value, nix_get_string_call
  * @return string
  * @return NULL in case of error.
  */
-const char * nix_get_path_string(nix_c_context * context, const Value * value);
+const char * nix_get_path_string(nix_c_context * context, const nix_value * value);
 
 /** @brief Get the length of a list
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @return length of list, error info via context
  */
-unsigned int nix_get_list_size(nix_c_context * context, const Value * value);
+unsigned int nix_get_list_size(nix_c_context * context, const nix_value * value);
 
 /** @brief Get the element count of an attrset
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @return attrset element count, error info via context
  */
-unsigned int nix_get_attrs_size(nix_c_context * context, const Value * value);
+unsigned int nix_get_attrs_size(nix_c_context * context, const nix_value * value);
 
 /** @brief Get float value in 64 bits
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @return float contents, error info via context
  */
-double nix_get_float(nix_c_context * context, const Value * value);
+double nix_get_float(nix_c_context * context, const nix_value * value);
 
 /** @brief Get int value
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @return int contents, error info via context
  */
-int64_t nix_get_int(nix_c_context * context, const Value * value);
+int64_t nix_get_int(nix_c_context * context, const nix_value * value);
 
 /** @brief Get external reference
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @return reference to external, NULL in case of error
  */
-ExternalValue * nix_get_external(nix_c_context * context, Value *);
+ExternalValue * nix_get_external(nix_c_context * context, nix_value *);
 
 /** @brief Get the ix'th element of a list
  *
@@ -238,7 +263,7 @@ ExternalValue * nix_get_external(nix_c_context * context, Value *);
  * @param[in] ix list element to get
  * @return value, NULL in case of errors
  */
-Value * nix_get_list_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int ix);
+nix_value * nix_get_list_byidx(nix_c_context * context, const nix_value * value, EvalState * state, unsigned int ix);
 
 /** @brief Get an attr by name
  *
@@ -249,7 +274,7 @@ Value * nix_get_list_byidx(nix_c_context * context, const Value * value, EvalSta
  * @param[in] name attribute name
  * @return value, NULL in case of errors
  */
-Value * nix_get_attr_byname(nix_c_context * context, const Value * value, EvalState * state, const char * name);
+nix_value * nix_get_attr_byname(nix_c_context * context, const nix_value * value, EvalState * state, const char * name);
 
 /** @brief Check if an attribute name exists on a value
  * @param[out] context Optional, stores error information
@@ -258,7 +283,7 @@ Value * nix_get_attr_byname(nix_c_context * context, const Value * value, EvalSt
  * @param[in] name attribute name
  * @return value, error info via context
  */
-bool nix_has_attr_byname(nix_c_context * context, const Value * value, EvalState * state, const char * name);
+bool nix_has_attr_byname(nix_c_context * context, const nix_value * value, EvalState * state, const char * name);
 
 /** @brief Get an attribute by index in the sorted bindings
  *
@@ -272,8 +297,8 @@ bool nix_has_attr_byname(nix_c_context * context, const Value * value, EvalState
  * @param[out] name will store a pointer to the attribute name
  * @return value, NULL in case of errors
  */
-Value *
-nix_get_attr_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int i, const char ** name);
+nix_value * nix_get_attr_byidx(
+    nix_c_context * context, const nix_value * value, EvalState * state, unsigned int i, const char ** name);
 
 /** @brief Get an attribute name by index in the sorted bindings
  *
@@ -286,7 +311,8 @@ nix_get_attr_byidx(nix_c_context * context, const Value * value, EvalState * sta
  * @param[in] i attribute index
  * @return name, NULL in case of errors
  */
-const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int i);
+const char *
+nix_get_attr_name_byidx(nix_c_context * context, const nix_value * value, EvalState * state, unsigned int i);
 
 /**@}*/
 /** @name Initializers
@@ -303,7 +329,7 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * valu
  * @param[in] b the boolean value
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_bool(nix_c_context * context, Value * value, bool b);
+nix_err nix_init_bool(nix_c_context * context, nix_value * value, bool b);
 
 /** @brief Set a string
  * @param[out] context Optional, stores error information
@@ -311,7 +337,7 @@ nix_err nix_init_bool(nix_c_context * context, Value * value, bool b);
  * @param[in] str the string, copied
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_string(nix_c_context * context, Value * value, const char * str);
+nix_err nix_init_string(nix_c_context * context, nix_value * value, const char * str);
 
 /** @brief Set a path
  * @param[out] context Optional, stores error information
@@ -319,7 +345,7 @@ nix_err nix_init_string(nix_c_context * context, Value * value, const char * str
  * @param[in] str the path string, copied
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_path_string(nix_c_context * context, EvalState * s, Value * value, const char * str);
+nix_err nix_init_path_string(nix_c_context * context, EvalState * s, nix_value * value, const char * str);
 
 /** @brief Set a float
  * @param[out] context Optional, stores error information
@@ -327,7 +353,7 @@ nix_err nix_init_path_string(nix_c_context * context, EvalState * s, Value * val
  * @param[in] d the float, 64-bits
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_float(nix_c_context * context, Value * value, double d);
+nix_err nix_init_float(nix_c_context * context, nix_value * value, double d);
 
 /** @brief Set an int
  * @param[out] context Optional, stores error information
@@ -336,13 +362,13 @@ nix_err nix_init_float(nix_c_context * context, Value * value, double d);
  * @return error code, NIX_OK on success.
  */
 
-nix_err nix_init_int(nix_c_context * context, Value * value, int64_t i);
+nix_err nix_init_int(nix_c_context * context, nix_value * value, int64_t i);
 /** @brief Set null
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_null(nix_c_context * context, Value * value);
+nix_err nix_init_null(nix_c_context * context, nix_value * value);
 
 /** @brief Set the value to a thunk that will perform a function application when needed.
  *
@@ -358,7 +384,7 @@ nix_err nix_init_null(nix_c_context * context, Value * value);
  * @see nix_value_call() for a similar function that performs the call immediately and only stores the return value.
  *      Note the different argument order.
  */
-nix_err nix_init_apply(nix_c_context * context, Value * value, Value * fn, Value * arg);
+nix_err nix_init_apply(nix_c_context * context, nix_value * value, nix_value * fn, nix_value * arg);
 
 /** @brief Set an external value
  * @param[out] context Optional, stores error information
@@ -366,7 +392,7 @@ nix_err nix_init_apply(nix_c_context * context, Value * value, Value * fn, Value
  * @param[in] val the external value to set. Will be GC-referenced by the value.
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_external(nix_c_context * context, Value * value, ExternalValue * val);
+nix_err nix_init_external(nix_c_context * context, nix_value * value, ExternalValue * val);
 
 /** @brief Create a list from a list builder
  * @param[out] context Optional, stores error information
@@ -374,7 +400,7 @@ nix_err nix_init_external(nix_c_context * context, Value * value, ExternalValue 
  * @param[out] value Nix value to modify
  * @return error code, NIX_OK on success.
  */
-nix_err nix_make_list(nix_c_context * context, ListBuilder * list_builder, Value * value);
+nix_err nix_make_list(nix_c_context * context, ListBuilder * list_builder, nix_value * value);
 
 /** @brief Create a list builder
  * @param[out] context Optional, stores error information
@@ -391,7 +417,8 @@ ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, 
  * @param[in] value value to insert
  * @return error code, NIX_OK on success.
  */
-nix_err nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, unsigned int index, Value * value);
+nix_err
+nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, unsigned int index, nix_value * value);
 
 /** @brief Free a list builder
  *
@@ -406,7 +433,7 @@ void nix_list_builder_free(ListBuilder * list_builder);
  * @param[in] b bindings builder to use. Make sure to unref this afterwards.
  * @return error code, NIX_OK on success.
  */
-nix_err nix_make_attrs(nix_c_context * context, Value * value, BindingsBuilder * b);
+nix_err nix_make_attrs(nix_c_context * context, nix_value * value, BindingsBuilder * b);
 
 /** @brief Set primop
  * @param[out] context Optional, stores error information
@@ -415,14 +442,14 @@ nix_err nix_make_attrs(nix_c_context * context, Value * value, BindingsBuilder *
  * @see nix_alloc_primop
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_primop(nix_c_context * context, Value * value, PrimOp * op);
+nix_err nix_init_primop(nix_c_context * context, nix_value * value, PrimOp * op);
 /** @brief Copy from another value
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
  * @param[in] source value to copy from
  * @return error code, NIX_OK on success.
  */
-nix_err nix_copy_value(nix_c_context * context, Value * value, const Value * source);
+nix_err nix_copy_value(nix_c_context * context, nix_value * value, const nix_value * source);
 /**@}*/
 
 /** @brief Create a bindings builder
@@ -442,7 +469,7 @@ BindingsBuilder * nix_make_bindings_builder(nix_c_context * context, EvalState *
  * @return error code, NIX_OK on success.
  */
 nix_err
-nix_bindings_builder_insert(nix_c_context * context, BindingsBuilder * builder, const char * name, Value * value);
+nix_bindings_builder_insert(nix_c_context * context, BindingsBuilder * builder, const char * name, nix_value * value);
 
 /** @brief Free a bindings builder
  *
@@ -469,7 +496,7 @@ void nix_bindings_builder_free(BindingsBuilder * builder);
                     You should set this to false when building for your application's purpose.
  * @return NULL if failed, are a new nix_realised_string, which must be freed with nix_realised_string_free
  */
-nix_realised_string * nix_string_realise(nix_c_context * context, EvalState * state, Value * value, bool isIFD);
+nix_realised_string * nix_string_realise(nix_c_context * context, EvalState * state, nix_value * value, bool isIFD);
 
 /** @brief Start of the string
  * @param[in] realised_string

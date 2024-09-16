@@ -10,10 +10,17 @@ namespace nix {
 struct Hash;
 
 /**
+ * Check whether a name is a valid store path name.
+ *
+ * @throws BadStorePathName if the name is invalid. The message is of the format "name %s is not valid, for this specific reason".
+ */
+void checkName(std::string_view name);
+
+/**
  * \ref StorePath "Store path" is the fundamental reference type of Nix.
  * A store paths refers to a Store object.
  *
- * See glossary.html#gloss-store-path for more information on a
+ * See store/store-path.html for more information on a
  * conceptual level.
  */
 class StorePath
@@ -31,34 +38,29 @@ public:
 
     StorePath() = delete;
 
+    /** @throws BadStorePath */
     StorePath(std::string_view baseName);
 
+    /** @throws BadStorePath */
     StorePath(const Hash & hash, std::string_view name);
 
-    std::string_view to_string() const
+    std::string_view to_string() const noexcept
     {
         return baseName;
     }
 
-    bool operator < (const StorePath & other) const
-    {
-        return baseName < other.baseName;
-    }
-
-    bool operator == (const StorePath & other) const
-    {
-        return baseName == other.baseName;
-    }
-
-    bool operator != (const StorePath & other) const
-    {
-        return baseName != other.baseName;
-    }
+    bool operator == (const StorePath & other) const noexcept = default;
+    auto operator <=> (const StorePath & other) const noexcept = default;
 
     /**
      * Check whether a file name ends with the extension for derivations.
      */
-    bool isDerivation() const;
+    bool isDerivation() const noexcept;
+
+    /**
+     * Throw an exception if `isDerivation` is false.
+     */
+    void requireDerivation() const;
 
     std::string_view name() const
     {
@@ -82,7 +84,7 @@ typedef std::vector<StorePath> StorePaths;
  * The file extension of \ref Derivation derivations when serialized
  * into store objects.
  */
-const std::string drvExtension = ".drv";
+constexpr std::string_view drvExtension = ".drv";
 
 }
 

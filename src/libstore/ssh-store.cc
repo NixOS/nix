@@ -1,7 +1,5 @@
-#include "ssh-store-config.hh"
-#include "store-api.hh"
+#include "ssh-store.hh"
 #include "local-fs-store.hh"
-#include "remote-store.hh"
 #include "remote-store-connection.hh"
 #include "source-accessor.hh"
 #include "archive.hh"
@@ -12,47 +10,42 @@
 
 namespace nix {
 
-struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
+SSHStoreConfig::SSHStoreConfig(
+    std::string_view scheme,
+    std::string_view authority,
+    const Params & params)
+    : StoreConfig(params)
+    , RemoteStoreConfig(params)
+    , CommonSSHStoreConfig(scheme, authority, params)
 {
-    using RemoteStoreConfig::RemoteStoreConfig;
-    using CommonSSHStoreConfig::CommonSSHStoreConfig;
+}
 
-    const Setting<Strings> remoteProgram{this, {"nix-daemon"}, "remote-program",
-        "Path to the `nix-daemon` executable on the remote machine."};
-
-    const std::string name() override { return "Experimental SSH Store"; }
-
-    std::string doc() override
-    {
-        return
-          #include "ssh-store.md"
-          ;
-    }
-};
+std::string SSHStoreConfig::doc()
+{
+    return
+      #include "ssh-store.md"
+      ;
+}
 
 class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
 {
 public:
 
-    SSHStore(const std::string & scheme, const std::string & host, const Params & params)
+    SSHStore(
+        std::string_view scheme,
+        std::string_view host,
+        const Params & params)
         : StoreConfig(params)
         , RemoteStoreConfig(params)
-        , CommonSSHStoreConfig(params)
-        , SSHStoreConfig(params)
+        , CommonSSHStoreConfig(scheme, host, params)
+        , SSHStoreConfig(scheme, host, params)
         , Store(params)
         , RemoteStore(params)
-        , host(host)
-        , master(
-            host,
-            sshKey,
-            sshPublicHostKey,
+        , master(createSSHMaster(
             // Use SSH master only if using more than 1 connection.
-            connections->capacity() > 1,
-            compress)
+            connections->capacity() > 1))
     {
     }
-
-    static std::set<std::string> uriSchemes() { return {"ssh-ng"}; }
 
     std::string getUri() override
     {
@@ -94,34 +87,32 @@ protected:
     };
 };
 
-struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfig
+
+MountedSSHStoreConfig::MountedSSHStoreConfig(StringMap params)
+    : StoreConfig(params)
+    , RemoteStoreConfig(params)
+    , CommonSSHStoreConfig(params)
+    , SSHStoreConfig(params)
+    , LocalFSStoreConfig(params)
 {
-    using SSHStoreConfig::SSHStoreConfig;
-    using LocalFSStoreConfig::LocalFSStoreConfig;
+}
 
-    MountedSSHStoreConfig(StringMap params)
-        : StoreConfig(params)
-        , RemoteStoreConfig(params)
-        , CommonSSHStoreConfig(params)
-        , SSHStoreConfig(params)
-        , LocalFSStoreConfig(params)
-    {
-    }
+MountedSSHStoreConfig::MountedSSHStoreConfig(std::string_view scheme, std::string_view host, StringMap params)
+    : StoreConfig(params)
+    , RemoteStoreConfig(params)
+    , CommonSSHStoreConfig(scheme, host, params)
+    , SSHStoreConfig(params)
+    , LocalFSStoreConfig(params)
+{
+}
 
-    const std::string name() override { return "Experimental SSH Store with filesystem mounted"; }
+std::string MountedSSHStoreConfig::doc()
+{
+    return
+      #include "mounted-ssh-store.md"
+      ;
+}
 
-    std::string doc() override
-    {
-        return
-          #include "mounted-ssh-store.md"
-          ;
-    }
-
-    std::optional<ExperimentalFeature> experimentalFeature() const override
-    {
-        return ExperimentalFeature::MountedSSHStore;
-    }
-};
 
 /**
  * The mounted ssh store assumes that filesystems on the remote host are
@@ -141,10 +132,13 @@ class MountedSSHStore : public virtual MountedSSHStoreConfig, public virtual SSH
 {
 public:
 
-    MountedSSHStore(const std::string & scheme, const std::string & host, const Params & params)
+    MountedSSHStore(
+        std::string_view scheme,
+        std::string_view host,
+        const Params & params)
         : StoreConfig(params)
         , RemoteStoreConfig(params)
-        , CommonSSHStoreConfig(params)
+        , CommonSSHStoreConfig(scheme, host, params)
         , SSHStoreConfig(params)
         , LocalFSStoreConfig(params)
         , MountedSSHStoreConfig(params)
@@ -156,11 +150,6 @@ public:
         extraRemoteProgramArgs = {
             "--process-ops",
         };
-    }
-
-    static std::set<std::string> uriSchemes()
-    {
-        return {"mounted-ssh-ng"};
     }
 
     std::string getUri() override

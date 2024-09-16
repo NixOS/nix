@@ -8,6 +8,7 @@
 #include "ref.hh"
 #include "canon-path.hh"
 #include "source-accessor.hh"
+#include "std-hash.hh"
 
 namespace nix {
 
@@ -103,9 +104,8 @@ struct SourcePath
      */
     SourcePath operator / (std::string_view c) const;
 
-    bool operator==(const SourcePath & x) const;
-    bool operator!=(const SourcePath & x) const;
-    bool operator<(const SourcePath & x) const;
+    bool operator==(const SourcePath & x) const noexcept;
+    std::strong_ordering operator<=>(const SourcePath & x) const noexcept;
 
     /**
      * Convenience wrapper around `SourceAccessor::resolveSymlinks()`.
@@ -115,8 +115,21 @@ struct SourcePath
     {
         return {accessor, accessor->resolveSymlinks(path, mode)};
     }
+
+    friend class std::hash<nix::SourcePath>;
 };
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path);
 
 }
+
+template<>
+struct std::hash<nix::SourcePath>
+{
+    std::size_t operator()(const nix::SourcePath & s) const noexcept
+    {
+        std::size_t hash = 0;
+        hash_combine(hash, s.accessor->number, s.path);
+        return hash;
+    }
+};

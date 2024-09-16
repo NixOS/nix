@@ -1,10 +1,12 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 set -u
 
 requireGit
 
-clearStore
+clearStoreIfPossible
 
 rootRepo=$TEST_ROOT/gitSubmodulesRoot
 subRepo=$TEST_ROOT/gitSubmodulesSub
@@ -101,6 +103,27 @@ noSubmoduleRepoBaseline=$(nix eval --raw --expr "(builtins.fetchGit { url = file
 noSubmoduleRepo=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$subRepo; rev = \"$subRev\"; submodules = true; }).outPath")
 
 [[ $noSubmoduleRepoBaseline == $noSubmoduleRepo ]]
+
+# Test .gitmodules with entries that refer to non-existent objects or objects that are not submodules.
+cat >> $rootRepo/.gitmodules <<EOF
+[submodule "missing"]
+        path = missing
+        url = https://example.org/missing.git
+
+[submodule "file"]
+        path = file
+        url = https://example.org/file.git
+EOF
+echo foo > $rootRepo/file
+git -C $rootRepo add file
+git -C $rootRepo commit -a -m "Add bad submodules"
+
+rev=$(git -C $rootRepo rev-parse HEAD)
+
+r=$(nix eval --raw --expr "builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }")
+
+[[ -f $r/file ]]
+[[ ! -e $r/missing ]]
 
 # Test relative submodule URLs.
 rm $TEST_HOME/.cache/nix/fetcher-cache*

@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "error.hh"
 #include "environment-variables.hh"
 #include "signals.hh"
@@ -46,27 +48,22 @@ std::ostream & operator <<(std::ostream & os, const HintFmt & hf)
 /**
  * An arbitrarily defined value comparison for the purpose of using traces in the key of a sorted container.
  */
-inline bool operator<(const Trace& lhs, const Trace& rhs)
+inline std::strong_ordering operator<=>(const Trace& lhs, const Trace& rhs)
 {
     // `std::shared_ptr` does not have value semantics for its comparison
     // functions, so we need to check for nulls and compare the dereferenced
     // values here.
     if (lhs.pos != rhs.pos) {
-        if (!lhs.pos)
-            return true;
-        if (!rhs.pos)
-            return false;
-        if (*lhs.pos != *rhs.pos)
-            return *lhs.pos < *rhs.pos;
+        if (auto cmp = bool{lhs.pos} <=> bool{rhs.pos}; cmp != 0)
+            return cmp;
+        if (auto cmp = *lhs.pos <=> *rhs.pos; cmp != 0)
+            return cmp;
     }
     // This formats a freshly formatted hint string and then throws it away, which
     // shouldn't be much of a problem because it only runs when pos is equal, and this function is
     // used for trace printing, which is infrequent.
-    return lhs.hint.str() < rhs.hint.str();
+    return lhs.hint.str() <=> rhs.hint.str();
 }
-inline bool operator> (const Trace& lhs, const Trace& rhs) { return rhs < lhs; }
-inline bool operator<=(const Trace& lhs, const Trace& rhs) { return !(lhs > rhs); }
-inline bool operator>=(const Trace& lhs, const Trace& rhs) { return !(lhs < rhs); }
 
 // print lines of code to the ostream, indicating the error column.
 void printCodeLines(std::ostream & out,
@@ -240,7 +237,10 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             break;
         }
         case Verbosity::lvlWarn: {
-            prefix = ANSI_WARNING "warning";
+            if (einfo.isFromExpr)
+                prefix = ANSI_WARNING "evaluation warning";
+            else
+                prefix = ANSI_WARNING "warning";
             break;
         }
         case Verbosity::lvlInfo: {
@@ -430,6 +430,38 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     out << indent(prefix, std::string(filterANSIEscapes(prefix, true).size(), ' '), chomp(oss.str()));
 
     return out;
+}
+
+/** Write to stderr in a robust and minimal way, considering that the process
+ * may be in a bad state.
+ */
+static void writeErr(std::string_view buf)
+{
+    while (!buf.empty()) {
+        auto n = write(STDERR_FILENO, buf.data(), buf.size());
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            abort();
+        }
+        buf = buf.substr(n);
+    }
+}
+
+void panic(std::string_view msg)
+{
+    writeErr("\n\n" ANSI_RED "terminating due to unexpected unrecoverable internal error: " ANSI_NORMAL );
+    writeErr(msg);
+    writeErr("\n");
+    abort();
+}
+
+void panic(const char * file, int line, const char * func)
+{
+    char buf[512];
+    int n = snprintf(buf, sizeof(buf), "Unexpected condition in %s at %s:%d", func, file, line);
+    if (n < 0)
+        panic("Unexpected condition and could not format error message");
+    panic(std::string_view(buf, std::min(static_cast<int>(sizeof(buf)), n)));
 }
 
 }

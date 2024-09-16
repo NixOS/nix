@@ -42,7 +42,6 @@
 # include <sched.h>
 # include <sys/statvfs.h>
 # include <sys/mount.h>
-# include <sys/ioctl.h>
 #endif
 
 #ifdef __CYGWIN__
@@ -51,8 +50,19 @@
 
 #include <sqlite3.h>
 
+#include "strings.hh"
+
 
 namespace nix {
+
+LocalStoreConfig::LocalStoreConfig(
+    std::string_view scheme,
+    std::string_view authority,
+    const Params & params)
+    : StoreConfig(params)
+    , LocalFSStoreConfig(authority, params)
+{
+}
 
 std::string LocalStoreConfig::doc()
 {
@@ -181,10 +191,13 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
     }
 }
 
-LocalStore::LocalStore(const Params & params)
+LocalStore::LocalStore(
+    std::string_view scheme,
+    PathView path,
+    const Params & params)
     : StoreConfig(params)
-    , LocalFSStoreConfig(params)
-    , LocalStoreConfig(params)
+    , LocalFSStoreConfig(path, params)
+    , LocalStoreConfig(scheme, path, params)
     , Store(params)
     , LocalFSStore(params)
     , dbDir(stateDir + "/db")
@@ -233,7 +246,7 @@ LocalStore::LocalStore(const Params & params)
         struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
         if (!gr)
             printError("warning: the group '%1%' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
-        else {
+        else if (!readOnly) {
             struct stat st;
             if (stat(realStoreDir.get().c_str(), &st))
                 throw SysError("getting attributes of path '%1%'", realStoreDir);
@@ -352,8 +365,6 @@ LocalStore::LocalStore(const Params & params)
            have performed the upgrade already. */
         curSchema = getSchema();
 
-        if (curSchema < 7) { upgradeStore7(); }
-
         openDB(*state, false);
 
         if (curSchema < 8) {
@@ -463,10 +474,9 @@ LocalStore::LocalStore(const Params & params)
 }
 
 
-LocalStore::LocalStore(std::string scheme, std::string path, const Params & params)
-    : LocalStore(params)
+LocalStore::LocalStore(const Params & params)
+    : LocalStore("local", "", params)
 {
-    throw UnimplementedError("LocalStore");
 }
 
 
@@ -1124,7 +1134,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             TeeSource wrapperSource { source, hashSink };
 
             narRead = true;
-            restorePath(realPath, wrapperSource);
+            restorePath(realPath, wrapperSource, settings.fsyncStorePaths);
 
             auto hashResult = hashSink.finish();
 
@@ -1145,7 +1155,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                     auto fim = specified.method.getFileIngestionMethod();
                     switch (fim) {
                     case FileIngestionMethod::Flat:
-                    case FileIngestionMethod::Recursive:
+                    case FileIngestionMethod::NixArchive:
                     {
                         HashModuloSink caSink {
                             specified.hash.algo,
@@ -1177,6 +1187,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             canonicalisePathMetaData(realPath);
 
             optimisePath(realPath, repair); // FIXME: combine with hashPath()
+
+            if (settings.fsyncStorePaths) {
+                recursiveSync(realPath);
+                syncParent(realPath);
+            }
 
             registerValidPath(info);
         }
@@ -1243,7 +1258,7 @@ StorePath LocalStore::addToStoreFromDump(
     std::filesystem::path tempDir;
     AutoCloseFD tempDirFd;
 
-    bool methodsMatch = ContentAddressMethod(FileIngestionMethod(dumpMethod)) == hashMethod;
+    bool methodsMatch = static_cast<FileIngestionMethod>(dumpMethod) == hashMethod.getFileIngestionMethod();
 
     /* If the methods don't match, our streaming hash of the dump is the
        wrong sort, and we need to rehash. */
@@ -1258,7 +1273,7 @@ StorePath LocalStore::addToStoreFromDump(
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir / "x";
 
-        restorePath(tempPath.string(), bothSource, dumpMethod);
+        restorePath(tempPath.string(), bothSource, dumpMethod, settings.fsyncStorePaths);
 
         dumpBuffer.reset();
         dump = {};
@@ -1272,7 +1287,7 @@ StorePath LocalStore::addToStoreFromDump(
             ? dumpHash
             : hashPath(
                 PosixSourceAccessor::createAtRoot(tempPath),
-                hashMethod.getFileIngestionMethod(), hashAlgo),
+                hashMethod.getFileIngestionMethod(), hashAlgo).first,
         {
             .others = references,
             // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -1304,8 +1319,8 @@ StorePath LocalStore::addToStoreFromDump(
                 auto fim = hashMethod.getFileIngestionMethod();
                 switch (fim) {
                 case FileIngestionMethod::Flat:
-                case FileIngestionMethod::Recursive:
-                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim);
+                case FileIngestionMethod::NixArchive:
+                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim, settings.fsyncStorePaths);
                     break;
                 case FileIngestionMethod::Git:
                     // doesn't correspond to serialization method, so
@@ -1320,7 +1335,7 @@ StorePath LocalStore::addToStoreFromDump(
             /* For computing the nar hash. In recursive SHA-256 mode, this
                is the same as the store hash, so no need to do it again. */
             auto narHash = std::pair { dumpHash, size };
-            if (dumpMethod != FileSerialisationMethod::Recursive || hashAlgo != HashAlgorithm::SHA256) {
+            if (dumpMethod != FileSerialisationMethod::NixArchive || hashAlgo != HashAlgorithm::SHA256) {
                 HashSink narSink { HashAlgorithm::SHA256 };
                 dumpPath(realPath, narSink);
                 narHash = narSink.finish();
@@ -1329,6 +1344,11 @@ StorePath LocalStore::addToStoreFromDump(
             canonicalisePathMetaData(realPath); // FIXME: merge into restorePath
 
             optimisePath(realPath, repair);
+
+            if (settings.fsyncStorePaths) {
+                recursiveSync(realPath);
+                syncParent(realPath);
+            }
 
             ValidPathInfo info {
                 *this,
@@ -1407,12 +1427,13 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         printInfo("checking link hashes...");
 
         for (auto & link : std::filesystem::directory_iterator{linksDir}) {
+            checkInterrupt();
             auto name = link.path().filename();
             printMsg(lvlTalkative, "checking contents of '%s'", name);
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
                 PosixSourceAccessor::createAtRoot(link.path()),
-                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).to_string(HashFormat::Nix32, false);
+                FileIngestionMethod::NixArchive, HashAlgorithm::SHA256).first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     link.path(), name, hash);
@@ -1499,6 +1520,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
        invalid states.
      */
     for (auto & i : std::filesystem::directory_iterator{realStoreDir.to_string()}) {
+        checkInterrupt();
         try {
             storePathsInStoreDir.insert({i.path().filename().string()});
         } catch (BadStorePath &) { }
@@ -1579,62 +1601,6 @@ std::optional<TrustedFlag> LocalStore::isTrustedClient()
 {
     return Trusted;
 }
-
-
-#if defined(FS_IOC_SETFLAGS) && defined(FS_IOC_GETFLAGS) && defined(FS_IMMUTABLE_FL)
-
-static void makeMutable(const Path & path)
-{
-    checkInterrupt();
-
-    auto st = lstat(path);
-
-    if (!S_ISDIR(st.st_mode) && !S_ISREG(st.st_mode)) return;
-
-    if (S_ISDIR(st.st_mode)) {
-        for (auto & i : readDirectory(path))
-            makeMutable(path + "/" + i.name);
-    }
-
-    /* The O_NOFOLLOW is important to prevent us from changing the
-       mutable bit on the target of a symlink (which would be a
-       security hole). */
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW
-#ifndef _WIN32
-        | O_CLOEXEC
-#endif
-        );
-    if (fd == INVALID_DESCRIPTOR) {
-        if (errno == ELOOP) return; // it's a symlink
-        throw SysError("opening file '%1%'", path);
-    }
-
-    unsigned int flags = 0, old;
-
-    /* Silently ignore errors getting/setting the immutable flag so
-       that we work correctly on filesystems that don't support it. */
-    if (ioctl(fd, FS_IOC_GETFLAGS, &flags)) return;
-    old = flags;
-    flags &= ~FS_IMMUTABLE_FL;
-    if (old == flags) return;
-    if (ioctl(fd, FS_IOC_SETFLAGS, &flags)) return;
-}
-
-/* Upgrade from schema 6 (Nix 0.15) to schema 7 (Nix >= 1.3). */
-void LocalStore::upgradeStore7()
-{
-    if (!isRootUser()) return;
-    printInfo("removing immutable bits from the Nix store (this may take a while)...");
-    makeMutable(realStoreDir);
-}
-
-#else
-
-void LocalStore::upgradeStore7()
-{
-}
-
-#endif
 
 
 void LocalStore::vacuumDB()

@@ -81,6 +81,17 @@ in
             virtualisation.additionalPaths = [ config.system.build.extraUtils ];
             nix.settings.substituters = lib.mkForce [ ];
             programs.ssh.extraConfig = "ConnectTimeout 30";
+            environment.systemPackages = [
+              # `bad-shell` is used to make sure Nix works an environment with a misbehaving shell.
+              #
+              # More realistically, a bad shell would still run the command ("echo started")
+              # but considering that our solution is to avoid this shell (set via $SHELL), we
+              # don't need to bother with a more functional mock shell.
+              (pkgs.writeScriptBin "bad-shell" ''
+                #!${pkgs.runtimeShell}
+                echo "Hello, I am a broken shell"
+              '')
+            ];
           };
       };
 
@@ -104,11 +115,23 @@ in
         builder.succeed("mkdir -p -m 700 /root/.ssh")
         builder.copy_from_host("key.pub", "/root/.ssh/authorized_keys")
         builder.wait_for_unit("sshd")
-        client.succeed(f"ssh -o StrictHostKeyChecking=no {builder.name} 'echo hello world'")
+        # Make sure the builder can handle our login correctly
+        builder.wait_for_unit("multi-user.target")
+        # Make sure there's no funny business on the client either
+        # (should not be necessary, but we have reason to be careful)
+        client.wait_for_unit("multi-user.target")
+        client.succeed(f"""
+          ssh -o StrictHostKeyChecking=no {builder.name} \
+            'echo hello world on $(hostname)' >&2
+        """)
+
+      # Check that SSH uses SHELL for LocalCommand, as expected, and check that
+      # our test setup here is working. The next test will use this bad SHELL.
+      client.succeed(f"SHELL=$(which bad-shell) ssh -oLocalCommand='true' -oPermitLocalCommand=yes {builder1.name} 'echo hello world' | grep -F 'Hello, I am a broken shell'")
 
       # Perform a build and check that it was performed on the builder.
       out = client.succeed(
-        "nix-build ${expr nodes.client 1} 2> build-output",
+        "SHELL=$(which bad-shell) nix-build ${expr nodes.client 1} 2> build-output",
         "grep -q Hello build-output"
       )
       builder1.succeed(f"test -e {out}")

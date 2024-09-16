@@ -20,11 +20,13 @@ void saveMountNamespace();
 void restoreMountNamespace();
 
 /**
- * Cause this thread to not share any FS attributes with the main
+ * Cause this thread to try to not share any FS attributes with the main
  * thread, because this causes setns() in restoreMountNamespace() to
  * fail.
+ *
+ * This is best effort -- EPERM and ENOSYS failures are just ignored.
  */
-void unshareFilesystem();
+void tryUnshareFilesystem();
 
 bool userNamespacesSupported();
 

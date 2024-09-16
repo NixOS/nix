@@ -1,5 +1,6 @@
 #include "buildenv.hh"
 #include "derivations.hh"
+#include "signals.hh"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -30,6 +31,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
     }
 
     for (const auto & ent : srcFiles) {
+        checkInterrupt();
         auto name = ent.path().filename();
         if (name.string()[0] == '.')
             /* not matched by glob */
