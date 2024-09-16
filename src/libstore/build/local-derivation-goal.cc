@@ -2972,6 +2972,7 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv->isBuiltin()) {
             printError("note: keeping build directory '%s'", tmpDir);
+            chmod(topTmpDir.c_str(), 0755);
             chmod(tmpDir.c_str(), 0755);
         }
         else
