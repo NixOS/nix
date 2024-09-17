@@ -4,17 +4,15 @@
 #include "store-cast.hh"
 #include "indirect-root-store.hh"
 #include "common-args.hh"
-#include "strings.hh"
-#include "installable-derived-path.hh"
 
 using namespace nix;
 
-struct CmdAddRoot : StoreCommand
+struct CmdAddGCRoot : StoreCommand
 {
     std::vector<std::string> links;
     bool checkResults = true;
 
-    CmdAddRoot()
+    CmdAddGCRoot()
     {
         expectArgs({
             .label = "indirect-roots",
@@ -25,13 +23,13 @@ struct CmdAddRoot : StoreCommand
 
     std::string description() override
     {
-        return "Add indirect gc-roots through the symlink arguments";
+        return "Add indirect gc roots through the symlink arguments";
     }
 
     std::string doc() override
     {
         return
-#include "add-root.md"
+#include "store-add-gc-root.md"
             ;
     }
 
@@ -53,7 +51,7 @@ struct CmdAddRoot : StoreCommand
             if (checkResults) {
                 auto path = indirectRootStore.followLinksToStorePath(indirectPath);
                 indirectRootStore.addTempRoot(path);
-                // TODO: ensure the path is safe from concurrent GC of fail.
+                // TODO: ensure `path` is safe from concurrent GC or fail.
             }
 
             indirectRootStore.addIndirectRoot(indirectPath);
@@ -61,4 +59,4 @@ struct CmdAddRoot : StoreCommand
     }
 };
 
-static auto rCmdAddRoot = registerCommand<CmdAddRoot>("add-root");
+static auto rCmdAddGCRoot = registerCommand2<CmdAddGCRoot>({"store", "add-gc-root"});

@@ -3,9 +3,8 @@ R""(
 # Examples
 
   ```console
-  $ readlink foo
-  /nix/store/xxx
-  $ nix add-root foo
+  $ ln -s /nix/store/xxx foo
+  $ nix store add-gc-root foo
   $ nix-store -q --roots /nix/store/xxx
   .../foo -> /nix/store/xxx
   ```
