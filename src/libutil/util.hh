@@ -172,9 +172,13 @@ constexpr char treeNull[] = "    ";
 
 
 /**
- * Base64 encoding/decoding.
+ * Encode arbitrary bytes as Base64.
  */
 std::string base64Encode(std::string_view s);
+
+/**
+ * Decode arbitrary bytes to Base64.
+ */
 std::string base64Decode(std::string_view s);
 
 
