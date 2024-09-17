@@ -245,7 +245,12 @@ Hash::Hash(std::string_view rest, HashAlgorithm algo, bool isSRI)
     }
 
     else if (isSRI || rest.size() == base64Len()) {
-        auto d = base64Decode(rest);
+        std::string d;
+        try {
+            d = base64Decode(rest);
+        } catch (Error & e) {
+            e.addTrace({}, "While decoding hash '%s'", rest);
+        }
         if (d.size() != hashSize)
             throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", rest);
         assert(hashSize);

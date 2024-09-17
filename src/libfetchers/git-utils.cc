@@ -460,7 +460,13 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         std::string re = R"(Good "git" signature for \* with .* key SHA256:[)";
         for (const fetchers::PublicKey & k : publicKeys){
             // Calculate sha256 fingerprint from public key and escape the regex symbol '+' to match the key literally
-            auto fingerprint = trim(hashString(HashAlgorithm::SHA256, base64Decode(k.key)).to_string(nix::HashFormat::Base64, false), "=");
+            std::string keyDecoded;
+            try {
+                keyDecoded = base64Decode(k.key);
+            } catch (Error & e) {
+                e.addTrace({}, "while decoding public key '%s' used for git signature", k.key);
+            }
+            auto fingerprint = trim(hashString(HashAlgorithm::SHA256, keyDecoded).to_string(nix::HashFormat::Base64, false), "=");
             auto escaped_fingerprint = std::regex_replace(fingerprint, std::regex("\\+"), "\\+" );
             re += "(" + escaped_fingerprint + ")";
         }

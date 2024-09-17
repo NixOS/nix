@@ -14,17 +14,30 @@ BorrowedCryptoValue BorrowedCryptoValue::parse(std::string_view s)
     return {s.substr(0, colon), s.substr(colon + 1)};
 }
 
-Key::Key(std::string_view s)
+Key::Key(std::string_view s, bool sensitiveValue)
 {
     auto ss = BorrowedCryptoValue::parse(s);
 
     name = ss.name;
     key = ss.payload;
 
+<<<<<<< HEAD
     if (name == "" || key == "")
         throw Error("secret key is corrupt");
+=======
+    try {
+        if (name == "" || key == "")
+            throw FormatError("key is corrupt");
+>>>>>>> 2b6b03d8d (Ensure error messages don't leak private key)
 
-    key = base64Decode(key);
+        key = base64Decode(key);
+    } catch (Error & e) {
+        std::string extra;
+        if (!sensitiveValue)
+            extra = fmt(" with raw value '%s'", key);
+        e.addTrace({}, "while decoding key named '%s'%s", name, extra);
+        throw;
+    }
 }
 
 std::string Key::to_string() const
@@ -33,7 +46,7 @@ std::string Key::to_string() const
 }
 
 SecretKey::SecretKey(std::string_view s)
-    : Key(s)
+    : Key{s, true}
 {
     if (key.size() != crypto_sign_SECRETKEYBYTES)
         throw Error("secret key is not valid");
@@ -66,7 +79,7 @@ SecretKey SecretKey::generate(std::string_view name)
 }
 
 PublicKey::PublicKey(std::string_view s)
-    : Key(s)
+    : Key{s, false}
 {
     if (key.size() != crypto_sign_PUBLICKEYBYTES)
         throw Error("public key is not valid");
@@ -83,7 +96,12 @@ bool PublicKey::verifyDetached(std::string_view data, std::string_view sig) cons
 
 bool PublicKey::verifyDetachedAnon(std::string_view data, std::string_view sig) const
 {
-    auto sig2 = base64Decode(sig);
+    std::string sig2;
+    try {
+        sig2 = base64Decode(sig);
+    } catch (Error & e) {
+        e.addTrace({}, "while decoding signature '%s'", sig);
+    }
     if (sig2.size() != crypto_sign_BYTES)
         throw Error("signature is not valid");
 
