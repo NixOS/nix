@@ -1,6 +1,7 @@
 #ifdef HAVE_RYML
 
 #include "libexpr.hh"
+#include "primops.hh"
 
 // Ugly, however direct access to the SAX parser is required in order to parse multiple JSON objects from a stream
 #include "json-to-value.cc"
@@ -9,6 +10,7 @@
 namespace nix {
 // Testing the conversion from YAML
 
+    /* replacement of non-ascii unicode characters, which indicate the presence of certain characters that would be otherwise hard to read */
     static std::string replaceUnicodePlaceholders(std::string_view str) {
         constexpr std::string_view eop("\xe2\x88\x8e");
         constexpr std::string_view filler{"\xe2\x80\x94"};
@@ -91,17 +93,24 @@ namespace nix {
     class FromYAMLTest : public LibExprTest {
         protected:
 
-            std::string execYAMLTest(std::string_view test) {
-                const PrimOpFun fromYAML = state.getBuiltin("fromYAML").primOp->fun;
+            void execYAMLTest(std::string_view test) {
+                //const PrimOpFun fromYAML = state.getBuiltin("fromYAML").primOp->fun;
+                PrimOpFun fromYAML = nullptr;
+                for (const auto & primOp : *RegisterPrimOp::primOps) {
+                    if (primOp.name == "__fromYAML") {
+                        fromYAML = primOp.fun;
+                    }
+                }
+                EXPECT_FALSE(fromYAML == nullptr) << "The experimental feature \"fromYAML\" is not available";
                 Value testCases, testVal;
                 Value *pTestVal = &testVal;
                 testVal.mkString(test);
                 fromYAML(state, noPos, &pTestVal, testCases);
-                int ctr = -1;
+                size_t ctr = 0;
+                std::string_view testName;
+                Value *json = nullptr;
                 for (auto testCase : testCases.listItems()) {
-                    Value *json = nullptr;
                     bool fail = false;
-                    ctr++;
                     std::string_view yamlRaw;
                     for (auto attr = testCase->attrs->begin(); attr != testCase->attrs->end(); attr++) {
                         auto name = state.symbols[attr->name];
@@ -111,44 +120,47 @@ namespace nix {
                             yamlRaw = state.forceStringNoCtx(*attr->value, noPos, "while interpreting the \"yaml\" field as string");
                         } else if (name == "fail") {
                             fail = state.forceBool(*attr->value, noPos, "while interpreting the \"fail\" field as bool");
+                        } else if (name == "name") {
+                            testName = state.forceStringNoCtx(*attr->value, noPos, "while interpreting the \"name\" field as string");
                         }
                     }
-                    fail |= !json;
-                    bool emptyJSON = false;
-                    std::string_view jsonStr;
+                    // extract expected result
                     Value jsonVal;
+                    bool nullJSON = json && json->type() == nNull;
+                    bool emptyJSON = !nullJSON;
+                    if (json && !nullJSON) {
+                        std::string_view jsonStr = state.forceStringNoCtx(*json, noPos, "while interpreting the \"json\" field as string");
+                        emptyJSON = jsonStr.empty();
+                        if (!emptyJSON) {
+                            jsonVal = parseJSONStream(state, jsonStr, fromYAML);
+                            jsonStr = printValue(state, jsonVal);
+                        }
+                    }
+                    // extract the YAML to be parsed
                     std::string yamlStr = replaceUnicodePlaceholders(yamlRaw);
                     Value yaml, yamlVal;
                     Value *pYaml = &yaml;
                     yaml.mkString(yamlStr);
                     if (!fail) {
-                        if (json->type() == nNull) {
-                            jsonStr = "null";
-                            jsonVal.mkNull();
+                        if (emptyJSON) {
+                            EXPECT_THROW(
+                                fromYAML(state, noPos, &pYaml, yamlVal),
+                                EvalError) << "Testcase #" << ctr << ": Expected empty YAML, which should throw an exception, parsed \"" << printValue(state, yamlVal) << "\":\n" << yamlRaw;
                         } else {
-                            jsonStr = state.forceStringNoCtx(*json, noPos, "while interpreting the \"json\" field as string");
-                        }
-                        if (!(emptyJSON = jsonStr.empty())) {
-                            if (json->type() != nNull) {
-                                jsonVal = parseJSONStream(state, jsonStr, fromYAML);
-                                jsonStr = printValue(state, jsonVal);
-                            }
                             fromYAML(state, noPos, &pYaml, yamlVal);
-                            EXPECT_EQ(printValue(state, yamlVal), printValue(state, jsonVal)) << "Testcase[" + std::to_string(ctr) + "]: Parsed YAML does not match expected JSON result";
+                            if (nullJSON) {
+                                EXPECT_TRUE(yamlVal.type() == nNull) << "Testcase #" << ctr << ": Expected null YAML:\n" << yamlStr;
+                            } else {
+                                EXPECT_EQ(printValue(state, yamlVal), printValue(state, jsonVal)) << "Testcase #" << ctr << ": Parsed YAML does not match expected JSON result:\n" << yamlRaw;
+                            }
                         }
+                    } else {
+                        EXPECT_THROW(
+                            fromYAML(state, noPos, &pYaml, yamlVal),
+                            EvalError) << "Testcase #" << ctr << " (" << testName << "): Parsing YAML has to throw an exception, but \"" << printValue(state, yamlVal) << "\" was parsed:\n" << yamlRaw;
                     }
-                    if (fail || emptyJSON) {
-                        try {
-                            fromYAML(state, noPos, &pYaml, yamlVal); // should throw exception, if fail is asserted, and has to throw, if emptyJSON is asserted
-                        } catch (const EvalError &e) {
-                            continue;
-                        }
-                    }
-                    EXPECT_FALSE(emptyJSON) << "Testcase[" + std::to_string(ctr) + "]: Parsing empty YAML has to fail";
-                    // ryml parses some invalid YAML successfully
-                    // EXPECT_FALSE(fail) << "Testcase[" << ctr << "]: Invalid YAML was parsed successfully";
+                    ctr++;
                 }
-                return "OK";
             }
     };
 
