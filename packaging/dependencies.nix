@@ -176,14 +176,14 @@ scope: {
 
   rapidyaml = pkgs.rapidyaml.overrideAttrs(old: let
     pname = "rapidyaml";
-    version = "0.5.0";
+    version = "0.7.2";
   in {
     src = pkgs.fetchFromGitHub {
       owner = "biojppm";
       repo = pname;
       rev = "v${version}";
       fetchSubmodules = true;
-      hash = "sha256-1/P6Szgng94UU8cPFAtOKMS+EmiwfW/IJl2UTolDU5s=";
+      hash = "sha256-vAYafhWo9xavM2j+mT3OGcX7ZSS25mieR/3b79BO+jA=";
     };
 
       cmakeFlags = [

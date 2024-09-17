@@ -35,71 +35,73 @@ static void s_error [[ noreturn ]] (const char* msg, size_t len, ryml::Location,
 
 static void visitYAMLNode(NixContext & context, Value & v, ryml::ConstNodeRef t) {
 
-    auto valTypeCheck = [=] (ryml::YamlTag_e tag, bool defaultVal = true) {
-        auto valTag = ryml::TAG_NONE;
-        if (t.has_val_tag()) {
-            auto tag = t.val_tag();
-            valTag = tag == "!" ? ryml::TAG_STR : ryml::to_tag(tag);
-        }
-        return valTag == ryml::TAG_NONE ? defaultVal : valTag == tag;
-    };
-
-    v.mkBlackhole();
-    if (t.has_key_tag()) {
-        auto tag = ryml::to_tag(t.key_tag());
-        if (tag != ryml::TAG_NONE && tag != ryml::TAG_STR) {
-            auto msg = ryml::formatrs<std::string>(
-                "Error: Nix supports string keys only, but the key '{}' has the tag '{}'", t.key(), t.key_tag());
-            s_error(msg.data(), msg.size(), {}, &context);
-        }
-    }
+    bool fail = false;
     if (t.is_map()) {
-        if (t.num_children() == 1) { // special case for YAML string ":"
-            auto child = t.child(0);
-            if (child.key().empty() && !child.is_key_quoted() && child.has_val() && child.val().empty() && !child.is_val_quoted()) {
-                v.mkNull();
-            }
-        }
-        if (v.type() != nNull) {
-            auto attrs = context.state.buildBindings(t.num_children());
+        auto attrs = context.state.buildBindings(t.num_children());
 
-            for (ryml::ConstNodeRef child : t.children()) {
-                std::string_view key(child.key().begin(), child.key().size());
-                visitYAMLNode(context, attrs.alloc(key), child);
+        for (ryml::ConstNodeRef child : t.children()) {
+            if (child.has_key_tag()) {
+                auto tag = ryml::to_tag(child.key_tag());
+                if (tag != ryml::TAG_NONE && tag != ryml::TAG_STR) {
+                    auto msg = ryml::formatrs<std::string>(
+                        "Error: Nix supports string keys only, but the key '{}' has the tag '{}' {}/{}", child.key(), child.key_tag(), tag, ryml::TAG_STR);
+                    s_error(msg.data(), msg.size(), {}, &context);
+                }
+            } else if (child.key_is_null()) {
+                std::stringstream ss;
+                ss << t;
+                auto msg = ryml::formatrs<std::string>(
+                    "Error: Nix supports string keys only, but the map '{}' contains a null-key", ss.str());
+                s_error(msg.data(), msg.size(), {}, &context);
             }
-
-            v.mkAttrs(attrs);
+            std::string_view key(child.key().begin(), child.key().size());
+            visitYAMLNode(context, attrs.alloc(key), child);
         }
+
+        v.mkAttrs(attrs);
     } else if (t.is_seq()) {
         context.state.mkList(v, t.num_children());
 
         size_t i = 0;
-        for (ryml::ConstNodeRef child : t.children())
+        for (ryml::ConstNodeRef child : t.children()) {
             visitYAMLNode(context, *(v.listElems()[i++] = context.state.allocValue()), child);
-    } else if (valTypeCheck(ryml::TAG_NULL) && t.val_is_null()) {
-        v.mkNull();
+        }
     } else if (t.has_val()) {
         bool _bool;
         NixFloat _float;
         NixInt _int;
-        bool isQuoted = t.is_val_quoted();
         auto val = t.val();
-        // Caution: ryml is able to convert integers into booleans and ryml::from_chars might ignore trailing chars
-        if (t.has_val_tag() && t.val_tag() == "!" && val.empty() && !isQuoted) { // special case for YAML string "!"
-            v.mkNull();
-        } else if (valTypeCheck(ryml::TAG_INT, !isQuoted) && val.is_integer() && ryml::from_chars(val, &_int)) {
-            v.mkInt(_int);
-        } else if (valTypeCheck(ryml::TAG_BOOL, !isQuoted) && ryml::from_chars(val, &_bool)) {
-            v.mkBool(_bool);
-        } else if (valTypeCheck(ryml::TAG_FLOAT, !isQuoted) && val.is_number() && ryml::from_chars(val, &_float)) {
-            v.mkFloat(_float);
+        auto valTag = ryml::TAG_NONE;
+        bool isQuoted = t.is_val_quoted();
+        bool isNull = (!isQuoted && val.empty()) || t.val_is_null();
+        if (t.has_val_tag()) {
+            auto tag = t.val_tag();
+            valTag = tag == "!" && !isNull ? ryml::TAG_STR : ryml::to_tag(tag);
         }
-        if (valTypeCheck(ryml::TAG_STR) && v.type() == nThunk) {
+
+        auto scalarTypeCheck = [=] (ryml::YamlTag_e tag) {
+            return valTag == ryml::TAG_NONE ? !isQuoted : valTag == tag;
+        };
+
+        // Caution: ryml is able to convert integers into booleans and ryml::from_chars might ignore trailing chars
+        if ((isNull && valTag != ryml::TAG_STR) || (valTag == ryml::TAG_NULL && (val == "null" || val == "~"))) {
+            v.mkNull();
+        } else if (scalarTypeCheck(ryml::TAG_INT) && val.is_integer() && ryml::from_chars(val, &_int)) {
+            v.mkInt(_int);
+        } else if (scalarTypeCheck(ryml::TAG_BOOL) && ryml::from_chars(val, &_bool)) {
+            v.mkBool(_bool);
+        } else if (scalarTypeCheck(ryml::TAG_FLOAT) && val.is_number() && ryml::from_chars(val, &_float)) {
+            v.mkFloat(_float);
+        } else if (valTag == ryml::TAG_NONE || valTag == ryml::TAG_STR) {
             std::string_view value(val.begin(), val.size());
             v.mkString(value);
+        } else {
+            fail = true;
         }
+    } else {
+        fail = true;
     }
-    if (v.type() == nThunk) {
+    if (fail) {
         auto val = t.has_val() ? t.val() : "";
         auto tag = t.has_val_tag() ? t.val_tag() : "";
         auto msg = ryml::formatrs<std::string>(
@@ -120,13 +122,12 @@ static RegisterPrimOp primop_fromYAML({
 
       returns the value `{ x = [ 1 2 3 ]; y = "null"; z = null; }`.
 
-      Maps are converted to attribute sets, but attribute sets require String keys, so that no other key data types are supported.
+      Maps are converted to attribute sets, but only strings are supported as keys.
 
-      Scalars are converted to the type specified by their optional value tag and parsing fails, if a conversion is not possible.
+      Scalars are converted to the type specified by their optional value tag. Parsing fails if a conversion is not possible.
       Not all YAML types are supported by Nix, e.g. Nix has no binary and timestamp data types, so that parsing of YAML with any of these types fails.
       Custom tags are ignored and a stream with multiple documents is mapped to a list except when the stream contains a single document.
     )",
-    .experimentalFeature = Xp::FromYaml,
     .fun = [] (EvalState & state, const PosIdx pos, Value * * args, Value & val) {
         auto yaml = state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.fromYAML");
 
@@ -135,9 +136,11 @@ static RegisterPrimOp primop_fromYAML({
             .pos = pos,
             .yaml = yaml
         };
-        ryml::set_callbacks({nullptr, nullptr, nullptr, s_error}); // failed assertion should throw an exception
-        ryml::Parser parser{{&context, nullptr, nullptr, s_error}};
-        auto tree = parser.parse_in_arena({}, ryml::csubstr(yaml.begin(), yaml.size()));
+        ryml::EventHandlerTree evth;
+        ryml::Callbacks callbacks(&context, nullptr, nullptr, s_error);
+        ryml::set_callbacks(callbacks);
+        ryml::Parser parser(&evth);
+        ryml::Tree tree = ryml::parse_in_arena(&parser, ryml::csubstr(yaml.begin(), yaml.size()));
         tree.resolve(); // resolve references
         tree.resolve_tags();
 
@@ -149,7 +152,8 @@ static RegisterPrimOp primop_fromYAML({
         if (root.is_stream() && root.num_children() == 1 && root.child(0).is_doc())
             root = root.child(0);
         visitYAMLNode(context, val, root);
-    }
+    },
+    .experimentalFeature = Xp::FromYaml
 });
 
 }
