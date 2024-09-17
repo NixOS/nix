@@ -44,7 +44,7 @@ static void visitYAMLNode(NixContext & context, Value & v, ryml::ConstNodeRef t)
                 auto tag = ryml::to_tag(child.key_tag());
                 if (tag != ryml::TAG_NONE && tag != ryml::TAG_STR) {
                     auto msg = ryml::formatrs<std::string>(
-                        "Error: Nix supports string keys only, but the key '{}' has the tag '{}' {}/{}", child.key(), child.key_tag(), tag, ryml::TAG_STR);
+                        "Error: Nix supports string keys only, but the key '{}' has the tag '{}'", child.key(), child.key_tag());
                     s_error(msg.data(), msg.size(), {}, &context);
                 }
             } else if (child.key_is_null()) {
