@@ -3,6 +3,7 @@
 #include "tests/nix_api_util.hh"
 
 #include "file-system.hh"
+#include <filesystem>
 
 #include "nix_api_store.h"
 #include "nix_api_store_internal.h"
@@ -47,7 +48,9 @@ protected:
             if (fs::create_directory(nixDir)) break;
         }
 #else
-        auto tmpl = nix::defaultTempDir() + "/tests_nix-store.XXXXXX";
+        // resolve any symlinks in i.e. on macOS /tmp -> /private/tmp
+        // because this is not allowed for a nix store.
+        auto tmpl = nix::absPath(std::filesystem::path(nix::defaultTempDir()) / "tests_nix-store.XXXXXX", true);
         nixDir = mkdtemp((char *) tmpl.c_str());
 #endif
 
