@@ -36,6 +36,7 @@ enum struct ExperimentalFeature
     MountedSSHStore,
     VerifiedFetches,
     PipeOperators,
+    FromYaml,
 };
 
 /**
