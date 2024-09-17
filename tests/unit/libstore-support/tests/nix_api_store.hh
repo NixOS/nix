@@ -61,6 +61,10 @@ protected:
         const char ** params[] = {p1, p2, p3, nullptr};
 
         store = nix_store_open(ctx, "local", params);
+        if (!store) {
+            std::string errMsg = nix_err_msg(nullptr, ctx, nullptr);
+            ASSERT_NE(store, nullptr) << "Could not open store: " << errMsg;
+        };
     }
 };
 }
