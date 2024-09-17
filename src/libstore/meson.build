@@ -427,7 +427,7 @@ extra_pkg_config_variables = {
 }
 
 # Working around https://github.com/mesonbuild/meson/issues/13584
-if host_machine.system() != 'macos'
+if host_machine.system() != 'darwin'
   extra_pkg_config_variables += {
     'localstatedir' : get_option('localstatedir'),
   }
