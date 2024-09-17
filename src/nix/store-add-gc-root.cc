@@ -19,6 +19,12 @@ struct CmdAddGCRoot : StoreCommand
             .handler = {&links},
             .completer = completePath,
         });
+
+        addFlag({
+            .longName = "no-check",
+            .description = "Do not test the validity of created roots.",
+            .handler = {&checkResults, false},
+        });
     }
 
     std::string description() override
@@ -51,7 +57,9 @@ struct CmdAddGCRoot : StoreCommand
             if (checkResults) {
                 auto path = indirectRootStore.followLinksToStorePath(indirectPath);
                 indirectRootStore.addTempRoot(path);
-                // TODO: ensure `path` is safe from concurrent GC or fail.
+                if (!indirectRootStore.isValidPath(path)) {
+                    throw Error("Indirect root '%1%' is no a symbolic link to a valid store path", link);
+                }
             }
 
             indirectRootStore.addIndirectRoot(indirectPath);
