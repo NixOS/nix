@@ -1,7 +1,6 @@
 with import ./config.nix;
 
-let
-
+rec {
   bar = mkDerivation {
     name = "bar";
     builder = builtins.toFile "builder.sh"
@@ -15,12 +14,20 @@ let
     assert builtins.pathExists bar;
     import bar;
 
-in
+  result = mkDerivation {
+    name = "foo";
+    builder = builtins.toFile "builder.sh"
+      ''
+        echo -n FOO${toString value} > $out
+      '';
+  };
 
-mkDerivation {
-  name = "foo";
-  builder = builtins.toFile "builder.sh"
-    ''
-      echo -n FOO${toString value} > $out
-    '';
+  addPath = mkDerivation {
+    name = "add-path";
+    src = builtins.filterSource (path: type: true) result;
+    builder = builtins.toFile "builder.sh"
+      ''
+        echo -n BLA$(cat $src) > $out
+      '';
+  };
 }
