@@ -12,6 +12,7 @@
 #include <mutex>
 #include <thread>
 
+#include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
 #ifndef _WIN32
@@ -363,10 +364,21 @@ void initLibStore(bool loadConfig) {
 
     preloadNSS();
 
+    /* Because of an objc quirk[1], calling curl_global_init for the first time
+       after fork() will always result in a crash.
+       Up until now the solution has been to set OBJC_DISABLE_INITIALIZE_FORK_SAFETY
+       for every nix process to ignore that error.
+       Instead of working around that error we address it at the core -
+       by calling curl_global_init here, which should mean curl will already
+       have been initialized by the time we try to do so in a forked process.
+
+       [1] https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-initialize.mm#L614-L636
+    */
+    curl_global_init(CURL_GLOBAL_ALL);
+#if __APPLE__
     /* On macOS, don't use the per-session TMPDIR (as set e.g. by
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */
-#if __APPLE__
     if (hasPrefix(defaultTempDir(), "/var/folders/"))
         unsetenv("TMPDIR");
 #endif
