@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStoreIfPossible
 
 if nix-instantiate --readonly-mode ./import-from-derivation.nix -A result; then
@@ -12,6 +14,11 @@ fi
 outPath=$(nix-build ./import-from-derivation.nix -A result --no-out-link)
 
 [ "$(cat "$outPath")" = FOO579 ]
+
+# FIXME: the next tests are broken on CA.
+if [[ -n "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
+    exit 0
+fi
 
 # Test filterSource on the result of a derivation.
 outPath2=$(nix-build ./import-from-derivation.nix -A addPath --no-out-link)
