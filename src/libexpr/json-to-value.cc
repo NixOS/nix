@@ -1,10 +1,8 @@
-#include "json-to-value.hh"
+#include "json-to-value-sax.hh"
 #include "value.hh"
 #include "eval.hh"
 
 #include <limits>
-#include <variant>
-#include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
@@ -12,7 +10,7 @@ namespace nix {
 
 // for more information, refer to
 // https://github.com/nlohmann/json/blob/master/include/nlohmann/detail/input/json_sax.hpp
-class JSONSax : nlohmann::json_sax<json> {
+class JSONSax : public nlohmann::json_sax<json> {
     class JSONState {
     protected:
         std::unique_ptr<JSONState> parent;
@@ -81,6 +79,7 @@ class JSONSax : nlohmann::json_sax<json> {
 
 public:
     JSONSax(EvalState & state, Value & v) : state(state), rs(new JSONState(&v)) {};
+    virtual ~JSONSax() = default;
 
     bool null() override
     {
@@ -177,6 +176,10 @@ void parseJSON(EvalState & state, const std::string_view & s_, Value & v)
     bool res = json::sax_parse(s_, &parser);
     if (!res)
         throw JSONParseError("Invalid JSON Value");
+}
+
+std::unique_ptr<nlohmann::json_sax<json>> makeJSONSaxParser(EvalState & state, Value & v) {
+    return { std::make_unique<JSONSax>(state, v) };
 }
 
 }

@@ -19,15 +19,15 @@ struct NixContext {
 static void s_error [[ noreturn ]] (const char* msg, size_t len, ryml::Location, void *nixContext)
 {
     auto context = static_cast<const NixContext *>(nixContext);
-    if (nixContext) {
-        throw EvalError({
-            .msg = hintfmt("while parsing the YAML string '%1%':\n\n%2%",
+    if (context) {
+        throw EvalError(context->state, ErrorInfo{
+            .msg = fmt("while parsing the YAML string '%1%':\n\n%2%",
                 context->yaml, std::string_view(msg, len)),
-            .errPos = context->state.positions[context->pos]
+            .pos = context->state.positions[context->pos]
         });
     } else {
-        throw EvalError({
-            .msg = hintfmt("failed assertion in rapidyaml library:\n\n%1%",
+        throw Error({
+            .msg = fmt("failed assertion in rapidyaml library:\n\n%1%",
                 std::string_view(msg, len))
         });
     }
@@ -60,16 +60,17 @@ static void visitYAMLNode(NixContext & context, Value & v, ryml::ConstNodeRef t)
 
         v.mkAttrs(attrs);
     } else if (t.is_seq()) {
-        context.state.mkList(v, t.num_children());
+        ListBuilder list(context.state, t.num_children());
 
         size_t i = 0;
         for (ryml::ConstNodeRef child : t.children()) {
-            visitYAMLNode(context, *(v.listElems()[i++] = context.state.allocValue()), child);
+            visitYAMLNode(context, *(list[i++] = context.state.allocValue()), child);
         }
+        v.mkList(list);
     } else if (t.has_val()) {
         bool _bool;
         NixFloat _float;
-        NixInt _int;
+        NixInt::Inner _int;
         auto val = t.val();
         auto valTag = ryml::TAG_NONE;
         bool isQuoted = t.is_val_quoted();
@@ -136,9 +137,11 @@ static RegisterPrimOp primop_fromYAML({
             .pos = pos,
             .yaml = yaml
         };
-        ryml::EventHandlerTree evth;
-        ryml::Callbacks callbacks(&context, nullptr, nullptr, s_error);
+        ryml::Callbacks callbacks;
+        callbacks.m_error = s_error;
         ryml::set_callbacks(callbacks);
+        callbacks.m_user_data = &context;
+        ryml::EventHandlerTree evth(callbacks);
         ryml::Parser parser(&evth);
         ryml::Tree tree = ryml::parse_in_arena(&parser, ryml::csubstr(yaml.begin(), yaml.size()));
         tree.resolve(); // resolve references

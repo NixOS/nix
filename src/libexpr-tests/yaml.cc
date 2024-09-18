@@ -1,10 +1,10 @@
 #ifdef HAVE_RYML
 
-#include "libexpr.hh"
+#include "tests/libexpr.hh"
 #include "primops.hh"
 
-// Ugly, however direct access to the SAX parser is required in order to parse multiple JSON objects from a stream
-#include "json-to-value.cc"
+// access to the json sax parser is required
+#include "json-to-value-sax.hh"
 
 
 namespace nix {
@@ -54,11 +54,11 @@ namespace nix {
 
     static bool parseJSON(EvalState & state, std::istream & s_, Value & v)
     {
-        JSONSax parser(state, v);
-        return nlohmann::json::sax_parse(s_, &parser, nlohmann::json::input_format_t::json, false);
+        auto parser = makeJSONSaxParser(state, v);
+        return nlohmann::json::sax_parse(s_, parser.get(), nlohmann::json::input_format_t::json, false);
     }
 
-    static Value parseJSONStream(EvalState & state, std::string_view json, PrimOpFun fromYAML) {
+    static Value parseJSONStream(EvalState & state, std::string_view json, std::function<PrimOpFun> fromYAML) {
         std::stringstream ss;
         ss << json;
         std::list<Value> list;
@@ -80,12 +80,12 @@ namespace nix {
         if (list.size() == 1) {
             root = *list.begin();
         } else {
-            state.mkList(root, list.size());
-            Value **elems = root.listElems();
+            ListBuilder list_builder(state, list.size());
             size_t i = 0;
             for (auto val : list) {
-                *(elems[i++] = state.allocValue()) = val;
+                *(list_builder[i++] = state.allocValue()) = val;
             }
+            root.mkList(list_builder);
         }
         return root;
     }
@@ -94,13 +94,14 @@ namespace nix {
         protected:
 
             void execYAMLTest(std::string_view test) {
-                //const PrimOpFun fromYAML = state.getBuiltin("fromYAML").primOp->fun;
-                PrimOpFun fromYAML = nullptr;
-                for (const auto & primOp : *RegisterPrimOp::primOps) {
-                    if (primOp.name == "__fromYAML") {
-                        fromYAML = primOp.fun;
+                std::function<PrimOpFun> fromYAML = [] () {
+                    for (const auto & primOp : *RegisterPrimOp::primOps) {
+                        if (primOp.name == "__fromYAML") {
+                            return primOp.fun;
+                        }
                     }
-                }
+                    return std::function<PrimOpFun>();
+                } ();
                 EXPECT_FALSE(fromYAML == nullptr) << "The experimental feature \"fromYAML\" is not available";
                 Value testCases, testVal;
                 Value *pTestVal = &testVal;
@@ -112,7 +113,7 @@ namespace nix {
                 for (auto testCase : testCases.listItems()) {
                     bool fail = false;
                     std::string_view yamlRaw;
-                    for (auto attr = testCase->attrs->begin(); attr != testCase->attrs->end(); attr++) {
+                    for (auto attr = testCase->attrs()->begin(); attr != testCase->attrs()->end(); attr++) {
                         auto name = state.symbols[attr->name];
                         if (name == "json") {
                             json = attr->value;
