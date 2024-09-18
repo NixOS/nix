@@ -59,7 +59,7 @@ public:
      *
      * This only returns the correct value after parseCmdline() has run.
      */
-    virtual Path getCommandBaseDir() const;
+    virtual std::filesystem::path getCommandBaseDir() const;
 
 protected:
 

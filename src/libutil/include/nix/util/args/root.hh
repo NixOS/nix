@@ -38,7 +38,7 @@ protected:
      *
      * @see getCommandBaseDir()
      */
-    Path commandBaseDir = ".";
+    std::filesystem::path commandBaseDir = ".";
 
 public:
     /** Parse the command line, throwing a UsageError if something goes
@@ -48,7 +48,7 @@ public:
 
     std::shared_ptr<Completions> completions;
 
-    Path getCommandBaseDir() const override;
+    std::filesystem::path getCommandBaseDir() const override;
 
 protected:
 
