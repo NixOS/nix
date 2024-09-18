@@ -28,7 +28,7 @@ if canUseSandbox; then
     # of a shell in the sandbox. We only care about testing the IFD
     # semantics.
     for i in bar result addPath; do
-        nix copy --to "$store2_url" --no-check-sigs "$(nix-build ./import-from-derivation.nix -A $i --no-out-link)"
+        nix copy --to "$store2_url" --no-check-sigs "$(nix-build ./import-from-derivation.nix -A "$i" --no-out-link)"
     done
 
     clearStore
@@ -36,7 +36,7 @@ if canUseSandbox; then
     outPath_check=$(nix-build ./import-from-derivation.nix -A result --no-out-link --store "$store2_url")
     [[ "$outPath" = "$outPath_check" ]]
     [[ ! -e "$outPath" ]]
-    [[ -e "$store2/nix/store/$(basename $outPath)" ]]
+    [[ -e "$store2/nix/store/$(basename "$outPath")" ]]
 
     outPath2_check=$(nix-build ./import-from-derivation.nix -A addPath --no-out-link --store "$store2_url")
     [[ "$outPath2" = "$outPath2_check" ]]
