@@ -31,11 +31,13 @@ env > $TEST_ROOT/expected-env
 nix shell -f shell-hello.nix hello -c env > $TEST_ROOT/actual-env
 # Remove/reset variables we expect to be different.
 # - PATH is modified by nix shell
+# - we unset TMPDIR on macOS if it contains /var/folders
 # - _ is set by bash and is expectedf to differ because it contains the original command
 # - __CF_USER_TEXT_ENCODING is set by macOS and is beyond our control
 sed -i \
   -e 's/PATH=.*/PATH=.../' \
   -e 's/_=.*/_=.../' \
+  -e '/^TMPDIR=\/var\/folders\/.*/d' \
   -e '/^__CF_USER_TEXT_ENCODING=.*$/d' \
   $TEST_ROOT/expected-env $TEST_ROOT/actual-env
 sort $TEST_ROOT/expected-env > $TEST_ROOT/expected-env.sorted
