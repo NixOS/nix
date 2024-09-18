@@ -172,6 +172,10 @@ void LocalDerivationGoal::killSandbox(bool getStats)
 
 void LocalDerivationGoal::tryLocalBuild()
 {
+#if __APPLE__
+    additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
+#endif
+
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
         state = &DerivationGoal::tryToBuild;
@@ -477,10 +481,6 @@ void LocalDerivationGoal::startBuilder()
             worker.store.printStorePath(drvPath),
             settings.thisSystem,
             concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
-
-#if __APPLE__
-    additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
-#endif
 
     /* Create a temporary directory where the build will take
        place. */
