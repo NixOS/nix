@@ -86,7 +86,7 @@ static char buf[1024];]],
 AC_LANG_POP(C++)
 
 
-AC_CHECK_FUNCS([statvfs pipe2])
+AC_CHECK_FUNCS([statvfs pipe2 close_range])
 
 
 # Check for lutimes, optionally used for changing the mtime of

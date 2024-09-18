@@ -120,8 +120,37 @@ void Pipe::create()
 
 //////////////////////////////////////////////////////////////////////
 
+<<<<<<< HEAD
 void unix::closeMostFDs(const std::set<int> & exceptions)
 {
+=======
+#if __linux__ || __FreeBSD__
+static int unix_close_range(unsigned int first, unsigned int last, int flags)
+{
+#if !HAVE_CLOSE_RANGE
+    return syscall(SYS_close_range, first, last, (unsigned int)flags);
+#else
+    return close_range(first, last, flags);
+#endif
+}
+#endif
+
+void unix::closeExtraFDs()
+{
+    constexpr int MAX_KEPT_FD = 2;
+    static_assert(std::max({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO}) == MAX_KEPT_FD);
+
+#if __linux__ || __FreeBSD__
+    // first try to close_range everything we don't care about. if this
+    // returns an error with these parameters we're running on a kernel
+    // that does not implement close_range (i.e. pre 5.9) and fall back
+    // to the old method. we should remove that though, in some future.
+    if (unix_close_range(MAX_KEPT_FD + 1, ~0U, 0) == 0) {
+        return;
+    }
+#endif
+
+>>>>>>> 5c87c40a5 (Use close_range when available)
 #if __linux__
     try {
         for (auto & s : std::filesystem::directory_iterator{"/proc/self/fd"}) {

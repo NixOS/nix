@@ -28,6 +28,7 @@ subdir('build-utils-meson/subprojects')
 # HAVE_LUTIMES 1`. The `#define` is unconditional, 0 for not found and 1
 # for found. One therefore uses it with `#if` not `#ifdef`.
 check_funcs = [
+  'close_range',
   # Optionally used for changing the mtime of symlinks.
   'lutimes',
   # Optionally used for creating pipes on Unix
