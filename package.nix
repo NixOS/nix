@@ -31,6 +31,7 @@
 , openssl
 , pkg-config
 , rapidcheck
+, rapidyaml
 , sqlite
 , toml11
 , unixtools
@@ -224,6 +225,7 @@ in {
     libgit2
     libsodium
     openssl
+    rapidyaml
     sqlite
     toml11
     xz
