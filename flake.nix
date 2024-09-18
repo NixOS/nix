@@ -139,6 +139,12 @@
 
           nix = final.nixComponents.nix;
 
+          nix-serve =
+            prev.nix-serve.override {
+              # undo potential version pinning
+              nix = final.nix;
+            };
+
           # See https://github.com/NixOS/nixpkgs/pull/214409
           # Remove when fixed in this flake's nixpkgs
           pre-commit =

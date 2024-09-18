@@ -160,3 +160,10 @@ in
 
   cgroups = runNixOSTestFor "x86_64-linux" ./cgroups;
 }
+// (let
+  inherit (nixpkgsFor."x86_64-linux".native) nixosTests;
+in {
+  nix-serve =
+    assert nixosTests.nix-serve.config.nodes.machine.services.nix-serve.package.nix == self.packages.x86_64-linux.nix;
+    nixosTests.nix-serve;
+})

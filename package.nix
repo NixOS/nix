@@ -27,6 +27,7 @@
 , mdbook
 , mdbook-linkcheck
 , mercurial
+, nix-perl-bindings
 , openssh
 , openssl
 , pkg-config
@@ -333,6 +334,10 @@ in {
   strictDeps = !withCoverageChecks;
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
+
+  passthru = lib.optionalAttrs (stdenv.buildPlatform.canExecute stdenv.hostPlatform) {
+    perl-bindings = nix-perl-bindings;
+  };
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;
