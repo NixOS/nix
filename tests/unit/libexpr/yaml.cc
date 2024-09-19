@@ -65,7 +65,7 @@ static Value parseJSONStream(EvalState & state, std::string_view json, std::func
     ss << json;
     std::list<Value> list;
     Value root, refJson;
-    Value * pRoot = &root, rymlJson;
+    Value *pRoot = &root, rymlJson;
     std::streampos start = 0;
     try {
         while (ss.peek() != EOF && json.size() - ss.tellg() > 1) {

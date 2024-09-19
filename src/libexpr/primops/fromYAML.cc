@@ -85,7 +85,8 @@ static void visitYAMLNode(NixContext & context, Value & v, ryml::ConstNodeRef t)
         };
 
         // Caution: ryml is able to convert integers into booleans and ryml::from_chars might ignore trailing chars
-        if ((isNull && valTag != ryml::TAG_STR) || (valTag == ryml::TAG_NULL && (val == "null" || val == "~"))) {
+        bool nullTagged = valTag == ryml::TAG_NULL && (val == "null" || val == "Null" || val == "NULL" || val == "~");
+        if ((isNull && valTag != ryml::TAG_STR) || nullTagged) {
             v.mkNull();
         } else if (scalarTypeCheck(ryml::TAG_INT) && val.is_integer() && ryml::from_chars(val, &_int)) {
             v.mkInt(_int);
