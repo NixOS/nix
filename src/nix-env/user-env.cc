@@ -61,7 +61,7 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
 
         auto attrs = state.buildBindings(7 + outputs.size());
 
-        attrs.alloc(state.sType).mkString("derivation");
+        attrs.alloc(state.sType).mkStringNoCopy("derivation");
         attrs.alloc(state.sName).mkString(i.queryName());
         auto system = i.querySystem();
         if (!system.empty())
