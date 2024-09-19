@@ -1,5 +1,4 @@
 #include "eval.hh"
-#include "eval-gc.hh"
 #include "eval-settings.hh"
 #include "primops.hh"
 #include "print-options.hh"
@@ -37,16 +36,6 @@
 
 #ifndef _WIN32 // TODO use portable implementation
 #  include <sys/resource.h>
-#endif
-
-#if HAVE_BOEHMGC
-
-#  define GC_INCLUDE_NEW
-
-#  include <gc/gc.h>
-#  include <gc/gc_cpp.h>
-#  include <gc/gc_allocator.h>
-
 #endif
 
 #include "strings-inline.hh"

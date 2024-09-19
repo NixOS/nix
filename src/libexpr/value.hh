@@ -4,21 +4,12 @@
 #include <cassert>
 #include <span>
 
+#include "eval-gc.hh"
 #include "symbol-table.hh"
 #include "value/context.hh"
 #include "source-path.hh"
 #include "print-options.hh"
 #include "checked-arithmetic.hh"
-
-#if HAVE_BOEHMGC
-#include <gc/gc_allocator.h>
-#else
-template<typename T>
-using traceable_allocator = std::allocator<T>;
-
-template<typename T>
-using gc_allocator = std::allocator<T>;
-#endif
 
 #include <nlohmann/json_fwd.hpp>
 

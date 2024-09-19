@@ -3,6 +3,24 @@
 
 #include <cstddef>
 
+#if HAVE_BOEHMGC
+
+#  define GC_INCLUDE_NEW
+
+#  include <gc/gc.h>
+#  include <gc/gc_cpp.h>
+#  include <gc/gc_allocator.h>
+
+#else
+
+template<typename T>
+using traceable_allocator = std::allocator<T>;
+
+template<typename T>
+using gc_allocator = std::allocator<T>;
+
+#endif
+
 namespace nix {
 
 /**
