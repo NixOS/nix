@@ -22,9 +22,10 @@ using traceable_allocator = std::allocator<T>;
 template<typename T>
 using gc_allocator = std::allocator<T>;
 
-#define GC_MALLOC_ATOMIC std::malloc
-#define GC_STRDUP std::strdup
-struct gc { };
+#  define GC_MALLOC_ATOMIC std::malloc
+#  define GC_STRDUP std::strdup
+struct gc
+{};
 
 #endif
 
