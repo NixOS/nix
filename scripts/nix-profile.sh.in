@@ -1,9 +1,9 @@
 # This file is tested by tests/installer/default.nix.
-if [ -n "$HOME" ] && [ -n "$USER" ]; then
+if [ -n "${HOME-}" ] && [ -n "${USER-}" ]; then
 
     # Set up the per-user profile.
 
-    if [ -n "$NIX_STATE_HOME" ]; then
+    if [ -n "${NIX_STATE_HOME-}" ]; then
         NIX_LINK="$NIX_STATE_HOME/profile"
     else
         NIX_LINK="$HOME/.nix-profile"
