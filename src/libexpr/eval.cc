@@ -47,11 +47,7 @@ namespace nix {
 static char * allocString(size_t size)
 {
     char * t;
-#if HAVE_BOEHMGC
     t = (char *) GC_MALLOC_ATOMIC(size);
-#else
-    t = (char *) malloc(size);
-#endif
     if (!t) throw std::bad_alloc();
     return t;
 }
@@ -60,11 +56,7 @@ static char * allocString(size_t size)
 static char * dupString(const char * s)
 {
     char * t;
-#if HAVE_BOEHMGC
     t = GC_STRDUP(s);
-#else
-    t = strdup(s);
-#endif
     if (!t) throw std::bad_alloc();
     return t;
 }

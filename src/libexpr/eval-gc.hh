@@ -13,11 +13,18 @@
 
 #else
 
+/* Some dummy aliases for Boehm GC definitions to reduce the number of
+   #ifdefs. */
+
 template<typename T>
 using traceable_allocator = std::allocator<T>;
 
 template<typename T>
 using gc_allocator = std::allocator<T>;
+
+#define GC_MALLOC_ATOMIC std::malloc
+#define GC_STRDUP std::strdup
+struct gc { };
 
 #endif
 

@@ -57,9 +57,7 @@ enum class ProcessLineResult {
 struct NixRepl
     : AbstractNixRepl
     , detail::ReplCompleterMixin
-    #if HAVE_BOEHMGC
     , gc
-    #endif
 {
     size_t debugTraceIndex;
 
