@@ -139,11 +139,7 @@ struct Constant
     bool impureOnly = false;
 };
 
-#if HAVE_BOEHMGC
-    typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
-#else
-    typedef std::map<std::string, Value *> ValMap;
-#endif
+typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
 
 typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
 
@@ -329,21 +325,13 @@ private:
     /**
      * A cache from path names to parse trees.
      */
-#if HAVE_BOEHMGC
     typedef std::unordered_map<SourcePath, Expr *, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
-#else
-    typedef std::unordered_map<SourcePath, Expr *> FileParseCache;
-#endif
     FileParseCache fileParseCache;
 
     /**
      * A cache from path names to values.
      */
-#if HAVE_BOEHMGC
     typedef std::unordered_map<SourcePath, Value, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
-#else
-    typedef std::unordered_map<SourcePath, Value> FileEvalCache;
-#endif
     FileEvalCache fileEvalCache;
 
     /**
