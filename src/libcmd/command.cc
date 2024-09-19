@@ -23,7 +23,8 @@ nix::Commands RegisterCommand::getCommandsFor(const std::vector<std::string> & p
         if (name.size() == prefix.size() + 1) {
             bool equal = true;
             for (size_t i = 0; i < prefix.size(); ++i)
-                if (name[i] != prefix[i]) equal = false;
+                if (name[i] != prefix[i])
+                    equal = false;
             if (equal)
                 res.insert_or_assign(name[prefix.size()], command);
         }
@@ -42,16 +43,16 @@ void NixMultiCommand::run()
         std::set<std::string> subCommandTextLines;
         for (auto & [name, _] : commands)
             subCommandTextLines.insert(fmt("- `%s`", name));
-        std::string markdownError = fmt("`nix %s` requires a sub-command. Available sub-commands:\n\n%s\n",
-                commandName, concatStringsSep("\n", subCommandTextLines));
+        std::string markdownError =
+            fmt("`nix %s` requires a sub-command. Available sub-commands:\n\n%s\n",
+                commandName,
+                concatStringsSep("\n", subCommandTextLines));
         throw UsageError(renderMarkdownToTerminal(markdownError));
     }
     command->second->run();
 }
 
-StoreCommand::StoreCommand()
-{
-}
+StoreCommand::StoreCommand() {}
 
 ref<Store> StoreCommand::getStore()
 {
@@ -126,10 +127,8 @@ ref<Store> EvalCommand::getEvalStore()
 ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState) {
-        evalState =
-            std::allocate_shared<EvalState>(
-                traceable_allocator<EvalState>(),
-                lookupPath, getEvalStore(), fetchSettings, evalSettings, getStore());
+        evalState = std::allocate_shared<EvalState>(
+            traceable_allocator<EvalState>(), lookupPath, getEvalStore(), fetchSettings, evalSettings, getStore());
 
         evalState->repair = repair;
 
@@ -144,7 +143,8 @@ MixOperateOnOptions::MixOperateOnOptions()
 {
     addFlag({
         .longName = "derivation",
-        .description = "Operate on the [store derivation](@docroot@/glossary.md#gloss-store-derivation) rather than its outputs.",
+        .description =
+            "Operate on the [store derivation](@docroot@/glossary.md#gloss-store-derivation) rather than its outputs.",
         .category = installablesCategory,
         .handler = {&operateOn, OperateOn::Derivation},
     });
@@ -233,46 +233,48 @@ void StorePathCommand::run(ref<Store> store, StorePaths && storePaths)
 
 MixProfile::MixProfile()
 {
-    addFlag({
-        .longName = "profile",
-        .description = "The profile to operate on.",
-        .labels = {"path"},
-        .handler = {&profile},
-        .completer = completePath
-    });
+    addFlag(
+        {.longName = "profile",
+         .description = "The profile to operate on.",
+         .labels = {"path"},
+         .handler = {&profile},
+         .completer = completePath});
 }
 
 void MixProfile::updateProfile(const StorePath & storePath)
 {
-    if (!profile) return;
+    if (!profile)
+        return;
     auto store = getStore().dynamic_pointer_cast<LocalFSStore>();
-    if (!store) throw Error("'--profile' is not supported for this Nix store");
+    if (!store)
+        throw Error("'--profile' is not supported for this Nix store");
     auto profile2 = absPath(*profile);
-    switchLink(profile2,
-        createGeneration(*store, profile2, storePath));
+    switchLink(profile2, createGeneration(*store, profile2, storePath));
 }
 
 void MixProfile::updateProfile(const BuiltPaths & buildables)
 {
-    if (!profile) return;
+    if (!profile)
+        return;
 
     StorePaths result;
 
     for (auto & buildable : buildables) {
-        std::visit(overloaded {
-            [&](const BuiltPath::Opaque & bo) {
-                result.push_back(bo.path);
+        std::visit(
+            overloaded{
+                [&](const BuiltPath::Opaque & bo) { result.push_back(bo.path); },
+                [&](const BuiltPath::Built & bfd) {
+                    for (auto & output : bfd.outputs) {
+                        result.push_back(output.second);
+                    }
+                },
             },
-            [&](const BuiltPath::Built & bfd) {
-                for (auto & output : bfd.outputs) {
-                    result.push_back(output.second);
-                }
-            },
-        }, buildable.raw());
+            buildable.raw());
     }
 
     if (result.size() != 1)
-        throw UsageError("'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
+        throw UsageError(
+            "'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
 
     updateProfile(result[0]);
 }
@@ -282,7 +284,8 @@ MixDefaultProfile::MixDefaultProfile()
     profile = getDefaultProfile();
 }
 
-MixEnvironment::MixEnvironment() : ignoreEnvironment(false)
+MixEnvironment::MixEnvironment()
+    : ignoreEnvironment(false)
 {
     addFlag({
         .longName = "ignore-env",
@@ -338,7 +341,8 @@ MixEnvironment::MixEnvironment() : ignoreEnvironment(false)
     });
 }
 
-void MixEnvironment::setEnviron() {
+void MixEnvironment::setEnviron()
+{
     if (ignoreEnvironment && !unsetVars.empty())
         throw UsageError("--unset-env-var does not make sense with --ignore-env");
 
@@ -348,17 +352,13 @@ void MixEnvironment::setEnviron() {
     auto env = getEnv();
 
     if (ignoreEnvironment)
-        std::erase_if(env, [&](const auto & var) {
-            return !keepVars.contains(var.first);
-        });
+        std::erase_if(env, [&](const auto & var) { return !keepVars.contains(var.first); });
 
     for (const auto & [name, value] : setVars)
         env[name] = value;
 
     if (!unsetVars.empty())
-        std::erase_if(env, [&](const auto & var) {
-            return unsetVars.contains(var.first);
-        });
+        std::erase_if(env, [&](const auto & var) { return unsetVars.contains(var.first); });
 
     replaceEnv(env);
 

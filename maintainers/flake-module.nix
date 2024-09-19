@@ -28,8 +28,6 @@
             ''^src/build-remote/build-remote\.cc$''
             ''^src/libcmd/built-path\.cc$''
             ''^src/libcmd/built-path\.hh$''
-            ''^src/libcmd/command\.cc$''
-            ''^src/libcmd/command\.hh$''
             ''^src/libcmd/common-eval-args\.cc$''
             ''^src/libcmd/common-eval-args\.hh$''
             ''^src/libcmd/editor-for\.cc$''
