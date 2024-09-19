@@ -41,8 +41,6 @@ EOL
 	echo
 done
 
-echo
-echo
 echo "namespace nix {"
 for f in "$1"/src/*.yaml; do
 	testname="$(basename "${f}" .yaml)"
@@ -57,9 +55,10 @@ for f in "$1"/src/*.yaml; do
 			skip="true"
 			;;
 	esac
-	echo "TEST_F(${testclass}, T_${testname}) {"
+	echo "TEST_F(${testclass}, T_${testname})"
+	echo "{"
 	if [ "${testname}" = "565N" ]; then
-		echo "    ASSERT_THROW(${testmethod}(T_${testname}),EvalError); // nix has no binary data type"
+		echo "    ASSERT_THROW(${testmethod}(T_${testname}), EvalError); // nix has no binary data type"
 	else
 		if [ "${skip}" = "true" ]; then
 			echo "    GTEST_SKIP() << \"Reason: Invalid yaml is parsed successfully\";"
