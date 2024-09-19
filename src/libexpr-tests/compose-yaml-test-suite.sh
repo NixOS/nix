@@ -46,6 +46,7 @@ for f in "$1"/src/*.yaml; do
 	testname="$(basename "${f}" .yaml)"
 	ignore="false"
 	skip="false"
+	# shellcheck disable=SC2221,SC2222
 	case "${testname}" in
 		"H7TQ"|"MUS6"|"ZYU8")
 			echo "/** This test is ignored because these tests are not required to fail and rapidyaml ignores the YAML version string."
