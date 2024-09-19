@@ -1,39 +1,37 @@
 #ifdef HAVE_RYML
 
-#include "primops.hh"
-#include "eval-inline.hh"
+#  include "primops.hh"
+#  include "eval-inline.hh"
 
-#include <ryml.hpp>
-#include <c4/format.hpp>
-#include <c4/std/string.hpp>
-
+#  include <ryml.hpp>
+#  include <c4/format.hpp>
+#  include <c4/std/string.hpp>
 
 namespace nix {
 
-struct NixContext {
+struct NixContext
+{
     EvalState & state;
     const PosIdx pos;
     std::string_view yaml;
 };
 
-static void s_error [[ noreturn ]] (const char* msg, size_t len, ryml::Location, void *nixContext)
+static void s_error [[noreturn]] (const char * msg, size_t len, ryml::Location, void * nixContext)
 {
     auto context = static_cast<const NixContext *>(nixContext);
     if (context) {
-        throw EvalError(context->state, ErrorInfo{
-            .msg = fmt("while parsing the YAML string '%1%':\n\n%2%",
-                context->yaml, std::string_view(msg, len)),
-            .pos = context->state.positions[context->pos]
-        });
+        throw EvalError(
+            context->state,
+            ErrorInfo{
+                .msg = fmt("while parsing the YAML string '%1%':\n\n%2%", context->yaml, std::string_view(msg, len)),
+                .pos = context->state.positions[context->pos]});
     } else {
-        throw Error({
-            .msg = fmt("failed assertion in rapidyaml library:\n\n%1%",
-                std::string_view(msg, len))
-        });
+        throw Error({.msg = fmt("failed assertion in rapidyaml library:\n\n%1%", std::string_view(msg, len))});
     }
 }
 
-static void visitYAMLNode(NixContext & context, Value & v, ryml::ConstNodeRef t) {
+static void visitYAMLNode(NixContext & context, Value & v, ryml::ConstNodeRef t)
+{
 
     bool fail = false;
     if (t.is_map()) {
@@ -44,7 +42,9 @@ static void visitYAMLNode(NixContext & context, Value & v, ryml::ConstNodeRef t)
                 auto tag = ryml::to_tag(child.key_tag());
                 if (tag != ryml::TAG_NONE && tag != ryml::TAG_STR) {
                     auto msg = ryml::formatrs<std::string>(
-                        "Error: Nix supports string keys only, but the key '{}' has the tag '{}'", child.key(), child.key_tag());
+                        "Error: Nix supports string keys only, but the key '{}' has the tag '{}'",
+                        child.key(),
+                        child.key_tag());
                     s_error(msg.data(), msg.size(), {}, &context);
                 }
             } else if (child.key_is_null()) {
@@ -80,7 +80,7 @@ static void visitYAMLNode(NixContext & context, Value & v, ryml::ConstNodeRef t)
             valTag = tag == "!" && !isNull ? ryml::TAG_STR : ryml::to_tag(tag);
         }
 
-        auto scalarTypeCheck = [=] (ryml::YamlTag_e tag) {
+        auto scalarTypeCheck = [=](ryml::YamlTag_e tag) {
             return valTag == ryml::TAG_NONE ? !isQuoted : valTag == tag;
         };
 
@@ -111,53 +111,51 @@ static void visitYAMLNode(NixContext & context, Value & v, ryml::ConstNodeRef t)
     }
 }
 
-static RegisterPrimOp primop_fromYAML({
-    .name = "__fromYAML",
-    .args = {"e"},
-    .doc = R"(
-      Convert a YAML 1.2 string to a Nix value, if a conversion is possible. For example,
+static RegisterPrimOp primop_fromYAML(
+    {.name = "__fromYAML",
+     .args = {"e"},
+     .doc = R"(
+       Convert a YAML 1.2 string to a Nix value, if a conversion is possible. For example,
 
-      ```nix
-      builtins.fromYAML ''{x: [1, 2, 3], y: !!str null, z: null}''
-      ```
+       ```nix
+       builtins.fromYAML ''{x: [1, 2, 3], y: !!str null, z: null}''
+       ```
 
-      returns the value `{ x = [ 1 2 3 ]; y = "null"; z = null; }`.
+       returns the value `{ x = [ 1 2 3 ]; y = "null"; z = null; }`.
 
-      Maps are converted to attribute sets, but only strings are supported as keys.
+       Maps are converted to attribute sets, but only strings are supported as keys.
 
-      Scalars are converted to the type specified by their optional value tag. Parsing fails if a conversion is not possible.
-      Not all YAML types are supported by Nix, e.g. Nix has no binary and timestamp data types, so that parsing of YAML with any of these types fails.
-      Custom tags are ignored and a stream with multiple documents is mapped to a list except when the stream contains a single document.
-    )",
-    .fun = [] (EvalState & state, const PosIdx pos, Value * * args, Value & val) {
-        auto yaml = state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.fromYAML");
+       Scalars are converted to the type specified by their optional value tag. Parsing fails if a conversion is not possible.
+       Not all YAML types are supported by Nix, e.g. Nix has no binary and timestamp data types, so that parsing of YAML with any of these types fails.
+       Custom tags are ignored and a stream with multiple documents is mapped to a list except when the stream contains a single document.
+     )",
+     .fun =
+         [](EvalState & state, const PosIdx pos, Value ** args, Value & val) {
+             auto yaml =
+                 state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.fromYAML");
 
-        NixContext context{
-            .state = state,
-            .pos = pos,
-            .yaml = yaml
-        };
-        ryml::Callbacks callbacks;
-        callbacks.m_error = s_error;
-        ryml::set_callbacks(callbacks);
-        callbacks.m_user_data = &context;
-        ryml::EventHandlerTree evth(callbacks);
-        ryml::Parser parser(&evth);
-        ryml::Tree tree = ryml::parse_in_arena(&parser, ryml::csubstr(yaml.begin(), yaml.size()));
-        tree.resolve(); // resolve references
-        tree.resolve_tags();
+             NixContext context{.state = state, .pos = pos, .yaml = yaml};
+             ryml::Callbacks callbacks;
+             callbacks.m_error = s_error;
+             ryml::set_callbacks(callbacks);
+             callbacks.m_user_data = &context;
+             ryml::EventHandlerTree evth(callbacks);
+             ryml::Parser parser(&evth);
+             ryml::Tree tree = ryml::parse_in_arena(&parser, ryml::csubstr(yaml.begin(), yaml.size()));
+             tree.resolve(); // resolve references
+             tree.resolve_tags();
 
-        auto root = tree.crootref();
-        if (!root.has_val() && !root.is_map() && !root.is_seq()) {
-            std::string msg = "YAML string has no content";
-            s_error(msg.data(), msg.size(), {}, &context);
-        }
-        if (root.is_stream() && root.num_children() == 1 && root.child(0).is_doc())
-            root = root.child(0);
-        visitYAMLNode(context, val, root);
-    },
-    .experimentalFeature = Xp::FromYaml
-});
+             auto root = tree.crootref();
+             if (!root.has_val() && !root.is_map() && !root.is_seq()) {
+                 std::string msg = "YAML string has no content";
+                 s_error(msg.data(), msg.size(), {}, &context);
+             }
+             if (root.is_stream() && root.num_children() == 1 && root.child(0).is_doc()) {
+                 root = root.child(0);
+             }
+             visitYAMLNode(context, val, root);
+         },
+     .experimentalFeature = Xp::FromYaml});
 
 }
 

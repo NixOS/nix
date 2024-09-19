@@ -2,7 +2,6 @@
 
 #pragma once
 
-
 static constexpr std::string_view T_229Q = R"RAW(
 ---
 - name: Spec Example 2.4. Sequence of Mappings
@@ -11835,1445 +11834,1794 @@ static constexpr std::string_view T_ZYU8 = R"RAW(
     ---
 )RAW";
 
-
-
 namespace nix {
-    TEST_F(FromYAMLTest, T_229Q) {
-        execYAMLTest(T_229Q);
-    }
-
-    TEST_F(FromYAMLTest, T_236B) {
-        execYAMLTest(T_236B);
-    }
-
-    TEST_F(FromYAMLTest, T_26DV) {
-        execYAMLTest(T_26DV);
-    }
-
-    TEST_F(FromYAMLTest, T_27NA) {
-        execYAMLTest(T_27NA);
-    }
-
-    TEST_F(FromYAMLTest, T_2AUY) {
-        execYAMLTest(T_2AUY);
-    }
-
-    TEST_F(FromYAMLTest, T_2CMS) {
-        execYAMLTest(T_2CMS);
-    }
-
-    TEST_F(FromYAMLTest, T_2EBW) {
-        execYAMLTest(T_2EBW);
-    }
-
-    TEST_F(FromYAMLTest, T_2G84) {
-        execYAMLTest(T_2G84);
-    }
-
-    TEST_F(FromYAMLTest, T_2JQS) {
-        execYAMLTest(T_2JQS);
-    }
-
-    TEST_F(FromYAMLTest, T_2LFX) {
-        execYAMLTest(T_2LFX);
-    }
-
-    TEST_F(FromYAMLTest, T_2SXE) {
-        execYAMLTest(T_2SXE);
-    }
-
-    TEST_F(FromYAMLTest, T_2XXW) {
-        execYAMLTest(T_2XXW);
-    }
-
-    TEST_F(FromYAMLTest, T_33X3) {
-        execYAMLTest(T_33X3);
-    }
-
-    TEST_F(FromYAMLTest, T_35KP) {
-        execYAMLTest(T_35KP);
-    }
-
-    TEST_F(FromYAMLTest, T_36F6) {
-        execYAMLTest(T_36F6);
-    }
-
-    TEST_F(FromYAMLTest, T_3ALJ) {
-        execYAMLTest(T_3ALJ);
-    }
-
-    TEST_F(FromYAMLTest, T_3GZX) {
-        execYAMLTest(T_3GZX);
-    }
-
-    TEST_F(FromYAMLTest, T_3HFZ) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_3HFZ);
-    }
-
-    TEST_F(FromYAMLTest, T_3MYT) {
-        execYAMLTest(T_3MYT);
-    }
-
-    TEST_F(FromYAMLTest, T_3R3P) {
-        execYAMLTest(T_3R3P);
-    }
-
-    TEST_F(FromYAMLTest, T_3RLN) {
-        execYAMLTest(T_3RLN);
-    }
-
-    TEST_F(FromYAMLTest, T_3UYS) {
-        execYAMLTest(T_3UYS);
-    }
-
-    TEST_F(FromYAMLTest, T_4ABK) {
-        execYAMLTest(T_4ABK);
-    }
-
-    TEST_F(FromYAMLTest, T_4CQQ) {
-        execYAMLTest(T_4CQQ);
-    }
-
-    TEST_F(FromYAMLTest, T_4EJS) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_4EJS);
-    }
-
-    TEST_F(FromYAMLTest, T_4FJ6) {
-        execYAMLTest(T_4FJ6);
-    }
-
-    TEST_F(FromYAMLTest, T_4GC6) {
-        execYAMLTest(T_4GC6);
-    }
-
-    TEST_F(FromYAMLTest, T_4H7K) {
-        execYAMLTest(T_4H7K);
-    }
-
-    TEST_F(FromYAMLTest, T_4HVU) {
-        execYAMLTest(T_4HVU);
-    }
-
-    TEST_F(FromYAMLTest, T_4JVG) {
-        execYAMLTest(T_4JVG);
-    }
-
-    TEST_F(FromYAMLTest, T_4MUZ) {
-        execYAMLTest(T_4MUZ);
-    }
-
-    TEST_F(FromYAMLTest, T_4Q9F) {
-        execYAMLTest(T_4Q9F);
-    }
-
-    TEST_F(FromYAMLTest, T_4QFQ) {
-        execYAMLTest(T_4QFQ);
-    }
-
-    TEST_F(FromYAMLTest, T_4RWC) {
-        execYAMLTest(T_4RWC);
-    }
-
-    TEST_F(FromYAMLTest, T_4UYU) {
-        execYAMLTest(T_4UYU);
-    }
-
-    TEST_F(FromYAMLTest, T_4V8U) {
-        execYAMLTest(T_4V8U);
-    }
-
-    TEST_F(FromYAMLTest, T_4WA9) {
-        execYAMLTest(T_4WA9);
-    }
-
-    TEST_F(FromYAMLTest, T_4ZYM) {
-        execYAMLTest(T_4ZYM);
-    }
-
-    TEST_F(FromYAMLTest, T_52DL) {
-        execYAMLTest(T_52DL);
-    }
-
-    TEST_F(FromYAMLTest, T_54T7) {
-        execYAMLTest(T_54T7);
-    }
-
-    TEST_F(FromYAMLTest, T_55WF) {
-        execYAMLTest(T_55WF);
-    }
-
-    TEST_F(FromYAMLTest, T_565N) {
-        ASSERT_THROW(execYAMLTest(T_565N),EvalError); // nix has no binary data type
-    }
-
-    TEST_F(FromYAMLTest, T_57H4) {
-        execYAMLTest(T_57H4);
-    }
-
-    TEST_F(FromYAMLTest, T_58MP) {
-        execYAMLTest(T_58MP);
-    }
-
-    TEST_F(FromYAMLTest, T_5BVJ) {
-        execYAMLTest(T_5BVJ);
-    }
-
-    TEST_F(FromYAMLTest, T_5C5M) {
-        execYAMLTest(T_5C5M);
-    }
-
-    TEST_F(FromYAMLTest, T_5GBF) {
-        execYAMLTest(T_5GBF);
-    }
-
-    TEST_F(FromYAMLTest, T_5KJE) {
-        execYAMLTest(T_5KJE);
-    }
-
-    TEST_F(FromYAMLTest, T_5LLU) {
-        execYAMLTest(T_5LLU);
-    }
-
-    TEST_F(FromYAMLTest, T_5MUD) {
-        execYAMLTest(T_5MUD);
-    }
-
-    TEST_F(FromYAMLTest, T_5NYZ) {
-        execYAMLTest(T_5NYZ);
-    }
-
-    TEST_F(FromYAMLTest, T_5T43) {
-        execYAMLTest(T_5T43);
-    }
-
-    TEST_F(FromYAMLTest, T_5TRB) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_5TRB);
-    }
-
-    TEST_F(FromYAMLTest, T_5TYM) {
-        execYAMLTest(T_5TYM);
-    }
-
-    TEST_F(FromYAMLTest, T_5U3A) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_5U3A);
-    }
-
-    TEST_F(FromYAMLTest, T_5WE3) {
-        execYAMLTest(T_5WE3);
-    }
-
-    TEST_F(FromYAMLTest, T_62EZ) {
-        execYAMLTest(T_62EZ);
-    }
-
-    TEST_F(FromYAMLTest, T_652Z) {
-        execYAMLTest(T_652Z);
-    }
-
-    TEST_F(FromYAMLTest, T_65WH) {
-        execYAMLTest(T_65WH);
-    }
-
-    TEST_F(FromYAMLTest, T_6BCT) {
-        execYAMLTest(T_6BCT);
-    }
-
-    TEST_F(FromYAMLTest, T_6BFJ) {
-        execYAMLTest(T_6BFJ);
-    }
-
-    TEST_F(FromYAMLTest, T_6CA3) {
-        execYAMLTest(T_6CA3);
-    }
-
-    TEST_F(FromYAMLTest, T_6CK3) {
-        execYAMLTest(T_6CK3);
-    }
-
-    TEST_F(FromYAMLTest, T_6FWR) {
-        execYAMLTest(T_6FWR);
-    }
-
-    TEST_F(FromYAMLTest, T_6H3V) {
-        execYAMLTest(T_6H3V);
-    }
-
-    TEST_F(FromYAMLTest, T_6HB6) {
-        execYAMLTest(T_6HB6);
-    }
-
-    TEST_F(FromYAMLTest, T_6JQW) {
-        execYAMLTest(T_6JQW);
-    }
-
-    TEST_F(FromYAMLTest, T_6JTT) {
-        execYAMLTest(T_6JTT);
-    }
-
-    TEST_F(FromYAMLTest, T_6JWB) {
-        execYAMLTest(T_6JWB);
-    }
-
-    TEST_F(FromYAMLTest, T_6KGN) {
-        execYAMLTest(T_6KGN);
-    }
-
-    TEST_F(FromYAMLTest, T_6LVF) {
-        execYAMLTest(T_6LVF);
-    }
-
-    TEST_F(FromYAMLTest, T_6M2F) {
-        execYAMLTest(T_6M2F);
-    }
-
-    TEST_F(FromYAMLTest, T_6PBE) {
-        execYAMLTest(T_6PBE);
-    }
-
-    TEST_F(FromYAMLTest, T_6S55) {
-        execYAMLTest(T_6S55);
-    }
-
-    TEST_F(FromYAMLTest, T_6SLA) {
-        execYAMLTest(T_6SLA);
-    }
-
-    TEST_F(FromYAMLTest, T_6VJK) {
-        execYAMLTest(T_6VJK);
-    }
-
-    TEST_F(FromYAMLTest, T_6WLZ) {
-        execYAMLTest(T_6WLZ);
-    }
-
-    TEST_F(FromYAMLTest, T_6WPF) {
-        execYAMLTest(T_6WPF);
-    }
-
-    TEST_F(FromYAMLTest, T_6XDY) {
-        execYAMLTest(T_6XDY);
-    }
-
-    TEST_F(FromYAMLTest, T_6ZKB) {
-        execYAMLTest(T_6ZKB);
-    }
-
-    TEST_F(FromYAMLTest, T_735Y) {
-        execYAMLTest(T_735Y);
-    }
-
-    TEST_F(FromYAMLTest, T_74H7) {
-        execYAMLTest(T_74H7);
-    }
-
-    TEST_F(FromYAMLTest, T_753E) {
-        execYAMLTest(T_753E);
-    }
-
-    TEST_F(FromYAMLTest, T_7A4E) {
-        execYAMLTest(T_7A4E);
-    }
-
-    TEST_F(FromYAMLTest, T_7BMT) {
-        execYAMLTest(T_7BMT);
-    }
-
-    TEST_F(FromYAMLTest, T_7BUB) {
-        execYAMLTest(T_7BUB);
-    }
-
-    TEST_F(FromYAMLTest, T_7FWL) {
-        execYAMLTest(T_7FWL);
-    }
-
-    TEST_F(FromYAMLTest, T_7LBH) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_7LBH);
-    }
-
-    TEST_F(FromYAMLTest, T_7MNF) {
-        execYAMLTest(T_7MNF);
-    }
-
-    TEST_F(FromYAMLTest, T_7T8X) {
-        execYAMLTest(T_7T8X);
-    }
-
-    TEST_F(FromYAMLTest, T_7TMG) {
-        execYAMLTest(T_7TMG);
-    }
-
-    TEST_F(FromYAMLTest, T_7W2P) {
-        execYAMLTest(T_7W2P);
-    }
-
-    TEST_F(FromYAMLTest, T_7Z25) {
-        execYAMLTest(T_7Z25);
-    }
-
-    TEST_F(FromYAMLTest, T_7ZZ5) {
-        execYAMLTest(T_7ZZ5);
-    }
-
-    TEST_F(FromYAMLTest, T_82AN) {
-        execYAMLTest(T_82AN);
-    }
-
-    TEST_F(FromYAMLTest, T_87E4) {
-        execYAMLTest(T_87E4);
-    }
-
-    TEST_F(FromYAMLTest, T_8CWC) {
-        execYAMLTest(T_8CWC);
-    }
-
-    TEST_F(FromYAMLTest, T_8G76) {
-        execYAMLTest(T_8G76);
-    }
-
-    TEST_F(FromYAMLTest, T_8KB6) {
-        execYAMLTest(T_8KB6);
-    }
-
-    TEST_F(FromYAMLTest, T_8MK2) {
-        execYAMLTest(T_8MK2);
-    }
-
-    TEST_F(FromYAMLTest, T_8QBE) {
-        execYAMLTest(T_8QBE);
-    }
-
-    TEST_F(FromYAMLTest, T_8UDB) {
-        execYAMLTest(T_8UDB);
-    }
-
-    TEST_F(FromYAMLTest, T_8XDJ) {
-        execYAMLTest(T_8XDJ);
-    }
-
-    TEST_F(FromYAMLTest, T_8XYN) {
-        execYAMLTest(T_8XYN);
-    }
-
-    TEST_F(FromYAMLTest, T_93JH) {
-        execYAMLTest(T_93JH);
-    }
-
-    TEST_F(FromYAMLTest, T_93WF) {
-        execYAMLTest(T_93WF);
-    }
-
-    TEST_F(FromYAMLTest, T_96L6) {
-        execYAMLTest(T_96L6);
-    }
-
-    TEST_F(FromYAMLTest, T_96NN) {
-        execYAMLTest(T_96NN);
-    }
-
-    TEST_F(FromYAMLTest, T_98YD) {
-        execYAMLTest(T_98YD);
-    }
-
-    TEST_F(FromYAMLTest, T_9BXH) {
-        execYAMLTest(T_9BXH);
-    }
-
-    TEST_F(FromYAMLTest, T_9C9N) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_9C9N);
-    }
-
-    TEST_F(FromYAMLTest, T_9CWY) {
-        execYAMLTest(T_9CWY);
-    }
-
-    TEST_F(FromYAMLTest, T_9DXL) {
-        execYAMLTest(T_9DXL);
-    }
-
-    TEST_F(FromYAMLTest, T_9FMG) {
-        execYAMLTest(T_9FMG);
-    }
-
-    TEST_F(FromYAMLTest, T_9HCY) {
-        execYAMLTest(T_9HCY);
-    }
-
-    TEST_F(FromYAMLTest, T_9J7A) {
-        execYAMLTest(T_9J7A);
-    }
-
-    TEST_F(FromYAMLTest, T_9JBA) {
-        execYAMLTest(T_9JBA);
-    }
-
-    TEST_F(FromYAMLTest, T_9KAX) {
-        execYAMLTest(T_9KAX);
-    }
-
-    TEST_F(FromYAMLTest, T_9KBC) {
-        execYAMLTest(T_9KBC);
-    }
-
-    TEST_F(FromYAMLTest, T_9MAG) {
-        execYAMLTest(T_9MAG);
-    }
-
-    TEST_F(FromYAMLTest, T_9MMA) {
-        execYAMLTest(T_9MMA);
-    }
-
-    TEST_F(FromYAMLTest, T_9MMW) {
-        execYAMLTest(T_9MMW);
-    }
-
-    TEST_F(FromYAMLTest, T_9MQT) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_9MQT);
-    }
-
-    TEST_F(FromYAMLTest, T_9SA2) {
-        execYAMLTest(T_9SA2);
-    }
-
-    TEST_F(FromYAMLTest, T_9SHH) {
-        execYAMLTest(T_9SHH);
-    }
-
-    TEST_F(FromYAMLTest, T_9TFX) {
-        execYAMLTest(T_9TFX);
-    }
-
-    TEST_F(FromYAMLTest, T_9U5K) {
-        execYAMLTest(T_9U5K);
-    }
-
-    TEST_F(FromYAMLTest, T_9WXW) {
-        execYAMLTest(T_9WXW);
-    }
-
-    TEST_F(FromYAMLTest, T_9YRD) {
-        execYAMLTest(T_9YRD);
-    }
-
-    TEST_F(FromYAMLTest, T_A2M4) {
-        execYAMLTest(T_A2M4);
-    }
-
-    TEST_F(FromYAMLTest, T_A6F9) {
-        execYAMLTest(T_A6F9);
-    }
-
-    TEST_F(FromYAMLTest, T_A984) {
-        execYAMLTest(T_A984);
-    }
-
-    TEST_F(FromYAMLTest, T_AB8U) {
-        execYAMLTest(T_AB8U);
-    }
-
-    TEST_F(FromYAMLTest, T_AVM7) {
-        execYAMLTest(T_AVM7);
-    }
-
-    TEST_F(FromYAMLTest, T_AZ63) {
-        execYAMLTest(T_AZ63);
-    }
-
-    TEST_F(FromYAMLTest, T_AZW3) {
-        execYAMLTest(T_AZW3);
-    }
-
-    TEST_F(FromYAMLTest, T_B3HG) {
-        execYAMLTest(T_B3HG);
-    }
-
-    TEST_F(FromYAMLTest, T_B63P) {
-        execYAMLTest(T_B63P);
-    }
-
-    TEST_F(FromYAMLTest, T_BD7L) {
-        execYAMLTest(T_BD7L);
-    }
-
-    TEST_F(FromYAMLTest, T_BEC7) {
-        execYAMLTest(T_BEC7);
-    }
-
-    TEST_F(FromYAMLTest, T_BF9H) {
-        execYAMLTest(T_BF9H);
-    }
-
-    TEST_F(FromYAMLTest, T_BS4K) {
-        execYAMLTest(T_BS4K);
-    }
-
-    TEST_F(FromYAMLTest, T_BU8L) {
-        execYAMLTest(T_BU8L);
-    }
-
-    TEST_F(FromYAMLTest, T_C2DT) {
-        execYAMLTest(T_C2DT);
-    }
-
-    TEST_F(FromYAMLTest, T_C2SP) {
-        execYAMLTest(T_C2SP);
-    }
-
-    TEST_F(FromYAMLTest, T_C4HZ) {
-        execYAMLTest(T_C4HZ);
-    }
-
-    TEST_F(FromYAMLTest, T_CC74) {
-        execYAMLTest(T_CC74);
-    }
-
-    TEST_F(FromYAMLTest, T_CFD4) {
-        execYAMLTest(T_CFD4);
-    }
-
-    TEST_F(FromYAMLTest, T_CML9) {
-        execYAMLTest(T_CML9);
-    }
-
-    TEST_F(FromYAMLTest, T_CN3R) {
-        execYAMLTest(T_CN3R);
-    }
-
-    TEST_F(FromYAMLTest, T_CPZ3) {
-        execYAMLTest(T_CPZ3);
-    }
-
-    TEST_F(FromYAMLTest, T_CQ3W) {
-        execYAMLTest(T_CQ3W);
-    }
-
-    TEST_F(FromYAMLTest, T_CT4Q) {
-        execYAMLTest(T_CT4Q);
-    }
-
-    TEST_F(FromYAMLTest, T_CTN5) {
-        execYAMLTest(T_CTN5);
-    }
-
-    TEST_F(FromYAMLTest, T_CUP7) {
-        execYAMLTest(T_CUP7);
-    }
-
-    TEST_F(FromYAMLTest, T_CVW2) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_CVW2);
-    }
-
-    TEST_F(FromYAMLTest, T_CXX2) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_CXX2);
-    }
-
-    TEST_F(FromYAMLTest, T_D49Q) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_D49Q);
-    }
-
-    TEST_F(FromYAMLTest, T_D83L) {
-        execYAMLTest(T_D83L);
-    }
-
-    TEST_F(FromYAMLTest, T_D88J) {
-        execYAMLTest(T_D88J);
-    }
-
-    TEST_F(FromYAMLTest, T_D9TU) {
-        execYAMLTest(T_D9TU);
-    }
-
-    TEST_F(FromYAMLTest, T_DBG4) {
-        execYAMLTest(T_DBG4);
-    }
-
-    TEST_F(FromYAMLTest, T_DC7X) {
-        execYAMLTest(T_DC7X);
-    }
-
-    TEST_F(FromYAMLTest, T_DE56) {
-        execYAMLTest(T_DE56);
-    }
-
-    TEST_F(FromYAMLTest, T_DFF7) {
-        execYAMLTest(T_DFF7);
-    }
-
-    TEST_F(FromYAMLTest, T_DHP8) {
-        execYAMLTest(T_DHP8);
-    }
-
-    TEST_F(FromYAMLTest, T_DK3J) {
-        execYAMLTest(T_DK3J);
-    }
-
-    TEST_F(FromYAMLTest, T_DK4H) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_DK4H);
-    }
-
-    TEST_F(FromYAMLTest, T_DK95) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_DK95);
-    }
-
-    TEST_F(FromYAMLTest, T_DMG6) {
-        execYAMLTest(T_DMG6);
-    }
-
-    TEST_F(FromYAMLTest, T_DWX9) {
-        execYAMLTest(T_DWX9);
-    }
-
-    TEST_F(FromYAMLTest, T_E76Z) {
-        execYAMLTest(T_E76Z);
-    }
-
-    TEST_F(FromYAMLTest, T_EB22) {
-        execYAMLTest(T_EB22);
-    }
-
-    TEST_F(FromYAMLTest, T_EHF6) {
-        execYAMLTest(T_EHF6);
-    }
-
-    TEST_F(FromYAMLTest, T_EW3V) {
-        execYAMLTest(T_EW3V);
-    }
-
-    TEST_F(FromYAMLTest, T_EX5H) {
-        execYAMLTest(T_EX5H);
-    }
-
-    TEST_F(FromYAMLTest, T_EXG3) {
-        execYAMLTest(T_EXG3);
-    }
-
-    TEST_F(FromYAMLTest, T_F2C7) {
-        execYAMLTest(T_F2C7);
-    }
-
-    TEST_F(FromYAMLTest, T_F3CP) {
-        execYAMLTest(T_F3CP);
-    }
-
-    TEST_F(FromYAMLTest, T_F6MC) {
-        execYAMLTest(T_F6MC);
-    }
-
-    TEST_F(FromYAMLTest, T_F8F9) {
-        execYAMLTest(T_F8F9);
-    }
-
-    TEST_F(FromYAMLTest, T_FBC9) {
-        execYAMLTest(T_FBC9);
-    }
-
-    TEST_F(FromYAMLTest, T_FH7J) {
-        execYAMLTest(T_FH7J);
-    }
-
-    TEST_F(FromYAMLTest, T_FP8R) {
-        execYAMLTest(T_FP8R);
-    }
-
-    TEST_F(FromYAMLTest, T_FQ7F) {
-        execYAMLTest(T_FQ7F);
-    }
-
-    TEST_F(FromYAMLTest, T_FRK4) {
-        execYAMLTest(T_FRK4);
-    }
-
-    TEST_F(FromYAMLTest, T_FTA2) {
-        execYAMLTest(T_FTA2);
-    }
-
-    TEST_F(FromYAMLTest, T_FUP4) {
-        execYAMLTest(T_FUP4);
-    }
-
-    TEST_F(FromYAMLTest, T_G4RS) {
-        execYAMLTest(T_G4RS);
-    }
-
-    TEST_F(FromYAMLTest, T_G5U8) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_G5U8);
-    }
-
-    TEST_F(FromYAMLTest, T_G7JE) {
-        execYAMLTest(T_G7JE);
-    }
-
-    TEST_F(FromYAMLTest, T_G992) {
-        execYAMLTest(T_G992);
-    }
-
-    TEST_F(FromYAMLTest, T_G9HC) {
-        execYAMLTest(T_G9HC);
-    }
-
-    TEST_F(FromYAMLTest, T_GDY7) {
-        execYAMLTest(T_GDY7);
-    }
-
-    TEST_F(FromYAMLTest, T_GH63) {
-        execYAMLTest(T_GH63);
-    }
-
-    TEST_F(FromYAMLTest, T_GT5M) {
-        execYAMLTest(T_GT5M);
-    }
-
-    TEST_F(FromYAMLTest, T_H2RW) {
-        execYAMLTest(T_H2RW);
-    }
-
-    TEST_F(FromYAMLTest, T_H3Z8) {
-        execYAMLTest(T_H3Z8);
-    }
-
-    TEST_F(FromYAMLTest, T_H7J7) {
-        execYAMLTest(T_H7J7);
-    }
-
-    /** This test is ignored because these tests are not required to fail and rapidyaml ignores the YAML version string.
-    TEST_F(FromYAMLTest, T_H7TQ) {
-        execYAMLTest(T_H7TQ);
-    }
-    */
-
-    TEST_F(FromYAMLTest, T_HM87) {
-        execYAMLTest(T_HM87);
-    }
-
-    TEST_F(FromYAMLTest, T_HMK4) {
-        execYAMLTest(T_HMK4);
-    }
-
-    TEST_F(FromYAMLTest, T_HMQ5) {
-        execYAMLTest(T_HMQ5);
-    }
-
-    TEST_F(FromYAMLTest, T_HRE5) {
-        execYAMLTest(T_HRE5);
-    }
-
-    TEST_F(FromYAMLTest, T_HS5T) {
-        execYAMLTest(T_HS5T);
-    }
-
-    TEST_F(FromYAMLTest, T_HU3P) {
-        execYAMLTest(T_HU3P);
-    }
-
-    TEST_F(FromYAMLTest, T_HWV9) {
-        execYAMLTest(T_HWV9);
-    }
-
-    TEST_F(FromYAMLTest, T_J3BT) {
-        execYAMLTest(T_J3BT);
-    }
-
-    TEST_F(FromYAMLTest, T_J5UC) {
-        execYAMLTest(T_J5UC);
-    }
-
-    TEST_F(FromYAMLTest, T_J7PZ) {
-        execYAMLTest(T_J7PZ);
-    }
-
-    TEST_F(FromYAMLTest, T_J7VC) {
-        execYAMLTest(T_J7VC);
-    }
-
-    TEST_F(FromYAMLTest, T_J9HZ) {
-        execYAMLTest(T_J9HZ);
-    }
-
-    TEST_F(FromYAMLTest, T_JEF9) {
-        execYAMLTest(T_JEF9);
-    }
-
-    TEST_F(FromYAMLTest, T_JHB9) {
-        execYAMLTest(T_JHB9);
-    }
-
-    TEST_F(FromYAMLTest, T_JKF3) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_JKF3);
-    }
-
-    TEST_F(FromYAMLTest, T_JQ4R) {
-        execYAMLTest(T_JQ4R);
-    }
-
-    TEST_F(FromYAMLTest, T_JR7V) {
-        execYAMLTest(T_JR7V);
-    }
-
-    TEST_F(FromYAMLTest, T_JS2J) {
-        execYAMLTest(T_JS2J);
-    }
-
-    TEST_F(FromYAMLTest, T_JTV5) {
-        execYAMLTest(T_JTV5);
-    }
-
-    TEST_F(FromYAMLTest, T_JY7Z) {
-        execYAMLTest(T_JY7Z);
-    }
-
-    TEST_F(FromYAMLTest, T_K3WX) {
-        execYAMLTest(T_K3WX);
-    }
-
-    TEST_F(FromYAMLTest, T_K4SU) {
-        execYAMLTest(T_K4SU);
-    }
-
-    TEST_F(FromYAMLTest, T_K527) {
-        execYAMLTest(T_K527);
-    }
-
-    TEST_F(FromYAMLTest, T_K54U) {
-        execYAMLTest(T_K54U);
-    }
-
-    TEST_F(FromYAMLTest, T_K858) {
-        execYAMLTest(T_K858);
-    }
-
-    TEST_F(FromYAMLTest, T_KH5V) {
-        execYAMLTest(T_KH5V);
-    }
-
-    TEST_F(FromYAMLTest, T_KK5P) {
-        execYAMLTest(T_KK5P);
-    }
-
-    TEST_F(FromYAMLTest, T_KMK3) {
-        execYAMLTest(T_KMK3);
-    }
-
-    TEST_F(FromYAMLTest, T_KS4U) {
-        execYAMLTest(T_KS4U);
-    }
-
-    TEST_F(FromYAMLTest, T_KSS4) {
-        execYAMLTest(T_KSS4);
-    }
-
-    TEST_F(FromYAMLTest, T_L24T) {
-        execYAMLTest(T_L24T);
-    }
-
-    TEST_F(FromYAMLTest, T_L383) {
-        execYAMLTest(T_L383);
-    }
-
-    TEST_F(FromYAMLTest, T_L94M) {
-        execYAMLTest(T_L94M);
-    }
-
-    TEST_F(FromYAMLTest, T_L9U5) {
-        execYAMLTest(T_L9U5);
-    }
-
-    TEST_F(FromYAMLTest, T_LE5A) {
-        execYAMLTest(T_LE5A);
-    }
-
-    TEST_F(FromYAMLTest, T_LHL4) {
-        execYAMLTest(T_LHL4);
-    }
-
-    TEST_F(FromYAMLTest, T_LP6E) {
-        execYAMLTest(T_LP6E);
-    }
-
-    TEST_F(FromYAMLTest, T_LQZ7) {
-        execYAMLTest(T_LQZ7);
-    }
-
-    TEST_F(FromYAMLTest, T_LX3P) {
-        execYAMLTest(T_LX3P);
-    }
-
-    TEST_F(FromYAMLTest, T_M29M) {
-        execYAMLTest(T_M29M);
-    }
-
-    TEST_F(FromYAMLTest, T_M2N8) {
-        execYAMLTest(T_M2N8);
-    }
-
-    TEST_F(FromYAMLTest, T_M5C3) {
-        execYAMLTest(T_M5C3);
-    }
-
-    TEST_F(FromYAMLTest, T_M5DY) {
-        execYAMLTest(T_M5DY);
-    }
-
-    TEST_F(FromYAMLTest, T_M6YH) {
-        execYAMLTest(T_M6YH);
-    }
-
-    TEST_F(FromYAMLTest, T_M7A3) {
-        execYAMLTest(T_M7A3);
-    }
-
-    TEST_F(FromYAMLTest, T_M7NX) {
-        execYAMLTest(T_M7NX);
-    }
-
-    TEST_F(FromYAMLTest, T_M9B4) {
-        execYAMLTest(T_M9B4);
-    }
-
-    TEST_F(FromYAMLTest, T_MJS9) {
-        execYAMLTest(T_MJS9);
-    }
-
-    /** This test is ignored because these tests are not required to fail and rapidyaml ignores the YAML version string.
-    TEST_F(FromYAMLTest, T_MUS6) {
-        execYAMLTest(T_MUS6);
-    }
-    */
-
-    TEST_F(FromYAMLTest, T_MXS3) {
-        execYAMLTest(T_MXS3);
-    }
-
-    TEST_F(FromYAMLTest, T_MYW6) {
-        execYAMLTest(T_MYW6);
-    }
-
-    TEST_F(FromYAMLTest, T_MZX3) {
-        execYAMLTest(T_MZX3);
-    }
-
-    TEST_F(FromYAMLTest, T_N4JP) {
-        execYAMLTest(T_N4JP);
-    }
-
-    TEST_F(FromYAMLTest, T_N782) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_N782);
-    }
-
-    TEST_F(FromYAMLTest, T_NAT4) {
-        execYAMLTest(T_NAT4);
-    }
-
-    TEST_F(FromYAMLTest, T_NB6Z) {
-        execYAMLTest(T_NB6Z);
-    }
-
-    TEST_F(FromYAMLTest, T_NHX8) {
-        execYAMLTest(T_NHX8);
-    }
-
-    TEST_F(FromYAMLTest, T_NJ66) {
-        execYAMLTest(T_NJ66);
-    }
-
-    TEST_F(FromYAMLTest, T_NKF9) {
-        execYAMLTest(T_NKF9);
-    }
-
-    TEST_F(FromYAMLTest, T_NP9H) {
-        execYAMLTest(T_NP9H);
-    }
-
-    TEST_F(FromYAMLTest, T_P2AD) {
-        execYAMLTest(T_P2AD);
-    }
-
-    TEST_F(FromYAMLTest, T_P2EQ) {
-        execYAMLTest(T_P2EQ);
-    }
-
-    TEST_F(FromYAMLTest, T_P76L) {
-        execYAMLTest(T_P76L);
-    }
-
-    TEST_F(FromYAMLTest, T_P94K) {
-        execYAMLTest(T_P94K);
-    }
-
-    TEST_F(FromYAMLTest, T_PBJ2) {
-        execYAMLTest(T_PBJ2);
-    }
-
-    TEST_F(FromYAMLTest, T_PRH3) {
-        execYAMLTest(T_PRH3);
-    }
-
-    TEST_F(FromYAMLTest, T_PUW8) {
-        execYAMLTest(T_PUW8);
-    }
-
-    TEST_F(FromYAMLTest, T_PW8X) {
-        execYAMLTest(T_PW8X);
-    }
-
-    TEST_F(FromYAMLTest, T_Q4CL) {
-        execYAMLTest(T_Q4CL);
-    }
-
-    TEST_F(FromYAMLTest, T_Q5MG) {
-        execYAMLTest(T_Q5MG);
-    }
-
-    TEST_F(FromYAMLTest, T_Q88A) {
-        execYAMLTest(T_Q88A);
-    }
-
-    TEST_F(FromYAMLTest, T_Q8AD) {
-        execYAMLTest(T_Q8AD);
-    }
-
-    TEST_F(FromYAMLTest, T_Q9WF) {
-        execYAMLTest(T_Q9WF);
-    }
-
-    TEST_F(FromYAMLTest, T_QB6E) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_QB6E);
-    }
-
-    TEST_F(FromYAMLTest, T_QF4Y) {
-        execYAMLTest(T_QF4Y);
-    }
-
-    TEST_F(FromYAMLTest, T_QLJ7) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_QLJ7);
-    }
-
-    TEST_F(FromYAMLTest, T_QT73) {
-        execYAMLTest(T_QT73);
-    }
-
-    TEST_F(FromYAMLTest, T_R4YG) {
-        execYAMLTest(T_R4YG);
-    }
-
-    TEST_F(FromYAMLTest, T_R52L) {
-        execYAMLTest(T_R52L);
-    }
-
-    TEST_F(FromYAMLTest, T_RHX7) {
-        execYAMLTest(T_RHX7);
-    }
-
-    TEST_F(FromYAMLTest, T_RLU9) {
-        execYAMLTest(T_RLU9);
-    }
-
-    TEST_F(FromYAMLTest, T_RR7F) {
-        execYAMLTest(T_RR7F);
-    }
-
-    TEST_F(FromYAMLTest, T_RTP8) {
-        execYAMLTest(T_RTP8);
-    }
-
-    TEST_F(FromYAMLTest, T_RXY3) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_RXY3);
-    }
-
-    TEST_F(FromYAMLTest, T_RZP5) {
-        execYAMLTest(T_RZP5);
-    }
-
-    TEST_F(FromYAMLTest, T_RZT7) {
-        execYAMLTest(T_RZT7);
-    }
-
-    TEST_F(FromYAMLTest, T_S3PD) {
-        execYAMLTest(T_S3PD);
-    }
-
-    TEST_F(FromYAMLTest, T_S4GJ) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_S4GJ);
-    }
-
-    TEST_F(FromYAMLTest, T_S4JQ) {
-        execYAMLTest(T_S4JQ);
-    }
-
-    TEST_F(FromYAMLTest, T_S4T7) {
-        execYAMLTest(T_S4T7);
-    }
-
-    TEST_F(FromYAMLTest, T_S7BG) {
-        execYAMLTest(T_S7BG);
-    }
-
-    TEST_F(FromYAMLTest, T_S98Z) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_S98Z);
-    }
-
-    TEST_F(FromYAMLTest, T_S9E8) {
-        execYAMLTest(T_S9E8);
-    }
-
-    TEST_F(FromYAMLTest, T_SBG9) {
-        execYAMLTest(T_SBG9);
-    }
-
-    TEST_F(FromYAMLTest, T_SF5V) {
-        execYAMLTest(T_SF5V);
-    }
-
-    TEST_F(FromYAMLTest, T_SKE5) {
-        execYAMLTest(T_SKE5);
-    }
-
-    TEST_F(FromYAMLTest, T_SM9W) {
-        execYAMLTest(T_SM9W);
-    }
-
-    TEST_F(FromYAMLTest, T_SR86) {
-        execYAMLTest(T_SR86);
-    }
-
-    TEST_F(FromYAMLTest, T_SSW6) {
-        execYAMLTest(T_SSW6);
-    }
-
-    TEST_F(FromYAMLTest, T_SU5Z) {
-        execYAMLTest(T_SU5Z);
-    }
-
-    TEST_F(FromYAMLTest, T_SU74) {
-        execYAMLTest(T_SU74);
-    }
-
-    TEST_F(FromYAMLTest, T_SY6V) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_SY6V);
-    }
-
-    TEST_F(FromYAMLTest, T_SYW4) {
-        execYAMLTest(T_SYW4);
-    }
-
-    TEST_F(FromYAMLTest, T_T26H) {
-        execYAMLTest(T_T26H);
-    }
-
-    TEST_F(FromYAMLTest, T_T4YY) {
-        execYAMLTest(T_T4YY);
-    }
-
-    TEST_F(FromYAMLTest, T_T5N4) {
-        execYAMLTest(T_T5N4);
-    }
-
-    TEST_F(FromYAMLTest, T_T833) {
-        execYAMLTest(T_T833);
-    }
-
-    TEST_F(FromYAMLTest, T_TD5N) {
-        execYAMLTest(T_TD5N);
-    }
-
-    TEST_F(FromYAMLTest, T_TE2A) {
-        execYAMLTest(T_TE2A);
-    }
-
-    TEST_F(FromYAMLTest, T_TL85) {
-        execYAMLTest(T_TL85);
-    }
-
-    TEST_F(FromYAMLTest, T_TS54) {
-        execYAMLTest(T_TS54);
-    }
-
-    TEST_F(FromYAMLTest, T_U3C3) {
-        execYAMLTest(T_U3C3);
-    }
-
-    TEST_F(FromYAMLTest, T_U3XV) {
-        execYAMLTest(T_U3XV);
-    }
-
-    TEST_F(FromYAMLTest, T_U44R) {
-        execYAMLTest(T_U44R);
-    }
-
-    TEST_F(FromYAMLTest, T_U99R) {
-        execYAMLTest(T_U99R);
-    }
-
-    TEST_F(FromYAMLTest, T_U9NS) {
-        execYAMLTest(T_U9NS);
-    }
-
-    TEST_F(FromYAMLTest, T_UDM2) {
-        execYAMLTest(T_UDM2);
-    }
-
-    TEST_F(FromYAMLTest, T_UDR7) {
-        execYAMLTest(T_UDR7);
-    }
-
-    TEST_F(FromYAMLTest, T_UGM3) {
-        execYAMLTest(T_UGM3);
-    }
-
-    TEST_F(FromYAMLTest, T_UKK6) {
-        execYAMLTest(T_UKK6);
-    }
-
-    TEST_F(FromYAMLTest, T_UT92) {
-        execYAMLTest(T_UT92);
-    }
-
-    TEST_F(FromYAMLTest, T_UV7Q) {
-        execYAMLTest(T_UV7Q);
-    }
-
-    TEST_F(FromYAMLTest, T_V55R) {
-        execYAMLTest(T_V55R);
-    }
-
-    TEST_F(FromYAMLTest, T_V9D5) {
-        execYAMLTest(T_V9D5);
-    }
-
-    TEST_F(FromYAMLTest, T_VJP3) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_VJP3);
-    }
-
-    TEST_F(FromYAMLTest, T_W42U) {
-        execYAMLTest(T_W42U);
-    }
-
-    TEST_F(FromYAMLTest, T_W4TN) {
-        execYAMLTest(T_W4TN);
-    }
-
-    TEST_F(FromYAMLTest, T_W5VH) {
-        execYAMLTest(T_W5VH);
-    }
-
-    TEST_F(FromYAMLTest, T_W9L4) {
-        execYAMLTest(T_W9L4);
-    }
-
-    TEST_F(FromYAMLTest, T_WZ62) {
-        execYAMLTest(T_WZ62);
-    }
-
-    TEST_F(FromYAMLTest, T_X38W) {
-        execYAMLTest(T_X38W);
-    }
-
-    TEST_F(FromYAMLTest, T_X4QW) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_X4QW);
-    }
-
-    TEST_F(FromYAMLTest, T_X8DW) {
-        execYAMLTest(T_X8DW);
-    }
-
-    TEST_F(FromYAMLTest, T_XLQ9) {
-        execYAMLTest(T_XLQ9);
-    }
-
-    TEST_F(FromYAMLTest, T_XV9V) {
-        execYAMLTest(T_XV9V);
-    }
-
-    TEST_F(FromYAMLTest, T_XW4D) {
-        execYAMLTest(T_XW4D);
-    }
-
-    TEST_F(FromYAMLTest, T_Y2GN) {
-        execYAMLTest(T_Y2GN);
-    }
-
-    TEST_F(FromYAMLTest, T_Y79Y) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_Y79Y);
-    }
-
-    TEST_F(FromYAMLTest, T_YD5X) {
-        execYAMLTest(T_YD5X);
-    }
-
-    TEST_F(FromYAMLTest, T_YJV2) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_YJV2);
-    }
-
-    TEST_F(FromYAMLTest, T_Z67P) {
-        execYAMLTest(T_Z67P);
-    }
-
-    TEST_F(FromYAMLTest, T_Z9M4) {
-        execYAMLTest(T_Z9M4);
-    }
-
-    TEST_F(FromYAMLTest, T_ZCZ6) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_ZCZ6);
-    }
-
-    TEST_F(FromYAMLTest, T_ZF4X) {
-        execYAMLTest(T_ZF4X);
-    }
-
-    TEST_F(FromYAMLTest, T_ZH7C) {
-        execYAMLTest(T_ZH7C);
-    }
-
-    TEST_F(FromYAMLTest, T_ZK9H) {
-        execYAMLTest(T_ZK9H);
-    }
-
-    TEST_F(FromYAMLTest, T_ZL4Z) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_ZL4Z);
-    }
-
-    TEST_F(FromYAMLTest, T_ZVH3) {
-        execYAMLTest(T_ZVH3);
-    }
-
-    TEST_F(FromYAMLTest, T_ZWK4) {
-        execYAMLTest(T_ZWK4);
-    }
-
-    TEST_F(FromYAMLTest, T_ZXT5) {
-        GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
-        execYAMLTest(T_ZXT5);
-    }
-
-    /** This test is ignored because these tests are not required to fail and rapidyaml ignores the YAML version string.
-    TEST_F(FromYAMLTest, T_ZYU8) {
-        execYAMLTest(T_ZYU8);
-    }
-    */
+TEST_F(FromYAMLTest, T_229Q)
+{
+    execYAMLTest(T_229Q);
+}
+
+TEST_F(FromYAMLTest, T_236B)
+{
+    execYAMLTest(T_236B);
+}
+
+TEST_F(FromYAMLTest, T_26DV)
+{
+    execYAMLTest(T_26DV);
+}
+
+TEST_F(FromYAMLTest, T_27NA)
+{
+    execYAMLTest(T_27NA);
+}
+
+TEST_F(FromYAMLTest, T_2AUY)
+{
+    execYAMLTest(T_2AUY);
+}
+
+TEST_F(FromYAMLTest, T_2CMS)
+{
+    execYAMLTest(T_2CMS);
+}
+
+TEST_F(FromYAMLTest, T_2EBW)
+{
+    execYAMLTest(T_2EBW);
+}
+
+TEST_F(FromYAMLTest, T_2G84)
+{
+    execYAMLTest(T_2G84);
+}
+
+TEST_F(FromYAMLTest, T_2JQS)
+{
+    execYAMLTest(T_2JQS);
+}
+
+TEST_F(FromYAMLTest, T_2LFX)
+{
+    execYAMLTest(T_2LFX);
+}
+
+TEST_F(FromYAMLTest, T_2SXE)
+{
+    execYAMLTest(T_2SXE);
+}
+
+TEST_F(FromYAMLTest, T_2XXW)
+{
+    execYAMLTest(T_2XXW);
+}
+
+TEST_F(FromYAMLTest, T_33X3)
+{
+    execYAMLTest(T_33X3);
+}
+
+TEST_F(FromYAMLTest, T_35KP)
+{
+    execYAMLTest(T_35KP);
+}
+
+TEST_F(FromYAMLTest, T_36F6)
+{
+    execYAMLTest(T_36F6);
+}
+
+TEST_F(FromYAMLTest, T_3ALJ)
+{
+    execYAMLTest(T_3ALJ);
+}
+
+TEST_F(FromYAMLTest, T_3GZX)
+{
+    execYAMLTest(T_3GZX);
+}
+
+TEST_F(FromYAMLTest, T_3HFZ)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_3HFZ);
+}
+
+TEST_F(FromYAMLTest, T_3MYT)
+{
+    execYAMLTest(T_3MYT);
+}
+
+TEST_F(FromYAMLTest, T_3R3P)
+{
+    execYAMLTest(T_3R3P);
+}
+
+TEST_F(FromYAMLTest, T_3RLN)
+{
+    execYAMLTest(T_3RLN);
+}
+
+TEST_F(FromYAMLTest, T_3UYS)
+{
+    execYAMLTest(T_3UYS);
+}
+
+TEST_F(FromYAMLTest, T_4ABK)
+{
+    execYAMLTest(T_4ABK);
+}
+
+TEST_F(FromYAMLTest, T_4CQQ)
+{
+    execYAMLTest(T_4CQQ);
+}
+
+TEST_F(FromYAMLTest, T_4EJS)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_4EJS);
+}
+
+TEST_F(FromYAMLTest, T_4FJ6)
+{
+    execYAMLTest(T_4FJ6);
+}
+
+TEST_F(FromYAMLTest, T_4GC6)
+{
+    execYAMLTest(T_4GC6);
+}
+
+TEST_F(FromYAMLTest, T_4H7K)
+{
+    execYAMLTest(T_4H7K);
+}
+
+TEST_F(FromYAMLTest, T_4HVU)
+{
+    execYAMLTest(T_4HVU);
+}
+
+TEST_F(FromYAMLTest, T_4JVG)
+{
+    execYAMLTest(T_4JVG);
+}
+
+TEST_F(FromYAMLTest, T_4MUZ)
+{
+    execYAMLTest(T_4MUZ);
+}
+
+TEST_F(FromYAMLTest, T_4Q9F)
+{
+    execYAMLTest(T_4Q9F);
+}
+
+TEST_F(FromYAMLTest, T_4QFQ)
+{
+    execYAMLTest(T_4QFQ);
+}
+
+TEST_F(FromYAMLTest, T_4RWC)
+{
+    execYAMLTest(T_4RWC);
+}
+
+TEST_F(FromYAMLTest, T_4UYU)
+{
+    execYAMLTest(T_4UYU);
+}
+
+TEST_F(FromYAMLTest, T_4V8U)
+{
+    execYAMLTest(T_4V8U);
+}
+
+TEST_F(FromYAMLTest, T_4WA9)
+{
+    execYAMLTest(T_4WA9);
+}
+
+TEST_F(FromYAMLTest, T_4ZYM)
+{
+    execYAMLTest(T_4ZYM);
+}
+
+TEST_F(FromYAMLTest, T_52DL)
+{
+    execYAMLTest(T_52DL);
+}
+
+TEST_F(FromYAMLTest, T_54T7)
+{
+    execYAMLTest(T_54T7);
+}
+
+TEST_F(FromYAMLTest, T_55WF)
+{
+    execYAMLTest(T_55WF);
+}
+
+TEST_F(FromYAMLTest, T_565N)
+{
+    ASSERT_THROW(execYAMLTest(T_565N), EvalError); // nix has no binary data type
+}
+
+TEST_F(FromYAMLTest, T_57H4)
+{
+    execYAMLTest(T_57H4);
+}
+
+TEST_F(FromYAMLTest, T_58MP)
+{
+    execYAMLTest(T_58MP);
+}
+
+TEST_F(FromYAMLTest, T_5BVJ)
+{
+    execYAMLTest(T_5BVJ);
+}
+
+TEST_F(FromYAMLTest, T_5C5M)
+{
+    execYAMLTest(T_5C5M);
+}
+
+TEST_F(FromYAMLTest, T_5GBF)
+{
+    execYAMLTest(T_5GBF);
+}
+
+TEST_F(FromYAMLTest, T_5KJE)
+{
+    execYAMLTest(T_5KJE);
+}
+
+TEST_F(FromYAMLTest, T_5LLU)
+{
+    execYAMLTest(T_5LLU);
+}
+
+TEST_F(FromYAMLTest, T_5MUD)
+{
+    execYAMLTest(T_5MUD);
+}
+
+TEST_F(FromYAMLTest, T_5NYZ)
+{
+    execYAMLTest(T_5NYZ);
+}
+
+TEST_F(FromYAMLTest, T_5T43)
+{
+    execYAMLTest(T_5T43);
+}
+
+TEST_F(FromYAMLTest, T_5TRB)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_5TRB);
+}
+
+TEST_F(FromYAMLTest, T_5TYM)
+{
+    execYAMLTest(T_5TYM);
+}
+
+TEST_F(FromYAMLTest, T_5U3A)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_5U3A);
+}
+
+TEST_F(FromYAMLTest, T_5WE3)
+{
+    execYAMLTest(T_5WE3);
+}
+
+TEST_F(FromYAMLTest, T_62EZ)
+{
+    execYAMLTest(T_62EZ);
+}
+
+TEST_F(FromYAMLTest, T_652Z)
+{
+    execYAMLTest(T_652Z);
+}
+
+TEST_F(FromYAMLTest, T_65WH)
+{
+    execYAMLTest(T_65WH);
+}
+
+TEST_F(FromYAMLTest, T_6BCT)
+{
+    execYAMLTest(T_6BCT);
+}
+
+TEST_F(FromYAMLTest, T_6BFJ)
+{
+    execYAMLTest(T_6BFJ);
+}
+
+TEST_F(FromYAMLTest, T_6CA3)
+{
+    execYAMLTest(T_6CA3);
+}
+
+TEST_F(FromYAMLTest, T_6CK3)
+{
+    execYAMLTest(T_6CK3);
+}
+
+TEST_F(FromYAMLTest, T_6FWR)
+{
+    execYAMLTest(T_6FWR);
+}
+
+TEST_F(FromYAMLTest, T_6H3V)
+{
+    execYAMLTest(T_6H3V);
+}
+
+TEST_F(FromYAMLTest, T_6HB6)
+{
+    execYAMLTest(T_6HB6);
+}
+
+TEST_F(FromYAMLTest, T_6JQW)
+{
+    execYAMLTest(T_6JQW);
+}
+
+TEST_F(FromYAMLTest, T_6JTT)
+{
+    execYAMLTest(T_6JTT);
+}
+
+TEST_F(FromYAMLTest, T_6JWB)
+{
+    execYAMLTest(T_6JWB);
+}
+
+TEST_F(FromYAMLTest, T_6KGN)
+{
+    execYAMLTest(T_6KGN);
+}
+
+TEST_F(FromYAMLTest, T_6LVF)
+{
+    execYAMLTest(T_6LVF);
+}
+
+TEST_F(FromYAMLTest, T_6M2F)
+{
+    execYAMLTest(T_6M2F);
+}
+
+TEST_F(FromYAMLTest, T_6PBE)
+{
+    execYAMLTest(T_6PBE);
+}
+
+TEST_F(FromYAMLTest, T_6S55)
+{
+    execYAMLTest(T_6S55);
+}
+
+TEST_F(FromYAMLTest, T_6SLA)
+{
+    execYAMLTest(T_6SLA);
+}
+
+TEST_F(FromYAMLTest, T_6VJK)
+{
+    execYAMLTest(T_6VJK);
+}
+
+TEST_F(FromYAMLTest, T_6WLZ)
+{
+    execYAMLTest(T_6WLZ);
+}
+
+TEST_F(FromYAMLTest, T_6WPF)
+{
+    execYAMLTest(T_6WPF);
+}
+
+TEST_F(FromYAMLTest, T_6XDY)
+{
+    execYAMLTest(T_6XDY);
+}
+
+TEST_F(FromYAMLTest, T_6ZKB)
+{
+    execYAMLTest(T_6ZKB);
+}
+
+TEST_F(FromYAMLTest, T_735Y)
+{
+    execYAMLTest(T_735Y);
+}
+
+TEST_F(FromYAMLTest, T_74H7)
+{
+    execYAMLTest(T_74H7);
+}
+
+TEST_F(FromYAMLTest, T_753E)
+{
+    execYAMLTest(T_753E);
+}
+
+TEST_F(FromYAMLTest, T_7A4E)
+{
+    execYAMLTest(T_7A4E);
+}
+
+TEST_F(FromYAMLTest, T_7BMT)
+{
+    execYAMLTest(T_7BMT);
+}
+
+TEST_F(FromYAMLTest, T_7BUB)
+{
+    execYAMLTest(T_7BUB);
+}
+
+TEST_F(FromYAMLTest, T_7FWL)
+{
+    execYAMLTest(T_7FWL);
+}
+
+TEST_F(FromYAMLTest, T_7LBH)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_7LBH);
+}
+
+TEST_F(FromYAMLTest, T_7MNF)
+{
+    execYAMLTest(T_7MNF);
+}
+
+TEST_F(FromYAMLTest, T_7T8X)
+{
+    execYAMLTest(T_7T8X);
+}
+
+TEST_F(FromYAMLTest, T_7TMG)
+{
+    execYAMLTest(T_7TMG);
+}
+
+TEST_F(FromYAMLTest, T_7W2P)
+{
+    execYAMLTest(T_7W2P);
+}
+
+TEST_F(FromYAMLTest, T_7Z25)
+{
+    execYAMLTest(T_7Z25);
+}
+
+TEST_F(FromYAMLTest, T_7ZZ5)
+{
+    execYAMLTest(T_7ZZ5);
+}
+
+TEST_F(FromYAMLTest, T_82AN)
+{
+    execYAMLTest(T_82AN);
+}
+
+TEST_F(FromYAMLTest, T_87E4)
+{
+    execYAMLTest(T_87E4);
+}
+
+TEST_F(FromYAMLTest, T_8CWC)
+{
+    execYAMLTest(T_8CWC);
+}
+
+TEST_F(FromYAMLTest, T_8G76)
+{
+    execYAMLTest(T_8G76);
+}
+
+TEST_F(FromYAMLTest, T_8KB6)
+{
+    execYAMLTest(T_8KB6);
+}
+
+TEST_F(FromYAMLTest, T_8MK2)
+{
+    execYAMLTest(T_8MK2);
+}
+
+TEST_F(FromYAMLTest, T_8QBE)
+{
+    execYAMLTest(T_8QBE);
+}
+
+TEST_F(FromYAMLTest, T_8UDB)
+{
+    execYAMLTest(T_8UDB);
+}
+
+TEST_F(FromYAMLTest, T_8XDJ)
+{
+    execYAMLTest(T_8XDJ);
+}
+
+TEST_F(FromYAMLTest, T_8XYN)
+{
+    execYAMLTest(T_8XYN);
+}
+
+TEST_F(FromYAMLTest, T_93JH)
+{
+    execYAMLTest(T_93JH);
+}
+
+TEST_F(FromYAMLTest, T_93WF)
+{
+    execYAMLTest(T_93WF);
+}
+
+TEST_F(FromYAMLTest, T_96L6)
+{
+    execYAMLTest(T_96L6);
+}
+
+TEST_F(FromYAMLTest, T_96NN)
+{
+    execYAMLTest(T_96NN);
+}
+
+TEST_F(FromYAMLTest, T_98YD)
+{
+    execYAMLTest(T_98YD);
+}
+
+TEST_F(FromYAMLTest, T_9BXH)
+{
+    execYAMLTest(T_9BXH);
+}
+
+TEST_F(FromYAMLTest, T_9C9N)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_9C9N);
+}
+
+TEST_F(FromYAMLTest, T_9CWY)
+{
+    execYAMLTest(T_9CWY);
+}
+
+TEST_F(FromYAMLTest, T_9DXL)
+{
+    execYAMLTest(T_9DXL);
+}
+
+TEST_F(FromYAMLTest, T_9FMG)
+{
+    execYAMLTest(T_9FMG);
+}
+
+TEST_F(FromYAMLTest, T_9HCY)
+{
+    execYAMLTest(T_9HCY);
+}
+
+TEST_F(FromYAMLTest, T_9J7A)
+{
+    execYAMLTest(T_9J7A);
+}
+
+TEST_F(FromYAMLTest, T_9JBA)
+{
+    execYAMLTest(T_9JBA);
+}
+
+TEST_F(FromYAMLTest, T_9KAX)
+{
+    execYAMLTest(T_9KAX);
+}
+
+TEST_F(FromYAMLTest, T_9KBC)
+{
+    execYAMLTest(T_9KBC);
+}
+
+TEST_F(FromYAMLTest, T_9MAG)
+{
+    execYAMLTest(T_9MAG);
+}
+
+TEST_F(FromYAMLTest, T_9MMA)
+{
+    execYAMLTest(T_9MMA);
+}
+
+TEST_F(FromYAMLTest, T_9MMW)
+{
+    execYAMLTest(T_9MMW);
+}
+
+TEST_F(FromYAMLTest, T_9MQT)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_9MQT);
+}
+
+TEST_F(FromYAMLTest, T_9SA2)
+{
+    execYAMLTest(T_9SA2);
+}
+
+TEST_F(FromYAMLTest, T_9SHH)
+{
+    execYAMLTest(T_9SHH);
+}
+
+TEST_F(FromYAMLTest, T_9TFX)
+{
+    execYAMLTest(T_9TFX);
+}
+
+TEST_F(FromYAMLTest, T_9U5K)
+{
+    execYAMLTest(T_9U5K);
+}
+
+TEST_F(FromYAMLTest, T_9WXW)
+{
+    execYAMLTest(T_9WXW);
+}
+
+TEST_F(FromYAMLTest, T_9YRD)
+{
+    execYAMLTest(T_9YRD);
+}
+
+TEST_F(FromYAMLTest, T_A2M4)
+{
+    execYAMLTest(T_A2M4);
+}
+
+TEST_F(FromYAMLTest, T_A6F9)
+{
+    execYAMLTest(T_A6F9);
+}
+
+TEST_F(FromYAMLTest, T_A984)
+{
+    execYAMLTest(T_A984);
+}
+
+TEST_F(FromYAMLTest, T_AB8U)
+{
+    execYAMLTest(T_AB8U);
+}
+
+TEST_F(FromYAMLTest, T_AVM7)
+{
+    execYAMLTest(T_AVM7);
+}
+
+TEST_F(FromYAMLTest, T_AZ63)
+{
+    execYAMLTest(T_AZ63);
+}
+
+TEST_F(FromYAMLTest, T_AZW3)
+{
+    execYAMLTest(T_AZW3);
+}
+
+TEST_F(FromYAMLTest, T_B3HG)
+{
+    execYAMLTest(T_B3HG);
+}
+
+TEST_F(FromYAMLTest, T_B63P)
+{
+    execYAMLTest(T_B63P);
+}
+
+TEST_F(FromYAMLTest, T_BD7L)
+{
+    execYAMLTest(T_BD7L);
+}
+
+TEST_F(FromYAMLTest, T_BEC7)
+{
+    execYAMLTest(T_BEC7);
+}
+
+TEST_F(FromYAMLTest, T_BF9H)
+{
+    execYAMLTest(T_BF9H);
+}
+
+TEST_F(FromYAMLTest, T_BS4K)
+{
+    execYAMLTest(T_BS4K);
+}
+
+TEST_F(FromYAMLTest, T_BU8L)
+{
+    execYAMLTest(T_BU8L);
+}
+
+TEST_F(FromYAMLTest, T_C2DT)
+{
+    execYAMLTest(T_C2DT);
+}
+
+TEST_F(FromYAMLTest, T_C2SP)
+{
+    execYAMLTest(T_C2SP);
+}
+
+TEST_F(FromYAMLTest, T_C4HZ)
+{
+    execYAMLTest(T_C4HZ);
+}
+
+TEST_F(FromYAMLTest, T_CC74)
+{
+    execYAMLTest(T_CC74);
+}
+
+TEST_F(FromYAMLTest, T_CFD4)
+{
+    execYAMLTest(T_CFD4);
+}
+
+TEST_F(FromYAMLTest, T_CML9)
+{
+    execYAMLTest(T_CML9);
+}
+
+TEST_F(FromYAMLTest, T_CN3R)
+{
+    execYAMLTest(T_CN3R);
+}
+
+TEST_F(FromYAMLTest, T_CPZ3)
+{
+    execYAMLTest(T_CPZ3);
+}
+
+TEST_F(FromYAMLTest, T_CQ3W)
+{
+    execYAMLTest(T_CQ3W);
+}
+
+TEST_F(FromYAMLTest, T_CT4Q)
+{
+    execYAMLTest(T_CT4Q);
+}
+
+TEST_F(FromYAMLTest, T_CTN5)
+{
+    execYAMLTest(T_CTN5);
+}
+
+TEST_F(FromYAMLTest, T_CUP7)
+{
+    execYAMLTest(T_CUP7);
+}
+
+TEST_F(FromYAMLTest, T_CVW2)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_CVW2);
+}
+
+TEST_F(FromYAMLTest, T_CXX2)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_CXX2);
+}
+
+TEST_F(FromYAMLTest, T_D49Q)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_D49Q);
+}
+
+TEST_F(FromYAMLTest, T_D83L)
+{
+    execYAMLTest(T_D83L);
+}
+
+TEST_F(FromYAMLTest, T_D88J)
+{
+    execYAMLTest(T_D88J);
+}
+
+TEST_F(FromYAMLTest, T_D9TU)
+{
+    execYAMLTest(T_D9TU);
+}
+
+TEST_F(FromYAMLTest, T_DBG4)
+{
+    execYAMLTest(T_DBG4);
+}
+
+TEST_F(FromYAMLTest, T_DC7X)
+{
+    execYAMLTest(T_DC7X);
+}
+
+TEST_F(FromYAMLTest, T_DE56)
+{
+    execYAMLTest(T_DE56);
+}
+
+TEST_F(FromYAMLTest, T_DFF7)
+{
+    execYAMLTest(T_DFF7);
+}
+
+TEST_F(FromYAMLTest, T_DHP8)
+{
+    execYAMLTest(T_DHP8);
+}
+
+TEST_F(FromYAMLTest, T_DK3J)
+{
+    execYAMLTest(T_DK3J);
+}
+
+TEST_F(FromYAMLTest, T_DK4H)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_DK4H);
+}
+
+TEST_F(FromYAMLTest, T_DK95)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_DK95);
+}
+
+TEST_F(FromYAMLTest, T_DMG6)
+{
+    execYAMLTest(T_DMG6);
+}
+
+TEST_F(FromYAMLTest, T_DWX9)
+{
+    execYAMLTest(T_DWX9);
+}
+
+TEST_F(FromYAMLTest, T_E76Z)
+{
+    execYAMLTest(T_E76Z);
+}
+
+TEST_F(FromYAMLTest, T_EB22)
+{
+    execYAMLTest(T_EB22);
+}
+
+TEST_F(FromYAMLTest, T_EHF6)
+{
+    execYAMLTest(T_EHF6);
+}
+
+TEST_F(FromYAMLTest, T_EW3V)
+{
+    execYAMLTest(T_EW3V);
+}
+
+TEST_F(FromYAMLTest, T_EX5H)
+{
+    execYAMLTest(T_EX5H);
+}
+
+TEST_F(FromYAMLTest, T_EXG3)
+{
+    execYAMLTest(T_EXG3);
+}
+
+TEST_F(FromYAMLTest, T_F2C7)
+{
+    execYAMLTest(T_F2C7);
+}
+
+TEST_F(FromYAMLTest, T_F3CP)
+{
+    execYAMLTest(T_F3CP);
+}
+
+TEST_F(FromYAMLTest, T_F6MC)
+{
+    execYAMLTest(T_F6MC);
+}
+
+TEST_F(FromYAMLTest, T_F8F9)
+{
+    execYAMLTest(T_F8F9);
+}
+
+TEST_F(FromYAMLTest, T_FBC9)
+{
+    execYAMLTest(T_FBC9);
+}
+
+TEST_F(FromYAMLTest, T_FH7J)
+{
+    execYAMLTest(T_FH7J);
+}
+
+TEST_F(FromYAMLTest, T_FP8R)
+{
+    execYAMLTest(T_FP8R);
+}
+
+TEST_F(FromYAMLTest, T_FQ7F)
+{
+    execYAMLTest(T_FQ7F);
+}
+
+TEST_F(FromYAMLTest, T_FRK4)
+{
+    execYAMLTest(T_FRK4);
+}
+
+TEST_F(FromYAMLTest, T_FTA2)
+{
+    execYAMLTest(T_FTA2);
+}
+
+TEST_F(FromYAMLTest, T_FUP4)
+{
+    execYAMLTest(T_FUP4);
+}
+
+TEST_F(FromYAMLTest, T_G4RS)
+{
+    execYAMLTest(T_G4RS);
+}
+
+TEST_F(FromYAMLTest, T_G5U8)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_G5U8);
+}
+
+TEST_F(FromYAMLTest, T_G7JE)
+{
+    execYAMLTest(T_G7JE);
+}
+
+TEST_F(FromYAMLTest, T_G992)
+{
+    execYAMLTest(T_G992);
+}
+
+TEST_F(FromYAMLTest, T_G9HC)
+{
+    execYAMLTest(T_G9HC);
+}
+
+TEST_F(FromYAMLTest, T_GDY7)
+{
+    execYAMLTest(T_GDY7);
+}
+
+TEST_F(FromYAMLTest, T_GH63)
+{
+    execYAMLTest(T_GH63);
+}
+
+TEST_F(FromYAMLTest, T_GT5M)
+{
+    execYAMLTest(T_GT5M);
+}
+
+TEST_F(FromYAMLTest, T_H2RW)
+{
+    execYAMLTest(T_H2RW);
+}
+
+TEST_F(FromYAMLTest, T_H3Z8)
+{
+    execYAMLTest(T_H3Z8);
+}
+
+TEST_F(FromYAMLTest, T_H7J7)
+{
+    execYAMLTest(T_H7J7);
+}
+
+/** This test is ignored because these tests are not required to fail and rapidyaml ignores the YAML version string.
+TEST_F(FromYAMLTest, T_H7TQ)
+{
+    execYAMLTest(T_H7TQ);
+}
+*/
+
+TEST_F(FromYAMLTest, T_HM87)
+{
+    execYAMLTest(T_HM87);
+}
+
+TEST_F(FromYAMLTest, T_HMK4)
+{
+    execYAMLTest(T_HMK4);
+}
+
+TEST_F(FromYAMLTest, T_HMQ5)
+{
+    execYAMLTest(T_HMQ5);
+}
+
+TEST_F(FromYAMLTest, T_HRE5)
+{
+    execYAMLTest(T_HRE5);
+}
+
+TEST_F(FromYAMLTest, T_HS5T)
+{
+    execYAMLTest(T_HS5T);
+}
+
+TEST_F(FromYAMLTest, T_HU3P)
+{
+    execYAMLTest(T_HU3P);
+}
+
+TEST_F(FromYAMLTest, T_HWV9)
+{
+    execYAMLTest(T_HWV9);
+}
+
+TEST_F(FromYAMLTest, T_J3BT)
+{
+    execYAMLTest(T_J3BT);
+}
+
+TEST_F(FromYAMLTest, T_J5UC)
+{
+    execYAMLTest(T_J5UC);
+}
+
+TEST_F(FromYAMLTest, T_J7PZ)
+{
+    execYAMLTest(T_J7PZ);
+}
+
+TEST_F(FromYAMLTest, T_J7VC)
+{
+    execYAMLTest(T_J7VC);
+}
+
+TEST_F(FromYAMLTest, T_J9HZ)
+{
+    execYAMLTest(T_J9HZ);
+}
+
+TEST_F(FromYAMLTest, T_JEF9)
+{
+    execYAMLTest(T_JEF9);
+}
+
+TEST_F(FromYAMLTest, T_JHB9)
+{
+    execYAMLTest(T_JHB9);
+}
+
+TEST_F(FromYAMLTest, T_JKF3)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_JKF3);
+}
+
+TEST_F(FromYAMLTest, T_JQ4R)
+{
+    execYAMLTest(T_JQ4R);
+}
+
+TEST_F(FromYAMLTest, T_JR7V)
+{
+    execYAMLTest(T_JR7V);
+}
+
+TEST_F(FromYAMLTest, T_JS2J)
+{
+    execYAMLTest(T_JS2J);
+}
+
+TEST_F(FromYAMLTest, T_JTV5)
+{
+    execYAMLTest(T_JTV5);
+}
+
+TEST_F(FromYAMLTest, T_JY7Z)
+{
+    execYAMLTest(T_JY7Z);
+}
+
+TEST_F(FromYAMLTest, T_K3WX)
+{
+    execYAMLTest(T_K3WX);
+}
+
+TEST_F(FromYAMLTest, T_K4SU)
+{
+    execYAMLTest(T_K4SU);
+}
+
+TEST_F(FromYAMLTest, T_K527)
+{
+    execYAMLTest(T_K527);
+}
+
+TEST_F(FromYAMLTest, T_K54U)
+{
+    execYAMLTest(T_K54U);
+}
+
+TEST_F(FromYAMLTest, T_K858)
+{
+    execYAMLTest(T_K858);
+}
+
+TEST_F(FromYAMLTest, T_KH5V)
+{
+    execYAMLTest(T_KH5V);
+}
+
+TEST_F(FromYAMLTest, T_KK5P)
+{
+    execYAMLTest(T_KK5P);
+}
+
+TEST_F(FromYAMLTest, T_KMK3)
+{
+    execYAMLTest(T_KMK3);
+}
+
+TEST_F(FromYAMLTest, T_KS4U)
+{
+    execYAMLTest(T_KS4U);
+}
+
+TEST_F(FromYAMLTest, T_KSS4)
+{
+    execYAMLTest(T_KSS4);
+}
+
+TEST_F(FromYAMLTest, T_L24T)
+{
+    execYAMLTest(T_L24T);
+}
+
+TEST_F(FromYAMLTest, T_L383)
+{
+    execYAMLTest(T_L383);
+}
+
+TEST_F(FromYAMLTest, T_L94M)
+{
+    execYAMLTest(T_L94M);
+}
+
+TEST_F(FromYAMLTest, T_L9U5)
+{
+    execYAMLTest(T_L9U5);
+}
+
+TEST_F(FromYAMLTest, T_LE5A)
+{
+    execYAMLTest(T_LE5A);
+}
+
+TEST_F(FromYAMLTest, T_LHL4)
+{
+    execYAMLTest(T_LHL4);
+}
+
+TEST_F(FromYAMLTest, T_LP6E)
+{
+    execYAMLTest(T_LP6E);
+}
+
+TEST_F(FromYAMLTest, T_LQZ7)
+{
+    execYAMLTest(T_LQZ7);
+}
+
+TEST_F(FromYAMLTest, T_LX3P)
+{
+    execYAMLTest(T_LX3P);
+}
+
+TEST_F(FromYAMLTest, T_M29M)
+{
+    execYAMLTest(T_M29M);
+}
+
+TEST_F(FromYAMLTest, T_M2N8)
+{
+    execYAMLTest(T_M2N8);
+}
+
+TEST_F(FromYAMLTest, T_M5C3)
+{
+    execYAMLTest(T_M5C3);
+}
+
+TEST_F(FromYAMLTest, T_M5DY)
+{
+    execYAMLTest(T_M5DY);
+}
+
+TEST_F(FromYAMLTest, T_M6YH)
+{
+    execYAMLTest(T_M6YH);
+}
+
+TEST_F(FromYAMLTest, T_M7A3)
+{
+    execYAMLTest(T_M7A3);
+}
+
+TEST_F(FromYAMLTest, T_M7NX)
+{
+    execYAMLTest(T_M7NX);
+}
+
+TEST_F(FromYAMLTest, T_M9B4)
+{
+    execYAMLTest(T_M9B4);
+}
+
+TEST_F(FromYAMLTest, T_MJS9)
+{
+    execYAMLTest(T_MJS9);
+}
+
+/** This test is ignored because these tests are not required to fail and rapidyaml ignores the YAML version string.
+TEST_F(FromYAMLTest, T_MUS6)
+{
+    execYAMLTest(T_MUS6);
+}
+*/
+
+TEST_F(FromYAMLTest, T_MXS3)
+{
+    execYAMLTest(T_MXS3);
+}
+
+TEST_F(FromYAMLTest, T_MYW6)
+{
+    execYAMLTest(T_MYW6);
+}
+
+TEST_F(FromYAMLTest, T_MZX3)
+{
+    execYAMLTest(T_MZX3);
+}
+
+TEST_F(FromYAMLTest, T_N4JP)
+{
+    execYAMLTest(T_N4JP);
+}
+
+TEST_F(FromYAMLTest, T_N782)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_N782);
+}
+
+TEST_F(FromYAMLTest, T_NAT4)
+{
+    execYAMLTest(T_NAT4);
+}
+
+TEST_F(FromYAMLTest, T_NB6Z)
+{
+    execYAMLTest(T_NB6Z);
+}
+
+TEST_F(FromYAMLTest, T_NHX8)
+{
+    execYAMLTest(T_NHX8);
+}
+
+TEST_F(FromYAMLTest, T_NJ66)
+{
+    execYAMLTest(T_NJ66);
+}
+
+TEST_F(FromYAMLTest, T_NKF9)
+{
+    execYAMLTest(T_NKF9);
+}
+
+TEST_F(FromYAMLTest, T_NP9H)
+{
+    execYAMLTest(T_NP9H);
+}
+
+TEST_F(FromYAMLTest, T_P2AD)
+{
+    execYAMLTest(T_P2AD);
+}
+
+TEST_F(FromYAMLTest, T_P2EQ)
+{
+    execYAMLTest(T_P2EQ);
+}
+
+TEST_F(FromYAMLTest, T_P76L)
+{
+    execYAMLTest(T_P76L);
+}
+
+TEST_F(FromYAMLTest, T_P94K)
+{
+    execYAMLTest(T_P94K);
+}
+
+TEST_F(FromYAMLTest, T_PBJ2)
+{
+    execYAMLTest(T_PBJ2);
+}
+
+TEST_F(FromYAMLTest, T_PRH3)
+{
+    execYAMLTest(T_PRH3);
+}
+
+TEST_F(FromYAMLTest, T_PUW8)
+{
+    execYAMLTest(T_PUW8);
+}
+
+TEST_F(FromYAMLTest, T_PW8X)
+{
+    execYAMLTest(T_PW8X);
+}
+
+TEST_F(FromYAMLTest, T_Q4CL)
+{
+    execYAMLTest(T_Q4CL);
+}
+
+TEST_F(FromYAMLTest, T_Q5MG)
+{
+    execYAMLTest(T_Q5MG);
+}
+
+TEST_F(FromYAMLTest, T_Q88A)
+{
+    execYAMLTest(T_Q88A);
+}
+
+TEST_F(FromYAMLTest, T_Q8AD)
+{
+    execYAMLTest(T_Q8AD);
+}
+
+TEST_F(FromYAMLTest, T_Q9WF)
+{
+    execYAMLTest(T_Q9WF);
+}
+
+TEST_F(FromYAMLTest, T_QB6E)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_QB6E);
+}
+
+TEST_F(FromYAMLTest, T_QF4Y)
+{
+    execYAMLTest(T_QF4Y);
+}
+
+TEST_F(FromYAMLTest, T_QLJ7)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_QLJ7);
+}
+
+TEST_F(FromYAMLTest, T_QT73)
+{
+    execYAMLTest(T_QT73);
+}
+
+TEST_F(FromYAMLTest, T_R4YG)
+{
+    execYAMLTest(T_R4YG);
+}
+
+TEST_F(FromYAMLTest, T_R52L)
+{
+    execYAMLTest(T_R52L);
+}
+
+TEST_F(FromYAMLTest, T_RHX7)
+{
+    execYAMLTest(T_RHX7);
+}
+
+TEST_F(FromYAMLTest, T_RLU9)
+{
+    execYAMLTest(T_RLU9);
+}
+
+TEST_F(FromYAMLTest, T_RR7F)
+{
+    execYAMLTest(T_RR7F);
+}
+
+TEST_F(FromYAMLTest, T_RTP8)
+{
+    execYAMLTest(T_RTP8);
+}
+
+TEST_F(FromYAMLTest, T_RXY3)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_RXY3);
+}
+
+TEST_F(FromYAMLTest, T_RZP5)
+{
+    execYAMLTest(T_RZP5);
+}
+
+TEST_F(FromYAMLTest, T_RZT7)
+{
+    execYAMLTest(T_RZT7);
+}
+
+TEST_F(FromYAMLTest, T_S3PD)
+{
+    execYAMLTest(T_S3PD);
+}
+
+TEST_F(FromYAMLTest, T_S4GJ)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_S4GJ);
+}
+
+TEST_F(FromYAMLTest, T_S4JQ)
+{
+    execYAMLTest(T_S4JQ);
+}
+
+TEST_F(FromYAMLTest, T_S4T7)
+{
+    execYAMLTest(T_S4T7);
+}
+
+TEST_F(FromYAMLTest, T_S7BG)
+{
+    execYAMLTest(T_S7BG);
+}
+
+TEST_F(FromYAMLTest, T_S98Z)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_S98Z);
+}
+
+TEST_F(FromYAMLTest, T_S9E8)
+{
+    execYAMLTest(T_S9E8);
+}
+
+TEST_F(FromYAMLTest, T_SBG9)
+{
+    execYAMLTest(T_SBG9);
+}
+
+TEST_F(FromYAMLTest, T_SF5V)
+{
+    execYAMLTest(T_SF5V);
+}
+
+TEST_F(FromYAMLTest, T_SKE5)
+{
+    execYAMLTest(T_SKE5);
+}
+
+TEST_F(FromYAMLTest, T_SM9W)
+{
+    execYAMLTest(T_SM9W);
+}
+
+TEST_F(FromYAMLTest, T_SR86)
+{
+    execYAMLTest(T_SR86);
+}
+
+TEST_F(FromYAMLTest, T_SSW6)
+{
+    execYAMLTest(T_SSW6);
+}
+
+TEST_F(FromYAMLTest, T_SU5Z)
+{
+    execYAMLTest(T_SU5Z);
+}
+
+TEST_F(FromYAMLTest, T_SU74)
+{
+    execYAMLTest(T_SU74);
+}
+
+TEST_F(FromYAMLTest, T_SY6V)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_SY6V);
+}
+
+TEST_F(FromYAMLTest, T_SYW4)
+{
+    execYAMLTest(T_SYW4);
+}
+
+TEST_F(FromYAMLTest, T_T26H)
+{
+    execYAMLTest(T_T26H);
+}
+
+TEST_F(FromYAMLTest, T_T4YY)
+{
+    execYAMLTest(T_T4YY);
+}
+
+TEST_F(FromYAMLTest, T_T5N4)
+{
+    execYAMLTest(T_T5N4);
+}
+
+TEST_F(FromYAMLTest, T_T833)
+{
+    execYAMLTest(T_T833);
+}
+
+TEST_F(FromYAMLTest, T_TD5N)
+{
+    execYAMLTest(T_TD5N);
+}
+
+TEST_F(FromYAMLTest, T_TE2A)
+{
+    execYAMLTest(T_TE2A);
+}
+
+TEST_F(FromYAMLTest, T_TL85)
+{
+    execYAMLTest(T_TL85);
+}
+
+TEST_F(FromYAMLTest, T_TS54)
+{
+    execYAMLTest(T_TS54);
+}
+
+TEST_F(FromYAMLTest, T_U3C3)
+{
+    execYAMLTest(T_U3C3);
+}
+
+TEST_F(FromYAMLTest, T_U3XV)
+{
+    execYAMLTest(T_U3XV);
+}
+
+TEST_F(FromYAMLTest, T_U44R)
+{
+    execYAMLTest(T_U44R);
+}
+
+TEST_F(FromYAMLTest, T_U99R)
+{
+    execYAMLTest(T_U99R);
+}
+
+TEST_F(FromYAMLTest, T_U9NS)
+{
+    execYAMLTest(T_U9NS);
+}
+
+TEST_F(FromYAMLTest, T_UDM2)
+{
+    execYAMLTest(T_UDM2);
+}
+
+TEST_F(FromYAMLTest, T_UDR7)
+{
+    execYAMLTest(T_UDR7);
+}
+
+TEST_F(FromYAMLTest, T_UGM3)
+{
+    execYAMLTest(T_UGM3);
+}
+
+TEST_F(FromYAMLTest, T_UKK6)
+{
+    execYAMLTest(T_UKK6);
+}
+
+TEST_F(FromYAMLTest, T_UT92)
+{
+    execYAMLTest(T_UT92);
+}
+
+TEST_F(FromYAMLTest, T_UV7Q)
+{
+    execYAMLTest(T_UV7Q);
+}
+
+TEST_F(FromYAMLTest, T_V55R)
+{
+    execYAMLTest(T_V55R);
+}
+
+TEST_F(FromYAMLTest, T_V9D5)
+{
+    execYAMLTest(T_V9D5);
+}
+
+TEST_F(FromYAMLTest, T_VJP3)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_VJP3);
+}
+
+TEST_F(FromYAMLTest, T_W42U)
+{
+    execYAMLTest(T_W42U);
+}
+
+TEST_F(FromYAMLTest, T_W4TN)
+{
+    execYAMLTest(T_W4TN);
+}
+
+TEST_F(FromYAMLTest, T_W5VH)
+{
+    execYAMLTest(T_W5VH);
+}
+
+TEST_F(FromYAMLTest, T_W9L4)
+{
+    execYAMLTest(T_W9L4);
+}
+
+TEST_F(FromYAMLTest, T_WZ62)
+{
+    execYAMLTest(T_WZ62);
+}
+
+TEST_F(FromYAMLTest, T_X38W)
+{
+    execYAMLTest(T_X38W);
+}
+
+TEST_F(FromYAMLTest, T_X4QW)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_X4QW);
+}
+
+TEST_F(FromYAMLTest, T_X8DW)
+{
+    execYAMLTest(T_X8DW);
+}
+
+TEST_F(FromYAMLTest, T_XLQ9)
+{
+    execYAMLTest(T_XLQ9);
+}
+
+TEST_F(FromYAMLTest, T_XV9V)
+{
+    execYAMLTest(T_XV9V);
+}
+
+TEST_F(FromYAMLTest, T_XW4D)
+{
+    execYAMLTest(T_XW4D);
+}
+
+TEST_F(FromYAMLTest, T_Y2GN)
+{
+    execYAMLTest(T_Y2GN);
+}
+
+TEST_F(FromYAMLTest, T_Y79Y)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_Y79Y);
+}
+
+TEST_F(FromYAMLTest, T_YD5X)
+{
+    execYAMLTest(T_YD5X);
+}
+
+TEST_F(FromYAMLTest, T_YJV2)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_YJV2);
+}
+
+TEST_F(FromYAMLTest, T_Z67P)
+{
+    execYAMLTest(T_Z67P);
+}
+
+TEST_F(FromYAMLTest, T_Z9M4)
+{
+    execYAMLTest(T_Z9M4);
+}
+
+TEST_F(FromYAMLTest, T_ZCZ6)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_ZCZ6);
+}
+
+TEST_F(FromYAMLTest, T_ZF4X)
+{
+    execYAMLTest(T_ZF4X);
+}
+
+TEST_F(FromYAMLTest, T_ZH7C)
+{
+    execYAMLTest(T_ZH7C);
+}
+
+TEST_F(FromYAMLTest, T_ZK9H)
+{
+    execYAMLTest(T_ZK9H);
+}
+
+TEST_F(FromYAMLTest, T_ZL4Z)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_ZL4Z);
+}
+
+TEST_F(FromYAMLTest, T_ZVH3)
+{
+    execYAMLTest(T_ZVH3);
+}
+
+TEST_F(FromYAMLTest, T_ZWK4)
+{
+    execYAMLTest(T_ZWK4);
+}
+
+TEST_F(FromYAMLTest, T_ZXT5)
+{
+    GTEST_SKIP() << "Reason: Invalid yaml is parsed successfully";
+    execYAMLTest(T_ZXT5);
+}
+
+/** This test is ignored because these tests are not required to fail and rapidyaml ignores the YAML version string.
+TEST_F(FromYAMLTest, T_ZYU8)
+{
+    execYAMLTest(T_ZYU8);
+}
+*/
 
 } /* namespace nix */
