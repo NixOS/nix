@@ -321,11 +321,7 @@ MixEnvironment::MixEnvironment() : ignoreEnvironment(false)
     addFlag({
         .longName = "set-env-var",
         .shortName = 's',
-        .description = "Add/override an environment variable *name* with *value*.\n\n"
-                       "> **Notes**\n"
-                       ">\n"
-                       "> Duplicate definitions will be overwritten, last one wins.\n\n"
-                       "> Cancles out with `--unset-env-var`.\n\n",
+        .description = "Sets an environment variable *name* with *value*.",
         .category = environmentVariablesCategory,
         .labels = {"name", "value"},
         .handler = {[&](std::string name, std::string value) {

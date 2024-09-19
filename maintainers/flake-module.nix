@@ -547,7 +547,6 @@
             ''^tests/functional/flakes/absolute-paths\.sh$''
             ''^tests/functional/flakes/check\.sh$''
             ''^tests/functional/flakes/config\.sh$''
-            ''^tests/functional/flakes/develop\.sh$''
             ''^tests/functional/flakes/flakes\.sh$''
             ''^tests/functional/flakes/follow-paths\.sh$''
             ''^tests/functional/flakes/prefetch\.sh$''
