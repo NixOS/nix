@@ -15,6 +15,9 @@
 #else
 template<typename T>
 using traceable_allocator = std::allocator<T>;
+
+template<typename T>
+using gc_allocator = std::allocator<T>;
 #endif
 
 #include <nlohmann/json_fwd.hpp>
