@@ -51,6 +51,14 @@ endforeach
 
 subdir('build-utils-meson/threads')
 
+# Check if -latomic is needed
+# This is needed for std::atomic on some platforms
+# We did not manage to test this reliably on all platforms, so we hardcode
+# it for now.
+if host_machine.cpu_family() == 'arm'
+  deps_other += cxx.find_library('atomic')
+endif
+
 if host_machine.system() == 'windows'
   socket = cxx.find_library('ws2_32')
   deps_other += socket
