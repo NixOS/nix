@@ -4349,7 +4349,7 @@ static void prim_substring(EvalState & state, const PosIdx pos, Value ** args, V
     if (len == 0) {
         state.forceValue(*args[2], pos);
         if (args[2]->type() == nString) {
-            v.mkString("", args[2]->context());
+            v.mkStringNoCopy("", args[2]->context());
             return;
         }
     }

@@ -54,7 +54,7 @@ TEST_F(JSONValueTest, IntNegative)
 TEST_F(JSONValueTest, String)
 {
     Value v;
-    v.mkString("test");
+    v.mkStringNoCopy("test");
     ASSERT_EQ(getJSONValue(v), "\"test\"");
 }
 
@@ -62,7 +62,7 @@ TEST_F(JSONValueTest, StringQuotes)
 {
     Value v;
 
-    v.mkString("test\"");
+    v.mkStringNoCopy("test\"");
     ASSERT_EQ(getJSONValue(v), "\"test\\\"\"");
 }
 

@@ -35,14 +35,14 @@ TEST_F(ValuePrintingTests, tBool)
 TEST_F(ValuePrintingTests, tString)
 {
     Value vString;
-    vString.mkString("some-string");
+    vString.mkStringNoCopy("some-string");
     test(vString, "\"some-string\"");
 }
 
 TEST_F(ValuePrintingTests, tPath)
 {
     Value vPath;
-    vPath.mkString("/foo");
+    vPath.mkStringNoCopy("/foo");
     test(vPath, "\"/foo\"");
 }
 
@@ -290,10 +290,10 @@ TEST_F(StringPrintingTests, maxLengthTruncation)
 TEST_F(ValuePrintingTests, attrsTypeFirst)
 {
     Value vType;
-    vType.mkString("puppy");
+    vType.mkStringNoCopy("puppy");
 
     Value vApple;
-    vApple.mkString("apple");
+    vApple.mkStringNoCopy("apple");
 
     BindingsBuilder builder(state, state.allocBindings(10));
     builder.insert(state.symbols.create("type"), &vType);
@@ -334,7 +334,7 @@ TEST_F(ValuePrintingTests, ansiColorsBool)
 TEST_F(ValuePrintingTests, ansiColorsString)
 {
     Value v;
-    v.mkString("puppy");
+    v.mkStringNoCopy("puppy");
 
     test(v, ANSI_MAGENTA "\"puppy\"" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }
@@ -342,7 +342,7 @@ TEST_F(ValuePrintingTests, ansiColorsString)
 TEST_F(ValuePrintingTests, ansiColorsStringElided)
 {
     Value v;
-    v.mkString("puppy");
+    v.mkStringNoCopy("puppy");
 
     test(
         v,
@@ -390,7 +390,7 @@ TEST_F(ValuePrintingTests, ansiColorsAttrs)
 TEST_F(ValuePrintingTests, ansiColorsDerivation)
 {
     Value vDerivation;
-    vDerivation.mkString("derivation");
+    vDerivation.mkStringNoCopy("derivation");
 
     BindingsBuilder builder(state, state.allocBindings(10));
     builder.insert(state.s.type, &vDerivation);
@@ -413,7 +413,7 @@ TEST_F(ValuePrintingTests, ansiColorsError)
 {
     Value throw_ = state.getBuiltin("throw");
     Value message;
-    message.mkString("uh oh!");
+    message.mkStringNoCopy("uh oh!");
     Value vError;
     vError.mkApp(&throw_, &message);
 
@@ -430,12 +430,12 @@ TEST_F(ValuePrintingTests, ansiColorsDerivationError)
 {
     Value throw_ = state.getBuiltin("throw");
     Value message;
-    message.mkString("uh oh!");
+    message.mkStringNoCopy("uh oh!");
     Value vError;
     vError.mkApp(&throw_, &message);
 
     Value vDerivation;
-    vDerivation.mkString("derivation");
+    vDerivation.mkStringNoCopy("derivation");
 
     BindingsBuilder builder(state, state.allocBindings(10));
     builder.insert(state.s.type, &vDerivation);

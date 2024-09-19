@@ -292,10 +292,10 @@ EvalState::EvalState(
     vNull.mkNull();
     vTrue.mkBool(true);
     vFalse.mkBool(false);
-    vStringRegular.mkString("regular");
-    vStringDirectory.mkString("directory");
-    vStringSymlink.mkString("symlink");
-    vStringUnknown.mkString("unknown");
+    vStringRegular.mkStringNoCopy("regular");
+    vStringDirectory.mkStringNoCopy("directory");
+    vStringSymlink.mkStringNoCopy("symlink");
+    vStringUnknown.mkStringNoCopy("unknown");
 
     /* Construct the Nix expression search path. */
     assert(lookupPath.elements.empty());
@@ -824,7 +824,7 @@ DebugTraceStacker::DebugTraceStacker(EvalState & evalState, DebugTrace t)
 
 void Value::mkString(std::string_view s)
 {
-    mkString(makeImmutableString(s));
+    mkStringNoCopy(makeImmutableString(s));
 }
 
 static const char ** encodeContext(const NixStringContext & context)
@@ -843,12 +843,12 @@ static const char ** encodeContext(const NixStringContext & context)
 
 void Value::mkString(std::string_view s, const NixStringContext & context)
 {
-    mkString(makeImmutableString(s), encodeContext(context));
+    mkStringNoCopy(makeImmutableString(s), encodeContext(context));
 }
 
 void Value::mkStringMove(const char * s, const NixStringContext & context)
 {
-    mkString(s, encodeContext(context));
+    mkStringNoCopy(s, encodeContext(context));
 }
 
 void Value::mkPath(const SourcePath & path)

@@ -960,7 +960,7 @@ public:
         setStorage(b);
     }
 
-    inline void mkString(const char * s, const char ** context = 0) noexcept
+    void mkStringNoCopy(const char * s, const char ** context = 0) noexcept
     {
         setStorage(StringWithContext{.c_str = s, .context = context});
     }
