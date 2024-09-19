@@ -120,12 +120,14 @@ void Pipe::create()
 
 //////////////////////////////////////////////////////////////////////
 
-#if __linux__ || __FreeBSD__
+#if __linux__
 // In future we can use a syscall wrapper, but at the moment musl and older glibc version don't support it.
 static int unix_close_range(unsigned int first, unsigned int last, int flags)
 {
     return syscall(SYS_close_range, first, last, (unsigned int)flags);
 }
+#elif __FreeBSD__
+#define unix_close_range close_range
 #endif
 
 void unix::closeExtraFDs()
