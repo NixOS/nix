@@ -23,7 +23,8 @@ template<typename T>
 using gc_allocator = std::allocator<T>;
 
 #  define GC_MALLOC_ATOMIC std::malloc
-#  define GC_STRDUP std::strdup
+#  define GC_STRDUP strdup
+
 struct gc
 {};
 
