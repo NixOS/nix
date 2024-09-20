@@ -96,6 +96,10 @@ struct Expr
     virtual void setName(Symbol name);
     virtual void setDocComment(DocComment docComment) { };
     virtual PosIdx getPos() const { return noPos; }
+
+    // These are temporary methods to be used only in parser.y
+    virtual void resetCursedOr() { };
+    virtual void warnIfCursedOr(const SymbolTable & symbols, const PosTable & positions) { };
 };
 
 #define COMMON_METHODS \
@@ -354,10 +358,16 @@ struct ExprCall : Expr
     Expr * fun;
     std::vector<Expr *> args;
     PosIdx pos;
+    std::optional<PosIdx> cursedOrEndPos; // used during parsing to warn about https://github.com/NixOS/nix/issues/11118
     ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args)
-        : fun(fun), args(args), pos(pos)
+        : fun(fun), args(args), pos(pos), cursedOrEndPos({})
+    { }
+    ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args, PosIdx && cursedOrEndPos)
+        : fun(fun), args(args), pos(pos), cursedOrEndPos(cursedOrEndPos)
     { }
     PosIdx getPos() const override { return pos; }
+    virtual void resetCursedOr() override;
+    virtual void warnIfCursedOr(const SymbolTable & symbols, const PosTable & positions) override;
     COMMON_METHODS
 };
 
