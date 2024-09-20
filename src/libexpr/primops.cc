@@ -1354,7 +1354,6 @@ static void derivationStrictInternal(
                     else if (i->name == state.sOutputs)
                         handleOutputs(tokenizeString<Strings>(s));
                 }
-
             }
 
         } catch (Error & e) {
@@ -1421,6 +1420,8 @@ static void derivationStrictInternal(
             drvExtension
         ).atPos(v).debugThrow();
     }
+
+    drv.options = DerivationOptions::fromEnv(drv.env);
 
     if (outputHash) {
         /* Handle fixed-output derivations.

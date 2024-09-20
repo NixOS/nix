@@ -179,10 +179,6 @@ void LocalDerivationGoal::killSandbox(bool getStats)
 
 Goal::Co LocalDerivationGoal::tryLocalBuild()
 {
-#if __APPLE__
-    additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
-#endif
-
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
         worker.waitForBuildSlot(shared_from_this());
@@ -195,13 +191,12 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     /* Are we doing a chroot build? */
     {
-        auto noChroot = parsedDrv->getBoolAttr("__noChroot");
         if (settings.sandboxMode == smEnabled) {
-            if (noChroot)
+            if (drv->options.noChroot)
                 throw Error("derivation '%s' has '__noChroot' set, "
                     "but that's not allowed when 'sandbox' is 'true'", worker.store.printStorePath(drvPath));
 #if __APPLE__
-            if (additionalSandboxProfile != "")
+            if (drv->options.additionalSandboxProfile != "")
                 throw Error("derivation '%s' specifies a sandbox profile, "
                     "but this is only allowed when 'sandbox' is 'relaxed'", worker.store.printStorePath(drvPath));
 #endif
@@ -210,7 +205,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
         else if (settings.sandboxMode == smDisabled)
             useChroot = false;
         else if (settings.sandboxMode == smRelaxed)
-            useChroot = derivationType->isSandboxed() && !noChroot;
+            useChroot = derivationType->isSandboxed() && !drv->options.noChroot;
     }
 
     auto & localStore = getLocalStore();
@@ -235,7 +230,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     if (useBuildUsers()) {
         if (!buildUser)
-            buildUser = acquireUserLock(parsedDrv->useUidRange() ? 65536 : 1, useChroot);
+            buildUser = acquireUserLock(drv->useUidRange() ? 65536 : 1, useChroot);
 
         if (!buildUser) {
             if (!actLock)
@@ -491,10 +486,10 @@ void LocalDerivationGoal::startBuilder()
     killSandbox(false);
 
     /* Right platform? */
-    if (!parsedDrv->canBuildLocally(worker.store))
+    if (!drv->canBuildLocally(worker.store))
         throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
             drv->platform,
-            concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
+            concatStringsSep(", ", drv->getRequiredSystemFeatures()),
             worker.store.printStorePath(drvPath),
             settings.thisSystem,
             concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
@@ -656,7 +651,7 @@ void LocalDerivationGoal::startBuilder()
         PathSet allowedPaths = settings.allowedImpureHostPrefixes;
 
         /* This works like the above, except on a per-derivation level */
-        auto impurePaths = parsedDrv->getStringsAttr("__impureHostDeps").value_or(Strings());
+        auto impurePaths = drv->options.impureHostDeps;
 
         for (auto & i : impurePaths) {
             bool found = false;
@@ -676,7 +671,7 @@ void LocalDerivationGoal::startBuilder()
                 throw Error("derivation '%s' requested impure path '%s', but it was not in allowed-impure-host-deps",
                     worker.store.printStorePath(drvPath), i);
 
-            /* Allow files in __impureHostDeps to be missing; e.g.
+            /* Allow files in drv->options.impureHostDeps to be missing; e.g.
                macOS 11+ has no /usr/lib/libSystem*.dylib */
             pathsInChroot[i] = {i, true};
         }
@@ -716,10 +711,10 @@ void LocalDerivationGoal::startBuilder()
            nobody account.  The latter is kind of a hack to support
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
-        if (parsedDrv->useUidRange())
+        if (drv->useUidRange())
             chownToBuilder(chrootRootDir + "/etc");
 
-        if (parsedDrv->useUidRange() && (!buildUser || buildUser->getUIDCount() < 65536))
+        if (drv->useUidRange() && (!buildUser || buildUser->getUIDCount() < 65536))
             throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
 
         /* Declare the build user's group so that programs get a consistent
@@ -778,7 +773,7 @@ void LocalDerivationGoal::startBuilder()
         }
 
 #else
-        if (parsedDrv->useUidRange())
+        if (drv->useUidRange())
             throw Error("feature 'uid-range' is not supported on this platform");
         #if __APPLE__
             /* We don't really have any parent prep work to do (yet?)
@@ -788,7 +783,7 @@ void LocalDerivationGoal::startBuilder()
         #endif
 #endif
     } else {
-        if (parsedDrv->useUidRange())
+        if (drv->useUidRange())
             throw Error("feature 'uid-range' is only supported in sandboxed builds");
     }
 
@@ -833,7 +828,7 @@ void LocalDerivationGoal::startBuilder()
 
     /* Fire up a Nix daemon to process recursive Nix calls from the
        builder. */
-    if (parsedDrv->getRequiredSystemFeatures().count("recursive-nix"))
+    if (drv->getRequiredSystemFeatures().count("recursive-nix"))
         startDaemon();
 
     /* Run the builder. */
@@ -1175,7 +1170,7 @@ void LocalDerivationGoal::initEnv()
         if (!impureEnv.empty())
             experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
 
-        for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings())) {
+        for (auto & i : drv->options.impureEnvVars){
             auto envVar = impureEnv.find(i);
             if (envVar != impureEnv.end()) {
                 env[i] = envVar->second;
@@ -1197,7 +1192,7 @@ void LocalDerivationGoal::initEnv()
 
 void LocalDerivationGoal::writeStructuredAttrs()
 {
-    if (auto structAttrsJson = parsedDrv->prepareStructuredAttrs(worker.store, inputPaths)) {
+    if (auto structAttrsJson = parsedDrv->prepareStructuredAttrs(worker.store, inputPaths, *drv)) {
         auto json = structAttrsJson.value();
         nlohmann::json rewritten;
         for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {
@@ -1926,7 +1921,7 @@ void LocalDerivationGoal::runChild()
             }
 
             /* Make /etc unwritable */
-            if (!parsedDrv->useUidRange())
+            if (!drv->useUidRange())
                 chmod_(chrootRootDir + "/etc", 0555);
 
             /* Unshare this mount namespace. This is necessary because
@@ -2122,7 +2117,7 @@ void LocalDerivationGoal::runChild()
                 }
                 sandboxProfile += ")\n";
 
-                sandboxProfile += additionalSandboxProfile;
+                sandboxProfile += drv->options.additionalSandboxProfile;
             } else
                 sandboxProfile +=
                     #include "sandbox-minimal.sb"
@@ -2134,8 +2129,6 @@ void LocalDerivationGoal::runChild()
             Path sandboxFile = tmpDir + "/.sandbox.sb";
 
             writeFile(sandboxFile, sandboxProfile);
-
-            bool allowLocalNetworking = parsedDrv->getBoolAttr("__darwinAllowLocalNetworking");
 
             /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
                to find temporary directories, so we want to open up a broader place for them to put their files, if needed. */
@@ -2152,7 +2145,7 @@ void LocalDerivationGoal::runChild()
                 args.push_back(sandboxFile);
                 args.push_back("-D");
                 args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
-                if (allowLocalNetworking) {
+                if (drv->options.allowLocalNetworking) {
                     args.push_back("-D");
                     args.push_back(std::string("_ALLOW_LOCAL_NETWORKING=1"));
                 }
@@ -2822,13 +2815,6 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
         auto & outputName = output.first;
         auto & info = output.second;
 
-        struct Checks
-        {
-            bool ignoreSelfRefs = false;
-            std::optional<uint64_t> maxSize, maxClosureSize;
-            std::optional<Strings> allowedReferences, allowedRequisites, disallowedReferences, disallowedRequisites;
-        };
-
         /* Compute the closure and closure size of some output. This
            is slightly tricky because some of its references (namely
            other outputs) may not be valid yet. */
@@ -2860,7 +2846,7 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
             return std::make_pair(std::move(pathsDone), closureSize);
         };
 
-        auto applyChecks = [&](const Checks & checks)
+        auto applyChecks = [&](const DerivationOptions::OutputChecks & checks)
         {
             if (checks.maxSize && info.narSize > *checks.maxSize)
                 throw BuildError("path '%s' is too large at %d bytes; limit is %d bytes",
@@ -2925,67 +2911,10 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
             checkRefs(checks.disallowedRequisites, false, true);
         };
 
-        if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
-            if (get(*structuredAttrs, "allowedReferences")){
-                warn("'structuredAttrs' disables the effect of the top-level attribute 'allowedReferences'; use 'outputChecks' instead");
-            }
-            if (get(*structuredAttrs, "allowedRequisites")){
-                warn("'structuredAttrs' disables the effect of the top-level attribute 'allowedRequisites'; use 'outputChecks' instead");
-            }
-            if (get(*structuredAttrs, "disallowedRequisites")){
-                warn("'structuredAttrs' disables the effect of the top-level attribute 'disallowedRequisites'; use 'outputChecks' instead");
-            }
-            if (get(*structuredAttrs, "disallowedReferences")){
-                warn("'structuredAttrs' disables the effect of the top-level attribute 'disallowedReferences'; use 'outputChecks' instead");
-            }
-            if (get(*structuredAttrs, "maxSize")){
-                warn("'structuredAttrs' disables the effect of the top-level attribute 'maxSize'; use 'outputChecks' instead");
-            }
-            if (get(*structuredAttrs, "maxClosureSize")){
-                warn("'structuredAttrs' disables the effect of the top-level attribute 'maxClosureSize'; use 'outputChecks' instead");
-            }
-            if (auto outputChecks = get(*structuredAttrs, "outputChecks")) {
-                if (auto output = get(*outputChecks, outputName)) {
-                    Checks checks;
+        if (auto outputChecks = get(drv->options.checksPerOutput, outputName))
+            applyChecks(*outputChecks);
 
-                    if (auto maxSize = get(*output, "maxSize"))
-                        checks.maxSize = maxSize->get<uint64_t>();
-
-                    if (auto maxClosureSize = get(*output, "maxClosureSize"))
-                        checks.maxClosureSize = maxClosureSize->get<uint64_t>();
-
-                    auto get_ = [&](const std::string & name) -> std::optional<Strings> {
-                        if (auto i = get(*output, name)) {
-                            Strings res;
-                            for (auto j = i->begin(); j != i->end(); ++j) {
-                                if (!j->is_string())
-                                    throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, worker.store.printStorePath(drvPath));
-                                res.push_back(j->get<std::string>());
-                            }
-                            checks.disallowedRequisites = res;
-                            return res;
-                        }
-                        return {};
-                    };
-
-                    checks.allowedReferences = get_("allowedReferences");
-                    checks.allowedRequisites = get_("allowedRequisites");
-                    checks.disallowedReferences = get_("disallowedReferences");
-                    checks.disallowedRequisites = get_("disallowedRequisites");
-
-                    applyChecks(checks);
-                }
-            }
-        } else {
-            // legacy non-structured-attributes case
-            Checks checks;
-            checks.ignoreSelfRefs = true;
-            checks.allowedReferences = parsedDrv->getStringsAttr("allowedReferences");
-            checks.allowedRequisites = parsedDrv->getStringsAttr("allowedRequisites");
-            checks.disallowedReferences = parsedDrv->getStringsAttr("disallowedReferences");
-            checks.disallowedRequisites = parsedDrv->getStringsAttr("disallowedRequisites");
-            applyChecks(checks);
-        }
+        applyChecks(drv->options.checksAllOutputs);
     }
 }
 

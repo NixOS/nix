@@ -109,11 +109,6 @@ struct LocalDerivationGoal : public DerivationGoal
     typedef map<std::string, std::string> Environment;
     Environment env;
 
-#if __APPLE__
-    typedef std::string SandboxProfile;
-    SandboxProfile additionalSandboxProfile;
-#endif
-
     /**
      * Hash rewriting.
      */

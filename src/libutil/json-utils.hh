@@ -24,6 +24,7 @@ const nlohmann::json & valueAt(
     const std::string & key);
 
 std::optional<nlohmann::json> optionalValueAt(const nlohmann::json::object_t & value, const std::string & key);
+std::optional<nlohmann::json> nullableValueAt(const nlohmann::json::object_t & value, const std::string & key);
 
 /**
  * Downcast the json object, failing with a nice error if the conversion fails.
