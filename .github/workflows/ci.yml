@@ -206,6 +206,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: NixOS/flake-regressions
+          ref: gc-torture
           path: flake-regressions
       - name: Checkout flake-regressions-data
         uses: actions/checkout@v4
