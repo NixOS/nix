@@ -29,11 +29,6 @@
 #include "ref.hh"
 #include "value.hh"
 
-#if HAVE_BOEHMGC
-#define GC_INCLUDE_NEW
-#include <gc/gc_cpp.h>
-#endif
-
 #include "strings.hh"
 
 namespace nix {
@@ -62,9 +57,7 @@ enum class ProcessLineResult {
 struct NixRepl
     : AbstractNixRepl
     , detail::ReplCompleterMixin
-    #if HAVE_BOEHMGC
     , gc
-    #endif
 {
     size_t debugTraceIndex;
 
