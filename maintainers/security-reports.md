@@ -9,7 +9,13 @@ In case a vulnerability is reported:
    > [!IMPORTANT]
    > Add the reporter as a collaborator so they get notified of all activities.
 
-   Note deadlines if applicable.
+   In addition to the details in the advisory template, the initial report should:
+   
+   - Include sufficient details of the vulnerability to allow it to be understood and reproduced.
+   - Redact any personal data.
+   - Set a deadline (if applicable).
+   - Provide proof of concept code (if available).
+   - Reference any further reading material that may be appropriate.
 
 1. Establish a private communication channel (e.g. a Matrix room) with the reporter and all Nix maintainers.
 
