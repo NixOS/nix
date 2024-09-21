@@ -177,7 +177,7 @@ testReplResponseNoRegex $'
 :a builtins.foldl\' (x: y: x // y) {} (map (x: { ${builtins.toString x} = x; }) (builtins.genList (x: x) 13))
 ' 'Added 13 variables.
 "0", "1", "10", "11", "12", "2", "3", "4", "5", "6"
-... and 3 more'
+... and 3 more; view with :ll'
 
 # Test the `:reload` mechansim with flakes:
 # - Eval `./flake#changingThing`
@@ -328,7 +328,7 @@ runRepl () {
       -e "s@$testDirNoUnderscores@/path/to/tests/functional@g" \
       -e "s@$nixVersion@<nix version>@g" \
       -e "/Added [0-9]* variables/{s@ [0-9]* @ <number omitted> @;n;d}" \
-      -e '/\.\.\. and [0-9]* more/d' \
+      -e '/\.\.\. and [0-9]* more; view with :ll/d' \
     | grep -vF $'warning: you don\'t have Internet access; disabling some network-dependent features' \
     ;
 }
