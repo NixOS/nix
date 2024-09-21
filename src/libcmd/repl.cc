@@ -813,6 +813,25 @@ void NixRepl::addAttrsToScope(Value & attrs)
     staticEnv->sort();
     staticEnv->deduplicate();
     notice("Added %1% variables.", attrs.attrs()->size());
+
+    const int max_print = 20;
+    int counter = 0;
+    std::ostringstream loaded;
+    for (auto & i : attrs.attrs()->lexicographicOrder(state->symbols)) {
+        if (counter >= max_print)
+            break;
+
+        if (counter > 0)
+            loaded << ", ";
+
+        printIdentifier(loaded, state->symbols[i->name]);
+        counter += 1;
+    }
+
+    notice("%1%", loaded.str());
+
+    if (attrs.attrs()->size() > max_print)
+        notice("... and %1% more", attrs.attrs()->size() - max_print);
 }
 
 
