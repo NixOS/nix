@@ -159,12 +159,6 @@ scope: {
       ];
   });
 
-  # TODO change in Nixpkgs, Windows works fine. First commit of
-  # https://github.com/NixOS/nixpkgs/pull/322977 backported will fix.
-  toml11 = pkgs.toml11.overrideAttrs (old: {
-    meta.platforms = lib.platforms.all;
-  });
-
   inherit resolvePath filesetToSource;
 
   mkMesonDerivation =
