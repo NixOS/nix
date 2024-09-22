@@ -114,8 +114,6 @@ scope: {
   });
 
   libgit2 = pkgs.libgit2.overrideAttrs (attrs: {
-    src = inputs.libgit2;
-    version = inputs.libgit2.lastModifiedDate;
     cmakeFlags = attrs.cmakeFlags or []
       ++ [ "-DUSE_SSH=exec" ];
   });
