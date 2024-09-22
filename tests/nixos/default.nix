@@ -56,18 +56,9 @@ let
     nix.package = lib.mkForce pkgs.nixVersions.nix_2_3;
   };
 
-  otherNixes.nix_2_13.setNixPackage = { lib, pkgs, ... }: {
+  otherNixes.nix_2_24.setNixPackage = { lib, pkgs, ... }: {
     imports = [ checkOverrideNixVersion ];
-    nix.package = lib.mkForce (
-      self.inputs.nixpkgs-23-11.legacyPackages.${pkgs.stdenv.hostPlatform.system}.nixVersions.nix_2_13.overrideAttrs (o: {
-        meta = o.meta // { knownVulnerabilities = []; };
-      })
-    );
-  };
-
-  otherNixes.nix_2_18.setNixPackage = { lib, pkgs, ... }: {
-    imports = [ checkOverrideNixVersion ];
-    nix.package = lib.mkForce pkgs.nixVersions.nix_2_18;
+    nix.package = lib.mkForce pkgs.nixVersions.nix_2_24;
   };
 
 in
