@@ -114,14 +114,6 @@ scope: {
     requiredSystemFeatures = [ ];
   };
 
-  libseccomp = pkgs.libseccomp.overrideAttrs (_: rec {
-    version = "2.5.5";
-    src = pkgs.fetchurl {
-      url = "https://github.com/seccomp/libseccomp/releases/download/v${version}/libseccomp-${version}.tar.gz";
-      hash = "sha256-JIosik2bmFiqa69ScSw0r+/PnJ6Ut23OAsHJqiX7M3U=";
-    };
-  });
-
   boehmgc = pkgs.boehmgc.override {
     enableLargeConfig = true;
   };
