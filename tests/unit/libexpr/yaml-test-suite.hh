@@ -9929,7 +9929,6 @@ static constexpr std::string_view T_SM9W = R"RAW(
   json: null
   dump: |
     :
-  fail: true
 )RAW";
 
 static constexpr std::string_view T_SR86 = R"RAW(
@@ -11834,7 +11833,9 @@ static constexpr std::string_view T_ZYU8 = R"RAW(
     ---
 )RAW";
 
-namespace nix {
+namespace {
+using namespace nix;
+
 TEST_F(FromYAMLTest, T_229Q)
 {
     execYAMLTest(T_229Q);
@@ -11892,7 +11893,7 @@ TEST_F(FromYAMLTest, T_2SXE)
 
 TEST_F(FromYAMLTest, T_2XXW)
 {
-    execYAMLTest(T_2XXW);
+    EXPECT_THROW(execYAMLTest(T_2XXW), EvalError) << "usage of optional tag like !!set and !!omap (not implemented)";
 }
 
 TEST_F(FromYAMLTest, T_33X3)
@@ -12044,7 +12045,7 @@ TEST_F(FromYAMLTest, T_55WF)
 
 TEST_F(FromYAMLTest, T_565N)
 {
-    ASSERT_THROW(execYAMLTest(T_565N), EvalError); // nix has no binary data type
+    EXPECT_THROW(execYAMLTest(T_565N), EvalError) << "nix has no binary data type";
 }
 
 TEST_F(FromYAMLTest, T_57H4)
@@ -12105,7 +12106,7 @@ TEST_F(FromYAMLTest, T_5TRB)
 
 TEST_F(FromYAMLTest, T_5TYM)
 {
-    execYAMLTest(T_5TYM);
+    EXPECT_THROW(execYAMLTest(T_5TYM), EvalError) << "usage of unknown tags";
 }
 
 TEST_F(FromYAMLTest, T_5U3A)
@@ -12151,7 +12152,7 @@ TEST_F(FromYAMLTest, T_6CA3)
 
 TEST_F(FromYAMLTest, T_6CK3)
 {
-    execYAMLTest(T_6CK3);
+    EXPECT_THROW(execYAMLTest(T_6CK3), EvalError) << "usage of unknown tags";
 }
 
 TEST_F(FromYAMLTest, T_6FWR)
@@ -12221,7 +12222,7 @@ TEST_F(FromYAMLTest, T_6VJK)
 
 TEST_F(FromYAMLTest, T_6WLZ)
 {
-    execYAMLTest(T_6WLZ);
+    EXPECT_THROW(execYAMLTest(T_6WLZ), EvalError) << "usage of unknown tags";
 }
 
 TEST_F(FromYAMLTest, T_6WPF)
@@ -12271,7 +12272,7 @@ TEST_F(FromYAMLTest, T_7BUB)
 
 TEST_F(FromYAMLTest, T_7FWL)
 {
-    execYAMLTest(T_7FWL);
+    EXPECT_THROW(execYAMLTest(T_7FWL), EvalError) << "usage of unknown tags";
 }
 
 TEST_F(FromYAMLTest, T_7LBH)
@@ -12479,7 +12480,7 @@ TEST_F(FromYAMLTest, T_9U5K)
 
 TEST_F(FromYAMLTest, T_9WXW)
 {
-    execYAMLTest(T_9WXW);
+    EXPECT_THROW(execYAMLTest(T_9WXW), EvalError) << "usage of unknown tags";
 }
 
 TEST_F(FromYAMLTest, T_9YRD)
@@ -12569,12 +12570,12 @@ TEST_F(FromYAMLTest, T_C2SP)
 
 TEST_F(FromYAMLTest, T_C4HZ)
 {
-    execYAMLTest(T_C4HZ);
+    EXPECT_THROW(execYAMLTest(T_C4HZ), EvalError) << "usage of unknown tags";
 }
 
 TEST_F(FromYAMLTest, T_CC74)
 {
-    execYAMLTest(T_CC74);
+    EXPECT_THROW(execYAMLTest(T_CC74), EvalError) << "usage of unknown tags";
 }
 
 TEST_F(FromYAMLTest, T_CFD4)
@@ -12614,7 +12615,7 @@ TEST_F(FromYAMLTest, T_CTN5)
 
 TEST_F(FromYAMLTest, T_CUP7)
 {
-    execYAMLTest(T_CUP7);
+    EXPECT_THROW(execYAMLTest(T_CUP7), EvalError) << "usage of unknown tags";
 }
 
 TEST_F(FromYAMLTest, T_CVW2)
@@ -12897,7 +12898,7 @@ TEST_F(FromYAMLTest, T_J5UC)
 
 TEST_F(FromYAMLTest, T_J7PZ)
 {
-    execYAMLTest(T_J7PZ);
+    EXPECT_THROW(execYAMLTest(T_J7PZ), EvalError) << "usage of optional tag like !!set and !!omap (not implemented)";
 }
 
 TEST_F(FromYAMLTest, T_J7VC)
@@ -13058,7 +13059,7 @@ TEST_F(FromYAMLTest, T_M2N8)
 
 TEST_F(FromYAMLTest, T_M5C3)
 {
-    execYAMLTest(T_M5C3);
+    EXPECT_THROW(execYAMLTest(T_M5C3), EvalError) << "usage of unknown tags";
 }
 
 TEST_F(FromYAMLTest, T_M5DY)
@@ -13166,7 +13167,7 @@ TEST_F(FromYAMLTest, T_P2EQ)
 
 TEST_F(FromYAMLTest, T_P76L)
 {
-    execYAMLTest(T_P76L);
+    EXPECT_THROW(execYAMLTest(T_P76L), EvalError) << "usage of unknown tags";
 }
 
 TEST_F(FromYAMLTest, T_P94K)
@@ -13452,7 +13453,7 @@ TEST_F(FromYAMLTest, T_UDR7)
 
 TEST_F(FromYAMLTest, T_UGM3)
 {
-    execYAMLTest(T_UGM3);
+    EXPECT_THROW(execYAMLTest(T_UGM3), EvalError) << "usage of unknown tags";
 }
 
 TEST_F(FromYAMLTest, T_UKK6)
@@ -13566,12 +13567,12 @@ TEST_F(FromYAMLTest, T_YJV2)
 
 TEST_F(FromYAMLTest, T_Z67P)
 {
-    execYAMLTest(T_Z67P);
+    EXPECT_THROW(execYAMLTest(T_Z67P), EvalError) << "usage of unknown tags";
 }
 
 TEST_F(FromYAMLTest, T_Z9M4)
 {
-    execYAMLTest(T_Z9M4);
+    EXPECT_THROW(execYAMLTest(T_Z9M4), EvalError) << "usage of unknown tags";
 }
 
 TEST_F(FromYAMLTest, T_ZCZ6)
@@ -13624,4 +13625,4 @@ TEST_F(FromYAMLTest, T_ZYU8)
 }
 */
 
-} /* namespace nix */
+} /* namespace */

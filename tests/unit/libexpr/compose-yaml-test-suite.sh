@@ -30,10 +30,14 @@ for f in "$1"/src/*.yaml; do
     }
 EOL
 			;;
-		"SM9W")
-			# not JSON compatible due to null key
-			echo "  fail: true"
-			;;
+#		"SM9W")
+#			echo "  # not JSON compatible due to null key"
+#			echo "  fail: true"
+#			;;
+#		"UKK6")
+#			echo "  # empty document"
+#			echo "  fail: true"
+#			;;
 		*)
 			;;
 	esac
@@ -41,11 +45,14 @@ EOL
 	echo
 done
 
-echo "namespace nix {"
+echo "namespace {"
+echo "using namespace nix;"
+echo
 for f in "$1"/src/*.yaml; do
 	testname="$(basename "${f}" .yaml)"
 	ignore="false"
 	skip="false"
+	throw_comment=""
 	# shellcheck disable=SC2221,SC2222
 	case "${testname}" in
 		"H7TQ"|"MUS6"|"ZYU8")
@@ -55,11 +62,20 @@ for f in "$1"/src/*.yaml; do
 		"3HFZ"|"4EJS"|"5TRB"|"5U3A"|"7LBH"|"9C9N"|"9MQT"|"CVW2"|"CXX2"|"D49Q"|"DK4H"|"DK95"|"G5U8"|"JKF3"|"N782"|"QB6E"|"QLJ7"|"RXY3"|"S4GJ"|"S98Z"|"SY6V"|"VJP3"|"X4QW"|"Y79Y"|"YJV2"|"ZCZ6"|"ZL4Z"|"ZXT5"|"3HFZ"|"4EJS"|"5TRB"|"5U3A"|"7LBH"|"9C9N"|"9MQT"|"CVW2"|"CXX2"|"D49Q"|"DK4H"|"DK95"|"G5U8"|"JKF3"|"N782"|"QB6E"|"QLJ7"|"RXY3"|"S4GJ"|"S98Z"|"SY6V"|"VJP3"|"X4QW"|"Y79Y"|"YJV2"|"ZCZ6"|"ZL4Z"|"ZXT5")
 			skip="true"
 			;;
+		"565N")
+			throw_comment="nix has no binary data type"
+			;;
+		"5TYM"|"6CK3"|"6WLZ"|"7FWL"|"9WXW"|"C4HZ"|"CC74"|"CUP7"|"M5C3"|"P76L"|"UGM3"|"Z67P"|"Z9M4")
+			throw_comment="usage of unknown tags"
+			;;
+		"2XXW"|"J7PZ")
+			throw_comment="usage of optional tag like !!set and !!omap (not implemented)"
+			;;
 	esac
 	echo "TEST_F(${testclass}, T_${testname})"
 	echo "{"
-	if [ "${testname}" = "565N" ]; then
-		echo "    ASSERT_THROW(${testmethod}(T_${testname}), EvalError); // nix has no binary data type"
+	if [ -n "${throw_comment}" ]; then
+		echo "    EXPECT_THROW(${testmethod}(T_${testname}), EvalError) << \"${throw_comment}\";"
 	else
 		if [ "${skip}" = "true" ]; then
 			echo "    GTEST_SKIP() << \"Reason: Invalid yaml is parsed successfully\";"
@@ -70,4 +86,4 @@ for f in "$1"/src/*.yaml; do
 	[[ "${ignore}" = "true" ]] && echo "*/"
 	echo
 done
-echo "} /* namespace nix */"
+echo "} /* namespace */"
