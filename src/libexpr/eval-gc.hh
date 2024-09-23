@@ -3,6 +3,33 @@
 
 #include <cstddef>
 
+#if HAVE_BOEHMGC
+
+#  define GC_INCLUDE_NEW
+
+#  include <gc/gc.h>
+#  include <gc/gc_cpp.h>
+#  include <gc/gc_allocator.h>
+
+#else
+
+/* Some dummy aliases for Boehm GC definitions to reduce the number of
+   #ifdefs. */
+
+template<typename T>
+using traceable_allocator = std::allocator<T>;
+
+template<typename T>
+using gc_allocator = std::allocator<T>;
+
+#  define GC_MALLOC_ATOMIC std::malloc
+#  define GC_STRDUP strdup
+
+struct gc
+{};
+
+#endif
+
 namespace nix {
 
 /**
