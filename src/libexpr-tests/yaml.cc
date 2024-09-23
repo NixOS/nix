@@ -1,17 +1,21 @@
 #ifdef HAVE_RYML
 
+#  include <cstring>
 #  include "tests/libexpr.hh"
 #  include "primops.hh"
 
 // access to the json sax parser is required
 #  include "json-to-value-sax.hh"
 
-namespace nix {
-// Testing the conversion from YAML
+namespace {
+using namespace nix;
+using FromYAMLFun = Value(EvalState &, Value, std::optional<Value>);
 
-/* replacement of non-ascii unicode characters, which indicate the presence of certain characters that would be
- * otherwise hard to read */
-static std::string replaceUnicodePlaceholders(std::string_view str)
+/**
+ * replacement of non-ascii unicode characters, which indicate the presence of certain characters that would be
+ * otherwise hard to read
+ */
+std::string replaceUnicodePlaceholders(std::string_view str)
 {
     constexpr std::string_view eop("\xe2\x88\x8e");
     constexpr std::string_view filler{"\xe2\x80\x94"};
@@ -53,19 +57,18 @@ static std::string replaceUnicodePlaceholders(std::string_view str)
     return ret;
 }
 
-static bool parseJSON(EvalState & state, std::istream & s_, Value & v)
+bool parseJSON(EvalState & state, std::istream & s_, Value & v)
 {
     auto parser = makeJSONSaxParser(state, v);
     return nlohmann::json::sax_parse(s_, parser.get(), nlohmann::json::input_format_t::json, false);
 }
 
-static Value parseJSONStream(EvalState & state, std::string_view json, std::function<PrimOpFun> fromYAML)
+Value parseJSONStream(EvalState & state, std::string_view json, std::function<FromYAMLFun> fromYAML)
 {
     std::stringstream ss;
     ss << json;
     std::list<Value> list;
     Value root, refJson;
-    Value *pRoot = &root, rymlJson;
     std::streampos start = 0;
     try {
         while (ss.peek() != EOF && json.size() - ss.tellg() > 1) {
@@ -74,7 +77,7 @@ static Value parseJSONStream(EvalState & state, std::string_view json, std::func
             // sanity check: builtins.fromJSON and builtins.fromYAML should return the same result when applied to a
             // JSON string
             root.mkString(std::string_view(json.begin() + start, ss.tellg() - start));
-            fromYAML(state, noPos, &pRoot, rymlJson);
+            Value rymlJson = fromYAML(state, root, {});
             EXPECT_EQ(printValue(state, refJson), printValue(state, rymlJson));
             start = ss.tellg() + std::streampos(1);
         }
@@ -93,25 +96,51 @@ static Value parseJSONStream(EvalState & state, std::string_view json, std::func
     return root;
 }
 
+} /* namespace */
+
+namespace nix {
+// Testing the conversion from YAML
+
 class FromYAMLTest : public LibExprTest
 {
 protected:
+    static std::function<FromYAMLFun> getFromYAML()
+    {
+        static std::function<FromYAMLFun> fromYAML = []() {
+            for (const auto & primOp : *RegisterPrimOp::primOps) {
+                if (primOp.name == "__fromYAML") {
+                    auto primOpFun = primOp.fun;
+                    std::function<FromYAMLFun> function =
+                        [=](EvalState & state, Value yaml, std::optional<Value> options) {
+                            Value emptyOptions, result;
+                            auto bindings = state.buildBindings(0);
+                            emptyOptions.mkAttrs(bindings);
+                            Value * args[3] = {&yaml, options ? &*options : &emptyOptions, nullptr};
+                            primOpFun(state, noPos, args, result);
+                            return result;
+                        };
+                    return function;
+                }
+            }
+            ADD_FAILURE() << "The experimental feature \"fromYAML\" is not available";
+            return std::function<FromYAMLFun>();
+        }();
+        return fromYAML;
+    }
+
+    Value parseYAML(const char * str, std::optional<Value> options = {})
+    {
+        Value test;
+        test.mkString(str);
+        return getFromYAML()(state, test, options);
+    }
 
     void execYAMLTest(std::string_view test)
     {
-        std::function<PrimOpFun> fromYAML = []() {
-            for (const auto & primOp : *RegisterPrimOp::primOps) {
-                if (primOp.name == "__fromYAML") {
-                    return primOp.fun;
-                }
-            }
-            return std::function<PrimOpFun>();
-        }();
-        EXPECT_FALSE(fromYAML == nullptr) << "The experimental feature \"fromYAML\" is not available";
-        Value testCases, testVal;
-        Value * pTestVal = &testVal;
+        auto fromYAML = getFromYAML();
+        Value testVal;
         testVal.mkString(test);
-        fromYAML(state, noPos, &pTestVal, testCases);
+        Value testCases = fromYAML(state, testVal, {});
         size_t ctr = 0;
         std::string_view testName;
         Value * json = nullptr;
@@ -123,52 +152,45 @@ protected:
                 if (name == "json") {
                     json = attr->value;
                 } else if (name == "yaml") {
-                    yamlRaw =
-                        state.forceStringNoCtx(*attr->value, noPos, "while interpreting the \"yaml\" field as string");
+                    yamlRaw = attr->value->string_view();
                 } else if (name == "fail") {
-                    fail = state.forceBool(*attr->value, noPos, "while interpreting the \"fail\" field as bool");
+                    fail = attr->value->boolean();
                 } else if (name == "name") {
-                    testName =
-                        state.forceStringNoCtx(*attr->value, noPos, "while interpreting the \"name\" field as string");
+                    testName = attr->value->string_view();
                 }
             }
             // extract expected result
             Value jsonVal;
-            bool nullJSON = json && json->type() == nNull;
-            bool emptyJSON = !nullJSON;
-            if (json && !nullJSON) {
-                std::string_view jsonStr =
-                    state.forceStringNoCtx(*json, noPos, "while interpreting the \"json\" field as string");
-                emptyJSON = jsonStr.empty();
-                if (!emptyJSON) {
+            bool noJSON = !json || json->type() != nString;
+            if (!noJSON) {
+                std::string_view jsonStr = json->string_view();
+                // Test cases with "json: ''" are parsed as empty JSON and test cases with the value of the "json" node
+                // being a block scalar, have no JSON representation, if the block scalar contains the line "null"
+                // (indentation 0)
+                noJSON = jsonStr.empty()
+                         || (jsonStr != "null" && (jsonStr.starts_with("null") || jsonStr.ends_with("null")))
+                         || jsonStr.find("\nnull\n") != std::string_view::npos;
+                if (!noJSON) {
                     jsonVal = parseJSONStream(state, jsonStr, fromYAML);
-                    jsonStr = printValue(state, jsonVal);
                 }
             }
             // extract the YAML to be parsed
             std::string yamlStr = replaceUnicodePlaceholders(yamlRaw);
             Value yaml, yamlVal;
-            Value * pYaml = &yaml;
             yaml.mkString(yamlStr);
-            if (!fail) {
-                if (emptyJSON) {
-                    EXPECT_THROW(fromYAML(state, noPos, &pYaml, yamlVal), EvalError)
-                        << "Testcase #" << ctr << ": Expected empty YAML, which should throw an exception, parsed \""
-                        << printValue(state, yamlVal) << "\":\n"
-                        << yamlRaw;
-                } else {
-                    fromYAML(state, noPos, &pYaml, yamlVal);
-                    if (nullJSON) {
-                        EXPECT_TRUE(yamlVal.type() == nNull) << "Testcase #" << ctr << ": Expected null YAML:\n"
-                                                             << yamlStr;
-                    } else {
-                        EXPECT_EQ(printValue(state, yamlVal), printValue(state, jsonVal))
-                            << "Testcase #" << ctr << ": Parsed YAML does not match expected JSON result:\n"
-                            << yamlRaw;
-                    }
-                }
+            if (noJSON) {
+                EXPECT_THROW(yamlVal = fromYAML(state, yaml, {}), EvalError)
+                    << "Testcase #" << ctr
+                    << ": YAML has no JSON representation because of empty document or null key, parsed \""
+                    << printValue(state, yamlVal) << "\":\n"
+                    << yamlRaw;
+            } else if (!fail) {
+                yamlVal = fromYAML(state, yaml, {});
+                EXPECT_EQ(printValue(state, yamlVal), printValue(state, jsonVal))
+                    << "Testcase #" << ctr << ": Parsed YAML does not match expected JSON result:\n"
+                    << yamlRaw;
             } else {
-                EXPECT_THROW(fromYAML(state, noPos, &pYaml, yamlVal), EvalError)
+                EXPECT_THROW(yamlVal = fromYAML(state, yaml, {}), EvalError)
                     << "Testcase #" << ctr << " (" << testName << "): Parsing YAML has to throw an exception, but \""
                     << printValue(state, yamlVal) << "\" was parsed:\n"
                     << yamlRaw;
@@ -177,6 +199,146 @@ protected:
         }
     }
 };
+
+TEST_F(FromYAMLTest, NoContent)
+{
+    EXPECT_THROW(parseYAML(""), EvalError);
+}
+
+TEST_F(FromYAMLTest, Null)
+{
+    Value val = parseYAML("[ null, Null, NULL, ~, ]");
+    for (auto item : val.listItems()) {
+        EXPECT_EQ(item->type(), nNull);
+    }
+}
+
+TEST_F(FromYAMLTest, NaN)
+{
+    const char * nans[] = {".nan", ".NaN", ".NAN"};
+    for (auto str : nans) {
+        Value val = parseYAML(str);
+        ASSERT_EQ(val.type(), nFloat);
+        NixFloat _float = val.fpoint();
+        EXPECT_NE(_float, _float) << "'" << str << "' shall be parsed as NaN";
+    }
+    const char * strings[] = {"nan", "+nan", "-nan", "+.nan", "-.nan"};
+    for (auto str : strings) {
+        Value val = parseYAML(str);
+        ASSERT_EQ(val.type(), nString) << "'" << str << "' shall not be converted to a floating point type";
+        EXPECT_EQ(val.string_view(), std::string_view(str));
+    }
+}
+
+TEST_F(FromYAMLTest, Inf)
+{
+    NixFloat inf = std::numeric_limits<NixFloat>::infinity();
+    Value val = parseYAML("[ .INF, .Inf, .inf, +.INF, +.Inf, +.inf ]");
+    for (auto item : val.listItems()) {
+        ASSERT_EQ(item->type(), nFloat);
+        EXPECT_EQ(item->fpoint(), inf);
+    }
+    val = parseYAML("[ -.INF, -.Inf, -.inf ]");
+    for (auto item : val.listItems()) {
+        ASSERT_EQ(item->type(), nFloat);
+        EXPECT_EQ(item->fpoint(), -inf);
+    }
+    val = parseYAML("inf");
+    ASSERT_EQ(val.type(), nString) << "'inf' shall not be converted to a floating point type";
+    EXPECT_EQ(val.string_view(), "inf");
+}
+
+TEST_F(FromYAMLTest, IntLeadingPlus)
+{
+    Value val = parseYAML("+1");
+    ASSERT_EQ(val.type(), nInt);
+    EXPECT_EQ(val.integer(), NixInt(1));
+
+    val = parseYAML("+");
+    ASSERT_EQ(val.type(), nString);
+    EXPECT_EQ(val.string_view(), "+");
+}
+
+TEST_F(FromYAMLTest, TrueYAML1_2)
+{
+    Value val = parseYAML("[ true, True, TRUE ]");
+    for (auto item : val.listItems()) {
+        ASSERT_EQ(item->type(), nBool);
+        EXPECT_TRUE(item->boolean());
+    }
+    const char * strings[] = {"y", "Y", "on", "On", "ON", "yes", "Yes", "YES"};
+    for (auto str : strings) {
+        Value val = parseYAML(str);
+        ASSERT_EQ(val.type(), nString) << "'" << str << "' shall not be converted to a boolean";
+        EXPECT_EQ(val.string_view(), std::string_view(str));
+    }
+}
+
+TEST_F(FromYAMLTest, TrueYAML1_1)
+{
+    Value options;
+    auto bindings = state.buildBindings(1);
+    bindings.alloc("useBoolYAML1_1").mkBool(true);
+    options.mkAttrs(bindings);
+
+    Value val = parseYAML("[ true, True, TRUE, y, Y, on, On, ON, yes, Yes, YES ]", options);
+    for (auto item : val.listItems()) {
+        ASSERT_EQ(item->type(), nBool);
+        EXPECT_TRUE(item->boolean());
+    }
+}
+
+TEST_F(FromYAMLTest, FalseYAML1_2)
+{
+    Value val = parseYAML("[ false, False, FALSE ]");
+    for (auto item : val.listItems()) {
+        ASSERT_EQ(item->type(), nBool);
+        EXPECT_FALSE(item->boolean());
+    }
+    const char * strings[] = {"n", "N", "no", "No", "NO", "off", "Off", "OFF"};
+    for (auto str : strings) {
+        Value val = parseYAML(str);
+        ASSERT_EQ(val.type(), nString) << "'" << str << "' shall not be converted to a boolean";
+        EXPECT_EQ(val.string_view(), std::string_view(str));
+    }
+}
+
+TEST_F(FromYAMLTest, FalseYAML1_1)
+{
+    Value options;
+    auto bindings = state.buildBindings(1);
+    bindings.alloc("useBoolYAML1_1").mkBool(true);
+    options.mkAttrs(bindings);
+
+    Value val = parseYAML("[ false, False, FALSE, n, N, no, No, NO, off, Off, OFF ]", options);
+    for (auto item : val.listItems()) {
+        ASSERT_EQ(item->type(), nBool);
+        EXPECT_FALSE(item->boolean());
+    }
+}
+
+TEST_F(FromYAMLTest, QuotedString)
+{
+    const char * strings[] = {
+        "\"null\"",
+        "\"~\"",
+        "\"\"",
+        "\".inf\"",
+        "\"+.inf\"",
+        "\"-.inf\"",
+        "\".nan\"",
+        "\"true\"",
+        "\"false\"",
+        "\"1\"",
+        "\"+1\"",
+        "\"-1\"",
+        "\"1.0\""};
+    for (auto str : strings) {
+        Value val = parseYAML(str);
+        ASSERT_EQ(val.type(), nString) << "'" << str << "' shall be parsed as string";
+        EXPECT_EQ(val.string_view(), std::string_view(&str[1], strlen(str) - 2));
+    }
+}
 
 } /* namespace nix */
 
