@@ -223,6 +223,10 @@
           default = self.packages.${system}.nix-ng;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
+          nix-all-output-paths = nixpkgsFor.${system}.native.callPackage ./packaging/nix-all-output-paths.nix {
+            packages =
+              lib.mapAttrs (system: packages: packages.nix) self.packages;
+          };
         }
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         // flatMapAttrs
