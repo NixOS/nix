@@ -41,10 +41,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 
         auto source = sinkToSource([&](Sink & sink) {
 
-            /* No need to do TLS verification, because we check the hash of
-               the result anyway. */
             FileTransferRequest request(url);
-            request.verifyTLS = false;
             request.decompress = false;
 
             auto decompressor = makeDecompressionSink(
