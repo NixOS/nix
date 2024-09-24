@@ -159,6 +159,69 @@ static Object peelToTreeOrBlob(git_object * obj)
         return peelObject<Object>(obj, GIT_OBJECT_TREE);
 }
 
+<<<<<<< HEAD
+=======
+struct PackBuilderContext {
+    std::exception_ptr exception;
+
+    void handleException(const char * activity, int errCode)
+    {
+        switch (errCode) {
+            case GIT_OK:
+                break;
+            case GIT_EUSER:
+                if (!exception)
+                    panic("PackBuilderContext::handleException: user error, but exception was not set");
+
+                std::rethrow_exception(exception);
+            default:
+                throw Error("%s: %i, %s", Uncolored(activity), errCode, git_error_last()->message);
+        }
+    }
+};
+
+extern "C" {
+
+/**
+ * A `git_packbuilder_progress` implementation that aborts the pack building if needed.
+ */
+static int packBuilderProgressCheckInterrupt(int stage, uint32_t current, uint32_t total, void *payload)
+{
+    PackBuilderContext & args = * (PackBuilderContext *) payload;
+    try {
+        checkInterrupt();
+        return GIT_OK;
+    } catch (const std::exception & e) {
+        args.exception = std::current_exception();
+        return GIT_EUSER;
+    }
+};
+static git_packbuilder_progress PACKBUILDER_PROGRESS_CHECK_INTERRUPT = &packBuilderProgressCheckInterrupt;
+
+} // extern "C"
+
+static void initRepoAtomically(std::filesystem::path &path, bool bare) {
+    if (pathExists(path.string())) return;
+
+    Path tmpDir = createTempDir(std::filesystem::path(path).parent_path());
+    AutoDelete delTmpDir(tmpDir, true);
+    Repository tmpRepo;
+
+    if (git_repository_init(Setter(tmpRepo), tmpDir.c_str(), bare))
+        throw Error("creating Git repository %s: %s", path, git_error_last()->message);
+    try {
+        std::filesystem::rename(tmpDir, path);
+    } catch (std::filesystem::filesystem_error & e) {
+        if (e.code() == std::errc::file_exists) // Someone might race us to create the repository.
+            return;
+        else
+            throw SysError("moving temporary git repository from %s to %s", tmpDir, path);
+    }
+    // we successfully moved the repository, so the temporary directory no longer exists.
+    delTmpDir.cancel();
+}
+
+>>>>>>> 12d5b2cfa (create git caches atomically)
 struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
     /** Location of the repository on disk. */
@@ -170,6 +233,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         initLibGit2();
 
+<<<<<<< HEAD
         if (pathExists(path.string())) {
             if (git_repository_open(Setter(repo), path.string().c_str()))
                 throw Error("opening Git repository '%s': %s", path, git_error_last()->message);
@@ -177,6 +241,22 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             if (git_repository_init(Setter(repo), path.string().c_str(), bare))
                 throw Error("creating Git repository '%s': %s", path, git_error_last()->message);
         }
+=======
+        initRepoAtomically(path, bare);
+        if (git_repository_open(Setter(repo), path.string().c_str()))
+            throw Error("opening Git repository %s: %s", path, git_error_last()->message);
+
+        ObjectDb odb;
+        if (git_repository_odb(Setter(odb), repo.get()))
+            throw Error("getting Git object database: %s", git_error_last()->message);
+
+        // mempack_backend will be owned by the repository, so we are not expected to free it ourselves.
+        if (git_mempack_new(&mempack_backend))
+            throw Error("creating mempack backend: %s", git_error_last()->message);
+
+        if (git_odb_add_backend(odb.get(), mempack_backend, 999))
+            throw Error("adding mempack backend to Git object database: %s", git_error_last()->message);
+>>>>>>> 12d5b2cfa (create git caches atomically)
     }
 
     operator git_repository * ()
