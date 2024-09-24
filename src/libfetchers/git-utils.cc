@@ -205,6 +205,27 @@ static git_packbuilder_progress PACKBUILDER_PROGRESS_CHECK_INTERRUPT = &packBuil
 
 } // extern "C"
 
+static void initRepoAtomically(std::filesystem::path &path, bool bare) {
+    if (pathExists(path.string())) return;
+
+    Path tmpDir = createTempDir(std::filesystem::path(path).parent_path());
+    AutoDelete delTmpDir(tmpDir, true);
+    Repository tmpRepo;
+
+    if (git_repository_init(Setter(tmpRepo), tmpDir.c_str(), bare))
+        throw Error("creating Git repository %s: %s", path, git_error_last()->message);
+    try {
+        std::filesystem::rename(tmpDir, path);
+    } catch (std::filesystem::filesystem_error & e) {
+        if (e.code() == std::errc::file_exists) // Someone might race us to create the repository.
+            return;
+        else
+            throw SysError("moving temporary git repository from %s to %s", tmpDir, path);
+    }
+    // we successfully moved the repository, so the temporary directory no longer exists.
+    delTmpDir.cancel();
+}
+
 struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
     /** Location of the repository on disk. */
@@ -226,13 +247,9 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         initLibGit2();
 
-        if (pathExists(path.string())) {
-            if (git_repository_open(Setter(repo), path.string().c_str()))
-                throw Error("opening Git repository '%s': %s", path, git_error_last()->message);
-        } else {
-            if (git_repository_init(Setter(repo), path.string().c_str(), bare))
-                throw Error("creating Git repository '%s': %s", path, git_error_last()->message);
-        }
+        initRepoAtomically(path, bare);
+        if (git_repository_open(Setter(repo), path.string().c_str()))
+            throw Error("opening Git repository %s: %s", path, git_error_last()->message);
 
         ObjectDb odb;
         if (git_repository_odb(Setter(odb), repo.get()))
