@@ -248,15 +248,36 @@ TEST_F(FromYAMLTest, Inf)
     EXPECT_EQ(val.string_view(), "inf");
 }
 
-TEST_F(FromYAMLTest, IntLeadingPlus)
+TEST_F(FromYAMLTest, Int)
 {
-    Value val = parseYAML("+1");
-    ASSERT_EQ(val.type(), nInt);
-    EXPECT_EQ(val.integer(), NixInt(1));
+    Value val = parseYAML("[ 1, +1, 0x1, 0o1 ]");
+    for (auto item : val.listItems()) {
+        ASSERT_EQ(item->type(), nInt);
+        EXPECT_EQ(item->integer(), NixInt(1));
+    }
 
-    val = parseYAML("+");
-    ASSERT_EQ(val.type(), nString);
-    EXPECT_EQ(val.string_view(), "+");
+    const char * strings[] = {"+", "0b1", "0B1", "0O1", "0X1", "+0b1", "-0b1", "+0o1", "-0o1", "+0x1", "-0x1"};
+    for (auto str : strings) {
+        Value val = parseYAML(str);
+        ASSERT_EQ(val.type(), nString) << "'" << str << "' shall not be converted to an integer";
+        EXPECT_EQ(val.string_view(), str);
+    }
+}
+
+TEST_F(FromYAMLTest, Float)
+{
+    Value val = parseYAML("[ !!float 1, !!float 0x1, !!float 0o1, 1., +1., .1e1, +.1e1, 1.0, 10e-1, 10.e-1 ]");
+    for (auto item : val.listItems()) {
+        ASSERT_EQ(item->type(), nFloat);
+        EXPECT_EQ(item->fpoint(), 1.);
+    }
+
+    const char * strings[] = {"0x1.", "0X1.", "0b1.", "0B1.", "0o1.", "0O1"};
+    for (auto str : strings) {
+        Value val = parseYAML(str);
+        ASSERT_EQ(val.type(), nString) << "'" << str << "' shall not be converted to a float";
+        EXPECT_EQ(val.string_view(), str);
+    }
 }
 
 TEST_F(FromYAMLTest, TrueYAML1_2)
@@ -338,6 +359,11 @@ TEST_F(FromYAMLTest, QuotedString)
         ASSERT_EQ(val.type(), nString) << "'" << str << "' shall be parsed as string";
         EXPECT_EQ(val.string_view(), std::string_view(&str[1], strlen(str) - 2));
     }
+}
+
+TEST_F(FromYAMLTest, Map)
+{
+    EXPECT_THROW(parseYAML("{ \"2\": 2, 2: null }"), EvalError) << "non-unique keys";
 }
 
 } /* namespace nix */

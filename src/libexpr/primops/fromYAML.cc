@@ -67,6 +67,19 @@ inline bool isEqualSameLengthStr(const char * rhs, const char lhs[N + 1])
     return result;
 }
 
+bool isInt_1_2(ryml::csubstr val)
+{
+    bool result = val.is_integer();
+    // ryml::from_chars accepts signed binary, octal and hexadecimal integers
+    // YAML 1.2 defines unsigned octal and hexadecimal integers (lower-case identifiers)
+    if (result && val.size() >= 3
+        && ((val.begins_with_any("+-") && val.sub(2, 1).begins_with_any("xXoObB"))
+            || val.sub(1, 1).begins_with_any("XObB"))) {
+        result = false;
+    }
+    return result;
+}
+
 /**
  * Tries to parse a string into a floating point number according to the YAML 1.2 core schema, wrapping ryml::from_chars
  */
@@ -75,7 +88,7 @@ std::optional<NixFloat> parseFloat(std::optional<bool> isInt, ryml::csubstr val)
     std::optional<NixFloat> maybe_float;
     NixFloat _float;
     size_t len = val.size();
-    // first character as to match [0-9+-.]
+    // first character has to match [0-9+-.]
     if (isInt.value_or(false)) {
         NixInt::Inner _int;
         if (len > 0 && ryml::from_chars(val.sub(val[0] == '+'), &_int)) {
@@ -101,6 +114,7 @@ std::optional<NixFloat> parseFloat(std::optional<bool> isInt, ryml::csubstr val)
             // ryml::from_chars converts "nan" and "inf"
         } else if (
             !maybe_float && ((!isInt && val.is_number()) || (isInt && val.is_real()))
+            && val.sub(1, std::min(size_t(2), len - 1)).first_of("xXoObB") == ryml::npos
             && ryml::from_chars(val.sub(val[0] == '+'), &_float)) {
             // isInt => !*isInt because of (isInt && *isInt) == false)
             maybe_float = _float;
@@ -185,11 +199,10 @@ void visitYAMLNode(const NixContext & context, Value & v, ryml::ConstNodeRef t, 
     ryml::csubstr valTagStr;
     auto valTag = ryml::TAG_NONE;
     bool valTagCustom = t.has_val_tag();
-    bool valTagNonSpecifc = false;
     bool valTagNonSpecificStr = false;
     if (valTagCustom) {
         valTagStr = t.val_tag();
-        if (!(valTagNonSpecificStr = valTagStr == "!") && !(valTagNonSpecifc = valTagStr == "?")) {
+        if (!(valTagNonSpecificStr = valTagStr == "!")) {
             valTag = ryml::to_tag(valTagStr);
             valTagCustom = valTag == ryml::TAG_NONE;
             if (valTagCustom) {
@@ -225,6 +238,15 @@ void visitYAMLNode(const NixContext & context, Value & v, ryml::ConstNodeRef t, 
         }
 
         v.mkAttrs(attrs);
+        Symbol key;
+        // enforce uniqueness of keys
+        for (const auto & attr : *attrs.alreadySorted()) {
+            if (key == attr.name) {
+                auto fs = "Error: Non-unique key %2% after deserializing the map ''%3%''";
+                throwError(context, fs, context.state.symbols[key], t);
+            }
+            key = attr.name;
+        }
     } else if (t.is_seq()) {
         if (valTag != ryml::TAG_NONE && valTag != ryml::TAG_SEQ) {
             auto fs =
@@ -272,10 +294,14 @@ void visitYAMLNode(const NixContext & context, Value & v, ryml::ConstNodeRef t, 
         } else if (scalarTypeCheck(ryml::TAG_BOOL) && (_bool = parseBool(context.options, vs))) {
             v.mkBool(*_bool);
         } else if (
-            scalarTypeCheck(ryml::TAG_INT) && *(isInt = vs.is_integer())
+            scalarTypeCheck(ryml::TAG_INT) && *(isInt = isInt_1_2(vs))
             && ryml::from_chars(vs.sub(vs[0] == '+'), &_int)) {
             v.mkInt(_int);
-        } else if (scalarTypeCheck(ryml::TAG_FLOAT) && (_float = parseFloat(isInt, vs))) {
+        } else if (
+            ((valTag == ryml::TAG_FLOAT && (isInt || (isInt = isInt_1_2(vs)))) || (valTag == ryml::TAG_NONE && isPlain))
+            && (_float = parseFloat(isInt, vs))) {
+            // if the value is tagged with !!float, then isInt_1_2 evaluation is enforced because the int regex is not a
+            // subset of the float regex...
             v.mkFloat(*_float);
         } else if ((valTag == ryml::TAG_NONE && !valTagCustom) || valTag == ryml::TAG_STR) {
             std::string_view value(val.begin(), val.size());
@@ -319,7 +345,7 @@ static RegisterPrimOp primop_fromYAML(
        A stream with multiple documents is mapped to a list except when the stream contains a single document.
 
        Supported optional parameters in *attrset*:
-         - useBoolYAML1_1 :: bool = false: When enabled booleans are parsed according to the YAML 1.1 spec, which accepts more values than YAML 1.2.
+         - useBoolYAML1_1 :: bool ? false: When enabled booleans are parsed according to the YAML 1.1 spec, which matches more values than YAML 1.2.
                                            This option improves compatibility because many applications and configs are still using YAML 1.1 features.
      )",
      .fun =
