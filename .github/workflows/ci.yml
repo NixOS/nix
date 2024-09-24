@@ -48,8 +48,32 @@ jobs:
             free -h
           done
         ) &
-    - run: nix --experimental-features 'nix-command flakes' flake check -L
-    - run: nix --experimental-features 'nix-command flakes' flake show --all-systems --json
+    - run: nix run --inputs-from . nixpkgs#nix-fast-build -- --skip-cached --no-nom
+  show-flake:
+      runs-on: ubuntu-latest
+      timeout-minutes: 60
+      steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: cachix/install-nix-action@V27
+        with:
+          # The sandbox would otherwise be disabled by default on Darwin
+          extra_nix_config: "sandbox = true"
+      - run: nix --experimental-features 'nix-command flakes' flake show --all-systems --json
+  eval-hydra-jobs:
+      runs-on: ubuntu-latest
+      timeout-minutes: 60
+      steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: cachix/install-nix-action@V27
+        with:
+          # The sandbox would otherwise be disabled by default on Darwin
+          extra_nix_config: "sandbox = true"
+      - run: nix run --inputs-from . nixpkgs#nix-eval-jobs -- --force-recurse --gc-roots-dir gcroot --flake git+file://$(pwd)#hydraJobs
+
 
   # Steps to test CI automation in your own fork.
   # Cachix:
