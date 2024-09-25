@@ -258,7 +258,7 @@ EvalState::EvalState(
         settings.restrictEval || settings.pureEval
         ? ref<SourceAccessor>(AllowListSourceAccessor::create(getFSSourceAccessor(), {}, {},
             [&settings](const CanonPath & path) -> RestrictedPathError {
-                throw RestrictedPathError(
+                return RestrictedPathError(
                     std::string("access to absolute path '%1%' is forbidden ") +
                     (settings.pureEval
                         ? "in pure evaluation mode (use '--impure' to override)"
