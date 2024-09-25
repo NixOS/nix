@@ -32,12 +32,16 @@ struct OptimiseStats
 {
     unsigned long filesLinked = 0;
     uint64_t bytesFreed = 0;
-    uint64_t blocksFreed = 0;
 };
 
 struct LocalStoreConfig : virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
+
+    LocalStoreConfig(
+        std::string_view scheme,
+        std::string_view authority,
+        const Params & params);
 
     Setting<bool> requireSigs{this,
         settings.requireSigs,
@@ -62,6 +66,9 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
         )"};
 
     const std::string name() override { return "Local Store"; }
+
+    static std::set<std::string> uriSchemes()
+    { return {"local"}; }
 
     std::string doc() override;
 };
@@ -138,12 +145,12 @@ public:
      * necessary.
      */
     LocalStore(const Params & params);
-    LocalStore(std::string scheme, std::string path, const Params & params);
+    LocalStore(
+        std::string_view scheme,
+        PathView path,
+        const Params & params);
 
     ~LocalStore();
-
-    static std::set<std::string> uriSchemes()
-    { return {}; }
 
     /**
      * Implementations of abstract store API methods.
@@ -366,18 +373,16 @@ private:
 
     void updatePathInfo(State & state, const ValidPathInfo & info);
 
-    void upgradeStore6();
-    void upgradeStore7();
     PathSet queryValidPathsOld();
     ValidPathInfo queryPathInfoOld(const Path & path);
 
-    void findRoots(const Path & path, unsigned char type, Roots & roots);
+    void findRoots(const Path & path, std::filesystem::file_type type, Roots & roots);
 
     void findRootsNoTemp(Roots & roots, bool censor);
 
     void findRuntimeRoots(Roots & roots, bool censor);
 
-    std::pair<Path, AutoCloseFD> createTempDirInStore();
+    std::pair<std::filesystem::path, AutoCloseFD> createTempDirInStore();
 
     typedef std::unordered_set<ino_t> InodeHash;
 

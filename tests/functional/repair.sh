@@ -1,6 +1,10 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 needLocalStore "--repair needs a local store"
+
+TODO_NixOS
 
 clearStore
 

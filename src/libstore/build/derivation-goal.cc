@@ -1,5 +1,9 @@
 #include "derivation-goal.hh"
-#include "hook-instance.hh"
+#ifndef _WIN32 // TODO enable build hook on Windows
+#  include "hook-instance.hh"
+#endif
+#include "processes.hh"
+#include "config-global.hh"
 #include "worker.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
@@ -19,49 +23,26 @@
 
 #include <fstream>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/wait.h>
-#include <netdb.h>
 #include <fcntl.h>
-#include <termios.h>
 #include <unistd.h>
-#include <sys/mman.h>
-#include <sys/utsname.h>
-#include <sys/resource.h>
 
-#if HAVE_STATVFS
-#include <sys/statvfs.h>
+#ifndef _WIN32 // TODO abstract over proc exit status
+#  include <sys/wait.h>
 #endif
-
-/* Includes required for chroot support. */
-#if __linux__
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <net/if.h>
-#include <netinet/ip.h>
-#include <sys/mman.h>
-#include <sched.h>
-#include <sys/param.h>
-#include <sys/mount.h>
-#include <sys/syscall.h>
-#if HAVE_SECCOMP
-#include <seccomp.h>
-#endif
-#define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
-#endif
-
-#if __APPLE__
-#include <spawn.h>
-#include <sys/sysctl.h>
-#endif
-
-#include <pwd.h>
-#include <grp.h>
 
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 namespace nix {
+
+Goal::Co DerivationGoal::init() {
+    if (useDerivation) {
+        co_return getDerivation();
+    } else {
+        co_return haveDerivation();
+    }
+}
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath,
     const OutputsSpec & wantedOutputs, Worker & worker, BuildMode buildMode)
@@ -71,7 +52,6 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath,
     , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
 {
-    state = &DerivationGoal::getDerivation;
     name = fmt(
         "building of '%s' from .drv file",
         DerivedPath::Built { makeConstantStorePathRef(drvPath), wantedOutputs }.to_string(worker.store));
@@ -92,7 +72,6 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation 
 {
     this->drv = std::make_unique<Derivation>(drv);
 
-    state = &DerivationGoal::haveDerivation;
     name = fmt(
         "building of '%s' from in-memory derivation",
         DerivedPath::Built { makeConstantStorePathRef(drvPath), drv.outputNames() }.to_string(worker.store));
@@ -127,20 +106,18 @@ std::string DerivationGoal::key()
 
 void DerivationGoal::killChild()
 {
+#ifndef _WIN32 // TODO enable build hook on Windows
     hook.reset();
+#endif
 }
 
 
 void DerivationGoal::timedOut(Error && ex)
 {
     killChild();
-    done(BuildResult::TimedOut, {}, std::move(ex));
-}
-
-
-void DerivationGoal::work()
-{
-    (this->*state)();
+    // We're not inside a coroutine, hence we can't use co_return here.
+    // Thus we ignore the return value.
+    [[maybe_unused]] Done _ = done(BuildResult::TimedOut, {}, std::move(ex));
 }
 
 void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
@@ -164,7 +141,7 @@ void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
 }
 
 
-void DerivationGoal::getDerivation()
+Goal::Co DerivationGoal::getDerivation()
 {
     trace("init");
 
@@ -172,23 +149,22 @@ void DerivationGoal::getDerivation()
        exists.  If it doesn't, it may be created through a
        substitute. */
     if (buildMode == bmNormal && worker.evalStore.isValidPath(drvPath)) {
-        loadDerivation();
-        return;
+        co_return loadDerivation();
     }
 
     addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
 
-    state = &DerivationGoal::loadDerivation;
+    co_await Suspend{};
+    co_return loadDerivation();
 }
 
 
-void DerivationGoal::loadDerivation()
+Goal::Co DerivationGoal::loadDerivation()
 {
     trace("loading derivation");
 
     if (nrFailed != 0) {
-        done(BuildResult::MiscFailure, {}, Error("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath)));
-        return;
+        co_return done(BuildResult::MiscFailure, {}, Error("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath)));
     }
 
     /* `drvPath' should already be a root, but let's be on the safe
@@ -210,11 +186,11 @@ void DerivationGoal::loadDerivation()
     }
     assert(drv);
 
-    haveDerivation();
+    co_return haveDerivation();
 }
 
 
-void DerivationGoal::haveDerivation()
+Goal::Co DerivationGoal::haveDerivation()
 {
     trace("have derivation");
 
@@ -242,8 +218,7 @@ void DerivationGoal::haveDerivation()
             });
         }
 
-        gaveUpOnSubstitution();
-        return;
+        co_return gaveUpOnSubstitution();
     }
 
     for (auto & i : drv->outputsAndOptPaths(worker.store))
@@ -265,8 +240,7 @@ void DerivationGoal::haveDerivation()
 
     /* If they are all valid, then we're done. */
     if (allValid && buildMode == bmNormal) {
-        done(BuildResult::AlreadyValid, std::move(validOutputs));
-        return;
+        co_return done(BuildResult::AlreadyValid, std::move(validOutputs));
     }
 
     /* We are first going to try to create the invalid output paths
@@ -293,24 +267,21 @@ void DerivationGoal::haveDerivation()
             }
         }
 
-    if (waitees.empty()) /* to prevent hang (no wake-up event) */
-        outputsSubstitutionTried();
-    else
-        state = &DerivationGoal::outputsSubstitutionTried;
+    if (!waitees.empty()) co_await Suspend{}; /* to prevent hang (no wake-up event) */
+    co_return outputsSubstitutionTried();
 }
 
 
-void DerivationGoal::outputsSubstitutionTried()
+Goal::Co DerivationGoal::outputsSubstitutionTried()
 {
     trace("all outputs substituted (maybe)");
 
     assert(!drv->type().isImpure());
 
     if (nrFailed > 0 && nrFailed > nrNoSubstituters + nrIncompleteClosure && !settings.tryFallback) {
-        done(BuildResult::TransientFailure, {},
+        co_return done(BuildResult::TransientFailure, {},
             Error("some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
                 worker.store.printStorePath(drvPath)));
-        return;
     }
 
     /*  If the substitutes form an incomplete closure, then we should
@@ -344,32 +315,29 @@ void DerivationGoal::outputsSubstitutionTried()
 
     if (needRestart == NeedRestartForMoreOutputs::OutputsAddedDoNeed) {
         needRestart = NeedRestartForMoreOutputs::OutputsUnmodifedDontNeed;
-        haveDerivation();
-        return;
+        co_return haveDerivation();
     }
 
     auto [allValid, validOutputs] = checkPathValidity();
 
     if (buildMode == bmNormal && allValid) {
-        done(BuildResult::Substituted, std::move(validOutputs));
-        return;
+        co_return done(BuildResult::Substituted, std::move(validOutputs));
     }
     if (buildMode == bmRepair && allValid) {
-        repairClosure();
-        return;
+        co_return repairClosure();
     }
     if (buildMode == bmCheck && !allValid)
         throw Error("some outputs of '%s' are not valid, so checking is not possible",
             worker.store.printStorePath(drvPath));
 
     /* Nothing to wait for; tail call */
-    gaveUpOnSubstitution();
+    co_return gaveUpOnSubstitution();
 }
 
 
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
-void DerivationGoal::gaveUpOnSubstitution()
+Goal::Co DerivationGoal::gaveUpOnSubstitution()
 {
     /* At this point we are building all outputs, so if more are wanted there
        is no need to restart. */
@@ -430,14 +398,12 @@ void DerivationGoal::gaveUpOnSubstitution()
         addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i)));
     }
 
-    if (waitees.empty()) /* to prevent hang (no wake-up event) */
-        inputsRealised();
-    else
-        state = &DerivationGoal::inputsRealised;
+    if (!waitees.empty()) co_await Suspend{}; /* to prevent hang (no wake-up event) */
+    co_return inputsRealised();
 }
 
 
-void DerivationGoal::repairClosure()
+Goal::Co DerivationGoal::repairClosure()
 {
     assert(!drv->type().isImpure());
 
@@ -491,41 +457,39 @@ void DerivationGoal::repairClosure()
     }
 
     if (waitees.empty()) {
-        done(BuildResult::AlreadyValid, assertPathValidity());
-        return;
+        co_return done(BuildResult::AlreadyValid, assertPathValidity());
+    } else {
+        co_await Suspend{};
+        co_return closureRepaired();
     }
-
-    state = &DerivationGoal::closureRepaired;
 }
 
 
-void DerivationGoal::closureRepaired()
+Goal::Co DerivationGoal::closureRepaired()
 {
     trace("closure repaired");
     if (nrFailed > 0)
         throw Error("some paths in the output closure of derivation '%s' could not be repaired",
             worker.store.printStorePath(drvPath));
-    done(BuildResult::AlreadyValid, assertPathValidity());
+    co_return done(BuildResult::AlreadyValid, assertPathValidity());
 }
 
 
-void DerivationGoal::inputsRealised()
+Goal::Co DerivationGoal::inputsRealised()
 {
     trace("all inputs realised");
 
     if (nrFailed != 0) {
         if (!useDerivation)
             throw Error("some dependencies of '%s' are missing", worker.store.printStorePath(drvPath));
-        done(BuildResult::DependencyFailed, {}, Error(
+        co_return done(BuildResult::DependencyFailed, {}, Error(
                 "%s dependencies of derivation '%s' failed to build",
                 nrFailed, worker.store.printStorePath(drvPath)));
-        return;
     }
 
     if (retrySubstitution == RetrySubstitution::YesNeed) {
         retrySubstitution = RetrySubstitution::AlreadyRetried;
-        haveDerivation();
-        return;
+        co_return haveDerivation();
     }
 
     /* Gather information necessary for computing the closure and/or
@@ -591,8 +555,8 @@ void DerivationGoal::inputsRealised()
                 pathResolved, wantedOutputs, buildMode);
             addWaitee(resolvedDrvGoal);
 
-            state = &DerivationGoal::resolvedFinished;
-            return;
+            co_await Suspend{};
+            co_return resolvedFinished();
         }
 
         std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputPaths;
@@ -656,8 +620,9 @@ void DerivationGoal::inputsRealised()
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
        build hook. */
-    state = &DerivationGoal::tryToBuild;
     worker.wakeUp(shared_from_this());
+    co_await Suspend{};
+    co_return tryToBuild();
 }
 
 void DerivationGoal::started()
@@ -667,14 +632,22 @@ void DerivationGoal::started()
         buildMode == bmCheck ? "checking outputs of '%s'" :
         "building '%s'", worker.store.printStorePath(drvPath));
     fmt("building '%s'", worker.store.printStorePath(drvPath));
+#ifndef _WIN32 // TODO enable build hook on Windows
     if (hook) msg += fmt(" on '%s'", machineName);
+#endif
     act = std::make_unique<Activity>(*logger, lvlInfo, actBuild, msg,
-        Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", 1, 1});
+        Logger::Fields{worker.store.printStorePath(drvPath),
+#ifndef _WIN32 // TODO enable build hook on Windows
+        hook ? machineName :
+#endif
+            "",
+        1,
+        1});
     mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
     worker.updateProgress();
 }
 
-void DerivationGoal::tryToBuild()
+Goal::Co DerivationGoal::tryToBuild()
 {
     trace("trying to build");
 
@@ -710,7 +683,8 @@ void DerivationGoal::tryToBuild()
             actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                 fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
         worker.waitForAWhile(shared_from_this());
-        return;
+        co_await Suspend{};
+        co_return tryToBuild();
     }
 
     actLock.reset();
@@ -727,8 +701,7 @@ void DerivationGoal::tryToBuild()
     if (buildMode != bmCheck && allValid) {
         debug("skipping build of derivation '%s', someone beat us to it", worker.store.printStorePath(drvPath));
         outputLocks.setDeletion(true);
-        done(BuildResult::AlreadyValid, std::move(validOutputs));
-        return;
+        co_return done(BuildResult::AlreadyValid, std::move(validOutputs));
     }
 
     /* If any of the outputs already exist but are not valid, delete
@@ -754,9 +727,9 @@ void DerivationGoal::tryToBuild()
                    EOF from the hook. */
                 actLock.reset();
                 buildResult.startTime = time(0); // inexact
-                state = &DerivationGoal::buildDone;
                 started();
-                return;
+                co_await Suspend{};
+                co_return buildDone();
             case rpPostpone:
                 /* Not now; wait until at least one child finishes or
                    the wake-up timeout expires. */
@@ -765,7 +738,8 @@ void DerivationGoal::tryToBuild()
                         fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
                 worker.waitForAWhile(shared_from_this());
                 outputLocks.unlock();
-                return;
+                co_await Suspend{};
+                co_return tryToBuild();
             case rpDecline:
                 /* We should do it ourselves. */
                 break;
@@ -774,11 +748,12 @@ void DerivationGoal::tryToBuild()
 
     actLock.reset();
 
-    state = &DerivationGoal::tryLocalBuild;
     worker.wakeUp(shared_from_this());
+    co_await Suspend{};
+    co_return tryLocalBuild();
 }
 
-void DerivationGoal::tryLocalBuild() {
+Goal::Co DerivationGoal::tryLocalBuild() {
     throw Error(
         R"(
         Unable to build with a primary store that isn't a local store;
@@ -804,12 +779,18 @@ static void movePath(const Path & src, const Path & dst)
 {
     auto st = lstat(src);
 
-    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+    bool changePerm = (
+#ifndef _WIN32
+        geteuid()
+#else
+        !isRootUser()
+#endif
+        && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
 
     if (changePerm)
         chmod_(src, st.st_mode | S_IWUSR);
 
-    renameFile(src, dst);
+    std::filesystem::rename(src, dst);
 
     if (changePerm)
         chmod_(dst, st.st_mode);
@@ -822,7 +803,7 @@ void replaceValidPath(const Path & storePath, const Path & tmpPath)
        tmpPath (the replacement), so we have to move it out of the
        way first.  We'd better not be interrupted here, because if
        we're repairing (say) Glibc, we end up with a broken system. */
-    Path oldPath = fmt("%1%.old-%2%-%3%", storePath, getpid(), random());
+    Path oldPath = fmt("%1%.old-%2%-%3%", storePath, getpid(), rand());
     if (pathExists(storePath))
         movePath(storePath, oldPath);
 
@@ -844,14 +825,20 @@ void replaceValidPath(const Path & storePath, const Path & tmpPath)
 
 int DerivationGoal::getChildStatus()
 {
+#ifndef _WIN32 // TODO enable build hook on Windows
     return hook->pid.kill();
+#else
+    return 0;
+#endif
 }
 
 
 void DerivationGoal::closeReadPipes()
 {
-    hook->builderOut.readSide = -1;
-    hook->fromHook.readSide = -1;
+#ifndef _WIN32 // TODO enable build hook on Windows
+    hook->builderOut.readSide.close();
+    hook->fromHook.readSide.close();
+#endif
 }
 
 
@@ -943,7 +930,7 @@ void runPostBuildHook(
     });
 }
 
-void DerivationGoal::buildDone()
+Goal::Co DerivationGoal::buildDone()
 {
     trace("build done");
 
@@ -1038,20 +1025,23 @@ void DerivationGoal::buildDone()
         outputLocks.setDeletion(true);
         outputLocks.unlock();
 
-        done(BuildResult::Built, std::move(builtOutputs));
+        co_return done(BuildResult::Built, std::move(builtOutputs));
 
     } catch (BuildError & e) {
         outputLocks.unlock();
 
         BuildResult::Status st = BuildResult::MiscFailure;
 
+#ifndef _WIN32 // TODO abstract over proc exit status
         if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101)
             st = BuildResult::TimedOut;
 
         else if (hook && (!WIFEXITED(status) || WEXITSTATUS(status) != 100)) {
         }
 
-        else {
+        else
+#endif
+        {
             assert(derivationType);
             st =
                 dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
@@ -1060,12 +1050,11 @@ void DerivationGoal::buildDone()
                 BuildResult::PermanentFailure;
         }
 
-        done(st, {}, std::move(e));
-        return;
+        co_return done(st, {}, std::move(e));
     }
 }
 
-void DerivationGoal::resolvedFinished()
+Goal::Co DerivationGoal::resolvedFinished()
 {
     trace("resolved derivation finished");
 
@@ -1133,11 +1122,14 @@ void DerivationGoal::resolvedFinished()
     if (status == BuildResult::AlreadyValid)
         status = BuildResult::ResolvesToAlreadyValid;
 
-    done(status, std::move(builtOutputs));
+    co_return done(status, std::move(builtOutputs));
 }
 
 HookReply DerivationGoal::tryBuildHook()
 {
+#ifdef _WIN32 // TODO enable build hook on Windows
+    return rpDecline;
+#else
     if (settings.buildHook.get().empty() || !worker.tryBuildHook || !useDerivation) return rpDecline;
 
     if (!worker.hook)
@@ -1231,17 +1223,18 @@ HookReply DerivationGoal::tryBuildHook()
     }
 
     hook->sink = FdSink();
-    hook->toHook.writeSide = -1;
+    hook->toHook.writeSide.close();
 
     /* Create the log file and pipe. */
     Path logFile = openLogFile();
 
-    std::set<int> fds;
+    std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());
     fds.insert(hook->builderOut.readSide.get());
     worker.childStarted(shared_from_this(), fds, false, false);
 
     return rpAccept;
+#endif
 }
 
 
@@ -1277,7 +1270,11 @@ Path DerivationGoal::openLogFile()
     Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2),
         settings.compressLog ? ".bz2" : "");
 
-    fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0666);
+    fdLogFile = toDescriptor(open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC
+#ifndef _WIN32
+        | O_CLOEXEC
+#endif
+        , 0666));
     if (!fdLogFile) throw SysError("creating log file '%1%'", logFileName);
 
     logFileSink = std::make_shared<FdSink>(fdLogFile.get());
@@ -1297,16 +1294,20 @@ void DerivationGoal::closeLogFile()
     if (logSink2) logSink2->finish();
     if (logFileSink) logFileSink->flush();
     logSink = logFileSink = 0;
-    fdLogFile = -1;
+    fdLogFile.close();
 }
 
 
-bool DerivationGoal::isReadDesc(int fd)
+bool DerivationGoal::isReadDesc(Descriptor fd)
 {
+#ifdef _WIN32 // TODO enable build hook on Windows
+    return false;
+#else
     return fd == hook->builderOut.readSide.get();
+#endif
 }
 
-void DerivationGoal::handleChildOutput(int fd, std::string_view data)
+void DerivationGoal::handleChildOutput(Descriptor fd, std::string_view data)
 {
     // local & `ssh://`-builds are dealt with here.
     auto isWrittenToLog = isReadDesc(fd);
@@ -1315,7 +1316,9 @@ void DerivationGoal::handleChildOutput(int fd, std::string_view data)
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
             killChild();
-            done(
+            // We're not inside a coroutine, hence we can't use co_return here.
+            // Thus we ignore the return value.
+            [[maybe_unused]] Done _ = done(
                 BuildResult::LogLimitExceeded, {},
                 Error("%s killed after writing more than %d bytes of log output",
                     getName(), settings.maxLogSize));
@@ -1336,6 +1339,7 @@ void DerivationGoal::handleChildOutput(int fd, std::string_view data)
         if (logSink) (*logSink)(data);
     }
 
+#ifndef _WIN32 // TODO enable build hook on Windows
     if (hook && fd == hook->fromHook.readSide.get()) {
         for (auto c : data)
             if (c == '\n') {
@@ -1370,10 +1374,11 @@ void DerivationGoal::handleChildOutput(int fd, std::string_view data)
             } else
                 currentHookLine += c;
     }
+#endif
 }
 
 
-void DerivationGoal::handleEOF(int fd)
+void DerivationGoal::handleEOF(Descriptor fd)
 {
     if (!currentLogLine.empty()) flushLine();
     worker.wakeUp(shared_from_this());
@@ -1519,7 +1524,7 @@ SingleDrvOutputs DerivationGoal::assertPathValidity()
 }
 
 
-void DerivationGoal::done(
+Goal::Done DerivationGoal::done(
     BuildResult::Status status,
     SingleDrvOutputs builtOutputs,
     std::optional<Error> ex)
@@ -1556,7 +1561,7 @@ void DerivationGoal::done(
         fs << worker.store.printStorePath(drvPath) << "\t" << buildResult.toString() << std::endl;
     }
 
-    amDone(buildResult.success() ? ecSuccess : ecFailed, std::move(ex));
+    return amDone(buildResult.success() ? ecSuccess : ecFailed, std::move(ex));
 }
 
 
@@ -1564,7 +1569,7 @@ void DerivationGoal::waiteeDone(GoalPtr waitee, ExitCode result)
 {
     Goal::waiteeDone(waitee, result);
 
-    if (!useDerivation) return;
+    if (!useDerivation || !drv) return;
     auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
     auto * dg = dynamic_cast<DerivationGoal *>(&*waitee);

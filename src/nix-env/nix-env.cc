@@ -94,11 +94,11 @@ static bool parseInstallSourceOptions(Globals & globals,
 }
 
 
-static bool isNixExpr(const SourcePath & path, struct InputAccessor::Stat & st)
+static bool isNixExpr(const SourcePath & path, struct SourceAccessor::Stat & st)
 {
     return
-        st.type == InputAccessor::tRegular
-        || (st.type == InputAccessor::tDirectory && (path / "default.nix").resolveSymlinks().pathExists());
+        st.type == SourceAccessor::tRegular
+        || (st.type == SourceAccessor::tDirectory && (path / "default.nix").resolveSymlinks().pathExists());
 }
 
 
@@ -119,14 +119,14 @@ static void getAllExprs(EvalState & state,
 
         auto path2 = (path / i).resolveSymlinks();
 
-        InputAccessor::Stat st;
+        SourceAccessor::Stat st;
         try {
             st = path2.lstat();
         } catch (Error &) {
             continue; // ignore dangling symlinks in ~/.nix-defexpr
         }
 
-        if (isNixExpr(path2, st) && (st.type != InputAccessor::tRegular || hasSuffix(path2.baseName(), ".nix"))) {
+        if (isNixExpr(path2, st) && (st.type != SourceAccessor::tRegular || hasSuffix(path2.baseName(), ".nix"))) {
             /* Strip off the `.nix' filename suffix (if applicable),
                otherwise the attribute cannot be selected with the
                `-A' option.  Useful if you want to stick a Nix
@@ -149,7 +149,7 @@ static void getAllExprs(EvalState & state,
                 throw Error("too many Nix expressions in directory '%1%'", path);
             attrs.alloc(attrName).mkApp(&state.getBuiltin("import"), vArg);
         }
-        else if (st.type == InputAccessor::tDirectory)
+        else if (st.type == SourceAccessor::tDirectory)
             /* `path2' is a directory (with no default.nix in it);
                recurse into it. */
             getAllExprs(state, path2, seen, attrs);
@@ -171,7 +171,7 @@ static void loadSourceExpr(EvalState & state, const SourcePath & path, Value & v
        set flat, not nested, to make it easier for a user to have a
        ~/.nix-defexpr directory that includes some system-wide
        directory). */
-    else if (st.type == InputAccessor::tDirectory) {
+    else if (st.type == SourceAccessor::tDirectory) {
         auto attrs = state.buildBindings(maxAttrs);
         attrs.insert(state.symbols.create("_combineChannels"), &state.vEmptyList);
         StringSet seen;
@@ -204,15 +204,15 @@ static void loadDerivations(EvalState & state, const SourcePath & nixExprPath,
 }
 
 
-static long getPriority(EvalState & state, PackageInfo & drv)
+static NixInt getPriority(EvalState & state, PackageInfo & drv)
 {
-    return drv.queryMetaInt("priority", 0);
+    return drv.queryMetaInt("priority", NixInt(0));
 }
 
 
-static long comparePriorities(EvalState & state, PackageInfo & drv1, PackageInfo & drv2)
+static std::strong_ordering comparePriorities(EvalState & state, PackageInfo & drv1, PackageInfo & drv2)
 {
-    return getPriority(state, drv2) - getPriority(state, drv1);
+    return getPriority(state, drv2) <=> getPriority(state, drv1);
 }
 
 
@@ -280,7 +280,7 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
         auto & oneDrv = match.packageInfo;
 
         const auto drvName = DrvName { oneDrv.queryName() };
-        long comparison = 1;
+        std::strong_ordering comparison = std::strong_ordering::greater;
 
         const auto itOther = newest.find(drvName.name);
 
@@ -288,9 +288,9 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
             auto & newestDrv = itOther->second.packageInfo;
 
             comparison =
-                oneDrv.querySystem() == newestDrv.querySystem() ? 0 :
-                oneDrv.querySystem() == settings.thisSystem ? 1 :
-                newestDrv.querySystem() == settings.thisSystem ? -1 : 0;
+                oneDrv.querySystem() == newestDrv.querySystem() ? std::strong_ordering::equal :
+                oneDrv.querySystem() == settings.thisSystem ? std::strong_ordering::greater :
+                newestDrv.querySystem() == settings.thisSystem ? std::strong_ordering::less : std::strong_ordering::equal;
             if (comparison == 0)
                 comparison = comparePriorities(state, oneDrv, newestDrv);
             if (comparison == 0)
@@ -625,13 +625,13 @@ static void upgradeDerivations(Globals & globals,
                         continue;
                     DrvName newName(j->queryName());
                     if (newName.name == drvName.name) {
-                        int d = compareVersions(drvName.version, newName.version);
+                        std::strong_ordering d = compareVersions(drvName.version, newName.version);
                         if ((upgradeType == utLt && d < 0) ||
                             (upgradeType == utLeq && d <= 0) ||
                             (upgradeType == utEq && d == 0) ||
                             upgradeType == utAlways)
                         {
-                            long d2 = -1;
+                            std::strong_ordering d2 = std::strong_ordering::less;
                             if (bestElem != availElems.end()) {
                                 d2 = comparePriorities(*globals.state, *bestElem, *j);
                                 if (d2 == 0) d2 = compareVersions(bestVersion, newName.version);
@@ -902,7 +902,7 @@ static VersionDiff compareVersionAgainstSet(
     for (auto & i : elems) {
         DrvName name2(i.queryName());
         if (name.name == name2.name) {
-            int d = compareVersions(name.version, name2.version);
+            std::strong_ordering d = compareVersions(name.version, name2.version);
             if (d < 0) {
                 diff = cvGreater;
                 version = name2.version;
@@ -1159,7 +1159,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                     case cvEqual: ch = '='; break;
                     case cvGreater: ch = '<'; break;
                     case cvUnavail: ch = '-'; break;
-                    default: abort();
+                    default: unreachable();
                 }
 
                 if (xmlOutput) {
@@ -1238,15 +1238,15 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nInt) {
                                 attrs2["type"] = "int";
-                                attrs2["value"] = fmt("%1%", v->integer);
+                                attrs2["value"] = fmt("%1%", v->integer());
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nFloat) {
                                 attrs2["type"] = "float";
-                                attrs2["value"] = fmt("%1%", v->fpoint);
+                                attrs2["value"] = fmt("%1%", v->fpoint());
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nBool) {
                                 attrs2["type"] = "bool";
-                                attrs2["value"] = v->boolean ? "true" : "false";
+                                attrs2["value"] = v->boolean() ? "true" : "false";
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nList) {
                                 attrs2["type"] = "strings";
@@ -1260,13 +1260,11 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                             } else if (v->type() == nAttrs) {
                                 attrs2["type"] = "strings";
                                 XMLOpenElement m(xml, "meta", attrs2);
-                                Bindings & attrs = *v->attrs;
-                                for (auto &i : attrs) {
-                                    Attr & a(*attrs.find(i.name));
-                                    if(a.value->type() != nString) continue;
+                                for (auto & i : *v->attrs()) {
+                                    if (i.value->type() != nString) continue;
                                     XMLAttrs attrs3;
                                     attrs3["type"] = globals.state->symbols[i.name];
-                                    attrs3["value"] = a.value->c_str();
+                                    attrs3["value"] = i.value->c_str();
                                     xml.writeEmptyElement("string", attrs3);
                             }
                             }
@@ -1344,8 +1342,16 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
     RunPager pager;
 
     for (auto & i : gens) {
+#ifdef _WIN32 // TODO portable wrapper in libutil
+        tm * tp = localtime(&i.creationTime);
+        if (!tp)
+            throw Error("cannot convert time");
+        auto & t = *tp;
+#else
         tm t;
-        if (!localtime_r(&i.creationTime, &t)) throw Error("cannot convert time");
+        if (!localtime_r(&i.creationTime, &t))
+            throw Error("cannot convert time");
+#endif
         logger->cout("%|4|   %|4|-%|02|-%|02| %|02|:%|02|:%|02|   %||",
             i.number,
             t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
@@ -1519,7 +1525,7 @@ static int main_nix_env(int argc, char * * argv)
 
         auto store = openStore();
 
-        globals.state = std::shared_ptr<EvalState>(new EvalState(myArgs.searchPath, store));
+        globals.state = std::shared_ptr<EvalState>(new EvalState(myArgs.lookupPath, store, fetchSettings, evalSettings));
         globals.state->repair = myArgs.repair;
 
         globals.instSource.nixExprPath = std::make_shared<SourcePath>(

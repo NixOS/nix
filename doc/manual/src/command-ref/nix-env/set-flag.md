@@ -13,24 +13,24 @@ to be modified. There are several attributes that can be usefully
 modified, because they affect the behaviour of `nix-env` or the user
 environment build script:
 
-  - `priority` can be changed to resolve filename clashes. The user
-    environment build script uses the `meta.priority` attribute of
-    derivations to resolve filename collisions between packages. Lower
-    priority values denote a higher priority. For instance, the GCC
-    wrapper package and the Binutils package in Nixpkgs both have a file
-    `bin/ld`, so previously if you tried to install both you would get a
-    collision. Now, on the other hand, the GCC wrapper declares a higher
-    priority than Binutils, so the former’s `bin/ld` is symlinked in the
-    user environment.
+- `priority` can be changed to resolve filename clashes. The user
+  environment build script uses the `meta.priority` attribute of
+  derivations to resolve filename collisions between packages. Lower
+  priority values denote a higher priority. For instance, the GCC
+  wrapper package and the Binutils package in Nixpkgs both have a file
+  `bin/ld`, so previously if you tried to install both you would get a
+  collision. Now, on the other hand, the GCC wrapper declares a higher
+  priority than Binutils, so the former’s `bin/ld` is symlinked in the
+  user environment.
 
-  - `keep` can be set to `true` to prevent the package from being
-    upgraded or replaced. This is useful if you want to hang on to an
-    older version of a package.
+- `keep` can be set to `true` to prevent the package from being
+  upgraded or replaced. This is useful if you want to hang on to an
+  older version of a package.
 
-  - `active` can be set to `false` to “disable” the package. That is, no
-    symlinks will be generated to the files of the package, but it
-    remains part of the profile (so it won’t be garbage-collected). It
-    can be set back to `true` to re-enable the package.
+- `active` can be set to `false` to “disable” the package. That is, no
+  symlinks will be generated to the files of the package, but it
+  remains part of the profile (so it won’t be garbage-collected). It
+  can be set back to `true` to re-enable the package.
 
 {{#include ./opt-common.md}}
 

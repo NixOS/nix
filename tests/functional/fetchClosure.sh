@@ -1,6 +1,10 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 enableFeatures "fetch-closure"
+
+TODO_NixOS
 
 clearStore
 clearCacheCache

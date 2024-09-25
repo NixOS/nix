@@ -7,7 +7,8 @@
 
 #include "ref.hh"
 #include "canon-path.hh"
-#include "input-accessor.hh"
+#include "source-accessor.hh"
+#include "std-hash.hh"
 
 namespace nix {
 
@@ -19,10 +20,10 @@ namespace nix {
  */
 struct SourcePath
 {
-    ref<InputAccessor> accessor;
+    ref<SourceAccessor> accessor;
     CanonPath path;
 
-    SourcePath(ref<InputAccessor> accessor, CanonPath path = CanonPath::root)
+    SourcePath(ref<SourceAccessor> accessor, CanonPath path = CanonPath::root)
         : accessor(std::move(accessor))
         , path(std::move(path))
     { }
@@ -41,6 +42,11 @@ struct SourcePath
      */
     std::string readFile() const;
 
+    void readFile(
+        Sink & sink,
+        std::function<void(uint64_t)> sizeCallback = [](uint64_t size){}) const
+    { return accessor->readFile(path, sink, sizeCallback); }
+
     /**
      * Return whether this `SourcePath` denotes a file (of any type)
      * that exists
@@ -51,19 +57,19 @@ struct SourcePath
      * Return stats about this `SourcePath`, or throw an exception if
      * it doesn't exist.
      */
-    InputAccessor::Stat lstat() const;
+    SourceAccessor::Stat lstat() const;
 
     /**
      * Return stats about this `SourcePath`, or std::nullopt if it
      * doesn't exist.
      */
-    std::optional<InputAccessor::Stat> maybeLstat() const;
+    std::optional<SourceAccessor::Stat> maybeLstat() const;
 
     /**
      * If this `SourcePath` denotes a directory (not a symlink),
      * return its directory entries; otherwise throw an error.
      */
-    InputAccessor::DirEntries readDirectory() const;
+    SourceAccessor::DirEntries readDirectory() const;
 
     /**
      * If this `SourcePath` denotes a symlink, return its target;
@@ -98,9 +104,8 @@ struct SourcePath
      */
     SourcePath operator / (std::string_view c) const;
 
-    bool operator==(const SourcePath & x) const;
-    bool operator!=(const SourcePath & x) const;
-    bool operator<(const SourcePath & x) const;
+    bool operator==(const SourcePath & x) const noexcept;
+    std::strong_ordering operator<=>(const SourcePath & x) const noexcept;
 
     /**
      * Convenience wrapper around `SourceAccessor::resolveSymlinks()`.
@@ -110,8 +115,21 @@ struct SourcePath
     {
         return {accessor, accessor->resolveSymlinks(path, mode)};
     }
+
+    friend class std::hash<nix::SourcePath>;
 };
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path);
 
 }
+
+template<>
+struct std::hash<nix::SourcePath>
+{
+    std::size_t operator()(const nix::SourcePath & s) const noexcept
+    {
+        std::size_t hash = 0;
+        hash_combine(hash, s.accessor->number, s.path);
+        return hash;
+    }
+};

@@ -111,6 +111,8 @@ std::ostream & operator<<(std::ostream & out, const Magenta<T> & y)
 /**
  * Values wrapped in this class are printed without coloring.
  *
+ * Specifically, the color is reset to normal before printing the value.
+ *
  * By default, arguments to `HintFmt` are printed in magenta (see `Magenta`).
  */
 template <class T>
@@ -181,6 +183,8 @@ public:
         fmt % value.value;
         return *this;
     }
+
+    HintFmt & operator=(HintFmt const & rhs) = default;
 
     std::string str() const
     {

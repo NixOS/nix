@@ -43,22 +43,22 @@ static nlohmann::json builtPathsWithResultToJSON(const std::vector<BuiltPathWith
 }
 
 // TODO deduplicate with other code also setting such out links.
-static void createOutLinks(const Path& outLink, const std::vector<BuiltPathWithResult>& buildables, LocalFSStore& store2)
+static void createOutLinks(const std::filesystem::path& outLink, const std::vector<BuiltPathWithResult>& buildables, LocalFSStore& store2)
 {
     for (const auto & [_i, buildable] : enumerate(buildables)) {
         auto i = _i;
         std::visit(overloaded {
             [&](const BuiltPath::Opaque & bo) {
-                std::string symlink = outLink;
+                auto symlink = outLink;
                 if (i) symlink += fmt("-%d", i);
-                store2.addPermRoot(bo.path, absPath(symlink));
+                store2.addPermRoot(bo.path, absPath(symlink.string()));
             },
             [&](const BuiltPath::Built & bfd) {
                 for (auto & output : bfd.outputs) {
-                    std::string symlink = outLink;
+                    auto symlink = outLink;
                     if (i) symlink += fmt("-%d", i);
                     if (output.first != "out") symlink += fmt("-%s", output.first);
-                    store2.addPermRoot(output.second, absPath(symlink));
+                    store2.addPermRoot(output.second, absPath(symlink.string()));
                 }
             },
         }, buildable.path.raw());

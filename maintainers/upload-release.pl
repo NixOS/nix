@@ -42,7 +42,7 @@ my $flakeUrl = $evalInfo->{flake};
 my $flakeInfo = decode_json(`nix flake metadata --json "$flakeUrl"` or die) if $flakeUrl;
 my $nixRev = ($flakeInfo ? $flakeInfo->{revision} : $evalInfo->{jobsetevalinputs}->{nix}->{revision}) or die;
 
-my $buildInfo = decode_json(fetch("$evalUrl/job/build.x86_64-linux", 'application/json'));
+my $buildInfo = decode_json(fetch("$evalUrl/job/build.nix.x86_64-linux", 'application/json'));
 #print Dumper($buildInfo);
 
 my $releaseName = $buildInfo->{nixname};
@@ -91,7 +91,7 @@ sub getStorePath {
 sub copyManual {
     my $manual;
     eval {
-        $manual = getStorePath("build.x86_64-linux", "doc");
+        $manual = getStorePath("build.nix.x86_64-linux", "doc");
     };
     if ($@) {
         warn "$@";
@@ -112,7 +112,7 @@ sub copyManual {
         system("xz -d < '$manualNar' | nix-store --restore $tmpDir/manual.tmp") == 0
             or die "unable to unpack $manualNar\n";
         rename("$tmpDir/manual.tmp/share/doc/nix/manual", "$tmpDir/manual") or die;
-        system("rm -rf '$tmpDir/manual.tmp'") == 0 or die;
+        File::Path::remove_tree("$tmpDir/manual.tmp", {safe => 1});
     }
 
     system("aws s3 sync '$tmpDir/manual' s3://$releasesBucketName/$releaseDir/manual") == 0
@@ -171,6 +171,10 @@ eval {
     downloadFile("binaryTarballCross.x86_64-linux.armv7l-unknown-linux-gnueabihf", "1");
 };
 warn "$@" if $@;
+eval {
+    downloadFile("binaryTarballCross.x86_64-linux.riscv64-unknown-linux-gnu", "1");
+};
+warn "$@" if $@;
 downloadFile("installerScript", "1");
 
 # Upload docker images to dockerhub.
@@ -185,10 +189,7 @@ for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
     eval {
         downloadFile("dockerImage.$system", "1", $fn);
     };
-    if ($@) {
-        warn "$@" if $@;
-        next;
-    }
+    die "$@" if $@;
     $haveDocker = 1;
 
     print STDERR "loading docker image for $dockerPlatform...\n";
@@ -239,11 +240,12 @@ if ($haveDocker) {
 # Upload nix-fallback-paths.nix.
 write_file("$tmpDir/fallback-paths.nix",
     "{\n" .
-    "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
-    "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
-    "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
-    "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
-    "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
+    "  x86_64-linux = \"" . getStorePath("build.nix.x86_64-linux") . "\";\n" .
+    "  i686-linux = \"" . getStorePath("build.nix.i686-linux") . "\";\n" .
+    "  aarch64-linux = \"" . getStorePath("build.nix.aarch64-linux") . "\";\n" .
+    "  riscv64-linux = \"" . getStorePath("buildCross.nix.riscv64-unknown-linux-gnu.x86_64-linux") . "\";\n" .
+    "  x86_64-darwin = \"" . getStorePath("build.nix.x86_64-darwin") . "\";\n" .
+    "  aarch64-darwin = \"" . getStorePath("build.nix.aarch64-darwin") . "\";\n" .
     "}\n");
 
 # Upload release files to S3.
@@ -279,3 +281,6 @@ system("git remote update origin") == 0 or die;
 system("git tag --force --sign $version $nixRev -m 'Tagging release $version'") == 0 or die;
 system("git push --tags") == 0 or die;
 system("git push --force-with-lease origin $nixRev:refs/heads/latest-release") == 0 or die if $isLatest;
+
+File::Path::remove_tree($narCache, {safe => 1});
+File::Path::remove_tree($tmpDir, {safe => 1});

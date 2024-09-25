@@ -10,6 +10,7 @@
 struct nix_c_context
 {
     nix_err last_err_code = NIX_OK;
+    /** The last error message. Always check last_err_code. This may not have been cleared, so that clearing is fast. */
     std::optional<std::string> last_err = {};
     std::optional<nix::ErrorInfo> info = {};
     std::string name = "";
@@ -29,7 +30,7 @@ nix_err nix_context_error(nix_c_context * context);
  * @return NIX_OK if there were no errors.
  * @see nix_get_string_callback
  */
-nix_err call_nix_get_string_callback(const std::string str, void * callback, void * user_data);
+nix_err call_nix_get_string_callback(const std::string str, nix_get_string_callback callback, void * user_data);
 
 #define NIXC_CATCH_ERRS \
     catch (...) \

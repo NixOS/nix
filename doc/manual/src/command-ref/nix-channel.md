@@ -27,40 +27,46 @@ The moving parts of channels are:
 
 This command has the following operations:
 
-  - `--add` *url* \[*name*\]\
-    Add a channel *name* located at *url* to the list of subscribed channels.
-    If *name* is omitted, default to the last component of *url*, with the suffixes `-stable` or `-unstable` removed.
+- `--add` *url* \[*name*\]
 
-    > **Note**
-    >
-    > `--add` does not automatically perform an update.
-    > Use `--update` explicitly.
+  Add a channel *name* located at *url* to the list of subscribed channels.
+  If *name* is omitted, default to the last component of *url*, with the suffixes `-stable` or `-unstable` removed.
 
-    A channel URL must point to a directory containing a file `nixexprs.tar.gz`.
-    At the top level, that tarball must contain a single directory with a `default.nix` file that serves as the channel’s entry point.
+  > **Note**
+  >
+  > `--add` does not automatically perform an update.
+  > Use `--update` explicitly.
 
-  - `--remove` *name*\
-    Remove the channel *name* from the list of subscribed channels.
+  A channel URL must point to a directory containing a file `nixexprs.tar.gz`.
+  At the top level, that tarball must contain a single directory with a `default.nix` file that serves as the channel’s entry point.
 
-  - `--list`\
-    Print the names and URLs of all subscribed channels on standard output.
+- `--remove` *name*
 
-  - `--update` \[*names*…\]\
-    Download the Nix expressions of subscribed channels and create a new generation.
-    Update all channels if none is specified, and only those included in *names* otherwise.
+  Remove the channel *name* from the list of subscribed channels.
 
-  - `--list-generations`\
-    Prints a list of all the current existing generations for the
-    channel profile.
+- `--list`
 
-    Works the same way as
-    ```
-    nix-env --profile /nix/var/nix/profiles/per-user/$USER/channels --list-generations
-    ```
+  Print the names and URLs of all subscribed channels on standard output.
 
-  - `--rollback` \[*generation*\]\
-    Revert channels to the state before the last call to `nix-channel --update`.
-    Optionally, you can specify a specific channel *generation* number to restore.
+- `--update` \[*names*…\]
+
+  Download the Nix expressions of subscribed channels and create a new generation.
+  Update all channels if none is specified, and only those included in *names* otherwise.
+
+- `--list-generations`
+
+  Prints a list of all the current existing generations for the
+  channel profile.
+
+  Works the same way as
+  ```
+  nix-env --profile /nix/var/nix/profiles/per-user/$USER/channels --list-generations
+  ```
+
+- `--rollback` \[*generation*\]
+
+  Revert channels to the state before the last call to `nix-channel --update`.
+  Optionally, you can specify a specific channel *generation* number to restore.
 
 {{#include ./opt-common.md}}
 

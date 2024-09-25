@@ -11,6 +11,8 @@
 #include <iostream>
 #include <cerrno>
 
+namespace nix::fs { using namespace std::filesystem; }
+
 using namespace nix;
 
 std::string deleteOlderThan;
@@ -21,24 +23,24 @@ bool dryRun = false;
  * Of course, this makes rollbacks to before this point in time
  * impossible. */
 
-void removeOldGenerations(std::string dir)
+void removeOldGenerations(fs::path dir)
 {
-    if (access(dir.c_str(), R_OK) != 0) return;
+    if (access(dir.string().c_str(), R_OK) != 0) return;
 
-    bool canWrite = access(dir.c_str(), W_OK) == 0;
+    bool canWrite = access(dir.string().c_str(), W_OK) == 0;
 
-    for (auto & i : readDirectory(dir)) {
+    for (auto & i : fs::directory_iterator{dir}) {
         checkInterrupt();
 
-        auto path = dir + "/" + i.name;
-        auto type = i.type == DT_UNKNOWN ? getFileType(path) : i.type;
+        auto path = i.path().string();
+        auto type = i.symlink_status().type();
 
-        if (type == DT_LNK && canWrite) {
+        if (type == fs::file_type::symlink && canWrite) {
             std::string link;
             try {
                 link = readLink(path);
-            } catch (SysError & e) {
-                if (e.errNo == ENOENT) continue;
+            } catch (fs::filesystem_error & e) {
+                if (e.code() == std::errc::no_such_file_or_directory) continue;
                 throw;
             }
             if (link.find("link") != std::string::npos) {
@@ -49,7 +51,7 @@ void removeOldGenerations(std::string dir)
                 } else
                     deleteOldGenerations(path, dryRun);
             }
-        } else if (type == DT_DIR) {
+        } else if (type == fs::file_type::directory) {
             removeOldGenerations(path);
         }
     }
@@ -81,8 +83,11 @@ static int main_nix_collect_garbage(int argc, char * * argv)
         });
 
         if (removeOld) {
-            std::set<Path> dirsToClean = {
-                profilesDir(), settings.nixStateDir + "/profiles", dirOf(getDefaultProfile())};
+            std::set<fs::path> dirsToClean = {
+                profilesDir(),
+                fs::path{settings.nixStateDir} / "profiles",
+                fs::path{getDefaultProfile()}.parent_path(),
+            };
             for (auto & dir : dirsToClean)
                 removeOldGenerations(dir);
         }

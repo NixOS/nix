@@ -81,6 +81,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({
         .longName = name,
+        .aliases = aliases,
         .description = fmt("Set the `%s` setting.", name),
         .category = category,
         .labels = {"value"},
@@ -91,6 +92,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
     if (isAppendable())
         args.addFlag({
             .longName = "extra-" + name,
+            .aliases = aliases,
             .description = fmt("Append to the `%s` setting.", name),
             .category = category,
             .labels = {"value"},
@@ -116,10 +118,11 @@ T BaseSetting<T>::parse(const std::string & str) const
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
 
-    if (auto n = string2Int<T>(str))
-        return *n;
-    else
+    try {
+        return string2IntWithUnitPrefix<T>(str);
+    } catch (...) {
         throw UsageError("setting '%s' has invalid value '%s'", name, str);
+    }
 }
 
 template<typename T>

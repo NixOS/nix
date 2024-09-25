@@ -4,6 +4,7 @@
 #include "print.hh"
 #include "eval.hh"
 #include "eval-error.hh"
+#include "eval-settings.hh"
 
 namespace nix {
 
@@ -85,8 +86,8 @@ Env & EvalState::allocEnv(size_t size)
 void EvalState::forceValue(Value & v, const PosIdx pos)
 {
     if (v.isThunk()) {
-        Env * env = v.thunk.env;
-        Expr * expr = v.thunk.expr;
+        Env * env = v.payload.thunk.env;
+        Expr * expr = v.payload.thunk.expr;
         try {
             v.mkBlackhole();
             //checkInterrupt();
@@ -98,7 +99,7 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
         }
     }
     else if (v.isApp())
-        callFunction(*v.app.left, *v.app.right, v, pos);
+        callFunction(*v.payload.app.left, *v.payload.app.right, v, pos);
 }
 
 
@@ -138,5 +139,12 @@ inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view e
     }
 }
 
+[[gnu::always_inline]]
+inline CallDepth EvalState::addCallDepth(const PosIdx pos) {
+    if (callDepth > settings.maxCallDepth)
+        error<EvalError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
+
+    return CallDepth(callDepth);
+};
 
 }

@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 mkdir -p $TEST_ROOT/foo

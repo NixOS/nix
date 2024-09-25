@@ -1,6 +1,8 @@
+#!/usr/bin/env bash
+
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 cp ./dependencies.nix ./dependencies.builder0.sh ./config.nix $TEST_HOME
 

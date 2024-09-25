@@ -15,16 +15,16 @@ AutoCloseFD openLockFile(const Path & path, bool create);
 /**
  * Delete an open lock file.
  */
-void deleteLockFile(const Path & path, int fd);
+void deleteLockFile(const Path & path, Descriptor desc);
 
 enum LockType { ltRead, ltWrite, ltNone };
 
-bool lockFile(int fd, LockType lockType, bool wait);
+bool lockFile(Descriptor desc, LockType lockType, bool wait);
 
 class PathLocks
 {
 private:
-    typedef std::pair<int, Path> FDPair;
+    typedef std::pair<Descriptor, Path> FDPair;
     std::list<FDPair> fds;
     bool deletePaths;
 
@@ -42,15 +42,15 @@ public:
 
 struct FdLock
 {
-    int fd;
+    Descriptor desc;
     bool acquired = false;
 
-    FdLock(int fd, LockType lockType, bool wait, std::string_view waitMsg);
+    FdLock(Descriptor desc, LockType lockType, bool wait, std::string_view waitMsg);
 
     ~FdLock()
     {
         if (acquired)
-            lockFile(fd, ltNone, false);
+            lockFile(desc, ltNone, false);
     }
 };
 

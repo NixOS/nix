@@ -2,6 +2,8 @@ proto=$1
 shift
 (( $# == 0 ))
 
+TODO_NixOS
+
 clearStore
 clearCache
 

@@ -20,8 +20,8 @@ outPath=$(nix-build ../hermetic.nix --no-out-link --arg busybox "$busybox" --arg
 
 # Set a GC root.
 mkdir -p "$stateB"
-rm -f "$stateB"/gcroots/foo
-ln -sf $outPath "$stateB"/gcroots/foo
+rm -f "$stateB/gcroots/foo"
+ln -sf $outPath "$stateB/gcroots/foo"
 
 [ "$(nix-store -q --roots $outPath)" = "$stateB/gcroots/foo -> $outPath" ]
 
@@ -46,7 +46,7 @@ nix-collect-garbage
 # Check that the root and its dependencies haven't been deleted.
 cat "$storeBRoot/$outPath"
 
-rm "$stateB"/gcroots/foo
+rm "$stateB/gcroots/foo"
 
 nix-collect-garbage
 

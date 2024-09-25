@@ -2,10 +2,10 @@
 ///@file
 
 #include "types.hh"
-#include "lock.hh"
 #include "store-api.hh"
 #include "goal.hh"
 #include "realisation.hh"
+#include "muxable-pipe.hh"
 
 #include <future>
 #include <thread>
@@ -36,14 +36,14 @@ typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
 
 /**
  * A mapping used to remember for each child process to what goal it
- * belongs, and file descriptors for receiving log data and output
+ * belongs, and comm channels for receiving log data and output
  * path creation commands.
  */
 struct Child
 {
     WeakGoalPtr goal;
     Goal * goal2; // ugly hackery
-    std::set<int> fds;
+    std::set<MuxablePipePollState::CommChannel> channels;
     bool respectTimeouts;
     bool inBuildSlot;
     /**
@@ -53,11 +53,13 @@ struct Child
     steady_time_point timeStarted;
 };
 
+#ifndef _WIN32 // TODO Enable building on Windows
 /* Forward definition. */
 struct HookInstance;
+#endif
 
 /**
- * The worker class.
+ * Coordinates one or more realisations and their interdependencies.
  */
 class Worker
 {
@@ -90,12 +92,12 @@ private:
      * Number of build slots occupied.  This includes local builds but does not
      * include substitutions or remote builds via the build hook.
      */
-    unsigned int nrLocalBuilds;
+    size_t nrLocalBuilds;
 
     /**
      * Number of substitution slots occupied.
      */
-    unsigned int nrSubstitutions;
+    size_t nrSubstitutions;
 
     /**
      * Maps used to prevent multiple instantiations of a goal for the
@@ -152,10 +154,16 @@ public:
      */
     bool checkMismatch;
 
+#ifdef _WIN32
+    AutoCloseFD ioport;
+#endif
+
     Store & store;
     Store & evalStore;
 
+#ifndef _WIN32 // TODO Enable building on Windows
     std::unique_ptr<HookInstance> hook;
+#endif
 
     uint64_t expectedBuilds = 0;
     uint64_t doneBuilds = 0;
@@ -227,18 +235,18 @@ public:
      * Return the number of local build processes currently running (but not
      * remote builds via the build hook).
      */
-    unsigned int getNrLocalBuilds();
+    size_t getNrLocalBuilds();
 
     /**
      * Return the number of substitution processes currently running.
      */
-    unsigned int getNrSubstitutions();
+    size_t getNrSubstitutions();
 
     /**
      * Registers a running child process.  `inBuildSlot` means that
      * the process counts towards the jobs limit.
      */
-    void childStarted(GoalPtr goal, const std::set<int> & fds,
+    void childStarted(GoalPtr goal, const std::set<MuxablePipePollState::CommChannel> & channels,
         bool inBuildSlot, bool respectTimeouts);
 
     /**

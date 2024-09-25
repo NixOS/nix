@@ -10,10 +10,13 @@
 #include "eval-cache.hh"
 #include "attr-path.hh"
 #include "hilite.hh"
+#include "strings-inline.hh"
 
 #include <regex>
 #include <fstream>
 #include <nlohmann/json.hpp>
+
+#include "strings.hh"
 
 using namespace nix;
 using json = nlohmann::json;

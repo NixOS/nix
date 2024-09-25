@@ -24,7 +24,9 @@ protected:
 
     nix_c_context * ctx;
 
-    inline void assert_ctx_ok() {
+    inline void assert_ctx_ok()
+    {
+
         if (nix_err_code(ctx) == NIX_OK) {
             return;
         }
@@ -33,5 +35,14 @@ protected:
         std::string msg(p, n);
         FAIL() << "nix_err_code(ctx) != NIX_OK, message: " << msg;
     }
+
+    inline void assert_ctx_err()
+    {
+        if (nix_err_code(ctx) != NIX_OK) {
+            return;
+        }
+        FAIL() << "Got NIX_OK, but expected an error!";
+    }
 };
+
 }

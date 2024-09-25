@@ -9,6 +9,7 @@
 #include <optional>
 
 #include "types.hh"
+#include "file-path.hh"
 
 namespace nix {
 
@@ -16,6 +17,11 @@ namespace nix {
  * @return an environment variable.
  */
 std::optional<std::string> getEnv(const std::string & key);
+
+/**
+ * Like `getEnv`, but using `OsString` to avoid coercions.
+ */
+std::optional<OsString> getEnvOs(const OsString & key);
 
 /**
  * @return a non empty environment variable. Returns nullopt if the env
@@ -28,6 +34,13 @@ std::optional<std::string> getEnvNonEmpty(const std::string & key);
  */
 std::map<std::string, std::string> getEnv();
 
+#ifdef _WIN32
+/**
+ * Implementation of missing POSIX function.
+ */
+int unsetenv(const char * name);
+#endif
+
 /**
  * Like POSIX `setenv`, but always overrides.
  *
@@ -35,6 +48,11 @@ std::map<std::string, std::string> getEnv();
  * reimplement on Windows.
  */
 int setEnv(const char * name, const char * value);
+
+/**
+ * Like `setEnv`, but using `OsString` to avoid coercions.
+ */
+int setEnvOs(const OsString & name, const OsString & value);
 
 /**
  * Clear the environment.

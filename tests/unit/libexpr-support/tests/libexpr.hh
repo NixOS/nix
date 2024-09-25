@@ -4,12 +4,14 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include "fetch-settings.hh"
 #include "value.hh"
 #include "nixexpr.hh"
+#include "nixexpr.hh"
 #include "eval.hh"
+#include "eval-gc.hh"
 #include "eval-inline.hh"
 #include "eval-settings.hh"
-#include "store-api.hh"
 
 #include "tests/libstore.hh"
 
@@ -19,14 +21,14 @@ namespace nix {
             static void SetUpTestSuite() {
                 LibStoreTest::SetUpTestSuite();
                 initGC();
-                evalSettings.nixPath = {};
             }
 
         protected:
             LibExprTest()
                 : LibStoreTest()
-                , state({}, store)
+                , state({}, store, fetchSettings, evalSettings, nullptr)
             {
+                evalSettings.nixPath = {};
             }
             Value eval(std::string input, bool forceValue = true) {
                 Value v;
@@ -42,6 +44,9 @@ namespace nix {
                 return state.symbols.create(value);
             }
 
+            bool readOnlyMode = true;
+            fetchers::Settings fetchSettings{};
+            EvalSettings evalSettings{readOnlyMode};
             EvalState state;
     };
 
@@ -80,28 +85,28 @@ namespace nix {
         if (arg.type() != nInt) {
             return false;
         }
-        return arg.integer == v;
+        return arg.integer().value == v;
     }
 
     MATCHER_P(IsFloatEq, v, fmt("The float is equal to \"%1%\"", v)) {
         if (arg.type() != nFloat) {
             return false;
         }
-        return arg.fpoint == v;
+        return arg.fpoint() == v;
     }
 
     MATCHER(IsTrue, "") {
         if (arg.type() != nBool) {
             return false;
         }
-        return arg.boolean == true;
+        return arg.boolean() == true;
     }
 
     MATCHER(IsFalse, "") {
         if (arg.type() != nBool) {
             return false;
         }
-        return arg.boolean == false;
+        return arg.boolean() == false;
     }
 
     MATCHER_P(IsPathEq, p, fmt("Is a path equal to \"%1%\"", p)) {
@@ -134,8 +139,8 @@ namespace nix {
         if (arg.type() != nAttrs) {
             *result_listener << "Expected set got " << arg.type();
             return false;
-        } else if (arg.attrs->size() != (size_t)n) {
-            *result_listener << "Expected a set with " << n << " attributes but got " << arg.attrs->size();
+        } else if (arg.attrs()->size() != (size_t) n) {
+            *result_listener << "Expected a set with " << n << " attributes but got " << arg.attrs()->size();
             return false;
         }
         return true;

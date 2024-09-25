@@ -9,14 +9,15 @@
 #include "symbol-table.hh"
 #include "config.hh"
 #include "experimental-features.hh"
-#include "input-accessor.hh"
+#include "position.hh"
+#include "pos-table.hh"
+#include "source-accessor.hh"
 #include "search-path.hh"
 #include "repl-exit-status.hh"
+#include "ref.hh"
 
 #include <map>
 #include <optional>
-#include <unordered_map>
-#include <mutex>
 #include <functional>
 
 namespace nix {
@@ -29,17 +30,36 @@ namespace nix {
 constexpr size_t maxPrimOpArity = 8;
 
 class Store;
+namespace fetchers { struct Settings; }
+struct EvalSettings;
 class EvalState;
 class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
-struct MemoryInputAccessor;
+struct MemorySourceAccessor;
+namespace eval_cache {
+    class EvalCache;
+}
 
+/**
+ * Increments a count on construction and decrements on destruction.
+ */
+class CallDepth {
+  size_t & count;
+
+public:
+  CallDepth(size_t & count) : count(count) {
+    ++count;
+  }
+  ~CallDepth() {
+    --count;
+  }
+};
 
 /**
  * Function that implements a primop.
  */
-typedef void (* PrimOpFun) (EvalState & state, const PosIdx pos, Value * * args, Value & v);
+using PrimOpFun = void(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
 /**
  * Info about a primitive operation, and its implementation
@@ -80,7 +100,7 @@ struct PrimOp
     /**
      * Implementation of the primop.
      */
-    std::function<std::remove_pointer<PrimOpFun>::type> fun;
+    std::function<PrimOpFun> fun;
 
     /**
      * Optional experimental for this to be gated on.
@@ -94,7 +114,7 @@ struct PrimOp
     void check();
 };
 
-std::ostream & operator<<(std::ostream & output, PrimOp & primOp);
+std::ostream & operator<<(std::ostream & output, const PrimOp & primOp);
 
 /**
  * Info about a constant
@@ -119,11 +139,9 @@ struct Constant
     bool impureOnly = false;
 };
 
-#if HAVE_BOEHMGC
-    typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
-#else
-    typedef std::map<std::string, Value *> ValMap;
-#endif
+typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
+
+typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
 
 struct Env
 {
@@ -143,12 +161,6 @@ std::string printValue(EvalState & state, Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
 
 
-/**
- * Initialise the Boehm GC, if applicable.
- */
-void initGC();
-
-
 struct RegexCache;
 
 std::shared_ptr<RegexCache> makeRegexCache();
@@ -161,17 +173,21 @@ struct DebugTrace {
     bool isError;
 };
 
-
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
+    const fetchers::Settings & fetchSettings;
+    const EvalSettings & settings;
     SymbolTable symbols;
     PosTable positions;
 
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
-        sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
+        sRight, sWrong, sStructuredAttrs,
+        sAllowedReferences, sAllowedRequisites, sDisallowedReferences, sDisallowedRequisites,
+        sMaxSize, sMaxClosureSize,
+        sBuilder, sArgs,
         sContentAddressed, sImpure,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
@@ -227,18 +243,18 @@ public:
     /**
      * The accessor for the root filesystem.
      */
-    const ref<InputAccessor> rootFS;
+    const ref<SourceAccessor> rootFS;
 
     /**
      * The in-memory filesystem for <nix/...> paths.
      */
-    const ref<MemoryInputAccessor> corepkgsFS;
+    const ref<MemorySourceAccessor> corepkgsFS;
 
     /**
      * In-memory filesystem for internal, non-user-callable Nix
      * expressions like call-flake.nix.
      */
-    const ref<MemoryInputAccessor> internalFS;
+    const ref<MemorySourceAccessor> internalFS;
 
     const SourcePath derivationInternal;
 
@@ -274,6 +290,18 @@ public:
             return std::shared_ptr<const StaticEnv>();;
     }
 
+    /** Whether a debug repl can be started. If `false`, `runDebugRepl(error)` will return without starting a repl. */
+    bool canDebug();
+
+    /** Use front of `debugTraces`; see `runDebugRepl(error,env,expr)` */
+    void runDebugRepl(const Error * error);
+
+    /**
+     * Run a debug repl with the given error, environment and expression.
+     * @param error The error to debug, may be nullptr.
+     * @param env The environment to debug, matching the expression.
+     * @param expr The expression to debug, matching the environment.
+     */
     void runDebugRepl(const Error * error, const Env & env, const Expr & expr);
 
     template<class T, typename... Args>
@@ -283,35 +311,38 @@ public:
         return *new EvalErrorBuilder<T>(*this, args...);
     }
 
+    /**
+     * A cache for evaluation caches, so as to reuse the same root value if possible
+     */
+    std::map<const Hash, ref<eval_cache::EvalCache>> evalCaches;
+
 private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    std::map<SourcePath, StorePath> srcToStore;
+    Sync<std::unordered_map<SourcePath, StorePath>> srcToStore;
 
     /**
      * A cache from path names to parse trees.
      */
-#if HAVE_BOEHMGC
-    typedef std::map<SourcePath, Expr *, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
-#else
-    typedef std::map<SourcePath, Expr *> FileParseCache;
-#endif
+    typedef std::unordered_map<SourcePath, Expr *, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
     FileParseCache fileParseCache;
 
     /**
      * A cache from path names to values.
      */
-#if HAVE_BOEHMGC
-    typedef std::map<SourcePath, Value, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
-#else
-    typedef std::map<SourcePath, Value> FileEvalCache;
-#endif
+    typedef std::unordered_map<SourcePath, Value, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
     FileEvalCache fileEvalCache;
 
-    SearchPath searchPath;
+    /**
+     * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
+     * Grouped by file.
+     */
+    std::unordered_map<SourcePath, DocCommentMap> positionToDocComment;
 
-    std::map<std::string, std::optional<std::string>> searchPathResolved;
+    LookupPath lookupPath;
+
+    std::map<std::string, std::optional<std::string>> lookupPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -333,12 +364,14 @@ private:
 public:
 
     EvalState(
-        const SearchPath & _searchPath,
+        const LookupPath & _lookupPath,
         ref<Store> store,
+        const fetchers::Settings & fetchSettings,
+        const EvalSettings & settings,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
-    SearchPath getSearchPath() { return searchPath; }
+    LookupPath getLookupPath() { return lookupPath; }
 
     /**
      * Return a `SourcePath` that refers to `path` in the root
@@ -407,7 +440,7 @@ public:
      * Look up a file in the search path.
      */
     SourcePath findFile(const std::string_view path);
-    SourcePath findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
+    SourcePath findFile(const LookupPath & lookupPath, const std::string_view path, const PosIdx pos = noPos);
 
     /**
      * Try to resolve a search path value (not the optional key part).
@@ -416,8 +449,8 @@ public:
      *
      * If it is not found, return `std::nullopt`
      */
-    std::optional<std::string> resolveSearchPathPath(
-        const SearchPath::Path & elem,
+    std::optional<std::string> resolveLookupPathPath(
+        const LookupPath::Path & elem,
         bool initAccessControl = false);
 
     /**
@@ -540,6 +573,11 @@ public:
      */
     SingleDerivedPath coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx);
 
+#if HAVE_BOEHMGC
+    /** A GC root for the baseEnv reference. */
+    std::shared_ptr<Env *> baseEnvP;
+#endif
+
 public:
 
     /**
@@ -590,6 +628,12 @@ public:
         const char * doc;
     };
 
+    /**
+     * Retrieve the documentation for a value. This will evaluate the value if
+     * it is a thunk, and it will partially apply __functor if applicable.
+     *
+     * @param v The value to get the documentation for.
+     */
     std::optional<Doc> getDoc(Value & v);
 
 private:
@@ -615,10 +659,24 @@ private:
 public:
 
     /**
+     * Check that the call depth is within limits, and increment it, until the returned object is destroyed.
+     */
+    inline CallDepth addCallDepth(const PosIdx pos);
+
+    /**
      * Do a deep equality test between two values.  That is, list
      * elements and attributes are compared recursively.
      */
     bool eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx);
+
+    /**
+     * Like `eqValues`, but throws an `AssertionError` if not equal.
+     *
+     * WARNING:
+     * Callers should call `eqValues` first and report if `assertEqValues` behaves
+     * incorrectly. (e.g. if it doesn't throw if eqValues returns false or vice versa)
+     */
+    void assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx);
 
     bool isFunctor(Value & fun);
 
@@ -642,9 +700,6 @@ public:
      */
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
-
-    Value * allocAttr(Value & vAttrs, Symbol name);
-    Value * allocAttr(Value & vAttrs, std::string_view name);
 
     Bindings * allocBindings(size_t capacity);
 
@@ -747,6 +802,8 @@ public:
         std::string_view pathArg,
         PosIdx pos);
 
+    DocComment getDocCommentForPos(PosIdx pos);
+
 private:
 
     /**
@@ -829,8 +886,10 @@ std::string showType(const Value & v);
 
 /**
  * If `path` refers to a directory, then append "/default.nix".
+ *
+ * @param addDefaultNix Whether to append "/default.nix" after resolving symlinks.
  */
-SourcePath resolveExprPath(SourcePath path);
+SourcePath resolveExprPath(SourcePath path, bool addDefaultNix = true);
 
 /**
  * Whether a URI is allowed, assuming restrictEval is enabled

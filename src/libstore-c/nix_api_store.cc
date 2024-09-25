@@ -19,12 +19,12 @@ nix_err nix_libstore_init(nix_c_context * context)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_plugins(nix_c_context * context)
+nix_err nix_libstore_init_no_load_config(nix_c_context * context)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        nix::initPlugins();
+        nix::initLibStore(false);
     }
     NIXC_CATCH_ERRS
 }
@@ -56,7 +56,7 @@ void nix_store_free(Store * store)
     delete store;
 }
 
-nix_err nix_store_get_uri(nix_c_context * context, Store * store, void * callback, void * user_data)
+nix_err nix_store_get_uri(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -67,7 +67,8 @@ nix_err nix_store_get_uri(nix_c_context * context, Store * store, void * callbac
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_store_get_version(nix_c_context * context, Store * store, void * callback, void * user_data)
+nix_err
+nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -128,12 +129,11 @@ nix_err nix_store_realise(
     NIXC_CATCH_ERRS
 }
 
-void nix_store_path_name(const StorePath *store_path, void * callback, void * user_data)
+void nix_store_path_name(const StorePath * store_path, nix_get_string_callback callback, void * user_data)
 {
     std::string_view name = store_path->path.name();
-    ((nix_get_string_callback) callback)(name.data(), name.size(), user_data);
+    callback(name.data(), name.size(), user_data);
 }
-
 
 void nix_store_path_free(StorePath * sp)
 {
@@ -143,4 +143,16 @@ void nix_store_path_free(StorePath * sp)
 StorePath * nix_store_path_clone(const StorePath * p)
 {
     return new StorePath{p->path};
+}
+
+nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        nix::RealisedPath::Set paths;
+        paths.insert(path->path);
+        nix::copyClosure(*srcStore->ptr, *dstStore->ptr, paths);
+    }
+    NIXC_CATCH_ERRS
 }

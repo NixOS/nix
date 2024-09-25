@@ -3,7 +3,7 @@
 | Name                                   | Syntax                                     | Associativity | Precedence |
 |----------------------------------------|--------------------------------------------|---------------|------------|
 | [Attribute selection]                  | *attrset* `.` *attrpath* \[ `or` *expr* \] | none          | 1          |
-| Function application                   | *func* *expr*                              | left          | 2          |
+| [Function application]                 | *func* *expr*                              | left          | 2          |
 | [Arithmetic negation][arithmetic]      | `-` *number*                               | none          | 3          |
 | [Has attribute]                        | *attrset* `?` *attrpath*                   | none          | 4          |
 | List concatenation                     | *list* `++` *list*                         | right         | 5          |
@@ -26,12 +26,16 @@
 | Logical conjunction (`AND`)            | *bool* `&&` *bool*                         | left          | 12         |
 | Logical disjunction (`OR`)             | *bool* <code>\|\|</code> *bool*            | left          | 13         |
 | [Logical implication]                  | *bool* `->` *bool*                         | right         | 14         |
+| [Pipe operator] (experimental)         | *expr* `\|>` *func*                        | left          | 15         |
+| [Pipe operator] (experimental)         | *func* `<\|` *expr*                        | right         | 15         |
 
-[string]: ./values.md#type-string
-[path]: ./values.md#type-path
-[number]: ./values.md#type-number
-[list]: ./values.md#list
-[attribute set]: ./values.md#attribute-set
+[string]: ./types.md#type-string
+[path]: ./types.md#type-path
+[number]: ./types.md#type-float
+[list]: ./types.md#type-list
+[attribute set]: ./types.md#attribute-set
+
+<!-- TODO(@rhendric, #10970): ^ rationalize number -> int/float -->
 
 ## Attribute selection
 
@@ -42,13 +46,23 @@
 Select the attribute denoted by attribute path *attrpath* from [attribute set] *attrset*.
 If the attribute doesn’t exist, return the *expr* after `or` if provided, otherwise abort evaluation.
 
-An attribute path is a dot-separated list of [attribute names](./values.md#attribute-set).
+[Attribute selection]: #attribute-selection
+
+## Function application
 
 > **Syntax**
 >
-> *attrpath* = *name* [ `.` *name* ]...
+> *func* *expr*
 
-[Attribute selection]: #attribute-selection
+Apply the callable value *func* to the argument *expr*. Note the absence of any visible operator symbol.
+A callable value is either:
+- a [user-defined function][function]
+- a [built-in][builtins] function
+- an attribute set with a [`__functor` attribute](./syntax.md#attr-__functor)
+
+> **Warning**
+>
+> [List][list] items are also separated by whitespace, which means that function calls in list items must be enclosed by parentheses.
 
 ## Has attribute
 
@@ -61,7 +75,7 @@ The result is a [Boolean] value.
 
 See also: [`builtins.hasAttr`](@docroot@/language/builtins.md#builtins-hasAttr)
 
-[Boolean]: ./values.md#type-boolean
+[Boolean]: ./types.md#type-boolean
 
 [Has attribute]: #has-attribute
 
@@ -69,8 +83,12 @@ After evaluating *attrset* and *attrpath*, the computational complexity is O(log
 
 ## Arithmetic
 
-Numbers are type-compatible:
-Pure integer operations will always return integers, whereas any operation involving at least one floating point number return a floating point number.
+Numbers will retain their type unless mixed with other numeric types:
+Pure integer operations will always return integers, whereas any operation involving at least one floating point number returns a floating point number.
+
+Evaluation of the following numeric operations throws an evaluation error:
+- Division by zero
+- Integer overflow, that is, any operation yielding a result outside of the representable range of [Nix language integers](./syntax.md#number-literal)
 
 See also [Comparison] and [Equality].
 
@@ -128,7 +146,7 @@ The result is a string.
 > The file or directory at *path* must exist and is copied to the [store].
 > The path appears in the result as the corresponding [store path].
 
-[store path]: @docroot@/glossary.md#gloss-store-path
+[store path]: @docroot@/store/store-path.md
 [store]: @docroot@/glossary.md#gloss-store
 
 [String and path concatenation]: #string-and-path-concatenation
@@ -141,7 +159,7 @@ The result is a string.
 
 Update [attribute set] *attrset1* with names and values from *attrset2*.
 
-The returned attribute set will have of all the attributes in *attrset1* and *attrset2*.
+The returned attribute set will have all of the attributes in *attrset1* and *attrset2*.
 If an attribute name is present in both, the attribute value from the latter is taken.
 
 [Update]: #update
@@ -172,7 +190,7 @@ All comparison operators are implemented in terms of `<`, and the following equi
 - Numbers are type-compatible, see [arithmetic] operators.
 - Floating point numbers only differ up to a limited precision.
 
-[function]: ./constructs.md#functions
+[function]: ./syntax.md#functions
 
 [Equality]: #equality
 
@@ -182,3 +200,36 @@ Equivalent to `!`*b1* `||` *b2*.
 
 [Logical implication]: #logical-implication
 
+## Pipe operators
+
+- *a* `|>` *b* is equivalent to *b* *a*
+- *a* `<|` *b* is equivalent to *a* *b*
+
+> **Example**
+>
+> ```
+> nix-repl> 1 |> builtins.add 2 |> builtins.mul 3
+> 9
+>
+> nix-repl> builtins.add 1 <| builtins.mul 2 <| 3
+> 7
+> ```
+
+> **Warning**
+>
+> This syntax is part of an
+> [experimental feature](@docroot@/development/experimental-features.md)
+> and may change in future releases.
+>
+> To use this syntax, make sure the
+> [`pipe-operators` experimental feature](@docroot@/development/experimental-features.md#xp-feature-pipe-operators)
+> is enabled.
+> For example, include the following in [`nix.conf`](@docroot@/command-ref/conf-file.md):
+>
+> ```
+> extra-experimental-features = pipe-operators
+> ```
+
+[Pipe operator]: #pipe-operators
+[builtins]: ./builtins.md
+[Function application]: #function-application

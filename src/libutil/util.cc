@@ -1,5 +1,6 @@
 #include "util.hh"
 #include "fmt.hh"
+#include "file-path.hh"
 
 #include <array>
 #include <cctype>
@@ -7,6 +8,8 @@
 #include <regex>
 
 #include <sodium.h>
+#include <boost/lexical_cast.hpp>
+#include <stdint.h>
 
 #ifdef NDEBUG
 #error "Nix may not be built with assertions disabled (i.e. with -DNDEBUG)."
@@ -51,24 +54,6 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 //////////////////////////////////////////////////////////////////////
 
 
-template<class C> C tokenizeString(std::string_view s, std::string_view separators)
-{
-    C result;
-    auto pos = s.find_first_not_of(separators, 0);
-    while (pos != s.npos) {
-        auto end = s.find_first_of(separators, pos + 1);
-        if (end == s.npos) end = s.size();
-        result.insert(result.end(), std::string(s, pos, end - pos));
-        pos = s.find_first_not_of(separators, end);
-    }
-    return result;
-}
-
-template Strings tokenizeString(std::string_view s, std::string_view separators);
-template StringSet tokenizeString(std::string_view s, std::string_view separators);
-template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
-
-
 std::string chomp(std::string_view s)
 {
     size_t i = s.find_last_not_of(" \n\r\t");
@@ -109,6 +94,58 @@ std::string rewriteStrings(std::string s, const StringMap & rewrites)
             s.replace(j, i.first.size(), i.second);
     }
     return s;
+}
+
+template<class N>
+std::optional<N> string2Int(const std::string_view s)
+{
+    if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
+        return std::nullopt;
+    try {
+        return boost::lexical_cast<N>(s.data(), s.size());
+    } catch (const boost::bad_lexical_cast &) {
+        return std::nullopt;
+    }
+}
+
+// Explicitly instantiated in one place for faster compilation
+template std::optional<unsigned char>  string2Int<unsigned char>(const std::string_view s);
+template std::optional<unsigned short> string2Int<unsigned short>(const std::string_view s);
+template std::optional<unsigned int> string2Int<unsigned int>(const std::string_view s);
+template std::optional<unsigned long> string2Int<unsigned long>(const std::string_view s);
+template std::optional<unsigned long long> string2Int<unsigned long long>(const std::string_view s);
+template std::optional<signed char> string2Int<signed char>(const std::string_view s);
+template std::optional<signed short> string2Int<signed short>(const std::string_view s);
+template std::optional<signed int> string2Int<signed int>(const std::string_view s);
+template std::optional<signed long> string2Int<signed long>(const std::string_view s);
+template std::optional<signed long long> string2Int<signed long long>(const std::string_view s);
+
+template<class N>
+std::optional<N> string2Float(const std::string_view s)
+{
+    try {
+        return boost::lexical_cast<N>(s.data(), s.size());
+    } catch (const boost::bad_lexical_cast &) {
+        return std::nullopt;
+    }
+}
+
+template std::optional<double> string2Float<double>(const std::string_view s);
+template std::optional<float> string2Float<float>(const std::string_view s);
+
+
+std::string renderSize(uint64_t value, bool align)
+{
+    static const std::array<char, 9> prefixes{{
+        'K', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'
+    }};
+    size_t power = 0;
+    double res = value;
+    while (res > 1024 && power < prefixes.size()) {
+        ++power;
+        res /= 1024;
+    }
+    return fmt(align ? "%6.1f %ciB" : "%.1f %ciB", power == 0 ? res / 1024 : res, prefixes.at(power));
 }
 
 
@@ -206,8 +243,9 @@ std::string base64Decode(std::string_view s)
         if (c == '\n') continue;
 
         char digit = base64DecodeChars[(unsigned char) c];
-        if (digit == npos)
-            throw Error("invalid character in Base64 string: '%c'", c);
+        if (digit == npos) {
+            throw Error("invalid character in Base64 string: '%c' in '%s'", c, s.data());
+        }
 
         bits += 6;
         d = d << 6 | digit;

@@ -1,5 +1,6 @@
 #include "filetransfer.hh"
 #include "globals.hh"
+#include "config-global.hh"
 #include "store-api.hh"
 #include "s3.hh"
 #include "compression.hh"
@@ -53,6 +54,8 @@ struct curlFileTransfer : public FileTransfer
         bool done = false; // whether either the success or failure function has been called
         Callback<FileTransferResult> callback;
         CURL * req = 0;
+        // buffer to accompany the `req` above
+        char errbuf[CURL_ERROR_SIZE];
         bool active = false; // whether the handle has been added to the multi object
         std::string statusMsg;
 
@@ -70,7 +73,10 @@ struct curlFileTransfer : public FileTransfer
 
         curl_off_t writtenToSink = 0;
 
+        std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+
         inline static const std::set<long> successfulStatuses {200, 201, 204, 206, 304, 0 /* other protocol */};
+
         /* Get the HTTP status code, or 0 for other protocols. */
         long getHTTPStatus()
         {
@@ -366,16 +372,23 @@ struct curlFileTransfer : public FileTransfer
             if (writtenToSink)
                 curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);
 
+            curl_easy_setopt(req, CURLOPT_ERRORBUFFER, errbuf);
+            errbuf[0] = 0;
+
             result.data.clear();
             result.bodySize = 0;
         }
 
         void finish(CURLcode code)
         {
+            auto finishTime = std::chrono::steady_clock::now();
+
             auto httpStatus = getHTTPStatus();
 
-            debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
-                request.verb(), request.uri, code, httpStatus, result.bodySize);
+            debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes, duration = %.2f s",
+                request.verb(), request.uri, code, httpStatus, result.bodySize,
+                std::chrono::duration_cast<std::chrono::milliseconds>(finishTime - startTime).count() / 1000.0f
+                );
 
             appendCurrentUrl();
 
@@ -476,8 +489,8 @@ struct curlFileTransfer : public FileTransfer
                         code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                     : FileTransferError(err,
                         std::move(response),
-                        "unable to %s '%s': %s (%d)",
-                        request.verb(), request.uri, curl_easy_strerror(code), code);
+                        "unable to %s '%s': %s (%d) %s",
+                        request.verb(), request.uri, curl_easy_strerror(code), code, errbuf);
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a
@@ -516,10 +529,12 @@ struct curlFileTransfer : public FileTransfer
 
     Sync<State> state_;
 
+    #ifndef _WIN32 // TODO need graceful async exit support on Windows?
     /* We can't use a std::condition_variable to wake up the curl
        thread, because it only monitors file descriptors. So use a
        pipe instead. */
     Pipe wakeupPipe;
+    #endif
 
     std::thread workerThread;
 
@@ -539,8 +554,10 @@ struct curlFileTransfer : public FileTransfer
             fileTransferSettings.httpConnections.get());
         #endif
 
+        #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         wakeupPipe.create();
         fcntl(wakeupPipe.readSide.get(), F_SETFL, O_NONBLOCK);
+        #endif
 
         workerThread = std::thread([&]() { workerThreadEntry(); });
     }
@@ -561,18 +578,27 @@ struct curlFileTransfer : public FileTransfer
             auto state(state_.lock());
             state->quit = true;
         }
+        #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         writeFull(wakeupPipe.writeSide.get(), " ", false);
+        #endif
     }
 
     void workerThreadMain()
     {
         /* Cause this thread to be notified on SIGINT. */
+        #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         auto callback = createInterruptCallback([&]() {
             stopWorkerThread();
         });
+        #endif
 
         #if __linux__
-        unshareFilesystem();
+        try {
+            tryUnshareFilesystem();
+        } catch (nix::Error & e) {
+            e.addTrace({}, "in download thread");
+            throw;
+        }
         #endif
 
         std::map<CURL *, std::shared_ptr<TransferItem>> items;
@@ -607,9 +633,11 @@ struct curlFileTransfer : public FileTransfer
             /* Wait for activity, including wakeup events. */
             int numfds = 0;
             struct curl_waitfd extraFDs[1];
+            #ifndef _WIN32 // TODO need graceful async exit support on Windows?
             extraFDs[0].fd = wakeupPipe.readSide.get();
             extraFDs[0].events = CURL_WAIT_POLLIN;
             extraFDs[0].revents = 0;
+            #endif
             long maxSleepTimeMs = items.empty() ? 10000 : 100;
             auto sleepTimeMs =
                 nextWakeup != std::chrono::steady_clock::time_point()
@@ -693,7 +721,9 @@ struct curlFileTransfer : public FileTransfer
                 throw nix::Error("cannot enqueue download request because the download thread is shutting down");
             state->incoming.push(item);
         }
+        #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         writeFull(wakeupPipe.writeSide.get(), " ");
+        #endif
     }
 
 #if ENABLE_S3
@@ -833,8 +863,10 @@ void FileTransfer::download(
            buffer). We don't wait forever to prevent stalling the
            download thread. (Hopefully sleeping will throttle the
            sender.) */
-        if (state->data.size() > 1024 * 1024) {
+        if (state->data.size() > fileTransferSettings.downloadBufferSize) {
             debug("download buffer is full; going to sleep");
+            static bool haveWarned = false;
+            warnOnce(haveWarned, "download buffer is full; consider increasing the 'download-buffer-size' setting");
             state.wait_for(state->request, std::chrono::seconds(10));
         }
 

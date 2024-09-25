@@ -20,9 +20,11 @@ error:
              |       ^
             3|
 
-       error: assertion '(arg == "y")' failed
-       at /pwd/lang/eval-fail-assert.nix:2:12:
+       … while evaluating the condition of the assertion '(arg == "y")'
+         at /pwd/lang/eval-fail-assert.nix:2:12:
             1| let {
             2|   x = arg: assert arg == "y"; 123;
              |            ^
             3|
+
+       error: string '"x"' is not equal to string '"y"'

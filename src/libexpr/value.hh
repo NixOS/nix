@@ -2,18 +2,15 @@
 ///@file
 
 #include <cassert>
-#include <climits>
 #include <span>
 
+#include "eval-gc.hh"
 #include "symbol-table.hh"
 #include "value/context.hh"
-#include "input-accessor.hh"
 #include "source-path.hh"
 #include "print-options.hh"
+#include "checked-arithmetic.hh"
 
-#if HAVE_BOEHMGC
-#include <gc/gc_allocator.h>
-#endif
 #include <nlohmann/json_fwd.hpp>
 
 namespace nix {
@@ -23,6 +20,7 @@ class BindingsBuilder;
 
 
 typedef enum {
+    tUninitialized = 0,
     tInt = 1,
     tBool,
     tString,
@@ -74,8 +72,8 @@ class EvalState;
 class XMLWriter;
 class Printer;
 
-typedef int64_t NixInt;
-typedef double NixFloat;
+using NixInt = checked::Checked<int64_t>;
+using NixFloat = double;
 
 /**
  * External values must descend from ExternalValueBase, so that
@@ -112,7 +110,7 @@ class ExternalValueBase
      * Compare to another value of the same type. Defaults to uncomparable,
      * i.e. always false.
      */
-    virtual bool operator ==(const ExternalValueBase & b) const;
+    virtual bool operator ==(const ExternalValueBase & b) const noexcept;
 
     /**
      * Print the value as JSON. Defaults to unconvertable, i.e. throws an error
@@ -166,7 +164,7 @@ public:
 struct Value
 {
 private:
-    InternalType internalType;
+    InternalType internalType = tUninitialized;
 
     friend std::string showType(const Value & v);
 
@@ -216,7 +214,7 @@ public:
     };
 
     struct Path {
-        InputAccessor * accessor;
+        SourceAccessor * accessor;
         const char * path;
     };
 
@@ -234,14 +232,14 @@ public:
         ExprLambda * fun;
     };
 
-    union
+    using Payload = union
     {
         NixInt integer;
         bool boolean;
 
         StringWithContext string;
 
-        Path _path;
+        Path path;
 
         Bindings * attrs;
         struct {
@@ -258,6 +256,8 @@ public:
         NixFloat fpoint;
     };
 
+    Payload payload;
+
     /**
      * Returns the normal type of a Value. This only returns nThunk if
      * the Value hasn't been forceValue'd
@@ -268,6 +268,7 @@ public:
     inline ValueType type(bool invalidIsThunk = false) const
     {
         switch (internalType) {
+            case tUninitialized: break;
             case tInt: return nInt;
             case tBool: return nBool;
             case tString: return nString;
@@ -283,37 +284,43 @@ public:
         if (invalidIsThunk)
             return nThunk;
         else
-            abort();
+            unreachable();
+    }
+
+    inline void finishValue(InternalType newType, Payload newPayload)
+    {
+        payload = newPayload;
+        internalType = newType;
     }
 
     /**
-     * After overwriting an app node, be sure to clear pointers in the
-     * Value to ensure that the target isn't kept alive unnecessarily.
+     * A value becomes valid when it is initialized. We don't use this
+     * in the evaluator; only in the bindings, where the slight extra
+     * cost is warranted because of inexperienced callers.
      */
-    inline void clearValue()
+    inline bool isValid() const
     {
-        app.left = app.right = 0;
+        return internalType != tUninitialized;
+    }
+
+    inline void mkInt(NixInt::Inner n)
+    {
+        mkInt(NixInt{n});
     }
 
     inline void mkInt(NixInt n)
     {
-        clearValue();
-        internalType = tInt;
-        integer = n;
+        finishValue(tInt, { .integer = n });
     }
 
     inline void mkBool(bool b)
     {
-        clearValue();
-        internalType = tBool;
-        boolean = b;
+        finishValue(tBool, { .boolean = b });
     }
 
     inline void mkString(const char * s, const char * * context = 0)
     {
-        internalType = tString;
-        string.c_str = s;
-        string.context = context;
+        finishValue(tString, { .string = { .c_str = s, .context = context } });
     }
 
     void mkString(std::string_view s);
@@ -322,73 +329,54 @@ public:
 
     void mkStringMove(const char * s, const NixStringContext & context);
 
-    inline void mkString(const Symbol & s)
+    inline void mkString(const SymbolStr & s)
     {
-        mkString(((const std::string &) s).c_str());
+        mkString(s.c_str());
     }
 
     void mkPath(const SourcePath & path);
     void mkPath(std::string_view path);
 
-    inline void mkPath(InputAccessor * accessor, const char * path)
+    inline void mkPath(SourceAccessor * accessor, const char * path)
     {
-        clearValue();
-        internalType = tPath;
-        _path.accessor = accessor;
-        _path.path = path;
+        finishValue(tPath, { .path = { .accessor = accessor, .path = path } });
     }
 
     inline void mkNull()
     {
-        clearValue();
-        internalType = tNull;
+        finishValue(tNull, {});
     }
 
     inline void mkAttrs(Bindings * a)
     {
-        clearValue();
-        internalType = tAttrs;
-        attrs = a;
+        finishValue(tAttrs, { .attrs = a });
     }
 
     Value & mkAttrs(BindingsBuilder & bindings);
 
     void mkList(const ListBuilder & builder)
     {
-        clearValue();
-        if (builder.size == 1) {
-            smallList[0] = builder.inlineElems[0];
-            internalType = tList1;
-        } else if (builder.size == 2) {
-            smallList[0] = builder.inlineElems[0];
-            smallList[1] = builder.inlineElems[1];
-            internalType = tList2;
-        } else {
-            bigList.size = builder.size;
-            bigList.elems = builder.elems;
-            internalType = tListN;
-        }
+        if (builder.size == 1)
+            finishValue(tList1, { .smallList = { builder.inlineElems[0] } });
+        else if (builder.size == 2)
+            finishValue(tList2, { .smallList = { builder.inlineElems[0], builder.inlineElems[1] } });
+        else
+            finishValue(tListN, { .bigList = { .size = builder.size, .elems = builder.elems } });
     }
 
     inline void mkThunk(Env * e, Expr * ex)
     {
-        internalType = tThunk;
-        thunk.env = e;
-        thunk.expr = ex;
+        finishValue(tThunk, { .thunk = { .env = e, .expr = ex } });
     }
 
     inline void mkApp(Value * l, Value * r)
     {
-        internalType = tApp;
-        app.left = l;
-        app.right = r;
+        finishValue(tApp, { .app = { .left = l, .right = r } });
     }
 
     inline void mkLambda(Env * e, ExprLambda * f)
     {
-        internalType = tLambda;
-        lambda.env = e;
-        lambda.fun = f;
+        finishValue(tLambda, { .lambda = { .env = e, .fun = f } });
     }
 
     inline void mkBlackhole();
@@ -397,28 +385,22 @@ public:
 
     inline void mkPrimOpApp(Value * l, Value * r)
     {
-        internalType = tPrimOpApp;
-        primOpApp.left = l;
-        primOpApp.right = r;
+        finishValue(tPrimOpApp, { .primOpApp = { .left = l, .right = r } });
     }
 
     /**
      * For a `tPrimOpApp` value, get the original `PrimOp` value.
      */
-    PrimOp * primOpAppPrimOp() const;
+    const PrimOp * primOpAppPrimOp() const;
 
     inline void mkExternal(ExternalValueBase * e)
     {
-        clearValue();
-        internalType = tExternal;
-        external = e;
+        finishValue(tExternal, { .external = e });
     }
 
     inline void mkFloat(NixFloat n)
     {
-        clearValue();
-        internalType = tFloat;
-        fpoint = n;
+        finishValue(tFloat, { .fpoint = n });
     }
 
     bool isList() const
@@ -428,7 +410,7 @@ public:
 
     Value * const * listElems()
     {
-        return internalType == tList1 || internalType == tList2 ? smallList : bigList.elems;
+        return internalType == tList1 || internalType == tList2 ? payload.smallList : payload.bigList.elems;
     }
 
     std::span<Value * const> listItems() const
@@ -439,12 +421,12 @@ public:
 
     Value * const * listElems() const
     {
-        return internalType == tList1 || internalType == tList2 ? smallList : bigList.elems;
+        return internalType == tList1 || internalType == tList2 ? payload.smallList : payload.bigList.elems;
     }
 
     size_t listSize() const
     {
-        return internalType == tList1 ? 1 : internalType == tList2 ? 2 : bigList.size;
+        return internalType == tList1 ? 1 : internalType == tList2 ? 2 : payload.bigList.size;
     }
 
     PosIdx determinePos(const PosIdx pos) const;
@@ -460,26 +442,44 @@ public:
     {
         assert(internalType == tPath);
         return SourcePath(
-            ref(_path.accessor->shared_from_this()),
-            CanonPath(CanonPath::unchecked_t(), _path.path));
+            ref(payload.path.accessor->shared_from_this()),
+            CanonPath(CanonPath::unchecked_t(), payload.path.path));
     }
 
     std::string_view string_view() const
     {
         assert(internalType == tString);
-        return std::string_view(string.c_str);
+        return std::string_view(payload.string.c_str);
     }
 
-    const char * const c_str() const
+    const char * c_str() const
     {
         assert(internalType == tString);
-        return string.c_str;
+        return payload.string.c_str;
     }
 
     const char * * context() const
     {
-        return string.context;
+        return payload.string.context;
     }
+
+    ExternalValueBase * external() const
+    { return payload.external; }
+
+    const Bindings * attrs() const
+    { return payload.attrs; }
+
+    const PrimOp * primOp() const
+    { return payload.primOp; }
+
+    bool boolean() const
+    { return payload.boolean; }
+
+    NixInt integer() const
+    { return payload.integer; }
+
+    NixFloat fpoint() const
+    { return payload.fpoint; }
 };
 
 
@@ -487,25 +487,18 @@ extern ExprBlackHole eBlackHole;
 
 bool Value::isBlackhole() const
 {
-    return internalType == tThunk && thunk.expr == (Expr*) &eBlackHole;
+    return internalType == tThunk && payload.thunk.expr == (Expr*) &eBlackHole;
 }
 
 void Value::mkBlackhole()
 {
-    internalType = tThunk;
-    thunk.expr = (Expr*) &eBlackHole;
+    mkThunk(nullptr, (Expr *) &eBlackHole);
 }
 
 
-#if HAVE_BOEHMGC
 typedef std::vector<Value *, traceable_allocator<Value *>> ValueVector;
-typedef std::map<Symbol, Value *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Value *>>> ValueMap;
+typedef std::unordered_map<Symbol, Value *, std::hash<Symbol>, std::equal_to<Symbol>, traceable_allocator<std::pair<const Symbol, Value *>>> ValueMap;
 typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueVector>>> ValueVectorMap;
-#else
-typedef std::vector<Value *> ValueVector;
-typedef std::map<Symbol, Value *> ValueMap;
-typedef std::map<Symbol, ValueVector> ValueVectorMap;
-#endif
 
 
 /**

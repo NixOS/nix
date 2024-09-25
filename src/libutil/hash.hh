@@ -86,19 +86,14 @@ private:
 
 public:
     /**
-     * Check whether two hash are equal.
+     * Check whether two hashes are equal.
      */
-    bool operator == (const Hash & h2) const;
+    bool operator == (const Hash & h2) const noexcept;
 
     /**
-     * Check whether two hash are not equal.
+     * Compare how two hashes are ordered.
      */
-    bool operator != (const Hash & h2) const;
-
-    /**
-     * For sorting.
-     */
-    bool operator < (const Hash & h) const;
+    std::strong_ordering operator <=> (const Hash & h2) const noexcept;
 
     /**
      * Returns the length of a base-16 representation of this hash.

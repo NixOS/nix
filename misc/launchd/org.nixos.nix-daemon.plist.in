@@ -2,11 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
-    <key>EnvironmentVariables</key>
-    <dict>
-      <key>OBJC_DISABLE_INITIALIZE_FORK_SAFETY</key>
-      <string>YES</string>
-    </dict>
     <key>Label</key>
     <string>org.nixos.nix-daemon</string>
     <key>KeepAlive</key>

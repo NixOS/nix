@@ -1,11 +1,13 @@
 #pragma once
 ///@file
 
+#include <thread>
+#include <future>
+
 #include "store-api.hh"
 #include "goal.hh"
 #include "realisation.hh"
-#include <thread>
-#include <future>
+#include "muxable-pipe.hh"
 
 namespace nix {
 
@@ -25,53 +27,20 @@ class DrvOutputSubstitutionGoal : public Goal {
      */
     DrvOutput id;
 
-    /**
-     * The realisation corresponding to the given output id.
-     * Will be filled once we can get it.
-     */
-    std::shared_ptr<const Realisation> outputInfo;
-
-    /**
-     * The remaining substituters.
-     */
-    std::list<ref<Store>> subs;
-
-    /**
-     * The current substituter.
-     */
-    std::shared_ptr<Store> sub;
-
-    struct DownloadState
-    {
-        Pipe outPipe;
-        std::promise<std::shared_ptr<const Realisation>> promise;
-    };
-
-    std::shared_ptr<DownloadState> downloadState;
-
-    /**
-     * Whether a substituter failed.
-     */
-    bool substituterFailed = false;
-
 public:
     DrvOutputSubstitutionGoal(const DrvOutput& id, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
     typedef void (DrvOutputSubstitutionGoal::*GoalState)();
     GoalState state;
 
-    void init();
-    void tryNext();
-    void realisationFetched();
-    void outPathValid();
-    void finished();
+    Co init() override;
+    Co realisationFetched(std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub);
 
-    void timedOut(Error && ex) override { abort(); };
+    void timedOut(Error && ex) override { unreachable(); };
 
     std::string key() override;
 
-    void work() override;
-    void handleEOF(int fd) override;
+    void handleEOF(Descriptor fd) override;
 
     JobCategory jobCategory() const override {
         return JobCategory::Substitution;

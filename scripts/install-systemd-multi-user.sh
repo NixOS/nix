@@ -5,6 +5,7 @@ set -o pipefail
 
 # System specific settings
 export NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-30001}"
+export NIX_BUILD_GROUP_ID="${NIX_BUILD_GROUP_ID:-30000}"
 export NIX_BUILD_USER_NAME_TEMPLATE="nixbld%d"
 
 readonly SERVICE_SRC=/lib/systemd/system/nix-daemon.service
@@ -35,7 +36,7 @@ escape_systemd_env() {
 
 # Gather all non-empty proxy environment variables into a string
 create_systemd_proxy_env() {
-    vars="http_proxy https_proxy ftp_proxy no_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY NO_PROXY"
+    vars="http_proxy https_proxy ftp_proxy all_proxy no_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY ALL_PROXY NO_PROXY"
     for v in $vars; do
         if [ "x${!v:-}" != "x" ]; then
             echo "Environment=${v}=$(escape_systemd_env ${!v})"

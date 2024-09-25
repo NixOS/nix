@@ -20,11 +20,11 @@ testDeterministicCA () {
 
 testCutoffFor () {
     local out1 out2
-    out1=$(buildAttr $1 1)
+    out1=$(buildAttr "$1" 1)
     # The seed only changes the root derivation, and not it's output, so the
     # dependent derivations should only need to be built once.
     buildAttr rootCA 2
-    out2=$(buildAttr $1 2 -j0)
+    out2=$(buildAttr "$1" 2 -j0)
     test "$out1" == "$out2"
 }
 
@@ -41,7 +41,7 @@ testGC () {
     nix-instantiate ./content-addressed.nix -A rootCA --arg seed 5
     nix-collect-garbage --option keep-derivations true
     clearStore
-    buildAttr rootCA 1 --out-link $TEST_ROOT/rootCA
+    buildAttr rootCA 1 --out-link "$TEST_ROOT"/rootCA
     nix-collect-garbage
     buildAttr rootCA 1 -j0
 }
@@ -55,7 +55,7 @@ testNixCommand () {
 testNormalization () {
     clearStore
     outPath=$(buildAttr rootCA 1)
-    test "$(stat -c %Y $outPath)" -eq 1
+    test "$(stat -c %Y "$outPath")" -eq 1
 }
 
 clearStore

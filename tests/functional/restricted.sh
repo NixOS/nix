@@ -1,6 +1,8 @@
+#!/usr/bin/env bash
+
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 nix-instantiate --restrict-eval --eval -E '1 + 2'
 expectStderr 1 nix-instantiate --eval --restrict-eval ./restricted.nix | grepQuiet "forbidden in restricted mode"
@@ -8,11 +10,11 @@ expectStderr 1 nix-instantiate --eval --restrict-eval <(echo '1 + 2') | grepQuie
 nix-instantiate --restrict-eval ./simple.nix -I src=.
 nix-instantiate --restrict-eval ./simple.nix -I src1=simple.nix -I src2=config.nix -I src3=./simple.builder.sh
 
+# no default NIX_PATH
+(unset NIX_PATH; expectStderr 1 nix-instantiate --restrict-eval --find-file . | grepQuiet "file '.' was not found in the Nix search path")
+
 expectStderr 1 nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix' | grepQuiet "forbidden in restricted mode"
 nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix' -I src=../..
-
-expectStderr 1 nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../../src/nix-channel' | grepQuiet "forbidden in restricted mode"
-nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../../src/nix-channel' -I src=../../src
 
 expectStderr 1 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' | grepQuiet "forbidden in restricted mode"
 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' -I src=.

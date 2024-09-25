@@ -5,12 +5,13 @@
 #include "error.hh"
 #include "logging.hh"
 
-#include <boost/lexical_cast.hpp>
 
 #include <functional>
 #include <map>
 #include <sstream>
 #include <optional>
+
+#include "strings.hh"
 
 namespace nix {
 
@@ -27,36 +28,11 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss);
 MakeError(FormatError, Error);
 
 
-/**
- * String tokenizer.
- */
-template<class C> C tokenizeString(std::string_view s, std::string_view separators = " \t\n\r");
-
-
-/**
- * Concatenate the given strings with a separator between the
- * elements.
- */
-template<class C>
-std::string concatStringsSep(const std::string_view sep, const C & ss)
-{
-    size_t size = 0;
-    // need a cast to string_view since this is also called with Symbols
-    for (const auto & s : ss) size += sep.size() + std::string_view(s).size();
-    std::string s;
-    s.reserve(size);
-    for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
-        s += i;
-    }
-    return s;
-}
-
-template<class ... Parts>
-auto concatStrings(Parts && ... parts)
+template<class... Parts>
+auto concatStrings(Parts &&... parts)
     -> std::enable_if_t<(... && std::is_convertible_v<Parts, std::string_view>), std::string>
 {
-    std::string_view views[sizeof...(parts)] = { parts... };
+    std::string_view views[sizeof...(parts)] = {parts...};
     return concatStringsSep({}, views);
 }
 
@@ -102,16 +78,7 @@ std::string rewriteStrings(std::string s, const StringMap & rewrites);
  * Parse a string into an integer.
  */
 template<class N>
-std::optional<N> string2Int(const std::string_view s)
-{
-    if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
-        return std::nullopt;
-    try {
-        return boost::lexical_cast<N>(s.data(), s.size());
-    } catch (const boost::bad_lexical_cast &) {
-        return std::nullopt;
-    }
-}
+std::optional<N> string2Int(const std::string_view s);
 
 /**
  * Like string2Int(), but support an optional suffix 'K', 'M', 'G' or
@@ -120,7 +87,7 @@ std::optional<N> string2Int(const std::string_view s)
 template<class N>
 N string2IntWithUnitPrefix(std::string_view s)
 {
-    N multiplier = 1;
+    uint64_t multiplier = 1;
     if (!s.empty()) {
         char u = std::toupper(*s.rbegin());
         if (std::isalpha(u)) {
@@ -138,17 +105,17 @@ N string2IntWithUnitPrefix(std::string_view s)
 }
 
 /**
+ * Pretty-print a byte value, e.g. 12433615056 is rendered as `11.6
+ * GiB`. If `align` is set, the number will be right-justified by
+ * padding with spaces on the left.
+ */
+std::string renderSize(uint64_t value, bool align = false);
+
+/**
  * Parse a string into a float.
  */
 template<class N>
-std::optional<N> string2Float(const std::string_view s)
-{
-    try {
-        return boost::lexical_cast<N>(s.data(), s.size());
-    } catch (const boost::bad_lexical_cast &) {
-        return std::nullopt;
-    }
-}
+std::optional<N> string2Float(const std::string_view s);
 
 
 /**

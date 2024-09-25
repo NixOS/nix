@@ -1,9 +1,12 @@
+#!/usr/bin/env bash
+
 source common.sh
 
-if [[ $BUILD_SHARED_LIBS != 1 ]]; then
-    skipTest "Plugins are not supported"
-fi
+for ext in so dylib; do
+    plugin="$PWD/plugins/libplugintest.$ext"
+    [[ -f "$plugin" ]] && break
+done
 
-res=$(nix --option setting-set true --option plugin-files $PWD/plugins/libplugintest* eval --expr builtins.anotherNull)
+res=$(nix --option setting-set true --option plugin-files "$plugin" eval --expr builtins.anotherNull)
 
 [ "$res"x = "nullx" ]

@@ -1,3 +1,5 @@
+#include <nlohmann/json.hpp>
+
 #include "command.hh"
 #include "markdown.hh"
 #include "store-api.hh"
@@ -6,8 +8,7 @@
 #include "nixexpr.hh"
 #include "profiles.hh"
 #include "repl.hh"
-
-#include <nlohmann/json.hpp>
+#include "strings.hh"
 
 extern char * * environ __attribute__((weak));
 
@@ -126,14 +127,9 @@ ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState) {
         evalState =
-            #if HAVE_BOEHMGC
-            std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
-                searchPath, getEvalStore(), getStore())
-            #else
-            std::make_shared<EvalState>(
-                searchPath, getEvalStore(), getStore())
-            #endif
-            ;
+            std::allocate_shared<EvalState>(
+                traceable_allocator<EvalState>(),
+                lookupPath, getEvalStore(), fetchSettings, evalSettings, getStore());
 
         evalState->repair = repair;
 
