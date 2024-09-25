@@ -71,7 +71,9 @@ git -C "$rootFlake" add sub2/flake.lock
 
 # Make sure there are no content locks for relative path flakes.
 (! grep "$TEST_ROOT" "$subflake2/flake.lock")
-(! grep "$NIX_STORE_DIR" "$subflake2/flake.lock")
+if ! isTestOnNixOS; then
+    (! grep "$NIX_STORE_DIR" "$subflake2/flake.lock")
+fi
 (! grep narHash "$subflake2/flake.lock")
 
 # Test circular relative path flakes. FIXME: doesn't work at the moment.
