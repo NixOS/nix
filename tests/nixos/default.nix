@@ -44,4 +44,6 @@ in
   ca-fd-leak = runNixOSTestFor "x86_64-linux" ./ca-fd-leak;
 
   user-sandboxing = runNixOSTestFor "x86_64-linux" ./user-sandboxing;
+
+  fetchurl = runNixOSTestFor "x86_64-linux" ./fetchurl.nix;
 }
