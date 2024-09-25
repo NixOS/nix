@@ -146,15 +146,6 @@ in
   functional_root = runNixOSTestFor "x86_64-linux" ./functional/as-root.nix;
 
   user-sandboxing = runNixOSTestFor "x86_64-linux" ./user-sandboxing;
-<<<<<<< HEAD
-=======
-
-  s3-binary-cache-store = runNixOSTestFor "x86_64-linux" ./s3-binary-cache-store.nix;
-
-  fsync = runNixOSTestFor "x86_64-linux" ./fsync.nix;
-
-  cgroups = runNixOSTestFor "x86_64-linux" ./cgroups;
 
   fetchurl = runNixOSTestFor "x86_64-linux" ./fetchurl.nix;
->>>>>>> f2f47fa72 (Add a test for builtin:fetchurl cert verification)
 }
