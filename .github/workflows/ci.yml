@@ -48,6 +48,7 @@ jobs:
             free -h
           done
         ) &
+    - uses: mxschmitt/action-tmate@v3
     - run: nix --experimental-features 'nix-command flakes' flake check -L
     - run: nix --experimental-features 'nix-command flakes' flake show --all-systems --json
 
