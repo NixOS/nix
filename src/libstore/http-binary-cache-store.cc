@@ -169,28 +169,29 @@ protected:
     {
         try {
             checkEnabled();
+
+            auto request(makeRequest(path));
+
+            auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
+            getFileTransfer()->enqueueFileTransfer(request,
+                {[callbackPtr, this](std::future<FileTransferResult> result) {
+                    try {
+                        (*callbackPtr)(std::move(result.get().data));
+                    } catch (FileTransferError & e) {
+                        if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
+                            return (*callbackPtr)({});
+                        maybeDisable();
+                        callbackPtr->rethrow();
+                    } catch (...) {
+                        callbackPtr->rethrow();
+                    }
+            }});
+
         } catch (...) {
             callback.rethrow();
             return;
         }
-
-        auto request(makeRequest(path));
-
-        auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
-
-        getFileTransfer()->enqueueFileTransfer(request,
-            {[callbackPtr, this](std::future<FileTransferResult> result) {
-                try {
-                    (*callbackPtr)(std::move(result.get().data));
-                } catch (FileTransferError & e) {
-                    if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
-                        return (*callbackPtr)({});
-                    maybeDisable();
-                    callbackPtr->rethrow();
-                } catch (...) {
-                    callbackPtr->rethrow();
-                }
-            }});
     }
 
     /**
