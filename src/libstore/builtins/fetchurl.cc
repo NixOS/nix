@@ -6,7 +6,10 @@
 
 namespace nix {
 
-void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
+void builtinFetchurl(
+    const BasicDerivation & drv,
+    const std::string & netrcData,
+    const std::string & caFileData)
 {
     /* Make the host's netrc data available. Too bad curl requires
        this to be stored in a file. It would be nice if we could just
@@ -15,6 +18,9 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
         settings.netrcFile = "netrc";
         writeFile(settings.netrcFile, netrcData, 0600);
     }
+
+    settings.caFile = "ca-certificates.crt";
+    writeFile(settings.caFile, caFileData, 0600);
 
     auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);
