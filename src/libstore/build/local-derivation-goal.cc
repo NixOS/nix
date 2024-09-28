@@ -1740,13 +1740,27 @@ void LocalDerivationGoal::runChild()
 
         bool setUser = true;
 
-        /* Make the contents of netrc available to builtin:fetchurl
-           (which may run under a different uid and/or in a sandbox). */
+        /* Make the contents of netrc and the CA certificate bundle
+           available to builtin:fetchurl (which may run under a
+           different uid and/or in a sandbox). */
         std::string netrcData;
+<<<<<<< HEAD:src/libstore/build/local-derivation-goal.cc
         try {
             if (drv->isBuiltin() && drv->builder == "builtin:fetchurl")
                 netrcData = readFile(settings.netrcFile);
         } catch (SysError &) { }
+=======
+        std::string caFileData;
+        if (drv->isBuiltin() && drv->builder == "builtin:fetchurl") {
+           try {
+               netrcData = readFile(settings.netrcFile);
+           } catch (SystemError &) { }
+
+           try {
+               caFileData = readFile(settings.caFile);
+           } catch (SystemError &) { }
+        }
+>>>>>>> c1ecf0bee (fix passing CA files into builtins:fetchurl sandbox):src/libstore/unix/build/local-derivation-goal.cc
 
 #if __linux__
         if (useChroot) {
@@ -2174,7 +2188,11 @@ void LocalDerivationGoal::runChild()
                     e.second = rewriteStrings(e.second, inputRewrites);
 
                 if (drv->builder == "builtin:fetchurl")
+<<<<<<< HEAD:src/libstore/build/local-derivation-goal.cc
                     builtinFetchurl(drv2, netrcData);
+=======
+                    builtinFetchurl(*drv, outputs, netrcData, caFileData);
+>>>>>>> c1ecf0bee (fix passing CA files into builtins:fetchurl sandbox):src/libstore/unix/build/local-derivation-goal.cc
                 else if (drv->builder == "builtin:buildenv")
                     builtinBuildenv(drv2);
                 else if (drv->builder == "builtin:unpack-channel")
