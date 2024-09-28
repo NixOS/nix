@@ -1,7 +1,7 @@
 # Test whether builtin:fetchurl properly performs TLS certificate
 # checks on HTTPS servers.
 
-{ lib, config, pkgs, ... }:
+{ pkgs, ... }:
 
 let
 
@@ -25,7 +25,7 @@ in
   name = "nss-preload";
 
   nodes = {
-    machine = { lib, pkgs, ... }: {
+    machine = { pkgs, ... }: {
       services.nginx = {
         enable = true;
 
@@ -60,7 +60,7 @@ in
     };
   };
 
-  testScript = { nodes, ... }: ''
+  testScript = ''
     machine.wait_for_unit("nginx")
     machine.wait_for_open_port(443)
 
