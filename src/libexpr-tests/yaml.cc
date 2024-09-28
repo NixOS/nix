@@ -271,6 +271,9 @@ TEST_F(FromYAMLTest, Float)
         ASSERT_EQ(item->type(), nFloat);
         EXPECT_EQ(item->fpoint(), 1.);
     }
+    val = parseYAML("!!float -0");
+    ASSERT_EQ(val.type(), nFloat);
+    EXPECT_EQ(1. / val.fpoint(), 1. / -0.) << "\"!!float -0\" shall be parsed as -0.0";
 
     const char * strings[] = {"0x1.", "0X1.", "0b1.", "0B1.", "0o1.", "0O1"};
     for (auto str : strings) {

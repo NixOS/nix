@@ -11,48 +11,6 @@ namespace {
 
 using namespace nix;
 
-struct FromYAMLOptions
-{
-    bool useBoolYAML1_1 = false;
-
-    FromYAMLOptions(EvalState & state, Value options)
-    {
-        state.forceAttrs(options, PosIdx{}, "");
-        auto symbol = state.symbols.create("useBoolYAML1_1");
-        const Attr * useBoolYAML1_1 = options.attrs()->get(symbol);
-        if (useBoolYAML1_1) {
-            this->useBoolYAML1_1 = state.forceBool(*useBoolYAML1_1->value, {}, "");
-        }
-    }
-};
-
-struct NixContext
-{
-    EvalState & state;
-    const PosIdx pos;
-    std::string_view yaml;
-    const FromYAMLOptions options;
-};
-
-template<typename... Args>
-void throwError [[noreturn]] (const NixContext & context, const char * c_fs, const Args &... args)
-{
-    std::string fs = "while parsing the YAML string ''%1%'':\n\n";
-    fs += c_fs;
-    throw EvalError(
-        context.state, ErrorInfo{.msg = fmt(fs, context.yaml, args...), .pos = context.state.positions[context.pos]});
-}
-
-void s_error [[noreturn]] (const char * msg, size_t len, ryml::Location, void * nixContext)
-{
-    auto context = static_cast<const NixContext *>(nixContext);
-    if (context) {
-        throwError(*context, "%2%", std::string_view(msg, len));
-    } else {
-        throw Error({.msg = fmt("failed assertion in rapidyaml library:\n\n%1%", std::string_view(msg, len))});
-    }
-}
-
 /**
  * Equality check of a compile time C-string *lhs* and another string *rhs*.
  * Only call this function, if both strings have the same length.
@@ -65,6 +23,14 @@ inline bool isEqualSameLengthStr(const char * rhs, const char lhs[N + 1])
         result &= rhs[i] == lhs[i];
     }
     return result;
+}
+
+inline bool isNull(ryml::csubstr val)
+{
+    size_t len = val.size();
+    return len == 0 || (len == 1 && val[0] == '~')
+           || (len == 4 && (val[0] == 'n' || val[0] == 'N')
+               && (isEqualSameLengthStr<3>(&val[1], "ull") || isEqualSameLengthStr<4>(&val[0], "NULL")));
 }
 
 bool isInt_1_2(ryml::csubstr val)
@@ -91,7 +57,10 @@ std::optional<NixFloat> parseFloat(std::optional<bool> isInt, ryml::csubstr val)
     // first character has to match [0-9+-.]
     if (isInt.value_or(false)) {
         NixInt::Inner _int;
-        if (len > 0 && ryml::from_chars(val.sub(val[0] == '+'), &_int)) {
+        if (len == 2 && isEqualSameLengthStr<2>(&val[0], "-0")) {
+            // valid int, so that it would be parsed as 0.0 otherwise
+            maybe_float = -0.0;
+        } else if (ryml::from_chars(val.sub(val[0] == '+'), &_int)) {
             maybe_float.emplace(_int);
         }
     } else if (len >= 1 && val[0] >= '+' && val[0] <= '9' && val[0] != ',' && val[0] != '/') {
@@ -179,22 +148,77 @@ std::optional<bool> parseBool_1_1(ryml::csubstr val)
     return _bool;
 }
 
-inline std::optional<bool> parseBool(const FromYAMLOptions & options, ryml::csubstr val)
+struct FromYAMLContext
 {
-    std::optional<bool> result;
-    if (options.useBoolYAML1_1) {
-        result = parseBool_1_1(val);
-    } else {
-        result = parseBool_1_2(val);
+    struct ParserOptions
+    {
+        bool useBoolYAML1_1 = false;
+
+        ParserOptions(FromYAMLContext &, const Bindings *);
+    };
+
+    EvalState & state;
+    const PosIdx pos;
+    const std::string_view yaml;
+    const ParserOptions options;
+
+    FromYAMLContext(EvalState &, PosIdx, std::string_view, const Bindings *);
+
+    inline std::optional<bool> parseBool(ryml::csubstr val) const
+    {
+        std::optional<bool> result;
+        if (options.useBoolYAML1_1) {
+            result = parseBool_1_1(val);
+        } else {
+            result = parseBool_1_2(val);
+        }
+        return result;
     }
-    return result;
+
+    template<typename... Args>
+    void throwError [[noreturn]] (const char * c_fs, const Args &... args) const
+    {
+        std::string fs = "while parsing the YAML string ''%1%'':\n\n";
+        fs += c_fs;
+        throw EvalError(state, ErrorInfo{.msg = fmt(fs, yaml, args...), .pos = state.positions[pos]});
+    }
+
+    void visitYAMLNode(Value & v, ryml::ConstNodeRef t, bool isTopNode = false);
+};
+
+FromYAMLContext::FromYAMLContext(EvalState & state, PosIdx pos, std::string_view yaml, const Bindings * options)
+    : state(state)
+    , pos(pos)
+    , yaml(yaml)
+    , options(*this, options)
+{
+}
+
+FromYAMLContext::ParserOptions::ParserOptions(FromYAMLContext & context, const Bindings * options)
+{
+    auto symbol = context.state.symbols.create("useBoolYAML1_1");
+    const Attr * useBoolYAML1_1 = options->get(symbol);
+    if (useBoolYAML1_1) {
+        this->useBoolYAML1_1 =
+            context.state.forceBool(*useBoolYAML1_1->value, {}, "while evaluating the attribute \"useBoolYAML1_1\"");
+    }
+}
+
+void s_error [[noreturn]] (const char * msg, size_t len, ryml::Location, void * fromYAMLContext)
+{
+    auto context = static_cast<const FromYAMLContext *>(fromYAMLContext);
+    if (context) {
+        context->throwError("%2%", std::string_view(msg, len));
+    } else {
+        throw Error({.msg = fmt("failed assertion in rapidyaml library:\n\n%1%", std::string_view(msg, len))});
+    }
 }
 
 /**
  * Parse YAML according to the YAML 1.2 core schema by default
- * The behaviour can be modified by the FromYAMLOptions object in NixContext
+ * The behaviour can be modified by the FromYAMLOptions object in FromYAMLContext
  */
-void visitYAMLNode(const NixContext & context, Value & v, ryml::ConstNodeRef t, bool isTopNode = false)
+void FromYAMLContext::visitYAMLNode(Value & v, ryml::ConstNodeRef t, bool isTopNode)
 {
     ryml::csubstr valTagStr;
     auto valTag = ryml::TAG_NONE;
@@ -207,34 +231,30 @@ void visitYAMLNode(const NixContext & context, Value & v, ryml::ConstNodeRef t, 
             valTagCustom = valTag == ryml::TAG_NONE;
             if (valTagCustom) {
                 auto fs = "Error: Nix has no support for the unknown tag ''%2%'' in node ''%3%''";
-                throwError(context, fs, valTagStr, t);
+                throwError(fs, valTagStr, t);
             }
         }
     }
     if (t.is_map()) {
         if (valTag != ryml::TAG_NONE && valTag != ryml::TAG_MAP) {
             auto fs = "Error: Nix parsed ''%2%'' as map and only supported is the tag ''!!map'', but ''%3%'' was used";
-            throwError(context, fs, t, valTagStr);
+            throwError(fs, t, valTagStr);
         }
-        auto attrs = context.state.buildBindings(t.num_children());
+        auto attrs = state.buildBindings(t.num_children());
 
         for (ryml::ConstNodeRef child : t.children()) {
+            auto key = child.key();
             if (child.has_key_tag()) {
                 auto tag = ryml::to_tag(child.key_tag());
                 if (tag != ryml::TAG_NONE && tag != ryml::TAG_STR) {
                     auto fs = "Error: Nix supports string keys only, but the key ''%2%'' has the tag ''%3%''";
-                    throwError(context, fs, child.key(), child.key_tag());
+                    throwError(fs, child.key(), child.key_tag());
                 }
-            } else if (child.key_is_null()) {
+            } else if (child.is_key_plain() && isNull(key)) {
                 auto fs = "Error: Nix supports string keys only, but the map ''%2%'' contains a null-key";
-                throwError(context, fs, t);
-            } else if (
-                child.is_key_folded() && child.is_key_plain() && (!child.has_key_tag() || child.key_tag() != "?")) {
-                auto fs = "Error: Map with plain multiline implicit key ''%2%''";
-                throwError(context, fs, child.key());
+                throwError(fs, t);
             }
-            std::string_view key(child.key().begin(), child.key().size());
-            visitYAMLNode(context, attrs.alloc(key), child);
+            visitYAMLNode(attrs.alloc({key.begin(), key.size()}), child);
         }
 
         v.mkAttrs(attrs);
@@ -243,7 +263,7 @@ void visitYAMLNode(const NixContext & context, Value & v, ryml::ConstNodeRef t, 
         for (const auto & attr : *attrs.alreadySorted()) {
             if (key == attr.name) {
                 auto fs = "Error: Non-unique key %2% after deserializing the map ''%3%''";
-                throwError(context, fs, context.state.symbols[key], t);
+                throwError(fs, state.symbols[key], t);
             }
             key = attr.name;
         }
@@ -251,15 +271,15 @@ void visitYAMLNode(const NixContext & context, Value & v, ryml::ConstNodeRef t, 
         if (valTag != ryml::TAG_NONE && valTag != ryml::TAG_SEQ) {
             auto fs =
                 "Error: Nix parsed ''%2%'' as sequence and only supported is the tag ''!!seq'', but ''%3%'' was used";
-            throwError(context, fs, t, valTagStr);
+            throwError(fs, t, valTagStr);
         }
-        ListBuilder list(context.state, t.num_children());
+        ListBuilder list(state, t.num_children());
 
         bool isStream = t.is_stream();
         size_t i = 0;
         for (ryml::ConstNodeRef child : t.children()) {
             // a stream of documents is handled as sequence, too
-            visitYAMLNode(context, *(list[i++] = context.state.allocValue()), child, isTopNode && isStream);
+            visitYAMLNode(*(list[i++] = state.allocValue()), child, isTopNode && isStream);
         }
         v.mkList(list);
     } else if (t.has_val()) {
@@ -267,7 +287,7 @@ void visitYAMLNode(const NixContext & context, Value & v, ryml::ConstNodeRef t, 
         bool isPlain = t.is_val_plain();
         bool isEmpty = isPlain && val.empty();
         if (isTopNode && isEmpty) {
-            throwError(context, "Error: Empty document (plain empty scalars outside of collection)%2%", "");
+            throwError("Error: Empty document (plain empty scalars outside of collection)%2%", "");
         }
         if (valTagNonSpecificStr) {
             valTag = ryml::TAG_STR;
@@ -284,21 +304,16 @@ void visitYAMLNode(const NixContext & context, Value & v, ryml::ConstNodeRef t, 
         bool trim = valTag == ryml::TAG_NULL || valTag == ryml::TAG_BOOL || valTag == ryml::TAG_INT
                     || valTag == ryml::TAG_FLOAT;
         auto vs = trim ? val.trim("\n\t ") : val;
-        bool nullTagged = (valTag == ryml::TAG_NULL) && !isPlain
-                          && (vs.empty() || vs == "~"
-                              || (vs.size() == 4
-                                  && (((vs[0] == 'n' || vs[0] == 'N') && isEqualSameLengthStr<3>(&vs[1], "ull"))
-                                      || isEqualSameLengthStr<4>(&vs[0], "NULL"))));
-        if (((t.val_is_null() || isEmpty) && valTag != ryml::TAG_STR) || nullTagged) {
+        if (scalarTypeCheck(ryml::TAG_NULL) && isNull(vs)) {
             v.mkNull();
-        } else if (scalarTypeCheck(ryml::TAG_BOOL) && (_bool = parseBool(context.options, vs))) {
+        } else if (scalarTypeCheck(ryml::TAG_BOOL) && (_bool = parseBool(vs))) {
             v.mkBool(*_bool);
         } else if (
             scalarTypeCheck(ryml::TAG_INT) && *(isInt = isInt_1_2(vs))
             && ryml::from_chars(vs.sub(vs[0] == '+'), &_int)) {
             v.mkInt(_int);
         } else if (
-            ((valTag == ryml::TAG_FLOAT && (isInt || (isInt = isInt_1_2(vs)))) || (valTag == ryml::TAG_NONE && isPlain))
+            ((valTag == ryml::TAG_FLOAT && (isInt = isInt_1_2(vs))) || (valTag == ryml::TAG_NONE && isPlain))
             && (_float = parseFloat(isInt, vs))) {
             // if the value is tagged with !!float, then isInt_1_2 evaluation is enforced because the int regex is not a
             // subset of the float regex...
@@ -307,14 +322,12 @@ void visitYAMLNode(const NixContext & context, Value & v, ryml::ConstNodeRef t, 
             std::string_view value(val.begin(), val.size());
             v.mkString(value);
         } else {
-            throwError(context, "Error: Value ''%2%'' with tag ''%3%'' is invalid", val, valTagStr);
+            throwError("Error: Value ''%2%'' with tag ''%3%'' is invalid", val, valTagStr);
         }
-    } else if (isTopNode) {
-        throwError(context, "Error: Empty document (plain empty scalars outside of collection)", "");
     } else {
         auto val = t.has_val() ? t.val() : "";
         auto fs = "BUG: Encountered unreachable code while parsing ''%2%'' with tag ''%3%''";
-        throwError(context, fs, val, valTagStr);
+        throwError(fs, val, valTagStr);
     }
 }
 
@@ -350,10 +363,12 @@ static RegisterPrimOp primop_fromYAML(
      )",
      .fun =
          [](EvalState & state, const PosIdx pos, Value ** args, Value & val) {
-             auto yaml =
-                 state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.fromYAML");
+             auto yaml = state.forceStringNoCtx(
+                 *args[0], pos, "while evaluating the first argument passed to builtins.fromYAML");
+             state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.fromYAML");
+             auto options = args[1]->attrs();
 
-             NixContext context{.state = state, .pos = pos, .yaml = yaml, .options = {state, *args[1]}};
+             FromYAMLContext context(state, pos, yaml, options);
              ryml::Callbacks callbacks;
              callbacks.m_error = s_error;
              ryml::set_callbacks(callbacks);
@@ -368,7 +383,7 @@ static RegisterPrimOp primop_fromYAML(
              if (root.is_stream() && root.num_children() == 1 && root.child(0).is_doc()) {
                  root = root.child(0);
              }
-             visitYAMLNode(context, val, root, true);
+             context.visitYAMLNode(val, root, true);
          },
      .experimentalFeature = Xp::FromYaml});
 
