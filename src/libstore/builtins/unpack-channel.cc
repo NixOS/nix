@@ -20,7 +20,7 @@ void builtinUnpackChannel(
     auto & src = getAttr("src");
 
     if (fs::path{channelName}.filename().string() != channelName) {
-        throw Error("channelName is not allowed to contain filesystem seperators, got %1%", channelName);
+        throw Error("channelName is not allowed to contain filesystem separators, got %1%", channelName);
     }
 
     try {
