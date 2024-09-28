@@ -1732,13 +1732,20 @@ void LocalDerivationGoal::runChild()
 
         bool setUser = true;
 
-        /* Make the contents of netrc available to builtin:fetchurl
-           (which may run under a different uid and/or in a sandbox). */
+        /* Make the contents of netrc and the CA certificate bundle
+           available to builtin:fetchurl (which may run under a
+           different uid and/or in a sandbox). */
         std::string netrcData;
-        try {
-            if (drv->isBuiltin() && drv->builder == "builtin:fetchurl")
-                netrcData = readFile(settings.netrcFile);
-        } catch (SystemError &) { }
+        std::string caFileData;
+        if (drv->isBuiltin() && drv->builder == "builtin:fetchurl") {
+           try {
+               netrcData = readFile(settings.netrcFile);
+           } catch (SystemError &) { }
+
+           try {
+               caFileData = readFile(settings.caFile);
+           } catch (SystemError &) { }
+        }
 
 #if __linux__
         if (useChroot) {
@@ -2166,7 +2173,7 @@ void LocalDerivationGoal::runChild()
                     e.second = rewriteStrings(e.second, inputRewrites);
 
                 if (drv->builder == "builtin:fetchurl")
-                    builtinFetchurl(drv2, netrcData);
+                    builtinFetchurl(drv2, netrcData, caFileData);
                 else if (drv->builder == "builtin:buildenv")
                     builtinBuildenv(drv2);
                 else if (drv->builder == "builtin:unpack-channel")
