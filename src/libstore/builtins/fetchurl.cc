@@ -21,6 +21,16 @@ void builtinFetchurl(
 
     settings.caFile = "ca-certificates.crt";
     writeFile(settings.caFile, caFileData, 0600);
+<<<<<<< HEAD
+=======
+
+    auto out = get(drv.outputs, "out");
+    if (!out)
+        throw Error("'builtin:fetchurl' requires an 'out' output");
+
+    if (!(drv.type().isFixed() || drv.type().isImpure()))
+        throw Error("'builtin:fetchurl' must be a fixed-output or impure derivation");
+>>>>>>> 9b818f14d (fix passing CA files into builtins:fetchurl sandbox)
 
     auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);

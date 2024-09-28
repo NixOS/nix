@@ -1748,11 +1748,19 @@ void LocalDerivationGoal::runChild()
         if (drv->isBuiltin() && drv->builder == "builtin:fetchurl") {
            try {
                netrcData = readFile(settings.netrcFile);
+<<<<<<< HEAD
            } catch (SysError &) { }
 
            try {
                caFileData = readFile(settings.caFile);
            } catch (SysError &) { }
+=======
+           } catch (SystemError &) { }
+
+           try {
+               caFileData = readFile(settings.caFile);
+           } catch (SystemError &) { }
+>>>>>>> 9b818f14d (fix passing CA files into builtins:fetchurl sandbox)
         }
 
 #if __linux__
