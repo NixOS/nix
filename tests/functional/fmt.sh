@@ -11,7 +11,7 @@ cp ./simple.nix ./simple.builder.sh ./fmt.simple.sh ./config.nix "$TEST_HOME"
 
 cd "$TEST_HOME"
 
-nix fmt --help | grep "Format"
+nix fmt --help | grep "forward"
 
 cat << EOF > flake.nix
 {
