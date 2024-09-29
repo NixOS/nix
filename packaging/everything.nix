@@ -39,7 +39,7 @@
   nix-perl-bindings,
 }:
 
-(buildEnv rec {
+(buildEnv {
   name = "nix-${nix-cli.version}";
   paths = [
     nix-util
@@ -76,6 +76,8 @@
   ] ++ lib.optionals (stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
     nix-perl-bindings
   ];
+
+  meta.mainProgram = "nix";
 }).overrideAttrs (finalAttrs: prevAttrs: {
   doCheck = true;
   doInstallCheck = true;
