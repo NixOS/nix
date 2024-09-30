@@ -37,7 +37,7 @@ env > $TEST_ROOT/expected-env
 nix run -f shell-hello.nix env > $TEST_ROOT/actual-env
 # Remove/reset variables we expect to be different.
 # - PATH is modified by nix shell
-# - we unset TMPDIR on macOS if it contains /var/folders
+# - we unset TMPDIR on macOS if it contains /var/folders. bad. https://github.com/NixOS/nix/issues/7731
 # - _ is set by bash and is expected to differ because it contains the original command
 # - __CF_USER_TEXT_ENCODING is set by macOS and is beyond our control
 sed -i \
