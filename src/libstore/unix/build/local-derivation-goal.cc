@@ -109,9 +109,9 @@ LocalDerivationGoal::~LocalDerivationGoal()
 {
     /* Careful: we should never ever throw an exception from a
        destructor. */
-    try { deleteTmpDir(false); } catch (...) { ignoreException(); }
-    try { killChild(); } catch (...) { ignoreException(); }
-    try { stopDaemon(); } catch (...) { ignoreException(); }
+    try { deleteTmpDir(false); } catch (...) { ignoreExceptionInDestructor(); }
+    try { killChild(); } catch (...) { ignoreExceptionInDestructor(); }
+    try { stopDaemon(); } catch (...) { ignoreExceptionInDestructor(); }
 }
 
 
@@ -1531,7 +1531,7 @@ void LocalDerivationGoal::startDaemon()
                         NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
                 } catch (SystemError &) {
-                    ignoreException();
+                    ignoreExceptionExceptInterrupt();
                 }
             });
 

@@ -294,7 +294,7 @@ void PathSubstitutionGoal::cleanup()
 
         outPipe.close();
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 
