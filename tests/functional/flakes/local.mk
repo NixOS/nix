@@ -19,6 +19,7 @@ flake-tests := \
   $(d)/eval-cache.sh \
   $(d)/search-root.sh \
   $(d)/config.sh \
-  $(d)/show.sh
+  $(d)/show.sh \
+  $(d)/relative-paths.sh
 
 install-tests-groups += flake
