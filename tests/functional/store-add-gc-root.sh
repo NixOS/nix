@@ -2,7 +2,9 @@
 
 source common.sh
 
-clearStoreIfPossible
+TODO_NixOS
+
+clearStore
 
 function delete() { nix-store --delete "$storePath"; }
 function build() { nix build --no-link --print-out-paths -f simple.nix; }
