@@ -13,6 +13,8 @@
 
 #else
 
+#  include <memory>
+
 /* Some dummy aliases for Boehm GC definitions to reduce the number of
    #ifdefs. */
 
