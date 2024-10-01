@@ -23,7 +23,7 @@ This option requires either:
 > when running Nix commands, refer to GitHub issue [NixOS/nix#10892](https://github.com/NixOS/nix/issues/10892) for instructions to fix your installation without reinstalling.
 
 ```console
-$ bash <(curl -L https://nixos.org/nix/install) --daemon
+$ curl -L https://nixos.org/nix/install | sh -s -- --daemon
 ```
 
 ## Single-user
@@ -36,7 +36,7 @@ cannot offer equivalent sharing, isolation, or security.
 This option is suitable for systems without systemd.
 
 ```console
-$ bash <(curl -L https://nixos.org/nix/install) --no-daemon
+$ curl -L https://nixos.org/nix/install | sh -s -- --no-daemon
 ```
 
 ## Distributions
