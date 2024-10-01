@@ -139,7 +139,7 @@ struct curlFileTransfer : public FileTransfer
                 if (!done)
                     fail(FileTransferError(Interrupted, {}, "download of '%s' was interrupted", request.uri));
             } catch (...) {
-                ignoreException();
+                ignoreExceptionInDestructor();
             }
         }
 

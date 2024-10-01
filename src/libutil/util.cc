@@ -1,6 +1,7 @@
 #include "util.hh"
 #include "fmt.hh"
 #include "file-path.hh"
+#include "signals.hh"
 
 #include <array>
 #include <cctype>
@@ -182,7 +183,7 @@ std::string shellEscape(const std::string_view s)
 }
 
 
-void ignoreException(Verbosity lvl)
+void ignoreExceptionInDestructor(Verbosity lvl)
 {
     /* Make sure no exceptions leave this function.
        printError() also throws when remote is closed. */
@@ -193,6 +194,17 @@ void ignoreException(Verbosity lvl)
             printMsg(lvl, "error (ignored): %1%", e.what());
         }
     } catch (...) { }
+}
+
+void ignoreExceptionExceptInterrupt(Verbosity lvl)
+{
+    try {
+        throw;
+    } catch (const Interrupted & e) {
+        throw;
+    } catch (std::exception & e) {
+        printMsg(lvl, "error (ignored): %1%", e.what());
+    }
 }
 
 

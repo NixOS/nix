@@ -372,9 +372,11 @@ struct CmdFlakeCheck : FlakeCommand
         auto reportError = [&](const Error & e) {
             try {
                 throw e;
+            } catch (Interrupted & e) {
+                throw;
             } catch (Error & e) {
                 if (settings.keepGoing) {
-                    ignoreException();
+                    ignoreExceptionExceptInterrupt();
                     hasErrors = true;
                 }
                 else
