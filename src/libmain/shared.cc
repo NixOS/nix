@@ -174,15 +174,6 @@ void initNix(bool loadConfig)
        everybody. */
     umask(0022);
 
-    /* Initialise the PRNG. */
-    struct timeval tv;
-    gettimeofday(&tv, 0);
-#ifndef _WIN32
-    srandom(tv.tv_usec);
-#endif
-    srand(tv.tv_usec);
-
-
 }
 
 

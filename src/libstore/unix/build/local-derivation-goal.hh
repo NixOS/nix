@@ -307,6 +307,8 @@ struct LocalDerivationGoal : public DerivationGoal
      * rewrites caught everything
      */
     StorePath makeFallbackPath(OutputNameView outputName);
+
+    void replaceValidPath(const Path & storePath, const Path & tmpPath);
 };
 
 }
