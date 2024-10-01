@@ -222,7 +222,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        its timestamp back to 0. */
     MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : "");
 
-    std::filesystem::path tempLink = fmt("%1%/.tmp-link-%2%-%3%", realStoreDir, getpid(), rand());
+    std::filesystem::path tempLink = fmt("%1%/.tmp-link-%2%-%3%", realStoreDir, getpid(), rng());
 
     try {
         std::filesystem::create_hard_link(linkPath, tempLink);
