@@ -2022,11 +2022,6 @@ void LocalDerivationGoal::runChild()
                 throw SysError("setuid failed");
         }
 
-        /* Fill in the arguments. */
-        Strings args;
-
-        std::string builder = "invalid";
-
 #if __APPLE__
         /* This has to appear before import statements. */
         std::string sandboxProfile = "(version 1)\n";
@@ -2150,14 +2145,6 @@ void LocalDerivationGoal::runChild()
         }
 #endif
 
-        if (!drv->isBuiltin()) {
-            builder = drv->builder;
-            args.push_back(std::string(baseNameOf(drv->builder)));
-        }
-
-        for (auto & i : drv->args)
-            args.push_back(rewriteStrings(i, inputRewrites));
-
         /* Indicate that we managed to set up the build environment. */
         writeFull(STDERR_FILENO, std::string("\2\n"));
 
@@ -2187,6 +2174,14 @@ void LocalDerivationGoal::runChild()
             }
         }
 
+        // Now builder is not builtin
+
+        Strings args;
+        args.push_back(std::string(baseNameOf(drv->builder)));
+
+        for (auto & i : drv->args)
+            args.push_back(rewriteStrings(i, inputRewrites));
+
 #if __APPLE__
         posix_spawnattr_t attrp;
 
@@ -2208,9 +2203,9 @@ void LocalDerivationGoal::runChild()
             posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
         }
 
-        posix_spawn(NULL, builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+        posix_spawn(NULL, drv->builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 #else
-        execve(builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+        execve(drv->builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 #endif
 
         throw SysError("executing '%1%'", drv->builder);
