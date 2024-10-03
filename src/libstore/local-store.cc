@@ -93,7 +93,7 @@ struct LocalStore::State::Stmts {
     SQLiteStmt AddRealisationReference;
 };
 
-int getSchema(Path schemaPath)
+static int getSchema(Path schemaPath)
 {
     int curSchema = 0;
     if (pathExists(schemaPath)) {
@@ -130,61 +130,8 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
             curCASchema = nixCASchemaVersion;
         }
 
-        if (curCASchema < 2) {
-            SQLiteTxn txn(db);
-            // Ugly little sql dance to add a new `id` column and make it the primary key
-            db.exec(R"(
-                create table Realisations2 (
-                    id integer primary key autoincrement not null,
-                    drvPath text not null,
-                    outputName text not null, -- symbolic output id, usually "out"
-                    outputPath integer not null,
-                    signatures text, -- space-separated list
-                    foreign key (outputPath) references ValidPaths(id) on delete cascade
-                );
-                insert into Realisations2 (drvPath, outputName, outputPath, signatures)
-                    select drvPath, outputName, outputPath, signatures from Realisations;
-                drop table Realisations;
-                alter table Realisations2 rename to Realisations;
-            )");
-            db.exec(R"(
-                create index if not exists IndexRealisations on Realisations(drvPath, outputName);
-
-                create table if not exists RealisationsRefs (
-                    referrer integer not null,
-                    realisationReference integer,
-                    foreign key (referrer) references Realisations(id) on delete cascade,
-                    foreign key (realisationReference) references Realisations(id) on delete restrict
-                );
-            )");
-            txn.commit();
-        }
-
-        if (curCASchema < 3) {
-            SQLiteTxn txn(db);
-            // Apply new indices added in this schema update.
-            db.exec(R"(
-                -- used by QueryRealisationReferences
-                create index if not exists IndexRealisationsRefs on RealisationsRefs(referrer);
-                -- used by cascade deletion when ValidPaths is deleted
-                create index if not exists IndexRealisationsRefsOnOutputPath on Realisations(outputPath);
-            )");
-            txn.commit();
-        }
-        if (curCASchema < 4) {
-            SQLiteTxn txn(db);
-            db.exec(R"(
-                create trigger if not exists DeleteSelfRefsViaRealisations before delete on ValidPaths
-                begin
-                    delete from RealisationsRefs where realisationReference in (
-                    select id from Realisations where outputPath = old.id
-                    );
-                end;
-                -- used by deletion trigger
-                create index if not exists IndexRealisationsRefsRealisationReference on RealisationsRefs(realisationReference);
-            )");
-            txn.commit();
-        }
+        if (curCASchema < 4)
+            throw Error("experimental CA schema version %d is no longer supported", curCASchema);
 
         writeFile(schemaPath, fmt("%d", nixCASchemaVersion), 0666, true);
         lockFile(lockFd.get(), ltRead, true);
