@@ -2137,8 +2137,9 @@ void LocalDerivationGoal::runChild()
                 sandboxArgs.push_back("_ALLOW_LOCAL_NETWORKING");
                 sandboxArgs.push_back("1");
             }
-            if (sandbox_init_with_parameters(sandboxProfile.c_str(), 0, stringsToCharPtrs(sandboxArgs).data(), NULL)) {
-                writeFull(STDERR_FILENO, "failed to configure sandbox\n");
+            char * sandbox_errbuf = nullptr;
+            if (sandbox_init_with_parameters(sandboxProfile.c_str(), 0, stringsToCharPtrs(sandboxArgs).data(), &sandbox_errbuf)) {
+                writeFull(STDERR_FILENO, fmt("failed to configure sandbox: %s\n", sandbox_errbuf ? sandbox_errbuf : "(null)"));
                 _exit(1);
             }
         }
