@@ -2156,15 +2156,12 @@ void LocalDerivationGoal::runChild()
                 _exit(1);
             }
         }
+#endif
 
-        builder = drv->builder;
-        args.push_back(std::string(baseNameOf(drv->builder)));
-#else
         if (!drv->isBuiltin()) {
             builder = drv->builder;
             args.push_back(std::string(baseNameOf(drv->builder)));
         }
-#endif
 
         for (auto & i : drv->args)
             args.push_back(rewriteStrings(i, inputRewrites));
