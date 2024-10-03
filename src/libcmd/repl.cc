@@ -654,7 +654,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 ss << "No documentation found.\n\n";
             }
 
-            auto markdown = ss.str();
+            auto markdown = ss.view();
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
 
         } else

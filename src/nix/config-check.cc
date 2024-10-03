@@ -26,17 +26,17 @@ std::string formatProtocol(unsigned int proto)
     return "unknown";
 }
 
-bool checkPass(const std::string & msg) {
+bool checkPass(std::string_view msg) {
     notice(ANSI_GREEN "[PASS] " ANSI_NORMAL + msg);
     return true;
 }
 
-bool checkFail(const std::string & msg) {
+bool checkFail(std::string_view msg) {
     notice(ANSI_RED "[FAIL] " ANSI_NORMAL + msg);
     return false;
 }
 
-void checkInfo(const std::string & msg) {
+void checkInfo(std::string_view msg) {
     notice(ANSI_BLUE "[INFO] " ANSI_NORMAL + msg);
 }
 
@@ -91,7 +91,7 @@ struct CmdConfigCheck : StoreCommand
             ss << "Multiple versions of nix found in PATH:\n";
             for (auto & dir : dirs)
                 ss << "  " << dir << "\n";
-            return checkFail(ss.str());
+            return checkFail(ss.view());
         }
 
         return checkPass("PATH contains only one nix version.");
@@ -132,7 +132,7 @@ struct CmdConfigCheck : StoreCommand
             for (auto & dir : dirs)
                 ss << "  " << dir << "\n";
             ss << "\n";
-            return checkFail(ss.str());
+            return checkFail(ss.view());
         }
 
         return checkPass("All profiles are gcroots.");
@@ -151,7 +151,7 @@ struct CmdConfigCheck : StoreCommand
                << "sync with the daemon.\n\n"
                << "Client protocol: " << formatProtocol(clientProto) << "\n"
                << "Store protocol: " << formatProtocol(storeProto) << "\n\n";
-            return checkFail(ss.str());
+            return checkFail(ss.view());
         }
 
         return checkPass("Client protocol matches store protocol.");
