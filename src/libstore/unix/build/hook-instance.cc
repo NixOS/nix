@@ -91,7 +91,7 @@ HookInstance::~HookInstance()
         toHook.writeSide = -1;
         if (pid != -1) pid.kill();
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 

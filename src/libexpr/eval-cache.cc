@@ -101,7 +101,7 @@ struct AttrDb
                 state->txn->commit();
             state->txn.reset();
         } catch (...) {
-            ignoreException();
+            ignoreExceptionInDestructor();
         }
     }
 
@@ -112,7 +112,7 @@ struct AttrDb
         try {
             return fun();
         } catch (SQLiteError &) {
-            ignoreException();
+            ignoreExceptionExceptInterrupt();
             failed = true;
             return 0;
         }
@@ -351,7 +351,7 @@ static std::shared_ptr<AttrDb> makeAttrDb(
     try {
         return std::make_shared<AttrDb>(cfg, fingerprint, symbols);
     } catch (SQLiteError &) {
-        ignoreException();
+        ignoreExceptionExceptInterrupt();
         return nullptr;
     }
 }

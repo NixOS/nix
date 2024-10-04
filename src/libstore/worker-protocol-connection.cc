@@ -12,7 +12,7 @@ WorkerProto::BasicClientConnection::~BasicClientConnection()
     try {
         to.flush();
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 

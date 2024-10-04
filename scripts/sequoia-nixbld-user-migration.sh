@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -eo pipefail
+
 ((NEW_NIX_FIRST_BUILD_UID=351))
 ((TEMP_NIX_FIRST_BUILD_UID=31000))
 

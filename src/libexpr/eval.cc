@@ -1,5 +1,4 @@
 #include "eval.hh"
-#include "eval-gc.hh"
 #include "eval-settings.hh"
 #include "primops.hh"
 #include "print-options.hh"
@@ -39,16 +38,6 @@
 #  include <sys/resource.h>
 #endif
 
-#if HAVE_BOEHMGC
-
-#  define GC_INCLUDE_NEW
-
-#  include <gc/gc.h>
-#  include <gc/gc_cpp.h>
-#  include <gc/gc_allocator.h>
-
-#endif
-
 #include "strings-inline.hh"
 
 using json = nlohmann::json;
@@ -58,24 +47,7 @@ namespace nix {
 static char * allocString(size_t size)
 {
     char * t;
-#if HAVE_BOEHMGC
     t = (char *) GC_MALLOC_ATOMIC(size);
-#else
-    t = (char *) malloc(size);
-#endif
-    if (!t) throw std::bad_alloc();
-    return t;
-}
-
-
-static char * dupString(const char * s)
-{
-    char * t;
-#if HAVE_BOEHMGC
-    t = GC_STRDUP(s);
-#else
-    t = strdup(s);
-#endif
     if (!t) throw std::bad_alloc();
     return t;
 }
@@ -99,11 +71,7 @@ static const char * makeImmutableString(std::string_view s)
 
 RootValue allocRootValue(Value * v)
 {
-#if HAVE_BOEHMGC
     return std::allocate_shared<Value *>(traceable_allocator<Value *>(), v);
-#else
-    return std::make_shared<Value *>(v);
-#endif
 }
 
 // Pretty print types for assertion errors
@@ -855,9 +823,10 @@ static const char * * encodeContext(const NixStringContext & context)
         size_t n = 0;
         auto ctx = (const char * *)
             allocBytes((context.size() + 1) * sizeof(char *));
-        for (auto & i : context)
-            ctx[n++] = dupString(i.to_string().c_str());
-        ctx[n] = 0;
+        for (auto & i : context) {
+            ctx[n++] = makeImmutableString({i.to_string()});
+        }
+        ctx[n] = nullptr;
         return ctx;
     } else
         return nullptr;

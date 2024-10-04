@@ -1,5 +1,6 @@
 #include "serialise.hh"
 #include "signals.hh"
+#include "util.hh"
 
 #include <cstring>
 #include <cerrno>
@@ -52,7 +53,7 @@ void BufferedSink::flush()
 
 FdSink::~FdSink()
 {
-    try { flush(); } catch (...) { ignoreException(); }
+    try { flush(); } catch (...) { ignoreExceptionInDestructor(); }
 }
 
 

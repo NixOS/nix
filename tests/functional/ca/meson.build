@@ -16,7 +16,7 @@ suites += {
     'duplicate-realisation-in-closure.sh',
     'eval-store.sh',
     'gc.sh',
-    'import-derivation.sh',
+    'import-from-derivation.sh',
     'new-build-cmd.sh',
     'nix-copy.sh',
     'nix-run.sh',

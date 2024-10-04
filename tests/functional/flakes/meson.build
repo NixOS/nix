@@ -23,6 +23,7 @@ suites += {
     'search-root.sh',
     'config.sh',
     'show.sh',
+    'dubious-query.sh',
   ],
   'workdir': meson.current_build_dir(),
 }
