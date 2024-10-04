@@ -11,6 +11,8 @@
 #include "value-to-json.hh"
 #include "fetch-to-store.hh"
 
+#include <nlohmann/json.hpp>
+
 #include <ctime>
 #include <iomanip>
 #include <regex>

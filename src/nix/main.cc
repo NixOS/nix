@@ -19,6 +19,7 @@
 #include "eval-cache.hh"
 #include "flake/flake.hh"
 #include "self-exe.hh"
+#include "json-utils.hh"
 
 #include <sys/types.h>
 #include <regex>

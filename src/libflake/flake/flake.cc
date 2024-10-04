@@ -13,6 +13,8 @@
 #include "value-to-json.hh"
 #include "local-fs-store.hh"
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
 using namespace flake;

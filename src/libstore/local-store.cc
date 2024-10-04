@@ -50,6 +50,8 @@
 
 #include <sqlite3.h>
 
+#include <nlohmann/json.hpp>
+
 #include "strings.hh"
 
 
