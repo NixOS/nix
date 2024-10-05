@@ -13,8 +13,8 @@
 #include "git-utils.hh"
 #include "logging.hh"
 #include "finally.hh"
-
 #include "fetch-settings.hh"
+#include "json-utils.hh"
 
 #include <regex>
 #include <string.h>
