@@ -100,7 +100,7 @@ which you may remove.
    LABEL=Nix\040Store /nix apfs rw,nobrowse
    ```
 
-   by setting the cursor on the respective line using the error keys, and pressing `dd`, and then `:wq` to save the file.
+   by setting the cursor on the respective line using the arrow keys, and pressing `dd`, and then `:wq` to save the file.
 
    This will prevent automatic mounting of the Nix Store volume.
 
