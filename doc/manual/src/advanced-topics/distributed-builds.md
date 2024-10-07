@@ -1,10 +1,9 @@
 # Remote Builds
 
-A local Nix installation can forward Nix builds to other machines.
+A local Nix installation can forward Nix builds to other machines,
+this allows multiple builds to be performed in parallel.
 
-This allows multiple builds to be performed in parallel.
-
-Remote builds also allow Nix to perform multi-platform builds in a 
+Remote builds also allow Nix to perform multi-platform builds in a
 semi-transparent way. For example, if you perform a build for a
 `x86_64-darwin` on an `i686-linux` machine, Nix can automatically
 forward the build to a `x86_64-darwin` machine, if one is available.
@@ -34,13 +33,16 @@ query paramater, e.g.
 nix store info --store ssh://username@mac?ssh-key=/home/alice/my-key
 ```
 
-Since builds should be non-interactive, the key must not have a
+Since builds should be non-interactive, the key should not have a
 passphrase. Alternatively, you can load identities ahead of time into
 `ssh-agent` or `gpg-agent`.
 
-In a multi-user installation (default), the build is executed by the
-the Nix daemon. The Nix daemon's user (typically root) needs to have
-SSH access to the remote builder.
+In a multi-user installation (default), builds are executed by the Nix
+Daemon. The Nix Daemon cannot prompt for a passphrase via the terminal
+or `ssh-agent`, so the SSH key must not have a passphrase.
+
+In addition, the Nix Daemon's user (typically root) needs to have SSH
+access to the remote builder.
 
 Access can be verified by running `sudo su`, and then validating SSH
 access, e.g. by running `ssh mac`. SSH identity files for root users
