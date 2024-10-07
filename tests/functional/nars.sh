@@ -103,9 +103,10 @@ rm -rf "$TEST_ROOT/out"
 set +e
 unicodeTestOut=$(nix-store --restore "$TEST_ROOT/out" < unnormalized.nar 2>&1)
 unicodeTestCode=$?
-touch "$TEST_ROOT/unicode-â"
-touch "$TEST_ROOT/unicode-â"
 set -e
+
+touch "$TEST_ROOT/unicode-â" # non-canonical version
+touch "$TEST_ROOT/unicode-â"
 
 touchFilesCount=$(find "$TEST_ROOT" -maxdepth 1 -name "unicode-*" -type f | wc -l)
 
