@@ -1,35 +1,57 @@
 # Remote Builds
 
-Nix supports remote builds, where a local Nix installation can forward
-Nix builds to other machines. This allows multiple builds to be
-performed in parallel and allows Nix to perform multi-platform builds in
-a semi-transparent way. For instance, if you perform a build for a
-`x86_64-darwin` on an `i686-linux` machine, Nix can automatically
-forward the build to a `x86_64-darwin` machine, if available.
+A local Nix installation can forward Nix builds to other machines,
+this allows multiple builds to be performed in parallel.
 
-To forward a build to a remote machine, it’s required that the remote
-machine is accessible via SSH and that it has Nix installed. You can
-test whether connecting to the remote Nix instance works, e.g.
+Remote builds also allow Nix to perform multi-platform builds in a
+semi-transparent way. For example, if you perform a build for a
+`x86_64-darwin` on an `i686-linux` machine, Nix can automatically
+forward the build to a `x86_64-darwin` machine, if one is available.
+
+## Requirements
+
+For a local machine to forward a build to a remote machine, the remote machine must:
+
+- Have Nix installed
+- Be running an SSH server, e.g. `sshd`
+- Be accessible via SSH from the local machine over the network
+- Have the local machine's public SSH key in `/etc/ssh/authorized_keys.d/<username>`
+- Have the username of the SSH user in the `trusted-users` setting in `nix.conf`
+
+## Testing
+
+To test connecting to a remote Nix instance (in this case `mac`), run:
 
 ```console
-$ nix store info --store ssh://mac
+nix store info --store ssh://username@mac
 ```
 
-will try to connect to the machine named `mac`. It is possible to
-specify an SSH identity file as part of the remote store URI, e.g.
+To specify an SSH identity file as part of the remote store URI add a
+query paramater, e.g.
 
 ```console
-$ nix store info --store ssh://mac?ssh-key=/home/alice/my-key
+nix store info --store ssh://username@mac?ssh-key=/home/alice/my-key
 ```
 
 Since builds should be non-interactive, the key should not have a
 passphrase. Alternatively, you can load identities ahead of time into
 `ssh-agent` or `gpg-agent`.
 
+In a multi-user installation (default), builds are executed by the Nix
+Daemon. The Nix Daemon cannot prompt for a passphrase via the terminal
+or `ssh-agent`, so the SSH key must not have a passphrase.
+
+In addition, the Nix Daemon's user (typically root) needs to have SSH
+access to the remote builder.
+
+Access can be verified by running `sudo su`, and then validating SSH
+access, e.g. by running `ssh mac`. SSH identity files for root users
+are usually stored in `/root/.ssh/` (Linux) or `/var/root/.ssh` (MacOS).
+
 If you get the error
 
 ```console
-bash: nix-store: command not found
+bash: nix: command not found
 error: cannot connect to 'mac'
 ```
 
@@ -40,15 +62,28 @@ The [list of remote build machines](@docroot@/command-ref/conf-file.md#conf-buil
 For example, the following command allows you to build a derivation for `x86_64-darwin` on a Linux machine:
 
 ```console
-$ uname
+uname
+```
+
+```console
 Linux
+```
 
-$ nix build --impure \
-  --expr '(with import <nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
-  --builders 'ssh://mac x86_64-darwin'
+```console
+nix build --impure \
+ --expr '(with import <nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
+ --builders 'ssh://mac x86_64-darwin'
+```
+
+```console
 [1/0/1 built, 0.0 MiB DL] building foo on ssh://mac
+```
 
-$ cat ./result
+```console
+cat ./result
+```
+
+```console
 Darwin
 ```
 
@@ -61,6 +96,8 @@ It is possible to specify multiple build machines separated by a semicolon or a 
 Remote build machines can also be configured in [`nix.conf`](@docroot@/command-ref/conf-file.md), e.g.
 
     builders = ssh://mac x86_64-darwin ; ssh://beastie x86_64-freebsd
+
+After making changes to `nix.conf`, restart the Nix daemon for changes to take effect.
 
 Finally, remote build machines can be configured in a separate configuration
 file included in `builders` via the syntax `@/path/to/file`. For example,
