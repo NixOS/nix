@@ -69,7 +69,15 @@ which you may remove.
    # End Nix
    ```
 
-2. Stop and remove the Nix daemon services:
+   If you cannot edit these files directly, unlink them:
+
+   ```console
+   sudo unlink /etc/zshrc
+   sudo unlink /etc/bashrc
+   sudo unlink /etc/bash.bashrc
+   ```
+
+3. Stop and remove the Nix daemon services:
 
    ```console
    sudo launchctl unload /Library/LaunchDaemons/org.nixos.nix-daemon.plist
@@ -80,7 +88,7 @@ which you may remove.
 
    This stops the Nix daemon and prevents it from being started next time you boot the system.
 
-3. Remove the `nixbld` group and the `_nixbuildN` users:
+4. Remove the `nixbld` group and the `_nixbuildN` users:
 
    ```console
    sudo dscl . -delete /Groups/nixbld
@@ -89,7 +97,7 @@ which you may remove.
 
    This will remove all the build users that no longer serve a purpose.
 
-4. Edit fstab using `sudo vifs` to remove the line mounting the Nix Store volume on `/nix`, which looks like
+5. Edit fstab using `sudo vifs` to remove the line mounting the Nix Store volume on `/nix`, which looks like
 
    ```
    UUID=<uuid> /nix apfs rw,noauto,nobrowse,suid,owners
@@ -104,7 +112,7 @@ which you may remove.
 
    This will prevent automatic mounting of the Nix Store volume.
 
-5. Edit `/etc/synthetic.conf` to remove the `nix` line.
+6. Edit `/etc/synthetic.conf` to remove the `nix` line.
    If this is the only line in the file you can remove it entirely:
 
    ```bash
@@ -119,14 +127,14 @@ which you may remove.
 
    This will prevent the creation of the empty `/nix` directory.
 
-6. Remove the files Nix added to your system, except for the store:
+7. Remove the files Nix added to your system, except for the store:
 
    ```console
    sudo rm -rf /etc/nix /var/root/.nix-profile /var/root/.nix-defexpr /var/root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
    ```
 
 
-7. Remove the Nix Store volume:
+8. Remove the Nix Store volume:
 
    ```console
    sudo diskutil apfs deleteVolume /nix
