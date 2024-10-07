@@ -87,11 +87,11 @@ struct CmdConfigCheck : StoreCommand
         }
 
         if (dirs.size() != 1) {
-            std::stringstream ss;
+            std::ostringstream ss;
             ss << "Multiple versions of nix found in PATH:\n";
             for (auto & dir : dirs)
                 ss << "  " << dir << "\n";
-            return checkFail(ss.view());
+            return checkFail(toView(ss));
         }
 
         return checkPass("PATH contains only one nix version.");
@@ -125,14 +125,14 @@ struct CmdConfigCheck : StoreCommand
         }
 
         if (!dirs.empty()) {
-            std::stringstream ss;
+            std::ostringstream ss;
             ss << "Found profiles outside of " << settings.nixStateDir << "/profiles.\n"
                << "The generation this profile points to might not have a gcroot and could be\n"
                << "garbage collected, resulting in broken symlinks.\n\n";
             for (auto & dir : dirs)
                 ss << "  " << dir << "\n";
             ss << "\n";
-            return checkFail(ss.view());
+            return checkFail(toView(ss));
         }
 
         return checkPass("All profiles are gcroots.");
@@ -145,13 +145,13 @@ struct CmdConfigCheck : StoreCommand
             : PROTOCOL_VERSION;
 
         if (clientProto != storeProto) {
-            std::stringstream ss;
+            std::ostringstream ss;
             ss << "Warning: protocol version of this client does not match the store.\n"
                << "While this is not necessarily a problem it's recommended to keep the client in\n"
                << "sync with the daemon.\n\n"
                << "Client protocol: " << formatProtocol(clientProto) << "\n"
                << "Store protocol: " << formatProtocol(storeProto) << "\n\n";
-            return checkFail(ss.view());
+            return checkFail(toView(ss));
         }
 
         return checkPass("Client protocol matches store protocol.");

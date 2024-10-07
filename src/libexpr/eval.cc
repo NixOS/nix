@@ -539,7 +539,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     if (v.isLambda()) {
         auto exprLambda = v.payload.lambda.fun;
 
-        std::stringstream s(std::ios_base::out);
+        std::ostringstream s(std::ios_base::out);
         std::string name;
         auto pos = positions[exprLambda->getPos()];
         std::string docStr;
@@ -578,7 +578,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             .name = name,
             .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
             .args = {},
-            .doc = makeImmutableString(s.view()), // NOTE: memory leak when compiled without GC
+            .doc = makeImmutableString(toView(s)), // NOTE: memory leak when compiled without GC
         };
     }
     if (isFunctor(v)) {
@@ -1804,7 +1804,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
         std::ostringstream out;
         cond->show(state.symbols, out);
-        auto exprStr = out.view();
+        auto exprStr = toView(out);
 
         if (auto eq = dynamic_cast<ExprOpEq *>(cond)) {
             try {
