@@ -373,6 +373,9 @@ const redirects = {
     "gloss-local-store": "store/types/local-store.html",
     "gloss-chroot-store": "store/types/local-store.html",
   },
+  "files/profiles.html": {
+    "filesystem-layout": "#profile-contents",
+  },
 };
 
 // the following code matches the current page's URL against the set of redirects.
