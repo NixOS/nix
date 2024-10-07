@@ -186,7 +186,7 @@ struct Installable
         OperateOn operateOn,
         ref<Installable> installable);
 
-    static std::set<StorePath> toDerivations(
+    static std::vector<StorePath> toDerivations(
         ref<Store> store,
         const Installables & installables,
         bool useDeriver = false);

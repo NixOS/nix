@@ -9,18 +9,20 @@
 
 using namespace nix;
 
-static nlohmann::json storePathSetToJSON(const StorePathSet & paths, Store & store)
+static nlohmann::json storePathSetToJSON(const StorePaths & paths, Store & store)
 {
-    auto res = nlohmann::json::object();
+    nlohmann::json res;
     for (auto & path : paths) {
-        res[store.printStorePath(path)] = nlohmann::json::object();
+        nlohmann::json entry;
+        entry["drvPath"] = store.printStorePath(path);
+        res.push_back(entry);
     }
     return res;
 }
 
 // TODO deduplicate with other code also setting such out links.
 static void
-createOutLinks(const std::filesystem::path & outLink, const StorePathSet & derivations, LocalFSStore & store)
+createOutLinks(const std::filesystem::path & outLink, const StorePaths & derivations, LocalFSStore & store)
 {
     for (const auto & [_i, drv] : enumerate(derivations)) {
         auto i = _i;
