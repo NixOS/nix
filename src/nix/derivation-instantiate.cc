@@ -21,8 +21,7 @@ static nlohmann::json storePathSetToJSON(const StorePaths & paths, Store & store
 }
 
 // TODO deduplicate with other code also setting such out links.
-static void
-createOutLinks(const std::filesystem::path & outLink, const StorePaths & derivations, LocalFSStore & store)
+static void createOutLinks(const std::filesystem::path & outLink, const StorePaths & derivations, LocalFSStore & store)
 {
     for (const auto & [_i, drv] : enumerate(derivations)) {
         auto i = _i;
