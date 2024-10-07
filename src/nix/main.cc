@@ -118,6 +118,14 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         });
 
         addFlag({
+            .longName = "quiet",
+            .shortName = 'q',
+            .description = "Decrease the logging verbosity level.",
+            .category = loggingCategory,
+            .handler = {[]() { verbosity = verbosity > lvlError ? (Verbosity) (verbosity - 1) : lvlError; }},
+        });
+
+        addFlag({
             .longName = "print-build-logs",
             .shortName = 'L',
             .description = "Print full build logs on standard error.",
