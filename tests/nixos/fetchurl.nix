@@ -1,7 +1,7 @@
 # Test whether builtin:fetchurl properly performs TLS certificate
 # checks on HTTPS servers.
 
-{ lib, config, pkgs, ... }:
+{ pkgs, ... }:
 
 let
 
@@ -25,7 +25,7 @@ in
   name = "nss-preload";
 
   nodes = {
-    machine = { lib, pkgs, ... }: {
+    machine = { pkgs, ... }: {
       services.nginx = {
         enable = true;
 
@@ -60,12 +60,15 @@ in
     };
   };
 
-  testScript = { nodes, ... }: ''
+  testScript = ''
     machine.wait_for_unit("nginx")
     machine.wait_for_open_port(443)
 
     out = machine.succeed("curl https://good/index.html")
     assert out == "hello world\n"
+
+    out = machine.succeed("cat ${badCert}/cert.pem > /tmp/cafile.pem; curl --cacert /tmp/cafile.pem https://bad/index.html")
+    assert out == "foobar\n"
 
     # Fetching from a server with a trusted cert should work.
     machine.succeed("nix build --no-substitute --expr 'import <nix/fetchurl.nix> { url = \"https://good/index.html\"; hash = \"sha256-qUiQTy8PR5uPgZdpSzAYSw0u0cHNKh7A+4XSmaGSpEc=\"; }'")
@@ -74,5 +77,8 @@ in
     err = machine.fail("nix build --no-substitute --expr 'import <nix/fetchurl.nix> { url = \"https://bad/index.html\"; hash = \"sha256-rsBwZF/lPuOzdjBZN2E08FjMM3JHyXit0Xi2zN+wAZ8=\"; }' 2>&1")
     print(err)
     assert "SSL certificate problem: self-signed certificate" in err
+
+    # Fetching from a server with a trusted cert should work via environment variable override.
+    machine.succeed("NIX_SSL_CERT_FILE=/tmp/cafile.pem nix build --no-substitute --expr 'import <nix/fetchurl.nix> { url = \"https://bad/index.html\"; hash = \"sha256-rsBwZF/lPuOzdjBZN2E08FjMM3JHyXit0Xi2zN+wAZ8=\"; }'")
   '';
 }
