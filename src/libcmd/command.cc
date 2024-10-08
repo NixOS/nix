@@ -334,4 +334,29 @@ void MixEnvironment::setEnviron()
     }
 }
 
+void createOutLinks(
+    const std::filesystem::path & outLink,
+    const BuiltPaths & buildables,
+    LocalFSStore & store)
+{
+    for (const auto & [_i, buildable] : enumerate(buildables)) {
+        auto i = _i;
+        std::visit(overloaded {
+            [&](const BuiltPath::Opaque & bo) {
+                auto symlink = outLink;
+                if (i) symlink += fmt("-%d", i);
+                store.addPermRoot(bo.path, absPath(symlink.string()));
+            },
+            [&](const BuiltPath::Built & bfd) {
+                for (auto & output : bfd.outputs) {
+                    auto symlink = outLink;
+                    if (i) symlink += fmt("-%d", i);
+                    if (output.first != "out") symlink += fmt("-%s", output.first);
+                    store.addPermRoot(output.second, absPath(symlink.string()));
+                }
+            },
+        }, buildable.raw());
+    }
+}
+
 }

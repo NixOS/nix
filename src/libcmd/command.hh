@@ -18,6 +18,7 @@ extern char * * savedArgv;
 class EvalState;
 struct Pos;
 class Store;
+class LocalFSStore;
 
 static constexpr Command::Category catHelp = -1;
 static constexpr Command::Category catSecondary = 100;
@@ -366,5 +367,14 @@ void printClosureDiff(
     const StorePath & beforePath,
     const StorePath & afterPath,
     std::string_view indent);
+
+/**
+ * Create symlinks prefixed by `outLink` to the store paths in
+ * `buildables`.
+ */
+void createOutLinks(
+    const std::filesystem::path & outLink,
+    const BuiltPaths & buildables,
+    LocalFSStore & store);
 
 }
