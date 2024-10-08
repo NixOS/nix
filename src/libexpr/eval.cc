@@ -539,7 +539,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     if (v.isLambda()) {
         auto exprLambda = v.payload.lambda.fun;
 
-        std::ostringstream s(std::ios_base::out);
+        std::ostringstream s;
         std::string name;
         auto pos = positions[exprLambda->getPos()];
         std::string docStr;
@@ -570,8 +570,6 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
         }
 
         s << docStr;
-
-        s << '\0'; // for making a c string below
 
         return Doc {
             .pos = pos,
