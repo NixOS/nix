@@ -167,13 +167,15 @@
           ;
       };
 
-      checks = forAllSystems (system: {
+      checks = forAllSystems (system: let pkgs = nixpkgsFor.${system}.native; in {
+        # https://nixos.org/manual/nixpkgs/stable/index.html#tester-lycheeLinkCheck
+        linkcheck = pkgs.testers.lycheeLinkCheck {
+          site = lib.getOutput "doc" pkgs.nix + "/share/doc/nix/manual";
+        };
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
-        rl-next =
-          let pkgs = nixpkgsFor.${system}.native;
-          in pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
+        rl-next = pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
           LANG=C.UTF-8 ${pkgs.changelog-d}/bin/changelog-d ${./doc/manual/rl-next} >$out
         '';
         repl-completion = nixpkgsFor.${system}.native.callPackage ./tests/repl-completion.nix { };
