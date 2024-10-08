@@ -18,7 +18,9 @@ HASH=$(nix hash path $outPath)
 clearStore
 clearCacheCache
 
-nix copy --from $cacheURI $outPath --no-check-sigs
+nix copy --from $cacheURI $outPath --no-check-sigs --profile $TEST_ROOT/profile
+
+[[ -e $TEST_ROOT/profile ]]
 
 if ls $cacheDir/nar/*.zst &> /dev/null; then
     echo "files do exist"

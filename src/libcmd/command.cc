@@ -179,30 +179,34 @@ BuiltPathsCommand::BuiltPathsCommand(bool recursive)
 
 void BuiltPathsCommand::run(ref<Store> store, Installables && installables)
 {
-    BuiltPaths paths;
+    BuiltPaths rootPaths, allPaths;
+
     if (all) {
         if (installables.size())
             throw UsageError("'--all' does not expect arguments");
         // XXX: Only uses opaque paths, ignores all the realisations
         for (auto & p : store->queryAllValidPaths())
-            paths.emplace_back(BuiltPath::Opaque{p});
+            rootPaths.emplace_back(BuiltPath::Opaque{p});
+        allPaths = rootPaths;
     } else {
-        paths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
+        rootPaths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
+        allPaths = rootPaths;
+
         if (recursive) {
             // XXX: This only computes the store path closure, ignoring
             // intermediate realisations
             StorePathSet pathsRoots, pathsClosure;
-            for (auto & root : paths) {
+            for (auto & root : rootPaths) {
                 auto rootFromThis = root.outPaths();
                 pathsRoots.insert(rootFromThis.begin(), rootFromThis.end());
             }
             store->computeFSClosure(pathsRoots, pathsClosure);
             for (auto & path : pathsClosure)
-                paths.emplace_back(BuiltPath::Opaque{path});
+                allPaths.emplace_back(BuiltPath::Opaque{path});
         }
     }
 
-    run(store, std::move(paths));
+    run(store, std::move(allPaths), std::move(rootPaths));
 }
 
 StorePathsCommand::StorePathsCommand(bool recursive)
@@ -210,10 +214,10 @@ StorePathsCommand::StorePathsCommand(bool recursive)
 {
 }
 
-void StorePathsCommand::run(ref<Store> store, BuiltPaths && paths)
+void StorePathsCommand::run(ref<Store> store, BuiltPaths && allPaths, BuiltPaths && rootPaths)
 {
     StorePathSet storePaths;
-    for (auto & builtPath : paths)
+    for (auto & builtPath : allPaths)
         for (auto & p : builtPath.outPaths())
             storePaths.insert(p);
 
@@ -242,17 +246,21 @@ MixProfile::MixProfile()
     });
 }
 
-void MixProfile::updateProfile(const StorePath & storePath)
+void MixProfile::updateProfile(
+    const StorePath & storePath,
+    ref<Store> store_)
 {
     if (!profile) return;
-    auto store = getStore().dynamic_pointer_cast<LocalFSStore>();
+    auto store = store_.dynamic_pointer_cast<LocalFSStore>();
     if (!store) throw Error("'--profile' is not supported for this Nix store");
     auto profile2 = absPath(*profile);
     switchLink(profile2,
         createGeneration(*store, profile2, storePath));
 }
 
-void MixProfile::updateProfile(const BuiltPaths & buildables)
+void MixProfile::updateProfile(
+    const BuiltPaths & buildables,
+    ref<Store> store)
 {
     if (!profile) return;
 
@@ -274,7 +282,7 @@ void MixProfile::updateProfile(const BuiltPaths & buildables)
     if (result.size() != 1)
         throw UsageError("'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
 
-    updateProfile(result[0]);
+    updateProfile(result[0], store);
 }
 
 MixDefaultProfile::MixDefaultProfile()
@@ -308,7 +316,8 @@ MixEnvironment::MixEnvironment() : ignoreEnvironment(false)
     });
 }
 
-void MixEnvironment::setEnviron() {
+void MixEnvironment::setEnviron()
+{
     if (ignoreEnvironment) {
         if (!unset.empty())
             throw UsageError("--unset does not make sense with --ignore-environment");

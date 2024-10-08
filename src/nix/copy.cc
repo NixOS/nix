@@ -4,7 +4,7 @@
 
 using namespace nix;
 
-struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand
+struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile
 {
     CheckSigsFlag checkSigs = CheckSigs;
 
@@ -43,19 +43,21 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand
 
     Category category() override { return catSecondary; }
 
-    void run(ref<Store> srcStore, BuiltPaths && paths) override
+    void run(ref<Store> srcStore, BuiltPaths && allPaths, BuiltPaths && rootPaths) override
     {
         auto dstStore = getDstStore();
 
         RealisedPath::Set stuffToCopy;
 
-        for (auto & builtPath : paths) {
+        for (auto & builtPath : allPaths) {
             auto theseRealisations = builtPath.toRealisedPaths(*srcStore);
             stuffToCopy.insert(theseRealisations.begin(), theseRealisations.end());
         }
 
         copyPaths(
             *srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
+
+        updateProfile(rootPaths, dstStore);
     }
 };
 

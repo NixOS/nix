@@ -424,7 +424,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
         }
 
         try {
-            updateProfile(manifest.build(store));
+            updateProfile(manifest.build(store), store);
         } catch (BuildEnvFileConflictError & conflictError) {
             // FIXME use C++20 std::ranges once macOS has it
             //       See https://github.com/NixOS/nix/compare/3efa476c5439f8f6c1968a6ba20a31d1239c2f04..1fe5d172ece51a619e879c4b86f603d9495cc102
@@ -669,7 +669,7 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
             removedCount,
             newManifest.elements.size());
 
-        updateProfile(newManifest.build(store));
+        updateProfile(newManifest.build(store), store);
     }
 };
 
@@ -779,7 +779,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 builtPaths.find(&*installable)->second.first);
         }
 
-        updateProfile(manifest.build(store));
+        updateProfile(manifest.build(store), store);
     }
 };
 

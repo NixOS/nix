@@ -238,7 +238,7 @@ public:
 
     BuiltPathsCommand(bool recursive = false);
 
-    virtual void run(ref<Store> store, BuiltPaths && paths) = 0;
+    virtual void run(ref<Store> store, BuiltPaths && allPaths, BuiltPaths && rootPaths) = 0;
 
     void run(ref<Store> store, Installables && installables) override;
 
@@ -251,7 +251,7 @@ struct StorePathsCommand : public BuiltPathsCommand
 
     virtual void run(ref<Store> store, StorePaths && storePaths) = 0;
 
-    void run(ref<Store> store, BuiltPaths && paths) override;
+    void run(ref<Store> store, BuiltPaths && allPaths, BuiltPaths && rootPaths) override;
 };
 
 /**
@@ -301,11 +301,15 @@ struct MixProfile : virtual StoreCommand
     MixProfile();
 
     /* If 'profile' is set, make it point at 'storePath'. */
-    void updateProfile(const StorePath & storePath);
+    void updateProfile(
+        const StorePath & storePath,
+        ref<Store> store);
 
     /* If 'profile' is set, make it point at the store path produced
        by 'buildables'. */
-    void updateProfile(const BuiltPaths & buildables);
+    void updateProfile(
+        const BuiltPaths & buildables,
+        ref<Store> store);
 };
 
 struct MixDefaultProfile : MixProfile
