@@ -106,9 +106,17 @@ cat >flake.nix<<EOF
   };
 }
 EOF
-nix flake show > ./show-output.txt
+# close stderr, to force consistent tty size across different environments
+nix flake show > ./show-output.txt 2>/dev/null
+cat show-output.txt >&2
 test "$(awk -F '[:] ' '/aNoDescription/{print $NF}' ./show-output.txt)" = "package 'simple'"
 test "$(awk -F '[:] ' '/bOneLineDescription/{print $NF}' ./show-output.txt)" = "package 'simple' - 'one line'"
 test "$(awk -F '[:] ' '/cMultiLineDescription/{print $NF}' ./show-output.txt)" = "package 'simple' - 'line one'"
-test "$(awk -F '[:] ' '/dLongDescription/{print $NF}' ./show-output.txt)" = "package 'simple' - '012345678901234567890123456..."
+dLongDescription=$(awk -F '[:] ' '/dLongDescription/{print $NF}' ./show-output.txt)
+if [[ $dLongDescription == "package 'simple' - '0123456789"* ]]; then
+    :
+else
+    echo "description not as expected: $dLongDescription"
+    false
+fi
 test "$(awk -F '[:] ' '/eEmptyDescription/{print $NF}' ./show-output.txt)" = "package 'simple'"
