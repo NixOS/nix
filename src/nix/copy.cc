@@ -57,7 +57,7 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile
         copyPaths(
             *srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
 
-        updateProfile(rootPaths, dstStore);
+        updateProfile(rootPaths);
     }
 };
 

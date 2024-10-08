@@ -45,7 +45,20 @@ struct StoreCommand : virtual Command
 {
     StoreCommand();
     void run() override;
+
+    /**
+     * Return the default Nix store.
+     */
     ref<Store> getStore();
+
+    /**
+     * Return the destination Nix store.
+     */
+    virtual ref<Store> getDstStore()
+    {
+        return getStore();
+    }
+
     virtual ref<Store> createStore();
     /**
      * Main entry point, with a `Store` provided
@@ -68,7 +81,7 @@ struct CopyCommand : virtual StoreCommand
 
     ref<Store> createStore() override;
 
-    ref<Store> getDstStore();
+    ref<Store> getDstStore() override;
 };
 
 /**
@@ -301,15 +314,11 @@ struct MixProfile : virtual StoreCommand
     MixProfile();
 
     /* If 'profile' is set, make it point at 'storePath'. */
-    void updateProfile(
-        const StorePath & storePath,
-        ref<Store> store);
+    void updateProfile(const StorePath & storePath);
 
     /* If 'profile' is set, make it point at the store path produced
        by 'buildables'. */
-    void updateProfile(
-        const BuiltPaths & buildables,
-        ref<Store> store);
+    void updateProfile(const BuiltPaths & buildables);
 };
 
 struct MixDefaultProfile : MixProfile

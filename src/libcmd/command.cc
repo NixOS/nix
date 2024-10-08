@@ -246,21 +246,17 @@ MixProfile::MixProfile()
     });
 }
 
-void MixProfile::updateProfile(
-    const StorePath & storePath,
-    ref<Store> store_)
+void MixProfile::updateProfile(const StorePath & storePath)
 {
     if (!profile) return;
-    auto store = store_.dynamic_pointer_cast<LocalFSStore>();
+    auto store = getDstStore().dynamic_pointer_cast<LocalFSStore>();
     if (!store) throw Error("'--profile' is not supported for this Nix store");
     auto profile2 = absPath(*profile);
     switchLink(profile2,
         createGeneration(*store, profile2, storePath));
 }
 
-void MixProfile::updateProfile(
-    const BuiltPaths & buildables,
-    ref<Store> store)
+void MixProfile::updateProfile(const BuiltPaths & buildables)
 {
     if (!profile) return;
 
@@ -282,7 +278,7 @@ void MixProfile::updateProfile(
     if (result.size() != 1)
         throw UsageError("'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
 
-    updateProfile(result[0], store);
+    updateProfile(result[0]);
 }
 
 MixDefaultProfile::MixDefaultProfile()
