@@ -33,6 +33,7 @@
 
   nix-functional-tests,
 
+  nix-manual,
   nix-internal-api-docs,
   nix-external-api-docs,
 
@@ -70,6 +71,7 @@
 
     nix-cli
 
+    nix-manual
     nix-internal-api-docs
     nix-external-api-docs
 

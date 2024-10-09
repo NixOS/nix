@@ -146,6 +146,9 @@ in
     withCoverageChecks = true;
   };
 
+  # Nix's manual
+  manual = nixpkgsFor.x86_64-linux.native.nixComponents.nix-manual;
+
   # API docs for Nix's unstable internal C++ interfaces.
   internal-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-internal-api-docs;
 
