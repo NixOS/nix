@@ -50,6 +50,17 @@ readonly PROFILE_FISH_PREFIXES=(
 )
 readonly PROFILE_NIX_FILE_FISH="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.fish"
 
+# Nu has different syntax than zsh/bash, treat it separate
+readonly PROFILE_NU_SUFFIX="nushell/vendor/autoload/nix.nu"
+readonly PROFILE_NU_PREFIXES=(
+    # each of these are common values of $nu.vendor-autoload-dirs,
+    # under which Fish will look for a file named
+    # $PROFILE_NU_SUFFIX.
+    # "/usr/share" # not good for Macos
+    "/usr/local/share"
+)
+readonly PROFILE_NIX_FILE_NU="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.nu"
+
 readonly NIX_INSTALLED_NIX="@nix@"
 readonly NIX_INSTALLED_CACERT="@cacert@"
 #readonly NIX_INSTALLED_NIX="/nix/store/j8dbv5w6jl34caywh2ygdy88knx1mdf7-nix-2.3.6"
@@ -876,6 +887,17 @@ end
 EOF
 }
 
+# Nu has differing syntax
+nu_source_lines() {
+    cat <<EOF
+
+# Nix
+if ("$PROFILE_NIX_FILE_NU" | path exists) { use $PROFILE_NIX_FILE_NU }
+# End Nix
+
+EOF
+}
+
 configure_shell_profile() {
     task "Setting up shell profiles: ${PROFILE_TARGETS[*]}"
     for profile_target in "${PROFILE_TARGETS[@]}"; do
@@ -917,6 +939,25 @@ configure_shell_profile() {
             | _sudo "write nix-daemon settings to $profile_target" \
                     tee "$profile_target"
     done
+
+    task "Setting up shell profiles for Nu with ${PROFILE_NU_SUFFIX} inside ${PROFILE_NU_PREFIXES[*]}"
+    for nu_prefix in "${PROFILE_NU_PREFIXES[@]}"; do
+        if [ ! -d "$nu_prefix" ]; then
+            continue
+        fi
+
+        profile_target="${nu_prefix}/${PROFILE_NU_SUFFIX}"
+        conf_dir=$(dirname "$profile_target")
+        if [ ! -d "$conf_dir" ]; then
+            _sudo "create $conf_dir for our Nu hook" \
+                mkdir -p "$conf_dir"
+        fi
+
+        nu_source_lines \
+            | _sudo "write nix-daemon settings to $profile_target" \
+                    tee "$profile_target"
+    done
+
 
     # TODO: should we suggest '. $PROFILE_NIX_FILE'? It would get them on
     # their way less disruptively, but a counter-argument is that they won't
