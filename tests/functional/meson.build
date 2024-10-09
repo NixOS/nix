@@ -253,8 +253,9 @@ foreach suite : suites
         'NIX_REMOTE': '',
         'PS4': '+(${BASH_SOURCE[0]-$0}:$LINENO) ',
       },
-      # some tests take 15+ seconds even on an otherwise idle machine, on a loaded machine
-      # this can easily drive them to failure. give them more time than default of 30sec
+      # Some tests take 15+ seconds even on an otherwise idle machine;
+      # on a loaded machine this can easily drive them to failure. Give
+      # them more time than the default of 30 seconds.
       timeout : 300,
       # Used for target dependency/ordering tracking, not adding compiler flags or anything.
       depends : suite['deps'],
