@@ -1,18 +1,9 @@
-# configures `scripts/nix-profile.sh.in` (and copies the original to the build directory).
-# this is only needed for tests, but running it unconditionally does not hurt enough to care.
 configure_file(
   input : 'nix-profile.sh.in',
   output : 'nix-profile.sh',
   configuration : {
     'localstatedir': localstatedir,
   }
-)
-
-# https://github.com/mesonbuild/meson/issues/860
-configure_file(
-  input : 'nix-profile.sh.in',
-  output : 'nix-profile.sh.in',
-  copy : true,
 )
 
 foreach rc : [ '.sh', '.fish', '-daemon.sh', '-daemon.fish' ]
