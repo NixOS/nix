@@ -351,7 +351,7 @@
             ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.nativeBuildInputs
             ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
-            ++ pkgs.nixComponents.nix-functional-tests.baseNativeBuildInputs
+            ++ pkgs.nixComponents.nix-functional-tests.externalNativeBuildInputs
             ++ lib.optional
               (!buildCanExecuteHost
                  # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479

@@ -48,7 +48,7 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   # Hack for sake of the dev shell
-  passthru.baseNativeBuildInputs = [
+  passthru.externalNativeBuildInputs = [
     meson
     ninja
     pkg-config
@@ -66,7 +66,7 @@ mkMesonDerivation (finalAttrs: {
     util-linux
   ];
 
-  nativeBuildInputs = finalAttrs.passthru.baseNativeBuildInputs ++ [
+  nativeBuildInputs = finalAttrs.passthru.externalNativeBuildInputs ++ [
     nix-cli
   ];
 
