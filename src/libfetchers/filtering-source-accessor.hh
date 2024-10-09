@@ -36,6 +36,8 @@ struct FilteringSourceAccessor : SourceAccessor
 
     bool pathExists(const CanonPath & path) override;
 
+    Stat lstat(const CanonPath & path) override;
+
     std::optional<Stat> maybeLstat(const CanonPath & path) override;
 
     DirEntries readDirectory(const CanonPath & path) override;
@@ -63,13 +65,20 @@ struct FilteringSourceAccessor : SourceAccessor
 struct AllowListSourceAccessor : public FilteringSourceAccessor
 {
     /**
-     * Grant access to the specified prefix.
+     * Grant access to the specified prefix, i.e. the path *and* its
+     * children.
      */
     virtual void allowPrefix(CanonPath prefix) = 0;
 
+    /**
+     * Grant access to a path but not its children.
+     */
+    virtual void allowPath(CanonPath path) = 0;
+
     static ref<AllowListSourceAccessor> create(
         ref<SourceAccessor> next,
-        std::set<CanonPath> && allowedPrefixes,
+        std::unordered_set<CanonPath> && allowedPrefixes,
+        std::unordered_set<CanonPath> && allowedPaths,
         MakeNotAllowedError && makeNotAllowedError);
 
     using FilteringSourceAccessor::FilteringSourceAccessor;

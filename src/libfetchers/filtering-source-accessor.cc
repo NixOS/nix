@@ -1,5 +1,7 @@
 #include "filtering-source-accessor.hh"
 
+#include <unordered_set>
+
 namespace nix {
 
 std::optional<std::filesystem::path> FilteringSourceAccessor::getPhysicalPath(const CanonPath & path)
@@ -19,10 +21,15 @@ bool FilteringSourceAccessor::pathExists(const CanonPath & path)
     return isAllowed(path) && next->pathExists(prefix / path);
 }
 
-std::optional<SourceAccessor::Stat> FilteringSourceAccessor::maybeLstat(const CanonPath & path)
+SourceAccessor::Stat FilteringSourceAccessor::lstat(const CanonPath & path)
 {
     checkAccess(path);
-    return next->maybeLstat(prefix / path);
+    return next->lstat(prefix / path);
+}
+
+std::optional<SourceAccessor::Stat> FilteringSourceAccessor::maybeLstat(const CanonPath & path)
+{
+    return isAllowed(path) ? next->maybeLstat(prefix / path) : std::nullopt;
 }
 
 SourceAccessor::DirEntries FilteringSourceAccessor::readDirectory(const CanonPath & path)
@@ -57,33 +64,46 @@ void FilteringSourceAccessor::checkAccess(const CanonPath & path)
 
 struct AllowListSourceAccessorImpl : AllowListSourceAccessor
 {
-    std::set<CanonPath> allowedPrefixes;
+    std::unordered_set<CanonPath> allowedPrefixes;
+    std::unordered_set<CanonPath> allowedPaths;
 
     AllowListSourceAccessorImpl(
         ref<SourceAccessor> next,
-        std::set<CanonPath> && allowedPrefixes,
+        std::unordered_set<CanonPath> && allowedPrefixes,
+        std::unordered_set<CanonPath> && allowedPaths,
         MakeNotAllowedError && makeNotAllowedError)
         : AllowListSourceAccessor(SourcePath(next), std::move(makeNotAllowedError))
         , allowedPrefixes(std::move(allowedPrefixes))
+        , allowedPaths(std::move(allowedPaths))
     { }
 
     bool isAllowed(const CanonPath & path) override
     {
-        return path.isAllowed(allowedPrefixes);
+        return allowedPaths.count(path) || path.isAllowed(allowedPrefixes);
     }
 
     void allowPrefix(CanonPath prefix) override
     {
         allowedPrefixes.insert(std::move(prefix));
     }
+
+    void allowPath(CanonPath path) override
+    {
+        allowedPaths.insert(std::move(path));
+    }
 };
 
 ref<AllowListSourceAccessor> AllowListSourceAccessor::create(
     ref<SourceAccessor> next,
-    std::set<CanonPath> && allowedPrefixes,
+    std::unordered_set<CanonPath> && allowedPrefixes,
+    std::unordered_set<CanonPath> && allowedPaths,
     MakeNotAllowedError && makeNotAllowedError)
 {
-    return make_ref<AllowListSourceAccessorImpl>(next, std::move(allowedPrefixes), std::move(makeNotAllowedError));
+    return make_ref<AllowListSourceAccessorImpl>(
+        next,
+        std::move(allowedPrefixes),
+        std::move(allowedPaths),
+        std::move(makeNotAllowedError));
 }
 
 bool CachingFilteringSourceAccessor::isAllowed(const CanonPath & path)
