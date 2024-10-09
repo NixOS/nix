@@ -1,17 +1,42 @@
-## Profiles
+## Profile Directory
 
-A directory that contains links to profiles managed by [`nix-env`] and [`nix profile`]:
+A directory that contains profiles.
+Profiles are typically managed by [`nix-env`] and [`nix profile`].
+These are the default profile directories:
 
 - `$XDG_STATE_HOME/nix/profiles` for regular users
 - `$NIX_STATE_DIR/profiles/per-user/root` if the user is `root`
 
-A profile is a directory of symlinks to files in the Nix store.
+## Profile
+
+Profiles are a basic version control mechanism built atop more core Nix constructs and symlinks.
+Profiles consist of
+
+- A map of zero or more generations, each mapping a *generation number* to a [store object](@docroot@/glossary.md#gloss-store-object).
+
+- An optional *current* or *active* generation, which is one of those in the map.
+
+Profiles are represented on disk by symlinks within a directory that obey a certain structure.
+Profiles have names, which allows storing more than one profile in the same directory.
+The symlinks of a single profile all begin with the name of profile, which identifies which symlinks belong to which profile within a directory.
+A combined `<profile-directory>/<profile-name>` path uniquely identifies a profile on the local file system, by specifying both its location and name.
+
+Each generation is represented by a symlink with a name with 3 dash-separated components: `<profile-name>-<generation-number>-link`.
+The leading `profile-` identifies which profile the generation belongs to.
+The trailing `-link` identifies this symlink as a generation symlink.
+The middle generation number is the "key" part of the generation key-value pair.
+The symlink target is a store paths, which in turn point to the store object that is the "value" part of the generation key-value pair.
+The creation time of the symlink is used for time-based garbage collection operations of generations.
+Other metadata is not used.
+
+The current/active generation is specified by a symlink that is just the name of the profile: `<profile-name>`.
+The target of the symlink is *not* a store path, but instead the name of a generation symlink (which is a relative path to that symlink within the current directory).
+
+Each of these symlinks is a root for the Nix garbage collector.
 
 ### Filesystem layout
 
-Profiles are versioned as follows. When using a profile named *path*, *path* is a symlink to *path*`-`*N*`-link`, where *N* is the version of the profile.
-In turn, *path*`-`*N*`-link` is a symlink to a path in the Nix store.
-For example:
+Here is an example of a profile:
 
 ```console
 $ ls -l ~alice/.local/state/nix/profiles/profile*
@@ -21,11 +46,27 @@ lrwxrwxrwx 1 alice users 51 Oct 29 13:20 /home/alice/.local/state/nix/profiles/p
 lrwxrwxrwx 1 alice users 51 Nov 25 14:35 /home/alice/.local/state/nix/profiles/profile-7-link -> /nix/store/mp0x6xnsg0b8qhswy6riqvimai4gm677-profile
 ```
 
-Each of these symlinks is a root for the Nix garbage collector.
+- `/home/alice/.local/state/nix/profiles` is the directory that contains the profile.
 
-The contents of the store path corresponding to each version of the
-profile is a tree of symlinks to the files of the installed packages,
-e.g.
+- `profile` is the name of the profile.
+
+- Generations 5, 6, and 7, currently exist.
+  (Generations 1 to 4 once existed but were deleted.)
+
+- Generation 7 is the active generation.
+
+## Symlink tree profile
+
+Typical profiles created by [`nix-env`](@docroot@/command-ref/nix-env.md) (and indirectly by [`nix-channel`](@docroot@/command-ref/nix-channel.md) too) have additional structure.
+The contents of each generation is not just can arbitrary store object, but a symlink tree merging together various other store objects.
+
+Additionally, the store object contains a manifest file, providing some info on what those merged store objects are and where they came from:
+- [`manifest.nix`](@docroot@/command-ref/files/manifest.nix.md) used by [`nix-env`](@docroot@/command-ref/nix-env.md).
+- [`manifest.json`](@docroot@/command-ref/files/manifest.json.md) used by [`nix profile`](@docroot@/command-ref/new-cli/nix3-profile.md) (experimental).
+
+### Filesystem layout
+
+Here is an example of a `nix-env` profile:
 
 ```console
 $ ll -R ~eelco/.local/state/nix/profiles/profile-7-link/
@@ -49,10 +90,6 @@ lrwxrwxrwx 3 root root 107 Jan  1  1970 us.zoom.Zoom.desktop -> /nix/store/wbhg2
 
 …
 ```
-
-Each profile version contains a manifest file:
-- [`manifest.nix`](@docroot@/command-ref/files/manifest.nix.md) used by [`nix-env`](@docroot@/command-ref/nix-env.md).
-- [`manifest.json`](@docroot@/command-ref/files/manifest.json.md) used by [`nix profile`](@docroot@/command-ref/new-cli/nix3-profile.md) (experimental).
 
 ## User profile link
 
