@@ -18,6 +18,7 @@
 #include "callback.hh"
 #include "filetransfer.hh"
 #include "signals.hh"
+#include "provenance.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -364,12 +365,13 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 
 
 ref<const ValidPathInfo> RemoteStore::addCAToStore(
-        Source & dump,
-        std::string_view name,
-        ContentAddressMethod caMethod,
-        HashAlgorithm hashAlgo,
-        const StorePathSet & references,
-        RepairFlag repair)
+    Source & dump,
+    std::string_view name,
+    ContentAddressMethod caMethod,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    RepairFlag repair,
+    std::shared_ptr<const Provenance> provenance)
 {
     std::optional<ConnectionHandle> conn_(getConnection());
     auto & conn = *conn_;
@@ -382,6 +384,8 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
             << caMethod.renderWithAlgo(hashAlgo);
         WorkerProto::write(*this, *conn, references);
         conn->to << repair;
+        if (conn->features.contains(WorkerProto::featureProvenance))
+            conn->to << nlohmann::json(provenance).dump();
 
         // The dump source may invoke the store, so we need to make some room.
         connections->incCapacity();
@@ -463,7 +467,8 @@ StorePath RemoteStore::addToStoreFromDump(
     ContentAddressMethod hashMethod,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
-    RepairFlag repair)
+    RepairFlag repair,
+    std::shared_ptr<const Provenance> provenance)
 {
     FileSerialisationMethod fsm;
     switch (hashMethod.getFileIngestionMethod()) {
@@ -482,13 +487,16 @@ StorePath RemoteStore::addToStoreFromDump(
     }
     if (fsm != dumpMethod)
         unsupported("RemoteStore::addToStoreFromDump doesn't support this `dumpMethod` `hashMethod` combination");
-    return addCAToStore(dump, name, hashMethod, hashAlgo, references, repair)->path;
+    return addCAToStore(dump, name, hashMethod, hashAlgo, references, repair, provenance)->path;
 }
 
 
 void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
+    if (info.provenance)
+        throw UnimplementedError("RemoteStore::addToStore() with provenance");
+
     auto conn(getConnection());
 
     if (GET_PROTOCOL_MINOR(conn->protoVersion) < 18) {
@@ -539,6 +547,7 @@ void RemoteStore::addMultipleToStore(
     RepairFlag repair,
     CheckSigsFlag checkSigs)
 {
+    std::set<WorkerProto::Feature> features;
     auto source = sinkToSource([&](Sink & sink) {
         sink << pathsToCopy.size();
         for (auto & [pathInfo, pathSource] : pathsToCopy) {
@@ -546,6 +555,7 @@ void RemoteStore::addMultipleToStore(
                  WorkerProto::WriteConn {
                      .to = sink,
                      .version = 16,
+                     .features = features, // FIXME
                  },
                  pathInfo);
             pathSource->drainInto(sink);

@@ -15,12 +15,15 @@
 #include "derivations.hh"
 #include "args.hh"
 #include "git.hh"
+#include "provenance.hh"
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
 # include "monitor-fd.hh"
 #endif
 
 #include <sstream>
+
+#include <nlohmann/json.hpp>
 
 namespace nix::daemon {
 
@@ -398,6 +401,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             bool repairBool;
             conn.from >> repairBool;
             auto repair = RepairFlag{repairBool};
+            std::shared_ptr<const Provenance> provenance;
+            if (conn.features.contains(WorkerProto::featureProvenance))
+                provenance =
+                    nlohmann::json::parse(readString(conn.from))
+                    .template get<std::shared_ptr<const Provenance>>();
 
             logger->startWork();
             auto pathInfo = [&]() {
@@ -423,7 +431,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                     assert(false);
                 }
                 // TODO these two steps are essentially RemoteStore::addCAToStore. Move it up to Store.
-                auto path = store->addToStoreFromDump(source, name, dumpMethod, contentAddressMethod, hashAlgo, refs, repair);
+                auto path = store->addToStoreFromDump(
+                    source,
+                    name,
+                    dumpMethod,
+                    contentAddressMethod,
+                    hashAlgo,
+                    refs,
+                    repair,
+                    provenance);
                 return store->queryPathInfo(path);
             }();
             logger->stopWork();

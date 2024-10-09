@@ -19,6 +19,7 @@
 #include "unix-domain-socket.hh"
 #include "posix-fs-canonicalise.hh"
 #include "posix-source-accessor.hh"
+#include "provenance.hh"
 
 #include <regex>
 #include <queue>
@@ -1381,7 +1382,8 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
         HashAlgorithm hashAlgo,
         const StorePathSet & references,
         PathFilter & filter,
-        RepairFlag repair) override
+        RepairFlag repair,
+        std::shared_ptr<const Provenance> provenance) override
     { throw Error("addToStore"); }
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
@@ -1398,9 +1400,10 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
         ContentAddressMethod hashMethod,
         HashAlgorithm hashAlgo,
         const StorePathSet & references,
-        RepairFlag repair) override
+        RepairFlag repair,
+        std::shared_ptr<const Provenance> provenance) override
     {
-        auto path = next->addToStoreFromDump(dump, name, dumpMethod, hashMethod, hashAlgo, references, repair);
+        auto path = next->addToStoreFromDump(dump, name, dumpMethod, hashMethod, hashAlgo, references, repair, provenance);
         goal.addDependency(path);
         return path;
     }
@@ -2787,6 +2790,13 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 
         newInfo.deriver = drvPath;
         newInfo.ultimate = true;
+        if (drvProvenance)
+            newInfo.provenance = std::make_shared<const Provenance>(
+                Provenance::ProvDerivation {
+                    .drvPath = drvPath,
+                    .output = outputName,
+                    .provenance = drvProvenance,
+                });
         localStore.signPathInfo(newInfo);
 
         finish(newInfo.path);

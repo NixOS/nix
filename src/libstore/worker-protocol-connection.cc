@@ -5,7 +5,7 @@
 
 namespace nix {
 
-const std::set<WorkerProto::Feature> WorkerProto::allFeatures{};
+const std::set<WorkerProto::Feature> WorkerProto::allFeatures{{WorkerProto::featureProvenance}};
 
 WorkerProto::BasicClientConnection::~BasicClientConnection()
 {

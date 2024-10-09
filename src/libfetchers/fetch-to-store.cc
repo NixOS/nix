@@ -11,7 +11,8 @@ StorePath fetchToStore(
     std::string_view name,
     ContentAddressMethod method,
     PathFilter * filter,
-    RepairFlag repair)
+    RepairFlag repair,
+    std::shared_ptr<const Provenance> provenance)
 {
     // FIXME: add an optimisation for the case where the accessor is
     // a `PosixSourceAccessor` pointing to a store path.
@@ -42,7 +43,7 @@ StorePath fetchToStore(
         ? store.computeStorePath(
             name, path, method, HashAlgorithm::SHA256, {}, filter2).first
         : store.addToStore(
-            name, path, method, HashAlgorithm::SHA256, {}, filter2, repair);
+            name, path, method, HashAlgorithm::SHA256, {}, filter2, repair, provenance);
 
     if (cacheKey && mode == FetchMode::Copy)
         fetchers::getCache()->upsert(*cacheKey, store, {}, storePath);

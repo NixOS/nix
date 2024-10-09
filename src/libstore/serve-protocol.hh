@@ -41,6 +41,8 @@ struct ServeProto
      */
     using Version = unsigned int;
 
+    using Feature = std::string;
+
     /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
@@ -48,6 +50,7 @@ struct ServeProto
     struct ReadConn {
         Source & from;
         Version version;
+        std::set<Feature> features; // unused
     };
 
     /**
@@ -57,6 +60,7 @@ struct ServeProto
     struct WriteConn {
         Sink & to;
         Version version;
+        std::set<Feature> features; // unused
     };
 
     /**

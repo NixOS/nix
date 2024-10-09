@@ -302,7 +302,8 @@ StorePath BinaryCacheStore::addToStoreFromDump(
     ContentAddressMethod hashMethod,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
-    RepairFlag repair)
+    RepairFlag repair,
+    std::shared_ptr<const Provenance> provenance)
 {
     std::optional<Hash> caHash;
     std::string nar;
@@ -364,6 +365,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(
             nar.first,
         };
         info.narSize = nar.second;
+        info.provenance = provenance;
         return info;
     })->path;
 }
@@ -448,7 +450,8 @@ StorePath BinaryCacheStore::addToStore(
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
     PathFilter & filter,
-    RepairFlag repair)
+    RepairFlag repair,
+    std::shared_ptr<const Provenance> provenance)
 {
     /* FIXME: Make BinaryCacheStore::addToStoreCommon support
        non-recursive+sha256 so we can just use the default
@@ -474,6 +477,7 @@ StorePath BinaryCacheStore::addToStore(
             nar.first,
         };
         info.narSize = nar.second;
+        info.provenance = provenance;
         return info;
     })->path;
 }

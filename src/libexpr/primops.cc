@@ -1519,7 +1519,7 @@ static void derivationStrictInternal(
     }
 
     /* Write the resulting term into the Nix store directory. */
-    auto drvPath = writeDerivation(*state.store, drv, state.repair);
+    auto drvPath = writeDerivation(*state.store, drv, state.repair, false, state.getRootProvenance());
     auto drvPathS = state.store->printStorePath(drvPath);
 
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
@@ -2320,7 +2320,15 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
         })
         : ({
             StringSource s { contents };
-            state.store->addToStoreFromDump(s, name, FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, refs, state.repair);
+            state.store->addToStoreFromDump(
+                s,
+                name,
+                FileSerialisationMethod::Flat,
+                ContentAddressMethod::Raw::Text,
+                HashAlgorithm::SHA256,
+                refs,
+                state.repair,
+                state.getRootProvenance());
         });
 
     /* Note: we don't need to add `context' to the context of the
@@ -2480,7 +2488,8 @@ static void addPath(
                 name,
                 method,
                 filter.get(),
-                state.repair);
+                state.repair,
+                state.getRootProvenance());
             if (expectedHash && expectedStorePath != dstPath)
                 state.error<EvalError>(
                     "store path mismatch in (possibly filtered) path added from '%s'",

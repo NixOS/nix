@@ -37,6 +37,7 @@ class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct MemorySourceAccessor;
+struct Provenance;
 namespace eval_cache {
     class EvalCache;
 }
@@ -863,6 +864,15 @@ private:
 
     friend struct Value;
     friend class ListBuilder;
+
+    // FIXME: how to handle this in the multi-threaded evaluator?
+    std::shared_ptr<const Provenance> rootProvenance;
+
+public:
+
+    std::shared_ptr<const Provenance> getRootProvenance();
+
+    void setRootProvenance(std::shared_ptr<const Provenance> provenance);
 };
 
 struct DebugTraceStacker {
