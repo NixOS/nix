@@ -1,1 +1,1 @@
-../../doc/manual/src/store/types/index.md.in
+../../doc/manual/source/store/types/index.md.in
