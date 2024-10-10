@@ -565,8 +565,9 @@ or NixOS modules, which are composed into the top-level flake's
 Inputs specified in `flake.nix` are typically "unlocked" in the sense
 that they don't specify an exact revision. To ensure reproducibility,
 Nix will automatically generate and use a *lock file* called
-`flake.lock` in the flake's directory. The lock file contains a graph
-structure isomorphic to the graph of dependencies of the root
+`flake.lock` in the flake's directory.
+The lock file is a UTF-8 JSON file.
+It contains a graph structure isomorphic to the graph of dependencies of the root
 flake. Each node in the graph (except the root node) maps the
 (usually) unlocked input specifications in `flake.nix` to locked input
 specifications. Each node also contains some metadata, such as the

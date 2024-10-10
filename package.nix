@@ -325,11 +325,6 @@ in {
   preInstallCheck =
     lib.optionalString (! doBuild) ''
       mkdir -p src/nix-channel
-    ''
-    # See https://github.com/NixOS/nix/issues/2523
-    # Occurs often in tests since https://github.com/NixOS/nix/pull/9900
-    + lib.optionalString stdenv.hostPlatform.isDarwin ''
-      export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
     '';
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;

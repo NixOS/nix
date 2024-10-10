@@ -162,7 +162,7 @@ ninja: no work to do.
 Individual tests can be run with `meson`:
 
 ```shell-session
-$ meson test ${testName}
+$ meson test --verbose ${testName}
 ninja: Entering directory `/home/jcericson/src/nix/master/build'
 ninja: no work to do.
 1/1 nix-functional-tests:main / ${testName}        OK               0.41s
@@ -177,7 +177,11 @@ Timeout:            0
 Full log written to /home/jcericson/src/nix/master/build/meson-logs/testlog.txt
 ```
 
-or without `meson`, showing the output:
+The `--verbose` flag will make Meson also show the console output of each test for easier debugging.
+The test script will then be traced with `set -x` and the output displayed as it happens,
+regardless of whether the test succeeds or fails.
+
+Tests can be also run directly without `meson`:
 
 ```shell-session
 $ TEST_NAME=${testName} NIX_REMOTE='' PS4='+(${BASH_SOURCE[0]-$0}:$LINENO) tests/functional/${testName}.sh
@@ -187,8 +191,6 @@ output from foo
 output from bar
 ...
 ```
-
-The test script will then be traced with `set -x` and the output displayed as it happens, regardless of whether the test succeeds or fails.
 
 ### Debugging failing functional tests
 

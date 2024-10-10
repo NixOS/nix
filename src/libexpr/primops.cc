@@ -631,11 +631,7 @@ struct CompareValues
 };
 
 
-#if HAVE_BOEHMGC
 typedef std::list<Value *, gc_allocator<Value *>> ValueList;
-#else
-typedef std::list<Value *> ValueList;
-#endif
 
 
 static Bindings::const_iterator getAttr(
@@ -3136,7 +3132,7 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * arg
         std::optional<ListBuilder> list;
     };
 
-    std::map<Symbol, Item> attrsSeen;
+    std::map<Symbol, Item, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Item>>> attrsSeen;
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.zipAttrsWith");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.zipAttrsWith");

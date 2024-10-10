@@ -48,7 +48,7 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   # Hack for sake of the dev shell
-  passthru.baseNativeBuildInputs = [
+  passthru.externalNativeBuildInputs = [
     meson
     ninja
     pkg-config
@@ -66,7 +66,7 @@ mkMesonDerivation (finalAttrs: {
     util-linux
   ];
 
-  nativeBuildInputs = finalAttrs.passthru.baseNativeBuildInputs ++ [
+  nativeBuildInputs = finalAttrs.passthru.externalNativeBuildInputs ++ [
     nix-cli
   ];
 
@@ -94,13 +94,6 @@ mkMesonDerivation (finalAttrs: {
   mesonCheckFlags = [
     "--print-errorlogs"
   ];
-
-  preCheck =
-    # See https://github.com/NixOS/nix/issues/2523
-    # Occurs often in tests since https://github.com/NixOS/nix/pull/9900
-    lib.optionalString stdenv.hostPlatform.isDarwin ''
-      export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
-    '';
 
   doCheck = true;
 

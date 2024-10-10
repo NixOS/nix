@@ -8,7 +8,7 @@
 #include "tests/nix_api_expr.hh"
 #include "tests/string_callback.hh"
 
-#include "gmock/gmock.h"
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 namespace nixC {

@@ -59,7 +59,7 @@ NIX_ROOT =
 endif
 
 # Prefix all but `NIX_STORE_DIR`, since we aren't doing a local store
-# yet so a "logical" store dir that is the same as unix is prefered.
+# yet so a "logical" store dir that is the same as unix is preferred.
 #
 # Also, it keeps the unit tests working.
 

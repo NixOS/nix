@@ -672,7 +672,7 @@ struct CmdDevelop : Common, MixEnvironment
                 throw Error("package 'nixpkgs#bashInteractive' does not provide a 'bin/bash'");
 
         } catch (Error &) {
-            ignoreException();
+            ignoreExceptionExceptInterrupt();
         }
 
         // Override SHELL with the one chosen for this environment.

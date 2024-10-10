@@ -1,3 +1,4 @@
+#include "json-utils.hh"
 #include "ssh-store.hh"
 #include "local-fs-store.hh"
 #include "remote-store-connection.hh"
@@ -84,6 +85,7 @@ SSHStoreConfig::SSHStoreConfig(
 
 std::string SSHStoreConfig::doc()
 {
+    return
       #include "ssh-store.md"
       ;
 }

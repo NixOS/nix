@@ -184,6 +184,9 @@ nix registry list | grepInverse '^user' # nothing in user registry
 nix flake metadata flake1
 nix flake metadata flake1 | grepQuiet 'Locked URL:.*flake1.*'
 
+# Test 'nix flake metadata' on a chroot store.
+nix flake metadata --store $TEST_ROOT/chroot-store flake1
+
 # Test 'nix flake metadata' on a local flake.
 (cd "$flake1Dir" && nix flake metadata) | grepQuiet 'URL:.*flake1.*'
 (cd "$flake1Dir" && nix flake metadata .) | grepQuiet 'URL:.*flake1.*'

@@ -2,6 +2,7 @@
 #include "nar-info.hh"
 #include "store-api.hh"
 #include "strings.hh"
+#include "json-utils.hh"
 
 namespace nix {
 

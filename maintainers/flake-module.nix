@@ -508,7 +508,7 @@
             ''^tests/functional/ca/concurrent-builds\.sh$''
             ''^tests/functional/ca/eval-store\.sh$''
             ''^tests/functional/ca/gc\.sh$''
-            ''^tests/functional/ca/import-derivation\.sh$''
+            ''^tests/functional/ca/import-from-derivation\.sh$''
             ''^tests/functional/ca/new-build-cmd\.sh$''
             ''^tests/functional/ca/nix-shell\.sh$''
             ''^tests/functional/ca/post-hook\.sh$''

@@ -1,4 +1,3 @@
-#include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 #include <optional>
 
@@ -9,6 +8,7 @@
 #include "tests/characterization.hh"
 #include "parsed-derivations.hh"
 #include "types.hh"
+#include "json-utils.hh"
 
 namespace nix {
 

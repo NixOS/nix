@@ -60,6 +60,7 @@ in
 
   nix-functional-tests = callPackage ../src/nix-functional-tests/package.nix { version = fineVersion; };
 
+  nix-manual = callPackage ../doc/manual/package.nix { version = fineVersion; };
   nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { version = fineVersion; };
   nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { version = fineVersion; };
 

@@ -11,6 +11,8 @@
 #include "value-to-json.hh"
 #include "fetch-to-store.hh"
 
+#include <nlohmann/json.hpp>
+
 #include <ctime>
 #include <iomanip>
 #include <regex>
@@ -246,7 +248,7 @@ static RegisterPrimOp primop_fetchTree({
       The following source types and associated input attributes are supported.
 
       <!-- TODO: It would be soooo much more predictable to work with (and
-      document) if `fetchTree` was a curried call with the first paramter for
+      document) if `fetchTree` was a curried call with the first parameter for
       `type` or an attribute like `builtins.fetchTree.git`! -->
 
       - `"file"`

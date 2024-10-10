@@ -33,7 +33,7 @@
 [path]: ./types.md#type-path
 [number]: ./types.md#type-float
 [list]: ./types.md#type-list
-[attribute set]: ./types.md#attribute-set
+[attribute set]: ./types.md#type-attrs
 
 <!-- TODO(@rhendric, #10970): ^ rationalize number -> int/float -->
 
@@ -75,7 +75,7 @@ The result is a [Boolean] value.
 
 See also: [`builtins.hasAttr`](@docroot@/language/builtins.md#builtins-hasAttr)
 
-[Boolean]: ./types.md#type-boolean
+[Boolean]: ./types.md#type-bool
 
 [Has attribute]: #has-attribute
 

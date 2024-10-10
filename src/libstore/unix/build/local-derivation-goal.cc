@@ -109,9 +109,9 @@ LocalDerivationGoal::~LocalDerivationGoal()
 {
     /* Careful: we should never ever throw an exception from a
        destructor. */
-    try { deleteTmpDir(false); } catch (...) { ignoreException(); }
-    try { killChild(); } catch (...) { ignoreException(); }
-    try { stopDaemon(); } catch (...) { ignoreException(); }
+    try { deleteTmpDir(false); } catch (...) { ignoreExceptionInDestructor(); }
+    try { killChild(); } catch (...) { ignoreExceptionInDestructor(); }
+    try { stopDaemon(); } catch (...) { ignoreExceptionInDestructor(); }
 }
 
 
@@ -444,25 +444,22 @@ void LocalDerivationGoal::startBuilder()
         #if __linux__
         experimentalFeatureSettings.require(Xp::Cgroups);
 
+        /* If we're running from the daemon, then this will return the
+           root cgroup of the service. Otherwise, it will return the
+           current cgroup. */
+        auto rootCgroup = getRootCgroup();
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS)
             throw Error("cannot determine the cgroups file system");
-
-        auto ourCgroups = getCgroups("/proc/self/cgroup");
-        auto ourCgroup = ourCgroups[""];
-        if (ourCgroup == "")
-            throw Error("cannot determine cgroup name from /proc/self/cgroup");
-
-        auto ourCgroupPath = canonPath(*cgroupFS + "/" + ourCgroup);
-
-        if (!pathExists(ourCgroupPath))
-            throw Error("expected cgroup directory '%s'", ourCgroupPath);
+        auto rootCgroupPath = canonPath(*cgroupFS + "/" + rootCgroup);
+        if (!pathExists(rootCgroupPath))
+            throw Error("expected cgroup directory '%s'", rootCgroupPath);
 
         static std::atomic<unsigned int> counter{0};
 
         cgroup = buildUser
-            ? fmt("%s/nix-build-uid-%d", ourCgroupPath, buildUser->getUID())
-            : fmt("%s/nix-build-pid-%d-%d", ourCgroupPath, getpid(), counter++);
+            ? fmt("%s/nix-build-uid-%d", rootCgroupPath, buildUser->getUID())
+            : fmt("%s/nix-build-pid-%d-%d", rootCgroupPath, getpid(), counter++);
 
         debug("using cgroup '%s'", *cgroup);
 
@@ -1540,7 +1537,7 @@ void LocalDerivationGoal::startDaemon()
                         NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
                 } catch (SystemError &) {
-                    ignoreException();
+                    ignoreExceptionExceptInterrupt();
                 }
             });
 
@@ -1752,13 +1749,20 @@ void LocalDerivationGoal::runChild()
 
         bool setUser = true;
 
-        /* Make the contents of netrc available to builtin:fetchurl
-           (which may run under a different uid and/or in a sandbox). */
+        /* Make the contents of netrc and the CA certificate bundle
+           available to builtin:fetchurl (which may run under a
+           different uid and/or in a sandbox). */
         std::string netrcData;
-        try {
-            if (drv->isBuiltin() && drv->builder == "builtin:fetchurl")
-                netrcData = readFile(settings.netrcFile);
-        } catch (SystemError &) { }
+        std::string caFileData;
+        if (drv->isBuiltin() && drv->builder == "builtin:fetchurl") {
+           try {
+               netrcData = readFile(settings.netrcFile);
+           } catch (SystemError &) { }
+
+           try {
+               caFileData = readFile(settings.caFile);
+           } catch (SystemError &) { }
+        }
 
 #if __linux__
         if (useChroot) {
@@ -2197,7 +2201,7 @@ void LocalDerivationGoal::runChild()
                         worker.store.printStorePath(scratchOutputs.at(e.first)));
 
                 if (drv->builder == "builtin:fetchurl")
-                    builtinFetchurl(*drv, outputs, netrcData);
+                    builtinFetchurl(*drv, outputs, netrcData, caFileData);
                 else if (drv->builder == "builtin:buildenv")
                     builtinBuildenv(*drv, outputs);
                 else if (drv->builder == "builtin:unpack-channel")
@@ -3006,6 +3010,7 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv->isBuiltin()) {
             printError("note: keeping build directory '%s'", tmpDir);
+            chmod(topTmpDir.c_str(), 0755);
             chmod(tmpDir.c_str(), 0755);
         }
         else

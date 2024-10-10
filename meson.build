@@ -23,6 +23,9 @@ subproject('nix')
 # Docs
 subproject('internal-api-docs')
 subproject('external-api-docs')
+if not meson.is_cross_build()
+  subproject('nix-manual')
+endif
 
 # External C wrapper libraries
 subproject('libutil-c')

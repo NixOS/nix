@@ -104,7 +104,7 @@ symlink.
 
   Prints a set of derivation files (`.drv`) which are supposed produce
   said paths when realized. Might print nothing, for example for source paths
-  or paths subsituted from a binary cache.
+  or paths substituted from a binary cache.
 
 - `--graph`
 
@@ -241,4 +241,3 @@ $ nix-store --query --roots $(which svn)
 /nix/var/nix/profiles/default-82-link
 /home/eelco/.local/state/nix/profiles/profile-97-link
 ```
-

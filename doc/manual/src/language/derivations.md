@@ -113,7 +113,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 
 ### Optional
 
-- [`args`]{#attr-args} ([List](@docroot@/language/types.md#list) of [String](@docroot@/language/types.md#type-string))
+- [`args`]{#attr-args} ([List](@docroot@/language/types.md#type-list) of [String](@docroot@/language/types.md#type-string))
 
   Default: `[ ]`
 
@@ -132,7 +132,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   > };
   > ```
 
-- [`outputs`]{#attr-outputs} ([List](@docroot@/language/types.md#list) of [String](@docroot@/language/types.md#type-string))
+- [`outputs`]{#attr-outputs} ([List](@docroot@/language/types.md#type-list) of [String](@docroot@/language/types.md#type-string))
 
   Default: `[ "out" ]`
 

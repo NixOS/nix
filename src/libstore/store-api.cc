@@ -932,14 +932,25 @@ StorePathSet Store::queryValidPaths(const StorePathSet & paths, SubstituteFlag m
     auto doQuery = [&](const StorePath & path) {
         checkInterrupt();
         queryPathInfo(path, {[path, &state_, &wakeup](std::future<ref<const ValidPathInfo>> fut) {
-            auto state(state_.lock());
+            bool exists = false;
+            std::exception_ptr newExc{};
+
             try {
                 auto info = fut.get();
-                state->valid.insert(path);
+                exists = true;
             } catch (InvalidPath &) {
             } catch (...) {
-                state->exc = std::current_exception();
+                newExc = std::current_exception();
             }
+
+            auto state(state_.lock());
+
+            if (exists)
+                state->valid.insert(path);
+
+            if (newExc)
+                state->exc = newExc;
+
             assert(state->left);
             if (!--state->left)
                 wakeup.notify_one();
@@ -1154,7 +1165,7 @@ std::map<StorePath, StorePath> copyPaths(
         // not be within our control to change that, and we might still want
         // to at least copy the output paths.
         if (e.missingFeature == Xp::CaDerivations)
-            ignoreException();
+            ignoreExceptionExceptInterrupt();
         else
             throw;
     }

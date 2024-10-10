@@ -214,6 +214,16 @@ void callFlake(
     const LockedFlake & lockedFlake,
     Value & v);
 
+/**
+ * Map a `SourcePath` to the corresponding store path. This is a
+ * temporary hack to support chroot stores while we don't have full
+ * lazy trees. FIXME: Remove this once we can pass a sourcePath rather
+ * than a storePath to call-flake.nix.
+ */
+std::pair<StorePath, Path> sourcePathToStorePath(
+    ref<Store> store,
+    const SourcePath & path);
+
 }
 
 void emitTreeAttrs(

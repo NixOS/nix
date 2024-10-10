@@ -1,7 +1,7 @@
 #pragma once
 //@file
 
-#include <nlohmann/json_fwd.hpp>
+#include <nlohmann/json.hpp>
 
 #include "config-abstract.hh"
 #include "json-impls.hh"

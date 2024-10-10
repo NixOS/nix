@@ -3,7 +3,7 @@ R"(
 **Store URL format**: `s3://`*bucket-name*
 
 This store allows reading and writing a binary cache stored in an AWS S3 (or S3-compatible service) bucket.
-This store shares many idioms with the [HTTP Binary Cache Store](#http-binary-cache-store).
+This store shares many idioms with the [HTTP Binary Cache Store](@docroot@/store/types/http-binary-cache-store.md).
 
 For AWS S3, the binary cache URL for a bucket named `example-nix-cache` will be exactly <s3://example-nix-cache>.
 For S3 compatible binary caches, consult that cache's documentation.

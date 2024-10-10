@@ -1,3 +1,4 @@
+#include "json-utils.hh"
 #include "archive.hh"
 #include "posix-source-accessor.hh"
 #include "store-api.hh"

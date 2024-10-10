@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "error.hh"
 #include "repl-interacter.hh"
 #include "repl.hh"
 
@@ -27,11 +28,6 @@
 #include "print.hh"
 #include "ref.hh"
 #include "value.hh"
-
-#if HAVE_BOEHMGC
-#define GC_INCLUDE_NEW
-#include <gc/gc_cpp.h>
-#endif
 
 #include "strings.hh"
 
@@ -61,9 +57,7 @@ enum class ProcessLineResult {
 struct NixRepl
     : AbstractNixRepl
     , detail::ReplCompleterMixin
-    #if HAVE_BOEHMGC
     , gc
-    #endif
 {
     size_t debugTraceIndex;
 
@@ -134,7 +128,7 @@ NixRepl::NixRepl(const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalS
     , getValues(getValues)
     , staticEnv(new StaticEnv(nullptr, state->staticBaseEnv.get()))
     , runNixPtr{runNix}
-    , interacter(make_unique<ReadlineLikeInteracter>(getDataDir() + "/nix/repl-history"))
+    , interacter(make_unique<ReadlineLikeInteracter>(getDataDir() + "/repl-history"))
 {
 }
 
@@ -720,7 +714,14 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
     if (flakeRefS.empty())
         throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
 
-    auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, std::filesystem::current_path().string(), true);
+    std::filesystem::path cwd;
+    try {
+        cwd = std::filesystem::current_path();
+    } catch (std::filesystem::filesystem_error & e) {
+        throw SysError("cannot determine current working directory");
+    }
+
+    auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, cwd.string(), true);
     if (evalSettings.pureEval && !flakeRef.input.isLocked())
         throw Error("cannot use ':load-flake' on locked flake reference '%s' (use --impure to override)", flakeRefS);
 
@@ -825,7 +826,7 @@ void NixRepl::runNix(Path program, const Strings & args, const std::optional<std
     if (runNixPtr)
         (*runNixPtr)(program, args, input);
     else
-        throw Error("Cannot run '%s', no method of calling the Nix CLI provided", program);
+        throw Error("Cannot run '%s' because no method of calling the Nix CLI was provided. This is a configuration problem pertaining to how this program was built. See Nix 2.25 release notes", program);
 }
 
 

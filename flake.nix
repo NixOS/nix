@@ -221,6 +221,7 @@
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
           default = self.packages.${system}.nix-ng;
+          nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
         }
@@ -349,9 +350,10 @@
             ++ pkgs.nixComponents.nix-store.nativeBuildInputs
             ++ pkgs.nixComponents.nix-fetchers.nativeBuildInputs
             ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.nativeBuildInputs
+            ++ lib.optionals buildCanExecuteHost pkgs.nixComponents.nix-manual.externalNativeBuildInputs
             ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
-            ++ pkgs.nixComponents.nix-functional-tests.baseNativeBuildInputs
+            ++ pkgs.nixComponents.nix-functional-tests.externalNativeBuildInputs
             ++ lib.optional
               (!buildCanExecuteHost
                  # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
@@ -370,7 +372,7 @@
             # TODO: Remove the darwin check once
             # https://github.com/NixOS/nixpkgs/pull/291814 is available
             ++ lib.optional (stdenv.cc.isClang && !stdenv.buildPlatform.isDarwin) pkgs.buildPackages.bear
-            ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) pkgs.buildPackages.clang-tools;
+            ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (lib.hiPrio pkgs.buildPackages.clang-tools);
 
           buildInputs = attrs.buildInputs or []
             ++ [

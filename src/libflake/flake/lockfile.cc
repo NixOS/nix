@@ -54,12 +54,13 @@ StorePath LockedNode::computeStorePath(Store & store) const
 }
 
 
-static std::shared_ptr<Node> doFind(const ref<Node>& root, const InputPath & path, std::vector<InputPath>& visited) {
+static std::shared_ptr<Node> doFind(const ref<Node> & root, const InputPath & path, std::vector<InputPath> & visited)
+{
     auto pos = root;
 
     auto found = std::find(visited.cbegin(), visited.cend(), path);
 
-    if(found != visited.end()) {
+    if (found != visited.end()) {
         std::vector<std::string> cycle;
         std::transform(found, visited.cend(), std::back_inserter(cycle), printInputPath);
         cycle.push_back(printInputPath(path));

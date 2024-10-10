@@ -88,9 +88,9 @@ nix_tests = \
   why-depends.sh \
   derivation-json.sh \
   derivation-advanced-attributes.sh \
-  import-derivation.sh \
+  import-from-derivation.sh \
   nix_path.sh \
-  case-hack.sh \
+  nars.sh \
   placeholders.sh \
   ssh-relay.sh \
   build.sh \

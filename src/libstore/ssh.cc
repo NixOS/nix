@@ -7,6 +7,16 @@
 
 namespace nix {
 
+static std::string parsePublicHostKey(std::string_view host, std::string_view sshPublicHostKey)
+{
+    try {
+        return base64Decode(sshPublicHostKey);
+    } catch (Error & e) {
+        e.addTrace({}, "while decoding ssh public host key for host '%s'", host);
+        throw;
+    }
+}
+
 SSHMaster::SSHMaster(
     std::string_view host,
     std::string_view keyFile,
@@ -15,7 +25,7 @@ SSHMaster::SSHMaster(
     : host(host)
     , fakeSSH(host == "localhost")
     , keyFile(keyFile)
-    , sshPublicHostKey(sshPublicHostKey)
+    , sshPublicHostKey(parsePublicHostKey(host, sshPublicHostKey))
     , useMaster(useMaster && !fakeSSH)
     , compress(compress)
     , logFD(logFD)
@@ -39,7 +49,7 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
         std::filesystem::path fileName = state->tmpDir->path() / "host-key";
         auto p = host.rfind("@");
         std::string thost = p != std::string::npos ? std::string(host, p + 1) : host;
-        writeFile(fileName.string(), thost + " " + base64Decode(sshPublicHostKey) + "\n");
+        writeFile(fileName.string(), thost + " " + sshPublicHostKey + "\n");
         args.insert(args.end(), {"-oUserKnownHostsFile=" + fileName.string()});
     }
     if (compress)

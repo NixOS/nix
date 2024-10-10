@@ -7,10 +7,11 @@
 #include "split.hh"
 #include "common-protocol.hh"
 #include "common-protocol-impl.hh"
+#include "strings-inline.hh"
+#include "json-utils.hh"
+
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
-
-#include "strings-inline.hh"
 
 namespace nix {
 

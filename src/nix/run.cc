@@ -75,7 +75,7 @@ void execProgramInStore(ref<Store> store,
 
 }
 
-struct CmdRun : InstallableValueCommand
+struct CmdRun : InstallableValueCommand, MixEnvironment
 {
     using InstallableCommand::run;
 
@@ -134,6 +134,8 @@ struct CmdRun : InstallableValueCommand
         // Release our references to eval caches to ensure they are persisted to disk, because
         // we are about to exec out of this process without running C++ destructors.
         state->evalCaches.clear();
+
+        setEnviron();
 
         execProgramInStore(store, UseLookupPath::DontUse, app.program, allArgs);
     }

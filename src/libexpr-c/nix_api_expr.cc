@@ -16,8 +16,6 @@
 
 #if HAVE_BOEHMGC
 #  include <mutex>
-#  define GC_INCLUDE_NEW 1
-#  include "gc_cpp.h"
 #endif
 
 nix_err nix_libexpr_init(nix_c_context * context)

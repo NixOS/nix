@@ -2,6 +2,7 @@
 #include "signals.hh"
 #include "finally.hh"
 #include "serialise.hh"
+#include "util.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -65,7 +66,7 @@ AutoCloseFD::~AutoCloseFD()
     try {
         close();
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 

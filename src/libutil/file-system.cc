@@ -5,6 +5,7 @@
 #include "signals.hh"
 #include "finally.hh"
 #include "serialise.hh"
+#include "util.hh"
 
 #include <atomic>
 #include <cerrno>
@@ -517,7 +518,7 @@ AutoDelete::~AutoDelete()
             }
         }
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 

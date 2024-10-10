@@ -7,7 +7,7 @@ ca-tests := \
   $(d)/duplicate-realisation-in-closure.sh \
   $(d)/eval-store.sh \
   $(d)/gc.sh \
-  $(d)/import-derivation.sh \
+  $(d)/import-from-derivation.sh \
   $(d)/new-build-cmd.sh \
   $(d)/nix-copy.sh \
   $(d)/nix-run.sh \

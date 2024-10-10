@@ -111,9 +111,8 @@ void ThreadPool::doWork(bool mainThread)
                         try {
                             std::rethrow_exception(exc);
                         } catch (std::exception & e) {
-                            if (!dynamic_cast<Interrupted*>(&e) &&
-                                !dynamic_cast<ThreadPoolShutDown*>(&e))
-                                ignoreException();
+                            if (!dynamic_cast<ThreadPoolShutDown*>(&e))
+                                ignoreExceptionExceptInterrupt();
                         } catch (...) {
                         }
                     }
