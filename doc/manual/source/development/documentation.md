@@ -35,7 +35,7 @@ In order to reflect changes to the [Makefile for the manual], clear all generate
 [Makefile for the manual]: https://github.com/NixOS/nix/blob/master/doc/manual/local.mk
 
 ```console
-rm $(git ls-files doc/manual/ -o | grep -F '.md') && rmdir doc/manual/src/command-ref/new-cli && make manual-html -j $NIX_BUILD_CORES
+rm $(git ls-files doc/manual/ -o | grep -F '.md') && rmdir doc/manual/source/command-ref/new-cli && make manual-html -j $NIX_BUILD_CORES
 ```
 
 ## Style guide
@@ -182,7 +182,7 @@ Please observe these guidelines to ease reviews:
 
 `@docroot@` provides a base path for links that occur in reusable snippets or other documentation that doesn't have a base path of its own.
 
-If a broken link occurs in a snippet that was inserted into multiple generated files in different directories, use `@docroot@` to reference the `doc/manual/src` directory.
+If a broken link occurs in a snippet that was inserted into multiple generated files in different directories, use `@docroot@` to reference the `doc/manual/source` directory.
 
 If the `@docroot@` literal appears in an error message from the [`mdbook-linkcheck`] tool, the `@docroot@` replacement needs to be applied to the generated source file that mentions it.
 See existing `@docroot@` logic in the [Makefile for the manual].
