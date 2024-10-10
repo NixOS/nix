@@ -65,6 +65,7 @@
 #include <iostream>
 
 #include "strings.hh"
+#include "signals.hh"
 
 namespace nix {
 
@@ -1579,6 +1580,8 @@ void LocalDerivationGoal::startDaemon()
                         FdSink(remote.get()),
                         NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
+                } catch (const Interrupted &) {
+                    debug("interrupted daemon connection");
                 } catch (SystemError &) {
                     ignoreExceptionExceptInterrupt();
                 }
