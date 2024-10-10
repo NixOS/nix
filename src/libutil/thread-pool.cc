@@ -119,7 +119,6 @@ void ThreadPool::doWork(bool mainThread)
                             // Similarly expected.
                         } catch (std::exception & e) {
                             ignoreExceptionExceptInterrupt();
-                        } catch (...) {
                         }
                     }
                 }
