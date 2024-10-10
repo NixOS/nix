@@ -115,9 +115,10 @@ void ThreadPool::doWork(bool mainThread)
                             // workers, which is expected, so we should ignore
                             // it silently and let the first one bubble up,
                             // rethrown via the original state->exception.
+                        } catch (const ThreadPoolShutDown &) {
+                            // Similarly expected.
                         } catch (std::exception & e) {
-                            if (!dynamic_cast<ThreadPoolShutDown*>(&e))
-                                ignoreExceptionExceptInterrupt();
+                            ignoreExceptionExceptInterrupt();
                         } catch (...) {
                         }
                     }
