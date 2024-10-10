@@ -36,6 +36,31 @@ inline void checkInterrupt();
  */
 MakeError(Interrupted, BaseError);
 
+enum StopOrContinue {
+    Stop, Continue
+};
+
+/**
+ * Loop until the process is interrupted or `false` is returned.
+ *
+ * @note When this function returns, the thread or process must stop, or
+ *       in case of - say - a repl, reset `setInterrupted`.
+ *
+ * @param f A function that returns `StopOrContinue` to control the loop.
+ */
+template <typename F>
+void loopUntilInterrupted(F && f) {
+    while (true) {
+        try {
+            checkInterrupt();
+            if (f() == Stop)
+                break;
+        } catch (const Interrupted &) {
+            break;
+        }
+    }
+}
+
 
 struct InterruptCallback
 {

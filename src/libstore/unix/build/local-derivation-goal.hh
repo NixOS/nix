@@ -225,8 +225,15 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     void writeStructuredAttrs();
 
+    /**
+     * Start an in-process nix daemon thread for recursive-nix.
+     */
     void startDaemon();
 
+    /**
+     * Stop the in-process nix daemon thread.
+     * @see startDaemon
+     */
     void stopDaemon();
 
     /**
