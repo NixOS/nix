@@ -88,6 +88,7 @@ nix_tests = \
   why-depends.sh \
   derivation-json.sh \
   derivation-advanced-attributes.sh \
+  derivation-instantiate.sh \
   import-from-derivation.sh \
   nix_path.sh \
   nars.sh \
