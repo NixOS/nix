@@ -211,6 +211,11 @@ struct LocalDerivationGoal : public DerivationGoal
     void initEnv();
 
     /**
+     * Process messages send by the sandbox initialization.
+     */
+    void processSandboxSetupMessages();
+
+    /**
      * Setup tmp dir location.
      */
     void initTmpDir();

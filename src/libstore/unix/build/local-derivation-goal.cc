@@ -433,6 +433,41 @@ static void doBind(const Path & source, const Path & target, bool optional = fal
 };
 #endif
 
+/**
+ * Rethrow the current exception as a subclass of `Error`.
+ */
+static void rethrowExceptionAsError()
+{
+    try {
+        throw;
+    } catch (Error &) {
+        throw;
+    } catch (std::exception & e) {
+        throw Error(e.what());
+    } catch (...) {
+        throw Error("unknown exception");
+    }
+}
+
+/**
+ * Send the current exception to the parent in the format expected by
+ * `LocalDerivationGoal::processSandboxSetupMessages()`.
+ */
+static void handleChildException(bool sendException)
+{
+    try {
+        rethrowExceptionAsError();
+    } catch (Error & e) {
+        if (sendException) {
+            writeFull(STDERR_FILENO, "\1\n");
+            FdSink sink(STDERR_FILENO);
+            sink << e;
+            sink.flush();
+        } else
+            std::cerr << e.msg();
+    }
+}
+
 void LocalDerivationGoal::startBuilder()
 {
     if ((buildUser && buildUser->getUIDCount() != 1)
@@ -949,32 +984,40 @@ void LocalDerivationGoal::startBuilder()
                root. */
             openSlave();
 
-            /* Drop additional groups here because we can't do it
-               after we've created the new user namespace. */
-            if (setgroups(0, 0) == -1) {
-                if (errno != EPERM)
-                    throw SysError("setgroups failed");
-                if (settings.requireDropSupplementaryGroups)
-                    throw Error("setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
+            try {
+                /* Drop additional groups here because we can't do it
+                   after we've created the new user namespace. */
+                if (setgroups(0, 0) == -1) {
+                    if (errno != EPERM)
+                        throw SysError("setgroups failed");
+                    if (settings.requireDropSupplementaryGroups)
+                        throw Error("setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
+                }
+
+                ProcessOptions options;
+                options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
+                if (privateNetwork)
+                    options.cloneFlags |= CLONE_NEWNET;
+                if (usingUserNamespace)
+                    options.cloneFlags |= CLONE_NEWUSER;
+
+                pid_t child = startProcess([&]() { runChild(); }, options);
+
+                writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
+                _exit(0);
+            } catch (...) {
+                handleChildException(true);
+                _exit(1);
             }
-
-            ProcessOptions options;
-            options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
-            if (privateNetwork)
-                options.cloneFlags |= CLONE_NEWNET;
-            if (usingUserNamespace)
-                options.cloneFlags |= CLONE_NEWUSER;
-
-            pid_t child = startProcess([&]() { runChild(); }, options);
-
-            writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
-            _exit(0);
         });
 
         sendPid.writeSide.close();
 
-        if (helper.wait() != 0)
+        if (helper.wait() != 0) {
+            processSandboxSetupMessages();
+            // Only reached if the child process didn't send an exception.
             throw Error("unable to start build process");
+        }
 
         userNamespaceSync.readSide = -1;
 
@@ -1050,7 +1093,12 @@ void LocalDerivationGoal::startBuilder()
     pid.setSeparatePG(true);
     worker.childStarted(shared_from_this(), {builderOut.get()}, true, true);
 
-    /* Check if setting up the build environment failed. */
+    processSandboxSetupMessages();
+}
+
+
+void LocalDerivationGoal::processSandboxSetupMessages()
+{
     std::vector<std::string> msgs;
     while (true) {
         std::string msg = [&]() {
@@ -1078,7 +1126,8 @@ void LocalDerivationGoal::startBuilder()
 }
 
 
-void LocalDerivationGoal::initTmpDir() {
+void LocalDerivationGoal::initTmpDir()
+{
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
 #if __linux__
@@ -2237,14 +2286,8 @@ void LocalDerivationGoal::runChild()
 
         throw SysError("executing '%1%'", drv->builder);
 
-    } catch (Error & e) {
-        if (sendException) {
-            writeFull(STDERR_FILENO, "\1\n");
-            FdSink sink(STDERR_FILENO);
-            sink << e;
-            sink.flush();
-        } else
-            std::cerr << e.msg();
+    } catch (...) {
+        handleChildException(sendException);
         _exit(1);
     }
 }
