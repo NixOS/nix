@@ -79,7 +79,7 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
      - Functional tests – [`tests/functional/**.sh`](./tests/functional)
      - Unit tests – [`src/*/tests`](./src/)
      - Integration tests – [`tests/nixos/*`](./tests/nixos)
-   - [ ] User documentation in the [manual](./doc/manual/src)
+   - [ ] User documentation in the [manual](./doc/manual/source)
    - [ ] API documentation in header files
    - [ ] Code and comments are self-explanatory
    - [ ] Commit message explains **why** the change was made
@@ -90,7 +90,7 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
 ## Making changes to the Nix manual
 
 The Nix reference manual is hosted on https://nixos.org/manual/nix.
-The underlying source files are located in [`doc/manual/src`](./doc/manual/src).
+The underlying source files are located in [`doc/manual/source`](./doc/manual/source).
 For small changes you can [use GitHub to edit these files](https://docs.github.com/en/repositories/working-with-files/managing-files/editing-files)
 For larger changes see the [Nix reference manual](https://nix.dev/manual/nix/development/development/contributing.html).
 
