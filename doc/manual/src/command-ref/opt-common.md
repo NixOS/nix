@@ -193,9 +193,7 @@ Most Nix commands accept the following command-line options:
 
 - <span id="opt-eval-store">[`--eval-store`](#opt-eval-store)</span> *store-url*
 
-  The [URL of the Nix store](@docroot@/store/types/index.md#store-url-format)
-  to use for evaluation, i.e. to store derivations (.drv files) and inputs
-  referenced by them.
+  The [URL to the Nix store](@docroot@/store/types/index.md#store-url-format) to use for evaluation, i.e. where to store derivations (`.drv` files) and inputs referenced by them.
 
 - <span id="opt-expr">[`--expr`](#opt-expr)</span> / `-E`
 
