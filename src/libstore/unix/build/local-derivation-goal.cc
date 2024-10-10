@@ -19,6 +19,7 @@
 #include "unix-domain-socket.hh"
 #include "posix-fs-canonicalise.hh"
 #include "posix-source-accessor.hh"
+#include "signals.hh"
 
 #include <regex>
 #include <queue>
@@ -1504,7 +1505,7 @@ void LocalDerivationGoal::startDaemon()
 
     daemonThread = std::thread([this, store]() {
 
-        while (true) {
+        loopUntilInterrupted([this, store]() {
 
             /* Accept a connection. */
             struct sockaddr_un remoteAddr;
@@ -1513,8 +1514,8 @@ void LocalDerivationGoal::startDaemon()
             AutoCloseFD remote = accept(daemonSocket.get(),
                 (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             if (!remote) {
-                if (errno == EINTR || errno == EAGAIN) continue;
-                if (errno == EINVAL || errno == ECONNABORTED) break;
+                if (errno == EINTR || errno == EAGAIN) return Continue;
+                if (errno == EINVAL || errno == ECONNABORTED) return Stop;
                 throw SysError("accepting connection");
             }
 
@@ -1538,8 +1539,9 @@ void LocalDerivationGoal::startDaemon()
             });
 
             daemonWorkerThreads.push_back(std::move(workerThread));
-        }
-
+            return Continue;
+        });
+        // We've been interrupted, so we shut down this thread asap.
         debug("daemon shutting down");
     });
 }
