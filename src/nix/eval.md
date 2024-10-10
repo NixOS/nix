@@ -50,8 +50,7 @@ R""(
 
 # Description
 
-This command evaluates the given Nix expression and prints the
-result on standard output.
+This command eagerly evaluates the given Nix expression and prints the result on standard output.
 
 # Output format
 
