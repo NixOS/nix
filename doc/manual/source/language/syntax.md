@@ -443,7 +443,7 @@ three kinds of patterns:
     This works on any set that contains at least the three named
     attributes.
 
-    It is possible to provide *default values* for attributes, in
+  - It is possible to provide *default values* for attributes, in
     which case they are allowed to be missing. A default value is
     specified by writing `name ?  e`, where *e* is an arbitrary
     expression. For example,
@@ -501,6 +501,45 @@ three kinds of patterns:
     >
     > ```nix
     > [ 23 {} ]
+    > ```
+
+  - All bindings introduced by the function are in scope in the entire function expression; not just in the body.
+    It can therefore be used in default values.
+
+    > **Example**
+    >
+    > A parameter (`x`), is used in the default value for another parameter (`y`):
+    >
+    > ```nix
+    > let
+    >   f = { x, y ? [x] }: { inherit y; };
+    > in
+    >   f { x = 3; }
+    > ```
+    >
+    > This evaluates to:
+    >
+    > ```nix
+    > {
+    >   y = [ 3 ];
+    > }
+    > ```
+
+    > **Example**
+    >
+    > The binding of an `@` pattern, `args`, is used in the default value for a parameter, `x`:
+    >
+    > ```nix
+    > let
+    >   f = args@{ x ? args.a, ... }: x;
+    > in
+    >   f { a = 1; }
+    > ```
+    >
+    > This evaluates to:
+    >
+    > ```nix
+    > 1
     > ```
 
 Note that functions do not have names. If you want to give them a name,
