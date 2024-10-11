@@ -504,7 +504,7 @@ three kinds of patterns:
     > ```
 
     The full function argument bound by the `@`-pattern is also brought into scope over the set pattern on the other side of the `@`, not just over the body of the function.
-    It can therefore be used in default values:
+    It can therefore be used in default values.
 
     > **Example**
     >
