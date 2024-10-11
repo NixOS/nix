@@ -9,6 +9,7 @@
 #include "globals.hh"
 #include "compression.hh"
 #include "filetransfer.hh"
+#include "signals.hh"
 
 #include <aws/core/Aws.h>
 #include <aws/core/VersionConfig.h>
@@ -117,6 +118,7 @@ class RetryStrategy : public Aws::Client::DefaultRetryStrategy
 {
     bool ShouldRetry(const Aws::Client::AWSError<Aws::Client::CoreErrors>& error, long attemptedRetries) const override
     {
+        checkInterrupt();
         auto retry = Aws::Client::DefaultRetryStrategy::ShouldRetry(error, attemptedRetries);
         if (retry)
             printError("AWS error '%s' (%s), will retry in %d ms",
