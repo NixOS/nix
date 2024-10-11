@@ -212,18 +212,23 @@ nix_symlinks = [
   'nix-store',
 ]
 
+name_suffix = ''
+if host_machine.system() == 'windows'
+  name_suffix = '.exe'
+endif
+
 foreach linkname : nix_symlinks
   install_symlink(
-    linkname,
+    linkname + name_suffix,
     # TODO(Qyriad): should these continue to be relative symlinks?
-    pointing_to : 'nix',
+    pointing_to : fs.name(this_exe),
     install_dir : get_option('bindir'),
     # The 'runtime' tag is what executables default to, which we want to emulate here.
     install_tag : 'runtime'
   )
   t = custom_target(
     command: ['ln', '-sf', fs.name(this_exe), '@OUTPUT@'],
-    output: linkname,
+    output: linkname + name_suffix,
     # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
     build_by_default: true
   )
@@ -233,15 +238,15 @@ endforeach
 
 install_symlink(
   'build-remote',
-  pointing_to : '..' / '..'/ get_option('bindir') / 'nix',
-  install_dir : get_option('libexecdir') / 'nix',
+  pointing_to : '..' / '..'/ get_option('bindir') / fs.name(this_exe),
+  install_dir : get_option('libexecdir') / fs.name(this_exe),
   # The 'runtime' tag is what executables default to, which we want to emulate here.
   install_tag : 'runtime'
 )
 
 custom_target(
   command: ['ln', '-sf', fs.name(this_exe), '@OUTPUT@'],
-  output: 'build-remote',
+  output: 'build-remote' + name_suffix,
   # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
   build_by_default: true
 )
