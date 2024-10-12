@@ -36,7 +36,7 @@ extern char * * environ __attribute__((weak));
 /* Recreate the effect of the perl shellwords function, breaking up a
  * string into arguments like a shell word, including escapes
  */
-static std::vector<std::string> shellwords(const std::string & s)
+static std::vector<std::string> shellwords(std::string_view s)
 {
     std::regex whitespace("^\\s+");
     auto begin = s.cbegin();
@@ -51,7 +51,7 @@ static std::vector<std::string> shellwords(const std::string & s)
     auto it = begin;
     for (; it != s.cend(); ++it) {
         if (st == sBegin) {
-            std::smatch match;
+            std::cmatch match;
             if (regex_search(it, s.cend(), match, whitespace)) {
                 cur.append(begin, it);
                 res.push_back(cur);
@@ -173,7 +173,7 @@ static void main_nix_build(int argc, char * * argv)
                     line = chomp(line);
                     std::smatch match;
                     if (std::regex_match(line, match, std::regex("^#!\\s*nix-shell\\s+(.*)$")))
-                        for (const auto & word : shellwords(match[1].str()))
+                        for (const auto & word : shellwords({match[1].first, match[1].second}))
                             args.push_back(word);
                 }
             }
@@ -260,9 +260,9 @@ static void main_nix_build(int argc, char * * argv)
                 // read the shebang to understand which packages to read from. Since
                 // this is handled via nix-shell -p, we wrap our ruby script execution
                 // in ruby -e 'load' which ignores the shebangs.
-                envCommand = fmt("exec %1% %2% -e 'load(ARGV.shift)' -- %3% %4%", execArgs, interpreter, shellEscape(script), joined.str());
+                envCommand = fmt("exec %1% %2% -e 'load(ARGV.shift)' -- %3% %4%", execArgs, interpreter, shellEscape(script), toView(joined));
             } else {
-                envCommand = fmt("exec %1% %2% %3% %4%", execArgs, interpreter, shellEscape(script), joined.str());
+                envCommand = fmt("exec %1% %2% %3% %4%", execArgs, interpreter, shellEscape(script), toView(joined));
             }
         }
 

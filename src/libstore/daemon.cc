@@ -90,11 +90,11 @@ struct TunnelLogger : public Logger
     {
         if (ei.level > verbosity) return;
 
-        std::stringstream oss;
+        std::ostringstream oss;
         showErrorInfo(oss, ei, false);
 
         StringSink buf;
-        buf << STDERR_NEXT << oss.str();
+        buf << STDERR_NEXT << toView(oss);
         enqueueMsg(buf.s);
     }
 

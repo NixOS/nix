@@ -645,7 +645,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
         } else if (fallbackPos) {
-            std::stringstream ss;
+            std::ostringstream ss;
             ss << "Attribute `" << fallbackName << "`\n\n";
             ss << "  … defined at " << state->positions[fallbackPos] << "\n\n";
             if (fallbackDoc) {
@@ -654,7 +654,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 ss << "No documentation found.\n\n";
             }
 
-            auto markdown = ss.str();
+            auto markdown = toView(ss);
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
 
         } else

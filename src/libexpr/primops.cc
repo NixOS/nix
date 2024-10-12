@@ -40,6 +40,13 @@ namespace nix {
  * Miscellaneous
  *************************************************************/
 
+static inline Value * mkString(EvalState & state, const std::csub_match & match)
+{
+    Value * v = state.allocValue();
+    v->mkString({match.first, match.second});
+    return v;
+}
+
 StringMap EvalState::realiseContext(const NixStringContext & context, StorePathSet * maybePathsOut, bool isIFD)
 {
     std::vector<DerivedPath::Built> drvs;
@@ -2129,7 +2136,7 @@ static void prim_toXML(EvalState & state, const PosIdx pos, Value * * args, Valu
     std::ostringstream out;
     NixStringContext context;
     printValueAsXML(state, true, false, *args[0], out, context, pos);
-    v.mkString(out.str(), context);
+    v.mkString(toView(out), context);
 }
 
 static RegisterPrimOp primop_toXML({
@@ -2237,7 +2244,7 @@ static void prim_toJSON(EvalState & state, const PosIdx pos, Value * * args, Val
     std::ostringstream out;
     NixStringContext context;
     printValueAsJSON(state, true, *args[0], pos, out, context);
-    v.mkString(out.str(), context);
+    v.mkString(toView(out), context);
 }
 
 static RegisterPrimOp primop_toJSON({
@@ -4268,7 +4275,7 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
             if (!match[i + 1].matched)
                 v2 = &state.vNull;
             else
-                (v2 = state.allocValue())->mkString(match[i + 1].str());
+                v2 = mkString(state, match[i + 1]);
         v.mkList(list);
 
     } catch (std::regex_error & e) {
@@ -4352,7 +4359,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
             auto match = *i;
 
             // Add a string for non-matched characters.
-            (list[idx++] = state.allocValue())->mkString(match.prefix().str());
+            list[idx++] = mkString(state, match.prefix());
 
             // Add a list for matched substrings.
             const size_t slen = match.size() - 1;
@@ -4363,14 +4370,14 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
                 if (!match[si + 1].matched)
                     v2 = &state.vNull;
                 else
-                    (v2 = state.allocValue())->mkString(match[si + 1].str());
+                    v2 = mkString(state, match[si + 1]);
             }
 
             (list[idx++] = state.allocValue())->mkList(list2);
 
             // Add a string for non-matched suffix characters.
             if (idx == 2 * len)
-                (list[idx++] = state.allocValue())->mkString(match.suffix().str());
+                list[idx++] = mkString(state, match.suffix());
         }
 
         assert(idx == 2 * len + 1);
