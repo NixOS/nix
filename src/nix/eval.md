@@ -50,7 +50,9 @@ R""(
 
 # Description
 
-This command also evaluates any nested attribute values and list items, and prints the result on standard output.
+This command evaluates the given Nix expression, and prints the result on standard output.
+
+It also evaluates any nested attribute values and list items.
 
 # Output format
 
