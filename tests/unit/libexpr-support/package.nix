@@ -1,6 +1,6 @@
 { lib
 , stdenv
-, mkMesonDerivation
+, mkMesonLibrary
 
 , nix-store-test-support
 , nix-expr
@@ -16,7 +16,7 @@ let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonLibrary (finalAttrs: {
   pname = "nix-util-test-support";
   inherit version;
 
@@ -31,8 +31,6 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];
-
-  outputs = [ "out" "dev" ];
 
   propagatedBuildInputs = [
     nix-store-test-support
@@ -54,10 +52,6 @@ mkMesonDerivation (finalAttrs: {
   env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
     LDFLAGS = "-fuse-ld=gold";
   };
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

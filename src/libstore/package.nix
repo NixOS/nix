@@ -1,6 +1,6 @@
 { lib
 , stdenv
-, mkMesonDerivation
+, mkMesonLibrary
 
 , unixtools
 
@@ -25,7 +25,7 @@ let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonLibrary (finalAttrs: {
   pname = "nix-store";
   inherit version;
 
@@ -46,8 +46,6 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "md") ./.)
     (fileset.fileFilter (file: file.hasExt "sql") ./.)
   ];
-
-  outputs = [ "out" "dev" ];
 
   nativeBuildInputs =
     lib.optional embeddedSandboxShell unixtools.hexdump;
@@ -90,10 +88,6 @@ mkMesonDerivation (finalAttrs: {
   } // lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
     LDFLAGS = "-fuse-ld=gold";
   };
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

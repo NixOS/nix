@@ -69,8 +69,21 @@ let
       nativeBuildInputs = [
         pkgs.buildPackages.meson
         pkgs.buildPackages.ninja
-        pkgs.buildPackages.pkg-config
       ] ++ prevAttrs.nativeBuildInputs or [];
+    };
+
+  mesonBuildLayer = finalAttrs: prevAttrs:
+    {
+      nativeBuildInputs = prevAttrs.nativeBuildInputs or [] ++ [
+        pkgs.buildPackages.pkg-config
+      ];
+      separateDebugInfo = !stdenv.hostPlatform.isStatic;
+      hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
+    };
+
+  mesonLibraryLayer = finalAttrs: prevAttrs:
+    {
+      outputs = prevAttrs.outputs or [ "out" ] ++ [ "dev" ];
     };
 
   # Work around weird `--as-needed` linker behavior with BSD, see
@@ -188,8 +201,24 @@ scope: {
   mkMesonDerivation =
     mkPackageBuilder [
       miscGoodPractice
+      localSourceLayer
+      mesonLayer
+    ];
+  mkMesonExecutable =
+    mkPackageBuilder [
+      miscGoodPractice
       bsdNoLinkAsNeeded
       localSourceLayer
       mesonLayer
+      mesonBuildLayer
+    ];
+  mkMesonLibrary =
+    mkPackageBuilder [
+      miscGoodPractice
+      bsdNoLinkAsNeeded
+      localSourceLayer
+      mesonLayer
+      mesonBuildLayer
+      mesonLibraryLayer
     ];
 }

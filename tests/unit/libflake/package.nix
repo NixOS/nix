@@ -1,7 +1,7 @@
 { lib
 , buildPackages
 , stdenv
-, mkMesonDerivation
+, mkMesonExecutable
 
 , nix-flake
 , nix-expr-test-support
@@ -20,7 +20,7 @@ let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonExecutable (finalAttrs: {
   pname = "nix-flake-tests";
   inherit version;
 
@@ -57,10 +57,6 @@ mkMesonDerivation (finalAttrs: {
   env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
     LDFLAGS = "-fuse-ld=gold";
   };
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   passthru = {
     tests = {

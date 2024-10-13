@@ -1,6 +1,6 @@
 { lib
 , stdenv
-, mkMesonDerivation
+, mkMesonExecutable
 
 , nix-store
 , nix-expr
@@ -16,7 +16,7 @@ let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonExecutable (finalAttrs: {
   pname = "nix";
   inherit version;
 
@@ -102,10 +102,6 @@ mkMesonDerivation (finalAttrs: {
   env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
     LDFLAGS = "-fuse-ld=gold";
   };
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

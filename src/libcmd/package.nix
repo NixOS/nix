@@ -1,6 +1,6 @@
 { lib
 , stdenv
-, mkMesonDerivation
+, mkMesonLibrary
 
 , nix-util
 , nix-store
@@ -33,7 +33,7 @@ let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonLibrary (finalAttrs: {
   pname = "nix-cmd";
   inherit version;
 
@@ -48,8 +48,6 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];
-
-  outputs = [ "out" "dev" ];
 
   buildInputs = [
     ({ inherit editline readline; }.${readlineFlavor})
@@ -81,10 +79,6 @@ mkMesonDerivation (finalAttrs: {
   env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
     LDFLAGS = "-fuse-ld=gold";
   };
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

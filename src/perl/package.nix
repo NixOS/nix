@@ -1,6 +1,7 @@
 { lib
 , stdenv
 , mkMesonDerivation
+, pkg-config
 , perl
 , perlPackages
 , nix-store
@@ -32,6 +33,7 @@ perl.pkgs.toPerlModule (mkMesonDerivation (finalAttrs: {
   ]);
 
   nativeBuildInputs = [
+    pkg-config
     perl
     curl
   ];
