@@ -1,11 +1,7 @@
 { lib
 , stdenv
 , mkMesonDerivation
-, releaseTools
 
-, meson
-, ninja
-, pkg-config
 , bison
 , flex
 , cmake # for resolving toml11 dep
@@ -64,9 +60,6 @@ mkMesonDerivation (finalAttrs: {
   outputs = [ "out" "dev" ];
 
   nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
     bison
     flex
     cmake

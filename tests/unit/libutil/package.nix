@@ -2,11 +2,6 @@
 , buildPackages
 , stdenv
 , mkMesonDerivation
-, releaseTools
-
-, meson
-, ninja
-, pkg-config
 
 , nix-util
 , nix-util-c
@@ -39,12 +34,6 @@ mkMesonDerivation (finalAttrs: {
     # ./meson.options
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
-  ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
   ];
 
   buildInputs = [

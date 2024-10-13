@@ -1,11 +1,7 @@
 { lib
 , stdenv
 , mkMesonDerivation
-, releaseTools
 
-, meson
-, ninja
-, pkg-config
 , unixtools
 
 , nix-util
@@ -53,11 +49,8 @@ mkMesonDerivation (finalAttrs: {
 
   outputs = [ "out" "dev" ];
 
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-  ] ++ lib.optional embeddedSandboxShell unixtools.hexdump;
+  nativeBuildInputs =
+    lib.optional embeddedSandboxShell unixtools.hexdump;
 
   buildInputs = [
     boost

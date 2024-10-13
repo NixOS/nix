@@ -1,11 +1,6 @@
 { lib
 , stdenv
 , mkMesonDerivation
-, releaseTools
-
-, meson
-, ninja
-, pkg-config
 
 , openssl
 
@@ -37,12 +32,6 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   outputs = [ "out" "dev" ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-  ];
 
   propagatedBuildInputs = [
     nix-util

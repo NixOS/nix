@@ -3,11 +3,7 @@
 , mkMesonDerivation
 , perl
 , perlPackages
-, meson
-, ninja
-, pkg-config
 , nix-store
-, darwin
 , version
 , curl
 , bzip2
@@ -36,9 +32,6 @@ perl.pkgs.toPerlModule (mkMesonDerivation (finalAttrs: {
   ]);
 
   nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
     perl
     curl
   ];

@@ -1,11 +1,6 @@
 { lib
 , stdenv
 , mkMesonDerivation
-, releaseTools
-
-, meson
-, ninja
-, pkg-config
 
 , nix-util
 , nix-store
@@ -55,12 +50,6 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   outputs = [ "out" "dev" ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-  ];
 
   buildInputs = [
     ({ inherit editline readline; }.${readlineFlavor})

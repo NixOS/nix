@@ -1,17 +1,11 @@
 { lib
 , stdenv
 , mkMesonDerivation
-, releaseTools
-
-, meson
-, ninja
-, pkg-config
 
 , nix-util
 , nix-store
 , nlohmann_json
 , libgit2
-, man
 
 # Configuration Options
 
@@ -38,12 +32,6 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   outputs = [ "out" "dev" ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-  ];
 
   buildInputs = [
     libgit2

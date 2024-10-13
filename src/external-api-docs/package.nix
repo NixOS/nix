@@ -1,8 +1,6 @@
 { lib
 , mkMesonDerivation
 
-, meson
-, ninja
 , doxygen
 
 # Configuration Options
@@ -37,8 +35,6 @@ mkMesonDerivation (finalAttrs: {
     ];
 
   nativeBuildInputs = [
-    meson
-    ninja
     doxygen
   ];
 

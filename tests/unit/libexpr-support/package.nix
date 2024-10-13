@@ -1,11 +1,6 @@
 { lib
 , stdenv
 , mkMesonDerivation
-, releaseTools
-
-, meson
-, ninja
-, pkg-config
 
 , nix-store-test-support
 , nix-expr
@@ -38,12 +33,6 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   outputs = [ "out" "dev" ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-  ];
 
   propagatedBuildInputs = [
     nix-store-test-support

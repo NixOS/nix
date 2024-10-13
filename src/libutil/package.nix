@@ -1,11 +1,6 @@
 { lib
 , stdenv
 , mkMesonDerivation
-, releaseTools
-
-, meson
-, ninja
-, pkg-config
 
 , boost
 , brotli
@@ -44,12 +39,6 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   outputs = [ "out" "dev" ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-  ];
 
   buildInputs = [
     brotli

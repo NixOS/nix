@@ -1,20 +1,11 @@
 { lib
 , stdenv
 , mkMesonDerivation
-, releaseTools
-
-, meson
-, ninja
-, pkg-config
 
 , nix-store
 , nix-expr
 , nix-main
 , nix-cmd
-
-, rapidcheck
-, gtest
-, runCommand
 
 # Configuration Options
 
@@ -89,12 +80,6 @@ mkMesonDerivation (finalAttrs: {
       ../nix-store
     ]
   );
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-  ];
 
   buildInputs = [
     nix-store

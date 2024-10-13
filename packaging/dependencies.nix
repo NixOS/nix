@@ -60,6 +60,16 @@ let
       workDir = null;
     };
 
+  mesonLayer = finalAttrs: prevAttrs:
+    {
+      mesonFlags = prevAttrs.mesonFlags or [];
+      nativeBuildInputs = [
+        pkgs.buildPackages.meson
+        pkgs.buildPackages.ninja
+        pkgs.buildPackages.pkg-config
+      ] ++ prevAttrs.nativeBuildInputs or [];
+    };
+
   # Work around weird `--as-needed` linker behavior with BSD, see
   # https://github.com/mesonbuild/meson/issues/3593
   bsdNoLinkAsNeeded = finalAttrs: prevAttrs:
@@ -177,6 +187,7 @@ scope: {
       miscGoodPractice
       bsdNoLinkAsNeeded
       localSourceLayer
+      mesonLayer
     ];
   in stdenv.mkDerivation
    (lib.extends
