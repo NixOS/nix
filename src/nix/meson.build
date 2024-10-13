@@ -212,14 +212,14 @@ nix_symlinks = [
   'nix-store',
 ]
 
-name_suffix = ''
+executable_suffix = ''
 if host_machine.system() == 'windows'
-  name_suffix = '.exe'
+  executable_suffix = '.exe'
 endif
 
 foreach linkname : nix_symlinks
   install_symlink(
-    linkname + name_suffix,
+    linkname + executable_suffix,
     # TODO(Qyriad): should these continue to be relative symlinks?
     pointing_to : fs.name(this_exe),
     install_dir : get_option('bindir'),
@@ -228,7 +228,7 @@ foreach linkname : nix_symlinks
   )
   t = custom_target(
     command: ['ln', '-sf', fs.name(this_exe), '@OUTPUT@'],
-    output: linkname + name_suffix,
+    output: linkname + executable_suffix,
     # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
     build_by_default: true
   )
@@ -246,7 +246,7 @@ install_symlink(
 
 custom_target(
   command: ['ln', '-sf', fs.name(this_exe), '@OUTPUT@'],
-  output: 'build-remote' + name_suffix,
+  output: 'build-remote' + executable_suffix,
   # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
   build_by_default: true
 )
