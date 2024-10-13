@@ -38,6 +38,10 @@ let
   # Indirection for Nixpkgs to override when package.nix files are vendored
   filesetToSource = lib.fileset.toSource;
 
+  /** Given a set of layers, create a mkDerivation-like function */
+  mkPackageBuilder = exts: userFn:
+    stdenv.mkDerivation (lib.extends (lib.composeManyExtensions exts) userFn);
+
   localSourceLayer = finalAttrs: prevAttrs:
     let
       workDirPath =
@@ -62,7 +66,6 @@ let
 
   mesonLayer = finalAttrs: prevAttrs:
     {
-      mesonFlags = prevAttrs.mesonFlags or [];
       nativeBuildInputs = [
         pkgs.buildPackages.meson
         pkgs.buildPackages.ninja
@@ -182,15 +185,11 @@ scope: {
 
   inherit resolvePath filesetToSource;
 
-  mkMesonDerivation = f: let
-    exts = [
+  mkMesonDerivation =
+    mkPackageBuilder [
       miscGoodPractice
       bsdNoLinkAsNeeded
       localSourceLayer
       mesonLayer
     ];
-  in stdenv.mkDerivation
-   (lib.extends
-     (lib.composeManyExtensions exts)
-     f);
 }
