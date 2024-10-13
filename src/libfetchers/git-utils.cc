@@ -208,7 +208,7 @@ static git_packbuilder_progress PACKBUILDER_PROGRESS_CHECK_INTERRUPT = &packBuil
 static void initRepoAtomically(std::filesystem::path &path, bool bare) {
     if (pathExists(path.string())) return;
 
-    Path tmpDir = createTempDir(std::filesystem::path(path).parent_path());
+    Path tmpDir = createTempDir(os_string_to_string(PathViewNG { std::filesystem::path(path).parent_path() }));
     AutoDelete delTmpDir(tmpDir, true);
     Repository tmpRepo;
 
