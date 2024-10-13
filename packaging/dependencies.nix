@@ -180,6 +180,6 @@ scope: {
     ];
   in stdenv.mkDerivation
    (lib.extends
-     (lib.foldr lib.composeExtensions (_: _: {}) exts)
+     (lib.composeManyExtensions exts)
      f);
 }
