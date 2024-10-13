@@ -55,7 +55,10 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
     ./lexer.l
     ./parser.y
-    (fileset.fileFilter (file: file.hasExt "nix") ./.)
+    (fileset.difference
+      (fileset.fileFilter (file: file.hasExt "nix") ./.)
+      ./package.nix
+    )
   ];
 
   outputs = [ "out" "dev" ];
