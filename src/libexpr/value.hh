@@ -318,7 +318,7 @@ public:
         finishValue(tBool, { .boolean = b });
     }
 
-    inline void mkString(const char * s, const char * * context = 0)
+    inline void mkStringNoCopy(const char * s, const char * * context = 0)
     {
         finishValue(tString, { .string = { .c_str = s, .context = context } });
     }
@@ -331,7 +331,7 @@ public:
 
     inline void mkString(const SymbolStr & s)
     {
-        mkString(s.c_str());
+        mkStringNoCopy(s.c_str());
     }
 
     void mkPath(const SourcePath & path);
