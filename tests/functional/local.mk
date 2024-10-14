@@ -107,6 +107,7 @@ nix_tests = \
   completions.sh \
   impure-derivations.sh \
   path-from-hash-part.sh \
+  store-import-export.sh \
   path-info.sh \
   toString-path.sh \
   read-only-store.sh \
