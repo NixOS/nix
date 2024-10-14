@@ -1,11 +1,7 @@
 { lib
 , stdenv
-, mkMesonDerivation
-, releaseTools
+, mkMesonLibrary
 
-, meson
-, ninja
-, pkg-config
 , bison
 , flex
 , cmake # for resolving toml11 dep
@@ -38,7 +34,7 @@ let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonLibrary (finalAttrs: {
   pname = "nix-expr";
   inherit version;
 
@@ -55,15 +51,13 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
     ./lexer.l
     ./parser.y
-    (fileset.fileFilter (file: file.hasExt "nix") ./.)
+    (fileset.difference
+      (fileset.fileFilter (file: file.hasExt "nix") ./.)
+      ./package.nix
+    )
   ];
 
-  outputs = [ "out" "dev" ];
-
   nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
     bison
     flex
     cmake
@@ -101,10 +95,6 @@ mkMesonDerivation (finalAttrs: {
   } // lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
     LDFLAGS = "-fuse-ld=gold";
   };
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;
