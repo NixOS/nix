@@ -503,6 +503,24 @@ three kinds of patterns:
     > [ 23 {} ]
     > ```
 
+    The full function argument bound by the `@`-pattern is also brought into scope over the set pattern on the other side of the `@`, not just over the body of the function.
+    It can therefore be used in default values.
+
+    > **Example**
+    >
+    > ```nix
+    > let
+    >   f = args@{ x ? args.a, ... }: x;
+    > in
+    >   f { a = 1; }
+    > ```
+    >
+    > evaluates to
+    >
+    > ```nix
+    > 1
+    > ```
+
 Note that functions do not have names. If you want to give them a name,
 you can bind them to an attribute, e.g.,
 
