@@ -977,8 +977,24 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
     void pushBuilder(std::string name)
     {
+        const git_tree_entry * entry;
+        Tree prevTree = nullptr;
+
+        if (!pendingDirs.empty() &&
+            (entry = git_treebuilder_get(pendingDirs.back().builder.get(), name.c_str())))
+        {
+            /* Clone a tree that we've already finished. This happens
+               if a tarball has directory entries that are not
+               contiguous. */
+            if (git_tree_entry_type(entry) != GIT_OBJECT_TREE)
+                throw Error("parent of '%s' is not a directory", name);
+
+            if (git_tree_entry_to_object((git_object * *) (git_tree * *) Setter(prevTree), *repo, entry))
+                throw Error("looking up parent of '%s': %s", name, git_error_last()->message);
+        }
+
         git_treebuilder * b;
-        if (git_treebuilder_new(&b, *repo, nullptr))
+        if (git_treebuilder_new(&b, *repo, prevTree.get()))
             throw Error("creating a tree builder: %s", git_error_last()->message);
         pendingDirs.push_back({ .name = std::move(name), .builder = TreeBuilder(b) });
     };
