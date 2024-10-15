@@ -3,6 +3,7 @@
 #include "source-path.hh"
 #include "fetch-to-store.hh"
 #include "json-utils.hh"
+#include "store-path-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -100,7 +101,7 @@ Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
     auto allowedAttrs = inputScheme->allowedAttrs();
 
     for (auto & [name, _] : attrs)
-        if (name != "type" && allowedAttrs.count(name) == 0)
+        if (name != "type" && name != "final" && allowedAttrs.count(name) == 0)
             throw Error("input attribute '%s' not supported by scheme '%s'", name, schemeName);
 
     auto res = inputScheme->inputFromAttrs(settings, attrs);
@@ -143,6 +144,11 @@ bool Input::isDirect() const
 bool Input::isLocked() const
 {
     return scheme && scheme->isLocked(*this);
+}
+
+bool Input::isFinal() const
+{
+    return maybeGetBoolAttr(attrs, "final").value_or(false);
 }
 
 Attrs Input::toAttrs() const
@@ -221,6 +227,12 @@ void InputScheme::checkLocks(const Input & specified, const Input & final) const
             throw Error("'revCount' attribute mismatch in input '%s', expected %d",
                 final.to_string(), *prevRevCount);
     }
+
+    assert(final.isFinal());
+
+    if (specified.isFinal() && specified.attrs != final.attrs)
+        throw Error("fetching final input '%s' resulted in different input '%s'",
+            attrsToJSON(specified.attrs), attrsToJSON(final.attrs));
 }
 
 std::pair<ref<SourceAccessor>, Input> Input::getAccessor(ref<Store> store) const
@@ -244,10 +256,42 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
+    /* The tree may already be in the Nix store, or it could be
+       substituted (which is often faster than fetching from the
+       original source). So check that. We only do this for final
+       inputs, otherwise there is a risk that we don't return the
+       same attributes (like `lastModified`) that the "real" fetcher
+       would return.
+
+       FIXME: add a setting to disable this.
+       FIXME: substituting may be slower than fetching normally,
+       e.g. for fetchers like that Git that are incremental!
+    */
+    if (isFinal() && getNarHash()) {
+        try {
+            auto storePath = computeStorePath(*store);
+
+            store->ensurePath(storePath);
+
+            debug("using substituted/cached input '%s' in '%s'",
+                to_string(), store->printStorePath(storePath));
+
+            auto accessor = makeStorePathAccessor(store, storePath);
+
+            accessor->fingerprint = scheme->getFingerprint(store, *this);
+
+            return {accessor, *this};
+        } catch (Error & e) {
+            debug("substitution of input '%s' failed: %s", to_string(), e.what());
+        }
+    }
+
     auto [accessor, final] = scheme->getAccessor(store, *this);
 
     assert(!accessor->fingerprint);
     accessor->fingerprint = scheme->getFingerprint(store, final);
+
+    final.attrs.insert_or_assign("final", Explicit<bool>(true));
 
     return {accessor, std::move(final)};
 }

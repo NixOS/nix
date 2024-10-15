@@ -85,7 +85,6 @@ static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos
         state.forceValue(value, pos);
 }
 
-
 static void expectType(EvalState & state, ValueType type,
     Value & value, const PosIdx pos)
 {
