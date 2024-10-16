@@ -1,5 +1,6 @@
 [book]
 title = "Nix Reference Manual"
+src = "source"
 
 [output.html]
 additional-css = ["custom.css"]

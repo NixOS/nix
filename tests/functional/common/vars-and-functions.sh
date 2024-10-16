@@ -78,7 +78,7 @@ clearProfiles() {
 
 # Clear the store, but do not fail if we're in an environment where we can't.
 # This allows the test to run in a NixOS test environment, where we use the system store.
-# See doc/manual/src/contributing/testing.md / Running functional tests on NixOS.
+# See doc/manual/source/contributing/testing.md / Running functional tests on NixOS.
 clearStoreIfPossible() {
     if isTestOnNixOS; then
         echo "clearStoreIfPossible: Not clearing store, because we're on NixOS. Moving on."
