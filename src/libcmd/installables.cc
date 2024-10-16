@@ -917,4 +917,12 @@ void BuiltPathsCommand::applyDefaultInstallables(std::vector<std::string> & rawI
         rawInstallables.push_back(".");
 }
 
+BuiltPaths toBuiltPaths(const std::vector<BuiltPathWithResult> & builtPathsWithResult)
+{
+    BuiltPaths res;
+    for (auto & i : builtPathsWithResult)
+        res.push_back(i.path);
+    return res;
+}
+
 }
