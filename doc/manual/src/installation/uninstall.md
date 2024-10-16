@@ -145,6 +145,14 @@ which you may remove.
 
    If you get an error that the volume is in use by the kernel, reboot and immediately delete the volume before starting any other process.
 
+8. Remove the password to the encrypted Nix Store volume:
+
+   ```console
+   sudo security delete-generic-password  -a "Nix Store" -s "Nix Store" -l "disk3 encryption password" -D "Encrypted volume password"`
+   ```
+
+   If you had multiple Nix Store volumes, you need to run the command multiple times until it mentions, that no further passwords matching the criteria were found.
+
 > **Note**
 >
 > After you complete the steps here, you will still have an empty `/nix` directory.
