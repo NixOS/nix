@@ -185,6 +185,14 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
             auto narHash = store->queryPathInfo(storePath)->narHash;
             final.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
+            // FIXME: we would like to mark inputs as final in
+            // getAccessorUnchecked(), but then we can't add
+            // narHash. Or maybe narHash should be excluded from the
+            // concept of "final" inputs?
+            final.attrs.insert_or_assign("final", Explicit<bool>(true));
+
+            assert(final.isFinal());
+
             scheme->checkLocks(*this, final);
 
             return {storePath, final};
@@ -227,8 +235,6 @@ void InputScheme::checkLocks(const Input & specified, const Input & final) const
             throw Error("'revCount' attribute mismatch in input '%s', expected %d",
                 final.to_string(), *prevRevCount);
     }
-
-    assert(final.isFinal());
 
     if (specified.isFinal() && specified.attrs != final.attrs)
         throw Error("fetching final input '%s' resulted in different input '%s'",
@@ -290,8 +296,6 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
     assert(!accessor->fingerprint);
     accessor->fingerprint = scheme->getFingerprint(store, final);
-
-    final.attrs.insert_or_assign("final", Explicit<bool>(true));
 
     return {accessor, std::move(final)};
 }
