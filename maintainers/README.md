@@ -29,11 +29,7 @@ We aim to achieve this by improving the contributor experience and attracting mo
 
 ## Members
 
-- Eelco Dolstra (@edolstra) – Team lead
-- Valentin Gagarin (@fricklerhandwerk)
-- Thomas Bereknyei (@tomberek)
-- Robert Hensing (@roberth)
-- John Ericson (@Ericson2314)
+See https://nixos.org/community/teams/nix/ for the current team membership.
 
 The team is on Github as [@NixOS/nix-team](https://github.com/orgs/NixOS/teams/nix-team).
 
