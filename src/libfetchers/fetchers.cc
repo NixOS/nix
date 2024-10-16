@@ -265,7 +265,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
        FIXME: add a setting to disable this.
        FIXME: substituting may be slower than fetching normally,
-       e.g. for fetchers like that Git that are incremental!
+       e.g. for fetchers like Git that are incremental!
     */
     if (isFinal() && getNarHash()) {
         try {
