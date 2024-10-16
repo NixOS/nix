@@ -111,7 +111,7 @@ void ThreadPool::doWork(bool mainThread)
                         try {
                             std::rethrow_exception(exc);
                         } catch (const Interrupted &) {
-                            // The interrupted state may be picked up multiple
+                            // The interrupted state may be picked up by multiple
                             // workers, which is expected, so we should ignore
                             // it silently and let the first one bubble up,
                             // rethrown via the original state->exception.
