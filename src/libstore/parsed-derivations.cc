@@ -151,7 +151,7 @@ std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & s
         for (auto i = e->begin(); i != e->end(); ++i) {
             StorePathSet storePaths;
             for (auto & p : *i)
-                storePaths.insert(store.parseStorePath(p.get<std::string>()));
+                storePaths.insert(store.toStorePath(p.get<std::string>()).first);
             json[i.key()] = store.pathInfoToJSON(
                 store.exportReferences(storePaths, inputPaths), false, true);
         }
