@@ -143,7 +143,7 @@ namespace nix {
     }
 
     TEST(CanonPath, allowed) {
-        std::set<CanonPath> allowed {
+        std::unordered_set<CanonPath> allowed {
             CanonPath("foo/bar"),
             CanonPath("foo!"),
             CanonPath("xyzzy"),
@@ -152,11 +152,11 @@ namespace nix {
 
         ASSERT_TRUE (CanonPath("foo/bar").isAllowed(allowed));
         ASSERT_TRUE (CanonPath("foo/bar/bla").isAllowed(allowed));
-        ASSERT_TRUE (CanonPath("foo").isAllowed(allowed));
+        ASSERT_FALSE(CanonPath("foo").isAllowed(allowed));
         ASSERT_FALSE(CanonPath("bar").isAllowed(allowed));
         ASSERT_FALSE(CanonPath("bar/a").isAllowed(allowed));
-        ASSERT_TRUE (CanonPath("a").isAllowed(allowed));
-        ASSERT_TRUE (CanonPath("a/b").isAllowed(allowed));
+        ASSERT_FALSE(CanonPath("a").isAllowed(allowed));
+        ASSERT_FALSE(CanonPath("a/b").isAllowed(allowed));
         ASSERT_TRUE (CanonPath("a/b/c").isAllowed(allowed));
         ASSERT_TRUE (CanonPath("a/b/c/d").isAllowed(allowed));
         ASSERT_TRUE (CanonPath("a/b/c/d/e").isAllowed(allowed));
@@ -164,7 +164,7 @@ namespace nix {
         ASSERT_FALSE(CanonPath("a/b/d").isAllowed(allowed));
         ASSERT_FALSE(CanonPath("aaa").isAllowed(allowed));
         ASSERT_FALSE(CanonPath("zzz").isAllowed(allowed));
-        ASSERT_TRUE (CanonPath("/").isAllowed(allowed));
+        ASSERT_FALSE(CanonPath("/").isAllowed(allowed));
     }
 
     TEST(CanonPath, makeRelative) {
