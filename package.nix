@@ -176,8 +176,6 @@ in {
           ./scripts/local.mk
         ] ++ lib.optionals enableManual [
           ./doc/manual
-        ] ++ lib.optionals buildUnitTests [
-          ./tests/unit
         ] ++ lib.optionals doInstallCheck [
           ./tests/functional
         ]));
