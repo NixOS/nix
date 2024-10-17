@@ -88,7 +88,7 @@ struct PrimOp
     /**
      * Optional free-form documentation about the primop.
      */
-    const char * doc = nullptr;
+    const std::string doc = "";
 
     /**
      * Add a trace item, `while calling the '<name>' builtin`

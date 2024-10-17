@@ -333,6 +333,16 @@ std::string showBytes(uint64_t bytes);
 
 
 /**
+ * For using `std::unique` with C functions.
+ */
+struct FreeDeleter
+{
+    template <typename T>
+    void operator()(T *p) const { std::free(p); }
+};
+
+
+/**
  * Provide an addition operator between strings and string_views
  * inexplicably omitted from the standard library.
  */
