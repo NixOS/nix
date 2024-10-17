@@ -248,6 +248,7 @@ headers = [config_h] + files(
   'util.hh',
   'variant-wrapper.hh',
   'xml-writer.hh',
+  'rng.hh'
 )
 
 if host_machine.system() == 'linux'
