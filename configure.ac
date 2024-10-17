@@ -269,6 +269,29 @@ AS_CASE(["$readline_flavor"],
   [AC_MSG_ERROR([bad value "$readline_flavor" for --with-readline-flavor, must be one of: editline, readline])])
 PKG_CHECK_MODULES([EDITLINE], [$readline_flavor_pc], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLAGS"])
 
+# Look for rapidyaml.
+have_ryml=
+AC_ARG_ENABLE([ryml], AS_HELP_STRING([--disable-ryml], [Do not enable rapidyaml and disable builtins.fromYAML]), [], [have_ryml=1])
+AC_ARG_VAR([RYML_CPPFLAGS], [C/C++ preprocessor flags for RAPIDYAML])
+AC_ARG_VAR([RYML_LDFLAGS], [linker flags for RAPIDYAML])
+if test "x$have_ryml" != "x"; then
+    AC_LANG_PUSH([C++])
+    # append RYML_CPPFLAGS to CXXFLAGS because CPPFLAGS are not passed to the C++ compiler
+    CXXFLAGS="$RYML_CPPFLAGS $CXXFLAGS"
+    LDFLAGS="$RYML_LDFLAGS $RYML_LDFLAGS"
+    LIBS="-lryml $LIBS"
+    AC_CHECK_HEADERS([ryml.hpp], [true],
+      [AC_MSG_ERROR([Header of libryml is not found.])])
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+        #include <ryml.hpp>
+      ]], [[ryml::Tree tree;]])],
+      [AC_DEFINE([HAVE_RYML], [1], [Use rapidyaml])
+       AC_SUBST(RYML_LIBS, [-lryml])],
+      [AC_MSG_ERROR([libryml is not found.])])
+    AC_LANG_POP([C++])
+fi
+AC_SUBST(HAVE_RYML, [$have_ryml])
+
 # Look for libsodium.
 PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
 
