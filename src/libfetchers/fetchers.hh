@@ -84,10 +84,20 @@ public:
     bool isDirect() const;
 
     /**
-     * Check whether this is a "locked" input, that is,
-     * one that contains a commit hash or content hash.
+     * Check whether this is a "locked" input, that is, it has
+     * attributes like a Git revision or NAR hash that uniquely
+     * identify its contents.
      */
     bool isLocked() const;
+
+    /**
+     * Check whether this is a "final" input, meaning that fetching it
+     * will not add or change any attributes. For instance, a Git
+     * input with a `rev` attribute but without a `lastModified`
+     * attribute is considered locked but not final. Only "final"
+     * inputs can be substituted from a binary cache.
+     */
+    bool isFinal() const;
 
     bool operator ==(const Input & other) const noexcept;
 
@@ -144,6 +154,10 @@ public:
     /**
      * For locked inputs, return a string that uniquely specifies the
      * content of the input (typically a commit hash or content hash).
+     *
+     * Only known-equivalent inputs should return the same fingerprint.
+     *
+     * This is not a stable identifier between Nix versions, but not guaranteed to change either.
      */
     std::optional<std::string> getFingerprint(ref<Store> store) const;
 };
@@ -212,24 +226,15 @@ struct InputScheme
      */
     virtual std::optional<ExperimentalFeature> experimentalFeature() const;
 
+    /// See `Input::isDirect()`.
     virtual bool isDirect(const Input & input) const
     { return true; }
 
-    /**
-     * A sufficiently unique string that can be used as a cache key to identify the `input`.
-     *
-     * Only known-equivalent inputs should return the same fingerprint.
-     *
-     * This is not a stable identifier between Nix versions, but not guaranteed to change either.
-     */
+    /// See `Input::getFingerprint()`.
     virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
     { return std::nullopt; }
 
-    /**
-     * Return `true` if this input is considered "locked", i.e. it has
-     * attributes like a Git revision or NAR hash that uniquely
-     * identify its contents.
-     */
+    /// See `Input::isLocked()`.
     virtual bool isLocked(const Input & input) const
     { return false; }
 
