@@ -384,7 +384,11 @@ struct TarballInputScheme : CurlInputScheme
             input = immutableInput;
         }
 
-        if (result.lastModified && !input.attrs.contains("lastModified"))
+        /* If we got a lastModified and the input is not final and
+           doesn't have one, then return it. Note that we don't do
+           this if the input is final for compatibility with old lock
+           files that didn't include lastModified. */
+        if (result.lastModified && !_input.isFinal() && !input.attrs.contains("lastModified"))
             input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
         input.attrs.insert_or_assign("narHash",
