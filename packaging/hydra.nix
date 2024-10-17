@@ -32,7 +32,7 @@ let
   # convention to transpose it, and to transpose it efficiently, we need to
   # enumerate them manually, so that we don't evaluate unnecessary package sets.
   forAllPackages = lib.genAttrs [
-    "nix"
+    "nix-everything"
     "nix-util"
     "nix-util-c"
     "nix-util-test-support"
@@ -54,7 +54,6 @@ let
     "nix-cmd"
     "nix-cli"
     "nix-functional-tests"
-    "nix-ng"
   ];
 in
 {
@@ -180,7 +179,7 @@ in
         import (nixpkgs + "/lib/tests/test-with-nix.nix")
           {
             lib = nixpkgsFor.${system}.native.lib;
-            nix = self.packages.${system}.nix;
+            nix = self.packages.${system}.nix-cli;
             pkgs = nixpkgsFor.${system}.native;
           }
       );

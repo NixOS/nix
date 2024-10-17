@@ -2,7 +2,7 @@
 
 { pkgs }:
 
-(pkgs.nix.override { forDevShell = true; }).overrideAttrs (attrs:
+pkgs.nixComponents.nix-util.overrideAttrs (attrs:
 
 let
   stdenv = pkgs.nixDependencies.stdenv;
