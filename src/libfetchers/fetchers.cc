@@ -220,8 +220,8 @@ void InputScheme::checkLocks(const Input & specified, const Input & final) const
 
     if (auto prevLastModified = specified.getLastModified()) {
         if (final.getLastModified() != prevLastModified)
-            throw Error("'lastModified' attribute mismatch in input '%s', expected %d",
-                final.to_string(), *prevLastModified);
+            throw Error("'lastModified' attribute mismatch in input '%s', expected %d, got %d",
+                final.to_string(), *prevLastModified, final.getLastModified().value_or(-1));
     }
 
     if (auto prevRev = specified.getRev()) {
