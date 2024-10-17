@@ -184,7 +184,7 @@ struct GitInputScheme : InputScheme
         for (auto & [name, value] : url.query) {
             if (name == "rev" || name == "ref" || name == "keytype" || name == "publicKey" || name == "publicKeys")
                 attrs.emplace(name, value);
-            else if (name == "shallow" || name == "submodules" || name == "exportIgnore" || name == "allRefs" || name == "verifyCommit")
+            else if (name == "shallow" || name == "submodules" || name == "lfs" || name == "exportIgnore" || name == "allRefs" || name == "verifyCommit")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
@@ -209,6 +209,7 @@ struct GitInputScheme : InputScheme
             "rev",
             "shallow",
             "submodules",
+            "lfs",
             "exportIgnore",
             "lastModified",
             "revCount",
@@ -392,6 +393,11 @@ struct GitInputScheme : InputScheme
     bool getSubmodulesAttr(const Input & input) const
     {
         return maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+    }
+
+    bool getLfsAttr(const Input & input) const
+    {
+        return maybeGetBoolAttr(input.attrs, "lfs").value_or(false);
     }
 
     bool getExportIgnoreAttr(const Input & input) const
@@ -669,6 +675,12 @@ struct GitInputScheme : InputScheme
                 mounts.insert_or_assign(CanonPath::root, accessor);
                 accessor = makeMountedSourceAccessor(std::move(mounts));
             }
+        }
+
+        if (getLfsAttr(input)) {
+            warn("lfs attr set on %s", input.to_string());
+            // urlencoded `?lfs=1` param is set,
+            repo->smudgeLfs();
         }
 
         assert(!origRev || origRev == rev);
