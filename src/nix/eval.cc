@@ -89,8 +89,9 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
                     // FIXME: disallow strings with contexts?
                     writeFile(path.string(), v.string_view());
                 else if (v.type() == nAttrs) {
+                    [[maybe_unused]] bool directoryCreated = fs::create_directory(path);
                     // Directory should not already exist
-                    assert(fs::create_directory(path.string()));
+                    assert(directoryCreated);
                     for (auto & attr : *v.attrs()) {
                         std::string_view name = state->symbols[attr.name];
                         try {
