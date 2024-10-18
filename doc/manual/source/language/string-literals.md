@@ -150,6 +150,21 @@ These special characters are escaped as follows:
 
 `''\` escapes any other character.
 
+A "dollar-curly" (`${`) can be written as follows: 
+> **Example**
+>
+> ```nix
+> ''
+>   echo ''${PATH}
+> ''
+> ```
+>
+>     "echo ${PATH}\n"
+
+> **Note**
+>
+> This differs from the syntax for escaping a dollar-curly within double quotes (`"\${"`). Be aware of which one is needed at a given moment.
+
 A "double-dollar-curly" (`$${`) can be written literally.
 
 > **Example**
