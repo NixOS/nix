@@ -130,6 +130,50 @@ AC_ARG_WITH(store-dir, AS_HELP_STRING([--with-store-dir=PATH],[path of the Nix s
 AC_SUBST(storedir)
 
 
+<<<<<<< HEAD
+=======
+# Running the functional tests without building Nix is useful for testing
+# different pre-built versions of Nix against each other.
+AC_ARG_ENABLE(build, AS_HELP_STRING([--disable-build],[Do not build nix]),
+  ENABLE_BUILD=$enableval, ENABLE_BUILD=yes)
+AC_SUBST(ENABLE_BUILD)
+
+# Building without unit tests is useful for bootstrapping with a smaller footprint
+# or running the tests in a separate derivation. Otherwise, we do compile and
+# run them.
+
+AC_ARG_ENABLE(unit-tests, AS_HELP_STRING([--disable-unit-tests],[Do not build the tests]),
+  ENABLE_UNIT_TESTS=$enableval, ENABLE_UNIT_TESTS=$ENABLE_BUILD)
+AC_SUBST(ENABLE_UNIT_TESTS)
+
+AS_IF(
+  [test "$ENABLE_BUILD" == "no" && test "$ENABLE_UNIT_TESTS" == "yes"],
+  [AC_MSG_ERROR([Cannot enable unit tests when building overall is disabled. Please do not pass '--enable-unit-tests' or do not pass '--disable-build'.])])
+
+AC_ARG_ENABLE(functional-tests, AS_HELP_STRING([--disable-functional-tests],[Do not build the tests]),
+  ENABLE_FUNCTIONAL_TESTS=$enableval, ENABLE_FUNCTIONAL_TESTS=yes)
+AC_SUBST(ENABLE_FUNCTIONAL_TESTS)
+
+# documentation generation switch
+AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation generation]),
+  ENABLE_DOC_GEN=$enableval, ENABLE_DOC_GEN=$ENABLE_BUILD)
+AC_SUBST(ENABLE_DOC_GEN)
+
+AS_IF(
+  [test "$ENABLE_BUILD" == "no" && test "$ENABLE_DOC_GEN" == "yes"],
+  [AC_MSG_ERROR([Cannot enable generated docs when building overall is disabled. Please do not pass '--enable-doc-gen' or do not pass '--disable-build'.])])
+
+AS_IF(
+  [test "$ENABLE_FUNCTIONAL_TESTS" == "yes" || test "$ENABLE_DOC_GEN" == "yes"],
+  [NEED_PROG(jq, jq)])
+
+AS_IF(
+  [test "$ENABLE_DOC_GEN" == "yes"],
+  [NEED_PROG(man, man)])
+
+AS_IF([test "$ENABLE_BUILD" == "yes"],[
+
+>>>>>>> 85b0cd320 (nix/tests: run test help.sh only if nix is built with documentation)
 # Look for boost, a required dependency.
 # Note that AX_BOOST_BASE only exports *CPP* BOOST_CPPFLAGS, no CXX flags,
 # and CPPFLAGS are not passed to the C++ compiler automatically.
