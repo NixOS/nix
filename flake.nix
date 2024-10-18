@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.05";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
@@ -138,6 +138,12 @@
           });
 
           nix = final.nixComponents.nix;
+
+          nix-serve =
+            prev.nix-serve.override {
+              # undo potential version pinning
+              nix = final.nix;
+            };
 
           # See https://github.com/NixOS/nixpkgs/pull/214409
           # Remove when fixed in this flake's nixpkgs
