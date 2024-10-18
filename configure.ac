@@ -419,6 +419,25 @@ if test ${cross_compiling:-no} = no && ! test -z ${sandbox_shell+x}; then
   else
     AC_MSG_RESULT(disabled)
   fi
+
+  # system refers to host platform
+  case $system in
+    *-darwin)
+      # ldd unsupported on darwin *build* platform, and
+      # static linking against system libraries not recommended on darwin,
+      # so we don't check that sandbox-shell is statically linked
+      ;;
+    *)
+      # A dynamically linked shell will not work in the sandbox.
+      AC_MSG_CHECKING([whether sandbox-shell is statically linked])
+      if ldd $sandbox_shell 2>&1 | grep -q "not a dynamic executable"; then
+        AC_MSG_RESULT(yes)
+      else
+        AC_MSG_RESULT(no)
+        AC_MSG_ERROR([Please enable busybox STATIC])
+      fi
+      ;;
+  esac
 fi
 
 AC_ARG_ENABLE(embedded-sandbox-shell, AS_HELP_STRING([--enable-embedded-sandbox-shell],[include the sandbox shell in the Nix binary [default=no]]),
