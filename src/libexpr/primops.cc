@@ -939,6 +939,9 @@ static RegisterPrimOp primop_tryEval({
       `let e = { x = throw ""; }; in
       (builtins.tryEval (builtins.deepSeq e e)).success` will be
       `false`.
+
+      `tryEval` intentionally does not return the error message, because that risks bringing non-determinism into the evaluation result, and it would become very difficult to improve error reporting without breaking existing expressions.
+      Instead, use [`builtins.addErrorContext`](@docroot@/language/builtins.md#builtins-addErrorContext) to add context to the error message, and use a Nix unit testing tool for testing.
     )",
     .fun = prim_tryEval,
 });
