@@ -26,7 +26,7 @@ rm -rf $TEST_ROOT/machine* || true
 # Note: ssh://localhost bypasses ssh, directly invoking nix-store as a
 # child process. This allows us to test LegacySSHStore::buildDerivation().
 # ssh-ng://... likewise allows us to test RemoteStore::buildDerivation().
-nix build -L -v -f $file -o $TEST_ROOT/result --max-jobs 0 \
+nix build -L -vvv -f $file -o $TEST_ROOT/result --max-jobs 0 \
   --arg busybox $busybox \
   --store $TEST_ROOT/machine0 \
   --builders "$(join_by '; ' "${builders[@]}")"

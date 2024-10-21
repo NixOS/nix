@@ -620,6 +620,8 @@
         # System tests.
         tests.authorization = runNixOSTestFor "x86_64-linux" ./tests/nixos/authorization.nix;
 
+        tests.fetchurl = runNixOSTestFor "x86_64-linux" ./tests/nixos/fetchurl.nix;
+
         tests.remoteBuilds = runNixOSTestFor "x86_64-linux" ./tests/nixos/remote-builds.nix;
 
         tests.nix-copy-closure = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy-closure.nix;
