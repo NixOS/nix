@@ -78,7 +78,7 @@ if ! git diff --quiet --cached; then
   die "repo has staged changes, please commit or stash them"
 fi
 
-if ! grep "$SUMMARY_MARKER_LINE" doc/manual/src/SUMMARY.md.in >/dev/null; then
+if ! grep "$SUMMARY_MARKER_LINE" doc/manual/source/SUMMARY.md.in >/dev/null; then
   # would have been nice to catch this early, but won't be worth the extra infra
   die "SUMMARY.md.in is missing the marker line '$SUMMARY_MARKER_LINE', which would be used for inserting a new release notes page. Please fix the script."
 fi
@@ -117,7 +117,7 @@ log "version_full=$version_full"
 log "IS_PATCH=$IS_PATCH"
 
 basename=rl-${version_major_minor}.md
-file=doc/manual/src/release-notes/$basename
+file=doc/manual/source/release-notes/$basename
 
 if ! $IS_PATCH; then
   if [[ -e $file ]]; then
@@ -169,7 +169,7 @@ if ! $IS_PATCH; then
   # find the marker line, insert new link after it
   escaped_marker="$(echo "$SUMMARY_MARKER_LINE" | sed -e 's/\//\\\//g' -e 's/ /\\ /g')"
   escaped_line="$(echo "$NEW_SUMMARY_LINE" | sed -e 's/\//\\\//g' -e 's/ /\\ /g')"
-  logcmd sed -i -e "/$escaped_marker/a $escaped_line" doc/manual/src/SUMMARY.md.in
+  logcmd sed -i -e "/$escaped_marker/a $escaped_line" doc/manual/source/SUMMARY.md.in
 fi
 
 for f in doc/manual/rl-next/*.md; do
@@ -178,7 +178,7 @@ for f in doc/manual/rl-next/*.md; do
   fi
 done
 
-logcmd git add $file doc/manual/src/SUMMARY.md.in
+logcmd git add $file doc/manual/source/SUMMARY.md.in
 logcmd git status
 logcmd git commit -m "release notes: $version_full"
 
