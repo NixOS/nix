@@ -150,7 +150,7 @@ struct PathInputScheme : InputScheme
             store->addTempRoot(*storePath);
 
         time_t mtime = 0;
-        if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
+        if (!storePath || !store->isValidPath(*storePath)) {
             // FIXME: try to substitute storePath.
             auto src = sinkToSource([&](Sink & sink) {
                 mtime = dumpPathAndGetMtime(absPath, sink, defaultPathFilter);
