@@ -503,7 +503,7 @@ three kinds of patterns:
     > [ 23 {} ]
     > ```
 
-    The full function argument bound by the `@`-pattern is also brought into scope over the set pattern on the other side of the `@`, not just over the body of the function.
+    All bindings introduced by the function are in scope in the entire function expression; not just in the body. For example, the binding of an `@` pattern is available in the `?`-defaults:
     It can therefore be used in default values.
 
     > **Example**
