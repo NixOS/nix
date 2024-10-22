@@ -31,6 +31,15 @@ output=$(nix-shell --pure --keep SELECTED_IMPURE_VAR "$shellDotNix" -A shellDrv 
 
 [ "$output" = " - foo - bar - baz" ]
 
+# test NIX_BUILD_TOP
+testTmpDir=$(pwd)/nix-shell
+mkdir -p "$testTmpDir"
+output=$(TMPDIR="$testTmpDir" nix-shell --pure "$shellDotNix" -A shellDrv --run 'echo $NIX_BUILD_TOP')
+[[ "$output" =~ ${testTmpDir}.* ]] || {
+    echo "expected $output =~ ${testTmpDir}.*" >&2
+    exit 1
+}
+
 # Test nix-shell on a .drv
 [[ $(nix-shell --pure $(nix-instantiate "$shellDotNix" -A shellDrv) --run \
     'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX - $TEST_inNixShell"') = " - foo - bar - false" ]]
