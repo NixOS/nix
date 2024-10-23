@@ -114,7 +114,6 @@ nix_tests = \
   impure-env.sh \
   debugger.sh \
   extra-sandbox-profile.sh \
-  help.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
   nix_tests += compute-levels.sh
@@ -126,6 +125,10 @@ ifeq ($(ENABLE_BUILD), yes)
   ifeq ($(BUILD_SHARED_LIBS), 1)
     nix_tests += plugins.sh
   endif
+endif
+
+ifeq ($(ENABLE_DOC_GEN), yes)
+    nix_tests += help.sh
 endif
 
 $(d)/test-libstoreconsumer.sh.test $(d)/test-libstoreconsumer.sh.test-debug: \

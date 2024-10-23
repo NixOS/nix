@@ -170,6 +170,10 @@ AS_IF(
   [test "$ENABLE_FUNCTIONAL_TESTS" == "yes" || test "$ENABLE_DOC_GEN" == "yes"],
   [NEED_PROG(jq, jq)])
 
+AS_IF(
+  [test "$ENABLE_DOC_GEN" == "yes"],
+  [NEED_PROG(man, man)])
+
 AS_IF([test "$ENABLE_BUILD" == "yes"],[
 
 # Look for boost, a required dependency.
