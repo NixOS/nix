@@ -171,7 +171,7 @@ AS_IF(
   [NEED_PROG(jq, jq)])
 
 AS_IF(
-  [test "$ENABLE_DOC_GEN" == "yes"],
+  [test "$ENABLE_DOC_GEN" == "yes" && test "$ENABLE_FUNCTIONAL_TESTS" == "yes"],
   [NEED_PROG(man, man)])
 
 AS_IF([test "$ENABLE_BUILD" == "yes"],[
