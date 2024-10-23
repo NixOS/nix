@@ -203,16 +203,18 @@ in {
     (lib.getBin lowdown)
     mdbook
     mdbook-linkcheck
-  ] ++ lib.optionals doInstallCheck [
+    jq # Also for custom mdBook preprocessor.
+  ] ++ lib.optional stdenv.hostPlatform.isStatic unixtools.hexdump
+  ;
+
+  nativeInstallCheckInputs = [
     git
     mercurial
     openssh
-  ] ++ lib.optionals (doInstallCheck || enableManual) [
-    jq # Also for custom mdBook preprocessor.
+    jq
   ] ++ lib.optionals enableManual [
     man
-  ] ++ lib.optional stdenv.hostPlatform.isStatic unixtools.hexdump
-  ;
+  ];
 
   buildInputs = lib.optionals doBuild (
   [
