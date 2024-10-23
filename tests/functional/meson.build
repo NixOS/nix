@@ -184,6 +184,7 @@ suites = [
       'debugger.sh',
       'extra-sandbox-profile.sh',
       'help.sh',
+      'store-add-gc-root.sh',
     ],
     'workdir': meson.current_build_dir(),
   },

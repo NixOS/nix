@@ -103,6 +103,7 @@ nix_tests = \
   nix-profile.sh \
   suggestions.sh \
   store-info.sh \
+  store-add-gc-root.sh \
   fetchClosure.sh \
   completions.sh \
   impure-derivations.sh \
