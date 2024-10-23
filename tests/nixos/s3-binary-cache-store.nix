@@ -12,7 +12,7 @@ let
   storeUrl = "s3://my-cache?endpoint=http://server:9000&region=eu-west-1";
 
 in {
-  name = "nix-copy-closure";
+  name = "s3-binary-cache-store";
 
   nodes =
     { server =

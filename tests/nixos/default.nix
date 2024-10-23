@@ -161,4 +161,6 @@ in
   cgroups = runNixOSTestFor "x86_64-linux" ./cgroups;
 
   fetchurl = runNixOSTestFor "x86_64-linux" ./fetchurl.nix;
+
+  chrootStore = runNixOSTestFor "x86_64-linux" ./chroot-store.nix;
 }
