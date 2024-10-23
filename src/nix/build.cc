@@ -42,29 +42,6 @@ static nlohmann::json builtPathsWithResultToJSON(const std::vector<BuiltPathWith
     return res;
 }
 
-// TODO deduplicate with other code also setting such out links.
-static void createOutLinks(const std::filesystem::path& outLink, const std::vector<BuiltPathWithResult>& buildables, LocalFSStore& store2)
-{
-    for (const auto & [_i, buildable] : enumerate(buildables)) {
-        auto i = _i;
-        std::visit(overloaded {
-            [&](const BuiltPath::Opaque & bo) {
-                auto symlink = outLink;
-                if (i) symlink += fmt("-%d", i);
-                store2.addPermRoot(bo.path, absPath(symlink.string()));
-            },
-            [&](const BuiltPath::Built & bfd) {
-                for (auto & output : bfd.outputs) {
-                    auto symlink = outLink;
-                    if (i) symlink += fmt("-%d", i);
-                    if (output.first != "out") symlink += fmt("-%s", output.first);
-                    store2.addPermRoot(output.second, absPath(symlink.string()));
-                }
-            },
-        }, buildable.path.raw());
-    }
-}
-
 struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 {
     Path outLink = "result";
@@ -140,7 +117,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
         if (outLink != "")
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                createOutLinks(outLink, buildables, *store2);
+                createOutLinks(outLink, toBuiltPaths(buildables), *store2);
 
         if (printOutputPaths) {
             stopProgressBar();
