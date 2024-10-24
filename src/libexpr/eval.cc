@@ -2384,6 +2384,9 @@ StorePath EvalState::fetchToStore(
     PathFilter * filter,
     RepairFlag repair)
 {
+    if (path.accessor == rootFS && settings.disallowCopyPaths.get().contains(path.path.abs())) {
+        error<EvalError>("not allowed to copy '%1%' due to option '%2%'", path.path.abs(), settings.disallowCopyPaths.name).debugThrow();
+    }
     return ::nix::fetchToStore(*store, path, mode, name, method, filter, repair);
 }
 
