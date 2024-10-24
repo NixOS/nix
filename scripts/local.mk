@@ -7,7 +7,9 @@ profiledir = $(sysconfdir)/profile.d
 
 $(eval $(call install-file-as, $(d)/nix-profile.sh, $(profiledir)/nix.sh, 0644))
 $(eval $(call install-file-as, $(d)/nix-profile.fish, $(profiledir)/nix.fish, 0644))
+$(eval $(call install-file-as, $(d)/nix-profile.nu, $(profiledir)/nix.nu, 0644))
 $(eval $(call install-file-as, $(d)/nix-profile-daemon.sh, $(profiledir)/nix-daemon.sh, 0644))
 $(eval $(call install-file-as, $(d)/nix-profile-daemon.fish, $(profiledir)/nix-daemon.fish, 0644))
+$(eval $(call install-file-as, $(d)/nix-profile-daemon.nu, $(profiledir)/nix-daemon.nu, 0644))
 
 clean-files += $(nix_noinst_scripts)

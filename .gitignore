@@ -40,6 +40,8 @@ perl/Makefile.config
 /scripts/nix-profile-daemon.sh
 /scripts/nix-profile.fish
 /scripts/nix-profile-daemon.fish
+/scripts/nix-profile.nu
+/scripts/nix-profile-daemon.nu
 
 # /src/libexpr/
 /src/libexpr/lexer-tab.cc
