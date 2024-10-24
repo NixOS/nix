@@ -2358,7 +2358,6 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
         ? *dstPathCached
         : [&]() {
             auto dstPath = fetchToStore(
-                *store,
                 path.resolveSymlinks(),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
                 path.baseName(),
@@ -2376,6 +2375,18 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     });
     return dstPath;
 }
+
+StorePath EvalState::fetchToStore(
+    const SourcePath & path,
+    FetchMode mode,
+    std::string_view name,
+    ContentAddressMethod method,
+    PathFilter * filter,
+    RepairFlag repair)
+{
+    return ::nix::fetchToStore(*store, path, mode, name, method, filter, repair);
+}
+
 
 
 SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
@@ -3055,7 +3066,7 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
                 store,
                 fetchSettings,
                 EvalSettings::resolvePseudoUrl(value));
-            auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
+            auto storePath = fetchToStore(SourcePath(accessor), FetchMode::Copy);
             return finish(store->toRealPath(storePath));
         } catch (Error & e) {
             logWarning({

@@ -2473,8 +2473,7 @@ static void addPath(
                 {}));
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            auto dstPath = fetchToStore(
-                *state.store,
+            auto dstPath = state.fetchToStore(
                 path.resolveSymlinks(),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
                 name,
