@@ -813,6 +813,9 @@ public:
         PathFilter * filter = nullptr,
         RepairFlag repair = NoRepair);
 
+    /** Throws if path occurs in the disallow-copy-path option. */
+    void checkDisallowCopyPath(const SourcePath & path);
+
 private:
 
     /**
