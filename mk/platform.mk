@@ -21,6 +21,10 @@ ifdef HOST_OS
     HOST_NETBSD = 1
     HOST_UNIX = 1
   endif
+  ifeq ($(patsubst openbsd%,,$(HOST_KERNEL)),)
+    HOST_OPENBSD = 1
+    HOST_UNIX = 1
+  endif
   ifeq ($(HOST_KERNEL), linux)
     HOST_LINUX = 1
     HOST_UNIX = 1
