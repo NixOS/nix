@@ -255,6 +255,8 @@ struct EvalSettings : Config
           This is useful for finding expressions which copy sources, which can slow down evaluation.
           You may find copied sources by running `nix` commands with increased verbosity, such as `nix build -vvvv 2>&1 | grep /nix/store`.
           After identifying one more more paths, run `nix build --option disallow-copy-paths /nix/store/... --show-trace` to find the expression that copies the path, or add `--debugger`.
+
+          A filtering copy is always allowed, such as `builtins.filterSource` or `builtins.path { filter = ...; }`.
         )"};
 };
 

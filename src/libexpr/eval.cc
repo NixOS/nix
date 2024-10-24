@@ -2390,7 +2390,8 @@ StorePath EvalState::fetchToStore(
     PathFilter * filter,
     RepairFlag repair)
 {
-    checkDisallowCopyPath(path);
+    if (!filter)
+        checkDisallowCopyPath(path);
     return ::nix::fetchToStore(*store, path, mode, name, method, filter, repair);
 }
 
