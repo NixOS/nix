@@ -1,5 +1,6 @@
 nix_tests = \
   test-infra.sh \
+  disallow-copy-paths.sh \
   gc.sh \
   nix-collect-garbage-d.sh \
   remote-store.sh \
