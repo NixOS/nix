@@ -1,4 +1,5 @@
 #include "git-utils.hh"
+#include "git-lfs-fetch.hh"
 #include "cache.hh"
 #include "finally.hh"
 #include "processes.hh"
@@ -659,6 +660,17 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, 
 /**
  * Raw git tree input accessor.
  */
+
+static int attr_callback(const char *name, const char *value, void *payload) {
+    warn("got an attribute! it's %s = %s", name, value);
+    return 0;
+    //// Check if the attribute is a filter attribute
+    //if (strncmp(name, "filter.", 7) == 0) {
+    //    printf("Filter attribute: %s\n", name);
+    //}
+    //return 0; // Continue iterating
+}
+
 struct GitSourceAccessor : SourceAccessor
 {
     ref<GitRepoImpl> repo;
@@ -673,6 +685,15 @@ struct GitSourceAccessor : SourceAccessor
     std::string readBlob(const CanonPath & path, bool symlink)
     {
         auto blob = getBlob(path, symlink);
+
+        int error;
+        // read filters here, perform smudge
+
+        // TODO: fix git_attr_foreach here, it can't seem to parse `.gitattributes` here even though it should
+        warn("on path %s", path.abs().c_str());
+         if ((error = git_attr_foreach(&(*(*repo).repo), GIT_ATTR_CHECK_INCLUDE_HEAD, path.rel_c_str(), attr_callback, NULL)) < 0) {
+             warn("git_attr_foreach: %s", git_error_last()->message);
+             }
 
         auto data = std::string_view((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
 
@@ -1249,6 +1270,20 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     }
 
     return result;
+}
+
+void GitRepoImpl::smudgeLfs() {
+    const auto metadatas = lfs::parse_lfs_files(this->repo);
+    const auto [url, host, path] = lfs::get_lfs_endpoint_url(this->repo);
+    // TODO: handle public lfs repos without ssh?
+    const auto token = lfs::get_lfs_api_token(host, path);
+    auto urls = lfs::fetch_urls(url, token, metadatas);
+    std::cerr << "Got urls! ";
+    for (const auto &url : urls) {
+      std::cerr << url << std::endl;
+    }
+    std::cerr << "Fetching actual data" << std::endl;
+    lfs::download_files(urls, this->path);
 }
 
 ref<GitRepo> getTarballCache()
