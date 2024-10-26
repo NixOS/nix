@@ -12,6 +12,6 @@ INCLUDE_libfetchers := -I $(d)
 
 libfetchers_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers)
 
-libfetchers_LDFLAGS += $(THREAD_LDFLAGS) $(LIBGIT2_LIBS) -larchive
+libfetchers_LDFLAGS += $(THREAD_LDFLAGS) $(LIBGIT2_LIBS) $(LIBCURL_LIBS) -larchive
 
 libfetchers_LIBS = libutil libstore

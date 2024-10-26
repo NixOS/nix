@@ -74,10 +74,6 @@ struct GitRepo
 
     virtual std::string resolveSubmoduleUrl(const std::string & url) = 0;
 
-    virtual std::string resolveSubmoduleUrl(
-        const std::string & url,
-        const std::string & base) = 0;
-
     virtual bool hasObject(const Hash & oid) = 0;
 
     virtual ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;

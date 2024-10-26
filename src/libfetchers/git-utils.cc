@@ -328,6 +328,8 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) override;
 
+    void smudgeLfs() override;
+
     std::string resolveSubmoduleUrl(const std::string & url) override
     {
         git_buf buf = GIT_BUF_INIT;
@@ -1103,8 +1105,8 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
 }
 
 void GitRepoImpl::smudgeLfs() {
-    const auto metadatas = lfs::parse_lfs_files(this->repo);
-    const auto [url, host, path] = lfs::get_lfs_endpoint_url(this->repo);
+    const auto metadatas = lfs::parse_lfs_files(&(*repo));
+    const auto [url, host, path] = lfs::get_lfs_endpoint_url(&(*repo));
     // TODO: handle public lfs repos without ssh?
     const auto token = lfs::get_lfs_api_token(host, path);
     auto urls = lfs::fetch_urls(url, token, metadatas);
