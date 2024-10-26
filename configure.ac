@@ -89,9 +89,10 @@ AC_LANG_POP(C++)
 AC_CHECK_FUNCS([statvfs pipe2])
 
 
-# Check for lutimes, optionally used for changing the mtime of
-# symlinks.
-AC_CHECK_FUNCS([lutimes])
+# Check for lutimes and utimensat, optionally used for changing the
+# mtime of symlinks.
+AC_CHECK_DECLS([AT_SYMLINK_NOFOLLOW], [], [], [[#include <fcntl.h>]])
+AC_CHECK_FUNCS([lutimes utimensat])
 
 
 # Check whether the store optimiser can optimise symlinks.
