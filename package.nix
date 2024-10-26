@@ -76,7 +76,9 @@
 #
 # Temporarily disabled on Windows because the `GC_throw_bad_alloc`
 # symbol is missing during linking.
-, enableGC ? !stdenv.hostPlatform.isWindows
+#
+# Disabled on OpenBSD because of missing `_data_start` symbol while linking
+, enableGC ? !stdenv.hostPlatform.isWindows && !stdenv.hostPlatform.isOpenBSD
 
 # Whether to enable Markdown rendering in the Nix binary.
 , enableMarkdown ? !stdenv.hostPlatform.isWindows
