@@ -42,12 +42,16 @@ check_funcs = [
   # Optionally used to try to close more file descriptors (e.g. before
   # forking) on Unix.
   'sysconf',
+  # Optionally used for changing the mtime of files and symlinks.
+  'utimensat',
 ]
 foreach funcspec : check_funcs
   define_name = 'HAVE_' + funcspec.underscorify().to_upper()
   define_value = cxx.has_function(funcspec).to_int()
   configdata.set(define_name, define_value)
 endforeach
+
+configdata.set('HAVE_DECL_AT_SYMLINK_NOFOLLOW', cxx.has_header_symbol('fcntl.h', 'AT_SYMLINK_NOFOLLOW').to_int())
 
 subdir('build-utils-meson/threads')
 
