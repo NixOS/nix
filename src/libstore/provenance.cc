@@ -11,6 +11,7 @@ std::string Provenance::type() const
         overloaded{
             [&](const Provenance::ProvDerivation & p) -> std::string { return "derivation"; },
             [&](const Provenance::ProvCopied & p) -> std::string { return "copied"; },
+            [&](const Provenance::ProvSourcePath & p) -> std::string { return "source"; },
             [&](const Provenance::ProvFlake & p) -> std::string { return "flake"; },
         },
         raw);
@@ -30,6 +31,7 @@ void to_json(nlohmann::json & j, const Provenance & p)
         overloaded{
             [&](const Provenance::ProvDerivation & p) { nlohmann::to_json(j, p); },
             [&](const Provenance::ProvCopied & p) { nlohmann::to_json(j, p); },
+            [&](const Provenance::ProvSourcePath & p) { nlohmann::to_json(j, p); },
             [&](const Provenance::ProvFlake & p) { nlohmann::to_json(j, p); },
         },
         p.raw);
@@ -48,6 +50,14 @@ void to_json(nlohmann::json & j, const Provenance::ProvCopied & p)
     j = nlohmann::json{
         {"from", p.from},
         {"provenance", nlohmann::json(p.provenance)},
+    };
+}
+
+void to_json(nlohmann::json & j, const Provenance::ProvSourcePath & p)
+{
+    j = nlohmann::json{
+        {"tree", *p.tree},
+        {"path", p.path.abs()},
     };
 }
 
@@ -72,6 +82,12 @@ void from_json(const nlohmann::json & j, Provenance & p)
         p = {Provenance::ProvFlake{
             .flake = std::make_shared<nlohmann::json>(j.at("flake")), // FIXME: validate
             .flakeOutput = j.at("output").get<std::string>(),
+        }};
+
+    else if (type == "source")
+        p = {Provenance::ProvSourcePath{
+            .tree = std::make_shared<nlohmann::json>(j.at("tree")), // FIXME: validate
+            .path = CanonPath(j.at("path").get<std::string>()),
         }};
 
     else if (type == "derivation") {

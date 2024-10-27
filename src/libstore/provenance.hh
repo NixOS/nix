@@ -2,6 +2,7 @@
 
 #include "outputs-spec.hh"
 #include "path.hh"
+#include "canon-path.hh"
 
 #include "nlohmann/json_fwd.hpp"
 
@@ -57,6 +58,16 @@ struct Provenance
     };
 
     /**
+     * Type that denotes a store path that was produced by copying a
+     * path inside a source tree.
+     */
+    struct ProvSourcePath
+    {
+        std::shared_ptr<nlohmann::json> tree; // FIXME: change to Attrs
+        CanonPath path;
+    };
+
+    /**
      * Type that denotes a store path (typically a .drv file or
      * derivation input source) that was produced by the evaluation of
      * a flake.
@@ -67,7 +78,7 @@ struct Provenance
         std::string flakeOutput;
     };
 
-    using Raw = std::variant<ProvDerivation, ProvCopied, ProvFlake>;
+    using Raw = std::variant<ProvDerivation, ProvCopied, ProvSourcePath, ProvFlake>;
 
     Raw raw;
 
@@ -89,6 +100,7 @@ void to_json(nlohmann::json & j, const std::shared_ptr<const Provenance> & p);
 void to_json(nlohmann::json & j, const Provenance & p);
 void to_json(nlohmann::json & j, const Provenance::ProvDerivation & p);
 void to_json(nlohmann::json & j, const Provenance::ProvCopied & p);
+void to_json(nlohmann::json & j, const Provenance::ProvSourcePath & p);
 void to_json(nlohmann::json & j, const Provenance::ProvFlake & p);
 
 void from_json(const nlohmann::json & j, std::shared_ptr<const Provenance> & p);
