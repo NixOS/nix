@@ -86,7 +86,9 @@ define build-library
     else
       ifndef HOST_DARWIN
         ifndef HOST_WINDOWS
-          $(1)_LDFLAGS += -Wl,-z,defs
+	  ifndef HOST_OPENBSD
+            $(1)_LDFLAGS += -Wl,-z,defs
+          endif
         endif
       endif
     endif
