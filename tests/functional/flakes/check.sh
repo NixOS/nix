@@ -18,6 +18,17 @@ nix flake check $flakeDir
 
 cat > $flakeDir/flake.nix <<EOF
 {
+  outputs = { self }: {
+    overlay = finalll: prev: {
+    };
+  };
+}
+EOF
+
+(! nix flake check $flakeDir)
+
+cat > $flakeDir/flake.nix <<EOF
+{
   outputs = { self, ... }: {
     overlays.x86_64-linux.foo = final: prev: {
     };

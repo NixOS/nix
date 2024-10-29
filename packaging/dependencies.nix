@@ -152,16 +152,5 @@ scope: {
 
   inherit resolvePath filesetToSource;
 
-  mkMesonDerivation = f: let
-    exts = [
-      miscGoodPractice
-      bsdNoLinkAsNeeded
-      localSourceLayer
-    ];
-  in stdenv.mkDerivation
-   (lib.extends
-     (lib.foldr lib.composeExtensions (_: _: {}) exts)
-     f);
-
-  inherit (inputs) flake-schemas;
+  mkMesonDerivation = f: stdenv.mkDerivation (lib.extends localSourceLayer f);
 }
