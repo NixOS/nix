@@ -201,26 +201,169 @@ struct GitInputScheme : InputScheme
         return "git";
     }
 
-    StringSet allowedAttrs() const override
+    std::string schemeDescription() const override
+    {
+        return stripIndentation(R"(
+          Fetch a Git tree and copy it to the Nix store.
+          This is similar to [`builtins.fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit).
+        )");
+    }
+
+    std::map<std::string, AttributeInfo> allowedAttrs() const override
     {
         return {
-            "url",
-            "ref",
-            "rev",
-            "shallow",
-            "submodules",
-            "exportIgnore",
-            "lastModified",
-            "revCount",
-            "narHash",
-            "allRefs",
-            "name",
-            "dirtyRev",
-            "dirtyShortRev",
-            "verifyCommit",
-            "keytype",
-            "publicKey",
-            "publicKeys",
+            {
+                "url",
+                {
+                    .type = "String",
+                    .required = true,
+                    .doc = R"(
+                      The URL formats supported are the same as for Git itself.
+
+                      > **Example**
+                      >
+                      > ```nix
+                      > fetchTree {
+                      >   type = "git";
+                      >   url = "git@github.com:NixOS/nixpkgs.git";
+                      > }
+                      > ```
+
+                      > **Note**
+                      >
+                      > If the URL points to a local directory, and no `ref` or `rev` is given, Nix will only consider files added to the Git index, as listed by `git ls-files` but use the *current file contents* of the Git working directory.
+                    )",
+                },
+            },
+            {
+                "ref",
+                {
+                    .type = "String",
+                    .required = false,
+                    .doc = R"(
+                      By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
+
+                      A [Git reference](https://git-scm.com/book/en/v2/Git-Internals-Git-References), such as a branch or tag name.
+
+                      Default: `"HEAD"`
+                    )",
+                },
+            },
+            {
+                "rev",
+                {
+                    .type = "String",
+                    .required = false,
+                    .doc = R"(
+                      A Git revision; a commit hash.
+
+                      Default: the tip of `ref`
+                    )",
+                },
+            },
+            {
+                "shallow",
+                {
+                    .type = "Bool",
+                    .required = false,
+                    .doc = R"(
+                      Make a shallow clone when fetching the Git tree.
+                      When this is enabled, the options `ref` and `allRefs` have no effect anymore.
+
+                      Default: `true`
+                    )",
+                },
+            },
+            {
+                "submodules",
+                {
+                    .type = "Bool",
+                    .required = false,
+                    .doc = R"(
+                      Also fetch submodules if available.
+
+                      Default: `false`
+                    )",
+                },
+            },
+            {
+                "lastModified",
+                {
+                    .type = "integer",
+                    .required = false,
+                    .doc = R"(
+                      Unix timestamp of the fetched commit.
+
+                      If set, pass through the value to the output attribute set.
+                      Otherwise, generated from the fetched Git tree.
+                    )",
+                },
+            },
+            {
+                "revCount",
+                {
+                    .type = "integer",
+                    .required = false,
+                    .doc = R"(
+                      Number of revisions in the history of the Git repository before the fetched commit.
+
+                      If set, pass through the value to the output attribute set.
+                      Otherwise, generated from the fetched Git tree.
+                    )",
+                },
+            },
+            {
+                "narHash",
+                {},
+            },
+            {
+                "allRefs",
+                {
+                    .type = "Bool",
+                    .required = false,
+                    .doc = R"(
+                      By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
+
+                      Whether to fetch all references (eg. branches and tags) of the repository.
+                      With this argument being true, it's possible to load a `rev` from *any* `ref`.
+                      (Without setting this option, only `rev`s from the specified `ref` are supported).
+
+                      Default: `false`
+                    )",
+                },
+            },
+            {
+                "name",
+                {},
+            },
+            {
+                "dirtyRev",
+                {},
+            },
+            {
+                "dirtyShortRev",
+                {},
+            },
+            {
+                "exportIgnore",
+                {},
+            },
+            {
+                "verifyCommit",
+                {},
+            },
+            {
+                "keytype",
+                {},
+            },
+            {
+                "publicKey",
+                {},
+            },
+            {
+                "publicKeys",
+                {},
+            },
         };
     }
 

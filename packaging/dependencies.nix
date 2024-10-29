@@ -166,6 +166,11 @@ scope: {
       ];
   });
 
+  cmark = pkgs.cmark.overrideAttrs (_: {
+    src = inputs.cmark;
+    version = inputs.lastModifiedDate;
+  });
+
   busybox-sandbox-shell = pkgs.busybox-sandbox-shell or (pkgs.busybox.override {
     useMusl = true;
     enableStatic = true;

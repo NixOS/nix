@@ -23,6 +23,7 @@
 , libseccomp
 , libsodium
 , man
+, cmark
 , lowdown
 , mdbook
 , mdbook-linkcheck
@@ -81,7 +82,7 @@
 , enableGC ? !stdenv.hostPlatform.isWindows && !stdenv.hostPlatform.isOpenBSD
 
 # Whether to enable Markdown rendering in the Nix binary.
-, enableMarkdown ? !stdenv.hostPlatform.isWindows
+, enableLowdown ? !stdenv.hostPlatform.isWindows
 
 # Which interactive line editor library to use for Nix's repl.
 #
@@ -229,7 +230,8 @@ in {
     toml11
     xz
     ({ inherit readline editline; }.${readlineFlavor})
-  ] ++ lib.optionals enableMarkdown [
+    cmark
+  ] ++ lib.optionals enableLowdown [
     lowdown
   ] ++ lib.optionals buildUnitTests [
     gtest
@@ -256,7 +258,7 @@ in {
     (lib.enableFeature doInstallCheck "functional-tests")
     (lib.enableFeature enableManual "doc-gen")
     (lib.enableFeature enableGC "gc")
-    (lib.enableFeature enableMarkdown "markdown")
+    (lib.enableFeature enableLowdown "lowdown")
     (lib.enableFeature installUnitTests "install-unit-tests")
     (lib.withFeatureAs true "readline-flavor" readlineFlavor)
   ] ++ lib.optionals (!forDevShell) [

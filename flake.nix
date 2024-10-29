@@ -6,6 +6,8 @@
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   inputs.libgit2 = { url = "github:libgit2/libgit2/v1.8.1"; flake = false; };
+  # Until https://github.com/commonmark/cmark/pull/524 is released
+  inputs.cmark = { url = "github:commonmark/cmark"; flake = false; };
 
   # dev tooling
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";

@@ -90,9 +90,9 @@ in
 
   # Toggles some settings for better coverage. Windows needs these
   # library combinations, and Debian build Nix with GNU readline too.
-  buildReadlineNoMarkdown = forAllSystems (system:
+  buildReadlineNoLowdown = forAllSystems (system:
     self.packages.${system}.nix.override {
-      enableMarkdown = false;
+      enableLowdown = false;
       readlineFlavor = "readline";
     }
   );
