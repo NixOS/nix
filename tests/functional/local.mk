@@ -44,6 +44,7 @@ nix_tests = \
   fetchGitSubmodules.sh \
   fetchGitVerification.sh \
   readfile-context.sh \
+  readfile-stdin.sh \
   nix-channel.sh \
   recursive.sh \
   dependencies.sh \
