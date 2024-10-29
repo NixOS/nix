@@ -460,7 +460,13 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         std::string re = R"(Good "git" signature for \* with .* key SHA256:[)";
         for (const fetchers::PublicKey & k : publicKeys){
             // Calculate sha256 fingerprint from public key and escape the regex symbol '+' to match the key literally
-            auto fingerprint = trim(hashString(HashAlgorithm::SHA256, base64Decode(k.key)).to_string(nix::HashFormat::Base64, false), "=");
+            std::string keyDecoded;
+            try {
+                keyDecoded = base64Decode(k.key);
+            } catch (Error & e) {
+                e.addTrace({}, "while decoding public key '%s' used for git signature", k.key);
+            }
+            auto fingerprint = trim(hashString(HashAlgorithm::SHA256, keyDecoded).to_string(nix::HashFormat::Base64, false), "=");
             auto escaped_fingerprint = std::regex_replace(fingerprint, std::regex("\\+"), "\\+" );
             re += "(" + escaped_fingerprint + ")";
         }
@@ -601,12 +607,16 @@ struct GitSourceAccessor : SourceAccessor
         return readBlob(path, true);
     }
 
-    Hash getSubmoduleRev(const CanonPath & path)
+    /**
+     * If `path` exists and is a submodule, return its
+     * revision. Otherwise return nothing.
+     */
+    std::optional<Hash> getSubmoduleRev(const CanonPath & path)
     {
-        auto entry = need(path);
+        auto entry = lookup(path);
 
-        if (git_tree_entry_type(entry) != GIT_OBJECT_COMMIT)
-            throw Error("'%s' is not a submodule", showPath(path));
+        if (!entry || git_tree_entry_type(entry) != GIT_OBJECT_COMMIT)
+            return std::nullopt;
 
         return toHash(*git_tree_entry_id(entry));
     }
@@ -1074,8 +1084,10 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     auto rawAccessor = getRawAccessor(rev);
 
     for (auto & submodule : parseSubmodules(pathTemp)) {
-        auto rev = rawAccessor->getSubmoduleRev(submodule.path);
-        result.push_back({std::move(submodule), rev});
+        /* Filter out .gitmodules entries that don't exist or are not
+           submodules. */
+        if (auto rev = rawAccessor->getSubmoduleRev(submodule.path))
+            result.push_back({std::move(submodule), *rev});
     }
 
     return result;
