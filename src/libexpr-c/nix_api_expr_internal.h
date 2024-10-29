@@ -19,11 +19,6 @@ struct BindingsBuilder
     nix::BindingsBuilder builder;
 };
 
-struct ListBuilder
-{
-    nix::ListBuilder builder;
-};
-
 struct nix_value
 {
     nix::Value value;

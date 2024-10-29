@@ -98,6 +98,32 @@
               useLLVM = true;
             };
             overlays = [
+              # Update immer to the latest
+              # TODO(@connorbaker): Upstream this.
+              (final: prev: {
+                immer =
+                let
+                  inherit (final.lib.strings) cmakeBool;
+                in
+                prev.immer.overrideAttrs (finalAttrs: _: {
+                  strictDeps = true;
+                  version = "0.8.1-unstable-2024-09-18";
+                  src = final.fetchFromGitHub {
+                    owner = "arximboldi";
+                    repo = "immer";
+                    rev = "df6ef46d97e1fe81f397015b9aeb32505cef653b";
+                    hash = "sha256-fV6Rqbg/vtUH2DdgLYULl0zLM3WUSG1qYLZtqAhaWQw=";
+                  };
+                  doCheck = false;
+                  # TODO(@connorbaker): Add support for doCheck = true;
+                  cmakeFlags = [
+                    (cmakeBool "immer_BUILD_DOCS" false)
+                    (cmakeBool "immer_BUILD_EXAMPLES" finalAttrs.doCheck)
+                    (cmakeBool "immer_BUILD_EXTRAS" false)
+                    (cmakeBool "immer_BUILD_TESTS" finalAttrs.doCheck)
+                  ];
+                });
+              })
               (overlayFor (p: p.${stdenv}))
             ];
           };

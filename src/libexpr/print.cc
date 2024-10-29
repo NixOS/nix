@@ -380,7 +380,7 @@ private:
     /**
      * @note This may force items.
      */
-    bool shouldPrettyPrintList(std::span<Value * const> list)
+    bool shouldPrettyPrintList(const Value::List list)
     {
         if (!options.shouldPrettyPrint() || list.empty()) {
             return false;
@@ -415,16 +415,16 @@ private:
         if (depth < options.maxDepth) {
             increaseIndent();
             output << "[";
-            auto listItems = v.listItems();
-            auto prettyPrint = shouldPrettyPrintList(listItems);
+            auto list = v.list();
+            auto prettyPrint = shouldPrettyPrintList(list);
 
             size_t currentListItemsPrinted = 0;
 
-            for (auto elem : listItems) {
+            for (auto elem : list) {
                 printSpace(prettyPrint);
 
                 if (totalListItemsPrinted >= options.maxListItems) {
-                    printElided(listItems.size() - currentListItemsPrinted, "item", "items");
+                    printElided(list.size() - currentListItemsPrinted, "item", "items");
                     break;
                 }
 

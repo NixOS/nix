@@ -50,15 +50,6 @@ typedef struct EvalState EvalState;
  */
 typedef struct BindingsBuilder BindingsBuilder;
 
-/** @brief Stores an under-construction list
- * @ingroup value_manip
- *
- * Do not reuse.
- * @see nix_make_list_builder, nix_list_builder_free, nix_make_list
- * @see nix_list_builder_insert
- */
-typedef struct ListBuilder ListBuilder;
-
 /** @brief PrimOp function
  * @ingroup primops
  *
@@ -392,39 +383,6 @@ nix_err nix_init_apply(nix_c_context * context, nix_value * value, nix_value * f
  * @return error code, NIX_OK on success.
  */
 nix_err nix_init_external(nix_c_context * context, nix_value * value, ExternalValue * val);
-
-/** @brief Create a list from a list builder
- * @param[out] context Optional, stores error information
- * @param[in] list_builder list builder to use. Make sure to unref this afterwards.
- * @param[out] value Nix value to modify
- * @return error code, NIX_OK on success.
- */
-nix_err nix_make_list(nix_c_context * context, ListBuilder * list_builder, nix_value * value);
-
-/** @brief Create a list builder
- * @param[out] context Optional, stores error information
- * @param[in] state nix evaluator state
- * @param[in] capacity how many bindings you'll add. Don't exceed.
- * @return owned reference to a list builder. Make sure to unref when you're done.
- */
-ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, size_t capacity);
-
-/** @brief Insert bindings into a builder
- * @param[out] context Optional, stores error information
- * @param[in] list_builder ListBuilder to insert into
- * @param[in] index index to manipulate
- * @param[in] value value to insert
- * @return error code, NIX_OK on success.
- */
-nix_err
-nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, unsigned int index, nix_value * value);
-
-/** @brief Free a list builder
- *
- * Does not fail.
- * @param[in] list_builder The builder to free.
- */
-void nix_list_builder_free(ListBuilder * list_builder);
 
 /** @brief Create an attribute set from a bindings builder
  * @param[out] context Optional, stores error information

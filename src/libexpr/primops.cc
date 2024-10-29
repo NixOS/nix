@@ -26,6 +26,8 @@
 #include <cstring>
 #include <sstream>
 #include <regex>
+#include <utility>
+#include <vector>
 
 #ifndef _WIN32
 # include <dlfcn.h>
@@ -35,6 +37,14 @@
 
 namespace nix {
 
+// TODO(@connorbaker): Be careful when using containers from the standard library, as they need to be configured to use
+// the Boehm GC's allocator! Look for and replace usages of vector, pair, map, etc. with the GC versions.
+
+// TODO(@connorbaker): Look for uses of values after they've been added to a Value::List -- immer uses `std::move` to
+// avoid copying, but not sure what the implications are.
+
+// TODO(@connorbaker): Rewrite functions involving lists to make use of persistence -- currently they're largely written
+// in a way that duplicates data.
 
 /*************************************************************
  * Miscellaneous
@@ -197,10 +207,12 @@ void derivationToValue(EvalState & state, const PosIdx pos, const SourcePath & p
     });
     attrs.alloc(state.sName).mkString(drv.env["name"]);
 
-    auto list = state.buildList(drv.outputs.size());
-    for (const auto & [i, o] : enumerate(drv.outputs)) {
+    auto list = state.allocList();
+    for (const auto & o : drv.outputs) {
         mkOutputString(state, attrs, storePath, o);
-        (list[i] = state.allocValue())->mkString(o.first);
+        auto outputString = state.allocValue();
+        outputString->mkString(o.first);
+        *list = list->push_back(outputString);
     }
     attrs.alloc(state.sOutputs).mkList(list);
 
@@ -402,7 +414,7 @@ void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Valu
 void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.exec");
-    auto elems = args[0]->listElems();
+    auto elems = args[0]->list();
     auto count = args[0]->listSize();
     if (count == 0)
         state.error<EvalError>("at least one argument to 'exec' required").atPos(pos).debugThrow();
@@ -647,8 +659,8 @@ struct CompareValues
                             return false;
                         } else if (i == v1->listSize()) {
                             return true;
-                        } else if (!state.eqValues(*v1->listElems()[i], *v2->listElems()[i], pos, errorCtx)) {
-                            return (*this)(v1->listElems()[i], v2->listElems()[i], "while comparing two list elements");
+                        } else if (!state.eqValues(*v1->list()[i], *v2->list()[i], pos, errorCtx)) {
+                            return (*this)(v1->list()[i], v2->list()[i], "while comparing two list elements");
                         }
                     }
                 default:
@@ -664,6 +676,7 @@ struct CompareValues
 };
 
 
+// TODO(@connorbaker): Get rid of ValueList.
 typedef std::list<Value *, gc_allocator<Value *>> ValueList;
 
 
@@ -690,7 +703,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value * * a
     state.forceList(*startSet->value, noPos, "while evaluating the 'startSet' attribute passed as argument to builtins.genericClosure");
 
     ValueList workSet;
-    for (auto elem : startSet->value->listItems())
+    for (auto elem : startSet->value->list())
         workSet.push_back(elem);
 
     if (startSet->value->listSize() == 0) {
@@ -728,16 +741,18 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value * * a
         state.forceList(newElements, noPos, "while evaluating the return value of the `operator` passed to builtins.genericClosure");
 
         /* Add the values returned by the operator to the work set. */
-        for (auto elem : newElements.listItems()) {
+        for (auto elem : newElements.list()) {
             state.forceValue(*elem, noPos); // "while evaluating one one of the elements returned by the `operator` passed to builtins.genericClosure");
             workSet.push_back(elem);
         }
     }
 
     /* Create the result list. */
-    auto list = state.buildList(res.size());
-    for (const auto & [n, i] : enumerate(res))
-        list[n] = i;
+    auto list = state.allocList();
+    auto transientList = list->transient();
+    for (const auto & v : res)
+        transientList.push_back(v);
+    *list = transientList.persistent();
     v.mkList(list);
 }
 
@@ -1324,7 +1339,7 @@ static void derivationStrictInternal(
                command-line arguments to the builder. */
             else if (i->name == state.sArgs) {
                 state.forceList(*i->value, pos, context_below);
-                for (auto elem : i->value->listItems()) {
+                for (auto elem : i->value->list()) {
                     auto s = state.coerceToString(pos, *elem, context,
                             "while evaluating an element of the argument list",
                             true).toOwned();
@@ -1356,7 +1371,7 @@ static void derivationStrictInternal(
                         /* Require ‘outputs’ to be a list of strings. */
                         state.forceList(*i->value, pos, context_below);
                         Strings ss;
-                        for (auto elem : i->value->listItems())
+                        for (auto elem : i->value->list())
                             ss.emplace_back(state.forceStringNoCtx(*elem, pos, context_below));
                         handleOutputs(ss);
                     }
@@ -1832,7 +1847,7 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
 
     LookupPath lookupPath;
 
-    for (auto v2 : args[0]->listItems()) {
+    for (auto v2 : args[0]->list()) {
         state.forceAttrs(*v2, pos, "while evaluating an element of the list passed to builtins.findFile");
 
         std::string prefix;
@@ -2675,14 +2690,23 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value * * args, 
 {
     state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.attrNames");
 
-    auto list = state.buildList(args[0]->attrs()->size());
+    auto vec = std::vector<Value *>();
+    vec.reserve(args[0]->attrs()->size());
 
-    for (const auto & [n, i] : enumerate(*args[0]->attrs()))
-        (list[n] = state.allocValue())->mkString(state.symbols[i.name]);
+    for (const auto & attr : *args[0]->attrs()) {
+        auto v = state.allocValue();
+        v->mkString(state.symbols[attr.name]);
+        vec.push_back(v);
+    }
 
-    std::sort(list.begin(), list.end(),
+    std::sort(vec.begin(), vec.end(),
               [](Value * v1, Value * v2) { return strcmp(v1->c_str(), v2->c_str()) < 0; });
-
+    
+    auto list = state.allocList();
+    auto transientList = list->transient();
+    for (auto & v : vec)
+        transientList.push_back(v);
+    *list = transientList.persistent();
     v.mkList(list);
 }
 
@@ -2703,21 +2727,29 @@ static void prim_attrValues(EvalState & state, const PosIdx pos, Value * * args,
 {
     state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.attrValues");
 
-    auto list = state.buildList(args[0]->attrs()->size());
+    auto vec = std::vector<Value *>();
+    vec.reserve(args[0]->attrs()->size());
 
-    for (const auto & [n, i] : enumerate(*args[0]->attrs()))
-        list[n] = (Value *) &i;
+    for (const auto & attr: *args[0]->attrs())
+        // Extremely gross mis-cast so we can sort by name
+        vec.push_back((Value *) &attr);
 
-    std::sort(list.begin(), list.end(),
+    std::sort(vec.begin(), vec.end(),
         [&](Value * v1, Value * v2) {
             std::string_view s1 = state.symbols[((Attr *) v1)->name],
                 s2 = state.symbols[((Attr *) v2)->name];
             return s1 < s2;
         });
 
-    for (auto & v : list)
+    // Quickly convert the values to the actual values to hide the shame.
+    for (auto & v : vec)
         v = ((Attr *) v)->value;
 
+    auto list = state.allocList();
+    auto transientList = list->transient();
+    for (auto & v : vec)
+        transientList.push_back(v);
+    *list = transientList.persistent();
     v.mkList(list);
 }
 
@@ -2872,7 +2904,7 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value * * args
     // 64: large enough to fit the attributes of a derivation
     boost::container::small_vector<Attr, 64> names;
     names.reserve(args[1]->listSize());
-    for (auto elem : args[1]->listItems()) {
+    for (auto elem : args[1]->list()) {
         state.forceStringNoCtx(*elem, pos, "while evaluating the values of the second argument passed to builtins.removeAttrs");
         names.emplace_back(state.symbols.create(elem->string_view()), nullptr);
     }
@@ -2918,7 +2950,7 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value * * args
 
     std::set<Symbol> seen;
 
-    for (auto v2 : args[0]->listItems()) {
+    for (auto v2 : args[0]->list()) {
         state.forceAttrs(*v2, pos, "while evaluating an element of the list passed to builtins.listToAttrs");
 
         auto j = getAttr(state, state.sName, v2->attrs(), "in a {name=...; value=...;} pair");
@@ -3052,15 +3084,18 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
     SmallValueVector<nonRecursiveStackReservation> res(args[1]->listSize());
     size_t found = 0;
 
-    for (auto v2 : args[1]->listItems()) {
+    for (auto v2 : args[1]->list()) {
         state.forceAttrs(*v2, pos, "while evaluating an element in the list passed as second argument to builtins.catAttrs");
         if (auto i = v2->attrs()->get(attrName))
             res[found++] = i->value;
     }
 
-    auto list = state.buildList(found);
+    auto list = state.allocList();
+    auto transientList = list->transient();
     for (unsigned int n = 0; n < found; ++n)
-        list[n] = res[n];
+        transientList.push_back(res[n]);
+
+    *list = transientList.persistent();
     v.mkList(list);
 }
 
@@ -3154,52 +3189,36 @@ static RegisterPrimOp primop_mapAttrs({
 
 static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    // we will first count how many values are present for each given key.
-    // we then allocate a single attrset and pre-populate it with lists of
-    // appropriate sizes, stash the pointers to the list elements of each,
-    // and populate the lists. after that we replace the list in the every
-    // attribute with the merge function application. this way we need not
-    // use (slightly slower) temporary storage the GC does not know about.
-
-    struct Item
-    {
-        size_t size = 0;
-        size_t pos = 0;
-        std::optional<ListBuilder> list;
-    };
-
-    std::map<Symbol, Item, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Item>>> attrsSeen;
+    // TODO(@connorbaker): Revisit the template parameters and choice of allocator.
+    std::map<Symbol, std::pair<Value::List *, Value::TransientList>, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, std::pair<Value::List *, Value::TransientList>>>> attrsSeen;
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.zipAttrsWith");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.zipAttrsWith");
-    const auto listItems = args[1]->listItems();
 
-    for (auto & vElem : listItems) {
+    for (auto & vElem : args[1]->list()) {
         state.forceAttrs(*vElem, noPos, "while evaluating a value of the list passed as second argument to builtins.zipAttrsWith");
-        for (auto & attr : *vElem->attrs())
-            attrsSeen.try_emplace(attr.name).first->second.size++;
-    }
-
-    for (auto & [sym, elem] : attrsSeen)
-        elem.list.emplace(state.buildList(elem.size));
-
-    for (auto & vElem : listItems) {
         for (auto & attr : *vElem->attrs()) {
-            auto & item = attrsSeen.at(attr.name);
-            (*item.list)[item.pos++] = attr.value;
+            if (!attrsSeen.contains(attr.name)) {
+                auto list = state.allocList();
+                auto transientList = list->transient();
+                attrsSeen[attr.name] = {list, transientList};
+            }
+            attrsSeen[attr.name].second.push_back(attr.value);
         }
     }
 
     auto attrs = state.buildBindings(attrsSeen.size());
 
-    for (auto & [sym, elem] : attrsSeen) {
+    for (auto & [sym, listPair] : attrsSeen) {
         auto name = state.allocValue();
         name->mkString(state.symbols[sym]);
         auto call1 = state.allocValue();
         call1->mkApp(args[0], name);
         auto call2 = state.allocValue();
         auto arg = state.allocValue();
-        arg->mkList(*elem.list);
+        auto valueList = listPair.second.persistent();
+        *listPair.first = valueList;
+        arg->mkList(listPair.first);
         call2->mkApp(call1, arg);
         attrs.insert(sym, call2);
     }
@@ -3269,8 +3288,8 @@ static void elemAt(EvalState & state, const PosIdx pos, Value & list, int n, Val
             "list index %1% is out of bounds",
             n
         ).atPos(pos).debugThrow();
-    state.forceValue(*list.listElems()[n], pos);
-    v = *list.listElems()[n];
+    state.forceValue(*list.list()[n], pos);
+    v = *list.list()[n];
 }
 
 /* Return the n-1'th element of a list. */
@@ -3316,10 +3335,9 @@ static void prim_tail(EvalState & state, const PosIdx pos, Value * * args, Value
     if (args[0]->listSize() == 0)
         state.error<EvalError>("'tail' called on an empty list").atPos(pos).debugThrow();
 
-    auto list = state.buildList(args[0]->listSize() - 1);
-    for (const auto & [n, v] : enumerate(list))
-        v = args[0]->listElems()[n + 1];
-    v.mkList(list);
+    auto tail = state.allocList();
+    *tail = args[0]->list().drop(1);
+    v.mkList(tail);
 }
 
 static RegisterPrimOp primop_tail({
@@ -3350,10 +3368,14 @@ static void prim_map(EvalState & state, const PosIdx pos, Value * * args, Value 
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.map");
 
-    auto list = state.buildList(args[1]->listSize());
-    for (const auto & [n, v] : enumerate(list))
-        (v = state.allocValue())->mkApp(
-            args[0], args[1]->listElems()[n]);
+    auto list = state.allocList();
+    auto transientList = list->transient();
+    for (const auto & v : args[1]->list()) {
+        auto newV = state.allocValue();
+        newV->mkApp(args[0], v);
+        transientList.push_back(newV);
+    }
+    *list = transientList.persistent();
     v.mkList(list);
 }
 
@@ -3387,26 +3409,18 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Val
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filter");
 
-    SmallValueVector<nonRecursiveStackReservation> vs(args[1]->listSize());
-    size_t k = 0;
+    auto list = state.allocList();
+    auto transientList = list->transient();
 
-    bool same = true;
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
+    for (auto arg : args[1]->list()) {
         Value res;
-        state.callFunction(*args[0], *args[1]->listElems()[n], res, noPos);
+        state.callFunction(*args[0], *arg, res, noPos);
         if (state.forceBool(res, pos, "while evaluating the return value of the filtering function passed to builtins.filter"))
-            vs[k++] = args[1]->listElems()[n];
-        else
-            same = false;
+            transientList.push_back(arg);
     }
 
-    if (same)
-        v = *args[1];
-    else {
-        auto list = state.buildList(k);
-        for (const auto & [n, v] : enumerate(list)) v = vs[n];
-        v.mkList(list);
-    }
+    *list = transientList.persistent();
+    v.mkList(list);
 }
 
 static RegisterPrimOp primop_filter({
@@ -3424,7 +3438,7 @@ static void prim_elem(EvalState & state, const PosIdx pos, Value * * args, Value
 {
     bool res = false;
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.elem");
-    for (auto elem : args[1]->listItems())
+    for (auto elem : args[1]->list())
         if (state.eqValues(*args[0], *elem, pos, "while searching for the presence of the given element in the list")) {
             res = true;
             break;
@@ -3446,7 +3460,7 @@ static RegisterPrimOp primop_elem({
 static void prim_concatLists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.concatLists");
-    state.concatLists(v, args[0]->listSize(), args[0]->listElems(), pos, "while evaluating a value of the list passed to builtins.concatLists");
+    state.concatLists(v, args[0]->list(), pos, "while evaluating a value of the list passed to builtins.concatLists");
 }
 
 static RegisterPrimOp primop_concatLists({
@@ -3484,7 +3498,7 @@ static void prim_foldlStrict(EvalState & state, const PosIdx pos, Value * * args
     if (args[2]->listSize()) {
         Value * vCur = args[1];
 
-        for (auto [n, elem] : enumerate(args[2]->listItems())) {
+        for (auto [n, elem] : enumerate(args[2]->list())) {
             Value * vs []{vCur, elem};
             vCur = n == args[2]->listSize() - 1 ? &v : state.allocValue();
             state.callFunction(*args[0], 2, vs, *vCur, pos);
@@ -3526,7 +3540,7 @@ static void anyOrAll(bool any, EvalState & state, const PosIdx pos, Value * * ar
         : "while evaluating the return value of the function passed to builtins.all";
 
     Value vTmp;
-    for (auto elem : args[1]->listItems()) {
+    for (auto elem : args[1]->list()) {
         state.callFunction(*args[0], *elem, vTmp, pos);
         bool res = state.forceBool(vTmp, pos, errorCtx);
         if (res == any) {
@@ -3582,12 +3596,16 @@ static void prim_genList(EvalState & state, const PosIdx pos, Value * * args, Va
     // as evaluating map without accessing any values makes little sense.
     state.forceFunction(*args[0], noPos, "while evaluating the first argument passed to builtins.genList");
 
-    auto list = state.buildList(len);
-    for (const auto & [n, v] : enumerate(list)) {
+    auto list = state.allocList();
+    auto transientList = list->transient();
+    for (size_t n = 0; n < len; ++n) {
         auto arg = state.allocValue();
         arg->mkInt(n);
-        (v = state.allocValue())->mkApp(args[0], arg);
+        auto app = state.allocValue();
+        app->mkApp(args[0], arg);
+        transientList.push_back(app);
     }
+    *list = transientList.persistent();
     v.mkList(list);
 }
 
@@ -3622,9 +3640,13 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.sort");
 
-    auto list = state.buildList(len);
-    for (const auto & [n, v] : enumerate(list))
-        state.forceValue(*(v = args[1]->listElems()[n]), pos);
+    auto vec = std::vector<Value *>();
+    vec.reserve(len);
+
+    for (const auto & v : args[1]->list()) {
+        state.forceValue(*v, pos);
+        vec.push_back(v);
+    }
 
     auto comparator = [&](Value * a, Value * b) {
         /* Optimization: if the comparator is lessThan, bypass
@@ -3644,8 +3666,13 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
     /* FIXME: std::sort can segfault if the comparator is not a strict
        weak ordering. What to do? std::stable_sort() seems more
        resilient, but no guarantees... */
-    std::stable_sort(list.begin(), list.end(), comparator);
+    std::stable_sort(vec.begin(), vec.end(), comparator);
 
+    auto list = state.allocList();
+    auto transientList = list->transient();
+    for (const auto v : vec)
+        transientList.push_back(v);
+    *list = transientList.persistent();
     v.mkList(list);
 }
 
@@ -3675,33 +3702,26 @@ static void prim_partition(EvalState & state, const PosIdx pos, Value * * args, 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.partition");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.partition");
 
-    auto len = args[1]->listSize();
+    auto rlist = state.allocList();
+    auto rtransientList = rlist->transient();
+    auto wlist = state.allocList();
+    auto wtransientList = wlist->transient();
 
-    ValueVector right, wrong;
-
-    for (unsigned int n = 0; n < len; ++n) {
-        auto vElem = args[1]->listElems()[n];
-        state.forceValue(*vElem, pos);
+    for (const auto v : args[1]->list()) {
+        state.forceValue(*v, pos);
         Value res;
-        state.callFunction(*args[0], *vElem, res, pos);
+        state.callFunction(*args[0], *v, res, pos);
         if (state.forceBool(res, pos, "while evaluating the return value of the partition function passed to builtins.partition"))
-            right.push_back(vElem);
+            rtransientList.push_back(v);
         else
-            wrong.push_back(vElem);
+            wtransientList.push_back(v);
     }
+    *rlist = rtransientList.persistent();
+    *wlist = wtransientList.persistent();
 
     auto attrs = state.buildBindings(2);
 
-    auto rsize = right.size();
-    auto rlist = state.buildList(rsize);
-    if (rsize)
-        memcpy(rlist.elems, right.data(), sizeof(Value *) * rsize);
     attrs.alloc(state.sRight).mkList(rlist);
-
-    auto wsize = wrong.size();
-    auto wlist = state.buildList(wsize);
-    if (wsize)
-        memcpy(wlist.elems, wrong.data(), sizeof(Value *) * wsize);
     attrs.alloc(state.sWrong).mkList(wlist);
 
     v.mkAttrs(attrs);
@@ -3735,24 +3755,27 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value * * args, Va
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.groupBy");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.groupBy");
 
-    ValueVectorMap attrs;
+    std::map<Symbol, std::pair<Value::List *, Value::TransientList>> attrs;
 
-    for (auto vElem : args[1]->listItems()) {
+    for (auto vElem : args[1]->list()) {
         Value res;
         state.callFunction(*args[0], *vElem, res, pos);
         auto name = state.forceStringNoCtx(res, pos, "while evaluating the return value of the grouping function passed to builtins.groupBy");
         auto sym = state.symbols.create(name);
-        auto vector = attrs.try_emplace(sym, ValueVector()).first;
-        vector->second.push_back(vElem);
+
+        if (!attrs.contains(sym)) {
+                auto list = state.allocList();
+                auto transientList = list->transient();
+                attrs[sym] = {list, transientList};
+            }
+            attrs[sym].second.push_back(vElem);
     }
 
     auto attrs2 = state.buildBindings(attrs.size());
 
-    for (auto & i : attrs) {
-        auto size = i.second.size();
-        auto list = state.buildList(size);
-        memcpy(list.elems, i.second.data(), sizeof(Value *) * size);
-        attrs2.alloc(i.first).mkList(list);
+    for (auto & [name, listPair] : attrs) {
+        *listPair.first = listPair.second.persistent();
+        attrs2.alloc(name).mkList(listPair.first);
     }
 
     v.mkAttrs(attrs2.alreadySorted());
@@ -3786,26 +3809,15 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
 {
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.concatMap");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.concatMap");
-    auto nrLists = args[1]->listSize();
 
-    // List of returned lists before concatenation. References to these Values must NOT be persisted.
-    SmallTemporaryValueVector<conservativeStackReservation> lists(nrLists);
-    size_t len = 0;
+    auto list = state.allocList();
 
-    for (unsigned int n = 0; n < nrLists; ++n) {
-        Value * vElem = args[1]->listElems()[n];
-        state.callFunction(*args[0], *vElem, lists[n], pos);
-        state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)), "while evaluating the return value of the function passed to builtins.concatMap");
-        len += lists[n].listSize();
-    }
-
-    auto list = state.buildList(len);
-    auto out = list.elems;
-    for (unsigned int n = 0, pos = 0; n < nrLists; ++n) {
-        auto l = lists[n].listSize();
-        if (l)
-            memcpy(out + pos, lists[n].listElems(), l * sizeof(Value *));
-        pos += l;
+    for (auto arg : args[1]->list()) {
+        // TODO(@connorbaker): Will the list stored in res be available after the loop, or will it be garbage collected?
+        Value res;
+        state.callFunction(*args[0], *arg, res, pos);
+        state.forceList(res, res.determinePos(args[0]->determinePos(pos)), "while evaluating the return value of the function passed to builtins.concatMap");
+        *list = *list + res.list();
     }
     v.mkList(list);
 }
@@ -4292,20 +4304,26 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         NixStringContext context;
         const auto str = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.match");
 
-        std::cmatch match;
-        if (!std::regex_match(str.begin(), str.end(), match, regex)) {
+        std::cmatch matches;
+        if (!std::regex_match(str.begin(), str.end(), matches, regex)) {
             v.mkNull();
             return;
         }
 
+        auto listOfMatches = state.allocList();
+        auto transientListOfMatches = listOfMatches->transient();
+
         // the first match is the whole string
-        auto list = state.buildList(match.size() - 1);
-        for (const auto & [i, v2] : enumerate(list))
-            if (!match[i + 1].matched)
-                v2 = &state.vNull;
-            else
-                v2 = mkString(state, match[i + 1]);
-        v.mkList(list);
+        for (auto match : std::span(matches).subspan(1)) {
+            if (!match.matched) {
+                transientListOfMatches.push_back(&state.vNull);
+            } else {
+                transientListOfMatches.push_back(mkString(state, match));
+            }
+        }
+
+        *listOfMatches = transientListOfMatches.persistent();
+        v.mkList(listOfMatches);
 
     } catch (std::regex_error & e) {
         if (e.code() == std::regex_constants::error_space) {
@@ -4374,44 +4392,56 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 
         // Any matches results are surrounded by non-matching results.
         const size_t len = std::distance(begin, end);
-        auto list = state.buildList(2 * len + 1);
-        size_t idx = 0;
 
+        auto listOfMatches = state.allocList();
+        auto transientListOfMatches = listOfMatches->transient();
         if (len == 0) {
-            list[0] = args[1];
-            v.mkList(list);
+            transientListOfMatches.push_back(args[1]);
+            *listOfMatches = transientListOfMatches.persistent();
+            v.mkList(listOfMatches);
             return;
         }
+
+        size_t idx = 0;
 
         for (auto i = begin; i != end; ++i) {
             assert(idx <= 2 * len + 1 - 3);
             auto match = *i;
 
             // Add a string for non-matched characters.
-            list[idx++] = mkString(state, match.prefix());
+            transientListOfMatches.push_back(mkString(state, match.prefix()));
+            idx++;
 
             // Add a list for matched substrings.
-            const size_t slen = match.size() - 1;
+            auto listOfSubMatches = state.allocList();
+            auto transientListOfSubMatches = listOfSubMatches->transient();
 
-            // Start at 1, beacause the first match is the whole string.
-            auto list2 = state.buildList(slen);
-            for (const auto & [si, v2] : enumerate(list2)) {
-                if (!match[si + 1].matched)
-                    v2 = &state.vNull;
-                else
-                    v2 = mkString(state, match[si + 1]);
+            // NOTE: Start at 1, beacause the first match is the whole string.
+            for (auto subMatch : std::span(match).subspan(1)) {
+                if (!subMatch.matched) {
+                    transientListOfSubMatches.push_back(&state.vNull);
+                } else {
+                    transientListOfSubMatches.push_back(mkString(state, subMatch));
+                }
             }
 
-            (list[idx++] = state.allocValue())->mkList(list2);
+            *listOfSubMatches = transientListOfSubMatches.persistent();
+            auto scratchValue = state.allocValue();
+            scratchValue->mkList(listOfSubMatches);
+            transientListOfMatches.push_back(scratchValue);
+            idx++;
 
             // Add a string for non-matched suffix characters.
-            if (idx == 2 * len)
-                list[idx++] = mkString(state, match.suffix());
+            if (idx == 2 * len) {
+                transientListOfMatches.push_back(mkString(state, match.suffix()));
+                idx++;
+            }
         }
 
         assert(idx == 2 * len + 1);
 
-        v.mkList(list);
+        *listOfMatches = transientListOfMatches.persistent();
+        v.mkList(listOfMatches);
 
     } catch (std::regex_error & e) {
         if (e.code() == std::regex_constants::error_space) {
@@ -4474,7 +4504,7 @@ static void prim_concatStringsSep(EvalState & state, const PosIdx pos, Value * *
     res.reserve((args[1]->listSize() + 32) * sep.size());
     bool first = true;
 
-    for (auto elem : args[1]->listItems()) {
+    for (auto elem : args[1]->list()) {
         if (first) first = false; else res += sep;
         res += *state.coerceToString(pos, *elem, context, "while evaluating one element of the list of strings to concat passed to builtins.concatStringsSep");
     }
@@ -4504,11 +4534,11 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value * * a
 
     std::vector<std::string> from;
     from.reserve(args[0]->listSize());
-    for (auto elem : args[0]->listItems())
+    for (auto elem : args[0]->list())
         from.emplace_back(state.forceString(*elem, pos, "while evaluating one of the strings to replace passed to builtins.replaceStrings"));
 
     std::unordered_map<size_t, std::string> cache;
-    auto to = args[1]->listItems();
+    auto to = args[1]->list();
 
     NixStringContext context;
     auto s = state.forceString(*args[2], context, pos, "while evaluating the third argument passed to builtins.replaceStrings");
@@ -4633,9 +4663,15 @@ static void prim_splitVersion(EvalState & state, const PosIdx pos, Value * * arg
             break;
         components.emplace_back(component);
     }
-    auto list = state.buildList(components.size());
-    for (const auto & [n, component] : enumerate(components))
-        (list[n] = state.allocValue())->mkString(std::move(component));
+
+    auto list = state.allocList();
+    auto transientList = list->transient();
+    for (const auto & component : components) {
+        auto v = state.allocValue();
+        v->mkString(std::move(component));
+        transientList.push_back(v);
+    }
+    *list = transientList.persistent();
     v.mkList(list);
 }
 
@@ -4878,13 +4914,17 @@ void EvalState::createBaseEnv()
     });
 
     /* Add a value containing the current Nix expression search path. */
-    auto list = buildList(lookupPath.elements.size());
-    for (const auto & [n, i] : enumerate(lookupPath.elements)) {
+    auto list = allocList();
+    auto transientList = list->transient();
+    for (const auto & i : lookupPath.elements) {
         auto attrs = buildBindings(2);
         attrs.alloc("path").mkString(i.path.s);
         attrs.alloc("prefix").mkString(i.prefix.s);
-        (list[n] = allocValue())->mkAttrs(attrs);
+        auto v = allocValue();
+        v->mkAttrs(attrs);
+        transientList.push_back(v);
     }
+    *list = transientList.persistent();
     v.mkList(list);
     addConstant("__nixPath", v, {
         .type = nList,

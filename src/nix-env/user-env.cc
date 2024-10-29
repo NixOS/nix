@@ -50,7 +50,8 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
 
     /* Construct the whole top level derivation. */
     StorePathSet references;
-    auto list = state.buildList(elems.size());
+    auto list = state.allocList();
+    auto listTransient = list->transient();
     for (const auto & [n, i] : enumerate(elems)) {
         /* Create a pseudo-derivation containing the name, system,
            output paths, and optionally the derivation path, as well
@@ -71,9 +72,12 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
             attrs.alloc(state.sDrvPath).mkString(state.store->printStorePath(*drvPath));
 
         // Copy each output meant for installation.
-        auto outputsList = state.buildList(outputs.size());
-        for (const auto & [m, j] : enumerate(outputs)) {
-            (outputsList[m] = state.allocValue())->mkString(j.first);
+        auto outputsList = state.allocList();
+        auto outputsListTransient = outputsList->transient();
+        for (const auto & j : outputs) {
+            auto v = state.allocValue();
+            v->mkString(j.first);
+            outputsListTransient.push_back(v);
             auto outputAttrs = state.buildBindings(2);
             outputAttrs.alloc(state.sOutPath).mkString(state.store->printStorePath(*j.second));
             attrs.alloc(j.first).mkAttrs(outputAttrs);
@@ -85,7 +89,9 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
 
             references.insert(*j.second);
         }
+        *outputsList = outputsListTransient.persistent();
         attrs.alloc(state.sOutputs).mkList(outputsList);
+
 
         // Copy the meta attributes.
         auto meta = state.buildBindings(metaNames.size());
@@ -96,11 +102,13 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
         }
 
         attrs.alloc(state.sMeta).mkAttrs(meta);
-
-        (list[n] = state.allocValue())->mkAttrs(attrs);
+        auto v = state.allocValue();
+        v->mkAttrs(attrs);
+        listTransient.push_back(v);
 
         if (drvPath) references.insert(*drvPath);
     }
+    *list = listTransient.persistent();
 
     Value manifest;
     manifest.mkList(list);

@@ -38,6 +38,14 @@ boost = dependency(
 # put in `deps_other`.
 deps_other += boost
 
+immer = dependency(
+  'Immer',
+  version : '>=0.8.0',
+  method : 'cmake',
+  include_type: 'system',
+)
+deps_other += immer
+
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
@@ -53,6 +61,7 @@ if bdw_gc.found()
     configdata.set(define_name, define_value)
   endforeach
   configdata.set('GC_THREADS', 1)
+  configdata.set('IMMER_HAS_LIBGC', 1)
 endif
 configdata.set('HAVE_BOEHMGC', bdw_gc.found().to_int())
 

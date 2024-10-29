@@ -13,6 +13,21 @@
 
 #include <nlohmann/json_fwd.hpp>
 
+#include <immer/heap/gc_heap.hpp>
+#include <immer/heap/heap_policy.hpp>
+#include <immer/memory_policy.hpp>
+#include <immer/refcount/no_refcount_policy.hpp>
+#include <immer/flex_vector.hpp>
+#include <immer/flex_vector_transient.hpp>
+
+// declare a memory policy for using a tracing garbage collector
+using gc_policy = immer::memory_policy<immer::heap_policy<immer::gc_heap>,
+                                       immer::no_refcount_policy,
+                                       immer::default_lock_policy,
+                                       immer::gc_transience_policy,
+                                       false,
+                                       false>;
+
 namespace nix {
 
 struct Value;
@@ -27,9 +42,7 @@ typedef enum {
     tPath,
     tNull,
     tAttrs,
-    tList1,
-    tList2,
-    tListN,
+    tList,
     tThunk,
     tApp,
     tLambda,
@@ -133,36 +146,6 @@ class ExternalValueBase
 std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
 
 
-class ListBuilder
-{
-    const size_t size;
-    Value * inlineElems[2] = {nullptr, nullptr};
-public:
-    Value * * elems;
-    ListBuilder(EvalState & state, size_t size);
-
-    // NOTE: Can be noexcept because we are just copying integral values and
-    // raw pointers.
-    ListBuilder(ListBuilder && x) noexcept
-        : size(x.size)
-        , inlineElems{x.inlineElems[0], x.inlineElems[1]}
-        , elems(size <= 2 ? inlineElems : x.elems)
-    { }
-
-    Value * & operator [](size_t n)
-    {
-        return elems[n];
-    }
-
-    typedef Value * * iterator;
-
-    iterator begin() { return &elems[0]; }
-    iterator end() { return &elems[size]; }
-
-    friend struct Value;
-};
-
-
 struct Value
 {
 private:
@@ -234,6 +217,11 @@ public:
         ExprLambda * fun;
     };
 
+    // alias the vector type so we are not concerned about memory policies
+    // in the places where we actually use it
+    using List = immer::flex_vector<nix::Value *, gc_policy>;
+    using TransientList = immer::flex_vector_transient<nix::Value *, gc_policy>;
+
     using Payload = union
     {
         NixInt integer;
@@ -244,11 +232,7 @@ public:
         Path path;
 
         Bindings * attrs;
-        struct {
-            size_t size;
-            Value * const * elems;
-        } bigList;
-        Value * smallList[2];
+        List * list;
         ClosureThunk thunk;
         FunctionApplicationThunk app;
         Lambda lambda;
@@ -277,7 +261,7 @@ public:
             case tPath: return nPath;
             case tNull: return nNull;
             case tAttrs: return nAttrs;
-            case tList1: case tList2: case tListN: return nList;
+            case tList: return nList;
             case tLambda: case tPrimOp: case tPrimOpApp: return nFunction;
             case tExternal: return nExternal;
             case tFloat: return nFloat;
@@ -286,6 +270,7 @@ public:
         if (invalidIsThunk)
             return nThunk;
         else
+            printError("Value::type: invalid internal type: %d", internalType);
             unreachable();
     }
 
@@ -356,14 +341,9 @@ public:
 
     Value & mkAttrs(BindingsBuilder & bindings);
 
-    void mkList(const ListBuilder & builder)
+    void mkList(List * list)
     {
-        if (builder.size == 1)
-            finishValue(tList1, { .smallList = { builder.inlineElems[0] } });
-        else if (builder.size == 2)
-            finishValue(tList2, { .smallList = { builder.inlineElems[0], builder.inlineElems[1] } });
-        else
-            finishValue(tListN, { .bigList = { .size = builder.size, .elems = builder.elems } });
+        finishValue(tList, { .list = list });
     }
 
     inline void mkThunk(Env * e, Expr * ex)
@@ -407,28 +387,12 @@ public:
 
     bool isList() const
     {
-        return internalType == tList1 || internalType == tList2 || internalType == tListN;
-    }
-
-    Value * const * listElems()
-    {
-        return internalType == tList1 || internalType == tList2 ? payload.smallList : payload.bigList.elems;
-    }
-
-    std::span<Value * const> listItems() const
-    {
-        assert(isList());
-        return std::span<Value * const>(listElems(), listSize());
-    }
-
-    Value * const * listElems() const
-    {
-        return internalType == tList1 || internalType == tList2 ? payload.smallList : payload.bigList.elems;
+        return internalType == tList;
     }
 
     size_t listSize() const
     {
-        return internalType == tList1 ? 1 : internalType == tList2 ? 2 : payload.bigList.size;
+        return payload.list->size();
     }
 
     PosIdx determinePos(const PosIdx pos) const;
@@ -470,6 +434,9 @@ public:
 
     const Bindings * attrs() const
     { return payload.attrs; }
+
+    List list() const
+    { return *payload.list; }
 
     const PrimOp * primOp() const
     { return payload.primOp; }

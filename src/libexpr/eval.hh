@@ -708,6 +708,7 @@ public:
     /**
      * Allocation primitives.
      */
+    inline Value::List * allocList();
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 
@@ -716,11 +717,6 @@ public:
     BindingsBuilder buildBindings(size_t capacity)
     {
         return BindingsBuilder(*this, allocBindings(capacity));
-    }
-
-    ListBuilder buildList(size_t size)
-    {
-        return ListBuilder(*this, size);
     }
 
     /**
@@ -774,7 +770,7 @@ public:
         const SingleDerivedPath & p,
         Value & v);
 
-    void concatLists(Value & v, size_t nrLists, Value * const * lists, const PosIdx pos, std::string_view errorCtx);
+    void concatLists(Value & v, const Value::List lists, const PosIdx pos, std::string_view errorCtx);
 
     /**
      * Print statistics, if enabled.
@@ -872,7 +868,6 @@ private:
     friend void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
     friend struct Value;
-    friend class ListBuilder;
 };
 
 struct DebugTraceStacker {

@@ -50,11 +50,23 @@ void printAmbiguous(
         break;
     }
     case nList:
-        if (seen && v.listSize() && !seen->insert(v.listElems()).second)
+        // TODO(@connorbaker): Accessing payload directly is gross, but we need a single void*
+        // to insert into the set, and the way immer's flex_vector checks for equality yields
+        // a tuple of void*.
+        // TODO(@connorbaker): This currently fails the testcase
+        // $ nix-instantiate --eval --strict ./tests/functional/lang/eval-okay-print.nix
+        // [ null <PRIMOP> <PRIMOP-APP> <LAMBDA> [ «repeated» ] ]
+        // It should yield:
+        // [ null <PRIMOP> <PRIMOP-APP> <LAMBDA> [ [ «repeated» ] ] ]
+        // Oddly enough,
+        // $ nix eval --expr "$(cat ./tests/functional/lang/eval-okay-print.nix)"
+        // [ null «primop toString» «partially applied primop deepSeq» «lambda @ «string»:1:61» [ [ «repeated» ] ] ]
+        // So it's likely a bug in the path used by `nix-instantiate`.
+        if (seen && v.listSize() && !seen->insert(v.payload.list).second)
             str << "«repeated»";
         else {
             str << "[ ";
-            for (auto v2 : v.listItems()) {
+            for (auto v2 : v.list()) {
                 if (v2)
                     printAmbiguous(*v2, symbols, str, seen, depth - 1);
                 else

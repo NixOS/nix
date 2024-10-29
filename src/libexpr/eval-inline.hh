@@ -5,6 +5,7 @@
 #include "eval.hh"
 #include "eval-error.hh"
 #include "eval-settings.hh"
+#include <cassert>
 
 namespace nix {
 
@@ -22,6 +23,15 @@ inline void * allocBytes(size_t n)
 #endif
     if (!p) throw std::bad_alloc();
     return p;
+}
+
+/* Allocate a new array of attributes for an attribute set with a specific
+   capacity. The space is implicitly reserved after the Bindings
+   structure. */
+[[gnu::always_inline]]
+Value::List * EvalState::allocList()
+{
+    return new (allocBytes(sizeof(Value::List))) Value::List();
 }
 
 
@@ -98,8 +108,11 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
             throw;
         }
     }
-    else if (v.isApp())
+    else if (v.isApp()) {
         callFunction(*v.payload.app.left, *v.payload.app.right, v, pos);
+    }
+    // TODO(@connorbaker): Somewhere, somehow, an uninitialized value is being forced.
+    assert(v.isValid());
 }
 
 

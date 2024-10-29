@@ -324,7 +324,7 @@ nix_value * nix_get_list_byidx(nix_c_context * context, const nix_value * value,
     try {
         auto & v = check_value_in(value);
         assert(v.type() == nix::nList);
-        auto * p = v.listElems()[ix];
+        auto * p = v.list()[ix];
         nix_gc_incref(nullptr, p);
         if (p != nullptr)
             state->state.forceValue(*p, nix::noPos);
@@ -486,53 +486,6 @@ nix_err nix_init_external(nix_c_context * context, nix_value * value, ExternalVa
         auto & v = check_value_out(value);
         auto r = (nix::ExternalValueBase *) val;
         v.mkExternal(r);
-    }
-    NIXC_CATCH_ERRS
-}
-
-ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, size_t capacity)
-{
-    if (context)
-        context->last_err_code = NIX_OK;
-    try {
-        auto builder = state->state.buildList(capacity);
-        return new
-#if HAVE_BOEHMGC
-            (NoGC)
-#endif
-                ListBuilder{std::move(builder)};
-    }
-    NIXC_CATCH_ERRS_NULL
-}
-
-nix_err
-nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, unsigned int index, nix_value * value)
-{
-    if (context)
-        context->last_err_code = NIX_OK;
-    try {
-        auto & e = check_value_not_null(value);
-        list_builder->builder[index] = &e;
-    }
-    NIXC_CATCH_ERRS
-}
-
-void nix_list_builder_free(ListBuilder * list_builder)
-{
-#if HAVE_BOEHMGC
-    GC_FREE(list_builder);
-#else
-    delete list_builder;
-#endif
-}
-
-nix_err nix_make_list(nix_c_context * context, ListBuilder * list_builder, nix_value * value)
-{
-    if (context)
-        context->last_err_code = NIX_OK;
-    try {
-        auto & v = check_value_out(value);
-        v.mkList(list_builder->builder);
     }
     NIXC_CATCH_ERRS
 }

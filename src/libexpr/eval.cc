@@ -290,7 +290,7 @@ EvalState::EvalState(
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
-    vEmptyList.mkList(buildList(0));
+    vEmptyList.mkList(allocList());
     vNull.mkNull();
     vTrue.mkBool(true);
     vFalse.mkBool(false);
@@ -874,13 +874,6 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
     }
 }
 
-ListBuilder::ListBuilder(EvalState & state, size_t size)
-    : size(size)
-    , elems(size <= 2 ? inlineElems : (Value * *) allocBytes(size * sizeof(Value *)))
-{
-    state.nrListElems += size;
-}
-
 Value * EvalState::getBool(bool b) {
     return b ? &vTrue : &vFalse;
 }
@@ -1307,9 +1300,15 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
-    auto list = state.buildList(elems.size());
-    for (const auto & [n, v2] : enumerate(list))
-        v2 = elems[n]->maybeThunk(state, env);
+    auto list = state.allocList();
+    // TODO(@connorbaker): Did removing the use of transients here resolve an error?
+    // auto transientList = list->transient();
+    // for (auto & i : elems)
+    //     transientList.push_back(i->maybeThunk(state, env));
+    
+    // *list = transientList.persistent();
+    for (auto & i : elems)
+        *list = list->push_back(i->maybeThunk(state, env));
     v.mkList(list);
 }
 
@@ -1907,40 +1906,26 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 {
-    Value v1; e1->eval(state, env, v1);
-    Value v2; e2->eval(state, env, v2);
-    Value * lists[2] = { &v1, &v2 };
-    state.concatLists(v, 2, lists, pos, "while evaluating one of the elements to concatenate");
+    auto v1 = state.allocValue(); 
+    e1->eval(state, env, *v1);
+    auto v2 = state.allocValue();
+    e2->eval(state, env, *v2);
+    state.concatLists(v, Value::List({v1, v2}), pos, "while evaluating one of the elements to concatenate");
 }
 
 
-void EvalState::concatLists(Value & v, size_t nrLists, Value * const * lists, const PosIdx pos, std::string_view errorCtx)
+void EvalState::concatLists(Value & v, const Value::List lists, const PosIdx pos, std::string_view errorCtx)
 {
     nrListConcats++;
 
-    Value * nonEmpty = 0;
-    size_t len = 0;
-    for (size_t n = 0; n < nrLists; ++n) {
-        forceList(*lists[n], pos, errorCtx);
-        auto l = lists[n]->listSize();
-        len += l;
-        if (l) nonEmpty = lists[n];
+    // TODO(@connorbaker): We should be able to get a pointer to the list from the first argument and then concatenate from there.
+    // However, because Value is mutable, I can't think of an easy way to do that.
+    auto newList = allocList();
+    for (auto list : lists) {
+        forceList(*list, pos, errorCtx);
+        *newList = *newList + list->list();
     }
-
-    if (nonEmpty && len == nonEmpty->listSize()) {
-        v = *nonEmpty;
-        return;
-    }
-
-    auto list = buildList(len);
-    auto out = list.elems;
-    for (size_t n = 0, pos = 0; n < nrLists; ++n) {
-        auto l = lists[n]->listSize();
-        if (l)
-            memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
-        pos += l;
-    }
-    v.mkList(list);
+    v.mkList(newList);
 }
 
 
@@ -2099,7 +2084,7 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
-            for (auto v2 : v.listItems())
+            for (auto v2 : v.list())
                 recurse(*v2);
         }
     };
@@ -2326,7 +2311,7 @@ BackedStringView EvalState::coerceToString(
 
         if (v.isList()) {
             std::string result;
-            for (auto [n, v2] : enumerate(v.listItems())) {
+            for (auto [n, v2] : enumerate(v.list())) {
                 try {
                     result += *coerceToString(pos, *v2, context,
                             "while evaluating one element of the list",
@@ -2580,7 +2565,7 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         }
         for (size_t n = 0; n < v1.listSize(); ++n) {
             try {
-                assertEqValues(*v1.listElems()[n], *v2.listElems()[n], pos, errorCtx);
+                assertEqValues(*v1.list()[n], *v2.list()[n], pos, errorCtx);
             } catch (Error & e) {
                 e.addTrace(positions[pos], "while comparing list element %d", n);
                 throw;
@@ -2732,7 +2717,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         case nList:
             if (v1.listSize() != v2.listSize()) return false;
             for (size_t n = 0; n < v1.listSize(); ++n)
-                if (!eqValues(*v1.listElems()[n], *v2.listElems()[n], pos, errorCtx)) return false;
+                if (!eqValues(*v1.list()[n], *v2.list()[n], pos, errorCtx)) return false;
             return true;
 
         case nAttrs: {

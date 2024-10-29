@@ -4,6 +4,7 @@
 
 , bison
 , flex
+, immer
 , cmake # for resolving toml11 dep
 
 , nix-util
@@ -76,6 +77,7 @@ mkMesonLibrary (finalAttrs: {
   # Hack for sake of the dev shell
   passthru.externalPropagatedBuildInputs = [
     boost
+    immer
     nlohmann_json
   ] ++ lib.optional enableGC boehmgc;
 
