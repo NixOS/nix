@@ -178,6 +178,38 @@ static void mkOutputString(
         o.second.path(*state.store, Derivation::nameFromPath(drvPath), o.first));
 }
 
+/**
+ * Import a Nix file with an alternate base scope, as `builtins.scopedImport` does.
+ *
+ * @param state The evaluation state.
+ * @param pos The position of the import call.
+ * @param path The path to the file to import.
+ * @param vScope The base scope to use for the import.
+ * @param v Return value
+ */
+static void scopedImport(EvalState & state, const PosIdx pos, SourcePath & path, Value * vScope, Value & v) {
+    state.forceAttrs(*vScope, pos, "while evaluating the first argument passed to builtins.scopedImport");
+
+    Env * env = &state.allocEnv(vScope->attrs()->size());
+    env->up = &state.baseEnv;
+
+    auto staticEnv = std::make_shared<StaticEnv>(nullptr, state.staticBaseEnv.get(), vScope->attrs()->size());
+
+    unsigned int displ = 0;
+    for (auto & attr : *vScope->attrs()) {
+        staticEnv->vars.emplace_back(attr.name, displ);
+        env->values[displ++] = attr.value;
+    }
+
+    // No need to call staticEnv.sort(), because
+    // args[0]->attrs is already sorted.
+
+    printTalkative("evaluating file '%1%'", path);
+    Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
+
+    e->eval(state, *env, v);
+}
+
 /* Load and evaluate an expression from path specified by the
    argument. */
 static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * vScope, Value & v)
@@ -226,30 +258,10 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
     }
 
     else {
-        if (!vScope)
+        if (vScope)
+            scopedImport(state, pos, path, vScope, v);
+        else
             state.evalFile(path, v);
-        else {
-            state.forceAttrs(*vScope, pos, "while evaluating the first argument passed to builtins.scopedImport");
-
-            Env * env = &state.allocEnv(vScope->attrs()->size());
-            env->up = &state.baseEnv;
-
-            auto staticEnv = std::make_shared<StaticEnv>(nullptr, state.staticBaseEnv.get(), vScope->attrs()->size());
-
-            unsigned int displ = 0;
-            for (auto & attr : *vScope->attrs()) {
-                staticEnv->vars.emplace_back(attr.name, displ);
-                env->values[displ++] = attr.value;
-            }
-
-            // No need to call staticEnv.sort(), because
-            // args[0]->attrs is already sorted.
-
-            printTalkative("evaluating file '%1%'", path);
-            Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
-
-            e->eval(state, *env, v);
-        }
     }
 }
 
