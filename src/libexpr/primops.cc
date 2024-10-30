@@ -270,12 +270,11 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
     if (auto storePath = isValidDerivationInStore()) {
         derivationToValue(state, pos, path, *storePath, v);
     }
-
+    else if (vScope) {
+        scopedImport(state, pos, path, vScope, v);
+    }
     else {
-        if (vScope)
-            scopedImport(state, pos, path, vScope, v);
-        else
-            state.evalFile(path, v);
+        state.evalFile(path, v);
     }
 }
 
