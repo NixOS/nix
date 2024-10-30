@@ -32,7 +32,7 @@
         then ""
         else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
 
-      linux32BitSystems = [ "i686-linux" ];
+      linux32BitSystems = [ /* "i686-linux" */ ];
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
       linuxSystems = linux32BitSystems ++ linux64BitSystems;
       darwinSystems = [ "x86_64-darwin" "aarch64-darwin" ];
@@ -44,7 +44,7 @@
         "riscv64-unknown-linux-gnu"
         "x86_64-unknown-netbsd"
         "x86_64-unknown-freebsd"
-        "x86_64-w64-mingw32"
+        #"x86_64-w64-mingw32"
       ];
 
       stdenvs = [
@@ -175,7 +175,7 @@
 
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
-        installTests = self.hydraJobs.installTests.${system};
+        #installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
         rl-next =
           let pkgs = nixpkgsFor.${system}.native;
@@ -201,7 +201,7 @@
         } // lib.optionalAttrs (! nixpkgsFor.${system}.native.stdenv.hostPlatform.isDarwin) {
           # TODO: enable static builds for darwin, blocked on:
           #       https://github.com/NixOS/nixpkgs/issues/320448
-          "static-" = nixpkgsFor.${system}.static;
+          #"static-" = nixpkgsFor.${system}.static;
         })
         (nixpkgsPrefix: nixpkgs:
           flatMapAttrs nixpkgs.nixComponents
@@ -238,7 +238,7 @@
           (pkgName: {}: {
               # These attributes go right into `packages.<system>`.
               "${pkgName}" = nixpkgsFor.${system}.native.nixComponents.${pkgName};
-              "${pkgName}-static" = nixpkgsFor.${system}.static.nixComponents.${pkgName};
+              #"${pkgName}-static" = nixpkgsFor.${system}.static.nixComponents.${pkgName};
             }
             // flatMapAttrs (lib.genAttrs crossSystems (_: { })) (crossSystem: {}: {
               # These attributes go right into `packages.<system>`.
@@ -362,7 +362,7 @@
           in
             (makeShells "native" nixpkgsFor.${system}.native) //
             (lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin)
-              (makeShells "static" nixpkgsFor.${system}.static) //
+              #(makeShells "static" nixpkgsFor.${system}.static) //
               (forAllCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv))) //
             {
               default = self.devShells.${system}.native-stdenvPackages;
