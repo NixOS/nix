@@ -1,5 +1,5 @@
 [book]
-title = "Nix Reference Manual"
+title = "Determinate Nix Reference Manual"
 
 [output.html]
 additional-css = ["custom.css"]
