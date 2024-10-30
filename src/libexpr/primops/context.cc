@@ -219,13 +219,11 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
             infoAttrs.alloc(sAllOutputs).mkBool(true);
         if (!info.second.outputs.empty()) {
             auto list = state.allocList();
-            auto transientList = list->transient();
             for (const auto & [i, output] : enumerate(info.second.outputs)) {
                 auto v = state.allocValue();
                 v->mkString(output);
-                transientList.push_back(v);
+                *list = list->push_back(v);
             }
-            *list = transientList.persistent();
             infoAttrs.alloc(state.sOutputs).mkList(list);
         }
         attrs.alloc(state.store->printStorePath(info.first)).mkAttrs(infoAttrs);

@@ -81,7 +81,7 @@ TEST_F(ValuePrintingTests, tList)
 
     // TODO(@connorbaker): Test fails because previously, using ListBuilder and over-allocating would set entries to nullptr.
     // That's no longer the case with persistent vectors.
-    auto list = Value::List({ &vOne, &vTwo,  nullptr });
+    auto list = ValueList({ &vOne, &vTwo,  nullptr });
 
     Value vList;
     vList.mkList(&list);
@@ -250,7 +250,7 @@ TEST_F(ValuePrintingTests, depthList)
     Value vNested;
     vNested.mkAttrs(builder2.finish());
 
-    auto list = Value::List({ &vOne, &vTwo, &vNested });
+    auto list = ValueList({ &vOne, &vTwo, &vNested });
     Value vList;
     vList.mkList(&list);
 
@@ -539,7 +539,7 @@ TEST_F(ValuePrintingTests, ansiColorsList)
 
     // TODO(@connorbaker): Test fails because previously, using ListBuilder and over-allocating would set entries to nullptr.
     // That's no longer the case with persistent vectors.
-    auto list = Value::List({ &vOne, &vTwo,  nullptr });
+    auto list = ValueList({ &vOne, &vTwo,  nullptr });
     Value vList;
     vList.mkList(&list);
 
@@ -668,7 +668,7 @@ TEST_F(ValuePrintingTests, ansiColorsListRepeated)
     Value vEmpty;
     vEmpty.mkAttrs(emptyBuilder.finish());
 
-    auto list = Value::List({ &vEmpty, &vEmpty });
+    auto list = ValueList({ &vEmpty, &vEmpty });
     Value vList;
     vList.mkList(&list);
 
@@ -686,7 +686,7 @@ TEST_F(ValuePrintingTests, listRepeated)
     Value vEmpty;
     vEmpty.mkAttrs(emptyBuilder.finish());
 
-    auto list = Value::List({ &vEmpty, &vEmpty });
+    auto list = ValueList({ &vEmpty, &vEmpty });
     Value vList;
     vList.mkList(&list);
 
@@ -745,7 +745,7 @@ TEST_F(ValuePrintingTests, ansiColorsListElided)
     vTwo.mkInt(2);
 
     {
-    auto list = Value::List({ &vOne, &vTwo });
+    auto list = ValueList({ &vOne, &vTwo });
     Value vList;
     vList.mkList(&list);
 
@@ -761,7 +761,7 @@ TEST_F(ValuePrintingTests, ansiColorsListElided)
     vThree.mkInt(3);
 
     {
-    auto list = Value::List({ &vOne, &vTwo, &vThree });
+    auto list = ValueList({ &vOne, &vTwo, &vThree });
     Value vList;
     vList.mkList(&list);
 

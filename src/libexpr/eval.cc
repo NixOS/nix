@@ -1301,12 +1301,6 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
     auto list = state.allocList();
-    // TODO(@connorbaker): Did removing the use of transients here resolve an error?
-    // auto transientList = list->transient();
-    // for (auto & i : elems)
-    //     transientList.push_back(i->maybeThunk(state, env));
-    
-    // *list = transientList.persistent();
     for (auto & i : elems)
         *list = list->push_back(i->maybeThunk(state, env));
     v.mkList(list);
@@ -1910,11 +1904,11 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
     e1->eval(state, env, *v1);
     auto v2 = state.allocValue();
     e2->eval(state, env, *v2);
-    state.concatLists(v, Value::List({v1, v2}), pos, "while evaluating one of the elements to concatenate");
+    state.concatLists(v, ValueList({v1, v2}), pos, "while evaluating one of the elements to concatenate");
 }
 
 
-void EvalState::concatLists(Value & v, const Value::List lists, const PosIdx pos, std::string_view errorCtx)
+void EvalState::concatLists(Value & v, const ValueList lists, const PosIdx pos, std::string_view errorCtx)
 {
     nrListConcats++;
 

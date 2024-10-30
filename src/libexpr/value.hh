@@ -2,7 +2,6 @@
 ///@file
 
 #include <cassert>
-#include <span>
 
 #include "eval-gc.hh"
 #include "symbol-table.hh"
@@ -18,7 +17,6 @@
 #include <immer/memory_policy.hpp>
 #include <immer/refcount/no_refcount_policy.hpp>
 #include <immer/flex_vector.hpp>
-#include <immer/flex_vector_transient.hpp>
 
 // declare a memory policy for using a tracing garbage collector
 using gc_policy = immer::memory_policy<immer::heap_policy<immer::gc_heap>,
@@ -33,6 +31,9 @@ namespace nix {
 struct Value;
 class BindingsBuilder;
 
+// alias the vector type so we are not concerned about memory policies
+// in the places where we actually use it
+typedef immer::flex_vector<nix::Value *, gc_policy> ValueList;
 
 typedef enum {
     tUninitialized = 0,
@@ -217,11 +218,6 @@ public:
         ExprLambda * fun;
     };
 
-    // alias the vector type so we are not concerned about memory policies
-    // in the places where we actually use it
-    using List = immer::flex_vector<nix::Value *, gc_policy>;
-    using TransientList = immer::flex_vector_transient<nix::Value *, gc_policy>;
-
     using Payload = union
     {
         NixInt integer;
@@ -232,7 +228,7 @@ public:
         Path path;
 
         Bindings * attrs;
-        List * list;
+        ValueList * list;
         ClosureThunk thunk;
         FunctionApplicationThunk app;
         Lambda lambda;
@@ -341,7 +337,7 @@ public:
 
     Value & mkAttrs(BindingsBuilder & bindings);
 
-    void mkList(List * list)
+    void mkList(ValueList * list)
     {
         finishValue(tList, { .list = list });
     }
@@ -435,7 +431,7 @@ public:
     const Bindings * attrs() const
     { return payload.attrs; }
 
-    List list() const
+    ValueList list() const
     { return *payload.list; }
 
     const PrimOp * primOp() const

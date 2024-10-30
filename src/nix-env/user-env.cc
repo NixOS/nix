@@ -51,7 +51,6 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
     /* Construct the whole top level derivation. */
     StorePathSet references;
     auto list = state.allocList();
-    auto listTransient = list->transient();
     for (const auto & [n, i] : enumerate(elems)) {
         /* Create a pseudo-derivation containing the name, system,
            output paths, and optionally the derivation path, as well
@@ -73,11 +72,10 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
 
         // Copy each output meant for installation.
         auto outputsList = state.allocList();
-        auto outputsListTransient = outputsList->transient();
         for (const auto & j : outputs) {
             auto v = state.allocValue();
             v->mkString(j.first);
-            outputsListTransient.push_back(v);
+            *outputsList = outputsList->push_back(v);
             auto outputAttrs = state.buildBindings(2);
             outputAttrs.alloc(state.sOutPath).mkString(state.store->printStorePath(*j.second));
             attrs.alloc(j.first).mkAttrs(outputAttrs);
@@ -89,7 +87,6 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
 
             references.insert(*j.second);
         }
-        *outputsList = outputsListTransient.persistent();
         attrs.alloc(state.sOutputs).mkList(outputsList);
 
 
@@ -104,11 +101,10 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
         attrs.alloc(state.sMeta).mkAttrs(meta);
         auto v = state.allocValue();
         v->mkAttrs(attrs);
-        listTransient.push_back(v);
+        *list = list->push_back(v);
 
         if (drvPath) references.insert(*drvPath);
     }
-    *list = listTransient.persistent();
 
     Value manifest;
     manifest.mkList(list);

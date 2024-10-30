@@ -380,7 +380,7 @@ private:
     /**
      * @note This may force items.
      */
-    bool shouldPrettyPrintList(const Value::List list)
+    bool shouldPrettyPrintList(const ValueList list)
     {
         if (!options.shouldPrettyPrint() || list.empty()) {
             return false;

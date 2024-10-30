@@ -29,9 +29,9 @@ inline void * allocBytes(size_t n)
    capacity. The space is implicitly reserved after the Bindings
    structure. */
 [[gnu::always_inline]]
-Value::List * EvalState::allocList()
+ValueList * EvalState::allocList()
 {
-    return new (allocBytes(sizeof(Value::List))) Value::List();
+    return new (allocBytes(sizeof(ValueList))) ValueList();
 }
 
 

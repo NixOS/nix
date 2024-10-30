@@ -59,10 +59,8 @@ class JSONSax : nlohmann::json_sax<json> {
         std::unique_ptr<JSONState> resolve(EvalState & state) override
         {
             auto list = state.allocList();
-            auto transientList = list->transient();
             for (auto & i : values)
-                transientList.push_back(i);
-            *list = transientList.persistent();
+                *list = list->push_back(i);
             parent->value(state).mkList(list);
             return std::move(parent);
         }

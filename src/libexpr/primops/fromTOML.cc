@@ -39,13 +39,11 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, V
                     auto array = toml::get<std::vector<toml::value>>(t);
 
                     auto list = state.allocList();
-                    auto transientList = list->transient();
                     for (const auto & tomlValue :array) {
                         auto v = state.allocValue();
                         visit(*v, tomlValue);
-                        transientList.push_back(v);
+                        *list = list->push_back(v);
                     }
-                    *list = transientList.persistent();
                     v.mkList(list);
                 }
                 break;;
