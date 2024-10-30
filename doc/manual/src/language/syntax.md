@@ -503,10 +503,12 @@ three kinds of patterns:
     > [ 23 {} ]
     > ```
 
-    All bindings introduced by the function are in scope in the entire function expression; not just in the body. For example, the binding of an `@` pattern is available in the `?`-defaults:
+    All bindings introduced by the function are in scope in the entire function expression; not just in the body.
     It can therefore be used in default values.
 
     > **Example**
+    >
+    >  The binding of an `@` pattern is available in the `?`-defaults:
     >
     > ```nix
     > let
