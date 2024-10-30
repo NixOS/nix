@@ -20,6 +20,7 @@
 #include "fetch-to-store.hh"
 #include "tarball.hh"
 #include "parser-tab.hh"
+#include "value.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -1300,6 +1301,10 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
+    // TODO(@connorbaker): Tried to switch to using transient here, but started getting this error:
+    // Value::type: invalid internal type: -183796896
+    // That's an indication the value is being used after it's been freed. Not sure why that's happening.
+    // NOTE: Running with GC_DONT_GC=1 doesn't seem to trigger the error, so it's likely a GC issue.
     auto list = state.allocList();
     for (auto & i : elems)
         *list = list->push_back(i->maybeThunk(state, env));
@@ -1902,15 +1907,14 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 {
     auto v1 = state.allocValue(); 
     e1->eval(state, env, *v1);
+    state.forceList(*v1, pos, "in the left operand of the list concatenation operator");
     auto v2 = state.allocValue();
     e2->eval(state, env, *v2);
-    // TODO(@connorbaker): This kills me -- why do we need to create the list on the heap? Shouldn't I be able to pass
-    // a ValueList by value to concatLists without worrying about it being garbage collected *while the function is running*?
-    // If this doesn't work, then should I allocList in the test cases?
+    state.forceList(*v2, pos, "in the right operand of the list concatenation operator");
+
     auto list = state.allocList();
-    *list = list->push_back(v1);
-    *list = list->push_back(v2);
-    state.concatLists(v, *list, pos, "while evaluating one of the elements to concatenate");
+    *list = v1->list() + v2->list();
+    v.mkList(list);
 }
 
 

@@ -34,6 +34,13 @@ ValueList * EvalState::allocList()
     return new (allocBytes(sizeof(ValueList))) ValueList();
 }
 
+template <typename T>
+[[gnu::always_inline]]
+ValueList * EvalState::allocListFromInitializerList(std::initializer_list<T> values)
+{
+    return new (allocBytes(sizeof(ValueList))) ValueList(values);
+}
+
 
 [[gnu::always_inline]]
 Value * EvalState::allocValue()

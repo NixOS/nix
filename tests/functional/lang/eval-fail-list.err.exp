@@ -1,5 +1,5 @@
 error:
-       … while evaluating one of the elements to concatenate
+       … in the left operand of the list concatenation operator
          at /pwd/lang/eval-fail-list.nix:1:2:
             1| 8++1
              |  ^

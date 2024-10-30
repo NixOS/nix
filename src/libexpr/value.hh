@@ -17,6 +17,7 @@
 #include <immer/memory_policy.hpp>
 #include <immer/refcount/no_refcount_policy.hpp>
 #include <immer/flex_vector.hpp>
+#include <immer/flex_vector_transient.hpp>
 
 // declare a memory policy for using a tracing garbage collector
 using gc_policy = immer::memory_policy<immer::heap_policy<immer::gc_heap>,
@@ -33,7 +34,8 @@ class BindingsBuilder;
 
 // alias the vector type so we are not concerned about memory policies
 // in the places where we actually use it
-typedef immer::flex_vector<nix::Value *, gc_policy> ValueList;
+typedef immer::flex_vector<nix::Value *, gc_policy, 5U, 5U> ValueList;
+typedef immer::flex_vector_transient<nix::Value *, gc_policy, 5U, 5U> ValueListTransient;
 
 typedef enum {
     tUninitialized = 0,

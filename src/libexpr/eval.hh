@@ -709,6 +709,8 @@ public:
      * Allocation primitives.
      */
     inline ValueList * allocList();
+    template <typename T>
+    inline ValueList * allocListFromInitializerList(std::initializer_list<T> values);
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 
