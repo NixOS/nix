@@ -125,7 +125,10 @@
   - [C++ style guide](development/cxx.md)
   - [Experimental Features](development/experimental-features.md)
   - [Contributing](development/contributing.md)
-- [Releases](release-notes/index.md)
+- [Determinate Nix Releases Notes](release-notes-determinate/index.md)
+  - [Changes between Nix and Determinate Nix](release-notes-determinate/changes.md)
+  - [Release 1.0 (2024-11-??)](release-notes-determinate/rl-1.0.md)
+- [Nix Releases Notes](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
   - [Release 2.24 (2024-07-31)](release-notes/rl-2.24.md)
   - [Release 2.23 (2024-06-03)](release-notes/rl-2.23.md)
