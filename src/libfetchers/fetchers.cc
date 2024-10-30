@@ -101,7 +101,7 @@ Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
     auto allowedAttrs = inputScheme->allowedAttrs();
 
     for (auto & [name, _] : attrs)
-        if (name != "type" && name != "final" && allowedAttrs.count(name) == 0)
+        if (name != "type" && name != "__final" && allowedAttrs.count(name) == 0)
             throw Error("input attribute '%s' not supported by scheme '%s'", name, schemeName);
 
     auto res = inputScheme->inputFromAttrs(settings, attrs);
@@ -148,7 +148,7 @@ bool Input::isLocked() const
 
 bool Input::isFinal() const
 {
-    return maybeGetBoolAttr(attrs, "final").value_or(false);
+    return maybeGetBoolAttr(attrs, "__final").value_or(false);
 }
 
 Attrs Input::toAttrs() const
@@ -189,7 +189,7 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
             // getAccessorUnchecked(), but then we can't add
             // narHash. Or maybe narHash should be excluded from the
             // concept of "final" inputs?
-            final.attrs.insert_or_assign("final", Explicit<bool>(true));
+            final.attrs.insert_or_assign("__final", Explicit<bool>(true));
 
             assert(final.isFinal());
 

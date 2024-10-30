@@ -48,8 +48,8 @@ LockedNode::LockedNode(
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 
     // For backward compatibility, lock file entries are implicitly final.
-    assert(!lockedRef.input.attrs.contains("final"));
-    lockedRef.input.attrs.insert_or_assign("final", Explicit<bool>(true));
+    assert(!lockedRef.input.attrs.contains("__final"));
+    lockedRef.input.attrs.insert_or_assign("__final", Explicit<bool>(true));
 }
 
 StorePath LockedNode::computeStorePath(Store & store) const
@@ -194,11 +194,11 @@ std::pair<nlohmann::json, LockFile::KeyMap> LockFile::toJSON() const
         if (auto lockedNode = node.dynamic_pointer_cast<const LockedNode>()) {
             n["original"] = fetchers::attrsToJSON(lockedNode->originalRef.toAttrs());
             n["locked"] = fetchers::attrsToJSON(lockedNode->lockedRef.toAttrs());
-            /* For backward compatibility, omit the "final"
+            /* For backward compatibility, omit the "__final"
                attribute. We never allow non-final inputs in lock files
                anyway. */
             assert(lockedNode->lockedRef.input.isFinal());
-            n["locked"].erase("final");
+            n["locked"].erase("__final");
             if (!lockedNode->isFlake)
                 n["flake"] = false;
         }

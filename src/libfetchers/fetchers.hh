@@ -78,24 +78,28 @@ public:
     Attrs toAttrs() const;
 
     /**
-     * Check whether this is a "direct" input, that is, not
+     * Return whether this is a "direct" input, that is, not
      * one that goes through a registry.
      */
     bool isDirect() const;
 
     /**
-     * Check whether this is a "locked" input, that is, it has
+     * Return whether this is a "locked" input, that is, it has
      * attributes like a Git revision or NAR hash that uniquely
      * identify its contents.
      */
     bool isLocked() const;
 
     /**
-     * Check whether this is a "final" input, meaning that fetching it
+     * Return whether this is a "final" input, meaning that fetching it
      * will not add or change any attributes. For instance, a Git
      * input with a `rev` attribute but without a `lastModified`
      * attribute is considered locked but not final. Only "final"
      * inputs can be substituted from a binary cache.
+     *
+     * The "final" state is denoted by the presence of an attribute
+     * `__final = true`. This attribute is currently undocumented and
+     * for internal use only.
      */
     bool isFinal() const;
 
@@ -226,15 +230,12 @@ struct InputScheme
      */
     virtual std::optional<ExperimentalFeature> experimentalFeature() const;
 
-    /// See `Input::isDirect()`.
     virtual bool isDirect(const Input & input) const
     { return true; }
 
-    /// See `Input::getFingerprint()`.
     virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
     { return std::nullopt; }
 
-    /// See `Input::isLocked()`.
     virtual bool isLocked(const Input & input) const
     { return false; }
 

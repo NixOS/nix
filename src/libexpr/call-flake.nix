@@ -45,7 +45,7 @@ let
             else
               # FIXME: remove obsolete node.info.
               # Note: lock file entries are always final.
-              fetchTree (node.info or {} // removeAttrs node.locked ["dir"] // { final = true; });
+              fetchTree (node.info or {} // removeAttrs node.locked ["dir"] // { __final = true; });
 
           subdir = overrides.${key}.dir or node.locked.dir or "";
 

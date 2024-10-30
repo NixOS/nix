@@ -72,7 +72,7 @@ struct PathInputScheme : InputScheme
         auto query = attrsToQuery(input.attrs);
         query.erase("path");
         query.erase("type");
-        query.erase("final");
+        query.erase("__final");
         return ParsedURL {
             .scheme = "path",
             .path = getStrAttr(input.attrs, "path"),
