@@ -202,6 +202,7 @@
             libsodium
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
+          ++ lib.optionals stdenv.isDarwin [darwin.apple_sdk.libs.sandbox]
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
         checkDeps = [
