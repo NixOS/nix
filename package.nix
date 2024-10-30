@@ -27,6 +27,7 @@
 , libseccomp
 , libsodium
 , man
+, darwin
 , lowdown
 , mdbook
 , mdbook-linkcheck
@@ -249,7 +250,9 @@ in {
   ] ++ lib.optionals buildUnitTests [
     gtest
     rapidcheck
-  ] ++ lib.optional stdenv.isLinux (libseccomp.overrideAttrs (_: rec {
+  ]
+    ++ lib.optional stdenv.hostPlatform.isDarwin darwin.apple_sdk.libs.sandbox
+    ++ lib.optional stdenv.isLinux (libseccomp.overrideAttrs (_: rec {
     version = "2.5.5";
     src = fetchurl {
       url = "https://github.com/seccomp/libseccomp/releases/download/v${version}/libseccomp-${version}.tar.gz";
