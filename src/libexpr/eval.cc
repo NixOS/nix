@@ -1904,7 +1904,13 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
     e1->eval(state, env, *v1);
     auto v2 = state.allocValue();
     e2->eval(state, env, *v2);
-    state.concatLists(v, ValueList({v1, v2}), pos, "while evaluating one of the elements to concatenate");
+    // TODO(@connorbaker): This kills me -- why do we need to create the list on the heap? Shouldn't I be able to pass
+    // a ValueList by value to concatLists without worrying about it being garbage collected *while the function is running*?
+    // If this doesn't work, then should I allocList in the test cases?
+    auto list = state.allocList();
+    *list = list->push_back(v1);
+    *list = list->push_back(v2);
+    state.concatLists(v, *list, pos, "while evaluating one of the elements to concatenate");
 }
 
 
