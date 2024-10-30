@@ -1247,6 +1247,8 @@ std::vector<Path> getUserConfigFiles();
 
 extern const std::string nixVersion;
 
+extern const std::string determinateNixVersion;
+
 /**
  * @param loadConfig Whether to load configuration from `nix.conf`, `NIX_CONFIG`, etc. May be disabled for unit tests.
  * @note When using libexpr, and/or libmain, This is not sufficient. See initNix().

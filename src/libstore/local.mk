@@ -73,7 +73,8 @@ libstore_CXXFLAGS += \
  -DNIX_CONF_DIR=\"$(NIX_ROOT)$(sysconfdir)/nix\" \
  -DNIX_BIN_DIR=\"$(NIX_ROOT)$(bindir)\" \
  -DNIX_MAN_DIR=\"$(NIX_ROOT)$(mandir)\" \
- -DLSOF=\"$(NIX_ROOT)$(lsof)\"
+ -DLSOF=\"$(NIX_ROOT)$(lsof)\" \
+ -DDETERMINATE_NIX_VERSION=\""$(shell cat ./.version-determinate)"\"
 
 ifeq ($(embedded_sandbox_shell),yes)
 libstore_CXXFLAGS += -DSANDBOX_SHELL=\"__embedded_sandbox_shell__\"
