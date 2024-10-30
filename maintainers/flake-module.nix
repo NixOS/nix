@@ -7,7 +7,7 @@
 
   perSystem = { config, pkgs, ... }: {
 
-    # https://flake.parts/options/pre-commit-hooks-nix.html#options
+    # https://flake.parts/options/git-hooks-nix#options
     pre-commit.settings = {
       hooks = {
         clang-format = {
@@ -501,7 +501,6 @@
             ''^scripts/install-nix-from-closure\.sh$''
             ''^scripts/install-systemd-multi-user\.sh$''
             ''^src/nix/get-env\.sh$''
-            ''^tests/functional/build\.sh$''
             ''^tests/functional/ca/build-dry\.sh$''
             ''^tests/functional/ca/build-with-garbage-path\.sh$''
             ''^tests/functional/ca/common\.sh$''
@@ -517,7 +516,6 @@
             ''^tests/functional/ca/selfref-gc\.sh$''
             ''^tests/functional/ca/why-depends\.sh$''
             ''^tests/functional/characterisation-test-infra\.sh$''
-            ''^tests/functional/check\.sh$''
             ''^tests/functional/common/vars-and-functions\.sh$''
             ''^tests/functional/completions\.sh$''
             ''^tests/functional/compute-levels\.sh$''
@@ -534,7 +532,6 @@
             ''^tests/functional/dyn-drv/old-daemon-error-hack\.sh$''
             ''^tests/functional/dyn-drv/recursive-mod-json\.sh$''
             ''^tests/functional/eval-store\.sh$''
-            ''^tests/functional/eval\.sh$''
             ''^tests/functional/export-graph\.sh$''
             ''^tests/functional/export\.sh$''
             ''^tests/functional/extra-sandbox-profile\.sh$''
@@ -544,13 +541,11 @@
             ''^tests/functional/fetchGitSubmodules\.sh$''
             ''^tests/functional/fetchGitVerification\.sh$''
             ''^tests/functional/fetchMercurial\.sh$''
-            ''^tests/functional/fetchurl\.sh$''
             ''^tests/functional/fixed\.builder1\.sh$''
             ''^tests/functional/fixed\.builder2\.sh$''
             ''^tests/functional/fixed\.sh$''
             ''^tests/functional/flakes/absolute-paths\.sh$''
             ''^tests/functional/flakes/check\.sh$''
-            ''^tests/functional/flakes/common\.sh$''
             ''^tests/functional/flakes/config\.sh$''
             ''^tests/functional/flakes/develop\.sh$''
             ''^tests/functional/flakes/flakes\.sh$''
@@ -565,16 +560,12 @@
             ''^tests/functional/gc-concurrent\.sh$''
             ''^tests/functional/gc-concurrent2\.builder\.sh$''
             ''^tests/functional/gc-non-blocking\.sh$''
-            ''^tests/functional/gc\.sh$''
             ''^tests/functional/git-hashing/common\.sh$''
             ''^tests/functional/git-hashing/simple\.sh$''
             ''^tests/functional/hash-convert\.sh$''
-            ''^tests/functional/help\.sh$''
             ''^tests/functional/impure-derivations\.sh$''
-            ''^tests/functional/impure-env\.sh$''
             ''^tests/functional/impure-eval\.sh$''
             ''^tests/functional/install-darwin\.sh$''
-            ''^tests/functional/lang\.sh$''
             ''^tests/functional/legacy-ssh-store\.sh$''
             ''^tests/functional/linux-sandbox\.sh$''
             ''^tests/functional/local-overlay-store/add-lower-inner\.sh$''
@@ -603,7 +594,6 @@
             ''^tests/functional/logging\.sh$''
             ''^tests/functional/misc\.sh$''
             ''^tests/functional/multiple-outputs\.sh$''
-            ''^tests/functional/nar-access\.sh$''
             ''^tests/functional/nested-sandboxing\.sh$''
             ''^tests/functional/nested-sandboxing/command\.sh$''
             ''^tests/functional/nix-build\.sh$''
@@ -624,7 +614,6 @@
             ''^tests/functional/path-from-hash-part\.sh$''
             ''^tests/functional/path-info\.sh$''
             ''^tests/functional/placeholders\.sh$''
-            ''^tests/functional/plugins\.sh$''
             ''^tests/functional/post-hook\.sh$''
             ''^tests/functional/pure-eval\.sh$''
             ''^tests/functional/push-to-store-old\.sh$''
@@ -639,7 +628,6 @@
             ''^tests/functional/search\.sh$''
             ''^tests/functional/secure-drv-outputs\.sh$''
             ''^tests/functional/selfref-gc\.sh$''
-            ''^tests/functional/shell\.sh$''
             ''^tests/functional/shell\.shebang\.sh$''
             ''^tests/functional/simple\.builder\.sh$''
             ''^tests/functional/supplementary-groups\.sh$''
@@ -649,7 +637,6 @@
             ''^tests/functional/user-envs\.builder\.sh$''
             ''^tests/functional/user-envs\.sh$''
             ''^tests/functional/why-depends\.sh$''
-            ''^tests/functional/zstd\.sh$''
             ''^src/libutil-tests/data/git/check-data\.sh$''
           ];
         };
