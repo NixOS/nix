@@ -164,3 +164,10 @@ in
 
   chrootStore = runNixOSTestFor "x86_64-linux" ./chroot-store.nix;
 }
+// (let
+  inherit (nixpkgsFor."x86_64-linux".native) nixosTests;
+in {
+  nix-serve =
+    assert nixosTests.nix-serve.config.nodes.machine.services.nix-serve.package.nix == self.packages.x86_64-linux.nix;
+    nixosTests.nix-serve;
+})

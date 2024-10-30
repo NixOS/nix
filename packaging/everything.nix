@@ -126,5 +126,8 @@
         nix-main-c
       ;
     };
+  }
+  // lib.optionalAttrs (stdenv.buildPlatform.canExecute stdenv.hostPlatform) {
+    perl-bindings = nix-perl-bindings;
   };
 })
