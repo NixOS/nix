@@ -173,6 +173,7 @@
             boost
             lowdown-nix
           ]
+          ++ lib.optionals stdenv.isDarwin [darwin.apple_sdk.libs.sandbox]
           ++ lib.optionals stdenv.isLinux [(libseccomp.overrideAttrs (_: rec {
             version = "2.5.5";
             src = fetchurl {
