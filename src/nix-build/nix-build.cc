@@ -163,7 +163,7 @@ static void main_nix_build(int argc, char * * argv)
         script = argv[1];
         try {
             auto lines = tokenizeString<Strings>(readFile(script), "\n");
-            if (std::regex_search(lines.front(), std::regex("^#!"))) {
+            if (!lines.empty() && std::regex_search(lines.front(), std::regex("^#!"))) {
                 lines.pop_front();
                 inShebang = true;
                 for (int i = 2; i < argc; ++i)
@@ -526,8 +526,6 @@ static void main_nix_build(int argc, char * * argv)
         // Set the environment.
         auto env = getEnv();
 
-        auto tmp = getEnvNonEmpty("TMPDIR").value_or("/tmp");
-
         if (pure) {
             decltype(env) newEnv;
             for (auto & i : env)
@@ -538,18 +536,16 @@ static void main_nix_build(int argc, char * * argv)
             env["__ETC_PROFILE_SOURCED"] = "1";
         }
 
-        env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmp;
+        env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDir.path();
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
         auto passAsFile = tokenizeString<StringSet>(getOr(drv.env, "passAsFile", ""));
 
-        bool keepTmp = false;
         int fileNr = 0;
 
         for (auto & var : drv.env)
             if (passAsFile.count(var.first)) {
-                keepTmp = true;
                 auto fn = ".attr-" + std::to_string(fileNr++);
                 Path p = (tmpDir.path() / fn).string();
                 writeFile(p, var.second);
@@ -591,7 +587,6 @@ static void main_nix_build(int argc, char * * argv)
 
                 env["NIX_ATTRS_SH_FILE"] = attrsSH;
                 env["NIX_ATTRS_JSON_FILE"] = attrsJSON;
-                keepTmp = true;
             }
         }
 
@@ -601,12 +596,10 @@ static void main_nix_build(int argc, char * * argv)
            lose the current $PATH directories. */
         auto rcfile = (tmpDir.path() / "rc").string();
         std::string rc = fmt(
-                R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; }; )"s +
-                (keepTmp ?
-                    "trap _nix_shell_clean_tmpdir EXIT; "
-                    "exitHooks+=(_nix_shell_clean_tmpdir); "
-                    "failureHooks+=(_nix_shell_clean_tmpdir); ":
-                    "_nix_shell_clean_tmpdir; ") +
+                (R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; };)"s
+                  "trap _nix_shell_clean_tmpdir EXIT; "
+                  "exitHooks+=(_nix_shell_clean_tmpdir); "
+                  "failureHooks+=(_nix_shell_clean_tmpdir); ") +
                 (pure ? "" : "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;") +
                 "%2%"
                 // always clear PATH.

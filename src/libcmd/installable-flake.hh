@@ -53,8 +53,6 @@ struct InstallableFlake : InstallableValue
 
     std::vector<std::string> getActualAttrPaths();
 
-    Value * getFlakeOutputs(EvalState & state, const flake::LockedFlake & lockedFlake);
-
     DerivedPathsWithInfo toDerivedPaths() override;
 
     std::pair<Value *, PosIdx> toValue(EvalState & state) override;

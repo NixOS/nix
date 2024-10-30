@@ -3136,7 +3136,11 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * arg
         std::optional<ListBuilder> list;
     };
 
+#if HAVE_BOEHMGC
+    std::map<Symbol, Item, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Item>>> attrsSeen;
+#else
     std::map<Symbol, Item> attrsSeen;
+#endif
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.zipAttrsWith");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.zipAttrsWith");

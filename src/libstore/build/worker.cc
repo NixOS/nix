@@ -184,13 +184,13 @@ void Worker::wakeUp(GoalPtr goal)
 }
 
 
-unsigned Worker::getNrLocalBuilds()
+size_t Worker::getNrLocalBuilds()
 {
     return nrLocalBuilds;
 }
 
 
-unsigned Worker::getNrSubstitutions()
+size_t Worker::getNrSubstitutions()
 {
     return nrSubstitutions;
 }

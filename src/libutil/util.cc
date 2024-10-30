@@ -261,7 +261,7 @@ std::string base64Decode(std::string_view s)
 
         char digit = base64DecodeChars[(unsigned char) c];
         if (digit == npos)
-            throw Error("invalid character in Base64 string: '%c'", c);
+            throw FormatError("invalid character in Base64 string: '%c'", c);
 
         bits += 6;
         d = d << 6 | digit;

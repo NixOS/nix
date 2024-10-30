@@ -90,6 +90,7 @@ DownloadFileResult downloadFile(
     /* Cache metadata for all URLs in the redirect chain. */
     for (auto & url : res.urls) {
         key.second.insert_or_assign("url", url);
+        assert(!res.urls.empty());
         infoAttrs.insert_or_assign("url", *res.urls.rbegin());
         getCache()->upsert(key, *store, infoAttrs, *storePath);
     }
@@ -102,7 +103,7 @@ DownloadFileResult downloadFile(
     };
 }
 
-DownloadTarballResult downloadTarball(
+static DownloadTarballResult downloadTarball_(
     const std::string & url,
     const Headers & headers)
 {
@@ -200,6 +201,22 @@ DownloadTarballResult downloadTarball(
     // cache poisoning.
 
     return attrsToResult(infoAttrs);
+}
+
+ref<SourceAccessor> downloadTarball(
+    ref<Store> store,
+    const Settings & settings,
+    const std::string & url)
+{
+    /* Go through Input::getAccessor() to ensure that the resulting
+       accessor has a fingerprint. */
+    fetchers::Attrs attrs;
+    attrs.insert_or_assign("type", "tarball");
+    attrs.insert_or_assign("url", url);
+
+    auto input = Input::fromAttrs(settings, std::move(attrs));
+
+    return input.getAccessor(store).first;
 }
 
 // An input scheme corresponding to a curl-downloadable resource.
@@ -353,7 +370,7 @@ struct TarballInputScheme : CurlInputScheme
     {
         auto input(_input);
 
-        auto result = downloadTarball(getStrAttr(input.attrs, "url"), {});
+        auto result = downloadTarball_(getStrAttr(input.attrs, "url"), {});
 
         result.accessor->setPathDisplay("«" + input.to_string() + "»");
 

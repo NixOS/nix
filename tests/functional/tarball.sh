@@ -100,3 +100,17 @@ chmod +x "$TEST_ROOT/tar_root/foo"
 tar cvf "$TEST_ROOT/tar.tar" -C "$TEST_ROOT/tar_root" .
 path="$(nix flake prefetch --refresh --json "tarball+file://$TEST_ROOT/tar.tar" | jq -r .storePath)"
 [[ $(cat "$path/foo") = bar ]]
+
+# Test a tarball with non-contiguous directory entries.
+rm -rf "$TEST_ROOT/tar_root"
+mkdir -p "$TEST_ROOT/tar_root/a/b"
+echo foo > "$TEST_ROOT/tar_root/a/b/foo"
+echo bla > "$TEST_ROOT/tar_root/bla"
+tar cvf "$TEST_ROOT/tar.tar" -C "$TEST_ROOT/tar_root" .
+echo abc > "$TEST_ROOT/tar_root/bla"
+echo xyzzy > "$TEST_ROOT/tar_root/a/b/xyzzy"
+tar rvf "$TEST_ROOT/tar.tar" -C "$TEST_ROOT/tar_root" ./a/b/xyzzy ./bla
+path="$(nix flake prefetch --refresh --json "tarball+file://$TEST_ROOT/tar.tar" | jq -r .storePath)"
+[[ $(cat "$path/a/b/xyzzy") = xyzzy ]]
+[[ $(cat "$path/a/b/foo") = foo ]]
+[[ $(cat "$path/bla") = abc ]]

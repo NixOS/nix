@@ -1,6 +1,6 @@
 # Test ‘nix-copy-closure’.
 
-{ lib, config, nixpkgs, hostPkgs, ... }:
+{ lib, config, nixpkgs, ... }:
 
 let
   pkgs = config.nodes.client.nixpkgs.pkgs;
