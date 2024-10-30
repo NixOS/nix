@@ -64,6 +64,7 @@ in
 
   shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
 
+  /*
   buildStatic = forAllPackages (pkgName:
     lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.nixComponents.${pkgName}));
 
@@ -85,6 +86,7 @@ in
       readlineFlavor = "readline";
     }
   );
+  */
 
   # Perl bindings for various platforms.
   perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-perl-bindings);
@@ -94,6 +96,7 @@ in
   # the installation script.
   binaryTarball = forAllSystems (system: binaryTarball nixpkgsFor.${system}.native.nix nixpkgsFor.${system}.native);
 
+  /*
   binaryTarballCross = lib.genAttrs [ "x86_64-linux" ] (system:
     forAllCrossSystems (crossSystem:
       binaryTarball
@@ -125,6 +128,7 @@ in
     self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
     self.hydraJobs.binaryTarballCross."x86_64-linux"."riscv64-unknown-linux-gnu"
   ];
+  */
 
   # docker image with Nix inside
   dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
@@ -178,6 +182,7 @@ in
     nixpkgs = nixpkgs-regression;
   };
 
+  /*
   installTests = forAllSystems (system:
     let pkgs = nixpkgsFor.${system}.native; in
     pkgs.runCommand "install-tests"
@@ -197,4 +202,5 @@ in
     binaryTarballs = self.hydraJobs.binaryTarball;
     inherit nixpkgsFor;
   };
+  */
 }
