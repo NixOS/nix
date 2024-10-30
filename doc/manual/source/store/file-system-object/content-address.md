@@ -1,13 +1,13 @@
 # Content-Addressing File System Objects
 
-For many operations, Nix needs to calculate [a content addresses](@docroot@/glossary.md#gloss-content-address) of [a file system object][file system object].
+For many operations, Nix needs to calculate [a content addresses](@docroot@/glossary.md#gloss-content-address) of [a file system object][file system object] (FSO).
 Usually this is needed as part of
 [content addressing store objects](../store-object/content-address.md),
 since store objects always have a root file system object.
 But some command-line utilities also just work on "raw" file system objects, not part of any store object.
 
 Every content addressing scheme Nix uses ultimately involves feeding data into a [hash function](https://en.wikipedia.org/wiki/Hash_function), and getting back an opaque fixed-size digest which is deemed a content address.
-The various *methods* of content addressing thus differ in how abstract data (in this case, a file system object and its descendents) are fed into the hash function.
+The various *methods* of content addressing thus differ in how abstract data (in this case, a file system object and its descendants) are fed into the hash function.
 
 ## Serialising File System Objects { #serial }
 
@@ -25,7 +25,7 @@ For example, Unix commands like `sha256sum` or `sha1sum` will produce hashes for
 
 ### Nix Archive (NAR) { #serial-nix-archive }
 
-For the other cases of [file system objects][file system object], especially directories with arbitrary descendents, we need a more complex serialisation format.
+For the other cases of [file system objects][file system object], especially directories with arbitrary descendants, we need a more complex serialisation format.
 Examples of such serialisations are the ZIP and TAR file formats.
 However, for our purposes these formats have two problems:
 
