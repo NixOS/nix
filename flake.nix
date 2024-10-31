@@ -468,7 +468,8 @@
                   boost
                 ]
                 ++ lib.optional (currentStdenv.isLinux || currentStdenv.isDarwin) libsodium
-                ++ lib.optional currentStdenv.isDarwin darwin.apple_sdk.frameworks.Security;
+                ++ lib.optional currentStdenv.isDarwin darwin.apple_sdk.frameworks.Security
+                ++ lib.optional stdenv.hostPlatform.isDarwin darwin.apple_sdk.libs.sandbox;
 
               configureFlags = [
                 "--with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}"
