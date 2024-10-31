@@ -49,6 +49,10 @@ test_custom_build_dir() {
   [ "$status" = "100" ]
   [[ 1 == "$(count "$customBuildDir/nix-build-"*)" ]]
   local buildDir=("$customBuildDir/nix-build-"*)
+  if [[ "${#buildDir[@]}" -ne 1 ]]; then
+    echo "expected one nix-build-* directory, got: ${buildDir[*]}" >&2
+    exit 1
+  fi
   if [[ -e ${buildDir[*]}/build ]]; then
       buildDir[0]="${buildDir[*]}/build"
   fi
