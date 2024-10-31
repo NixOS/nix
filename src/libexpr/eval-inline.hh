@@ -25,23 +25,6 @@ inline void * allocBytes(size_t n)
     return p;
 }
 
-/* Allocate a new array of attributes for an attribute set with a specific
-   capacity. The space is implicitly reserved after the Bindings
-   structure. */
-[[gnu::always_inline]]
-ValueList * EvalState::allocList()
-{
-    return new (allocBytes(sizeof(ValueList))) ValueList();
-}
-
-template <typename T>
-[[gnu::always_inline]]
-ValueList * EvalState::allocListFromInitializerList(std::initializer_list<T> values)
-{
-    return new (allocBytes(sizeof(ValueList))) ValueList(values);
-}
-
-
 [[gnu::always_inline]]
 Value * EvalState::allocValue()
 {
@@ -66,6 +49,63 @@ Value * EvalState::allocValue()
 
     nrValues++;
     return (Value *) p;
+}
+
+// TODO(@connorbaker):
+// Is it possible using the batched alloc resulted in a performance regression?
+// $ hyperfine --warmup 2 --min-runs 20 --export-markdown system-eval-bench.md --parameter-list nix-version nix-after-batch-alloc './{nix-version}/bin/nix eval --no-eval-cache --read-only github:ConnorBaker/nixos-configs/39f01b05c37494627242162863b4725e38600b50#nixosConfigurations.nixos-desktop.config.system.build.toplevel' && hyperfine --warmup 2 --min-runs 20 --export-markdown list-concat-eval-bench.md --parameter-list nix-version nix-after-batch-alloc './{nix-version}/bin/nix eval --no-eval-cache --read-only --json --file ./nixpkgs-91bc7dadf7bf0bf3fb9203e611bd856f40fc2b66/pkgs/top-level/release-attrpaths-superset.nix names'
+// Benchmark 1: ./nix-after-batch-alloc/bin/nix eval --no-eval-cache --read-only github:ConnorBaker/nixos-configs/39f01b05c37494627242162863b4725e38600b50#nixosConfigurations.nixos-desktop.config.system.build.toplevel
+//   Time (mean ± σ):      3.357 s ±  0.030 s    [User: 3.003 s, System: 0.339 s]
+//   Range (min … max):    3.327 s …  3.442 s    20 runs
+//
+// Benchmark 1: ./nix-after-batch-alloc/bin/nix eval --no-eval-cache --read-only --json --file ./nixpkgs-91bc7dadf7bf0bf3fb9203e611bd856f40fc2b66/pkgs/top-level/release-attrpaths-superset.nix names
+//   Time (mean ± σ):     19.000 s ±  0.050 s    [User: 17.066 s, System: 1.888 s]
+//   Range (min … max):   18.932 s … 19.145 s    20 runs
+[[gnu::always_inline]]
+ValueList * EvalState::allocList()
+{
+    // See the comment in allocValue for an explanation of this block.
+    // TODO(@connorbaker): Beginning cargo-culting.
+    // 1. Do we need to assign to an intermediate variable, like `allocEnv` does?
+    // 2. Do we need to use a C-style cast?
+#if HAVE_BOEHMGC
+    if (!*listAllocCache) {
+        *listAllocCache = GC_malloc_many(sizeof(ValueList));
+        if (!*listAllocCache) throw std::bad_alloc();
+    }
+
+    void * p = *listAllocCache;
+    *listAllocCache = GC_NEXT(p);
+    GC_NEXT(p) = nullptr;
+#else
+    void * p = allocBytes(sizeof(ValueList));
+#endif
+
+    return ::new (p) ValueList;
+}
+
+template <typename Range>
+[[gnu::always_inline]]
+ValueList * EvalState::allocListFromRange(Range range)
+{
+    // See the comment in allocValue for an explanation of this block.
+    // TODO(@connorbaker): Beginning cargo-culting.
+    // 1. Do we need to assign to an intermediate variable, like `allocEnv` does?
+    // 2. Do we need to use a C-style cast?
+#if HAVE_BOEHMGC
+    if (!*listAllocCache) {
+        *listAllocCache = GC_malloc_many(sizeof(ValueList));
+        if (!*listAllocCache) throw std::bad_alloc();
+    }
+
+    void * p = *listAllocCache;
+    *listAllocCache = GC_NEXT(p);
+    GC_NEXT(p) = nullptr;
+#else
+    void * p = allocBytes(sizeof(ValueList));
+#endif
+
+    return ::new (p) ValueList(range.begin(), range.end());
 }
 
 

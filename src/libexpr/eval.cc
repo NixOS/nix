@@ -23,17 +23,23 @@
 #include "value.hh"
 
 #include <algorithm>
-#include <iostream>
-#include <sstream>
 #include <cstring>
-#include <optional>
-#include <unistd.h>
-#include <sys/time.h>
 #include <fstream>
 #include <functional>
+#include <iostream>
+#include <memory>
+#include <optional>
+#include <sstream>
+#include <sys/time.h>
+#include <unistd.h>
+#include <utility>
 
-#include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
+#include <immer/algorithm.hpp>
+#include <nlohmann/json.hpp>
+#include <range/v3/algorithm/fold_left.hpp>
+#include <range/v3/algorithm/transform.hpp>
+#include <range/v3/view/transform.hpp>
 
 #ifndef _WIN32 // TODO use portable implementation
 #  include <sys/resource.h>
@@ -274,6 +280,7 @@ EvalState::EvalState(
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
+    , listAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
     , baseEnv(**baseEnvP)
@@ -1301,14 +1308,22 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
-    // TODO(@connorbaker): Tried to switch to using transient here, but started getting this error:
-    // Value::type: invalid internal type: -183796896
+    // TODO(@connorbaker): Tried to switch to using transient here, but started getting this error when calling transience.push_back:
+    // nix: /nix/store/gkghbi5d6849mwsbcdhnqljz2xnjvnis-immer-0.8.1-unstable-2024-09-18/include/immer/transience/gc_transience_policy.hpp:95:
+    // ownee &immer::gc_transience_policy::apply<immer::heap_policy<immer::gc_heap>>::type::ownee::operator=(edit)
+    // [HeapPolicy = immer::heap_policy<immer::gc_heap>]: Assertion `e != noone' failed.
     // That's an indication the value is being used after it's been freed. Not sure why that's happening.
     // NOTE: Running with GC_DONT_GC=1 doesn't seem to trigger the error, so it's likely a GC issue.
-    auto list = state.allocList();
-    for (auto & i : elems)
-        *list = list->push_back(i->maybeThunk(state, env));
-    v.mkList(list);
+    v.mkList(ranges::fold_left(elems, state.allocList(), [&](const auto & list, const auto & elem) {
+        *list = list->push_back(elem->maybeThunk(state, env));
+        return list;
+    }));
+    // TODO(@connorbaker): This doesn't work either, which leads me to suspect the implementation of the mutable data
+    // structure isn't correctly interfacing with the GC. Is this because it is intended to store values, rather than
+    // references to values like I'm using it for currently?
+    // v.mkList(state.allocListFromRange(elems | ranges::views::transform([&](const auto & elem) {
+    //     return elem->maybeThunk(state, env);
+    // })));
 }
 
 
@@ -1905,9 +1920,12 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 {
+    state.nrListConcats++;
+
     auto v1 = state.allocValue(); 
     e1->eval(state, env, *v1);
     state.forceList(*v1, pos, "in the left operand of the list concatenation operator");
+
     auto v2 = state.allocValue();
     e2->eval(state, env, *v2);
     state.forceList(*v2, pos, "in the right operand of the list concatenation operator");
@@ -1924,12 +1942,11 @@ void EvalState::concatLists(Value & v, const ValueList lists, const PosIdx pos, 
 
     // TODO(@connorbaker): We should be able to get a pointer to the list from the first argument and then concatenate from there.
     // However, because Value is mutable, I can't think of an easy way to do that.
-    auto newList = allocList();
-    for (auto list : lists) {
+    v.mkList(immer::accumulate(lists, allocList(), [&](const auto & concatenated, const auto & list) {
         forceList(*list, pos, errorCtx);
-        *newList = *newList + list->list();
-    }
-    v.mkList(newList);
+        *concatenated = *concatenated + list->list();
+        return concatenated;
+    }));
 }
 
 

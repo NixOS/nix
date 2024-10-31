@@ -361,6 +361,11 @@ private:
     std::shared_ptr<void *> valueAllocCache;
 
     /**
+     * Allocation cache for GC'd ValueList objects.
+     */
+    std::shared_ptr<void *> listAllocCache;
+
+    /**
      * Allocation cache for size-1 Env objects.
      */
     std::shared_ptr<void *> env1AllocCache;
@@ -709,8 +714,7 @@ public:
      * Allocation primitives.
      */
     inline ValueList * allocList();
-    template <typename T>
-    inline ValueList * allocListFromInitializerList(std::initializer_list<T> values);
+    template <typename Range> inline ValueList * allocListFromRange(Range range);
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 

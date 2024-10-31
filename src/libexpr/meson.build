@@ -46,6 +46,14 @@ immer = dependency(
 )
 deps_other += immer
 
+range_v3 = dependency(
+  'range-v3',
+  version : '>=0.12.0',
+  method : 'cmake',
+  include_type: 'system',
+)
+deps_other += range_v3
+
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 

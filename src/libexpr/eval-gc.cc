@@ -35,10 +35,7 @@ static void * oomHandler(size_t requested)
 static inline void initGCReal()
 {
     /* Initialise the Boehm garbage collector. */
-
-    /* Don't look for interior pointers. This reduces the odds of
-       misdetection a bit. */
-    GC_set_all_interior_pointers(0);
+    GC_set_all_interior_pointers(1);
 
     /* We don't have any roots in data segments, so don't scan from
        there. */

@@ -98,31 +98,41 @@
               useLLVM = true;
             };
             overlays = [
-              # Update immer to the latest
+              # Update immer and range-v3 to the latest
               # TODO(@connorbaker): Upstream this.
               (final: prev: {
                 immer =
-                let
-                  inherit (final.lib.strings) cmakeBool;
-                in
-                prev.immer.overrideAttrs (finalAttrs: _: {
+                  let
+                    inherit (final.lib.strings) cmakeBool;
+                  in
+                  prev.immer.overrideAttrs (finalAttrs: _: {
+                    strictDeps = true;
+                    version = "0.8.1-unstable-2024-09-18";
+                    src = final.fetchFromGitHub {
+                      owner = "arximboldi";
+                      repo = "immer";
+                      rev = "df6ef46d97e1fe81f397015b9aeb32505cef653b";
+                      hash = "sha256-fV6Rqbg/vtUH2DdgLYULl0zLM3WUSG1qYLZtqAhaWQw=";
+                    };
+                    doCheck = false;
+                    # TODO(@connorbaker): Add support for doCheck = true;
+                    cmakeFlags = [
+                      (cmakeBool "immer_BUILD_DOCS" false)
+                      (cmakeBool "immer_BUILD_EXAMPLES" finalAttrs.doCheck)
+                      (cmakeBool "immer_BUILD_EXTRAS" false)
+                      (cmakeBool "immer_BUILD_TESTS" finalAttrs.doCheck)
+                    ];
+                  });
+                range-v3 = prev.range-v3.overrideAttrs {
                   strictDeps = true;
-                  version = "0.8.1-unstable-2024-09-18";
+                  version = "0.12.0-unstable-2024-10-01";
                   src = final.fetchFromGitHub {
-                    owner = "arximboldi";
-                    repo = "immer";
-                    rev = "df6ef46d97e1fe81f397015b9aeb32505cef653b";
-                    hash = "sha256-fV6Rqbg/vtUH2DdgLYULl0zLM3WUSG1qYLZtqAhaWQw=";
+                    owner = "ericniebler";
+                    repo = "range-v3";
+                    rev = "7e6f34b1e820fb8321346888ef0558a0ec842b8e";
+                    hash = "sha256-FbLZ8CHnLdTs0FRdLPTOBiw2lcuIuSoFSb8E4MD8DWQ=";
                   };
-                  doCheck = false;
-                  # TODO(@connorbaker): Add support for doCheck = true;
-                  cmakeFlags = [
-                    (cmakeBool "immer_BUILD_DOCS" false)
-                    (cmakeBool "immer_BUILD_EXAMPLES" finalAttrs.doCheck)
-                    (cmakeBool "immer_BUILD_EXTRAS" false)
-                    (cmakeBool "immer_BUILD_TESTS" finalAttrs.doCheck)
-                  ];
-                });
+                };
               })
               (overlayFor (p: p.${stdenv}))
             ];

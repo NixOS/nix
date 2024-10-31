@@ -35,7 +35,7 @@ class BindingsBuilder;
 // alias the vector type so we are not concerned about memory policies
 // in the places where we actually use it
 typedef immer::flex_vector<nix::Value *, gc_policy, 5U, 5U> ValueList;
-typedef immer::flex_vector_transient<nix::Value *, gc_policy, 5U, 5U> ValueListTransient;
+typedef ValueList::transient_type ValueListTransient;
 
 typedef enum {
     tUninitialized = 0,
