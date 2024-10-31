@@ -41,7 +41,8 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
       boost
     ]
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
-    ++ lib.optional stdenv.isDarwin darwin.apple_sdk.frameworks.Security;
+    ++ lib.optional stdenv.isDarwin darwin.apple_sdk.frameworks.Security
+    ++ lib.optional stdenv.hostPlatform.isDarwin darwin.apple_sdk.libs.sandbox;
 
   # `perlPackages.Test2Harness` is marked broken for Darwin
   doCheck = !stdenv.isDarwin;
