@@ -11,9 +11,16 @@
 #include <stdexcept>
 #include <string>
 
+
 namespace fs = std::filesystem;
 
 namespace lfs {
+
+// see Fetch::rules
+struct AttrRule {
+    std::string pattern;
+    std::map<std::string, std::string> attributes;
+};
 
 // git-lfs metadata about a file
 struct Md {
@@ -22,6 +29,183 @@ struct Md {
                    // for downloads
   size_t size;     // in bytes
 };
+
+struct Fetch {
+  // only true after init()
+  bool ready = false;
+
+  // from shelling out to ssh, used  for 2 subsequent fetches:
+  // list of URLs to fetch from, and fetching the data itself
+  std::string token = "";
+
+  // this is the URL you hit to get another list of URLs for subsequent fetches
+  // e.g. https://github.com/owner/repo.git/info/lfs/objects/batch
+  // determined from the git remote
+  std::string rootUrl = "";
+
+  // parsed contents of .gitattributes
+  // .gitattributes contains a list of path patterns, and list of attributes (=key-value tags) for each pattern
+  // paths tagged with `filter=lfs` need to be smudged by downloading from lfs server
+  std::vector<AttrRule> rules = {};
+
+  void init(git_repository* repo, std::string gitattributesContent);
+  bool hasAttribute(const std::string& path, const std::string& attrName) const;
+  std::string download(const std::string& data, const std::string& path) const;
+  std::vector<nlohmann::json> fetch_urls(const std::vector<Md> &metadatas) const;
+};
+
+bool matchesPattern(std::string_view path, std::string_view pattern) {
+    if (pattern.ends_with("/**")) {
+        auto prefix = pattern.substr(0, pattern.length() - 3);
+        return path.starts_with(prefix);
+    }
+    size_t patternPos = 0;
+    size_t pathPos = 0;
+
+    while (patternPos < pattern.length() && pathPos < path.length()) {
+        if (pattern[patternPos] == '*') {
+            // For "*.ext" pattern, match against end of path
+            if (patternPos == 0 && pattern.find('*', 1) == std::string_view::npos) {
+                return path.ends_with(pattern.substr(1));
+            }
+            auto nextPatternChar = pattern[patternPos + 1];
+            while (pathPos < path.length() && path[pathPos] != nextPatternChar) {
+                pathPos++;
+            }
+            patternPos++;
+        } else if (pattern[patternPos] == path[pathPos]) {
+            patternPos++;
+            pathPos++;
+        } else {
+            return false;
+        }
+    }
+
+    return patternPos == pattern.length() && pathPos == path.length();
+}
+
+static size_t WriteCallback(void *contents, size_t size, size_t nmemb,
+                            std::string *s) {
+  size_t newLength = size * nmemb;
+  try {
+    s->append((char *)contents, newLength);
+  } catch (std::bad_alloc &e) {
+    // Handle memory bad_alloc error
+    return 0;
+  }
+  return newLength;
+}
+
+std::string download_to_memory(const std::string &url, const std::string &auth_header) {
+  CURL *curl;
+  CURLcode res;
+  std::string response_string;
+
+  curl = curl_easy_init();
+  if (curl) {
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_string);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+    struct curl_slist *headers = nullptr;
+    const std::string auth_header_prepend = "Authorization: " + auth_header;
+    headers = curl_slist_append(headers, auth_header_prepend.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+    res = curl_easy_perform(curl);
+    if (res != CURLE_OK) {
+      std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res)
+                << std::endl;
+    }
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+  }
+
+  return response_string;
+}
+
+
+
+// generic parser for .gitattributes files
+// I could not get libgit2 parsing to work with GitSourceAccessor,
+// but GitExportIgnoreSourceAccessor somehow works, so TODO
+AttrRule parseGitAttrLine(std::string_view line)
+{
+  // example .gitattributes line: `*.beeg filter=lfs diff=lfs merge=lfs -text`
+    AttrRule rule;
+    if (line.empty() || line[0] == '#')
+        return rule;
+    size_t pos = line.find_first_of(" \t");
+    if (pos == std::string_view::npos)
+        return rule;
+    rule.pattern = std::string(line.substr(0, pos));
+    pos = line.find_first_not_of(" \t", pos);
+    if (pos == std::string_view::npos)
+        return rule;
+    std::string_view rest = line.substr(pos);
+
+    while (!rest.empty()) {
+        pos = rest.find_first_of(" \t");
+        std::string_view attr = rest.substr(0, pos);
+        if (attr[0] == '-') {
+            rule.attributes[std::string(attr.substr(1))] = "false";
+        } else if (auto equals_pos = attr.find('='); equals_pos != std::string_view::npos) {
+            auto key = attr.substr(0, equals_pos);
+            auto value = attr.substr(equals_pos + 1);
+            rule.attributes[std::string(key)] = std::string(value);
+        } else {
+            rule.attributes[std::string(attr)] = "true";
+        }
+        if (pos == std::string_view::npos)
+            break;
+        rest = rest.substr(pos);
+        pos = rest.find_first_not_of(" \t");
+        if (pos == std::string_view::npos)
+            break;
+        rest = rest.substr(pos);
+    }
+
+    return rule;
+}
+
+
+std::vector<AttrRule> parseGitAttrFile(std::string_view content)
+{
+    std::vector<AttrRule> rules;
+
+    size_t pos = 0;
+    while (pos < content.length()) {
+        size_t eol = content.find('\n', pos);
+        std::string_view line;
+
+        if (eol == std::string_view::npos) {
+            line = content.substr(pos);
+            pos = content.length();
+        } else {
+            line = content.substr(pos, eol - pos);
+            pos = eol + 1;
+        }
+
+        // Trim carriage return if present
+        if (!line.empty() && line.back() == '\r')
+            line.remove_suffix(1);
+
+        // Skip empty lines and comments
+        if (line.empty() || line[0] == '#')
+            continue;
+
+        auto rule = parseGitAttrLine(line);
+        if (!rule.pattern.empty())
+            rules.push_back(std::move(rule));
+    }
+
+    return rules;
+}
+
+
+
 
 std::string exec_command(const std::string &cmd) {
   std::cout << cmd << std::endl;
@@ -57,56 +241,46 @@ std::string get_lfs_api_token(const std::string &host,
   return res;
 }
 
-std::tuple<std::string, std::string, std::string>
-get_lfs_endpoint_url(git_repository *repo) {
+std::string get_lfs_endpoint_url(git_repository *repo) {
   int err;
-  git_config *config = nullptr;
-  // using git_repository_config instead of _snapshot makes the
-  // git_config_get_string call fail why????
-  if (git_repository_config_snapshot(&config, repo) < 0) {
-    // Handle error if necessary
-    git_config_free(config);
-    std::cerr << "no config" << std::endl;
-    return {"", "", ""};
-  }
-
-  const char *url_c_str;
-  err = git_config_get_string(&url_c_str, config, "remote.origin.url");
+  git_remote* remote = NULL;
+  err = git_remote_lookup(&remote, repo, "origin"); // TODO: we just created this repo so I think origin is always the only remote, but should double check
   if (err < 0) {
-    // Handle error if necessary
-    std::cerr << "no remote.origin.url: " << err << std::endl;
-    git_config_free(config);
-    return {"", "", ""};
-  }
-  std::string url = std::string(url_c_str);
-  std::cerr << "url_c_str: " << url_c_str << std::endl;
-
-  if (url.back() == '/') {
-    url.pop_back();
+      std::cerr << " failed git_remote_lookup with: " << err << std::endl;
+      return "";
   }
 
-  // idk what this was for man
-  // if (url.compare(url.length() - 4, 4, ".git") != 0) {
-  // url += "/info/lfs";
-  //} else {
-  //    url += ".git/info/lfs";
-  //}
 
-  // Parse the URL
-  std::string scheme, host, path;
-  if (url.find("https://") != 0) {
-    size_t at_pos = url.find('@');
-    if (at_pos != std::string::npos) {
-      host = url.substr(at_pos + 1);
-      size_t colon_pos = host.find(':');
-      path = host.substr(colon_pos + 1);
-      host = host.substr(0, colon_pos);
-      scheme = "https";
-      url = scheme + "://" + host + "/" + path;
-    }
+  const char *url_c_str = git_remote_url(remote);
+  if (!url_c_str) {
+    std::cerr << "no remote url ";
+    return "";
   }
 
-  return std::make_tuple(url, host, path);
+  return std::string(url_c_str);
+}
+
+// splits url into (hostname, path)
+std::tuple<std::string, std::string> split_url(const std::string& url_in) {
+  CURLU *url = curl_url();
+
+  if (curl_url_set(url, CURLUPART_URL, url_in.c_str(), 0) != CURLUE_OK) {
+      std::cerr << "Failed to set URL\n";
+      return {"", ""};
+  }
+
+  char *hostname;
+  char *path;
+
+  if (curl_url_get(url, CURLUPART_HOST, &hostname, 0) != CURLUE_OK) {
+      std::cerr << "no hostname" << std::endl;
+  }
+
+  if (curl_url_get(url, CURLUPART_PATH, &path, 0) != CURLUE_OK) {
+      std::cerr << "no path" << std::endl;
+  }
+
+  return std::make_tuple(std::string(hostname), std::string(path));
 }
 
 std::string git_attr_value_to_string(git_attr_value_t value) {
@@ -201,7 +375,7 @@ std::string get_obj_content(git_repository *repo, std::string path) {
   return std::string(static_cast<const char *>(content));
 }
 
-std::tuple<std::string, size_t> parse_lfs_metadata(const std::string &content) {
+Md parse_lfs_metadata(const std::string &content, const std::string &filename) {
   std::istringstream iss(content);
   std::string line;
   std::string oid;
@@ -223,36 +397,33 @@ std::tuple<std::string, size_t> parse_lfs_metadata(const std::string &content) {
     }
   }
 
-  return std::make_tuple(oid, size);
+  return Md{filename, oid, size};
 }
 
-// path, oid, size
-std::vector<Md> parse_lfs_files(git_repository *repo) {
-  const auto files = find_lfs_files(repo);
-  std::vector<Md> out;
-  for (const auto &file : *files) {
-    std::cerr << file;
-    auto content = get_obj_content(repo, file);
-    auto [oid, size] = parse_lfs_metadata(content);
-    out.push_back(Md{file, oid, size});
-  }
-
-  return out;
+void Fetch::init(git_repository* repo, std::string gitattributesContent) {
+   this->rootUrl = lfs::get_lfs_endpoint_url(repo);
+   const auto [host, path] = lfs::split_url(rootUrl);
+   this->token = lfs::get_lfs_api_token(host, path);
+   this->rules = lfs::parseGitAttrFile(gitattributesContent);
+   this->ready = true;
 }
 
-static size_t WriteCallback(void *contents, size_t size, size_t nmemb,
-                            std::string *s) {
-  size_t newLength = size * nmemb;
-  try {
-    s->append((char *)contents, newLength);
-  } catch (std::bad_alloc &e) {
-    // Handle memory bad_alloc error
-    return 0;
-  }
-  return newLength;
+bool Fetch::hasAttribute(const std::string& path, const std::string& attrName) const
+{
+    // Iterate rules in reverse order (last matching rule wins)
+    for (auto it = rules.rbegin(); it != rules.rend(); ++it) {
+        if (matchesPattern(path, it->pattern)) {
+            auto attr = it->attributes.find(attrName);
+            if (attr != it->attributes.end()) {
+                // Found a matching rule with this attribute
+                return attr->second != "false";
+            }
+        }
+    }
+    return false;
 }
 
-nlohmann::json oids_to_payload(const std::vector<Md> &items) {
+nlohmann::json mdToPayload(const std::vector<Md> &items) {
   nlohmann::json j_array = nlohmann::json::array();
   for (const auto &md : items) {
     j_array.push_back({{"oid", md.oid}, {"size", md.size}});
@@ -260,23 +431,20 @@ nlohmann::json oids_to_payload(const std::vector<Md> &items) {
   return j_array;
 }
 
-std::vector<nlohmann::json> fetch_urls(const std::string &lfs_url,
-                                       const std::string &token,
-                                       const std::vector<Md> &metadatas) {
+std::vector<nlohmann::json> Fetch::fetch_urls(const std::vector<Md> &metadatas) const {
   std::vector<nlohmann::json> objects;
 
-  nlohmann::json oid_list = oids_to_payload(metadatas);
+  nlohmann::json oid_list = mdToPayload(metadatas);
   nlohmann::json data = {
       {"operation", "download"},
   };
   data["objects"] = oid_list;
   auto data_str = data.dump();
-  std::cerr << "data_str: " + data_str << std::endl;
 
   CURL *curl = curl_easy_init();
   std::string response_string;
   std::string header_string;
-  auto lfs_url_batch = lfs_url + "/info/lfs/objects/batch";
+  auto lfs_url_batch = rootUrl + "/info/lfs/objects/batch";
   curl_easy_setopt(curl, CURLOPT_URL, lfs_url_batch.c_str());
   curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data_str.c_str());
 
@@ -289,7 +457,6 @@ std::vector<nlohmann::json> fetch_urls(const std::string &lfs_url,
   headers = curl_slist_append(headers, "Accept: application/vnd.git-lfs+json");
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   curl_easy_setopt(curl, CURLOPT_POST, 1L);
-  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_string);
 
@@ -303,7 +470,6 @@ std::vector<nlohmann::json> fetch_urls(const std::string &lfs_url,
   curl_slist_free_all(headers);
 
   try {
-    std::cerr << "resp: " << response_string << std::endl;
     // example resp here:
     // {"objects":[{"oid":"f5e02aa71e67f41d79023a128ca35bad86cf7b6656967bfe0884b3a3c4325eaf","size":10000000,"actions":{"download":{"href":"https://gitlab.com/b-camacho/test-lfs.git/gitlab-lfs/objects/f5e02aa71e67f41d79023a128ca35bad86cf7b6656967bfe0884b3a3c4325eaf","header":{"Authorization":"Basic
     // Yi1jYW1hY2hvOmV5SjBlWEFpT2lKS1YxUWlMQ0poYkdjaU9pSklVekkxTmlKOS5leUprWVhSaElqcDdJbUZqZEc5eUlqb2lZaTFqWVcxaFkyaHZJbjBzSW1wMGFTSTZJbUptTURZNFpXVTFMVEprWmpVdE5HWm1ZUzFpWWpRMExUSXpNVEV3WVRReU1qWmtaaUlzSW1saGRDSTZNVGN4TkRZeE16ZzBOU3dpYm1KbUlqb3hOekUwTmpFek9EUXdMQ0psZUhBaU9qRTNNVFEyTWpFd05EVjkuZk9yMDNkYjBWSTFXQzFZaTBKRmJUNnJTTHJPZlBwVW9lYllkT0NQZlJ4QQ=="}}},"authenticated":true}]}
@@ -322,77 +488,21 @@ std::vector<nlohmann::json> fetch_urls(const std::string &lfs_url,
   return objects;
 }
 
-static size_t WriteData(void *ptr, size_t size, size_t nmemb, void *stream) {
-  size_t written = fwrite(ptr, size, nmemb, (FILE *)stream);
-  return written;
+std::string Fetch::download(const std::string& pointer_data, const std::string& path) const {
+  const auto md = parse_lfs_metadata(pointer_data, path);
+  std::vector<Md> v_mds;
+  v_mds.push_back(md);
+  const auto obj_urls = fetch_urls(v_mds);
+
+  const auto obj = obj_urls[0];
+  std::string oid = obj["oid"];
+  std::string ourl = obj["actions"]["download"]["href"];
+  std::string auth_header =
+  obj["actions"]["download"]["header"]["Authorization"];
+  const auto data = lfs::download_to_memory(ourl, auth_header);
+  return data;
 }
 
-void download_file(const std::string &url, const std::string &auth_header,
-                   const std::string &output_filename) {
-  CURL *curl;
-  FILE *fp;
-  CURLcode res;
 
-  curl = curl_easy_init();
-  if (curl) {
-    fp = fopen(output_filename.c_str(), "wb");
-    if (fp == nullptr) {
-      std::cerr << "Failed to open file for writing: " << output_filename
-                << std::endl;
-      return;
-    }
-
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteData);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-
-    struct curl_slist *headers = nullptr;
-    const std::string auth_header_prepend = "Authorization: " + auth_header;
-    headers = curl_slist_append(headers, auth_header_prepend.c_str());
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-    res = curl_easy_perform(curl);
-    if (res != CURLE_OK) {
-      std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res)
-                << std::endl;
-    }
-
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-    fclose(fp);
-  }
-}
-
-void download_files(nlohmann::json objects, std::string dir) {
-  for (auto &obj : objects) {
-    std::string oid = obj["oid"];
-    std::string url = obj["actions"]["download"]["href"];
-    std::string auth_header =
-        obj["actions"]["download"]["header"]["Authorization"];
-    download_file(url, auth_header, dir + "/" + oid);
-  }
-}
-
-// moves files from temporary download dir to final location
-void move_files(const std::vector<Md> &metadata,
-                const std::string &sourceDir, const std::string &repoRoot) {
-  namespace fs = std::filesystem;
-
-  for (const auto &md : metadata) {
-    fs::path srcFile =
-        fs::path(sourceDir) / md.oid; // Construct the source file path
-    fs::path destFile =
-        fs::path(repoRoot) / md.path; // Construct the destination file path
-
-    // Move the file
-    try {
-      fs::rename(srcFile, destFile);
-    } catch (const fs::filesystem_error &e) {
-      std::cerr << "Error moving file " << srcFile << " to " << destFile << ": "
-                << e.what() << std::endl;
-    }
-  }
-}
 
 } // namespace lfs

@@ -328,8 +328,6 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) override;
 
-    void smudgeLfs() override;
-
     std::string resolveSubmoduleUrl(const std::string & url) override
     {
         git_buf buf = GIT_BUF_INIT;
@@ -358,9 +356,9 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     /**
      * A 'GitSourceAccessor' with no regard for export-ignore or any other transformations.
      */
-    ref<GitSourceAccessor> getRawAccessor(const Hash & rev);
+    ref<GitSourceAccessor> getRawAccessor(const Hash & rev, bool smudgeLfs);
 
-    ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
+    ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore, bool smudgeLfs) override;
 
     ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
 
@@ -476,7 +474,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     Hash treeHashToNarHash(const Hash & treeHash) override
     {
-        auto accessor = getAccessor(treeHash, false);
+        auto accessor = getAccessor(treeHash, false, false);
 
         fetchers::Cache::Key cacheKey{"treeHashToNarHash", {{"treeHash", treeHash.gitRev()}}};
 
@@ -517,24 +515,16 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, 
  * Raw git tree input accessor.
  */
 
-static int attr_callback(const char *name, const char *value, void *payload) {
-    warn("got an attribute! it's %s = %s", name, value);
-    return 0;
-    //// Check if the attribute is a filter attribute
-    //if (strncmp(name, "filter.", 7) == 0) {
-    //    printf("Filter attribute: %s\n", name);
-    //}
-    //return 0; // Continue iterating
-}
-
 struct GitSourceAccessor : SourceAccessor
 {
     ref<GitRepoImpl> repo;
     Object root;
+    std::optional<lfs::Fetch> lfsFetch;
 
-    GitSourceAccessor(ref<GitRepoImpl> repo_, const Hash & rev)
+    GitSourceAccessor(ref<GitRepoImpl> repo_, const Hash & rev, std::optional<lfs::Fetch> lfsFetch)
         : repo(repo_)
         , root(peelToTreeOrBlob(lookupObject(*repo, hashToOID(rev)).get()))
+        , lfsFetch(lfsFetch)
     {
     }
 
@@ -542,19 +532,23 @@ struct GitSourceAccessor : SourceAccessor
     {
         auto blob = getBlob(path, symlink);
 
-        int error;
-        // read filters here, perform smudge
+        auto data = std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
 
-        // TODO: fix git_attr_foreach here, it can't seem to parse `.gitattributes` here even though it should
-        warn("on path %s", path.abs().c_str());
-         if ((error = git_attr_foreach(&(*(*repo).repo), GIT_ATTR_CHECK_INCLUDE_HEAD, path.rel_c_str(), attr_callback, NULL)) < 0) {
-             warn("git_attr_foreach: %s", git_error_last()->message);
-             }
+        if (path != CanonPath(".gitattributes") && lfsFetch) {
+            auto& _lfsFetch = *lfsFetch;
+            if (!_lfsFetch.ready) {
+                const auto contents = readFile(CanonPath(".gitattributes"));
+                _lfsFetch.init(*repo, contents);
+                };
+            if (_lfsFetch.hasAttribute(path.abs(), "filter")) {
+                return _lfsFetch.download(data, path.abs());
+            }
+        }
 
-        auto data = std::string_view((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
-
-        return std::string(data);
+        return data;
     }
+
+    // TODO(b-camacho): implement callback-based readFile override
 
     std::string readFile(const CanonPath & path) override
     {
@@ -730,6 +724,7 @@ struct GitSourceAccessor : SourceAccessor
         return tree;
     }
 
+
     Blob getBlob(const CanonPath & path, bool expectSymlink)
     {
         if (!expectSymlink && git_object_type(root.get()) == GIT_OBJECT_BLOB)
@@ -747,6 +742,7 @@ struct GitSourceAccessor : SourceAccessor
         if (path.isRoot()) notExpected();
 
         auto entry = need(path);
+
 
         if (git_tree_entry_type(entry) != GIT_OBJECT_BLOB)
             notExpected();
@@ -769,6 +765,7 @@ struct GitSourceAccessor : SourceAccessor
 };
 
 struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor {
+
     ref<GitRepoImpl> repo;
     std::optional<Hash> rev;
 
@@ -1035,16 +1032,24 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     }
 };
 
-ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
+ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev, bool smudgeLfs)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
-    return make_ref<GitSourceAccessor>(self, rev);
+    if (smudgeLfs) {
+        auto lfsFetch = lfs::Fetch{};
+        return make_ref<GitSourceAccessor>(self, rev, std::make_optional(lfsFetch));
+    }
+    else {
+        return make_ref<GitSourceAccessor>(self, rev, std::nullopt);
+    }
 }
 
-ref<SourceAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
+ref<SourceAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore, bool smudgeLfs)
 {
+    // exportIgnore does not work with git-lfs smudging
+    //assert(!(exportIgnore && smudgeLfs));
     auto self = ref<GitRepoImpl>(shared_from_this());
-    ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev);
+    ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev, smudgeLfs);
     if (exportIgnore) {
         return make_ref<GitExportIgnoreSourceAccessor>(self, rawGitAccessor, rev);
     }
@@ -1083,7 +1088,7 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     /* Read the .gitmodules files from this revision. */
     CanonPath modulesFile(".gitmodules");
 
-    auto accessor = getAccessor(rev, exportIgnore);
+    auto accessor = getAccessor(rev, exportIgnore, false);
     if (!accessor->pathExists(modulesFile)) return {};
 
     /* Parse it and get the revision of each submodule. */
@@ -1094,7 +1099,7 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
 
     std::vector<std::tuple<Submodule, Hash>> result;
 
-    auto rawAccessor = getRawAccessor(rev);
+    auto rawAccessor = getRawAccessor(rev, false);
 
     for (auto & submodule : parseSubmodules(pathTemp)) {
         auto rev = rawAccessor->getSubmoduleRev(submodule.path);
@@ -1102,20 +1107,6 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     }
 
     return result;
-}
-
-void GitRepoImpl::smudgeLfs() {
-    const auto metadatas = lfs::parse_lfs_files(&(*repo));
-    const auto [url, host, path] = lfs::get_lfs_endpoint_url(&(*repo));
-    // TODO: handle public lfs repos without ssh?
-    const auto token = lfs::get_lfs_api_token(host, path);
-    auto urls = lfs::fetch_urls(url, token, metadatas);
-    std::cerr << "Got urls! ";
-    for (const auto &url : urls) {
-      std::cerr << url << std::endl;
-    }
-    std::cerr << "Fetching actual data" << std::endl;
-    lfs::download_files(urls, this->path);
 }
 
 ref<GitRepo> getTarballCache()

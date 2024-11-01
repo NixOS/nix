@@ -78,7 +78,7 @@ TEST_F(GitUtilsTest, sink_basic)
     // sink->createHardlink("foo-1.1/links/foo-2", CanonPath("foo-1.1/hello"));
 
     auto result = repo->dereferenceSingletonDirectory(sink->sync());
-    auto accessor = repo->getAccessor(result, false);
+    auto accessor = repo->getAccessor(result, false, false);
     auto entries = accessor->readDirectory(CanonPath::root);
     ASSERT_EQ(entries.size(), 5);
     ASSERT_EQ(accessor->readFile(CanonPath("hello")), "hello world");

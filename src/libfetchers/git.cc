@@ -640,7 +640,8 @@ struct GitInputScheme : InputScheme
         verifyCommit(input, repo);
 
         bool exportIgnore = getExportIgnoreAttr(input);
-        auto accessor = repo->getAccessor(rev, exportIgnore);
+        bool smudgeLfs = getLfsAttr(input);
+        auto accessor = repo->getAccessor(rev, exportIgnore, smudgeLfs);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
@@ -677,9 +678,7 @@ struct GitInputScheme : InputScheme
         }
 
         if (getLfsAttr(input)) {
-            warn("lfs attr set on %s", input.to_string());
-            // urlencoded `?lfs=1` param is set,
-            repo->smudgeLfs();
+            printTalkative("lfs=1 on %s", input.to_string());
         }
 
         assert(!origRev || origRev == rev);
