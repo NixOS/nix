@@ -193,7 +193,7 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 
             assert(final.isFinal());
 
-            scheme->checkLocks(*this, final);
+            checkLocks(*this, final);
 
             return {storePath, final};
         } catch (Error & e) {
@@ -205,8 +205,35 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
     return {std::move(storePath), input};
 }
 
-void InputScheme::checkLocks(const Input & specified, const Input & final) const
+void Input::checkLocks(Input specified, Input & final)
 {
+    /* If the original input is final, then we just return the
+       original attributes, dropping any new fields returned by the
+       fetcher. However, any fields that are in both the original and
+       final input must be identical. */
+    if (specified.isFinal()) {
+
+        /* Backwards compatibility hack: we had some lock files in the
+           past that 'narHash' fields with incorrect base-64
+           formatting (lacking the trailing '=', e.g. 'sha256-ri...Mw'
+           instead of ''sha256-ri...Mw='). So fix that. */
+        if (auto prevNarHash = specified.getNarHash())
+            specified.attrs.insert_or_assign("narHash", prevNarHash->to_string(HashFormat::SRI, true));
+
+        for (auto & field : specified.attrs) {
+            auto field2 = final.attrs.find(field.first);
+            if (field2 != final.attrs.end() && field.second != field2->second)
+                throw Error("mismatch in field '%s' of final input '%s', got '%s'",
+                    field.first,
+                    attrsToJSON(specified.attrs),
+                    attrsToJSON(final.attrs));
+        }
+
+        final.attrs = specified.attrs;
+
+        return;
+    }
+
     if (auto prevNarHash = specified.getNarHash()) {
         if (final.getNarHash() != prevNarHash) {
             if (final.getNarHash())
@@ -235,23 +262,6 @@ void InputScheme::checkLocks(const Input & specified, const Input & final) const
             throw Error("'revCount' attribute mismatch in input '%s', expected %d",
                 final.to_string(), *prevRevCount);
     }
-
-    /* If the original input is final, then the result must be the
-       same (i.e. cannot remove, add or change fields. */
-    if (specified.isFinal()) {
-
-        /* Backwards compatibility hack: we had some lock files in the
-           past that 'narHash' fields with incorrect base-64
-           formatting (lacking the trailing '=', e.g. 'sha256-ri...Mw'
-           instead of ''sha256-ri...Mw='). So fix */
-        auto specified2 = specified;
-        if (auto prevNarHash = specified2.getNarHash())
-            specified2.attrs.insert_or_assign("narHash", prevNarHash->to_string(HashFormat::SRI, true));
-
-        if (specified2.attrs != final.attrs)
-            throw Error("fetching final input '%s' resulted in different input '%s'",
-                attrsToJSON(specified2.attrs), attrsToJSON(final.attrs));
-    }
 }
 
 std::pair<ref<SourceAccessor>, Input> Input::getAccessor(ref<Store> store) const
@@ -259,7 +269,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessor(ref<Store> store) const
     try {
         auto [accessor, final] = getAccessorUnchecked(store);
 
-        scheme->checkLocks(*this, final);
+        checkLocks(*this, final);
 
         return {accessor, std::move(final)};
     } catch (Error & e) {

@@ -91,9 +91,9 @@ public:
     bool isLocked() const;
 
     /**
-     * Return whether this is a "final" input, meaning that fetching it
-     * will not add or change any attributes. For instance, a Git
-     * input with a `rev` attribute but without a `lastModified`
+     * Return whether this is a "final" input, meaning that fetching
+     * it will not add, remove or change any attributes. For instance,
+     * a Git input with a `rev` attribute but without a `lastModified`
      * attribute is considered locked but not final. Only "final"
      * inputs can be substituted from a binary cache.
      *
@@ -112,6 +112,19 @@ public:
      * location in the Nix store and the locked input.
      */
     std::pair<StorePath, Input> fetchToStore(ref<Store> store) const;
+
+    /**
+     * Check the locking attributes in `final` against
+     * `specified`. E.g. if `specified` has a `rev` attribute, then
+     * `final` must have the same `rev` attribute. Throw an exception
+     * if there is a mismatch.
+     *
+     * If `specified` is marked final (i.e. has the `__final`
+     * attribute), then the intersection of attributes in `specified`
+     * and `final` must be equal, and `final.attrs` is set to
+     * `specified.attrs` (i.e. we discard any new attributes).
+     */
+    static void checkLocks(Input specified, Input & final);
 
     /**
      * Return a `SourceAccessor` that allows access to files in the
@@ -238,14 +251,6 @@ struct InputScheme
 
     virtual bool isLocked(const Input & input) const
     { return false; }
-
-    /**
-     * Check the locking attributes in `final` against
-     * `specified`. E.g. if `specified` has a `rev` attribute, then
-     * `final` must have the same `rev` attribute. Throw an exception
-     * if there is a mismatch.
-     */
-    virtual void checkLocks(const Input & specified, const Input & final) const;
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
