@@ -236,9 +236,22 @@ void InputScheme::checkLocks(const Input & specified, const Input & final) const
                 final.to_string(), *prevRevCount);
     }
 
-    if (specified.isFinal() && specified.attrs != final.attrs)
-        throw Error("fetching final input '%s' resulted in different input '%s'",
-            attrsToJSON(specified.attrs), attrsToJSON(final.attrs));
+    /* If the original input is final, then the result must be the
+       same (i.e. cannot remove, add or change fields. */
+    if (specified.isFinal()) {
+
+        /* Backwards compatibility hack: we had some lock files in the
+           past that 'narHash' fields with incorrect base-64
+           formatting (lacking the trailing '=', e.g. 'sha256-ri...Mw'
+           instead of ''sha256-ri...Mw='). So fix */
+        auto specified2 = specified;
+        if (auto prevNarHash = specified2.getNarHash())
+            specified2.attrs.insert_or_assign("narHash", prevNarHash->to_string(HashFormat::SRI, true));
+
+        if (specified2.attrs != final.attrs)
+            throw Error("fetching final input '%s' resulted in different input '%s'",
+                attrsToJSON(specified2.attrs), attrsToJSON(final.attrs));
+    }
 }
 
 std::pair<ref<SourceAccessor>, Input> Input::getAccessor(ref<Store> store) const
