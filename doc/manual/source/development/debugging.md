@@ -1,8 +1,9 @@
 # Debugging Nix
 
 This section provides instructions on how to build and debug Nix with debug
-symbols enabled. It assumes you are using Nix with the [`flakes`] and
-[`nix-command`] experimental features enabled.
+symbols enabled.
+It assumes you are using Nix with the [`flakes`] and [`nix-command`]
+experimental features enabled.
 
 [`flakes`]: @docroot@/development/experimental-features.md#xp-feature-flakes
 [`nix-command`]: @docroot@/development/experimental-features.md#xp-nix-command
