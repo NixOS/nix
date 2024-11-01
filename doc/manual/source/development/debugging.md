@@ -51,13 +51,14 @@ For macOS systems, use `lldb`:
 To debug the Nix binary you just run:
 
 ```console
-[nix-shell]$ gdb --args ./subprojects/nix/nix
+[nix-shell]$ gdb --args ../outputs/out/bin/nix
+
 ```
 
 #### On macOS:
 
 ```console
-[nix-shell]$ lldb -- ./subprojects/nix/nix
+[nix-shell]$ lldb -- ../outputs/out/bin/nix
 ```
 
 ### Using the Debugger
