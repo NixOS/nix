@@ -16,7 +16,7 @@ In the development shell, set the `mesonBuildType` environment variable to
 `debug` before configuring the build:
 
 ```console
-[nix-shell]$ export mesonBuildType=debug
+[nix-shell]$ export mesonBuildType=debugoptimized
 ```
 
 Then, configure and build Nix:
