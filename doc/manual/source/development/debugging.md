@@ -1,61 +1,41 @@
 # Debugging Nix
 
-This section provides instructions on how to build and debug Nix with debug
-symbols enabled.
-It assumes you are using Nix with the [`flakes`] and [`nix-command`]
-experimental features enabled.
-
-[`flakes`]: @docroot@/development/experimental-features.md#xp-feature-flakes
-[`nix-command`]: @docroot@/development/experimental-features.md#xp-nix-command
+This section shows how to build and debug Nix with debug symbols enabled.
 
 ## Building Nix with Debug Symbols
 
-First, ensure you have set up the development environment as described in the
-[building documentation](./building.md).
-
-In the development shell, set the `mesonBuildType` environment variable to
-`debug` before configuring the build:
+In the development shell, set the `mesonBuildType` environment variable to `debug` before configuring the build:
 
 ```console
 [nix-shell]$ export mesonBuildType=debugoptimized
 ```
 
-Then, configure and build Nix:
-
-```console
-[nix-shell]$ mesonConfigurePhase
-[nix-shell]$ ninjaInstallPhase
-```
-
-This will build Nix with debug symbols, which are essential for effective
-debugging.
+Then, proceed to build Nix as described in [Building Nix](./building.md).
+This will build Nix with debug symbols, which are essential for effective debugging.
 
 ## Debugging the Nix Binary
 
-### Installing a Debugger
-
-Install your preferred debugger within the development shell.
+Obtain your preferred debugger within the development shell:
 
 ```console
-[nix-shell]$ nix shell nixpkgs#gdb
+[nix-shell]$ nix-shell -p gdb
 ```
 
-For macOS systems, use `lldb`:
+On macOS, use `lldb`:
 
 ```console
-[nix-shell]$ nix shell nixpkgs#lldb
+[nix-shell]$ nix-shell -p lldb
 ```
 
 ### Launching the Debugger
 
-To debug the Nix binary you just run:
+To debug the Nix binary, run:
 
 ```console
 [nix-shell]$ gdb --args ../outputs/out/bin/nix
-
 ```
 
-#### On macOS:
+On macOS, use `lldb`:
 
 ```console
 [nix-shell]$ lldb -- ../outputs/out/bin/nix
@@ -70,15 +50,13 @@ Inside the debugger, you can set breakpoints, run the program, and inspect varia
 (gdb) run <arguments>
 ```
 
-Refer to the [GDB Documentation](https://www.gnu.org/software/gdb/documentation/) for
-comprehensive usage instructions.
+Refer to the [GDB Documentation](https://www.gnu.org/software/gdb/documentation/) for comprehensive usage instructions.
 
-#### Using LLDB (macOS):
+On macOS, use `lldb`:
 
 ```lldb
 (lldb) breakpoint set --name main
 (lldb) process launch -- <arguments>
 ```
 
-Refer to the [LLDB Tutorial](https://lldb.llvm.org/use/tutorial.html) for
-comprehensive usage instructions.
+Refer to the [LLDB Tutorial](https://lldb.llvm.org/use/tutorial.html) for comprehensive usage instructions.
