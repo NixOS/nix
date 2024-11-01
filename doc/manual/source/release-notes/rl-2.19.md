@@ -75,3 +75,7 @@
   (experimental) can be found by any program that follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html).
 
 - A new command `nix store add` has been added. It replaces `nix store add-file` and `nix store add-path` which are now deprecated.
+
+- A new option [`always-allow-substitutes`](@docroot@/command-ref/conf-file.md#conf-always-allow-substitutes) has been added.
+
+  When set to `true`, Nix will always try to substitute a derivation, even if it has the [`allowSubstitutes`]{#adv-attr-allowSubstitutes} attribute set to `false`.
