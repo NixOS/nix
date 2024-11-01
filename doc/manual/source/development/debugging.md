@@ -23,7 +23,7 @@ Then, configure and build Nix:
 
 ```console
 [nix-shell]$ mesonConfigurePhase
-[nix-shell]$ ninjaBuildPhase
+[nix-shell]$ ninjaInstallPhase
 ```
 
 This will build Nix with debug symbols, which are essential for effective
