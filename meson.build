@@ -3,6 +3,7 @@
 
 project('nix-dev-shell', 'cpp',
   version : files('.version'),
+  subproject_dir : 'src',
   default_options : [
     'localstatedir=/nix/var',
   ]
@@ -39,12 +40,12 @@ if not meson.is_cross_build()
 endif
 
 # Testing
-subproject('nix-util-test-support')
-subproject('nix-util-tests')
-subproject('nix-store-test-support')
-subproject('nix-store-tests')
-subproject('nix-fetchers-tests')
-subproject('nix-expr-test-support')
-subproject('nix-expr-tests')
-subproject('nix-flake-tests')
+subproject('libutil-test-support')
+subproject('libutil-tests')
+subproject('libstore-test-support')
+subproject('libstore-tests')
+subproject('libfetchers-tests')
+subproject('libexpr-test-support')
+subproject('libexpr-tests')
+subproject('libflake-tests')
 subproject('nix-functional-tests')

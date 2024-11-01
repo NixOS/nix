@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <string>
+#include <sstream>
 
 #include "strings-inline.hh"
 #include "os-string.hh"

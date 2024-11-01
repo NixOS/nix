@@ -1,1 +1,1 @@
-../../doc/manual/src/command-ref/files/profiles.md
+../../doc/manual/source/command-ref/files/profiles.md

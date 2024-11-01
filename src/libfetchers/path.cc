@@ -158,7 +158,11 @@ struct PathInputScheme : InputScheme
             });
             storePath = store->addToStoreFromDump(*src, "source");
         }
-        input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
+
+        /* Trust the lastModified value supplied by the user, if
+           any. It's not a "secure" attribute so we don't care. */
+        if (!input.getLastModified())
+            input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
 
         return {makeStorePathAccessor(store, *storePath), std::move(input)};
     }

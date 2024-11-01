@@ -57,9 +57,9 @@ mkMesonExecutable (finalAttrs: {
     ../nix-env/buildenv.nix
     ./get-env.sh
     ./help-stores.md
-    ../../doc/manual/src/store/types/index.md.in
+    ../../doc/manual/source/store/types/index.md.in
     ./profiles.md
-    ../../doc/manual/src/command-ref/files/profiles.md
+    ../../doc/manual/source/command-ref/files/profiles.md
 
     # Files
   ] ++ lib.concatMap
