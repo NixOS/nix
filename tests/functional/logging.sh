@@ -22,7 +22,7 @@ nix-build dependencies.nix --no-out-link --compress-build-log
 builder="$(realpath "$(mktemp)")"
 echo -e "#!/bin/sh\nmkdir \$out" > "$builder"
 outp="$(nix-build -E \
-    'with import ./config.nix; mkDerivation { name = "fnord"; builder = '"$builder"'; }' \
+    'with import '"${config_nix}"'; mkDerivation { name = "fnord"; builder = '"$builder"'; }' \
     --out-link "$(mktemp -d)/result")"
 
 test -d "$outp"

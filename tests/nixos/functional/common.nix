@@ -55,6 +55,10 @@ in
             -e 's!nix_tests += test-libstoreconsumer\.sh!!' \
             ;
 
+          _NIX_TEST_SOURCE_DIR="$(realpath tests/functional)"
+          export _NIX_TEST_SOURCE_DIR
+          export _NIX_TEST_BUILD_DIR="''${_NIX_TEST_SOURCE_DIR}"
+
           export isTestOnNixOS=1
           export version=${config.nix.package.version}
           export NIX_REMOTE_=daemon

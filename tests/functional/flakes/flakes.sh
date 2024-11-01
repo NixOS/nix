@@ -390,7 +390,7 @@ cat > "$flake3Dir/flake.nix" <<EOF
 }
 EOF
 
-cp ../config.nix "$flake3Dir"
+cp "${config_nix}" "$flake3Dir"
 
 git -C "$flake3Dir" add flake.nix config.nix
 git -C "$flake3Dir" commit -m 'Add nonFlakeInputs'

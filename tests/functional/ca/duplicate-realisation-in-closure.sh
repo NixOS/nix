@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source ./common.sh
+source common.sh
 
 requireDaemonNewerThan "2.4pre20210625"
 

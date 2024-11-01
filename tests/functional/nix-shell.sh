@@ -79,7 +79,7 @@ sed -e "s|@ENV_PROG@|$(type -P env)|" shell.shebang.expr > $TEST_ROOT/shell.sheb
 chmod a+rx $TEST_ROOT/shell.shebang.expr
 # Should fail due to expressions using relative path
 ! $TEST_ROOT/shell.shebang.expr bar
-cp shell.nix config.nix $TEST_ROOT
+cp shell.nix "${config_nix}" $TEST_ROOT
 # Should succeed
 echo "cwd: $PWD"
 output=$($TEST_ROOT/shell.shebang.expr bar)
@@ -126,7 +126,7 @@ $TEST_ROOT/shell.shebang.nix
 mkdir $TEST_ROOT/lookup-test $TEST_ROOT/empty
 
 echo "import $shellDotNix" > $TEST_ROOT/lookup-test/shell.nix
-cp config.nix $TEST_ROOT/lookup-test/
+cp "${config_nix}" $TEST_ROOT/lookup-test/
 echo 'abort "do not load default.nix!"' > $TEST_ROOT/lookup-test/default.nix
 
 nix-shell $TEST_ROOT/lookup-test -A shellDrv --run 'echo "it works"' | grepQuiet "it works"
