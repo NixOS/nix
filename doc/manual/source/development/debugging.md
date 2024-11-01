@@ -34,8 +34,13 @@ debugging.
 
 ### Installing a Debugger
 
-Install your preferred debugger within the development shell. For example, to
-install `lldb`:
+Install your preferred debugger within the development shell.
+
+```console
+[nix-shell]$ nix shell nixpkgs#gdb
+```
+
+For macOS systems, use `lldb`:
 
 ```console
 [nix-shell]$ nix shell nixpkgs#lldb
@@ -43,7 +48,13 @@ install `lldb`:
 
 ### Launching the Debugger
 
-To debug the Nix binary you just built:
+To debug the Nix binary you just run:
+
+```console
+[nix-shell]$ gdb --args ./subprojects/nix/nix
+```
+
+#### On macOS:
 
 ```console
 [nix-shell]$ lldb -- ./subprojects/nix/nix
@@ -51,7 +62,17 @@ To debug the Nix binary you just built:
 
 ### Using the Debugger
 
-Inside `lldb`, you can set breakpoints, run the program, and inspect variables:
+Inside the debugger, you can set breakpoints, run the program, and inspect variables.
+
+```gdb
+(gdb) break main
+(gdb) run <arguments>
+```
+
+Refer to the [GDB Documentation](https://www.gnu.org/software/gdb/documentation/) for
+comprehensive usage instructions.
+
+#### Using LLDB (macOS):
 
 ```lldb
 (lldb) breakpoint set --name main
