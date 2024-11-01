@@ -12,6 +12,8 @@ project('nix-store', 'cpp',
   license : 'LGPL-2.1-or-later',
 )
 
+fs = import('fs')
+
 cxx = meson.get_compiler('cpp')
 
 subdir('build-utils-meson/deps-lists')
@@ -20,6 +22,8 @@ configdata = configuration_data()
 
 # TODO rename, because it will conflict with downstream projects
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
+
+configdata.set_quoted('DETERMINATE_NIX_VERSION', fs.read('./.version-determinate'))
 
 configdata.set_quoted('SYSTEM', host_machine.system())
 
@@ -319,8 +323,6 @@ if host_machine.system() == 'windows'
 else
   subdir('unix')
 endif
-
-fs = import('fs')
 
 prefix = get_option('prefix')
 # For each of these paths, assume that it is relative to the prefix unless
