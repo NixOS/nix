@@ -29,7 +29,7 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > ```
 > src
 > ├── libexpr
-> │   ├── local.mk
+> │   ├── meson.build
 > │   ├── value/context.hh
 > │   ├── value/context.cc
 > │   …
@@ -37,25 +37,24 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > ├── tests
 > │   │
 > │   …
-> │   └── unit
-> │       ├── libutil
-> │       │   ├── local.mk
-> │       │   …
-> │       │   └── data
-> │       │       ├── git/tree.txt
-> │       │       …
-> │       │
-> │       ├── libexpr-support
-> │       │   ├── local.mk
-> │       │   └── tests
-> │       │       ├── value/context.hh
-> │       │       ├── value/context.cc
-> │       │       …
-> │       │
-> │       ├── libexpr
-> │       …   ├── local.mk
-> │           ├── value/context.cc
-> │           …
+> │   ├── libutil-tests
+> │   │   ├── meson.build
+> │   │   …
+> │   │   └── data
+> │   │       ├── git/tree.txt
+> │   │       …
+> │   │
+> │   ├── libexpr-test-support
+> │   │   ├── meson.build
+> │   │   └── tests
+> │   │       ├── value/context.hh
+> │   │       ├── value/context.cc
+> │   │       …
+> │   │
+> │   ├── libexpr-tests
+> │   …   ├── meson.build
+> │       ├── value/context.cc
+> │       …
 > …
 > ```
 
@@ -128,7 +127,7 @@ On other platforms they wouldn't be run at all.
 
 ## Functional tests
 
-The functional tests reside under the `tests/functional` directory and are listed in `tests/functional/local.mk`.
+The functional tests reside under the `tests/functional` directory and are listed in `tests/functional/meson.build`.
 Each test is a bash script.
 
 Functional tests are run during `installCheck` in the `nix` package build, as well as separately from the build, in VM tests.
