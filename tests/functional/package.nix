@@ -6,7 +6,6 @@
 , meson
 , ninja
 , pkg-config
-, rsync
 
 , jq
 , git
@@ -52,7 +51,6 @@ mkMesonDerivation (finalAttrs: {
     meson
     ninja
     pkg-config
-    rsync
 
     jq
     git

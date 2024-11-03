@@ -10,7 +10,7 @@ tarroot=$TEST_ROOT/tarball
 rm -rf "$tarroot"
 mkdir -p "$tarroot"
 cp dependencies.nix "$tarroot/default.nix"
-cp config.nix dependencies.builder*.sh "$tarroot/"
+cp "${config_nix}" dependencies.builder*.sh "$tarroot/"
 touch -d '@1000000000' "$tarroot" "$tarroot"/*
 
 hash=$(nix hash path "$tarroot")
@@ -45,7 +45,7 @@ test_tarball() {
     nix-instantiate --eval -E 'with <fnord/xyzzy>; 1 + 2' -I fnord=file:///no-such-tarball"$ext"
     (! nix-instantiate --eval -E '<fnord/xyzzy> 1' -I fnord=file:///no-such-tarball"$ext")
 
-    nix-instantiate --eval -E '<fnord/config.nix>' -I fnord=file:///no-such-tarball"$ext" -I fnord=.
+    nix-instantiate --eval -E '<fnord/config.nix>' -I fnord=file:///no-such-tarball"$ext" -I fnord="${_NIX_TEST_BUILD_DIR}"
 
     # Ensure that the `name` attribute isn’t accepted as that would mess
     # with the content-addressing

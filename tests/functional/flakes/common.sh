@@ -34,7 +34,10 @@ writeSimpleFlake() {
 }
 EOF
 
-    cp ../simple.nix ../shell.nix ../simple.builder.sh ../config.nix "$flakeDir/"
+    cp ../simple.nix ../shell.nix ../simple.builder.sh "${config_nix}" "$flakeDir/"
+
+    # `config.nix` cannot be gotten via build dir / env var (runs afoul pure eval). Instead get from flake.
+    removeBuildDirRef "$flakeDir"/*.nix
 }
 
 createSimpleGitFlake() {

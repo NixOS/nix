@@ -8,7 +8,7 @@ clearStore
 rm -rf $TEST_HOME/.cache $TEST_HOME/.config $TEST_HOME/.local
 
 # Create flake under test.
-cp ../shell-hello.nix ../config.nix $TEST_HOME/
+cp ../shell-hello.nix "${config_nix}" $TEST_HOME/
 cat <<EOF >$TEST_HOME/flake.nix
 {
     inputs.nixpkgs.url = "$TEST_HOME/nixpkgs";
@@ -25,7 +25,11 @@ EOF
 
 # Create fake nixpkgs flake.
 mkdir -p $TEST_HOME/nixpkgs
-cp ../config.nix ../shell.nix $TEST_HOME/nixpkgs
+cp "${config_nix}" ../shell.nix $TEST_HOME/nixpkgs
+
+# `config.nix` cannot be gotten via build dir / env var (runs afoul pure eval). Instead get from flake.
+removeBuildDirRef "$TEST_HOME/nixpkgs"/*.nix
+
 cat <<EOF >$TEST_HOME/nixpkgs/flake.nix
 {
     outputs = {self}: {
