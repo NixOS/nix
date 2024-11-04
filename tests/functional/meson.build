@@ -1,4 +1,4 @@
-project('nix-functional-tests', 'cpp',
+project('nix-functional-tests',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -170,6 +170,7 @@ suites = [
 
 nix_store = dependency('nix-store', required : false)
 if nix_store.found()
+  add_languages('cpp')
   subdir('test-libstoreconsumer')
   suites += {
     'name': 'libstoreconsumer',
@@ -187,6 +188,7 @@ endif
 # Plugin tests require shared libraries support.
 nix_expr = dependency('nix-expr', required : false)
 if nix_expr.found() and get_option('default_library') != 'static'
+  add_languages('cpp')
   subdir('plugins')
   suites += {
     'name': 'plugins',

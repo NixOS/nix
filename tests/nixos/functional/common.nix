@@ -24,47 +24,42 @@ in
     environment.systemPackages = let
       run-test-suite = pkgs.writeShellApplication {
         name = "run-test-suite";
-        runtimeInputs = [ pkgs.gnumake pkgs.jq pkgs.git ];
+        runtimeInputs = [
+          pkgs.meson
+          pkgs.ninja
+          pkgs.jq
+          pkgs.git
+
+          # Want to avoid `/run/current-system/sw/bin/bash` because we
+          # want a store path. Likewise for coreutils.
+          pkgs.bash
+          pkgs.coreutils
+        ];
         text = ''
           set -x
+
           cat /proc/sys/fs/file-max
           ulimit -Hn
           ulimit -Sn
+
           cd ~
-          cp -r ${pkgs.nix.overrideAttrs (o: {
-            name = "nix-configured-source";
-            outputs = [ "out" ];
-            separateDebugInfo = false;
-            disallowedReferences = [ ];
-            buildPhase = ":";
-            checkPhase = ":";
-            installPhase = ''
-              cp -r . $out
-            '';
-            installCheckPhase = ":";
-            fixupPhase = ":";
-            doInstallCheck = true;
-          })} nix
+
+          cp -r ${pkgs.nixComponents.nix-functional-tests.src} nix
           chmod -R +w nix
-          cd nix
 
-          # Tests we don't need
-          echo >tests/functional/plugins/local.mk
-          sed -i tests/functional/local.mk \
-            -e 's!nix_tests += plugins\.sh!!' \
-            -e 's!nix_tests += test-libstoreconsumer\.sh!!' \
-            ;
-
-          _NIX_TEST_SOURCE_DIR="$(realpath tests/functional)"
-          export _NIX_TEST_SOURCE_DIR
-          export _NIX_TEST_BUILD_DIR="''${_NIX_TEST_SOURCE_DIR}"
+          chmod u+w nix/.version
+          echo ${pkgs.nixComponents.version} > nix/.version
 
           export isTestOnNixOS=1
-          export version=${config.nix.package.version}
+
           export NIX_REMOTE_=daemon
           export NIX_REMOTE=daemon
+
           export NIX_STORE=${builtins.storeDir}
-          make -j1 installcheck --keep-going
+
+          meson setup nix/tests/functional build
+          cd build
+          meson test -j1 --print-errorlogs
         '';
       };
     in [
