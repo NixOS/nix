@@ -13,6 +13,8 @@
 
 namespace nix {
 
+static constexpr auto environmentVariablesCategory = "Options that change environment variables";
+
 /**
  * @return an environment variable.
  */

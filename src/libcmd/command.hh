@@ -13,7 +13,7 @@ namespace nix {
 
 extern std::string programPath;
 
-extern char * * savedArgv;
+extern char ** savedArgv;
 
 class EvalState;
 struct Pos;
@@ -25,7 +25,8 @@ static constexpr Command::Category catSecondary = 100;
 static constexpr Command::Category catUtility = 101;
 static constexpr Command::Category catNixInstallation = 102;
 
-static constexpr auto installablesCategory = "Options that change the interpretation of [installables](@docroot@/command-ref/new-cli/nix.md#installables)";
+static constexpr auto installablesCategory =
+    "Options that change the interpretation of [installables](@docroot@/command-ref/new-cli/nix.md#installables)";
 
 struct NixMultiCommand : MultiCommand, virtual Command
 {
@@ -126,7 +127,9 @@ struct MixFlakeOptions : virtual Args, EvalCommand
      * arguments) so that the completions for these flags can use them.
      */
     virtual std::vector<FlakeRef> getFlakeRefsForCompletion()
-    { return {}; }
+    {
+        return {};
+    }
 };
 
 struct SourceExprCommand : virtual Args, MixFlakeOptions
@@ -136,11 +139,9 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
 
     SourceExprCommand();
 
-    Installables parseInstallables(
-        ref<Store> store, std::vector<std::string> ss);
+    Installables parseInstallables(ref<Store> store, std::vector<std::string> ss);
 
-    ref<Installable> parseInstallable(
-        ref<Store> store, const std::string & installable);
+    ref<Installable> parseInstallable(ref<Store> store, const std::string & installable);
 
     virtual Strings getDefaultFlakeAttrPaths();
 
@@ -286,10 +287,10 @@ struct RegisterCommand
     typedef std::map<std::vector<std::string>, std::function<ref<Command>()>> Commands;
     static Commands * commands;
 
-    RegisterCommand(std::vector<std::string> && name,
-        std::function<ref<Command>()> command)
+    RegisterCommand(std::vector<std::string> && name, std::function<ref<Command>()> command)
     {
-        if (!commands) commands = new Commands;
+        if (!commands)
+            commands = new Commands;
         commands->emplace(name, command);
     }
 
@@ -299,13 +300,13 @@ struct RegisterCommand
 template<class T>
 static RegisterCommand registerCommand(const std::string & name)
 {
-    return RegisterCommand({name}, [](){ return make_ref<T>(); });
+    return RegisterCommand({name}, []() { return make_ref<T>(); });
 }
 
 template<class T>
 static RegisterCommand registerCommand2(std::vector<std::string> && name)
 {
-    return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
+    return RegisterCommand(std::move(name), []() { return make_ref<T>(); });
 }
 
 struct MixProfile : virtual StoreCommand
@@ -327,19 +328,21 @@ struct MixDefaultProfile : MixProfile
     MixDefaultProfile();
 };
 
-struct MixEnvironment : virtual Args {
+struct MixEnvironment : virtual Args
+{
 
-    StringSet keep, unset;
-    Strings stringsEnv;
-    std::vector<char*> vectorEnv;
+    StringSet keepVars;
+    StringSet unsetVars;
+    std::map<std::string, std::string> setVars;
     bool ignoreEnvironment;
 
     MixEnvironment();
 
     /***
-     * Modify global environ based on `ignoreEnvironment`, `keep`, and
-     * `unset`. It's expected that exec will be called before this class
-     * goes out of scope, otherwise `environ` will become invalid.
+     * Modify global environ based on `ignoreEnvironment`, `keep`,
+     * `unset`, and `added`. It's expected that exec will be called
+     * before this class goes out of scope, otherwise `environ` will
+     * become invalid.
      */
     void setEnviron();
 };
@@ -363,10 +366,7 @@ void completeFlakeRefWithFragment(
 std::string showVersions(const std::set<std::string> & versions);
 
 void printClosureDiff(
-    ref<Store> store,
-    const StorePath & beforePath,
-    const StorePath & afterPath,
-    std::string_view indent);
+    ref<Store> store, const StorePath & beforePath, const StorePath & afterPath, std::string_view indent);
 
 /**
  * Create symlinks prefixed by `outLink` to the store paths in
