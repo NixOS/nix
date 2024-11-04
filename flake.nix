@@ -81,37 +81,31 @@
         imports = [ ./maintainers/flake-module.nix ];
         systems = lib.subtractLists crossSystems systems;
         perSystem = { system, ... }: {
-          _module.args.pkgs = nixpkgsFor.${system}.native;
+          _module.args.pkgs = nixpkgsFor.${system}.native.stdenvPackages;
         };
       };
 
       # Memoize nixpkgs for different platforms for efficiency.
       nixpkgsFor = forAllSystems
         (system: let
-          make-pkgs = crossSystem: stdenv: import nixpkgs {
-            localSystem = {
-              inherit system;
-            };
-            crossSystem = if crossSystem == null then null else {
-              config = crossSystem;
-            } // lib.optionalAttrs (crossSystem == "x86_64-unknown-freebsd13") {
-              useLLVM = true;
-            };
-            overlays = [
-              (overlayFor (p: p.${stdenv}))
-            ];
-          };
-          stdenvs = forAllStdenvs (make-pkgs null);
-          native = stdenvs.stdenvPackages;
+          make-pkgs = crossSystem:
+            forAllStdenvs (stdenv: import nixpkgs {
+              localSystem = {
+                inherit system;
+              };
+              crossSystem = if crossSystem == null then null else {
+                config = crossSystem;
+              } // lib.optionalAttrs (crossSystem == "x86_64-unknown-freebsd13") {
+                useLLVM = true;
+              };
+              overlays = [
+                (overlayFor (p: p.${stdenv}))
+              ];
+            });
         in {
-          inherit stdenvs native;
-          static = native.pkgsStatic;
-          cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
+          native = make-pkgs null;
+          cross = forAllCrossSystems make-pkgs;
         });
-
-      binaryTarball = nix: pkgs: pkgs.callPackage ./scripts/binary-tarball.nix {
-        inherit nix;
-      };
 
       overlayFor = getStdenv: final: prev:
         let
@@ -156,7 +150,6 @@
       hydraJobs = import ./packaging/hydra.nix {
         inherit
           inputs
-          binaryTarball
           forAllCrossSystems
           forAllSystems
           lib
@@ -172,11 +165,11 @@
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
         rl-next =
-          let pkgs = nixpkgsFor.${system}.native;
+          let pkgs = nixpkgsFor.${system}.native.stdenvPackages;
           in pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
           LANG=C.UTF-8 ${pkgs.changelog-d}/bin/changelog-d ${./doc/manual/rl-next} >$out
         '';
-        repl-completion = nixpkgsFor.${system}.native.callPackage ./tests/repl-completion.nix { };
+        repl-completion = nixpkgsFor.${system}.native.stdenvPackages.callPackage ./tests/repl-completion.nix { };
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
       } // (lib.optionalAttrs (!(builtins.elem system linux32BitSystems))) {
@@ -192,12 +185,12 @@
       /*
       # Add "passthru" tests
       // flatMapAttrs ({
-          "" = nixpkgsFor.${system}.native;
-        } // lib.optionalAttrs (! nixpkgsFor.${system}.native.stdenv.hostPlatform.isDarwin) {
+          "" = nixpkgsFor.${system}.native.stdenvPackages;
+        } // lib.optionalAttrs (! nixpkgsFor.${system}.native.stdenvPackages.stdenv.hostPlatform.isDarwin) {
           # TODO: enable static builds for darwin, blocked on:
           #       https://github.com/NixOS/nixpkgs/issues/320448
           # TODO: disabled to speed up GHA CI.
-          #"static-" = nixpkgsFor.${system}.static;
+          #"static-" = nixpkgsFor.${system}.stdenvPackages.pkgsStatic;
         })
         (nixpkgsPrefix: nixpkgs:
           flatMapAttrs nixpkgs.nixComponents
@@ -218,12 +211,12 @@
       packages = forAllSystems (system:
         { # Here we put attributes that map 1:1 into packages.<system>, ie
           # for which we don't apply the full build matrix such as cross or static.
-          inherit (nixpkgsFor.${system}.native)
+          inherit (nixpkgsFor.${system}.native.stdenvPackages)
             changelog-d;
           default = self.packages.${system}.nix-ng;
-          nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
-          nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
-          nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
+          nix-manual = nixpkgsFor.${system}.native.stdenvPackages.nixComponents.nix-manual;
+          nix-internal-api-docs = nixpkgsFor.${system}.native.stdenvPackages.nixComponents.nix-internal-api-docs;
+          nix-external-api-docs = nixpkgsFor.${system}.native.stdenvPackages.nixComponents.nix-external-api-docs;
         }
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         // flatMapAttrs
@@ -264,22 +257,22 @@
           }
           (pkgName: { supportsCross ? true }: {
               # These attributes go right into `packages.<system>`.
-              "${pkgName}" = nixpkgsFor.${system}.native.nixComponents.${pkgName};
-              "${pkgName}-static" = nixpkgsFor.${system}.static.nixComponents.${pkgName};
+              "${pkgName}" = nixpkgsFor.${system}.native.stdenvPackages.nixComponents.${pkgName};
+              "${pkgName}-static" = nixpkgsFor.${system}.native.stdenvPackages.pkgsStatic.nixComponents.${pkgName};
             }
             // lib.optionalAttrs supportsCross (flatMapAttrs (lib.genAttrs crossSystems (_: { })) (crossSystem: {}: {
               # These attributes go right into `packages.<system>`.
-              "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName};
+              "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.stdenvPackages.nixComponents.${pkgName};
             }))
             // flatMapAttrs (lib.genAttrs stdenvs (_: { })) (stdenvName: {}: {
               # These attributes go right into `packages.<system>`.
-              "${pkgName}-${stdenvName}" = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".nixComponents.${pkgName};
+              "${pkgName}-${stdenvName}" = nixpkgsFor.${system}.native."${stdenvName}Packages".nixComponents.${pkgName};
             })
           )
         // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         dockerImage =
           let
-            pkgs = nixpkgsFor.${system}.native;
+            pkgs = nixpkgsFor.${system}.native.stdenvPackages;
             image = import ./docker.nix { inherit pkgs; tag = pkgs.nix.version; };
           in
           pkgs.runCommand
@@ -299,14 +292,14 @@
       in
         forAllSystems (system:
           prefixAttrs "native" (forAllStdenvs (stdenvName: makeShell {
-            pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages";
+            pkgs = nixpkgsFor.${system}.native."${stdenvName}Packages";
           })) //
-          lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin) (
+          lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenvPackages.stdenv.isDarwin) (
             prefixAttrs "static" (forAllStdenvs (stdenvName: makeShell {
               pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".pkgsStatic;
             })) //
             prefixAttrs "cross" (forAllCrossSystems (crossSystem: makeShell {
-              pkgs = nixpkgsFor.${system}.cross.${crossSystem};
+              pkgs = nixpkgsFor.${system}.cross.${crossSystem}.stdenvPackages;
             }))
           ) //
           {

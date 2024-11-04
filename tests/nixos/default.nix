@@ -1,4 +1,4 @@
-{ lib, nixpkgs, nixpkgsFor, self }:
+{ lib, nixpkgs, nixpkgsFor, nixpkgs-23-11 }:
 
 let
 
@@ -17,12 +17,12 @@ let
         test
       ];
 
-      hostPkgs = nixpkgsFor.${system}.native;
+      hostPkgs = nixpkgsFor.${system}.native.stdenvPackages;
       defaults = {
-        nixpkgs.pkgs = nixpkgsFor.${system}.native;
+        nixpkgs.pkgs = nixpkgsFor.${system}.native.stdenvPackages;
         nix.checkAllErrors = false;
         # TODO: decide which packaging stage to use. `nix-cli` is efficient, but not the same as the user-facing `everything.nix` package (`default`). Perhaps a good compromise is `everything.nix` + `noTests` defined above?
-        nix.package = nixpkgsFor.${system}.native.nixComponents.nix-cli;
+        nix.package = nixpkgsFor.${system}.native.stdenvPackages.nixComponents.nix-cli;
       };
       _module.args.nixpkgs = nixpkgs;
       _module.args.system = system;
@@ -59,7 +59,7 @@ let
   otherNixes.nix_2_13.setNixPackage = { lib, pkgs, ... }: {
     imports = [ checkOverrideNixVersion ];
     nix.package = lib.mkForce (
-      self.inputs.nixpkgs-23-11.legacyPackages.${pkgs.stdenv.hostPlatform.system}.nixVersions.nix_2_13.overrideAttrs (o: {
+      nixpkgs-23-11.legacyPackages.${pkgs.stdenv.hostPlatform.system}.nixVersions.nix_2_13.overrideAttrs (o: {
         meta = o.meta // { knownVulnerabilities = []; };
       })
     );
