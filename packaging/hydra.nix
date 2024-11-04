@@ -1,5 +1,4 @@
 { inputs
-, binaryTarball
 , forAllCrossSystems
 , forAllSystems
 , lib
@@ -12,7 +11,7 @@ let
   inherit (inputs) nixpkgs nixpkgs-regression;
 
   installScriptFor = tarballs:
-    nixpkgsFor.x86_64-linux.native.callPackage ../scripts/installer.nix {
+    nixpkgsFor.x86_64-linux.native.callPackage ./installer {
       inherit tarballs;
     };
 
@@ -62,7 +61,7 @@ in
     [ "i686-linux" ];
 
   buildStatic = forAllPackages (pkgName:
-    lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.nixComponents.${pkgName}));
+    lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.native.pkgsStatic.nixComponents.${pkgName}));
 
   buildCross = forAllPackages (pkgName:
     # Hack to avoid non-evaling package
@@ -99,13 +98,12 @@ in
   # Binary tarball for various platforms, containing a Nix store
   # with the closure of 'nix' package, and the second half of
   # the installation script.
-  binaryTarball = forAllSystems (system: binaryTarball nixpkgsFor.${system}.native.nix nixpkgsFor.${system}.native);
+  binaryTarball = forAllSystems (system:
+    nixpkgsFor.${system}.native.callPackage ./binary-tarball.nix {});
 
   binaryTarballCross = lib.genAttrs [ "x86_64-linux" ] (system:
     forAllCrossSystems (crossSystem:
-      binaryTarball
-        nixpkgsFor.${system}.cross.${crossSystem}.nix
-        nixpkgsFor.${system}.cross.${crossSystem}));
+      nixpkgsFor.${system}.cross.${crossSystem}.callPackage ./binary-tarball.nix {}));
 
   # The first half of the installation script. This is uploaded
   # to https://nixos.org/nix/install. It downloads the binary
@@ -124,7 +122,7 @@ in
     self.hydraJobs.binaryTarballCross."x86_64-linux"."riscv64-unknown-linux-gnu"
   ];
 
-  installerScriptForGHA = forAllSystems (system: nixpkgsFor.${system}.native.callPackage ../scripts/installer.nix {
+  installerScriptForGHA = forAllSystems (system: nixpkgsFor.${system}.native.callPackage ./installer {
     tarballs = [ self.hydraJobs.binaryTarball.${system} ];
   });
 
@@ -147,7 +145,10 @@ in
   external-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-external-api-docs;
 
   # System tests.
-  tests = import ../tests/nixos { inherit lib nixpkgs nixpkgsFor self; } // {
+  tests = import ../tests/nixos {
+    inherit lib nixpkgs nixpkgsFor;
+    inherit (self.inputs) nixpkgs-23-11;
+  } // {
 
     # Make sure that nix-env still produces the exact same result
     # on a particular version of Nixpkgs.
