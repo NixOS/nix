@@ -187,7 +187,7 @@ in
     let pkgs = nixpkgsFor.${system}.native; in
     pkgs.runCommand "install-tests"
       {
-        againstSelf = testNixVersions pkgs pkgs.pkgs.nix;
+        againstSelf = testNixVersions pkgs pkgs.nix;
         againstCurrentLatest =
           # FIXME: temporarily disable this on macOS because of #3605.
           if system == "x86_64-linux"
