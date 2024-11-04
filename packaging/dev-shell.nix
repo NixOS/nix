@@ -1,10 +1,11 @@
 { lib, devFlake }:
 
-pkgs: stdenv:
+{ pkgs }:
 
 (pkgs.nix.override { forDevShell = true; }).overrideAttrs (attrs:
 
 let
+  stdenv = pkgs.nixDependencies.stdenv;
   buildCanExecuteHost = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
   modular = devFlake.getSystem stdenv.buildPlatform.system;
   transformFlag = prefix: flag:

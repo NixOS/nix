@@ -295,21 +295,23 @@
 
       devShells = let
         makeShell = import ./packaging/dev-shell.nix { inherit lib devFlake; };
+        prefixAttrs = prefix: lib.mapAttrs' (k: v: lib.nameValuePair "${prefix}-${k}" v);
       in
         forAllSystems (system:
-          let
-            makeShells = prefix: pkgs:
-              lib.mapAttrs'
-              (k: v: lib.nameValuePair "${prefix}-${k}" v)
-              (forAllStdenvs (stdenvName: makeShell pkgs pkgs.${stdenvName}));
-          in
-            (makeShells "native" nixpkgsFor.${system}.native) //
-            (lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin)
-              (makeShells "static" nixpkgsFor.${system}.static) //
-              (forAllCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv))) //
-            {
-              default = self.devShells.${system}.native-stdenvPackages;
-            }
+          prefixAttrs "native" (forAllStdenvs (stdenvName: makeShell {
+            pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages";
+          })) //
+          lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin) (
+            prefixAttrs "static" (forAllStdenvs (stdenvName: makeShell {
+              pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".pkgsStatic;
+            })) //
+            prefixAttrs "cross" (forAllCrossSystems (crossSystem: makeShell {
+              pkgs = nixpkgsFor.${system}.cross.${crossSystem};
+            }))
+          ) //
+          {
+            default = self.devShells.${system}.native-stdenvPackages;
+          }
         );
   };
 }
