@@ -38,8 +38,11 @@ mkMesonDerivation (finalAttrs: {
   fileset = fileset.unions [
     ../../build-utils-meson
     ./build-utils-meson
+    # FIXME: get rid of these symlinks.
     ../../.version
     ./.version
+    ../../.version-determinate
+    ./.version-determinate
     ./meson.build
     ./meson.options
     ./linux/meson.build
