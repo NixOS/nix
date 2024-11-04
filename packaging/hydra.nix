@@ -16,25 +16,16 @@ let
       inherit tarballs;
     };
 
-  testNixVersions = pkgs: client: daemon:
-    pkgs.nixComponents.callPackage ../package.nix {
+  testNixVersions = pkgs: daemon:
+    pkgs.nixComponents.nix-functional-tests.override {
       pname =
         "nix-tests"
         + lib.optionalString
           (lib.versionAtLeast daemon.version "2.4pre20211005" &&
-           lib.versionAtLeast client.version "2.4pre20211005")
-          "-${client.version}-against-${daemon.version}";
+           lib.versionAtLeast pkgs.nix.version "2.4pre20211005")
+          "-${pkgs.nix.version}-against-${daemon.version}";
 
-      test-client = client;
       test-daemon = daemon;
-
-      doBuild = false;
-
-      # This could be more accurate, but a shorter version will match the
-      # fine version with rev. This functionality is already covered in
-      # the normal test, so it's fine.
-      version = pkgs.nixComponents.version;
-      versionSuffix = pkgs.nixComponents.versionSuffix;
     };
 
   # Technically we could just return `pkgs.nixComponents`, but for Hydra it's
@@ -196,15 +187,15 @@ in
     let pkgs = nixpkgsFor.${system}.native; in
     pkgs.runCommand "install-tests"
       {
-        againstSelf = testNixVersions pkgs pkgs.nix pkgs.pkgs.nix;
+        againstSelf = testNixVersions pkgs pkgs.nix;
         againstCurrentLatest =
           # FIXME: temporarily disable this on macOS because of #3605.
           if system == "x86_64-linux"
-          then testNixVersions pkgs pkgs.nix pkgs.nixVersions.latest
+          then testNixVersions pkgs pkgs.nixVersions.latest
           else null;
         # Disabled because the latest stable version doesn't handle
         # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
-        # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
+        # againstLatestStable = testNixVersions pkgs pkgs.nixStable;
       } "touch $out");
 
   installerTests = import ../tests/installer {
