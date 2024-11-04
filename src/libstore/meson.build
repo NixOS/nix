@@ -72,6 +72,11 @@ has_acl_support = cxx.has_header('sys/xattr.h') \
   and cxx.has_function('lremovexattr')
 configdata.set('HAVE_ACL_SUPPORT', has_acl_support.to_int())
 
+if host_machine.system() == 'darwin'
+  sandbox = cxx.find_library('sandbox')
+  deps_other += [sandbox]
+endif
+
 subdir('build-utils-meson/threads')
 
 boost = dependency(

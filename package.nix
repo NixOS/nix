@@ -23,6 +23,7 @@
 , libseccomp
 , libsodium
 , man
+, darwin
 , lowdown
 , mdbook
 , mdbook-linkcheck
@@ -238,6 +239,7 @@ in {
     gtest
     rapidcheck
   ] ++ lib.optional stdenv.isLinux libseccomp
+    ++ lib.optional stdenv.hostPlatform.isDarwin darwin.apple_sdk.libs.sandbox
     ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
     # There have been issues building these dependencies
     ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))
