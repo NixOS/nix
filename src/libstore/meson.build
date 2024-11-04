@@ -23,7 +23,7 @@ configdata = configuration_data()
 # TODO rename, because it will conflict with downstream projects
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
-configdata.set_quoted('DETERMINATE_NIX_VERSION', fs.read('./.version-determinate'))
+configdata.set_quoted('DETERMINATE_NIX_VERSION', fs.read('.version-determinate').strip())
 
 configdata.set_quoted('SYSTEM', host_machine.system())
 
@@ -71,6 +71,11 @@ has_acl_support = cxx.has_header('sys/xattr.h') \
   and cxx.has_function('llistxattr') \
   and cxx.has_function('lremovexattr')
 configdata.set('HAVE_ACL_SUPPORT', has_acl_support.to_int())
+
+if host_machine.system() == 'darwin'
+  sandbox = cxx.find_library('sandbox')
+  deps_other += [sandbox]
+endif
 
 subdir('build-utils-meson/threads')
 

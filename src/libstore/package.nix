@@ -7,6 +7,7 @@
 , ninja
 , pkg-config
 , unixtools
+, darwin
 
 , nix-util
 , boost
@@ -37,8 +38,11 @@ mkMesonDerivation (finalAttrs: {
   fileset = fileset.unions [
     ../../build-utils-meson
     ./build-utils-meson
+    # FIXME: get rid of these symlinks.
     ../../.version
     ./.version
+    ../../.version-determinate
+    ./.version-determinate
     ./meson.build
     ./meson.options
     ./linux/meson.build
@@ -65,6 +69,7 @@ mkMesonDerivation (finalAttrs: {
     sqlite
   ] ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
     # There have been issues building these dependencies
+    ++ lib.optional stdenv.hostPlatform.isDarwin darwin.apple_sdk.libs.sandbox
     ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))
       aws-sdk-cpp
   ;
