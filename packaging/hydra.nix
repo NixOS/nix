@@ -139,11 +139,11 @@ in
   # docker image with Nix inside
   dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
 
-  # Line coverage analysis.
-  coverage = nixpkgsFor.x86_64-linux.native.nix.override {
-    pname = "nix-coverage";
-    withCoverageChecks = true;
-  };
+  # # Line coverage analysis.
+  # coverage = nixpkgsFor.x86_64-linux.native.nix.override {
+  #   pname = "nix-coverage";
+  #   withCoverageChecks = true;
+  # };
 
   # Nix's manual
   manual = nixpkgsFor.x86_64-linux.native.nixComponents.nix-manual;
