@@ -38,6 +38,10 @@ let
   # Indirection for Nixpkgs to override when package.nix files are vendored
   filesetToSource = lib.fileset.toSource;
 
+  /** Given a set of layers, create a mkDerivation-like function */
+  mkPackageBuilder = exts: userFn:
+    stdenv.mkDerivation (lib.extends (lib.composeManyExtensions exts) userFn);
+
   localSourceLayer = finalAttrs: prevAttrs:
     let
       workDirPath =
@@ -58,6 +62,28 @@ let
       # Clear what `derivation` can't/shouldn't serialize; see prevAttrs.workDir.
       fileset = null;
       workDir = null;
+    };
+
+  mesonLayer = finalAttrs: prevAttrs:
+    {
+      nativeBuildInputs = [
+        pkgs.buildPackages.meson
+        pkgs.buildPackages.ninja
+      ] ++ prevAttrs.nativeBuildInputs or [];
+    };
+
+  mesonBuildLayer = finalAttrs: prevAttrs:
+    {
+      nativeBuildInputs = prevAttrs.nativeBuildInputs or [] ++ [
+        pkgs.buildPackages.pkg-config
+      ];
+      separateDebugInfo = !stdenv.hostPlatform.isStatic;
+      hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
+    };
+
+  mesonLibraryLayer = finalAttrs: prevAttrs:
+    {
+      outputs = prevAttrs.outputs or [ "out" ] ++ [ "dev" ];
     };
 
   # Work around weird `--as-needed` linker behavior with BSD, see
@@ -172,14 +198,27 @@ scope: {
 
   inherit resolvePath filesetToSource;
 
-  mkMesonDerivation = f: let
-    exts = [
+  mkMesonDerivation =
+    mkPackageBuilder [
+      miscGoodPractice
+      localSourceLayer
+      mesonLayer
+    ];
+  mkMesonExecutable =
+    mkPackageBuilder [
       miscGoodPractice
       bsdNoLinkAsNeeded
       localSourceLayer
+      mesonLayer
+      mesonBuildLayer
     ];
-  in stdenv.mkDerivation
-   (lib.extends
-     (lib.foldr lib.composeExtensions (_: _: {}) exts)
-     f);
+  mkMesonLibrary =
+    mkPackageBuilder [
+      miscGoodPractice
+      bsdNoLinkAsNeeded
+      localSourceLayer
+      mesonLayer
+      mesonBuildLayer
+      mesonLibraryLayer
+    ];
 }

@@ -11,11 +11,13 @@
 
 using namespace nix;
 
+namespace nix::fs { using namespace std::filesystem; }
+
 struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 {
     bool raw = false;
     std::optional<std::string> apply;
-    std::optional<Path> writeTo;
+    std::optional<fs::path> writeTo;
 
     CmdEval() : InstallableValueCommand()
     {
@@ -75,20 +77,21 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
         if (writeTo) {
             stopProgressBar();
 
-            if (pathExists(*writeTo))
-                throw Error("path '%s' already exists", *writeTo);
+            if (fs::symlink_exists(*writeTo))
+                throw Error("path '%s' already exists", writeTo->string());
 
-            std::function<void(Value & v, const PosIdx pos, const std::filesystem::path & path)> recurse;
+            std::function<void(Value & v, const PosIdx pos, const fs::path & path)> recurse;
 
-            recurse = [&](Value & v, const PosIdx pos, const std::filesystem::path & path)
+            recurse = [&](Value & v, const PosIdx pos, const fs::path & path)
             {
                 state->forceValue(v, pos);
                 if (v.type() == nString)
                     // FIXME: disallow strings with contexts?
                     writeFile(path.string(), v.string_view());
                 else if (v.type() == nAttrs) {
-                    // TODO abstract mkdir perms for Windows
-                    createDir(path.string(), 0777);
+                    [[maybe_unused]] bool directoryCreated = fs::create_directory(path);
+                    // Directory should not already exist
+                    assert(directoryCreated);
                     for (auto & attr : *v.attrs()) {
                         std::string_view name = state->symbols[attr.name];
                         try {

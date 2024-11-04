@@ -645,7 +645,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
         } else if (fallbackPos) {
-            std::stringstream ss;
+            std::ostringstream ss;
             ss << "Attribute `" << fallbackName << "`\n\n";
             ss << "  … defined at " << state->positions[fallbackPos] << "\n\n";
             if (fallbackDoc) {
@@ -654,7 +654,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 ss << "No documentation found.\n\n";
             }
 
-            auto markdown = ss.str();
+            auto markdown = toView(ss);
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
 
         } else
@@ -826,7 +826,7 @@ void NixRepl::runNix(Path program, const Strings & args, const std::optional<std
     if (runNixPtr)
         (*runNixPtr)(program, args, input);
     else
-        throw Error("Cannot run '%s', no method of calling the Nix CLI provided", program);
+        throw Error("Cannot run '%s' because no method of calling the Nix CLI was provided. This is a configuration problem pertaining to how this program was built. See Nix 2.25 release notes", program);
 }
 
 

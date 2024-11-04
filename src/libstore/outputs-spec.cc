@@ -30,16 +30,15 @@ std::optional<OutputsSpec> OutputsSpec::parseOpt(std::string_view s)
 {
     static std::regex regex(std::string { outputSpecRegexStr });
 
-    std::smatch match;
-    std::string s2 { s }; // until some improves std::regex
-    if (!std::regex_match(s2, match, regex))
+    std::cmatch match;
+    if (!std::regex_match(s.cbegin(), s.cend(), match, regex))
         return std::nullopt;
 
     if (match[1].matched)
         return { OutputsSpec::All {} };
 
     if (match[2].matched)
-        return OutputsSpec::Names { tokenizeString<StringSet>(match[2].str(), ",") };
+        return OutputsSpec::Names { tokenizeString<StringSet>({match[2].first, match[2].second}, ",") };
 
     assert(false);
 }

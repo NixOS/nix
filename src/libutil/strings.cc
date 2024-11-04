@@ -1,10 +1,26 @@
 #include <filesystem>
 #include <string>
+#include <sstream>
 
 #include "strings-inline.hh"
 #include "os-string.hh"
 
 namespace nix {
+
+struct view_stringbuf : public std::stringbuf
+{
+    inline std::string_view toView()
+    {
+        auto begin = pbase();
+        return {begin, begin + pubseekoff(0, std::ios_base::cur, std::ios_base::out)};
+    }
+};
+
+std::string_view toView(const std::ostringstream & os)
+{
+    auto buf = static_cast<view_stringbuf *>(os.rdbuf());
+    return buf->toView();
+}
 
 template std::list<std::string> tokenizeString(std::string_view s, std::string_view separators);
 template std::set<std::string> tokenizeString(std::string_view s, std::string_view separators);

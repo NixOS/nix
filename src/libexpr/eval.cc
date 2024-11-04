@@ -539,7 +539,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     if (v.isLambda()) {
         auto exprLambda = v.payload.lambda.fun;
 
-        std::stringstream s(std::ios_base::out);
+        std::ostringstream s;
         std::string name;
         auto pos = positions[exprLambda->getPos()];
         std::string docStr;
@@ -571,17 +571,12 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 
         s << docStr;
 
-        s << '\0'; // for making a c string below
-        std::string ss = s.str();
-
         return Doc {
             .pos = pos,
             .name = name,
             .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
             .args = {},
-            .doc =
-                // FIXME: this leaks; make the field std::string?
-                strdup(ss.data()),
+            .doc = makeImmutableString(toView(s)), // NOTE: memory leak when compiled without GC
         };
     }
     if (isFunctor(v)) {
@@ -1805,11 +1800,9 @@ void ExprIf::eval(EvalState & state, Env & env, Value & v)
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
     if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
-        auto exprStr = ({
-            std::ostringstream out;
-            cond->show(state.symbols, out);
-            out.str();
-        });
+        std::ostringstream out;
+        cond->show(state.symbols, out);
+        auto exprStr = toView(out);
 
         if (auto eq = dynamic_cast<ExprOpEq *>(cond)) {
             try {
@@ -2841,7 +2834,9 @@ void EvalState::printStatistics()
 #endif
 #if HAVE_BOEHMGC
         {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
+#ifndef _WIN32 // TODO implement
         {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
+#endif
 #endif
     };
     topObj["envs"] = {

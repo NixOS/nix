@@ -14,27 +14,6 @@ project('nix-functional-tests', 'cpp',
 
 fs = import('fs')
 
-# Need to combine source and build trees
-run_command(
-  'rsync',
-  '-a',
-  '--copy-unsafe-links',
-  meson.current_source_dir() / '',
-  meson.current_build_dir() / '',
-)
-# This current-source-escaping relative is no good because we don't know
-# where the build directory will be, therefore we fix it up. Once the
-# Make build system is gone, we should think about doing this better.
-scripts_dir = fs.relative_to(
-  meson.current_source_dir() / '..' / '..' / 'scripts',
-  meson.current_build_dir(),
-)
-run_command(
-  'sed',
-  '-i', meson.current_build_dir() / 'bash-profile.sh',
-  '-e', 's^../../scripts^@0@^'.format(scripts_dir),
-)
-
 nix = find_program('nix')
 bash = find_program('bash', native : true)
 busybox = find_program('busybox', native : true, required : false)
@@ -185,7 +164,7 @@ suites = [
       'extra-sandbox-profile.sh',
       'help.sh',
     ],
-    'workdir': meson.current_build_dir(),
+    'workdir': meson.current_source_dir(),
   },
 ]
 
@@ -200,7 +179,7 @@ if nix_store.found()
     'tests': [
       'test-libstoreconsumer.sh',
     ],
-    'workdir': meson.current_build_dir(),
+    'workdir': meson.current_source_dir(),
   }
 
 endif
@@ -217,7 +196,7 @@ if nix_expr.found() and get_option('default_library') != 'static'
     'tests': [
       'plugins.sh',
     ],
-    'workdir': meson.current_build_dir(),
+    'workdir': meson.current_source_dir(),
   }
 endif
 
@@ -228,14 +207,12 @@ subdir('git-hashing')
 subdir('local-overlay-store')
 
 foreach suite : suites
+  workdir = suite['workdir']
+  suite_name = suite['name']
   foreach script : suite['tests']
-    workdir = suite['workdir']
-    prefix = fs.relative_to(workdir, meson.project_build_root())
-
-    script = script
     # Turns, e.g., `tests/functional/flakes/show.sh` into a Meson test target called
     # `functional-flakes-show`.
-    name = fs.replace_suffix(prefix / script, '')
+    name = fs.replace_suffix(script, '')
 
     test(
       name,
@@ -247,14 +224,17 @@ foreach suite : suites
         '-o', 'pipefail',
         script,
       ],
-      suite : suite['name'],
+      suite : suite_name,
       env : {
-        'TEST_NAME': name,
+        '_NIX_TEST_SOURCE_DIR': meson.current_source_dir(),
+        '_NIX_TEST_BUILD_DIR': meson.current_build_dir(),
+        'TEST_NAME': suite_name / name,
         'NIX_REMOTE': '',
         'PS4': '+(${BASH_SOURCE[0]-$0}:$LINENO) ',
       },
-      # some tests take 15+ seconds even on an otherwise idle machine, on a loaded machine
-      # this can easily drive them to failure. give them more time than default of 30sec
+      # Some tests take 15+ seconds even on an otherwise idle machine;
+      # on a loaded machine this can easily drive them to failure. Give
+      # them more time than the default of 30 seconds.
       timeout : 300,
       # Used for target dependency/ordering tracking, not adding compiler flags or anything.
       depends : suite['deps'],

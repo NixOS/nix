@@ -8,6 +8,11 @@
 
 namespace nix {
 
+/*
+ * workaround for unavailable view() method (C++20) of std::ostringstream under MacOS with clang-16
+ */
+std::string_view toView(const std::ostringstream & os);
+
 /**
  * String tokenizer.
  *

@@ -1,20 +1,11 @@
 { lib
 , stdenv
-, mkMesonDerivation
-, releaseTools
-
-, meson
-, ninja
-, pkg-config
+, mkMesonExecutable
 
 , nix-store
 , nix-expr
 , nix-main
 , nix-cmd
-
-, rapidcheck
-, gtest
-, runCommand
 
 # Configuration Options
 
@@ -25,7 +16,7 @@ let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonExecutable (finalAttrs: {
   pname = "nix";
   inherit version;
 
@@ -66,9 +57,9 @@ mkMesonDerivation (finalAttrs: {
     ../nix-env/buildenv.nix
     ./get-env.sh
     ./help-stores.md
-    ../../doc/manual/src/store/types/index.md.in
+    ../../doc/manual/source/store/types/index.md.in
     ./profiles.md
-    ../../doc/manual/src/command-ref/files/profiles.md
+    ../../doc/manual/source/command-ref/files/profiles.md
 
     # Files
   ] ++ lib.concatMap
@@ -89,12 +80,6 @@ mkMesonDerivation (finalAttrs: {
       ../nix-store
     ]
   );
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-  ];
 
   buildInputs = [
     nix-store
@@ -117,10 +102,6 @@ mkMesonDerivation (finalAttrs: {
   env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
     LDFLAGS = "-fuse-ld=gold";
   };
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

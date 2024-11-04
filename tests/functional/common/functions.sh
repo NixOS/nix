@@ -28,7 +28,7 @@ clearProfiles() {
 
 # Clear the store, but do not fail if we're in an environment where we can't.
 # This allows the test to run in a NixOS test environment, where we use the system store.
-# See doc/manual/src/contributing/testing.md / Running functional tests on NixOS.
+# See doc/manual/source/contributing/testing.md / Running functional tests on NixOS.
 clearStoreIfPossible() {
     if isTestOnNixOS; then
         echo "clearStoreIfPossible: Not clearing store, because we're on NixOS. Moving on."
@@ -341,6 +341,15 @@ grep() {
 # Return the number of arguments
 count() {
   echo $#
+}
+
+# Sometimes, e.g. due to pure eval, restricted eval, or sandboxing, we
+# cannot look up `config.nix` in the build dir, and have to instead get
+# it from the current directory. (In this case, the current directly
+# will be somewhere in `$TEST_ROOT`.)
+removeBuildDirRef() {
+  # shellcheck disable=SC2016 # The ${} in this is Nix, not shell
+  sed -i -e 's,"${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/[^ ]*config.nix",./config.nix,' "$@"
 }
 
 trap onError ERR

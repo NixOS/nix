@@ -6,7 +6,6 @@
 , meson
 , ninja
 , pkg-config
-, rsync
 
 , jq
 , git
@@ -48,11 +47,10 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   # Hack for sake of the dev shell
-  passthru.baseNativeBuildInputs = [
+  passthru.externalNativeBuildInputs = [
     meson
     ninja
     pkg-config
-    rsync
 
     jq
     git
@@ -66,7 +64,7 @@ mkMesonDerivation (finalAttrs: {
     util-linux
   ];
 
-  nativeBuildInputs = finalAttrs.passthru.baseNativeBuildInputs ++ [
+  nativeBuildInputs = finalAttrs.passthru.externalNativeBuildInputs ++ [
     nix-cli
   ];
 
@@ -74,7 +72,6 @@ mkMesonDerivation (finalAttrs: {
     nix-store
     nix-expr
   ];
-
 
   preConfigure =
     # "Inline" .version so it's not a symlink, and includes the suffix.

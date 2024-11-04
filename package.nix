@@ -23,6 +23,7 @@
 , libseccomp
 , libsodium
 , man
+, darwin
 , lowdown
 , mdbook
 , mdbook-linkcheck
@@ -76,7 +77,9 @@
 #
 # Temporarily disabled on Windows because the `GC_throw_bad_alloc`
 # symbol is missing during linking.
-, enableGC ? !stdenv.hostPlatform.isWindows
+#
+# Disabled on OpenBSD because of missing `_data_start` symbol while linking
+, enableGC ? !stdenv.hostPlatform.isWindows && !stdenv.hostPlatform.isOpenBSD
 
 # Whether to enable Markdown rendering in the Nix binary.
 , enableMarkdown ? !stdenv.hostPlatform.isWindows
@@ -176,8 +179,6 @@ in {
           ./scripts/local.mk
         ] ++ lib.optionals enableManual [
           ./doc/manual
-        ] ++ lib.optionals buildUnitTests [
-          ./tests/unit
         ] ++ lib.optionals doInstallCheck [
           ./tests/functional
         ]));
@@ -209,9 +210,10 @@ in {
     git
     mercurial
     openssh
-    man # for testing `nix-* --help`
   ] ++ lib.optionals (doInstallCheck || enableManual) [
     jq # Also for custom mdBook preprocessor.
+  ] ++ lib.optionals enableManual [
+    man
   ] ++ lib.optional stdenv.hostPlatform.isStatic unixtools.hexdump
   ;
 
@@ -234,6 +236,7 @@ in {
     gtest
     rapidcheck
   ] ++ lib.optional stdenv.isLinux libseccomp
+    ++ lib.optional stdenv.hostPlatform.isDarwin darwin.apple_sdk.libs.sandbox
     ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
     # There have been issues building these dependencies
     ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))

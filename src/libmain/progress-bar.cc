@@ -158,10 +158,10 @@ public:
     {
         auto state(state_.lock());
 
-        std::stringstream oss;
+        std::ostringstream oss;
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
-        log(*state, ei.level, oss.str());
+        log(*state, ei.level, toView(oss));
     }
 
     void log(State & state, Verbosity lvl, std::string_view s)

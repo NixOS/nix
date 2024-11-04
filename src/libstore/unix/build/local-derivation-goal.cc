@@ -58,6 +58,10 @@
 #if __APPLE__
 #include <spawn.h>
 #include <sys/sysctl.h>
+#include <sandbox.h>
+
+/* This definition is undocumented but depended upon by all major browsers. */
+extern "C" int sandbox_init_with_parameters(const char *profile, uint64_t flags, const char *const parameters[], char **errorbuf);
 #endif
 
 #include <pwd.h>
@@ -65,6 +69,7 @@
 #include <iostream>
 
 #include "strings.hh"
+#include "signals.hh"
 
 namespace nix {
 
@@ -432,6 +437,41 @@ static void doBind(const Path & source, const Path & target, bool optional = fal
     }
 };
 #endif
+
+/**
+ * Rethrow the current exception as a subclass of `Error`.
+ */
+static void rethrowExceptionAsError()
+{
+    try {
+        throw;
+    } catch (Error &) {
+        throw;
+    } catch (std::exception & e) {
+        throw Error(e.what());
+    } catch (...) {
+        throw Error("unknown exception");
+    }
+}
+
+/**
+ * Send the current exception to the parent in the format expected by
+ * `LocalDerivationGoal::processSandboxSetupMessages()`.
+ */
+static void handleChildException(bool sendException)
+{
+    try {
+        rethrowExceptionAsError();
+    } catch (Error & e) {
+        if (sendException) {
+            writeFull(STDERR_FILENO, "\1\n");
+            FdSink sink(STDERR_FILENO);
+            sink << e;
+            sink.flush();
+        } else
+            std::cerr << e.msg();
+    }
+}
 
 void LocalDerivationGoal::startBuilder()
 {
@@ -949,32 +989,40 @@ void LocalDerivationGoal::startBuilder()
                root. */
             openSlave();
 
-            /* Drop additional groups here because we can't do it
-               after we've created the new user namespace. */
-            if (setgroups(0, 0) == -1) {
-                if (errno != EPERM)
-                    throw SysError("setgroups failed");
-                if (settings.requireDropSupplementaryGroups)
-                    throw Error("setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
+            try {
+                /* Drop additional groups here because we can't do it
+                   after we've created the new user namespace. */
+                if (setgroups(0, 0) == -1) {
+                    if (errno != EPERM)
+                        throw SysError("setgroups failed");
+                    if (settings.requireDropSupplementaryGroups)
+                        throw Error("setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
+                }
+
+                ProcessOptions options;
+                options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
+                if (privateNetwork)
+                    options.cloneFlags |= CLONE_NEWNET;
+                if (usingUserNamespace)
+                    options.cloneFlags |= CLONE_NEWUSER;
+
+                pid_t child = startProcess([&]() { runChild(); }, options);
+
+                writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
+                _exit(0);
+            } catch (...) {
+                handleChildException(true);
+                _exit(1);
             }
-
-            ProcessOptions options;
-            options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
-            if (privateNetwork)
-                options.cloneFlags |= CLONE_NEWNET;
-            if (usingUserNamespace)
-                options.cloneFlags |= CLONE_NEWUSER;
-
-            pid_t child = startProcess([&]() { runChild(); }, options);
-
-            writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
-            _exit(0);
         });
 
         sendPid.writeSide.close();
 
-        if (helper.wait() != 0)
+        if (helper.wait() != 0) {
+            processSandboxSetupMessages();
+            // Only reached if the child process didn't send an exception.
             throw Error("unable to start build process");
+        }
 
         userNamespaceSync.readSide = -1;
 
@@ -1050,7 +1098,12 @@ void LocalDerivationGoal::startBuilder()
     pid.setSeparatePG(true);
     worker.childStarted(shared_from_this(), {builderOut.get()}, true, true);
 
-    /* Check if setting up the build environment failed. */
+    processSandboxSetupMessages();
+}
+
+
+void LocalDerivationGoal::processSandboxSetupMessages()
+{
     std::vector<std::string> msgs;
     while (true) {
         std::string msg = [&]() {
@@ -1078,7 +1131,8 @@ void LocalDerivationGoal::startBuilder()
 }
 
 
-void LocalDerivationGoal::initTmpDir() {
+void LocalDerivationGoal::initTmpDir()
+{
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
 #if __linux__
@@ -1530,6 +1584,8 @@ void LocalDerivationGoal::startDaemon()
                         FdSink(remote.get()),
                         NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
+                } catch (const Interrupted &) {
+                    debug("interrupted daemon connection");
                 } catch (SystemError &) {
                     ignoreExceptionExceptInterrupt();
                 }
@@ -1959,7 +2015,7 @@ void LocalDerivationGoal::runChild()
             if (chdir(chrootRootDir.c_str()) == -1)
                 throw SysError("cannot change directory to '%1%'", chrootRootDir);
 
-            if (mkdir("real-root", 0) == -1)
+            if (mkdir("real-root", 0500) == -1)
                 throw SysError("cannot create real-root directory");
 
             if (pivot_root(".", "real-root") == -1)
@@ -2031,153 +2087,129 @@ void LocalDerivationGoal::runChild()
                 throw SysError("setuid failed");
         }
 
-        /* Fill in the arguments. */
-        Strings args;
-
-        std::string builder = "invalid";
-
-        if (drv->isBuiltin()) {
-            ;
-        }
 #if __APPLE__
-        else {
-            /* This has to appear before import statements. */
-            std::string sandboxProfile = "(version 1)\n";
+        /* This has to appear before import statements. */
+        std::string sandboxProfile = "(version 1)\n";
 
-            if (useChroot) {
+        if (useChroot) {
 
-                /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
-                PathSet ancestry;
+            /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
+            PathSet ancestry;
 
-                /* We build the ancestry before adding all inputPaths to the store because we know they'll
-                   all have the same parents (the store), and there might be lots of inputs. This isn't
-                   particularly efficient... I doubt it'll be a bottleneck in practice */
-                for (auto & i : pathsInChroot) {
-                    Path cur = i.first;
-                    while (cur.compare("/") != 0) {
-                        cur = dirOf(cur);
-                        ancestry.insert(cur);
-                    }
-                }
-
-                /* And we want the store in there regardless of how empty pathsInChroot. We include the innermost
-                   path component this time, since it's typically /nix/store and we care about that. */
-                Path cur = worker.store.storeDir;
+            /* We build the ancestry before adding all inputPaths to the store because we know they'll
+               all have the same parents (the store), and there might be lots of inputs. This isn't
+               particularly efficient... I doubt it'll be a bottleneck in practice */
+            for (auto & i : pathsInChroot) {
+                Path cur = i.first;
                 while (cur.compare("/") != 0) {
-                    ancestry.insert(cur);
                     cur = dirOf(cur);
+                    ancestry.insert(cur);
                 }
+            }
 
-                /* Add all our input paths to the chroot */
-                for (auto & i : inputPaths) {
-                    auto p = worker.store.printStorePath(i);
-                    pathsInChroot[p] = p;
-                }
+            /* And we want the store in there regardless of how empty pathsInChroot. We include the innermost
+               path component this time, since it's typically /nix/store and we care about that. */
+            Path cur = worker.store.storeDir;
+            while (cur.compare("/") != 0) {
+                ancestry.insert(cur);
+                cur = dirOf(cur);
+            }
 
-                /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
-                if (settings.darwinLogSandboxViolations) {
-                    sandboxProfile += "(deny default)\n";
-                } else {
-                    sandboxProfile += "(deny default (with no-log))\n";
-                }
+            /* Add all our input paths to the chroot */
+            for (auto & i : inputPaths) {
+                auto p = worker.store.printStorePath(i);
+                pathsInChroot[p] = p;
+            }
 
-                sandboxProfile +=
-                    #include "sandbox-defaults.sb"
-                    ;
-
-                if (!derivationType->isSandboxed())
-                    sandboxProfile +=
-                        #include "sandbox-network.sb"
-                        ;
-
-                /* Add the output paths we'll use at build-time to the chroot */
-                sandboxProfile += "(allow file-read* file-write* process-exec\n";
-                for (auto & [_, path] : scratchOutputs)
-                    sandboxProfile += fmt("\t(subpath \"%s\")\n", worker.store.printStorePath(path));
-
-                sandboxProfile += ")\n";
-
-                /* Our inputs (transitive dependencies and any impurities computed above)
-
-                   without file-write* allowed, access() incorrectly returns EPERM
-                 */
-                sandboxProfile += "(allow file-read* file-write* process-exec\n";
-                for (auto & i : pathsInChroot) {
-                    if (i.first != i.second.source)
-                        throw Error(
-                            "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin",
-                            i.first, i.second.source);
-
-                    std::string path = i.first;
-                    auto optSt = maybeLstat(path.c_str());
-                    if (!optSt) {
-                        if (i.second.optional)
-                            continue;
-                        throw SysError("getting attributes of required path '%s", path);
-                    }
-                    if (S_ISDIR(optSt->st_mode))
-                        sandboxProfile += fmt("\t(subpath \"%s\")\n", path);
-                    else
-                        sandboxProfile += fmt("\t(literal \"%s\")\n", path);
-                }
-                sandboxProfile += ")\n";
-
-                /* Allow file-read* on full directory hierarchy to self. Allows realpath() */
-                sandboxProfile += "(allow file-read*\n";
-                for (auto & i : ancestry) {
-                    sandboxProfile += fmt("\t(literal \"%s\")\n", i);
-                }
-                sandboxProfile += ")\n";
-
-                sandboxProfile += additionalSandboxProfile;
-            } else
-                sandboxProfile +=
-                    #include "sandbox-minimal.sb"
-                    ;
-
-            debug("Generated sandbox profile:");
-            debug(sandboxProfile);
-
-            Path sandboxFile = tmpDir + "/.sandbox.sb";
-
-            writeFile(sandboxFile, sandboxProfile);
-
-            bool allowLocalNetworking = parsedDrv->getBoolAttr("__darwinAllowLocalNetworking");
-
-            /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
-               to find temporary directories, so we want to open up a broader place for them to put their files, if needed. */
-            Path globalTmpDir = canonPath(defaultTempDir(), true);
-
-            /* They don't like trailing slashes on subpath directives */
-            while (!globalTmpDir.empty() && globalTmpDir.back() == '/')
-                globalTmpDir.pop_back();
-
-            if (getEnv("_NIX_TEST_NO_SANDBOX") != "1") {
-                builder = "/usr/bin/sandbox-exec";
-                args.push_back("sandbox-exec");
-                args.push_back("-f");
-                args.push_back(sandboxFile);
-                args.push_back("-D");
-                args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
-                if (allowLocalNetworking) {
-                    args.push_back("-D");
-                    args.push_back(std::string("_ALLOW_LOCAL_NETWORKING=1"));
-                }
-                args.push_back(drv->builder);
+            /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
+            if (settings.darwinLogSandboxViolations) {
+                sandboxProfile += "(deny default)\n";
             } else {
-                builder = drv->builder;
-                args.push_back(std::string(baseNameOf(drv->builder)));
+                sandboxProfile += "(deny default (with no-log))\n";
+            }
+
+            sandboxProfile +=
+                #include "sandbox-defaults.sb"
+                ;
+
+            if (!derivationType->isSandboxed())
+                sandboxProfile +=
+                    #include "sandbox-network.sb"
+                    ;
+
+            /* Add the output paths we'll use at build-time to the chroot */
+            sandboxProfile += "(allow file-read* file-write* process-exec\n";
+            for (auto & [_, path] : scratchOutputs)
+                sandboxProfile += fmt("\t(subpath \"%s\")\n", worker.store.printStorePath(path));
+
+            sandboxProfile += ")\n";
+
+            /* Our inputs (transitive dependencies and any impurities computed above)
+
+               without file-write* allowed, access() incorrectly returns EPERM
+             */
+            sandboxProfile += "(allow file-read* file-write* process-exec\n";
+            for (auto & i : pathsInChroot) {
+                if (i.first != i.second.source)
+                    throw Error(
+                        "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin",
+                        i.first, i.second.source);
+
+                std::string path = i.first;
+                auto optSt = maybeLstat(path.c_str());
+                if (!optSt) {
+                    if (i.second.optional)
+                        continue;
+                    throw SysError("getting attributes of required path '%s", path);
+                }
+                if (S_ISDIR(optSt->st_mode))
+                    sandboxProfile += fmt("\t(subpath \"%s\")\n", path);
+                else
+                    sandboxProfile += fmt("\t(literal \"%s\")\n", path);
+            }
+            sandboxProfile += ")\n";
+
+            /* Allow file-read* on full directory hierarchy to self. Allows realpath() */
+            sandboxProfile += "(allow file-read*\n";
+            for (auto & i : ancestry) {
+                sandboxProfile += fmt("\t(literal \"%s\")\n", i);
+            }
+            sandboxProfile += ")\n";
+
+            sandboxProfile += additionalSandboxProfile;
+        } else
+            sandboxProfile +=
+                #include "sandbox-minimal.sb"
+                ;
+
+        debug("Generated sandbox profile:");
+        debug(sandboxProfile);
+
+        bool allowLocalNetworking = parsedDrv->getBoolAttr("__darwinAllowLocalNetworking");
+
+        /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
+            to find temporary directories, so we want to open up a broader place for them to put their files, if needed. */
+        Path globalTmpDir = canonPath(defaultTempDir(), true);
+
+        /* They don't like trailing slashes on subpath directives */
+        while (!globalTmpDir.empty() && globalTmpDir.back() == '/')
+            globalTmpDir.pop_back();
+
+        if (getEnv("_NIX_TEST_NO_SANDBOX") != "1") {
+            Strings sandboxArgs;
+            sandboxArgs.push_back("_GLOBAL_TMP_DIR");
+            sandboxArgs.push_back(globalTmpDir);
+            if (allowLocalNetworking) {
+                sandboxArgs.push_back("_ALLOW_LOCAL_NETWORKING");
+                sandboxArgs.push_back("1");
+            }
+            char * sandbox_errbuf = nullptr;
+            if (sandbox_init_with_parameters(sandboxProfile.c_str(), 0, stringsToCharPtrs(sandboxArgs).data(), &sandbox_errbuf)) {
+                writeFull(STDERR_FILENO, fmt("failed to configure sandbox: %s\n", sandbox_errbuf ? sandbox_errbuf : "(null)"));
+                _exit(1);
             }
         }
-#else
-        else {
-            builder = drv->builder;
-            args.push_back(std::string(baseNameOf(drv->builder)));
-        }
 #endif
-
-        for (auto & i : drv->args)
-            args.push_back(rewriteStrings(i, inputRewrites));
 
         /* Indicate that we managed to set up the build environment. */
         writeFull(STDERR_FILENO, std::string("\2\n"));
@@ -2209,6 +2241,14 @@ void LocalDerivationGoal::runChild()
             }
         }
 
+        // Now builder is not builtin
+
+        Strings args;
+        args.push_back(std::string(baseNameOf(drv->builder)));
+
+        for (auto & i : drv->args)
+            args.push_back(rewriteStrings(i, inputRewrites));
+
 #if __APPLE__
         posix_spawnattr_t attrp;
 
@@ -2230,21 +2270,15 @@ void LocalDerivationGoal::runChild()
             posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
         }
 
-        posix_spawn(NULL, builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+        posix_spawn(NULL, drv->builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 #else
-        execve(builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+        execve(drv->builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 #endif
 
         throw SysError("executing '%1%'", drv->builder);
 
-    } catch (Error & e) {
-        if (sendException) {
-            writeFull(STDERR_FILENO, "\1\n");
-            FdSink sink(STDERR_FILENO);
-            sink << e;
-            sink.flush();
-        } else
-            std::cerr << e.msg();
+    } catch (...) {
+        handleChildException(sendException);
         _exit(1);
     }
 }
@@ -3025,7 +3059,7 @@ bool LocalDerivationGoal::isReadDesc(int fd)
 StorePath LocalDerivationGoal::makeFallbackPath(OutputNameView outputName)
 {
     // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
-    // See doc/manual/src/protocols/store-path.md for details
+    // See doc/manual/source/protocols/store-path.md for details
     // TODO: We may want to separate the responsibilities of constructing the path fingerprint and of actually doing the hashing
     auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName);
     return worker.store.makeStorePath(
@@ -3038,7 +3072,7 @@ StorePath LocalDerivationGoal::makeFallbackPath(OutputNameView outputName)
 StorePath LocalDerivationGoal::makeFallbackPath(const StorePath & path)
 {
     // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
-    // See doc/manual/src/protocols/store-path.md for details
+    // See doc/manual/source/protocols/store-path.md for details
     auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string());
     return worker.store.makeStorePath(
         pathType,
