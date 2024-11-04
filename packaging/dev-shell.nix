@@ -86,10 +86,11 @@ in {
     ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (lib.hiPrio pkgs.buildPackages.clang-tools);
 
   buildInputs = attrs.buildInputs or []
-    ++ [
-      pkgs.gtest
-      pkgs.rapidcheck
-    ]
+    ++ pkgs.nixComponents.nix-util.buildInputs
+    ++ pkgs.nixComponents.nix-store.buildInputs
+    ++ pkgs.nixComponents.nix-fetchers.buildInputs
+    ++ pkgs.nixComponents.nix-expr.buildInputs
+    ++ pkgs.nixComponents.nix-store-tests.externalBuildInputs
     ++ lib.optional havePerl pkgs.perl
     ;
 })
