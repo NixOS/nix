@@ -73,20 +73,28 @@ in
     (forAllCrossSystems (crossSystem:
       lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName}))));
 
-  buildNoGc = forAllSystems (system:
-    self.packages.${system}.nix.override { enableGC = false; }
-  );
+  buildNoGc = let
+    components = forAllSystems (system:
+      nixpkgsFor.${system}.native.nixComponents.overrideScope (self: super: {
+        nix-expr = super.nix-expr.override { enableGC = false; };
+      })
+    );
+  in forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
 
   buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-cli);
 
   # Toggles some settings for better coverage. Windows needs these
   # library combinations, and Debian build Nix with GNU readline too.
-  buildReadlineNoMarkdown = forAllSystems (system:
-    self.packages.${system}.nix.override {
-      enableMarkdown = false;
-      readlineFlavor = "readline";
-    }
-  );
+  buildReadlineNoMarkdown = let
+    components = forAllSystems (system:
+      nixpkgsFor.${system}.native.nixComponents.overrideScope (self: super: {
+        nix-cmd = super.nix-cmd.override {
+          enableMarkdown = false;
+          readlineFlavor = "readline";
+        };
+      })
+    );
+  in forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
 
   # Perl bindings for various platforms.
   perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-perl-bindings);
