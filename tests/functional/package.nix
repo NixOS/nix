@@ -24,6 +24,7 @@
 
 # Configuration Options
 
+, pname ? "nix-functional-tests"
 , version
 
 # For running the functional tests against a different pre-built Nix.
@@ -35,8 +36,7 @@ let
 in
 
 mkMesonDerivation (finalAttrs: {
-  pname = "nix-functional-tests";
-  inherit version;
+  inherit pname version;
 
   workDir = ./.;
   fileset = fileset.unions [
