@@ -22,10 +22,12 @@ subproject('libcmd')
 subproject('nix')
 
 # Docs
-subproject('internal-api-docs')
-subproject('external-api-docs')
-if not meson.is_cross_build()
-  subproject('nix-manual')
+if get_option('doc-gen')
+  subproject('internal-api-docs')
+  subproject('external-api-docs')
+  if not meson.is_cross_build()
+    subproject('nix-manual')
+  endif
 endif
 
 # External C wrapper libraries
@@ -35,17 +37,19 @@ subproject('libexpr-c')
 subproject('libmain-c')
 
 # Language Bindings
-if not meson.is_cross_build()
+if get_option('bindings') and not meson.is_cross_build()
   subproject('perl')
 endif
 
 # Testing
-subproject('libutil-test-support')
-subproject('libutil-tests')
-subproject('libstore-test-support')
-subproject('libstore-tests')
-subproject('libfetchers-tests')
-subproject('libexpr-test-support')
-subproject('libexpr-tests')
-subproject('libflake-tests')
+if get_option('unit-tests')
+  subproject('libutil-test-support')
+  subproject('libutil-tests')
+  subproject('libstore-test-support')
+  subproject('libstore-tests')
+  subproject('libfetchers-tests')
+  subproject('libexpr-test-support')
+  subproject('libexpr-tests')
+  subproject('libflake-tests')
+endif
 subproject('nix-functional-tests')
