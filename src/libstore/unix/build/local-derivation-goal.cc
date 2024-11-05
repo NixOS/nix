@@ -555,7 +555,7 @@ void LocalDerivationGoal::startBuilder()
            possible. Any mitigation along these lines would have to be
            done directly in the sandbox profile. */
         tmpDir = topTmpDir + "/build";
-        createDir(tmpDir, 0700);
+        createDir(tmpDir, 0750);
     } else {
         tmpDir = topTmpDir;
     }
