@@ -11,9 +11,13 @@
 #include <stdexcept>
 #include <string>
 
+#include "serialise.hh"
+#include "processes.hh"
+
 
 namespace fs = std::filesystem;
 
+namespace nix {
 namespace lfs {
 
 // see Fetch::rules
@@ -50,8 +54,8 @@ struct Fetch {
 
   void init(git_repository* repo, std::string gitattributesContent);
   bool hasAttribute(const std::string& path, const std::string& attrName) const;
-  std::string download(const std::string& data, const std::string& path) const;
-  std::vector<nlohmann::json> fetch_urls(const std::vector<Md> &metadatas) const;
+  void fetch(const std::string& pointerFileContents, const std::string& pointerFilePath, Sink& sink) const;
+  std::vector<nlohmann::json> fetchUrls(const std::vector<Md> &metadatas) const;
 };
 
 bool matchesPattern(std::string_view path, std::string_view pattern) {
@@ -84,7 +88,7 @@ bool matchesPattern(std::string_view path, std::string_view pattern) {
     return patternPos == pattern.length() && pathPos == path.length();
 }
 
-static size_t WriteCallback(void *contents, size_t size, size_t nmemb,
+static size_t writeCallback(void *contents, size_t size, size_t nmemb,
                             std::string *s) {
   size_t newLength = size * nmemb;
   try {
@@ -96,34 +100,62 @@ static size_t WriteCallback(void *contents, size_t size, size_t nmemb,
   return newLength;
 }
 
-std::string download_to_memory(const std::string &url, const std::string &auth_header) {
-  CURL *curl;
-  CURLcode res;
-  std::string response_string;
+struct SinkCallbackData {
+    Sink* sink;
+    std::string_view sha256Expected;
+    HashSink hashSink;
+    
+    SinkCallbackData(Sink* sink, std::string_view sha256) 
+        : sink(sink)
+        , sha256Expected(sha256)
+        , hashSink(HashAlgorithm::SHA256) 
+    {}
+};
 
-  curl = curl_easy_init();
-  if (curl) {
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_string);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-
-    struct curl_slist *headers = nullptr;
-    const std::string auth_header_prepend = "Authorization: " + auth_header;
-    headers = curl_slist_append(headers, auth_header_prepend.c_str());
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-    res = curl_easy_perform(curl);
-    if (res != CURLE_OK) {
-      std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res)
-                << std::endl;
+static size_t sinkWriteCallback(void *contents, size_t size, size_t nmemb, SinkCallbackData *data) {
+    size_t totalSize = size * nmemb;
+    try {
+        data->hashSink({(char *)contents, totalSize});
+        (*data->sink)({(char *)contents, totalSize});
+    } catch (std::exception &e) {
+        return 0;
     }
+    return totalSize;
+}
 
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-  }
+void downloadToSink(const std::string &url, const std::string &authHeader, Sink &sink, std::string_view sha256Expected) {
+    CURL *curl;
+    CURLcode res;
 
-  return response_string;
+    curl = curl_easy_init();
+    if (curl) {
+        SinkCallbackData data(&sink, sha256Expected);
+        
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, sinkWriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+        struct curl_slist *headers = nullptr;
+        const std::string authHeader_prepend = "Authorization: " + authHeader;
+        headers = curl_slist_append(headers, authHeader_prepend.c_str());
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+        res = curl_easy_perform(curl);
+        if (res != CURLE_OK) {
+            curl_slist_free_all(headers);
+            curl_easy_cleanup(curl);
+            throw std::runtime_error(std::string("curl_easy_perform() failed: ") + curl_easy_strerror(res));
+        }
+
+        const auto sha256Actual = data.hashSink.finish().first.to_string(HashFormat::Base16, false);
+        if (sha256Actual != data.sha256Expected) {
+            throw std::runtime_error("sha256 mismatch: while fetching " + url + ": expected " + std::string(data.sha256Expected) + " but got " + sha256Actual);
+        }
+
+        curl_slist_free_all(headers);
+        curl_easy_cleanup(curl);
+    }
 }
 
 
@@ -207,32 +239,14 @@ std::vector<AttrRule> parseGitAttrFile(std::string_view content)
 
 
 
-std::string exec_command(const std::string &cmd) {
-  std::cout << cmd << std::endl;
-  std::string data;
-  std::array<char, 256> buffer;
-  std::string result;
-  std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd.c_str(), "r"),
-                                                pclose);
-  if (!pipe) {
-    throw std::runtime_error("popen() failed!");
-  }
-  while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
-    result += buffer.data();
-  }
-  if (result.back() == '\n') {
-    result.pop_back();
-  }
-  return result;
-}
-
-std::string get_lfs_api_token(const std::string &host,
+std::string getLfsApiToken(const std::string &host,
                               const std::string &path) {
-  std::string command =
-      "ssh git@" + host + " git-lfs-authenticate " + path + " download";
-  std::string output = exec_command(command);
-  std::string res;
+  auto [status, output] = runProgram(RunOptions {
+      .program = "ssh",
+      .args = {"git@" + host, "git-lfs-authenticate", path, "download"},
+  });
 
+  std::string res;
   if (!output.empty()) {
     nlohmann::json query_resp = nlohmann::json::parse(output);
     res = query_resp["header"]["Authorization"].get<std::string>();
@@ -241,10 +255,10 @@ std::string get_lfs_api_token(const std::string &host,
   return res;
 }
 
-std::string get_lfs_endpoint_url(git_repository *repo) {
+std::string getLfsEndpointUrl(git_repository *repo) {
   int err;
   git_remote* remote = NULL;
-  err = git_remote_lookup(&remote, repo, "origin"); // TODO: we just created this repo so I think origin is always the only remote, but should double check
+  err = git_remote_lookup(&remote, repo, "origin");
   if (err < 0) {
       std::cerr << " failed git_remote_lookup with: " << err << std::endl;
       return "";
@@ -261,7 +275,7 @@ std::string get_lfs_endpoint_url(git_repository *repo) {
 }
 
 // splits url into (hostname, path)
-std::tuple<std::string, std::string> split_url(const std::string& url_in) {
+std::tuple<std::string, std::string> splitUrl(const std::string& url_in) {
   CURLU *url = curl_url();
 
   if (curl_url_set(url, CURLUPART_URL, url_in.c_str(), 0) != CURLUE_OK) {
@@ -328,54 +342,11 @@ std::unique_ptr<std::vector<std::string>> find_lfs_files(git_repository *repo) {
   return out;
 }
 
-std::string get_obj_content(git_repository *repo, std::string path) {
-  // Get the HEAD commit
-  git_object *obj = nullptr;
-  if (git_revparse_single(&obj, repo, "HEAD^{commit}") != 0) {
-    std::cerr << "Failed to find HEAD" << std::endl;
-    return "";
-  }
-
-  git_commit *commit = nullptr;
-  git_commit_lookup(&commit, repo, git_object_id(obj));
-  git_object_free(obj);
-
-  git_tree *tree = nullptr;
-  if (git_commit_tree(&tree, commit) != 0) {
-    std::cerr << "Failed to get tree from commit" << std::endl;
-    git_commit_free(commit);
-    return "";
-  }
-
-  git_tree_entry *entry;
-  if (git_tree_entry_bypath(&entry, tree, path.c_str()) != 0) {
-    std::cerr << "Failed to find " << path << " in the tree" << std::endl;
-    git_tree_free(tree);
-    git_commit_free(commit);
-    return "";
-  }
-
-  git_blob *blob = nullptr;
-  if (git_blob_lookup(&blob, repo, git_tree_entry_id(entry)) != 0) {
-    std::cerr << "Failed to lookup blob" << std::endl;
-    git_tree_entry_free(
-        const_cast<git_tree_entry *>(entry)); // Free entry after use
-    git_tree_free(tree);
-    git_commit_free(commit);
-    return "";
-  }
-
-  auto content = git_blob_rawcontent(blob);
-  git_object_free(obj);
-  git_tree_free(tree);
-  git_commit_free(commit);
-
-  // is this copy elided? i wont pretend to understand
-  // https://en.cppreference.com/w/cpp/language/copy_elision
-  return std::string(static_cast<const char *>(content));
-}
-
-Md parse_lfs_metadata(const std::string &content, const std::string &filename) {
+Md parseLfsMetadata(const std::string &content, const std::string &filename) {
+  // example git-lfs poitner file:
+  // version https://git-lfs.github.com/spec/v1
+  // oid sha256:f5e02aa71e67f41d79023a128ca35bad86cf7b6656967bfe0884b3a3c4325eaf
+  // size 10000000
   std::istringstream iss(content);
   std::string line;
   std::string oid;
@@ -384,14 +355,14 @@ Md parse_lfs_metadata(const std::string &content, const std::string &filename) {
   while (getline(iss, line)) {
     std::size_t pos = line.find("oid sha256:");
     if (pos != std::string::npos) {
-      oid = line.substr(pos + 11); // Extract hash after "oid sha256:"
+      oid = line.substr(pos + 11); // skip "oid sha256:"
       continue;
     }
 
     pos = line.find("size ");
     if (pos != std::string::npos) {
       std::string sizeStr =
-          line.substr(pos + 5); // Extract size number after "size "
+          line.substr(pos + 5); // skip "size "
       size = std::stol(sizeStr);
       continue;
     }
@@ -401,9 +372,9 @@ Md parse_lfs_metadata(const std::string &content, const std::string &filename) {
 }
 
 void Fetch::init(git_repository* repo, std::string gitattributesContent) {
-   this->rootUrl = lfs::get_lfs_endpoint_url(repo);
-   const auto [host, path] = lfs::split_url(rootUrl);
-   this->token = lfs::get_lfs_api_token(host, path);
+   this->rootUrl = lfs::getLfsEndpointUrl(repo);
+   const auto [host, path] = lfs::splitUrl(rootUrl);
+   this->token = lfs::getLfsApiToken(host, path);
    this->rules = lfs::parseGitAttrFile(gitattributesContent);
    this->ready = true;
 }
@@ -424,44 +395,40 @@ bool Fetch::hasAttribute(const std::string& path, const std::string& attrName) c
 }
 
 nlohmann::json mdToPayload(const std::vector<Md> &items) {
-  nlohmann::json j_array = nlohmann::json::array();
+  nlohmann::json jArray = nlohmann::json::array();
   for (const auto &md : items) {
-    j_array.push_back({{"oid", md.oid}, {"size", md.size}});
+    jArray.push_back({{"oid", md.oid}, {"size", md.size}});
   }
-  return j_array;
+  return jArray;
 }
 
-std::vector<nlohmann::json> Fetch::fetch_urls(const std::vector<Md> &metadatas) const {
-  std::vector<nlohmann::json> objects;
-
-  nlohmann::json oid_list = mdToPayload(metadatas);
+std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> &metadatas) const {
+  nlohmann::json oidList = mdToPayload(metadatas);
   nlohmann::json data = {
       {"operation", "download"},
   };
-  data["objects"] = oid_list;
-  auto data_str = data.dump();
+  data["objects"] = oidList;
+  auto dataStr = data.dump();
 
   CURL *curl = curl_easy_init();
-  std::string response_string;
-  std::string header_string;
-  auto lfs_url_batch = rootUrl + "/info/lfs/objects/batch";
-  curl_easy_setopt(curl, CURLOPT_URL, lfs_url_batch.c_str());
-  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data_str.c_str());
+  std::string responseString;
+  std::string headerString;
+  auto lfsUrlBatch = rootUrl + "/info/lfs/objects/batch";
+  curl_easy_setopt(curl, CURLOPT_URL, lfsUrlBatch.c_str());
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, dataStr.c_str());
 
-  // Set headers
   struct curl_slist *headers = NULL;
-  auto auth_header = "Authorization: " + token;
-  headers = curl_slist_append(headers, auth_header.c_str());
+  auto authHeader = "Authorization: " + token;
+  headers = curl_slist_append(headers, authHeader.c_str());
   headers =
       curl_slist_append(headers, "Content-Type: application/vnd.git-lfs+json");
   headers = curl_slist_append(headers, "Accept: application/vnd.git-lfs+json");
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   curl_easy_setopt(curl, CURLOPT_POST, 1L);
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_string);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseString);
 
   CURLcode res = curl_easy_perform(curl);
-  // Check for errors
   if (res != CURLE_OK)
     fprintf(stderr, "curl_easy_perform() failed: %s\n",
             curl_easy_strerror(res));
@@ -469,40 +436,38 @@ std::vector<nlohmann::json> Fetch::fetch_urls(const std::vector<Md> &metadatas) 
   curl_easy_cleanup(curl);
   curl_slist_free_all(headers);
 
-  try {
-    // example resp here:
-    // {"objects":[{"oid":"f5e02aa71e67f41d79023a128ca35bad86cf7b6656967bfe0884b3a3c4325eaf","size":10000000,"actions":{"download":{"href":"https://gitlab.com/b-camacho/test-lfs.git/gitlab-lfs/objects/f5e02aa71e67f41d79023a128ca35bad86cf7b6656967bfe0884b3a3c4325eaf","header":{"Authorization":"Basic
-    // Yi1jYW1hY2hvOmV5SjBlWEFpT2lKS1YxUWlMQ0poYkdjaU9pSklVekkxTmlKOS5leUprWVhSaElqcDdJbUZqZEc5eUlqb2lZaTFqWVcxaFkyaHZJbjBzSW1wMGFTSTZJbUptTURZNFpXVTFMVEprWmpVdE5HWm1ZUzFpWWpRMExUSXpNVEV3WVRReU1qWmtaaUlzSW1saGRDSTZNVGN4TkRZeE16ZzBOU3dpYm1KbUlqb3hOekUwTmpFek9EUXdMQ0psZUhBaU9qRTNNVFEyTWpFd05EVjkuZk9yMDNkYjBWSTFXQzFZaTBKRmJUNnJTTHJPZlBwVW9lYllkT0NQZlJ4QQ=="}}},"authenticated":true}]}
-    auto resp = nlohmann::json::parse(response_string);
-    if (resp.contains("objects")) {
-      objects.insert(objects.end(), resp["objects"].begin(),
-                     resp["objects"].end());
-    } else {
-      throw std::runtime_error("Response does not contain 'objects'");
-    }
-  } catch (std::exception &e) {
-    std::cerr << "Failed to parse JSON or invalid response: " << e.what()
-              << std::endl;
+  std::vector<nlohmann::json> objects;
+  // example resp here:
+  // {"objects":[{"oid":"f5e02aa71e67f41d79023a128ca35bad86cf7b6656967bfe0884b3a3c4325eaf","size":10000000,"actions":{"download":{"href":"https://gitlab.com/b-camacho/test-lfs.git/gitlab-lfs/objects/f5e02aa71e67f41d79023a128ca35bad86cf7b6656967bfe0884b3a3c4325eaf","header":{"Authorization":"Basic
+  // Yi1jYW1hY2hvOmV5SjBlWEFpT2lKS1YxUWlMQ0poYkdjaU9pSklVekkxTmlKOS5leUprWVhSaElqcDdJbUZqZEc5eUlqb2lZaTFqWVcxaFkyaHZJbjBzSW1wMGFTSTZJbUptTURZNFpXVTFMVEprWmpVdE5HWm1ZUzFpWWpRMExUSXpNVEV3WVRReU1qWmtaaUlzSW1saGRDSTZNVGN4TkRZeE16ZzBOU3dpYm1KbUlqb3hOekUwTmpFek9EUXdMQ0psZUhBaU9qRTNNVFEyTWpFd05EVjkuZk9yMDNkYjBWSTFXQzFZaTBKRmJUNnJTTHJPZlBwVW9lYllkT0NQZlJ4QQ=="}}},"authenticated":true}]}
+  auto resp = nlohmann::json::parse(responseString);
+  if (resp.contains("objects")) {
+    objects.insert(objects.end(), resp["objects"].begin(),
+                   resp["objects"].end());
+  } else {
+    throw std::runtime_error("Response does not contain 'objects'");
   }
 
   return objects;
 }
 
-std::string Fetch::download(const std::string& pointer_data, const std::string& path) const {
-  const auto md = parse_lfs_metadata(pointer_data, path);
-  std::vector<Md> v_mds;
-  v_mds.push_back(md);
-  const auto obj_urls = fetch_urls(v_mds);
+void Fetch::fetch(const std::string& pointerFileContents, const std::string& pointerFilePath, Sink& sink) const {
+  const auto md = parseLfsMetadata(pointerFileContents, pointerFilePath);
+  std::vector<Md> vMds;
+  vMds.push_back(md);
+  const auto objUrls = fetchUrls(vMds);
 
-  const auto obj = obj_urls[0];
+  const auto obj = objUrls[0];
   std::string oid = obj["oid"];
   std::string ourl = obj["actions"]["download"]["href"];
-  std::string auth_header =
-  obj["actions"]["download"]["header"]["Authorization"];
-  const auto data = lfs::download_to_memory(ourl, auth_header);
-  return data;
+  std::string authHeader =
+      obj["actions"]["download"]["header"]["Authorization"];
+  // oid is also the sha256
+  downloadToSink(ourl, authHeader, sink, oid);
 }
 
 
 
 } // namespace lfs
+
+} // namespace nix

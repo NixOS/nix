@@ -541,14 +541,37 @@ struct GitSourceAccessor : SourceAccessor
                 _lfsFetch.init(*repo, contents);
                 };
             if (_lfsFetch.hasAttribute(path.abs(), "filter")) {
-                return _lfsFetch.download(data, path.abs());
+                StringSink s;
+                _lfsFetch.fetch(data, path.abs(), s);
+                return s.s;
             }
         }
 
         return data;
     }
 
-    // TODO(b-camacho): implement callback-based readFile override
+    void readFile(
+        const CanonPath & path,
+        Sink & sink,
+        std::function<void(uint64_t)> sizeCallback = [](uint64_t size){}) override {
+        auto blob = getBlob(path, false);
+        auto size = git_blob_rawsize(blob.get());
+        sizeCallback(size);
+
+        auto pointerFileContents = std::string((const char *) git_blob_rawcontent(blob.get()), size);
+
+        if (path != CanonPath(".gitattributes") && lfsFetch) {
+            auto& _lfsFetch = *lfsFetch;
+            if (!_lfsFetch.ready) {
+                const auto contents = readFile(CanonPath(".gitattributes"));
+                _lfsFetch.init(*repo, contents);
+            }
+            if (_lfsFetch.hasAttribute(path.abs(), "filter")) {
+                _lfsFetch.fetch(pointerFileContents, path.abs(), sink);
+                return;
+            }
+        }
+    }
 
     std::string readFile(const CanonPath & path) override
     {
@@ -1046,8 +1069,6 @@ ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev, bool smudge
 
 ref<SourceAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore, bool smudgeLfs)
 {
-    // exportIgnore does not work with git-lfs smudging
-    //assert(!(exportIgnore && smudgeLfs));
     auto self = ref<GitRepoImpl>(shared_from_this());
     ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev, smudgeLfs);
     if (exportIgnore) {
