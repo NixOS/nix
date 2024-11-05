@@ -265,6 +265,7 @@ else
 endif
 
 subdir('build-utils-meson/export-all-symbols')
+subdir('build-utils-meson/windows-version')
 
 this_library = library(
   'nixutil',

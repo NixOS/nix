@@ -28,6 +28,7 @@ subdir('build-utils-meson/subprojects')
 subdir('build-utils-meson/threads')
 
 subdir('build-utils-meson/export-all-symbols')
+subdir('build-utils-meson/windows-version')
 
 rapidcheck = dependency('rapidcheck')
 deps_private += rapidcheck
