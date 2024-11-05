@@ -56,6 +56,7 @@ headers = files(
 )
 
 subdir('build-utils-meson/export-all-symbols')
+subdir('build-utils-meson/windows-version')
 
 this_library = library(
   'nix-expr-test-support',
