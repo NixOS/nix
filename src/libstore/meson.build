@@ -34,6 +34,8 @@ subdir('build-utils-meson/subprojects')
 run_command('ln', '-s',
   meson.project_build_root() / '__nothing_link_target',
   meson.project_build_root() / '__nothing_symlink',
+  # native doesn't allow dangling symlinks, which the tests require
+  env : { 'MSYS' : 'winsymlinks:lnk' },
   check : true,
 )
 can_link_symlink = run_command('ln',
