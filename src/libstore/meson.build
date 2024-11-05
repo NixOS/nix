@@ -76,6 +76,11 @@ if host_machine.system() == 'darwin'
   deps_other += [sandbox]
 endif
 
+if host_machine.system() == 'windows'
+  wsock32 = cxx.find_library('wsock32')
+  deps_other += [wsock32]
+endif
+
 subdir('build-utils-meson/threads')
 
 boost = dependency(
