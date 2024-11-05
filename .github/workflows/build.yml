@@ -4,6 +4,10 @@ on:
       os:
         required: true
         type: string
+      manual:
+        required: false
+        type: boolean
+        default: false
 
 jobs:
 
