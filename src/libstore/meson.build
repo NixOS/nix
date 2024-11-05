@@ -34,6 +34,8 @@ subdir('build-utils-meson/subprojects')
 run_command('ln', '-s',
   meson.project_build_root() / '__nothing_link_target',
   meson.project_build_root() / '__nothing_symlink',
+  # native doesn't allow dangling symlinks, which the tests require
+  env : { 'MSYS' : 'winsymlinks:lnk' },
   check : true,
 )
 can_link_symlink = run_command('ln',
@@ -72,6 +74,11 @@ configdata.set('HAVE_ACL_SUPPORT', has_acl_support.to_int())
 if host_machine.system() == 'darwin'
   sandbox = cxx.find_library('sandbox')
   deps_other += [sandbox]
+endif
+
+if host_machine.system() == 'windows'
+  wsock32 = cxx.find_library('wsock32')
+  deps_other += [wsock32]
 endif
 
 subdir('build-utils-meson/threads')
