@@ -31,6 +31,8 @@
 
 namespace nix {
 
+namespace fs { using namespace std::filesystem; }
+
 void completeFlakeInputPath(
     AddCompletions & completions,
     ref<EvalState> evalState,
@@ -86,7 +88,7 @@ MixFlakeOptions::MixFlakeOptions()
 
     > **DEPRECATED**
     >
-    > Use [`--no-use-registries`](#opt-no-use-registries) instead.
+    > Use [`--no-use-registries`](@docroot@/command-ref/conf-file.md#conf-use-registries) instead.
         )",
         .category = category,
         .handler = {[&]() {
@@ -341,7 +343,7 @@ void completeFlakeRefWithFragment(
             auto flakeRefS = std::string(prefix.substr(0, hash));
 
             // TODO: ideally this would use the command base directory instead of assuming ".".
-            auto flakeRef = parseFlakeRef(fetchSettings, expandTilde(flakeRefS), absPath("."));
+            auto flakeRef = parseFlakeRef(fetchSettings, expandTilde(flakeRefS), fs::current_path().string());
 
             auto evalCache = openEvalCache(*evalState,
                 std::make_shared<flake::LockedFlake>(lockFlake(

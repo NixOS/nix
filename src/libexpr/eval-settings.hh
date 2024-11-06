@@ -87,10 +87,19 @@ struct EvalSettings : Config
           If the respective paths are accessible, the default values are:
 
           - `$HOME/.nix-defexpr/channels`
+
+            The [user channel link](@docroot@/command-ref/files/default-nix-expression.md#user-channel-link), pointing to the current state of [channels](@docroot@/command-ref/files/channels.md) for the current user.
+
           - `nixpkgs=$NIX_STATE_DIR/profiles/per-user/root/channels/nixpkgs`
+
+            The current state of the `nixpkgs` channel for the `root` user.
+
           - `$NIX_STATE_DIR/profiles/per-user/root/channels`
 
-          See [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR) for details.
+            The current state of all channels for the `root` user.
+
+          These files are set up by the [Nix installer](@docroot@/installation/installing-binary.md).
+          See [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR) for details on the environment variable.
 
           > **Note**
           >
@@ -185,7 +194,11 @@ struct EvalSettings : Config
         )"};
 
     Setting<bool> useEvalCache{this, true, "eval-cache",
-        "Whether to use the flake evaluation cache."};
+        R"(
+            Whether to use the flake evaluation cache.
+            Certain commands won't have to evaluate when invoked for the second time with a particular version of a flake.
+            Intermediate results are not cached.
+        )"};
 
     Setting<bool> ignoreExceptionsDuringTry{this, false, "ignore-try",
         R"(

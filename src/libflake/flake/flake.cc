@@ -13,6 +13,8 @@
 #include "value-to-json.hh"
 #include "local-fs-store.hh"
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
 using namespace flake;
@@ -140,9 +142,16 @@ static FlakeInput parseFlakeInput(EvalState & state,
                     case nBool:
                         attrs.emplace(state.symbols[attr.name], Explicit<bool> { attr.value->boolean() });
                         break;
-                    case nInt:
-                        attrs.emplace(state.symbols[attr.name], (long unsigned int) attr.value->integer());
+                    case nInt: {
+                        auto intValue = attr.value->integer().value;
+
+                        if (intValue < 0) {
+                            state.error<EvalError>("negative value given for flake input attribute %1%: %2%", state.symbols[attr.name], intValue).debugThrow();
+                        }
+
+                        attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
                         break;
+                    }
                     default:
                         if (attr.name == state.symbols.create("publicKeys")) {
                             experimentalFeatureSettings.require(Xp::VerifiedFetches);
@@ -272,7 +281,7 @@ static Flake readFlake(
             else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    state.forceInt(*setting.value, setting.pos, ""));
+                    state.forceInt(*setting.value, setting.pos, "").value);
             else if (setting.value->type() == nBool)
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
@@ -744,6 +753,21 @@ LockedFlake lockFlake(
     }
 }
 
+std::pair<StorePath, Path> sourcePathToStorePath(
+    ref<Store> store,
+    const SourcePath & _path)
+{
+    auto path = _path.path.abs();
+
+    if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
+        auto realStoreDir = store2->getRealStoreDir();
+        if (isInDir(path, realStoreDir))
+            path = store2->storeDir + path.substr(realStoreDir.size());
+    }
+
+    return store->toStorePath(path);
+}
+
 void callFlake(EvalState & state,
     const LockedFlake & lockedFlake,
     Value & vRes)
@@ -761,17 +785,7 @@ void callFlake(EvalState & state,
 
         auto lockedNode = node.dynamic_pointer_cast<const LockedNode>();
 
-        // FIXME: This is a hack to support chroot stores. Remove this
-        // once we can pass a sourcePath rather than a storePath to
-        // call-flake.nix.
-        auto path = sourcePath.path.abs();
-        if (auto store = state.store.dynamic_pointer_cast<LocalFSStore>()) {
-            auto realStoreDir = store->getRealStoreDir();
-            if (isInDir(path, realStoreDir))
-                path = store->storeDir + path.substr(realStoreDir.size());
-        }
-
-        auto [storePath, subdir] = state.store->toStorePath(path);
+        auto [storePath, subdir] = sourcePathToStorePath(state.store, sourcePath);
 
         emitTreeAttrs(
             state,
@@ -904,8 +918,13 @@ static void prim_flakeRefToString(
     for (const auto & attr : *args[0]->attrs()) {
         auto t = attr.value->type();
         if (t == nInt) {
-            attrs.emplace(state.symbols[attr.name],
-                (uint64_t) attr.value->integer());
+            auto intValue = attr.value->integer().value;
+
+            if (intValue < 0) {
+                state.error<EvalError>("negative value given for flake ref attr %1%: %2%", state.symbols[attr.name], intValue).atPos(pos).debugThrow();
+            }
+
+            attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
         } else if (t == nBool) {
             attrs.emplace(state.symbols[attr.name],
                 Explicit<bool> { attr.value->boolean() });

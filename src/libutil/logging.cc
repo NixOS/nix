@@ -85,10 +85,10 @@ public:
 
     void logEI(const ErrorInfo & ei) override
     {
-        std::stringstream oss;
+        std::ostringstream oss;
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
-        log(ei.level, oss.str());
+        log(ei.level, toView(oss));
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
@@ -346,7 +346,7 @@ Activity::~Activity()
     try {
         logger.stopActivity(id);
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 

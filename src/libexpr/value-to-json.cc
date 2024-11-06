@@ -22,7 +22,7 @@ json printValueAsJSON(EvalState & state, bool strict,
     switch (v.type()) {
 
         case nInt:
-            out = v.integer();
+            out = v.integer().value;
             break;
 
         case nBool:

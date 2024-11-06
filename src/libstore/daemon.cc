@@ -90,11 +90,11 @@ struct TunnelLogger : public Logger
     {
         if (ei.level > verbosity) return;
 
-        std::stringstream oss;
+        std::ostringstream oss;
         showErrorInfo(oss, ei, false);
 
         StringSink buf;
-        buf << STDERR_NEXT << oss.str();
+        buf << STDERR_NEXT << toView(oss);
         enqueueMsg(buf.s);
     }
 
@@ -402,6 +402,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             logger->startWork();
             auto pathInfo = [&]() {
                 // NB: FramedSource must be out of scope before logger->stopWork();
+                // FIXME: this means that if there is an error
+                // half-way through, the client will keep sending
+                // data, since we haven't sent it the error yet.
                 auto [contentAddressMethod, hashAlgo] = ContentAddressMethod::parseWithAlgo(camStr);
                 FramedSource source(conn.from);
                 FileSerialisationMethod dumpMethod;

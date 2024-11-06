@@ -138,7 +138,7 @@ or          { return OR_KW; }
 {INT}       { errno = 0;
               std::optional<int64_t> numMay = string2Int<int64_t>(yytext);
               if (numMay.has_value()) {
-                  yylval->n = *numMay;
+                  yylval->n = NixInt{*numMay};
               } else {
                   throw ParseError(ErrorInfo{
                       .msg = HintFmt("invalid integer '%1%'", yytext),

@@ -104,6 +104,27 @@ noSubmoduleRepo=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$subR
 
 [[ $noSubmoduleRepoBaseline == $noSubmoduleRepo ]]
 
+# Test .gitmodules with entries that refer to non-existent objects or objects that are not submodules.
+cat >> $rootRepo/.gitmodules <<EOF
+[submodule "missing"]
+        path = missing
+        url = https://example.org/missing.git
+
+[submodule "file"]
+        path = file
+        url = https://example.org/file.git
+EOF
+echo foo > $rootRepo/file
+git -C $rootRepo add file
+git -C $rootRepo commit -a -m "Add bad submodules"
+
+rev=$(git -C $rootRepo rev-parse HEAD)
+
+r=$(nix eval --raw --expr "builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }")
+
+[[ -f $r/file ]]
+[[ ! -e $r/missing ]]
+
 # Test relative submodule URLs.
 rm $TEST_HOME/.cache/nix/fetcher-cache*
 rm -rf $rootRepo/.git $rootRepo/.gitmodules $rootRepo/sub

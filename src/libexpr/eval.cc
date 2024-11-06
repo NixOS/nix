@@ -1,5 +1,4 @@
 #include "eval.hh"
-#include "eval-gc.hh"
 #include "eval-settings.hh"
 #include "primops.hh"
 #include "print-options.hh"
@@ -39,16 +38,6 @@
 #  include <sys/resource.h>
 #endif
 
-#if HAVE_BOEHMGC
-
-#  define GC_INCLUDE_NEW
-
-#  include <gc/gc.h>
-#  include <gc/gc_cpp.h>
-#  include <gc/gc_allocator.h>
-
-#endif
-
 #include "strings-inline.hh"
 
 using json = nlohmann::json;
@@ -58,24 +47,7 @@ namespace nix {
 static char * allocString(size_t size)
 {
     char * t;
-#if HAVE_BOEHMGC
     t = (char *) GC_MALLOC_ATOMIC(size);
-#else
-    t = (char *) malloc(size);
-#endif
-    if (!t) throw std::bad_alloc();
-    return t;
-}
-
-
-static char * dupString(const char * s)
-{
-    char * t;
-#if HAVE_BOEHMGC
-    t = GC_STRDUP(s);
-#else
-    t = strdup(s);
-#endif
     if (!t) throw std::bad_alloc();
     return t;
 }
@@ -99,11 +71,7 @@ static const char * makeImmutableString(std::string_view s)
 
 RootValue allocRootValue(Value * v)
 {
-#if HAVE_BOEHMGC
     return std::allocate_shared<Value *>(traceable_allocator<Value *>(), v);
-#else
-    return std::make_shared<Value *>(v);
-#endif
 }
 
 // Pretty print types for assertion errors
@@ -571,7 +539,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     if (v.isLambda()) {
         auto exprLambda = v.payload.lambda.fun;
 
-        std::stringstream s(std::ios_base::out);
+        std::ostringstream s;
         std::string name;
         auto pos = positions[exprLambda->getPos()];
         std::string docStr;
@@ -603,18 +571,32 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 
         s << docStr;
 
-        s << '\0'; // for making a c string below
-        std::string ss = s.str();
-
         return Doc {
             .pos = pos,
             .name = name,
             .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
             .args = {},
-            .doc =
-                // FIXME: this leaks; make the field std::string?
-                strdup(ss.data()),
+            .doc = makeImmutableString(toView(s)), // NOTE: memory leak when compiled without GC
         };
+    }
+    if (isFunctor(v)) {
+        try {
+            Value & functor = *v.attrs()->find(sFunctor)->value;
+            Value * vp = &v;
+            Value partiallyApplied;
+            // The first paramater is not user-provided, and may be
+            // handled by code that is opaque to the user, like lib.const = x: y: y;
+            // So preferably we show docs that are relevant to the
+            // "partially applied" function returned by e.g. `const`.
+            // We apply the first argument:
+            callFunction(functor, 1, &vp, partiallyApplied, noPos);
+            auto _level = addCallDepth(noPos);
+            return getDoc(partiallyApplied);
+        }
+        catch (Error & e) {
+            e.addTrace(nullptr, "while partially calling '%1%' to retrieve documentation", "__functor");
+            throw;
+        }
     }
     return {};
 }
@@ -836,9 +818,10 @@ static const char * * encodeContext(const NixStringContext & context)
         size_t n = 0;
         auto ctx = (const char * *)
             allocBytes((context.size() + 1) * sizeof(char *));
-        for (auto & i : context)
-            ctx[n++] = dupString(i.to_string().c_str());
-        ctx[n] = 0;
+        for (auto & i : context) {
+            ctx[n++] = makeImmutableString({i.to_string()});
+        }
+        ctx[n] = nullptr;
         return ctx;
     } else
         return nullptr;
@@ -1471,26 +1454,9 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
     v.mkLambda(&env, this);
 }
 
-namespace {
-/** Increments a count on construction and decrements on destruction.
- */
-class CallDepth {
-  size_t & count;
-public:
-  CallDepth(size_t & count) : count(count) {
-    ++count;
-  }
-  ~CallDepth() {
-    --count;
-  }
-};
-};
-
 void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos)
 {
-    if (callDepth > settings.maxCallDepth)
-        error<EvalError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
-    CallDepth _level(callDepth);
+    auto _level = addCallDepth(pos);
 
     auto trace = settings.traceFunctionCalls
         ? std::make_unique<FunctionCallTrace>(positions[pos])
@@ -1834,11 +1800,9 @@ void ExprIf::eval(EvalState & state, Env & env, Value & v)
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
     if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
-        auto exprStr = ({
-            std::ostringstream out;
-            cond->show(state.symbols, out);
-            out.str();
-        });
+        std::ostringstream out;
+        cond->show(state.symbols, out);
+        auto exprStr = toView(out);
 
         if (auto eq = dynamic_cast<ExprOpEq *>(cond)) {
             try {
@@ -1979,7 +1943,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     NixStringContext context;
     std::vector<BackedStringView> s;
     size_t sSize = 0;
-    NixInt n = 0;
+    NixInt n{0};
     NixFloat nf = 0;
 
     bool first = !forceString;
@@ -2023,17 +1987,22 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
         if (firstType == nInt) {
             if (vTmp.type() == nInt) {
-                n += vTmp.integer();
+                auto newN = n + vTmp.integer();
+                if (auto checked = newN.valueChecked(); checked.has_value()) {
+                    n = NixInt(*checked);
+                } else {
+                    state.error<EvalError>("integer overflow in adding %1% + %2%", n, vTmp.integer()).atPos(i_pos).debugThrow();
+                }
             } else if (vTmp.type() == nFloat) {
                 // Upgrade the type from int to float;
                 firstType = nFloat;
-                nf = n;
+                nf = n.value;
                 nf += vTmp.fpoint();
             } else
                 state.error<EvalError>("cannot add %1% to an integer", showType(vTmp)).atPos(i_pos).withFrame(env, *this).debugThrow();
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
-                nf += vTmp.integer();
+                nf += vTmp.integer().value;
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint();
             } else
@@ -2158,7 +2127,7 @@ NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view err
     try {
         forceValue(v, pos);
         if (v.type() == nInt)
-            return v.integer();
+            return v.integer().value;
         else if (v.type() != nFloat)
             error<TypeError>(
                 "expected a float but found %1%: %2%",
@@ -2345,7 +2314,7 @@ BackedStringView EvalState::coerceToString(
            shell scripting convenience, just like `null'. */
         if (v.type() == nBool && v.boolean()) return "1";
         if (v.type() == nBool && !v.boolean()) return "";
-        if (v.type() == nInt) return std::to_string(v.integer());
+        if (v.type() == nInt) return std::to_string(v.integer().value);
         if (v.type() == nFloat) return std::to_string(v.fpoint());
         if (v.type() == nNull) return "";
 
@@ -2728,9 +2697,9 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
 
     // Special case type-compatibility between float and int
     if (v1.type() == nInt && v2.type() == nFloat)
-        return v1.integer() == v2.fpoint();
+        return v1.integer().value == v2.fpoint();
     if (v1.type() == nFloat && v2.type() == nInt)
-        return v1.fpoint() == v2.integer();
+        return v1.fpoint() == v2.integer().value;
 
     // All other types are not compatible with each other.
     if (v1.type() != v2.type()) return false;
@@ -2865,7 +2834,9 @@ void EvalState::printStatistics()
 #endif
 #if HAVE_BOEHMGC
         {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
+#ifndef _WIN32 // TODO implement
         {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
+#endif
 #endif
     };
     topObj["envs"] = {
@@ -3083,7 +3054,9 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
     if (EvalSettings::isPseudoUrl(value)) {
         try {
             auto accessor = fetchers::downloadTarball(
-                EvalSettings::resolvePseudoUrl(value)).accessor;
+                store,
+                fetchSettings,
+                EvalSettings::resolvePseudoUrl(value));
             auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
             return finish(store->toRealPath(storePath));
         } catch (Error & e) {

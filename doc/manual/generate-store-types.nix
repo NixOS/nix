@@ -21,7 +21,7 @@ let
 
   "index.md" = replaceStrings
     [ "@store-types@" ] [ index ]
-    (readFile ./src/store/types/index.md.in);
+    (readFile ./source/store/types/index.md.in);
 
   tableOfContents =
     let

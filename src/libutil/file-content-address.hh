@@ -70,7 +70,8 @@ void dumpPath(
 void restorePath(
     const Path & path,
     Source & source,
-    FileSerialisationMethod method);
+    FileSerialisationMethod method,
+    bool startFsync = false);
 
 
 /**

@@ -23,6 +23,7 @@
 , libseccomp
 , libsodium
 , man
+, darwin
 , lowdown
 , mdbook
 , mdbook-linkcheck
@@ -47,7 +48,8 @@
 
 , pname ? "nix"
 
-, versionSuffix ? ""
+, version
+, versionSuffix
 
 # Whether to build Nix. Useful to skip for tasks like testing existing pre-built versions of Nix
 , doBuild ? true
@@ -59,7 +61,7 @@
 # Run the functional tests as part of the build.
 , doInstallCheck ? test-client != null || __forDefaults.canRunInstalled
 
-# Check test coverage of Nix. Probably want to use with with at least
+# Check test coverage of Nix. Probably want to use with at least
 # one of `doCHeck` or `doInstallCheck` enabled.
 , withCoverageChecks ? false
 
@@ -75,7 +77,9 @@
 #
 # Temporarily disabled on Windows because the `GC_throw_bad_alloc`
 # symbol is missing during linking.
-, enableGC ? !stdenv.hostPlatform.isWindows
+#
+# Disabled on OpenBSD because of missing `_data_start` symbol while linking
+, enableGC ? !stdenv.hostPlatform.isWindows && !stdenv.hostPlatform.isOpenBSD
 
 # Whether to enable Markdown rendering in the Nix binary.
 , enableMarkdown ? !stdenv.hostPlatform.isWindows
@@ -111,8 +115,6 @@
 
 let
   inherit (lib) fileset;
-
-  version = lib.fileContents ./.version + versionSuffix;
 
   # selected attributes with defaults, will be used to define some
   # things which should instead be gotten via `finalAttrs` in order to
@@ -177,8 +179,6 @@ in {
           ./scripts/local.mk
         ] ++ lib.optionals enableManual [
           ./doc/manual
-        ] ++ lib.optionals buildUnitTests [
-          ./tests/unit
         ] ++ lib.optionals doInstallCheck [
           ./tests/functional
         ]));
@@ -210,9 +210,10 @@ in {
     git
     mercurial
     openssh
-    man # for testing `nix-* --help`
   ] ++ lib.optionals (doInstallCheck || enableManual) [
     jq # Also for custom mdBook preprocessor.
+  ] ++ lib.optionals enableManual [
+    man
   ] ++ lib.optional stdenv.hostPlatform.isStatic unixtools.hexdump
   ;
 
@@ -235,6 +236,7 @@ in {
     gtest
     rapidcheck
   ] ++ lib.optional stdenv.isLinux libseccomp
+    ++ lib.optional stdenv.hostPlatform.isDarwin darwin.apple_sdk.libs.sandbox
     ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
     # There have been issues building these dependencies
     ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))
@@ -326,11 +328,6 @@ in {
   preInstallCheck =
     lib.optionalString (! doBuild) ''
       mkdir -p src/nix-channel
-    ''
-    # See https://github.com/NixOS/nix/issues/2523
-    # Occurs often in tests since https://github.com/NixOS/nix/pull/9900
-    + lib.optionalString stdenv.hostPlatform.isDarwin ''
-      export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
     '';
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;

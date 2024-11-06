@@ -40,7 +40,7 @@ struct ExtraPathInfoValue : ExtraPathInfo
         /**
          * An optional priority for use with "build envs". See Package
          */
-        std::optional<NixInt> priority;
+        std::optional<NixInt::Inner> priority;
 
         /**
          * The attribute path associated with this value. The idea is

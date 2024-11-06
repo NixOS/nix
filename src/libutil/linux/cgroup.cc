@@ -144,4 +144,23 @@ CgroupStats destroyCgroup(const Path & cgroup)
     return destroyCgroup(cgroup, true);
 }
 
+std::string getCurrentCgroup()
+{
+    auto cgroupFS = getCgroupFS();
+    if (!cgroupFS)
+        throw Error("cannot determine the cgroups file system");
+
+    auto ourCgroups = getCgroups("/proc/self/cgroup");
+    auto ourCgroup = ourCgroups[""];
+    if (ourCgroup == "")
+        throw Error("cannot determine cgroup name from /proc/self/cgroup");
+    return ourCgroup;
+}
+
+std::string getRootCgroup()
+{
+    static std::string rootCgroup = getCurrentCgroup();
+    return rootCgroup;
+}
+
 }

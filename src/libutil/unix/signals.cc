@@ -91,7 +91,7 @@ void unix::triggerInterrupt()
             try {
                 callback();
             } catch (...) {
-                ignoreException();
+                ignoreExceptionInDestructor();
             }
         }
     }

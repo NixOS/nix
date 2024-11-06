@@ -333,7 +333,7 @@ static std::string quoteRegexChars(const std::string & raw)
 }
 
 #if __linux__
-static void readFileRoots(const char * path, UncheckedRoots & roots)
+static void readFileRoots(const std::filesystem::path & path, UncheckedRoots & roots)
 {
     try {
         roots[readFile(path)].emplace(path);
@@ -958,8 +958,8 @@ void LocalStore::autoGC(bool sync)
 
             } catch (...) {
                 // FIXME: we could propagate the exception to the
-                // future, but we don't really care.
-                ignoreException();
+                // future, but we don't really care. (what??)
+                ignoreExceptionInDestructor();
             }
 
         }).detach();

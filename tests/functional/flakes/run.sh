@@ -6,7 +6,10 @@ TODO_NixOS
 
 clearStore
 rm -rf $TEST_HOME/.cache $TEST_HOME/.config $TEST_HOME/.local
-cp ../shell-hello.nix ../config.nix $TEST_HOME
+
+cp ../shell-hello.nix "${config_nix}" $TEST_HOME
+# `config.nix` cannot be gotten via build dir / env var (runs afoul pure eval). Instead get from flake.
+removeBuildDirRef "$TEST_HOME"/*.nix
 cd $TEST_HOME
 
 cat <<EOF > flake.nix
@@ -37,11 +40,13 @@ env > $TEST_ROOT/expected-env
 nix run -f shell-hello.nix env > $TEST_ROOT/actual-env
 # Remove/reset variables we expect to be different.
 # - PATH is modified by nix shell
+# - we unset TMPDIR on macOS if it contains /var/folders. bad. https://github.com/NixOS/nix/issues/7731
 # - _ is set by bash and is expected to differ because it contains the original command
 # - __CF_USER_TEXT_ENCODING is set by macOS and is beyond our control
 sed -i \
   -e 's/PATH=.*/PATH=.../' \
   -e 's/_=.*/_=.../' \
+  -e '/^TMPDIR=\/var\/folders\/.*/d' \
   -e '/^__CF_USER_TEXT_ENCODING=.*$/d' \
   $TEST_ROOT/expected-env $TEST_ROOT/actual-env
 sort $TEST_ROOT/expected-env | uniq > $TEST_ROOT/expected-env.sorted

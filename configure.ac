@@ -62,11 +62,15 @@ AC_CHECK_TOOL([AR], [ar])
 AC_SYS_LARGEFILE
 
 
-# Solaris-specific stuff.
+# OS-specific stuff.
 case "$host_os" in
   solaris*)
     # Solaris requires -lsocket -lnsl for network functions
     LDFLAGS="-lsocket -lnsl $LDFLAGS"
+    ;;
+  darwin*)
+    # Need to link to libsandbox.
+    LDFLAGS="-lsandbox $LDFLAGS"
     ;;
 esac
 
@@ -86,12 +90,13 @@ static char buf[1024];]],
 AC_LANG_POP(C++)
 
 
-AC_CHECK_FUNCS([statvfs pipe2])
+AC_CHECK_FUNCS([statvfs pipe2 close_range])
 
 
-# Check for lutimes, optionally used for changing the mtime of
-# symlinks.
-AC_CHECK_FUNCS([lutimes])
+# Check for lutimes and utimensat, optionally used for changing the
+# mtime of symlinks.
+AC_CHECK_DECLS([AT_SYMLINK_NOFOLLOW], [], [], [[#include <fcntl.h>]])
+AC_CHECK_FUNCS([lutimes utimensat])
 
 
 # Check whether the store optimiser can optimise symlinks.
@@ -169,6 +174,10 @@ AS_IF(
 AS_IF(
   [test "$ENABLE_FUNCTIONAL_TESTS" == "yes" || test "$ENABLE_DOC_GEN" == "yes"],
   [NEED_PROG(jq, jq)])
+
+AS_IF(
+  [test "$ENABLE_DOC_GEN" == "yes"],
+  [NEED_PROG(man, man)])
 
 AS_IF([test "$ENABLE_BUILD" == "yes"],[
 

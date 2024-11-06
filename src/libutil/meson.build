@@ -28,6 +28,7 @@ subdir('build-utils-meson/subprojects')
 # HAVE_LUTIMES 1`. The `#define` is unconditional, 0 for not found and 1
 # for found. One therefore uses it with `#if` not `#ifdef`.
 check_funcs = [
+  'close_range',
   # Optionally used for changing the mtime of symlinks.
   'lutimes',
   # Optionally used for creating pipes on Unix
@@ -41,6 +42,8 @@ check_funcs = [
   # Optionally used to try to close more file descriptors (e.g. before
   # forking) on Unix.
   'sysconf',
+  # Optionally used for changing the mtime of files and symlinks.
+  'utimensat',
 ]
 foreach funcspec : check_funcs
   define_name = 'HAVE_' + funcspec.underscorify().to_upper()
@@ -48,7 +51,17 @@ foreach funcspec : check_funcs
   configdata.set(define_name, define_value)
 endforeach
 
+configdata.set('HAVE_DECL_AT_SYMLINK_NOFOLLOW', cxx.has_header_symbol('fcntl.h', 'AT_SYMLINK_NOFOLLOW').to_int())
+
 subdir('build-utils-meson/threads')
+
+# Check if -latomic is needed
+# This is needed for std::atomic on some platforms
+# We did not manage to test this reliably on all platforms, so we hardcode
+# it for now.
+if host_machine.cpu_family() == 'arm'
+  deps_other += cxx.find_library('atomic')
+endif
 
 if host_machine.system() == 'windows'
   socket = cxx.find_library('ws2_32')
@@ -129,6 +142,7 @@ sources = files(
   'english.cc',
   'environment-variables.cc',
   'error.cc',
+  'executable-path.cc',
   'exit.cc',
   'experimental-features.cc',
   'file-content-address.cc',
@@ -171,6 +185,7 @@ headers = [config_h] + files(
   'args/root.hh',
   'callback.hh',
   'canon-path.hh',
+  'checked-arithmetic.hh',
   'chunked-vector.hh',
   'closure.hh',
   'comparator.hh',
@@ -183,6 +198,8 @@ headers = [config_h] + files(
   'english.hh',
   'environment-variables.hh',
   'error.hh',
+  'exec.hh',
+  'executable-path.hh',
   'exit.hh',
   'experimental-features.hh',
   'file-content-address.hh',
@@ -202,6 +219,7 @@ headers = [config_h] + files(
   'lru-cache.hh',
   'memory-source-accessor.hh',
   'muxable-pipe.hh',
+  'os-string.hh',
   'pool.hh',
   'position.hh',
   'posix-source-accessor.hh',
@@ -247,6 +265,7 @@ else
 endif
 
 subdir('build-utils-meson/export-all-symbols')
+subdir('build-utils-meson/windows-version')
 
 this_library = library(
   'nixutil',

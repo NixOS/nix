@@ -40,6 +40,13 @@ namespace nix {
  * Miscellaneous
  *************************************************************/
 
+static inline Value * mkString(EvalState & state, const std::csub_match & match)
+{
+    Value * v = state.allocValue();
+    v->mkString({match.first, match.second});
+    return v;
+}
+
 StringMap EvalState::realiseContext(const NixStringContext & context, StorePathSet * maybePathsOut, bool isIFD)
 {
     std::vector<DerivedPath::Built> drvs;
@@ -171,6 +178,78 @@ static void mkOutputString(
         o.second.path(*state.store, Derivation::nameFromPath(drvPath), o.first));
 }
 
+/**
+ * `import` will parse a derivation when it imports a `.drv` file from the store.
+ *
+ * @param state The evaluation state.
+ * @param pos The position of the `import` call.
+ * @param path The path to the `.drv` to import.
+ * @param storePath The path to the `.drv` to import.
+ * @param v Return value
+ */
+void derivationToValue(EvalState & state, const PosIdx pos, const SourcePath & path, const StorePath & storePath, Value & v) {
+    auto path2 = path.path.abs();
+    Derivation drv = state.store->readDerivation(storePath);
+    auto attrs = state.buildBindings(3 + drv.outputs.size());
+    attrs.alloc(state.sDrvPath).mkString(path2, {
+        NixStringContextElem::DrvDeep { .drvPath = storePath },
+    });
+    attrs.alloc(state.sName).mkString(drv.env["name"]);
+
+    auto list = state.buildList(drv.outputs.size());
+    for (const auto & [i, o] : enumerate(drv.outputs)) {
+        mkOutputString(state, attrs, storePath, o);
+        (list[i] = state.allocValue())->mkString(o.first);
+    }
+    attrs.alloc(state.sOutputs).mkList(list);
+
+    auto w = state.allocValue();
+    w->mkAttrs(attrs);
+
+    if (!state.vImportedDrvToDerivation) {
+        state.vImportedDrvToDerivation = allocRootValue(state.allocValue());
+        state.eval(state.parseExprFromString(
+            #include "imported-drv-to-derivation.nix.gen.hh"
+            , state.rootPath(CanonPath::root)), **state.vImportedDrvToDerivation);
+    }
+
+    state.forceFunction(**state.vImportedDrvToDerivation, pos, "while evaluating imported-drv-to-derivation.nix.gen.hh");
+    v.mkApp(*state.vImportedDrvToDerivation, w);
+    state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix.gen.hh");
+}
+
+/**
+ * Import a Nix file with an alternate base scope, as `builtins.scopedImport` does.
+ *
+ * @param state The evaluation state.
+ * @param pos The position of the import call.
+ * @param path The path to the file to import.
+ * @param vScope The base scope to use for the import.
+ * @param v Return value
+ */
+static void scopedImport(EvalState & state, const PosIdx pos, SourcePath & path, Value * vScope, Value & v) {
+    state.forceAttrs(*vScope, pos, "while evaluating the first argument passed to builtins.scopedImport");
+
+    Env * env = &state.allocEnv(vScope->attrs()->size());
+    env->up = &state.baseEnv;
+
+    auto staticEnv = std::make_shared<StaticEnv>(nullptr, state.staticBaseEnv.get(), vScope->attrs()->size());
+
+    unsigned int displ = 0;
+    for (auto & attr : *vScope->attrs()) {
+        staticEnv->vars.emplace_back(attr.name, displ);
+        env->values[displ++] = attr.value;
+    }
+
+    // No need to call staticEnv.sort(), because
+    // args[0]->attrs is already sorted.
+
+    printTalkative("evaluating file '%1%'", path);
+    Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
+
+    e->eval(state, *env, v);
+}
+
 /* Load and evaluate an expression from path specified by the
    argument. */
 static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * vScope, Value & v)
@@ -189,60 +268,13 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
     };
 
     if (auto storePath = isValidDerivationInStore()) {
-        Derivation drv = state.store->readDerivation(*storePath);
-        auto attrs = state.buildBindings(3 + drv.outputs.size());
-        attrs.alloc(state.sDrvPath).mkString(path2, {
-            NixStringContextElem::DrvDeep { .drvPath = *storePath },
-        });
-        attrs.alloc(state.sName).mkString(drv.env["name"]);
-
-        auto list = state.buildList(drv.outputs.size());
-        for (const auto & [i, o] : enumerate(drv.outputs)) {
-            mkOutputString(state, attrs, *storePath, o);
-            (list[i] = state.allocValue())->mkString(o.first);
-        }
-        attrs.alloc(state.sOutputs).mkList(list);
-
-        auto w = state.allocValue();
-        w->mkAttrs(attrs);
-
-        if (!state.vImportedDrvToDerivation) {
-            state.vImportedDrvToDerivation = allocRootValue(state.allocValue());
-            state.eval(state.parseExprFromString(
-                #include "imported-drv-to-derivation.nix.gen.hh"
-                , state.rootPath(CanonPath::root)), **state.vImportedDrvToDerivation);
-        }
-
-        state.forceFunction(**state.vImportedDrvToDerivation, pos, "while evaluating imported-drv-to-derivation.nix.gen.hh");
-        v.mkApp(*state.vImportedDrvToDerivation, w);
-        state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix.gen.hh");
+        derivationToValue(state, pos, path, *storePath, v);
     }
-
+    else if (vScope) {
+        scopedImport(state, pos, path, vScope, v);
+    }
     else {
-        if (!vScope)
-            state.evalFile(path, v);
-        else {
-            state.forceAttrs(*vScope, pos, "while evaluating the first argument passed to builtins.scopedImport");
-
-            Env * env = &state.allocEnv(vScope->attrs()->size());
-            env->up = &state.baseEnv;
-
-            auto staticEnv = std::make_shared<StaticEnv>(nullptr, state.staticBaseEnv.get(), vScope->attrs()->size());
-
-            unsigned int displ = 0;
-            for (auto & attr : *vScope->attrs()) {
-                staticEnv->vars.emplace_back(attr.name, displ);
-                env->values[displ++] = attr.value;
-            }
-
-            // No need to call staticEnv.sort(), because
-            // args[0]->attrs is already sorted.
-
-            printTalkative("evaluating file '%1%'", path);
-            Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
-
-            e->eval(state, *env, v);
-        }
+        state.evalFile(path, v);
     }
 }
 
@@ -587,9 +619,9 @@ struct CompareValues
     {
         try {
             if (v1->type() == nFloat && v2->type() == nInt)
-                return v1->fpoint() < v2->integer();
+                return v1->fpoint() < v2->integer().value;
             if (v1->type() == nInt && v2->type() == nFloat)
-                return v1->integer() < v2->fpoint();
+                return v1->integer().value < v2->fpoint();
             if (v1->type() != v2->type())
                 state.error<EvalError>("cannot compare %s with %s", showType(*v1), showType(*v2)).debugThrow();
             // Allow selecting a subset of enum values
@@ -631,11 +663,7 @@ struct CompareValues
 };
 
 
-#if HAVE_BOEHMGC
 typedef std::list<Value *, gc_allocator<Value *>> ValueList;
-#else
-typedef std::list<Value *> ValueList;
-#endif
 
 
 static Bindings::const_iterator getAttr(
@@ -941,6 +969,9 @@ static RegisterPrimOp primop_tryEval({
       `let e = { x = throw ""; }; in
       (builtins.tryEval (builtins.deepSeq e e)).success` will be
       `false`.
+
+      `tryEval` intentionally does not return the error message, because that risks bringing non-determinism into the evaluation result, and it would become very difficult to improve error reporting without breaking existing expressions.
+      Instead, use [`builtins.addErrorContext`](@docroot@/language/builtins.md#builtins-addErrorContext) to add context to the error message, and use a Nix unit testing tool for testing.
     )",
     .fun = prim_tryEval,
 });
@@ -2133,7 +2164,7 @@ static void prim_toXML(EvalState & state, const PosIdx pos, Value * * args, Valu
     std::ostringstream out;
     NixStringContext context;
     printValueAsXML(state, true, false, *args[0], out, context, pos);
-    v.mkString(out.str(), context);
+    v.mkString(toView(out), context);
 }
 
 static RegisterPrimOp primop_toXML({
@@ -2241,7 +2272,7 @@ static void prim_toJSON(EvalState & state, const PosIdx pos, Value * * args, Val
     std::ostringstream out;
     NixStringContext context;
     printValueAsJSON(state, true, *args[0], pos, out, context);
-    v.mkString(out.str(), context);
+    v.mkString(toView(out), context);
 }
 
 static RegisterPrimOp primop_toJSON({
@@ -2762,13 +2793,13 @@ static struct LazyPosAcessors {
     PrimOp primop_lineOfPos{
         .arity = 1,
         .fun = [] (EvalState & state, PosIdx pos, Value * * args, Value & v) {
-            v.mkInt(state.positions[PosIdx(args[0]->integer())].line);
+            v.mkInt(state.positions[PosIdx(args[0]->integer().value)].line);
         }
     };
     PrimOp primop_columnOfPos{
         .arity = 1,
         .fun = [] (EvalState & state, PosIdx pos, Value * * args, Value & v) {
-            v.mkInt(state.positions[PosIdx(args[0]->integer())].column);
+            v.mkInt(state.positions[PosIdx(args[0]->integer().value)].column);
         }
     };
 
@@ -3136,7 +3167,7 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * arg
         std::optional<ListBuilder> list;
     };
 
-    std::map<Symbol, Item> attrsSeen;
+    std::map<Symbol, Item, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Item>>> attrsSeen;
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.zipAttrsWith");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.zipAttrsWith");
@@ -3244,7 +3275,8 @@ static void elemAt(EvalState & state, const PosIdx pos, Value & list, int n, Val
 /* Return the n-1'th element of a list. */
 static void prim_elemAt(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    elemAt(state, pos, *args[0], state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.elemAt"), v);
+    NixInt::Inner elem = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.elemAt").value;
+    elemAt(state, pos, *args[0], elem, v);
 }
 
 static RegisterPrimOp primop_elemAt({
@@ -3538,10 +3570,12 @@ static RegisterPrimOp primop_all({
 
 static void prim_genList(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto len = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.genList");
+    auto len_ = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.genList").value;
 
-    if (len < 0)
-        state.error<EvalError>("cannot create list of size %1%", len).atPos(pos).debugThrow();
+    if (len_ < 0)
+        state.error<EvalError>("cannot create list of size %1%", len_).atPos(pos).debugThrow();
+
+    size_t len = size_t(len_);
 
     // More strict than striclty (!) necessary, but acceptable
     // as evaluating map without accessing any values makes little sense.
@@ -3798,9 +3832,17 @@ static void prim_add(EvalState & state, const PosIdx pos, Value * * args, Value 
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
         v.mkFloat(state.forceFloat(*args[0], pos, "while evaluating the first argument of the addition")
                 + state.forceFloat(*args[1], pos, "while evaluating the second argument of the addition"));
-    else
-        v.mkInt(  state.forceInt(*args[0], pos, "while evaluating the first argument of the addition")
-                + state.forceInt(*args[1], pos, "while evaluating the second argument of the addition"));
+    else {
+        auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument of the addition");
+        auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument of the addition");
+
+        auto result_ = i1 + i2;
+        if (auto result = result_.valueChecked(); result.has_value()) {
+            v.mkInt(*result);
+        } else {
+            state.error<EvalError>("integer overflow in adding %1% + %2%", i1, i2).atPos(pos).debugThrow();
+        }
+    }
 }
 
 static RegisterPrimOp primop_add({
@@ -3819,9 +3861,18 @@ static void prim_sub(EvalState & state, const PosIdx pos, Value * * args, Value 
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
         v.mkFloat(state.forceFloat(*args[0], pos, "while evaluating the first argument of the subtraction")
                 - state.forceFloat(*args[1], pos, "while evaluating the second argument of the subtraction"));
-    else
-        v.mkInt(  state.forceInt(*args[0], pos, "while evaluating the first argument of the subtraction")
-                - state.forceInt(*args[1], pos, "while evaluating the second argument of the subtraction"));
+    else {
+        auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument of the subtraction");
+        auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument of the subtraction");
+
+        auto result_ = i1 - i2;
+
+        if (auto result = result_.valueChecked(); result.has_value()) {
+            v.mkInt(*result);
+        } else {
+            state.error<EvalError>("integer overflow in subtracting %1% - %2%", i1, i2).atPos(pos).debugThrow();
+        }
+    }
 }
 
 static RegisterPrimOp primop_sub({
@@ -3840,9 +3891,18 @@ static void prim_mul(EvalState & state, const PosIdx pos, Value * * args, Value 
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
         v.mkFloat(state.forceFloat(*args[0], pos, "while evaluating the first of the multiplication")
                 * state.forceFloat(*args[1], pos, "while evaluating the second argument of the multiplication"));
-    else
-        v.mkInt(  state.forceInt(*args[0], pos, "while evaluating the first argument of the multiplication")
-                * state.forceInt(*args[1], pos, "while evaluating the second argument of the multiplication"));
+    else {
+        auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument of the multiplication");
+        auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument of the multiplication");
+
+        auto result_ = i1 * i2;
+
+        if (auto result = result_.valueChecked(); result.has_value()) {
+            v.mkInt(*result);
+        } else {
+            state.error<EvalError>("integer overflow in multiplying %1% * %2%", i1, i2).atPos(pos).debugThrow();
+        }
+    }
 }
 
 static RegisterPrimOp primop_mul({
@@ -3869,10 +3929,12 @@ static void prim_div(EvalState & state, const PosIdx pos, Value * * args, Value 
         NixInt i1 = state.forceInt(*args[0], pos, "while evaluating the first operand of the division");
         NixInt i2 = state.forceInt(*args[1], pos, "while evaluating the second operand of the division");
         /* Avoid division overflow as it might raise SIGFPE. */
-        if (i1 == std::numeric_limits<NixInt>::min() && i2 == -1)
-            state.error<EvalError>("overflow in integer division").atPos(pos).debugThrow();
-
-        v.mkInt(i1 / i2);
+        auto result_ = i1 / i2;
+        if (auto result = result_.valueChecked(); result.has_value()) {
+            v.mkInt(*result);
+        } else {
+            state.error<EvalError>("integer overflow in dividing %1% / %2%", i1, i2).atPos(pos).debugThrow();
+        }
     }
 }
 
@@ -3887,8 +3949,9 @@ static RegisterPrimOp primop_div({
 
 static void prim_bitAnd(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    v.mkInt(state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitAnd")
-            & state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitAnd"));
+    auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitAnd");
+    auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitAnd");
+    v.mkInt(i1.value & i2.value);
 }
 
 static RegisterPrimOp primop_bitAnd({
@@ -3902,8 +3965,10 @@ static RegisterPrimOp primop_bitAnd({
 
 static void prim_bitOr(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    v.mkInt(state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitOr")
-            | state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitOr"));
+    auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitOr");
+    auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitOr");
+
+    v.mkInt(i1.value | i2.value);
 }
 
 static RegisterPrimOp primop_bitOr({
@@ -3917,8 +3982,10 @@ static RegisterPrimOp primop_bitOr({
 
 static void prim_bitXor(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    v.mkInt(state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitXor")
-            ^ state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitXor"));
+    auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitXor");
+    auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitXor");
+
+    v.mkInt(i1.value ^ i2.value);
 }
 
 static RegisterPrimOp primop_bitXor({
@@ -3998,13 +4065,19 @@ static RegisterPrimOp primop_toString({
    non-negative. */
 static void prim_substring(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    int start = state.forceInt(*args[0], pos, "while evaluating the first argument (the start offset) passed to builtins.substring");
+    NixInt::Inner start = state.forceInt(*args[0], pos, "while evaluating the first argument (the start offset) passed to builtins.substring").value;
 
     if (start < 0)
         state.error<EvalError>("negative start position in 'substring'").atPos(pos).debugThrow();
 
 
-    int len = state.forceInt(*args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring");
+    NixInt::Inner len = state.forceInt(*args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring").value;
+
+    // Negative length may be idiomatically passed to builtins.substring to get
+    // the tail of the string.
+    if (len < 0) {
+        len = std::numeric_limits<NixInt::Inner>::max();
+    }
 
     // Special-case on empty substring to avoid O(n) strlen
     // This allows for the use of empty substrings to efficently capture string context
@@ -4047,7 +4120,7 @@ static void prim_stringLength(EvalState & state, const PosIdx pos, Value * * arg
 {
     NixStringContext context;
     auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.stringLength");
-    v.mkInt(s->size());
+    v.mkInt(NixInt::Inner(s->size()));
 }
 
 static RegisterPrimOp primop_stringLength({
@@ -4230,7 +4303,7 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
             if (!match[i + 1].matched)
                 v2 = &state.vNull;
             else
-                (v2 = state.allocValue())->mkString(match[i + 1].str());
+                v2 = mkString(state, match[i + 1]);
         v.mkList(list);
 
     } catch (std::regex_error & e) {
@@ -4314,7 +4387,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
             auto match = *i;
 
             // Add a string for non-matched characters.
-            (list[idx++] = state.allocValue())->mkString(match.prefix().str());
+            list[idx++] = mkString(state, match.prefix());
 
             // Add a list for matched substrings.
             const size_t slen = match.size() - 1;
@@ -4325,14 +4398,14 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
                 if (!match[si + 1].matched)
                     v2 = &state.vNull;
                 else
-                    (v2 = state.allocValue())->mkString(match[si + 1].str());
+                    v2 = mkString(state, match[si + 1]);
             }
 
             (list[idx++] = state.allocValue())->mkList(list2);
 
             // Add a string for non-matched suffix characters.
             if (idx == 2 * len)
-                (list[idx++] = state.allocValue())->mkString(match.suffix().str());
+                list[idx++] = mkString(state, match.suffix());
         }
 
         assert(idx == 2 * len + 1);
@@ -4531,7 +4604,8 @@ static void prim_compareVersions(EvalState & state, const PosIdx pos, Value * * 
 {
     auto version1 = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.compareVersions");
     auto version2 = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.compareVersions");
-    v.mkInt(compareVersions(version1, version2));
+    auto result = compareVersions(version1, version2);
+    v.mkInt(result < 0 ? -1 : result > 0 ? 1 : 0);
 }
 
 static RegisterPrimOp primop_compareVersions({
@@ -4814,7 +4888,10 @@ void EvalState::createBaseEnv()
     addConstant("__nixPath", v, {
         .type = nList,
         .doc = R"(
-          The value of the [`nix-path` configuration setting](@docroot@/command-ref/conf-file.md#conf-nix-path): a list of search path entries used to resolve [lookup paths](@docroot@/language/constructs/lookup-path.md).
+          A list of search path entries used to resolve [lookup paths](@docroot@/language/constructs/lookup-path.md).
+          Its value is primarily determined by the [`nix-path` configuration setting](@docroot@/command-ref/conf-file.md#conf-nix-path), which are
+          - Overridden by the [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH) environment variable or the `--nix-path` option
+          - Extended by the [`-I` option](@docroot@/command-ref/opt-common.md#opt-I) or `--extra-nix-path`
 
           > **Example**
           >

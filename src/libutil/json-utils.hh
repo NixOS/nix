@@ -3,11 +3,12 @@
 
 #include <nlohmann/json.hpp>
 #include <list>
-#include <nlohmann/json_fwd.hpp>
 
 #include "types.hh"
 
 namespace nix {
+
+enum struct ExperimentalFeature;
 
 const nlohmann::json * get(const nlohmann::json & map, const std::string & key);
 
@@ -70,6 +71,12 @@ struct json_avoids_null<std::list<T>> : std::true_type {};
 
 template<typename K, typename V>
 struct json_avoids_null<std::map<K, V>> : std::true_type {};
+
+/**
+ * `ExperimentalFeature` is always rendered as a string.
+ */
+template<>
+struct json_avoids_null<ExperimentalFeature> : std::true_type {};
 
 }
 

@@ -30,9 +30,9 @@ R""(
 
 # Description
 
-This command adds inputs to the lock file of a flake (`flake.lock`)
-so that it contains a lock for every flake input specified in
-`flake.nix`. Existing lock file entries are not updated.
+This command updates the lock file of a flake (`flake.lock`)
+so that it contains an up-to-date lock for every flake input specified in
+`flake.nix`. Lock file entries are aready up-to-date are not modified.
 
 If you want to update existing lock entries, use
 [`nix flake update`](@docroot@/command-ref/new-cli/nix3-flake-update.md)

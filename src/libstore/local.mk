@@ -59,7 +59,7 @@ NIX_ROOT =
 endif
 
 # Prefix all but `NIX_STORE_DIR`, since we aren't doing a local store
-# yet so a "logical" store dir that is the same as unix is prefered.
+# yet so a "logical" store dir that is the same as unix is preferred.
 #
 # Also, it keeps the unit tests working.
 
@@ -71,7 +71,6 @@ libstore_CXXFLAGS += \
  -DNIX_STATE_DIR=\"$(NIX_ROOT)$(localstatedir)/nix\" \
  -DNIX_LOG_DIR=\"$(NIX_ROOT)$(localstatedir)/log/nix\" \
  -DNIX_CONF_DIR=\"$(NIX_ROOT)$(sysconfdir)/nix\" \
- -DNIX_BIN_DIR=\"$(NIX_ROOT)$(bindir)\" \
  -DNIX_MAN_DIR=\"$(NIX_ROOT)$(mandir)\" \
  -DLSOF=\"$(NIX_ROOT)$(lsof)\"
 

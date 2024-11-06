@@ -7,12 +7,16 @@ namespace nix {
 
 namespace fetchers { struct PublicKey; }
 
+/**
+ * A sink that writes into a Git repository. Note that nothing may be written
+ * until `flush()` is called.
+ */
 struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
 {
     /**
      * Flush builder and return a final Git hash.
      */
-    virtual Hash sync() = 0;
+    virtual Hash flush() = 0;
 };
 
 struct GitRepo
@@ -79,6 +83,8 @@ struct GitRepo
     virtual ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
 
     virtual ref<GitFileSystemObjectSink> getFileSystemObjectSink() = 0;
+
+    virtual void flush() = 0;
 
     virtual void fetch(
         const std::string & url,

@@ -20,7 +20,7 @@ PosixSourceAccessor::PosixSourceAccessor()
 
 SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
 {
-    std::filesystem::path path2 = absPath(path.string());
+    std::filesystem::path path2 = absPath(path);
     return {
         make_ref<PosixSourceAccessor>(path2.root_path()),
         CanonPath { path2.relative_path().string() },
@@ -132,23 +132,24 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
 {
     assertNoSymlinks(path);
     DirEntries res;
-    for (auto & entry : std::filesystem::directory_iterator{makeAbsPath(path)}) {
-        checkInterrupt();
-        auto type = [&]() -> std::optional<Type> {
-            std::filesystem::file_type nativeType;
-            try {
-                nativeType = entry.symlink_status().type();
-            } catch (std::filesystem::filesystem_error & e) {
-                // We cannot always stat the child. (Ideally there is no
-                // stat because the native directory entry has the type
-                // already, but this isn't always the case.)
-                if (e.code() == std::errc::permission_denied || e.code() == std::errc::operation_not_permitted)
-                    return std::nullopt;
-                else throw;
-            }
+    try {
+        for (auto & entry : std::filesystem::directory_iterator{makeAbsPath(path)}) {
+            checkInterrupt();
+            auto type = [&]() -> std::optional<Type> {
+                std::filesystem::file_type nativeType;
+                try {
+                    nativeType = entry.symlink_status().type();
+                } catch (std::filesystem::filesystem_error & e) {
+                    // We cannot always stat the child. (Ideally there is no
+                    // stat because the native directory entry has the type
+                    // already, but this isn't always the case.)
+                    if (e.code() == std::errc::permission_denied || e.code() == std::errc::operation_not_permitted)
+                        return std::nullopt;
+                    else throw;
+                }
 
-            // cannot exhaustively enumerate because implementation-specific
-            // additional file types are allowed.
+                // cannot exhaustively enumerate because implementation-specific
+                // additional file types are allowed.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch-enum"
             switch (nativeType) {
@@ -158,8 +159,11 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
             default: return tMisc;
             }
 #pragma GCC diagnostic pop
-        }();
-        res.emplace(entry.path().filename().string(), type);
+            }();
+            res.emplace(entry.path().filename().string(), type);
+        }
+    } catch (std::filesystem::filesystem_error & e) {
+        throw SysError("reading directory %1%", showPath(path));
     }
     return res;
 }

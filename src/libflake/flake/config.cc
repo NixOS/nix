@@ -12,7 +12,7 @@ typedef std::map<std::string, std::map<std::string, bool>> TrustedList;
 
 Path trustedListPath()
 {
-    return getDataDir() + "/nix/trusted-settings.json";
+    return getDataDir() + "/trusted-settings.json";
 }
 
 static TrustedList readTrustedList()

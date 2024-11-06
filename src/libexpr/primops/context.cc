@@ -86,7 +86,7 @@ static RegisterPrimOp primop_unsafeDiscardOutputDependency({
 
       This is the opposite of [`builtins.addDrvOutputDependencies`](#builtins-addDrvOutputDependencies).
 
-      This is unsafe because it allows us to "forget" store objects we would have otherwise refered to with the string context,
+      This is unsafe because it allows us to "forget" store objects we would have otherwise referred to with the string context,
       whereas Nix normally tracks all dependencies consistently.
       Safe operations "grow" but never "shrink" string contexts.
       [`builtins.addDrvOutputDependencies`] in contrast is safe because "derivation deep" string context element always refers to the underlying derivation (among many more things).

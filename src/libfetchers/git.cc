@@ -13,8 +13,8 @@
 #include "git-utils.hh"
 #include "logging.hh"
 #include "finally.hh"
-
 #include "fetch-settings.hh"
+#include "json-utils.hh"
 
 #include <regex>
 #include <string.h>
@@ -44,7 +44,7 @@ bool isCacheFileWithinTtl(time_t now, const struct stat & st)
 Path getCachePath(std::string_view key, bool shallow)
 {
     return getCacheDir()
-    + "/nix/gitv3/"
+    + "/gitv3/"
     + hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false)
     + (shallow ? "-shallow" : "");
 }
@@ -590,9 +590,10 @@ struct GitInputScheme : InputScheme
                 }
 
                 try {
-                    setWriteTime(localRefFile, now, now);
+                    if (!input.getRev())
+                        setWriteTime(localRefFile, now, now);
                 } catch (Error & e) {
-                    warn("could not update mtime for file '%s': %s", localRefFile, e.msg());
+                    warn("could not update mtime for file '%s': %s", localRefFile, e.info().msg);
                 }
                 if (!originalRef && !storeCachedHead(repoInfo.url, ref))
                     warn("could not update cached head '%s' for '%s'", ref, repoInfo.url);

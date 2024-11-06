@@ -24,7 +24,7 @@ our @EXPORT = qw(
 
     hashPath hashFile hashString convertHash
     signString checkSignature
-    getBinDir getStoreDir
+    getStoreDir
     setVerbosity
 );
 

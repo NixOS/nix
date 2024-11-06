@@ -42,6 +42,21 @@ namespace eval_cache {
 }
 
 /**
+ * Increments a count on construction and decrements on destruction.
+ */
+class CallDepth {
+  size_t & count;
+
+public:
+  CallDepth(size_t & count) : count(count) {
+    ++count;
+  }
+  ~CallDepth() {
+    --count;
+  }
+};
+
+/**
  * Function that implements a primop.
  */
 using PrimOpFun = void(EvalState & state, const PosIdx pos, Value * * args, Value & v);
@@ -124,11 +139,7 @@ struct Constant
     bool impureOnly = false;
 };
 
-#if HAVE_BOEHMGC
-    typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
-#else
-    typedef std::map<std::string, Value *> ValMap;
-#endif
+typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
 
 typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
 
@@ -314,21 +325,13 @@ private:
     /**
      * A cache from path names to parse trees.
      */
-#if HAVE_BOEHMGC
     typedef std::unordered_map<SourcePath, Expr *, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
-#else
-    typedef std::unordered_map<SourcePath, Expr *> FileParseCache;
-#endif
     FileParseCache fileParseCache;
 
     /**
      * A cache from path names to values.
      */
-#if HAVE_BOEHMGC
     typedef std::unordered_map<SourcePath, Value, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
-#else
-    typedef std::unordered_map<SourcePath, Value> FileEvalCache;
-#endif
     FileEvalCache fileEvalCache;
 
     /**
@@ -625,6 +628,12 @@ public:
         const char * doc;
     };
 
+    /**
+     * Retrieve the documentation for a value. This will evaluate the value if
+     * it is a thunk, and it will partially apply __functor if applicable.
+     *
+     * @param v The value to get the documentation for.
+     */
     std::optional<Doc> getDoc(Value & v);
 
 private:
@@ -648,6 +657,11 @@ private:
     size_t callDepth = 0;
 
 public:
+
+    /**
+     * Check that the call depth is within limits, and increment it, until the returned object is destroyed.
+     */
+    inline CallDepth addCallDepth(const PosIdx pos);
 
     /**
      * Do a deep equality test between two values.  That is, list

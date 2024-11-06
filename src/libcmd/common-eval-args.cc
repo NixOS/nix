@@ -18,6 +18,8 @@
 
 namespace nix {
 
+namespace fs { using namespace std::filesystem; }
+
 fetchers::Settings fetchSettings;
 
 static GlobalConfig::Register rFetchSettings(&fetchSettings);
@@ -119,8 +121,8 @@ MixEvalArgs::MixEvalArgs()
         .category = category,
         .labels = {"original-ref", "resolved-ref"},
         .handler = {[&](std::string _from, std::string _to) {
-            auto from = parseFlakeRef(fetchSettings, _from, absPath("."));
-            auto to = parseFlakeRef(fetchSettings, _to, absPath("."));
+            auto from = parseFlakeRef(fetchSettings, _from, fs::current_path().string());
+            auto to = parseFlakeRef(fetchSettings, _to, fs::current_path().string());
             fetchers::Attrs extraAttrs;
             if (to.subdir != "") extraAttrs["dir"] = to.subdir;
             fetchers::overrideRegistry(from.input, to.input, extraAttrs);
@@ -171,7 +173,9 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * bas
 {
     if (EvalSettings::isPseudoUrl(s)) {
         auto accessor = fetchers::downloadTarball(
-            EvalSettings::resolvePseudoUrl(s)).accessor;
+            state.store,
+            state.fetchSettings,
+            EvalSettings::resolvePseudoUrl(s));
         auto storePath = fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy);
         return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
     }

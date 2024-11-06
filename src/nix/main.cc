@@ -2,7 +2,6 @@
 #include "current-process.hh"
 #include "command.hh"
 #include "common-args.hh"
-#include "eval-gc.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "globals.hh"
@@ -19,6 +18,8 @@
 #include "network-proxy.hh"
 #include "eval-cache.hh"
 #include "flake/flake.hh"
+#include "self-exe.hh"
+#include "json-utils.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -365,6 +366,17 @@ void mainWrapped(int argc, char * * argv)
     initNix();
     initGC();
     flake::initLib(flakeSettings);
+
+    /* Set the build hook location
+
+       For builds we perform a self-invocation, so Nix has to be
+       self-aware. That is, it has to know where it is installed. We
+       don't think it's sentient.
+     */
+    settings.buildHook.setDefault(Strings {
+        getNixBin({}).string(),
+        "__build-remote",
+    });
 
     #if __linux__
     if (isRootUser()) {

@@ -1,7 +1,7 @@
 "c api":
   - changed-files:
     - any-glob-to-any-file: "src/lib*-c/**/*"
-    - any-glob-to-any-file: "test/unit/**/nix_api_*"
+    - any-glob-to-any-file: "src/*test*/**/nix_api_*"
     - any-glob-to-any-file: "doc/external-api/**/*"
 
 "contributor-experience":
@@ -9,7 +9,7 @@
     - any-glob-to-any-file: "CONTRIBUTING.md"
     - any-glob-to-any-file: ".github/ISSUE_TEMPLATE/*"
     - any-glob-to-any-file: ".github/PULL_REQUEST_TEMPLATE.md"
-    - any-glob-to-any-file: "doc/manual/src/contributing/**"
+    - any-glob-to-any-file: "doc/manual/source/contributing/**"
 
 "documentation":
   - changed-files:
