@@ -6,6 +6,7 @@
 , nix-store
 , nlohmann_json
 , libgit2
+, curl
 
 # Configuration Options
 
@@ -33,6 +34,7 @@ mkMesonLibrary (finalAttrs: {
 
   buildInputs = [
     libgit2
+    curl
   ];
 
   propagatedBuildInputs = [
