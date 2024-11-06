@@ -1,7 +1,6 @@
 { lib
 , stdenv
 , mkMesonDerivation
-, releaseTools
 
 , meson
 , ninja
@@ -15,10 +14,6 @@
 , nix-store
 , nix-expr
 , nix-cli
-
-, rapidcheck
-, gtest
-, runCommand
 
 , busybox-sandbox-shell ? null
 
