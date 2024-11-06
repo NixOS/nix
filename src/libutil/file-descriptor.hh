@@ -77,8 +77,13 @@ void writeFull(Descriptor fd, std::string_view s, bool allowInterrupts = true);
 
 /**
  * Read a line from a file descriptor.
+ *
+ * @param fd The file descriptor to read from
+ * @param eofOk If true, return an unterminated line if EOF is reached. (e.g. the empty string)
+ *
+ * @return A line of text ending in `\n`, or a string without `\n` if `eofOk` is true and EOF is reached.
  */
-std::string readLine(Descriptor fd);
+std::string readLine(Descriptor fd, bool eofOk = false);
 
 /**
  * Write a line to a file descriptor.

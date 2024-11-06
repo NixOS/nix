@@ -47,7 +47,7 @@ void writeFull(int fd, std::string_view s, bool allowInterrupts)
 }
 
 
-std::string readLine(int fd)
+std::string readLine(int fd, bool eofOk)
 {
     std::string s;
     while (1) {
@@ -58,8 +58,12 @@ std::string readLine(int fd)
         if (rd == -1) {
             if (errno != EINTR)
                 throw SysError("reading a line");
-        } else if (rd == 0)
-            throw EndOfFile("unexpected EOF reading a line");
+        } else if (rd == 0) {
+            if (eofOk)
+                return s;
+            else
+                throw EndOfFile("unexpected EOF reading a line");
+        }
         else {
             if (ch == '\n') return s;
             s += ch;
