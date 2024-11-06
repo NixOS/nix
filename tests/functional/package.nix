@@ -60,6 +60,7 @@ mkMesonDerivation (finalAttrs: {
     # etc.
     busybox-sandbox-shell
     # For Overlay FS tests need `mount`, `umount`, and `unshare`.
+    # For `script` command (ensuring a TTY)
     # TODO use `unixtools` to be precise over which executables instead?
     util-linux
   ];
