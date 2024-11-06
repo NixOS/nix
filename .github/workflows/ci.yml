@@ -60,7 +60,7 @@ jobs:
 
   flake_regressions:
     needs: build_x86_64-linux
-    runs-on: ubuntu-22.04
+    runs-on: UbuntuLatest32Cores128G
     steps:
       - name: Checkout nix
         uses: actions/checkout@v4
