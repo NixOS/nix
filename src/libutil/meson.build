@@ -53,15 +53,8 @@ endforeach
 
 configdata.set('HAVE_DECL_AT_SYMLINK_NOFOLLOW', cxx.has_header_symbol('fcntl.h', 'AT_SYMLINK_NOFOLLOW').to_int())
 
+subdir('build-utils-meson/libatomic')
 subdir('build-utils-meson/threads')
-
-# Check if -latomic is needed
-# This is needed for std::atomic on some platforms
-# We did not manage to test this reliably on all platforms, so we hardcode
-# it for now.
-if host_machine.cpu_family() == 'arm'
-  deps_other += cxx.find_library('atomic')
-endif
 
 if host_machine.system() == 'windows'
   socket = cxx.find_library('ws2_32')
