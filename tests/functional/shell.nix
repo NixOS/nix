@@ -1,6 +1,6 @@
 { inNixShell ? false, contentAddressed ? false, fooContents ? "foo" }:
 
-let cfg = import "${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/config.nix"; in
+let cfg = import ./config.nix; in
 with cfg;
 
 let

@@ -39,9 +39,6 @@ EOF
 
     cp simple.nix shell.nix simple.builder.sh "${config_nix}" "$flakeDir/"
 
-    # `config.nix` cannot be gotten via build dir / env var (runs afoul pure eval). Instead get from flake.
-    removeBuildDirRef "$flakeDir"/*.nix
-
     TODO_NixOS
 
     outPath=$(nix build --print-out-paths --no-link --sandbox-paths '/nix? /bin? /lib? /lib64? /usr?' --store "$TEST_ROOT/x" path:"$flakeDir")
