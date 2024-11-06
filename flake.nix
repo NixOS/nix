@@ -295,7 +295,7 @@
 
       devShells = let
         makeShell = import ./packaging/dev-shell.nix { inherit lib devFlake; };
-        prefixAttrs = prefix: lib.mapAttrs' (k: v: lib.nameValuePair "${prefix}-${k}" v);
+        prefixAttrs = prefix: lib.concatMapAttrs (k: v: { "${prefix}-${k}" = v; });
       in
         forAllSystems (system:
           prefixAttrs "native" (forAllStdenvs (stdenvName: makeShell {
