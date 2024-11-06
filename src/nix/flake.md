@@ -148,7 +148,7 @@ reference types:
 
 * `ref`: A Git or Mercurial branch or tag name.
 
-Finally, some attribute are typically not specified by the user, but
+Finally, some attributes are typically not specified by the user, but
 can occur in *locked* flake references and are available to Nix code:
 
 * `revCount`: The number of ancestors of the commit `rev`.
@@ -158,6 +158,8 @@ can occur in *locked* flake references and are available to Nix code:
   Git/Mercurial flakes, this is the commit time of commit *rev*, while
   for tarball flakes, it's the most recent timestamp of any file
   inside the tarball.
+
+Attributes that start with `__` are internal or experimental and may be removed in future versions.
 
 ## Types
 

@@ -92,10 +92,9 @@ public:
 
     /**
      * Return whether this is a "final" input, meaning that fetching
-     * it will not add, remove or change any attributes. For instance,
-     * a Git input with a `rev` attribute but without a `lastModified`
-     * attribute is considered locked but not final. Only "final"
-     * inputs can be substituted from a binary cache.
+     * it will not add, remove or change any attributes. (See
+     * `checkLocks()` for the semantics.) Only "final" inputs can be
+     * substituted from a binary cache.
      *
      * The "final" state is denoted by the presence of an attribute
      * `__final = true`. This attribute is currently undocumented and
