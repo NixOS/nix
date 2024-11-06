@@ -124,18 +124,36 @@
           # without "polluting" the top level "`pkgs`" attrset.
           # This also has the benefit of providing us with a distinct set of packages
           # we can iterate over.
-          nixComponents = lib.makeScope final.nixDependencies.newScope (import ./packaging/components.nix {
-            inherit (final) lib;
-            inherit officialRelease;
-            src = self;
-          });
+          nixComponents =
+            lib.makeScopeWithSplicing'
+              {
+                inherit (final) splicePackages;
+                inherit (final.nixDependencies) newScope;
+              }
+              {
+                otherSplices = final.generateSplicesForMkScope "nixComponents";
+                f = import ./packaging/components.nix {
+                  inherit (final) lib;
+                  inherit officialRelease;
+                  src = self;
+                };
+              };
 
           # The dependencies are in their own scope, so that they don't have to be
           # in Nixpkgs top level `pkgs` or `nixComponents`.
-          nixDependencies = lib.makeScope final.newScope (import ./packaging/dependencies.nix {
-            inherit inputs stdenv;
-            pkgs = final;
-          });
+          nixDependencies =
+            lib.makeScopeWithSplicing'
+              {
+                inherit (final) splicePackages;
+                inherit (final) newScope; # layered directly on pkgs, unlike nixComponents above
+              }
+              {
+                otherSplices = final.generateSplicesForMkScope "nixDependencies";
+                f = import ./packaging/dependencies.nix {
+                  inherit inputs stdenv;
+                  pkgs = final;
+                };
+              };
 
           nix = final.nixComponents.nix-cli;
 
