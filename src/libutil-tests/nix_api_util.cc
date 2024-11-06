@@ -7,6 +7,8 @@
 
 #include <gtest/gtest.h>
 
+#include <memory>
+
 namespace nixC {
 
 TEST_F(nix_api_util_context, nix_context_error)
@@ -57,6 +59,14 @@ struct MySettings : nix::Config
 MySettings mySettings;
 static nix::GlobalConfig::Register rs(&mySettings);
 
+static auto createOwnedNixContext()
+{
+    return std::unique_ptr<nix_c_context, decltype([](nix_c_context * ctx) {
+                               if (ctx)
+                                   nix_c_context_free(ctx);
+                           })>(nix_c_context_create(), {});
+}
+
 TEST_F(nix_api_util_context, nix_setting_get)
 {
     ASSERT_EQ(ctx->last_err_code, NIX_OK);
@@ -97,7 +107,8 @@ TEST_F(nix_api_util_context, nix_err_msg)
 
     // advanced usage
     unsigned int sz;
-    err_msg = nix_err_msg(nix_c_context_create(), ctx, &sz);
+    auto new_ctx = createOwnedNixContext();
+    err_msg = nix_err_msg(new_ctx.get(), ctx, &sz);
     ASSERT_EQ(sz, err_msg.size());
 }
 
@@ -113,7 +124,8 @@ TEST_F(nix_api_util_context, nix_err_info_msg)
     } catch (...) {
         nix_context_error(ctx);
     }
-    nix_err_info_msg(nix_c_context_create(), ctx, OBSERVE_STRING(err_info));
+    auto new_ctx = createOwnedNixContext();
+    nix_err_info_msg(new_ctx.get(), ctx, OBSERVE_STRING(err_info));
     ASSERT_STREQ("testing error", err_info.c_str());
 }
 
@@ -130,7 +142,8 @@ TEST_F(nix_api_util_context, nix_err_name)
     } catch (...) {
         nix_context_error(ctx);
     }
-    nix_err_name(nix_c_context_create(), ctx, OBSERVE_STRING(err_name));
+    auto new_ctx = createOwnedNixContext();
+    nix_err_name(new_ctx.get(), ctx, OBSERVE_STRING(err_name));
     ASSERT_EQ(std::string(err_name), "nix::Error");
 }
 
