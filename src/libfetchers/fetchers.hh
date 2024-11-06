@@ -113,17 +113,17 @@ public:
     std::pair<StorePath, Input> fetchToStore(ref<Store> store) const;
 
     /**
-     * Check the locking attributes in `final` against
+     * Check the locking attributes in `result` against
      * `specified`. E.g. if `specified` has a `rev` attribute, then
-     * `final` must have the same `rev` attribute. Throw an exception
+     * `result` must have the same `rev` attribute. Throw an exception
      * if there is a mismatch.
      *
      * If `specified` is marked final (i.e. has the `__final`
      * attribute), then the intersection of attributes in `specified`
-     * and `final` must be equal, and `final.attrs` is set to
+     * and `result` must be equal, and `final.attrs` is set to
      * `specified.attrs` (i.e. we discard any new attributes).
      */
-    static void checkLocks(Input specified, Input & final);
+    static void checkLocks(Input specified, Input & result);
 
     /**
      * Return a `SourceAccessor` that allows access to files in the
