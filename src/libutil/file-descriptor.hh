@@ -106,12 +106,42 @@ void drainFD(
 #endif
     );
 
+/**
+ * Get [Standard Input](https://en.wikipedia.org/wiki/Standard_streams#Standard_input_(stdin))
+ */
 [[gnu::always_inline]]
-inline Descriptor getStandardOut() {
+inline Descriptor getStandardInput()
+{
+#ifndef _WIN32
+    return STDIN_FILENO;
+#else
+    return GetStdHandle(STD_INPUT_HANDLE);
+#endif
+}
+
+/**
+ * Get [Standard Output](https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout))
+ */
+[[gnu::always_inline]]
+inline Descriptor getStandardOutput()
+{
 #ifndef _WIN32
     return STDOUT_FILENO;
 #else
     return GetStdHandle(STD_OUTPUT_HANDLE);
+#endif
+}
+
+/**
+ * Get [Standard Error](https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr))
+ */
+[[gnu::always_inline]]
+inline Descriptor getStandardError()
+{
+#ifndef _WIN32
+    return STDERR_FILENO;
+#else
+    return GetStdHandle(STD_ERROR_HANDLE);
 #endif
 }
 
