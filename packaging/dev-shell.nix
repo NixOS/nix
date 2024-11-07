@@ -2,7 +2,7 @@
 
 { pkgs }:
 
-pkgs.nixComponents.nix-util.overrideAttrs (attrs:
+(pkgs.nix.override { forDevShell = true; }).overrideAttrs (attrs:
 
 let
   stdenv = pkgs.nixDependencies.stdenv;
@@ -88,12 +88,9 @@ in {
   buildInputs = attrs.buildInputs or []
     ++ pkgs.nixComponents.nix-util.buildInputs
     ++ pkgs.nixComponents.nix-store.buildInputs
-    ++ pkgs.nixComponents.nix-store-tests.externalBuildInputs
     ++ pkgs.nixComponents.nix-fetchers.buildInputs
     ++ pkgs.nixComponents.nix-expr.buildInputs
-    ++ pkgs.nixComponents.nix-expr.externalPropagatedBuildInputs
-    ++ pkgs.nixComponents.nix-cmd.buildInputs
-    ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.externalBuildInputs
+    ++ pkgs.nixComponents.nix-store-tests.externalBuildInputs
     ++ lib.optional havePerl pkgs.perl
     ;
 })

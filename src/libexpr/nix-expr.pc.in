@@ -1,0 +1,10 @@
+prefix=@prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: Nix
+Description: Nix Package Manager
+Version: @PACKAGE_VERSION@
+Requires: nix-store bdw-gc
+Libs: -L${libdir} -lnixexpr
+Cflags: -I${includedir}/nix -std=c++2a
