@@ -60,7 +60,7 @@ jobs:
 
   flake_regressions:
     needs: build_x86_64-linux
-    runs-on: ubuntu-22.04
+    runs-on: UbuntuLatest32Cores128G
     steps:
       - name: Checkout nix
         uses: actions/checkout@v4
@@ -78,4 +78,4 @@ jobs:
         with:
           flakehub: true
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix build --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH scripts/flake-regressions.sh
+      - run: nix build --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=25 flake-regressions/eval-all.sh
