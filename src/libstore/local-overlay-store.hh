@@ -97,7 +97,7 @@ class LocalOverlayStore : public virtual LocalOverlayStoreConfig, public virtual
      * is that store's store dir, and the upper layer is some
      * scratch storage just for us.
      */
-    ref<LocalFSStore> lowerStore;
+    ref<Store> lowerStore;
 
 public:
     LocalOverlayStore(const Params & params)

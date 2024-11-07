@@ -26,9 +26,13 @@ LocalOverlayStore::LocalOverlayStore(std::string_view scheme, PathView path, con
     , Store(params)
     , LocalFSStore(params)
     , LocalStore(params)
-    , lowerStore(openStore(percentDecode(lowerStoreUri.get())).dynamic_pointer_cast<LocalFSStore>())
+    , lowerStore(openStore(percentDecode(lowerStoreUri.get())))
 {
+    auto fsStore = lowerStore.dynamic_pointer_cast<LocalFSStore>();
     if (checkMount.get()) {
+        if (!fsStore) {
+            throw Error("check-mount is only supported for local filesystem stores, but '%s' store is specified", lowerStore->getUri());
+        }
         std::smatch match;
         std::string mountInfo;
         auto mounts = readFile(std::filesystem::path{"/proc/self/mounts"});
@@ -45,7 +49,7 @@ LocalOverlayStore::LocalOverlayStore(std::string_view scheme, PathView path, con
             return std::regex_search(mountInfo, std::regex("\\b" + option + "=" + value + "( |,)"));
         };
 
-        auto expectedLowerDir = lowerStore->realStoreDir.get();
+        auto expectedLowerDir = fsStore->realStoreDir.get();
         if (!checkOption("lowerdir", expectedLowerDir) || !checkOption("upperdir", upperLayer)) {
             debug("expected lowerdir: %s", expectedLowerDir);
             debug("expected upperdir: %s", upperLayer);
