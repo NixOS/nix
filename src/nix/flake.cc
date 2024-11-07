@@ -17,7 +17,6 @@
 #include "eval-cache.hh"
 #include "markdown.hh"
 #include "users.hh"
-#include "terminal.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -1275,97 +1274,25 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 auto showDerivation = [&]()
                 {
                     auto name = visitor.getAttr(state->sName)->getString();
-                    std::optional<std::string> description;
-                    if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
-                        if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
-                            description = aDescription->getString();
-                    }
 
                     if (json) {
+                        std::optional<std::string> description;
+                        if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
+                            if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
+                                description = aDescription->getString();
+                        }
                         j.emplace("type", "derivation");
                         j.emplace("name", name);
                         j.emplace("description", description ? *description : "");
                     } else {
-                        auto type =
+                        logger->cout("%s: %s '%s'",
+                            headerPrefix,
                             attrPath.size() == 2 && attrPathS[0] == "devShell" ? "development environment" :
                             attrPath.size() >= 2 && attrPathS[0] == "devShells" ? "development environment" :
                             attrPath.size() == 3 && attrPathS[0] == "checks" ? "derivation" :
                             attrPath.size() >= 1 && attrPathS[0] == "hydraJobs" ? "derivation" :
-                            "package";
-                        if (description && !description->empty()) {
-
-                            // Takes a string and returns the # of characters displayed
-                            auto columnLengthOfString = [](std::string_view s) -> unsigned int {
-                                unsigned int columnCount = 0;
-                                for (auto i = s.begin(); i < s.end();) {
-                                    // Test first character to determine if it is one of
-                                    // treeConn, treeLast, treeLine
-                                    if (*i == -30) {
-                                        i += 3;
-                                        ++columnCount;
-                                    }
-                                    // Escape sequences
-                                    // https://en.wikipedia.org/wiki/ANSI_escape_code
-                                    else if (*i == '\e') {
-                                        // Eat '['
-                                        if (*(++i) == '[') {
-                                            ++i;
-                                            // Eat parameter bytes
-                                            while(*i >= 0x30 && *i <= 0x3f) ++i;
-
-                                            // Eat intermediate bytes
-                                            while(*i >= 0x20 && *i <= 0x2f) ++i;
-
-                                            // Eat final byte
-                                            if(*i >= 0x40 && *i <= 0x73) ++i;
-                                        }
-                                        else {
-                                            // Eat Fe Escape sequence
-                                            if (*i >= 0x40 && *i <= 0x5f) ++i;
-                                        }
-                                    }
-                                    else {
-                                        ++i;
-                                        ++columnCount;
-                                    }
-                                }
-
-                                return columnCount;
-                            };
-
-                            // Maximum length to print
-                            size_t maxLength = getWindowSize().second > 0 ? getWindowSize().second : 80;
-
-                            // Trim the description and only use the first line
-                            auto trimmed = trim(*description);
-                            auto newLinePos = trimmed.find('\n');
-                            auto length = newLinePos != std::string::npos ? newLinePos : trimmed.length();
-
-                            auto beginningOfLine = fmt("%s: %s '%s'", headerPrefix, type, name);
-                            auto line = fmt("%s: %s '%s' - '%s'", headerPrefix, type, name, trimmed.substr(0, length));
-
-                            // If we are already over the maximum length then do not trim
-                            // and don't print the description (preserves existing behavior)
-                            if (columnLengthOfString(beginningOfLine) >= maxLength) {
-                                logger->cout("%s", beginningOfLine);
-                            }
-                            // If the entire line fits then print that
-                            else if (columnLengthOfString(line) < maxLength) {
-                                logger->cout("%s", line);
-                            }
-                            // Otherwise we need to truncate
-                            else {
-                                auto lineLength = columnLengthOfString(line);
-                                auto chopOff = lineLength - maxLength;
-                                line.resize(line.length() - chopOff);
-                                line = line.replace(line.length() - 3, 3, "...");
-
-                                logger->cout("%s", line);
-                            }
-                        }
-                        else {
-                            logger->cout("%s: %s '%s'", headerPrefix, type, name);
-                        }
+                            "package",
+                            name);
                     }
                 };
 
