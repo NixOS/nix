@@ -694,7 +694,7 @@ static void opDump(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
 
-    FdSink sink(getStandardOut());
+    FdSink sink(getStandardOutput());
     std::string path = *opArgs.begin();
     dumpPath(path, sink);
     sink.flush();
@@ -722,7 +722,7 @@ static void opExport(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs)
         paths.insert(store->followLinksToStorePath(i));
 
-    FdSink sink(getStandardOut());
+    FdSink sink(getStandardOutput());
     store->exportPaths(paths, sink);
     sink.flush();
 }
@@ -835,7 +835,7 @@ static void opServe(Strings opFlags, Strings opArgs)
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
     FdSource in(STDIN_FILENO);
-    FdSink out(getStandardOut());
+    FdSink out(getStandardOutput());
 
     /* Exchange the greeting. */
     ServeProto::Version clientVersion =
