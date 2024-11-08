@@ -6,15 +6,14 @@
     # purge nix git cache to make sure we start with a clean slate
     client.succeed("rm -rf ~/.cache/nix")
 
-    # add two commits to the repo:
-    client.succeed(f"""
-      dd if=/dev/urandom of={repo.path}/beeg bs=1M count=1 \
-      && {repo.git} lfs track "beeg" \
-      && {repo.git} add .gitattributes \
-      && {repo.git} add beeg \
-      && {repo.git} commit -m 'commit1' \
-      && {repo.git} push origin main
-    """)
+    # add an lfs-enrolled file to the repo:
+    client.succeed(f"dd if=/dev/urandom of={repo.path}/beeg bs=1M count=1")
+    client.succeed(f"{repo.git} lfs install")
+    client.succeed(f"{repo.git} lfs track --filename \"beeg\"")
+    client.succeed(f"{repo.git} add .gitattributes")
+    client.succeed(f"{repo.git} add beeg")
+    client.succeed(f"{repo.git} commit -m 'commit1'")
+    client.succeed(f"{repo.git} push origin main")
 
     # memoize the revision
     commit1_rev = client.succeed(f"""
@@ -24,9 +23,9 @@
     # first fetch without lfs, check that we did not smudge the file
     fetchGit_nolfs_expr = f"""
       builtins.fetchGit {{
-        type = "git";
         url = "{repo.remote}";
         rev = "{commit1_rev}";
+        ref = "main";
         lfs = false;
       }}
     """
@@ -42,14 +41,14 @@
     """).strip()
 
     expected_max_size_lfs = 1024
-    assert int(file_size_nolfs) < expected_max_size_lfs, f"lfs-enrolled file bigger than {expected_max_size_lfs}, file was probably smudged but we did not set lfs=true"
+    assert int(file_size_nolfs) < expected_max_size_lfs, f"did not set lfs=true, yet lfs-enrolled file is {file_size_nolfs}b (>{expected_max_size_lfs}b), probably smudged when we should not have"
 
     # now fetch with lfs=true and check that the file was smudged
     fetchGit_lfs_expr = f"""
       builtins.fetchGit {{
-        type = "git";
         url = "{repo.remote}";
         rev = "{commit1_rev}";
+        ref = "main";
         lfs = true;
       }}
     """
@@ -65,6 +64,6 @@
     """).strip()
 
     expected_min_size_lfs = 1024 * 1024  # 1MB
-    assert int(file_size_lfs) >= expected_min_size_lfs, f"lfs-enrolled file smaller than {expected_min_size_lfs}, file was probably not smudged despite lfs=true"
+    assert int(file_size_lfs) >= expected_min_size_lfs, f"set lfs=true, yet lfs-enrolled file is {file_size_lfs}b (<{expected_min_size_lfs}), probably did not smudge when we should have"
   '';
 }
