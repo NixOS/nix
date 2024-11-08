@@ -294,109 +294,24 @@
       });
 
       devShells = let
-        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs:
-        let
-          buildCanExecuteHost = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
-          modular = devFlake.getSystem stdenv.buildPlatform.system;
-          transformFlag = prefix: flag:
-            assert builtins.isString flag;
-            let
-              rest = builtins.substring 2 (builtins.stringLength flag) flag;
-            in
-              "-D${prefix}:${rest}";
-          havePerl = stdenv.buildPlatform == stdenv.hostPlatform && stdenv.hostPlatform.isUnix;
-          ignoreCrossFile = flags: builtins.filter (flag: !(lib.strings.hasInfix "cross-file" flag)) flags;
-        in {
-          pname = "shell-for-" + attrs.pname;
-
-          # Remove the version suffix to avoid unnecessary attempts to substitute in nix develop
-          version = lib.fileContents ./.version;
-          name = attrs.pname;
-
-          installFlags = "sysconfdir=$(out)/etc";
-          shellHook = ''
-            PATH=$prefix/bin:$PATH
-            unset PYTHONPATH
-            export MANPATH=$out/share/man:$MANPATH
-
-            # Make bash completion work.
-            XDG_DATA_DIRS+=:$out/share
-          '';
-
-          # We use this shell with the local checkout, not unpackPhase.
-          src = null;
-
-          env = {
-            # Needed for Meson to find Boost.
-            # https://github.com/NixOS/nixpkgs/issues/86131.
-            BOOST_INCLUDEDIR = "${lib.getDev pkgs.nixDependencies.boost}/include";
-            BOOST_LIBRARYDIR = "${lib.getLib pkgs.nixDependencies.boost}/lib";
-            # For `make format`, to work without installing pre-commit
-            _NIX_PRE_COMMIT_HOOKS_CONFIG =
-              "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml" modular.pre-commit.settings.rawConfig}";
-          };
-
-          mesonFlags =
-            map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents.nix-util.mesonFlags)
-            ++ map (transformFlag "libstore") (ignoreCrossFile pkgs.nixComponents.nix-store.mesonFlags)
-            ++ map (transformFlag "libfetchers") (ignoreCrossFile pkgs.nixComponents.nix-fetchers.mesonFlags)
-            ++ lib.optionals havePerl (map (transformFlag "perl") (ignoreCrossFile pkgs.nixComponents.nix-perl-bindings.mesonFlags))
-            ++ map (transformFlag "libexpr") (ignoreCrossFile pkgs.nixComponents.nix-expr.mesonFlags)
-            ++ map (transformFlag "libcmd") (ignoreCrossFile pkgs.nixComponents.nix-cmd.mesonFlags)
-            ;
-
-          nativeBuildInputs = attrs.nativeBuildInputs or []
-            ++ pkgs.nixComponents.nix-util.nativeBuildInputs
-            ++ pkgs.nixComponents.nix-store.nativeBuildInputs
-            ++ pkgs.nixComponents.nix-fetchers.nativeBuildInputs
-            ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.nativeBuildInputs
-            ++ lib.optionals buildCanExecuteHost pkgs.nixComponents.nix-manual.externalNativeBuildInputs
-            ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
-            ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
-            ++ pkgs.nixComponents.nix-functional-tests.externalNativeBuildInputs
-            ++ lib.optional
-              (!buildCanExecuteHost
-                 # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
-                 && !(stdenv.hostPlatform.isWindows && stdenv.buildPlatform.isDarwin)
-                 && stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages
-                 && lib.meta.availableOn stdenv.buildPlatform (stdenv.hostPlatform.emulator pkgs.buildPackages))
-              pkgs.buildPackages.mesonEmulatorHook
-            ++ [
-              pkgs.buildPackages.cmake
-              pkgs.buildPackages.shellcheck
-              pkgs.buildPackages.changelog-d
-              modular.pre-commit.settings.package
-              (pkgs.writeScriptBin "pre-commit-hooks-install"
-                modular.pre-commit.settings.installationScript)
-            ]
-            # TODO: Remove the darwin check once
-            # https://github.com/NixOS/nixpkgs/pull/291814 is available
-            ++ lib.optional (stdenv.cc.isClang && !stdenv.buildPlatform.isDarwin) pkgs.buildPackages.bear
-            ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (lib.hiPrio pkgs.buildPackages.clang-tools);
-
-          buildInputs = attrs.buildInputs or []
-            ++ [
-              pkgs.gtest
-              pkgs.rapidcheck
-            ]
-            ++ lib.optional havePerl pkgs.perl
-            ;
-        });
-        in
+        makeShell = import ./packaging/dev-shell.nix { inherit lib devFlake; };
+        prefixAttrs = prefix: lib.concatMapAttrs (k: v: { "${prefix}-${k}" = v; });
+      in
         forAllSystems (system:
-          let
-            makeShells = prefix: pkgs:
-              lib.mapAttrs'
-              (k: v: lib.nameValuePair "${prefix}-${k}" v)
-              (forAllStdenvs (stdenvName: makeShell pkgs pkgs.${stdenvName}));
-          in
-            (makeShells "native" nixpkgsFor.${system}.native) //
-            (lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin)
-              (makeShells "static" nixpkgsFor.${system}.static) //
-              (forAllCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv))) //
-            {
-              default = self.devShells.${system}.native-stdenvPackages;
-            }
+          prefixAttrs "native" (forAllStdenvs (stdenvName: makeShell {
+            pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages";
+          })) //
+          lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin) (
+            prefixAttrs "static" (forAllStdenvs (stdenvName: makeShell {
+              pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".pkgsStatic;
+            })) //
+            prefixAttrs "cross" (forAllCrossSystems (crossSystem: makeShell {
+              pkgs = nixpkgsFor.${system}.cross.${crossSystem};
+            }))
+          ) //
+          {
+            default = self.devShells.${system}.native-stdenvPackages;
+          }
         );
   };
 }

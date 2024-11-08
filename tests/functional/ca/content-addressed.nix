@@ -1,4 +1,4 @@
-with import ./config.nix;
+with import "${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/ca/config.nix";
 
 let mkCADerivation = args: mkDerivation ({
     __contentAddressed = true;

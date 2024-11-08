@@ -91,6 +91,7 @@ ifdef HOST_WINDOWS
   #
   # TODO do not do this, and instead do fine-grained export annotations.
   GLOBAL_LDFLAGS += -Wl,--export-all-symbols
+  GLOBAL_CXXFLAGS += -D_WIN32_WINNT=0x0602
 endif
 
 GLOBAL_CXXFLAGS += -g -Wall -Wdeprecated-copy -Wignored-qualifiers -Wimplicit-fallthrough -Werror=unused-result -Werror=suggest-override -include $(buildprefix)config.h -std=c++2a -I src

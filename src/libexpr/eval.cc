@@ -2834,7 +2834,9 @@ void EvalState::printStatistics()
 #endif
 #if HAVE_BOEHMGC
         {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
+#ifndef _WIN32 // TODO implement
         {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
+#endif
 #endif
     };
     topObj["envs"] = {

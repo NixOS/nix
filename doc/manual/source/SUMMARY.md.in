@@ -121,6 +121,7 @@
 - [Development](development/index.md)
   - [Building](development/building.md)
   - [Testing](development/testing.md)
+  - [Debugging](development/debugging.md)
   - [Documentation](development/documentation.md)
   - [CLI guideline](development/cli-guideline.md)
   - [JSON guideline](development/json-guideline.md)

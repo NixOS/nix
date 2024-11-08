@@ -28,6 +28,7 @@ subdir('build-utils-meson/subprojects')
 subdir('build-utils-meson/threads')
 
 subdir('build-utils-meson/export-all-symbols')
+subdir('build-utils-meson/windows-version')
 
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite

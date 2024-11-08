@@ -134,7 +134,7 @@ rm -f "$TEST_ROOT/unicode-*"
 
 # Unpacking a NAR with a NUL character in a file name should fail.
 rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < nul.nar | grepQuiet "NAR contains invalid file name 'f"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < nul-character.nar | grepQuiet "NAR contains invalid file name 'f"
 
 # Likewise for a '.' filename.
 rm -rf "$TEST_ROOT/out"

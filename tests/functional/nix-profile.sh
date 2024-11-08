@@ -47,7 +47,7 @@ printf World > $flake1Dir/who
 printf 1.0 > $flake1Dir/version
 printf false > $flake1Dir/ca.nix
 
-cp ./config.nix $flake1Dir/
+cp "${config_nix}" $flake1Dir/
 
 # Test upgrading from nix-env.
 nix-env -f ./user-envs.nix -i foo-1.0
@@ -140,7 +140,7 @@ nix profile install $(nix-build --no-out-link ./simple.nix)
 
 # Test packages with same name from different sources
 mkdir $TEST_ROOT/simple-too
-cp ./simple.nix ./config.nix simple.builder.sh $TEST_ROOT/simple-too
+cp ./simple.nix "${config_nix}" simple.builder.sh $TEST_ROOT/simple-too
 nix profile install --file $TEST_ROOT/simple-too/simple.nix ''
 nix profile list | grep -A4 'Name:.*simple' | grep 'Name:.*simple-1'
 nix profile remove simple 2>&1 | grep 'removed 1 packages'

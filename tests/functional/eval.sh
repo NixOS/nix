@@ -45,7 +45,7 @@ printf 123 > "$TEST_ROOT/xyzzy/default.nix"
 [[ $(nix eval --impure --expr "import $TEST_ROOT/foo/bar") = 123 ]]
 
 # Test --arg-from-file.
-[[ "$(nix eval --raw --arg-from-file foo config.nix --expr '{ foo }: { inherit foo; }' foo)" = "$(cat config.nix)" ]]
+[[ "$(nix eval --raw --arg-from-file foo "${config_nix}" --expr '{ foo }: { inherit foo; }' foo)" = "$(cat "${config_nix}")" ]]
 
 # Check that special(-ish) files are drained.
 if [[ -e /proc/version ]]; then

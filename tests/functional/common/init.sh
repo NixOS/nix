@@ -19,7 +19,7 @@ EOF
 
   # When we're doing everything in the same store, we need to bring
   # dependencies into context.
-  sed -i "$(dirname "${BASH_SOURCE[0]}")"/../config.nix \
+  sed -i "${_NIX_TEST_BUILD_DIR}/config.nix" \
     -e 's^\(shell\) = "/nix/store/\([^/]*\)/\(.*\)";^\1 = builtins.appendContext "/nix/store/\2" { "/nix/store/\2".path = true; } + "/\3";^' \
     -e 's^\(path\) = "/nix/store/\([^/]*\)/\(.*\)";^\1 = builtins.appendContext "/nix/store/\2" { "/nix/store/\2".path = true; } + "/\3";^' \
     ;

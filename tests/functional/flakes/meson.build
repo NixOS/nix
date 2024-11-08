@@ -25,5 +25,5 @@ suites += {
     'show.sh',
     'dubious-query.sh',
   ],
-  'workdir': meson.current_build_dir(),
+  'workdir': meson.current_source_dir(),
 }
