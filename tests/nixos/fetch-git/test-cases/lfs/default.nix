@@ -1,7 +1,7 @@
 {
   # mostly copied from https://github.com/NixOS/nix/blob/358c26fd13a902d9a4032a00e6683571be07a384/tests/nixos/fetch-git/test-cases/fetchTree-shallow/default.nix#L1
   # ty @DavHau
-  description = "fetchGit with lfs=true smudges LFS pointers";
+  description = "fetchGit smudges LFS pointers iff lfs=true";
   script = ''
     # purge nix git cache to make sure we start with a clean slate
     client.succeed("rm -rf ~/.cache/nix")

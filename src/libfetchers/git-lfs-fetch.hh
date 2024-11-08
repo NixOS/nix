@@ -7,12 +7,14 @@
 #include <iostream>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 
 #include "serialise.hh"
 #include "processes.hh"
+#include "url.hh"
 
 
 namespace fs = std::filesystem;
@@ -58,6 +60,8 @@ struct Fetch {
   std::vector<nlohmann::json> fetchUrls(const std::vector<Md> &metadatas) const;
 };
 
+// check if `path` has attribute corresponding to the `pattern`
+// TODO replace this with libgit2 pathspec?
 bool matchesPattern(std::string_view path, std::string_view pattern) {
     if (pattern.ends_with("/**")) {
         auto prefix = pattern.substr(0, pattern.length() - 3);
@@ -68,7 +72,6 @@ bool matchesPattern(std::string_view path, std::string_view pattern) {
 
     while (patternPos < pattern.length() && pathPos < path.length()) {
         if (pattern[patternPos] == '*') {
-            // For "*.ext" pattern, match against end of path
             if (patternPos == 0 && pattern.find('*', 1) == std::string_view::npos) {
                 return path.ends_with(pattern.substr(1));
             }
@@ -91,12 +94,7 @@ bool matchesPattern(std::string_view path, std::string_view pattern) {
 static size_t writeCallback(void *contents, size_t size, size_t nmemb,
                             std::string *s) {
   size_t newLength = size * nmemb;
-  try {
-    s->append((char *)contents, newLength);
-  } catch (std::bad_alloc &e) {
-    // Handle memory bad_alloc error
-    return 0;
-  }
+  s->append((char *)contents, newLength);
   return newLength;
 }
 
@@ -104,22 +102,18 @@ struct SinkCallbackData {
     Sink* sink;
     std::string_view sha256Expected;
     HashSink hashSink;
-    
-    SinkCallbackData(Sink* sink, std::string_view sha256) 
+
+    SinkCallbackData(Sink* sink, std::string_view sha256)
         : sink(sink)
         , sha256Expected(sha256)
-        , hashSink(HashAlgorithm::SHA256) 
+        , hashSink(HashAlgorithm::SHA256)
     {}
 };
 
 static size_t sinkWriteCallback(void *contents, size_t size, size_t nmemb, SinkCallbackData *data) {
     size_t totalSize = size * nmemb;
-    try {
-        data->hashSink({(char *)contents, totalSize});
-        (*data->sink)({(char *)contents, totalSize});
-    } catch (std::exception &e) {
-        return 0;
-    }
+    data->hashSink({(char *)contents, totalSize});
+    (*data->sink)({(char *)contents, totalSize});
     return totalSize;
 }
 
@@ -130,7 +124,7 @@ void downloadToSink(const std::string &url, const std::string &authHeader, Sink 
     curl = curl_easy_init();
     if (curl) {
         SinkCallbackData data(&sink, sha256Expected);
-        
+
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, sinkWriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
@@ -220,11 +214,9 @@ std::vector<AttrRule> parseGitAttrFile(std::string_view content)
             pos = eol + 1;
         }
 
-        // Trim carriage return if present
         if (!line.empty() && line.back() == '\r')
             line.remove_suffix(1);
 
-        // Skip empty lines and comments
         if (line.empty() || line[0] == '#')
             continue;
 
@@ -246,11 +238,16 @@ std::string getLfsApiToken(const std::string &host,
       .args = {"git@" + host, "git-lfs-authenticate", path, "download"},
   });
 
-  std::string res;
-  if (!output.empty()) {
-    nlohmann::json query_resp = nlohmann::json::parse(output);
-    res = query_resp["header"]["Authorization"].get<std::string>();
-  }
+  if (output.empty())
+    throw std::runtime_error("git-lfs-authenticate: no output (cmd: ssh git@" + host + " git-lfs-authenticate " + path + " download)");
+
+  nlohmann::json query_resp = nlohmann::json::parse(output);
+  if (!query_resp.contains("header"))
+    throw std::runtime_error("no header in git-lfs-authenticate response");
+  if (!query_resp["header"].contains("Authorization"))
+    throw std::runtime_error("no Authorization in git-lfs-authenticate response");
+
+  std::string res = query_resp["header"]["Authorization"].get<std::string>();
 
   return res;
 }
@@ -260,41 +257,16 @@ std::string getLfsEndpointUrl(git_repository *repo) {
   git_remote* remote = NULL;
   err = git_remote_lookup(&remote, repo, "origin");
   if (err < 0) {
-      std::cerr << " failed git_remote_lookup with: " << err << std::endl;
       return "";
   }
 
 
   const char *url_c_str = git_remote_url(remote);
   if (!url_c_str) {
-    std::cerr << "no remote url ";
     return "";
   }
 
   return std::string(url_c_str);
-}
-
-// splits url into (hostname, path)
-std::tuple<std::string, std::string> splitUrl(const std::string& url_in) {
-  CURLU *url = curl_url();
-
-  if (curl_url_set(url, CURLUPART_URL, url_in.c_str(), 0) != CURLUE_OK) {
-      std::cerr << "Failed to set URL\n";
-      return {"", ""};
-  }
-
-  char *hostname;
-  char *path;
-
-  if (curl_url_get(url, CURLUPART_HOST, &hostname, 0) != CURLUE_OK) {
-      std::cerr << "no hostname" << std::endl;
-  }
-
-  if (curl_url_get(url, CURLUPART_PATH, &path, 0) != CURLUE_OK) {
-      std::cerr << "no path" << std::endl;
-  }
-
-  return std::make_tuple(std::string(hostname), std::string(path));
 }
 
 std::string git_attr_value_to_string(git_attr_value_t value) {
@@ -312,35 +284,6 @@ std::string git_attr_value_to_string(git_attr_value_t value) {
   }
 }
 
-std::unique_ptr<std::vector<std::string>> find_lfs_files(git_repository *repo) {
-  git_index *index;
-  int error;
-  error = git_repository_index(&index, repo);
-  if (error < 0) {
-    const git_error *e = git_error_last();
-    std::cerr << "Error reading index: " << e->message << std::endl;
-    git_repository_free(repo);
-    return nullptr;
-  }
-
-  std::unique_ptr<std::vector<std::string>> out =
-      std::make_unique<std::vector<std::string>>();
-  size_t entry_count = git_index_entrycount(index);
-  for (size_t i = 0; i < entry_count; ++i) {
-    const git_index_entry *entry = git_index_get_byindex(index, i);
-    if (entry) {
-      const char *value;
-      if (git_attr_get(&value, repo, GIT_ATTR_CHECK_INDEX_ONLY, entry->path,
-                       "filter") == 0) {
-        auto value_type = git_attr_value(value);
-        if (value_type == GIT_ATTR_VALUE_STRING && strcmp(value, "lfs") == 0) {
-          out->push_back(entry->path);
-        }
-      }
-    }
-  }
-  return out;
-}
 
 Md parseLfsMetadata(const std::string &content, const std::string &filename) {
   // example git-lfs poitner file:
@@ -371,22 +314,42 @@ Md parseLfsMetadata(const std::string &content, const std::string &filename) {
   return Md{filename, oid, size};
 }
 
+// there's already a ParseURL here https://github.com/b-camacho/nix/blob/ef6fa54e05cd4134ec41b0d64c1a16db46237f83/src/libutil/url.cc#L13
+// but that one doesn't handle the `git@` prefix that libgit2 sometimes returns for a git remote
+// (one would think fixGitURL is for that? but it doesn't handle a scheme prefix)
+std::tuple<std::string, std::string, std::string, std::string, std::string> parseGitRemoteUrl(const std::string& url) {
+    std::regex pattern(R"((\w+)://(\w+@)?([^/]+)(:\d{1,5})?/(.*))");
+    std::smatch matches;
+
+    if (std::regex_search(url, matches, pattern)) {
+        return {
+            matches[1].str(), // scheme
+            matches[2].str(), // optional "git@" part idk the name
+            matches[3].str(), // domain
+            matches[4].str(), // port
+            matches[5].str(), // path
+        };
+    }
+
+    return {"", "", "", "", ""};
+}
+
 void Fetch::init(git_repository* repo, std::string gitattributesContent) {
-   this->rootUrl = lfs::getLfsEndpointUrl(repo);
-   const auto [host, path] = lfs::splitUrl(rootUrl);
-   this->token = lfs::getLfsApiToken(host, path);
+   const auto remoteUrl = lfs::getLfsEndpointUrl(repo);
+
+   const auto [scheme, maybeSshUser, domain, port, path] = parseGitRemoteUrl(remoteUrl);
+   this->rootUrl = (scheme == "ssh" ? "https" : scheme) + "://" + domain + port + "/" + path;
+   this->token = lfs::getLfsApiToken(domain, path);
    this->rules = lfs::parseGitAttrFile(gitattributesContent);
    this->ready = true;
 }
 
 bool Fetch::hasAttribute(const std::string& path, const std::string& attrName) const
 {
-    // Iterate rules in reverse order (last matching rule wins)
     for (auto it = rules.rbegin(); it != rules.rend(); ++it) {
         if (matchesPattern(path, it->pattern)) {
             auto attr = it->attributes.find(attrName);
             if (attr != it->attributes.end()) {
-                // Found a matching rule with this attribute
                 return attr->second != "false";
             }
         }
@@ -416,6 +379,8 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> &metadatas) c
   auto lfsUrlBatch = rootUrl + "/info/lfs/objects/batch";
   curl_easy_setopt(curl, CURLOPT_URL, lfsUrlBatch.c_str());
   curl_easy_setopt(curl, CURLOPT_POSTFIELDS, dataStr.c_str());
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 
   struct curl_slist *headers = NULL;
   auto authHeader = "Authorization: " + token;
@@ -440,6 +405,7 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> &metadatas) c
   // example resp here:
   // {"objects":[{"oid":"f5e02aa71e67f41d79023a128ca35bad86cf7b6656967bfe0884b3a3c4325eaf","size":10000000,"actions":{"download":{"href":"https://gitlab.com/b-camacho/test-lfs.git/gitlab-lfs/objects/f5e02aa71e67f41d79023a128ca35bad86cf7b6656967bfe0884b3a3c4325eaf","header":{"Authorization":"Basic
   // Yi1jYW1hY2hvOmV5SjBlWEFpT2lKS1YxUWlMQ0poYkdjaU9pSklVekkxTmlKOS5leUprWVhSaElqcDdJbUZqZEc5eUlqb2lZaTFqWVcxaFkyaHZJbjBzSW1wMGFTSTZJbUptTURZNFpXVTFMVEprWmpVdE5HWm1ZUzFpWWpRMExUSXpNVEV3WVRReU1qWmtaaUlzSW1saGRDSTZNVGN4TkRZeE16ZzBOU3dpYm1KbUlqb3hOekUwTmpFek9EUXdMQ0psZUhBaU9qRTNNVFEyTWpFd05EVjkuZk9yMDNkYjBWSTFXQzFZaTBKRmJUNnJTTHJPZlBwVW9lYllkT0NQZlJ4QQ=="}}},"authenticated":true}]}
+
   auto resp = nlohmann::json::parse(responseString);
   if (resp.contains("objects")) {
     objects.insert(objects.end(), resp["objects"].begin(),
@@ -471,3 +437,4 @@ void Fetch::fetch(const std::string& pointerFileContents, const std::string& poi
 } // namespace lfs
 
 } // namespace nix
+

@@ -1,0 +1,1 @@
+{ absolute = /foo; expr = /home/bmc/sources/nix/tests/lang/foo/bar; home = /fake-home/foo; notfirst = /home/bmc/sources/nix/tests/lang/bar/foo; simple = /home/bmc/sources/nix/tests/lang/foo; slashes = /foo/bar; surrounded = /home/bmc/sources/nix/tests/lang/a-foo-b; }

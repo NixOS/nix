@@ -676,9 +676,9 @@ struct GitSourceAccessor : SourceAccessor
 
     std::string readBlob(const CanonPath & path, bool symlink)
     {
-        auto blob = getBlob(path, symlink);
+        const auto blob = getBlob(path, symlink);
 
-        auto data = std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
+        const auto data = std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
 
         if (path != CanonPath(".gitattributes") && lfsFetch) {
             auto& _lfsFetch = *lfsFetch;
@@ -704,19 +704,24 @@ struct GitSourceAccessor : SourceAccessor
         auto size = git_blob_rawsize(blob.get());
         sizeCallback(size);
 
-        auto pointerFileContents = std::string((const char *) git_blob_rawcontent(blob.get()), size);
+        // if lfs, this is just a pointer file
+        // if not lfs then it's not big either way
+        auto contents = std::string((const char *) git_blob_rawcontent(blob.get()), size);
 
-        if (path != CanonPath(".gitattributes") && lfsFetch) {
+        if (lfsFetch && path != CanonPath(".gitattributes")) {
             auto& _lfsFetch = *lfsFetch;
             if (!_lfsFetch.ready) {
                 const auto contents = readFile(CanonPath(".gitattributes"));
                 _lfsFetch.init(*repo, contents);
             }
             if (_lfsFetch.hasAttribute(path.abs(), "filter")) {
-                _lfsFetch.fetch(pointerFileContents, path.abs(), sink);
+                _lfsFetch.fetch(contents, path.abs(), sink);
                 return;
             }
         }
+
+        // either not using lfs or file should not be smudged
+        sink(contents);
     }
 
     std::string readFile(const CanonPath & path) override
@@ -897,7 +902,6 @@ struct GitSourceAccessor : SourceAccessor
         return tree;
     }
 
-
     Blob getBlob(const CanonPath & path, bool expectSymlink)
     {
         if (!expectSymlink && git_object_type(root.get()) == GIT_OBJECT_BLOB)
@@ -915,7 +919,6 @@ struct GitSourceAccessor : SourceAccessor
         if (path.isRoot()) notExpected();
 
         auto entry = need(path);
-
 
         if (git_tree_entry_type(entry) != GIT_OBJECT_BLOB)
             notExpected();
@@ -938,7 +941,6 @@ struct GitSourceAccessor : SourceAccessor
 };
 
 struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor {
-
     ref<GitRepoImpl> repo;
     std::optional<Hash> rev;
 

@@ -1,0 +1,1 @@
+({ fetchurl, stdenv }: ((stdenv).mkDerivation { name = "libXi-6.0.1"; src = (fetchurl { md5 = "7e935a42428d63a387b3c048be0f2756"; url = "http://freedesktop.org/~xlibs/release/libXi-6.0.1.tar.bz2"; }); }))

@@ -678,10 +678,6 @@ struct GitInputScheme : InputScheme
             }
         }
 
-        if (getLfsAttr(input)) {
-            printTalkative("lfs=1 on %s", input.to_string());
-        }
-
         assert(!origRev || origRev == rev);
         if (!getShallowAttr(input))
             input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
@@ -807,7 +803,7 @@ struct GitInputScheme : InputScheme
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
         if (auto rev = input.getRev())
-            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
+            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "") + (getLfsAttr(input) ? ";l" : "");
         else
             return std::nullopt;
     }
