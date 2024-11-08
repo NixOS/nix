@@ -159,8 +159,6 @@ can occur in *locked* flake references and are available to Nix code:
   for tarball flakes, it's the most recent timestamp of any file
   inside the tarball.
 
-Attributes that start with `__` are internal or experimental and may be removed in future versions.
-
 ## Types
 
 Currently the `type` attribute can be one of the following:

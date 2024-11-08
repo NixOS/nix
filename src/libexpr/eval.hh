@@ -108,6 +108,11 @@ struct PrimOp
     std::optional<ExperimentalFeature> experimentalFeature;
 
     /**
+     * If true, this primop is not exposed to the user.
+     */
+    bool internal = false;
+
+    /**
      * Validity check to be performed by functions that introduce primops,
      * such as RegisterPrimOp() and Value::mkPrimOp().
      */
@@ -590,6 +595,11 @@ public:
      * The same, but used during parsing to resolve variables.
      */
     std::shared_ptr<StaticEnv> staticBaseEnv; // !!! should be private
+
+    /**
+     * Internal primops not exposed to the user.
+     */
+    std::unordered_map<std::string, Value *, std::hash<std::string>, std::equal_to<std::string>, traceable_allocator<std::pair<const std::string, Value *>>> internalPrimOps;
 
     /**
      * Name and documentation about every constant.
