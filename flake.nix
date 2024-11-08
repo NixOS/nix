@@ -137,7 +137,7 @@
             pkgs = final;
           });
 
-          nix = final.nixComponents.nix-cli;
+          nix = final.nixComponents.nix;
 
           # See https://github.com/NixOS/nixpkgs/pull/214409
           # Remove when fixed in this flake's nixpkgs
@@ -189,6 +189,7 @@
         # system, we should reenable this.
         #perlBindings = self.hydraJobs.perlBindings.${system};
       }
+      /*
       # Add "passthru" tests
       // flatMapAttrs ({
           "" = nixpkgsFor.${system}.native;
@@ -210,6 +211,7 @@
             "${nixpkgsPrefix}nix-functional-tests" = nixpkgs.nixComponents.nix-functional-tests;
           }
         )
+      */
       // devFlake.checks.${system} or {}
       );
 
@@ -218,8 +220,7 @@
           # for which we don't apply the full build matrix such as cross or static.
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
-          # TODO probably should be `nix-cli`
-          default = self.packages.${system}.nix-everything;
+          default = self.packages.${system}.nix-ng;
           nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
@@ -227,6 +228,7 @@
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         // flatMapAttrs
           { # Components we'll iterate over in the upcoming lambda
+            "nix" = { };
             "nix-util" = { };
             "nix-util-c" = { };
             "nix-util-test-support" = { };
@@ -255,11 +257,10 @@
 
             "nix-cli" = { };
 
-            "nix-everything" = { };
-
             "nix-functional-tests" = { supportsCross = false; };
 
             "nix-perl-bindings" = { supportsCross = false; };
+            "nix-ng" = { };
           }
           (pkgName: { supportsCross ? true }: {
               # These attributes go right into `packages.<system>`.

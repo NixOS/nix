@@ -3,6 +3,7 @@
 source common.sh
 
 cp ../simple.nix ../simple.builder.sh "${config_nix}" $TEST_HOME
+removeBuildDirRef "$TEST_HOME/simple.nix"
 
 cd $TEST_HOME
 
