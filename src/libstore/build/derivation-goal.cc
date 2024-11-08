@@ -991,7 +991,8 @@ Goal::Co DerivationGoal::buildDone()
                 auto nixLogCommand = experimentalFeatureSettings.isEnabled(Xp::NixCommand)
                     ? "nix log"
                     : "nix-store -l";
-                msg += fmt("For full logs, run '" ANSI_BOLD "%s %s" ANSI_NORMAL "'.",
+                // Don't put quotes around the command. This is copy-pasted a ton, so don't make that error prone.
+                msg += fmt("For full logs, run " ANSI_BOLD "%s %s" ANSI_NORMAL,
                     nixLogCommand,
                     worker.store.printStorePath(drvPath));
             }
