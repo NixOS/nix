@@ -33,7 +33,7 @@ Machine::Machine(
     systemTypes(systemTypes),
     sshKey(sshKey),
     maxJobs(maxJobs),
-    speedFactor(speedFactor == 0.0f ? 1.0f : std::move(speedFactor)),
+    speedFactor(speedFactor == 0.0f ? 1.0f : speedFactor),
     supportedFeatures(supportedFeatures),
     mandatoryFeatures(mandatoryFeatures),
     sshPublicHostKey(sshPublicHostKey)
