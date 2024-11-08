@@ -7,8 +7,8 @@
 
 namespace nix {
 
-PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && root)
-    : root(std::move(root))
+PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && argRoot)
+    : root(std::move(argRoot))
 {
     assert(root.empty() || root.is_absolute());
     displayPrefix = root.string();
