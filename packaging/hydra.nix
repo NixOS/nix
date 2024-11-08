@@ -62,7 +62,9 @@ in
   build = forAllPackages (pkgName:
     forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.${pkgName}));
 
-  shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
+  shellInputs = removeAttrs
+    (forAllSystems (system: self.devShells.${system}.default.inputDerivation))
+    [ "i686-linux" ];
 
   buildStatic = forAllPackages (pkgName:
     lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.nixComponents.${pkgName}));
