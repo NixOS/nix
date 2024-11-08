@@ -1,6 +1,6 @@
 # Release 2.25.0 (2024-11-07)
 
-- Use envvars NIX_CACHE_HOME, NIX_CONFIG_HOME, NIX_DATA_HOME, NIX_STATE_HOME if defined [#11351](https://github.com/NixOS/nix/pull/11351)
+- New environment variables to override XDG locations [#11351](https://github.com/NixOS/nix/pull/11351)
 
   Added new environment variables:
 
@@ -10,34 +10,27 @@
   - `NIX_STATE_HOME`
 
   Each, if defined, takes precedence over the corresponding [XDG environment variable](@docroot@/command-ref/env-common.md#xdg-base-directories).
-  This provides more fine-grained control over where Nix looks for files, and allows to have a stand-alone Nix environment, which only uses files in a specific directory, and doesn't interfere with the user environment.
+  This provides more fine-grained control over where Nix looks for files. It allows having a stand-alone Nix environment that only uses files in a specific directory and that doesn't interfere with the user environment.
 
 - Define integer overflow in the Nix language as an error [#10968](https://github.com/NixOS/nix/issues/10968) [#11188](https://github.com/NixOS/nix/pull/11188)
 
-  Previously, integer overflow in the Nix language invoked C++ level signed overflow, which was undefined behaviour, but *usually* manifested as wrapping around on overflow.
-
-  Since prior to the public release of Lix, Lix had C++ signed overflow defined to crash the process and nobody noticed this having accidentally removed overflow from the Nix language for three months until it was caught by fiddling around.
-  Given the significant body of actual Nix code that has been evaluated by Lix in that time, it does not appear that nixpkgs or much of importance depends on integer overflow, so it appears safe to turn into an error.
-
-  Some other overflows were fixed:
-  - `builtins.fromJSON` of values greater than the maximum representable value in a signed 64-bit integer will generate an error.
-  - `nixConfig` in flakes will no longer accept negative values for configuration options.
-
-  Integer overflow now looks like the following:
+  Previously, integer overflow in the Nix language invoked C++ level signed overflow, which manifested as wrapping around on overflow. It now looks like this:
 
   ```
   $ nix eval --expr '9223372036854775807 + 1'
   error: integer overflow in adding 9223372036854775807 + 1
   ```
 
-- The `build-hook` setting's default is less useful when using `libnixstore` as a library [#11178](https://github.com/NixOS/nix/pull/11178)
+  Some other overflows were fixed:
+  - `builtins.fromJSON` of values greater than the maximum representable value in a signed 64-bit integer will generate an error.
+  - `nixConfig` in flakes will no longer accept negative values for configuration options.
 
-  *This is an obscure issue that only affects usage of the `libnixstore` library outside of the Nix executable.*
+- The `build-hook` setting no longer has a useful default when using `libnixstore` as a library [#11178](https://github.com/NixOS/nix/pull/11178)
+
+  *This is an obscure issue that only affects usage of the `libnixstore` library outside of the Nix executable. It is unrelated to the `post-build-hook` settings, which is often used for pushing to a cache.*
 
   As part the ongoing [rewrite of the build system](https://github.com/NixOS/nix/issues/2503) to use [Meson](https://mesonbuild.com/), we are also switching to packaging individual Nix components separately (and building them in separate derivations).
   This means that when building `libnixstore` we do not know where the Nix binaries will be installed --- `libnixstore` doesn't know about downstream consumers like the Nix binaries at all.
-
-  *This is also unrelated to the _`post`_-`build-hook`*, which is often used for pushing to a cache.*
 
   This has a small adverse affect on remote building --- the `build-remote` executable that is specified from the [`build-hook`](@docroot@/command-ref/conf-file.md#conf-build-hook) setting will not be gotten from the (presumed) installation location, but instead looked up on the `PATH`.
   This means that other applications linking `libnixstore` that wish to use remote building must arrange for the `nix` command to be on the PATH (or manually overriding `build-hook`) in order for that to work.
@@ -48,13 +41,12 @@
 
   The Perl bindings no longer expose `getBinDir` either, since the underlying C++ libraries those bindings wrap no longer know the location of installed binaries as described above.
 
-- wrap filesystem exceptions more correctly [#11378](https://github.com/NixOS/nix/pull/11378)
+- Wrap filesystem exceptions more correctly [#11378](https://github.com/NixOS/nix/pull/11378)
 
   With the switch to `std::filesystem` in different places, Nix started to throw `std::filesystem::filesystem_error` in many places instead of its own exceptions.
+  As a result, Nix no longer generated error traces when (for example) listing a non-existing directory. It could also lead to crashes inside the Nix REPL.
 
-  This lead to no longer generating error traces, for example when listing a non-existing directory, and can also lead to crashes inside the Nix REPL.
-
-  This version catches these types of exception correctly and wrap them into Nix's own exeception type.
+  This version catches these types of exception correctly and wraps them into Nix's own exception type.
 
   Author: [**@Mic92**](https://github.com/Mic92)
 
@@ -64,38 +56,16 @@
 
   Author: [**@squalus**](https://github.com/squalus)
 
-- Show package descriptions with `nix flake show` [#10977](https://github.com/NixOS/nix/issues/10977) [#10980](https://github.com/NixOS/nix/pull/10980)
-
-  `nix flake show` will now display a package's `meta.description` if it exists. If the description does not fit in the terminal it will be truncated to fit the terminal width. If the size of the terminal width is unknown the description will be capped at 80 characters.
-
-  ```
-  $ nix flake show
-  └───packages
-      └───x86_64-linux
-          ├───builderImage: package 'docker-image-ara-builder-image.tar.gz' - 'Docker image hosting the nix build environment'
-          └───runnerImage: package 'docker-image-gitlab-runner.tar.gz' - 'Docker image hosting the gitlab-runner executable'
-  ```
-
-  In a narrower terminal:
-
-  ```
-  $ nix flake show
-  └───packages
-      └───x86_64-linux
-          ├───builderImage: package 'docker-image-ara-builder-image.tar.gz' - 'Docker image hosting the nix b...
-          └───runnerImage: package 'docker-image-gitlab-runner.tar.gz' - 'Docker image hosting the gitlab-run...
-  ```
-
 - Removing the default argument passed to the `nix fmt` formatter [#11438](https://github.com/NixOS/nix/pull/11438)
 
-  The underlying formatter no longer receives the ". " default argument when `nix fmt` is called with no arguments.
+  The underlying formatter no longer receives the "." default argument when `nix fmt` is called with no arguments.
 
   This change was necessary as the formatter wasn't able to distinguish between
   a user wanting to format the current folder with `nix fmt .` or the generic
   `nix fmt`.
 
-  The default behaviour is now the responsibility of the formatter itself, and
-  allows tools such as treefmt to format the whole tree instead of only the
+  The default behavior is now the responsibility of the formatter itself, and
+  allows tools such as `treefmt` to format the whole tree instead of only the
   current directory and below.
 
   Author: [**@zimbatm**](https://github.com/zimbatm)
