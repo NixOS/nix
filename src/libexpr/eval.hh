@@ -714,7 +714,6 @@ public:
      * Allocation primitives.
      */
     inline ValueList * allocList();
-    template <typename Range> inline ValueList * allocListFromRange(Range range);
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 

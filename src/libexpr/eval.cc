@@ -29,6 +29,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <range/v3/view/concat.hpp>
 #include <sstream>
 #include <sys/time.h>
 #include <unistd.h>
@@ -37,9 +38,7 @@
 #include <boost/container/small_vector.hpp>
 #include <immer/algorithm.hpp>
 #include <nlohmann/json.hpp>
-#include <range/v3/algorithm/fold_left.hpp>
-#include <range/v3/algorithm/transform.hpp>
-#include <range/v3/view/transform.hpp>
+#include <range/v3/all.hpp>
 
 #ifndef _WIN32 // TODO use portable implementation
 #  include <sys/resource.h>
@@ -1938,11 +1937,12 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 
 void EvalState::concatLists(Value & v, const ValueList lists, const PosIdx pos, std::string_view errorCtx)
 {
-    nrListConcats++;
-
     // TODO(@connorbaker): We should be able to get a pointer to the list from the first argument and then concatenate from there.
     // However, because Value is mutable, I can't think of an easy way to do that.
+    // TODO(@connorbaker): Because concatenation is associative, we can reduce the number of concatenations by doing a tree-like
+    // concatenation instead of a linear one. Consider using a binary search to do so.
     v.mkList(immer::accumulate(lists, allocList(), [&](const auto & concatenated, const auto & list) {
+        nrListConcats++;
         forceList(*list, pos, errorCtx);
         *concatenated = *concatenated + list->list();
         return concatenated;
@@ -2105,6 +2105,9 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
+            // TODO(@connorbaker): Replacing this with
+            // immer::for_each(v.list(), [&](const auto & v) { recurse(*v); });
+            // Increases the heap size by a fair amount, potentially because of the lambda capture.
             for (auto v2 : v.list())
                 recurse(*v2);
         }
@@ -2736,10 +2739,13 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
             return true;
 
         case nList:
-            if (v1.listSize() != v2.listSize()) return false;
-            for (size_t n = 0; n < v1.listSize(); ++n)
-                if (!eqValues(*v1.list()[n], *v2.list()[n], pos, errorCtx)) return false;
-            return true;
+            return v1.listSize() == v2.listSize()
+                && ranges::all_of(
+                    ranges::views::zip_with(
+                        [&](const auto & a, const auto & b) { return eqValues(*a, *b, pos, errorCtx); },
+                        ranges::subrange(v1.list().begin(), v1.list().end()),
+                        ranges::subrange(v2.list().begin(), v2.list().end())),
+                    std::identity{});
 
         case nAttrs: {
             /* If both sets denote a derivation (type = "derivation"),

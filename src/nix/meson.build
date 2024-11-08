@@ -2,6 +2,8 @@ project('nix', 'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
+    # Set -Wno-array-bounds to avoid warnings in Immer's generated code.
+    'cpp_args=-Warray-bounds=0',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'debug=true',

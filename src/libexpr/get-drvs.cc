@@ -5,6 +5,8 @@
 #include "path-with-outputs.hh"
 
 #include <cstring>
+#include <immer/algorithm.hpp>
+#include <range/v3/algorithm/all_of.hpp>
 #include <regex>
 
 
@@ -115,25 +117,23 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
         const Attr * i;
         if (attrs && (i = attrs->get(state->sOutputs))) {
             state->forceList(*i->value, i->pos, "while evaluating the 'outputs' attribute of a derivation");
-
-            /* For each output... */
-            for (auto elem : i->value->list()) {
+            immer::for_each(i->value->list(), [&](const auto & elem) {
                 std::string output(state->forceStringNoCtx(*elem, i->pos, "while evaluating the name of an output of a derivation"));
 
                 if (withPaths) {
                     /* Evaluate the corresponding set. */
                     auto out = attrs->get(state->symbols.create(output));
-                    if (!out) continue; // FIXME: throw error?
+                    if (!out) return; // FIXME: throw error?
                     state->forceAttrs(*out->value, i->pos, "while evaluating an output of a derivation");
 
                     /* And evaluate its ‘outPath’ attribute. */
                     auto outPath = out->value->attrs()->get(state->sOutPath);
-                    if (!outPath) continue; // FIXME: throw error?
+                    if (!outPath) return; // FIXME: throw error?
                     NixStringContext context;
                     outputs.emplace(output, state->coerceToStorePath(outPath->pos, *outPath->value, context, "while evaluating an output path of a derivation"));
                 } else
                     outputs.emplace(output, std::nullopt);
-            }
+            });
         } else
             outputs.emplace("out", withPaths ? std::optional{queryOutPath()} : std::nullopt);
     }
@@ -159,12 +159,12 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
             /* ^ this shows during `nix-env -i` right under the bad derivation */
         if (!outTI->isList()) throw errMsg;
         Outputs result;
-        for (auto elem : outTI->list()) {
+        immer::for_each(outTI->list(), [&](const auto & elem) {
             if (elem->type() != nString) throw errMsg;
             auto out = outputs.find(elem->c_str());
             if (out == outputs.end()) throw errMsg;
             result.insert(*out);
-        }
+        });
         return result;
     }
 }
@@ -206,9 +206,10 @@ bool PackageInfo::checkMeta(Value & v)
 {
     state->forceValue(v, v.determinePos(noPos));
     if (v.type() == nList) {
-        for (auto elem : v.list())
-            if (!checkMeta(*elem)) return false;
-        return true;
+        // TODO(@connorbaker): Does immer::all_of support short-circuiting?
+        return ranges::all_of(v.list(), [&](const auto & elem) {
+            return checkMeta(*elem);
+        });
     }
     else if (v.type() == nAttrs) {
         if (v.attrs()->get(state->sOutPath)) return false;

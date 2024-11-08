@@ -84,30 +84,6 @@ ValueList * EvalState::allocList()
     return ::new (p) ValueList;
 }
 
-template <typename Range>
-[[gnu::always_inline]]
-ValueList * EvalState::allocListFromRange(Range range)
-{
-    // See the comment in allocValue for an explanation of this block.
-    // TODO(@connorbaker): Beginning cargo-culting.
-    // 1. Do we need to assign to an intermediate variable, like `allocEnv` does?
-    // 2. Do we need to use a C-style cast?
-#if HAVE_BOEHMGC
-    if (!*listAllocCache) {
-        *listAllocCache = GC_malloc_many(sizeof(ValueList));
-        if (!*listAllocCache) throw std::bad_alloc();
-    }
-
-    void * p = *listAllocCache;
-    *listAllocCache = GC_NEXT(p);
-    GC_NEXT(p) = nullptr;
-#else
-    void * p = allocBytes(sizeof(ValueList));
-#endif
-
-    return ::new (p) ValueList(range.begin(), range.end());
-}
-
 
 [[gnu::always_inline]]
 Env & EvalState::allocEnv(size_t size)
