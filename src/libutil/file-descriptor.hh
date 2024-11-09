@@ -155,7 +155,7 @@ public:
     AutoCloseFD();
     AutoCloseFD(Descriptor fd);
     AutoCloseFD(const AutoCloseFD & fd) = delete;
-    AutoCloseFD(AutoCloseFD&& fd);
+    AutoCloseFD(AutoCloseFD&& fd) noexcept;
     ~AutoCloseFD();
     AutoCloseFD& operator =(const AutoCloseFD & fd) = delete;
     AutoCloseFD& operator =(AutoCloseFD&& fd);
