@@ -36,6 +36,35 @@ struct Md {
   size_t size;     // in bytes
 };
 
+struct GitUrl {
+    std::string protocol;
+    std::string user;
+    std::string host;
+    std::string port;
+    std::string path;
+
+    std::string toHttp() const {
+        if (protocol.empty() || host.empty()) {
+            return "";
+        }
+        std::string prefix = ((protocol == "ssh") ? "https" : protocol) + "://";
+        return prefix + host +
+               (port.empty() ? "" : ":" + port) + "/" + path;
+    }
+
+    // [host, path]
+    std::pair<std::string, std::string> toSsh() const {
+        if (host.empty()) {
+            return {"", ""};
+        }
+        std::string userPart = user.empty() ? "" : user + "@";
+        return {
+            userPart + host,
+            path
+        };
+    }
+};
+
 struct Fetch {
   // only true after init()
   bool ready = false;
@@ -44,10 +73,8 @@ struct Fetch {
   // list of URLs to fetch from, and fetching the data itself
   std::string token = "";
 
-  // this is the URL you hit to get another list of URLs for subsequent fetches
-  // e.g. https://github.com/owner/repo.git/info/lfs/objects/batch
-  // determined from the git remote
-  std::string rootUrl = "";
+  // derived from git remote url
+  GitUrl gitUrl = GitUrl{};
 
   // parsed contents of .gitattributes
   // .gitattributes contains a list of path patterns, and list of attributes (=key-value tags) for each pattern
@@ -122,34 +149,34 @@ void downloadToSink(const std::string &url, const std::string &authHeader, Sink 
     CURLcode res;
 
     curl = curl_easy_init();
-    if (curl) {
-        SinkCallbackData data(&sink, sha256Expected);
+    SinkCallbackData data(&sink, sha256Expected);
 
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, sinkWriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
-        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, sinkWriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
-        struct curl_slist *headers = nullptr;
+    struct curl_slist *headers = nullptr;
+    if (!authHeader.empty()) {
         const std::string authHeader_prepend = "Authorization: " + authHeader;
         headers = curl_slist_append(headers, authHeader_prepend.c_str());
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    }
 
-        res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
-            curl_slist_free_all(headers);
-            curl_easy_cleanup(curl);
-            throw std::runtime_error(std::string("curl_easy_perform() failed: ") + curl_easy_strerror(res));
-        }
-
-        const auto sha256Actual = data.hashSink.finish().first.to_string(HashFormat::Base16, false);
-        if (sha256Actual != data.sha256Expected) {
-            throw std::runtime_error("sha256 mismatch: while fetching " + url + ": expected " + std::string(data.sha256Expected) + " but got " + sha256Actual);
-        }
-
+    res = curl_easy_perform(curl);
+    if (res != CURLE_OK) {
         curl_slist_free_all(headers);
         curl_easy_cleanup(curl);
+        throw std::runtime_error(std::string("curl_easy_perform() failed: ") + curl_easy_strerror(res));
     }
+
+    const auto sha256Actual = data.hashSink.finish().first.to_string(HashFormat::Base16, false);
+    if (sha256Actual != data.sha256Expected) {
+        throw std::runtime_error("sha256 mismatch: while fetching " + url + ": expected " + std::string(data.sha256Expected) + " but got " + sha256Actual);
+    }
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
 }
 
 
@@ -231,15 +258,15 @@ std::vector<AttrRule> parseGitAttrFile(std::string_view content)
 
 
 
-std::string getLfsApiToken(const std::string &host,
-                              const std::string &path) {
+std::string getLfsApiToken(const GitUrl& u) {
+  const auto [maybeUserAndHost, path] = u.toSsh();
   auto [status, output] = runProgram(RunOptions {
       .program = "ssh",
-      .args = {"git@" + host, "git-lfs-authenticate", path, "download"},
+      .args = {maybeUserAndHost, "git-lfs-authenticate", path, "download"},
   });
 
   if (output.empty())
-    throw std::runtime_error("git-lfs-authenticate: no output (cmd: ssh git@" + host + " git-lfs-authenticate " + path + " download)");
+    throw std::runtime_error("git-lfs-authenticate: no output (cmd: ssh " + maybeUserAndHost + " git-lfs-authenticate " + path + " download)");
 
   nlohmann::json query_resp = nlohmann::json::parse(output);
   if (!query_resp.contains("header"))
@@ -286,7 +313,7 @@ std::string git_attr_value_to_string(git_attr_value_t value) {
 
 
 Md parseLfsMetadata(const std::string &content, const std::string &filename) {
-  // example git-lfs poitner file:
+  // example git-lfs pointer file:
   // version https://git-lfs.github.com/spec/v1
   // oid sha256:f5e02aa71e67f41d79023a128ca35bad86cf7b6656967bfe0884b3a3c4325eaf
   // size 10000000
@@ -314,32 +341,46 @@ Md parseLfsMetadata(const std::string &content, const std::string &filename) {
   return Md{filename, oid, size};
 }
 
-// there's already a ParseURL here https://github.com/b-camacho/nix/blob/ef6fa54e05cd4134ec41b0d64c1a16db46237f83/src/libutil/url.cc#L13
-// but that one doesn't handle the `git@` prefix that libgit2 sometimes returns for a git remote
-// (one would think fixGitURL is for that? but it doesn't handle a scheme prefix)
-std::tuple<std::string, std::string, std::string, std::string, std::string> parseGitRemoteUrl(const std::string& url) {
-    std::regex pattern(R"((\w+)://(\w+@)?([^/]+)(:\d{1,5})?/(.*))");
-    std::smatch matches;
 
-    if (std::regex_search(url, matches, pattern)) {
-        return {
-            matches[1].str(), // scheme
-            matches[2].str(), // optional "git@" part idk the name
-            matches[3].str(), // domain
-            matches[4].str(), // port
-            matches[5].str(), // path
-        };
+
+// there's already a ParseURL here https://github.com/b-camacho/nix/blob/ef6fa54e05cd4134ec41b0d64c1a16db46237f83/src/libutil/url.cc#L13
+// but that does not handle git's custom scp-like syntax
+GitUrl parseGitUrl(const std::string& url) {
+    GitUrl result;
+
+    // regular protocols
+    const std::regex r_url(
+        R"(^(ssh|git|https?|ftps?)://(?:([^@]+)@)?([^:/]+)(?::(\d+))?/(.*))");
+
+    // "alternative scp-like syntax" https://git-scm.com/docs/git-fetch#_git_urls
+    const std::regex r_scp_like_url(
+        R"(^(?:([^@]+)@)?([^:/]+):(/?.*))");
+
+    std::smatch matches;
+    if (std::regex_match(url, matches, r_url)) {
+        result.protocol = matches[1].str();
+        result.user = matches[2].str();
+        result.host = matches[3].str();
+        result.port = matches[4].str();
+        result.path = matches[5].str();
+    }
+    else if (std::regex_match(url, matches, r_scp_like_url)) {
+        result.protocol = "ssh";
+
+        result.user = matches[1].str();
+        result.host = matches[2].str();
+        result.path = matches[3].str();
     }
 
-    return {"", "", "", "", ""};
+    return result;
 }
+
 
 void Fetch::init(git_repository* repo, std::string gitattributesContent) {
    const auto remoteUrl = lfs::getLfsEndpointUrl(repo);
 
-   const auto [scheme, maybeSshUser, domain, port, path] = parseGitRemoteUrl(remoteUrl);
-   this->rootUrl = (scheme == "ssh" ? "https" : scheme) + "://" + domain + port + "/" + path;
-   this->token = lfs::getLfsApiToken(domain, path);
+   this->gitUrl = parseGitUrl(remoteUrl);
+   this->token = lfs::getLfsApiToken(this->gitUrl);
    this->rules = lfs::parseGitAttrFile(gitattributesContent);
    this->ready = true;
 }
@@ -365,6 +406,7 @@ nlohmann::json mdToPayload(const std::vector<Md> &items) {
   return jArray;
 }
 
+
 std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> &metadatas) const {
   nlohmann::json oidList = mdToPayload(metadatas);
   nlohmann::json data = {
@@ -374,13 +416,14 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> &metadatas) c
   auto dataStr = data.dump();
 
   CURL *curl = curl_easy_init();
+  char curlErrBuf[CURL_ERROR_SIZE];
+  curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curlErrBuf);
   std::string responseString;
   std::string headerString;
-  auto lfsUrlBatch = rootUrl + "/info/lfs/objects/batch";
+  auto lfsUrlBatch = gitUrl.toHttp() + "/info/lfs/objects/batch";
   curl_easy_setopt(curl, CURLOPT_URL, lfsUrlBatch.c_str());
   curl_easy_setopt(curl, CURLOPT_POSTFIELDS, dataStr.c_str());
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 
   struct curl_slist *headers = NULL;
   auto authHeader = "Authorization: " + token;
@@ -394,9 +437,11 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> &metadatas) c
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseString);
 
   CURLcode res = curl_easy_perform(curl);
-  if (res != CURLE_OK)
-    fprintf(stderr, "curl_easy_perform() failed: %s\n",
-            curl_easy_strerror(res));
+  if (res != CURLE_OK) {
+      std::stringstream ss;
+      ss << "lfs::fetchUrls: bad response from info/lfs/objects/batch: code " << res << " " << curlErrBuf;
+      throw std::runtime_error(ss.str());
+  }
 
   curl_easy_cleanup(curl);
   curl_slist_free_all(headers);
@@ -406,15 +451,22 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> &metadatas) c
   // {"objects":[{"oid":"f5e02aa71e67f41d79023a128ca35bad86cf7b6656967bfe0884b3a3c4325eaf","size":10000000,"actions":{"download":{"href":"https://gitlab.com/b-camacho/test-lfs.git/gitlab-lfs/objects/f5e02aa71e67f41d79023a128ca35bad86cf7b6656967bfe0884b3a3c4325eaf","header":{"Authorization":"Basic
   // Yi1jYW1hY2hvOmV5SjBlWEFpT2lKS1YxUWlMQ0poYkdjaU9pSklVekkxTmlKOS5leUprWVhSaElqcDdJbUZqZEc5eUlqb2lZaTFqWVcxaFkyaHZJbjBzSW1wMGFTSTZJbUptTURZNFpXVTFMVEprWmpVdE5HWm1ZUzFpWWpRMExUSXpNVEV3WVRReU1qWmtaaUlzSW1saGRDSTZNVGN4TkRZeE16ZzBOU3dpYm1KbUlqb3hOekUwTmpFek9EUXdMQ0psZUhBaU9qRTNNVFEyTWpFd05EVjkuZk9yMDNkYjBWSTFXQzFZaTBKRmJUNnJTTHJPZlBwVW9lYllkT0NQZlJ4QQ=="}}},"authenticated":true}]}
 
-  auto resp = nlohmann::json::parse(responseString);
-  if (resp.contains("objects")) {
-    objects.insert(objects.end(), resp["objects"].begin(),
-                   resp["objects"].end());
-  } else {
-    throw std::runtime_error("Response does not contain 'objects'");
-  }
+  try {
+    auto resp = nlohmann::json::parse(responseString);
+    if (resp.contains("objects")) {
+      objects.insert(objects.end(), resp["objects"].begin(),
+                     resp["objects"].end());
+    } else {
+      throw std::runtime_error("response does not contain 'objects'");
+    }
 
-  return objects;
+    return objects;
+    } catch (const nlohmann::json::parse_error& e) {
+        std::stringstream ss;
+        ss << "response did not parse as json: " << responseString;
+        throw std::runtime_error(ss.str());
+
+  }
 }
 
 void Fetch::fetch(const std::string& pointerFileContents, const std::string& pointerFilePath, Sink& sink) const {
@@ -424,15 +476,21 @@ void Fetch::fetch(const std::string& pointerFileContents, const std::string& poi
   const auto objUrls = fetchUrls(vMds);
 
   const auto obj = objUrls[0];
-  std::string oid = obj["oid"];
-  std::string ourl = obj["actions"]["download"]["href"];
-  std::string authHeader =
-      obj["actions"]["download"]["header"]["Authorization"];
-  // oid is also the sha256
-  downloadToSink(ourl, authHeader, sink, oid);
+  try {
+    std::string oid = obj.at("oid");
+    std::string ourl = obj.at("actions").at("download").at("href");
+    std::string authHeader = "";
+    if (obj.at("actions").at("download").at("header").contains("Authorization")) {
+        authHeader = obj["actions"]["download"]["header"]["Authorization"];
+    }
+    // oid is also the sha256
+    downloadToSink(ourl, authHeader, sink, oid);
+  } catch (const nlohmann::json::out_of_range& e) {
+      std::stringstream ss;
+      ss << "bad json from /info/lfs/objects/batch: " << obj;
+      throw std::runtime_error(ss.str());
+  }
 }
-
-
 
 } // namespace lfs
 
