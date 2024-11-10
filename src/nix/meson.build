@@ -106,6 +106,7 @@ nix_sources = [config_h] + files(
   'run.cc',
   'search.cc',
   'sigs.cc',
+  'store-add-gc-root.cc',
   'store-copy-log.cc',
   'store-delete.cc',
   'store-gc.cc',
