@@ -79,6 +79,7 @@ nix_sources = [config_h] + files(
   'config.cc',
   'copy.cc',
   'derivation-add.cc',
+  'derivation-instantiate.cc',
   'derivation-show.cc',
   'derivation.cc',
   'develop.cc',

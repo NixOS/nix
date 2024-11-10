@@ -803,18 +803,18 @@ StorePath Installable::toStorePath(
     return *paths.begin();
 }
 
-StorePathSet Installable::toDerivations(
+StorePaths Installable::toDerivations(
     ref<Store> store,
     const Installables & installables,
     bool useDeriver)
 {
-    StorePathSet drvPaths;
+    StorePaths drvPaths;
 
     for (const auto & i : installables)
         for (const auto & b : i->toDerivedPaths())
             std::visit(overloaded {
                 [&](const DerivedPath::Opaque & bo) {
-                    drvPaths.insert(
+                    drvPaths.push_back(
                         bo.path.isDerivation()
                             ? bo.path
                         : useDeriver
@@ -822,7 +822,7 @@ StorePathSet Installable::toDerivations(
                         : throw Error("argument '%s' did not evaluate to a derivation", i->what()));
                 },
                 [&](const DerivedPath::Built & bfd) {
-                    drvPaths.insert(resolveDerivedPath(*store, *bfd.drvPath));
+                    drvPaths.push_back(resolveDerivedPath(*store, *bfd.drvPath));
                 },
             }, b.path.raw());
 
