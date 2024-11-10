@@ -1730,7 +1730,7 @@ void EvalState::incrFunctionCall(ExprLambda * fun)
 }
 
 
-void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
+void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res)
 {
     auto pos = fun.determinePos(noPos);
 
