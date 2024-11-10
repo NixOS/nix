@@ -1207,6 +1207,10 @@ void LocalDerivationGoal::initEnv()
     /* The maximum number of cores to utilize for parallel building. */
     env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores);
 
+    /* Provide a load average limit for build tools to throttle jobs. */
+    if (settings.loadLimit.get())
+        env["NIX_LOAD_LIMIT"] = fmt("%d", settings.loadLimit.get().value());
+
     initTmpDir();
 
     /* Compatibility hack with Nix <= 0.7: if this is a fixed-output

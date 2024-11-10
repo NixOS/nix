@@ -199,6 +199,7 @@ struct ClientSettings
     time_t maxSilentTime;
     bool verboseBuild;
     unsigned int buildCores;
+    std::optional<unsigned int> loadLimit;
     bool useSubstitutes;
     StringMap overrides;
 
@@ -212,6 +213,7 @@ struct ClientSettings
         settings.maxSilentTime = maxSilentTime;
         settings.verboseBuild = verboseBuild;
         settings.buildCores = buildCores;
+        settings.loadLimit.assign(loadLimit);
         settings.useSubstitutes = useSubstitutes;
 
         for (auto & i : overrides) {

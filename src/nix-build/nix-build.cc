@@ -539,6 +539,8 @@ static void main_nix_build(int argc, char * * argv)
         env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDir.path().string();
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
+        if (settings.loadLimit.get())
+            env["NIX_LOAD_LIMIT"] = std::to_string(settings.loadLimit.get().value());
 
         auto passAsFile = tokenizeString<StringSet>(getOr(drv.env, "passAsFile", ""));
 

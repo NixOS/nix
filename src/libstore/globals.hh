@@ -161,7 +161,6 @@ public:
         R"(
           Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/language/derivations.md#builder-execution) of a derivation.
           The `builder` executable can use this variable to control its own maximum amount of parallelism.
-
           <!--
           FIXME(@fricklerhandwerk): I don't think this should even be mentioned here.
           A very generic example using `derivation` and `xargs` may be more appropriate to explain the mechanism.
@@ -171,6 +170,8 @@ public:
 
           The value `0` means that the `builder` should use all available CPU cores in the system.
 
+          The [`load-limit`](#conf-load-limit) setting can be used to limit the total amount of build parallelism based on system load average.
+
           > **Note**
           >
           > The number of parallel local Nix build jobs is independently controlled with the [`max-jobs`](#conf-max-jobs) setting.
@@ -178,6 +179,33 @@ public:
         {"build-cores"},
         // Don't document the machine-specific default value
         false};
+
+    Setting<std::optional<unsigned int>> loadLimit{
+      this,
+      { getDefaultCores() },
+      "load-limit",
+      R"(
+        Sets the value of the `NIX_LOAD_LIMIT` environment variable in the
+        invocation of builders. Builders can use this value at their discretion
+        to dynamically control the amount of parallelism with respect to the
+        machine's load average.
+
+        For instance, a builder could use the value to set the `-l` flag to GNU
+        Make. In this case, if the load average of the machine exceeds
+        `NIX_LOAD_LIMIT`, the amount of parallelism will be dynamically
+        reduced.
+
+        By default, it is set to the number of cores on the machine.
+
+        On busy machines where Nix co-exists with other workloads, or where
+        build throughput is paramount and memory usage is not a bottleneck, the
+        default value may not work as intended. In this case, `load-limit`
+        should be set to a higher value, or to `none` to prevent the
+        `NIX_LOAD_LIMIT` variable being set at all.
+      )",
+      {},
+      // Don't document the machine-specific default value
+      false};
 
     /**
      * Read-only mode.  Don't copy stuff to the store, don't change
