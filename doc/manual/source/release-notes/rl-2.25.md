@@ -70,12 +70,6 @@
 
   Author: [**@zimbatm**](https://github.com/zimbatm)
 
-- Flakes are no longer substituted [#10612](https://github.com/NixOS/nix/pull/10612)
-
-  Nix will no longer attempt to substitute the source code of flakes from a binary cache. This functionality was broken because it could lead to different evaluation results depending on whether the flake was available in the binary cache, or even depending on whether the flake was already in the local store.
-
-  Author: [**@edolstra**](https://github.com/edolstra)
-
 - `<nix/fetchurl.nix>` uses TLS verification [#11585](https://github.com/NixOS/nix/pull/11585)
 
   Previously `<nix/fetchurl.nix>` did not do TLS verification. This was because the Nix sandbox in the past did not have access to TLS certificates, and Nix checks the hash of the fetched file anyway. However, this can expose authentication data from `netrc` and URLs to man-in-the-middle attackers. In addition, Nix now in some cases (such as when using impure derivations) does *not* check the hash. Therefore we have now enabled TLS verification. This means that downloads by `<nix/fetchurl.nix>` will now fail if you're fetching from a HTTPS server that does not have a valid certificate.
