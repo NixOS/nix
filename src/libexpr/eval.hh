@@ -3,6 +3,7 @@
 
 #include "attr-set.hh"
 #include "eval-error.hh"
+#include "fetch-to-store.hh"
 #include "types.hh"
 #include "value.hh"
 #include "nixexpr.hh"
@@ -813,6 +814,17 @@ public:
         PosIdx pos);
 
     DocComment getDocCommentForPos(PosIdx pos);
+
+    StorePath fetchToStore(
+        const SourcePath & path,
+        FetchMode mode,
+        std::string_view name = "source",
+        ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive,
+        PathFilter * filter = nullptr,
+        RepairFlag repair = NoRepair);
+
+    /** Throws if path occurs in the disallow-copy-path option. */
+    void checkDisallowCopyPath(const SourcePath & path);
 
 private:
 

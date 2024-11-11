@@ -2364,7 +2364,6 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
         ? *dstPathCached
         : [&]() {
             auto dstPath = fetchToStore(
-                *store,
                 path.resolveSymlinks(),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
                 path.baseName(),
@@ -2382,6 +2381,26 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     });
     return dstPath;
 }
+
+void EvalState::checkDisallowCopyPath(const SourcePath & path) {
+    if (path.accessor == rootFS && settings.disallowCopyPaths.get().contains(path.path.abs())) {
+        error<EvalError>("not allowed to copy '%1%' due to option '%2%'", path.path.abs(), settings.disallowCopyPaths.name).debugThrow();
+    }
+}
+
+StorePath EvalState::fetchToStore(
+    const SourcePath & path,
+    FetchMode mode,
+    std::string_view name,
+    ContentAddressMethod method,
+    PathFilter * filter,
+    RepairFlag repair)
+{
+    if (!filter)
+        checkDisallowCopyPath(path);
+    return ::nix::fetchToStore(*store, path, mode, name, method, filter, repair);
+}
+
 
 
 SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
@@ -3063,7 +3082,7 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
                 store,
                 fetchSettings,
                 EvalSettings::resolvePseudoUrl(value));
-            auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
+            auto storePath = fetchToStore(SourcePath(accessor), FetchMode::Copy);
             return finish(store->toRealPath(storePath));
         } catch (Error & e) {
             logWarning({

@@ -2499,8 +2499,7 @@ static void addPath(
                 {}));
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            auto dstPath = fetchToStore(
-                *state.store,
+            auto dstPath = state.fetchToStore(
                 path.resolveSymlinks(),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
                 name,
@@ -2513,8 +2512,12 @@ static void addPath(
                     path
                 ).atPos(pos).debugThrow();
             state.allowAndSetStorePathString(dstPath, v);
-        } else
+        } else {
+            if (!filterFun)
+                state.checkDisallowCopyPath(path);
+
             state.allowAndSetStorePathString(*expectedStorePath, v);
+        }
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while adding path '%s'", path);
         throw;
