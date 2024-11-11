@@ -32,7 +32,7 @@ let
   # convention to transpose it, and to transpose it efficiently, we need to
   # enumerate them manually, so that we don't evaluate unnecessary package sets.
   forAllPackages = lib.genAttrs [
-    "nix"
+    "nix-everything"
     "nix-util"
     "nix-util-c"
     "nix-util-test-support"
@@ -54,7 +54,6 @@ let
     "nix-cmd"
     "nix-cli"
     "nix-functional-tests"
-    "nix-ng"
   ];
 in
 {
@@ -141,11 +140,11 @@ in
   # docker image with Nix inside
   dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
 
-  # Line coverage analysis.
-  coverage = nixpkgsFor.x86_64-linux.native.nix.override {
-    pname = "nix-coverage";
-    withCoverageChecks = true;
-  };
+  # # Line coverage analysis.
+  # coverage = nixpkgsFor.x86_64-linux.native.nix.override {
+  #   pname = "nix-coverage";
+  #   withCoverageChecks = true;
+  # };
 
   # Nix's manual
   manual = nixpkgsFor.x86_64-linux.native.nixComponents.nix-manual;
@@ -182,7 +181,7 @@ in
         import (nixpkgs + "/lib/tests/test-with-nix.nix")
           {
             lib = nixpkgsFor.${system}.native.lib;
-            nix = self.packages.${system}.nix;
+            nix = self.packages.${system}.nix-cli;
             pkgs = nixpkgsFor.${system}.native;
           }
       );

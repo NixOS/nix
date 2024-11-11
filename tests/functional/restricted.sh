@@ -12,10 +12,6 @@ mkdir -p "$TEST_ROOT/nix"
 cp ./simple.nix "$TEST_ROOT/nix"
 cp ./simple.builder.sh "$TEST_ROOT/nix"
 cp "${config_nix}" "$TEST_ROOT/nix"
-simple_nix="$TEST_ROOT/nix/simple.nix"
-# N.B. redefine
-config_nix="$TEST_ROOT/nix/config.nix"
-removeBuildDirRef "${simple_nix}"
 cd "$TEST_ROOT/nix"
 
 nix-instantiate --restrict-eval ./simple.nix -I src=.
