@@ -27,9 +27,6 @@ EOF
 mkdir -p "$TEST_HOME/nixpkgs"
 cp "${config_nix}" ../shell.nix "$TEST_HOME/nixpkgs"
 
-# `config.nix` cannot be gotten via build dir / env var (runs afoul pure eval). Instead get from flake.
-removeBuildDirRef "$TEST_HOME/nixpkgs"/*.nix
-
 cat <<EOF >"$TEST_HOME/nixpkgs/flake.nix"
 {
     outputs = {self}: {

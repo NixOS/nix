@@ -4,9 +4,6 @@ source common.sh
 
 cp ../simple.nix ../simple.builder.sh "${config_nix}" "$TEST_HOME"
 
-# `config.nix` cannot be gotten via build dir / env var (runs afoul pure eval). Instead get from flake.
-removeBuildDirRef "$TEST_HOME"/*.nix
-
 cd "$TEST_HOME"
 
 cat <<EOF > flake.nix

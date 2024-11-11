@@ -2,7 +2,7 @@
 { foo ? "foo"
 }:
 
-with import "${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/config.nix";
+with import ./config.nix;
 
 assert foo == "foo";
 
