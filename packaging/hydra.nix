@@ -1,5 +1,4 @@
 { inputs
-, binaryTarball
 , forAllCrossSystems
 , forAllSystems
 , lib
@@ -12,7 +11,7 @@ let
   inherit (inputs) nixpkgs nixpkgs-regression;
 
   installScriptFor = tarballs:
-    nixpkgsFor.x86_64-linux.native.callPackage ../scripts/installer.nix {
+    nixpkgsFor.x86_64-linux.native.stdenvPackages.callPackage ./installer {
       inherit tarballs;
     };
 
@@ -60,36 +59,36 @@ in
 {
   # Binary package for various platforms.
   build = forAllPackages (pkgName:
-    forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.${pkgName}));
+    forAllSystems (system: nixpkgsFor.${system}.native.stdenvPackages.nixComponents.${pkgName}));
 
   shellInputs = removeAttrs
     (forAllSystems (system: self.devShells.${system}.default.inputDerivation))
     [ "i686-linux" ];
 
   buildStatic = forAllPackages (pkgName:
-    lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.nixComponents.${pkgName}));
+    lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.native.stdenvPackages.pkgsStatic.nixComponents.${pkgName}));
 
   buildCross = forAllPackages (pkgName:
     # Hack to avoid non-evaling package
     (if pkgName == "nix-functional-tests" then lib.flip builtins.removeAttrs ["x86_64-w64-mingw32"] else lib.id)
     (forAllCrossSystems (crossSystem:
-      lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName}))));
+      lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.stdenvPackages.nixComponents.${pkgName}))));
 
   buildNoGc = let
     components = forAllSystems (system:
-      nixpkgsFor.${system}.native.nixComponents.overrideScope (self: super: {
+      nixpkgsFor.${system}.native.stdenvPackages.nixComponents.overrideScope (self: super: {
         nix-expr = super.nix-expr.override { enableGC = false; };
       })
     );
   in forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
 
-  buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-cli);
+  buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.stdenvPackages.nixComponents.nix-cli);
 
   # Toggles some settings for better coverage. Windows needs these
   # library combinations, and Debian build Nix with GNU readline too.
   buildReadlineNoMarkdown = let
     components = forAllSystems (system:
-      nixpkgsFor.${system}.native.nixComponents.overrideScope (self: super: {
+      nixpkgsFor.${system}.native.stdenvPackages.nixComponents.overrideScope (self: super: {
         nix-cmd = super.nix-cmd.override {
           enableMarkdown = false;
           readlineFlavor = "readline";
@@ -99,18 +98,17 @@ in
   in forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
 
   # Perl bindings for various platforms.
-  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-perl-bindings);
+  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.stdenvPackages.nixComponents.nix-perl-bindings);
 
   # Binary tarball for various platforms, containing a Nix store
   # with the closure of 'nix' package, and the second half of
   # the installation script.
-  binaryTarball = forAllSystems (system: binaryTarball nixpkgsFor.${system}.native.nix nixpkgsFor.${system}.native);
+  binaryTarball = forAllSystems (system:
+    nixpkgsFor.${system}.native.stdenvPackages.callPackage ./binary-tarball.nix {});
 
   binaryTarballCross = lib.genAttrs [ "x86_64-linux" ] (system:
     forAllCrossSystems (crossSystem:
-      binaryTarball
-        nixpkgsFor.${system}.cross.${crossSystem}.nix
-        nixpkgsFor.${system}.cross.${crossSystem}));
+      nixpkgsFor.${system}.cross.${crossSystem}.stdenvPackages.callPackage ./binary-tarball.nix {}));
 
   # The first half of the installation script. This is uploaded
   # to https://nixos.org/nix/install. It downloads the binary
@@ -142,28 +140,31 @@ in
   dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
 
   # Line coverage analysis.
-  coverage = nixpkgsFor.x86_64-linux.native.nix.override {
+  coverage = nixpkgsFor.x86_64-linux.native.stdenvPackages.nix.override {
     pname = "nix-coverage";
     withCoverageChecks = true;
   };
 
   # Nix's manual
-  manual = nixpkgsFor.x86_64-linux.native.nixComponents.nix-manual;
+  manual = nixpkgsFor.x86_64-linux.native.stdenvPackages.nixComponents.nix-manual;
 
   # API docs for Nix's unstable internal C++ interfaces.
-  internal-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-internal-api-docs;
+  internal-api-docs = nixpkgsFor.x86_64-linux.native.stdenvPackages.nixComponents.nix-internal-api-docs;
 
   # API docs for Nix's C bindings.
-  external-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-external-api-docs;
+  external-api-docs = nixpkgsFor.x86_64-linux.native.stdenvPackages.nixComponents.nix-external-api-docs;
 
   # System tests.
-  tests = import ../tests/nixos { inherit lib nixpkgs nixpkgsFor self; } // {
+  tests = import ../tests/nixos {
+    inherit lib nixpkgs nixpkgsFor;
+    inherit (self.inputs) nixpkgs-23-11;
+  } // {
 
     # Make sure that nix-env still produces the exact same result
     # on a particular version of Nixpkgs.
     evalNixpkgs =
       let
-        inherit (nixpkgsFor.x86_64-linux.native) runCommand nix;
+        inherit (nixpkgsFor.x86_64-linux.native.stdenvPackages) runCommand nix;
       in
       runCommand "eval-nixos" { buildInputs = [ nix ]; }
         ''
@@ -181,20 +182,20 @@ in
       forAllSystems (system:
         import (nixpkgs + "/lib/tests/test-with-nix.nix")
           {
-            lib = nixpkgsFor.${system}.native.lib;
+            lib = nixpkgsFor.${system}.native.stdenvPackages.lib;
             nix = self.packages.${system}.nix;
-            pkgs = nixpkgsFor.${system}.native;
+            pkgs = nixpkgsFor.${system}.native.stdenvPackages;
           }
       );
   };
 
   metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
-    pkgs = nixpkgsFor.x86_64-linux.native;
+    pkgs = nixpkgsFor.x86_64-linux.native.stdenvPackages;
     nixpkgs = nixpkgs-regression;
   };
 
   installTests = forAllSystems (system:
-    let pkgs = nixpkgsFor.${system}.native; in
+    let pkgs = nixpkgsFor.${system}.native.stdenvPackages; in
     pkgs.runCommand "install-tests"
       {
         againstSelf = testNixVersions pkgs pkgs.nix;

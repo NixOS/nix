@@ -139,7 +139,7 @@ let
 
   makeTest = imageName: testName:
     let image = images.${imageName}; in
-    with nixpkgsFor.${image.system}.native;
+    with nixpkgsFor.${image.system}.native.stdenvPackages;
     runCommand
       "installer-test-${imageName}-${testName}"
       { buildInputs = [ qemu_kvm openssh ];
