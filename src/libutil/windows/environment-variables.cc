@@ -13,7 +13,7 @@ std::optional<OsString> getEnvOs(const OsString & key)
     }
 
     // Allocate a buffer to hold the environment variable value
-    std::wstring value{L'\0', bufferSize};
+    std::wstring value{bufferSize, L'\0'};
 
     // Retrieve the environment variable value
     DWORD resultSize = GetEnvironmentVariableW(key.c_str(), &value[0], bufferSize);
