@@ -221,6 +221,11 @@
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
           default = self.packages.${system}.nix;
+<<<<<<< HEAD
+=======
+          # TODO probably should be `nix-cli`
+          nix = self.packages.${system}.nix-everything;
+>>>>>>> 000d06d85 (Provide a "nix" package)
           nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
