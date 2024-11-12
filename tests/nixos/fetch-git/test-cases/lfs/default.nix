@@ -53,10 +53,13 @@
       }}
     """
 
+
     # fetch the repo via nix
     fetched_lfs = client.succeed(f"""
       nix eval --impure --raw --expr '({fetchGit_lfs_expr}).outPath'
     """)
+
+    assert fetched_lfs != fetched_nolfs, f"fetching with and without lfs yielded the same store path {fetched_lfs}, fingerprinting error?"
 
     # check that file was smudged
     file_size_lfs = client.succeed(f"""

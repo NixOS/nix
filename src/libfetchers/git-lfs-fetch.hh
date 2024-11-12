@@ -380,7 +380,9 @@ void Fetch::init(git_repository* repo, std::string gitattributesContent) {
    const auto remoteUrl = lfs::getLfsEndpointUrl(repo);
 
    this->gitUrl = parseGitUrl(remoteUrl);
-   this->token = lfs::getLfsApiToken(this->gitUrl);
+   if (this->gitUrl.protocol == "ssh") {
+       this->token = lfs::getLfsApiToken(this->gitUrl);
+   }
    this->rules = lfs::parseGitAttrFile(gitattributesContent);
    this->ready = true;
 }
@@ -420,14 +422,17 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> &metadatas) c
   curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curlErrBuf);
   std::string responseString;
   std::string headerString;
-  auto lfsUrlBatch = gitUrl.toHttp() + "/info/lfs/objects/batch";
+  const auto lfsUrlBatch = gitUrl.toHttp() + "/info/lfs/objects/batch";
   curl_easy_setopt(curl, CURLOPT_URL, lfsUrlBatch.c_str());
   curl_easy_setopt(curl, CURLOPT_POSTFIELDS, dataStr.c_str());
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
   struct curl_slist *headers = NULL;
-  auto authHeader = "Authorization: " + token;
-  headers = curl_slist_append(headers, authHeader.c_str());
+  if (this->token != "") {
+      const auto authHeader = "Authorization: " + token;
+      headers = curl_slist_append(headers, authHeader.c_str());
+  }
+
   headers =
       curl_slist_append(headers, "Content-Type: application/vnd.git-lfs+json");
   headers = curl_slist_append(headers, "Accept: application/vnd.git-lfs+json");
