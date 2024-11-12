@@ -218,8 +218,9 @@
           # for which we don't apply the full build matrix such as cross or static.
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
+          default = self.packages.${system}.nix;
           # TODO probably should be `nix-cli`
-          default = self.packages.${system}.nix-everything;
+          nix = self.packages.${system}.nix-everything;
           nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
