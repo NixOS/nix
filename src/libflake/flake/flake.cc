@@ -816,7 +816,7 @@ void callFlake(EvalState & state,
     assert(vFetchFinalTree);
 
     Value * args[] = {vLocks, &vOverrides, *vFetchFinalTree};
-    state.callFunction(*vCallFlake, 3, args, vRes, noPos);
+    state.callFunction(*vCallFlake, args, vRes, noPos);
 }
 
 void initLib(const Settings & settings)

@@ -690,13 +690,12 @@ public:
 
     bool isFunctor(Value & fun);
 
-    // FIXME: use std::span
-    void callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos);
+    void callFunction(Value & fun, std::span<Value *> args, Value & vRes, const PosIdx pos);
 
     void callFunction(Value & fun, Value & arg, Value & vRes, const PosIdx pos)
     {
         Value * args[] = {&arg};
-        callFunction(fun, 1, args, vRes, pos);
+        callFunction(fun, args, vRes, pos);
     }
 
     /**
