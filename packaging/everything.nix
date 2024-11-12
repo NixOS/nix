@@ -107,12 +107,8 @@ in
 (buildEnv {
   name = "nix-${nix-cli.version}";
   paths = [
-    # unfortunately, `buildEnv` doesn't support multiple outputs
-
     nix-cli
-
-    # TODO: separate doc output attribute?
-    nix-manual
+    nix-manual.man
   ];
 
   meta.mainProgram = "nix";
@@ -191,7 +187,8 @@ in
      */
     inherit dev;
     inherit devdoc;
-    outputs = [ "out" "dev" "devdoc" ];
+    doc = nix-manual;
+    outputs = [ "out" "dev" "devdoc" "doc" ];
     all = lib.attrValues (lib.genAttrs finalAttrs.passthru.outputs (outName: finalAttrs.finalPackage.${outName}));
   };
   meta = prevAttrs.meta // {
