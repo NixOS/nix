@@ -29,7 +29,7 @@
 
 namespace nix {
 
-namespace fs = std::filesystem;
+namespace fs { using namespace std::filesystem; }
 
 /**
  * Treat the string as possibly an absolute path, by inspecting the

@@ -77,7 +77,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
         if (writeTo) {
             stopProgressBar();
 
-            if (nix::symlink_exists(*writeTo))
+            if (fs::symlink_exists(*writeTo))
                 throw Error("path '%s' already exists", writeTo->string());
 
             std::function<void(Value & v, const PosIdx pos, const fs::path & path)> recurse;

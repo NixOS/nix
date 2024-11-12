@@ -8,7 +8,9 @@
 
 namespace nix {
 
-namespace fs = std::filesystem;
+namespace fs {
+using namespace std::filesystem;
+}
 
 namespace {
 

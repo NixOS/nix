@@ -126,6 +126,8 @@ std::optional<struct stat> maybeLstat(const Path & path);
  */
 bool pathExists(const Path & path);
 
+namespace fs {
+
 /**
  *  ```
  *  symlink_exists(p) = std::filesystem::exists(std::filesystem::symlink_status(p))
@@ -138,6 +140,8 @@ bool pathExists(const Path & path);
 inline bool symlink_exists(const std::filesystem::path & path) {
     return std::filesystem::exists(std::filesystem::symlink_status(path));
 }
+
+} // namespace fs
 
 /**
  * A version of pathExists that returns false on a permission error.
