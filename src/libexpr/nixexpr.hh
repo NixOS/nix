@@ -206,7 +206,7 @@ struct ExprSelect : Expr
     /**
      * Evaluate the `a.b.c` part of `a.b.c.d`. This exists mostly for the purpose of :doc in the repl.
      *
-     * @param[out] v The attribute set that should contain the last attribute name (if it exists).
+     * @param[out] attrs The attribute set that should contain the last attribute name (if it exists).
      * @return The last attribute name in `attrPath`
      *
      * @note This does *not* evaluate the final attribute, and does not fail if that's the only attribute that does not exist.

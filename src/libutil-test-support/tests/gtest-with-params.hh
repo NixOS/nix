@@ -6,7 +6,9 @@
 // The lion's share of this code is copy pasted directly out of RapidCheck
 // headers, so the copyright is set accordingly.
 /**
- * @file Implements the ability to run a RapidCheck test under gtest with changed
+ * @file
+ *
+ * Implements the ability to run a RapidCheck test under gtest with changed
  * test parameters such as the number of tests to run. This is useful for
  * running very large numbers of the extremely cheap property tests.
  */

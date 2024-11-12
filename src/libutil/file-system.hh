@@ -126,8 +126,6 @@ std::optional<struct stat> maybeLstat(const Path & path);
  */
 bool pathExists(const Path & path);
 
-namespace fs {
-
 /**
  *  ```
  *  symlink_exists(p) = std::filesystem::exists(std::filesystem::symlink_status(p))
@@ -140,8 +138,6 @@ namespace fs {
 inline bool symlink_exists(const std::filesystem::path & path) {
     return std::filesystem::exists(std::filesystem::symlink_status(path));
 }
-
-} // namespace fs
 
 /**
  * A version of pathExists that returns false on a permission error.
@@ -227,7 +223,7 @@ void createDir(const Path & path, mode_t mode = 0755);
  * Set the access and modification times of the given path, not
  * following symlinks.
  *
- * @param accessTime Specified in seconds.
+ * @param accessedTime Specified in seconds.
  *
  * @param modificationTime Specified in seconds.
  *
