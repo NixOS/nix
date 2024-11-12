@@ -90,7 +90,19 @@ Path canonPath(PathView path, bool resolveSymlinks)
     // The standard filesystem library will behave differently. For example,
     // libstd++ in GCC will only resolve 40 symlinks.
     // I hope that isn't a problem!
-    return (resolveSymlinks ? fs::canonical(path) : fs::path { path }.lexically_normal()).string();
+    auto result = resolveSymlinks ? fs::weakly_canonical(path) : fs::path { path }.lexically_normal();
+
+    // Strip trailing slashes
+    while (!result.has_filename() && result.has_parent_path())
+    {
+        // The parent of "D:/" is "D:/" so we need to be careful.
+        fs::path parent = result.parent_path();
+        if (parent == result)
+            break;
+        result = parent;
+    }
+
+    return result.string();
 }
 
 
