@@ -1,6 +1,8 @@
 #pragma once
 /**
- * @file Implementation of Profiles.
+ * @file
+ *
+ * Implementation of Profiles.
  *
  * See the manual for additional information.
  */

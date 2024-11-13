@@ -129,7 +129,7 @@ nix_err nix_value_call_multi(
  * @param[in] state The state of the evaluation.
  * @param[out] value The result of the function call.
  * @param[in] fn The Nix function to call.
- * @param[in] args The arguments to pass to the function.
+ * @param[in] ... The arguments to pass to the function.
  *
  * @see nix_value_call_multi
  */
