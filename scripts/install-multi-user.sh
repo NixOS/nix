@@ -876,12 +876,28 @@ end
 EOF
 }
 
+append_shell_source_lines() {
+    shell_source_lines \
+        | _sudo "extend your $1 with nix-daemon settings" \
+            tee -a "$1"
+}
+
+append_fish_source_lines() {
+    fish_source_lines \
+        | _sudo "write nix-daemon settings to $profile_target" \
+            tee "$profile_target"
+}
+
 configure_shell_profile() {
     task "Setting up shell profiles: ${PROFILE_TARGETS[*]}"
     for profile_target in "${PROFILE_TARGETS[@]}"; do
         if [ -e "$profile_target" ]; then
-            _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
-                  cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
+            if ! [ "$NIX_DO_NOT_BACKUP" = "1" ]; then
+                _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
+                      cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
+            else
+                ok "shell profile $profile_target backup is skipped"
+            fi
         else
             # try to create the file if its directory exists
             target_dir="$(dirname "$profile_target")"
@@ -892,9 +908,15 @@ configure_shell_profile() {
         fi
 
         if [ -e "$profile_target" ]; then
-            shell_source_lines \
-                | _sudo "extend your $profile_target with nix-daemon settings" \
-                        tee -a "$profile_target"
+            if ! [ "$NIX_DO_NOT_OVERWRITE_PROFILE" = "1" ]; then
+                append_shell_source_lines "$profile_target"
+            else
+                if grep -q "# End Nix" "$profile_target"; then
+                    ok "shell profile $profile_target modification is skipped"
+                else
+                    append_shell_source_lines $profile_target
+                fi
+            fi
         fi
     done
 
@@ -913,9 +935,15 @@ configure_shell_profile() {
                 mkdir "$conf_dir"
         fi
 
-        fish_source_lines \
-            | _sudo "write nix-daemon settings to $profile_target" \
-                    tee "$profile_target"
+        if ! [ "$NIX_DO_NOT_OVERWRITE_PROFILE" = "1" ]; then
+            append_fish_source_lines $profile_target
+        else
+            if grep -q "# End Nix" "$profile_target"; then
+                ok "fish profile $profile_target modification is skipped"
+            else
+                append_fish_source_lines $profile_target
+            fi
+        fi
     done
 
     # TODO: should we suggest '. $PROFILE_NIX_FILE'? It would get them on
@@ -995,7 +1023,11 @@ main() {
     # the sudo/root check out of validate to the head of this func.
     # Cure is *intended* to subsume the validate-and-abort approach,
     # so it may eventually obsolete it.
-    validate_starting_assumptions
+    if ! [ "$NIX_DO_NOT_VALIDATE" = "1" ]; then
+        validate_starting_assumptions
+    else
+        ok "Skipping validation"
+    fi
 
     setup_report
 
@@ -1042,6 +1074,11 @@ case "${1-}" in
     #     uninstall "$@";;
     # install == same as the no-arg condition for now (but, explicit)
     ""|install)
+        main;;
+    fix)
+        export NIX_DO_NOT_VALIDATE=1
+        export NIX_DO_NOT_BACKUP=1
+        export NIX_DO_NOT_OVERWRITE_PROFILE=1
         main;;
     *) # holding space for future options (like uninstall + install?)
         failure "install-multi-user: invalid argument";;
