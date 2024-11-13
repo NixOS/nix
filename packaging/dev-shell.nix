@@ -31,6 +31,35 @@ in {
 
     # Make bash completion work.
     XDG_DATA_DIRS+=:$out/share
+
+    # Make the default phases do the right thing.
+    # FIXME: this wouldn't be needed if the ninja package set buildPhase() instead of $buildPhase.
+    # FIXME: mesonConfigurePhase shouldn't cd to the build directory. It would be better to pass '-C <dir>' to ninja.
+
+    cdToBuildDir() {
+        if [[ ! -e build.ninja ]]; then
+            cd build
+        fi
+    }
+
+    configurePhase() {
+        mesonConfigurePhase
+    }
+
+    buildPhase() {
+        cdToBuildDir
+        ninjaBuildPhase
+    }
+
+    checkPhase() {
+        cdToBuildDir
+        mesonCheckPhase
+    }
+
+    installPhase() {
+        cdToBuildDir
+        ninjaInstallPhase
+    }
   '';
 
   # We use this shell with the local checkout, not unpackPhase.
