@@ -63,9 +63,7 @@ struct CmdCopySigs : StorePathsCommand
 
                     /* Don't import signatures that don't match this
                        binary. */
-                    if (info->narHash != info2->narHash ||
-                        info->narSize != info2->narSize ||
-                        info->references != info2->references)
+                    if (info->narHash != info2->narHash)
                         continue;
 
                     for (auto & sig : info2->sigs)
