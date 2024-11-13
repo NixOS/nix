@@ -3,6 +3,7 @@
 #include "store-api.hh"
 #include "common-args.hh"
 #include "nar-info.hh"
+#include "exit.hh"
 
 #include <algorithm>
 #include <array>
@@ -36,12 +37,13 @@ static uint64_t getStoreObjectsTotalSize(Store & store, const StorePathSet & clo
  * @param showClosureSize If true, the closure size of each path is
  * included.
  */
-static json pathInfoToJSON(
+static std::pair<json, int> pathInfoToJSON(
     Store & store,
     const StorePathSet & storePaths,
     bool showClosureSize)
 {
     json::object_t jsonAllObjects = json::object();
+    int resultCode = 0;
 
     for (auto & storePath : storePaths) {
         json jsonObject;
@@ -80,11 +82,12 @@ static json pathInfoToJSON(
 
         } catch (InvalidPath &) {
             jsonObject = nullptr;
+            resultCode = 1;
         }
 
         jsonAllObjects[printedStorePath] = std::move(jsonObject);
     }
-    return jsonAllObjects;
+    return std::make_pair(jsonAllObjects, resultCode);
 }
 
 
@@ -154,11 +157,15 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             pathLen = std::max(pathLen, store->printStorePath(storePath).size());
 
         if (json) {
-            std::cout << pathInfoToJSON(
+            auto pair = pathInfoToJSON(
                 *store,
                 // FIXME: preserve order?
                 StorePathSet(storePaths.begin(), storePaths.end()),
-                showClosureSize).dump();
+                showClosureSize);
+            auto json = pair.first;
+            auto resultCode = pair.second;
+            std::cout << json.dump();
+            throw Exit(resultCode);
         }
 
         else {
