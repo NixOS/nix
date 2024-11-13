@@ -1330,8 +1330,10 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     } else {
                         if (visitor.isDerivation())
                             showDerivation();
-                        else
-                            throw Error("expected a derivation");
+                        else {
+                            auto name = visitor.getAttrPathStr(state->sName);
+                            throw Error(fmt("%s must be a derivation", name));
+                        }
                     }
                 }
 
