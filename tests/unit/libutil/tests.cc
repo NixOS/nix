@@ -700,4 +700,9 @@ namespace nix {
         ASSERT_EQ(filterANSIEscapes("f𐍈𐍈bär", true, 4), "f𐍈𐍈b");
     }
 
+    TEST(filterANSIEscapes, osc8)
+    {
+        ASSERT_EQ(filterANSIEscapes("\e]8;;http://example.com\e\\This is a link\e]8;;\e\\"), "This is a link");
+    }
+
 }
