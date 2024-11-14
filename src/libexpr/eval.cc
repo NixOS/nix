@@ -1475,10 +1475,10 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
     auto makeAppChain = [&]()
     {
         vRes = vCur;
-        for (size_t i = 0; i < args.size(); ++i) {
+        for (auto arg : args) {
             auto fun2 = allocValue();
             *fun2 = vRes;
-            vRes.mkPrimOpApp(fun2, args[i]);
+            vRes.mkPrimOpApp(fun2, arg);
         }
     };
 
