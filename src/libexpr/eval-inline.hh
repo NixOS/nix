@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "config-expr.hh"
 #include "print.hh"
 #include "eval.hh"
 #include "eval-error.hh"
@@ -12,44 +13,57 @@ namespace nix {
 /**
  * Note: Various places expect the allocated memory to be zeroed.
  */
-[[gnu::always_inline]]
+[[nodiscard]]
+[[using gnu: hot, always_inline, returns_nonnull, malloc, alloc_size(1)]]
 inline void * allocBytes(size_t n)
 {
-    void * p;
-#if HAVE_BOEHMGC
-    p = GC_MALLOC(n);
-#else
-    p = calloc(n, 1);
-#endif
-    if (!p) throw std::bad_alloc();
+    void * p = nullptr;
+
+    if constexpr (HAVE_BOEHMGC) {
+        p = GC_MALLOC(n);
+    } else {
+        p = calloc(n, 1);
+    }
+
+    if (p == nullptr) [[unlikely]] {
+        throw std::bad_alloc();
+    }
     return p;
 }
 
-[[gnu::always_inline]]
-Value * EvalState::allocValue()
+
+[[nodiscard]]
+[[using gnu: hot, always_inline, returns_nonnull, malloc]]
+inline Value * EvalState::allocValue()
 {
-#if HAVE_BOEHMGC
-    /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
+    void * p = nullptr;
+
+    if constexpr (HAVE_BOEHMGC) {
+        /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
        GC_malloc_many returns a linked list of objects of the given size, where the first word
        of each object is also the pointer to the next object in the list. This also means that we
        have to explicitly clear the first word of every object we take. */
-    if (!*valueAllocCache) {
-        *valueAllocCache = GC_malloc_many(sizeof(Value));
-        if (!*valueAllocCache) throw std::bad_alloc();
+        if (*valueAllocCache == nullptr) [[unlikely]] {
+            *valueAllocCache = GC_malloc_many(sizeof(Value));
+        }
+
+        if (*valueAllocCache == nullptr) [[unlikely]] {
+            throw std::bad_alloc();
+        }
+
+        /* GC_NEXT is a convenience macro for accessing the first word of an object.
+        Take the first list item, advance the list to the next item, and clear the next pointer. */
+        p = *valueAllocCache;
+        *valueAllocCache = GC_NEXT(p);
+        GC_NEXT(p) = nullptr;
+    } else {
+        p = allocBytes(sizeof(Value));
     }
 
-    /* GC_NEXT is a convenience macro for accessing the first word of an object.
-       Take the first list item, advance the list to the next item, and clear the next pointer. */
-    void * p = *valueAllocCache;
-    *valueAllocCache = GC_NEXT(p);
-    GC_NEXT(p) = nullptr;
-#else
-    void * p = allocBytes(sizeof(Value));
-#endif
-
     nrValues++;
-    return (Value *) p;
+    return static_cast<Value *>(p);
 }
+
 
 // TODO(@connorbaker):
 // Is it possible using the batched alloc resulted in a performance regression?
@@ -61,62 +75,73 @@ Value * EvalState::allocValue()
 // Benchmark 1: ./nix-after-batch-alloc/bin/nix eval --no-eval-cache --read-only --json --file ./nixpkgs-91bc7dadf7bf0bf3fb9203e611bd856f40fc2b66/pkgs/top-level/release-attrpaths-superset.nix names
 //   Time (mean ± σ):     19.000 s ±  0.050 s    [User: 17.066 s, System: 1.888 s]
 //   Range (min … max):   18.932 s … 19.145 s    20 runs
-[[gnu::always_inline]]
-ValueList * EvalState::allocList()
+[[nodiscard]]
+[[using gnu: hot, always_inline, returns_nonnull, malloc]]
+inline ValueList * EvalState::allocList()
 {
+    void * p = nullptr;
+
     // See the comment in allocValue for an explanation of this block.
     // TODO(@connorbaker): Beginning cargo-culting.
     // 1. Do we need to assign to an intermediate variable, like `allocEnv` does?
     // 2. Do we need to use a C-style cast?
-#if HAVE_BOEHMGC
-    if (!*listAllocCache) {
-        *listAllocCache = GC_malloc_many(sizeof(ValueList));
-        if (!*listAllocCache) throw std::bad_alloc();
-    }
+    if constexpr (HAVE_BOEHMGC) {
+        if (*listAllocCache == nullptr) [[unlikely]] {
+            *listAllocCache = GC_malloc_many(sizeof(ValueList));
+        }
 
-    void * p = *listAllocCache;
-    *listAllocCache = GC_NEXT(p);
-    GC_NEXT(p) = nullptr;
-#else
-    void * p = allocBytes(sizeof(ValueList));
-#endif
+        if (*listAllocCache == nullptr) [[unlikely]] {
+            throw std::bad_alloc();
+        }
+
+        p = *listAllocCache;
+        *listAllocCache = GC_NEXT(p);
+        GC_NEXT(p) = nullptr;
+    } else {
+        p = allocBytes(sizeof(ValueList));
+    }
 
     return ::new (p) ValueList;
 }
 
 
-[[gnu::always_inline]]
-Env & EvalState::allocEnv(size_t size)
+[[nodiscard]]
+[[using gnu: hot, always_inline, returns_nonnull, malloc]]
+inline Env * EvalState::allocEnv(size_t size)
 {
     nrEnvs++;
     nrValuesInEnvs += size;
 
-    Env * env;
+    void * p = nullptr;
 
-#if HAVE_BOEHMGC
-    if (size == 1) {
-        /* see allocValue for explanations. */
-        if (!*env1AllocCache) {
-            *env1AllocCache = GC_malloc_many(sizeof(Env) + sizeof(Value *));
-            if (!*env1AllocCache) throw std::bad_alloc();
+    if constexpr (HAVE_BOEHMGC) {
+        if (size == 1) {
+            /* see allocValue for explanations. */
+            if (*env1AllocCache == nullptr) [[unlikely]] {
+                *env1AllocCache = GC_malloc_many(sizeof(Env) + sizeof(Value *));
+            }
+
+            if (*env1AllocCache == nullptr) [[unlikely]] {
+                throw std::bad_alloc();
+            }
+
+            p = *env1AllocCache;
+            *env1AllocCache = GC_NEXT(p);
+            GC_NEXT(p) = nullptr;
         }
+    }
 
-        void * p = *env1AllocCache;
-        *env1AllocCache = GC_NEXT(p);
-        GC_NEXT(p) = nullptr;
-        env = (Env *) p;
-    } else
-#endif
-        env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
+    if (p == nullptr) {
+        p = allocBytes(sizeof(Env) + size * sizeof(Value *));
+    }
 
     /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
-
-    return *env;
+    return static_cast<Env *>(p);
 }
 
 
-[[gnu::always_inline]]
-void EvalState::forceValue(Value & v, const PosIdx pos)
+[[using gnu: hot, always_inline]]
+inline void EvalState::forceValue(Value & v, const PosIdx pos)
 {
     if (v.isThunk()) {
         Env * env = v.payload.thunk.env;
@@ -139,7 +164,7 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
 }
 
 
-[[gnu::always_inline]]
+[[using gnu: hot, always_inline]]
 inline void EvalState::forceAttrs(Value & v, const PosIdx pos, std::string_view errorCtx)
 {
     forceAttrs(v, [&]() { return pos; }, errorCtx);
@@ -147,12 +172,12 @@ inline void EvalState::forceAttrs(Value & v, const PosIdx pos, std::string_view 
 
 
 template <typename Callable>
-[[gnu::always_inline]]
+[[using gnu: hot, always_inline]]
 inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view errorCtx)
 {
     PosIdx pos = getPos();
     forceValue(v, pos);
-    if (v.type() != nAttrs) {
+    if (v.type() != nAttrs) [[ unlikely ]] {
         error<TypeError>(
             "expected a set but found %1%: %2%",
             showType(v),
@@ -162,11 +187,11 @@ inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view e
 }
 
 
-[[gnu::always_inline]]
+[[using gnu: hot, always_inline]]
 inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view errorCtx)
 {
     forceValue(v, pos);
-    if (!v.isList()) {
+    if (!v.isList()) [[ unlikely ]] {
         error<TypeError>(
             "expected a list but found %1%: %2%",
             showType(v),
@@ -175,12 +200,14 @@ inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view e
     }
 }
 
-[[gnu::always_inline]]
-inline CallDepth EvalState::addCallDepth(const PosIdx pos) {
-    if (callDepth > settings.maxCallDepth)
-        error<EvalError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
 
-    return CallDepth(callDepth);
+[[using gnu: hot, always_inline]]
+inline CallDepth EvalState::addCallDepth(const PosIdx pos) {
+    if (callDepth > settings.maxCallDepth) [[unlikely ]] {
+        error<EvalError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
+    }
+
+    return {callDepth};
 };
 
 }

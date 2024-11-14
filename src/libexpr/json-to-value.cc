@@ -59,8 +59,8 @@ class JSONSax : nlohmann::json_sax<json> {
         ValueVector values;
         std::unique_ptr<JSONState> resolve(EvalState & state) override
         {
-            parent->value(state).mkList(ranges::fold_left(values, state.allocList(), [](const auto & list, const auto & v) {
-                *list = list->push_back(v);
+            parent->value(state).mkList(ranges::fold_left(values, state.allocList(), [](auto * const list, auto * const v) {
+                *list = std::move(*list).push_back(v);
                 return list;
             }));
             return std::move(parent);

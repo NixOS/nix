@@ -16,8 +16,12 @@
 #include "fetch-to-store.hh"
 
 #include <boost/container/small_vector.hpp>
+#include <compare>
+#include <functional>
 #include <immer/algorithm.hpp>
 #include <nlohmann/json.hpp>
+#include <range/v3/algorithm/fold_left.hpp>
+#include <range/v3/algorithm/set_algorithm.hpp>
 #include <range/v3/all.hpp>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -46,6 +50,8 @@ namespace nix {
 
 // TODO(@connorbaker): Rewrite functions involving lists to make use of persistence -- currently they're largely written
 // in a way that duplicates data.
+
+// TODO(@connorbaker): Lift placeholder values out of lambdas and into the enclosing scope to avoid repeated construction/destruction.
 
 /*************************************************************
  * Miscellaneous
@@ -208,15 +214,15 @@ void derivationToValue(EvalState & state, const PosIdx pos, const SourcePath & p
     });
     attrs.alloc(state.sName).mkString(drv.env["name"]);
     attrs.alloc(state.sOutputs)
-        .mkList(ranges::fold_left(drv.outputs, state.allocList(), [&](const auto & list, const auto & output) {
+        .mkList(ranges::fold_left(drv.outputs, state.allocList(), [&](auto * const list, const auto & output) {
             mkOutputString(state, attrs, storePath, output);
-            auto outputString = state.allocValue();
+            auto * const outputString = state.allocValue();
             outputString->mkString(output.first);
-            *list = list->push_back(outputString);
+            *list = std::move(*list).push_back(outputString);
             return list;
         }));
 
-    auto w = state.allocValue();
+    auto *w = state.allocValue();
     w->mkAttrs(attrs);
 
     if (!state.vImportedDrvToDerivation) {
@@ -243,7 +249,7 @@ void derivationToValue(EvalState & state, const PosIdx pos, const SourcePath & p
 static void scopedImport(EvalState & state, const PosIdx pos, SourcePath & path, Value * vScope, Value & v) {
     state.forceAttrs(*vScope, pos, "while evaluating the first argument passed to builtins.scopedImport");
 
-    Env * env = &state.allocEnv(vScope->attrs()->size());
+    Env * env = state.allocEnv(vScope->attrs()->size());
     env->up = &state.baseEnv;
 
     auto staticEnv = std::make_shared<StaticEnv>(nullptr, state.staticBaseEnv.get(), vScope->attrs()->size());
@@ -415,7 +421,7 @@ void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.exec");
     auto elems = args[0]->list();
-    auto count = args[0]->listSize();
+    auto count = elems.size();
     if (count == 0)
         state.error<EvalError>("at least one argument to 'exec' required").atPos(pos).debugThrow();
     NixStringContext context;
@@ -423,7 +429,7 @@ void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
             "while evaluating the first element of the argument passed to builtins.exec",
             false, false).toOwned();
     Strings commandArgs;
-    immer::for_each(args[0]->list().drop(1), [&](const auto & v) {
+    immer::for_each(elems.drop(1), [&](auto * const v) {
         commandArgs.push_back(state.coerceToString(pos, *v, context,
                 "while evaluating an element of the argument passed to builtins.exec",
                 false, false).toOwned());
@@ -435,7 +441,7 @@ void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
     }
 
     auto output = runProgram(program, true, commandArgs);
-    Expr * parsed;
+    Expr * parsed = nullptr;
     try {
         parsed = state.parseExprFromString(std::move(output), state.rootPath(CanonPath::root));
     } catch (Error & e) {
@@ -653,7 +659,7 @@ struct CompareValues
                     return strcmp(v1->payload.path.path, v2->payload.path.path) < 0;
                 case nList:
                     // Lexicographic comparison
-                    return ranges::lexicographical_compare(v1->list(), v2->list(), [&](const auto & a, const auto & b) {
+                    return ranges::lexicographical_compare(v1->list(), v2->list(), [&](auto * const a, auto * const b) {
                         // If they are not equal, return the result of comparing them
                         return !state.eqValues(*a, *b, pos, errorCtx) && (*this)(a, b, "while comparing two list elements");
                     });
@@ -687,7 +693,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value * * a
     state.forceAttrs(*args[0], noPos, "while evaluating the first argument passed to builtins.genericClosure");
 
     /* Get the start set. */
-    auto startSet = getAttr(state, state.sStartSet, args[0]->attrs(), "in the attrset passed as argument to builtins.genericClosure");
+    const auto *const startSet = getAttr(state, state.sStartSet, args[0]->attrs(), "in the attrset passed as argument to builtins.genericClosure");
 
     state.forceList(*startSet->value, noPos, "while evaluating the 'startSet' attribute passed as argument to builtins.genericClosure");
 
@@ -697,41 +703,41 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value * * a
     }
 
     /* Get the operator. */
-    auto op = getAttr(state, state.sOperator, args[0]->attrs(), "in the attrset passed as argument to builtins.genericClosure");
+    const auto *const op = getAttr(state, state.sOperator, args[0]->attrs(), "in the attrset passed as argument to builtins.genericClosure");
     state.forceFunction(*op->value, noPos, "while evaluating the 'operator' attribute passed as argument to builtins.genericClosure");
 
     /* Construct the closure by applying the operator to elements of
        `workSet', adding the result to `workSet', continuing until
        no new elements are found. */
-    auto res = state.allocList();
+    auto * const res = state.allocList();
     // `doneKeys' doesn't need to be a GC root, because its values are
     // reachable from res.
-    auto cmp = CompareValues(state, noPos, "while comparing the `key` attributes of two genericClosure elements");
+    const auto cmp = CompareValues(state, noPos, "while comparing the `key` attributes of two genericClosure elements");
     std::set<Value *, decltype(cmp), traceable_allocator<Value *>> doneKeys(cmp);
 
+    Value newElements;
     auto workSet = startSet->value->list();
     while (!workSet.empty()) {
-        auto e = workSet.front();
-        workSet = workSet.drop(1);
+        auto * e = workSet.front();
+        workSet = std::move(workSet).drop(1);
 
         state.forceAttrs(*e, noPos, "while evaluating one of the elements generated by (or initially passed to) builtins.genericClosure");
 
-        auto key = getAttr(state, state.sKey, e->attrs(), "in one of the attrsets generated by (or initially passed to) builtins.genericClosure");
+        const auto *const key = getAttr(state, state.sKey, e->attrs(), "in one of the attrsets generated by (or initially passed to) builtins.genericClosure");
         state.forceValue(*key->value, noPos);
 
         if (!doneKeys.insert(key->value).second) continue;
-        *res = res->push_back(e);
+        *res = std::move(*res).push_back(e);
 
         /* Call the `operator' function with `e' as argument. */
-        Value newElements;
         state.callFunction(*op->value, 1, &e, newElements, noPos);
         state.forceList(newElements, noPos, "while evaluating the return value of the `operator` passed to builtins.genericClosure");
-        immer::for_each(newElements.list(), [&](const auto &elem){
+        immer::for_each(newElements.list(), [&](auto * const elem){
             state.forceValue(*elem, noPos);
         });
 
         /* Add the values returned by the operator to the work set. */
-        workSet = workSet + newElements.list();
+        workSet = std::move(workSet) + newElements.list();
     }
 
     v.mkList(res);
@@ -1320,7 +1326,7 @@ static void derivationStrictInternal(
                command-line arguments to the builder. */
             else if (i->name == state.sArgs) {
                 state.forceList(*i->value, pos, context_below);
-                immer::for_each(i->value->list(), [&](const auto & elem){
+                immer::for_each(i->value->list(), [&](auto * const elem){
                     drv.args.push_back(state.coerceToString(pos, *elem, context,
                             "while evaluating an element of the argument list",
                             true).toOwned());
@@ -1351,7 +1357,7 @@ static void derivationStrictInternal(
                         /* Require ‘outputs’ to be a list of strings. */
                         state.forceList(*i->value, pos, context_below);
                         Strings ss;
-                        immer::for_each(i->value->list(), [&](const auto & elem){
+                        immer::for_each(i->value->list(), [&](auto * const elem){
                             ss.emplace_back(state.forceStringNoCtx(*elem, pos, context_below));
                         });
                         handleOutputs(ss);
@@ -1827,17 +1833,17 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.findFile");
 
     LookupPath lookupPath;
-    immer::for_each(args[0]->list(), [&](const auto & v2){
+    std::string prefix;
+    NixStringContext context;
+    immer::for_each(args[0]->list(), [&](auto * const v2){
         state.forceAttrs(*v2, pos, "while evaluating an element of the list passed to builtins.findFile");
 
-        std::string prefix;
         auto i = v2->attrs()->find(state.sPrefix);
         if (i != v2->attrs()->end())
             prefix = state.forceStringNoCtx(*i->value, pos, "while evaluating the `prefix` attribute of an element of the list passed to builtins.findFile");
 
         i = getAttr(state, state.sPath, v2->attrs(), "in an element of the __nixPath");
 
-        NixStringContext context;
         auto path = state.coerceToString(pos, *i->value, context,
                 "while evaluating the `path` attribute of an element of the list passed to builtins.findFile",
                 false, false).toOwned();
@@ -2669,22 +2675,17 @@ static RegisterPrimOp primop_path({
 static void prim_attrNames(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.attrNames");
+    const auto *const attrs = args[0]->attrs();
 
-    ValueVector vec;
-    vec.reserve(args[0]->attrs()->size());
-
-    for (const auto & attr : *args[0]->attrs()) {
-        auto v = state.allocValue();
-        v->mkString(state.symbols[attr.name]);
-        vec.push_back(v);
-    }
-
-    std::sort(vec.begin(), vec.end(),
-              [](Value * v1, Value * v2) { return strcmp(v1->c_str(), v2->c_str()) < 0; });
+    const auto symbols = *attrs
+        | ranges::views::transform([&](const auto & attr) { return std::string_view(state.symbols[attr.name]); })
+        | ranges::to<std::vector>
+        | ranges::actions::sort;
     
-
-    v.mkList(ranges::fold_left(vec, state.allocList(), [](const auto & list, const auto & v) {
-        *list = list->push_back(v);
+    v.mkList(ranges::fold_left(symbols, state.allocList(), [&](auto * const list, const auto & symbol) {
+        auto * const v = state.allocValue();
+        v->mkString(symbol);
+        *list = std::move(*list).push_back(v);
         return list;
     }));
 }
@@ -2706,18 +2707,16 @@ static void prim_attrValues(EvalState & state, const PosIdx pos, Value * * args,
 {
     state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.attrValues");
 
-    v.mkList(ranges::fold_left(
-        ranges::views::all(*args[0]->attrs())
-        | ranges::views::transform([&](const auto & attr) { return &attr; })
-        | ranges::to_vector
+    const auto attrs = *args[0]->attrs()
+        | ranges::to<std::vector>
         | ranges::actions::sort([&](const auto & a, const auto & b) {
-                  return std::string_view(state.symbols[a->name]) < std::string_view(state.symbols[b->name]);
-              }),
-        state.allocList(),
-        [](const auto & list, const auto & v) {
-            *list = list->push_back(((Attr *) v)->value);
-            return list;
-        }));
+            return std::string_view(state.symbols[a.name]) < std::string_view(state.symbols[b.name]);
+        });
+
+    v.mkList(ranges::fold_left(attrs, state.allocList(), [](auto * const list, const auto & attr) {
+        *list = std::move(*list).push_back(attr.value);
+        return list;
+    }));
 }
 
 static RegisterPrimOp primop_attrValues({
@@ -2868,23 +2867,24 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value * * args
     /* Get the attribute names to be removed.
        We keep them as Attrs instead of Symbols so std::set_difference
        can be used to remove them from attrs[0]. */
-    // 64: large enough to fit the attributes of a derivation
-    boost::container::small_vector<Attr, 64> names;
-    names.reserve(args[1]->listSize());
-    immer::for_each(args[1]->list(), [&](const auto & elem) {
-        state.forceStringNoCtx(*elem, pos, "while evaluating the values of the second argument passed to builtins.removeAttrs");
-        names.emplace_back(state.symbols.create(elem->string_view()), nullptr);
-    });
-    std::sort(names.begin(), names.end());
+    const auto names = args[1]->list()
+        | std::views::transform([&](auto * const elem) {
+            state.forceStringNoCtx(*elem, pos, "while evaluating the values of the second argument passed to builtins.removeAttrs");
+            return Attr(state.symbols.create(elem->string_view()), nullptr);
+        })
+        | ranges::to<std::vector>
+        | ranges::actions::sort(std::less<>());
 
     /* Copy all attributes not in that set.  Note that we don't need
        to sort v.attrs because it's a subset of an already sorted
        vector. */
     auto attrs = state.buildBindings(args[0]->attrs()->size());
-    std::set_difference(
-        args[0]->attrs()->begin(), args[0]->attrs()->end(),
-        names.begin(), names.end(),
-        std::back_inserter(attrs));
+    std::ranges::set_difference(
+        *args[0]->attrs(),
+        names,
+        std::back_inserter(attrs),
+        std::less<>()
+    );
     v.mkAttrs(attrs.alreadySorted());
 }
 
@@ -2915,18 +2915,18 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value * * args
 
     auto attrs = state.buildBindings(args[0]->listSize());
 
-    std::set<Symbol, std::less<Symbol>, traceable_allocator<Symbol>> seen;
+    std::set<Symbol, std::less<>, traceable_allocator<Symbol>> seen;
 
-    immer::for_each(args[0]->list(), [&](const auto & v2) {
+    immer::for_each(args[0]->list(), [&](auto * const v2) {
         state.forceAttrs(*v2, pos, "while evaluating an element of the list passed to builtins.listToAttrs");
 
-        auto j = getAttr(state, state.sName, v2->attrs(), "in a {name=...; value=...;} pair");
+        const auto * const j = getAttr(state, state.sName, v2->attrs(), "in a {name=...; value=...;} pair");
 
-        auto name = state.forceStringNoCtx(*j->value, j->pos, "while evaluating the `name` attribute of an element of the list passed to builtins.listToAttrs");
+        const auto name = state.forceStringNoCtx(*j->value, j->pos, "while evaluating the `name` attribute of an element of the list passed to builtins.listToAttrs");
 
-        auto sym = state.symbols.create(name);
+        const auto sym = state.symbols.create(name);
         if (seen.insert(sym).second) {
-            auto j2 = getAttr(state, state.sValue, v2->attrs(), "in a {name=...; value=...;} pair");
+            const auto * const j2 = getAttr(state, state.sValue, v2->attrs(), "in a {name=...; value=...;} pair");
             attrs.insert(sym, j2->value, j2->pos);
         }
     });
@@ -3047,10 +3047,11 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
 {
     auto attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.catAttrs"));
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.catAttrs");
-    v.mkList(immer::accumulate(args[1]->list(), state.allocList(), [&](const auto & list, const auto & v2) {
+    v.mkList(immer::accumulate(args[1]->list(), state.allocList(), [&](auto * const list, auto * const v2) {
         state.forceAttrs(*v2, pos, "while evaluating an element in the list passed as second argument to builtins.catAttrs");
-        if (auto i = v2->attrs()->get(attrName))
-            *list = list->push_back(i->value);
+        if (const auto * const i = v2->attrs()->get(attrName)) {
+            *list = std::move(*list).push_back(i->value);
+        }
         return list;
     }));
 }
@@ -3145,29 +3146,29 @@ static RegisterPrimOp primop_mapAttrs({
 
 static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    std::map<Symbol, ValueList *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueList *>>> attrsSeen;
+    std::map<Symbol, ValueList *, std::less<>, traceable_allocator<std::pair<const Symbol, ValueList *>>> attrsSeen;
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.zipAttrsWith");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.zipAttrsWith");
 
-    immer::for_each(args[1]->list(), [&](const auto & vElem) {
+    immer::for_each(args[1]->list(), [&](auto * const vElem) {
         state.forceAttrs(*vElem, noPos, "while evaluating a value of the list passed as second argument to builtins.zipAttrsWith");
-        for (const auto & attr : *vElem->attrs()) {
+        for (const auto attr : *vElem->attrs()) {
             attrsSeen.try_emplace(attr.name, state.allocList());
-            *attrsSeen[attr.name] = attrsSeen[attr.name]->push_back(attr.value);
+            *attrsSeen[attr.name] = std::move(*attrsSeen[attr.name]).push_back(attr.value);
         }
     });
 
     auto attrs = state.buildBindings(attrsSeen.size());
 
-    for (const auto & [sym, list] : attrsSeen) {
-        auto name = state.allocValue();
+    for (const auto [sym, list] : attrsSeen) {
+        auto * const name = state.allocValue();
         name->mkString(state.symbols[sym]);
-        auto arg = state.allocValue();
+        auto * const arg = state.allocValue();
         arg->mkList(list);
-        auto call1 = state.allocValue();
+        auto * const call1 = state.allocValue();
         call1->mkApp(args[0], name);
-        auto call2 = state.allocValue();
+        auto * const call2 = state.allocValue();
         call2->mkApp(call1, arg);
         attrs.insert(sym, call2);
     }
@@ -3288,7 +3289,7 @@ static void prim_tail(EvalState & state, const PosIdx pos, Value * * args, Value
     if (args[0]->listSize() == 0)
         state.error<EvalError>("'tail' called on an empty list").atPos(pos).debugThrow();
 
-    auto tail = state.allocList();
+    auto * const tail = state.allocList();
     *tail = args[0]->list().drop(1);
     v.mkList(tail);
 }
@@ -3321,10 +3322,10 @@ static void prim_map(EvalState & state, const PosIdx pos, Value * * args, Value 
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.map");
 
-    v.mkList(immer::accumulate(args[1]->list(), state.allocList(), [&](const auto & list, const auto & v) {
-        auto newV = state.allocValue();
+    v.mkList(immer::accumulate(args[1]->list(), state.allocList(), [&](auto * const list, auto * const v) {
+        auto * const newV = state.allocValue();
         newV->mkApp(args[0], v);
-        *list = list->push_back(newV);
+        *list = std::move(*list).push_back(newV);
         return list;
     }));
 }
@@ -3359,11 +3360,12 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Val
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filter");
 
-    v.mkList(immer::accumulate(args[1]->list(), state.allocList(), [&](const auto & list, const auto & arg) {
-        Value res;
+    Value res;
+    v.mkList(immer::accumulate(args[1]->list(), state.allocList(), [&](auto * const list, auto * const arg) {
         state.callFunction(*args[0], *arg, res, noPos);
-        if (state.forceBool(res, pos, "while evaluating the return value of the filtering function passed to builtins.filter"))
-            *list = list->push_back(arg);
+        if (state.forceBool(res, pos, "while evaluating the return value of the filtering function passed to builtins.filter")) {
+            *list = std::move(*list).push_back(arg);
+        }
         return list;
     }));
 }
@@ -3383,7 +3385,7 @@ static void prim_elem(EvalState & state, const PosIdx pos, Value * * args, Value
 {
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.elem");
     // TODO(@connorbaker): immer doesn't provide any_of.
-    v.mkBool(ranges::any_of(args[1]->list(), [&](const auto & elem) {
+    v.mkBool(ranges::any_of(args[1]->list(), [&](auto * const elem) {
         return state.eqValues(*args[0], *elem, pos, "while searching for the presence of the given element in the list");
     }));
 }
@@ -3488,7 +3490,7 @@ static void prim_any(EvalState & state, const PosIdx pos, Value * * args, Value 
     state.forceFunction(*args[0], pos, std::string("while evaluating the first argument passed to builtins.any"));
     state.forceList(*args[1], pos, std::string("while evaluating the second argument passed to builtins.any"));
     std::string_view errorCtx = "while evaluating the return value of the function passed to builtins.any";
-    v.mkBool(ranges::any_of(args[1]->list(), [&](const auto & elem) {
+    v.mkBool(ranges::any_of(args[1]->list(), [&](auto * const elem) {
         state.callFunction(*args[0], *elem, v, pos);
         return state.forceBool(v, pos, errorCtx);
     }));
@@ -3509,7 +3511,7 @@ static void prim_all(EvalState & state, const PosIdx pos, Value * * args, Value 
     state.forceFunction(*args[0], pos, std::string("while evaluating the first argument passed to builtins.all"));
     state.forceList(*args[1], pos, std::string("while evaluating the second argument passed to builtins.all"));
     std::string_view errorCtx = "while evaluating the return value of the function passed to builtins.all";
-    v.mkBool(ranges::all_of(args[1]->list(), [&](const auto & elem) {
+    v.mkBool(ranges::all_of(args[1]->list(), [&](auto * const elem) {
         state.callFunction(*args[0], *elem, v, pos);
         return state.forceBool(v, pos, errorCtx);
     }));
@@ -3538,12 +3540,12 @@ static void prim_genList(EvalState & state, const PosIdx pos, Value * * args, Va
     // as evaluating map without accessing any values makes little sense.
     state.forceFunction(*args[0], noPos, "while evaluating the first argument passed to builtins.genList");
 
-    v.mkList(ranges::fold_left(ranges::views::iota(size_t(0), len), state.allocList(), [&](const auto & list, const auto & n) {
-        auto arg = state.allocValue();
+    v.mkList(ranges::fold_left(ranges::views::iota(size_t(0), len), state.allocList(), [&](auto * const list, const auto n) {
+        auto * const arg = state.allocValue();
         arg->mkInt(n);
-        auto app = state.allocValue();
+        auto * const app = state.allocValue();
         app->mkApp(args[0], arg);
-        *list = list->push_back(app);
+        *list = std::move(*list).push_back(app);
         return list;
     }));
 }
@@ -3581,18 +3583,19 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
 
     ValueVector vec;
     vec.reserve(len);
-    immer::for_each(args[1]->list(), [&](const auto & v) {
+    immer::for_each(args[1]->list(), [&](auto * const v) {
         state.forceValue(*v, pos);
         vec.push_back(v);
     });
 
-    auto comparator = [&](Value * a, Value * b) {
+    auto comparator = [&](Value * const a, Value * const b) {
         /* Optimization: if the comparator is lessThan, bypass
            callFunction. */
         if (args[0]->isPrimOp()) {
-            auto ptr = args[0]->primOp()->fun.target<decltype(&prim_lessThan)>();
-            if (ptr && *ptr == prim_lessThan)
+            const auto * const ptr = args[0]->primOp()->fun.target<decltype(&prim_lessThan)>();
+            if ((ptr != nullptr) && *ptr == prim_lessThan) {
                 return CompareValues(state, noPos, "while evaluating the ordering function passed to builtins.sort")(a, b);
+            }
         }
 
         Value * vs[] = {a, b};
@@ -3606,8 +3609,8 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
        resilient, but no guarantees... */
     std::stable_sort(vec.begin(), vec.end(), comparator);
 
-    v.mkList(ranges::fold_left(vec, state.allocList(), [&](const auto & list, const auto & v) {
-        *list = list->push_back(v);
+    v.mkList(ranges::fold_left(vec, state.allocList(), [&](auto * const list, auto * const v) {
+        *list = std::move(*list).push_back(v);
         return list;
     }));
 }
@@ -3638,17 +3641,19 @@ static void prim_partition(EvalState & state, const PosIdx pos, Value * * args, 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.partition");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.partition");
 
-    auto rlist = state.allocList();
-    auto wlist = state.allocList();
+    auto * const rlist = state.allocList();
+    auto * const wlist = state.allocList();
 
-    immer::for_each(args[1]->list(), [&](const auto & v) {
+    Value res;
+    immer::for_each(args[1]->list(), [&](auto * const v) {
         state.forceValue(*v, pos);
-        Value res;
         state.callFunction(*args[0], *v, res, pos);
-        if (state.forceBool(res, pos, "while evaluating the return value of the partition function passed to builtins.partition"))
-            *rlist = rlist->push_back(v);
-        else
-            *wlist = wlist->push_back(v);
+        if (state.forceBool(res, pos, "while evaluating the return value of the partition function passed to builtins.partition")) {
+            *rlist = std::move(*rlist).push_back(v);
+        }
+        else {
+            *wlist = std::move(*wlist).push_back(v);
+        }
     });
 
     auto attrs = state.buildBindings(2);
@@ -3688,20 +3693,20 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value * * args, Va
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.groupBy");
 
     // TODO(@connorbaker): Rewrite and optimize this function.
-    std::map<Symbol, ValueList *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueList *>>> attrsSeen;
+    std::map<Symbol, ValueList *, std::less<>, traceable_allocator<std::pair<const Symbol, ValueList *>>> attrsSeen;
 
-    immer::for_each(args[1]->list(), [&](const auto & vElem) {
-        Value res;
+    Value res;
+    immer::for_each(args[1]->list(), [&](auto * const vElem) {
         state.callFunction(*args[0], *vElem, res, pos);
-        auto name = state.forceStringNoCtx(res, pos, "while evaluating the return value of the grouping function passed to builtins.groupBy");
-        auto sym = state.symbols.create(name);
+        const auto name = state.forceStringNoCtx(res, pos, "while evaluating the return value of the grouping function passed to builtins.groupBy");
+        const auto sym = state.symbols.create(name);
 
         attrsSeen.try_emplace(sym, state.allocList());
-        *attrsSeen[sym] = attrsSeen[sym]->push_back(vElem);
+        *attrsSeen[sym] = std::move(*attrsSeen[sym]).push_back(vElem);
     });
 
     auto attrs = state.buildBindings(attrsSeen.size());
-    ranges::for_each(attrsSeen, [&](const auto & pair) {
+    ranges::for_each(attrsSeen, [&](const auto pair) {
         attrs.alloc(pair.first).mkList(pair.second);
     });
     v.mkAttrs(attrs.alreadySorted());
@@ -3735,12 +3740,11 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
 {
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.concatMap");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.concatMap");
-    v.mkList(immer::accumulate(args[1]->list(), state.allocList(), [&](const auto & list, const auto & v) {
-        // TODO(@connorbaker): Will the list stored in res be available after the loop, or will it be garbage collected?
-        Value res;
+    Value res;
+    v.mkList(immer::accumulate(args[1]->list(), state.allocList(), [&](auto * const list, auto * const v) {
         state.callFunction(*args[0], *v, res, pos);
         state.forceList(res, res.determinePos(args[0]->determinePos(pos)), "while evaluating the return value of the function passed to builtins.concatMap");
-        *list = *list + res.list();
+        *list = std::move(*list) + res.list();
         return list;
     }));
 }
@@ -4234,8 +4238,8 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         }
 
         // the first match is the whole string
-        v.mkList(ranges::fold_left(std::span(matches).subspan(1), state.allocList(), [&](const auto & listOfMatches, const auto & match) {
-            *listOfMatches = listOfMatches->push_back(match.matched ? mkString(state, match) : &state.vNull);
+        v.mkList(ranges::fold_left(std::span(matches).subspan(1), state.allocList(), [&](auto * const listOfMatches, const auto match) {
+            *listOfMatches = std::move(*listOfMatches).push_back(match.matched ? mkString(state, match) : &state.vNull);
             return listOfMatches;
         }));
 
@@ -4307,9 +4311,9 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         // Any matches results are surrounded by non-matching results.
         const size_t len = std::distance(begin, end);
 
-        auto listOfMatches = state.allocList();
+        auto * const listOfMatches = state.allocList();
         if (len == 0) {
-            *listOfMatches = listOfMatches->push_back(args[1]);
+            *listOfMatches = std::move(*listOfMatches).push_back(args[1]);
             v.mkList(listOfMatches);
             return;
         }
@@ -4318,32 +4322,29 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 
         for (auto i = begin; i != end; ++i) {
             assert(idx <= 2 * len + 1 - 3);
-            auto match = *i;
+            const auto match = *i;
 
             // Add a string for non-matched characters.
-            *listOfMatches = listOfMatches->push_back(mkString(state, match.prefix()));
+            *listOfMatches = std::move(*listOfMatches).push_back(mkString(state, match.prefix()));
             idx++;
 
             // Add a list for matched substrings.
-            auto listOfSubMatches = state.allocList();
+            auto * const listOfSubMatches = state.allocList();
 
             // NOTE: Start at 1, beacause the first match is the whole string.
-            for (auto subMatch : std::span(match).subspan(1)) {
-                if (!subMatch.matched) {
-                    *listOfSubMatches = listOfSubMatches->push_back(&state.vNull);
-                } else {
-                    *listOfSubMatches = listOfSubMatches->push_back(mkString(state, subMatch));
-                }
-            }
+            for (const auto subMatch : std::span(match).subspan(1))
+                *listOfSubMatches = std::move(*listOfSubMatches).push_back(subMatch.matched
+                    ? mkString(state, subMatch)
+                    : &state.vNull);
 
-            auto scratchValue = state.allocValue();
+            auto * const scratchValue = state.allocValue();
             scratchValue->mkList(listOfSubMatches);
-            *listOfMatches = listOfMatches->push_back(scratchValue);
+            *listOfMatches = std::move(*listOfMatches).push_back(scratchValue);
             idx++;
 
             // Add a string for non-matched suffix characters.
             if (idx == 2 * len) {
-                *listOfMatches = listOfMatches->push_back(mkString(state, match.suffix()));
+                *listOfMatches = std::move(*listOfMatches).push_back(mkString(state, match.suffix()));
                 idx++;
             }
         }
@@ -4445,8 +4446,9 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value * * a
 
     std::vector<std::string> from;
     from.reserve(args[0]->listSize());
-    for (auto elem : args[0]->list())
-        from.emplace_back(state.forceString(*elem, pos, "while evaluating one of the strings to replace passed to builtins.replaceStrings"));
+    immer::for_each(args[0]->list(), [&](auto * const elem) {
+        from.emplace_back(state.forceStringNoCtx(*elem, pos, "while evaluating one of the strings to replace passed to builtins.replaceStrings"));
+    });
 
     std::unordered_map<size_t, std::string> cache;
     auto to = args[1]->list();
@@ -4575,13 +4577,12 @@ static void prim_splitVersion(EvalState & state, const PosIdx pos, Value * * arg
         components.emplace_back(component);
     }
 
-    auto list = state.allocList();
-    for (const auto & component : components) {
-        auto v = state.allocValue();
-        v->mkString(std::move(component));
-        *list = list->push_back(v);
-    }
-    v.mkList(list);
+    v.mkList(ranges::fold_left(components, state.allocList(), [&](auto * const list, const auto component) {
+        auto * const v = state.allocValue();
+        v->mkString(component);
+        *list = std::move(*list).push_back(std::move(v));
+        return list;
+    }));
 }
 
 static RegisterPrimOp primop_splitVersion({
@@ -4823,14 +4824,14 @@ void EvalState::createBaseEnv()
     });
 
     /* Add a value containing the current Nix expression search path. */
-    auto list = allocList();
+    auto * const list = allocList();
     for (const auto & i : lookupPath.elements) {
         auto attrs = buildBindings(2);
         attrs.alloc("path").mkString(i.path.s);
         attrs.alloc("prefix").mkString(i.prefix.s);
-        auto v = allocValue();
+        auto * const v = allocValue();
         v->mkAttrs(attrs);
-        *list = list->push_back(v);
+        *list = std::move(*list).push_back(std::move(v));
     }
     v.mkList(list);
     addConstant("__nixPath", v, {

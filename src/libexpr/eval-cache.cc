@@ -720,7 +720,7 @@ std::vector<std::string> AttrCursor::getListOfStrings()
 
     std::vector<std::string> res;
     res.reserve(v.listSize());
-    immer::for_each(v.list(), [&](const auto & elem) {
+    immer::for_each(v.list(), [&](auto * elem) {
         res.push_back(std::string(root->state.forceStringNoCtx(*elem, noPos, "while evaluating an attribute for caching")));
     });
 

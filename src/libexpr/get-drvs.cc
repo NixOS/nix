@@ -117,36 +117,40 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
         const Attr * i;
         if (attrs && (i = attrs->get(state->sOutputs))) {
             state->forceList(*i->value, i->pos, "while evaluating the 'outputs' attribute of a derivation");
-            immer::for_each(i->value->list(), [&](const auto & elem) {
+            immer::for_each(i->value->list(), [&](auto * elem) {
                 std::string output(state->forceStringNoCtx(*elem, i->pos, "while evaluating the name of an output of a derivation"));
 
                 if (withPaths) {
                     /* Evaluate the corresponding set. */
-                    auto out = attrs->get(state->symbols.create(output));
+                    const auto *out = attrs->get(state->symbols.create(output));
                     if (!out) return; // FIXME: throw error?
                     state->forceAttrs(*out->value, i->pos, "while evaluating an output of a derivation");
 
                     /* And evaluate its ‘outPath’ attribute. */
-                    auto outPath = out->value->attrs()->get(state->sOutPath);
+                    const auto *outPath = out->value->attrs()->get(state->sOutPath);
                     if (!outPath) return; // FIXME: throw error?
                     NixStringContext context;
                     outputs.emplace(output, state->coerceToStorePath(outPath->pos, *outPath->value, context, "while evaluating an output path of a derivation"));
-                } else
+                } else {
                     outputs.emplace(output, std::nullopt);
+                }
             });
-        } else
+        } else {
             outputs.emplace("out", withPaths ? std::optional{queryOutPath()} : std::nullopt);
+        }
     }
 
-    if (!onlyOutputsToInstall || !attrs)
+    if (!onlyOutputsToInstall || (attrs == nullptr)) {
         return outputs;
+    }
 
     const Attr * i;
     if (attrs && (i = attrs->get(state->sOutputSpecified)) && state->forceBool(*i->value, i->pos, "while evaluating the 'outputSpecified' attribute of a derivation")) {
         Outputs result;
         auto out = outputs.find(queryOutputName());
-        if (out == outputs.end())
+        if (out == outputs.end()) {
             throw Error("derivation does not have output '%s'", queryOutputName());
+        }
         result.insert(*out);
         return result;
     }
@@ -213,9 +217,9 @@ bool PackageInfo::checkMeta(Value & v)
     }
     else if (v.type() == nAttrs) {
         if (v.attrs()->get(state->sOutPath)) return false;
-        for (auto & i : *v.attrs())
-            if (!checkMeta(*i.value)) return false;
-        return true;
+        return ranges::all_of(*v.attrs(), [&](const auto & i) {
+            return checkMeta(*i.value);
+        });
     }
     else return v.type() == nInt || v.type() == nBool || v.type() == nString ||
                 v.type() == nFloat;
@@ -225,7 +229,7 @@ bool PackageInfo::checkMeta(Value & v)
 Value * PackageInfo::queryMeta(const std::string & name)
 {
     if (!getMeta()) return 0;
-    auto a = meta->get(state->symbols.create(name));
+    const auto *a = meta->get(state->symbols.create(name));
     if (!a || !checkMeta(*a->value)) return 0;
     return a->value;
 }

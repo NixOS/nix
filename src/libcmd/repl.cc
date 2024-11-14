@@ -741,7 +741,7 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
 
 void NixRepl::initEnv()
 {
-    env = &state->allocEnv(envSize);
+    env = state->allocEnv(envSize);
     env->up = &state->baseEnv;
     displ = 0;
     staticEnv->vars.clear();
