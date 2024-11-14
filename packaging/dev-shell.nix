@@ -113,7 +113,7 @@ in {
     # https://github.com/NixOS/nixpkgs/pull/291814 is available
     ++ lib.optional (stdenv.cc.isClang && !stdenv.buildPlatform.isDarwin) pkgs.buildPackages.bear
     ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) [
-      (lib.hiPrio pkgs.buildPackages.clang-tools-18)
+      (lib.hiPrio pkgs.buildPackages.clang-tools_18)
       pkgs.buildPackages.llvmPackages_18.lldb
     ];
 
