@@ -19,10 +19,6 @@
 # include "namespaces.hh"
 #endif
 
-#ifndef _WIN32
-# include <sys/resource.h>
-#endif
-
 namespace nix {
 
 unsigned int getMaxCPU()
@@ -73,29 +69,6 @@ void setStackSize(size_t stackSize)
                     stackSize,
                     limit.rlim_max,
                     std::strerror(errno)
-                ).str()
-            );
-        }
-    }
-    #else
-    ULONG_PTR stackLow, stackHigh;
-    GetCurrentThreadStackLimits(&stackLow, &stackHigh);
-    ULONG maxStackSize = stackHigh - stackLow;
-    ULONG currStackSize = 0;
-    // This retrieves the current promised stack size
-    SetThreadStackGuarantee(&currStackSize);
-    if (currStackSize < stackSize) {
-        savedStackSize = currStackSize;
-        ULONG newStackSize = std::min(static_cast<ULONG>(stackSize), maxStackSize);
-        if (SetThreadStackGuarantee(&newStackSize) == 0) {
-            logger->log(
-                lvlError,
-                HintFmt(
-                    "Failed to increase stack size from %1% to %2% (maximum allowed stack size: %3%): %4%",
-                    savedStackSize,
-                    stackSize,
-                    maxStackSize,
-                    std::to_string(GetLastError())
                 ).str()
             );
         }
