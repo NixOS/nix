@@ -64,10 +64,10 @@ void PosixSourceAccessor::readFile(
 
     off_t left = st.st_size;
 
-    std::array<unsigned char, 64 * 1024> buf;
+    auto buf = std::make_unique<std::array<unsigned char, 64 * 1024>>();
     while (left) {
         checkInterrupt();
-        ssize_t rd = read(fromDescriptorReadOnly(fd.get()), buf.data(), (size_t) std::min(left, (off_t) buf.size()));
+        ssize_t rd = read(fromDescriptorReadOnly(fd.get()), buf->data(), (size_t) std::min(left, (off_t) buf->size()));
         if (rd == -1) {
             if (errno != EINTR)
                 throw SysError("reading from file '%s'", showPath(path));
@@ -76,7 +76,7 @@ void PosixSourceAccessor::readFile(
             throw SysError("unexpected end-of-file reading '%s'", showPath(path));
         else {
             assert(rd <= left);
-            sink({(char *) buf.data(), (size_t) rd});
+            sink({(char *) buf->data(), (size_t) rd});
             left -= rd;
         }
     }
