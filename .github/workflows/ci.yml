@@ -128,7 +128,7 @@ jobs:
     - run: exec bash -c "nix-channel --update && nix-env -iA nixpkgs.hello && hello"
 
   docker_push_image:
-    needs: [check_secrets, tests]
+    needs: [check_secrets, tests, vm_tests]
     permissions:
       contents: read
       packages: write
