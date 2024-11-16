@@ -2120,7 +2120,7 @@ void EvalState::forceValueDeep(Value & v)
                     addErrorTrace(e, i.pos, "while evaluating the attribute '%1%'", symbols[i.name]);
                     throw;
                 }
-}
+            }
         }
 
         else if (v.isList()) {
@@ -2129,7 +2129,7 @@ void EvalState::forceValueDeep(Value & v)
             // Increases the heap size by a fair amount, potentially because of the lambda capture.
             for (auto * const v2 : v.list()) {
                 recurse(*v2);
-}
+            }
         }
     };
 

@@ -118,7 +118,6 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_value)
 
 TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_build)
 {
-    // TODO(@connorbaker): Fails because "allow-import-from-derivation" is disabled on host.
     auto expr = R"(
         derivation { name = "letsbuild";
             system = builtins.currentSystem;
@@ -137,7 +136,6 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_build)
 TEST_F(nix_api_expr_test, nix_expr_realise_context)
 {
     // TODO (ca-derivations): add a content-addressed derivation output, which produces a placeholder
-    // TODO(@connorbaker): Fails because "allow-import-from-derivation" is disabled on host.
     auto expr = R"(
         ''
             a derivation output: ${

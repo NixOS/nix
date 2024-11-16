@@ -4407,18 +4407,28 @@ static void prim_concatStringsSep(EvalState & state, const PosIdx pos, Value * *
 {
     NixStringContext context;
 
-    auto sep = state.forceString(*args[0], context, pos, "while evaluating the first argument (the separator string) passed to builtins.concatStringsSep");
+    const auto sep = state.forceString(*args[0], context, pos, "while evaluating the first argument (the separator string) passed to builtins.concatStringsSep");
     state.forceList(*args[1], pos, "while evaluating the second argument (the list of strings to concat) passed to builtins.concatStringsSep");
+    const auto list = args[1]->list();
+    const auto numElements = list.size();
 
     std::string res;
-    res.reserve((args[1]->listSize() + 32) * sep.size());
-    bool first = true;
 
-    // TODO(@connorbaker): Resume rewrite and update here. See if ranges has something for this.
+    if (numElements == 0) {
+        v.mkString(res, context);
+        return;
+    }
 
-    for (auto elem : args[1]->list()) {
-        if (first) first = false; else res += sep;
-        res += *state.coerceToString(pos, *elem, context, "while evaluating one element of the list of strings to concat passed to builtins.concatStringsSep");
+    // Manually handle the first element for the singleton case.
+    auto * const head = list.front();
+    res = *state.coerceToString(pos, *head, context, "while evaluating one element of the list of strings to concat passed to builtins.concatStringsSep");
+
+    if (numElements > 1) {
+        res.reserve((numElements + 32) * sep.size());
+        immer::for_each(list.drop(1), [&](auto * const elem) {
+            res += sep;
+            res += *state.coerceToString(pos, *elem, context, "while evaluating one element of the list of strings to concat passed to builtins.concatStringsSep");
+        });
     }
 
     v.mkString(res, context);

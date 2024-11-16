@@ -215,13 +215,17 @@ bool PackageInfo::checkMeta(Value & v)
             return checkMeta(*elem);
         });
     }
-    else if (v.type() == nAttrs) {
-        if (v.attrs()->get(state->sOutPath)) return false;
+
+    if (v.type() == nAttrs) {
+        if (v.attrs()->get(state->sOutPath) != nullptr) {
+            return false;
+        }
         return ranges::all_of(*v.attrs(), [&](const auto & i) {
             return checkMeta(*i.value);
         });
     }
-    else return v.type() == nInt || v.type() == nBool || v.type() == nString ||
+
+    return v.type() == nInt || v.type() == nBool || v.type() == nString ||
                 v.type() == nFloat;
 }
 
