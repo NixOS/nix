@@ -686,9 +686,10 @@ struct GitSourceAccessor : SourceAccessor
                 const auto contents = readFile(CanonPath(".gitattributes"));
                 _lfsFetch.init(*repo, contents);
                 };
-            if (_lfsFetch.hasAttribute(path.abs(), "filter")) {
+            auto pathStr = std::string(path.rel());
+            if (_lfsFetch.hasAttribute(pathStr, "filter", "lfs")) {
                 StringSink s;
-                _lfsFetch.fetch(data, path.abs(), s);
+                _lfsFetch.fetch(data, pathStr, s);
                 return s.s;
             }
         }
@@ -714,8 +715,10 @@ struct GitSourceAccessor : SourceAccessor
                 const auto contents = readFile(CanonPath(".gitattributes"));
                 _lfsFetch.init(*repo, contents);
             }
-            if (_lfsFetch.hasAttribute(path.abs(), "filter")) {
-                _lfsFetch.fetch(contents, path.abs(), sink);
+
+            auto pathStr = std::string(path.rel());
+            if (_lfsFetch.hasAttribute(pathStr, "filter", "lfs")) {
+                _lfsFetch.fetch(contents, pathStr, sink);
                 return;
             }
         }
