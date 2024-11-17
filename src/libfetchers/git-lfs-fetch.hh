@@ -25,7 +25,41 @@ namespace lfs {
 // see Fetch::rules
 struct AttrRule {
     std::string pattern;
-    std::map<std::string, std::string> attributes;
+    std::unordered_map<std::string, std::string> attributes;
+    git_pathspec* pathspec = nullptr;
+
+    AttrRule() = default;
+
+    explicit AttrRule(std::string pat) : pattern(std::move(pat)) {
+        initPathspec();
+    }
+
+    ~AttrRule() {
+        if (pathspec) {
+            git_pathspec_free(pathspec);
+        }
+    }
+
+    AttrRule(const AttrRule& other)
+        : pattern(other.pattern)
+        , attributes(other.attributes)
+        , pathspec(nullptr)
+    {
+        if (!pattern.empty()) {
+            initPathspec();
+        }
+    }
+
+    void initPathspec() {
+        git_strarray patterns = {0};
+        const char* pattern_str = pattern.c_str();
+        patterns.strings = const_cast<char**>(&pattern_str);
+        patterns.count = 1;
+
+        if (git_pathspec_new(&pathspec, &patterns) != 0) {
+            throw std::runtime_error("Failed to create git pathspec");
+        }
+    }
 };
 
 // git-lfs metadata about a file
@@ -81,42 +115,12 @@ struct Fetch {
   // paths tagged with `filter=lfs` need to be smudged by downloading from lfs server
   std::vector<AttrRule> rules = {};
 
-  void init(git_repository* repo, std::string gitattributesContent);
-  bool hasAttribute(const std::string& path, const std::string& attrName) const;
+  void init(git_repository* repo, const std::string& gitattributesContent);
+  bool hasAttribute(const std::string& path, const std::string& attrName, const std::string& attrValue) const;
   void fetch(const std::string& pointerFileContents, const std::string& pointerFilePath, Sink& sink) const;
   std::vector<nlohmann::json> fetchUrls(const std::vector<Md> &metadatas) const;
 };
 
-// check if `path` has attribute corresponding to the `pattern`
-// TODO replace this with libgit2 pathspec?
-bool matchesPattern(std::string_view path, std::string_view pattern) {
-    if (pattern.ends_with("/**")) {
-        auto prefix = pattern.substr(0, pattern.length() - 3);
-        return path.starts_with(prefix);
-    }
-    size_t patternPos = 0;
-    size_t pathPos = 0;
-
-    while (patternPos < pattern.length() && pathPos < path.length()) {
-        if (pattern[patternPos] == '*') {
-            if (patternPos == 0 && pattern.find('*', 1) == std::string_view::npos) {
-                return path.ends_with(pattern.substr(1));
-            }
-            auto nextPatternChar = pattern[patternPos + 1];
-            while (pathPos < path.length() && path[pathPos] != nextPatternChar) {
-                pathPos++;
-            }
-            patternPos++;
-        } else if (pattern[patternPos] == path[pathPos]) {
-            patternPos++;
-            pathPos++;
-        } else {
-            return false;
-        }
-    }
-
-    return patternPos == pattern.length() && pathPos == path.length();
-}
 
 static size_t writeCallback(void *contents, size_t size, size_t nmemb,
                             std::string *s) {
@@ -144,6 +148,7 @@ static size_t sinkWriteCallback(void *contents, size_t size, size_t nmemb, SinkC
     return totalSize;
 }
 
+// if authHeader is "", downloadToSink assumes to auth is expected
 void downloadToSink(const std::string &url, const std::string &authHeader, Sink &sink, std::string_view sha256Expected) {
     CURL *curl;
     CURLcode res;
@@ -177,82 +182,6 @@ void downloadToSink(const std::string &url, const std::string &authHeader, Sink 
 
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
-}
-
-
-
-// generic parser for .gitattributes files
-// I could not get libgit2 parsing to work with GitSourceAccessor,
-// but GitExportIgnoreSourceAccessor somehow works, so TODO
-AttrRule parseGitAttrLine(std::string_view line)
-{
-  // example .gitattributes line: `*.beeg filter=lfs diff=lfs merge=lfs -text`
-    AttrRule rule;
-    if (line.empty() || line[0] == '#')
-        return rule;
-    size_t pos = line.find_first_of(" \t");
-    if (pos == std::string_view::npos)
-        return rule;
-    rule.pattern = std::string(line.substr(0, pos));
-    pos = line.find_first_not_of(" \t", pos);
-    if (pos == std::string_view::npos)
-        return rule;
-    std::string_view rest = line.substr(pos);
-
-    while (!rest.empty()) {
-        pos = rest.find_first_of(" \t");
-        std::string_view attr = rest.substr(0, pos);
-        if (attr[0] == '-') {
-            rule.attributes[std::string(attr.substr(1))] = "false";
-        } else if (auto equals_pos = attr.find('='); equals_pos != std::string_view::npos) {
-            auto key = attr.substr(0, equals_pos);
-            auto value = attr.substr(equals_pos + 1);
-            rule.attributes[std::string(key)] = std::string(value);
-        } else {
-            rule.attributes[std::string(attr)] = "true";
-        }
-        if (pos == std::string_view::npos)
-            break;
-        rest = rest.substr(pos);
-        pos = rest.find_first_not_of(" \t");
-        if (pos == std::string_view::npos)
-            break;
-        rest = rest.substr(pos);
-    }
-
-    return rule;
-}
-
-
-std::vector<AttrRule> parseGitAttrFile(std::string_view content)
-{
-    std::vector<AttrRule> rules;
-
-    size_t pos = 0;
-    while (pos < content.length()) {
-        size_t eol = content.find('\n', pos);
-        std::string_view line;
-
-        if (eol == std::string_view::npos) {
-            line = content.substr(pos);
-            pos = content.length();
-        } else {
-            line = content.substr(pos, eol - pos);
-            pos = eol + 1;
-        }
-
-        if (!line.empty() && line.back() == '\r')
-            line.remove_suffix(1);
-
-        if (line.empty() || line[0] == '#')
-            continue;
-
-        auto rule = parseGitAttrLine(line);
-        if (!rule.pattern.empty())
-            rules.push_back(std::move(rule));
-    }
-
-    return rules;
 }
 
 
@@ -375,8 +304,76 @@ GitUrl parseGitUrl(const std::string& url) {
     return result;
 }
 
+std::vector<AttrRule> parseGitAttrFile(const std::string& content)
+{
+    std::vector<AttrRule> rules;
+    std::string content_str(content);
+    std::istringstream iss(content_str);
+    std::string line;
 
-void Fetch::init(git_repository* repo, std::string gitattributesContent) {
+    while (std::getline(iss, line)) {
+        if (line.empty() || line[0] == '#')
+            continue;
+
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+
+        size_t pattern_end = line.find_first_of(" \t"); // matches space OR tab
+        if (pattern_end == std::string::npos)
+            continue;
+
+        AttrRule rule;
+        rule.pattern = line.substr(0, pattern_end);
+
+        git_strarray patterns = {0};
+        const char* pattern_str = rule.pattern.c_str();
+        patterns.strings = const_cast<char**>(&pattern_str);
+        patterns.count = 1;
+
+        if (git_pathspec_new(&rule.pathspec, &patterns) != 0) {
+            std::stringstream ss;
+            ss << "git_pathspec_new parsing '" << line"': " << (error ? error->message : "unknown error") << std::endl;
+            warn(ss.str());
+            continue;
+        }
+
+        size_t attr_start = line.find_first_not_of(" \t", pattern_end);
+        if (attr_start != std::string::npos) {
+            std::string_view rest(line);
+            rest.remove_prefix(attr_start);
+
+            while (!rest.empty()) {
+                size_t attr_end = rest.find_first_of(" \t");
+                std::string_view attr = rest.substr(0, attr_end);
+
+                if (attr[0] == '-') {
+                    rule.attributes[std::string(attr.substr(1))] = "false";
+                } else if (auto equals_pos = attr.find('='); equals_pos != std::string_view::npos) {
+                    auto key = attr.substr(0, equals_pos);
+                    auto value = attr.substr(equals_pos + 1);
+                    rule.attributes[std::string(key)] = std::string(value);
+                } else {
+                    rule.attributes[std::string(attr)] = "true";
+                }
+
+                if (attr_end == std::string_view::npos)
+                    break;
+
+                rest = rest.substr(attr_end);
+                size_t next_attr = rest.find_first_not_of(" \t");
+                if (next_attr == std::string_view::npos)
+                    break;
+                rest = rest.substr(next_attr);
+            }
+        }
+
+        rules.push_back(std::move(rule));
+    }
+
+    return rules;
+}
+
+void Fetch::init(git_repository* repo, const std::string& gitattributesContent) {
    const auto remoteUrl = lfs::getLfsEndpointUrl(repo);
 
    this->gitUrl = parseGitUrl(remoteUrl);
@@ -387,13 +384,22 @@ void Fetch::init(git_repository* repo, std::string gitattributesContent) {
    this->ready = true;
 }
 
-bool Fetch::hasAttribute(const std::string& path, const std::string& attrName) const
+
+
+bool Fetch::hasAttribute(const std::string& path, const std::string& attrName, const std::string& attrValue) const
 {
     for (auto it = rules.rbegin(); it != rules.rend(); ++it) {
-        if (matchesPattern(path, it->pattern)) {
+        int match = git_pathspec_matches_path(
+            it->pathspec,
+            0, // no flags
+            path.c_str()
+        );
+
+        if (match > 0) {
             auto attr = it->attributes.find(attrName);
             if (attr != it->attributes.end()) {
-                return attr->second != "false";
+                return attr->second == attrValue;
+            } else {
             }
         }
     }
@@ -475,7 +481,7 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> &metadatas) c
 }
 
 void Fetch::fetch(const std::string& pointerFileContents, const std::string& pointerFilePath, Sink& sink) const {
-  const auto md = parseLfsMetadata(pointerFileContents, pointerFilePath);
+  const auto md = parseLfsMetadata(std::string(pointerFileContents), std::string(pointerFilePath));
   std::vector<Md> vMds;
   vMds.push_back(md);
   const auto objUrls = fetchUrls(vMds);
@@ -485,14 +491,14 @@ void Fetch::fetch(const std::string& pointerFileContents, const std::string& poi
     std::string oid = obj.at("oid");
     std::string ourl = obj.at("actions").at("download").at("href");
     std::string authHeader = "";
-    if (obj.at("actions").at("download").at("header").contains("Authorization")) {
+    if (obj.at("actions").at("download").contains("header") && obj.at("actions").at("download").at("header").contains("Authorization")) {
         authHeader = obj["actions"]["download"]["header"]["Authorization"];
     }
     // oid is also the sha256
     downloadToSink(ourl, authHeader, sink, oid);
   } catch (const nlohmann::json::out_of_range& e) {
       std::stringstream ss;
-      ss << "bad json from /info/lfs/objects/batch: " << obj;
+      ss << "bad json from /info/lfs/objects/batch: " << obj << " " << e.what();
       throw std::runtime_error(ss.str());
   }
 }
