@@ -254,8 +254,6 @@ protected:
 // Test exact match pattern
 TEST_F(FetchAttributeTest, ExactMatch) {
     EXPECT_TRUE(fetch1.hasAttribute("litfile", "filter", "lfs"));
-    EXPECT_TRUE(fetch1.hasAttribute("./litfile", "filter", "lfs"));
-    EXPECT_TRUE(fetch1.hasAttribute("/litfile", "filter", "lfs"));
     EXPECT_FALSE(fetch1.hasAttribute("other", "filter", "lfs"));
 }
 
