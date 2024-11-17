@@ -137,7 +137,7 @@ Functional tests are run during `installCheck` in the `nix` package build, as we
 The whole test suite (functional and unit tests) can be run with:
 
 ```shell-session
-$ mesonCheckPhase
+$ checkPhase
 ```
 
 ### Grouping tests

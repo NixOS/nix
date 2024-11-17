@@ -91,6 +91,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
 
     /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
+    buildReqs.reserve(drvs.size());
     for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
     buildStore->buildPaths(buildReqs, bmNormal, store);
 

@@ -1,6 +1,6 @@
 # vim: filetype=meson
 
-option('doc-gen', type : 'boolean', value : true,
+option('doc-gen', type : 'boolean', value : false,
   description : 'Generate documentation',
 )
 

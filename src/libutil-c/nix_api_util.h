@@ -162,7 +162,7 @@ void nix_c_context_free(nix_c_context * context);
  */
 nix_err nix_libutil_init(nix_c_context * context);
 
-/** @defgroup settings
+/** @defgroup settings Nix configuration settings
  *  @{
  */
 /**

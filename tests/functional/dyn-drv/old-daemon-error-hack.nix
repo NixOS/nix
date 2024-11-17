@@ -1,4 +1,4 @@
-with import "${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/dyn-drv/config.nix";
+with import ./config.nix;
 
 # A simple content-addressed derivation.
 # The derivation can be arbitrarily modified by passing a different `seed`,

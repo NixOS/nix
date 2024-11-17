@@ -510,9 +510,15 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
 
     Value * v = allocValue();
     v->mkPrimOp(new PrimOp(primOp));
-    staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
-    baseEnv.values[baseEnvDispl++] = v;
-    baseEnv.values[0]->payload.attrs->push_back(Attr(symbols.create(primOp.name), v));
+
+    if (primOp.internal)
+        internalPrimOps.emplace(primOp.name, v);
+    else {
+        staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
+        baseEnv.values[baseEnvDispl++] = v;
+        baseEnv.values[0]->payload.attrs->push_back(Attr(symbols.create(primOp.name), v));
+    }
+
     return v;
 }
 
@@ -1730,7 +1736,7 @@ void EvalState::incrFunctionCall(ExprLambda * fun)
 }
 
 
-void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
+void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res)
 {
     auto pos = fun.determinePos(noPos);
 

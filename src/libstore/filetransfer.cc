@@ -153,7 +153,7 @@ struct curlFileTransfer : public FileTransfer
         template<class T>
         void fail(T && e)
         {
-            failEx(std::make_exception_ptr(std::move(e)));
+            failEx(std::make_exception_ptr(std::forward<T>(e)));
         }
 
         LambdaSink finalSink;

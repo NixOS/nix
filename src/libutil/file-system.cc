@@ -501,7 +501,7 @@ void deletePath(const fs::path & path, uint64_t & bytesFreed)
 
 AutoDelete::AutoDelete() : del{false} {}
 
-AutoDelete::AutoDelete(const fs::path & p, bool recursive) : _path(p)
+AutoDelete::AutoDelete(const std::filesystem::path & p, bool recursive) : _path(p)
 {
     del = true;
     this->recursive = recursive;

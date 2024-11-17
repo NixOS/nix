@@ -218,8 +218,12 @@ static void initRepoAtomically(std::filesystem::path &path, bool bare) {
     try {
         std::filesystem::rename(tmpDir, path);
     } catch (std::filesystem::filesystem_error & e) {
-        if (e.code() == std::errc::file_exists) // Someone might race us to create the repository.
+        // Someone may race us to create the repository.
+        if (e.code() == std::errc::file_exists
+            // `path` may be attempted to be deleted by s::f::rename, in which case the code is:
+            || e.code() == std::errc::directory_not_empty) {
             return;
+        }
         else
             throw SysError("moving temporary git repository from %s to %s", tmpDir, path);
     }

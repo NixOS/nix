@@ -203,7 +203,7 @@ $ xdg-open ./result/share/doc/nix/internal-api/html/index.html
 or inside `nix-shell` or `nix develop`:
 
 ```console
-$ mesonConfigurePhase
+$ configurePhase
 $ ninja src/internal-api-docs/html
 $ xdg-open src/internal-api-docs/html/index.html
 ```
@@ -224,7 +224,7 @@ $ xdg-open ./result/share/doc/nix/external-api/html/index.html
 or inside `nix-shell` or `nix develop`:
 
 ```
-$ mesonConfigurePhase
+$ configurePhase
 $ ninja src/external-api-docs/html
 $ xdg-open src/external-api-docs/html/index.html
 ```

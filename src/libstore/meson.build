@@ -81,6 +81,7 @@ if host_machine.system() == 'windows'
   deps_other += [wsock32]
 endif
 
+subdir('build-utils-meson/libatomic')
 subdir('build-utils-meson/threads')
 
 boost = dependency(
