@@ -234,6 +234,51 @@ TEST_F(GitUtilsTest, gitUrlToSsh) {
     }
 }
 
+class FetchAttributeTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // test literal (non-wildcard) matches too
+        std::string content1 = "litfile filter=lfs diff=lfs merge=lfs -text";
+        auto rules1 = parseGitAttrFile(content1);
+        fetch1.rules = std::move(rules1);
+
+        std::string content2 = "*.wildcard filter=lfs diff=lfs merge=lfs -text";
+        auto rules2 = parseGitAttrFile(content2);
+        fetch2.rules = std::move(rules2);
+    }
+
+    Fetch fetch1;
+    Fetch fetch2;
+};
+
+// Test exact match pattern
+TEST_F(FetchAttributeTest, ExactMatch) {
+    EXPECT_TRUE(fetch1.hasAttribute("litfile", "filter", "lfs"));
+    EXPECT_TRUE(fetch1.hasAttribute("./litfile", "filter", "lfs"));
+    EXPECT_TRUE(fetch1.hasAttribute("/litfile", "filter", "lfs"));
+    EXPECT_FALSE(fetch1.hasAttribute("other", "filter", "lfs"));
+}
+
+// Test wildcard pattern
+TEST_F(FetchAttributeTest, WildcardMatch) {
+    EXPECT_TRUE(fetch2.hasAttribute("match.wildcard", "filter", "lfs"));
+    EXPECT_FALSE(fetch2.hasAttribute("nomatch.otherext", "filter", "lfs"));
+    EXPECT_FALSE(fetch2.hasAttribute("nomatch.wildcard.extra", "filter", "lfs"));
+}
+
+// Test empty path
+TEST_F(FetchAttributeTest, EmptyPath) {
+    EXPECT_FALSE(fetch1.hasAttribute("", "filter", "lfs"));
+    EXPECT_FALSE(fetch2.hasAttribute("", "filter", "lfs"));
+}
+
+// Test case sensitivity
+TEST_F(FetchAttributeTest, CaseSensitivity) {
+    EXPECT_FALSE(fetch1.hasAttribute("LITFILE", "filter", "lfs"));
+    EXPECT_FALSE(fetch2.hasAttribute("file.CHUNG", "filter", "lfs"));
+}
+
+
 } // namespace lfs
 
 } // namespace nix
