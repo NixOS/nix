@@ -331,8 +331,9 @@ std::vector<AttrRule> parseGitAttrFile(const std::string& content)
         patterns.count = 1;
 
         if (git_pathspec_new(&rule.pathspec, &patterns) != 0) {
+            auto error = git_error_last();
             std::stringstream ss;
-            ss << "git_pathspec_new parsing '" << line"': " << (error ? error->message : "unknown error") << std::endl;
+            ss << "git_pathspec_new parsing '" << line << "': " << (error ? error->message : "unknown error") << std::endl;
             warn(ss.str());
             continue;
         }
