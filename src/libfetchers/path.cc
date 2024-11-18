@@ -7,14 +7,16 @@ namespace nix::fetchers {
 
 struct PathInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
+    std::optional<Input> inputFromURL(
+        const Settings & settings,
+        const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "path") return {};
 
         if (url.authority && *url.authority != "")
             throw Error("path URL '%s' should not have an authority ('%s')", url.url, *url.authority);
 
-        Input input;
+        Input input{settings};
         input.attrs.insert_or_assign("type", "path");
         input.attrs.insert_or_assign("path", url.path);
 
@@ -57,12 +59,14 @@ struct PathInputScheme : InputScheme
         };
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
+    std::optional<Input> inputFromAttrs(
+        const Settings & settings,
+        const Attrs & attrs) const override
     {
         getStrAttr(attrs, "path");
         maybeGetBoolAttr(attrs, "lock");
 
-        Input input;
+        Input input{settings};
         input.attrs = attrs;
         return input;
     }
@@ -78,6 +82,7 @@ struct PathInputScheme : InputScheme
         auto query = attrsToQuery(input.attrs);
         query.erase("path");
         query.erase("type");
+        query.erase("__final");
         return ParsedURL {
             .scheme = "path",
             .path = getStrAttr(input.attrs, "path"),
@@ -135,8 +140,6 @@ struct PathInputScheme : InputScheme
                 input2.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
             } else
                 input2.attrs.erase("narHash");
-
-            input2.attrs.erase("lastModified");
 
             #if 0
             // FIXME: produce a better error message if the path does

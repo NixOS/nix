@@ -1,22 +1,21 @@
 # Nix
 
 [![Open Collective supporters](https://opencollective.com/nixos/tiers/supporter/badge.svg?label=Supporters&color=brightgreen)](https://opencollective.com/nixos)
-[![Test](https://github.com/NixOS/nix/workflows/Test/badge.svg)](https://github.com/NixOS/nix/actions)
+[![CI](https://github.com/NixOS/nix/workflows/CI/badge.svg)](https://github.com/NixOS/nix/actions/workflows/ci.yml)
 
 Nix is a powerful package manager for Linux and other Unix systems that makes package
-management reliable and reproducible. Please refer to the [Nix manual](https://nixos.org/nix/manual)
+management reliable and reproducible. Please refer to the [Nix manual](https://nix.dev/reference/nix-manual)
 for more details.
 
 ## Installation and first steps
 
 Visit [nix.dev](https://nix.dev) for [installation instructions](https://nix.dev/tutorials/install-nix) and [beginner tutorials](https://nix.dev/tutorials/first-steps).
 
-Full reference documentation can be found in the [Nix manual](https://nixos.org/nix/manual).
+Full reference documentation can be found in the [Nix manual](https://nix.dev/reference/nix-manual).
 
 ## Building and developing
 
-See our [Hacking guide](https://nixos.org/manual/nix/unstable/contributing/hacking.html) in our manual for instruction on how to
- set up a development environment and build Nix from source.
+Follow instructions in the Nix reference manual to [set up a development environment and build Nix from source](https://nix.dev/manual/nix/development/development/building.html).
 
 ## Contributing
 

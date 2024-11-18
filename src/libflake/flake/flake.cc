@@ -9,10 +9,12 @@
 #include "fetchers.hh"
 #include "finally.hh"
 #include "fetch-settings.hh"
-#include "flake-settings.hh"
+#include "flake/settings.hh"
 #include "value-to-json.hh"
 #include "local-fs-store.hh"
 #include "patching-source-accessor.hh"
+
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -44,7 +46,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
 
 static FlakeInput parseFlakeInput(
     EvalState & state,
-    const std::string & inputName,
+    std::string_view inputName,
     Value * value,
     const PosIdx pos,
     const InputPath & lockRootPath,
@@ -104,9 +106,16 @@ static FlakeInput parseFlakeInput(
                     case nBool:
                         attrs.emplace(state.symbols[attr.name], Explicit<bool> { attr.value->boolean() });
                         break;
-                    case nInt:
-                        attrs.emplace(state.symbols[attr.name], (long unsigned int) attr.value->integer());
+                    case nInt: {
+                        auto intValue = attr.value->integer().value;
+
+                        if (intValue < 0) {
+                            state.error<EvalError>("negative value given for flake input attribute %1%: %2%", state.symbols[attr.name], intValue).debugThrow();
+                        }
+
+                        attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
                         break;
+                    }
                     default:
                         if (attr.name == state.symbols.create("publicKeys")) {
                             experimentalFeatureSettings.require(Xp::VerifiedFetches);
@@ -128,7 +137,7 @@ static FlakeInput parseFlakeInput(
 
     if (attrs.count("type"))
         try {
-            input.ref = FlakeRef::fromAttrs(attrs);
+            input.ref = FlakeRef::fromAttrs(state.fetchSettings, attrs);
         } catch (Error & e) {
             e.addTrace(state.positions[pos], HintFmt("while evaluating flake input"));
             throw;
@@ -138,11 +147,11 @@ static FlakeInput parseFlakeInput(
         if (!attrs.empty())
             throw Error("unexpected flake input attribute '%s', at %s", attrs.begin()->first, state.positions[pos]);
         if (url)
-            input.ref = parseFlakeRef(*url, {}, true, input.isFlake, true);
+            input.ref = parseFlakeRef(state.fetchSettings, *url, {}, true, input.isFlake, true);
     }
 
     if (!input.follows && !input.ref)
-        input.ref = FlakeRef::fromAttrs({{"type", "indirect"}, {"id", inputName}});
+        input.ref = FlakeRef::fromAttrs(state.fetchSettings, {{"type", "indirect"}, {"id", std::string(inputName)}});
 
     return input;
 }
@@ -211,7 +220,7 @@ static Flake readFlake(
             for (auto & formal : outputs->value->payload.lambda.fun->formals->formals) {
                 if (formal.name != state.sSelf)
                     flake.inputs.emplace(state.symbols[formal.name], FlakeInput {
-                        .ref = parseFlakeRef(state.symbols[formal.name])
+                        .ref = parseFlakeRef(state.fetchSettings, std::string(state.symbols[formal.name]))
                     });
             }
         }
@@ -239,7 +248,7 @@ static Flake readFlake(
             else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    state.forceInt(*setting.value, setting.pos, ""));
+                    state.forceInt(*setting.value, setting.pos, "").value);
             else if (setting.value->type() == nBool)
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
@@ -309,37 +318,41 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistri
     return getFlake(state, originalRef, useRegistries, {}, {});
 }
 
-static LockFile readLockFile(const SourcePath & lockFilePath)
+static LockFile readLockFile(
+    const fetchers::Settings & fetchSettings,
+    const SourcePath & lockFilePath)
 {
     return lockFilePath.pathExists()
-        ? LockFile(lockFilePath.readFile(), fmt("%s", lockFilePath))
+        ? LockFile(fetchSettings, lockFilePath.readFile(), fmt("%s", lockFilePath))
         : LockFile();
 }
 
 /* Compute an in-memory lock file for the specified top-level flake,
    and optionally write it to file, if the flake is writable. */
 LockedFlake lockFlake(
+    const Settings & settings,
     EvalState & state,
     const FlakeRef & topRef,
     const LockFlags & lockFlags)
 {
     experimentalFeatureSettings.require(Xp::Flakes);
 
-    auto useRegistries = lockFlags.useRegistries.value_or(flakeSettings.useRegistries);
+    auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
 
     auto flake = getFlake(state, topRef, useRegistries, {}, {});
 
     if (lockFlags.applyNixConfig) {
-        flake.config.apply();
+        flake.config.apply(settings);
         state.store->setOptions();
     }
 
     try {
-        if (!fetchSettings.allowDirty && lockFlags.referenceLockFilePath) {
+        if (!state.fetchSettings.allowDirty && lockFlags.referenceLockFilePath) {
             throw Error("reference lock file was provided, but the `allow-dirty` setting is set to false");
         }
 
         auto oldLockFile = readLockFile(
+            state.fetchSettings,
             lockFlags.referenceLockFilePath.value_or(
                 flake.lockFilePath()));
 
@@ -632,7 +645,7 @@ LockedFlake lockFlake(
                                 inputFlake.inputs, childNode, inputPath,
                                 oldLock
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
-                                : readLockFile(inputFlake.lockFilePath()).root.get_ptr(),
+                                : readLockFile(state.fetchSettings, inputFlake.lockFilePath()).root.get_ptr(),
                                 oldLock ? followsPrefix : inputPath,
                                 inputFlake.path,
                                 false);
@@ -702,7 +715,7 @@ LockedFlake lockFlake(
 
             if (lockFlags.writeLockFile) {
                 if (auto unlockedInput = newLockFile.isUnlocked()) {
-                    if (fetchSettings.warnDirty)
+                    if (state.fetchSettings.warnDirty)
                         warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
                 } else {
                     if (!lockFlags.updateLockFile)
@@ -731,7 +744,7 @@ LockedFlake lockFlake(
                         if (lockFlags.commitLockFile) {
                             std::string cm;
 
-                            cm = flakeSettings.commitLockFileSummary.get();
+                            cm = settings.commitLockFileSummary.get();
 
                             if (cm == "") {
                                 cm = fmt("%s: %s", flake.lockFilePath().path.rel(), lockFileExists ? "Update" : "Add");
@@ -774,6 +787,21 @@ LockedFlake lockFlake(
     }
 }
 
+std::pair<StorePath, Path> sourcePathToStorePath(
+    ref<Store> store,
+    const SourcePath & _path)
+{
+    auto path = _path.path.abs();
+
+    if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
+        auto realStoreDir = store2->getRealStoreDir();
+        if (isInDir(path, realStoreDir))
+            path = store2->storeDir + path.substr(realStoreDir.size());
+    }
+
+    return store->toStorePath(path);
+}
+
 void callFlake(EvalState & state,
     const LockedFlake & lockedFlake,
     Value & vRes)
@@ -814,53 +842,58 @@ void callFlake(EvalState & state,
     auto vCallFlake = state.allocValue();
     state.evalFile(state.callFlakeInternal, *vCallFlake);
 
-    auto vTmp1 = state.allocValue();
     auto vLocks = state.allocValue();
     vLocks->mkString(lockFileStr);
-    state.callFunction(*vCallFlake, *vLocks, *vTmp1, noPos);
 
-    state.callFunction(*vTmp1, vOverrides, vRes, noPos);
+    auto vFetchFinalTree = get(state.internalPrimOps, "fetchFinalTree");
+    assert(vFetchFinalTree);
+
+    Value * args[] = {vLocks, &vOverrides, *vFetchFinalTree};
+    state.callFunction(*vCallFlake, 3, args, vRes, noPos);
 }
 
-static void prim_getFlake(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+void initLib(const Settings & settings)
 {
-    std::string flakeRefS(state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.getFlake"));
-    auto flakeRef = parseFlakeRef(flakeRefS, {}, true);
-    if (state.settings.pureEval && !flakeRef.input.isLocked())
-        throw Error("cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)", flakeRefS, state.positions[pos]);
+    auto prim_getFlake = [&settings](EvalState & state, const PosIdx pos, Value * * args, Value & v)
+    {
+        std::string flakeRefS(state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.getFlake"));
+        auto flakeRef = parseFlakeRef(state.fetchSettings, flakeRefS, {}, true);
+        if (state.settings.pureEval && !flakeRef.input.isLocked())
+            throw Error("cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)", flakeRefS, state.positions[pos]);
 
-    callFlake(state,
-        lockFlake(state, flakeRef,
-            LockFlags {
-                .updateLockFile = false,
-                .writeLockFile = false,
-                .useRegistries = !state.settings.pureEval && flakeSettings.useRegistries,
-                .allowUnlocked = !state.settings.pureEval,
-            }),
-        v);
+        callFlake(state,
+            lockFlake(settings, state, flakeRef,
+                LockFlags {
+                    .updateLockFile = false,
+                    .writeLockFile = false,
+                    .useRegistries = !state.settings.pureEval && settings.useRegistries,
+                    .allowUnlocked = !state.settings.pureEval,
+                }),
+            v);
+    };
+
+    RegisterPrimOp::primOps->push_back({
+        .name =  "__getFlake",
+        .args = {"args"},
+        .doc = R"(
+          Fetch a flake from a flake reference, and return its output attributes and some metadata. For example:
+
+          ```nix
+          (builtins.getFlake "nix/55bc52401966fbffa525c574c14f67b00bc4fb3a").packages.x86_64-linux.nix
+          ```
+
+          Unless impure evaluation is allowed (`--impure`), the flake reference
+          must be "locked", e.g. contain a Git revision or content hash. An
+          example of an unlocked usage is:
+
+          ```nix
+          (builtins.getFlake "github:edolstra/dwarffs").rev
+          ```
+        )",
+        .fun = prim_getFlake,
+        .experimentalFeature = Xp::Flakes,
+    });
 }
-
-static RegisterPrimOp r2({
-    .name =  "__getFlake",
-    .args = {"args"},
-    .doc = R"(
-      Fetch a flake from a flake reference, and return its output attributes and some metadata. For example:
-
-      ```nix
-      (builtins.getFlake "nix/55bc52401966fbffa525c574c14f67b00bc4fb3a").packages.x86_64-linux.nix
-      ```
-
-      Unless impure evaluation is allowed (`--impure`), the flake reference
-      must be "locked", e.g. contain a Git revision or content hash. An
-      example of an unlocked usage is:
-
-      ```nix
-      (builtins.getFlake "github:edolstra/dwarffs").rev
-      ```
-    )",
-    .fun = prim_getFlake,
-    .experimentalFeature = Xp::Flakes,
-});
 
 static void prim_parseFlakeRef(
     EvalState & state,
@@ -870,7 +903,7 @@ static void prim_parseFlakeRef(
 {
     std::string flakeRefS(state.forceStringNoCtx(*args[0], pos,
         "while evaluating the argument passed to builtins.parseFlakeRef"));
-    auto attrs = parseFlakeRef(flakeRefS, {}, true).toAttrs();
+    auto attrs = parseFlakeRef(state.fetchSettings, flakeRefS, {}, true).toAttrs();
     auto binds = state.buildBindings(attrs.size());
     for (const auto & [key, value] : attrs) {
         auto s = state.symbols.create(key);
@@ -919,8 +952,13 @@ static void prim_flakeRefToString(
     for (const auto & attr : *args[0]->attrs()) {
         auto t = attr.value->type();
         if (t == nInt) {
-            attrs.emplace(state.symbols[attr.name],
-                (uint64_t) attr.value->integer());
+            auto intValue = attr.value->integer().value;
+
+            if (intValue < 0) {
+                state.error<EvalError>("negative value given for flake ref attr %1%: %2%", state.symbols[attr.name], intValue).atPos(pos).debugThrow();
+            }
+
+            attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
         } else if (t == nBool) {
             attrs.emplace(state.symbols[attr.name],
                 Explicit<bool> { attr.value->boolean() });
@@ -935,7 +973,7 @@ static void prim_flakeRefToString(
                 showType(*attr.value)).debugThrow();
         }
     }
-    auto flakeRef = FlakeRef::fromAttrs(attrs);
+    auto flakeRef = FlakeRef::fromAttrs(state.fetchSettings, attrs);
     v.mkString(flakeRef.to_string());
 }
 

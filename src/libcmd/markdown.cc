@@ -1,21 +1,23 @@
 #include "markdown.hh"
-#include "util.hh"
+#include "environment-variables.hh"
+#include "error.hh"
 #include "finally.hh"
 #include "terminal.hh"
 
 #if HAVE_LOWDOWN
-# include <sys/queue.h>
-# include <lowdown.h>
+#  include <sys/queue.h>
+#  include <lowdown.h>
 #endif
 
 namespace nix {
 
-std::string renderMarkdownToTerminal(std::string_view markdown)
-{
 #if HAVE_LOWDOWN
+static std::string doRenderMarkdownToTerminal(std::string_view markdown)
+{
     int windowWidth = getWindowSize().second;
 
-    struct lowdown_opts opts {
+    struct lowdown_opts opts
+    {
         .type = LOWDOWN_TERM,
         .maxdepth = 20,
         .cols = (size_t) std::max(windowWidth - 5, 60),
@@ -51,9 +53,21 @@ std::string renderMarkdownToTerminal(std::string_view markdown)
         throw Error("allocation error while rendering Markdown");
 
     return filterANSIEscapes(std::string(buf->data, buf->size), !isTTY());
-#else
-    return std::string(markdown);
-#endif
 }
 
+std::string renderMarkdownToTerminal(std::string_view markdown)
+{
+    if (auto e = getEnv("_NIX_TEST_RAW_MARKDOWN"); e && *e == "1")
+        return std::string(markdown);
+    else
+        return doRenderMarkdownToTerminal(markdown);
 }
+
+#else
+std::string renderMarkdownToTerminal(std::string_view markdown)
+{
+    return std::string(markdown);
+}
+#endif
+
+} // namespace nix

@@ -19,6 +19,10 @@
 #include <nlohmann/json.hpp>
 #include <algorithm>
 
+#include "strings.hh"
+
+namespace nix::fs { using namespace std::filesystem; }
+
 using namespace nix;
 
 struct DevelopSettings : Config
@@ -339,7 +343,7 @@ struct Common : InstallableCommand, MixProfile
         ref<Store> store,
         const BuildEnvironment & buildEnvironment,
         const std::filesystem::path & tmpDir,
-        const std::filesystem::path & outputsDir = std::filesystem::path { absPath(".") } / "outputs")
+        const std::filesystem::path & outputsDir = fs::path { fs::current_path() } / "outputs")
     {
         // A list of colon-separated environment variables that should be
         // prepended to, rather than overwritten, in order to keep the shell usable.
@@ -413,7 +417,7 @@ struct Common : InstallableCommand, MixProfile
 
         if (buildEnvironment.providesStructuredAttrs()) {
             fixupStructuredAttrs(
-                PATHNG_LITERAL("sh"),
+                OS_STR("sh"),
                 "NIX_ATTRS_SH_FILE",
                 buildEnvironment.getAttrsSH(),
                 rewrites,
@@ -421,7 +425,7 @@ struct Common : InstallableCommand, MixProfile
                 tmpDir
             );
             fixupStructuredAttrs(
-                PATHNG_LITERAL("json"),
+                OS_STR("json"),
                 "NIX_ATTRS_JSON_FILE",
                 buildEnvironment.getAttrsJSON(),
                 rewrites,
@@ -445,10 +449,10 @@ struct Common : InstallableCommand, MixProfile
         const BuildEnvironment & buildEnvironment,
         const std::filesystem::path & tmpDir)
     {
-        auto targetFilePath = tmpDir / PATHNG_LITERAL(".attrs.");
+        auto targetFilePath = tmpDir / OS_STR(".attrs.");
         targetFilePath += ext;
 
-        writeFile(targetFilePath.string(), content);
+        writeFile(targetFilePath, content);
 
         auto fileInBuilderEnv = buildEnvironment.vars.find(envVar);
         assert(fileInBuilderEnv != buildEnvironment.vars.end());
@@ -606,6 +610,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         else if (!command.empty()) {
             std::vector<std::string> args;
+            args.reserve(command.size());
             for (auto s : command)
                 args.push_back(shellEscape(s));
             script += fmt("exec %s\n", concatStringsSep(" ", args));
@@ -668,7 +673,7 @@ struct CmdDevelop : Common, MixEnvironment
                 throw Error("package 'nixpkgs#bashInteractive' does not provide a 'bin/bash'");
 
         } catch (Error &) {
-            ignoreException();
+            ignoreExceptionExceptInterrupt();
         }
 
         // Override SHELL with the one chosen for this environment.
@@ -698,7 +703,11 @@ struct CmdDevelop : Common, MixEnvironment
             }
         }
 
-        runProgramInStore(store, UseLookupPath::Use, shell, args, buildEnvironment.getSystem());
+        // Release our references to eval caches to ensure they are persisted to disk, because
+        // we are about to exec out of this process without running C++ destructors.
+        getEvalState()->evalCaches.clear();
+
+        execProgramInStore(store, UseLookupPath::Use, shell, args, buildEnvironment.getSystem());
 #endif
     }
 };

@@ -33,9 +33,9 @@ public:
     {
         if (registry) return registry;
         if (registry_path.empty()) {
-            registry = fetchers::getUserRegistry();
+            registry = fetchers::getUserRegistry(fetchSettings);
         } else {
-            registry = fetchers::getCustomRegistry(registry_path);
+            registry = fetchers::getCustomRegistry(fetchSettings, registry_path);
         }
         return registry;
     }
@@ -68,7 +68,7 @@ struct CmdRegistryList : StoreCommand
     {
         using namespace fetchers;
 
-        auto registries = getRegistries(store);
+        auto registries = getRegistries(fetchSettings, store);
 
         for (auto & registry : registries) {
             for (auto & entry : registry->entries) {
@@ -109,8 +109,8 @@ struct CmdRegistryAdd : MixEvalArgs, Command, RegistryCommand
 
     void run() override
     {
-        auto fromRef = parseFlakeRef(fromUrl);
-        auto toRef = parseFlakeRef(toUrl);
+        auto fromRef = parseFlakeRef(fetchSettings, fromUrl);
+        auto toRef = parseFlakeRef(fetchSettings, toUrl);
         auto registry = getRegistry();
         fetchers::Attrs extraAttrs;
         if (toRef.subdir != "") extraAttrs["dir"] = toRef.subdir;
@@ -144,7 +144,7 @@ struct CmdRegistryRemove : RegistryCommand, Command
     void run() override
     {
         auto registry = getRegistry();
-        registry->remove(parseFlakeRef(url).input);
+        registry->remove(parseFlakeRef(fetchSettings, url).input);
         registry->write(getRegistryPath());
     }
 };
@@ -185,8 +185,8 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
     {
         if (locked.empty()) locked = url;
         auto registry = getRegistry();
-        auto ref = parseFlakeRef(url);
-        auto lockedRef = parseFlakeRef(locked);
+        auto ref = parseFlakeRef(fetchSettings, url);
+        auto lockedRef = parseFlakeRef(fetchSettings, locked);
         registry->remove(ref.input);
         auto resolved = lockedRef.resolve(store).input.getAccessor(store).second;
         if (!resolved.isLocked())

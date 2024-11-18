@@ -25,6 +25,19 @@ R""(
     → 'github:NixOS/nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293' (2023-07-05)
   ```
 
+* Update multiple inputs:
+
+  ```console
+  # nix flake update nixpkgs nixpkgs-unstable
+  warning: updating lock file '/home/myself/repos/testflake/flake.lock':
+  • Updated input 'nixpkgs':
+      'github:nixos/nixpkgs/8f7492cce28977fbf8bd12c72af08b1f6c7c3e49' (2024-09-14)
+    → 'github:nixos/nixpkgs/086b448a5d54fd117f4dc2dee55c9f0ff461bdc1' (2024-09-16)
+  • Updated input 'nixpkgs-unstable':
+      'github:nixos/nixpkgs/345c263f2f53a3710abe117f28a5cb86d0ba4059' (2024-09-13)
+    → 'github:nixos/nixpkgs/99dc8785f6a0adac95f5e2ab05cc2e1bf666d172' (2024-09-16)
+  ```
+
 * Update only a single input of a flake in a different directory:
 
   ```console

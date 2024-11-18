@@ -30,6 +30,8 @@ deps_public_maybe_subproject = [
 ]
 subdir('build-utils-meson/subprojects')
 
+subdir('build-utils-meson/threads')
+
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
@@ -64,6 +66,7 @@ add_project_arguments(
   '-include', 'config-util.hh',
   '-include', 'config-store.hh',
   # '-include', 'config-fetchers.h',
+  '-include', 'config-expr.hh',
   '-include', 'config-main.hh',
   '-include', 'config-cmd.hh',
   language : 'cpp',

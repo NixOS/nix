@@ -1,5 +1,6 @@
 #include "current-process.hh"
 #include "environment-variables.hh"
+#include "executable-path.hh"
 #include "signals.hh"
 #include "processes.hh"
 #include "finally.hh"
@@ -182,7 +183,7 @@ static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun)
 #endif
     if (pid != 0) return pid;
     fun();
-    abort();
+    unreachable();
 }
 
 
@@ -417,6 +418,14 @@ std::string statusToString(int status)
 bool statusOk(int status)
 {
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+int execvpe(const char * file0, const char * const argv[], const char * const envp[])
+{
+    auto file = ExecutablePath::load().findPath(file0);
+    // `const_cast` is safe. See the note in
+    // https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html
+    return execve(file.c_str(), const_cast<char *const *>(argv), const_cast<char *const *>(envp));
 }
 
 }

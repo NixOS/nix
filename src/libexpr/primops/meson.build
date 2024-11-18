@@ -1,12 +1,7 @@
-foreach header : [
+generated_headers += gen_header.process(
   'derivation.nix',
-]
-  generated_headers += custom_target(
-    command : [ 'bash', '-c', '{ echo \'R"__NIX_STR(\' && cat @INPUT@ && echo \')__NIX_STR"\'; } > "$1"', '_ignored_argv0', '@OUTPUT@' ],
-    input : header,
-    output : '@PLAINNAME@.gen.hh',
-  )
-endforeach
+  preserve_path_from: meson.project_source_root(),
+)
 
 sources += files(
   'context.cc',

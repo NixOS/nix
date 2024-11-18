@@ -7,6 +7,8 @@
 #include <condition_variable>
 #include <cassert>
 
+#include "error.hh"
+
 namespace nix {
 
 /**
@@ -47,7 +49,7 @@ public:
         friend SyncBase;
         Lock(SyncBase * s) : s(s), lk(s->mutex) { }
     public:
-        Lock(Lock && l) : s(l.s) { abort(); }
+        Lock(Lock && l) : s(l.s) { unreachable(); }
         Lock(const Lock & l) = delete;
         ~Lock() { }
 
@@ -104,7 +106,7 @@ public:
      * Acquire read access to the inner value. When using
      * `std::shared_mutex`, this will use a shared lock.
      */
-    ReadLock read() const { return ReadLock(const_cast<SyncBase *>(this)); }
+    ReadLock readLock() const { return ReadLock(const_cast<SyncBase *>(this)); }
 };
 
 template<class T>

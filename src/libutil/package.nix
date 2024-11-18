@@ -1,11 +1,6 @@
 { lib
 , stdenv
-, mkMesonDerivation
-, releaseTools
-
-, meson
-, ninja
-, pkg-config
+, mkMesonLibrary
 
 , boost
 , brotli
@@ -24,7 +19,7 @@ let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonLibrary (finalAttrs: {
   pname = "nix-util";
   inherit version;
 
@@ -41,14 +36,6 @@ mkMesonDerivation (finalAttrs: {
     ./windows/meson.build
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
-  ];
-
-  outputs = [ "out" "dev" ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
   ];
 
   buildInputs = [
@@ -87,14 +74,6 @@ mkMesonDerivation (finalAttrs: {
   } // lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
     LDFLAGS = "-fuse-ld=gold";
   };
-
-  enableParallelBuilding = true;
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  strictDeps = true;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

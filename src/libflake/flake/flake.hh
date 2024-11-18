@@ -12,6 +12,16 @@ class EvalState;
 
 namespace flake {
 
+struct Settings;
+
+/**
+ * Initialize `libnixflake`
+ *
+ * So far, this registers the `builtins.getFlake` primop, which depends
+ * on the choice of `flake:Settings`.
+ */
+void initLib(const Settings & settings);
+
 struct FlakeInput;
 
 typedef std::map<FlakeId, FlakeInput> FlakeInputs;
@@ -58,7 +68,7 @@ struct ConfigFile
 
     std::map<std::string, ConfigValue> settings;
 
-    void apply();
+    void apply(const Settings & settings);
 };
 
 /**
@@ -195,6 +205,7 @@ struct LockFlags
 };
 
 LockedFlake lockFlake(
+    const Settings & settings,
     EvalState & state,
     const FlakeRef & flakeRef,
     const LockFlags & lockFlags);
@@ -203,6 +214,16 @@ void callFlake(
     EvalState & state,
     const LockedFlake & lockedFlake,
     Value & v);
+
+/**
+ * Map a `SourcePath` to the corresponding store path. This is a
+ * temporary hack to support chroot stores while we don't have full
+ * lazy trees. FIXME: Remove this once we can pass a sourcePath rather
+ * than a storePath to call-flake.nix.
+ */
+std::pair<StorePath, Path> sourcePathToStorePath(
+    ref<Store> store,
+    const SourcePath & path);
 
 }
 
@@ -213,5 +234,12 @@ void emitTreeAttrs(
     Value & v,
     bool emptyRevFallback = false,
     bool forceDirty = false);
+
+/**
+ * An internal builtin similar to `fetchTree`, except that it
+ * always treats the input as final (i.e. no attributes can be
+ * added/removed/changed).
+ */
+void prim_fetchFinalTree(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
 }

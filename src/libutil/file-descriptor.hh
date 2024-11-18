@@ -77,8 +77,13 @@ void writeFull(Descriptor fd, std::string_view s, bool allowInterrupts = true);
 
 /**
  * Read a line from a file descriptor.
+ *
+ * @param fd The file descriptor to read from
+ * @param eofOk If true, return an unterminated line if EOF is reached. (e.g. the empty string)
+ *
+ * @return A line of text ending in `\n`, or a string without `\n` if `eofOk` is true and EOF is reached.
  */
-std::string readLine(Descriptor fd);
+std::string readLine(Descriptor fd, bool eofOk = false);
 
 /**
  * Write a line to a file descriptor.
@@ -101,12 +106,42 @@ void drainFD(
 #endif
     );
 
+/**
+ * Get [Standard Input](https://en.wikipedia.org/wiki/Standard_streams#Standard_input_(stdin))
+ */
 [[gnu::always_inline]]
-inline Descriptor getStandardOut() {
+inline Descriptor getStandardInput()
+{
+#ifndef _WIN32
+    return STDIN_FILENO;
+#else
+    return GetStdHandle(STD_INPUT_HANDLE);
+#endif
+}
+
+/**
+ * Get [Standard Output](https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout))
+ */
+[[gnu::always_inline]]
+inline Descriptor getStandardOutput()
+{
 #ifndef _WIN32
     return STDOUT_FILENO;
 #else
     return GetStdHandle(STD_OUTPUT_HANDLE);
+#endif
+}
+
+/**
+ * Get [Standard Error](https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr))
+ */
+[[gnu::always_inline]]
+inline Descriptor getStandardError()
+{
+#ifndef _WIN32
+    return STDERR_FILENO;
+#else
+    return GetStdHandle(STD_ERROR_HANDLE);
 #endif
 }
 
@@ -120,7 +155,7 @@ public:
     AutoCloseFD();
     AutoCloseFD(Descriptor fd);
     AutoCloseFD(const AutoCloseFD & fd) = delete;
-    AutoCloseFD(AutoCloseFD&& fd);
+    AutoCloseFD(AutoCloseFD&& fd) noexcept;
     ~AutoCloseFD();
     AutoCloseFD& operator =(const AutoCloseFD & fd) = delete;
     AutoCloseFD& operator =(AutoCloseFD&& fd);
@@ -128,7 +163,18 @@ public:
     explicit operator bool() const;
     Descriptor release();
     void close();
-    void fsync();
+
+    /**
+     * Perform a blocking fsync operation.
+     */
+    void fsync() const;
+
+    /**
+     * Asynchronously flush to disk without blocking, if available on
+     * the platform. This is just a performance optimization, and
+     * fsync must be run later even if this is called.
+     */
+    void startFsync() const;
 };
 
 class Pipe
@@ -143,10 +189,10 @@ public:
 namespace unix {
 
 /**
- * Close all file descriptors except those listed in the given set.
+ * Close all file descriptors except stdio fds (ie 0, 1, 2).
  * Good practice in child processes.
  */
-void closeMostFDs(const std::set<Descriptor> & exceptions);
+void closeExtraFDs();
 
 /**
  * Set the close-on-exec flag for the given file descriptor.

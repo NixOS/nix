@@ -1,4 +1,5 @@
-with import ./config.nix;
+let config_nix = /. + "${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/config.nix"; in
+with import config_nix;
 
 mkDerivation rec {
   name = "recursive";
@@ -41,7 +42,7 @@ mkDerivation rec {
 
     # Build a derivation.
     nix $opts build -L --impure --expr '
-      with import ${./config.nix};
+      with import ${config_nix};
       mkDerivation {
         name = "inner1";
         buildCommand = "echo $fnord blaat > $out";

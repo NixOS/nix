@@ -3,6 +3,7 @@
 #include "source-path.hh"
 #include "fetch-to-store.hh"
 #include "json-utils.hh"
+#include "store-path-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -35,9 +36,11 @@ nlohmann::json dumpRegisterInputSchemeInfo() {
     return res;
 }
 
-Input Input::fromURL(const std::string & url, bool requireTree)
+Input Input::fromURL(
+    const Settings & settings,
+    const std::string & url, bool requireTree)
 {
-    return fromURL(parseURL(url), requireTree);
+    return fromURL(settings, parseURL(url), requireTree);
 }
 
 static void fixupInput(Input & input)
@@ -49,10 +52,12 @@ static void fixupInput(Input & input)
     input.getLastModified();
 }
 
-Input Input::fromURL(const ParsedURL & url, bool requireTree)
+Input Input::fromURL(
+    const Settings & settings,
+    const ParsedURL & url, bool requireTree)
 {
     for (auto & [_, inputScheme] : *inputSchemes) {
-        auto res = inputScheme->inputFromURL(url, requireTree);
+        auto res = inputScheme->inputFromURL(settings, url, requireTree);
         if (res) {
             experimentalFeatureSettings.require(inputScheme->experimentalFeature());
             res->scheme = inputScheme;
@@ -64,7 +69,7 @@ Input Input::fromURL(const ParsedURL & url, bool requireTree)
     throw Error("input '%s' is unsupported", url.url);
 }
 
-Input Input::fromAttrs(Attrs && attrs)
+Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
 {
     auto schemeName = ({
         auto schemeNameOpt = maybeGetStrAttr(attrs, "type");
@@ -78,7 +83,7 @@ Input Input::fromAttrs(Attrs && attrs)
         // but not all of them. Doing this is to support those other
         // operations which are supposed to be robust on
         // unknown/uninterpretable inputs.
-        Input input;
+        Input input { settings };
         input.attrs = attrs;
         fixupInput(input);
         return input;
@@ -96,10 +101,10 @@ Input Input::fromAttrs(Attrs && attrs)
     auto allowedAttrs = inputScheme->allowedAttrs();
 
     for (auto & [name, _] : attrs)
-        if (name != "type" && allowedAttrs.count(name) == 0)
+        if (name != "type" && name != "__final" && allowedAttrs.count(name) == 0)
             throw Error("input attribute '%s' not supported by scheme '%s'", name, schemeName);
 
-    auto res = inputScheme->inputFromAttrs(attrs);
+    auto res = inputScheme->inputFromAttrs(settings, attrs);
     if (!res) return raw();
     res->scheme = inputScheme;
     fixupInput(*res);
@@ -141,6 +146,11 @@ bool Input::isLocked() const
     return scheme && scheme->isLocked(*this);
 }
 
+bool Input::isFinal() const
+{
+    return maybeGetBoolAttr(attrs, "__final").value_or(false);
+}
+
 std::optional<std::string> Input::isRelative() const
 {
     assert(scheme);
@@ -152,7 +162,7 @@ Attrs Input::toAttrs() const
     return attrs;
 }
 
-bool Input::operator ==(const Input & other) const
+bool Input::operator ==(const Input & other) const noexcept
 {
     return attrs == other.attrs;
 }
@@ -171,13 +181,26 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 {
     auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
         try {
-            auto [accessor, final] = getAccessorUnchecked(store);
+            auto [accessor, result] = getAccessorUnchecked(store);
 
-            auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, final.getName());
+            auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, result.getName());
 
-            scheme->checkLocks(*this, final);
+            #if 0
+            auto narHash = store->queryPathInfo(storePath)->narHash;
+            result.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
+            #endif
 
-            return {storePath, final};
+            // FIXME: we would like to mark inputs as final in
+            // getAccessorUnchecked(), but then we can't add
+            // narHash. Or maybe narHash should be excluded from the
+            // concept of "final" inputs?
+            result.attrs.insert_or_assign("__final", Explicit<bool>(true));
+
+            assert(result.isFinal());
+
+            checkLocks(*this, result);
+
+            return {storePath, result};
         } catch (Error & e) {
             e.addTrace({}, "while fetching the input '%s'", to_string());
             throw;
@@ -187,13 +210,40 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
     return {std::move(storePath), input};
 }
 
-void InputScheme::checkLocks(const Input & specified, const Input & final) const
+void Input::checkLocks(Input specified, Input & result)
 {
+    /* If the original input is final, then we just return the
+       original attributes, dropping any new fields returned by the
+       fetcher. However, any fields that are in both the specified and
+       result input must be identical. */
+    if (specified.isFinal()) {
+
+        /* Backwards compatibility hack: we had some lock files in the
+           past that 'narHash' fields with incorrect base-64
+           formatting (lacking the trailing '=', e.g. 'sha256-ri...Mw'
+           instead of ''sha256-ri...Mw='). So fix that. */
+        if (auto prevNarHash = specified.getNarHash())
+            specified.attrs.insert_or_assign("narHash", prevNarHash->to_string(HashFormat::SRI, true));
+
+        for (auto & field : specified.attrs) {
+            auto field2 = result.attrs.find(field.first);
+            if (field2 != result.attrs.end() && field.second != field2->second)
+                throw Error("mismatch in field '%s' of input '%s', got '%s'",
+                    field.first,
+                    attrsToJSON(specified.attrs),
+                    attrsToJSON(result.attrs));
+        }
+
+        result.attrs = specified.attrs;
+
+        return;
+    }
+
     if (auto prevNarHash = specified.getNarHash()) {
-        if (final.getNarHash() != prevNarHash) {
-            if (final.getNarHash())
+        if (result.getNarHash() != prevNarHash) {
+            if (result.getNarHash())
                 throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s' but got '%s'",
-                    specified.to_string(), prevNarHash->to_string(HashFormat::SRI, true), final.getNarHash()->to_string(HashFormat::SRI, true));
+                    specified.to_string(), prevNarHash->to_string(HashFormat::SRI, true), result.getNarHash()->to_string(HashFormat::SRI, true));
             else
                 throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s' but got none",
                     specified.to_string(), prevNarHash->to_string(HashFormat::SRI, true));
@@ -201,22 +251,24 @@ void InputScheme::checkLocks(const Input & specified, const Input & final) const
     }
 
     if (auto prevLastModified = specified.getLastModified()) {
-        if (final.getLastModified() != prevLastModified)
-            throw Error("'lastModified' attribute mismatch in input '%s', expected %d",
-                final.to_string(), *prevLastModified);
+        if (result.getLastModified() != prevLastModified)
+            throw Error("'lastModified' attribute mismatch in input '%s', expected %d, got %d",
+                result.to_string(), *prevLastModified, result.getLastModified().value_or(-1));
     }
 
     if (auto prevRev = specified.getRev()) {
-        if (final.getRev() != prevRev)
+        if (result.getRev() != prevRev)
             throw Error("'rev' attribute mismatch in input '%s', expected %s",
-                final.to_string(), prevRev->gitRev());
+                result.to_string(), prevRev->gitRev());
     }
 
     if (auto prevRevCount = specified.getRevCount()) {
-        if (final.getRevCount() != prevRevCount)
+        if (result.getRevCount() != prevRevCount)
             throw Error("'revCount' attribute mismatch in input '%s', expected %d",
-                final.to_string(), *prevRevCount);
+                result.to_string(), *prevRevCount);
     }
+
+    // FIXME: check treeHash
 }
 
 std::pair<ref<SourceAccessor>, Input> Input::getAccessor(ref<Store> store) const
@@ -227,11 +279,11 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessor(ref<Store> store) const
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
     try {
-        auto [accessor, final] = getAccessorUnchecked(store);
+        auto [accessor, result] = getAccessorUnchecked(store);
 
-        scheme->checkLocks(*this, final);
+        checkLocks(*this, result);
 
-        return {accessor, std::move(final)};
+        return {accessor, std::move(result)};
     } catch (Error & e) {
         e.addTrace({}, "while fetching the input '%s'", to_string());
         throw;
@@ -245,12 +297,44 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
-    auto [accessor, final] = scheme->getAccessor(store, *this);
+    #if 0
+    /* The tree may already be in the Nix store, or it could be
+       substituted (which is often faster than fetching from the
+       original source). So check that. We only do this for final
+       inputs, otherwise there is a risk that we don't return the
+       same attributes (like `lastModified`) that the "real" fetcher
+       would return.
+
+       FIXME: add a setting to disable this.
+       FIXME: substituting may be slower than fetching normally,
+       e.g. for fetchers like Git that are incremental!
+    */
+    if (isFinal() && getNarHash()) {
+        try {
+            auto storePath = computeStorePath(*store);
+
+            store->ensurePath(storePath);
+
+            debug("using substituted/cached input '%s' in '%s'",
+                to_string(), store->printStorePath(storePath));
+
+            auto accessor = makeStorePathAccessor(store, storePath);
+
+            accessor->fingerprint = scheme->getFingerprint(store, *this);
+
+            return {accessor, *this};
+        } catch (Error & e) {
+            debug("substitution of input '%s' failed: %s", to_string(), e.what());
+        }
+    }
+    #endif
+
+    auto [accessor, result] = scheme->getAccessor(store, *this);
 
     assert(!accessor->fingerprint);
-    accessor->fingerprint = scheme->getFingerprint(store, final);
+    accessor->fingerprint = scheme->getFingerprint(store, result);
 
-    return {accessor, std::move(final)};
+    return {accessor, std::move(result)};
 }
 
 Input Input::applyOverrides(
@@ -382,7 +466,10 @@ namespace nlohmann {
 
 using namespace nix;
 
-fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json) {
+#ifndef DOXYGEN_SKIP
+
+fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json)
+{
     fetchers::PublicKey res = { };
     if (auto type = optionalValueAt(json, "type"))
         res.type = getString(*type);
@@ -392,9 +479,12 @@ fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & 
     return res;
 }
 
-void adl_serializer<fetchers::PublicKey>::to_json(json & json, fetchers::PublicKey p) {
+void adl_serializer<fetchers::PublicKey>::to_json(json & json, fetchers::PublicKey p)
+{
     json["type"] = p.type;
     json["key"] = p.key;
 }
+
+#endif
 
 }

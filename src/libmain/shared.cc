@@ -8,7 +8,6 @@
 #include "signals.hh"
 
 #include <algorithm>
-#include <cctype>
 #include <exception>
 #include <iostream>
 
@@ -23,6 +22,8 @@
 
 #include <openssl/crypto.h>
 
+#include "exit.hh"
+#include "strings.hh"
 
 namespace nix {
 
@@ -415,7 +416,7 @@ RunPager::~RunPager()
         }
 #endif
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 

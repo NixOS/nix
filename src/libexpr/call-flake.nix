@@ -10,6 +10,9 @@ lockFileStr:
 # unlocked trees.
 overrides:
 
+# This is `prim_fetchFinalTree`.
+fetchTreeFinal:
+
 let
 
   lockFile = builtins.fromJSON lockFileStr;
@@ -53,7 +56,8 @@ let
             else
               # FIXME: remove obsolete node.info.
               let
-                tree = fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
+                # Note: lock file entries are always final.
+                tree = fetchTreeFinal (node.info or {} // removeAttrs node.locked ["dir"]);
               in
                 # Apply patches.
                 tree // (

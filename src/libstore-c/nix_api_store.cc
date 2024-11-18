@@ -29,16 +29,6 @@ nix_err nix_libstore_init_no_load_config(nix_c_context * context)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_plugins(nix_c_context * context)
-{
-    if (context)
-        context->last_err_code = NIX_OK;
-    try {
-        nix::initPlugins();
-    }
-    NIXC_CATCH_ERRS
-}
-
 Store * nix_store_open(nix_c_context * context, const char * uri, const char *** params)
 {
     if (context)
@@ -153,4 +143,16 @@ void nix_store_path_free(StorePath * sp)
 StorePath * nix_store_path_clone(const StorePath * p)
 {
     return new StorePath{p->path};
+}
+
+nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        nix::RealisedPath::Set paths;
+        paths.insert(path->path);
+        nix::copyClosure(*srcStore->ptr, *dstStore->ptr, paths);
+    }
+    NIXC_CATCH_ERRS
 }

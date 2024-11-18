@@ -1,10 +1,8 @@
 #pragma once
 ///@file
 
-#include "types.hh"
-
-#include <optional>
-
+#include <memory>
+#include <vector>
 #include <sys/types.h>
 
 namespace nix {

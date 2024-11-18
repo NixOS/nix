@@ -1,6 +1,6 @@
 #include "users.hh"
 #include "config-global.hh"
-#include "flake-settings.hh"
+#include "flake/settings.hh"
 #include "flake.hh"
 
 #include <nlohmann/json.hpp>
@@ -12,7 +12,7 @@ typedef std::map<std::string, std::map<std::string, bool>> TrustedList;
 
 Path trustedListPath()
 {
-    return getDataDir() + "/nix/trusted-settings.json";
+    return getDataDir() + "/trusted-settings.json";
 }
 
 static TrustedList readTrustedList()
@@ -30,7 +30,7 @@ static void writeTrustedList(const TrustedList & trustedList)
     writeFile(path, nlohmann::json(trustedList).dump());
 }
 
-void ConfigFile::apply()
+void ConfigFile::apply(const Settings & flakeSettings)
 {
     std::set<std::string> whitelist{"bash-prompt", "bash-prompt-prefix", "bash-prompt-suffix", "flake-registry", "commit-lock-file-summary", "commit-lockfile-summary"};
 
@@ -47,11 +47,11 @@ void ConfigFile::apply()
         else if (auto* b = std::get_if<Explicit<bool>>(&value))
             valueS = b->t ? "true" : "false";
         else if (auto ss = std::get_if<std::vector<std::string>>(&value))
-            valueS = concatStringsSep(" ", *ss); // FIXME: evil
+            valueS = dropEmptyInitThenConcatStringsSep(" ", *ss); // FIXME: evil
         else
             assert(false);
 
-        if (!whitelist.count(baseName) && !nix::flakeSettings.acceptFlakeConfig) {
+        if (!whitelist.count(baseName) && !flakeSettings.acceptFlakeConfig) {
             bool trusted = false;
             auto trustedList = readTrustedList();
             auto tlname = get(trustedList, name);

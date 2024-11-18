@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include "types.hh"
 #include "serialise.hh"
 #include "source-accessor.hh"
 #include "file-system.hh"
@@ -42,6 +41,19 @@ struct FileSystemObjectSink
 };
 
 /**
+ * An extension of `FileSystemObjectSink` that supports file types
+ * that are not supported by Nix's FSO model.
+ */
+struct ExtendedFileSystemObjectSink : virtual FileSystemObjectSink
+{
+    /**
+     * Create a hard link. The target must be the path of a previously
+     * encountered file relative to the root of the FSO.
+     */
+    virtual void createHardlink(const CanonPath & path, const CanonPath & target) = 0;
+};
+
+/**
  * Recursively copy file system objects from the source into the sink.
  */
 void copyRecursive(
@@ -66,6 +78,11 @@ struct NullFileSystemObjectSink : FileSystemObjectSink
 struct RestoreSink : FileSystemObjectSink
 {
     std::filesystem::path dstPath;
+    bool startFsync = false;
+
+    explicit RestoreSink(bool startFsync)
+        : startFsync{startFsync}
+    { }
 
     void createDirectory(const CanonPath & path) override;
 

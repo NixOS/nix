@@ -18,14 +18,10 @@
 
 #include <nlohmann/json_fwd.hpp>
 #include <atomic>
-#include <limits>
 #include <map>
-#include <unordered_map>
-#include <unordered_set>
 #include <memory>
 #include <string>
 #include <chrono>
-#include <variant>
 
 
 namespace nix {
@@ -205,7 +201,7 @@ protected:
         LRUCache<std::string, PathInfoCacheValue> pathInfoCache;
     };
 
-    Sync<State> state;
+    SharedSync<State> state;
 
     std::shared_ptr<NarInfoDiskCache> diskCache;
 
@@ -220,6 +216,10 @@ public:
 
     virtual ~Store() { }
 
+    /**
+     * @todo move to `StoreConfig` one we store enough information in
+     * those to recover the scheme and authority in all cases.
+     */
     virtual std::string getUri() = 0;
 
     /**
@@ -260,11 +260,11 @@ public:
 
     /**
      * Query the set of all valid paths. Note that for some store
-     * backends, the name part of store paths may be replaced by 'x'
-     * (i.e. you'll get /nix/store/<hash>-x rather than
-     * /nix/store/<hash>-<name>). Use queryPathInfo() to obtain the
+     * backends, the name part of store paths may be replaced by `x`
+     * (i.e. you'll get `/nix/store/<hash>-x` rather than
+     * `/nix/store/<hash>-<name>`). Use queryPathInfo() to obtain the
      * full store path. FIXME: should return a set of
-     * std::variant<StorePath, HashPart> to get rid of this hack.
+     * `std::variant<StorePath, HashPart>` to get rid of this hack.
      */
     virtual StorePathSet queryAllValidPaths()
     { unsupported("queryAllValidPaths"); }
@@ -901,7 +901,7 @@ struct Implementations
     {
         if (!registered) registered = new std::vector<StoreFactory>();
         StoreFactory factory{
-            .uriSchemes = T::uriSchemes(),
+            .uriSchemes = TConfig::uriSchemes(),
             .create =
                 ([](auto scheme, auto uri, auto & params)
                  -> std::shared_ptr<Store>

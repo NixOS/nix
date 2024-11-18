@@ -11,16 +11,31 @@
 namespace nix {
 
 class Store;
+
+namespace fetchers { struct Settings; }
+
 class EvalState;
 struct EvalSettings;
 struct CompatibilitySettings;
 class Bindings;
 struct SourcePath;
 
+namespace flake { struct Settings; }
+
+/**
+ * @todo Get rid of global setttings variables
+ */
+extern fetchers::Settings fetchSettings;
+
 /**
  * @todo Get rid of global setttings variables
  */
 extern EvalSettings evalSettings;
+
+/**
+ * @todo Get rid of global setttings variables
+ */
+extern flake::Settings flakeSettings;
 
 /**
  * Settings that control behaviors that have changed since Nix 2.3.

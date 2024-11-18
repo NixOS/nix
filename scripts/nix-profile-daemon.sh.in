@@ -52,7 +52,7 @@ elif [ -e /etc/pki/tls/certs/ca-bundle.crt ]; then # Fedora, CentOS
 else
   # Fall back to what is in the nix profiles, favouring whatever is defined last.
   check_nix_profiles() {
-    if [ -n "$ZSH_VERSION" ]; then
+    if [ -n "${ZSH_VERSION:-}" ]; then
       # Zsh by default doesn't split words in unquoted parameter expansion.
       # Set local_options for these options to be reverted at the end of the function
       # and shwordsplit to force splitting words in $NIX_PROFILES below.

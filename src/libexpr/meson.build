@@ -32,6 +32,7 @@ subdir('build-utils-meson/threads')
 boost = dependency(
   'boost',
   modules : ['container', 'context'],
+  include_type: 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
@@ -55,7 +56,12 @@ if bdw_gc.found()
 endif
 configdata.set('HAVE_BOEHMGC', bdw_gc.found().to_int())
 
-toml11 = dependency('toml11', version : '>=3.7.0', method : 'cmake')
+toml11 = dependency(
+  'toml11',
+  version : '>=3.7.0',
+  method : 'cmake',
+  include_type: 'system',
+)
 deps_other += toml11
 
 config_h = configure_file(
@@ -69,6 +75,7 @@ add_project_arguments(
   '-include', 'config-util.hh',
   '-include', 'config-store.hh',
   # '-include', 'config-fetchers.h',
+  '-include', 'config-expr.hh',
   language : 'cpp',
 )
 
@@ -116,19 +123,16 @@ lexer_tab = custom_target(
   install_dir : get_option('includedir') / 'nix',
 )
 
+subdir('build-utils-meson/generate-header')
+
 generated_headers = []
 foreach header : [
   'imported-drv-to-derivation.nix',
   'fetchurl.nix',
   'call-flake.nix',
 ]
-  generated_headers += custom_target(
-    command : [ 'bash', '-c', '{ echo \'R"__NIX_STR(\' && cat @INPUT@ && echo \')__NIX_STR"\'; } > "$1"', '_ignored_argv0', '@OUTPUT@' ],
-    input : header,
-    output : '@PLAINNAME@.gen.hh',
-  )
+  generated_headers += gen_header.process(header)
 endforeach
-
 
 sources = files(
   'attr-path.cc',
@@ -141,6 +145,7 @@ sources = files(
   'function-trace.cc',
   'get-drvs.cc',
   'json-to-value.cc',
+  'lexer-helpers.cc',
   'nixexpr.cc',
   'paths.cc',
   'primops.cc',
@@ -167,6 +172,7 @@ headers = [config_h] + files(
   'gc-small-vector.hh',
   'get-drvs.hh',
   'json-to-value.hh',
+  # internal: 'lexer-helpers.hh',
   'nixexpr.hh',
   'parser-state.hh',
   'pos-idx.hh',

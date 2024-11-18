@@ -25,6 +25,8 @@ deps_public_maybe_subproject = [
 ]
 subdir('build-utils-meson/subprojects')
 
+subdir('build-utils-meson/threads')
+
 # TODO rename, because it will conflict with downstream projects
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
@@ -61,6 +63,7 @@ headers = [config_h] + files(
 headers += files('nix_api_util_internal.h')
 
 subdir('build-utils-meson/export-all-symbols')
+subdir('build-utils-meson/windows-version')
 
 this_library = library(
   'nixutilc',

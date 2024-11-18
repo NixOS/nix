@@ -8,19 +8,39 @@
   pkgs,
 
   stdenv,
-  versionSuffix,
 }:
+
+let
+  prevStdenv = stdenv;
+in
 
 let
   inherit (pkgs) lib;
 
   root = ../.;
 
+  stdenv = if prevStdenv.isDarwin && prevStdenv.isx86_64
+    then darwinStdenv
+    else prevStdenv;
+
+  # Fix the following error with the default x86_64-darwin SDK:
+  #
+  #     error: aligned allocation function of type 'void *(std::size_t, std::align_val_t)' is only available on macOS 10.13 or newer
+  #
+  # Despite the use of the 10.13 deployment target here, the aligned
+  # allocation function Clang uses with this setting actually works
+  # all the way back to 10.6.
+  darwinStdenv = pkgs.overrideSDK prevStdenv { darwinMinVersion = "10.13"; };
+
   # Nixpkgs implements this by returning a subpath into the fetched Nix sources.
   resolvePath = p: p;
 
   # Indirection for Nixpkgs to override when package.nix files are vendored
   filesetToSource = lib.fileset.toSource;
+
+  /** Given a set of layers, create a mkDerivation-like function */
+  mkPackageBuilder = exts: userFn:
+    stdenv.mkDerivation (lib.extends (lib.composeManyExtensions exts) userFn);
 
   localSourceLayer = finalAttrs: prevAttrs:
     let
@@ -44,10 +64,52 @@ let
       workDir = null;
     };
 
+  mesonLayer = finalAttrs: prevAttrs:
+    {
+      nativeBuildInputs = [
+        pkgs.buildPackages.meson
+        pkgs.buildPackages.ninja
+      ] ++ prevAttrs.nativeBuildInputs or [];
+    };
+
+  mesonBuildLayer = finalAttrs: prevAttrs:
+    {
+      nativeBuildInputs = prevAttrs.nativeBuildInputs or [] ++ [
+        pkgs.buildPackages.pkg-config
+      ];
+      separateDebugInfo = !stdenv.hostPlatform.isStatic;
+      hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
+    };
+
+  mesonLibraryLayer = finalAttrs: prevAttrs:
+    {
+      outputs = prevAttrs.outputs or [ "out" ] ++ [ "dev" ];
+    };
+
+  # Work around weird `--as-needed` linker behavior with BSD, see
+  # https://github.com/mesonbuild/meson/issues/3593
+  bsdNoLinkAsNeeded = finalAttrs: prevAttrs:
+    lib.optionalAttrs stdenv.hostPlatform.isBSD {
+      mesonFlags = [ (lib.mesonBool "b_asneeded" false) ] ++ prevAttrs.mesonFlags or [];
+    };
+
+  miscGoodPractice = finalAttrs: prevAttrs:
+    {
+      strictDeps = prevAttrs.strictDeps or true;
+      enableParallelBuilding = true;
+    };
 in
 scope: {
-  inherit stdenv versionSuffix;
-  version = lib.fileContents ../.version + versionSuffix;
+  inherit stdenv;
+
+  aws-sdk-cpp = (pkgs.aws-sdk-cpp.override {
+    apis = [ "s3" "transfer" ];
+    customMemoryManagement = false;
+  }).overrideAttrs {
+    # only a stripped down version is built, which takes a lot less resources
+    # to build, so we don't need a "big-parallel" machine.
+    requiredSystemFeatures = [ ];
+  };
 
   libseccomp = pkgs.libseccomp.overrideAttrs (_: rec {
     version = "2.5.5";
@@ -79,6 +141,29 @@ scope: {
     version = inputs.libgit2.lastModifiedDate;
     cmakeFlags = attrs.cmakeFlags or []
       ++ [ "-DUSE_SSH=exec" ];
+    nativeBuildInputs = attrs.nativeBuildInputs or []
+      # gitMinimal does not build on Windows. See packbuilder patch.
+      ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
+        # Needed for `git apply`; see `prePatch`
+        pkgs.buildPackages.gitMinimal
+      ];
+    # Only `git apply` can handle git binary patches
+    prePatch = attrs.prePatch or ""
+      + lib.optionalString (!stdenv.hostPlatform.isWindows) ''
+        patch() {
+          git apply
+        }
+      '';
+    patches = attrs.patches or []
+      ++ [
+        ./patches/libgit2-mempack-thin-packfile.patch
+      ]
+      # gitMinimal does not build on Windows, but fortunately this patch only
+      # impacts interruptibility
+      ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
+        # binary patch; see `prePatch`
+        ./patches/libgit2-packbuilder-callback-interruptible.patch
+      ];
   });
 
   busybox-sandbox-shell = pkgs.busybox-sandbox-shell or (pkgs.busybox.override {
@@ -113,5 +198,27 @@ scope: {
 
   inherit resolvePath filesetToSource;
 
-  mkMesonDerivation = f: stdenv.mkDerivation (lib.extends localSourceLayer f);
+  mkMesonDerivation =
+    mkPackageBuilder [
+      miscGoodPractice
+      localSourceLayer
+      mesonLayer
+    ];
+  mkMesonExecutable =
+    mkPackageBuilder [
+      miscGoodPractice
+      bsdNoLinkAsNeeded
+      localSourceLayer
+      mesonLayer
+      mesonBuildLayer
+    ];
+  mkMesonLibrary =
+    mkPackageBuilder [
+      miscGoodPractice
+      bsdNoLinkAsNeeded
+      localSourceLayer
+      mesonLayer
+      mesonBuildLayer
+      mesonLibraryLayer
+    ];
 }

@@ -27,7 +27,11 @@
 
 #include <nlohmann/json.hpp>
 
+#include "strings-inline.hh"
+
 namespace nix {
+
+namespace fs { using namespace std::filesystem; }
 
 void completeFlakeInputPath(
     AddCompletions & completions,
@@ -84,7 +88,7 @@ MixFlakeOptions::MixFlakeOptions()
 
     > **DEPRECATED**
     >
-    > Use [`--no-use-registries`](#opt-no-use-registries) instead.
+    > Use [`--no-use-registries`](@docroot@/command-ref/conf-file.md#conf-use-registries) instead.
         )",
         .category = category,
         .handler = {[&]() {
@@ -129,7 +133,7 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.writeLockFile = false;
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputPath(inputPath),
-                parseFlakeRef(flakeRef, absPath(getCommandBaseDir()), true));
+                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()), true));
         }},
         .completer = {[&](AddCompletions & completions, size_t n, std::string_view prefix) {
             if (n == 0) {
@@ -170,14 +174,15 @@ MixFlakeOptions::MixFlakeOptions()
         .handler = {[&](std::string flakeRef) {
             auto evalState = getEvalState();
             auto flake = flake::lockFlake(
+                flakeSettings,
                 *evalState,
-                parseFlakeRef(flakeRef, absPath(getCommandBaseDir())),
+                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir())),
                 { .writeLockFile = false });
             for (auto & [inputName, input] : flake.lockFile.root->inputs) {
                 auto input2 = flake.lockFile.findInput({inputName}); // resolve 'follows' nodes
                 if (auto input3 = std::dynamic_pointer_cast<const flake::LockedNode>(input2)) {
                     overrideRegistry(
-                        fetchers::Input::fromAttrs({{"type","indirect"}, {"id", inputName}}),
+                        fetchers::Input::fromAttrs(fetchSettings, {{"type","indirect"}, {"id", inputName}}),
                         input3->lockedRef.input,
                         {});
                 }
@@ -289,10 +294,10 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
 
             if (v2.type() == nAttrs) {
                 for (auto & i : *v2.attrs()) {
-                    std::string name = state->symbols[i.name];
+                    std::string_view name = state->symbols[i.name];
                     if (name.find(searchWord) == 0) {
                         if (prefix_ == "")
-                            completions.add(name);
+                            completions.add(std::string(name));
                         else
                             completions.add(prefix_ + "." + name);
                     }
@@ -338,10 +343,11 @@ void completeFlakeRefWithFragment(
             auto flakeRefS = std::string(prefix.substr(0, hash));
 
             // TODO: ideally this would use the command base directory instead of assuming ".".
-            auto flakeRef = parseFlakeRef(expandTilde(flakeRefS), absPath("."));
+            auto flakeRef = parseFlakeRef(fetchSettings, expandTilde(flakeRefS), fs::current_path().string());
 
             auto evalCache = openEvalCache(*evalState,
-                std::make_shared<flake::LockedFlake>(lockFlake(*evalState, flakeRef, lockFlags)));
+                std::make_shared<flake::LockedFlake>(lockFlake(
+                    flakeSettings, *evalState, flakeRef, lockFlags)));
 
             auto root = evalCache->getRoot();
 
@@ -372,6 +378,7 @@ void completeFlakeRefWithFragment(
                         auto attrPath2 = (*attr)->getAttrPath(attr2);
                         /* Strip the attrpath prefix. */
                         attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
+                        // FIXME: handle names with dots
                         completions.add(flakeRefS + "#" + prefixRoot + concatStringsSep(".", evalState->symbols.resolve(attrPath2)));
                     }
                 }
@@ -403,7 +410,7 @@ void completeFlakeRef(AddCompletions & completions, ref<Store> store, std::strin
     Args::completeDir(completions, 0, prefix);
 
     /* Look for registry entries that match the prefix. */
-    for (auto & registry : fetchers::getRegistries(store)) {
+    for (auto & registry : fetchers::getRegistries(fetchSettings, store)) {
         for (auto & entry : registry->entries) {
             auto from = entry.from.to_string();
             if (!hasPrefix(prefix, "flake:") && hasPrefix(from, "flake:")) {
@@ -534,7 +541,8 @@ Installables SourceExprCommand::parseInstallables(
             }
 
             try {
-                auto [flakeRef, fragment] = parseFlakeRefWithFragment(std::string { prefix }, absPath(getCommandBaseDir()));
+                auto [flakeRef, fragment] = parseFlakeRefWithFragment(
+                    fetchSettings, std::string { prefix }, absPath(getCommandBaseDir()));
                 result.push_back(make_ref<InstallableFlake>(
                         this,
                         getEvalState(),
@@ -849,8 +857,10 @@ std::vector<FlakeRef> RawInstallablesCommand::getFlakeRefsForCompletion()
 {
     applyDefaultInstallables(rawInstallables);
     std::vector<FlakeRef> res;
+    res.reserve(rawInstallables.size());
     for (auto i : rawInstallables)
         res.push_back(parseFlakeRefWithFragment(
+            fetchSettings,
             expandTilde(i),
             absPath(getCommandBaseDir())).first);
     return res;
@@ -873,6 +883,7 @@ std::vector<FlakeRef> InstallableCommand::getFlakeRefsForCompletion()
 {
     return {
         parseFlakeRefWithFragment(
+            fetchSettings,
             expandTilde(_installable),
             absPath(getCommandBaseDir())).first
     };

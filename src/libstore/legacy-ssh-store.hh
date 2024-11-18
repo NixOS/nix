@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "ssh-store-config.hh"
+#include "common-ssh-store-config.hh"
 #include "store-api.hh"
 #include "ssh.hh"
 #include "callback.hh"
@@ -13,6 +13,11 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 {
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
+    LegacySSHStoreConfig(
+        std::string_view scheme,
+        std::string_view authority,
+        const Params & params);
+
     const Setting<Strings> remoteProgram{this, {"nix-store"}, "remote-program",
         "Path to the `nix-store` executable on the remote machine."};
 
@@ -20,6 +25,8 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
         "Maximum number of concurrent SSH connections."};
 
     const std::string name() override { return "SSH Store"; }
+
+    static std::set<std::string> uriSchemes() { return {"ssh"}; }
 
     std::string doc() override;
 };
@@ -40,8 +47,6 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     ref<Pool<Connection>> connections;
 
     SSHMaster master;
-
-    static std::set<std::string> uriSchemes() { return {"ssh"}; }
 
     LegacySSHStore(
         std::string_view scheme,

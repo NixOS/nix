@@ -182,7 +182,13 @@ in
     print(out)
     info = json.loads(out)
     assert info["revision"] == "${private-flake-rev}", f"revision mismatch: {info['revision']} != ${private-flake-rev}"
+    assert info["fingerprint"]
     cat_log()
+
+    # Fetching with the resolved URL should produce the same result.
+    info2 = json.loads(client.succeed(f"nix flake metadata {info['url']} --json --access-tokens github.com=ghp_000000000000000000000000000000000000 --tarball-ttl 0"))
+    print(info["fingerprint"], info2["fingerprint"])
+    assert info["fingerprint"] == info2["fingerprint"], "fingerprint mismatch"
 
     client.succeed("nix registry pin nixpkgs")
     client.succeed("nix flake metadata nixpkgs --tarball-ttl 0 >&2")

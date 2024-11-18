@@ -126,7 +126,7 @@ std::string EvalState::rewriteVirtualPaths(std::string_view s, std::string_view 
 
             res.append(fetchToStore(*store, {accessor->second}, FetchMode::DryRun).hashPart());
         } catch (...) {
-            ignoreException();
+            ignoreExceptionInDestructor();
             res.append(s.substr(m, end - m));
         }
 

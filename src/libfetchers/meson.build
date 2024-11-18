@@ -26,6 +26,8 @@ deps_public_maybe_subproject = [
 ]
 subdir('build-utils-meson/subprojects')
 
+subdir('build-utils-meson/threads')
+
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
@@ -50,15 +52,16 @@ sources = files(
   'fetch-to-store.cc',
   'fetchers.cc',
   'filtering-source-accessor.cc',
-  'git.cc',
   'git-utils.cc',
+  'git.cc',
   'github.cc',
   'indirect.cc',
   'mercurial.cc',
   'mounted-source-accessor.cc',
+  'patching-source-accessor.cc',
   'path.cc',
-  'store-path-accessor.cc',
   'registry.cc',
+  'store-path-accessor.cc',
   'tarball.cc',
 )
 
@@ -69,10 +72,11 @@ headers = files(
   'cache.hh',
   'fetch-settings.hh',
   'fetch-to-store.hh',
+  'fetchers.hh',
   'filtering-source-accessor.hh',
   'git-utils.hh',
   'mounted-source-accessor.hh',
-  'fetchers.hh',
+  'patching-source-accessor.hh',
   'registry.hh',
   'store-path-accessor.hh',
   'tarball.hh',

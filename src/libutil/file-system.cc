@@ -5,12 +5,14 @@
 #include "signals.hh"
 #include "finally.hh"
 #include "serialise.hh"
+#include "util.hh"
 
 #include <atomic>
 #include <cerrno>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
+#include <deque>
 #include <sstream>
 #include <filesystem>
 
@@ -23,9 +25,11 @@
 # include <io.h>
 #endif
 
-namespace fs = std::filesystem;
+#include "strings-inline.hh"
 
 namespace nix {
+
+namespace fs { using namespace std::filesystem; }
 
 /**
  * Treat the string as possibly an absolute path, by inspecting the
@@ -70,6 +74,10 @@ Path absPath(PathView path, std::optional<PathView> dir, bool resolveSymlinks)
     return canonPath(path, resolveSymlinks);
 }
 
+std::filesystem::path absPath(const std::filesystem::path & path, bool resolveSymlinks)
+{
+    return absPath(path.string(), std::nullopt, resolveSymlinks);
+}
 
 Path canonPath(PathView path, bool resolveSymlinks)
 {
@@ -90,7 +98,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
        arbitrary (but high) limit to prevent infinite loops. */
     unsigned int followCount = 0, maxFollow = 1024;
 
-    auto ret = canonPathInner<NativePathTrait>(
+    auto ret = canonPathInner<OsPathTrait<char>>(
         path,
         [&followCount, &temp, maxFollow, resolveSymlinks]
         (std::string & result, std::string_view & remaining) {
@@ -120,7 +128,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
 
 Path dirOf(const PathView path)
 {
-    Path::size_type pos = NativePathTrait::rfindPathSep(path);
+    Path::size_type pos = OsPathTrait<char>::rfindPathSep(path);
     if (pos == path.npos)
         return ".";
     return fs::path{path}.parent_path().string();
@@ -133,10 +141,10 @@ std::string_view baseNameOf(std::string_view path)
         return "";
 
     auto last = path.size() - 1;
-    while (last > 0 && NativePathTrait::isPathSep(path[last]))
+    while (last > 0 && OsPathTrait<char>::isPathSep(path[last]))
         last -= 1;
 
-    auto pos = NativePathTrait::rfindPathSep(path, last);
+    auto pos = OsPathTrait<char>::rfindPathSep(path, last);
     if (pos == path.npos)
         pos = 0;
     else
@@ -203,10 +211,10 @@ bool pathExists(const Path & path)
     return maybeLstat(path).has_value();
 }
 
-bool pathAccessible(const Path & path)
+bool pathAccessible(const std::filesystem::path & path)
 {
     try {
-        return pathExists(path);
+        return pathExists(path.string());
     } catch (SysError & e) {
         // swallow EPERM
         if (e.errNo == EPERM) return false;
@@ -233,6 +241,11 @@ std::string readFile(const Path & path)
     if (!fd)
         throw SysError("opening file '%1%'", path);
     return readFile(fd.get());
+}
+
+std::string readFile(const std::filesystem::path & path)
+{
+    return readFile(os_string_to_string(PathViewNG { path }));
 }
 
 
@@ -313,6 +326,50 @@ void syncParent(const Path & path)
     if (!fd)
         throw SysError("opening file '%1%'", path);
     fd.fsync();
+}
+
+
+void recursiveSync(const Path & path)
+{
+    /* If it's a file, just fsync and return. */
+    auto st = lstat(path);
+    if (S_ISREG(st.st_mode)) {
+        AutoCloseFD fd = toDescriptor(open(path.c_str(), O_RDONLY, 0));
+        if (!fd)
+            throw SysError("opening file '%1%'", path);
+        fd.fsync();
+        return;
+    }
+
+    /* Otherwise, perform a depth-first traversal of the directory and
+       fsync all the files. */
+    std::deque<fs::path> dirsToEnumerate;
+    dirsToEnumerate.push_back(path);
+    std::vector<fs::path> dirsToFsync;
+    while (!dirsToEnumerate.empty()) {
+        auto currentDir = dirsToEnumerate.back();
+        dirsToEnumerate.pop_back();
+        for (auto & entry : std::filesystem::directory_iterator(currentDir)) {
+            auto st = entry.symlink_status();
+            if (fs::is_directory(st)) {
+                dirsToEnumerate.emplace_back(entry.path());
+            } else if (fs::is_regular_file(st)) {
+                AutoCloseFD fd = toDescriptor(open(entry.path().string().c_str(), O_RDONLY, 0));
+                if (!fd)
+                    throw SysError("opening file '%1%'", entry.path());
+                fd.fsync();
+            }
+        }
+        dirsToFsync.emplace_back(std::move(currentDir));
+    }
+
+    /* Fsync all the directories. */
+    for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
+        AutoCloseFD fd = toDescriptor(open(dir->string().c_str(), O_RDONLY, 0));
+        if (!fd)
+            throw SysError("opening directory '%1%'", *dir);
+        fd.fsync();
+    }
 }
 
 
@@ -414,7 +471,11 @@ void deletePath(const fs::path & path)
 
 void createDir(const Path & path, mode_t mode)
 {
-    if (mkdir(path.c_str(), mode) == -1)
+    if (mkdir(path.c_str()
+#ifndef _WIN32
+                , mode
+#endif
+                ) == -1)
         throw SysError("creating directory '%1%'", path);
 }
 
@@ -440,7 +501,7 @@ void deletePath(const fs::path & path, uint64_t & bytesFreed)
 
 AutoDelete::AutoDelete() : del{false} {}
 
-AutoDelete::AutoDelete(const fs::path & p, bool recursive) : _path(p)
+AutoDelete::AutoDelete(const std::filesystem::path & p, bool recursive) : _path(p)
 {
     del = true;
     this->recursive = recursive;
@@ -457,7 +518,7 @@ AutoDelete::~AutoDelete()
             }
         }
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 
@@ -544,31 +605,53 @@ void createSymlink(const Path & target, const Path & link)
     fs::create_symlink(target, link);
 }
 
-void replaceSymlink(const Path & target, const Path & link)
+void replaceSymlink(const fs::path & target, const fs::path & link)
 {
     for (unsigned int n = 0; true; n++) {
-        Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
+        auto tmp = link.parent_path() / fs::path{fmt(".%d_%s", n, link.filename().string())};
+        tmp = tmp.lexically_normal();
 
         try {
-            createSymlink(target, tmp);
+            fs::create_symlink(target, tmp);
         } catch (fs::filesystem_error & e) {
             if (e.code() == std::errc::file_exists) continue;
             throw;
         }
 
-        std::filesystem::rename(tmp, link);
+        fs::rename(tmp, link);
 
         break;
     }
 }
 
 void setWriteTime(
-    const std::filesystem::path & path,
+    const fs::path & path,
     time_t accessedTime,
     time_t modificationTime,
     std::optional<bool> optIsSymlink)
 {
-#ifndef _WIN32
+#ifdef _WIN32
+    // FIXME use `fs::last_write_time`.
+    //
+    // Would be nice to use std::filesystem unconditionally, but
+    // doesn't support access time just modification time.
+    //
+    // System clock vs File clock issues also make that annoying.
+    warn("Changing file times is not yet implemented on Windows, path is '%s'", path);
+#elif HAVE_UTIMENSAT && HAVE_DECL_AT_SYMLINK_NOFOLLOW
+    struct timespec times[2] = {
+        {
+            .tv_sec = accessedTime,
+            .tv_nsec = 0,
+        },
+        {
+            .tv_sec = modificationTime,
+            .tv_nsec = 0,
+        },
+    };
+    if (utimensat(AT_FDCWD, path.c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
+        throw SysError("changing modification time of '%s' (using `utimensat`)", path);
+#else
     struct timeval times[2] = {
         {
             .tv_sec = accessedTime,
@@ -579,42 +662,21 @@ void setWriteTime(
             .tv_usec = 0,
         },
     };
-#endif
-
-    auto nonSymlink = [&]{
-        bool isSymlink = optIsSymlink
-            ? *optIsSymlink
-            : fs::is_symlink(path);
-
-        if (!isSymlink) {
-#ifdef _WIN32
-            // FIXME use `fs::last_write_time`.
-            //
-            // Would be nice to use std::filesystem unconditionally, but
-            // doesn't support access time just modification time.
-            //
-            // System clock vs File clock issues also make that annoying.
-            warn("Changing file times is not yet implemented on Windows, path is '%s'", path);
-#else
-            if (utimes(path.c_str(), times) == -1) {
-
-                throw SysError("changing modification time of '%s' (not a symlink)", path);
-            }
-#endif
-        } else {
-            throw Error("Cannot modification time of symlink '%s'", path);
-        }
-    };
-
 #if HAVE_LUTIMES
-    if (lutimes(path.c_str(), times) == -1) {
-        if (errno == ENOSYS)
-            nonSymlink();
-        else
-            throw SysError("changing modification time of '%s'", path);
-    }
+    if (lutimes(path.c_str(), times) == -1)
+        throw SysError("changing modification time of '%s'", path);
 #else
-    nonSymlink();
+    bool isSymlink = optIsSymlink
+        ? *optIsSymlink
+        : fs::is_symlink(path);
+
+    if (!isSymlink) {
+        if (utimes(path.c_str(), times) == -1)
+            throw SysError("changing modification time of '%s' (not a symlink)", path);
+    } else {
+        throw Error("Cannot modification time of symlink '%s'", path);
+    }
+#endif
 #endif
 }
 
@@ -678,5 +740,19 @@ void moveFile(const Path & oldName, const Path & newName)
 }
 
 //////////////////////////////////////////////////////////////////////
+
+bool isExecutableFileAmbient(const fs::path & exe) {
+    // Check file type, because directory being executable means
+    // something completely different.
+    // `is_regular_file` follows symlinks before checking.
+    return std::filesystem::is_regular_file(exe)
+        && access(exe.string().c_str(),
+#ifdef WIN32
+        0 // TODO do better
+#else
+        X_OK
+#endif
+        ) == 0;
+}
 
 }
