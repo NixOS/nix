@@ -1,6 +1,10 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 [[ $(type -p hg) ]] || skipTest "Mercurial not installed"
+
+TODO_NixOS
 
 clearStore
 

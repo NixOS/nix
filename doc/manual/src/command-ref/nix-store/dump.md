@@ -8,7 +8,7 @@
 
 ## Description
 
-The operation `--dump` produces a [NAR (Nix ARchive)][Nix Archive] file containing the
+The operation `--dump` produces a [Nix archive](@docroot@/glossary.md#gloss-nar) (NAR) file containing the
 contents of the file system tree rooted at *path*. The archive is
 written to standard output.
 
@@ -30,8 +30,7 @@ NAR archives support filenames of unlimited length and 64-bit file
 sizes. They can contain regular files, directories, and symbolic links,
 but not other types of files (such as device nodes).
 
-A Nix archive can be unpacked using `nix-store
---restore`.
+A Nix archive can be unpacked using [`nix-store --restore`](@docroot@/command-ref/nix-store/restore.md).
 
 [Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 

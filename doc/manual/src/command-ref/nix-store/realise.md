@@ -32,7 +32,7 @@ If no substitutes are available and no store derivation is given, realisation fa
 [store objects]: @docroot@/store/store-object.md
 [closure]: @docroot@/glossary.md#gloss-closure
 [substituters]: @docroot@/command-ref/conf-file.md#conf-substituters
-[content-addressed derivations]: @docroot@/contributing/experimental-features.md#xp-feature-ca-derivations
+[content-addressed derivations]: @docroot@/development/experimental-features.md#xp-feature-ca-derivations
 [Nix database]: @docroot@/glossary.md#gloss-nix-database
 
 The resulting paths are printed on standard output.
@@ -42,23 +42,26 @@ For non-derivation arguments, the argument itself is printed.
 
 # Options
 
-  - `--dry-run`\
-    Print on standard error a description of what packages would be
-    built or downloaded, without actually performing the operation.
+- `--dry-run`
 
-  - `--ignore-unknown`\
-    If a non-derivation path does not have a substitute, then silently
-    ignore it.
+  Print on standard error a description of what packages would be
+  built or downloaded, without actually performing the operation.
 
-  - `--check`\
-    This option allows you to check whether a derivation is
-    deterministic. It rebuilds the specified derivation and checks
-    whether the result is bitwise-identical with the existing outputs,
-    printing an error if that’s not the case. The outputs of the
-    specified derivation must already exist. When used with `-K`, if an
-    output path is not identical to the corresponding output from the
-    previous build, the new output path is left in
-    `/nix/store/name.check.`
+- `--ignore-unknown`
+
+  If a non-derivation path does not have a substitute, then silently
+  ignore it.
+
+- `--check`
+
+  This option allows you to check whether a derivation is
+  deterministic. It rebuilds the specified derivation and checks
+  whether the result is bitwise-identical with the existing outputs,
+  printing an error if that’s not the case. The outputs of the
+  specified derivation must already exist. When used with `-K`, if an
+  output path is not identical to the corresponding output from the
+  previous build, the new output path is left in
+  `/nix/store/name.check.`
 
 {{#include ./opt-common.md}}
 

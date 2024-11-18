@@ -69,10 +69,17 @@ std::string PackageInfo::querySystem() const
 std::optional<StorePath> PackageInfo::queryDrvPath() const
 {
     if (!drvPath && attrs) {
-        NixStringContext context;
-        if (auto i = attrs->get(state->sDrvPath))
-            drvPath = {state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the 'drvPath' attribute of a derivation")};
-        else
+        if (auto i = attrs->get(state->sDrvPath)) {
+            NixStringContext context;
+            auto found = state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the 'drvPath' attribute of a derivation");
+            try {
+                found.requireDerivation();
+            } catch (Error & e) {
+                e.addTrace(state->positions[i->pos], "while evaluating the 'drvPath' attribute of a derivation");
+                throw;
+            }
+            drvPath = {std::move(found)};
+        } else
             drvPath = {std::nullopt};
     }
     return drvPath.value_or(std::nullopt);
@@ -239,8 +246,8 @@ NixInt PackageInfo::queryMetaInt(const std::string & name, NixInt def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            integer meta fields. */
-        if (auto n = string2Int<NixInt>(v->c_str()))
-            return *n;
+        if (auto n = string2Int<NixInt::Inner>(v->c_str()))
+            return NixInt{*n};
     }
     return def;
 }
@@ -335,9 +342,9 @@ std::optional<PackageInfo> getDerivation(EvalState & state, Value & v,
 }
 
 
-static std::string addToPath(const std::string & s1, const std::string & s2)
+static std::string addToPath(const std::string & s1, std::string_view s2)
 {
-    return s1.empty() ? s2 : s1 + "." + s2;
+    return s1.empty() ? std::string(s2) : s1 + "." + s2;
 }
 
 
@@ -367,21 +374,27 @@ static void getDerivations(EvalState & state, Value & vIn,
            bound to the attribute with the "lower" name should take
            precedence). */
         for (auto & i : v.attrs()->lexicographicOrder(state.symbols)) {
-            debug("evaluating attribute '%1%'", state.symbols[i->name]);
-            if (!std::regex_match(std::string(state.symbols[i->name]), attrRegex))
-                continue;
-            std::string pathPrefix2 = addToPath(pathPrefix, state.symbols[i->name]);
-            if (combineChannels)
-                getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
-            else if (getDerivation(state, *i->value, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
-                /* If the value of this attribute is itself a set,
-                   should we recurse into it?  => Only if it has a
-                   `recurseForDerivations = true' attribute. */
-                if (i->value->type() == nAttrs) {
-                    auto j = i->value->attrs()->get(state.sRecurseForDerivations);
-                    if (j && state.forceBool(*j->value, j->pos, "while evaluating the attribute `recurseForDerivations`"))
-                        getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+            std::string_view symbol{state.symbols[i->name]};
+            try {
+                debug("evaluating attribute '%1%'", symbol);
+                if (!std::regex_match(symbol.begin(), symbol.end(), attrRegex))
+                    continue;
+                std::string pathPrefix2 = addToPath(pathPrefix, symbol);
+                if (combineChannels)
+                    getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+                else if (getDerivation(state, *i->value, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
+                    /* If the value of this attribute is itself a set,
+                    should we recurse into it?  => Only if it has a
+                    `recurseForDerivations = true' attribute. */
+                    if (i->value->type() == nAttrs) {
+                        auto j = i->value->attrs()->get(state.sRecurseForDerivations);
+                        if (j && state.forceBool(*j->value, j->pos, "while evaluating the attribute `recurseForDerivations`"))
+                            getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+                    }
                 }
+            } catch (Error & e) {
+                e.addTrace(state.positions[i->pos], "while evaluating the attribute '%s'", symbol);
+                throw;
             }
         }
     }

@@ -1,12 +1,14 @@
 #pragma once
 ///@file
 
-#include "types.hh"
-#include "hash.hh"
-#include "config.hh"
-
 #include <string>
 #include <future>
+
+#include "logging.hh"
+#include "types.hh"
+#include "ref.hh"
+#include "config.hh"
+#include "serialise.hh"
 
 namespace nix {
 
@@ -45,6 +47,12 @@ struct FileTransferSettings : Config
 
     Setting<unsigned int> tries{this, 5, "download-attempts",
         "How often Nix will attempt to download a file before giving up."};
+
+    Setting<size_t> downloadBufferSize{this, 64 * 1024 * 1024, "download-buffer-size",
+        R"(
+          The size of Nix's internal download buffer during `curl` transfers. If data is
+          not processed quickly enough to exceed the size of this buffer, downloads may stall.
+        )"};
 };
 
 extern FileTransferSettings fileTransferSettings;

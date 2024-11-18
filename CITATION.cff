@@ -1,0 +1,42 @@
+cff-version: 1.2.0
+title: Nix
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Eelco
+    family-names: Dolstra
+    email: edolstra@gmail.com
+  - name: The Nix contributors
+    website: 'https://github.com/NixOS/nix'
+references:
+  - title: The Purely Functional Software Deployment Model
+    authors:
+    - family-names: Dolstra
+      given-names: Eelco
+    year: 2006
+    type: thesis
+    thesis-type: PhD thesis
+    isbn: 90-393-4130-3
+    url: https://dspace.library.uu.nl/handle/1874/7540
+    database-provider: Utrecht University Repository
+    institution:
+      name: Utrecht University
+    keywords:
+    - configuration management
+    - software deployment
+    - purely functional
+    - component-based software engineering
+repository-code: 'https://github.com/NixOS/nix'
+url: 'https://nixos.org/'
+abstract: >-
+  Nix, a purely functional package manager, is a powerful
+  package manager for Linux and other Unix systems that
+  makes package management reliable and reproducible.
+keywords:
+  - reproducibility
+  - open-source
+  - c++
+  - functional
+license: LGPL-2.1

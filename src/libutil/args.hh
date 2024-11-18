@@ -1,8 +1,8 @@
 #pragma once
 ///@file
 
-#include <iostream>
 #include <functional>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <optional>
@@ -11,6 +11,7 @@
 
 #include "types.hh"
 #include "experimental-features.hh"
+#include "ref.hh"
 
 namespace nix {
 
@@ -109,6 +110,16 @@ protected:
         { }
 
         Handler(std::optional<std::string> * dest)
+            : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
+            , arity(1)
+        { }
+
+        Handler(std::filesystem::path * dest)
+            : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
+            , arity(1)
+        { }
+
+        Handler(std::optional<std::filesystem::path> * dest)
             : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
             , arity(1)
         { }
@@ -284,6 +295,18 @@ public:
     }
 
     /**
+     * Expect a path argument.
+     */
+    void expectArg(const std::string & label, std::filesystem::path * dest, bool optional = false)
+    {
+        expectArgs({
+            .label = label,
+            .optional = optional,
+            .handler = {dest}
+        });
+    }
+
+    /**
      * Expect 0 or more arguments.
      */
     void expectArgs(const std::string & label, std::vector<std::string> * dest)
@@ -380,7 +403,7 @@ struct Completion {
     std::string completion;
     std::string description;
 
-    bool operator<(const Completion & other) const;
+    auto operator<=>(const Completion & other) const noexcept;
 };
 
 /**

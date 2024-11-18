@@ -6,7 +6,10 @@ mkDerivation {
   name = "nested-sandboxing";
   busybox = builtins.getEnv "busybox";
   EXTRA_SANDBOX = builtins.getEnv "EXTRA_SANDBOX";
-  buildCommand = if altitude == 0 then ''
+  buildCommand = ''
+    set -x
+    set -eu -o pipefail
+  '' + (if altitude == 0 then ''
     echo Deep enough! > $out
   '' else ''
     cp -r ${../common} ./common
@@ -20,5 +23,5 @@ mkDerivation {
     source ./nested-sandboxing/command.sh
 
     runNixBuild ${storeFun} ${toString altitude} >> $out
-  '';
+  '');
 }

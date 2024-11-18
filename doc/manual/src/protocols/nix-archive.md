@@ -29,7 +29,7 @@ regular = [ str("executable"), str("") ], str("contents"), str(contents);
 symlink = str("target"), str(target);
 
 (* side condition: directory entries must be ordered by their names *)
-directory = str("type"), str("directory") { directory-entry };
+directory = { directory-entry };
 
 directory-entry = str("entry"), str("("), str("name"), str(name), str("node"), nar-obj, str(")");
 ```

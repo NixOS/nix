@@ -1,7 +1,7 @@
 #include <fcntl.h>
 
 #include "error.hh"
-#include "config.hh"
+#include "config-global.hh"
 #include "fs-sink.hh"
 
 #if _WIN32
@@ -14,7 +14,7 @@ namespace nix {
 
 void copyRecursive(
     SourceAccessor & accessor, const CanonPath & from,
-    FileSystemObjectSink & sink, const Path & to)
+    FileSystemObjectSink & sink, const CanonPath & to)
 {
     auto stat = accessor.lstat(from);
 
@@ -43,7 +43,7 @@ void copyRecursive(
         for (auto & [name, _] : accessor.readDirectory(from)) {
             copyRecursive(
                 accessor, from / name,
-                sink, to + "/" + name);
+                sink, to / name);
             break;
         }
         break;
@@ -53,7 +53,7 @@ void copyRecursive(
         throw Error("file '%1%' has an unsupported type", from);
 
     default:
-        abort();
+        unreachable();
     }
 }
 
@@ -68,35 +68,49 @@ static RestoreSinkSettings restoreSinkSettings;
 
 static GlobalConfig::Register r1(&restoreSinkSettings);
 
-
-void RestoreSink::createDirectory(const Path & path)
+static std::filesystem::path append(const std::filesystem::path & src, const CanonPath & path)
 {
-    Path p = dstPath + path;
-    if (
-#ifndef _WIN32 // TODO abstract mkdir perms for Windows
-        mkdir(p.c_str(), 0777) == -1
-#else
-        !CreateDirectoryW(pathNG(p).c_str(), NULL)
-#endif
-        )
-        throw NativeSysError("creating directory '%1%'", p);
+    auto dst = src;
+    if (!path.rel().empty())
+        dst /= path.rel();
+    return dst;
+}
+
+void RestoreSink::createDirectory(const CanonPath & path)
+{
+    auto p = append(dstPath, path);
+    if (!std::filesystem::create_directory(p))
+        throw Error("path '%s' already exists", p.string());
 };
 
 struct RestoreRegularFile : CreateRegularFileSink {
     AutoCloseFD fd;
+    bool startFsync = false;
+
+    ~RestoreRegularFile()
+    {
+        /* Initiate an fsync operation without waiting for the
+           result. The real fsync should be run before registering a
+           store path, but this is a performance optimization to allow
+           the disk write to start early. */
+        if (fd && startFsync)
+            fd.startFsync();
+    }
 
     void operator () (std::string_view data) override;
     void isExecutable() override;
     void preallocateContents(uint64_t size) override;
 };
 
-void RestoreSink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
+void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
-    Path p = dstPath + path;
+    auto p = append(dstPath, path);
+
     RestoreRegularFile crf;
+    crf.startFsync = startFsync;
     crf.fd =
 #ifdef _WIN32
-        CreateFileW(pathNG(path).c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)
+        CreateFileW(p.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)
 #else
         open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666)
 #endif
@@ -141,14 +155,14 @@ void RestoreRegularFile::operator () (std::string_view data)
     writeFull(fd.get(), data);
 }
 
-void RestoreSink::createSymlink(const Path & path, const std::string & target)
+void RestoreSink::createSymlink(const CanonPath & path, const std::string & target)
 {
-    Path p = dstPath + path;
-    nix::createSymlink(target, p);
+    auto p = append(dstPath, path);
+    nix::createSymlink(target, p.string());
 }
 
 
-void RegularFileSink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
+void RegularFileSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
     struct CRF : CreateRegularFileSink {
         RegularFileSink & back;
@@ -163,7 +177,7 @@ void RegularFileSink::createRegularFile(const Path & path, std::function<void(Cr
 }
 
 
-void NullFileSystemObjectSink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
+void NullFileSystemObjectSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
     struct : CreateRegularFileSink {
         void operator () (std::string_view data) override {}

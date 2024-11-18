@@ -162,6 +162,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
     /* Read the `temproots' directory for per-process temporary root
        files. */
     for (auto & i : std::filesystem::directory_iterator{tempRootsDir}) {
+        checkInterrupt();
         auto name = i.path().filename().string();
         if (name[0] == '.') {
             // Ignore hidden files. Some package managers (notably portage) create
@@ -228,8 +229,10 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
             type = std::filesystem::symlink_status(path).type();
 
         if (type == std::filesystem::file_type::directory) {
-            for (auto & i : std::filesystem::directory_iterator{path})
+            for (auto & i : std::filesystem::directory_iterator{path}) {
+                checkInterrupt();
                 findRoots(i.path().string(), i.symlink_status().type(), roots);
+            }
         }
 
         else if (type == std::filesystem::file_type::symlink) {
@@ -330,7 +333,7 @@ static std::string quoteRegexChars(const std::string & raw)
 }
 
 #if __linux__
-static void readFileRoots(const char * path, UncheckedRoots & roots)
+static void readFileRoots(const std::filesystem::path & path, UncheckedRoots & roots)
 {
     try {
         roots[readFile(path)].emplace(path);
@@ -556,7 +559,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                        non-blocking flag from the server socket, so
                        explicitly make it blocking. */
                     if (fcntl(fdClient.get(), F_SETFL, fcntl(fdClient.get(), F_GETFL) & ~O_NONBLOCK) == -1)
-                        abort();
+                        panic("Could not set non-blocking flag on client socket");
 
                     while (true) {
                         try {
@@ -781,7 +784,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 throw Error(
                     "Cannot delete path '%1%' since it is still alive. "
                     "To find out why, use: "
-                    "nix-store --query --roots",
+                    "nix-store --query --roots and nix-store --query --referrers",
                     printStorePath(i));
         }
 
@@ -888,7 +891,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
 void LocalStore::autoGC(bool sync)
 {
-#ifdef HAVE_STATVFS
+#if HAVE_STATVFS
     static auto fakeFreeSpaceFile = getEnv("_NIX_TEST_FREE_SPACE_FILE");
 
     auto getAvail = [this]() -> uint64_t {
@@ -955,8 +958,8 @@ void LocalStore::autoGC(bool sync)
 
             } catch (...) {
                 // FIXME: we could propagate the exception to the
-                // future, but we don't really care.
-                ignoreException();
+                // future, but we don't really care. (what??)
+                ignoreExceptionInDestructor();
             }
 
         }).detach();

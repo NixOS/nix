@@ -62,7 +62,7 @@ These pages can be viewed offline:
 
 Several operations, such as [`nix-env --query`](./nix-env/query.md) and [`nix-env --install`](./nix-env/install.md), take a list of *arguments* that specify the packages on which to operate.
 
-Packages are identified based on a `name` part and a `version` part of a [symbolic derivation name](@docroot@/language/derivations.md#attr-names):
+Packages are identified based on a `name` part and a `version` part of a [symbolic derivation name](@docroot@/language/derivations.md#attr-name):
 
 - `name`: Everything up to but not including the first dash (`-`) that is *not* followed by a letter.
 - `version`: The rest, excluding the separating dash.

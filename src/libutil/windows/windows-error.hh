@@ -5,7 +5,7 @@
 
 #include "error.hh"
 
-namespace nix {
+namespace nix::windows {
 
 /**
  * Windows Error type.

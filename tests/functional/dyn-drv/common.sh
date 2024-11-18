@@ -5,4 +5,6 @@ requireDaemonNewerThan "2.16.0pre20230419"
 
 enableFeatures "ca-derivations dynamic-derivations"
 
+TODO_NixOS
+
 restartDaemon

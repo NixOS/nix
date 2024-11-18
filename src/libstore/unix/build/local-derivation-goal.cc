@@ -64,6 +64,8 @@
 #include <grp.h>
 #include <iostream>
 
+#include "strings.hh"
+
 namespace nix {
 
 void handleDiffHook(
@@ -107,9 +109,9 @@ LocalDerivationGoal::~LocalDerivationGoal()
 {
     /* Careful: we should never ever throw an exception from a
        destructor. */
-    try { deleteTmpDir(false); } catch (...) { ignoreException(); }
-    try { killChild(); } catch (...) { ignoreException(); }
-    try { stopDaemon(); } catch (...) { ignoreException(); }
+    try { deleteTmpDir(false); } catch (...) { ignoreExceptionInDestructor(); }
+    try { killChild(); } catch (...) { ignoreExceptionInDestructor(); }
+    try { stopDaemon(); } catch (...) { ignoreExceptionInDestructor(); }
 }
 
 
@@ -163,7 +165,7 @@ void LocalDerivationGoal::killSandbox(bool getStats)
             buildResult.cpuSystem = stats.cpuSystem;
         }
         #else
-        abort();
+        unreachable();
         #endif
     }
 
@@ -175,7 +177,7 @@ void LocalDerivationGoal::killSandbox(bool getStats)
 }
 
 
-void LocalDerivationGoal::tryLocalBuild()
+Goal::Co LocalDerivationGoal::tryLocalBuild()
 {
 #if __APPLE__
     additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
@@ -183,10 +185,10 @@ void LocalDerivationGoal::tryLocalBuild()
 
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
-        state = &DerivationGoal::tryToBuild;
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
-        return;
+        co_await Suspend{};
+        co_return tryToBuild();
     }
 
     assert(derivationType);
@@ -240,7 +242,8 @@ void LocalDerivationGoal::tryLocalBuild()
                 actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                     fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
             worker.waitForAWhile(shared_from_this());
-            return;
+            co_await Suspend{};
+            co_return tryLocalBuild();
         }
     }
 
@@ -255,15 +258,13 @@ void LocalDerivationGoal::tryLocalBuild()
         outputLocks.unlock();
         buildUser.reset();
         worker.permanentFailure = true;
-        done(BuildResult::InputRejected, {}, std::move(e));
-        return;
+        co_return done(BuildResult::InputRejected, {}, std::move(e));
     }
 
-    /* This state will be reached when we get EOF on the child's
-       log pipe. */
-    state = &DerivationGoal::buildDone;
-
     started();
+    co_await Suspend{};
+    // after EOF on child
+    co_return buildDone();
 }
 
 static void chmod_(const Path & path, mode_t mode)
@@ -432,6 +433,41 @@ static void doBind(const Path & source, const Path & target, bool optional = fal
 };
 #endif
 
+/**
+ * Rethrow the current exception as a subclass of `Error`.
+ */
+static void rethrowExceptionAsError()
+{
+    try {
+        throw;
+    } catch (Error &) {
+        throw;
+    } catch (std::exception & e) {
+        throw Error(e.what());
+    } catch (...) {
+        throw Error("unknown exception");
+    }
+}
+
+/**
+ * Send the current exception to the parent in the format expected by
+ * `LocalDerivationGoal::processSandboxSetupMessages()`.
+ */
+static void handleChildException(bool sendException)
+{
+    try {
+        rethrowExceptionAsError();
+    } catch (Error & e) {
+        if (sendException) {
+            writeFull(STDERR_FILENO, "\1\n");
+            FdSink sink(STDERR_FILENO);
+            sink << e;
+            sink.flush();
+        } else
+            std::cerr << e.msg();
+    }
+}
+
 void LocalDerivationGoal::startBuilder()
 {
     if ((buildUser && buildUser->getUIDCount() != 1)
@@ -443,25 +479,22 @@ void LocalDerivationGoal::startBuilder()
         #if __linux__
         experimentalFeatureSettings.require(Xp::Cgroups);
 
+        /* If we're running from the daemon, then this will return the
+           root cgroup of the service. Otherwise, it will return the
+           current cgroup. */
+        auto rootCgroup = getRootCgroup();
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS)
             throw Error("cannot determine the cgroups file system");
-
-        auto ourCgroups = getCgroups("/proc/self/cgroup");
-        auto ourCgroup = ourCgroups[""];
-        if (ourCgroup == "")
-            throw Error("cannot determine cgroup name from /proc/self/cgroup");
-
-        auto ourCgroupPath = canonPath(*cgroupFS + "/" + ourCgroup);
-
-        if (!pathExists(ourCgroupPath))
-            throw Error("expected cgroup directory '%s'", ourCgroupPath);
+        auto rootCgroupPath = canonPath(*cgroupFS + "/" + rootCgroup);
+        if (!pathExists(rootCgroupPath))
+            throw Error("expected cgroup directory '%s'", rootCgroupPath);
 
         static std::atomic<unsigned int> counter{0};
 
         cgroup = buildUser
-            ? fmt("%s/nix-build-uid-%d", ourCgroupPath, buildUser->getUID())
-            : fmt("%s/nix-build-pid-%d-%d", ourCgroupPath, getpid(), counter++);
+            ? fmt("%s/nix-build-uid-%d", rootCgroupPath, buildUser->getUID())
+            : fmt("%s/nix-build-pid-%d-%d", rootCgroupPath, getpid(), counter++);
 
         debug("using cgroup '%s'", *cgroup);
 
@@ -503,8 +536,24 @@ void LocalDerivationGoal::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
-    tmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+    topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+#if __APPLE__
+    if (false) {
+#else
+    if (useChroot) {
+#endif
+        /* If sandboxing is enabled, put the actual TMPDIR underneath
+           an inaccessible root-owned directory, to prevent outside
+           access.
 
+           On macOS, we don't use an actual chroot, so this isn't
+           possible. Any mitigation along these lines would have to be
+           done directly in the sandbox profile. */
+        tmpDir = topTmpDir + "/build";
+        createDir(tmpDir, 0700);
+    } else {
+        tmpDir = topTmpDir;
+    }
     chownToBuilder(tmpDir);
 
     for (auto & [outputName, status] : initialOutputs) {
@@ -672,15 +721,19 @@ void LocalDerivationGoal::startBuilder()
            environment using bind-mounts.  We put it in the Nix store
            so that the build outputs can be moved efficiently from the
            chroot to their final location. */
-        chrootRootDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
-        deletePath(chrootRootDir);
+        chrootParentDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
+        deletePath(chrootParentDir);
 
         /* Clean up the chroot directory automatically. */
-        autoDelChroot = std::make_shared<AutoDelete>(chrootRootDir);
+        autoDelChroot = std::make_shared<AutoDelete>(chrootParentDir);
 
-        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootRootDir);
+        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootParentDir);
 
-        // FIXME: make this 0700
+        if (mkdir(chrootParentDir.c_str(), 0700) == -1)
+            throw SysError("cannot create '%s'", chrootRootDir);
+
+        chrootRootDir = chrootParentDir + "/root";
+
         if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
             throw SysError("cannot create '%1%'", chrootRootDir);
 
@@ -931,32 +984,40 @@ void LocalDerivationGoal::startBuilder()
                root. */
             openSlave();
 
-            /* Drop additional groups here because we can't do it
-               after we've created the new user namespace. */
-            if (setgroups(0, 0) == -1) {
-                if (errno != EPERM)
-                    throw SysError("setgroups failed");
-                if (settings.requireDropSupplementaryGroups)
-                    throw Error("setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
+            try {
+                /* Drop additional groups here because we can't do it
+                   after we've created the new user namespace. */
+                if (setgroups(0, 0) == -1) {
+                    if (errno != EPERM)
+                        throw SysError("setgroups failed");
+                    if (settings.requireDropSupplementaryGroups)
+                        throw Error("setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
+                }
+
+                ProcessOptions options;
+                options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
+                if (privateNetwork)
+                    options.cloneFlags |= CLONE_NEWNET;
+                if (usingUserNamespace)
+                    options.cloneFlags |= CLONE_NEWUSER;
+
+                pid_t child = startProcess([&]() { runChild(); }, options);
+
+                writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
+                _exit(0);
+            } catch (...) {
+                handleChildException(true);
+                _exit(1);
             }
-
-            ProcessOptions options;
-            options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
-            if (privateNetwork)
-                options.cloneFlags |= CLONE_NEWNET;
-            if (usingUserNamespace)
-                options.cloneFlags |= CLONE_NEWUSER;
-
-            pid_t child = startProcess([&]() { runChild(); }, options);
-
-            writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
-            _exit(0);
         });
 
         sendPid.writeSide.close();
 
-        if (helper.wait() != 0)
+        if (helper.wait() != 0) {
+            processSandboxSetupMessages();
+            // Only reached if the child process didn't send an exception.
             throw Error("unable to start build process");
+        }
 
         userNamespaceSync.readSide = -1;
 
@@ -1032,7 +1093,12 @@ void LocalDerivationGoal::startBuilder()
     pid.setSeparatePG(true);
     worker.childStarted(shared_from_this(), {builderOut.get()}, true, true);
 
-    /* Check if setting up the build environment failed. */
+    processSandboxSetupMessages();
+}
+
+
+void LocalDerivationGoal::processSandboxSetupMessages()
+{
     std::vector<std::string> msgs;
     while (true) {
         std::string msg = [&]() {
@@ -1060,7 +1126,8 @@ void LocalDerivationGoal::startBuilder()
 }
 
 
-void LocalDerivationGoal::initTmpDir() {
+void LocalDerivationGoal::initTmpDir()
+{
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
 #if __linux__
@@ -1237,7 +1304,7 @@ bool LocalDerivationGoal::isAllowed(const DerivedPath & req)
 struct RestrictedStoreConfig : virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
-    const std::string name() { return "Restricted Store"; }
+    const std::string name() override { return "Restricted Store"; }
 };
 
 /* A wrapper around LocalStore that only allows building/querying of
@@ -1500,19 +1567,20 @@ void LocalDerivationGoal::startDaemon()
                 throw SysError("accepting connection");
             }
 
-            closeOnExec(remote.get());
+            unix::closeOnExec(remote.get());
 
             debug("received daemon connection");
 
             auto workerThread = std::thread([store, remote{std::move(remote)}]() {
-                FdSource from(remote.get());
-                FdSink to(remote.get());
                 try {
-                    daemon::processConnection(store, from, to,
+                    daemon::processConnection(
+                        store,
+                        FdSource(remote.get()),
+                        FdSink(remote.get()),
                         NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
                 } catch (SystemError &) {
-                    ignoreException();
+                    ignoreExceptionExceptInterrupt();
                 }
             });
 
@@ -1680,10 +1748,13 @@ void setupSeccomp()
             throw SysError("unable to add seccomp rule");
     }
 
-    /* Prevent builders from creating EAs or ACLs. Not all filesystems
+    /* Prevent builders from using EAs or ACLs. Not all filesystems
        support these, and they're not allowed in the Nix store because
        they're not representable in the NAR serialisation. */
-    if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(setxattr), 0) != 0 ||
+    if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(getxattr), 0) != 0 ||
+        seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(lgetxattr), 0) != 0 ||
+        seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(fgetxattr), 0) != 0 ||
+        seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(setxattr), 0) != 0 ||
         seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(lsetxattr), 0) != 0 ||
         seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(fsetxattr), 0) != 0)
         throw SysError("unable to add seccomp rule");
@@ -1721,13 +1792,20 @@ void LocalDerivationGoal::runChild()
 
         bool setUser = true;
 
-        /* Make the contents of netrc available to builtin:fetchurl
-           (which may run under a different uid and/or in a sandbox). */
+        /* Make the contents of netrc and the CA certificate bundle
+           available to builtin:fetchurl (which may run under a
+           different uid and/or in a sandbox). */
         std::string netrcData;
-        try {
-            if (drv->isBuiltin() && drv->builder == "builtin:fetchurl")
-                netrcData = readFile(settings.netrcFile);
-        } catch (SystemError &) { }
+        std::string caFileData;
+        if (drv->isBuiltin() && drv->builder == "builtin:fetchurl") {
+           try {
+               netrcData = readFile(settings.netrcFile);
+           } catch (SystemError &) { }
+
+           try {
+               caFileData = readFile(settings.caFile);
+           } catch (SystemError &) { }
+        }
 
 #if __linux__
         if (useChroot) {
@@ -1930,7 +2008,7 @@ void LocalDerivationGoal::runChild()
             if (chdir(chrootRootDir.c_str()) == -1)
                 throw SysError("cannot change directory to '%1%'", chrootRootDir);
 
-            if (mkdir("real-root", 0) == -1)
+            if (mkdir("real-root", 0500) == -1)
                 throw SysError("cannot create real-root directory");
 
             if (pivot_root(".", "real-root") == -1)
@@ -1961,7 +2039,7 @@ void LocalDerivationGoal::runChild()
             throw SysError("changing into '%1%'", tmpDir);
 
         /* Close all other file descriptors. */
-        closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
+        unix::closeExtraFDs();
 
 #if __linux__
         linux::setPersonality(drv->platform);
@@ -2166,7 +2244,7 @@ void LocalDerivationGoal::runChild()
                         worker.store.printStorePath(scratchOutputs.at(e.first)));
 
                 if (drv->builder == "builtin:fetchurl")
-                    builtinFetchurl(*drv, outputs, netrcData);
+                    builtinFetchurl(*drv, outputs, netrcData, caFileData);
                 else if (drv->builder == "builtin:buildenv")
                     builtinBuildenv(*drv, outputs);
                 else if (drv->builder == "builtin:unpack-channel")
@@ -2208,14 +2286,8 @@ void LocalDerivationGoal::runChild()
 
         throw SysError("executing '%1%'", drv->builder);
 
-    } catch (Error & e) {
-        if (sendException) {
-            writeFull(STDERR_FILENO, "\1\n");
-            FdSink sink(STDERR_FILENO);
-            sink << e;
-            sink.flush();
-        } else
-            std::cerr << e.msg();
+    } catch (...) {
+        handleChildException(sendException);
         _exit(1);
     }
 }
@@ -2489,7 +2561,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 auto fim = outputHash.method.getFileIngestionMethod();
                 switch (fim) {
                 case FileIngestionMethod::Flat:
-                case FileIngestionMethod::Recursive:
+                case FileIngestionMethod::NixArchive:
                 {
                     HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
                     auto fim = outputHash.method.getFileIngestionMethod();
@@ -2531,7 +2603,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             {
                 HashResult narHashAndSize = hashPath(
                     {getFSSourceAccessor(), CanonPath(actualPath)},
-                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.first;
                 newInfo0.narSize = narHashAndSize.second;
             }
@@ -2554,7 +2626,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 rewriteOutput(outputRewrites);
                 HashResult narHashAndSize = hashPath(
                     {getFSSourceAccessor(), CanonPath(actualPath)},
-                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
                 auto refs = rewriteRefs();
@@ -2904,6 +2976,24 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
         };
 
         if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
+            if (get(*structuredAttrs, "allowedReferences")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'allowedReferences'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "allowedRequisites")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'allowedRequisites'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "disallowedRequisites")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'disallowedRequisites'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "disallowedReferences")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'disallowedReferences'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "maxSize")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'maxSize'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "maxClosureSize")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'maxClosureSize'; use 'outputChecks' instead");
+            }
             if (auto outputChecks = get(*structuredAttrs, "outputChecks")) {
                 if (auto output = get(*outputChecks, outputName)) {
                     Checks checks;
@@ -2952,15 +3042,17 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
 
 void LocalDerivationGoal::deleteTmpDir(bool force)
 {
-    if (tmpDir != "") {
+    if (topTmpDir != "") {
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv->isBuiltin()) {
             printError("note: keeping build directory '%s'", tmpDir);
+            chmod(topTmpDir.c_str(), 0755);
             chmod(tmpDir.c_str(), 0755);
         }
         else
-            deletePath(tmpDir);
+            deletePath(topTmpDir);
+        topTmpDir = "";
         tmpDir = "";
     }
 }

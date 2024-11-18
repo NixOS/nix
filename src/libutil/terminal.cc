@@ -4,6 +4,8 @@
 
 #if _WIN32
 # include <io.h>
+# define WIN32_LEAN_AND_MEAN
+# include <windows.h>
 # define isatty _isatty
 #else
 # include <sys/ioctl.h>
@@ -97,17 +99,26 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
 
 
-#ifndef _WIN32
 void updateWindowSize()
 {
+    #ifndef _WIN32
     struct winsize ws;
     if (ioctl(2, TIOCGWINSZ, &ws) == 0) {
         auto windowSize_(windowSize.lock());
         windowSize_->first = ws.ws_row;
         windowSize_->second = ws.ws_col;
     }
+    #else
+    CONSOLE_SCREEN_BUFFER_INFO info;
+    // From https://stackoverflow.com/a/12642749
+    if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info) != 0) {
+        auto windowSize_(windowSize.lock());
+        // From https://github.com/libuv/libuv/blob/v1.48.0/src/win/tty.c#L1130
+        windowSize_->first = info.srWindow.Bottom - info.srWindow.Top + 1;
+        windowSize_->second = info.dwSize.X;
+    }
+    #endif
 }
-#endif
 
 
 std::pair<unsigned short, unsigned short> getWindowSize()

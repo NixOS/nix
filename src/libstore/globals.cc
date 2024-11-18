@@ -1,19 +1,21 @@
 #include "globals.hh"
+#include "config-global.hh"
 #include "current-process.hh"
 #include "archive.hh"
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
 #include "compute-levels.hh"
+#include "signals.hh"
 
 #include <algorithm>
 #include <map>
 #include <mutex>
 #include <thread>
 
+#include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
 #ifndef _WIN32
-# include <dlfcn.h>
 # include <sys/utsname.h>
 #endif
 
@@ -32,6 +34,8 @@
 #ifdef __APPLE__
 #include <sys/sysctl.h>
 #endif
+
+#include "strings.hh"
 
 namespace nix {
 
@@ -61,7 +65,6 @@ Settings::Settings()
     , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
     , nixConfDir(canonPath(getEnvNonEmpty("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
     , nixUserConfFiles(getUserConfigFiles())
-    , nixBinDir(canonPath(getEnvNonEmpty("NIX_BIN_DIR").value_or(NIX_BIN_DIR)))
     , nixManDir(canonPath(NIX_MAN_DIR))
     , nixDaemonSocketFile(canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
@@ -80,7 +83,7 @@ Settings::Settings()
         Strings ss;
         for (auto & p : tokenizeString<Strings>(*s, ":"))
             ss.push_back("@" + p);
-        builders = concatStringsSep(" ", ss);
+        builders = concatStringsSep("\n", ss);
     }
 
 #if defined(__linux__) && defined(SANDBOX_SHELL)
@@ -92,42 +95,14 @@ Settings::Settings()
     sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
-
-    /* Set the build hook location
-
-       For builds we perform a self-invocation, so Nix has to be self-aware.
-       That is, it has to know where it is installed. We don't think it's sentient.
-
-       Normally, nix is installed according to `nixBinDir`, which is set at compile time,
-       but can be overridden. This makes for a great default that works even if this
-       code is linked as a library into some other program whose main is not aware
-       that it might need to be a build remote hook.
-
-       However, it may not have been installed at all. For example, if it's a static build,
-       there's a good chance that it has been moved out of its installation directory.
-       That makes `nixBinDir` useless. Instead, we'll query the OS for the path to the
-       current executable, using `getSelfExe()`.
-
-       As a last resort, we resort to `PATH`. Hopefully we find a `nix` there that's compatible.
-       If you're porting Nix to a new platform, that might be good enough for a while, but
-       you'll want to improve `getSelfExe()` to work on your platform.
-     */
-    std::string nixExePath = nixBinDir + "/nix";
-    if (!pathExists(nixExePath)) {
-        nixExePath = getSelfExe().value_or("nix");
-    }
-    buildHook = {
-        nixExePath,
-        "__build-remote",
-    };
 }
 
-void loadConfFile()
+void loadConfFile(AbstractConfig & config)
 {
     auto applyConfigFile = [&](const Path & path) {
         try {
             std::string contents = readFile(path);
-            globalConfig.applyConfig(contents, path);
+            config.applyConfig(contents, path);
         } catch (SystemError &) { }
     };
 
@@ -135,7 +110,7 @@ void loadConfFile()
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
-    globalConfig.resetOverridden();
+    config.resetOverridden();
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
@@ -144,7 +119,7 @@ void loadConfFile()
 
     auto nixConfEnv = getEnv("NIX_CONFIG");
     if (nixConfEnv.has_value()) {
-        globalConfig.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
+        config.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
     }
 
 }
@@ -161,7 +136,7 @@ std::vector<Path> getUserConfigFiles()
     std::vector<Path> files;
     auto dirs = getConfigDirs();
     for (auto & dir : dirs) {
-        files.insert(files.end(), dir + "/nix/nix.conf");
+        files.insert(files.end(), dir + "/nix.conf");
     }
     return files;
 }
@@ -294,25 +269,28 @@ template<> std::string BaseSetting<SandboxMode>::to_string() const
     if (value == smEnabled) return "true";
     else if (value == smRelaxed) return "relaxed";
     else if (value == smDisabled) return "false";
-    else abort();
+    else unreachable();
 }
 
 template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({
         .longName = name,
+        .aliases = aliases,
         .description = "Enable sandboxing.",
         .category = category,
         .handler = {[this]() { override(smEnabled); }}
     });
     args.addFlag({
         .longName = "no-" + name,
+        .aliases = aliases,
         .description = "Disable sandboxing.",
         .category = category,
         .handler = {[this]() { override(smDisabled); }}
     });
     args.addFlag({
         .longName = "relaxed-" + name,
+        .aliases = aliases,
         .description = "Enable sandboxing, but allow builds to disable it.",
         .category = category,
         .handler = {[this]() { override(smRelaxed); }}
@@ -330,57 +308,6 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
     }
 }
 
-
-Paths PluginFilesSetting::parse(const std::string & str) const
-{
-    if (pluginsLoaded)
-        throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
-    return BaseSetting<Paths>::parse(str);
-}
-
-
-void initPlugins()
-{
-    assert(!settings.pluginFiles.pluginsLoaded);
-    for (const auto & pluginFile : settings.pluginFiles.get()) {
-        std::vector<std::filesystem::path> pluginFiles;
-        try {
-            auto ents = std::filesystem::directory_iterator{pluginFile};
-            for (const auto & ent : ents)
-                pluginFiles.emplace_back(ent.path());
-        } catch (std::filesystem::filesystem_error & e) {
-            if (e.code() != std::errc::not_a_directory)
-                throw;
-            pluginFiles.emplace_back(pluginFile);
-        }
-        for (const auto & file : pluginFiles) {
-            /* handle is purposefully leaked as there may be state in the
-               DSO needed by the action of the plugin. */
-#ifndef _WIN32 // TODO implement via DLL loading on Windows
-            void *handle =
-                dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
-            if (!handle)
-                throw Error("could not dynamically open plugin file '%s': %s", file, dlerror());
-
-            /* Older plugins use a statically initialized object to run their code.
-               Newer plugins can also export nix_plugin_entry() */
-            void (*nix_plugin_entry)() = (void (*)())dlsym(handle, "nix_plugin_entry");
-            if (nix_plugin_entry)
-                nix_plugin_entry();
-#else
-                throw Error("could not dynamically open plugin file '%s'", file);
-#endif
-        }
-    }
-
-    /* Since plugins can add settings, try to re-apply previously
-       unknown settings. */
-    globalConfig.reapplyUnknownSettings();
-    globalConfig.warnUnknownSettings();
-
-    /* Tell the user if they try to set plugin-files after we've already loaded */
-    settings.pluginFiles.pluginsLoaded = true;
-}
 
 static void preloadNSS()
 {
@@ -433,14 +360,25 @@ void initLibStore(bool loadConfig) {
     initLibUtil();
 
     if (loadConfig)
-        loadConfFile();
+        loadConfFile(globalConfig);
 
     preloadNSS();
 
+    /* Because of an objc quirk[1], calling curl_global_init for the first time
+       after fork() will always result in a crash.
+       Up until now the solution has been to set OBJC_DISABLE_INITIALIZE_FORK_SAFETY
+       for every nix process to ignore that error.
+       Instead of working around that error we address it at the core -
+       by calling curl_global_init here, which should mean curl will already
+       have been initialized by the time we try to do so in a forked process.
+
+       [1] https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-initialize.mm#L614-L636
+    */
+    curl_global_init(CURL_GLOBAL_ALL);
+#if __APPLE__
     /* On macOS, don't use the per-session TMPDIR (as set e.g. by
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */
-#if __APPLE__
     if (hasPrefix(defaultTempDir(), "/var/folders/"))
         unsetenv("TMPDIR");
 #endif

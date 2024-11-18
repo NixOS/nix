@@ -1,3 +1,7 @@
+<!-- Some of the options documented here are hardcopied from
+     src/libcmd/common-eval-args.cc
+-->
+
 # Common Options
 
 Most Nix commands accept the following command-line options:
@@ -37,7 +41,7 @@ Most Nix commands accept the following command-line options:
     Print even more informational messages.
 
   - `4` “Debug”
-   
+
     Print debug information.
 
   - `5` “Vomit”
@@ -143,7 +147,7 @@ Most Nix commands accept the following command-line options:
 
   This option is accepted by `nix-env`, `nix-instantiate`, `nix-shell` and `nix-build`.
   When evaluating Nix expressions, the expression evaluator will automatically try to call functions that it encounters.
-  It can automatically call functions for which every argument has a [default value](@docroot@/language/constructs.md#functions) (e.g., `{ argName ?  defaultValue }: ...`).
+  It can automatically call functions for which every argument has a [default value](@docroot@/language/syntax.md#functions) (e.g., `{ argName ?  defaultValue }: ...`).
 
   With `--arg`, you can also call functions that have arguments without a default value (or override a default value).
   That is, if the evaluator encounters a function with an argument named *name*, it will call it with value *value*.
@@ -160,6 +164,14 @@ Most Nix commands accept the following command-line options:
   So if you call this Nix expression (e.g., when you do `nix-env --install --attr pkgname`), the function will be called automatically using the value [`builtins.currentSystem`](@docroot@/language/builtins.md) for the `system` argument.
   You can override this using `--arg`, e.g., `nix-env --install --attr pkgname --arg system \"i686-freebsd\"`.
   (Note that since the argument is a Nix string literal, you have to escape the quotes.)
+
+- <span id="opt-arg-from-file">[`--arg-from-file`](#opt-arg-from-file)</span> *name* *path*
+
+  Pass the contents of file *path* as the argument *name* to Nix functions.
+
+- <span id="opt-arg-from-stdin">[`--arg-from-stdin`](#opt-arg-from-stdin)</span> *name*
+
+  Pass the contents of stdin as the argument *name* to Nix functions.
 
 - <span id="opt-argstr">[`--argstr`](#opt-argstr)</span> *name* *value*
 
@@ -179,6 +191,10 @@ Most Nix commands accept the following command-line options:
   attribute of the fourth element of the array in the `foo` attribute
   of the top-level expression.
 
+- <span id="opt-eval-store">[`--eval-store`](#opt-eval-store)</span> *store-url*
+
+  The [URL to the Nix store](@docroot@/store/types/index.md#store-url-format) to use for evaluation, i.e. where to store derivations (`.drv` files) and inputs referenced by them.
+
 - <span id="opt-expr">[`--expr`](#opt-expr)</span> / `-E`
 
   Interpret the command line arguments as a list of Nix expressions to be parsed and evaluated, rather than as a list of file names of Nix expressions.
@@ -187,11 +203,16 @@ Most Nix commands accept the following command-line options:
   For `nix-shell`, this option is commonly used to give you a shell in which you can build the packages returned by the expression.
   If you want to get a shell which contain the *built* packages ready for use, give your expression to the `nix-shell --packages ` convenience flag instead.
 
-- <span id="opt-I">[`-I`](#opt-I)</span> *path*
+- <span id="opt-I">[`-I` / `--include`](#opt-I)</span> *path*
 
-  Add an entry to the [Nix expression search path](@docroot@/command-ref/conf-file.md#conf-nix-path).
+  Add an entry to the list of search paths used to resolve [lookup paths](@docroot@/language/constructs/lookup-path.md).
   This option may be given multiple times.
-  Paths added through `-I` take precedence over [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH).
+
+  Paths added through `-I` take precedence over the [`nix-path` configuration setting](@docroot@/command-ref/conf-file.md#conf-nix-path) and the [`NIX_PATH` environment variable](@docroot@/command-ref/env-common.md#env-NIX_PATH).
+
+- <span id="opt-impure">[`--impure`](#opt-impure)</span>
+
+  Allow access to mutable paths and repositories.
 
 - <span id="opt-option">[`--option`](#opt-option)</span> *name* *value*
 

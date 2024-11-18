@@ -29,54 +29,65 @@ md5sum`.
 
 # Options
 
-  - `--flat`\
-    Print the cryptographic hash of the contents of each regular file *path*.
-    That is, instead of computing
-    the hash of the [Nix Archive (NAR)](@docroot@/store/file-system-object/content-address.md#serial-nix-archive) of *path*,
-    just [directly hash]((@docroot@/store/file-system-object/content-address.md#serial-flat) *path* as is.
-    This requires *path* to resolve to a regular file rather than directory.
-    The result is identical to that produced by the GNU commands
-    `md5sum` and `sha1sum`.
+- `--flat`
 
-  - `--base16`\
-    Print the hash in a hexadecimal representation (default).
+  Print the cryptographic hash of the contents of each regular file *path*.
+  That is, instead of computing
+  the hash of the [Nix Archive (NAR)](@docroot@/store/file-system-object/content-address.md#serial-nix-archive) of *path*,
+  just [directly hash]((@docroot@/store/file-system-object/content-address.md#serial-flat) *path* as is.
+  This requires *path* to resolve to a regular file rather than directory.
+  The result is identical to that produced by the GNU commands
+  `md5sum` and `sha1sum`.
 
-  - `--base32`\
-    Print the hash in a base-32 representation rather than hexadecimal.
-    This base-32 representation is more compact and can be used in Nix
-    expressions (such as in calls to `fetchurl`).
+- `--base16`
 
-  - `--base64`\
-    Similar to --base32, but print the hash in a base-64 representation,
-    which is more compact than the base-32 one.
+  Print the hash in a hexadecimal representation (default).
 
-  - `--sri`\
-    Print the hash in SRI format with base-64 encoding.
-    The type of hash algorithm will be prepended to the hash string,
-    followed by a hyphen (-) and the base-64 hash body.
+- `--base32`
 
-  - `--truncate`\
-    Truncate hashes longer than 160 bits (such as SHA-256) to 160 bits.
+  Print the hash in a base-32 representation rather than hexadecimal.
+  This base-32 representation is more compact and can be used in Nix
+  expressions (such as in calls to `fetchurl`).
 
-  - `--type` *hashAlgo*\
-    Use the specified cryptographic hash algorithm, which can be one of
-    `md5`, `sha1`, `sha256`, and `sha512`.
+- `--base64`
 
-  - `--to-base16`\
-    Don’t hash anything, but convert the base-32 hash representation
-    *hash* to hexadecimal.
+  Similar to --base32, but print the hash in a base-64 representation,
+  which is more compact than the base-32 one.
 
-  - `--to-base32`\
-    Don’t hash anything, but convert the hexadecimal hash representation
-    *hash* to base-32.
+- `--sri`
 
-  - `--to-base64`\
-    Don’t hash anything, but convert the hexadecimal hash representation
-    *hash* to base-64.
+  Print the hash in SRI format with base-64 encoding.
+  The type of hash algorithm will be prepended to the hash string,
+  followed by a hyphen (-) and the base-64 hash body.
 
-  - `--to-sri`\
-    Don’t hash anything, but convert the hexadecimal hash representation
-    *hash* to SRI.
+- `--truncate`
+
+  Truncate hashes longer than 160 bits (such as SHA-256) to 160 bits.
+
+- `--type` *hashAlgo*
+
+  Use the specified cryptographic hash algorithm, which can be one of
+  `md5`, `sha1`, `sha256`, and `sha512`.
+
+- `--to-base16`
+
+  Don’t hash anything, but convert the base-32 hash representation
+  *hash* to hexadecimal.
+
+- `--to-base32`
+
+  Don’t hash anything, but convert the hexadecimal hash representation
+  *hash* to base-32.
+
+- `--to-base64`
+
+  Don’t hash anything, but convert the hexadecimal hash representation
+  *hash* to base-64.
+
+- `--to-sri`
+
+  Don’t hash anything, but convert the hexadecimal hash representation
+  *hash* to SRI.
 
 # Examples
 

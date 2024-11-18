@@ -80,6 +80,7 @@ An app is specified by a flake output attribute named
 apps.x86_64-linux.blender_2_79 = {
   type = "app";
   program = "${self.packages.x86_64-linux.blender_2_79}/bin/blender";
+  meta.description = "Run Blender, a free and open-source 3D creation suite.";
 };
 ```
 
@@ -89,5 +90,7 @@ The only supported attributes are:
 
 * `program` (required): The full path of the executable to run. It
   must reside in the Nix store.
+
+* `meta.description` (optional): A description of the app.
 
 )""

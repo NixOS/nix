@@ -4,7 +4,7 @@ programs += libstore-tests
 
 libstore-tests_NAME = libnixstore-tests
 
-libstore-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data
+libstore-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data GTEST_OUTPUT=xml:$$testresults/libstore-tests.xml
 
 libstore-tests_DIR := $(d)
 
@@ -31,3 +31,8 @@ libstore-tests_LIBS = \
     libstore libstorec libutil libutilc
 
 libstore-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS)
+
+ifdef HOST_WINDOWS
+  # Increase the default reserved stack size to 65 MB so Nix doesn't run out of space
+  libstore-tests_LDFLAGS += -Wl,--stack,$(shell echo $$((65 * 1024 * 1024)))
+endif

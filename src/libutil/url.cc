@@ -79,10 +79,14 @@ std::map<std::string, std::string> decodeQuery(const std::string & query)
 
     for (auto s : tokenizeString<Strings>(query, "&")) {
         auto e = s.find('=');
-        if (e != std::string::npos)
-            result.emplace(
-                s.substr(0, e),
-                percentDecode(std::string_view(s).substr(e + 1)));
+        if (e == std::string::npos) {
+            warn("dubious URI query '%s' is missing equal sign '%s', ignoring", s, "=");
+            continue;
+        }
+
+        result.emplace(
+            s.substr(0, e),
+            percentDecode(std::string_view(s).substr(e + 1)));
     }
 
     return result;
@@ -132,7 +136,7 @@ std::string ParsedURL::to_string() const
         + (fragment.empty() ? "" : "#" + percentEncode(fragment));
 }
 
-bool ParsedURL::operator ==(const ParsedURL & other) const
+bool ParsedURL::operator ==(const ParsedURL & other) const noexcept
 {
     return
         scheme == other.scheme
@@ -171,16 +175,16 @@ std::string fixGitURL(const std::string & url)
     std::regex scpRegex("([^/]*)@(.*):(.*)");
     if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
         return std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
-    else {
-        if (url.find("://") == std::string::npos) {
-            return (ParsedURL {
-                .scheme = "file",
-                .authority = "",
-                .path = url
-            }).to_string();
-        } else
-            return url;
+    if (hasPrefix(url, "file:"))
+        return url;
+    if (url.find("://") == std::string::npos) {
+        return (ParsedURL {
+            .scheme = "file",
+            .authority = "",
+            .path = url
+        }).to_string();
     }
+    return url;
 }
 
 // https://www.rfc-editor.org/rfc/rfc3986#section-3.1

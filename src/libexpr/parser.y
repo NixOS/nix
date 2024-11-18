@@ -1,4 +1,4 @@
-%glr-parser
+%define api.location.type { ::nix::ParserLocation }
 %define api.pure
 %locations
 %define parse.error verbose
@@ -8,8 +8,7 @@
 %parse-param { nix::ParserState * state }
 %lex-param { void * scanner }
 %lex-param { nix::ParserState * state }
-%expect 1
-%expect-rr 1
+%expect 0
 
 %code requires {
 
@@ -25,14 +24,40 @@
 #include "nixexpr.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
-#include "globals.hh"
 #include "parser-state.hh"
 
-#define YYLTYPE ::nix::ParserLocation
+// Bison seems to have difficulty growing the parser stack when using C++ with
+// a custom location type. This undocumented macro tells Bison that our
+// location type is "trivially copyable" in C++-ese, so it is safe to use the
+// same memcpy macro it uses to grow the stack that it uses with its own
+// default location type. Without this, we get "error: memory exhausted" when
+// parsing some large Nix files. Our other options are to increase the initial
+// stack size (200 by default) to be as large as we ever want to support (so
+// that growing the stack is unnecessary), or redefine the stack-relocation
+// macro ourselves (which is also undocumented).
+#define YYLTYPE_IS_TRIVIAL 1
+
 #define YY_DECL int yylex \
     (YYSTYPE * yylval_param, YYLTYPE * yylloc_param, yyscan_t yyscanner, nix::ParserState * state)
 
+// For efficiency, we only track offsets; not line,column coordinates
+# define YYLLOC_DEFAULT(Current, Rhs, N)                                \
+    do                                                                  \
+      if (N)                                                            \
+        {                                                               \
+          (Current).beginOffset = YYRHSLOC (Rhs, 1).beginOffset;        \
+          (Current).endOffset  = YYRHSLOC (Rhs, N).endOffset;           \
+        }                                                               \
+      else                                                              \
+        {                                                               \
+          (Current).beginOffset = (Current).endOffset =                 \
+            YYRHSLOC (Rhs, 0).endOffset;                                \
+        }                                                               \
+    while (0)
+
 namespace nix {
+
+typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
 
 Expr * parseExprFromBuf(
     char * text,
@@ -40,7 +65,9 @@ Expr * parseExprFromBuf(
     Pos::Origin origin,
     const SourcePath & basePath,
     SymbolTable & symbols,
+    const EvalSettings & settings,
     PosTable & positions,
+    DocCommentMap & docComments,
     const ref<SourceAccessor> rootFS,
     const Expr::AstSymbols & astSymbols);
 
@@ -59,19 +86,34 @@ YY_DECL;
 
 using namespace nix;
 
-#define CUR_POS state->at(*yylocp)
+#define CUR_POS state->at(yyloc)
 
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * error)
 {
     if (std::string_view(error).starts_with("syntax error, unexpected end of file")) {
-        loc->first_column = loc->last_column;
-        loc->first_line = loc->last_line;
+        loc->beginOffset = loc->endOffset;
     }
     throw ParseError({
         .msg = HintFmt(error),
         .pos = state->positions[state->at(*loc)]
     });
+}
+
+#define SET_DOC_POS(lambda, pos) setDocPosition(state->lexerState, lambda, state->at(pos))
+static void setDocPosition(const LexerState & lexerState, ExprLambda * lambda, PosIdx start) {
+    auto it = lexerState.positionToDocComment.find(start);
+    if (it != lexerState.positionToDocComment.end()) {
+        lambda->setDocComment(it->second);
+    }
+}
+
+static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
+    if (auto e2 = dynamic_cast<ExprCall *>(fn)) {
+        e2->args.push_back(arg);
+        return fn;
+    }
+    return new ExprCall(pos, fn, {arg});
 }
 
 
@@ -98,9 +140,10 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * 
 
 %type <e> start expr expr_function expr_if expr_op
 %type <e> expr_select expr_simple expr_app
+%type <e> expr_pipe_from expr_pipe_into
 %type <list> expr_list
-%type <attrs> binds
-%type <formals> formals
+%type <attrs> binds binds1
+%type <formals> formals formal_set
 %type <formal> formal
 %type <attrNames> attrpath
 %type <inheritAttrs> attrs
@@ -115,9 +158,11 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * 
 %token <path> PATH HPATH SPATH PATH_END
 %token <uri> URI
 %token IF THEN ELSE ASSERT WITH LET IN_KW REC INHERIT EQ NEQ AND OR IMPL OR_KW
+%token PIPE_FROM PIPE_INTO /* <| and |> */
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
 %token ELLIPSIS
+
 
 %right IMPL
 %left OR
@@ -140,18 +185,28 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, state->symbols.create($1), 0, $3); }
-  | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, state->validateFormals($2), $5); }
-  | '{' formals '}' '@' ID ':' expr_function
-    {
-      auto arg = state->symbols.create($5);
-      $$ = new ExprLambda(CUR_POS, arg, state->validateFormals($2, CUR_POS, arg), $7);
+    { auto me = new ExprLambda(CUR_POS, state->symbols.create($1), 0, $3);
+      $$ = me;
+      SET_DOC_POS(me, @1);
     }
-  | ID '@' '{' formals '}' ':' expr_function
+  | formal_set ':' expr_function[body]
+    { auto me = new ExprLambda(CUR_POS, state->validateFormals($formal_set), $body);
+      $$ = me;
+      SET_DOC_POS(me, @1);
+    }
+  | formal_set '@' ID ':' expr_function[body]
     {
-      auto arg = state->symbols.create($1);
-      $$ = new ExprLambda(CUR_POS, arg, state->validateFormals($4, CUR_POS, arg), $7);
+      auto arg = state->symbols.create($ID);
+      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formal_set, CUR_POS, arg), $body);
+      $$ = me;
+      SET_DOC_POS(me, @1);
+    }
+  | ID '@' formal_set ':' expr_function[body]
+    {
+      auto arg = state->symbols.create($ID);
+      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formal_set, CUR_POS, arg), $body);
+      $$ = me;
+      SET_DOC_POS(me, @1);
     }
   | ASSERT expr ';' expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
@@ -170,7 +225,19 @@ expr_function
 
 expr_if
   : IF expr THEN expr ELSE expr { $$ = new ExprIf(CUR_POS, $2, $4, $6); }
+  | expr_pipe_from
+  | expr_pipe_into
   | expr_op
+  ;
+
+expr_pipe_from
+  : expr_op PIPE_FROM expr_pipe_from { $$ = makeCall(state->at(@2), $1, $3); }
+  | expr_op PIPE_FROM expr_op        { $$ = makeCall(state->at(@2), $1, $3); }
+  ;
+
+expr_pipe_into
+  : expr_pipe_into PIPE_INTO expr_op { $$ = makeCall(state->at(@2), $3, $1); }
+  | expr_op        PIPE_INTO expr_op { $$ = makeCall(state->at(@2), $3, $1); }
   ;
 
 expr_op
@@ -197,25 +264,28 @@ expr_op
   ;
 
 expr_app
-  : expr_app expr_select {
-      if (auto e2 = dynamic_cast<ExprCall *>($1)) {
-          e2->args.push_back($2);
-          $$ = $1;
-      } else
-          $$ = new ExprCall(CUR_POS, $1, {$2});
-  }
-  | expr_select
+  : expr_app expr_select { $$ = makeCall(CUR_POS, $1, $2); $2->warnIfCursedOr(state->symbols, state->positions); }
+  | /* Once a ‘cursed or’ reaches this nonterminal, it is no longer cursed,
+       because the uncursed parse would also produce an expr_app. But we need
+       to remove the cursed status in order to prevent valid things like
+       `f (g or)` from triggering the warning. */
+    expr_select { $$ = $1; $$->resetCursedOr(); }
   ;
 
 expr_select
   : expr_simple '.' attrpath
     { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), nullptr); delete $3; }
   | expr_simple '.' attrpath OR_KW expr_select
-    { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), $5); delete $3; }
-  | /* Backwards compatibility: because Nixpkgs has a rarely used
-       function named ‘or’, allow stuff like ‘map or [...]’. */
+    { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), $5); delete $3; $5->warnIfCursedOr(state->symbols, state->positions); }
+  | /* Backwards compatibility: because Nixpkgs has a function named ‘or’,
+       allow stuff like ‘map or [...]’. This production is problematic (see
+       https://github.com/NixOS/nix/issues/11118) and will be refactored in the
+       future by treating `or` as a regular identifier. The refactor will (in
+       very rare cases, we think) change the meaning of expressions, so we mark
+       the ExprCall with data (establishing that it is a ‘cursed or’) that can
+       be used to emit a warning when an affected expression is parsed. */
     expr_simple OR_KW
-    { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, state->s.or_)}); }
+    { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, state->s.or_)}, state->positions.add(state->origin, @$.endOffset)); }
   | expr_simple
   ;
 
@@ -259,11 +329,13 @@ expr_simple
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $3->recursive = true; $$ = new ExprSelect(noPos, $3, state->s.body); }
+    { $3->recursive = true; $3->pos = CUR_POS; $$ = new ExprSelect(noPos, $3, state->s.body); }
   | REC '{' binds '}'
-    { $3->recursive = true; $$ = $3; }
-  | '{' binds '}'
-    { $$ = $2; }
+    { $3->recursive = true; $3->pos = CUR_POS; $$ = $3; }
+  | '{' binds1 '}'
+    { $2->pos = CUR_POS; $$ = $2; }
+  | '{' '}'
+    { $$ = new ExprAttrs(CUR_POS); }
   | '[' expr_list ']' { $$ = $2; }
   ;
 
@@ -287,14 +359,14 @@ string_parts_interpolated
 
 path_start
   : PATH {
-    Path path(absPath({$1.p, $1.l}, state->basePath.path.abs()));
+    Path path(absPath(std::string_view{$1.p, $1.l}, state->basePath.path.abs()));
     /* add back in the trailing '/' to the first segment */
     if ($1.p[$1.l-1] == '/' && $1.l > 1)
       path += "/";
     $$ = new ExprPath(ref<SourceAccessor>(state->rootFS), std::move(path));
   }
   | HPATH {
-    if (evalSettings.pureEval) {
+    if (state->settings.pureEval) {
         throw Error(
             "the path '%s' can not be resolved in pure mode",
             std::string_view($1.p, $1.l)
@@ -312,37 +384,50 @@ ind_string_parts
   ;
 
 binds
-  : binds attrpath '=' expr ';' { $$ = $1; state->addAttr($$, std::move(*$2), $4, state->at(@2)); delete $2; }
-  | binds INHERIT attrs ';'
-    { $$ = $1;
-      for (auto & [i, iPos] : *$3) {
-          if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              state->dupAttr(i.symbol, iPos, $$->attrs[i.symbol].pos);
-          $$->attrs.emplace(
+  : binds1
+  | { $$ = new ExprAttrs; }
+  ;
+
+binds1
+  : binds1[accum] attrpath '=' expr ';'
+    { $$ = $accum;
+      state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
+      delete $attrpath;
+    }
+  | binds[accum] INHERIT attrs ';'
+    { $$ = $accum;
+      for (auto & [i, iPos] : *$attrs) {
+          if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
+              state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
+          $accum->attrs.emplace(
               i.symbol,
               ExprAttrs::AttrDef(new ExprVar(iPos, i.symbol), iPos, ExprAttrs::AttrDef::Kind::Inherited));
       }
-      delete $3;
+      delete $attrs;
     }
-  | binds INHERIT '(' expr ')' attrs ';'
-    { $$ = $1;
-      if (!$$->inheritFromExprs)
-          $$->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
-      $$->inheritFromExprs->push_back($4);
-      auto from = new nix::ExprInheritFrom(state->at(@4), $$->inheritFromExprs->size() - 1);
-      for (auto & [i, iPos] : *$6) {
-          if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              state->dupAttr(i.symbol, iPos, $$->attrs[i.symbol].pos);
-          $$->attrs.emplace(
+  | binds[accum] INHERIT '(' expr ')' attrs ';'
+    { $$ = $accum;
+      if (!$accum->inheritFromExprs)
+          $accum->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
+      $accum->inheritFromExprs->push_back($expr);
+      auto from = new nix::ExprInheritFrom(state->at(@expr), $accum->inheritFromExprs->size() - 1);
+      for (auto & [i, iPos] : *$attrs) {
+          if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
+              state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
+          $accum->attrs.emplace(
               i.symbol,
               ExprAttrs::AttrDef(
                   new ExprSelect(iPos, from, i.symbol),
                   iPos,
                   ExprAttrs::AttrDef::Kind::InheritedFrom));
       }
-      delete $6;
+      delete $attrs;
     }
-  | { $$ = new ExprAttrs(state->at(@0)); }
+  | attrpath '=' expr ';'
+    { $$ = new ExprAttrs;
+      state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
+      delete $attrpath;
+    }
   ;
 
 attrs
@@ -396,19 +481,23 @@ string_attr
   ;
 
 expr_list
-  : expr_list expr_select { $$ = $1; $1->elems.push_back($2); /* !!! dangerous */ }
+  : expr_list expr_select { $$ = $1; $1->elems.push_back($2); /* !!! dangerous */; $2->warnIfCursedOr(state->symbols, state->positions); }
   | { $$ = new ExprList; }
   ;
 
+formal_set
+  : '{' formals ',' ELLIPSIS '}' { $$ = $formals;    $$->ellipsis = true; }
+  | '{' ELLIPSIS '}'             { $$ = new Formals; $$->ellipsis = true; }
+  | '{' formals ',' '}'          { $$ = $formals;    $$->ellipsis = false; }
+  | '{' formals '}'              { $$ = $formals;    $$->ellipsis = false; }
+  | '{' '}'                      { $$ = new Formals; $$->ellipsis = false; }
+  ;
+
 formals
-  : formal ',' formals
-    { $$ = $3; $$->formals.emplace_back(*$1); delete $1; }
+  : formals[accum] ',' formal
+    { $$ = $accum; $$->formals.emplace_back(*$formal); delete $formal; }
   | formal
-    { $$ = new Formals; $$->formals.emplace_back(*$1); $$->ellipsis = false; delete $1; }
-  |
-    { $$ = new Formals; $$->ellipsis = false; }
-  | ELLIPSIS
-    { $$ = new Formals; $$->ellipsis = true; }
+    { $$ = new Formals; $$->formals.emplace_back(*$formal); delete $formal; }
   ;
 
 formal
@@ -429,21 +518,30 @@ Expr * parseExprFromBuf(
     Pos::Origin origin,
     const SourcePath & basePath,
     SymbolTable & symbols,
+    const EvalSettings & settings,
     PosTable & positions,
+    DocCommentMap & docComments,
     const ref<SourceAccessor> rootFS,
     const Expr::AstSymbols & astSymbols)
 {
     yyscan_t scanner;
+    LexerState lexerState {
+        .positionToDocComment = docComments,
+        .positions = positions,
+        .origin = positions.addOrigin(origin, length),
+    };
     ParserState state {
+        .lexerState = lexerState,
         .symbols = symbols,
         .positions = positions,
         .basePath = basePath,
-        .origin = positions.addOrigin(origin, length),
+        .origin = lexerState.origin,
         .rootFS = rootFS,
         .s = astSymbols,
+        .settings = settings,
     };
 
-    yylex_init(&scanner);
+    yylex_init_extra(&lexerState, &scanner);
     Finally _destroy([&] { yylex_destroy(scanner); });
 
     yy_scan_buffer(text, length, scanner);

@@ -1,6 +1,10 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 needLocalStore "“min-free” and “max-free” are daemon options"
+
+TODO_NixOS
 
 clearStore
 

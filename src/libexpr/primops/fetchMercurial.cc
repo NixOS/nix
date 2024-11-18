@@ -53,7 +53,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     // whitelist. Ah well.
     state.checkURI(url);
 
-    if (evalSettings.pureEval && !rev)
+    if (state.settings.pureEval && !rev)
         throw Error("in pure evaluation mode, 'fetchMercurial' requires a Mercurial revision");
 
     fetchers::Attrs attrs;
@@ -62,7 +62,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     attrs.insert_or_assign("name", std::string(name));
     if (ref) attrs.insert_or_assign("ref", *ref);
     if (rev) attrs.insert_or_assign("rev", rev->gitRev());
-    auto input = fetchers::Input::fromAttrs(std::move(attrs));
+    auto input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
 
     auto [storePath, input2] = input.fetchToStore(state.store);
 

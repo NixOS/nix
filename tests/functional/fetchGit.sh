@@ -1,8 +1,10 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 requireGit
 
-clearStore
+clearStoreIfPossible
 
 # Intentionally not in a canonical form
 # See https://github.com/NixOS/nix/issues/6195

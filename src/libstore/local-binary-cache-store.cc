@@ -1,43 +1,46 @@
-#include "binary-cache-store.hh"
+#include "local-binary-cache-store.hh"
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
+#include "signals.hh"
 
 #include <atomic>
 
 namespace nix {
 
-struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
+LocalBinaryCacheStoreConfig::LocalBinaryCacheStoreConfig(
+    std::string_view scheme,
+    PathView binaryCacheDir,
+    const Params & params)
+    : StoreConfig(params)
+    , BinaryCacheStoreConfig(params)
+    , binaryCacheDir(binaryCacheDir)
 {
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+}
 
-    const std::string name() override { return "Local Binary Cache Store"; }
 
-    std::string doc() override
-    {
-        return
-          #include "local-binary-cache-store.md"
-          ;
-    }
-};
-
-class LocalBinaryCacheStore : public virtual LocalBinaryCacheStoreConfig, public virtual BinaryCacheStore
+std::string LocalBinaryCacheStoreConfig::doc()
 {
-private:
+    return
+      #include "local-binary-cache-store.md"
+      ;
+}
 
-    Path binaryCacheDir;
 
-public:
-
+struct LocalBinaryCacheStore : virtual LocalBinaryCacheStoreConfig, virtual BinaryCacheStore
+{
+    /**
+     * @param binaryCacheDir `file://` is a short-hand for `file:///`
+     * for now.
+     */
     LocalBinaryCacheStore(
-        const std::string scheme,
-        const Path & binaryCacheDir,
+        std::string_view scheme,
+        PathView binaryCacheDir,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
-        , LocalBinaryCacheStoreConfig(params)
+        , LocalBinaryCacheStoreConfig(scheme, binaryCacheDir, params)
         , Store(params)
         , BinaryCacheStore(params)
-        , binaryCacheDir(binaryCacheDir)
     {
     }
 
@@ -47,8 +50,6 @@ public:
     {
         return "file://" + binaryCacheDir;
     }
-
-    static std::set<std::string> uriSchemes();
 
 protected:
 
@@ -84,6 +85,7 @@ protected:
         StorePathSet paths;
 
         for (auto & entry : std::filesystem::directory_iterator{binaryCacheDir}) {
+            checkInterrupt();
             auto name = entry.path().filename().string();
             if (name.size() != 40 ||
                 !hasSuffix(name, ".narinfo"))
@@ -117,7 +119,7 @@ bool LocalBinaryCacheStore::fileExists(const std::string & path)
     return pathExists(binaryCacheDir + "/" + path);
 }
 
-std::set<std::string> LocalBinaryCacheStore::uriSchemes()
+std::set<std::string> LocalBinaryCacheStoreConfig::uriSchemes()
 {
     if (getEnv("_NIX_FORCE_HTTP") == "1")
         return {};

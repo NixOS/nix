@@ -103,27 +103,27 @@ Args::Flag contentAddressMethod(ContentAddressMethod * method)
     return Args::Flag {
         .longName  = "mode",
         // FIXME indentation carefully made for context, this is messed up.
-        /* FIXME link to store object content-addressing not file system
-           object content addressing once we have that page. */
         .description = R"(
     How to compute the content-address of the store object.
     One of:
 
-    - `nar` (the default):
+    - [`nar`](@docroot@/store/store-object/content-address.md#method-nix-archive)
+      (the default):
       Serialises the input as a
       [Nix Archive](@docroot@/store/file-system-object/content-address.md#serial-nix-archive)
       and passes that to the hash function.
 
-    - `flat`:
+    - [`flat`](@docroot@/store/store-object/content-address.md#method-flat):
       Assumes that the input is a single file and
       [directly passes](@docroot@/store/file-system-object/content-address.md#serial-flat)
       it to the hash function.
 
-    - `text`: Like `flat`, but used for
+    - [`text`](@docroot@/store/store-object/content-address.md#method-text):
+      Like `flat`, but used for
       [derivations](@docroot@/glossary.md#store-derivation) serialized in store object and
       [`builtins.toFile`](@docroot@/language/builtins.html#builtins-toFile).
       For advanced use-cases only;
-      for regular usage prefer `nar` and `flat.
+      for regular usage prefer `nar` and `flat`.
         )",
         .labels = {"content-address-method"},
         .handler = {[method](std::string s) {

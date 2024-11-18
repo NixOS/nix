@@ -1,3 +1,5 @@
+#include <unordered_set>
+
 #include "derivations.hh"
 #include "parsed-derivations.hh"
 #include "globals.hh"
@@ -8,6 +10,7 @@
 #include "callback.hh"
 #include "closure.hh"
 #include "filetransfer.hh"
+#include "strings.hh"
 
 namespace nix {
 

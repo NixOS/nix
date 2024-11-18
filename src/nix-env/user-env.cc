@@ -9,8 +9,9 @@
 #include "eval-inline.hh"
 #include "profiles.hh"
 #include "print-ambiguous.hh"
-#include <limits>
 
+#include <limits>
+#include <sstream>
 
 namespace nix {
 
@@ -110,11 +111,9 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
     auto manifestFile = ({
         std::ostringstream str;
         printAmbiguous(manifest, state.symbols, str, nullptr, std::numeric_limits<int>::max());
-        // TODO with C++20 we can use str.view() instead and avoid copy.
-        std::string str2 = str.str();
-        StringSource source { str2 };
+        StringSource source { toView(str) };
         state.store->addToStoreFromDump(
-            source, "env-manifest.nix", FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, references);
+            source, "env-manifest.nix", FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, references);
     });
 
     /* Get the environment builder expression. */
@@ -140,6 +139,7 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
     NixStringContext context;
     auto & aDrvPath(*topLevel.attrs()->find(state.sDrvPath));
     auto topLevelDrv = state.coerceToStorePath(aDrvPath.pos, *aDrvPath.value, context, "");
+    topLevelDrv.requireDerivation();
     auto & aOutPath(*topLevel.attrs()->find(state.sOutPath));
     auto topLevelOut = state.coerceToStorePath(aOutPath.pos, *aOutPath.value, context, "");
 

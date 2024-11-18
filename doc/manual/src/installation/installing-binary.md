@@ -1,5 +1,13 @@
 # Installing a Binary Distribution
 
+> **Updating to macOS 15 Sequoia**
+>
+> If you recently updated to macOS 15 Sequoia and are getting
+> ```console
+> error: the user '_nixbld1' in the group 'nixbld' does not exist
+> ```
+> when running Nix commands, refer to GitHub issue [NixOS/nix#10892](https://github.com/NixOS/nix/issues/10892) for instructions to fix your installation without reinstalling.
+
 To install the latest version Nix, run the following command:
 
 ```console
@@ -77,7 +85,7 @@ $ su root
 # Installing from a binary tarball
 
 You can also download a binary tarball that contains Nix and all its dependencies:
-- Choose a [version](https://releases.nixos.org/?prefix=nix/) and [system type](../contributing/hacking.md#platforms)
+- Choose a [version](https://releases.nixos.org/?prefix=nix/) and [system type](../development/building.md#platforms)
 - Download and unpack the tarball
 - Run the installer
 

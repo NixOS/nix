@@ -3,11 +3,12 @@
 #include "environment-variables.hh"
 #include "terminal.hh"
 #include "util.hh"
-#include "config.hh"
+#include "config-global.hh"
 #include "source-path.hh"
 #include "position.hh"
 
 #include <atomic>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <iostream>
 
@@ -84,10 +85,10 @@ public:
 
     void logEI(const ErrorInfo & ei) override
     {
-        std::stringstream oss;
+        std::ostringstream oss;
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
-        log(ei.level, oss.str());
+        log(ei.level, toView(oss));
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
@@ -188,7 +189,7 @@ struct JSONLogger : Logger {
             else if (f.type == Logger::Field::tString)
                 arr.push_back(f.s);
             else
-                abort();
+                unreachable();
     }
 
     void write(const nlohmann::json & json)
@@ -345,7 +346,7 @@ Activity::~Activity()
     try {
         logger.stopActivity(id);
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 

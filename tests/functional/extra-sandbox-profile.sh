@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 if [[ $(uname) != Darwin ]]; then skipTest "Need Darwin"; fi
