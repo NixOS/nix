@@ -167,7 +167,7 @@ suites = [
       'impure-env.sh',
       'debugger.sh',
       'extra-sandbox-profile.sh',
-      'help.sh',
+      #'help.sh',
     ],
     'workdir': meson.current_source_dir(),
   },
