@@ -55,16 +55,16 @@ generate_manual_deps = files(
 )
 
 # Generates types
-subdir('src/store')
+subdir('source/store')
 # Generates builtins.md and builtin-constants.md.
-subdir('src/language')
+subdir('source/language')
 # Generates new-cli pages, experimental-features-shortlist.md, and conf-file.md.
-subdir('src/command-ref')
+subdir('source/command-ref')
 # Generates experimental-feature-descriptions.md.
-subdir('src/development')
+subdir('source/development')
 # Generates rl-next-generated.md.
-subdir('src/release-notes')
-subdir('src')
+subdir('source/release-notes')
+subdir('source')
 
 # Hacky way to figure out if `nix` is an `ExternalProgram` or
 # `Exectuable`. Only the latter can occur in custom target input lists.
@@ -82,7 +82,7 @@ manual = custom_target(
     '-c',
     '''
         @0@ @INPUT0@ @CURRENT_SOURCE_DIR@ > @DEPFILE@
-        @0@ @INPUT1@ summary @2@ < @CURRENT_SOURCE_DIR@/src/SUMMARY.md.in > @2@/src/SUMMARY.md
+        @0@ @INPUT1@ summary @2@ < @CURRENT_SOURCE_DIR@/source/SUMMARY.md.in > @2@/source/SUMMARY.md
         rsync -r --include='*.md' @CURRENT_SOURCE_DIR@/ @2@/
         (cd @2@; RUST_LOG=warn @1@ build -d @2@ 3>&2 2>&1 1>&3) | { grep -Fv "because fragment resolution isn't implemented" || :; } 3>&2 2>&1 1>&3
         rm -rf @2@/manual
@@ -117,7 +117,7 @@ manual = custom_target(
   depfile : 'manual.d',
   env : {
     'RUST_LOG': 'info',
-    'MDBOOK_SUBSTITUTE_SEARCH': meson.current_build_dir() / 'src',
+    'MDBOOK_SUBSTITUTE_SEARCH': meson.current_build_dir() / 'source',
   },
 )
 manual_html = manual[0]
