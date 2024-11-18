@@ -20,19 +20,26 @@
 #include "fetch-to-store.hh"
 #include "tarball.hh"
 #include "parser-tab.hh"
+#include "value.hh"
 
 #include <algorithm>
-#include <iostream>
-#include <sstream>
 #include <cstring>
-#include <optional>
-#include <unistd.h>
-#include <sys/time.h>
 #include <fstream>
 #include <functional>
+#include <iostream>
+#include <memory>
+#include <optional>
+#include <range/v3/view/concat.hpp>
+#include <range/v3/view/zip_with.hpp>
+#include <sstream>
+#include <sys/time.h>
+#include <unistd.h>
+#include <utility>
 
-#include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
+#include <immer/algorithm.hpp>
+#include <nlohmann/json.hpp>
+#include <range/v3/all.hpp>
 
 #ifndef _WIN32 // TODO use portable implementation
 #  include <sys/resource.h>
@@ -273,8 +280,9 @@ EvalState::EvalState(
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
+    , listAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
-    , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
+    , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), allocEnv(BASE_ENV_SIZE)))
     , baseEnv(**baseEnvP)
 #else
     , baseEnv(allocEnv(BASE_ENV_SIZE))
@@ -290,7 +298,7 @@ EvalState::EvalState(
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
-    vEmptyList.mkList(buildList(0));
+    vEmptyList.mkList(allocList());
     vNull.mkNull();
     vTrue.mkBool(true);
     vFalse.mkBool(false);
@@ -874,13 +882,6 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
     }
 }
 
-ListBuilder::ListBuilder(EvalState & state, size_t size)
-    : size(size)
-    , elems(size <= 2 ? inlineElems : (Value * *) allocBytes(size * sizeof(Value *)))
-{
-    state.nrListElems += size;
-}
-
 Value * EvalState::getBool(bool b) {
     return b ? &vTrue : &vFalse;
 }
@@ -1167,29 +1168,30 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 
 Env * ExprAttrs::buildInheritFromEnv(EvalState & state, Env & up)
 {
-    Env & inheritEnv = state.allocEnv(inheritFromExprs->size());
-    inheritEnv.up = &up;
+    Env * inheritEnv = state.allocEnv(inheritFromExprs->size());
+    inheritEnv->up = &up;
 
     Displacement displ = 0;
-    for (auto from : *inheritFromExprs)
-        inheritEnv.values[displ++] = from->maybeThunk(state, up);
+    for (auto * from : *inheritFromExprs) {
+        inheritEnv->values[displ++] = from->maybeThunk(state, up);
+    }
 
-    return &inheritEnv;
+    return inheritEnv;
 }
 
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
     auto bindings = state.buildBindings(attrs.size() + dynamicAttrs.size());
-    auto dynamicEnv = &env;
+    auto * dynamicEnv = &env;
     bool sort = false;
 
     if (recursive) {
         /* Create a new environment that contains the attributes in
            this `rec'. */
-        Env & env2(state.allocEnv(attrs.size()));
-        env2.up = &env;
-        dynamicEnv = &env2;
-        Env * inheritEnv = inheritFromExprs ? buildInheritFromEnv(state, env2) : nullptr;
+        Env * env2(state.allocEnv(attrs.size()));
+        env2->up = &env;
+        dynamicEnv = env2;
+        Env * inheritEnv = inheritFromExprs ? buildInheritFromEnv(state, *env2) : nullptr;
 
         AttrDefs::iterator overrides = attrs.find(state.sOverrides);
         bool hasOverrides = overrides != attrs.end();
@@ -1202,10 +1204,11 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             Value * vAttr;
             if (hasOverrides && i.second.kind != AttrDef::Kind::Inherited) {
                 vAttr = state.allocValue();
-                mkThunk(*vAttr, *i.second.chooseByKind(&env2, &env, inheritEnv), i.second.e);
-            } else
-                vAttr = i.second.e->maybeThunk(state, *i.second.chooseByKind(&env2, &env, inheritEnv));
-            env2.values[displ++] = vAttr;
+                mkThunk(*vAttr, *i.second.chooseByKind(env2, &env, inheritEnv), i.second.e);
+            } else {
+                vAttr = i.second.e->maybeThunk(state, *i.second.chooseByKind(env2, &env, inheritEnv));
+            }
+            env2->values[displ++] = vAttr;
             bindings.insert(i.first, vAttr, i.second.pos);
         }
 
@@ -1225,7 +1228,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
                 AttrDefs::iterator j = attrs.find(i.name);
                 if (j != attrs.end()) {
                     (*bindings.bindings)[j->second.displ] = i;
-                    env2.values[j->second.displ] = i.value;
+                    env2->values[j->second.displ] = i.value;
                 } else
                     bindings.push_back(i);
             }
@@ -1273,26 +1276,26 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 {
     /* Create a new environment that contains the attributes in this
        `let'. */
-    Env & env2(state.allocEnv(attrs->attrs.size()));
-    env2.up = &env;
+    Env * env2(state.allocEnv(attrs->attrs.size()));
+    env2->up = &env;
 
-    Env * inheritEnv = attrs->inheritFromExprs ? attrs->buildInheritFromEnv(state, env2) : nullptr;
+    Env * inheritEnv = attrs->inheritFromExprs ? attrs->buildInheritFromEnv(state, *env2) : nullptr;
 
     /* The recursive attributes are evaluated in the new environment,
        while the inherited attributes are evaluated in the original
        environment. */
     Displacement displ = 0;
     for (auto & i : attrs->attrs) {
-        env2.values[displ++] = i.second.e->maybeThunk(
+        env2->values[displ++] = i.second.e->maybeThunk(
             state,
-            *i.second.chooseByKind(&env2, &env, inheritEnv));
+            *i.second.chooseByKind(env2, &env, inheritEnv));
     }
 
     auto dts = state.debugRepl
         ? makeDebugTraceStacker(
             state,
             *this,
-            env2,
+            *env2,
             getPos()
                 ? std::make_shared<Pos>(state.positions[getPos()])
                 : nullptr,
@@ -1301,16 +1304,32 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
         )
         : nullptr;
 
-    body->eval(state, env2, v);
+    body->eval(state, *env2, v);
 }
 
 
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
-    auto list = state.buildList(elems.size());
-    for (const auto & [n, v2] : enumerate(list))
-        v2 = elems[n]->maybeThunk(state, env);
-    v.mkList(list);
+    if (elems.empty()) {
+        v = state.vEmptyList;
+        return;
+    }
+    // TODO(@connorbaker): Tried to switch to using transient here, but started getting this error when calling transience.push_back:
+    // nix: /nix/store/gkghbi5d6849mwsbcdhnqljz2xnjvnis-immer-0.8.1-unstable-2024-09-18/include/immer/transience/gc_transience_policy.hpp:95:
+    // ownee &immer::gc_transience_policy::apply<immer::heap_policy<immer::gc_heap>>::type::ownee::operator=(edit)
+    // [HeapPolicy = immer::heap_policy<immer::gc_heap>]: Assertion `e != noone' failed.
+    // That's an indication the value is being used after it's been freed. Not sure why that's happening.
+    // NOTE: Running with GC_DONT_GC=1 doesn't seem to trigger the error, so it's likely a GC issue.
+    v.mkList(ranges::fold_left(elems, state.allocList(), [&](auto * const list, auto * const elem) {
+        *list = std::move(*list).push_back(elem->maybeThunk(state, env));
+        return list;
+    }));
+    // TODO(@connorbaker): This doesn't work either, which leads me to suspect the implementation of the mutable data
+    // structure isn't correctly interfacing with the GC. Is this because it is intended to store values, rather than
+    // references to values like I'm using it for currently?
+    // v.mkList(state.allocListFromRange(elems | ranges::views::transform([&](const auto & elem) {
+    //     return elem->maybeThunk(state, env);
+    // })));
 }
 
 
@@ -1493,13 +1512,13 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             auto size =
                 (!lambda.arg ? 0 : 1) +
                 (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
-            Env & env2(allocEnv(size));
-            env2.up = vCur.payload.lambda.env;
+            Env * env2(allocEnv(size));
+            env2->up = vCur.payload.lambda.env;
 
             Displacement displ = 0;
 
             if (!lambda.hasFormals())
-                env2.values[displ++] = args[0];
+                env2->values[displ++] = args[0];
             else {
                 try {
                     forceAttrs(*args[0], lambda.pos, "while evaluating the value passed for the lambda argument");
@@ -1509,7 +1528,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 }
 
                 if (lambda.arg)
-                    env2.values[displ++] = args[0];
+                    env2->values[displ++] = args[0];
 
                 /* For each formal argument, get the actual argument.  If
                    there is no matching actual argument but the formal
@@ -1527,10 +1546,10 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                                     .withFrame(*fun.payload.lambda.env, lambda)
                                     .debugThrow();
                         }
-                        env2.values[displ++] = i.def->maybeThunk(*this, env2);
+                        env2->values[displ++] = i.def->maybeThunk(*this, *env2);
                     } else {
                         attrsUsed++;
-                        env2.values[displ++] = j->value;
+                        env2->values[displ++] = j->value;
                     }
                 }
 
@@ -1539,7 +1558,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 if (!lambda.formals->ellipsis && attrsUsed != args[0]->attrs()->size()) {
                     /* Nope, so show the first unexpected argument to the
                        user. */
-                    for (auto & i : *args[0]->attrs())
+                    for (const auto & i : *args[0]->attrs())
                         if (!lambda.formals->has(i.name)) {
                             std::set<std::string> formalNames;
                             for (auto & formal : lambda.formals->formals)
@@ -1565,14 +1584,14 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             try {
                 auto dts = debugRepl
                     ? makeDebugTraceStacker(
-                        *this, *lambda.body, env2, positions[lambda.pos],
+                        *this, *lambda.body, *env2, positions[lambda.pos],
                         "while calling %s",
                         lambda.name
                         ? concatStrings("'", symbols[lambda.name], "'")
                         : "anonymous lambda")
                     : nullptr;
 
-                lambda.body->eval(*this, env2, vCur);
+                lambda.body->eval(*this, *env2, vCur);
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
                     addErrorTrace(
@@ -1788,11 +1807,11 @@ https://nixos.org/manual/nix/stable/language/constructs.html#functions.)", symbo
 
 void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
-    Env & env2(state.allocEnv(1));
-    env2.up = &env;
-    env2.values[0] = attrs->maybeThunk(state, env);
+    Env * env2(state.allocEnv(1));
+    env2->up = &env;
+    env2->values[0] = attrs->maybeThunk(state, env);
 
-    body->eval(state, env2, v);
+    body->eval(state, *env2, v);
 }
 
 
@@ -1907,40 +1926,45 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 {
+    state.nrListConcats++;
+
     Value v1; e1->eval(state, env, v1);
+    state.forceList(v1, pos, "in the left operand of the list concatenation operator");
+
     Value v2; e2->eval(state, env, v2);
-    Value * lists[2] = { &v1, &v2 };
-    state.concatLists(v, 2, lists, pos, "while evaluating one of the elements to concatenate");
+    state.forceList(v2, pos, "in the right operand of the list concatenation operator");
+
+    if (v1.listSize() == 0) {
+        v = v2;
+    } else if (v2.listSize() == 0) {
+        v = v1;
+    } else {
+        auto * const list = state.allocList();
+        *list = v1.list() + v2.list();
+        v.mkList(list);
+    }
 }
 
 
-void EvalState::concatLists(Value & v, size_t nrLists, Value * const * lists, const PosIdx pos, std::string_view errorCtx)
+void EvalState::concatLists(Value & v, const ValueList & lists, const PosIdx pos, std::string_view errorCtx)
 {
-    nrListConcats++;
-
-    Value * nonEmpty = 0;
-    size_t len = 0;
-    for (size_t n = 0; n < nrLists; ++n) {
-        forceList(*lists[n], pos, errorCtx);
-        auto l = lists[n]->listSize();
-        len += l;
-        if (l) nonEmpty = lists[n];
+    // TODO(@connorbaker): Because concatenation is associative, we can reduce the number of concatenations by doing a tree-like
+    // concatenation instead of a linear one. Consider using a binary search to do so.
+    const auto numElems = lists.size();
+    if (numElems == 0) {
+        v = vEmptyList;
+    } else if (numElems == 1) {
+        auto *const head = lists.front();
+        forceList(*head, pos, errorCtx);
+        v = *head;
+    } else {
+        nrListConcats += numElems - 1;
+        v.mkList(immer::accumulate(lists, allocList(), [&](auto * const concatenated, auto * const list) {
+            forceList(*list, pos, errorCtx);
+            *concatenated = std::move(*concatenated) + list->list();
+            return concatenated;
+        }));
     }
-
-    if (nonEmpty && len == nonEmpty->listSize()) {
-        v = *nonEmpty;
-        return;
-    }
-
-    auto list = buildList(len);
-    auto out = list.elems;
-    for (size_t n = 0, pos = 0; n < nrLists; ++n) {
-        auto l = lists[n]->listSize();
-        if (l)
-            memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
-        pos += l;
-    }
-    v.mkList(list);
 }
 
 
@@ -2083,7 +2107,7 @@ void EvalState::forceValueDeep(Value & v)
         forceValue(v, v.determinePos(noPos));
 
         if (v.type() == nAttrs) {
-            for (auto & i : *v.attrs())
+            for (const auto & i : *v.attrs()) {
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
                     auto dts = debugRepl && i.value->isThunk()
@@ -2096,11 +2120,16 @@ void EvalState::forceValueDeep(Value & v)
                     addErrorTrace(e, i.pos, "while evaluating the attribute '%1%'", symbols[i.name]);
                     throw;
                 }
+            }
         }
 
         else if (v.isList()) {
-            for (auto v2 : v.listItems())
+            // TODO(@connorbaker): Replacing this with
+            // immer::for_each(v.list(), [&](const auto & v) { recurse(*v); });
+            // Increases the heap size by a fair amount, potentially because of the lambda capture.
+            for (auto * const v2 : v.list()) {
                 recurse(*v2);
+            }
         }
     };
 
@@ -2326,7 +2355,7 @@ BackedStringView EvalState::coerceToString(
 
         if (v.isList()) {
             std::string result;
-            for (auto [n, v2] : enumerate(v.listItems())) {
+            for (const auto [n, v2] : enumerate(v.list())) {
                 try {
                     result += *coerceToString(pos, *v2, context,
                             "while evaluating one element of the list",
@@ -2337,8 +2366,9 @@ BackedStringView EvalState::coerceToString(
                 }
                 if (n < v.listSize() - 1
                     /* !!! not quite correct */
-                    && (!v2->isList() || v2->listSize() != 0))
+                    && (!v2->isList() || v2->listSize() != 0)) {
                     result += " ";
+}
             }
             return result;
         }
@@ -2578,9 +2608,10 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
                 ValuePrinter(*this, v2, errorPrintOptions))
                 .debugThrow();
         }
+        // TODO(@connorbaker): Rewrite to optimize for Immer.
         for (size_t n = 0; n < v1.listSize(); ++n) {
             try {
-                assertEqValues(*v1.listElems()[n], *v2.listElems()[n], pos, errorCtx);
+                assertEqValues(*v1.list()[n], *v2.list()[n], pos, errorCtx);
             } catch (Error & e) {
                 e.addTrace(positions[pos], "while comparing list element %d", n);
                 throw;
@@ -2729,12 +2760,19 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         case nNull:
             return true;
 
-        case nList:
-            if (v1.listSize() != v2.listSize()) return false;
-            for (size_t n = 0; n < v1.listSize(); ++n)
-                if (!eqValues(*v1.listElems()[n], *v2.listElems()[n], pos, errorCtx)) return false;
-            return true;
-
+        case nList: {
+            // TODO(@connorbaker): Cannot inline l1 and l2 because ranges::views::zip_with requires a borrowed range.
+            // If we do it inline, since v1.list() and v2.list() are rvalues, they're owned ranges.
+            const auto l1 = v1.list();
+            const auto l2 = v2.list();
+            return l1.size() == l2.size()
+                && ranges::all_of(
+                    ranges::views::zip_with(
+                        [&](auto * const a, auto * const b) { return eqValues(*a, *b, pos, errorCtx); },
+                        l1,
+                        l2),
+                    std::identity{});
+        }
         case nAttrs: {
             /* If both sets denote a derivation (type = "derivation"),
                then compare their outPaths. */

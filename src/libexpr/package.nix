@@ -4,6 +4,7 @@
 
 , bison
 , flex
+, immer
 , cmake # for resolving toml11 dep
 
 , nix-util
@@ -12,6 +13,7 @@
 , boost
 , boehmgc
 , nlohmann_json
+, range-v3
 , toml11
 
 # Configuration Options
@@ -76,7 +78,9 @@ mkMesonLibrary (finalAttrs: {
   # Hack for sake of the dev shell
   passthru.externalPropagatedBuildInputs = [
     boost
+    immer
     nlohmann_json
+    range-v3
   ] ++ lib.optional enableGC boehmgc;
 
   preConfigure =

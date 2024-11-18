@@ -1,3 +1,13 @@
-# We use pointers to aggregates in a couple of places, intentionally.
-# void * would look weird.
-Checks: '-bugprone-sizeof-expression'
+Checks:
+  - bugprone-*
+  - clang-analyzer-*
+  - cppcoreguidelines-*
+  - modernize-*
+  - -modernize-use-trailing-return-type
+  - performance-*
+  - portability-*
+  - readability-*
+  - -readability-identifier-length
+FormatStyle: file
+InheritParentConfig: true
+User: connorbaker

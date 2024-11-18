@@ -361,6 +361,11 @@ private:
     std::shared_ptr<void *> valueAllocCache;
 
     /**
+     * Allocation cache for GC'd ValueList objects.
+     */
+    std::shared_ptr<void *> listAllocCache;
+
+    /**
      * Allocation cache for size-1 Env objects.
      */
     std::shared_ptr<void *> env1AllocCache;
@@ -708,19 +713,15 @@ public:
     /**
      * Allocation primitives.
      */
-    inline Value * allocValue();
-    inline Env & allocEnv(size_t size);
+    ValueList * allocList();
+    Value * allocValue();
+    Env * allocEnv(size_t size);
 
     Bindings * allocBindings(size_t capacity);
 
     BindingsBuilder buildBindings(size_t capacity)
     {
         return BindingsBuilder(*this, allocBindings(capacity));
-    }
-
-    ListBuilder buildList(size_t size)
-    {
-        return ListBuilder(*this, size);
     }
 
     /**
@@ -774,7 +775,7 @@ public:
         const SingleDerivedPath & p,
         Value & v);
 
-    void concatLists(Value & v, size_t nrLists, Value * const * lists, const PosIdx pos, std::string_view errorCtx);
+    void concatLists(Value & v, const ValueList & lists, const PosIdx pos, std::string_view errorCtx);
 
     /**
      * Print statistics, if enabled.
@@ -872,7 +873,6 @@ private:
     friend void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
     friend struct Value;
-    friend class ListBuilder;
 };
 
 struct DebugTraceStacker {

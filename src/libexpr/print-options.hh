@@ -4,6 +4,7 @@
  * @brief Options for printing Nix values.
  */
 
+#include <cstddef>
 #include <limits>
 
 namespace nix {

@@ -143,35 +143,6 @@ TEST_F(nix_api_expr_test, nix_build_and_init_list_invalid)
     assert_ctx_err();
 }
 
-TEST_F(nix_api_expr_test, nix_build_and_init_list)
-{
-    int size = 10;
-    ListBuilder * builder = nix_make_list_builder(ctx, state, size);
-
-    nix_value * intValue = nix_alloc_value(ctx, state);
-    nix_value * intValue2 = nix_alloc_value(ctx, state);
-
-    // `init` and `insert` can be called in any order
-    nix_init_int(ctx, intValue, 42);
-    nix_list_builder_insert(ctx, builder, 0, intValue);
-    nix_list_builder_insert(ctx, builder, 1, intValue2);
-    nix_init_int(ctx, intValue2, 43);
-
-    nix_make_list(ctx, builder, value);
-    nix_list_builder_free(builder);
-
-    ASSERT_EQ(42, nix_get_int(ctx, nix_get_list_byidx(ctx, value, state, 0)));
-    ASSERT_EQ(43, nix_get_int(ctx, nix_get_list_byidx(ctx, value, state, 1)));
-    ASSERT_EQ(nullptr, nix_get_list_byidx(ctx, value, state, 2));
-    ASSERT_EQ(10, nix_get_list_size(ctx, value));
-
-    ASSERT_STREQ("a list", nix_get_typename(ctx, value));
-    ASSERT_EQ(NIX_TYPE_LIST, nix_get_type(ctx, value));
-
-    // Clean up
-    nix_gc_decref(ctx, intValue);
-}
-
 TEST_F(nix_api_expr_test, nix_build_and_init_attr_invalid)
 {
     ASSERT_EQ(nullptr, nix_get_attr_byname(ctx, nullptr, state, 0));

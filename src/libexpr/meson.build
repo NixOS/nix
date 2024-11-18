@@ -2,6 +2,8 @@ project('nix-expr', 'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
+    # Set -Wno-array-bounds to avoid warnings in Immer's generated code.
+    'cpp_args=-Warray-bounds=0',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'debug=true',
@@ -38,6 +40,22 @@ boost = dependency(
 # put in `deps_other`.
 deps_other += boost
 
+immer = dependency(
+  'Immer',
+  version : '>=0.8.0',
+  method : 'cmake',
+  include_type: 'system',
+)
+deps_other += immer
+
+range_v3 = dependency(
+  'range-v3',
+  version : '>=0.12.0',
+  method : 'cmake',
+  include_type: 'system',
+)
+deps_other += range_v3
+
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
@@ -53,6 +71,7 @@ if bdw_gc.found()
     configdata.set(define_name, define_value)
   endforeach
   configdata.set('GC_THREADS', 1)
+  configdata.set('IMMER_HAS_LIBGC', 1)
 endif
 configdata.set('HAVE_BOEHMGC', bdw_gc.found().to_int())
 

@@ -708,11 +708,11 @@ namespace nix {
         ASSERT_TRACE2("head 1",
                       TypeError,
                       HintFmt("expected a list but found %s: %s", "an integer", Uncolored(ANSI_CYAN "1" ANSI_NORMAL)),
-                      HintFmt("while evaluating the first argument passed to builtins.elemAt"));
+                      HintFmt("while evaluating the first argument passed to builtins.head"));
 
         ASSERT_TRACE1("head []",
                       Error,
-                      HintFmt("list index %d is out of bounds", 0));
+                      HintFmt("'head' called on an empty list"));
 
     }
 

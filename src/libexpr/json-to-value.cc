@@ -3,6 +3,7 @@
 #include "eval.hh"
 
 #include <limits>
+#include <range/v3/algorithm/fold_left.hpp>
 #include <variant>
 #include <nlohmann/json.hpp>
 
@@ -58,10 +59,10 @@ class JSONSax : nlohmann::json_sax<json> {
         ValueVector values;
         std::unique_ptr<JSONState> resolve(EvalState & state) override
         {
-            auto list = state.buildList(values.size());
-            for (const auto & [n, v2] : enumerate(list))
-                v2 = values[n];
-            parent->value(state).mkList(list);
+            parent->value(state).mkList(ranges::fold_left(values, state.allocList(), [](auto * const list, auto * const v) {
+                *list = std::move(*list).push_back(v);
+                return list;
+            }));
             return std::move(parent);
         }
         void add() override {

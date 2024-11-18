@@ -50,11 +50,11 @@ void printAmbiguous(
         break;
     }
     case nList:
-        if (seen && v.listSize() && !seen->insert(v.listElems()).second)
+        if (seen && v.listSize() && !seen->insert(&v).second)
             str << "«repeated»";
         else {
             str << "[ ";
-            for (auto v2 : v.listItems()) {
+            for (auto v2 : v.list()) {
                 if (v2)
                     printAmbiguous(*v2, symbols, str, seen, depth - 1);
                 else

@@ -6,6 +6,7 @@
 #include "store-api.hh"
 // Need specialization involving `SymbolStr` just in this one module.
 #include "strings-inline.hh"
+#include <immer/algorithm.hpp>
 
 namespace nix::eval_cache {
 
@@ -718,9 +719,10 @@ std::vector<std::string> AttrCursor::getListOfStrings()
         root->state.error<TypeError>("'%s' is not a list", getAttrPathStr()).debugThrow();
 
     std::vector<std::string> res;
-
-    for (auto & elem : v.listItems())
+    res.reserve(v.listSize());
+    immer::for_each(v.list(), [&](auto * elem) {
         res.push_back(std::string(root->state.forceStringNoCtx(*elem, noPos, "while evaluating an attribute for caching")));
+    });
 
     if (root->db)
         cachedValue = {root->db->setListOfStrings(getKey(), res), res};
