@@ -2,6 +2,8 @@
 
 source common.sh
 
+[[ $(type -p man) ]] || skipTest "'man' not installed"
+
 # test help output
 
 nix-build --help
