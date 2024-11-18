@@ -1,6 +1,6 @@
 # Derivation and Deriving Path
 
-So far, we have covered "inert" store objects.
+So far, we have covered "inert" [store objects][store object].
 But the point of the Nix store layer is to be a build system.
 Other system (like Git or IPFS) also store and transfer immutable data, but they don't concern themselves with *how* that data was created.
 
@@ -9,6 +9,8 @@ This is where Nix distinguishes itself.
 The two concepts need to be introduced together because, as described below, each depends on the other.
 
 ## [Derivation]{#derivation}
+
+A derivation is a specification for running an executable on precisely defined input files to repeatably produce output files at uniquely determined file system paths.
 
 What is natural Unix analog for a build step *in action*?
 Answer: a process that will eventually exit, leaving behind some output date.
@@ -38,22 +40,85 @@ The last bit of information is to take advantage of the fact that Nix allows *he
 The process's job is to produce the outputs, but have no other important side effects.
 The rules around this will be discussed in following sections.
 
-### Output name
-
-Most outputs are named `drv.name + '-' + outputName`.
-However, an output named "out" is just has name `drv.name`.
-This is to allow derivations with a single output to avoid a superfluous `-<outputName>` in their single output's name when no disambiguation is needed.
-
-### Placeholder
-
-TODO
-
 ### Referencing
 
 Derivations are always referred to by the store path of the store object they are encoded to.
 The store path name is the derivation name with `.drv` suffixed at the end.
 The store path digest we will explain in a following section after we go over the different variants of derivations, as the exact algorithm depends on them.
 Suffice to say for now, it is (a form of) content addressing based on the derivation and its inputs.
+
+> NOTE:
+> Actually we have defined "text addressing" already in "content-addressing store objects".
+> Note that we reserve the right to format new sorts of derivations on-disk differently in the future.
+> The choice of "text hashing" should be deemd arbitrary along with the choice of "ATerm" serialization.
+> Maybe this should be moved below to "encoding?".
+
+### Outputs {#outputs}
+
+The outputs are the derivations are the store objects it is obligated to produce.
+
+Outputs are assigned names, and also consistent of other information based on the type of derivation.
+
+Output names can be any string which is also a valid [store path] name.
+The store path of the output store object (also called an [output path] for short), has a name based on the derivation name and the output name.
+Most outputs are named `drvMame + '-' + outputName`.
+However, an output named "out" is just has name `drvName`.
+This is to allow derivations with a single output to avoid a superfluous `-<outputName>` in their single output's name when no disambiguation is needed.
+
+> **Example**
+>
+> A derivation is named `hello`, and has two outputs, `out`, and `dev`
+>
+> - The derivation's path will be: `/nix/store/<hash>-hello.drv`.
+>
+> - The store path of `out` will be: `/nix/store/<hash>-hello`.
+>
+> - The store path of `dev` will be: `/nix/store/<hash>-hello-dev`.
+
+### System {#system}
+
+The system type on which the [`builder`](#attr-builder) executable is meant to be run.
+
+A necessary condition for Nix to build derivations locally is that the `system` attribute matches the current [`system` configuration option].
+It can automatically [build on other platforms](@docroot@/language/derivations.md#attr-builder) by forwarding build requests to other machines.
+
+[`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
+
+
+### Builder {#builder}
+
+Path to an executable that will perform the build.
+
+### Args {#args}
+
+Command-line arguments to be passed to the [`builder`](#builder) executable.
+
+### Environment Variables {#env}
+
+Environment variables which will be passed to the [`builder`](#builder) executable.
+
+### Placeholder
+
+TODO
+
+Two types:
+
+- Reference to own outputs
+
+- output derived paths (see below), corresponding to store paths we haven't yet realized.
+
+> N.B. Current method of creating hashes which we substitute for string fields should be seen as an artifact of the current ATerm formula.
+> In order to be more explicit, and avoid gotchas analogous to [SQL injection](https://en.wikipedia.org/wiki/SQL_injection),
+> we ought to consider switching two a different format where we explicitly use a syntax for a oncatentation of plain strings and placeholders written more explicitly.
+
+### Inputs
+
+The inputs are a set of [deriving paths].
+Each of these must be [realised] prior to building the derivation in
+question.
+At that point, the derivation can be normalized replacing each input
+derived path with its store path --- which we now now since we've
+realised it.
 
 ## [Deriving path]{#deriving-path}
 
