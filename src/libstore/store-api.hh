@@ -260,11 +260,11 @@ public:
 
     /**
      * Query the set of all valid paths. Note that for some store
-     * backends, the name part of store paths may be replaced by 'x'
-     * (i.e. you'll get /nix/store/<hash>-x rather than
-     * /nix/store/<hash>-<name>). Use queryPathInfo() to obtain the
+     * backends, the name part of store paths may be replaced by `x`
+     * (i.e. you'll get `/nix/store/<hash>-x` rather than
+     * `/nix/store/<hash>-<name>`). Use queryPathInfo() to obtain the
      * full store path. FIXME: should return a set of
-     * std::variant<StorePath, HashPart> to get rid of this hack.
+     * `std::variant<StorePath, HashPart>` to get rid of this hack.
      */
     virtual StorePathSet queryAllValidPaths()
     { unsupported("queryAllValidPaths"); }

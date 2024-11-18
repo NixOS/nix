@@ -95,6 +95,8 @@
     nix-functional-tests
   ];
   passthru = prevAttrs.passthru // {
+    inherit (nix-cli) version;
+
     /**
       These are the libraries that are part of the Nix project. They are used
       by the Nix CLI and other tools.

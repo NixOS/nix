@@ -19,6 +19,9 @@ mkDerivation {
 
     export PATH=${builtins.getEnv "NIX_BIN_DIR"}:$PATH
 
+    export _NIX_TEST_SOURCE_DIR=$PWD
+    export _NIX_TEST_BUILD_DIR=$PWD
+
     source common.sh
     source ./nested-sandboxing/command.sh
 

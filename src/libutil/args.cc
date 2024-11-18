@@ -91,9 +91,6 @@ struct Parser {
 
     /**
      * @brief Parse the next character(s)
-     *
-     * @param r
-     * @return std::shared_ptr<Parser>
      */
     virtual void operator()(std::shared_ptr<Parser> & state, Strings & r) = 0;
 

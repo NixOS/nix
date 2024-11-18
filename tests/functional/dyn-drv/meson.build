@@ -15,5 +15,5 @@ suites += {
     'dep-built-drv.sh',
     'old-daemon-error-hack.sh',
   ],
-  'workdir': meson.current_build_dir(),
+  'workdir': meson.current_source_dir(),
 }

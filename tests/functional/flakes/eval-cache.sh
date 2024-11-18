@@ -7,7 +7,7 @@ requireGit
 flake1Dir="$TEST_ROOT/eval-cache-flake"
 
 createGitRepo "$flake1Dir" ""
-cp ../simple.nix ../simple.builder.sh ../config.nix "$flake1Dir/"
+cp ../simple.nix ../simple.builder.sh "${config_nix}" "$flake1Dir/"
 git -C "$flake1Dir" add simple.nix simple.builder.sh config.nix
 git -C "$flake1Dir" commit -m "config.nix"
 

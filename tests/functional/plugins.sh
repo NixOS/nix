@@ -3,7 +3,7 @@
 source common.sh
 
 for ext in so dylib; do
-    plugin="$PWD/plugins/libplugintest.$ext"
+    plugin="${_NIX_TEST_BUILD_DIR}/plugins/libplugintest.$ext"
     [[ -f "$plugin" ]] && break
 done
 

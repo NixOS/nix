@@ -79,7 +79,7 @@ cat > "$flake1Dir"/flake.nix <<EOF
 }
 EOF
 
-cp ../simple.nix ../simple.builder.sh ../config.nix "$flake1Dir/"
+cp ../simple.nix ../simple.builder.sh "${config_nix}" "$flake1Dir/"
 
 echo bar > "$flake1Dir/foo"
 

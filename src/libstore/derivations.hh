@@ -298,6 +298,10 @@ struct BasicDerivation
     std::string name;
 
     BasicDerivation() = default;
+    BasicDerivation(BasicDerivation &&) = default;
+    BasicDerivation(const BasicDerivation &) = default;
+    BasicDerivation& operator=(BasicDerivation &&) = default;
+    BasicDerivation& operator=(const BasicDerivation &) = default;
     virtual ~BasicDerivation() { };
 
     bool isBuiltin() const;

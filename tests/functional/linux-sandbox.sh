@@ -47,7 +47,7 @@ grepQuiet 'may not be deterministic' $TEST_ROOT/log
 
 # Test that sandboxed builds cannot write to /etc easily
 # `100` means build failure without extra info, see doc/manual/source/command-ref/status-build-failure.md
-expectStderr 100 nix-sandbox-build -E 'with import ./config.nix; mkDerivation { name = "etc-write"; buildCommand = "echo > /etc/test"; }' |
+expectStderr 100 nix-sandbox-build -E 'with import '"${config_nix}"'; mkDerivation { name = "etc-write"; buildCommand = "echo > /etc/test"; }' |
     grepQuiet "/etc/test: Permission denied"
 
 

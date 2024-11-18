@@ -91,7 +91,7 @@ struct PrimOp
     const char * doc = nullptr;
 
     /**
-     * Add a trace item, `while calling the '<name>' builtin`
+     * Add a trace item, while calling the `<name>` builtin.
      *
      * This is used to remove the redundant item for `builtins.addErrorContext`.
      */
@@ -106,6 +106,11 @@ struct PrimOp
      * Optional experimental for this to be gated on.
      */
     std::optional<ExperimentalFeature> experimentalFeature;
+
+    /**
+     * If true, this primop is not exposed to the user.
+     */
+    bool internal = false;
 
     /**
      * Validity check to be performed by functions that introduce primops,
@@ -592,6 +597,11 @@ public:
     std::shared_ptr<StaticEnv> staticBaseEnv; // !!! should be private
 
     /**
+     * Internal primops not exposed to the user.
+     */
+    std::unordered_map<std::string, Value *, std::hash<std::string>, std::equal_to<std::string>, traceable_allocator<std::pair<const std::string, Value *>>> internalPrimOps;
+
+    /**
      * Name and documentation about every constant.
      *
      * Constants from primops are hard to crawl, and their docs will go
@@ -693,7 +703,7 @@ public:
      * Automatically call a function for which each argument has a
      * default value or has a binding in the `args` map.
      */
-    void autoCallFunction(Bindings & args, Value & fun, Value & res);
+    void autoCallFunction(const Bindings & args, Value & fun, Value & res);
 
     /**
      * Allocation primitives.

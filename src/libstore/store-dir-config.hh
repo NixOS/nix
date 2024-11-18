@@ -59,20 +59,20 @@ struct StoreDirConfig : public Config
     std::string showPaths(const StorePathSet & paths);
 
     /**
-     * @return true if ‘path’ is in the Nix store (but not the Nix
+     * @return true if *path* is in the Nix store (but not the Nix
      * store itself).
      */
     bool isInStore(PathView path) const;
 
     /**
-     * @return true if ‘path’ is a store path, i.e. a direct child of the
+     * @return true if *path* is a store path, i.e. a direct child of the
      * Nix store.
      */
     bool isStorePath(std::string_view path) const;
 
     /**
-     * Split a path like /nix/store/<hash>-<name>/<bla> into
-     * /nix/store/<hash>-<name> and /<bla>.
+     * Split a path like `/nix/store/<hash>-<name>/<bla>` into
+     * `/nix/store/<hash>-<name>` and `/<bla>`.
      */
     std::pair<StorePath, Path> toStorePath(PathView path) const;
 

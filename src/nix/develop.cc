@@ -610,6 +610,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         else if (!command.empty()) {
             std::vector<std::string> args;
+            args.reserve(command.size());
             for (auto s : command)
                 args.push_back(shellEscape(s));
             script += fmt("exec %s\n", concatStringsSep(" ", args));

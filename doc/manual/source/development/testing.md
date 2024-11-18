@@ -29,7 +29,7 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > ```
 > src
 > ├── libexpr
-> │   ├── local.mk
+> │   ├── meson.build
 > │   ├── value/context.hh
 > │   ├── value/context.cc
 > │   …
@@ -37,33 +37,32 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > ├── tests
 > │   │
 > │   …
-> │   └── unit
-> │       ├── libutil
-> │       │   ├── local.mk
-> │       │   …
-> │       │   └── data
-> │       │       ├── git/tree.txt
-> │       │       …
-> │       │
-> │       ├── libexpr-support
-> │       │   ├── local.mk
-> │       │   └── tests
-> │       │       ├── value/context.hh
-> │       │       ├── value/context.cc
-> │       │       …
-> │       │
-> │       ├── libexpr
-> │       …   ├── local.mk
-> │           ├── value/context.cc
-> │           …
+> │   ├── libutil-tests
+> │   │   ├── meson.build
+> │   │   …
+> │   │   └── data
+> │   │       ├── git/tree.txt
+> │   │       …
+> │   │
+> │   ├── libexpr-test-support
+> │   │   ├── meson.build
+> │   │   └── tests
+> │   │       ├── value/context.hh
+> │   │       ├── value/context.cc
+> │   │       …
+> │   │
+> │   ├── libexpr-tests
+> │   …   ├── meson.build
+> │       ├── value/context.cc
+> │       …
 > …
 > ```
 
 The tests for each Nix library (`libnixexpr`, `libnixstore`, etc..) live inside a directory `src/${library_name_without-nix}-test`.
-Given an interface (header) and implementation pair in the original library, say, `src/libexpr/value/context.{hh,cc}`, we write tests for it in `src/nix-expr-tests/value/context.cc`, and (possibly) declare/define additional interfaces for testing purposes in `src/nix-expr-test-support/tests/value/context.{hh,cc}`.
+Given an interface (header) and implementation pair in the original library, say, `src/libexpr/value/context.{hh,cc}`, we write tests for it in `src/libexpr-tests/value/context.cc`, and (possibly) declare/define additional interfaces for testing purposes in `src/libexpr-test-support/tests/value/context.{hh,cc}`.
 
 Data for unit tests is stored in a `data` subdir of the directory for each unit test executable.
-For example, `libnixstore` code is in `src/libstore`, and its test data is in `src/nix-store-tests/data`.
+For example, `libnixstore` code is in `src/libstore`, and its test data is in `src/libstore-tests/data`.
 The path to the `src/${library_name_without-nix}-test/data` directory is passed to the unit test executable with the environment variable `_NIX_TEST_UNIT_DATA`.
 Note that each executable only gets the data for its tests.
 
@@ -128,7 +127,7 @@ On other platforms they wouldn't be run at all.
 
 ## Functional tests
 
-The functional tests reside under the `tests/functional` directory and are listed in `tests/functional/local.mk`.
+The functional tests reside under the `tests/functional` directory and are listed in `tests/functional/meson.build`.
 Each test is a bash script.
 
 Functional tests are run during `installCheck` in the `nix` package build, as well as separately from the build, in VM tests.
@@ -138,7 +137,7 @@ Functional tests are run during `installCheck` in the `nix` package build, as we
 The whole test suite (functional and unit tests) can be run with:
 
 ```shell-session
-$ mesonCheckPhase
+$ checkPhase
 ```
 
 ### Grouping tests
