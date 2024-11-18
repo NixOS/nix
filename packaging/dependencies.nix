@@ -70,6 +70,9 @@ let
         pkgs.buildPackages.meson
         pkgs.buildPackages.ninja
       ] ++ prevAttrs.nativeBuildInputs or [];
+      mesonCheckFlags = prevAttrs.mesonCheckFlags or [] ++ [
+        "--print-errorlogs"
+      ];
     };
 
   mesonBuildLayer = finalAttrs: prevAttrs:
