@@ -366,6 +366,12 @@ static RegisterPrimOp primop_fetchTree({
 
           Default: `false`
 
+        - `lfs` (Bool, optional)
+
+          Fetch any [Git LFS](https://git-lfs.com/) files.
+
+          Default: `false`
+
         - `allRefs` (Bool, optional)
 
           By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
@@ -690,6 +696,13 @@ static RegisterPrimOp primop_fetchGit({
 
         Make a shallow clone when fetching the Git tree.
         When this is enabled, the options `ref` and `allRefs` have no effect anymore.
+
+      - `lfs` (default: `false`)
+
+        A boolean that when `true` specifies that [Git LFS] files should be fetched.
+
+        [Git LFS]: https://git-lfs.com/
+
       - `allRefs`
 
         Whether to fetch all references (eg. branches and tags) of the repository.
