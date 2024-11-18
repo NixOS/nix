@@ -167,6 +167,35 @@ EOF
 chmod a+x $TEST_ROOT/marco/polo/default.nix
 (cd $TEST_ROOT/marco && ./polo/default.nix | grepQuiet "Polo")
 
+# https://github.com/NixOS/nix/issues/11892
+mkdir $TEST_ROOT/issue-11892
+cat >$TEST_ROOT/issue-11892/shebangscript <<EOF
+#!$(type -P env) nix-shell
+#! nix-shell -I nixpkgs=$shellDotNix
+#! nix-shell -p 'callPackage (import ./my_package.nix) {}'
+#! nix-shell -i bash
+set -euxo pipefail
+my_package
+EOF
+cat >$TEST_ROOT/issue-11892/my_package.nix <<EOF
+{ stdenv, shell, ... }:
+stdenv.mkDerivation {
+  name = "my_package";
+  buildCommand = ''
+    mkdir -p \$out/bin
+    ( echo "#!\${shell}"
+      echo "echo 'ok' 'baz11892'"
+    ) > \$out/bin/my_package
+    cat \$out/bin/my_package
+    chmod a+x \$out/bin/my_package
+  '';
+}
+EOF
+chmod a+x $TEST_ROOT/issue-11892/shebangscript
+$TEST_ROOT/issue-11892/shebangscript \
+  | tee /dev/stderr \
+  | grepQuiet "ok baz11892"
+
 
 #####################
 # Flake equivalents #
