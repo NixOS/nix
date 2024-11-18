@@ -21,7 +21,7 @@ A derivation consists of:
 
  - A set of *outputs*, consisting of names and possibly other data
 
- - A set of *inputs*, a set of deriving paths
+ - A set of *inputs*, a set of [deriving paths](#deriving-path)
 
  - Everything needed for an `execve` system call:
    1. Path to executable
@@ -74,8 +74,8 @@ type OutputName = String
 data DerivingPath
   = ConstantPath { path : StorePath }
   | Output {
-      drv    : StorePath,
-      output : OutputName,
+      drvPath : StorePath,
+      output  : OutputName,
     }
 ```
 
@@ -141,7 +141,7 @@ type OutputName = String
 data DerivingPath
   = ConstantPath { storeObj : StorePath }
   | Output {
-      drv    : DerivingPath, -- changed
+      drv    : DerivingPath, -- Note: changed
       output : OutputName,
     }
 ```
