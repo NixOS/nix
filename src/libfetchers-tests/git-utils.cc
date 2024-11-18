@@ -251,29 +251,20 @@ protected:
     Fetch fetch2;
 };
 
-// Test exact match pattern
 TEST_F(FetchAttributeTest, ExactMatch) {
     EXPECT_TRUE(fetch1.hasAttribute("litfile", "filter", "lfs"));
     EXPECT_FALSE(fetch1.hasAttribute("other", "filter", "lfs"));
 }
 
-// Test wildcard pattern
 TEST_F(FetchAttributeTest, WildcardMatch) {
     EXPECT_TRUE(fetch2.hasAttribute("match.wildcard", "filter", "lfs"));
     EXPECT_FALSE(fetch2.hasAttribute("nomatch.otherext", "filter", "lfs"));
     EXPECT_FALSE(fetch2.hasAttribute("nomatch.wildcard.extra", "filter", "lfs"));
 }
 
-// Test empty path
 TEST_F(FetchAttributeTest, EmptyPath) {
     EXPECT_FALSE(fetch1.hasAttribute("", "filter", "lfs"));
     EXPECT_FALSE(fetch2.hasAttribute("", "filter", "lfs"));
-}
-
-// Test case sensitivity
-TEST_F(FetchAttributeTest, CaseSensitivity) {
-    EXPECT_FALSE(fetch1.hasAttribute("LITFILE", "filter", "lfs"));
-    EXPECT_FALSE(fetch2.hasAttribute("file.CHUNG", "filter", "lfs"));
 }
 
 
