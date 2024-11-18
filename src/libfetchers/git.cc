@@ -642,7 +642,6 @@ struct GitInputScheme : InputScheme
 
         bool exportIgnore = getExportIgnoreAttr(input);
         bool smudgeLfs = getLfsAttr(input);
-        std::cerr << "smudgeLfs: " << smudgeLfs << std::endl;
         auto accessor = repo->getAccessor(rev, exportIgnore, smudgeLfs);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
@@ -805,9 +804,7 @@ struct GitInputScheme : InputScheme
     {
         if (auto rev = input.getRev())
         {
-            const auto s = rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "") + (getLfsAttr(input) ? ";l" : "");
-            std::cerr << "getFingerprint: " << s << std::endl;
-            return s;
+            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "") + (getLfsAttr(input) ? ";l" : "");
         }
         else
             return std::nullopt;
