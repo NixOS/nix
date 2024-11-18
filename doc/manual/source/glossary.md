@@ -22,7 +22,7 @@
 - [derivation]{#gloss-derivation}
 
   A single build task.
-  See [Derivation](@docroot@/doc/manual/src/store/drv.md#Derivation) for details.
+  See [Derivation](@docroot@/doc/manual/src/store/drv.md#derivation) for details.
 
   [derivation]: #gloss-derivation
 
@@ -241,14 +241,9 @@
 
 - [deriving path]{#gloss-deriving-path}
 
-  Deriving paths are a way to refer to [store objects][store object] that ar not yet [realised][realise].
-  This is necessary because, in general and particularly for [content-addressed derivations][content-addressed derivation], the [output path] of an [output] is not known in advance.
-  There are two forms:
+  Deriving paths are a way to refer to [store objects][store object] that might not be yet [realised][realise].
 
-  - *constant*: just a [store path]
-    It can be made [valid][validity] by copying it into the store: from the evaluator, command line interface or another store.
-
-  - *output*: a pair of a [store path] to a [derivation] and an [output] name.
+  See [Deriving Path](./store/drv.md#deriving-path) for details.
 
 - [deriver]{#gloss-deriver}
 

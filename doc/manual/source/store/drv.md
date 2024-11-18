@@ -8,7 +8,7 @@ This is where Nix distinguishes itself.
 *Derivations* represent individual build steps, and *deriving paths* are needed to to the *outputs* of those build steps.
 The two concepts need to be introduced together because, as described below, each depends on the other.
 
-## Derivation
+## [Derivation]{#derivation}
 
 What is natural Unix analog for a build step *in action*?
 Answer: a process that will eventually exit, leaving behind some output date.
@@ -55,9 +55,16 @@ The store path name is the derivation name with `.drv` suffixed at the end.
 The store path digest we will explain in a following section after we go over the different variants of derivations, as the exact algorithm depends on them.
 Suffice to say for now, it is (a form of) content addressing based on the derivation and its inputs.
 
-## Deriving path
+## [Deriving path]{#deriving-path}
 
-Deriving references are close to their abstract version, but using `StorePath` as the type of all references, matching the end of the previous subsection.
+Deriving paths are a way to refer to [store objects][store object] that might not yet be [realised][realise].
+This is necessary because, in general and particularly for [content-addressed derivations][content-addressed derivation], the [store path] of an [output] is not known in advance.
+There are two forms:
+
+- *constant*: just a [store path]
+  It can be made [valid][validity] by copying it into the store: from the evaluator, command line interface or another st    ore.
+
+- *output*: a pair of a [store path] to a [derivation] and an [output] name.
 
 In pseudo code:
 
@@ -72,46 +79,53 @@ data DerivingPath
     }
 ```
 
+[content-addressed derivation]: @docroot@/glossary.md#gloss-content-addressed-derivation
+[realise]: @docroot@/glossary.md#gloss-realise
+[store object]: @docroot@/store/store-object.md
+[store path]: @docroot@/store/store-path.md
+
 ## Encoding
 
 ### Derivation
 
-- The name is not encoded, because we can just get it from the store object!
+There are two formats, documented separately:
 
-:::{.note}
-Brief amusing history of PP-ATerm
-:::
+- The legacy [ATerm" format](protocols/derivation-aterm.md)
 
-#### `inputSrcs` vs `inputDrvs`
+- The modern [JSON format](source/protocols/json/derivation.md)
 
 ### Deriving Path
 
-Constant deriving paths are encoded simply as the underlying store path is.
-Thus, we see that every encoded store path is also a valid encoded (constant) deriving path.
+- *constant*
 
-Output deriving paths are encoded by
+  Constant deriving paths are encoded simply as the underlying store path is.
+  Thus, we see that every encoded store path is also a valid encoded (constant) deriving path.
 
-- encoding of a store path referring to a derivation
+- *output*
 
-- a separator (`^` or `!` depending on context)
+  Output deriving paths are encoded by
 
-- the name of an output
+  - encoding of a store path referring to a derivation
 
-An example would be:
+  - a separator (`^` or `!` depending on context)
 
-```
-/nix/store/lxrn8v5aamkikg6agxwdqd1jz7746wz4-firefox-98.0.2.drv^out
-```
+  - the name of an output
 
-This parses like so:
-
-```
-/nix/store/lxrn8v5aamkikg6agxwdqd1jz7746wz4-firefox-98.0.2.drv^out
-|------------------------------------------------------------| |-|
-store path (usual encoding)                                    output name
-                                                          |--|
-                                                          note the ".drv"
-```
+  > **Example**
+  >
+  > ```
+  > /nix/store/lxrn8v5aamkikg6agxwdqd1jz7746wz4-firefox-98.0.2.drv^out
+  > ```
+  >
+  > This parses like so:
+  >
+  > ```
+  > /nix/store/lxrn8v5aamkikg6agxwdqd1jz7746wz4-firefox-98.0.2.drv^out
+  > |------------------------------------------------------------| |-|
+  > store path (usual encoding)                                    output name
+  >                                                           |--|
+  >                                                           note the ".drv"
+  > ```
 
 ## Extending the model to be higher-order
 
