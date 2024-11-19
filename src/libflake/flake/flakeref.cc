@@ -67,6 +67,20 @@ std::optional<FlakeRef> maybeParseFlakeRef(
     }
 }
 
+static std::pair<FlakeRef, std::string> fromParsedURL(
+    const fetchers::Settings & fetchSettings,
+    ParsedURL && parsedURL,
+    bool isFlake)
+{
+    auto dir = getOr(parsedURL.query, "dir", "");
+    parsedURL.query.erase("dir");
+
+    std::string fragment;
+    std::swap(fragment, parsedURL.fragment);
+
+    return std::make_pair(FlakeRef(fetchers::Input::fromURL(fetchSettings, parsedURL, isFlake), dir), fragment);
+}
+
 std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
@@ -89,7 +103,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         fragment = percentDecode(url.substr(fragmentStart+1));
     }
     if (pathEnd != std::string::npos && fragmentStart != std::string::npos && url[pathEnd] == '?') {
-        query = decodeQuery(url.substr(pathEnd+1, fragmentStart-pathEnd-1));
+        query = decodeQuery(url.substr(pathEnd + 1, fragmentStart - pathEnd - 1));
     }
 
     if (baseDir) {
@@ -153,6 +167,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                         .authority = "",
                         .path = flakeRoot,
                         .query = query,
+                        .fragment = fragment,
                     };
 
                     if (subdir != "") {
@@ -164,9 +179,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                     if (pathExists(flakeRoot + "/.git/shallow"))
                         parsedURL.query.insert_or_assign("shallow", "1");
 
-                    return std::make_pair(
-                        FlakeRef(fetchers::Input::fromURL(fetchSettings, parsedURL), getOr(parsedURL.query, "dir", "")),
-                        fragment);
+                    return fromParsedURL(fetchSettings, std::move(parsedURL), isFlake);
                 }
 
                 subdir = std::string(baseNameOf(flakeRoot)) + (subdir.empty() ? "" : "/" + subdir);
@@ -185,11 +198,12 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     attrs.insert_or_assign("path", path);
 
     return std::make_pair(FlakeRef(fetchers::Input::fromAttrs(fetchSettings, std::move(attrs)), ""), fragment);
-};
+}
 
-
-/* Check if 'url' is a flake ID. This is an abbreviated syntax for
-    'flake:<flake-id>?ref=<ref>&rev=<rev>'. */
+/**
+ * Check if `url` is a flake ID. This is an abbreviated syntax for
+ * `flake:<flake-id>?ref=<ref>&rev=<rev>`.
+ */
 static std::optional<std::pair<FlakeRef, std::string>> parseFlakeIdRef(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
@@ -227,22 +241,11 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
     bool isFlake
 )
 {
-    ParsedURL parsedURL;
     try {
-        parsedURL = parseURL(url);
+        return fromParsedURL(fetchSettings, parseURL(url), isFlake);
     } catch (BadURL &) {
         return std::nullopt;
     }
-
-    std::string fragment;
-    std::swap(fragment, parsedURL.fragment);
-
-    auto input = fetchers::Input::fromURL(fetchSettings, parsedURL, isFlake);
-    input.parent = baseDir;
-
-    return std::make_pair(
-        FlakeRef(std::move(input), getOr(parsedURL.query, "dir", "")),
-        fragment);
 }
 
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
