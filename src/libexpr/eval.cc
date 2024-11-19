@@ -523,13 +523,19 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
 }
 
 
+Value & EvalState::getBuiltins()
+{
+    return *baseEnv.values[0];
+}
+
+
 Value & EvalState::getBuiltin(const std::string & name)
 {
     auto it = baseEnv.values[0]->attrs()->get(symbols.create(name));
     if (it)
         return *it->value;
     else
-        throw EvalError("builtin '%1%' not found", name);
+        error<EvalError>("builtin '%1%' not found", name).debugThrow();
 }
 
 

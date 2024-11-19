@@ -630,6 +630,12 @@ public:
      */
     Value & getBuiltin(const std::string & name);
 
+    /**
+     * Retrieve the `builtins` attrset, equivalent to evaluating the reference `builtins`.
+     * Always returns an attribute set value.
+     */
+    Value & getBuiltins();
+
     struct Doc
     {
         Pos pos;
