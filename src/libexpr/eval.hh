@@ -623,6 +623,11 @@ private:
 
 public:
 
+    /**
+     * Retrieve a specific builtin, equivalent to evaluating `builtins.${name}`.
+     * @param name The attribute name of the builtin to retrieve.
+     * @throws EvalError if the builtin does not exist.
+     */
     Value & getBuiltin(const std::string & name);
 
     struct Doc
