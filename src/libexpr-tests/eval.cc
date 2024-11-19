@@ -138,4 +138,27 @@ TEST(nix_isAllowedURI, non_scheme_colon) {
     ASSERT_FALSE(isAllowedURI("https://foo/bar:baz", allowed));
 }
 
+class EvalStateTest : public LibExprTest {};
+
+TEST_F(EvalStateTest, getBuiltins_ok) {
+    auto evaled = maybeThunk("builtins");
+    auto & builtins = state.getBuiltins();
+    ASSERT_TRUE(builtins.type() == nAttrs);
+    ASSERT_EQ(evaled, &builtins);
+}
+
+TEST_F(EvalStateTest, getBuiltin_ok) {
+    auto & builtin = state.getBuiltin("toString");
+    ASSERT_TRUE(builtin.type() == nFunction);
+    // FIXME
+    // auto evaled = maybeThunk("builtins.toString");
+    // ASSERT_EQ(evaled, &builtin);
+    auto & builtin2 = state.getBuiltin("true");
+    ASSERT_EQ(state.forceBool(builtin2, noPos, "in unit test"), true);
+}
+
+TEST_F(EvalStateTest, getBuiltin_fail) {
+    ASSERT_THROW(state.getBuiltin("nonexistent"), EvalError);
+}
+
 } // namespace nix
