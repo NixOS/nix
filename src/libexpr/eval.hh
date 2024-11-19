@@ -347,7 +347,7 @@ private:
 
     LookupPath lookupPath;
 
-    std::map<std::string, std::optional<std::string>> lookupPathResolved;
+    std::map<std::string, std::optional<SourcePath>> lookupPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -452,9 +452,9 @@ public:
      *
      * If the specified search path element is a URI, download it.
      *
-     * If it is not found, return `std::nullopt`
+     * If it is not found, return `std::nullopt`.
      */
-    std::optional<std::string> resolveLookupPathPath(
+    std::optional<SourcePath> resolveLookupPathPath(
         const LookupPath::Path & elem,
         bool initAccessControl = false);
 

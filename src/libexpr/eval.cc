@@ -3025,8 +3025,8 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
         if (!rOpt) continue;
         auto r = *rOpt;
 
-        Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
-        if (pathExists(res)) return rootPath(CanonPath(canonPath(res)));
+        auto res = (r / CanonPath(suffix)).resolveSymlinks();
+        if (res.pathExists()) return res;
     }
 
     if (hasPrefix(path, "nix/"))
@@ -3041,13 +3041,13 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
 }
 
 
-std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Path & value0, bool initAccessControl)
+std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Path & value0, bool initAccessControl)
 {
     auto & value = value0.s;
     auto i = lookupPathResolved.find(value);
     if (i != lookupPathResolved.end()) return i->second;
 
-    auto finish = [&](std::string res) {
+    auto finish = [&](SourcePath res) {
         debug("resolved search path element '%s' to '%s'", value, res);
         lookupPathResolved.emplace(value, res);
         return res;
@@ -3060,7 +3060,7 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
                 fetchSettings,
                 EvalSettings::resolvePseudoUrl(value));
             auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
-            return finish(store->toRealPath(storePath));
+            return finish(rootPath(store->toRealPath(storePath)));
         } catch (Error & e) {
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
@@ -3072,29 +3072,29 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
         auto scheme = value.substr(0, colPos);
         auto rest = value.substr(colPos + 1);
         if (auto * hook = get(settings.lookupPathHooks, scheme)) {
-            auto res = (*hook)(store, rest);
+            auto res = (*hook)(*this, rest);
             if (res)
                 return finish(std::move(*res));
         }
     }
 
     {
-        auto path = absPath(value);
+        auto path = rootPath(value);
 
         /* Allow access to paths in the search path. */
         if (initAccessControl) {
-            allowPath(path);
-            if (store->isInStore(path)) {
+            allowPath(path.path.abs());
+            if (store->isInStore(path.path.abs())) {
                 try {
                     StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(path).first, closure);
+                    store->computeFSClosure(store->toStorePath(path.path.abs()).first, closure);
                     for (auto & p : closure)
                         allowPath(p);
                 } catch (InvalidPath &) { }
             }
         }
 
-        if (pathExists(path))
+        if (path.pathExists())
             return finish(std::move(path));
         else {
             logWarning({
@@ -3105,7 +3105,6 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
 
     debug("failed to resolve search path element '%s'", value);
     return std::nullopt;
-
 }
 
 
