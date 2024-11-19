@@ -1603,7 +1603,8 @@ static RegisterPrimOp primop_placeholder({
  *************************************************************/
 
 
-/* Convert the argument to a path.  !!! obsolete? */
+/* Convert the argument to a path and then to a string (confusing,
+   eh?).  !!! obsolete? */
 static void prim_toPath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
@@ -2614,13 +2615,13 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), HashAlgorithm::SHA256);
         else
             state.error<EvalError>(
-                "unsupported argument '%1%' to 'addPath'",
+                "unsupported argument '%1%' to 'builtins.path'",
                 state.symbols[attr.name]
             ).atPos(attr.pos).debugThrow();
     }
     if (!path)
         state.error<EvalError>(
-            "missing required 'path' attribute in the first argument to builtins.path"
+            "missing required 'path' attribute in the first argument to 'builtins.path'"
         ).atPos(pos).debugThrow();
     if (name.empty())
         name = path->baseName();
