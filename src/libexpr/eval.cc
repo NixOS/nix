@@ -448,7 +448,7 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
         /* Install value the base environment. */
         staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
-        baseEnv.values[0]->payload.attrs->push_back(Attr(symbols.create(name2), v));
+        getBuiltins().payload.attrs->push_back(Attr(symbols.create(name2), v));
     }
 }
 
@@ -516,7 +516,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
     else {
         staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
-        baseEnv.values[0]->payload.attrs->push_back(Attr(symbols.create(primOp.name), v));
+        getBuiltins().payload.attrs->push_back(Attr(symbols.create(primOp.name), v));
     }
 
     return v;
@@ -531,7 +531,7 @@ Value & EvalState::getBuiltins()
 
 Value & EvalState::getBuiltin(const std::string & name)
 {
-    auto it = baseEnv.values[0]->attrs()->get(symbols.create(name));
+    auto it = getBuiltins().attrs()->get(symbols.create(name));
     if (it)
         return *it->value;
     else
