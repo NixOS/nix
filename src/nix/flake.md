@@ -84,6 +84,8 @@ Here are some examples of flake references in their URL-like representation:
   repository on GitHub.
 * `github:NixOS/nixpkgs/nixos-20.09`: The `nixos-20.09` branch of the
   `nixpkgs` repository.
+* `github:NixOS/nixpkgs/pull/357207/head`: The `357207` pull request
+   of the nixpkgs repository.
 * `github:NixOS/nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`: A
   specific revision of the `nixpkgs` repository.
 * `github:edolstra/nix-warez?dir=blender`: A flake in a subdirectory
