@@ -25,6 +25,7 @@ suites += {
     'show.sh',
     'dubious-query.sh',
     'shebang.sh',
+    'commit-lock-file-summary.sh',
   ],
   'workdir': meson.current_source_dir(),
 }
