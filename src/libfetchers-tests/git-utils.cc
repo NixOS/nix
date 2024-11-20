@@ -110,7 +110,6 @@ TEST_F(GitUtilsTest, sink_hardlink)
     }
 };
 
-
 namespace lfs {
 
 TEST_F(GitUtilsTest, parseGitRemoteUrl)
@@ -196,7 +195,8 @@ TEST_F(GitUtilsTest, parseGitRemoteUrl)
         EXPECT_EQ(result.path, "");
     }
 }
-TEST_F(GitUtilsTest, gitUrlToHttp) {
+TEST_F(GitUtilsTest, gitUrlToHttp)
+{
     {
         const GitUrl url = parseGitUrl("git@github.com:user/repo.git");
         EXPECT_EQ(url.toHttp(), "https://github.com/user/repo.git");
@@ -219,7 +219,8 @@ TEST_F(GitUtilsTest, gitUrlToHttp) {
     }
 }
 
-TEST_F(GitUtilsTest, gitUrlToSsh) {
+TEST_F(GitUtilsTest, gitUrlToSsh)
+{
     {
         const GitUrl url = parseGitUrl("https://example.com/user/repo.git");
         const auto [host, path] = url.toSsh();
@@ -234,9 +235,11 @@ TEST_F(GitUtilsTest, gitUrlToSsh) {
     }
 }
 
-class FetchAttributeTest : public ::testing::Test {
+class FetchAttributeTest : public ::testing::Test
+{
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         // test literal (non-wildcard) matches too
         std::string content1 = "litfile filter=lfs diff=lfs merge=lfs -text";
         auto rules1 = parseGitAttrFile(content1);
@@ -251,22 +254,24 @@ protected:
     Fetch fetch2;
 };
 
-TEST_F(FetchAttributeTest, ExactMatch) {
+TEST_F(FetchAttributeTest, ExactMatch)
+{
     EXPECT_TRUE(fetch1.hasAttribute("litfile", "filter", "lfs"));
     EXPECT_FALSE(fetch1.hasAttribute("other", "filter", "lfs"));
 }
 
-TEST_F(FetchAttributeTest, WildcardMatch) {
+TEST_F(FetchAttributeTest, WildcardMatch)
+{
     EXPECT_TRUE(fetch2.hasAttribute("match.wildcard", "filter", "lfs"));
     EXPECT_FALSE(fetch2.hasAttribute("nomatch.otherext", "filter", "lfs"));
     EXPECT_FALSE(fetch2.hasAttribute("nomatch.wildcard.extra", "filter", "lfs"));
 }
 
-TEST_F(FetchAttributeTest, EmptyPath) {
+TEST_F(FetchAttributeTest, EmptyPath)
+{
     EXPECT_FALSE(fetch1.hasAttribute("", "filter", "lfs"));
     EXPECT_FALSE(fetch2.hasAttribute("", "filter", "lfs"));
 }
-
 
 } // namespace lfs
 
