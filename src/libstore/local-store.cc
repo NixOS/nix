@@ -565,7 +565,7 @@ void LocalStore::upgradeDBSchema(State & state)
             );
 
     doUpgrade(
-        "202410124-provenance",
+        "20241024-provenance",
         "alter table ValidPaths add column provenance text");
 }
 
