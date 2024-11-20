@@ -71,7 +71,7 @@ nix build -o "$TEST_ROOT/result" "$flake3Dir#sth" --commit-lock-file
 nix registry add --registry "$registry" flake3 "git+file://$flake3Dir"
 
 nix build -o "$TEST_ROOT/result" flake3#fnord
-[[ $(cat $TEST_ROOT/result) = FNORD ]]
+[[ $(cat "$TEST_ROOT/result") = FNORD ]]
 
 # Check whether flake input fetching is lazy: flake3#sth does not
 # depend on flake2, so this shouldn't fail.
