@@ -819,7 +819,6 @@ public:
     bool callPathFilter(
         Value * filterFun,
         const SourcePath & path,
-        std::string_view pathArg,
         PosIdx pos);
 
     DocComment getDocCommentForPos(PosIdx pos);
