@@ -26,6 +26,7 @@ suites += {
     'dubious-query.sh',
     'shebang.sh',
     'commit-lock-file-summary.sh',
+    'non-flake-inputs.sh',
   ],
   'workdir': meson.current_source_dir(),
 }
