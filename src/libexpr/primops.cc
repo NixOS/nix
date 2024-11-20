@@ -2438,7 +2438,6 @@ static RegisterPrimOp primop_toFile({
 bool EvalState::callPathFilter(
     Value * filterFun,
     const SourcePath & path,
-    std::string_view pathArg,
     PosIdx pos)
 {
     auto st = path.lstat();
@@ -2446,7 +2445,7 @@ bool EvalState::callPathFilter(
     /* Call the filter function.  The first argument is the path, the
        second is a string indicating the type of the file. */
     Value arg1;
-    arg1.mkString(pathArg);
+    arg1.mkString(path.path.abs());
 
     // assert that type is not "unknown"
     Value * args []{&arg1, fileTypeToString(*this, st.type)};
@@ -2489,7 +2488,7 @@ static void addPath(
         if (filterFun)
             filter = std::make_unique<PathFilter>([&](const Path & p) {
                 auto p2 = CanonPath(p);
-                return state.callPathFilter(filterFun, {path.accessor, p2}, p2.abs(), pos);
+                return state.callPathFilter(filterFun, {path.accessor, p2}, pos);
             });
 
         std::optional<StorePath> expectedStorePath;
