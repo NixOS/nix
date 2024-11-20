@@ -24,6 +24,7 @@ suites += {
     'config.sh',
     'show.sh',
     'dubious-query.sh',
+    'shebang.sh',
   ],
   'workdir': meson.current_source_dir(),
 }
