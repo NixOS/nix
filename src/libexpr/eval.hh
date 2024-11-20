@@ -599,9 +599,7 @@ public:
     /**
      * Part of `coerceToSingleDerivedPath()` without any store IO which is exposed for unit testing only.
      */
-    std::pair<SingleDerivedPath, std::string_view> coerceToSingleDerivedPathUnchecked(
-        const PosIdx pos, Value & v,
-        std::string_view errorCtx);
+    std::pair<SingleDerivedPath, std::string_view> coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx);
 
     /**
      * Coerce to `SingleDerivedPath`.

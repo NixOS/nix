@@ -2003,48 +2003,48 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     std::shared_ptr<SourceAccessor> accessor;
 
     for (auto & [i_pos, i] : *es) {
-        Value * vTmp = vTmpP++;
-        i->eval(state, env, *vTmp);
+        Value & vTmp = *vTmpP++;
+        i->eval(state, env, vTmp);
 
         /* If the first element is a path, then the result will also
            be a path, we don't copy anything (yet - that's done later,
            since paths are copied when they are used in a derivation),
            and none of the strings are allowed to have contexts. */
         if (first) {
-            firstType = vTmp->type();
-            if (vTmp->type() == nPath) {
-                accessor = vTmp->path().accessor;
-                auto part = vTmp->path().path.abs();
+            firstType = vTmp.type();
+            if (vTmp.type() == nPath) {
+                accessor = vTmp.path().accessor;
+                auto part = vTmp.path().path.abs();
                 sSize += part.size();
                 s.emplace_back(std::move(part));
             }
         }
 
         if (firstType == nInt) {
-            if (vTmp->type() == nInt) {
-                auto newN = n + vTmp->integer();
+            if (vTmp.type() == nInt) {
+                auto newN = n + vTmp.integer();
                 if (auto checked = newN.valueChecked(); checked.has_value()) {
                     n = NixInt(*checked);
                 } else {
-                    state.error<EvalError>("integer overflow in adding %1% + %2%", n, vTmp->integer()).atPos(i_pos).debugThrow();
+                    state.error<EvalError>("integer overflow in adding %1% + %2%", n, vTmp.integer()).atPos(i_pos).debugThrow();
                 }
-            } else if (vTmp->type() == nFloat) {
+            } else if (vTmp.type() == nFloat) {
                 // Upgrade the type from int to float.
                 firstType = nFloat;
                 nf = n.value;
-                nf += vTmp->fpoint();
+                nf += vTmp.fpoint();
             } else
-                state.error<EvalError>("cannot add %1% to an integer", showType(*vTmp)).atPos(i_pos).withFrame(env, *this).debugThrow();
+                state.error<EvalError>("cannot add %1% to an integer", showType(vTmp)).atPos(i_pos).withFrame(env, *this).debugThrow();
         } else if (firstType == nFloat) {
-            if (vTmp->type() == nInt) {
-                nf += vTmp->integer().value;
-            } else if (vTmp->type() == nFloat) {
-                nf += vTmp->fpoint();
+            if (vTmp.type() == nInt) {
+                nf += vTmp.integer().value;
+            } else if (vTmp.type() == nFloat) {
+                nf += vTmp.fpoint();
             } else
-                state.error<EvalError>("cannot add %1% to a float", showType(*vTmp)).atPos(i_pos).withFrame(env, *this).debugThrow();
+                state.error<EvalError>("cannot add %1% to a float", showType(vTmp)).atPos(i_pos).withFrame(env, *this).debugThrow();
         } else if (firstType == nPath) {
             if (!first) {
-                auto part = state.coerceToString(i_pos, *vTmp, context, "while evaluating a path segment", false, false);
+                auto part = state.coerceToString(i_pos, vTmp, context, "while evaluating a path segment", false, false);
                 if (sSize <= 1 && !hasPrefix(*part, "/") && accessor != state.rootFS.get_ptr() && !part->empty())
                     state.error<EvalError>(
                         "cannot append non-absolute path '%1%' to '%2%' (hint: change it to '/%1%')",
@@ -2080,7 +2080,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             }
         } else {
             if (s.empty()) s.reserve(es->size());
-            auto part = state.coerceToString(i_pos, *vTmp, context, "while evaluating a path segment", false, firstType == nString);
+            auto part = state.coerceToString(i_pos, vTmp, context, "while evaluating a path segment", false, firstType == nString);
             sSize += part->size();
             s.emplace_back(std::move(part));
         }
