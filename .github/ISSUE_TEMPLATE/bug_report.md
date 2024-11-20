@@ -18,10 +18,13 @@ assignees: ''
 
 ## Steps To Reproduce
 
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+<!--
+  Example:
+
+  1. Clone this repository: ...
+  2. Run `nix-... ...`
+  3. Observe unexpected behaviour
+-->
 
 ## Expected behavior
 
