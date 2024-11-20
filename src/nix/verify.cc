@@ -69,6 +69,13 @@ struct CmdVerify : StorePathsCommand
 
         auto publicKeys = getDefaultPublicKeys();
 
+        if (publicKeys.empty()) {
+            printMsg(lvlChatty, "not using any public keys.");
+        } else {
+            for (auto & pk : publicKeys)
+                printMsg(lvlChatty, "using public key: %s:%s", pk.first, base64Encode(pk.second.key));
+        }
+
         Activity act(*logger, actVerifyPaths);
 
         std::atomic<size_t> done{0};
@@ -119,10 +126,11 @@ struct CmdVerify : StorePathsCommand
 
                     bool good = false;
 
-                    if (info->ultimate && !sigsNeeded)
+                    if (info->ultimate && !sigsNeeded) {
+                        printMsg(lvlChatty, "path is ultimately trusted");
                         good = true;
 
-                    else {
+                    } else {
 
                         StringSet sigsSeen;
                         size_t actualSigsNeeded = std::max(sigsNeeded, (size_t) 1);
@@ -131,12 +139,24 @@ struct CmdVerify : StorePathsCommand
                         auto doSigs = [&](StringSet sigs) {
                             for (auto sig : sigs) {
                                 if (!sigsSeen.insert(sig).second) continue;
-                                if (validSigs < ValidPathInfo::maxSigs && info->checkSignature(*store, publicKeys, sig))
+
+                                if (verbosity >= lvlChatty) {
+                                    auto ss = BorrowedCryptoValue::parse(sig);
+                                    printMsg(lvlChatty, "path is signed with key: %s", ss.name);
+                                }
+
+                                if (validSigs < ValidPathInfo::maxSigs && info->checkSignature(*store, publicKeys, sig)) {
                                     validSigs++;
+                                    if (validSigs == actualSigsNeeded)
+                                        printMsg(lvlChatty, "path has sufficient signatures");
+                                }
                             }
                         };
 
-                        if (info->isContentAddressed(*store)) validSigs = ValidPathInfo::maxSigs;
+                        if (info->isContentAddressed(*store)) {
+                            printMsg(lvlChatty, "path is content-addressed");
+                            validSigs = ValidPathInfo::maxSigs;
+                        }
 
                         doSigs(info->sigs);
 
@@ -144,13 +164,21 @@ struct CmdVerify : StorePathsCommand
                             if (validSigs >= actualSigsNeeded) break;
                             try {
                                 auto info2 = store2->queryPathInfo(info->path);
-                                if (info2->isContentAddressed(*store)) validSigs = ValidPathInfo::maxSigs;
+                                if (info2->isContentAddressed(*store)) {
+                                    printMsg(lvlChatty, "path is content-addressed");
+                                    validSigs = ValidPathInfo::maxSigs;
+                                }
                                 doSigs(info2->sigs);
                             } catch (InvalidPath &) {
                             } catch (Error & e) {
                                 logError(e.info());
                             }
                         }
+
+                        if (sigsSeen.size() == 0)
+                            printMsg(lvlChatty, "path does not have any signatures");
+                        if (validSigs == 0)
+                            printMsg(lvlChatty, "path does not have any valid signatures");
 
                         if (validSigs >= actualSigsNeeded)
                             good = true;
