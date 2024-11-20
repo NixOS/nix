@@ -29,12 +29,12 @@ EvalSettings evalSettings {
     {
         {
             "flake",
-            [](ref<Store> store, std::string_view rest) {
+            [](EvalState & state, std::string_view rest) {
                 experimentalFeatureSettings.require(Xp::Flakes);
                 // FIXME `parseFlakeRef` should take a `std::string_view`.
                 auto flakeRef = parseFlakeRef(fetchSettings, std::string { rest }, {}, true, false);
                 debug("fetching flake search path element '%s''", rest);
-                auto [accessor, _] = flakeRef.resolve(store).lazyFetch(store);
+                auto [accessor, _] = flakeRef.resolve(state.store).lazyFetch(state.store);
                 return SourcePath(accessor);
             },
         },

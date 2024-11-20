@@ -454,7 +454,7 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
         /* Install value the base environment. */
         staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
-        baseEnv.values[0]->payload.attrs->push_back(Attr(symbols.create(name2), v));
+        getBuiltins().payload.attrs->push_back(Attr(symbols.create(name2), v));
     }
 }
 
@@ -522,16 +522,26 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
     else {
         staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
-        baseEnv.values[0]->payload.attrs->push_back(Attr(symbols.create(primOp.name), v));
+        getBuiltins().payload.attrs->push_back(Attr(symbols.create(primOp.name), v));
     }
 
     return v;
 }
 
 
+Value & EvalState::getBuiltins()
+{
+    return *baseEnv.values[0];
+}
+
+
 Value & EvalState::getBuiltin(const std::string & name)
 {
-    return *baseEnv.values[0]->attrs()->find(symbols.create(name))->value;
+    auto it = getBuiltins().attrs()->get(symbols.create(name));
+    if (it)
+        return *it->value;
+    else
+        error<EvalError>("builtin '%1%' not found", name).debugThrow();
 }
 
 
@@ -594,14 +604,14 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     if (isFunctor(v)) {
         try {
             Value & functor = *v.attrs()->find(sFunctor)->value;
-            Value * vp = &v;
+            Value * vp[] = {&v};
             Value partiallyApplied;
             // The first paramater is not user-provided, and may be
             // handled by code that is opaque to the user, like lib.const = x: y: y;
             // So preferably we show docs that are relevant to the
             // "partially applied" function returned by e.g. `const`.
             // We apply the first argument:
-            callFunction(functor, 1, &vp, partiallyApplied, noPos);
+            callFunction(functor, vp, partiallyApplied, noPos);
             auto _level = addCallDepth(noPos);
             return getDoc(partiallyApplied);
         }
@@ -1476,7 +1486,7 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
     v.mkLambda(&env, this);
 }
 
-void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos)
+void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes, const PosIdx pos)
 {
     auto _level = addCallDepth(pos);
 
@@ -1491,16 +1501,16 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
     auto makeAppChain = [&]()
     {
         vRes = vCur;
-        for (size_t i = 0; i < nrArgs; ++i) {
+        for (auto arg : args) {
             auto fun2 = allocValue();
             *fun2 = vRes;
-            vRes.mkPrimOpApp(fun2, args[i]);
+            vRes.mkPrimOpApp(fun2, arg);
         }
     };
 
     const Attr * functor;
 
-    while (nrArgs > 0) {
+    while (args.size() > 0) {
 
         if (vCur.isLambda()) {
 
@@ -1603,15 +1613,14 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 throw;
             }
 
-            nrArgs--;
-            args += 1;
+            args = args.subspan(1);
         }
 
         else if (vCur.isPrimOp()) {
 
             size_t argsLeft = vCur.primOp()->arity;
 
-            if (nrArgs < argsLeft) {
+            if (args.size() < argsLeft) {
                 /* We don't have enough arguments, so create a tPrimOpApp chain. */
                 makeAppChain();
                 return;
@@ -1623,15 +1632,14 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 if (countCalls) primOpCalls[fn->name]++;
 
                 try {
-                    fn->fun(*this, vCur.determinePos(noPos), args, vCur);
+                    fn->fun(*this, vCur.determinePos(noPos), args.data(), vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
-                nrArgs -= argsLeft;
-                args += argsLeft;
+                args = args.subspan(argsLeft);
             }
         }
 
@@ -1647,7 +1655,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             auto arity = primOp->primOp()->arity;
             auto argsLeft = arity - argsDone;
 
-            if (nrArgs < argsLeft) {
+            if (args.size() < argsLeft) {
                 /* We still don't have enough arguments, so extend the tPrimOpApp chain. */
                 makeAppChain();
                 return;
@@ -1679,8 +1687,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     throw;
                 }
 
-                nrArgs -= argsLeft;
-                args += argsLeft;
+                args = args.subspan(argsLeft);
             }
         }
 
@@ -1691,13 +1698,12 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             Value * args2[] = {allocValue(), args[0]};
             *args2[0] = vCur;
             try {
-                callFunction(*functor->value, 2, args2, vCur, functor->pos);
+                callFunction(*functor->value, args2, vCur, functor->pos);
             } catch (Error & e) {
                 e.addTrace(positions[pos], "while calling a functor (an attribute set with a '__functor' attribute)");
                 throw;
             }
-            nrArgs--;
-            args++;
+            args = args.subspan(1);
         }
 
         else
@@ -1740,7 +1746,7 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
     for (size_t i = 0; i < args.size(); ++i)
         vArgs[i] = args[i]->maybeThunk(state, env);
 
-    state.callFunction(vFun, args.size(), vArgs.data(), v, pos);
+    state.callFunction(vFun, vArgs, v, pos);
 }
 
 
@@ -3154,7 +3160,7 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
         auto scheme = value.substr(0, colPos);
         auto rest = value.substr(colPos + 1);
         if (auto * hook = get(settings.lookupPathHooks, scheme)) {
-            auto res = (*hook)(store, rest);
+            auto res = (*hook)(*this, rest);
             if (res)
                 return finish(std::move(*res));
         }

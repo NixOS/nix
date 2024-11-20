@@ -7,7 +7,7 @@
 
 namespace nix {
 
-class Store;
+class EvalState;
 
 struct EvalSettings : Config
 {
@@ -20,7 +20,7 @@ struct EvalSettings : Config
      * The return value is (a) whether the entry was valid, and, if so,
      * what does it map to.
      */
-    using LookupPathHook = std::optional<SourcePath>(ref<Store> store, std::string_view);
+    using LookupPathHook = std::optional<SourcePath>(EvalState & state, std::string_view);
 
     /**
      * Map from "scheme" to a `LookupPathHook`.

@@ -128,7 +128,7 @@ jobs:
     - run: exec bash -c "nix-channel --update && nix-env -iA nixpkgs.hello && hello"
 
   docker_push_image:
-    needs: [check_secrets, tests]
+    needs: [check_secrets, tests, vm_tests]
     permissions:
       contents: read
       packages: write
@@ -194,7 +194,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix build -L .#hydraJobs.tests.githubFlakes .#hydraJobs.tests.tarballFlakes .#hydraJobs.tests.functional_user
+      - run: |
+          nix build -L \
+            .#hydraJobs.tests.functional_user \
+            .#hydraJobs.tests.githubFlakes \
+            .#hydraJobs.tests.nix-docker \
+            .#hydraJobs.tests.tarballFlakes \
+            ;
 
   flake_regressions:
     needs: vm_tests
