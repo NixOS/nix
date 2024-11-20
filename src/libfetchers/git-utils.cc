@@ -676,29 +676,31 @@ struct GitSourceAccessor : SourceAccessor
         , root(peelToTreeOrBlob(lookupObject(*repo, hashToOID(rev)).get()))
         , lfsFetch(lfsFetch)
     {
+        if (lfsFetch && !lookup(CanonPath(".gitattributes"))) {
+            warn("Requested to fetch lfs files, but no .gitattributes file was found, ignoring");
+        }
     }
 
     std::string readBlob(const CanonPath & path, bool symlink)
     {
         const auto blob = getBlob(path, symlink);
 
-        const auto data = std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
-
-        if (path != CanonPath(".gitattributes") && lfsFetch) {
+        if (lfsFetch && path != CanonPath(".gitattributes") && lookup(CanonPath(".gitattributes"))) {
             auto& _lfsFetch = *lfsFetch;
             if (!_lfsFetch.ready) {
                 const auto contents = readFile(CanonPath(".gitattributes"));
                 _lfsFetch.init(*repo, contents);
-                };
+            }
+
             auto pathStr = std::string(path.rel());
             if (_lfsFetch.hasAttribute(pathStr, "filter", "lfs")) {
                 StringSink s;
-                _lfsFetch.fetch(data, pathStr, s);
+                _lfsFetch.fetch(blob.get(), pathStr, s);
                 return s.s;
             }
         }
 
-        return data;
+        return std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
     }
 
     void readFile(
@@ -709,11 +711,7 @@ struct GitSourceAccessor : SourceAccessor
         auto size = git_blob_rawsize(blob.get());
         sizeCallback(size);
 
-        // if lfs, this is just a pointer file
-        // if not lfs then it's not big either way
-        auto contents = std::string((const char *) git_blob_rawcontent(blob.get()), size);
-
-        if (lfsFetch && path != CanonPath(".gitattributes")) {
+        if (lfsFetch && path != CanonPath(".gitattributes") && lookup(CanonPath(".gitattributes"))) {
             auto& _lfsFetch = *lfsFetch;
             if (!_lfsFetch.ready) {
                 const auto contents = readFile(CanonPath(".gitattributes"));
@@ -722,13 +720,15 @@ struct GitSourceAccessor : SourceAccessor
 
             auto pathStr = std::string(path.rel());
             if (_lfsFetch.hasAttribute(pathStr, "filter", "lfs")) {
-                _lfsFetch.fetch(contents, pathStr, sink);
+                _lfsFetch.fetch(blob.get(), pathStr, sink);
                 return;
             }
         }
 
-        // either not using lfs or file should not be smudged
-        sink(contents);
+        constexpr size_t chunkSize = 128 * 1024; // 128 KiB
+        for (size_t offset = 0; offset < size; offset += chunkSize) {
+            sink(std::string((const char *) git_blob_rawcontent(blob.get()) + offset, std::min(chunkSize, size - offset)));
+        }
     }
 
     std::string readFile(const CanonPath & path) override

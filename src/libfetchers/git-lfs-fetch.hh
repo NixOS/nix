@@ -117,7 +117,7 @@ struct Fetch {
 
   void init(git_repository* repo, const std::string& gitattributesContent);
   bool hasAttribute(const std::string& path, const std::string& attrName, const std::string& attrValue) const;
-  void fetch(const std::string& pointerFileContents, const std::string& pointerFilePath, Sink& sink) const;
+  void fetch(const git_blob* pointerBlob, const std::string& pointerFilePath, Sink& sink) const;
   std::vector<nlohmann::json> fetchUrls(const std::vector<Md> &metadatas) const;
 };
 
@@ -185,8 +185,6 @@ void downloadToSink(const std::string &url, const std::string &authHeader, Sink 
 }
 
 
-
-
 std::string getLfsApiToken(const GitUrl& u) {
   const auto [maybeUserAndHost, path] = u.toSsh();
   auto [status, output] = runProgram(RunOptions {
@@ -216,7 +214,6 @@ std::string getLfsEndpointUrl(git_repository *repo) {
       return "";
   }
 
-
   const char *url_c_str = git_remote_url(remote);
   if (!url_c_str) {
     return "";
@@ -241,35 +238,60 @@ std::string git_attr_value_to_string(git_attr_value_t value) {
 }
 
 
-Md parseLfsMetadata(const std::string &content, const std::string &filename) {
+std::optional<Md> parseLfsMetadata(const std::string &content, const std::string &filename) {
+  // https://github.com/git-lfs/git-lfs/blob/2ef4108/docs/spec.md
+  //
   // example git-lfs pointer file:
   // version https://git-lfs.github.com/spec/v1
   // oid sha256:f5e02aa71e67f41d79023a128ca35bad86cf7b6656967bfe0884b3a3c4325eaf
   // size 10000000
-  std::istringstream iss(content);
-  std::string line;
-  std::string oid;
-  size_t size = 0;
+  // (ending \n)
 
-  while (getline(iss, line)) {
-    std::size_t pos = line.find("oid sha256:");
-    if (pos != std::string::npos) {
-      oid = line.substr(pos + 11); // skip "oid sha256:"
-      continue;
-    }
-
-    pos = line.find("size ");
-    if (pos != std::string::npos) {
-      std::string sizeStr =
-          line.substr(pos + 5); // skip "size "
-      size = std::stol(sizeStr);
-      continue;
-    }
+  if (!content.starts_with("version ")) {
+    // Invalid pointer file
+    return std::nullopt;
   }
 
-  return Md{filename, oid, size};
-}
+  if (!content.starts_with("version https://git-lfs.github.com/spec/v1")) {
+    // In case there's new spec versions in the future, but for now only v1 exists
+    debug("Invalid version found on potential lfs pointer file, skipping");
+    return std::nullopt;
+  }
 
+  std::istringstream iss(content);
+  std::string line;
+
+  std::string oid;
+  std::string size;
+
+  while (getline(iss, line)) {
+    if (line.starts_with("version ")) {
+      continue;
+    }
+    if (line.starts_with("oid sha256:")) {
+      oid = line.substr(11); // skip "oid sha256:"
+      continue;
+    }
+    if (line.starts_with("size ")) {
+      size = line.substr(5); // skip "size "
+      continue;
+    }
+
+    debug("Custom extension '%s' found, ignoring", line);
+  }
+
+  if (oid.length() != 64 || !std::all_of(oid.begin(), oid.end(), ::isxdigit)) {
+    debug("Invalid sha256 %s, skipping", oid);
+    return std::nullopt;
+  }
+
+  if (size.length() == 0 || !std::all_of(size.begin(), size.end(), ::isdigit)) {
+    debug("Invalid size %s, skipping", size);
+    return std::nullopt;
+  }
+
+  return std::make_optional(Md{filename, oid, std::stoul(size)});
+}
 
 
 // there's already a ParseURL here https://github.com/b-camacho/nix/blob/ef6fa54e05cd4134ec41b0d64c1a16db46237f83/src/libutil/url.cc#L13
@@ -386,7 +408,6 @@ void Fetch::init(git_repository* repo, const std::string& gitattributesContent) 
 }
 
 
-
 bool Fetch::hasAttribute(const std::string& path, const std::string& attrName, const std::string& attrValue) const
 {
     for (auto it = rules.rbegin(); it != rules.rend(); ++it) {
@@ -481,10 +502,32 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> &metadatas) c
   }
 }
 
-void Fetch::fetch(const std::string& pointerFileContents, const std::string& pointerFilePath, Sink& sink) const {
+void Fetch::fetch(const git_blob* pointerBlob, const std::string& pointerFilePath, Sink& sink) const {
+  constexpr size_t chunkSize = 128 * 1024; // 128 KiB
+  auto size = git_blob_rawsize(pointerBlob);
+
+  if (size >= 1024) {
+    debug("Skip git-lfs, pointer file too large");
+    warn("Encountered a file that should have been a pointer, but wasn't: %s", pointerFilePath);
+    for (size_t offset = 0; offset < size; offset += chunkSize) {
+        sink(std::string((const char *) git_blob_rawcontent(pointerBlob) + offset, std::min(chunkSize, size - offset)));
+    }
+    return;
+  }
+
+  const auto pointerFileContents = std::string((const char *) git_blob_rawcontent(pointerBlob), size);
   const auto md = parseLfsMetadata(std::string(pointerFileContents), std::string(pointerFilePath));
+  if (md == std::nullopt) {
+    debug("Skip git-lfs, invalid pointer file");
+    warn("Encountered a file that should have been a pointer, but wasn't: %s", pointerFilePath);
+    for (size_t offset = 0; offset < size; offset += chunkSize) {
+        sink(std::string((const char *) git_blob_rawcontent(pointerBlob) + offset, std::min(chunkSize, size - offset)));
+    }
+    return;
+  }
+
   std::vector<Md> vMds;
-  vMds.push_back(md);
+  vMds.push_back(md.value());
   const auto objUrls = fetchUrls(vMds);
 
   const auto obj = objUrls[0];
@@ -507,4 +550,3 @@ void Fetch::fetch(const std::string& pointerFileContents, const std::string& poi
 } // namespace lfs
 
 } // namespace nix
-
