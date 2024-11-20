@@ -1,4 +1,4 @@
-# NOTE: instances of @variable@ are substituted as defined in /mk/templates.mk
+# NOTE: instances of @variable@ are substituted by the build system
 
 if [[ -z "${COMMON_SUBST_VARS_SH_SOURCED-}" ]]; then
 

@@ -40,6 +40,12 @@ namespace nix {
                 return v;
             }
 
+            Value * maybeThunk(std::string input, bool forceValue = true) {
+                Expr * e = state.parseExprFromString(input, state.rootPath(CanonPath::root));
+                assert(e);
+                return e->maybeThunk(state, state.baseEnv);
+            }
+
             Symbol createSymbol(const char * value) {
                 return state.symbols.create(value);
             }

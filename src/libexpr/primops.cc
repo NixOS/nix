@@ -91,6 +91,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
 
     /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
+    buildReqs.reserve(drvs.size());
     for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
     buildStore->buildPaths(buildReqs, bmNormal, store);
 
@@ -723,7 +724,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value * * a
 
         /* Call the `operator' function with `e' as argument. */
         Value newElements;
-        state.callFunction(*op->value, 1, &e, newElements, noPos);
+        state.callFunction(*op->value, {&e, 1}, newElements, noPos);
         state.forceList(newElements, noPos, "while evaluating the return value of the `operator` passed to builtins.genericClosure");
 
         /* Add the values returned by the operator to the work set. */
@@ -1602,7 +1603,8 @@ static RegisterPrimOp primop_placeholder({
  *************************************************************/
 
 
-/* Convert the argument to a path.  !!! obsolete? */
+/* Convert the argument to a path and then to a string (confusing,
+   eh?).  !!! obsolete? */
 static void prim_toPath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
@@ -2436,7 +2438,6 @@ static RegisterPrimOp primop_toFile({
 bool EvalState::callPathFilter(
     Value * filterFun,
     const SourcePath & path,
-    std::string_view pathArg,
     PosIdx pos)
 {
     auto st = path.lstat();
@@ -2444,12 +2445,12 @@ bool EvalState::callPathFilter(
     /* Call the filter function.  The first argument is the path, the
        second is a string indicating the type of the file. */
     Value arg1;
-    arg1.mkString(pathArg);
+    arg1.mkString(path.path.abs());
 
     // assert that type is not "unknown"
     Value * args []{&arg1, fileTypeToString(*this, st.type)};
     Value res;
-    callFunction(*filterFun, 2, args, res, pos);
+    callFunction(*filterFun, args, res, pos);
 
     return forceBool(res, pos, "while evaluating the return value of the path filter function");
 }
@@ -2487,7 +2488,7 @@ static void addPath(
         if (filterFun)
             filter = std::make_unique<PathFilter>([&](const Path & p) {
                 auto p2 = CanonPath(p);
-                return state.callPathFilter(filterFun, {path.accessor, p2}, p2.abs(), pos);
+                return state.callPathFilter(filterFun, {path.accessor, p2}, pos);
             });
 
         std::optional<StorePath> expectedStorePath;
@@ -2613,13 +2614,13 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), HashAlgorithm::SHA256);
         else
             state.error<EvalError>(
-                "unsupported argument '%1%' to 'addPath'",
+                "unsupported argument '%1%' to 'builtins.path'",
                 state.symbols[attr.name]
             ).atPos(attr.pos).debugThrow();
     }
     if (!path)
         state.error<EvalError>(
-            "missing required 'path' attribute in the first argument to builtins.path"
+            "missing required 'path' attribute in the first argument to 'builtins.path'"
         ).atPos(pos).debugThrow();
     if (name.empty())
         name = path->baseName();
@@ -3486,7 +3487,7 @@ static void prim_foldlStrict(EvalState & state, const PosIdx pos, Value * * args
         for (auto [n, elem] : enumerate(args[2]->listItems())) {
             Value * vs []{vCur, elem};
             vCur = n == args[2]->listSize() - 1 ? &v : state.allocValue();
-            state.callFunction(*args[0], 2, vs, *vCur, pos);
+            state.callFunction(*args[0], vs, *vCur, pos);
         }
         state.forceValue(v, pos);
     } else {
@@ -3636,7 +3637,7 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
 
         Value * vs[] = {a, b};
         Value vBool;
-        state.callFunction(*args[0], 2, vs, vBool, noPos);
+        state.callFunction(*args[0], vs, vBool, noPos);
         return state.forceBool(vBool, pos, "while evaluating the return value of the sorting function passed to builtins.sort");
     };
 
@@ -4936,7 +4937,7 @@ void EvalState::createBaseEnv()
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
-    baseEnv.values[0]->payload.attrs->sort();
+    getBuiltins().payload.attrs->sort();
 
     staticBaseEnv->sort();
 

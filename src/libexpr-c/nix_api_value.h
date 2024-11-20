@@ -77,8 +77,7 @@ typedef struct ExternalValue ExternalValue;
  */
 typedef struct nix_realised_string nix_realised_string;
 
-/** @defgroup primops
- * @brief Create your own primops
+/** @defgroup primops Adding primops
  * @{
  */
 /** @brief Function pointer for primops
@@ -252,7 +251,7 @@ int64_t nix_get_int(nix_c_context * context, const nix_value * value);
  * @param[in] value Nix value to inspect
  * @return reference to external, NULL in case of error
  */
-ExternalValue * nix_get_external(nix_c_context * context, nix_value *);
+ExternalValue * nix_get_external(nix_c_context * context, nix_value * value);
 
 /** @brief Get the ix'th element of a list
  *
@@ -423,7 +422,7 @@ nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, uns
 /** @brief Free a list builder
  *
  * Does not fail.
- * @param[in] builder the builder to free
+ * @param[in] list_builder The builder to free.
  */
 void nix_list_builder_free(ListBuilder * list_builder);
 

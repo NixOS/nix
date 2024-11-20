@@ -27,9 +27,6 @@ EOF
 mkdir -p "$TEST_HOME/nixpkgs"
 cp "${config_nix}" ../shell.nix "$TEST_HOME/nixpkgs"
 
-# `config.nix` cannot be gotten via build dir / env var (runs afoul pure eval). Instead get from flake.
-removeBuildDirRef "$TEST_HOME/nixpkgs"/*.nix
-
 cat <<EOF >"$TEST_HOME/nixpkgs/flake.nix"
 {
     outputs = {self}: {
@@ -125,7 +122,7 @@ expectStderr 1 nix develop --unset-env-var FOO --set-env-var FOO 'BAR' --no-writ
   grepQuiet "error: Cannot set environment variable 'FOO' that is unset with '--unset-env-var'"
 
 # Check that multiple `--ignore-env`'s are okay.
-expectStderr 0 nix develop --ignore-env --set-env-var FOO 'BAR' --ignore-env .#hello
+expectStderr 0 nix develop --ignore-env --set-env-var FOO 'BAR' --ignore-env .#hello < /dev/null
 
 # Determine the bashInteractive executable.
 nix build --no-write-lock-file './nixpkgs#bashInteractive' --out-link ./bash-interactive

@@ -16,7 +16,7 @@ struct MixCat : virtual Args
             throw Error("path '%1%' is not a regular file", path);
         stopProgressBar();
 
-        writeFull(getStandardOut(), accessor->readFile(CanonPath(path)));
+        writeFull(getStandardOutput(), accessor->readFile(CanonPath(path)));
     }
 };
 

@@ -1,6 +1,6 @@
 { inNixShell ? false, contentAddressed ? false, fooContents ? "foo" }:
 
-let cfg = import "${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/config.nix"; in
+let cfg = import ./config.nix; in
 with cfg;
 
 let
@@ -37,7 +37,7 @@ let pkgs = rec {
       mkdir -p $out
       ln -s ${setupSh} $out/setup
     '';
-  };
+  } // { inherit mkDerivation; };
 
   shellDrv = mkDerivation {
     name = "shellDrv";
@@ -93,6 +93,10 @@ let pkgs = rec {
     echo 'printf %s "$*"' > $out/bin/ruby
     chmod a+rx $out/bin/ruby
   '';
+
+  inherit (cfg) shell;
+
+  callPackage = f: args: f (pkgs // args);
 
   inherit pkgs;
 }; in pkgs

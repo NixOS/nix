@@ -1,7 +1,6 @@
 { lib
 , stdenv
 , mkMesonDerivation
-, releaseTools
 
 , meson
 , ninja
@@ -16,14 +15,11 @@
 , nix-expr
 , nix-cli
 
-, rapidcheck
-, gtest
-, runCommand
-
 , busybox-sandbox-shell ? null
 
 # Configuration Options
 
+, pname ? "nix-functional-tests"
 , version
 
 # For running the functional tests against a different pre-built Nix.
@@ -35,8 +31,7 @@ let
 in
 
 mkMesonDerivation (finalAttrs: {
-  pname = "nix-functional-tests";
-  inherit version;
+  inherit pname version;
 
   workDir = ./.;
   fileset = fileset.unions [
@@ -60,6 +55,7 @@ mkMesonDerivation (finalAttrs: {
     # etc.
     busybox-sandbox-shell
     # For Overlay FS tests need `mount`, `umount`, and `unshare`.
+    # For `script` command (ensuring a TTY)
     # TODO use `unixtools` to be precise over which executables instead?
     util-linux
   ];

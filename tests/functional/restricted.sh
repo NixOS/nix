@@ -12,10 +12,6 @@ mkdir -p "$TEST_ROOT/nix"
 cp ./simple.nix "$TEST_ROOT/nix"
 cp ./simple.builder.sh "$TEST_ROOT/nix"
 cp "${config_nix}" "$TEST_ROOT/nix"
-simple_nix="$TEST_ROOT/nix/simple.nix"
-# N.B. redefine
-config_nix="$TEST_ROOT/nix/config.nix"
-removeBuildDirRef "${simple_nix}"
 cd "$TEST_ROOT/nix"
 
 nix-instantiate --restrict-eval ./simple.nix -I src=.
@@ -27,7 +23,7 @@ nix-instantiate --restrict-eval ./simple.nix -I src1=./simple.nix -I src2=./conf
 (! nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix')
 nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix' -I src=../..
 
-expectStderr 1 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' | grepQuiet "forbidden in restricted mode"
+expectStderr 1 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' | grepQuiet "was not found in the Nix search path"
 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' -I src=.
 
 p=$(nix eval --raw --expr "builtins.fetchurl file://${_NIX_TEST_SOURCE_DIR}/restricted.sh" --impure --restrict-eval --allowed-uris "file://${_NIX_TEST_SOURCE_DIR}")

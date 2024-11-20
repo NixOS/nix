@@ -20,7 +20,11 @@ public:
     // Copying Finallys is definitely not a good idea and will cause them to be
     // called twice.
     Finally(Finally &other) = delete;
-    Finally(Finally &&other) : fun(std::move(other.fun)) {
+    // NOTE: Move constructor can be nothrow if the callable type is itself nothrow
+    // move-constructible.
+    Finally(Finally && other) noexcept(std::is_nothrow_move_constructible_v<Fn>)
+        : fun(std::move(other.fun))
+    {
         other.movedFrom = true;
     }
     ~Finally() noexcept(false)
