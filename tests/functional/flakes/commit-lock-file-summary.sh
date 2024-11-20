@@ -4,15 +4,9 @@ source ./common.sh
 
 TODO_NixOS
 
-requireGit
+createFlake1
 
-flake1Dir=$TEST_ROOT/flake1
 lockfileSummaryFlake=$TEST_ROOT/lockfileSummaryFlake
-
-createGitRepo "$flake1Dir" ""
-createSimpleGitFlake "$flake1Dir"
-nix registry add --registry "$registry" flake1 "git+file://$flake1Dir"
-
 createGitRepo "$lockfileSummaryFlake" "--initial-branch=main"
 
 # Test that the --commit-lock-file-summary flag and its alias work

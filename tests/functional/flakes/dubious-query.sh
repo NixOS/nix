@@ -2,11 +2,8 @@
 
 source ./common.sh
 
-requireGit
-
-repoDir="$TEST_ROOT/repo"
-createGitRepo "$repoDir"
-createSimpleGitFlake "$repoDir"
+createFlake1
+repoDir="$flake1Dir"
 
 # Check that a flakeref without a query is accepted correctly.
 expectStderr 0 nix --offline build --dry-run "git+file://$repoDir#foo"

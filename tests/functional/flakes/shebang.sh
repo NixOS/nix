@@ -4,15 +4,9 @@ source ./common.sh
 
 TODO_NixOS
 
-requireGit
+createFlake1
 
-flake1Dir=$TEST_ROOT/flake1
 scriptDir=$TEST_ROOT/nonFlake
-
-createGitRepo "$flake1Dir" ""
-createSimpleGitFlake "$flake1Dir"
-nix registry add --registry "$registry" flake1 "git+file://$flake1Dir"
-
 mkdir -p "$scriptDir"
 
 cat > "$scriptDir/shebang.sh" <<EOF

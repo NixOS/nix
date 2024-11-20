@@ -38,10 +38,19 @@ EOF
 }
 
 createSimpleGitFlake() {
+    requireGit
     local flakeDir="$1"
     writeSimpleFlake "$flakeDir"
     git -C "$flakeDir" add flake.nix simple.nix shell.nix simple.builder.sh config.nix
     git -C "$flakeDir" commit -m 'Initial'
+}
+
+# Create a simple Git flake and add it to the registry as "flake1".
+createFlake1() {
+    flake1Dir="$TEST_ROOT/flake1"
+    createGitRepo "$flake1Dir" ""
+    createSimpleGitFlake "$flake1Dir"
+    nix registry add --registry "$registry" flake1 "git+file://$flake1Dir"
 }
 
 writeDependentFlake() {
