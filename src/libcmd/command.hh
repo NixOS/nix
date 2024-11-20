@@ -372,9 +372,6 @@ void printClosureDiff(
  * Create symlinks prefixed by `outLink` to the store paths in
  * `buildables`.
  */
-void createOutLinks(
-    const std::filesystem::path & outLink,
-    const BuiltPaths & buildables,
-    LocalFSStore & store);
+void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & buildables, LocalFSStore & store);
 
 }
