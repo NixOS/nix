@@ -1010,6 +1010,13 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
         out << i.first << i.second;
 }
 
+
+std::string hashPlaceholder(const OutputNameView outputName)
+{
+    // FIXME: memoize?
+    return "/" + hashString(HashAlgorithm::SHA256, concatStrings("nix-output:", outputName)).to_string(HashFormat::Nix32, false);
+}
+
 void BasicDerivation::applyRewrites(const StringMap & rewrites)
 {
     if (rewrites.empty()) return;
@@ -1030,12 +1037,6 @@ void BasicDerivation::applyRewrites(const StringMap & rewrites)
         newEnv.emplace(envName, envValue);
     }
     env = std::move(newEnv);
-}
-
-std::string hashPlaceholder(const OutputNameView outputName)
-{
-    // FIXME: memoize?
-    return "/" + hashString(HashAlgorithm::SHA256, concatStrings("nix-output:", outputName)).to_string(HashFormat::Nix32, false);
 }
 
 static void rewriteDerivation(Store & store, BasicDerivation & drv, const StringMap & rewrites)
