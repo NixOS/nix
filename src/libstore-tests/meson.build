@@ -25,8 +25,6 @@ deps_public_maybe_subproject = [
 ]
 subdir('build-utils-meson/subprojects')
 
-subdir('build-utils-meson/threads')
-
 subdir('build-utils-meson/export-all-symbols')
 subdir('build-utils-meson/windows-version')
 
@@ -52,7 +50,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('build-utils-meson/common')
 
 sources = files(
   'common-protocol.cc',

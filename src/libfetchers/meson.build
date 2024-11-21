@@ -26,8 +26,6 @@ deps_public_maybe_subproject = [
 ]
 subdir('build-utils-meson/subprojects')
 
-subdir('build-utils-meson/threads')
-
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
@@ -43,7 +41,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('build-utils-meson/common')
 
 sources = files(
   'attrs.cc',

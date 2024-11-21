@@ -82,7 +82,6 @@ if host_machine.system() == 'windows'
 endif
 
 subdir('build-utils-meson/libatomic')
-subdir('build-utils-meson/threads')
 
 boost = dependency(
   'boost',
@@ -180,7 +179,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('build-utils-meson/common')
 
 sources = files(
   'binary-cache-store.cc',
