@@ -284,20 +284,22 @@ static Logger::Fields getFields(nlohmann::json & json)
     return fields;
 }
 
-std::optional<nlohmann::json> parseJSONMessage(const std::string & msg)
+std::optional<nlohmann::json> parseJSONMessage(const std::string & msg, std::string_view source)
 {
     if (!hasPrefix(msg, "@nix ")) return std::nullopt;
     try {
         return nlohmann::json::parse(std::string(msg, 5));
     } catch (std::exception & e) {
-        printError("bad JSON log message from builder: %s", e.what());
+        printError("bad JSON log message from %s: %s",
+            Uncolored(source),
+            e.what());
     }
     return std::nullopt;
 }
 
 bool handleJSONLogMessage(nlohmann::json & json,
     const Activity & act, std::map<ActivityId, Activity> & activities,
-    bool trusted)
+    std::string_view source, bool trusted)
 {
     try {
         std::string action = json["action"];
@@ -333,7 +335,8 @@ bool handleJSONLogMessage(nlohmann::json & json,
         return true;
     } catch (const nlohmann::json::exception &e) {
         warn(
-            "warning: Unable to handle a JSON message from the builder: %s",
+            "warning: Unable to handle a JSON message from %s: %s",
+            Uncolored(source),
             e.what()
         );
         return false;
@@ -341,12 +344,12 @@ bool handleJSONLogMessage(nlohmann::json & json,
 }
 
 bool handleJSONLogMessage(const std::string & msg,
-    const Activity & act, std::map<ActivityId, Activity> & activities, bool trusted)
+    const Activity & act, std::map<ActivityId, Activity> & activities, std::string_view source, bool trusted)
 {
-    auto json = parseJSONMessage(msg);
+    auto json = parseJSONMessage(msg, source);
     if (!json) return false;
 
-    return handleJSONLogMessage(*json, act, activities, trusted);
+    return handleJSONLogMessage(*json, act, activities, source, trusted);
 }
 
 Activity::~Activity()
