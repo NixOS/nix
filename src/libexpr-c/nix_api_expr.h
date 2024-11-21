@@ -14,6 +14,16 @@
 #include "nix_api_util.h"
 #include <stddef.h>
 
+#ifndef __has_c_attribute
+#  define __has_c_attribute(x) 0
+#endif
+
+#if __has_c_attribute(deprecated)
+#  define NIX_DEPRECATED(msg) [[deprecated(msg)]]
+#else
+#  define NIX_DEPRECATED(msg)
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,7 +55,7 @@ typedef struct EvalState EvalState; // nix::EvalState
  * @see nix_value_incref, nix_value_decref
  */
 typedef struct nix_value nix_value;
-[[deprecated("use nix_value instead")]] typedef nix_value Value;
+NIX_DEPRECATED("use nix_value instead") typedef nix_value Value;
 
 // Function prototypes
 /**
@@ -119,7 +129,7 @@ nix_err nix_value_call_multi(
  * @param[in] state The state of the evaluation.
  * @param[out] value The result of the function call.
  * @param[in] fn The Nix function to call.
- * @param[in] args The arguments to pass to the function.
+ * @param[in] ... The arguments to pass to the function.
  *
  * @see nix_value_call_multi
  */

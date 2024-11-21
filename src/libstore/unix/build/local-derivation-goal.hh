@@ -27,9 +27,15 @@ struct LocalDerivationGoal : public DerivationGoal
     std::optional<Path> cgroup;
 
     /**
-     * The temporary directory.
+     * The temporary directory used for the build.
      */
     Path tmpDir;
+
+    /**
+     * The top-level temporary directory. `tmpDir` is either equal to
+     * or a child of this directory.
+     */
+    Path topTmpDir;
 
     /**
      * The path of the temporary directory in the sandbox.
@@ -192,7 +198,7 @@ struct LocalDerivationGoal : public DerivationGoal
     /**
      * The additional states.
      */
-    void tryLocalBuild() override;
+    Goal::Co tryLocalBuild() override;
 
     /**
      * Start building a derivation.
@@ -205,6 +211,11 @@ struct LocalDerivationGoal : public DerivationGoal
     void initEnv();
 
     /**
+     * Process messages send by the sandbox initialization.
+     */
+    void processSandboxSetupMessages();
+
+    /**
      * Setup tmp dir location.
      */
     void initTmpDir();
@@ -214,8 +225,15 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     void writeStructuredAttrs();
 
+    /**
+     * Start an in-process nix daemon thread for recursive-nix.
+     */
     void startDaemon();
 
+    /**
+     * Stop the in-process nix daemon thread.
+     * @see startDaemon
+     */
     void stopDaemon();
 
     /**

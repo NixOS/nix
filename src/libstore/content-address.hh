@@ -73,6 +73,7 @@ struct ContentAddressMethod
 
     Raw raw;
 
+    bool operator ==(const ContentAddressMethod &) const = default;
     auto operator <=>(const ContentAddressMethod &) const = default;
 
     MAKE_WRAPPER_CONSTRUCTOR(ContentAddressMethod);
@@ -96,8 +97,9 @@ struct ContentAddressMethod
      * were ingested, with the fixed output case not prefixed for back
      * compat.
      *
-     * @param [in] m A string that should begin with the prefix.
-     * @param [out] m The remainder of the string after the prefix.
+     * @param m A string that should begin with the
+     * prefix. On return, the remainder of the string after the
+     * prefix.
      */
     static ContentAddressMethod parsePrefix(std::string_view & m);
 
@@ -138,14 +140,14 @@ struct ContentAddressMethod
 /**
  * We've accumulated several types of content-addressed paths over the
  * years; fixed-output derivations support multiple hash algorithms and
- * serialisation methods (flat file vs NAR). Thus, ‘ca’ has one of the
+ * serialisation methods (flat file vs NAR). Thus, `ca` has one of the
  * following forms:
  *
  * - `TextIngestionMethod`:
- *   ‘text:sha256:<sha256 hash of file contents>’
+ *   `text:sha256:<sha256 hash of file contents>`
  *
  * - `FixedIngestionMethod`:
- *   ‘fixed:<r?>:<hash algorithm>:<hash of file contents>’
+ *   `fixed:<r?>:<hash algorithm>:<hash of file contents>`
  */
 struct ContentAddress
 {
@@ -159,6 +161,7 @@ struct ContentAddress
      */
     Hash hash;
 
+    bool operator ==(const ContentAddress &) const = default;
     auto operator <=>(const ContentAddress &) const = default;
 
     /**
@@ -218,7 +221,9 @@ struct StoreReferences
      */
     size_t size() const;
 
-    auto operator <=>(const StoreReferences &) const = default;
+    bool operator ==(const StoreReferences &) const = default;
+    // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
+    //auto operator <=>(const StoreReferences &) const = default;
 };
 
 // This matches the additional info that we need for makeTextPath
@@ -235,7 +240,9 @@ struct TextInfo
      */
     StorePathSet references;
 
-    auto operator <=>(const TextInfo &) const = default;
+    bool operator ==(const TextInfo &) const = default;
+    // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
+    //auto operator <=>(const TextInfo &) const = default;
 };
 
 struct FixedOutputInfo
@@ -255,7 +262,9 @@ struct FixedOutputInfo
      */
     StoreReferences references;
 
-    auto operator <=>(const FixedOutputInfo &) const = default;
+    bool operator ==(const FixedOutputInfo &) const = default;
+    // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
+    //auto operator <=>(const FixedOutputInfo &) const = default;
 };
 
 /**
@@ -272,7 +281,9 @@ struct ContentAddressWithReferences
 
     Raw raw;
 
-    auto operator <=>(const ContentAddressWithReferences &) const = default;
+    bool operator ==(const ContentAddressWithReferences &) const = default;
+    // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
+    //auto operator <=>(const ContentAddressWithReferences &) const = default;
 
     MAKE_WRAPPER_CONSTRUCTOR(ContentAddressWithReferences);
 

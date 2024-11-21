@@ -1,5 +1,5 @@
-#include "config-util.h"
-#include "config-store.h"
+#include "config-util.hh"
+#include "config-store.hh"
 
 #include "EXTERN.h"
 #include "perl.h"
@@ -422,11 +422,6 @@ StoreWrapper::addTempRoot(char * storePath)
         } catch (Error & e) {
             croak("%s", e.what());
         }
-
-
-SV * getBinDir()
-    PPCODE:
-        XPUSHs(sv_2mortal(newSVpv(settings.nixBinDir.c_str(), 0)));
 
 
 SV * getStoreDir()

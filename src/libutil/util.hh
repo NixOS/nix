@@ -11,6 +11,8 @@
 #include <sstream>
 #include <optional>
 
+#include "strings.hh"
+
 namespace nix {
 
 void initLibUtil();
@@ -26,36 +28,11 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss);
 MakeError(FormatError, Error);
 
 
-/**
- * String tokenizer.
- */
-template<class C> C tokenizeString(std::string_view s, std::string_view separators = " \t\n\r");
-
-
-/**
- * Concatenate the given strings with a separator between the
- * elements.
- */
-template<class C>
-std::string concatStringsSep(const std::string_view sep, const C & ss)
-{
-    size_t size = 0;
-    // need a cast to string_view since this is also called with Symbols
-    for (const auto & s : ss) size += sep.size() + std::string_view(s).size();
-    std::string s;
-    s.reserve(size);
-    for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
-        s += i;
-    }
-    return s;
-}
-
-template<class ... Parts>
-auto concatStrings(Parts && ... parts)
+template<class... Parts>
+auto concatStrings(Parts &&... parts)
     -> std::enable_if_t<(... && std::is_convertible_v<Parts, std::string_view>), std::string>
 {
-    std::string_view views[sizeof...(parts)] = { parts... };
+    std::string_view views[sizeof...(parts)] = {parts...};
     return concatStringsSep({}, views);
 }
 
@@ -179,9 +156,26 @@ std::string toLower(std::string s);
 std::string shellEscape(const std::string_view s);
 
 
-/* Exception handling in destructors: print an error message, then
-   ignore the exception. */
-void ignoreException(Verbosity lvl = lvlError);
+/**
+ * Exception handling in destructors: print an error message, then
+ * ignore the exception.
+ *
+ * If you're not in a destructor, you usually want to use `ignoreExceptionExceptInterrupt()`.
+ *
+ * This function might also be used in callbacks whose caller may not handle exceptions,
+ * but ideally we propagate the exception using an exception_ptr in such cases.
+ * See e.g. `PackBuilderContext`
+ */
+void ignoreExceptionInDestructor(Verbosity lvl = lvlError);
+
+/**
+ * Not destructor-safe.
+ * Print an error message, then ignore the exception.
+ * If the exception is an `Interrupted` exception, rethrow it.
+ *
+ * This may be used in a few places where Interrupt can't happen, but that's ok.
+ */
+void ignoreExceptionExceptInterrupt(Verbosity lvl = lvlError);
 
 
 
@@ -195,9 +189,13 @@ constexpr char treeNull[] = "    ";
 
 
 /**
- * Base64 encoding/decoding.
+ * Encode arbitrary bytes as Base64.
  */
 std::string base64Encode(std::string_view s);
+
+/**
+ * Decode arbitrary bytes to Base64.
+ */
 std::string base64Decode(std::string_view s);
 
 

@@ -25,7 +25,7 @@ static size_t regularHashSize(HashAlgorithm type) {
     case HashAlgorithm::SHA256: return sha256HashSize;
     case HashAlgorithm::SHA512: return sha512HashSize;
     }
-    abort();
+    unreachable();
 }
 
 
@@ -41,7 +41,7 @@ Hash::Hash(HashAlgorithm algo) : algo(algo)
 }
 
 
-bool Hash::operator == (const Hash & h2) const
+bool Hash::operator == (const Hash & h2) const noexcept
 {
     if (hashSize != h2.hashSize) return false;
     for (unsigned int i = 0; i < hashSize; i++)
@@ -50,7 +50,7 @@ bool Hash::operator == (const Hash & h2) const
 }
 
 
-std::strong_ordering Hash::operator <=> (const Hash & h) const
+std::strong_ordering Hash::operator <=> (const Hash & h) const noexcept
 {
     if (auto cmp = hashSize <=> h.hashSize; cmp != 0) return cmp;
     for (unsigned int i = 0; i < hashSize; i++) {
@@ -245,7 +245,12 @@ Hash::Hash(std::string_view rest, HashAlgorithm algo, bool isSRI)
     }
 
     else if (isSRI || rest.size() == base64Len()) {
-        auto d = base64Decode(rest);
+        std::string d;
+        try {
+            d = base64Decode(rest);
+        } catch (Error & e) {
+            e.addTrace({}, "While decoding hash '%s'", rest);
+        }
         if (d.size() != hashSize)
             throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", rest);
         assert(hashSize);

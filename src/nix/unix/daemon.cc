@@ -33,6 +33,10 @@
 #include <grp.h>
 #include <fcntl.h>
 
+#if __linux__
+#include "cgroup.hh"
+#endif
+
 #if __APPLE__ || __FreeBSD__
 #include <sys/ucred.h>
 #endif
@@ -203,7 +207,11 @@ static PeerInfo getPeerInfo(int remote)
 
 #if defined(SO_PEERCRED)
 
-    ucred cred;
+# if defined(__OpenBSD__)
+   struct sockpeercred cred;
+# else
+   ucred cred;
+# endif
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
         throw SysError("getting peer credentials");
@@ -211,9 +219,9 @@ static PeerInfo getPeerInfo(int remote)
 
 #elif defined(LOCAL_PEERCRED)
 
-#if !defined(SOL_LOCAL)
-#define SOL_LOCAL 0
-#endif
+# if !defined(SOL_LOCAL)
+# define SOL_LOCAL 0
+# endif
 
     xucred cred;
     socklen_t credLen = sizeof(cred);
@@ -308,6 +316,27 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
     //  Get rid of children automatically; don't let them become zombies.
     setSigChldAction(true);
 
+    #if __linux__
+    if (settings.useCgroups) {
+        experimentalFeatureSettings.require(Xp::Cgroups);
+
+        //  This also sets the root cgroup to the current one.
+        auto rootCgroup = getRootCgroup();
+        auto cgroupFS = getCgroupFS();
+        if (!cgroupFS)
+            throw Error("cannot determine the cgroups file system");
+        auto rootCgroupPath = canonPath(*cgroupFS + "/" + rootCgroup);
+        if (!pathExists(rootCgroupPath))
+            throw Error("expected cgroup directory '%s'", rootCgroupPath);
+        auto daemonCgroupPath = rootCgroupPath + "/nix-daemon";
+        //  Create new sub-cgroup for the daemon.
+        if (mkdir(daemonCgroupPath.c_str(), 0755) != 0 && errno != EEXIST)
+            throw SysError("creating cgroup '%s'", daemonCgroupPath);
+        //  Move daemon into the new cgroup.
+        writeFile(daemonCgroupPath + "/cgroup.procs", fmt("%d", getpid()));
+    }
+    #endif
+
     //  Loop accepting connections.
     while (1) {
 
@@ -366,9 +395,12 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                 }
 
                 //  Handle the connection.
-                FdSource from(remote.get());
-                FdSink to(remote.get());
-                processConnection(openUncachedStore(), from, to, trusted, NotRecursive);
+                processConnection(
+                    openUncachedStore(),
+                    FdSource(remote.get()),
+                    FdSink(remote.get()),
+                    trusted,
+                    NotRecursive);
 
                 exit(0);
             }, options);
@@ -433,9 +465,11 @@ static void forwardStdioConnection(RemoteStore & store) {
  */
 static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
 {
-    FdSource from(STDIN_FILENO);
-    FdSink to(STDOUT_FILENO);
-    processConnection(store, from, to, trustClient, NotRecursive);
+    processConnection(
+        store,
+        FdSource(STDIN_FILENO),
+        FdSink(STDOUT_FILENO),
+        trustClient, NotRecursive);
 }
 
 /**

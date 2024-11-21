@@ -18,9 +18,13 @@
 #include "markdown.hh"
 #include "users.hh"
 
+#include <filesystem>
 #include <nlohmann/json.hpp>
-#include <queue>
 #include <iomanip>
+
+#include "strings-inline.hh"
+
+namespace nix::fs { using namespace std::filesystem; }
 
 using namespace nix;
 using namespace nix::flake;
@@ -48,19 +52,19 @@ public:
 
     FlakeRef getFlakeRef()
     {
-        return parseFlakeRef(flakeUrl, absPath(".")); //FIXME
+        return parseFlakeRef(fetchSettings, flakeUrl, fs::current_path().string()); //FIXME
     }
 
     LockedFlake lockFlake()
     {
-        return flake::lockFlake(*getEvalState(), getFlakeRef(), lockFlags);
+        return flake::lockFlake(flakeSettings, *getEvalState(), getFlakeRef(), lockFlags);
     }
 
     std::vector<FlakeRef> getFlakeRefsForCompletion() override
     {
         return {
             // Like getFlakeRef but with expandTilde calld first
-            parseFlakeRef(expandTilde(flakeUrl), absPath("."))
+            parseFlakeRef(fetchSettings, expandTilde(flakeUrl), fs::current_path().string())
         };
     }
 };
@@ -165,7 +169,7 @@ struct CmdFlakeLock : FlakeCommand
 };
 
 static void enumerateOutputs(EvalState & state, Value & vFlake,
-    std::function<void(const std::string & name, Value & vProvide, const PosIdx pos)> callback)
+    std::function<void(std::string_view name, Value & vProvide, const PosIdx pos)> callback)
 {
     auto pos = vFlake.determinePos(noPos);
     state.forceAttrs(vFlake, pos, "while evaluating a flake to get its outputs");
@@ -209,7 +213,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
         auto & flake = lockedFlake.flake;
 
         // Currently, all flakes are in the Nix store via the rootFS accessor.
-        auto storePath = store->printStorePath(store->toStorePath(flake.path.path.abs()).first);
+        auto storePath = store->printStorePath(sourcePathToStorePath(store, flake.path).first);
 
         if (json) {
             nlohmann::json j;
@@ -233,6 +237,8 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["lastModified"] = *lastModified;
             j["path"] = storePath;
             j["locks"] = lockedFlake.lockFile.toJSON().first;
+            if (auto fingerprint = lockedFlake.getFingerprint(store))
+                j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
             logger->cout("%s", j.dump());
         } else {
             logger->cout(
@@ -265,6 +271,10 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Last modified:" ANSI_NORMAL " %s",
                     std::put_time(std::localtime(&*lastModified), "%F %T"));
+            if (auto fingerprint = lockedFlake.getFingerprint(store))
+                logger->cout(
+                    ANSI_BOLD "Fingerprint:" ANSI_NORMAL "   %s",
+                    fingerprint->to_string(HashFormat::Base16, false));
 
             if (!lockedFlake.lockFile.root->inputs.empty())
                 logger->cout(ANSI_BOLD "Inputs:" ANSI_NORMAL);
@@ -361,9 +371,11 @@ struct CmdFlakeCheck : FlakeCommand
         auto reportError = [&](const Error & e) {
             try {
                 throw e;
+            } catch (Interrupted & e) {
+                throw;
             } catch (Error & e) {
                 if (settings.keepGoing) {
-                    ignoreException();
+                    ignoreExceptionExceptInterrupt();
                     hasErrors = true;
                 }
                 else
@@ -387,15 +399,15 @@ struct CmdFlakeCheck : FlakeCommand
                 || (hasPrefix(name, "_") && name.substr(1) == expected);
         };
 
-        auto checkSystemName = [&](const std::string & system, const PosIdx pos) {
+        auto checkSystemName = [&](std::string_view system, const PosIdx pos) {
             // FIXME: what's the format of "system"?
             if (system.find('-') == std::string::npos)
                 reportError(Error("'%s' is not a valid system type, at %s", system, resolve(pos)));
         };
 
-        auto checkSystemType = [&](const std::string & system, const PosIdx pos) {
+        auto checkSystemType = [&](std::string_view system, const PosIdx pos) {
             if (!checkAllSystems && system != localSystem) {
-                omittedSystems.insert(system);
+                omittedSystems.insert(std::string(system));
                 return false;
             } else {
                 return true;
@@ -430,21 +442,46 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkApp = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
-                #if 0
-                // FIXME
-                auto app = App(*state, v);
-                for (auto & i : app.context) {
-                    auto [drvPathS, outputName] = NixStringContextElem::parse(i);
-                    store->parseStorePath(drvPathS);
+                Activity act(*logger, lvlInfo, actUnknown, fmt("checking app '%s'", attrPath));
+                state->forceAttrs(v, pos, "");
+                if (auto attr = v.attrs()->get(state->symbols.create("type")))
+                    state->forceStringNoCtx(*attr->value, attr->pos, "");
+                else
+                    throw Error("app '%s' lacks attribute 'type'", attrPath);
+
+                if (auto attr = v.attrs()->get(state->symbols.create("program"))) {
+                    if (attr->name == state->symbols.create("program")) {
+                        NixStringContext context;
+                        state->forceString(*attr->value, context, attr->pos, "");
+                    }
+                } else
+                    throw Error("app '%s' lacks attribute 'program'", attrPath);
+
+                if (auto attr = v.attrs()->get(state->symbols.create("meta"))) {
+                    state->forceAttrs(*attr->value, attr->pos, "");
+                    if (auto dAttr = attr->value->attrs()->get(state->symbols.create("description")))
+                        state->forceStringNoCtx(*dAttr->value, dAttr->pos, "");
+                    else
+                        logWarning({
+                            .msg = HintFmt("app '%s' lacks attribute 'meta.description'", attrPath),
+                        });
+                } else
+                    logWarning({
+                        .msg = HintFmt("app '%s' lacks attribute 'meta'", attrPath),
+                    });
+
+                for (auto & attr : *v.attrs()) {
+                    std::string_view name(state->symbols[attr.name]);
+                    if (name != "type" && name != "program" && name != "meta")
+                        throw Error("app '%s' has unsupported attribute '%s'", attrPath, name);
                 }
-                #endif
             } catch (Error & e) {
                 e.addTrace(resolve(pos), HintFmt("while checking the app definition '%s'", attrPath));
                 reportError(e);
             }
         };
 
-        auto checkOverlay = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
+        auto checkOverlay = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
             try {
                 Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking overlay '%s'", attrPath));
@@ -463,7 +500,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        auto checkModule = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
+        auto checkModule = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
             try {
                 Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking NixOS module '%s'", attrPath));
@@ -474,9 +511,9 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        std::function<void(const std::string & attrPath, Value & v, const PosIdx pos)> checkHydraJobs;
+        std::function<void(std::string_view attrPath, Value & v, const PosIdx pos)> checkHydraJobs;
 
-        checkHydraJobs = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
+        checkHydraJobs = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
             try {
                 Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking Hydra job '%s'", attrPath));
@@ -517,7 +554,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        auto checkTemplate = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
+        auto checkTemplate = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
             try {
                 Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking template '%s'", attrPath));
@@ -573,7 +610,7 @@ struct CmdFlakeCheck : FlakeCommand
 
             enumerateOutputs(*state,
                 *vFlake,
-                [&](const std::string & name, Value & vOutput, const PosIdx pos) {
+                [&](std::string_view name, Value & vOutput, const PosIdx pos) {
                     Activity act(*logger, lvlInfo, actUnknown,
                         fmt("checking flake output '%s'", name));
 
@@ -597,7 +634,7 @@ struct CmdFlakeCheck : FlakeCommand
                         if (name == "checks") {
                             state->forceAttrs(vOutput, pos, "");
                             for (auto & attr : *vOutput.attrs()) {
-                                const auto & attr_name = state->symbols[attr.name];
+                                std::string_view attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
                                 if (checkSystemType(attr_name, attr.pos)) {
                                     state->forceAttrs(*attr.value, attr.pos, "");
@@ -622,7 +659,7 @@ struct CmdFlakeCheck : FlakeCommand
                                 const auto & attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
                                 if (checkSystemType(attr_name, attr.pos)) {
-                                    checkApp(
+                                    checkDerivation(
                                         fmt("%s.%s", name, attr_name),
                                         *attr.value, attr.pos);
                                 };
@@ -797,6 +834,7 @@ struct CmdFlakeCheck : FlakeCommand
             throw Error("some errors were encountered during the evaluation");
 
         if (!omittedSystems.empty()) {
+            // TODO: empty system is not visible; render all as nix strings?
             warn(
                 "The check omitted these incompatible systems: %s\n"
                 "Use '--all-systems' to check all.",
@@ -842,7 +880,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         auto evalState = getEvalState();
 
-        auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(templateUrl, absPath("."));
+        auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(
+            fetchSettings, templateUrl, fs::current_path().string());
 
         auto installable = InstallableFlake(nullptr,
             evalState, std::move(templateFlakeRef), templateName, ExtendedOutputsSpec::Default(),
@@ -852,36 +891,32 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         auto cursor = installable.getCursor(*evalState);
 
-        auto templateDirAttr = cursor->getAttr("path");
-        auto templateDir = templateDirAttr->getString();
+        auto templateDirAttr = cursor->getAttr("path")->forceValue();
+        NixStringContext context;
+        auto templateDir = evalState->coerceToPath(noPos, templateDirAttr, context, "");
 
-        if (!store->isInStore(templateDir))
-            evalState->error<TypeError>(
-                "'%s' was not found in the Nix store\n"
-                "If you've set '%s' to a string, try using a path instead.",
-                templateDir, templateDirAttr->getAttrPathStr()).debugThrow();
+        std::vector<fs::path> changedFiles;
+        std::vector<fs::path> conflictedFiles;
 
-        std::vector<Path> changedFiles;
-        std::vector<Path> conflictedFiles;
-
-        std::function<void(const Path & from, const Path & to)> copyDir;
-        copyDir = [&](const Path & from, const Path & to)
+        std::function<void(const SourcePath & from, const fs::path & to)> copyDir;
+        copyDir = [&](const SourcePath & from, const fs::path & to)
         {
-            createDirs(to);
+            fs::create_directories(to);
 
-            for (auto & entry : std::filesystem::directory_iterator{from}) {
+            for (auto & [name, entry] : from.readDirectory()) {
                 checkInterrupt();
-                auto from2 = entry.path().string();
-                auto to2 = to + "/" + entry.path().filename().string();
-                auto st = lstat(from2);
-                if (S_ISDIR(st.st_mode))
+                auto from2 = from / name;
+                auto to2 = to / name;
+                auto st = from2.lstat();
+                auto to_st = fs::symlink_status(to2);
+                if (st.type == SourceAccessor::tDirectory)
                     copyDir(from2, to2);
-                else if (S_ISREG(st.st_mode)) {
-                    auto contents = readFile(from2);
-                    if (pathExists(to2)) {
-                        auto contents2 = readFile(to2);
+                else if (st.type == SourceAccessor::tRegular) {
+                    auto contents = from2.readFile();
+                    if (fs::exists(to_st)) {
+                        auto contents2 = readFile(to2.string());
                         if (contents != contents2) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2, from2);
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
@@ -890,18 +925,18 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     } else
                         writeFile(to2, contents);
                 }
-                else if (S_ISLNK(st.st_mode)) {
-                    auto target = readLink(from2);
-                    if (pathExists(to2)) {
-                        if (readLink(to2) != target) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2, from2);
+                else if (st.type == SourceAccessor::tSymlink) {
+                    auto target = from2.readLink();
+                    if (fs::exists(to_st)) {
+                        if (fs::read_symlink(to2) != target) {
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
                         }
                         continue;
                     } else
-                          createSymlink(target, to2);
+                        fs::create_symlink(target, to2);
                 }
                 else
                     throw Error("file '%s' has unsupported type", from2);
@@ -912,19 +947,19 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         copyDir(templateDir, flakeDir);
 
-        if (!changedFiles.empty() && pathExists(flakeDir + "/.git")) {
+        if (!changedFiles.empty() && fs::exists(std::filesystem::path{flakeDir} / ".git")) {
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
-            for (auto & s : changedFiles) args.push_back(s);
+            for (auto & s : changedFiles) args.emplace_back(s.string());
             runProgram("git", true, args);
         }
-        auto welcomeText = cursor->maybeGetAttr("welcomeText");
-        if (welcomeText) {
+
+        if (auto welcomeText = cursor->maybeGetAttr("welcomeText")) {
             notice("\n");
             notice(renderMarkdownToTerminal(welcomeText->getString()));
         }
 
         if (!conflictedFiles.empty())
-            throw Error("Encountered %d conflicts - see above", conflictedFiles.size());
+            throw Error("encountered %d conflicts - see above", conflictedFiles.size());
     }
 };
 
@@ -1040,7 +1075,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         StorePathSet sources;
 
-        auto storePath = store->toStorePath(flake.flake.path.path.abs()).first;
+        auto storePath = sourcePathToStorePath(store, flake.flake.path).first;
 
         sources.insert(storePath);
 
@@ -1234,6 +1269,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 auto showDerivation = [&]()
                 {
                     auto name = visitor.getAttr(state->sName)->getString();
+
                     if (json) {
                         std::optional<std::string> description;
                         if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
@@ -1242,8 +1278,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         }
                         j.emplace("type", "derivation");
                         j.emplace("name", name);
-                        if (description)
-                            j.emplace("description", *description);
+                        j.emplace("description", description ? *description : "");
                     } else {
                         logger->cout("%s: %s '%s'",
                             headerPrefix,
@@ -1331,12 +1366,19 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     (attrPath.size() == 3 && attrPathS[0] == "apps"))
                 {
                     auto aType = visitor.maybeGetAttr("type");
+                    std::optional<std::string> description;
+                    if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
+                        if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
+                            description = aDescription->getString();
+                    }
                     if (!aType || aType->getString() != "app")
                         state->error<EvalError>("not an app definition").debugThrow();
                     if (json) {
                         j.emplace("type", "app");
+                        if (description)
+                            j.emplace("description", *description);
                     } else {
-                        logger->cout("%s: app", headerPrefix);
+                        logger->cout("%s: app: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description ? *description : "no description");
                     }
                 }
 

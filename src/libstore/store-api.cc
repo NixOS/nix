@@ -22,6 +22,8 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 using json = nlohmann::json;
 
 namespace nix {
@@ -169,7 +171,7 @@ std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
     PathFilter & filter) const
 {
     auto [h, size] = hashPath(path, method.getFileIngestionMethod(), hashAlgo, filter);
-    if (size && *size >= settings.warnLargePathThreshold)
+    if (settings.warnLargePathThreshold && size && *size >= settings.warnLargePathThreshold)
         warn("hashed large path '%s' (%s)", path, renderSize(*size));
     return {
         makeFixedOutputPathFromCA(
@@ -208,14 +210,16 @@ StorePath Store::addToStore(
         fsm = FileSerialisationMethod::NixArchive;
         break;
     }
-    auto source = sinkToSource([&](Sink & sink) {
-        dumpPath(path, sink, fsm, filter);
+    std::optional<StorePath> storePath;
+    auto sink = sourceToSink([&](Source & source) {
+        LengthSource lengthSource(source);
+        storePath = addToStoreFromDump(lengthSource, name, fsm, method, hashAlgo, references, repair);
+        if (settings.warnLargePathThreshold && lengthSource.total >= settings.warnLargePathThreshold)
+            warn("copied large path '%s' to the store (%s)", path, renderSize(lengthSource.total));
     });
-    LengthSource lengthSource(*source);
-    auto storePath = addToStoreFromDump(lengthSource, name, fsm, method, hashAlgo, references, repair);
-    if (lengthSource.total >= settings.warnLargePathThreshold)
-        warn("copied large path '%s' to the store (%s)", path, renderSize(lengthSource.total));
-    return storePath;
+    dumpPath(path, *sink, fsm, filter);
+    sink->finish();
+    return storePath.value();
 }
 
 void Store::addMultipleToStore(
@@ -818,14 +822,25 @@ StorePathSet Store::queryValidPaths(const StorePathSet & paths, SubstituteFlag m
     auto doQuery = [&](const StorePath & path) {
         checkInterrupt();
         queryPathInfo(path, {[path, &state_, &wakeup](std::future<ref<const ValidPathInfo>> fut) {
-            auto state(state_.lock());
+            bool exists = false;
+            std::exception_ptr newExc{};
+
             try {
                 auto info = fut.get();
-                state->valid.insert(path);
+                exists = true;
             } catch (InvalidPath &) {
             } catch (...) {
-                state->exc = std::current_exception();
+                newExc = std::current_exception();
             }
+
+            auto state(state_.lock());
+
+            if (exists)
+                state->valid.insert(path);
+
+            if (newExc)
+                state->exc = newExc;
+
             assert(state->left);
             if (!--state->left)
                 wakeup.notify_one();
@@ -918,7 +933,7 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
 const Store::Stats & Store::getStats()
 {
     {
-        auto state_(state.lock());
+        auto state_(state.readLock());
         stats.pathInfoCacheSize = state_->pathInfoCache.size();
     }
     return stats;
@@ -1040,7 +1055,7 @@ std::map<StorePath, StorePath> copyPaths(
         // not be within our control to change that, and we might still want
         // to at least copy the output paths.
         if (e.missingFeature == Xp::CaDerivations)
-            ignoreException();
+            ignoreExceptionExceptInterrupt();
         else
             throw;
     }
@@ -1300,7 +1315,7 @@ ref<Store> openStore(StoreReference && storeURI)
                 /* If /nix doesn't exist, there is no daemon socket, and
                    we're not root, then automatically set up a chroot
                    store in ~/.local/share/nix/root. */
-                auto chrootStore = getDataDir() + "/nix/root";
+                auto chrootStore = getDataDir() + "/root";
                 if (!pathExists(chrootStore)) {
                     try {
                         createDirs(chrootStore);

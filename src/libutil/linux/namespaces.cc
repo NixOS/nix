@@ -118,7 +118,7 @@ void saveMountNamespace()
 void restoreMountNamespace()
 {
     try {
-        auto savedCwd = absPath(".");
+        auto savedCwd = std::filesystem::current_path();
 
         if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
             throw SysError("restoring parent mount namespace");

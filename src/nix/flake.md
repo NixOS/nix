@@ -84,6 +84,8 @@ Here are some examples of flake references in their URL-like representation:
   repository on GitHub.
 * `github:NixOS/nixpkgs/nixos-20.09`: The `nixos-20.09` branch of the
   `nixpkgs` repository.
+* `github:NixOS/nixpkgs/pull/357207/head`: The `357207` pull request
+   of the nixpkgs repository.
 * `github:NixOS/nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`: A
   specific revision of the `nixpkgs` repository.
 * `github:edolstra/nix-warez?dir=blender`: A flake in a subdirectory
@@ -120,7 +122,7 @@ Contrary to URL-like references, path-like flake references can contain arbitrar
 
 ### Examples
 
-* `.`: The flake to which the current directory belongs to.
+* `.`: The flake to which the current directory belongs.
 * `/home/alice/src/patchelf`: A flake in some other directory.
 * `./../sub directory/with Ûñî©ôδ€`: A flake in another relative directory that
   has Unicode characters in its name.
@@ -148,7 +150,7 @@ reference types:
 
 * `ref`: A Git or Mercurial branch or tag name.
 
-Finally, some attribute are typically not specified by the user, but
+Finally, some attributes are typically not specified by the user, but
 can occur in *locked* flake references and are available to Nix code:
 
 * `revCount`: The number of ancestors of the commit `rev`.
@@ -258,6 +260,8 @@ Currently the `type` attribute can be one of the following:
   If the extension corresponds to a known archive format (`.zip`, `.tar`,
   `.tgz`, `.tar.gz`, `.tar.xz`, `.tar.bz2` or `.tar.zst`), then the `tarball+`
   can be dropped.
+
+  This can also be used to set the location of gitea/forgejo branches. [See here](@docroot@/protocols/tarball-fetcher.md#gitea-and-forgejo-support)
 
 * `file`: Plain files or directory tarballs, either over http(s) or from the local
   disk.
@@ -563,8 +567,9 @@ or NixOS modules, which are composed into the top-level flake's
 Inputs specified in `flake.nix` are typically "unlocked" in the sense
 that they don't specify an exact revision. To ensure reproducibility,
 Nix will automatically generate and use a *lock file* called
-`flake.lock` in the flake's directory. The lock file contains a graph
-structure isomorphic to the graph of dependencies of the root
+`flake.lock` in the flake's directory.
+The lock file is a UTF-8 JSON file.
+It contains a graph structure isomorphic to the graph of dependencies of the root
 flake. Each node in the graph (except the root node) maps the
 (usually) unlocked input specifications in `flake.nix` to locked input
 specifications. Each node also contains some metadata, such as the
@@ -662,6 +667,11 @@ following fields:
   cache: `narHash` allows the store path to be computed, while the
   other attributes are necessary because they provide information not
   stored in the store path.
+
+  The attributes in `locked` are considered "final", meaning that they are the only ones that are passed via the arguments of the `outputs` function of a flake.
+  For instance, if `locked` contains a `lastModified` attribute while the fetcher does not return a `lastModified` attribute, then the `lastModified` attribute will be passed to the `outputs` function.
+  Conversely, if `locked` does *not* contain a `lastModified` attribute while the fetcher *does* return a `lastModified` attribute, then no `lastModified` attribute will be passed.
+  If `locked` contains a `lastModifed` attribute and the fetcher returns a `lastModified` attribute, then they must have the same value.
 
 * `flake`: A Boolean denoting whether this is a flake or non-flake
   dependency. Corresponds to the `flake` attribute in the `inputs`

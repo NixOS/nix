@@ -38,7 +38,7 @@ void Logger::warn(const std::string & msg)
 
 void Logger::writeToStdout(std::string_view s)
 {
-    Descriptor standard_out = getStandardOut();
+    Descriptor standard_out = getStandardOutput();
     writeFull(standard_out, s);
     writeFull(standard_out, "\n");
 }
@@ -85,10 +85,10 @@ public:
 
     void logEI(const ErrorInfo & ei) override
     {
-        std::stringstream oss;
+        std::ostringstream oss;
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
-        log(ei.level, oss.str());
+        log(ei.level, toView(oss));
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
@@ -118,11 +118,7 @@ void writeToStderr(std::string_view s)
 {
     try {
         writeFull(
-#ifdef _WIN32
-            GetStdHandle(STD_ERROR_HANDLE),
-#else
-            STDERR_FILENO,
-#endif
+            getStandardError(),
             s, false);
     } catch (SystemError & e) {
         /* Ignore failing writes to stderr.  We need to ignore write
@@ -189,7 +185,7 @@ struct JSONLogger : Logger {
             else if (f.type == Logger::Field::tString)
                 arr.push_back(f.s);
             else
-                abort();
+                unreachable();
     }
 
     void write(const nlohmann::json & json)
@@ -346,7 +342,7 @@ Activity::~Activity()
     try {
         logger.stopActivity(id);
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 

@@ -43,17 +43,6 @@ nix_err nix_libstore_init(nix_c_context * context);
 nix_err nix_libstore_init_no_load_config(nix_c_context * context);
 
 /**
- * @brief Loads the plugins specified in Nix's plugin-files setting.
- *
- * Call this once, after calling your desired init functions and setting
- * relevant settings.
- *
- * @param[out] context Optional, stores error information
- * @return NIX_OK if the initialization was successful, an error code otherwise.
- */
-nix_err nix_init_plugins(nix_c_context * context);
-
-/**
  * @brief Open a nix store.
  *
  * Store instances may share state and resources behind the scenes.
@@ -171,6 +160,16 @@ nix_err nix_store_realise(
  */
 nix_err
 nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data);
+
+/**
+ * @brief Copy the closure of `path` from `srcStore` to `dstStore`.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] srcStore nix source store reference
+ * @param[in] dstStore nix destination store reference
+ * @param[in] path Path to copy
+ */
+nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path);
 
 // cffi end
 #ifdef __cplusplus

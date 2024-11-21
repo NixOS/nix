@@ -5,6 +5,7 @@ set -o pipefail
 
 # System specific settings
 export NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-30001}"
+export NIX_BUILD_GROUP_ID="${NIX_BUILD_GROUP_ID:-30000}"
 export NIX_BUILD_USER_NAME_TEMPLATE="nixbld%d"
 
 readonly SERVICE_SRC=/lib/systemd/system/nix-daemon.service
@@ -94,6 +95,9 @@ EOF
 poly_configure_nix_daemon_service() {
     if [ -e /run/systemd/system ]; then
         task "Setting up the nix-daemon systemd service"
+
+        _sudo "to create parent of the nix-daemon tmpfiles config" \
+              mkdir -p "$(dirname "$TMPFILES_DEST")"
 
         _sudo "to create the nix-daemon tmpfiles config" \
               ln -sfn "/nix/var/nix/profiles/default$TMPFILES_SRC" "$TMPFILES_DEST"

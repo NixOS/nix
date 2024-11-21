@@ -26,6 +26,7 @@
 #include "legacy.hh"
 #include "users.hh"
 #include "network-proxy.hh"
+#include "compatibility-settings.hh"
 
 using namespace nix;
 using namespace std::string_literals;
@@ -35,7 +36,7 @@ extern char * * environ __attribute__((weak));
 /* Recreate the effect of the perl shellwords function, breaking up a
  * string into arguments like a shell word, including escapes
  */
-static std::vector<std::string> shellwords(const std::string & s)
+static std::vector<std::string> shellwords(std::string_view s)
 {
     std::regex whitespace("^\\s+");
     auto begin = s.cbegin();
@@ -50,7 +51,7 @@ static std::vector<std::string> shellwords(const std::string & s)
     auto it = begin;
     for (; it != s.cend(); ++it) {
         if (st == sBegin) {
-            std::smatch match;
+            std::cmatch match;
             if (regex_search(it, s.cend(), match, whitespace)) {
                 cur.append(begin, it);
                 res.push_back(cur);
@@ -90,24 +91,50 @@ static std::vector<std::string> shellwords(const std::string & s)
     return res;
 }
 
+/**
+ * Like `resolveExprPath`, but prefers `shell.nix` instead of `default.nix`,
+ * and if `path` was a directory, it checks eagerly whether `shell.nix` or
+ * `default.nix` exist, throwing an error if they don't.
+ */
+static SourcePath resolveShellExprPath(SourcePath path)
+{
+    auto resolvedOrDir = resolveExprPath(path, false);
+    if (resolvedOrDir.resolveSymlinks().lstat().type == SourceAccessor::tDirectory) {
+        if ((resolvedOrDir / "shell.nix").pathExists()) {
+            if (compatibilitySettings.nixShellAlwaysLooksForShellNix) {
+                return resolvedOrDir / "shell.nix";
+            } else {
+                warn("Skipping '%1%', because the setting '%2%' is disabled. This is a deprecated behavior. Consider enabling '%2%'.",
+                    resolvedOrDir / "shell.nix",
+                    "nix-shell-always-looks-for-shell-nix");
+            }
+        }
+        if ((resolvedOrDir / "default.nix").pathExists()) {
+            return resolvedOrDir / "default.nix";
+        }
+        throw Error("neither '%s' nor '%s' found in '%s'", "shell.nix", "default.nix", resolvedOrDir);
+    }
+    return resolvedOrDir;
+}
+
 static void main_nix_build(int argc, char * * argv)
 {
     auto dryRun = false;
-    auto runEnv = std::regex_search(argv[0], std::regex("nix-shell$"));
+    auto isNixShell = std::regex_search(argv[0], std::regex("nix-shell$"));
     auto pure = false;
     auto fromArgs = false;
     auto packages = false;
     // Same condition as bash uses for interactive shells
     auto interactive = isatty(STDIN_FILENO) && isatty(STDERR_FILENO);
     Strings attrPaths;
-    Strings left;
+    Strings remainingArgs;
     BuildMode buildMode = bmNormal;
     bool readStdin = false;
 
     std::string envCommand; // interactive shell
     Strings envExclude;
 
-    auto myName = runEnv ? "nix-shell" : "nix-build";
+    auto myName = isNixShell ? "nix-shell" : "nix-build";
 
     auto inShebang = false;
     std::string script;
@@ -132,11 +159,11 @@ static void main_nix_build(int argc, char * * argv)
     // Heuristic to see if we're invoked as a shebang script, namely,
     // if we have at least one argument, it's the name of an
     // executable file, and it starts with "#!".
-    if (runEnv && argc > 1) {
+    if (isNixShell && argc > 1) {
         script = argv[1];
         try {
             auto lines = tokenizeString<Strings>(readFile(script), "\n");
-            if (std::regex_search(lines.front(), std::regex("^#!"))) {
+            if (!lines.empty() && std::regex_search(lines.front(), std::regex("^#!"))) {
                 lines.pop_front();
                 inShebang = true;
                 for (int i = 2; i < argc; ++i)
@@ -146,7 +173,7 @@ static void main_nix_build(int argc, char * * argv)
                     line = chomp(line);
                     std::smatch match;
                     if (std::regex_match(line, match, std::regex("^#!\\s*nix-shell\\s+(.*)$")))
-                        for (const auto & word : shellwords(match[1].str()))
+                        for (const auto & word : shellwords({match[1].first, match[1].second}))
                             args.push_back(word);
                 }
             }
@@ -156,6 +183,9 @@ static void main_nix_build(int argc, char * * argv)
     struct MyArgs : LegacyArgs, MixEvalArgs
     {
         using LegacyArgs::LegacyArgs;
+        void setBaseDir(Path baseDir) {
+            commandBaseDir = baseDir;
+        }
     };
 
     MyArgs myArgs(myName, [&](Strings::iterator & arg, const Strings::iterator & end) {
@@ -186,9 +216,9 @@ static void main_nix_build(int argc, char * * argv)
             dryRun = true;
 
         else if (*arg == "--run-env") // obsolete
-            runEnv = true;
+            isNixShell = true;
 
-        else if (runEnv && (*arg == "--command" || *arg == "--run")) {
+        else if (isNixShell && (*arg == "--command" || *arg == "--run")) {
             if (*arg == "--run")
                 interactive = false;
             envCommand = getArg(*arg, arg, end) + "\nexit";
@@ -206,7 +236,7 @@ static void main_nix_build(int argc, char * * argv)
         else if (*arg == "--pure") pure = true;
         else if (*arg == "--impure") pure = false;
 
-        else if (runEnv && (*arg == "--packages" || *arg == "-p"))
+        else if (isNixShell && (*arg == "--packages" || *arg == "-p"))
             packages = true;
 
         else if (inShebang && *arg == "-i") {
@@ -230,9 +260,9 @@ static void main_nix_build(int argc, char * * argv)
                 // read the shebang to understand which packages to read from. Since
                 // this is handled via nix-shell -p, we wrap our ruby script execution
                 // in ruby -e 'load' which ignores the shebangs.
-                envCommand = fmt("exec %1% %2% -e 'load(ARGV.shift)' -- %3% %4%", execArgs, interpreter, shellEscape(script), joined.str());
+                envCommand = fmt("exec %1% %2% -e 'load(ARGV.shift)' -- %3% %4%", execArgs, interpreter, shellEscape(script), toView(joined));
             } else {
-                envCommand = fmt("exec %1% %2% %3% %4%", execArgs, interpreter, shellEscape(script), joined.str());
+                envCommand = fmt("exec %1% %2% %3% %4%", execArgs, interpreter, shellEscape(script), toView(joined));
             }
         }
 
@@ -246,7 +276,7 @@ static void main_nix_build(int argc, char * * argv)
             return false;
 
         else
-            left.push_back(*arg);
+            remainingArgs.push_back(*arg);
 
         return true;
     });
@@ -259,14 +289,17 @@ static void main_nix_build(int argc, char * * argv)
     auto store = openStore();
     auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
-    auto state = std::make_unique<EvalState>(myArgs.lookupPath, evalStore, evalSettings, store);
+    auto state = std::make_unique<EvalState>(myArgs.lookupPath, evalStore, fetchSettings, evalSettings, store);
     state->repair = myArgs.repair;
     if (myArgs.repair) buildMode = bmRepair;
 
+    if (inShebang && compatibilitySettings.nixShellShebangArgumentsRelativeToScript) {
+        myArgs.setBaseDir(absPath(dirOf(script)));
+    }
     auto autoArgs = myArgs.getAutoArgs(*state);
 
     auto autoArgsWithInNixShell = autoArgs;
-    if (runEnv) {
+    if (isNixShell) {
         auto newArgs = state->buildBindings(autoArgsWithInNixShell->size() + 1);
         newArgs.alloc("inNixShell").mkBool(true);
         for (auto & i : *autoArgs) newArgs.insert(i);
@@ -276,19 +309,26 @@ static void main_nix_build(int argc, char * * argv)
     if (packages) {
         std::ostringstream joined;
         joined << "{...}@args: with import <nixpkgs> args; (pkgs.runCommandCC or pkgs.runCommand) \"shell\" { buildInputs = [ ";
-        for (const auto & i : left)
+        for (const auto & i : remainingArgs)
             joined << '(' << i << ") ";
         joined << "]; } \"\"";
         fromArgs = true;
-        left = {joined.str()};
-    } else if (!fromArgs) {
-        if (left.empty() && runEnv && pathExists("shell.nix"))
-            left = {"shell.nix"};
-        if (left.empty())
-            left = {"default.nix"};
+        remainingArgs = {joined.str()};
+    } else if (!fromArgs && remainingArgs.empty()) {
+        if (isNixShell && !compatibilitySettings.nixShellAlwaysLooksForShellNix && std::filesystem::exists("shell.nix")) {
+            // If we're in 2.3 compatibility mode, we need to look for shell.nix
+            // now, because it won't be done later.
+            remainingArgs = {"shell.nix"};
+        } else {
+            remainingArgs = {"."};
+
+            // Instead of letting it throw later, we throw here to give a more relevant error message
+            if (isNixShell && !std::filesystem::exists("shell.nix") && !std::filesystem::exists("default.nix"))
+                throw Error("no argument specified and no '%s' or '%s' file found in the working directory", "shell.nix", "default.nix");
+        }
     }
 
-    if (runEnv)
+    if (isNixShell)
         setEnv("IN_NIX_SHELL", pure ? "pure" : "impure");
 
     PackageInfos drvs;
@@ -299,9 +339,16 @@ static void main_nix_build(int argc, char * * argv)
     if (readStdin)
         exprs = {state->parseStdin()};
     else
-        for (auto i : left) {
-            if (fromArgs)
-                exprs.push_back(state->parseExprFromString(std::move(i), state->rootPath(".")));
+        for (auto i : remainingArgs) {
+            if (fromArgs) {
+                auto shebangBaseDir = absPath(dirOf(script));
+                exprs.push_back(state->parseExprFromString(
+                    std::move(i),
+                    (inShebang && compatibilitySettings.nixShellShebangArgumentsRelativeToScript)
+                        ? lookupFileArg(*state, shebangBaseDir)
+                        : state->rootPath(".")
+                ));
+            }
             else {
                 auto absolute = i;
                 try {
@@ -310,14 +357,18 @@ static void main_nix_build(int argc, char * * argv)
                 auto [path, outputNames] = parsePathWithOutputs(absolute);
                 if (evalStore->isStorePath(path) && hasSuffix(path, ".drv"))
                     drvs.push_back(PackageInfo(*state, evalStore, absolute));
-                else
+                else {
                     /* If we're in a #! script, interpret filenames
                        relative to the script. */
-                    exprs.push_back(
-                        state->parseExprFromFile(
-                            resolveExprPath(
-                                lookupFileArg(*state,
-                                    inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i))));
+                    auto baseDir = inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i;
+
+                    auto sourcePath = lookupFileArg(*state,
+                                    baseDir);
+                    auto resolvedPath =
+                        isNixShell ? resolveShellExprPath(sourcePath) : resolveExprPath(sourcePath);
+
+                    exprs.push_back(state->parseExprFromFile(resolvedPath));
+                }
             }
         }
 
@@ -330,7 +381,7 @@ static void main_nix_build(int argc, char * * argv)
 
         std::function<bool(const Value & v)> takesNixShellAttr;
         takesNixShellAttr = [&](const Value & v) {
-            if (!runEnv) {
+            if (!isNixShell) {
                 return false;
             }
             bool add = false;
@@ -381,7 +432,7 @@ static void main_nix_build(int argc, char * * argv)
             store->buildPaths(paths, buildMode, evalStore);
     };
 
-    if (runEnv) {
+    if (isNixShell) {
         if (drvs.size() != 1)
             throw UsageError("nix-shell requires a single derivation");
 
@@ -477,8 +528,6 @@ static void main_nix_build(int argc, char * * argv)
         // Set the environment.
         auto env = getEnv();
 
-        auto tmp = getEnvNonEmpty("TMPDIR").value_or("/tmp");
-
         if (pure) {
             decltype(env) newEnv;
             for (auto & i : env)
@@ -489,18 +538,16 @@ static void main_nix_build(int argc, char * * argv)
             env["__ETC_PROFILE_SOURCED"] = "1";
         }
 
-        env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmp;
+        env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDir.path().string();
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
         auto passAsFile = tokenizeString<StringSet>(getOr(drv.env, "passAsFile", ""));
 
-        bool keepTmp = false;
         int fileNr = 0;
 
         for (auto & var : drv.env)
             if (passAsFile.count(var.first)) {
-                keepTmp = true;
                 auto fn = ".attr-" + std::to_string(fileNr++);
                 Path p = (tmpDir.path() / fn).string();
                 writeFile(p, var.second);
@@ -542,7 +589,6 @@ static void main_nix_build(int argc, char * * argv)
 
                 env["NIX_ATTRS_SH_FILE"] = attrsSH;
                 env["NIX_ATTRS_JSON_FILE"] = attrsJSON;
-                keepTmp = true;
             }
         }
 
@@ -552,12 +598,10 @@ static void main_nix_build(int argc, char * * argv)
            lose the current $PATH directories. */
         auto rcfile = (tmpDir.path() / "rc").string();
         std::string rc = fmt(
-                R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; }; )"s +
-                (keepTmp ?
-                    "trap _nix_shell_clean_tmpdir EXIT; "
-                    "exitHooks+=(_nix_shell_clean_tmpdir); "
-                    "failureHooks+=(_nix_shell_clean_tmpdir); ":
-                    "_nix_shell_clean_tmpdir; ") +
+                (R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; };)"s
+                  "trap _nix_shell_clean_tmpdir EXIT; "
+                  "exitHooks+=(_nix_shell_clean_tmpdir); "
+                  "failureHooks+=(_nix_shell_clean_tmpdir); ") +
                 (pure ? "" : "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;") +
                 "%2%"
                 // always clear PATH.

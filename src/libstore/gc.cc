@@ -4,6 +4,7 @@
 #include "finally.hh"
 #include "unix-domain-socket.hh"
 #include "signals.hh"
+#include "posix-fs-canonicalise.hh"
 
 #if !defined(__linux__)
 // For shelling out to lsof
@@ -333,7 +334,7 @@ static std::string quoteRegexChars(const std::string & raw)
 }
 
 #if __linux__
-static void readFileRoots(const char * path, UncheckedRoots & roots)
+static void readFileRoots(const std::filesystem::path & path, UncheckedRoots & roots)
 {
     try {
         roots[readFile(path)].emplace(path);
@@ -559,7 +560,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                        non-blocking flag from the server socket, so
                        explicitly make it blocking. */
                     if (fcntl(fdClient.get(), F_SETFL, fcntl(fdClient.get(), F_GETFL) & ~O_NONBLOCK) == -1)
-                        abort();
+                        panic("Could not set non-blocking flag on client socket");
 
                     while (true) {
                         try {
@@ -763,13 +764,18 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 }
             }
         }
-
         for (auto & path : topoSortPaths(visited)) {
             if (!dead.insert(path).second) continue;
             if (shouldDelete) {
-                invalidatePathChecked(path);
-                deleteFromStore(path.to_string());
-                referrersCache.erase(path);
+                try {
+                    invalidatePathChecked(path);
+                    deleteFromStore(path.to_string());
+                    referrersCache.erase(path);
+                } catch (PathInUse &e) {
+                    // If we end up here, it's likely a new occurence
+                    // of https://github.com/NixOS/nix/issues/11923
+                    printError("BUG: %s", e.what());
+                }
             }
         }
     };
@@ -891,7 +897,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
 void LocalStore::autoGC(bool sync)
 {
-#ifdef HAVE_STATVFS
+#if HAVE_STATVFS
     static auto fakeFreeSpaceFile = getEnv("_NIX_TEST_FREE_SPACE_FILE");
 
     auto getAvail = [this]() -> uint64_t {
@@ -958,8 +964,8 @@ void LocalStore::autoGC(bool sync)
 
             } catch (...) {
                 // FIXME: we could propagate the exception to the
-                // future, but we don't really care.
-                ignoreException();
+                // future, but we don't really care. (what??)
+                ignoreExceptionInDestructor();
             }
 
         }).detach();

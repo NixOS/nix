@@ -1,57 +1,52 @@
 { lib
 , stdenv
+, mkMesonDerivation
+, pkg-config
 , perl
 , perlPackages
-, meson
-, ninja
-, pkg-config
 , nix-store
+, version
 , curl
 , bzip2
-, xz
-, boost
 , libsodium
-, darwin
-, versionSuffix ? ""
 }:
 
 let
   inherit (lib) fileset;
 in
 
-perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
+perl.pkgs.toPerlModule (mkMesonDerivation (finalAttrs: {
   pname = "nix-perl";
-  version = lib.fileContents ./.version + versionSuffix;
+  inherit version;
 
-  src = fileset.toSource {
-    root = ./.;
-    fileset = fileset.unions ([
-      ./MANIFEST
-      ./lib
-      ./meson.build
-      ./meson.options
-    ] ++ lib.optionals finalAttrs.doCheck [
-      ./.yath.rc.in
-      ./t
-    ]);
-  };
+  workDir = ./.;
+  fileset = fileset.unions ([
+    ./.version
+    ../../.version
+    ./MANIFEST
+    ./lib
+    ./meson.build
+    ./meson.options
+  ] ++ lib.optionals finalAttrs.doCheck [
+    ./.yath.rc.in
+    ./t
+  ]);
 
   nativeBuildInputs = [
-    meson
-    ninja
     pkg-config
+    perl
+    curl
   ];
 
   buildInputs = [
     nix-store
-    curl
+  ] ++ finalAttrs.passthru.externalBuildInputs;
+
+  # Hack for sake of the dev shell
+  passthru.externalBuildInputs = [
     bzip2
-    xz
-    perl
-    boost
-  ]
-  ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
-  ++ lib.optional stdenv.isDarwin darwin.apple_sdk.frameworks.Security;
+    libsodium
+  ];
 
   # `perlPackages.Test2Harness` is marked broken for Darwin
   doCheck = !stdenv.isDarwin;
@@ -63,6 +58,7 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
   preConfigure =
     # "Inline" .version so its not a symlink, and includes the suffix
     ''
+      chmod u+w .version
       echo ${finalAttrs.version} > .version
     '';
 
@@ -76,5 +72,5 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
     "--print-errorlogs"
   ];
 
-  enableParallelBuilding = true;
+  strictDeps = false;
 }))

@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "types.hh"
+#include "ref.hh"
 #include "store-reference.hh"
 
 namespace nix {
@@ -32,12 +32,12 @@ struct Machine {
 
     /**
      * @return Whether `features` is a subset of the union of `supportedFeatures` and
-     * `mandatoryFeatures`
+     * `mandatoryFeatures`.
      */
     bool allSupported(const std::set<std::string> & features) const;
 
     /**
-     * @return @Whether `mandatoryFeatures` is a subset of `features`
+     * @return Whether `mandatoryFeatures` is a subset of `features`.
      */
     bool mandatoryMet(const std::set<std::string> & features) const;
 

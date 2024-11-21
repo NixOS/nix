@@ -1,6 +1,7 @@
 #include "config.hh"
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
+#include "environment-variables.hh"
 #include "experimental-features.hh"
 #include "util.hh"
 #include "file-system.hh"
@@ -8,6 +9,8 @@
 #include "config-impl.hh"
 
 #include <nlohmann/json.hpp>
+
+#include "strings.hh"
 
 namespace nix {
 
@@ -91,7 +94,14 @@ void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overridd
 }
 
 
-static void applyConfigInner(const std::string & contents, const std::string & path, std::vector<std::pair<std::string, std::string>> & parsedContents) {
+/**
+ * Parse configuration in `contents`, and also the configuration files included from there, with their location specified relative to `path`.
+ *
+ * `contents` and `path` represent the file that is being parsed.
+ * The result is only an intermediate list of key-value pairs of strings.
+ * More parsing according to the settings-specific semantics is being done by `loadConfFile` in `libstore/globals.cc`.
+*/
+static void parseConfigFiles(const std::string & contents, const std::string & path, std::vector<std::pair<std::string, std::string>> & parsedContents) {
     unsigned int pos = 0;
 
     while (pos < contents.size()) {
@@ -107,7 +117,7 @@ static void applyConfigInner(const std::string & contents, const std::string & p
         if (tokens.empty()) continue;
 
         if (tokens.size() < 2)
-            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+            throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
 
         auto include = false;
         auto ignoreMissing = false;
@@ -120,12 +130,12 @@ static void applyConfigInner(const std::string & contents, const std::string & p
 
         if (include) {
             if (tokens.size() != 2)
-                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+                throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
             auto p = absPath(tokens[1], dirOf(path));
             if (pathExists(p)) {
                 try {
                     std::string includedContents = readFile(p);
-                    applyConfigInner(includedContents, p, parsedContents);
+                    parseConfigFiles(includedContents, p, parsedContents);
                 } catch (SystemError &) {
                     // TODO: Do we actually want to ignore this? Or is it better to fail?
                 }
@@ -136,7 +146,7 @@ static void applyConfigInner(const std::string & contents, const std::string & p
         }
 
         if (tokens[1] != "=")
-            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+            throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
 
         std::string name = std::move(tokens[0]);
 
@@ -153,7 +163,7 @@ static void applyConfigInner(const std::string & contents, const std::string & p
 void AbstractConfig::applyConfig(const std::string & contents, const std::string & path) {
     std::vector<std::pair<std::string, std::string>> parsedContents;
 
-    applyConfigInner(contents, path, parsedContents);
+    parseConfigFiles(contents, path, parsedContents);
 
     // First apply experimental-feature related settings
     for (const auto & [name, value] : parsedContents)
@@ -161,9 +171,18 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
             set(name, value);
 
     // Then apply other settings
-    for (const auto & [name, value] : parsedContents)
-        if (name != "experimental-features" && name != "extra-experimental-features")
+    // XXX: NIX_PATH must override the regular setting! This is done in `initGC()`
+    // Environment variables overriding settings should probably be part of the Config mechanism,
+    // but at the time of writing it's not worth building that for just one thing
+    for (const auto & [name, value] : parsedContents) {
+        if (name != "experimental-features" && name != "extra-experimental-features") {
+            if ((name == "nix-path" || name == "extra-nix-path")
+                && getEnv("NIX_PATH").has_value()) {
+                continue;
+            }
             set(name, value);
+        }
+    }
 }
 
 void Config::resetOverridden()
@@ -283,6 +302,7 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
 {
     args.addFlag({
         .longName = name,
+        .aliases = aliases,
         .description = fmt("Enable the `%s` setting.", name),
         .category = category,
         .handler = {[this] { override(true); }},
@@ -290,6 +310,7 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
     });
     args.addFlag({
         .longName = "no-" + name,
+        .aliases = aliases,
         .description = fmt("Disable the `%s` setting.", name),
         .category = category,
         .handler = {[this] { override(false); }},
