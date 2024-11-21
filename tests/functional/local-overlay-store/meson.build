@@ -14,5 +14,5 @@ suites += {
     'optimise.sh',
     'stale-file-handle.sh',
   ],
-  'workdir': meson.current_build_dir(),
+  'workdir': meson.current_source_dir(),
 }

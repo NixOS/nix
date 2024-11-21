@@ -63,6 +63,7 @@ headers = [config_h] + files(
 headers += files('nix_api_util_internal.h')
 
 subdir('build-utils-meson/export-all-symbols')
+subdir('build-utils-meson/windows-version')
 
 this_library = library(
   'nixutilc',

@@ -79,7 +79,7 @@ sed -e "s|@ENV_PROG@|$(type -P env)|" shell.shebang.expr > $TEST_ROOT/shell.sheb
 chmod a+rx $TEST_ROOT/shell.shebang.expr
 # Should fail due to expressions using relative path
 ! $TEST_ROOT/shell.shebang.expr bar
-cp shell.nix config.nix $TEST_ROOT
+cp shell.nix "${config_nix}" $TEST_ROOT
 # Should succeed
 echo "cwd: $PWD"
 output=$($TEST_ROOT/shell.shebang.expr bar)
@@ -126,7 +126,7 @@ $TEST_ROOT/shell.shebang.nix
 mkdir $TEST_ROOT/lookup-test $TEST_ROOT/empty
 
 echo "import $shellDotNix" > $TEST_ROOT/lookup-test/shell.nix
-cp config.nix $TEST_ROOT/lookup-test/
+cp "${config_nix}" $TEST_ROOT/lookup-test/
 echo 'abort "do not load default.nix!"' > $TEST_ROOT/lookup-test/default.nix
 
 nix-shell $TEST_ROOT/lookup-test -A shellDrv --run 'echo "it works"' | grepQuiet "it works"
@@ -166,6 +166,35 @@ cat >$TEST_ROOT/marco/polo/default.nix <<EOF
 EOF
 chmod a+x $TEST_ROOT/marco/polo/default.nix
 (cd $TEST_ROOT/marco && ./polo/default.nix | grepQuiet "Polo")
+
+# https://github.com/NixOS/nix/issues/11892
+mkdir $TEST_ROOT/issue-11892
+cat >$TEST_ROOT/issue-11892/shebangscript <<EOF
+#!$(type -P env) nix-shell
+#! nix-shell -I nixpkgs=$shellDotNix
+#! nix-shell -p 'callPackage (import ./my_package.nix) {}'
+#! nix-shell -i bash
+set -euxo pipefail
+my_package
+EOF
+cat >$TEST_ROOT/issue-11892/my_package.nix <<EOF
+{ stdenv, shell, ... }:
+stdenv.mkDerivation {
+  name = "my_package";
+  buildCommand = ''
+    mkdir -p \$out/bin
+    ( echo "#!\${shell}"
+      echo "echo 'ok' 'baz11892'"
+    ) > \$out/bin/my_package
+    cat \$out/bin/my_package
+    chmod a+x \$out/bin/my_package
+  '';
+}
+EOF
+chmod a+x $TEST_ROOT/issue-11892/shebangscript
+$TEST_ROOT/issue-11892/shebangscript \
+  | tee /dev/stderr \
+  | grepQuiet "ok baz11892"
 
 
 #####################

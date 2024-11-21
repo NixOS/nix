@@ -35,6 +35,7 @@ subdir('build-utils-meson/subprojects')
 subdir('build-utils-meson/threads')
 
 subdir('build-utils-meson/export-all-symbols')
+subdir('build-utils-meson/windows-version')
 
 configdata = configuration_data()
 
@@ -229,6 +230,8 @@ foreach linkname : nix_symlinks
   t = custom_target(
     command: ['ln', '-sf', fs.name(this_exe), '@OUTPUT@'],
     output: linkname + executable_suffix,
+    # native doesn't allow dangling symlinks, but the target executable often doesn't exist at this time
+    env : { 'MSYS' : 'winsymlinks:lnk' },
     # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
     build_by_default: true
   )
@@ -247,6 +250,8 @@ install_symlink(
 custom_target(
   command: ['ln', '-sf', fs.name(this_exe), '@OUTPUT@'],
   output: 'build-remote' + executable_suffix,
+  # native doesn't allow dangling symlinks, but the target executable often doesn't exist at this time
+  env : { 'MSYS' : 'winsymlinks:lnk' },
   # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
   build_by_default: true
 )

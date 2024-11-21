@@ -35,7 +35,7 @@ drvPath=$(nix-instantiate dependencies.nix)
 nix copy --to file://$TEST_ROOT/foo?compression="bzip2" $(nix-store -r "$drvPath")
 rm -rf $TEST_ROOT/nixexprs
 mkdir -p $TEST_ROOT/nixexprs
-cp config.nix dependencies.nix dependencies.builder*.sh $TEST_ROOT/nixexprs/
+cp "${config_nix}" dependencies.nix dependencies.builder*.sh $TEST_ROOT/nixexprs/
 ln -s dependencies.nix $TEST_ROOT/nixexprs/default.nix
 (cd $TEST_ROOT && tar cvf - nixexprs) | bzip2 > $TEST_ROOT/foo/nixexprs.tar.bz2
 

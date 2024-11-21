@@ -38,6 +38,8 @@ VERSIONED_CHARACTERIZATION_TEST(
         "oh no \0\0\0 what was that!",
     }))
 
+#ifndef DOXYGEN_SKIP
+
 VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
     storePath,
@@ -83,6 +85,8 @@ VERSIONED_CHARACTERIZATION_TEST(
             .outputName = "quux",
         },
     }))
+
+#endif
 
 VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
@@ -459,21 +463,14 @@ TEST_F(ServeProtoTest, handshake_client_truncated_replay_throws)
     CharacterizationTest::readTest("handshake-to-client", [&](std::string toClientLog) {
         for (size_t len = 0; len < toClientLog.size(); ++len) {
             NullBufferedSink nullSink;
-            StringSource in {
-                // truncate
-                toClientLog.substr(0, len)
-            };
+            auto substring = toClientLog.substr(0, len);
+            StringSource in{substring};
             if (len < 8) {
                 EXPECT_THROW(
-                    ServeProto::BasicClientConnection::handshake(
-                        nullSink, in, defaultVersion, "blah"),
-                    EndOfFile);
+                    ServeProto::BasicClientConnection::handshake(nullSink, in, defaultVersion, "blah"), EndOfFile);
             } else {
                 // Not sure why cannot keep on checking for `EndOfFile`.
-                EXPECT_THROW(
-                    ServeProto::BasicClientConnection::handshake(
-                        nullSink, in, defaultVersion, "blah"),
-                    Error);
+                EXPECT_THROW(ServeProto::BasicClientConnection::handshake(nullSink, in, defaultVersion, "blah"), Error);
             }
         }
     });

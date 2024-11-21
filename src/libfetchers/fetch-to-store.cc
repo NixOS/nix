@@ -45,6 +45,8 @@ StorePath fetchToStore(
         : store.addToStore(
             name, path, method, HashAlgorithm::SHA256, {}, filter2, repair, provenance);
 
+    debug(mode == FetchMode::DryRun ? "hashed '%s'" : "copied '%s' to '%s'", path, store.printStorePath(storePath));
+
     if (cacheKey && mode == FetchMode::Copy)
         fetchers::getCache()->upsert(*cacheKey, store, {}, storePath);
 

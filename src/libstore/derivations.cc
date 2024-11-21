@@ -1029,29 +1029,31 @@ std::string hashPlaceholder(const OutputNameView outputName)
     return "/" + hashString(HashAlgorithm::SHA256, concatStrings("nix-output:", outputName)).to_string(HashFormat::Nix32, false);
 }
 
-
-
-
-static void rewriteDerivation(Store & store, BasicDerivation & drv, const StringMap & rewrites)
+void BasicDerivation::applyRewrites(const StringMap & rewrites)
 {
-    debug("Rewriting the derivation");
+    if (rewrites.empty()) return;
 
-    for (auto & rewrite : rewrites) {
+    debug("rewriting the derivation");
+
+    for (auto & rewrite : rewrites)
         debug("rewriting %s as %s", rewrite.first, rewrite.second);
-    }
 
-    drv.builder = rewriteStrings(drv.builder, rewrites);
-    for (auto & arg : drv.args) {
+    builder = rewriteStrings(builder, rewrites);
+    for (auto & arg : args)
         arg = rewriteStrings(arg, rewrites);
-    }
 
     StringPairs newEnv;
-    for (auto & envVar : drv.env) {
+    for (auto & envVar : env) {
         auto envName = rewriteStrings(envVar.first, rewrites);
         auto envValue = rewriteStrings(envVar.second, rewrites);
         newEnv.emplace(envName, envValue);
     }
-    drv.env = newEnv;
+    env = std::move(newEnv);
+}
+
+static void rewriteDerivation(Store & store, BasicDerivation & drv, const StringMap & rewrites)
+{
+    drv.applyRewrites(rewrites);
 
     auto hashModulo = hashDerivationModulo(store, Derivation(drv), true);
     for (auto & [outputName, output] : drv.outputs) {

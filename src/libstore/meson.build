@@ -34,6 +34,8 @@ subdir('build-utils-meson/subprojects')
 run_command('ln', '-s',
   meson.project_build_root() / '__nothing_link_target',
   meson.project_build_root() / '__nothing_symlink',
+  # native doesn't allow dangling symlinks, which the tests require
+  env : { 'MSYS' : 'winsymlinks:lnk' },
   check : true,
 )
 can_link_symlink = run_command('ln',
@@ -69,6 +71,17 @@ has_acl_support = cxx.has_header('sys/xattr.h') \
   and cxx.has_function('lremovexattr')
 configdata.set('HAVE_ACL_SUPPORT', has_acl_support.to_int())
 
+if host_machine.system() == 'darwin'
+  sandbox = cxx.find_library('sandbox')
+  deps_other += [sandbox]
+endif
+
+if host_machine.system() == 'windows'
+  wsock32 = cxx.find_library('wsock32')
+  deps_other += [wsock32]
+endif
+
+subdir('build-utils-meson/libatomic')
 subdir('build-utils-meson/threads')
 
 boost = dependency(
@@ -407,6 +420,7 @@ foreach name, value : cpp_str_defines
 endforeach
 
 subdir('build-utils-meson/export-all-symbols')
+subdir('build-utils-meson/windows-version')
 
 this_library = library(
   'nixstore',

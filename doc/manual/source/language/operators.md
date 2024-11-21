@@ -102,7 +102,7 @@ The `+` operator is overloaded to also work on strings and paths.
 >
 > *string* `+` *string*
 
-Concatenate two [strings][string] and merge their string contexts.
+Concatenate two [strings][string] and merge their [string contexts](./string-context.md).
 
 [String concatenation]: #string-concatenation
 
@@ -128,7 +128,7 @@ The result is a path.
 
 > **Note**
 >
-> The string must not have a string context that refers to a [store path].
+> The string must not have a [string context](./string-context.md) that refers to a [store path].
 
 [Path and string concatenation]: #path-and-string-concatenation
 

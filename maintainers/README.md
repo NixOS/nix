@@ -59,6 +59,9 @@ Team meetings are generally open to anyone interested.
 We can make exceptions to discuss sensitive issues, such as security incidents or people matters.
 Contact any team member to get a calendar invite for reminders and updates.
 
+> [!IMPORTANT]
+> [Handling security reports](./security-reports.md) always takes priority.
+
 ## Project board protocol
 
 The team uses a [GitHub project board](https://github.com/orgs/NixOS/projects/19/views/1) for tracking its work.

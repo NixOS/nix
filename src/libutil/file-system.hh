@@ -227,7 +227,7 @@ void createDir(const Path & path, mode_t mode = 0755);
  * Set the access and modification times of the given path, not
  * following symlinks.
  *
- * @param accessTime Specified in seconds.
+ * @param accessedTime Specified in seconds.
  *
  * @param modificationTime Specified in seconds.
  *

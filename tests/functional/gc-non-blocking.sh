@@ -38,7 +38,7 @@ pid2=$!
 
 # Start a build. This should not be blocked by the GC in progress.
 outPath=$(nix-build --max-silent-time 60 -o "$TEST_ROOT/result" -E "
-  with import ./config.nix;
+  with import ${config_nix};
   mkDerivation {
     name = \"non-blocking\";
     buildCommand = \"set -x; test -e $running; mkdir \$out; echo > $fifo2\";

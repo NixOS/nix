@@ -37,7 +37,7 @@ if canUseSandbox; then
 }
 EOF
 
-    cp simple.nix shell.nix simple.builder.sh config.nix "$flakeDir/"
+    cp simple.nix shell.nix simple.builder.sh "${config_nix}" "$flakeDir/"
 
     TODO_NixOS
 

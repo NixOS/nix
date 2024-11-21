@@ -37,7 +37,8 @@ in {
         { config, pkgs, ... }:
         { services.openssh.enable = true;
           services.openssh.settings.PermitRootLogin = "yes";
-					users.users.root.password = "foobar";
+          users.users.root.hashedPasswordFile = null;
+          users.users.root.password = "foobar";
           virtualisation.writableStore = true;
           virtualisation.additionalPaths = [ pkgB pkgC ];
         };
@@ -64,7 +65,7 @@ in {
     # Copy the closure of package A from the client to the server using password authentication,
     # and check that all prompts are visible
     server.fail("nix-store --check-validity ${pkgA}")
-    client.send_chars("nix copy --to ssh://server ${pkgA} >&2; echo done\n")
+    client.send_chars("nix copy --to ssh://server ${pkgA} >&2; echo -n do; echo ne\n")
     client.wait_for_text("continue connecting")
     client.send_chars("yes\n")
     client.wait_for_text("Password:")
