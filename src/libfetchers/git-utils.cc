@@ -725,8 +725,8 @@ struct GitSourceAccessor : SourceAccessor
             }
         }
 
-        constexpr size_t chunkSize = 128 * 1024; // 128 KiB
-        for (size_t offset = 0; offset < size; offset += chunkSize) {
+        constexpr git_object_size_t chunkSize = 128 * 1024; // 128 KiB
+        for (git_object_size_t offset = 0; offset < size; offset += chunkSize) {
             sink(std::string((const char *) git_blob_rawcontent(blob.get()) + offset, std::min(chunkSize, size - offset)));
         }
     }

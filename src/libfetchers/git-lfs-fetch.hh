@@ -515,13 +515,13 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> & metadatas) 
 
 void Fetch::fetch(const git_blob * pointerBlob, const std::string & pointerFilePath, Sink & sink) const
 {
-    constexpr size_t chunkSize = 128 * 1024; // 128 KiB
+    constexpr git_object_size_t chunkSize = 128 * 1024; // 128 KiB
     auto size = git_blob_rawsize(pointerBlob);
 
     if (size >= 1024) {
         debug("Skip git-lfs, pointer file too large");
         warn("Encountered a file that should have been a pointer, but wasn't: %s", pointerFilePath);
-        for (size_t offset = 0; offset < size; offset += chunkSize) {
+        for (git_object_size_t offset = 0; offset < size; offset += chunkSize) {
             sink(std::string(
                 (const char *) git_blob_rawcontent(pointerBlob) + offset, std::min(chunkSize, size - offset)));
         }
@@ -533,7 +533,7 @@ void Fetch::fetch(const git_blob * pointerBlob, const std::string & pointerFileP
     if (md == std::nullopt) {
         debug("Skip git-lfs, invalid pointer file");
         warn("Encountered a file that should have been a pointer, but wasn't: %s", pointerFilePath);
-        for (size_t offset = 0; offset < size; offset += chunkSize) {
+        for (git_object_size_t offset = 0; offset < size; offset += chunkSize) {
             sink(std::string(
                 (const char *) git_blob_rawcontent(pointerBlob) + offset, std::min(chunkSize, size - offset)));
         }
