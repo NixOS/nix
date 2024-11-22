@@ -25,8 +25,6 @@ deps_public_maybe_subproject = [
 ]
 subdir('build-utils-meson/subprojects')
 
-subdir('build-utils-meson/threads')
-
 rapidcheck = dependency('rapidcheck')
 deps_public += rapidcheck
 
@@ -38,7 +36,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('build-utils-meson/common')
 
 sources = files(
   'tests/derived-path.cc',

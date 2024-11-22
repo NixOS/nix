@@ -79,8 +79,8 @@ static std::pair<FlakeRef, std::string> fromParsedURL(
     std::string fragment;
     std::swap(fragment, parsedURL.fragment);
 
-    return std::make_pair(FlakeRef(fetchers::Input::fromURL(fetchSettings, parsedURL, isFlake), dir), fragment);
-};
+    return {FlakeRef(fetchers::Input::fromURL(fetchSettings, parsedURL, isFlake), dir), fragment};
+}
 
 std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     const fetchers::Settings & fetchSettings,
@@ -203,8 +203,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         .query = query,
         .fragment = fragment
     }, isFlake);
-};
-
+}
 
 /**
  * Check if `url` is a flake ID. This is an abbreviated syntax for
