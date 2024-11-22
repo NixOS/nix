@@ -1,28 +1,22 @@
 { lib
-, buildPackages
 , stdenv
-, mkMesonExecutable
+, mkMesonLibrary
 
+, nix-store-c
+, nix-expr-c
 , nix-flake
-, nix-flake-c
-, nix-expr-test-support
-
-, rapidcheck
-, gtest
-, runCommand
 
 # Configuration Options
 
 , version
-, resolvePath
 }:
 
 let
   inherit (lib) fileset;
 in
 
-mkMesonExecutable (finalAttrs: {
-  pname = "nix-flake-tests";
+mkMesonLibrary (finalAttrs: {
+  pname = "nix-flake-c";
   inherit version;
 
   workDir = ./.;
@@ -35,14 +29,13 @@ mkMesonExecutable (finalAttrs: {
     # ./meson.options
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
+    (fileset.fileFilter (file: file.hasExt "h") ./.)
   ];
 
-  buildInputs = [
+  propagatedBuildInputs = [
+    nix-expr-c
+    nix-store-c
     nix-flake
-    nix-flake-c
-    nix-expr-test-support
-    rapidcheck
-    gtest
   ];
 
   preConfigure =
@@ -60,25 +53,8 @@ mkMesonExecutable (finalAttrs: {
     LDFLAGS = "-fuse-ld=gold";
   };
 
-  passthru = {
-    tests = {
-      run = runCommand "${finalAttrs.pname}-run" {
-        meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
-      } (lib.optionalString stdenv.hostPlatform.isWindows ''
-        export HOME="$PWD/home-dir"
-        mkdir -p "$HOME"
-      '' + ''
-        export _NIX_TEST_UNIT_DATA=${resolvePath ./data}
-        export NIX_CONFIG="extra-experimental-features = flakes"
-        ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
-        touch $out
-      '');
-    };
-  };
-
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;
-    mainProgram = finalAttrs.pname + stdenv.hostPlatform.extensions.executable;
   };
 
 })

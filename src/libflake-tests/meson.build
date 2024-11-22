@@ -19,6 +19,7 @@ subdir('build-utils-meson/deps-lists')
 deps_private_maybe_subproject = [
   dependency('nix-expr-test-support'),
   dependency('nix-flake'),
+  dependency('nix-flake-c'),
 ]
 deps_public_maybe_subproject = [
 ]
@@ -46,6 +47,7 @@ subdir('build-utils-meson/common')
 
 sources = files(
   'flakeref.cc',
+  'nix_api_flake.cc',
   'url-name.cc',
 )
 
@@ -68,6 +70,7 @@ test(
   this_exe,
   env : {
     '_NIX_TEST_UNIT_DATA': meson.current_source_dir() / 'data',
+    'NIX_CONFIG': 'extra-experimental-features = flakes',
   },
   protocol : 'gtest',
 )

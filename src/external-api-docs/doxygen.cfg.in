@@ -40,6 +40,7 @@ GENERATE_LATEX         = NO
 INPUT                  = \
   @src@/src/libutil-c \
   @src@/src/libexpr-c \
+  @src@/src/libflake-c \
   @src@/src/libstore-c \
   @src@/src/external-api-docs/README.md
 

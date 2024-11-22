@@ -19,6 +19,7 @@
   nix-expr-tests,
 
   nix-flake,
+  nix-flake-c,
   nix-flake-tests,
 
   nix-main,
@@ -53,6 +54,7 @@ let
       nix-expr-c
       nix-fetchers
       nix-flake
+      nix-flake-c
       nix-main
       nix-main-c
       nix-store
@@ -86,6 +88,7 @@ let
         "nix-expr-c"
         "nix-fetchers"
         "nix-flake"
+        "nix-flake-c"
         "nix-main"
         "nix-main-c"
         "nix-store"
@@ -169,6 +172,7 @@ in
         nix-expr
         nix-expr-c
         nix-flake
+        nix-flake-c
         nix-main
         nix-main-c
       ;
