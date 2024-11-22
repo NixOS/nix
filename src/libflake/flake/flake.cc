@@ -470,7 +470,7 @@ LockedFlake lockFlake(
                         Override {
                             .input = inputOverride,
                             .sourcePath = sourcePath,
-                            .parentInputPath = inputPathPrefix // FIXME: should this be inputPath?
+                            .parentInputPath = inputPathPrefix
                         });
                 }
             }
