@@ -26,7 +26,12 @@ in
   nix-expr-tests = callPackage ../tests/unit/libexpr/package.nix { };
 
   nix-flake = callPackage ../src/libflake/package.nix { };
+<<<<<<< HEAD
   nix-flake-tests = callPackage ../tests/unit/libflake/package.nix { };
+=======
+  nix-flake-c = callPackage ../src/libflake-c/package.nix { };
+  nix-flake-tests = callPackage ../src/libflake-tests/package.nix { };
+>>>>>>> 4eecf3c20 (Add nix-flake-c, nix_flake_init_global, nix_flake_settings_new)
 
   nix-main = callPackage ../src/libmain/package.nix { };
   nix-main-c = callPackage ../src/libmain-c/package.nix { };
