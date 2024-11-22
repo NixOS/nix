@@ -1229,7 +1229,7 @@ HookReply DerivationGoal::tryBuildHook()
     hook->toHook.writeSide.close();
 
     /* Create the log file and pipe. */
-    Path logFile = openLogFile();
+    [[maybe_unused]] Path logFile = openLogFile();
 
     std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());

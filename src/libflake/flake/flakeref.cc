@@ -257,8 +257,6 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 {
     using namespace fetchers;
 
-    std::smatch match;
-
     if (auto res = parseFlakeIdRef(fetchSettings, url, isFlake)) {
         return *res;
     } else if (auto res = parseURLFlakeRef(fetchSettings, url, baseDir, isFlake)) {
