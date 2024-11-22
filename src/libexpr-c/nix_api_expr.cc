@@ -21,6 +21,29 @@
 #  include "gc_cpp.h"
 #endif
 
+/**
+ * @brief Allocate and initialize using self-reference
+ *
+ * This allows a brace initializer to reference the object being constructed.
+ *
+ * @warning Use with care, as the pointer points to an object that is not fully constructed yet.
+ *
+ * @tparam T Type to allocate
+ * @tparam F A function type for `init`, taking a T* and returning the initializer for T
+ * @param init Function that takes a T* and returns the initializer for T
+ * @return Pointer to allocated and initialized object
+ */
+template <typename T, typename F>
+static T * unsafe_new_with_self(F && init)
+{
+    // Allocate
+    void * p = ::operator new(
+        sizeof(T),
+        static_cast<std::align_val_t>(alignof(T)));
+    // Initialize with placement new
+    return new (p) T(init(static_cast<T *>(p)));
+}
+
 nix_err nix_libexpr_init(nix_c_context * context)
 {
     if (context)
@@ -101,18 +124,14 @@ nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Sto
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        // Allocate ahead of time, because .settings needs self-reference
-        void * p = ::operator new(
-            sizeof(nix_eval_state_builder),
-            static_cast<std::align_val_t>(alignof(nix_eval_state_builder)));
-        auto * p2 = static_cast<nix_eval_state_builder *>(p);
-        new (p) nix_eval_state_builder{
-            .store = nix::ref<nix::Store>(store->ptr),
-            .settings = nix::EvalSettings{/* &bool */ p2->readOnlyMode},
-            .fetchSettings = nix::fetchers::Settings{},
-            .readOnlyMode = true,
-        };
-        return p2;
+        return unsafe_new_with_self<nix_eval_state_builder>([&](auto * self) {
+            return nix_eval_state_builder{
+                .store = nix::ref<nix::Store>(store->ptr),
+                .settings = nix::EvalSettings{/* &bool */ self->readOnlyMode},
+                .fetchSettings = nix::fetchers::Settings{},
+                .readOnlyMode = true,
+            };
+        });
     }
     NIXC_CATCH_ERRS_NULL
 }
@@ -154,21 +173,17 @@ EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        // Allocate ahead of time, because .state init needs self-reference
-        void * p = ::operator new(
-            sizeof(EvalState),
-            static_cast<std::align_val_t>(alignof(EvalState)));
-        auto * p2 = static_cast<EvalState *>(p);
-        new (p) EvalState {
-            .fetchSettings = std::move(builder->fetchSettings),
-            .settings = std::move(builder->settings),
-            .state = nix::EvalState(
-                builder->lookupPath,
-                builder->store,
-                p2->fetchSettings,
-                p2->settings),
-        };
-        return p2;
+        return unsafe_new_with_self<EvalState>([&](auto * self) {
+            return EvalState{
+                .fetchSettings = std::move(builder->fetchSettings),
+                .settings = std::move(builder->settings),
+                .state = nix::EvalState(
+                    builder->lookupPath,
+                    builder->store,
+                    self->fetchSettings,
+                    self->settings),
+            };
+        });
     }
     NIXC_CATCH_ERRS_NULL
 }
