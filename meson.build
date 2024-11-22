@@ -34,6 +34,7 @@ endif
 subproject('libutil-c')
 subproject('libstore-c')
 subproject('libexpr-c')
+subproject('libflake-c')
 subproject('libmain-c')
 
 # Language Bindings

@@ -22,6 +22,7 @@
   nix-expr-tests,
 
   nix-flake,
+  nix-flake-c,
   nix-flake-tests,
 
   nix-main,
@@ -40,6 +41,75 @@
   nix-perl-bindings,
 }:
 
+<<<<<<< HEAD
+=======
+let
+  dev = stdenv.mkDerivation (finalAttrs: {
+    name = "nix-${nix-cli.version}-dev";
+    pname = "nix";
+    version = nix-cli.version;
+    dontUnpack = true;
+    dontBuild = true;
+    libs = map lib.getDev [
+      nix-cmd
+      nix-expr
+      nix-expr-c
+      nix-fetchers
+      nix-flake
+      nix-flake-c
+      nix-main
+      nix-main-c
+      nix-store
+      nix-store-c
+      nix-util
+      nix-util-c
+      nix-perl-bindings
+    ];
+    installPhase = ''
+      mkdir -p $out/nix-support
+      echo $libs >> $out/nix-support/propagated-build-inputs
+    '';
+    passthru = {
+      tests = {
+        pkg-config =
+          testers.hasPkgConfigModules {
+            package = finalAttrs.finalPackage;
+          };
+      };
+
+      # If we were to fully emulate output selection here, we'd confuse the Nix CLIs,
+      # because they rely on `drvPath`.
+      dev = finalAttrs.finalPackage.out;
+
+      libs = throw "`nix.dev.libs` is not meant to be used; use `nix.libs` instead.";
+    };
+    meta = {
+      pkgConfigModules = [
+        "nix-cmd"
+        "nix-expr"
+        "nix-expr-c"
+        "nix-fetchers"
+        "nix-flake"
+        "nix-flake-c"
+        "nix-main"
+        "nix-main-c"
+        "nix-store"
+        "nix-store-c"
+        "nix-util"
+        "nix-util-c"
+      ];
+    };
+  });
+  devdoc = buildEnv {
+    name = "nix-${nix-cli.version}-devdoc";
+    paths = [
+      nix-internal-api-docs
+      nix-external-api-docs
+    ];
+  };
+
+in
+>>>>>>> 4eecf3c20 (Add nix-flake-c, nix_flake_init_global, nix_flake_settings_new)
 (buildEnv {
   name = "nix-${nix-cli.version}";
   paths = [
@@ -124,6 +194,7 @@
         nix-expr
         nix-expr-c
         nix-flake
+        nix-flake-c
         nix-main
         nix-main-c
       ;
