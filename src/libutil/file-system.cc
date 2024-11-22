@@ -5,6 +5,7 @@
 #include "signals.hh"
 #include "finally.hh"
 #include "serialise.hh"
+#include "util.hh"
 
 #include <atomic>
 #include <cerrno>
@@ -500,7 +501,7 @@ void deletePath(const fs::path & path, uint64_t & bytesFreed)
 
 AutoDelete::AutoDelete() : del{false} {}
 
-AutoDelete::AutoDelete(const fs::path & p, bool recursive) : _path(p)
+AutoDelete::AutoDelete(const std::filesystem::path & p, bool recursive) : _path(p)
 {
     del = true;
     this->recursive = recursive;
@@ -517,7 +518,7 @@ AutoDelete::~AutoDelete()
             }
         }
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 
@@ -629,7 +630,28 @@ void setWriteTime(
     time_t modificationTime,
     std::optional<bool> optIsSymlink)
 {
-#ifndef _WIN32
+#ifdef _WIN32
+    // FIXME use `fs::last_write_time`.
+    //
+    // Would be nice to use std::filesystem unconditionally, but
+    // doesn't support access time just modification time.
+    //
+    // System clock vs File clock issues also make that annoying.
+    warn("Changing file times is not yet implemented on Windows, path is '%s'", path);
+#elif HAVE_UTIMENSAT && HAVE_DECL_AT_SYMLINK_NOFOLLOW
+    struct timespec times[2] = {
+        {
+            .tv_sec = accessedTime,
+            .tv_nsec = 0,
+        },
+        {
+            .tv_sec = modificationTime,
+            .tv_nsec = 0,
+        },
+    };
+    if (utimensat(AT_FDCWD, path.c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
+        throw SysError("changing modification time of '%s' (using `utimensat`)", path);
+#else
     struct timeval times[2] = {
         {
             .tv_sec = accessedTime,
@@ -640,42 +662,21 @@ void setWriteTime(
             .tv_usec = 0,
         },
     };
-#endif
-
-    auto nonSymlink = [&]{
-        bool isSymlink = optIsSymlink
-            ? *optIsSymlink
-            : fs::is_symlink(path);
-
-        if (!isSymlink) {
-#ifdef _WIN32
-            // FIXME use `fs::last_write_time`.
-            //
-            // Would be nice to use std::filesystem unconditionally, but
-            // doesn't support access time just modification time.
-            //
-            // System clock vs File clock issues also make that annoying.
-            warn("Changing file times is not yet implemented on Windows, path is '%s'", path);
-#else
-            if (utimes(path.c_str(), times) == -1) {
-
-                throw SysError("changing modification time of '%s' (not a symlink)", path);
-            }
-#endif
-        } else {
-            throw Error("Cannot modification time of symlink '%s'", path);
-        }
-    };
-
 #if HAVE_LUTIMES
-    if (lutimes(path.c_str(), times) == -1) {
-        if (errno == ENOSYS)
-            nonSymlink();
-        else
-            throw SysError("changing modification time of '%s'", path);
-    }
+    if (lutimes(path.c_str(), times) == -1)
+        throw SysError("changing modification time of '%s'", path);
 #else
-    nonSymlink();
+    bool isSymlink = optIsSymlink
+        ? *optIsSymlink
+        : fs::is_symlink(path);
+
+    if (!isSymlink) {
+        if (utimes(path.c_str(), times) == -1)
+            throw SysError("changing modification time of '%s' (not a symlink)", path);
+    } else {
+        throw Error("Cannot modification time of symlink '%s'", path);
+    }
+#endif
 #endif
 }
 

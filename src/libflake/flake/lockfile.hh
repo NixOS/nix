@@ -76,8 +76,8 @@ struct LockFile
     std::pair<std::string, KeyMap> to_string() const;
 
     /**
-     * Check whether this lock file has any unlocked inputs. If so,
-     * return one.
+     * Check whether this lock file has any unlocked or non-final
+     * inputs. If so, return one.
      */
     std::optional<FlakeRef> isUnlocked() const;
 

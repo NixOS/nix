@@ -96,6 +96,10 @@ struct Expr
     virtual void setName(Symbol name);
     virtual void setDocComment(DocComment docComment) { };
     virtual PosIdx getPos() const { return noPos; }
+
+    // These are temporary methods to be used only in parser.y
+    virtual void resetCursedOr() { };
+    virtual void warnIfCursedOr(const SymbolTable & symbols, const PosTable & positions) { };
 };
 
 #define COMMON_METHODS \
@@ -202,7 +206,7 @@ struct ExprSelect : Expr
     /**
      * Evaluate the `a.b.c` part of `a.b.c.d`. This exists mostly for the purpose of :doc in the repl.
      *
-     * @param[out] v The attribute set that should contain the last attribute name (if it exists).
+     * @param[out] attrs The attribute set that should contain the last attribute name (if it exists).
      * @return The last attribute name in `attrPath`
      *
      * @note This does *not* evaluate the final attribute, and does not fail if that's the only attribute that does not exist.
@@ -354,10 +358,16 @@ struct ExprCall : Expr
     Expr * fun;
     std::vector<Expr *> args;
     PosIdx pos;
+    std::optional<PosIdx> cursedOrEndPos; // used during parsing to warn about https://github.com/NixOS/nix/issues/11118
     ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args)
-        : fun(fun), args(args), pos(pos)
+        : fun(fun), args(args), pos(pos), cursedOrEndPos({})
+    { }
+    ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args, PosIdx && cursedOrEndPos)
+        : fun(fun), args(args), pos(pos), cursedOrEndPos(cursedOrEndPos)
     { }
     PosIdx getPos() const override { return pos; }
+    virtual void resetCursedOr() override;
+    virtual void warnIfCursedOr(const SymbolTable & symbols, const PosTable & positions) override;
     COMMON_METHODS
 };
 
@@ -458,6 +468,7 @@ struct ExprBlackHole : Expr
     void show(const SymbolTable & symbols, std::ostream & str) const override {}
     void eval(EvalState & state, Env & env, Value & v) override;
     void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override {}
+    [[noreturn]] static void throwInfiniteRecursionError(EvalState & state, Value & v);
 };
 
 extern ExprBlackHole eBlackHole;

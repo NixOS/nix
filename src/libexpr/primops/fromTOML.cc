@@ -66,7 +66,7 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, V
                         attrs.alloc("_type").mkString("timestamp");
                         std::ostringstream s;
                         s << t;
-                        attrs.alloc("value").mkString(s.str());
+                        attrs.alloc("value").mkString(toView(s));
                         v.mkAttrs(attrs);
                     } else {
                         throw std::runtime_error("Dates and times are not supported");

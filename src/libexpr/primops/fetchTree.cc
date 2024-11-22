@@ -11,6 +11,8 @@
 #include "value-to-json.hh"
 #include "fetch-to-store.hh"
 
+#include <nlohmann/json.hpp>
+
 #include <ctime>
 #include <iomanip>
 #include <regex>
@@ -75,6 +77,7 @@ struct FetchTreeParams {
     bool emptyRevFallback = false;
     bool allowNameArgument = false;
     bool isFetchGit = false;
+    bool isFinal = false;
 };
 
 static void fetchTree(
@@ -192,6 +195,13 @@ static void fetchTree(
 
     state.checkURI(input.toURLString());
 
+    if (params.isFinal) {
+        input.attrs.insert_or_assign("__final", Explicit<bool>(true));
+    } else {
+        if (input.isFinal())
+            throw Error("input '%s' is not allowed to use the '__final' attribute", input.to_string());
+    }
+
     auto [storePath, input2] = input.fetchToStore(state.store);
 
     state.allowPath(storePath);
@@ -245,7 +255,7 @@ static RegisterPrimOp primop_fetchTree({
       The following source types and associated input attributes are supported.
 
       <!-- TODO: It would be soooo much more predictable to work with (and
-      document) if `fetchTree` was a curried call with the first paramter for
+      document) if `fetchTree` was a curried call with the first parameter for
       `type` or an attribute like `builtins.fetchTree.git`! -->
 
       - `"file"`
@@ -426,6 +436,18 @@ static RegisterPrimOp primop_fetchTree({
     )",
     .fun = prim_fetchTree,
     .experimentalFeature = Xp::FetchTree,
+});
+
+void prim_fetchFinalTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    fetchTree(state, pos, args, v, {.isFinal = true});
+}
+
+static RegisterPrimOp primop_fetchFinalTree({
+    .name = "fetchFinalTree",
+    .args = {"input"},
+    .fun = prim_fetchFinalTree,
+    .internal = true,
 });
 
 static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,

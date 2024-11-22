@@ -460,7 +460,7 @@ private:
 
                 std::ostringstream s;
                 s << state.positions[v.payload.lambda.fun->pos];
-                output << " @ " << filterANSIEscapes(s.str());
+                output << " @ " << filterANSIEscapes(toView(s));
             }
         } else if (v.isPrimOp()) {
             if (v.primOp())

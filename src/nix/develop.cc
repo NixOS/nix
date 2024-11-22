@@ -610,6 +610,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         else if (!command.empty()) {
             std::vector<std::string> args;
+            args.reserve(command.size());
             for (auto s : command)
                 args.push_back(shellEscape(s));
             script += fmt("exec %s\n", concatStringsSep(" ", args));
@@ -672,7 +673,7 @@ struct CmdDevelop : Common, MixEnvironment
                 throw Error("package 'nixpkgs#bashInteractive' does not provide a 'bin/bash'");
 
         } catch (Error &) {
-            ignoreException();
+            ignoreExceptionExceptInterrupt();
         }
 
         // Override SHELL with the one chosen for this environment.

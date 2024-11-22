@@ -205,6 +205,31 @@ static git_packbuilder_progress PACKBUILDER_PROGRESS_CHECK_INTERRUPT = &packBuil
 
 } // extern "C"
 
+static void initRepoAtomically(std::filesystem::path &path, bool bare) {
+    if (pathExists(path.string())) return;
+
+    Path tmpDir = createTempDir(os_string_to_string(PathViewNG { std::filesystem::path(path).parent_path() }));
+    AutoDelete delTmpDir(tmpDir, true);
+    Repository tmpRepo;
+
+    if (git_repository_init(Setter(tmpRepo), tmpDir.c_str(), bare))
+        throw Error("creating Git repository %s: %s", path, git_error_last()->message);
+    try {
+        std::filesystem::rename(tmpDir, path);
+    } catch (std::filesystem::filesystem_error & e) {
+        // Someone may race us to create the repository.
+        if (e.code() == std::errc::file_exists
+            // `path` may be attempted to be deleted by s::f::rename, in which case the code is:
+            || e.code() == std::errc::directory_not_empty) {
+            return;
+        }
+        else
+            throw SysError("moving temporary git repository from %s to %s", tmpDir, path);
+    }
+    // we successfully moved the repository, so the temporary directory no longer exists.
+    delTmpDir.cancel();
+}
+
 struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
     /** Location of the repository on disk. */
@@ -226,13 +251,9 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         initLibGit2();
 
-        if (pathExists(path.string())) {
-            if (git_repository_open(Setter(repo), path.string().c_str()))
-                throw Error("opening Git repository '%s': %s", path, git_error_last()->message);
-        } else {
-            if (git_repository_init(Setter(repo), path.string().c_str(), bare))
-                throw Error("creating Git repository '%s': %s", path, git_error_last()->message);
-        }
+        initRepoAtomically(path, bare);
+        if (git_repository_open(Setter(repo), path.string().c_str()))
+            throw Error("opening Git repository %s: %s", path, git_error_last()->message);
 
         ObjectDb odb;
         if (git_repository_odb(Setter(odb), repo.get()))
@@ -583,7 +604,13 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         std::string re = R"(Good "git" signature for \* with .* key SHA256:[)";
         for (const fetchers::PublicKey & k : publicKeys){
             // Calculate sha256 fingerprint from public key and escape the regex symbol '+' to match the key literally
-            auto fingerprint = trim(hashString(HashAlgorithm::SHA256, base64Decode(k.key)).to_string(nix::HashFormat::Base64, false), "=");
+            std::string keyDecoded;
+            try {
+                keyDecoded = base64Decode(k.key);
+            } catch (Error & e) {
+                e.addTrace({}, "while decoding public key '%s' used for git signature", k.key);
+            }
+            auto fingerprint = trim(hashString(HashAlgorithm::SHA256, keyDecoded).to_string(nix::HashFormat::Base64, false), "=");
             auto escaped_fingerprint = std::regex_replace(fingerprint, std::regex("\\+"), "\\+" );
             re += "(" + escaped_fingerprint + ")";
         }
@@ -954,8 +981,24 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
     void pushBuilder(std::string name)
     {
+        const git_tree_entry * entry;
+        Tree prevTree = nullptr;
+
+        if (!pendingDirs.empty() &&
+            (entry = git_treebuilder_get(pendingDirs.back().builder.get(), name.c_str())))
+        {
+            /* Clone a tree that we've already finished. This happens
+               if a tarball has directory entries that are not
+               contiguous. */
+            if (git_tree_entry_type(entry) != GIT_OBJECT_TREE)
+                throw Error("parent of '%s' is not a directory", name);
+
+            if (git_tree_entry_to_object((git_object * *) (git_tree * *) Setter(prevTree), *repo, entry))
+                throw Error("looking up parent of '%s': %s", name, git_error_last()->message);
+        }
+
         git_treebuilder * b;
-        if (git_treebuilder_new(&b, *repo, nullptr))
+        if (git_treebuilder_new(&b, *repo, prevTree.get()))
             throw Error("creating a tree builder: %s", git_error_last()->message);
         pendingDirs.push_back({ .name = std::move(name), .builder = TreeBuilder(b) });
     };

@@ -40,6 +40,13 @@ namespace nix {
  * Miscellaneous
  *************************************************************/
 
+static inline Value * mkString(EvalState & state, const std::csub_match & match)
+{
+    Value * v = state.allocValue();
+    v->mkString({match.first, match.second});
+    return v;
+}
+
 StringMap EvalState::realiseContext(const NixStringContext & context, StorePathSet * maybePathsOut, bool isIFD)
 {
     std::vector<DerivedPath::Built> drvs;
@@ -84,6 +91,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
 
     /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
+    buildReqs.reserve(drvs.size());
     for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
     buildStore->buildPaths(buildReqs, bmNormal, store);
 
@@ -171,6 +179,78 @@ static void mkOutputString(
         o.second.path(*state.store, Derivation::nameFromPath(drvPath), o.first));
 }
 
+/**
+ * `import` will parse a derivation when it imports a `.drv` file from the store.
+ *
+ * @param state The evaluation state.
+ * @param pos The position of the `import` call.
+ * @param path The path to the `.drv` to import.
+ * @param storePath The path to the `.drv` to import.
+ * @param v Return value
+ */
+void derivationToValue(EvalState & state, const PosIdx pos, const SourcePath & path, const StorePath & storePath, Value & v) {
+    auto path2 = path.path.abs();
+    Derivation drv = state.store->readDerivation(storePath);
+    auto attrs = state.buildBindings(3 + drv.outputs.size());
+    attrs.alloc(state.sDrvPath).mkString(path2, {
+        NixStringContextElem::DrvDeep { .drvPath = storePath },
+    });
+    attrs.alloc(state.sName).mkString(drv.env["name"]);
+
+    auto list = state.buildList(drv.outputs.size());
+    for (const auto & [i, o] : enumerate(drv.outputs)) {
+        mkOutputString(state, attrs, storePath, o);
+        (list[i] = state.allocValue())->mkString(o.first);
+    }
+    attrs.alloc(state.sOutputs).mkList(list);
+
+    auto w = state.allocValue();
+    w->mkAttrs(attrs);
+
+    if (!state.vImportedDrvToDerivation) {
+        state.vImportedDrvToDerivation = allocRootValue(state.allocValue());
+        state.eval(state.parseExprFromString(
+            #include "imported-drv-to-derivation.nix.gen.hh"
+            , state.rootPath(CanonPath::root)), **state.vImportedDrvToDerivation);
+    }
+
+    state.forceFunction(**state.vImportedDrvToDerivation, pos, "while evaluating imported-drv-to-derivation.nix.gen.hh");
+    v.mkApp(*state.vImportedDrvToDerivation, w);
+    state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix.gen.hh");
+}
+
+/**
+ * Import a Nix file with an alternate base scope, as `builtins.scopedImport` does.
+ *
+ * @param state The evaluation state.
+ * @param pos The position of the import call.
+ * @param path The path to the file to import.
+ * @param vScope The base scope to use for the import.
+ * @param v Return value
+ */
+static void scopedImport(EvalState & state, const PosIdx pos, SourcePath & path, Value * vScope, Value & v) {
+    state.forceAttrs(*vScope, pos, "while evaluating the first argument passed to builtins.scopedImport");
+
+    Env * env = &state.allocEnv(vScope->attrs()->size());
+    env->up = &state.baseEnv;
+
+    auto staticEnv = std::make_shared<StaticEnv>(nullptr, state.staticBaseEnv.get(), vScope->attrs()->size());
+
+    unsigned int displ = 0;
+    for (auto & attr : *vScope->attrs()) {
+        staticEnv->vars.emplace_back(attr.name, displ);
+        env->values[displ++] = attr.value;
+    }
+
+    // No need to call staticEnv.sort(), because
+    // args[0]->attrs is already sorted.
+
+    printTalkative("evaluating file '%1%'", path);
+    Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
+
+    e->eval(state, *env, v);
+}
+
 /* Load and evaluate an expression from path specified by the
    argument. */
 static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * vScope, Value & v)
@@ -189,60 +269,13 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
     };
 
     if (auto storePath = isValidDerivationInStore()) {
-        Derivation drv = state.store->readDerivation(*storePath);
-        auto attrs = state.buildBindings(3 + drv.outputs.size());
-        attrs.alloc(state.sDrvPath).mkString(path2, {
-            NixStringContextElem::DrvDeep { .drvPath = *storePath },
-        });
-        attrs.alloc(state.sName).mkString(drv.env["name"]);
-
-        auto list = state.buildList(drv.outputs.size());
-        for (const auto & [i, o] : enumerate(drv.outputs)) {
-            mkOutputString(state, attrs, *storePath, o);
-            (list[i] = state.allocValue())->mkString(o.first);
-        }
-        attrs.alloc(state.sOutputs).mkList(list);
-
-        auto w = state.allocValue();
-        w->mkAttrs(attrs);
-
-        if (!state.vImportedDrvToDerivation) {
-            state.vImportedDrvToDerivation = allocRootValue(state.allocValue());
-            state.eval(state.parseExprFromString(
-                #include "imported-drv-to-derivation.nix.gen.hh"
-                , state.rootPath(CanonPath::root)), **state.vImportedDrvToDerivation);
-        }
-
-        state.forceFunction(**state.vImportedDrvToDerivation, pos, "while evaluating imported-drv-to-derivation.nix.gen.hh");
-        v.mkApp(*state.vImportedDrvToDerivation, w);
-        state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix.gen.hh");
+        derivationToValue(state, pos, path, *storePath, v);
     }
-
+    else if (vScope) {
+        scopedImport(state, pos, path, vScope, v);
+    }
     else {
-        if (!vScope)
-            state.evalFile(path, v);
-        else {
-            state.forceAttrs(*vScope, pos, "while evaluating the first argument passed to builtins.scopedImport");
-
-            Env * env = &state.allocEnv(vScope->attrs()->size());
-            env->up = &state.baseEnv;
-
-            auto staticEnv = std::make_shared<StaticEnv>(nullptr, state.staticBaseEnv.get(), vScope->attrs()->size());
-
-            unsigned int displ = 0;
-            for (auto & attr : *vScope->attrs()) {
-                staticEnv->vars.emplace_back(attr.name, displ);
-                env->values[displ++] = attr.value;
-            }
-
-            // No need to call staticEnv.sort(), because
-            // args[0]->attrs is already sorted.
-
-            printTalkative("evaluating file '%1%'", path);
-            Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
-
-            e->eval(state, *env, v);
-        }
+        state.evalFile(path, v);
     }
 }
 
@@ -691,7 +724,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value * * a
 
         /* Call the `operator' function with `e' as argument. */
         Value newElements;
-        state.callFunction(*op->value, 1, &e, newElements, noPos);
+        state.callFunction(*op->value, {&e, 1}, newElements, noPos);
         state.forceList(newElements, noPos, "while evaluating the return value of the `operator` passed to builtins.genericClosure");
 
         /* Add the values returned by the operator to the work set. */
@@ -937,6 +970,9 @@ static RegisterPrimOp primop_tryEval({
       `let e = { x = throw ""; }; in
       (builtins.tryEval (builtins.deepSeq e e)).success` will be
       `false`.
+
+      `tryEval` intentionally does not return the error message, because that risks bringing non-determinism into the evaluation result, and it would become very difficult to improve error reporting without breaking existing expressions.
+      Instead, use [`builtins.addErrorContext`](@docroot@/language/builtins.md#builtins-addErrorContext) to add context to the error message, and use a Nix unit testing tool for testing.
     )",
     .fun = prim_tryEval,
 });
@@ -1567,7 +1603,8 @@ static RegisterPrimOp primop_placeholder({
  *************************************************************/
 
 
-/* Convert the argument to a path.  !!! obsolete? */
+/* Convert the argument to a path and then to a string (confusing,
+   eh?).  !!! obsolete? */
 static void prim_toPath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
@@ -2129,7 +2166,7 @@ static void prim_toXML(EvalState & state, const PosIdx pos, Value * * args, Valu
     std::ostringstream out;
     NixStringContext context;
     printValueAsXML(state, true, false, *args[0], out, context, pos);
-    v.mkString(out.str(), context);
+    v.mkString(toView(out), context);
 }
 
 static RegisterPrimOp primop_toXML({
@@ -2237,7 +2274,7 @@ static void prim_toJSON(EvalState & state, const PosIdx pos, Value * * args, Val
     std::ostringstream out;
     NixStringContext context;
     printValueAsJSON(state, true, *args[0], pos, out, context);
-    v.mkString(out.str(), context);
+    v.mkString(toView(out), context);
 }
 
 static RegisterPrimOp primop_toJSON({
@@ -2401,7 +2438,6 @@ static RegisterPrimOp primop_toFile({
 bool EvalState::callPathFilter(
     Value * filterFun,
     const SourcePath & path,
-    std::string_view pathArg,
     PosIdx pos)
 {
     auto st = path.lstat();
@@ -2409,12 +2445,12 @@ bool EvalState::callPathFilter(
     /* Call the filter function.  The first argument is the path, the
        second is a string indicating the type of the file. */
     Value arg1;
-    arg1.mkString(pathArg);
+    arg1.mkString(path.path.abs());
 
     // assert that type is not "unknown"
     Value * args []{&arg1, fileTypeToString(*this, st.type)};
     Value res;
-    callFunction(*filterFun, 2, args, res, pos);
+    callFunction(*filterFun, args, res, pos);
 
     return forceBool(res, pos, "while evaluating the return value of the path filter function");
 }
@@ -2452,7 +2488,7 @@ static void addPath(
         if (filterFun)
             filter = std::make_unique<PathFilter>([&](const Path & p) {
                 auto p2 = CanonPath(p);
-                return state.callPathFilter(filterFun, {path.accessor, p2}, p2.abs(), pos);
+                return state.callPathFilter(filterFun, {path.accessor, p2}, pos);
             });
 
         std::optional<StorePath> expectedStorePath;
@@ -2578,13 +2614,13 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), HashAlgorithm::SHA256);
         else
             state.error<EvalError>(
-                "unsupported argument '%1%' to 'addPath'",
+                "unsupported argument '%1%' to 'builtins.path'",
                 state.symbols[attr.name]
             ).atPos(attr.pos).debugThrow();
     }
     if (!path)
         state.error<EvalError>(
-            "missing required 'path' attribute in the first argument to builtins.path"
+            "missing required 'path' attribute in the first argument to 'builtins.path'"
         ).atPos(pos).debugThrow();
     if (name.empty())
         name = path->baseName();
@@ -3451,7 +3487,7 @@ static void prim_foldlStrict(EvalState & state, const PosIdx pos, Value * * args
         for (auto [n, elem] : enumerate(args[2]->listItems())) {
             Value * vs []{vCur, elem};
             vCur = n == args[2]->listSize() - 1 ? &v : state.allocValue();
-            state.callFunction(*args[0], 2, vs, *vCur, pos);
+            state.callFunction(*args[0], vs, *vCur, pos);
         }
         state.forceValue(v, pos);
     } else {
@@ -3601,7 +3637,7 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
 
         Value * vs[] = {a, b};
         Value vBool;
-        state.callFunction(*args[0], 2, vs, vBool, noPos);
+        state.callFunction(*args[0], vs, vBool, noPos);
         return state.forceBool(vBool, pos, "while evaluating the return value of the sorting function passed to builtins.sort");
     };
 
@@ -4268,7 +4304,7 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
             if (!match[i + 1].matched)
                 v2 = &state.vNull;
             else
-                (v2 = state.allocValue())->mkString(match[i + 1].str());
+                v2 = mkString(state, match[i + 1]);
         v.mkList(list);
 
     } catch (std::regex_error & e) {
@@ -4352,7 +4388,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
             auto match = *i;
 
             // Add a string for non-matched characters.
-            (list[idx++] = state.allocValue())->mkString(match.prefix().str());
+            list[idx++] = mkString(state, match.prefix());
 
             // Add a list for matched substrings.
             const size_t slen = match.size() - 1;
@@ -4363,14 +4399,14 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
                 if (!match[si + 1].matched)
                     v2 = &state.vNull;
                 else
-                    (v2 = state.allocValue())->mkString(match[si + 1].str());
+                    v2 = mkString(state, match[si + 1]);
             }
 
             (list[idx++] = state.allocValue())->mkList(list2);
 
             // Add a string for non-matched suffix characters.
             if (idx == 2 * len)
-                (list[idx++] = state.allocValue())->mkString(match.suffix().str());
+                list[idx++] = mkString(state, match.suffix());
         }
 
         assert(idx == 2 * len + 1);
@@ -4901,7 +4937,7 @@ void EvalState::createBaseEnv()
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
-    baseEnv.values[0]->payload.attrs->sort();
+    getBuiltins().payload.attrs->sort();
 
     staticBaseEnv->sort();
 

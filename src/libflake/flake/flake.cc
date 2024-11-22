@@ -13,6 +13,8 @@
 #include "value-to-json.hh"
 #include "local-fs-store.hh"
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
 using namespace flake;
@@ -82,7 +84,6 @@ static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos
     if (value.isThunk() && value.isTrivial())
         state.forceValue(value, pos);
 }
-
 
 static void expectType(EvalState & state, ValueType type,
     Value & value, const PosIdx pos)
@@ -892,12 +893,14 @@ void callFlake(EvalState & state,
     auto vCallFlake = state.allocValue();
     state.evalFile(state.callFlakeInternal, *vCallFlake);
 
-    auto vTmp1 = state.allocValue();
     auto vLocks = state.allocValue();
     vLocks->mkString(lockFileStr);
-    state.callFunction(*vCallFlake, *vLocks, *vTmp1, noPos);
 
-    state.callFunction(*vTmp1, vOverrides, vRes, noPos);
+    auto vFetchFinalTree = get(state.internalPrimOps, "fetchFinalTree");
+    assert(vFetchFinalTree);
+
+    Value * args[] = {vLocks, &vOverrides, *vFetchFinalTree};
+    state.callFunction(*vCallFlake, args, vRes, noPos);
 }
 
 void initLib(const Settings & settings)

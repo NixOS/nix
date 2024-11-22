@@ -53,15 +53,6 @@ static char * allocString(size_t size)
 }
 
 
-static char * dupString(const char * s)
-{
-    char * t;
-    t = GC_STRDUP(s);
-    if (!t) throw std::bad_alloc();
-    return t;
-}
-
-
 // When there's no need to write to the string, we can optimize away empty
 // string allocations.
 // This function handles makeImmutableString(std::string_view()) by returning
@@ -457,7 +448,7 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
         /* Install value the base environment. */
         staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
-        baseEnv.values[0]->payload.attrs->push_back(Attr(symbols.create(name2), v));
+        getBuiltins().payload.attrs->push_back(Attr(symbols.create(name2), v));
     }
 }
 
@@ -519,16 +510,32 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
 
     Value * v = allocValue();
     v->mkPrimOp(new PrimOp(primOp));
-    staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
-    baseEnv.values[baseEnvDispl++] = v;
-    baseEnv.values[0]->payload.attrs->push_back(Attr(symbols.create(primOp.name), v));
+
+    if (primOp.internal)
+        internalPrimOps.emplace(primOp.name, v);
+    else {
+        staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
+        baseEnv.values[baseEnvDispl++] = v;
+        getBuiltins().payload.attrs->push_back(Attr(symbols.create(primOp.name), v));
+    }
+
     return v;
+}
+
+
+Value & EvalState::getBuiltins()
+{
+    return *baseEnv.values[0];
 }
 
 
 Value & EvalState::getBuiltin(const std::string & name)
 {
-    return *baseEnv.values[0]->attrs()->find(symbols.create(name))->value;
+    auto it = getBuiltins().attrs()->get(symbols.create(name));
+    if (it)
+        return *it->value;
+    else
+        error<EvalError>("builtin '%1%' not found", name).debugThrow();
 }
 
 
@@ -548,7 +555,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     if (v.isLambda()) {
         auto exprLambda = v.payload.lambda.fun;
 
-        std::stringstream s(std::ios_base::out);
+        std::ostringstream s;
         std::string name;
         auto pos = positions[exprLambda->getPos()];
         std::string docStr;
@@ -580,30 +587,25 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 
         s << docStr;
 
-        s << '\0'; // for making a c string below
-        std::string ss = s.str();
-
         return Doc {
             .pos = pos,
             .name = name,
             .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
             .args = {},
-            .doc =
-                // FIXME: this leaks; make the field std::string?
-                strdup(ss.data()),
+            .doc = makeImmutableString(toView(s)), // NOTE: memory leak when compiled without GC
         };
     }
     if (isFunctor(v)) {
         try {
             Value & functor = *v.attrs()->find(sFunctor)->value;
-            Value * vp = &v;
+            Value * vp[] = {&v};
             Value partiallyApplied;
             // The first paramater is not user-provided, and may be
             // handled by code that is opaque to the user, like lib.const = x: y: y;
             // So preferably we show docs that are relevant to the
             // "partially applied" function returned by e.g. `const`.
             // We apply the first argument:
-            callFunction(functor, 1, &vp, partiallyApplied, noPos);
+            callFunction(functor, vp, partiallyApplied, noPos);
             auto _level = addCallDepth(noPos);
             return getDoc(partiallyApplied);
         }
@@ -832,9 +834,10 @@ static const char * * encodeContext(const NixStringContext & context)
         size_t n = 0;
         auto ctx = (const char * *)
             allocBytes((context.size() + 1) * sizeof(char *));
-        for (auto & i : context)
-            ctx[n++] = dupString(i.to_string().c_str());
-        ctx[n] = 0;
+        for (auto & i : context) {
+            ctx[n++] = makeImmutableString({i.to_string()});
+        }
+        ctx[n] = nullptr;
         return ctx;
     } else
         return nullptr;
@@ -1467,7 +1470,7 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
     v.mkLambda(&env, this);
 }
 
-void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos)
+void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes, const PosIdx pos)
 {
     auto _level = addCallDepth(pos);
 
@@ -1482,16 +1485,16 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
     auto makeAppChain = [&]()
     {
         vRes = vCur;
-        for (size_t i = 0; i < nrArgs; ++i) {
+        for (auto arg : args) {
             auto fun2 = allocValue();
             *fun2 = vRes;
-            vRes.mkPrimOpApp(fun2, args[i]);
+            vRes.mkPrimOpApp(fun2, arg);
         }
     };
 
     const Attr * functor;
 
-    while (nrArgs > 0) {
+    while (args.size() > 0) {
 
         if (vCur.isLambda()) {
 
@@ -1594,15 +1597,14 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 throw;
             }
 
-            nrArgs--;
-            args += 1;
+            args = args.subspan(1);
         }
 
         else if (vCur.isPrimOp()) {
 
             size_t argsLeft = vCur.primOp()->arity;
 
-            if (nrArgs < argsLeft) {
+            if (args.size() < argsLeft) {
                 /* We don't have enough arguments, so create a tPrimOpApp chain. */
                 makeAppChain();
                 return;
@@ -1614,15 +1616,14 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 if (countCalls) primOpCalls[fn->name]++;
 
                 try {
-                    fn->fun(*this, vCur.determinePos(noPos), args, vCur);
+                    fn->fun(*this, vCur.determinePos(noPos), args.data(), vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
-                nrArgs -= argsLeft;
-                args += argsLeft;
+                args = args.subspan(argsLeft);
             }
         }
 
@@ -1638,7 +1639,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             auto arity = primOp->primOp()->arity;
             auto argsLeft = arity - argsDone;
 
-            if (nrArgs < argsLeft) {
+            if (args.size() < argsLeft) {
                 /* We still don't have enough arguments, so extend the tPrimOpApp chain. */
                 makeAppChain();
                 return;
@@ -1670,8 +1671,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     throw;
                 }
 
-                nrArgs -= argsLeft;
-                args += argsLeft;
+                args = args.subspan(argsLeft);
             }
         }
 
@@ -1682,13 +1682,12 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             Value * args2[] = {allocValue(), args[0]};
             *args2[0] = vCur;
             try {
-                callFunction(*functor->value, 2, args2, vCur, functor->pos);
+                callFunction(*functor->value, args2, vCur, functor->pos);
             } catch (Error & e) {
                 e.addTrace(positions[pos], "while calling a functor (an attribute set with a '__functor' attribute)");
                 throw;
             }
-            nrArgs--;
-            args++;
+            args = args.subspan(1);
         }
 
         else
@@ -1731,7 +1730,7 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
     for (size_t i = 0; i < args.size(); ++i)
         vArgs[i] = args[i]->maybeThunk(state, env);
 
-    state.callFunction(vFun, args.size(), vArgs.data(), v, pos);
+    state.callFunction(vFun, vArgs, v, pos);
 }
 
 
@@ -1743,7 +1742,7 @@ void EvalState::incrFunctionCall(ExprLambda * fun)
 }
 
 
-void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
+void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res)
 {
     auto pos = fun.determinePos(noPos);
 
@@ -1813,11 +1812,9 @@ void ExprIf::eval(EvalState & state, Env & env, Value & v)
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
     if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
-        auto exprStr = ({
-            std::ostringstream out;
-            cond->show(state.symbols, out);
-            out.str();
-        });
+        std::ostringstream out;
+        cond->show(state.symbols, out);
+        auto exprStr = toView(out);
 
         if (auto eq = dynamic_cast<ExprOpEq *>(cond)) {
             try {
@@ -2055,9 +2052,12 @@ void ExprPos::eval(EvalState & state, Env & env, Value & v)
     state.mkPos(v, pos);
 }
 
-
-void ExprBlackHole::eval(EvalState & state, Env & env, Value & v)
+void ExprBlackHole::eval(EvalState & state, [[maybe_unused]] Env & env, Value & v)
 {
+    throwInfiniteRecursionError(state, v);
+}
+
+[[gnu::noinline]] [[noreturn]] void ExprBlackHole::throwInfiniteRecursionError(EvalState & state, Value &v) {
     state.error<InfiniteRecursionError>("infinite recursion encountered")
         .atPos(v.determinePos(noPos))
         .debugThrow();
@@ -2849,7 +2849,9 @@ void EvalState::printStatistics()
 #endif
 #if HAVE_BOEHMGC
         {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
+#ifndef _WIN32 // TODO implement
         {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
+#endif
 #endif
     };
     topObj["envs"] = {
@@ -3036,8 +3038,8 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
         if (!rOpt) continue;
         auto r = *rOpt;
 
-        Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
-        if (pathExists(res)) return rootPath(CanonPath(canonPath(res)));
+        auto res = (r / CanonPath(suffix)).resolveSymlinks();
+        if (res.pathExists()) return res;
     }
 
     if (hasPrefix(path, "nix/"))
@@ -3052,13 +3054,13 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
 }
 
 
-std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Path & value0, bool initAccessControl)
+std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Path & value0, bool initAccessControl)
 {
     auto & value = value0.s;
     auto i = lookupPathResolved.find(value);
     if (i != lookupPathResolved.end()) return i->second;
 
-    auto finish = [&](std::string res) {
+    auto finish = [&](SourcePath res) {
         debug("resolved search path element '%s' to '%s'", value, res);
         lookupPathResolved.emplace(value, res);
         return res;
@@ -3071,7 +3073,7 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
                 fetchSettings,
                 EvalSettings::resolvePseudoUrl(value));
             auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
-            return finish(store->toRealPath(storePath));
+            return finish(rootPath(store->toRealPath(storePath)));
         } catch (Error & e) {
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
@@ -3083,29 +3085,29 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
         auto scheme = value.substr(0, colPos);
         auto rest = value.substr(colPos + 1);
         if (auto * hook = get(settings.lookupPathHooks, scheme)) {
-            auto res = (*hook)(store, rest);
+            auto res = (*hook)(*this, rest);
             if (res)
                 return finish(std::move(*res));
         }
     }
 
     {
-        auto path = absPath(value);
+        auto path = rootPath(value);
 
         /* Allow access to paths in the search path. */
         if (initAccessControl) {
-            allowPath(path);
-            if (store->isInStore(path)) {
+            allowPath(path.path.abs());
+            if (store->isInStore(path.path.abs())) {
                 try {
                     StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(path).first, closure);
+                    store->computeFSClosure(store->toStorePath(path.path.abs()).first, closure);
                     for (auto & p : closure)
                         allowPath(p);
                 } catch (InvalidPath &) { }
             }
         }
 
-        if (pathExists(path))
+        if (path.pathExists())
             return finish(std::move(path));
         else {
             logWarning({
@@ -3116,7 +3118,6 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
 
     debug("failed to resolve search path element '%s'", value);
     return std::nullopt;
-
 }
 
 

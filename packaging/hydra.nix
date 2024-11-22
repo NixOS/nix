@@ -16,32 +16,23 @@ let
       inherit tarballs;
     };
 
-  testNixVersions = pkgs: client: daemon:
-    pkgs.nixComponents.callPackage ../package.nix {
+  testNixVersions = pkgs: daemon:
+    pkgs.nixComponents.nix-functional-tests.override {
       pname =
         "nix-tests"
         + lib.optionalString
           (lib.versionAtLeast daemon.version "2.4pre20211005" &&
-           lib.versionAtLeast client.version "2.4pre20211005")
-          "-${client.version}-against-${daemon.version}";
+           lib.versionAtLeast pkgs.nix.version "2.4pre20211005")
+          "-${pkgs.nix.version}-against-${daemon.version}";
 
-      test-client = client;
       test-daemon = daemon;
-
-      doBuild = false;
-
-      # This could be more accurate, but a shorter version will match the
-      # fine version with rev. This functionality is already covered in
-      # the normal test, so it's fine.
-      version = pkgs.nixComponents.version;
-      versionSuffix = pkgs.nixComponents.versionSuffix;
     };
 
   # Technically we could just return `pkgs.nixComponents`, but for Hydra it's
   # convention to transpose it, and to transpose it efficiently, we need to
   # enumerate them manually, so that we don't evaluate unnecessary package sets.
   forAllPackages = lib.genAttrs [
-    "nix"
+    "nix-everything"
     "nix-util"
     "nix-util-c"
     "nix-util-test-support"
@@ -63,7 +54,6 @@ let
     "nix-cmd"
     "nix-cli"
     "nix-functional-tests"
-    "nix-ng"
   ];
 in
 {
@@ -71,7 +61,9 @@ in
   build = forAllPackages (pkgName:
     forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.${pkgName}));
 
-  shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
+  shellInputs = removeAttrs
+    (forAllSystems (system: self.devShells.${system}.default.inputDerivation))
+    [ "i686-linux" ];
 
   buildStatic = forAllPackages (pkgName:
     lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.nixComponents.${pkgName}));
@@ -82,20 +74,28 @@ in
     (forAllCrossSystems (crossSystem:
       lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName}))));
 
-  buildNoGc = forAllSystems (system:
-    self.packages.${system}.nix.override { enableGC = false; }
-  );
+  buildNoGc = let
+    components = forAllSystems (system:
+      nixpkgsFor.${system}.native.nixComponents.overrideScope (self: super: {
+        nix-expr = super.nix-expr.override { enableGC = false; };
+      })
+    );
+  in forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
 
   buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-cli);
 
   # Toggles some settings for better coverage. Windows needs these
   # library combinations, and Debian build Nix with GNU readline too.
-  buildReadlineNoMarkdown = forAllSystems (system:
-    self.packages.${system}.nix.override {
-      enableMarkdown = false;
-      readlineFlavor = "readline";
-    }
-  );
+  buildReadlineNoMarkdown = let
+    components = forAllSystems (system:
+      nixpkgsFor.${system}.native.nixComponents.overrideScope (self: super: {
+        nix-cmd = super.nix-cmd.override {
+          enableMarkdown = false;
+          readlineFlavor = "readline";
+        };
+      })
+    );
+  in forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
 
   # Perl bindings for various platforms.
   perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-perl-bindings);
@@ -140,11 +140,14 @@ in
   # docker image with Nix inside
   dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
 
-  # Line coverage analysis.
-  coverage = nixpkgsFor.x86_64-linux.native.nix.override {
-    pname = "nix-coverage";
-    withCoverageChecks = true;
-  };
+  # # Line coverage analysis.
+  # coverage = nixpkgsFor.x86_64-linux.native.nix.override {
+  #   pname = "nix-coverage";
+  #   withCoverageChecks = true;
+  # };
+
+  # Nix's manual
+  manual = nixpkgsFor.x86_64-linux.native.nixComponents.nix-manual;
 
   # API docs for Nix's unstable internal C++ interfaces.
   internal-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-internal-api-docs;
@@ -178,7 +181,7 @@ in
         import (nixpkgs + "/lib/tests/test-with-nix.nix")
           {
             lib = nixpkgsFor.${system}.native.lib;
-            nix = self.packages.${system}.nix;
+            nix = self.packages.${system}.nix-cli;
             pkgs = nixpkgsFor.${system}.native;
           }
       );
@@ -193,15 +196,15 @@ in
     let pkgs = nixpkgsFor.${system}.native; in
     pkgs.runCommand "install-tests"
       {
-        againstSelf = testNixVersions pkgs pkgs.nix pkgs.pkgs.nix;
+        againstSelf = testNixVersions pkgs pkgs.nix;
         againstCurrentLatest =
           # FIXME: temporarily disable this on macOS because of #3605.
           if system == "x86_64-linux"
-          then testNixVersions pkgs pkgs.nix pkgs.nixVersions.latest
+          then testNixVersions pkgs pkgs.nixVersions.latest
           else null;
         # Disabled because the latest stable version doesn't handle
         # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
-        # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
+        # againstLatestStable = testNixVersions pkgs pkgs.nixStable;
       } "touch $out");
 
   installerTests = import ../tests/installer {

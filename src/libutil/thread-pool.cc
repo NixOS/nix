@@ -110,11 +110,15 @@ void ThreadPool::doWork(bool mainThread)
                            propagate it. */
                         try {
                             std::rethrow_exception(exc);
+                        } catch (const Interrupted &) {
+                            // The interrupted state may be picked up by multiple
+                            // workers, which is expected, so we should ignore
+                            // it silently and let the first one bubble up,
+                            // rethrown via the original state->exception.
+                        } catch (const ThreadPoolShutDown &) {
+                            // Similarly expected.
                         } catch (std::exception & e) {
-                            if (!dynamic_cast<Interrupted*>(&e) &&
-                                !dynamic_cast<ThreadPoolShutDown*>(&e))
-                                ignoreException();
-                        } catch (...) {
+                            ignoreExceptionExceptInterrupt();
                         }
                     }
                 }

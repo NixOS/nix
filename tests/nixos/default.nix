@@ -21,7 +21,8 @@ let
       defaults = {
         nixpkgs.pkgs = nixpkgsFor.${system}.native;
         nix.checkAllErrors = false;
-        nix.package = noTests nixpkgsFor.${system}.native.nix;
+        # TODO: decide which packaging stage to use. `nix-cli` is efficient, but not the same as the user-facing `everything.nix` package (`default`). Perhaps a good compromise is `everything.nix` + `noTests` defined above?
+        nix.package = nixpkgsFor.${system}.native.nixComponents.nix-cli;
       };
       _module.args.nixpkgs = nixpkgs;
       _module.args.system = system;
@@ -33,10 +34,9 @@ let
       forNix = nixVersion: runNixOSTestFor system {
         imports = [test];
         defaults.nixpkgs.overlays = [(curr: prev: {
-          # NOTE: noTests pkg might not have been built yet for some older versions of the package
-          #       and in versions before 2.25, the untested build wasn't shared with the tested build yet
-          #       Add noTests here when those versions become irrelevant.
-          nix = (builtins.getFlake "nix/${nixVersion}").packages.${system}.nix;
+          nix = let
+            packages = (builtins.getFlake "nix/${nixVersion}").packages.${system};
+          in packages.nix-cli or packages.nix;
         })];
       };
     };
@@ -124,6 +124,8 @@ in
 
   nix-copy = runNixOSTestFor "x86_64-linux" ./nix-copy.nix;
 
+  nix-docker = runNixOSTestFor "x86_64-linux" ./nix-docker.nix;
+
   nssPreload = runNixOSTestFor "x86_64-linux" ./nss-preload.nix;
 
   githubFlakes = runNixOSTestFor "x86_64-linux" ./github-flakes.nix;
@@ -159,4 +161,8 @@ in
   fsync = runNixOSTestFor "x86_64-linux" ./fsync.nix;
 
   cgroups = runNixOSTestFor "x86_64-linux" ./cgroups;
+
+  fetchurl = runNixOSTestFor "x86_64-linux" ./fetchurl.nix;
+
+  chrootStore = runNixOSTestFor "x86_64-linux" ./chroot-store.nix;
 }

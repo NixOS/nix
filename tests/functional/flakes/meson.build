@@ -23,6 +23,11 @@ suites += {
     'search-root.sh',
     'config.sh',
     'show.sh',
+    'dubious-query.sh',
+    'shebang.sh',
+    'commit-lock-file-summary.sh',
+    'non-flake-inputs.sh',
+    'relative-paths.sh',
   ],
-  'workdir': meson.current_build_dir(),
+  'workdir': meson.current_source_dir(),
 }
