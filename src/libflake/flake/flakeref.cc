@@ -78,7 +78,7 @@ static std::pair<FlakeRef, std::string> fromParsedURL(
     std::string fragment;
     std::swap(fragment, parsedURL.fragment);
 
-    return std::make_pair(FlakeRef(fetchers::Input::fromURL(fetchSettings, parsedURL, isFlake), dir), fragment);
+    return {FlakeRef(fetchers::Input::fromURL(fetchSettings, parsedURL, isFlake), dir), fragment};
 }
 
 std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
