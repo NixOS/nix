@@ -295,37 +295,45 @@ bool handleJSONLogMessage(nlohmann::json & json,
     const Activity & act, std::map<ActivityId, Activity> & activities,
     bool trusted)
 {
-    std::string action = json["action"];
+    try {
+        std::string action = json["action"];
 
-    if (action == "start") {
-        auto type = (ActivityType) json["type"];
-        if (trusted || type == actFileTransfer)
-            activities.emplace(std::piecewise_construct,
-                std::forward_as_tuple(json["id"]),
-                std::forward_as_tuple(*logger, (Verbosity) json["level"], type,
-                    json["text"], getFields(json["fields"]), act.id));
+        if (action == "start") {
+            auto type = (ActivityType) json["type"];
+            if (trusted || type == actFileTransfer)
+                activities.emplace(std::piecewise_construct,
+                    std::forward_as_tuple(json["id"]),
+                    std::forward_as_tuple(*logger, (Verbosity) json["level"], type,
+                        json["text"], getFields(json["fields"]), act.id));
+        }
+
+        else if (action == "stop")
+            activities.erase((ActivityId) json["id"]);
+
+        else if (action == "result") {
+            auto i = activities.find((ActivityId) json["id"]);
+            if (i != activities.end())
+                i->second.result((ResultType) json["type"], getFields(json["fields"]));
+        }
+
+        else if (action == "setPhase") {
+            std::string phase = json["phase"];
+            act.result(resSetPhase, phase);
+        }
+
+        else if (action == "msg") {
+            std::string msg = json["msg"];
+            logger->log((Verbosity) json["level"], msg);
+        }
+
+        return true;
+    } catch (nlohmann::json::exception &e) {
+        warn(
+            "warning: Unable to handle a JSON message from the builder: %s",
+            e.what()
+        );
+        return false;
     }
-
-    else if (action == "stop")
-        activities.erase((ActivityId) json["id"]);
-
-    else if (action == "result") {
-        auto i = activities.find((ActivityId) json["id"]);
-        if (i != activities.end())
-            i->second.result((ResultType) json["type"], getFields(json["fields"]));
-    }
-
-    else if (action == "setPhase") {
-        std::string phase = json["phase"];
-        act.result(resSetPhase, phase);
-    }
-
-    else if (action == "msg") {
-        std::string msg = json["msg"];
-        logger->log((Verbosity) json["level"], msg);
-    }
-
-    return true;
 }
 
 bool handleJSONLogMessage(const std::string & msg,
