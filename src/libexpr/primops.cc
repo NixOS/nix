@@ -4383,7 +4383,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 
         for (auto i = begin; i != end; ++i) {
             assert(idx <= 2 * len + 1 - 3);
-            auto match = *i;
+            const auto & match = *i;
 
             // Add a string for non-matched characters.
             list[idx++] = mkString(state, match.prefix());

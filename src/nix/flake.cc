@@ -94,7 +94,7 @@ public:
             .label="inputs",
             .optional=true,
             .handler={[&](std::vector<std::string> inputsToUpdate){
-                for (auto inputToUpdate : inputsToUpdate) {
+                for (const auto & inputToUpdate : inputsToUpdate) {
                     InputPath inputPath;
                     try {
                         inputPath = flake::parseInputPath(inputToUpdate);

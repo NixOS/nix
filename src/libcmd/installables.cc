@@ -858,7 +858,7 @@ std::vector<FlakeRef> RawInstallablesCommand::getFlakeRefsForCompletion()
     applyDefaultInstallables(rawInstallables);
     std::vector<FlakeRef> res;
     res.reserve(rawInstallables.size());
-    for (auto i : rawInstallables)
+    for (const auto & i : rawInstallables)
         res.push_back(parseFlakeRefWithFragment(
             fetchSettings,
             expandTilde(i),
