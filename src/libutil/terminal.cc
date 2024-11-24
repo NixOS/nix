@@ -26,7 +26,7 @@ bool isTTY()
 
 std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int width)
 {
-    std::string t, e;
+    std::string t;
     size_t w = 0;
     auto i = s.begin();
 
