@@ -23,7 +23,7 @@ in
 runCommand "nix-binary-tarball-${version}" env ''
   cp ${installerClosureInfo}/registration $TMPDIR/reginfo
   cp ${./create-darwin-volume.sh} $TMPDIR/create-darwin-volume.sh
-  substitute ${./install-nix-from-closure.sh} $TMPDIR/install \
+  substitute ${./install-nix-from-tarball.sh} $TMPDIR/install \
     --subst-var-by nix ${nix} \
     --subst-var-by cacert ${cacert}
 

@@ -496,7 +496,7 @@
             ''^scripts/create-darwin-volume\.sh$''
             ''^scripts/install-darwin-multi-user\.sh$''
             ''^scripts/install-multi-user\.sh$''
-            ''^scripts/install-nix-from-closure\.sh$''
+            ''^scripts/install-nix-from-tarball\.sh$''
             ''^scripts/install-systemd-multi-user\.sh$''
             ''^src/nix/get-env\.sh$''
             ''^tests/functional/ca/build-dry\.sh$''
