@@ -4,6 +4,7 @@
 
 , nix-store-test-support
 , nix-expr
+, nix-expr-c
 
 , rapidcheck
 
@@ -35,6 +36,7 @@ mkMesonLibrary (finalAttrs: {
   propagatedBuildInputs = [
     nix-store-test-support
     nix-expr
+    nix-expr-c
     rapidcheck
   ];
 

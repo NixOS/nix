@@ -3,6 +3,7 @@
 , mkMesonLibrary
 
 , nix-util
+, nix-util-c
 
 , rapidcheck
 
@@ -33,6 +34,7 @@ mkMesonLibrary (finalAttrs: {
 
   propagatedBuildInputs = [
     nix-util
+    nix-util-c
     rapidcheck
   ];
 

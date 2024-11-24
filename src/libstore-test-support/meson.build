@@ -22,6 +22,7 @@ deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-util-test-support'),
   dependency('nix-store'),
+  dependency('nix-store-c'),
 ]
 subdir('build-utils-meson/subprojects')
 
