@@ -38,7 +38,7 @@ void checkGTestWith(Testable && testable, MakeTestParams makeTestParams)
     } else {
         std::ostringstream ss;
         printResultMessage(result, ss);
-        FAIL() << ss.str() << std::endl;
+        throw std::runtime_error(ss.str());
     }
 }
 }
