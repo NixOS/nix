@@ -84,9 +84,10 @@ CanonPath SourceAccessor::resolveSymlinks(
         todo.pop_front();
         if (c == "" || c == ".")
             ;
-        else if (c == "..")
-            res.pop();
-        else {
+        else if (c == "..") {
+            if (!res.isRoot())
+                res.pop();
+        } else {
             res.push(c);
             if (mode == SymlinkResolution::Full || !todo.empty()) {
                 if (auto st = maybeLstat(res); st && st->type == SourceAccessor::tSymlink) {
