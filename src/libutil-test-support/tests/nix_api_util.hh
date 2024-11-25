@@ -26,14 +26,13 @@ protected:
 
     inline void assert_ctx_ok()
     {
-
         if (nix_err_code(ctx) == NIX_OK) {
             return;
         }
         unsigned int n;
         const char * p = nix_err_msg(nullptr, ctx, &n);
         std::string msg(p, n);
-        FAIL() << "nix_err_code(ctx) != NIX_OK, message: " << msg;
+        throw std::runtime_error(std::string("nix_err_code(ctx) != NIX_OK, message: ") + msg);
     }
 
     inline void assert_ctx_err()
@@ -41,7 +40,7 @@ protected:
         if (nix_err_code(ctx) != NIX_OK) {
             return;
         }
-        FAIL() << "Got NIX_OK, but expected an error!";
+        throw std::runtime_error("Got NIX_OK, but expected an error!");
     }
 };
 
