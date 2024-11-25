@@ -363,10 +363,10 @@ std::vector<AttrRule> parseGitAttrFile(const std::string & content)
         // These should effectively match the same files
         // https://github.com/libgit2/libgit2/issues/6946
         if (rule.pattern.starts_with("/**/")) {
-          rule.pattern = rule.pattern.substr(4);
+            rule.pattern = rule.pattern.substr(4);
         }
         while (rule.pattern.starts_with("**/")) {
-          rule.pattern = rule.pattern.substr(3);
+            rule.pattern = rule.pattern.substr(3);
         }
 
         git_strarray patterns = {0};
