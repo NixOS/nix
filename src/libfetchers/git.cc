@@ -664,6 +664,7 @@ struct GitInputScheme : InputScheme
                 attrs.insert_or_assign("rev", submoduleRev.gitRev());
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
                 attrs.insert_or_assign("submodules", Explicit<bool>{ true });
+                attrs.insert_or_assign("lfs", Explicit<bool>{ smudgeLfs });
                 attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
                 auto submoduleInput = fetchers::Input::fromAttrs(*input.settings, std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
