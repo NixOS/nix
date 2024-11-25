@@ -359,6 +359,15 @@ std::vector<AttrRule> parseGitAttrFile(const std::string & content)
 
         AttrRule rule;
         rule.pattern = line.substr(0, pattern_end);
+        // Workaround for libgit2 matching issues when the pattern starts with a recursive glob
+        // These should effectively match the same files
+        // https://github.com/libgit2/libgit2/issues/6946
+        if (rule.pattern.starts_with("/**/")) {
+          rule.pattern = rule.pattern.substr(4);
+        }
+        while (rule.pattern.starts_with("**/")) {
+          rule.pattern = rule.pattern.substr(3);
+        }
 
         git_strarray patterns = {0};
         const char * pattern_str = rule.pattern.c_str();
