@@ -3,6 +3,8 @@
   # ty @DavHau
   description = "fetchGit smudges LFS pointers if lfs=true";
   script = ''
+    from tempfile import TemporaryDirectory
+
     expected_max_size_lfs_pointer = 1024 # 1 KiB (values >= than this cannot be pointers, and test files are >= 1 MiB)
 
     # purge nix git cache to make sure we start with a clean slate
@@ -51,7 +53,6 @@
 
     # prove that it can be cloned with regular git first
     # (here we see the warning as stated above)
-    from tempfile import TemporaryDirectory
     with TemporaryDirectory() as tempdir:
       client.succeed(f"git clone -n {repo.remote} {tempdir} >&2")
       client.succeed(f"git -C {tempdir} lfs install >&2")
@@ -175,5 +176,27 @@
 
     assert int(file_size_default) < expected_max_size_lfs_pointer, \
       f"did not set lfs, yet lfs-enrolled file is {file_size_default}b (>{expected_max_size_lfs_pointer}b), probably bad default value"
+
+    # Use as flake input
+    ############################################################################
+    with TemporaryDirectory() as tempdir:
+      client.succeed(f"mkdir -p {tempdir}")
+      client.succeed(f"""
+        printf '{{
+          inputs = {{
+            foo = {{
+              url = "git+{repo.remote}?ref=main&rev={lfs_file_rev}&lfs=1";
+              flake = false;
+            }};
+          }};
+          outputs = {{ foo, self }}: {{ inherit (foo) outPath; }};
+        }}' >{tempdir}/flake.nix
+      """)
+      fetched_flake = client.succeed(f"""
+        nix eval {tempdir}#.outPath
+      """)
+
+    assert fetched_lfs == fetched_flake, \
+      f"fetching as flake input (store path {fetched_flake}) yielded a different result than using fetchGit (store path {fetched_lfs})"
   '';
 }
