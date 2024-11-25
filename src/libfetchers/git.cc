@@ -262,6 +262,8 @@ struct GitInputScheme : InputScheme
         if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
         if (getShallowAttr(input))
             url.query.insert_or_assign("shallow", "1");
+        if (getLfsAttr(input))
+            url.query.insert_or_assign("lfs", "1");
         if (getSubmodulesAttr(input))
             url.query.insert_or_assign("submodules", "1");
         if (maybeGetBoolAttr(input.attrs, "exportIgnore").value_or(false))
