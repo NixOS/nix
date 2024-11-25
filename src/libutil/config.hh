@@ -115,6 +115,8 @@ public:
      * Re-applies all previously attempted changes to unknown settings
      */
     void reapplyUnknownSettings();
+
+    virtual ~AbstractConfig() = default;
 };
 
 /**
