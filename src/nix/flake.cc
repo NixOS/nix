@@ -643,10 +643,11 @@ struct CmdFlakeCheck : FlakeCommand
                                             fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
                                             *attr2.value, attr2.pos);
                                         if (drvPath && attr_name == settings.thisSystem.get()) {
-                                            drvPaths.push_back(DerivedPath::Built {
+                                            auto path = DerivedPath::Built {
                                                 .drvPath = makeConstantStorePathRef(*drvPath),
                                                 .outputs = OutputsSpec::All { },
-                                            });
+                                            };
+                                            drvPaths.push_back(std::move(path));
                                         }
                                     }
                                 }
