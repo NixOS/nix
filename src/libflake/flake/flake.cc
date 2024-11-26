@@ -863,7 +863,7 @@ void initLib(const Settings & settings)
                             .atPos(*args[0])
                             .debugThrow();
                     if (!input.isFlake)
-                        state.error<EvalError>("'builtins.getFlake' does not permit attribute 'flake = false'; use 'builtins.fetchTree' instead")
+                        state.error<EvalError>("'builtins.getFlake' does not permit attribute 'flake = false'")
                             .atPos(*args[0])
                             .debugThrow();
 
