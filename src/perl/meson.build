@@ -65,7 +65,13 @@ yath = find_program('yath', required : false)
 
 # Required Libraries
 #-------------------------------------------------
-bzip2_dep = dependency('bzip2')
+bzip2_dep = dependency('bzip2', required: false)
+if not bzip2_dep.found()
+  bzip2_dep = cpp.find_library('bz2')
+  if not bzip2_dep.found()
+    error('No "bzip2" pkg-config or "bz2" library found')
+  endif
+endif
 curl_dep = dependency('libcurl')
 libsodium_dep = dependency('libsodium')
 
