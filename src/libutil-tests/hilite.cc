@@ -52,8 +52,7 @@ namespace nix {
             std::regex("pt"),
         };
         std::vector<std::smatch> matches;
-        for(auto regex : regexes)
-        {
+        for (const auto & regex : regexes) {
             for(auto it = std::sregex_iterator(str.begin(), str.end(), regex); it != std::sregex_iterator(); ++it) {
                 matches.push_back(*it);
             }

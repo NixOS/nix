@@ -79,7 +79,7 @@ struct CmdHashBase : Command
 
     void run() override
     {
-        for (auto path : paths) {
+        for (const auto & path : paths) {
             auto makeSink = [&]() -> std::unique_ptr<AbstractHashSink> {
                 if (modulus)
                     return std::make_unique<HashModuloSink>(hashAlgo, *modulus);
@@ -182,7 +182,7 @@ struct CmdToBase : Command
     void run() override
     {
         warn("The old format conversion sub commands of `nix hash` were deprecated in favor of `nix hash convert`.");
-        for (auto s : args)
+        for (const auto & s : args)
             logger->cout(Hash::parseAny(s, hashAlgo).to_string(hashFormat, hashFormat == HashFormat::SRI));
     }
 };

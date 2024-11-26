@@ -180,9 +180,9 @@ void chrootHelper(int argc, char * * argv)
         if (mount(realStoreDir.c_str(), (tmpDir + storeDir).c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-        for (auto entry : fs::directory_iterator{"/"}) {
+        for (const auto & entry : fs::directory_iterator{"/"}) {
             checkInterrupt();
-            auto src = entry.path();
+            const auto & src = entry.path();
             fs::path dst = tmpDir / entry.path().filename();
             if (pathExists(dst)) continue;
             auto st = entry.symlink_status();
