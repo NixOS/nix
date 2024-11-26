@@ -17,12 +17,10 @@ fs = import('fs')
 nix = find_program('nix')
 bash = find_program('bash', native : true)
 busybox = find_program('busybox', native : true, required : false)
-if host_machine.system() == 'windows'
-  # Because of the state of symlinks on Windows, coreutils.exe doesn't usually exist, but things like ls.exe will
-  coreutils = find_program('ls', native : true)
-else
-  coreutils = find_program('coreutils', native : true)
-endif
+# Look up `coreutils` package by searching for `ls` binary.
+# Previously we looked up `coreutils` on `linux`, but that is not
+# guaranteed to exist either.
+coreutils = find_program('ls', native : true)
 dot = find_program('dot', native : true, required : false)
 
 nix_bin_dir = fs.parent(nix.full_path())
