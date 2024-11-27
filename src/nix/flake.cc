@@ -941,7 +941,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                         }
                         continue;
                     } else
-                          fs::create_symlink(target, to2);
+                        createSymlink(target, to2);
                 }
                 else
                     throw Error("file '%s' has unsupported type", from2);

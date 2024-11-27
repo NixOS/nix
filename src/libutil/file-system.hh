@@ -250,8 +250,6 @@ void setWriteTime(const std::filesystem::path & path, const struct stat & st);
 /**
  * Create a symlink.
  *
- * In the process of being deprecated for
- * `std::filesystem::create_symlink`.
  */
 void createSymlink(const Path & target, const Path & link);
 
