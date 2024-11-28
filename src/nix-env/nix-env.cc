@@ -481,12 +481,13 @@ static void printMissing(EvalState & state, PackageInfos & elems)
 {
     std::vector<DerivedPath> targets;
     for (auto & i : elems)
-        if (auto drvPath = i.queryDrvPath())
-            targets.emplace_back(DerivedPath::Built{
+        if (auto drvPath = i.queryDrvPath()) {
+            auto path = DerivedPath::Built{
                 .drvPath = makeConstantStorePathRef(*drvPath),
                 .outputs = OutputsSpec::All { },
-            });
-        else
+            };
+            targets.emplace_back(std::move(path));
+        } else
             targets.emplace_back(DerivedPath::Opaque{
                 .path = i.queryOutPath(),
             });
