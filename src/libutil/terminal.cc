@@ -18,6 +18,7 @@ bool isTTY()
 {
     static const bool tty =
         isatty(STDERR_FILENO)
+        && isatty(STDOUT_FILENO)
         && getEnv("TERM").value_or("dumb") != "dumb"
         && !(getEnv("NO_COLOR").has_value() || getEnv("NOCOLOR").has_value());
 
