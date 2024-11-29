@@ -162,6 +162,7 @@
             ''^src/libstore/globals\.cc$''
             ''^src/libstore/globals\.hh$''
             ''^src/libstore/http-binary-cache-store\.cc$''
+            ''^src/libstore/http-binary-cache-store\.hh$''
             ''^src/libstore/legacy-ssh-store\.cc$''
             ''^src/libstore/legacy-ssh-store\.hh$''
             ''^src/libstore/length-prefixed-protocol-helper\.hh$''
