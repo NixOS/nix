@@ -63,6 +63,7 @@ struct BuildEnvironment
     std::map<std::string, Value> vars;
     std::map<std::string, std::string> bashFunctions;
     std::optional<std::pair<std::string, std::string>> structuredAttrs;
+    std::optional<int> minimalBashVersion;
 
     static BuildEnvironment fromJSON(std::string_view in)
     {
@@ -88,6 +89,10 @@ struct BuildEnvironment
 
         if (json.contains("structuredAttrs")) {
             res.structuredAttrs = {json["structuredAttrs"][".attrs.json"], json["structuredAttrs"][".attrs.sh"]};
+        }
+
+        if (json.contains("meta") && json["meta"].contains("min-bash-version")) {
+            res.minimalBashVersion = std::optional<int>{ json["meta"]["min-bash-version"] };
         }
 
         return res;
@@ -151,6 +156,18 @@ struct BuildEnvironment
 
     void toBash(std::ostream & out, const std::set<std::string> & ignoreVars) const
     {
+        if (minimalBashVersion.has_value()) {
+            out << stripIndentation(fmt(R"__NIX_STR(
+                            if [[ -n "${BASH_VERSINFO-}" && "${BASH_VERSINFO-}" -lt %d ]]; then
+                                echo "Detected Bash version that isn't supported by this derivation (${BASH_VERSION})"
+                                echo "Please install Bash %d or greater to continue."
+                                exit 1
+                            fi
+                        )__NIX_STR",
+                        minimalBashVersion.value(),
+                        minimalBashVersion.value()));
+        }
+
         for (auto & [name, value] : vars) {
             if (!ignoreVars.count(name)) {
                 if (auto str = std::get_if<String>(&value)) {
