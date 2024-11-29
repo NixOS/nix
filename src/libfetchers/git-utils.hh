@@ -55,9 +55,14 @@ struct GitRepo
            in the repo yet. */
         std::optional<Hash> headRev;
 
+        enum State { Clean, Dirty };
+
         /* All files in the working directory that are unchanged,
            modified or added, but excluding deleted files. */
-        std::set<CanonPath> files;
+        std::map<CanonPath, State> files;
+
+        /* The deleted files. */
+        std::set<CanonPath> deletedFiles;
 
         /* The submodules listed in .gitmodules of this workdir. */
         std::vector<Submodule> submodules;

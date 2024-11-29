@@ -685,7 +685,7 @@ struct GitInputScheme : InputScheme
         if (getSubmodulesAttr(input))
             /* Create mountpoints for the submodules. */
             for (auto & submodule : repoInfo.workdirInfo.submodules)
-                repoInfo.workdirInfo.files.insert(submodule.path);
+                repoInfo.workdirInfo.files.emplace(submodule.path, GitRepo::WorkdirInfo::State::Clean);
 
         auto repo = GitRepo::openRepo(repoInfo.url, false, false);
 
@@ -793,10 +793,34 @@ struct GitInputScheme : InputScheme
 
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
+        auto makeFingerprint = [&](const Hash & rev)
+        {
+            return rev.gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
+        };
+
         if (auto rev = input.getRev())
-            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
-        else
+            return makeFingerprint(*rev);
+        else {
+            auto repoInfo = getRepoInfo(input);
+            if (repoInfo.isLocal && repoInfo.workdirInfo.headRev) {
+                /* Calculate a fingerprint that takes into account the
+                   deleted and modified/added files. */
+                HashSink hashSink{HashAlgorithm::SHA512};
+                for (auto & file : repoInfo.workdirInfo.files)
+                    if (file.second == GitRepo::WorkdirInfo::State::Dirty) {
+                        writeString("modified:", hashSink);
+                        writeString(file.first.abs(), hashSink);
+                        readFile(std::filesystem::path(repoInfo.url) + file.first.abs(), hashSink);
+                    }
+                for (auto & file : repoInfo.workdirInfo.deletedFiles) {
+                    writeString("deleted:", hashSink);
+                    writeString(file.abs(), hashSink);
+                }
+                return makeFingerprint(*repoInfo.workdirInfo.headRev)
+                    + ";d=" + hashSink.finish().first.to_string(HashFormat::Base16, false);
+            }
             return std::nullopt;
+        }
     }
 
     bool isLocked(const Input & input) const override
