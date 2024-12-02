@@ -454,7 +454,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
             debug("got %d keys, next marker '%s'",
                 contents.size(), res.GetNextMarker());
 
-            for (auto object : contents) {
+            for (const auto & object : contents) {
                 auto & key = object.GetKey();
                 if (key.size() != 40 || !hasSuffix(key, ".narinfo")) continue;
                 paths.insert(parseStorePath(storeDir + "/" + key.substr(0, key.size() - 8) + "-" + MissingName));

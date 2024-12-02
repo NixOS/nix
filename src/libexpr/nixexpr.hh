@@ -468,6 +468,7 @@ struct ExprBlackHole : Expr
     void show(const SymbolTable & symbols, std::ostream & str) const override {}
     void eval(EvalState & state, Env & env, Value & v) override;
     void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override {}
+    [[noreturn]] static void throwInfiniteRecursionError(EvalState & state, Value & v);
 };
 
 extern ExprBlackHole eBlackHole;

@@ -26,8 +26,6 @@ deps_public_maybe_subproject = [
 ]
 subdir('build-utils-meson/subprojects')
 
-subdir('build-utils-meson/threads')
-
 pubsetbuf_test = '''
 #include <iostream>
 
@@ -60,7 +58,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('build-utils-meson/common')
 
 sources = files(
   'common-args.cc',

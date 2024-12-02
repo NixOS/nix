@@ -325,6 +325,12 @@ struct BasicDerivation
 
     static std::string_view nameFromPath(const StorePath & storePath);
 
+    /**
+     * Apply string rewrites to the `env`, `args` and `builder`
+     * fields.
+     */
+    void applyRewrites(const StringMap & rewrites);
+
     bool operator == (const BasicDerivation &) const = default;
     // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
     //auto operator <=> (const BasicDerivation &) const = default;

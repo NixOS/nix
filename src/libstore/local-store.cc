@@ -95,51 +95,6 @@ struct LocalStore::State::Stmts {
     SQLiteStmt AddRealisationReference;
 };
 
-static int getSchema(Path schemaPath)
-{
-    int curSchema = 0;
-    if (pathExists(schemaPath)) {
-        auto s = readFile(schemaPath);
-        auto n = string2Int<int>(s);
-        if (!n)
-            throw Error("'%1%' is corrupt", schemaPath);
-        curSchema = *n;
-    }
-    return curSchema;
-}
-
-void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
-{
-    const int nixCASchemaVersion = 4;
-    int curCASchema = getSchema(schemaPath);
-    if (curCASchema != nixCASchemaVersion) {
-        if (curCASchema > nixCASchemaVersion) {
-            throw Error("current Nix store ca-schema is version %1%, but I only support %2%",
-                 curCASchema, nixCASchemaVersion);
-        }
-
-        if (!lockFile(lockFd.get(), ltWrite, false)) {
-            printInfo("waiting for exclusive access to the Nix store for ca drvs...");
-            lockFile(lockFd.get(), ltNone, false); // We have acquired a shared lock; release it to prevent deadlocks
-            lockFile(lockFd.get(), ltWrite, true);
-        }
-
-        if (curCASchema == 0) {
-            static const char schema[] =
-              #include "ca-specific-schema.sql.gen.hh"
-                ;
-            db.exec(schema);
-            curCASchema = nixCASchemaVersion;
-        }
-
-        if (curCASchema < 4)
-            throw Error("experimental CA schema version %d is no longer supported", curCASchema);
-
-        writeFile(schemaPath, fmt("%d", nixCASchemaVersion), 0666, true);
-        lockFile(lockFd.get(), ltRead, true);
-    }
-}
-
 LocalStore::LocalStore(
     std::string_view scheme,
     PathView path,
@@ -316,6 +271,10 @@ LocalStore::LocalStore(
 
         openDB(*state, false);
 
+        /* Legacy database schema migrations. Don't bump 'schema' for
+           new migrations; instead, add a migration to
+           upgradeDBSchema(). */
+
         if (curSchema < 8) {
             SQLiteTxn txn(state->db);
             state->db.exec("alter table ValidPaths add column ultimate integer");
@@ -342,13 +301,7 @@ LocalStore::LocalStore(
 
     else openDB(*state, false);
 
-    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-        if (!readOnly) {
-            migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
-        } else {
-            throw Error("need to migrate to content-addressed schema, but this cannot be done in read-only mode");
-        }
-    }
+    upgradeDBSchema(*state);
 
     /* Prepare SQL statements. */
     state->stmts->RegisterValidPath.create(state->db,
@@ -483,7 +436,17 @@ std::string LocalStore::getUri()
 
 
 int LocalStore::getSchema()
-{ return nix::getSchema(schemaPath); }
+{
+    int curSchema = 0;
+    if (pathExists(schemaPath)) {
+        auto s = readFile(schemaPath);
+        auto n = string2Int<int>(s);
+        if (!n)
+            throw Error("'%1%' is corrupt", schemaPath);
+        curSchema = *n;
+    }
+    return curSchema;
+}
 
 void LocalStore::openDB(State & state, bool create)
 {
@@ -563,6 +526,42 @@ void LocalStore::openDB(State & state, bool create)
             ;
         db.exec(schema);
     }
+}
+
+
+void LocalStore::upgradeDBSchema(State & state)
+{
+    state.db.exec("create table if not exists SchemaMigrations (migration text primary key not null);");
+
+    std::set<std::string> schemaMigrations;
+
+    {
+        SQLiteStmt querySchemaMigrations;
+        querySchemaMigrations.create(state.db, "select migration from SchemaMigrations;");
+        auto useQuerySchemaMigrations(querySchemaMigrations.use());
+        while (useQuerySchemaMigrations.next())
+            schemaMigrations.insert(useQuerySchemaMigrations.getStr(0));
+    }
+
+    auto doUpgrade = [&](const std::string & migrationName, const std::string & stmt)
+    {
+        if (schemaMigrations.contains(migrationName))
+            return;
+
+        debug("executing Nix database schema migration '%s'...", migrationName);
+
+        SQLiteTxn txn(state.db);
+        state.db.exec(stmt + fmt(";\ninsert into SchemaMigrations values('%s')", migrationName));
+        txn.commit();
+
+        schemaMigrations.insert(migrationName);
+    };
+
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
+        doUpgrade(
+            "20220326-ca-derivations",
+            #include "ca-specific-schema.sql.gen.hh"
+            );
 }
 
 

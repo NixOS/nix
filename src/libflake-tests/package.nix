@@ -4,6 +4,7 @@
 , mkMesonExecutable
 
 , nix-flake
+, nix-flake-c
 , nix-expr-test-support
 
 , rapidcheck
@@ -38,6 +39,7 @@ mkMesonExecutable (finalAttrs: {
 
   buildInputs = [
     nix-flake
+    nix-flake-c
     nix-expr-test-support
     rapidcheck
     gtest
@@ -67,6 +69,7 @@ mkMesonExecutable (finalAttrs: {
         mkdir -p "$HOME"
       '' + ''
         export _NIX_TEST_UNIT_DATA=${resolvePath ./data}
+        export NIX_CONFIG="extra-experimental-features = flakes"
         ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
         touch $out
       '');

@@ -222,7 +222,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 {
     auto method = FileIngestionMethod::Flat;
 
-    for (auto i : opFlags)
+    for (const auto & i : opFlags)
         if (i == "--recursive") method = FileIngestionMethod::NixArchive;
         else throw UsageError("unknown flag '%1%'", i);
 

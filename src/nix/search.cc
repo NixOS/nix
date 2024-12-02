@@ -161,7 +161,6 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                                 {"description", description},
                             };
                         } else {
-                            auto name2 = hiliteMatches(name.name, nameMatches, ANSI_GREEN, "\e[0;2m");
                             if (results > 1) logger->cout("");
                             logger->cout(
                                 "* %s%s",

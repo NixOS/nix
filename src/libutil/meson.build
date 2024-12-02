@@ -54,7 +54,6 @@ endforeach
 configdata.set('HAVE_DECL_AT_SYMLINK_NOFOLLOW', cxx.has_header_symbol('fcntl.h', 'AT_SYMLINK_NOFOLLOW').to_int())
 
 subdir('build-utils-meson/libatomic')
-subdir('build-utils-meson/threads')
 
 if host_machine.system() == 'windows'
   socket = cxx.find_library('ws2_32')
@@ -121,7 +120,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('build-utils-meson/common')
 
 sources = files(
   'archive.cc',

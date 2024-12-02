@@ -48,15 +48,14 @@ case "$(uname -s)" in
         INSTALL_MODE=no-daemon;;
 esac
 
-# space-separated string
-ACTIONS=
+ACTION=
 
 # handle the command line flags
 while [ $# -gt 0 ]; do
     case $1 in
         --daemon)
             INSTALL_MODE=daemon
-            ACTIONS="${ACTIONS}install "
+            ACTION=install
             ;;
         --no-daemon)
             if [ "$(uname -s)" = "Darwin" ]; then
@@ -65,18 +64,14 @@ while [ $# -gt 0 ]; do
             fi
             INSTALL_MODE=no-daemon
             # intentional tail space
-            ACTIONS="${ACTIONS}install "
+            ACTION=install
             ;;
-        # --uninstall)
-        #     # intentional tail space
-        #     ACTIONS="${ACTIONS}uninstall "
-        #     ;;
         --yes)
             export NIX_INSTALLER_YES=1;;
         --no-channel-add)
             export NIX_INSTALLER_NO_CHANNEL_ADD=1;;
         --daemon-user-count)
-            export NIX_USER_COUNT=$2
+            export NIX_USER_COUNT="$2"
             shift;;
         --no-modify-profile)
             NIX_INSTALLER_NO_MODIFY_PROFILE=1;;
@@ -128,7 +123,7 @@ done
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
     printf '\e[1;31mSwitching to the Multi-user Installer\e[0m\n'
-    exec "$self/install-multi-user" $ACTIONS # let ACTIONS split
+    exec "$self/install-multi-user" $ACTION
     exit 0
 fi
 

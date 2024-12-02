@@ -22,10 +22,9 @@ deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-util-test-support'),
   dependency('nix-store'),
+  dependency('nix-store-c'),
 ]
 subdir('build-utils-meson/subprojects')
-
-subdir('build-utils-meson/threads')
 
 rapidcheck = dependency('rapidcheck')
 deps_public += rapidcheck
@@ -38,7 +37,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('build-utils-meson/common')
 
 sources = files(
   'tests/derived-path.cc',
