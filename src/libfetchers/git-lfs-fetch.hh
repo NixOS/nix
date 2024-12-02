@@ -122,7 +122,7 @@ struct Fetch
 
     void init(git_repository * repo, const std::string & gitattributesContent);
     bool hasAttribute(const std::string & path, const std::string & attrName, const std::string & attrValue) const;
-    void fetch(const git_blob * pointerBlob, const std::string & pointerFilePath, Sink & sink) const;
+    void fetch(const git_blob * pointerBlob, const std::string & pointerFilePath, Sink & sink, std::function<void(uint64_t)> sizeCallback) const;
     std::vector<nlohmann::json> fetchUrls(const std::vector<Md> & metadatas) const;
 };
 
@@ -155,7 +155,7 @@ static size_t sinkWriteCallback(void * contents, size_t size, size_t nmemb, Sink
     return totalSize;
 }
 
-// if authHeader is "", downloadToSink assumes to auth is expected
+// if authHeader is "", downloadToSink assumes no auth is expected
 void downloadToSink(
     const std::string & url, const std::string & authHeader, Sink & sink, std::string_view sha256Expected)
 {
@@ -522,29 +522,30 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> & metadatas) 
     }
 }
 
-void Fetch::fetch(const git_blob * pointerBlob, const std::string & pointerFilePath, Sink & sink) const
+void Fetch::fetch(const git_blob * pointerBlob, const std::string & pointerFilePath, Sink & sink, std::function<void(uint64_t)> sizeCallback) const
 {
     constexpr git_object_size_t chunkSize = 128 * 1024; // 128 KiB
-    auto size = git_blob_rawsize(pointerBlob);
+    auto pointerSize = git_blob_rawsize(pointerBlob);
 
-    if (size >= 1024) {
+    if (pointerSize >= 1024) {
         debug("Skip git-lfs, pointer file too large");
         warn("Encountered a file that should have been a pointer, but wasn't: %s", pointerFilePath);
-        for (git_object_size_t offset = 0; offset < size; offset += chunkSize) {
-            sink(std::string(
-                (const char *) git_blob_rawcontent(pointerBlob) + offset, std::min(chunkSize, size - offset)));
+        sizeCallback(pointerSize);
+        for (git_object_size_t offset = 0; offset < pointerSize; offset += chunkSize) {
+            sink(std::string((const char *) git_blob_rawcontent(pointerBlob) + offset, std::min(chunkSize, pointerSize - offset)));
         }
         return;
     }
 
-    const auto pointerFileContents = std::string((const char *) git_blob_rawcontent(pointerBlob), size);
+    const auto pointerFileContents = std::string((const char *) git_blob_rawcontent(pointerBlob), pointerSize);
     const auto md = parseLfsMetadata(std::string(pointerFileContents), std::string(pointerFilePath));
     if (md == std::nullopt) {
         debug("Skip git-lfs, invalid pointer file");
         warn("Encountered a file that should have been a pointer, but wasn't: %s", pointerFilePath);
-        for (git_object_size_t offset = 0; offset < size; offset += chunkSize) {
+        sizeCallback(pointerSize);
+        for (git_object_size_t offset = 0; offset < pointerSize; offset += chunkSize) {
             sink(std::string(
-                (const char *) git_blob_rawcontent(pointerBlob) + offset, std::min(chunkSize, size - offset)));
+                (const char *) git_blob_rawcontent(pointerBlob) + offset, std::min(chunkSize, pointerSize - offset)));
         }
         return;
     }
@@ -562,8 +563,9 @@ void Fetch::fetch(const git_blob * pointerBlob, const std::string & pointerFileP
             && obj.at("actions").at("download").at("header").contains("Authorization")) {
             authHeader = obj["actions"]["download"]["header"]["Authorization"];
         }
-        // oid is also the sha256
-        downloadToSink(ourl, authHeader, sink, oid);
+        const uint64_t size = obj.at("size");
+        sizeCallback(size);
+        downloadToSink(ourl, authHeader, sink, oid); // oid is also the sha256
     } catch (const nlohmann::json::out_of_range & e) {
         std::stringstream ss;
         ss << "bad json from /info/lfs/objects/batch: " << obj << " " << e.what();
@@ -572,5 +574,6 @@ void Fetch::fetch(const git_blob * pointerBlob, const std::string & pointerFileP
 }
 
 } // namespace lfs
+
 
 } // namespace nix

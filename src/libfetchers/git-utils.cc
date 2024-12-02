@@ -695,7 +695,12 @@ struct GitSourceAccessor : SourceAccessor
             auto pathStr = std::string(path.rel());
             if (_lfsFetch.hasAttribute(pathStr, "filter", "lfs")) {
                 StringSink s;
-                _lfsFetch.fetch(blob.get(), pathStr, s);
+                try {
+                    _lfsFetch.fetch(blob.get(), pathStr, s, [&s](uint64_t size){ s.s.reserve(size); });
+                } catch (Error &e) {
+                    e.addTrace({}, "while smudging git-lfs file '%s' (std::string interface)", pathStr);
+                    throw;
+                }
                 return s.s;
             }
         }
@@ -708,8 +713,6 @@ struct GitSourceAccessor : SourceAccessor
         Sink & sink,
         std::function<void(uint64_t)> sizeCallback = [](uint64_t size){}) override {
         auto blob = getBlob(path, false);
-        auto size = git_blob_rawsize(blob.get());
-        sizeCallback(size);
 
         if (lfsFetch && path != CanonPath(".gitattributes") && lookup(CanonPath(".gitattributes"))) {
             auto& _lfsFetch = *lfsFetch;
@@ -720,11 +723,19 @@ struct GitSourceAccessor : SourceAccessor
 
             auto pathStr = std::string(path.rel());
             if (_lfsFetch.hasAttribute(pathStr, "filter", "lfs")) {
-                _lfsFetch.fetch(blob.get(), pathStr, sink);
+                try {
+                    _lfsFetch.fetch(blob.get(), pathStr, sink, sizeCallback);
+                } catch (Error &e) {
+                    e.addTrace({}, "while smudging git-lfs file '%s' (callback interface)", pathStr);
+                    throw;
+                }
                 return;
             }
         }
 
+        // lfs disabled or does not apply to this path
+        auto size = git_blob_rawsize(blob.get());
+        sizeCallback(size);
         constexpr git_object_size_t chunkSize = 128 * 1024; // 128 KiB
         for (git_object_size_t offset = 0; offset < size; offset += chunkSize) {
             sink(std::string((const char *) git_blob_rawcontent(blob.get()) + offset, std::min(chunkSize, size - offset)));
