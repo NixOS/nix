@@ -2,5 +2,10 @@ subdir('bash')
 subdir('fish')
 subdir('zsh')
 
-subdir('launchd')
-subdir('systemd')
+if host_machine.system() == 'linux'
+  subdir('systemd')
+endif
+
+if host_machine.system() == 'darwin'
+  subdir('launchd')
+endif
