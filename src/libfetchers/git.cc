@@ -15,6 +15,7 @@
 #include "finally.hh"
 #include "fetch-settings.hh"
 #include "json-utils.hh"
+#include "archive.hh"
 
 #include <regex>
 #include <string.h>
@@ -802,7 +803,7 @@ struct GitInputScheme : InputScheme
             return makeFingerprint(*rev);
         else {
             auto repoInfo = getRepoInfo(input);
-            if (repoInfo.isLocal && repoInfo.workdirInfo.headRev) {
+            if (repoInfo.isLocal && repoInfo.workdirInfo.headRev && repoInfo.workdirInfo.submodules.empty()) {
                 /* Calculate a fingerprint that takes into account the
                    deleted and modified/added files. */
                 HashSink hashSink{HashAlgorithm::SHA512};
@@ -810,7 +811,7 @@ struct GitInputScheme : InputScheme
                     if (file.second == GitRepo::WorkdirInfo::State::Dirty) {
                         writeString("modified:", hashSink);
                         writeString(file.first.abs(), hashSink);
-                        readFile(std::filesystem::path(repoInfo.url) + file.first.abs(), hashSink);
+                        dumpPath(repoInfo.url + "/" + file.first.abs(), hashSink);
                     }
                 for (auto & file : repoInfo.workdirInfo.deletedFiles) {
                     writeString("deleted:", hashSink);
