@@ -337,6 +337,12 @@ bool handleJSONLogMessage(const std::string & msg,
     return handleJSONLogMessage(*json, act, activities, trusted);
 }
 
+void removeErrorPrefix(std::string & msg)
+{
+    if (hasPrefix(msg, "error: "))
+        msg.erase(0, 7);
+}
+
 Activity::~Activity()
 {
     try {
