@@ -3,7 +3,7 @@
 
 , meson
 , ninja
-, lowdown
+, lowdown-unsandboxed
 , mdbook
 , mdbook-linkcheck
 , jq
@@ -42,7 +42,7 @@ mkMesonDerivation (finalAttrs: {
   passthru.externalNativeBuildInputs = [
     meson
     ninja
-    (lib.getBin lowdown)
+    (lib.getBin lowdown-unsandboxed)
     mdbook
     mdbook-linkcheck
     jq
