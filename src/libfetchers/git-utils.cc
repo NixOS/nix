@@ -1279,7 +1279,7 @@ ref<GitRepo> getTarballCache()
 
 GitRepo::WorkdirInfo GitRepo::getCachedWorkdirInfo(const std::filesystem::path & path)
 {
-    static Sync<std::unordered_map<std::filesystem::path, WorkdirInfo>> _cache;
+    static Sync<std::map<std::filesystem::path, WorkdirInfo>> _cache;
     {
         auto cache(_cache.lock());
         auto i = cache->find(path);
