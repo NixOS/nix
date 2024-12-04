@@ -29,7 +29,9 @@ std::regex hostRegex(hostRegexS, std::regex::ECMAScript);
 
 struct GitArchiveInputScheme : InputScheme
 {
-    virtual std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const = 0;
+    virtual std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const {
+        return std::pair<std::string, std::string>("Authorization", fmt("Bearer %s", token));
+    }
 
     std::optional<Input> inputFromURL(
         const fetchers::Settings & settings,
@@ -486,6 +488,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
 struct SourceHutInputScheme : GitArchiveInputScheme
 {
+
     std::string_view schemeName() const override { return "sourcehut"; }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
