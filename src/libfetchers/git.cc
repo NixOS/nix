@@ -686,7 +686,7 @@ struct GitInputScheme : InputScheme
         if (getSubmodulesAttr(input))
             /* Create mountpoints for the submodules. */
             for (auto & submodule : repoInfo.workdirInfo.submodules)
-                repoInfo.workdirInfo.files.emplace(submodule.path, GitRepo::WorkdirInfo::State::Clean);
+                repoInfo.workdirInfo.files.insert(submodule.path);
 
         auto repo = GitRepo::openRepo(repoInfo.url, false, false);
 
@@ -807,12 +807,11 @@ struct GitInputScheme : InputScheme
                 /* Calculate a fingerprint that takes into account the
                    deleted and modified/added files. */
                 HashSink hashSink{HashAlgorithm::SHA512};
-                for (auto & file : repoInfo.workdirInfo.files)
-                    if (file.second == GitRepo::WorkdirInfo::State::Dirty) {
-                        writeString("modified:", hashSink);
-                        writeString(file.first.abs(), hashSink);
-                        dumpPath(repoInfo.url + "/" + file.first.abs(), hashSink);
-                    }
+                for (auto & file : repoInfo.workdirInfo.dirtyFiles) {
+                    writeString("modified:", hashSink);
+                    writeString(file.abs(), hashSink);
+                    dumpPath(repoInfo.url + "/" + file.abs(), hashSink);
+                }
                 for (auto & file : repoInfo.workdirInfo.deletedFiles) {
                     writeString("deleted:", hashSink);
                     writeString(file.abs(), hashSink);

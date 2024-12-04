@@ -55,11 +55,12 @@ struct GitRepo
            in the repo yet. */
         std::optional<Hash> headRev;
 
-        enum State { Clean, Dirty };
-
         /* All files in the working directory that are unchanged,
            modified or added, but excluding deleted files. */
-        std::map<CanonPath, State> files;
+        std::set<CanonPath> files;
+
+        /* All modified or added files. */
+        std::set<CanonPath> dirtyFiles;
 
         /* The deleted files. */
         std::set<CanonPath> deletedFiles;

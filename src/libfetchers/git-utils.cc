@@ -438,11 +438,11 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         {
             if (!(statusFlags & GIT_STATUS_INDEX_DELETED) &&
                 !(statusFlags & GIT_STATUS_WT_DELETED))
-                info.files.emplace(CanonPath(path),
-                    statusFlags == GIT_STATUS_CURRENT
-                    ? WorkdirInfo::State::Clean
-                    : WorkdirInfo::State::Dirty);
-            else
+            {
+                info.files.insert(CanonPath(path));
+                if (statusFlags != GIT_STATUS_CURRENT)
+                    info.dirtyFiles.insert(CanonPath(path));
+            } else
                 info.deletedFiles.insert(CanonPath(path));
             if (statusFlags != GIT_STATUS_CURRENT)
                 info.isDirty = true;
@@ -1208,15 +1208,6 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore
     }
 }
 
-template<typename K, typename V>
-std::set<K> getKeys(const std::map<K, V> & c)
-{
-    std::set<K> res;
-    for (auto & i : c)
-        res.insert(i.first);
-    return res;
-}
-
 ref<SourceAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
@@ -1229,7 +1220,7 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool export
         ? makeEmptySourceAccessor()
         : AllowListSourceAccessor::create(
             makeFSSourceAccessor(path),
-            std::set<CanonPath> { getKeys(wd.files) },
+            std::set<CanonPath> { wd.files },
             std::move(makeNotAllowedError)).cast<SourceAccessor>();
     if (exportIgnore)
         return make_ref<GitExportIgnoreSourceAccessor>(self, fileAccessor, std::nullopt);
