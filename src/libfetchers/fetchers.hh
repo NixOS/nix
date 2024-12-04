@@ -46,6 +46,11 @@ struct Input
      */
     std::optional<Path> parent;
 
+    /**
+     * Cached result of getFingerprint().
+     */
+    mutable std::optional<std::optional<std::string>> cachedFingerprint;
+
 public:
     /**
      * Create an `Input` from a URL.
