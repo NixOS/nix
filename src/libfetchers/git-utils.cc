@@ -5,6 +5,7 @@
 #include "signals.hh"
 #include "users.hh"
 #include "fs-sink.hh"
+#include "sync.hh"
 
 #include <git2/attr.h>
 #include <git2/blob.h>
@@ -1274,6 +1275,19 @@ ref<GitRepo> getTarballCache()
     static auto repoDir = std::filesystem::path(getCacheDir()) / "tarball-cache";
 
     return GitRepo::openRepo(repoDir, true, true);
+}
+
+GitRepo::WorkdirInfo GitRepo::getCachedWorkdirInfo(const std::filesystem::path & path)
+{
+    static Sync<std::unordered_map<std::filesystem::path, WorkdirInfo>> _cache;
+    {
+        auto cache(_cache.lock());
+        auto i = cache->find(path);
+        if (i != cache->end()) return i->second;
+    }
+    auto workdirInfo = GitRepo::openRepo(path)->getWorkdirInfo();
+    _cache.lock()->emplace(path, workdirInfo);
+    return workdirInfo;
 }
 
 }
