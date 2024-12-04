@@ -122,7 +122,11 @@ struct Fetch
 
     void init(git_repository * repo, const std::string & gitattributesContent);
     bool hasAttribute(const std::string & path, const std::string & attrName, const std::string & attrValue) const;
-    void fetch(const git_blob * pointerBlob, const std::string & pointerFilePath, Sink & sink, std::function<void(uint64_t)> sizeCallback) const;
+    void fetch(
+        const git_blob * pointerBlob,
+        const std::string & pointerFilePath,
+        Sink & sink,
+        std::function<void(uint64_t)> sizeCallback) const;
     std::vector<nlohmann::json> fetchUrls(const std::vector<Md> & metadatas) const;
 };
 
@@ -522,7 +526,11 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> & metadatas) 
     }
 }
 
-void Fetch::fetch(const git_blob * pointerBlob, const std::string & pointerFilePath, Sink & sink, std::function<void(uint64_t)> sizeCallback) const
+void Fetch::fetch(
+    const git_blob * pointerBlob,
+    const std::string & pointerFilePath,
+    Sink & sink,
+    std::function<void(uint64_t)> sizeCallback) const
 {
     constexpr git_object_size_t chunkSize = 128 * 1024; // 128 KiB
     auto pointerSize = git_blob_rawsize(pointerBlob);
@@ -532,7 +540,8 @@ void Fetch::fetch(const git_blob * pointerBlob, const std::string & pointerFileP
         warn("Encountered a file that should have been a pointer, but wasn't: %s", pointerFilePath);
         sizeCallback(pointerSize);
         for (git_object_size_t offset = 0; offset < pointerSize; offset += chunkSize) {
-            sink(std::string((const char *) git_blob_rawcontent(pointerBlob) + offset, std::min(chunkSize, pointerSize - offset)));
+            sink(std::string(
+                (const char *) git_blob_rawcontent(pointerBlob) + offset, std::min(chunkSize, pointerSize - offset)));
         }
         return;
     }
@@ -574,6 +583,5 @@ void Fetch::fetch(const git_blob * pointerBlob, const std::string & pointerFileP
 }
 
 } // namespace lfs
-
 
 } // namespace nix
