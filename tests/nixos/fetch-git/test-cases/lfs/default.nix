@@ -193,13 +193,10 @@
         }}' >{tempdir}/flake.nix
       """)
       fetched_flake = client.succeed(f"""
-        nix eval {tempdir}#.outPath
+        nix eval --raw {tempdir}#.outPath
       """)
 
-    # strip leading and trailing quotes
-    fetched_flake_trimmed = fetched_flake.strip()[1:-1]
-
-    assert fetched_lfs == fetched_flake_trimmed, \
-      f"fetching as flake input (store path {fetched_flake_trimmed}) yielded a different result than using fetchGit (store path {fetched_lfs})"
+    assert fetched_lfs == fetched_flake, \
+      f"fetching as flake input (store path {fetched_flake}) yielded a different result than using fetchGit (store path {fetched_lfs})"
   '';
 }
