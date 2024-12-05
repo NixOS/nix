@@ -163,8 +163,11 @@ struct CmdToBase : Command
     HashFormat hashFormat;
     std::optional<HashAlgorithm> hashAlgo;
     std::vector<std::string> args;
+    bool legacyCli;
 
-    CmdToBase(HashFormat hashFormat) : hashFormat(hashFormat)
+    CmdToBase(HashFormat hashFormat, bool legacyCli = false)
+        : hashFormat(hashFormat)
+        , legacyCli(legacyCli)
     {
         addFlag(flag::hashAlgoOpt("type", &hashAlgo));
         expectArgs("strings", &args);
@@ -181,8 +184,14 @@ struct CmdToBase : Command
 
     void run() override
     {
+<<<<<<< HEAD
         warn("The old format conversion sub commands of `nix hash` were deprecated in favor of `nix hash convert`.");
         for (auto s : args)
+=======
+        if (!legacyCli)
+            warn("The old format conversion subcommands of `nix hash` were deprecated in favor of `nix hash convert`.");
+        for (const auto & s : args)
+>>>>>>> 408c2faf9 (nix hash: Don't print 'nix hash' deprecation message)
             logger->cout(Hash::parseAny(s, hashAlgo).to_string(hashFormat, hashFormat == HashFormat::SRI));
     }
 };
@@ -328,7 +337,7 @@ static int compatNixHash(int argc, char * * argv)
     }
 
     else {
-        CmdToBase cmd(hashFormat);
+        CmdToBase cmd(hashFormat, true);
         cmd.args = ss;
         if (hashAlgo.has_value()) cmd.hashAlgo = hashAlgo;
         cmd.run();
