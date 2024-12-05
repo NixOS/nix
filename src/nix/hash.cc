@@ -222,9 +222,12 @@ struct CmdHashConvert : Command
     Category category() override { return catUtility; }
 
     void run() override {
-        for (const auto& s: hashStrings) {
-            Hash h = Hash::parseAny(s, algo);
-            if (from && h.to_string(*from, from == HashFormat::SRI) != s) {
+        for (const auto & s: hashStrings) {
+            Hash h =
+                from == HashFormat::SRI
+                ? Hash::parseSRI(s)
+                : Hash::parseAny(s, algo);
+            if (from && from != HashFormat::SRI && h.to_string(*from, false) != s) {
                 auto from_as_string = printHashFormat(*from);
                 throw BadHash("input hash '%s' does not have the expected format '--from %s'", s, from_as_string);
             }
