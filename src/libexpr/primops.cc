@@ -1100,7 +1100,7 @@ static RegisterPrimOp primop_warn({
     .name = "__warn",
     .args = {"e1", "e2"},
     .doc = R"(
-      Evaluate *e1*, which must be a string and print iton standard error as a warning.
+      Evaluate *e1*, which must be a string, and print it on standard error as a warning.
       Then return *e2*.
       This function is useful for non-critical situations where attention is advisable.
 
