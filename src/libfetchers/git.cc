@@ -184,7 +184,7 @@ struct GitInputScheme : InputScheme
         for (auto & [name, value] : url.query) {
             if (name == "rev" || name == "ref" || name == "keytype" || name == "publicKey" || name == "publicKeys")
                 attrs.emplace(name, value);
-            else if (name == "shallow" || name == "submodules" || name == "exportIgnore" || name == "allRefs" || name == "verifyCommit")
+            else if (name == "shallow" || name == "submodules" || name == "lfs" || name == "exportIgnore" || name == "allRefs" || name == "verifyCommit")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
@@ -209,6 +209,7 @@ struct GitInputScheme : InputScheme
             "rev",
             "shallow",
             "submodules",
+            "lfs",
             "exportIgnore",
             "lastModified",
             "revCount",
@@ -261,6 +262,8 @@ struct GitInputScheme : InputScheme
         if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
         if (getShallowAttr(input))
             url.query.insert_or_assign("shallow", "1");
+        if (getLfsAttr(input))
+            url.query.insert_or_assign("lfs", "1");
         if (getSubmodulesAttr(input))
             url.query.insert_or_assign("submodules", "1");
         if (maybeGetBoolAttr(input.attrs, "exportIgnore").value_or(false))
@@ -392,6 +395,11 @@ struct GitInputScheme : InputScheme
     bool getSubmodulesAttr(const Input & input) const
     {
         return maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+    }
+
+    bool getLfsAttr(const Input & input) const
+    {
+        return maybeGetBoolAttr(input.attrs, "lfs").value_or(false);
     }
 
     bool getExportIgnoreAttr(const Input & input) const
@@ -633,7 +641,8 @@ struct GitInputScheme : InputScheme
         verifyCommit(input, repo);
 
         bool exportIgnore = getExportIgnoreAttr(input);
-        auto accessor = repo->getAccessor(rev, exportIgnore);
+        bool smudgeLfs = getLfsAttr(input);
+        auto accessor = repo->getAccessor(rev, exportIgnore, smudgeLfs);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
@@ -655,6 +664,7 @@ struct GitInputScheme : InputScheme
                 attrs.insert_or_assign("rev", submoduleRev.gitRev());
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
                 attrs.insert_or_assign("submodules", Explicit<bool>{ true });
+                attrs.insert_or_assign("lfs", Explicit<bool>{ smudgeLfs });
                 attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
                 auto submoduleInput = fetchers::Input::fromAttrs(*input.settings, std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
@@ -794,7 +804,9 @@ struct GitInputScheme : InputScheme
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
         if (auto rev = input.getRev())
-            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
+        {
+            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "") + (getLfsAttr(input) ? ";l" : "");
+        }
         else
             return std::nullopt;
     }
