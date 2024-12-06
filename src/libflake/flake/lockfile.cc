@@ -42,8 +42,10 @@ LockedNode::LockedNode(
     : lockedRef(getFlakeRef(fetchSettings, json, "locked", "info")) // FIXME: remove "info"
     , originalRef(getFlakeRef(fetchSettings, json, "original", nullptr))
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
+    , parentPath(json.find("parent") != json.end() ? (std::optional<InputPath>) json["parent"] : std::nullopt)
+    , patchFiles(json.find("patchFiles") != json.end() ? (std::vector<std::string>) json["patchFiles"] : std::vector<std::string>{})
 {
-    if (!lockedRef.input.isLocked())
+    if (!lockedRef.input.isLocked() && !lockedRef.input.isRelative())
         throw Error("lock file contains unlocked input '%s'",
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 
@@ -52,14 +54,12 @@ LockedNode::LockedNode(
     lockedRef.input.attrs.insert_or_assign("__final", Explicit<bool>(true));
 }
 
-StorePath LockedNode::computeStorePath(Store & store) const
+static std::shared_ptr<Node> doFind(
+    const ref<Node> & root,
+    const InputPath & path,
+    std::vector<InputPath> & visited)
 {
-    return lockedRef.input.computeStorePath(store);
-}
-
-static std::shared_ptr<Node> doFind(const ref<Node> & root, const InputPath & path, std::vector<InputPath> & visited)
-{
-    auto pos = root;
+    std::shared_ptr<Node> pos = root;
 
     auto found = std::find(visited.cbegin(), visited.cend(), path);
 
@@ -74,7 +74,7 @@ static std::shared_ptr<Node> doFind(const ref<Node> & root, const InputPath & pa
     for (auto & elem : path) {
         if (auto i = get(pos->inputs, elem)) {
             if (auto node = std::get_if<0>(&*i))
-                pos = *node;
+                pos = (std::shared_ptr<LockedNode>) *node;
             else if (auto follows = std::get_if<1>(&*i)) {
                 if (auto p = doFind(root, *follows, visited))
                     pos = ref(p);
@@ -194,13 +194,20 @@ std::pair<nlohmann::json, LockFile::KeyMap> LockFile::toJSON() const
         if (auto lockedNode = node.dynamic_pointer_cast<const LockedNode>()) {
             n["original"] = fetchers::attrsToJSON(lockedNode->originalRef.toAttrs());
             n["locked"] = fetchers::attrsToJSON(lockedNode->lockedRef.toAttrs());
+            // FIXME
+            #if 0
             /* For backward compatibility, omit the "__final"
                attribute. We never allow non-final inputs in lock files
                anyway. */
             assert(lockedNode->lockedRef.input.isFinal());
+            #endif
             n["locked"].erase("__final");
             if (!lockedNode->isFlake)
                 n["flake"] = false;
+            if (lockedNode->parentPath)
+                n["parent"] = *lockedNode->parentPath;
+            if (!lockedNode->patchFiles.empty())
+                n["patchFiles"] = lockedNode->patchFiles;
         }
 
         nodes[key] = std::move(n);
@@ -247,7 +254,11 @@ std::optional<FlakeRef> LockFile::isUnlocked() const
     for (auto & i : nodes) {
         if (i == ref<const Node>(root)) continue;
         auto node = i.dynamic_pointer_cast<const LockedNode>();
-        if (node && (!node->lockedRef.input.isLocked() || !node->lockedRef.input.isFinal()))
+        if (node
+            && (!node->lockedRef.input.isLocked()
+                // FIXME
+                /* || !node->lockedRef.input.isFinal() */)
+            && !node->lockedRef.input.isRelative())
             return node->lockedRef;
     }
 
