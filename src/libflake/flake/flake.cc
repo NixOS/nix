@@ -54,7 +54,13 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
             fetched.emplace(originalRef.fetchTree(state.store));
         } else {
             if (allowLookup) {
-                resolvedRef = originalRef.resolve(state.store);
+                resolvedRef = originalRef.resolve(
+                    state.store,
+                    [](fetchers::Registry::RegistryType type) {
+                        /* Only use the global registry and CLI flags
+                           to resolve indirect flakerefs. */
+                        return type == fetchers::Registry::Flag || type == fetchers::Registry::Global;
+                    });
                 auto fetchedResolved = lookupInFlakeCache(flakeCache, originalRef);
                 if (!fetchedResolved) fetchedResolved.emplace(resolvedRef.fetchTree(state.store));
                 flakeCache.push_back({resolvedRef, *fetchedResolved});

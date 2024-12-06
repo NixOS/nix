@@ -3,7 +3,6 @@
 #include "url.hh"
 #include "url-parts.hh"
 #include "fetchers.hh"
-#include "registry.hh"
 
 namespace nix {
 
@@ -36,7 +35,9 @@ std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef)
     return str;
 }
 
-FlakeRef FlakeRef::resolve(ref<Store> store) const
+FlakeRef FlakeRef::resolve(
+    ref<Store> store,
+    const fetchers::RegistryFilter & filter) const
 {
     auto [input2, extraAttrs] = lookupInRegistries(store, input);
     return FlakeRef(std::move(input2), fetchers::maybeGetStrAttr(extraAttrs, "dir").value_or(subdir));
