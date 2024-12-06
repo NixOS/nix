@@ -9,6 +9,8 @@ self="$(dirname "$0")"
 nix="@nix@"
 cacert="@cacert@"
 
+# allow to override identity change command
+readonly NIX_BECOME="${NIX_BECOME:-sudo}"
 
 if ! [ -e "$self/.reginfo" ]; then
     echo "$0: incomplete installer (.reginfo is missing)" >&2
@@ -63,7 +65,6 @@ while [ $# -gt 0 ]; do
                 exit 1
             fi
             INSTALL_MODE=no-daemon
-            # intentional tail space
             ACTION=install
             ;;
         --yes)
@@ -135,8 +136,8 @@ echo "performing a single-user installation of Nix..." >&2
 
 if ! [ -e "$dest" ]; then
     cmd="mkdir -m 0755 $dest && chown $USER $dest"
-    echo "directory $dest does not exist; creating it by running '$cmd' using sudo" >&2
-    if ! sudo sh -c "$cmd"; then
+    echo "directory $dest does not exist; creating it by running '$cmd' using $NIX_BECOME" >&2
+    if ! $NIX_BECOME sh -c "$cmd"; then
         echo "$0: please manually run '$cmd' as root to create $dest" >&2
         exit 1
     fi
