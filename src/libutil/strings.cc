@@ -48,4 +48,63 @@ template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const s
 template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const std::set<std::string> &);
 template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const std::vector<std::string> &);
 
+/**
+ * Shell split string: split a string into shell arguments, respecting quotes and backslashes.
+ *
+ * Used for NIX_SSHOPTS handling, which previously used `tokenizeString` and was broken by
+ * Arguments that need to be passed to ssh with spaces in them.
+ */
+std::list<std::string> shellSplitString(std::string_view s)
+{
+    std::list<std::string> result;
+    std::string current;
+    bool inQuoteSingle = false;
+    bool inQuoteDouble = false;
+    bool escaped = false;
+    for (char c : s) {
+        if (escaped) {
+            current.push_back(c);
+            escaped = false;
+            continue;
+        }
+        if (c == '\\') {
+            escaped = true;
+            continue;
+        }
+        if (c == '\'') {
+            if (inQuoteSingle) {
+                inQuoteSingle = false;
+            } else if (!inQuoteDouble) {
+                inQuoteSingle = true;
+            } else {
+                current.push_back(c);
+            }
+            continue;
+        }
+        if (c == '"') {
+            if (inQuoteDouble) {
+                inQuoteDouble = false;
+            } else if (!inQuoteSingle) {
+                inQuoteDouble = true;
+            } else {
+                current.push_back(c);
+            }
+            continue;
+        }
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            if (inQuoteSingle || inQuoteDouble) {
+                current.push_back(c);
+            } else if (!current.empty()) {
+                result.push_back(current);
+                current.clear();
+            }
+            continue;
+        }
+        current.push_back(c);
+    }
+    if (!current.empty()) {
+        result.push_back(current);
+    }
+    return result;
+}
 } // namespace nix

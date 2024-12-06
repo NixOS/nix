@@ -345,4 +345,60 @@ RC_GTEST_PROP(splitString, recoveredByConcatStringsSep, (const std::string & s))
     RC_ASSERT(concatStringsSep("a", splitString<Strings>(s, "a")) == s);
 }
 
+
+/* ----------------------------------------------------------------------------
+ * shellSplitString
+ * --------------------------------------------------------------------------*/
+
+TEST(shellSplitString, empty)
+{
+    Strings expected = {};
+
+    ASSERT_EQ(shellSplitString(""), expected);
+}
+
+TEST(shellSplitString, oneWord)
+{
+    Strings expected = {"foo"};
+
+    ASSERT_EQ(shellSplitString("foo"), expected);
+}
+
+TEST(shellSplitString, oneWordQuotedWithSpaces)
+{
+    Strings expected = {"foo bar"};
+
+    ASSERT_EQ(shellSplitString("'foo bar'"), expected);
+}
+
+TEST(shellSplitString, oneWordQuotedWithSpacesAndDoubleQuoteInSingleQuote)
+{
+    Strings expected = {"foo bar\""};
+
+    ASSERT_EQ(shellSplitString("'foo bar\"'"), expected);
+}
+
+TEST(shellSplitString, oneWordQuotedWithDoubleQuotes)
+{
+    Strings expected = {"foo bar"};
+
+    ASSERT_EQ(shellSplitString("\"foo bar\""), expected);
+
+}
+
+TEST(shellSplitString, twoWords)
+{
+    Strings expected = {"foo", "bar"};
+
+    ASSERT_EQ(shellSplitString("foo bar"), expected);
+}
+
+TEST(shellSplitString, twoWordsWithSpacesAndQuotesQuoted)
+{
+    Strings expected = {"foo bar'", "baz\""};
+
+    ASSERT_EQ(shellSplitString("\"foo bar'\" 'baz\"'"), expected);
+}
+
+
 } // namespace nix
