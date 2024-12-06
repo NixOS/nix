@@ -2,6 +2,7 @@
 ///@file
 
 #include "local-fs-store.hh"
+#include "rng.hh"
 
 namespace nix {
 
@@ -67,6 +68,8 @@ struct IndirectRootStore : public virtual LocalFSStore
      * The form this weak-reference takes is implementation-specific.
      */
     virtual void addIndirectRoot(const Path & path) = 0;
+
+    RandomIntGenerator rng{};
 
 protected:
     void makeSymlink(const Path & link, const Path & target);
