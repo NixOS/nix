@@ -134,7 +134,8 @@ std::string Hash::to_string(HashFormat hashFormat, bool includeAlgo) const
 
 Hash Hash::dummy(HashAlgorithm::SHA256);
 
-Hash Hash::parseSRI(std::string_view original) {
+Hash Hash::parseSRI(std::string_view original)
+{
     auto rest = original;
 
     // Parse the has type before the separater, if there was one.
