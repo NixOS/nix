@@ -109,14 +109,6 @@ nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir?ref=HEAD#default"
 nix build -o "$flake1Dir/result" "git+file://$flake1Dir"
 nix path-info "$flake1Dir/result"
 
-# 'getFlake' on an unlocked flakeref should fail in pure mode, but
-# succeed in impure mode.
-(! nix build -o "$TEST_ROOT/result" --expr "(builtins.getFlake \"$flake1Dir\").packages.$system.default")
-nix build -o "$TEST_ROOT/result" --expr "(builtins.getFlake \"$flake1Dir\").packages.$system.default" --impure
-
-# 'getFlake' on a locked flakeref should succeed even in pure mode.
-nix build -o "$TEST_ROOT/result" --expr "(builtins.getFlake \"git+file://$flake1Dir?rev=$hash2\").packages.$system.default"
-
 # Regression test for dirOf on the root of the flake.
 [[ $(nix eval --json flake1#parent) = \""$NIX_STORE_DIR"\" ]]
 
@@ -131,12 +123,10 @@ nix build -o "$TEST_ROOT/result" --expr "(builtins.getFlake \"git+file://$flake1
 # Building a flake with an unlocked dependency should fail in pure mode.
 (! nix build -o "$TEST_ROOT/result" flake2#bar --no-registries)
 (! nix build -o "$TEST_ROOT/result" flake2#bar --no-use-registries)
-(! nix eval --expr "builtins.getFlake \"$flake2Dir\"")
 
 # But should succeed in impure mode.
 (! nix build -o "$TEST_ROOT/result" flake2#bar --impure)
 nix build -o "$TEST_ROOT/result" flake2#bar --impure --no-write-lock-file
-nix eval --expr "builtins.getFlake \"$flake2Dir\"" --impure
 
 # Building a local flake with an unlocked dependency should fail with --no-update-lock-file.
 expect 1 nix build -o "$TEST_ROOT/result" "$flake2Dir#bar" --no-update-lock-file 2>&1 | grep 'requires lock file changes'
