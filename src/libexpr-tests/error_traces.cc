@@ -712,7 +712,7 @@ namespace nix {
 
         ASSERT_TRACE1("head []",
                       Error,
-                      HintFmt("list index %d is out of bounds", 0));
+                      HintFmt("'head' called on an empty list"));
 
     }
 
