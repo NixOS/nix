@@ -352,35 +352,35 @@ RC_GTEST_PROP(splitString, recoveredByConcatStringsSep, (const std::string & s))
 
 TEST(shellSplitString, empty)
 {
-    Strings expected = {};
+    std::list<std::string> expected = {};
 
     ASSERT_EQ(shellSplitString(""), expected);
 }
 
 TEST(shellSplitString, oneWord)
 {
-    Strings expected = {"foo"};
+    std::list<std::string> expected = {"foo"};
 
     ASSERT_EQ(shellSplitString("foo"), expected);
 }
 
 TEST(shellSplitString, oneWordQuotedWithSpaces)
 {
-    Strings expected = {"foo bar"};
+    std::list<std::string> expected = {"foo bar"};
 
     ASSERT_EQ(shellSplitString("'foo bar'"), expected);
 }
 
 TEST(shellSplitString, oneWordQuotedWithSpacesAndDoubleQuoteInSingleQuote)
 {
-    Strings expected = {"foo bar\""};
+    std::list<std::string> expected = {"foo bar\""};
 
     ASSERT_EQ(shellSplitString("'foo bar\"'"), expected);
 }
 
 TEST(shellSplitString, oneWordQuotedWithDoubleQuotes)
 {
-    Strings expected = {"foo bar"};
+    std::list<std::string> expected = {"foo bar"};
 
     ASSERT_EQ(shellSplitString("\"foo bar\""), expected);
 
@@ -388,14 +388,14 @@ TEST(shellSplitString, oneWordQuotedWithDoubleQuotes)
 
 TEST(shellSplitString, twoWords)
 {
-    Strings expected = {"foo", "bar"};
+    std::list<std::string> expected = {"foo", "bar"};
 
     ASSERT_EQ(shellSplitString("foo bar"), expected);
 }
 
 TEST(shellSplitString, twoWordsWithSpacesAndQuotesQuoted)
 {
-    Strings expected = {"foo bar'", "baz\""};
+    std::list<std::string> expected = {"foo bar'", "baz\""};
 
     ASSERT_EQ(shellSplitString("\"foo bar'\" 'baz\"'"), expected);
 }
