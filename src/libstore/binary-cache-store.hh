@@ -64,6 +64,8 @@ protected:
     // The prefix under which realisation infos will be stored
     const std::string realisationsPrefix = "realisations";
 
+    const std::string cacheInfoFile = "nix-cache-info";
+
     BinaryCacheStore(const Params & params);
 
 public:
@@ -83,6 +85,12 @@ public:
      * Dump the contents of the specified file to a sink.
      */
     virtual void getFile(const std::string & path, Sink & sink);
+
+    /**
+     * Get the contents of /nix-cache-info. Return std::nullopt if it
+     * doesn't exist.
+     */
+    virtual std::optional<std::string> getNixCacheInfo();
 
     /**
      * Fetch the specified file and call the specified callback with
