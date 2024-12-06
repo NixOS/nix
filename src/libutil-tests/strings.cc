@@ -345,7 +345,6 @@ RC_GTEST_PROP(splitString, recoveredByConcatStringsSep, (const std::string & s))
     RC_ASSERT(concatStringsSep("a", splitString<Strings>(s, "a")) == s);
 }
 
-
 /* ----------------------------------------------------------------------------
  * shellSplitString
  * --------------------------------------------------------------------------*/
@@ -383,7 +382,6 @@ TEST(shellSplitString, oneWordQuotedWithDoubleQuotes)
     std::list<std::string> expected = {"foo bar"};
 
     ASSERT_EQ(shellSplitString("\"foo bar\""), expected);
-
 }
 
 TEST(shellSplitString, twoWords)
@@ -405,7 +403,6 @@ TEST(shellSplitString, emptyArgumentsAreAllowed)
     std::list<std::string> expected = {"foo", "", "bar", "baz", ""};
 
     ASSERT_EQ(shellSplitString("foo '' bar baz ''"), expected);
-
 }
 
 } // namespace nix
