@@ -61,7 +61,9 @@ std::list<std::string> shellSplitString(std::string_view s)
     bool inQuoteSingle = false;
     bool inQuoteDouble = false;
     bool escaped = false;
+    bool lastCharWasQuote = false;
     for (char c : s) {
+        lastCharWasQuote = false;
         if (escaped) {
             current.push_back(c);
             escaped = false;
@@ -74,8 +76,10 @@ std::list<std::string> shellSplitString(std::string_view s)
         if (c == '\'') {
             if (inQuoteSingle) {
                 inQuoteSingle = false;
+                lastCharWasQuote = true;
             } else if (!inQuoteDouble) {
                 inQuoteSingle = true;
+                lastCharWasQuote = true;
             } else {
                 current.push_back(c);
             }
@@ -84,8 +88,10 @@ std::list<std::string> shellSplitString(std::string_view s)
         if (c == '"') {
             if (inQuoteDouble) {
                 inQuoteDouble = false;
+                lastCharWasQuote = true;
             } else if (!inQuoteSingle) {
                 inQuoteDouble = true;
+                lastCharWasQuote = true;
             } else {
                 current.push_back(c);
             }
@@ -94,7 +100,7 @@ std::list<std::string> shellSplitString(std::string_view s)
         if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
             if (inQuoteSingle || inQuoteDouble) {
                 current.push_back(c);
-            } else if (!current.empty()) {
+            } else {
                 result.push_back(current);
                 current.clear();
             }
@@ -102,7 +108,7 @@ std::list<std::string> shellSplitString(std::string_view s)
         }
         current.push_back(c);
     }
-    if (!current.empty()) {
+    if (!current.empty() || lastCharWasQuote) {
         result.push_back(current);
     }
     return result;

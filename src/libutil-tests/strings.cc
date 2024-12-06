@@ -400,5 +400,12 @@ TEST(shellSplitString, twoWordsWithSpacesAndQuotesQuoted)
     ASSERT_EQ(shellSplitString("\"foo bar'\" 'baz\"'"), expected);
 }
 
+TEST(shellSplitString, emptyArgumentsAreAllowed)
+{
+    std::list<std::string> expected = {"foo", "", "bar", "baz", ""};
+
+    ASSERT_EQ(shellSplitString("foo '' bar baz ''"), expected);
+
+}
 
 } // namespace nix
