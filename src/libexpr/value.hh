@@ -510,4 +510,6 @@ typedef std::shared_ptr<Value *> RootValue;
 
 RootValue allocRootValue(Value * v);
 
+void forceNoNullByte(std::string_view s);
+
 }

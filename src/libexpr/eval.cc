@@ -3178,5 +3178,20 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v) {
     return v.print(str);
 }
 
+void forceNoNullByte(std::string_view s)
+{
+    if (memchr(s.data(), '\0', s.size())) {
+        std::string str;
+        for (auto c : s) {
+            if (c != '\0') {
+                str.push_back(c);
+            } else {
+                str.append("␀");
+            }
+        }
+        throw Error("input string '%s' cannot be represented as Nix string because it contains null bytes", str);
+    }
+}
+
 
 }
