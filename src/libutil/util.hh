@@ -338,7 +338,9 @@ std::string showBytes(uint64_t bytes);
  */
 inline std::string operator + (const std::string & s1, std::string_view s2)
 {
-    auto s = s1;
+    std::string s;
+    s.reserve(s1.size() + s2.size());
+    s.append(s1);
     s.append(s2);
     return s;
 }
@@ -351,10 +353,11 @@ inline std::string operator + (std::string && s, std::string_view s2)
 
 inline std::string operator + (std::string_view s1, const char * s2)
 {
+    auto s2Size = strlen(s2);
     std::string s;
-    s.reserve(s1.size() + strlen(s2));
+    s.reserve(s1.size() + s2Size);
     s.append(s1);
-    s.append(s2);
+    s.append(s2, s2Size);
     return s;
 }
 
