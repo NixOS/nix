@@ -2870,35 +2870,61 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
             std::optional<Strings> allowedReferences, allowedRequisites, disallowedReferences, disallowedRequisites;
         };
 
+        /** A path, with a chain of paths back to how we found it. */
+        struct PathWithSource {
+
+            StorePath path;
+
+            /**
+             * A parent of sorts that leads back to the starting set of the transitive closure, if that's what we're working with.
+             * If `path` was part of the starting set, this will be `nullptr`.
+             */
+            std::shared_ptr<PathWithSource> source;
+
+            /** Just the `path`, or something like `source of source -> source -> path`. */
+            std::string showChain(Store & store) {
+                if (source)
+                    return fmt("%s -> %s", source->showChain(store), store.printStorePath(path));
+                else
+                    return store.printStorePath(path);
+            };
+        };
+
+        struct Closure {
+            /** Keys: paths in the closure, values: reverse path from an initial path to the parent of the key */
+            std::map<StorePath, std::shared_ptr<PathWithSource>> pathsWithSources;
+            uint64_t size;
+        };
+
         /* Compute the closure and closure size of some output. This
            is slightly tricky because some of its references (namely
            other outputs) may not be valid yet. */
         auto getClosure = [&](const StorePath & path)
         {
             uint64_t closureSize = 0;
-            StorePathSet pathsDone;
-            std::queue<StorePath> pathsLeft;
-            pathsLeft.push(path);
+            std::map<StorePath, std::shared_ptr<PathWithSource>> pathsDone;
+            std::queue<PathWithSource> pathsLeft;
+            pathsLeft.push({path, nullptr});
 
             while (!pathsLeft.empty()) {
                 auto path = pathsLeft.front();
                 pathsLeft.pop();
-                if (!pathsDone.insert(path).second) continue;
+                if (!pathsDone.insert({path.path, path.source}).second) continue;
 
-                auto i = outputsByPath.find(worker.store.printStorePath(path));
+                auto i = outputsByPath.find(worker.store.printStorePath(path.path));
                 if (i != outputsByPath.end()) {
                     closureSize += i->second.narSize;
                     for (auto & ref : i->second.references)
-                        pathsLeft.push(ref);
+                        pathsLeft.push({ .path = ref, .source = std::make_shared<PathWithSource>(path) });
                 } else {
-                    auto info = worker.store.queryPathInfo(path);
+                    auto info = worker.store.queryPathInfo(path.path);
                     closureSize += info->narSize;
                     for (auto & ref : info->references)
-                        pathsLeft.push(ref);
+                        pathsLeft.push({ .path = ref, .source = std::make_shared<PathWithSource>(path) });
                 }
             }
 
-            return std::make_pair(std::move(pathsDone), closureSize);
+            return Closure { std::move(pathsDone), closureSize };
         };
 
         auto applyChecks = [&](const Checks & checks)
@@ -2908,7 +2934,7 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
                     worker.store.printStorePath(info.path), info.narSize, *checks.maxSize);
 
             if (checks.maxClosureSize) {
-                uint64_t closureSize = getClosure(info.path).second;
+                uint64_t closureSize = getClosure(info.path).size;
                 if (closureSize > *checks.maxClosureSize)
                     throw BuildError("closure of path '%s' is too large at %d bytes; limit is %d bytes",
                         worker.store.printStorePath(info.path), closureSize, *checks.maxClosureSize);
@@ -2931,32 +2957,51 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
                         throw BuildError("derivation contains an illegal reference specifier '%s'", i);
                 }
 
-                auto used = recursive
-                    ? getClosure(info.path).first
-                    : info.references;
+                std::map<StorePath, std::shared_ptr<PathWithSource>> used;
+                if (recursive) {
+                    used = getClosure(info.path).pathsWithSources;
+                } else {
+                    for (auto & ref : info.references)
+                        used.insert({ref, std::make_shared<PathWithSource>(PathWithSource { .path = info.path, .source = nullptr })});
+                }
 
                 if (recursive && checks.ignoreSelfRefs)
                     used.erase(info.path);
 
-                StorePathSet badPaths;
+                std::map<StorePath, std::shared_ptr<PathWithSource>> badPaths;
 
-                for (auto & i : used)
+                for (auto & [i, source] : used)
                     if (allowed) {
                         if (!spec.count(i))
-                            badPaths.insert(i);
+                            badPaths.insert({i, source});
                     } else {
                         if (spec.count(i))
-                            badPaths.insert(i);
+                            badPaths.insert({i, source});
                     }
 
                 if (!badPaths.empty()) {
                     std::string badPathsStr;
-                    for (auto & i : badPaths) {
-                        badPathsStr += "\n  ";
-                        badPathsStr += worker.store.printStorePath(i);
+
+                    if (recursive) {
+                        for (auto & [i, source] : badPaths) {
+                            badPathsStr += "\n  { ";
+                            badPathsStr += source->showChain(worker.store);
+                            badPathsStr += " -> ";
+                            badPathsStr += worker.store.printStorePath(i);
+                            badPathsStr += " }";
+                        }
+                        // Consider working with paths in a more stable order (https://github.com/NixOS/nix/issues/10875)
+                        // and/or get all possible chains and present them in the `nix-store -q --tree` format.
+                        throw BuildError("output '%s' is not allowed to refer to the following paths.\nShown below are chains that lead to the forbidden path(s). More may exist, in which case this pick is arbitrary.%s",
+                            worker.store.printStorePath(info.path), badPathsStr);
+                    } else {
+                        for (auto & [i, source] : badPaths) {
+                            badPathsStr += "\n  ";
+                            badPathsStr += worker.store.printStorePath(i);
+                        }
+                        throw BuildError("output '%s' is not allowed to have direct references to the following paths:%s",
+                            worker.store.printStorePath(info.path), badPathsStr);
                     }
-                    throw BuildError("output '%s' is not allowed to refer to the following paths:%s",
-                        worker.store.printStorePath(info.path), badPathsStr);
                 }
             };
 
