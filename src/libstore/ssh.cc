@@ -41,7 +41,7 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
 {
     auto state(state_.lock());
 
-    for (auto & i : tokenizeString<Strings>(getEnv("NIX_SSHOPTS").value_or("")))
+    for (auto & i : shellSplitString(getEnv("NIX_SSHOPTS").value_or("")))
         args.push_back(i);
     if (!keyFile.empty())
         args.insert(args.end(), {"-i", keyFile});

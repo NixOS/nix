@@ -71,4 +71,11 @@ extern template std::string dropEmptyInitThenConcatStringsSep(std::string_view, 
 extern template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const std::set<std::string> &);
 extern template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const std::vector<std::string> &);
 
+/**
+ * Shell split string: split a string into shell arguments, respecting quotes and backslashes.
+ *
+ * Used for NIX_SSHOPTS handling, which previously used `tokenizeString` and was broken by
+ * Arguments that need to be passed to ssh with spaces in them.
+ */
+std::list<std::string> shellSplitString(std::string_view s);
 }
