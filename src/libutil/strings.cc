@@ -53,64 +53,102 @@ template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const s
  *
  * Used for NIX_SSHOPTS handling, which previously used `tokenizeString` and was broken by
  * Arguments that need to be passed to ssh with spaces in them.
+ *
+ * Read https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html for the
+ * POSIX shell specification, which is technically what we are implementing here.
  */
 std::list<std::string> shellSplitString(std::string_view s)
 {
     std::list<std::string> result;
     std::string current;
-    bool inQuoteSingle = false;
-    bool inQuoteDouble = false;
-    bool escaped = false;
-    bool lastCharWasQuote = false;
-    for (char c : s) {
-        lastCharWasQuote = false;
-        if (escaped) {
-            current.push_back(c);
-            escaped = false;
-            continue;
+    bool startedCurrent = false;
+    bool escaping = false;
+
+    auto pushCurrent = [&]() {
+        if (startedCurrent) {
+            result.push_back(current);
+            current.clear();
+            startedCurrent = false;
         }
-        if (c == '\\') {
-            escaped = true;
-            continue;
-        }
-        if (c == '\'') {
-            if (inQuoteSingle) {
-                inQuoteSingle = false;
-                lastCharWasQuote = true;
-            } else if (!inQuoteDouble) {
-                inQuoteSingle = true;
-                lastCharWasQuote = true;
-            } else {
-                current.push_back(c);
-            }
-            continue;
-        }
-        if (c == '"') {
-            if (inQuoteDouble) {
-                inQuoteDouble = false;
-                lastCharWasQuote = true;
-            } else if (!inQuoteSingle) {
-                inQuoteDouble = true;
-                lastCharWasQuote = true;
-            } else {
-                current.push_back(c);
-            }
-            continue;
-        }
-        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-            if (inQuoteSingle || inQuoteDouble) {
-                current.push_back(c);
-            } else {
-                result.push_back(current);
-                current.clear();
-            }
-            continue;
-        }
+    };
+
+    auto pushChar = [&](char c) {
         current.push_back(c);
+        startedCurrent = true;
+    };
+
+    auto pop = [&]() {
+        auto c = s[0];
+        s.remove_prefix(1);
+        return c;
+    };
+
+    auto inDoubleQuotes = [&]() {
+        startedCurrent = true;
+        // in double quotes, escaping with backslash is only effective for $, `, ", and backslash
+        while (!s.empty()) {
+            auto c = pop();
+            if (escaping) {
+                switch (c) {
+                case '$':
+                case '`':
+                case '"':
+                case '\\':
+                    pushChar(c);
+                    break;
+                default:
+                    pushChar('\\');
+                    pushChar(c);
+                    break;
+                }
+                escaping = false;
+            } else if (c == '\\') {
+                escaping = true;
+            } else if (c == '"') {
+                return;
+            } else {
+                pushChar(c);
+            }
+        }
+        if (s.empty()) {
+            throw std::runtime_error("unterminated double quote (probably in NIX_SSHOPTS)");
+        }
+    };
+
+    auto inSingleQuotes = [&]() {
+        startedCurrent = true;
+        while (!s.empty()) {
+            auto c = pop();
+            if (c == '\'') {
+                return;
+            }
+            pushChar(c);
+        }
+        if (s.empty()) {
+            throw std::runtime_error("unterminated single quote (probably in NIX_SSHOPTS)");
+        }
+    };
+
+    while (!s.empty()) {
+        auto c = pop();
+        if (escaping) {
+            pushChar(c);
+            escaping = false;
+        } else if (c == '\\') {
+            escaping = true;
+        } else if (c == ' ' || c == '\t') {
+            pushCurrent();
+        } else if (c == '"') {
+            inDoubleQuotes();
+        } else if (c == '\'') {
+            inSingleQuotes();
+        } else {
+            pushChar(c);
+        }
     }
-    if (!current.empty() || lastCharWasQuote) {
-        result.push_back(current);
-    }
+
+    pushCurrent();
+
     return result;
 }
 } // namespace nix
