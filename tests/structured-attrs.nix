@@ -38,6 +38,12 @@ mkDerivation {
     [[ $json =~ '"narSize":288' ]]
     [[ $json =~ '"closureSize":288' ]]
     [[ $json =~ '"references":[]' ]]
+
+    [[ -e "$NIX_ATTRS_SH_FILE" ]]
+    [[ -e "$NIX_ATTRS_JSON_FILE" ]]
+
+    [[ "$(<"$NIX_ATTRS_SH_FILE")" = "$(<.attrs.sh)" ]]
+    [[ "$(<"$NIX_ATTRS_JSON_FILE")" = "$(<.attrs.json)" ]]
   '';
 
   buildInputs = [ "a" "b" "c" 123 "'" "\"" null ];
