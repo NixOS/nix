@@ -51,7 +51,7 @@
     # memorize the revision
     bad_lfs_rev = client.succeed(f"{repo.git} rev-parse HEAD").strip()
 
-    # prove that it can be cloned with regular git first
+    # test assumption that it can be cloned with regular git first
     # (here we see the warning as stated above)
     with TemporaryDirectory() as tempdir:
       client.succeed(f"git clone -n {repo.remote} {tempdir} >&2")

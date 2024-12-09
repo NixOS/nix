@@ -726,7 +726,7 @@ struct GitSourceAccessor : SourceAccessor
                 try {
                     _lfsFetch.fetch(blob.get(), pathStr, sink, sizeCallback);
                 } catch (Error &e) {
-                    e.addTrace({}, "while smudging git-lfs file '%s' (callback interface)", pathStr);
+                    e.addTrace({}, "while reading git-lfs file '%s'", pathStr);
                     throw;
                 }
                 return;

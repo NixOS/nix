@@ -313,7 +313,7 @@ std::optional<Md> parseLfsMetadata(const std::string & content, const std::strin
 }
 
 // there's already a ParseURL here
-// https://github.com/b-camacho/nix/blob/ef6fa54e05cd4134ec41b0d64c1a16db46237f83/src/libutil/url.cc#L13 but that does
+// https://github.com/NixOS/nix/blob/ef6fa54e05cd4134ec41b0d64c1a16db46237f83/src/libutil/url.cc#L13 but that does
 // not handle git's custom scp-like syntax
 GitUrl parseGitUrl(const std::string & url)
 {
