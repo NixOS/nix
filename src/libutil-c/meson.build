@@ -14,7 +14,7 @@ project('nix-util-c', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
@@ -23,7 +23,7 @@ deps_private_maybe_subproject = [
 ]
 deps_public_maybe_subproject = [
 ]
-subdir('build-utils-meson/subprojects')
+subdir('nix-meson-build-support/subprojects')
 
 # TODO rename, because it will conflict with downstream projects
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
@@ -45,7 +45,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/common')
+subdir('nix-meson-build-support/common')
 
 sources = files(
   'nix_api_util.cc',
@@ -60,8 +60,8 @@ headers = [config_h] + files(
 # TODO don't install this once tests don't use it.
 headers += files('nix_api_util_internal.h')
 
-subdir('build-utils-meson/export-all-symbols')
-subdir('build-utils-meson/windows-version')
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 this_library = library(
   'nixutilc',
@@ -77,4 +77,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-subdir('build-utils-meson/export')
+subdir('nix-meson-build-support/export')
