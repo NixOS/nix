@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include "http-binary-cache-store.hh"
+
 #include <string>
 #include <future>
 
@@ -64,6 +66,8 @@ struct FileTransferRequest
     std::string expectedETag;
     bool verifyTLS = true;
     bool head = false;
+    HttpAuthMethod authmethod = HttpAuthMethod::BASIC;
+    std::string bearer_token;
     size_t tries = fileTransferSettings.tries;
     unsigned int baseRetryTimeMs = 250;
     ActivityId parentAct;
