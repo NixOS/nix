@@ -12,6 +12,8 @@
       hooks = {
         clang-format = {
           enable = true;
+          # https://github.com/cachix/git-hooks.nix/pull/532
+          package = pkgs.llvmPackages_latest.clang-tools;
           excludes = [
             # We don't want to format test data
             # ''tests/(?!nixos/).*\.nix''
