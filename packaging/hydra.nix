@@ -19,11 +19,11 @@ let
   testNixVersions = pkgs: daemon:
     pkgs.nixComponents.nix-functional-tests.override {
       pname =
-        "nix-tests"
+        "nix-daemon-compat-tests"
         + lib.optionalString
           (lib.versionAtLeast daemon.version "2.4pre20211005" &&
            lib.versionAtLeast pkgs.nix.version "2.4pre20211005")
-          "-${pkgs.nix.version}-against-${daemon.version}";
+          "-${pkgs.nix.version}-with-daemon-${daemon.version}";
 
       test-daemon = daemon;
     };
