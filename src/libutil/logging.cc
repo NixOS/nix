@@ -335,7 +335,7 @@ bool handleJSONLogMessage(nlohmann::json & json,
         return true;
     } catch (const nlohmann::json::exception &e) {
         warn(
-            "warning: Unable to handle a JSON message from %s: %s",
+            "Unable to handle a JSON message from %s: %s",
             Uncolored(source),
             e.what()
         );
