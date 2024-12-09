@@ -81,7 +81,7 @@ FlakeRef parseFlakeRef(
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
  */
-std::optional<FlakeRef> maybeParseFlake(
+std::optional<FlakeRef> maybeParseFlakeRef(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
     const std::optional<Path> & baseDir = {});
