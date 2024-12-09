@@ -28,3 +28,6 @@ outp="$(nix-build -E \
 test -d "$outp"
 
 nix log "$outp"
+
+# Build works despite ill-formed structured build log entries.
+expectStderr 0 nix build -f ./logging/unusual-logging.nix --no-link | grepQuiet 'warning: Unable to handle a JSON message from the derivation builder:'
