@@ -14,7 +14,7 @@ project('nix-fetchers', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
@@ -24,7 +24,7 @@ deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
 ]
-subdir('build-utils-meson/subprojects')
+subdir('nix-meson-build-support/subprojects')
 
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
@@ -41,7 +41,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/common')
+subdir('nix-meson-build-support/common')
 
 sources = files(
   'attrs.cc',
@@ -90,4 +90,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-subdir('build-utils-meson/export')
+subdir('nix-meson-build-support/export')

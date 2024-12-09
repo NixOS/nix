@@ -14,7 +14,7 @@ project('nix-expr', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
@@ -25,7 +25,7 @@ deps_public_maybe_subproject = [
   dependency('nix-store'),
   dependency('nix-fetchers'),
 ]
-subdir('build-utils-meson/subprojects')
+subdir('nix-meson-build-support/subprojects')
 
 boost = dependency(
   'boost',
@@ -77,7 +77,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/common')
+subdir('nix-meson-build-support/common')
 
 parser_tab = custom_target(
   input : 'parser.y',
@@ -121,7 +121,7 @@ lexer_tab = custom_target(
   install_dir : get_option('includedir') / 'nix',
 )
 
-subdir('build-utils-meson/generate-header')
+subdir('nix-meson-build-support/generate-header')
 
 generated_headers = []
 foreach header : [
@@ -205,4 +205,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-subdir('build-utils-meson/export')
+subdir('nix-meson-build-support/export')

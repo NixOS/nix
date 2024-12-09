@@ -14,7 +14,7 @@ project('nix-flake-c', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
@@ -29,7 +29,7 @@ deps_public_maybe_subproject = [
   dependency('nix-store-c'),
   dependency('nix-expr-c'),
 ]
-subdir('build-utils-meson/subprojects')
+subdir('nix-meson-build-support/subprojects')
 
 # TODO rename, because it will conflict with downstream projects
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
@@ -58,7 +58,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/common')
+subdir('nix-meson-build-support/common')
 
 sources = files(
   'nix_api_flake.cc',
@@ -73,8 +73,8 @@ headers = [config_h] + files(
 # TODO move this header to libexpr, maybe don't use it in tests?
 headers += files('nix_api_flake.h')
 
-subdir('build-utils-meson/export-all-symbols')
-subdir('build-utils-meson/windows-version')
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 this_library = library(
   'nixflakec',
@@ -90,4 +90,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-subdir('build-utils-meson/export')
+subdir('nix-meson-build-support/export')
