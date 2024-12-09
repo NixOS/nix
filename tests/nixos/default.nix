@@ -24,6 +24,8 @@ let
         # TODO: decide which packaging stage to use. `nix-cli` is efficient, but not the same as the user-facing `everything.nix` package (`default`). Perhaps a good compromise is `everything.nix` + `noTests` defined above?
         nix.package = nixpkgsFor.${system}.native.nixComponents.nix-cli;
 
+        documentation.enable = false;
+
         # this links against nix and might break with our git version.
         system.tools.nixos-option.enable = false;
       };
