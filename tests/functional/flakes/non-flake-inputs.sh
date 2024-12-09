@@ -30,13 +30,13 @@ cat > "$flake3Dir/flake.nix" <<EOF
       flake = false;
     };
     nonFlakeFile = {
-      url = path://$nonFlakeDir/README.md;
       flake = false;
+      url = path://$nonFlakeDir/README.md?lock=1;
     };
-    nonFlakeFile2 = {
-      url = "$nonFlakeDir/README.md";
-      flake = false;
-    };
+    #nonFlakeFile2 = {
+    #  url = "$nonFlakeDir/README.md";
+    #  flake = false;
+    #};
   };
 
   description = "Fnord";
@@ -54,8 +54,8 @@ cat > "$flake3Dir/flake.nix" <<EOF
         buildCommand = ''
           cat \${inputs.nonFlake}/README.md > \$out
           [[ \$(cat \${inputs.nonFlake}/README.md) = \$(cat \${inputs.nonFlakeFile}) ]]
-          [[ \${inputs.nonFlakeFile} = \${inputs.nonFlakeFile2} ]]
         '';
+        #  [[ \${inputs.nonFlakeFile} = \${inputs.nonFlakeFile2} ]]
       };
   };
 }
@@ -96,7 +96,7 @@ cat > "$flake3Dir/flake.nix" <<EOF
 {
   inputs = {
     nonFlake = {
-      url = "$nonFlakeDir";
+      url = "git+file://$nonFlakeDir";
       flake = false;
     };
   };

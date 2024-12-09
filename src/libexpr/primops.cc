@@ -76,6 +76,9 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
                 if (maybePathsOut)
                     maybePathsOut->emplace(d.drvPath);
             },
+            [&](const NixStringContextElem::SourceAccessor & a) {
+                assert(false); // FIXME
+            }
         }, c.raw);
     }
 
@@ -256,7 +259,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
     auto path = realisePath(state, pos, vPath, std::nullopt);
     auto path2 = path.path.abs();
 
-    // FIXME
+    // FIXME: should only work for rootFS
     auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
         if (!state.store->isStorePath(path2))
             return std::nullopt;
@@ -372,6 +375,9 @@ extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
 void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    throw UnimplementedError("importNative");
+
+    #if 0
     auto path = realisePath(state, pos, *args[0]);
 
     std::string sym(state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.importNative"));
@@ -393,6 +399,7 @@ void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Valu
     (func)(state, v);
 
     /* We don't dlclose because v may be a primop referencing a function in the shared object file */
+    #endif
 }
 
 
@@ -831,8 +838,9 @@ static RegisterPrimOp primop_abort({
     {
         NixStringContext context;
         auto s = state.coerceToString(pos, *args[0], context,
-                "while evaluating the error message passed to builtins.abort").toOwned();
-        state.error<Abort>("evaluation aborted with the following error message: '%1%'", s).setIsFromExpr().debugThrow();
+            "while evaluating the error message passed to 'builtins.abort'").toOwned();
+        state.error<Abort>("evaluation aborted with the following error message: '%1%'",
+            state.prettyPrintPaths(s)).setIsFromExpr().debugThrow();
     }
 });
 
@@ -850,8 +858,8 @@ static RegisterPrimOp primop_throw({
     {
       NixStringContext context;
       auto s = state.coerceToString(pos, *args[0], context,
-              "while evaluating the error message passed to builtin.throw").toOwned();
-      state.error<ThrownError>(s).setIsFromExpr().debugThrow();
+          "while evaluating the error message passed to 'builtin.throw'").toOwned();
+      state.error<ThrownError>(state.prettyPrintPaths(s)).setIsFromExpr().debugThrow();
     }
 });
 
@@ -863,9 +871,9 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
     } catch (Error & e) {
         NixStringContext context;
         auto message = state.coerceToString(pos, *args[0], context,
-                "while evaluating the error message passed to builtins.addErrorContext",
+                "while evaluating the error message passed to 'builtins.addErrorContext'",
                 false, false).toOwned();
-        e.addTrace(nullptr, HintFmt(message), TracePrint::Always);
+        e.addTrace(nullptr, HintFmt(state.prettyPrintPaths(message)), TracePrint::Always);
         throw;
     }
 }
@@ -1043,7 +1051,7 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
 {
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nString)
-        printError("trace: %1%", args[0]->string_view());
+        printError("trace: %1%", state.prettyPrintPaths(args[0]->string_view()));
     else
         printError("trace: %1%", ValuePrinter(state, *args[0]));
     if (state.settings.builtinsTraceDebugger) {
@@ -1402,6 +1410,8 @@ static void derivationStrictInternal(
     /* Everything in the context of the strings in the derivation
        attributes should be added as dependencies of the resulting
        derivation. */
+    StringMap rewrites;
+
     for (auto & c : context) {
         std::visit(overloaded {
             /* Since this allows the builder to gain access to every
@@ -1426,8 +1436,36 @@ static void derivationStrictInternal(
             [&](const NixStringContextElem::Opaque & o) {
                 drv.inputSrcs.insert(o.path);
             },
+            [&](const NixStringContextElem::SourceAccessor & a) {
+                /* Copy a virtual path (from encodePath()) to the
+                   store. */
+                auto accessor = state.sourceAccessors.find(a.accessor);
+                assert(accessor != state.sourceAccessors.end());
+                SourcePath path{accessor->second};
+                auto storePath = fetchToStore(
+                    *state.store,
+                    path,
+                    settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy);
+                debug("lazily copied '%s' -> '%s'", path, state.store->printStorePath(storePath));
+                rewrites.emplace(fmt("lazylazy0000000000000000%08d", a.accessor), storePath.hashPart());
+                drv.inputSrcs.insert(storePath);
+            }
         }, c.raw);
     }
+
+    /* Rewrite virtual paths (from encodePath()) to real store paths. */
+    drv.applyRewrites(rewrites);
+
+    /* For backward compatibility, rewrite virtual paths without
+       context (e.g. passing `toString ./foo`) to store paths that
+       don't exist. This is a bug in user code (since those strings
+       don't have a context, so aren't accessible from a sandbox) but
+       we don't want to change evaluation results.  */
+    for (auto & [name, value] : drv.env)
+        value = state.rewriteVirtualPaths(
+            value,
+            "derivation at %s has an attribute that refers to source tree '%s' without context; this does not work correctly",
+            pos);
 
     /* Do we have all required attributes? */
     if (drv.builder == "")
@@ -1755,14 +1793,19 @@ static RegisterPrimOp primop_baseNameOf({
 });
 
 /* Return the directory of the given path, i.e., everything before the
-   last slash.  Return either a path or a string depending on the type
-   of the argument. */
+   last slash. Return either a path or a string depending on the type
+   of the argument. For backwards compatibility, the parent of a tree
+   other than rootFS is the store directory. */
 static void prim_dirOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nPath) {
         auto path = args[0]->path();
-        v.mkPath(path.path.isRoot() ? path : path.parent());
+        v.mkPath(path.path.isRoot()
+            ? path.accessor != state.rootFS
+            ? SourcePath{state.rootFS, CanonPath(state.store->storeDir)}
+            : SourcePath{state.rootFS}
+            : path.parent());
     } else {
         NixStringContext context;
         auto path = state.coerceToString(pos, *args[0], context,
@@ -1797,6 +1840,7 @@ static void prim_readFile(EvalState & state, const PosIdx pos, Value * * args, V
     StorePathSet refs;
     if (state.store->isInStore(path.path.abs())) {
         try {
+            // FIXME: only do queryPathInfo if path.accessor is the store accessor
             refs = state.store->queryPathInfo(state.store->toStorePath(path.path.abs()).first)->references;
         } catch (Error &) { // FIXME: should be InvalidPathError
         }
@@ -2324,6 +2368,11 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
     std::string name(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.toFile"));
     std::string contents(state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.toFile"));
 
+    contents = state.rewriteVirtualPaths(
+        contents,
+        "call to `builtins.toFile` at %s refers to source tree '%s' without context; this does not work correctly",
+        pos);
+
     StorePathSet refs;
 
     for (auto c : context) {
@@ -2443,7 +2492,13 @@ bool EvalState::callPathFilter(
     /* Call the filter function.  The first argument is the path, the
        second is a string indicating the type of the file. */
     Value arg1;
-    arg1.mkString(path.path.abs());
+    if (path.accessor == rootFS)
+        arg1.mkString(path.path.abs());
+    else
+        /* Backwards compatibility: encode the path as a lazy store
+           path string with context so that e.g. `dirOf path ==
+           "/nix/store"`. */
+        mkPathString(arg1, path);
 
     // assert that type is not "unknown"
     Value * args []{&arg1, fileTypeToString(*this, st.type)};
@@ -2496,6 +2551,10 @@ static void addPath(
                 *expectedHash,
                 {}));
 
+        // FIXME: instead of a store path, we could return a
+        // SourcePath that applies the filter lazily and copies to the
+        // store on-demand.
+
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
             auto dstPath = fetchToStore(
                 *state.store,
@@ -2527,7 +2586,16 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
         "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterSource");
 
-    addPath(state, pos, path.baseName(), path, args[0], ContentAddressMethod::Raw::NixArchive, std::nullopt, v, context);
+    addPath(
+        state,
+        pos,
+        state.computeBaseName(path),
+        path,
+        args[0],
+        ContentAddressMethod::Raw::NixArchive,
+        std::nullopt,
+        v,
+        context);
 }
 
 static RegisterPrimOp primop_filterSource({
