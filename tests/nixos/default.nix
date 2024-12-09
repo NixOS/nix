@@ -18,6 +18,16 @@ let
       defaults = {
         nixpkgs.pkgs = nixpkgsFor.${system}.native;
         nix.checkAllErrors = false;
+<<<<<<< HEAD
+=======
+        # TODO: decide which packaging stage to use. `nix-cli` is efficient, but not the same as the user-facing `everything.nix` package (`default`). Perhaps a good compromise is `everything.nix` + `noTests` defined above?
+        nix.package = nixpkgsFor.${system}.native.nixComponents.nix-cli;
+
+        # Evaluate VMs faster
+        documentation.enable = false;
+        # this links against nix and might break with our git version.
+        system.tools.nixos-option.enable = false;
+>>>>>>> 20ee83fff (tests/nixos: disable nixos-option)
       };
       _module.args.nixpkgs = nixpkgs;
       _module.args.system = system;
