@@ -23,6 +23,11 @@ let
         nix.checkAllErrors = false;
         # TODO: decide which packaging stage to use. `nix-cli` is efficient, but not the same as the user-facing `everything.nix` package (`default`). Perhaps a good compromise is `everything.nix` + `noTests` defined above?
         nix.package = nixpkgsFor.${system}.native.nixComponents.nix-cli;
+
+        documentation.enable = false;
+
+        # this links against nix and might break with our git version.
+        system.tools.nixos-option.enable = false;
       };
       _module.args.nixpkgs = nixpkgs;
       _module.args.system = system;
@@ -56,18 +61,9 @@ let
     nix.package = lib.mkForce pkgs.nixVersions.nix_2_3;
   };
 
-  otherNixes.nix_2_13.setNixPackage = { lib, pkgs, ... }: {
+  otherNixes.nix_2_24.setNixPackage = { lib, pkgs, ... }: {
     imports = [ checkOverrideNixVersion ];
-    nix.package = lib.mkForce (
-      self.inputs.nixpkgs-23-11.legacyPackages.${pkgs.stdenv.hostPlatform.system}.nixVersions.nix_2_13.overrideAttrs (o: {
-        meta = o.meta // { knownVulnerabilities = []; };
-      })
-    );
-  };
-
-  otherNixes.nix_2_18.setNixPackage = { lib, pkgs, ... }: {
-    imports = [ checkOverrideNixVersion ];
-    nix.package = lib.mkForce pkgs.nixVersions.nix_2_18;
+    nix.package = lib.mkForce pkgs.nixVersions.nix_2_24;
   };
 
 in
