@@ -5,7 +5,6 @@ queue_rules:
       - check-success=tests (macos-latest)
       - check-success=tests (ubuntu-latest)
       - check-success=vm_tests
-    merge_method: rebase
     batch_size: 5
 
 pull_request_rules:
