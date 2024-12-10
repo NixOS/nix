@@ -49,6 +49,8 @@ struct FlakeRef
 
     bool operator ==(const FlakeRef & other) const = default;
 
+    auto operator <=>(const FlakeRef &) const = default;
+
     FlakeRef(fetchers::Input && input, const Path & subdir)
         : input(std::move(input)), subdir(subdir)
     { }
