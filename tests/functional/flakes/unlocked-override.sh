@@ -30,3 +30,6 @@ git -C "$flake2Dir" add flake.nix
 echo 456 > "$flake1Dir"/x.nix
 
 [[ $(nix eval --json "$flake2Dir#x" --override-input flake1 "$TEST_ROOT/flake1") = 456 ]]
+
+expectStderr 1 nix flake lock "$flake2Dir" --override-input flake1 "$TEST_ROOT/flake1" |
+  grepQuiet "cannot write lock file.*because it has an unlocked input"
