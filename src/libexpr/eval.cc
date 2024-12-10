@@ -3178,5 +3178,14 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v) {
     return v.print(str);
 }
 
+void forceNoNullByte(std::string_view s)
+{
+    if (s.find('\0') != s.npos) {
+        using namespace std::string_view_literals;
+        auto str = replaceStrings(std::string(s), "\0"sv, "␀"sv);
+        throw Error("input string '%s' cannot be represented as Nix string because it contains null bytes", str);
+    }
+}
+
 
 }
