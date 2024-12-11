@@ -45,7 +45,10 @@ struct Explicit {
 
     bool operator ==(const Explicit<T> & other) const = default;
 
-    auto operator <=>(const Explicit<T> & other) const = default;
+    bool operator <(const Explicit<T> & other) const
+    {
+        return t < other.t;
+    }
 };
 
 

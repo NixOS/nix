@@ -49,7 +49,10 @@ struct FlakeRef
 
     bool operator ==(const FlakeRef & other) const = default;
 
-    auto operator <=>(const FlakeRef &) const = default;
+    bool operator <(const FlakeRef & other) const
+    {
+        return std::tie(input, subdir) < std::tie(other.input, other.subdir);
+    }
 
     FlakeRef(fetchers::Input && input, const Path & subdir)
         : input(std::move(input)), subdir(subdir)
