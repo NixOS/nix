@@ -172,7 +172,7 @@ Goal::Co DerivationGoal::loadDerivation()
        things being garbage collected while we're busy. */
     worker.evalStore.addTempRoot(drvPath);
 
-    /* Get the derivation. It is probably in the eval store, but it might be inthe main store:
+    /* Get the derivation. It is probably in the eval store, but it might be in the main store:
 
          - Resolved derivation are resolved against main store realisations, and so must be stored there.
 
@@ -181,6 +181,7 @@ Goal::Co DerivationGoal::loadDerivation()
     for (auto * drvStore : { &worker.evalStore, &worker.store }) {
         if (drvStore->isValidPath(drvPath)) {
             drv = std::make_unique<Derivation>(drvStore->readDerivation(drvPath));
+            drvProvenance = drvStore->queryPathInfo(drvPath)->provenance;
             break;
         }
     }

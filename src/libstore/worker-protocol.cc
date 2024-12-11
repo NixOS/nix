@@ -6,6 +6,7 @@
 #include "worker-protocol-impl.hh"
 #include "archive.hh"
 #include "path-info.hh"
+#include "provenance.hh"
 
 #include <chrono>
 #include <nlohmann/json.hpp>
@@ -232,6 +233,10 @@ UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const St
         info.sigs = readStrings<StringSet>(conn.from);
         info.ca = ContentAddress::parseOpt(readString(conn.from));
     }
+    if (conn.features.contains(WorkerProto::featureProvenance))
+        info.provenance =
+            nlohmann::json::parse(readString(conn.from))
+            .template get<std::shared_ptr<const Provenance>>();
     return info;
 }
 
@@ -248,6 +253,8 @@ void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(const StoreDirConfig & 
             << pathInfo.sigs
             << renderContentAddress(pathInfo.ca);
     }
+    if (conn.features.contains(WorkerProto::featureProvenance))
+        conn.to << nlohmann::json(pathInfo.provenance).dump();
 }
 
 
@@ -260,7 +267,7 @@ WorkerProto::ClientHandshakeInfo WorkerProto::Serialise<WorkerProto::ClientHands
     }
 
     if (GET_PROTOCOL_MINOR(conn.version) >= 35) {
-        res.remoteTrustsUs = WorkerProto::Serialise<std::optional<    TrustedFlag>>::read(store, conn);
+        res.remoteTrustsUs = WorkerProto::Serialise<std::optional<TrustedFlag>>::read(store, conn);
     } else {
         // We don't know the answer; protocol to old.
         res.remoteTrustsUs = std::nullopt;

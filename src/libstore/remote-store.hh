@@ -79,7 +79,8 @@ public:
             ContentAddressMethod caMethod,
             HashAlgorithm hashAlgo,
             const StorePathSet & references,
-            RepairFlag repair);
+            RepairFlag repair,
+            std::shared_ptr<const Provenance> provenance);
 
     /**
      * Add a content-addressable store path. `dump` will be drained.
@@ -91,7 +92,8 @@ public:
         ContentAddressMethod hashMethod = FileIngestionMethod::NixArchive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
-        RepairFlag repair = NoRepair) override;
+        RepairFlag repair = NoRepair,
+        std::shared_ptr<const Provenance> provenance = nullptr) override;
 
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;

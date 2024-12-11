@@ -135,8 +135,12 @@ bool BasicDerivation::isBuiltin() const
 }
 
 
-StorePath writeDerivation(Store & store,
-    const Derivation & drv, RepairFlag repair, bool readOnly)
+StorePath writeDerivation(
+    Store & store,
+    const Derivation & drv,
+    RepairFlag repair,
+    bool readOnly,
+    std::shared_ptr<const Provenance> provenance)
 {
     auto references = drv.inputSrcs;
     for (auto & i : drv.inputDrvs.map)
@@ -153,7 +157,15 @@ StorePath writeDerivation(Store & store,
         })
         : ({
             StringSource s { contents };
-            store.addToStoreFromDump(s, suffix, FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, references, repair);
+            store.addToStoreFromDump(
+                s,
+                suffix,
+                FileSerialisationMethod::Flat,
+                ContentAddressMethod::Raw::Text,
+                HashAlgorithm::SHA256,
+                references,
+                repair,
+                provenance);
         });
 }
 

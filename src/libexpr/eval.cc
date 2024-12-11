@@ -20,6 +20,7 @@
 #include "fetch-to-store.hh"
 #include "tarball.hh"
 #include "parser-tab.hh"
+#include "provenance.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -2379,7 +2380,8 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
                 path.baseName(),
                 ContentAddressMethod::Raw::NixArchive,
                 nullptr,
-                repair);
+                repair,
+                getRootProvenance());
             allowPath(dstPath);
             srcToStore.lock()->try_emplace(path, dstPath);
             printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
@@ -3187,5 +3189,16 @@ void forceNoNullByte(std::string_view s)
     }
 }
 
+
+std::shared_ptr<const Provenance> EvalState::getRootProvenance()
+{
+    return rootProvenance;
+}
+
+
+void EvalState::setRootProvenance(std::shared_ptr<const Provenance> provenance)
+{
+    rootProvenance = provenance;
+}
 
 }
