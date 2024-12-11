@@ -84,6 +84,8 @@ Here are some examples of flake references in their URL-like representation:
   repository on GitHub.
 * `github:NixOS/nixpkgs/nixos-20.09`: The `nixos-20.09` branch of the
   `nixpkgs` repository.
+* `github:NixOS/nixpkgs/pull/357207/head`: The `357207` pull request
+   of the nixpkgs repository.
 * `github:NixOS/nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`: A
   specific revision of the `nixpkgs` repository.
 * `github:edolstra/nix-warez?dir=blender`: A flake in a subdirectory
@@ -148,7 +150,7 @@ reference types:
 
 * `ref`: A Git or Mercurial branch or tag name.
 
-Finally, some attribute are typically not specified by the user, but
+Finally, some attributes are typically not specified by the user, but
 can occur in *locked* flake references and are available to Nix code:
 
 * `revCount`: The number of ancestors of the commit `rev`.
@@ -243,6 +245,9 @@ Currently the `type` attribute can be one of the following:
   * `./sub/dir` (when used on the command line and `dir/flake.nix` is in a git repository)
   * `git+https://example.org/my/repo`
   * `git+https://example.org/my/repo?dir=flake1`
+  * `git+https://example.org/my/repo?shallow=1` A shallow clone of the repository.
+     For large repositories, the shallow clone option can significantly speed up fresh clones compared
+     to non-shallow clones, while still providing faster updates than other fetch methods such as `tarball:` or `github:`.
   * `git+ssh://git@github.com/NixOS/nix?ref=v1.2.3`
   * `git://github.com/edolstra/dwarffs?ref=unstable&rev=e486d8d40e626a20e06d792db8cc5ac5aba9a5b4`
   * `git+file:///home/my-user/some-repo/some-repo`
@@ -665,6 +670,11 @@ following fields:
   cache: `narHash` allows the store path to be computed, while the
   other attributes are necessary because they provide information not
   stored in the store path.
+
+  The attributes in `locked` are considered "final", meaning that they are the only ones that are passed via the arguments of the `outputs` function of a flake.
+  For instance, if `locked` contains a `lastModified` attribute while the fetcher does not return a `lastModified` attribute, then the `lastModified` attribute will be passed to the `outputs` function.
+  Conversely, if `locked` does *not* contain a `lastModified` attribute while the fetcher *does* return a `lastModified` attribute, then no `lastModified` attribute will be passed.
+  If `locked` contains a `lastModifed` attribute and the fetcher returns a `lastModified` attribute, then they must have the same value.
 
 * `flake`: A Boolean denoting whether this is a flake or non-flake
   dependency. Corresponds to the `flake` attribute in the `inputs`

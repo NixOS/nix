@@ -40,8 +40,8 @@ mkMesonLibrary (finalAttrs: {
 
   workDir = ./.;
   fileset = fileset.unions [
-    ../../build-utils-meson
-    ./build-utils-meson
+    ../../nix-meson-build-support
+    ./nix-meson-build-support
     ../../.version
     ./.version
     ./meson.build
@@ -71,6 +71,10 @@ mkMesonLibrary (finalAttrs: {
     nix-util
     nix-store
     nix-fetchers
+  ] ++ finalAttrs.passthru.externalPropagatedBuildInputs;
+
+  # Hack for sake of the dev shell
+  passthru.externalPropagatedBuildInputs = [
     boost
     nlohmann_json
   ] ++ lib.optional enableGC boehmgc;

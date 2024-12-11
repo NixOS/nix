@@ -18,6 +18,7 @@ extern char ** savedArgv;
 class EvalState;
 struct Pos;
 class Store;
+class LocalFSStore;
 
 static constexpr Command::Category catHelp = -1;
 static constexpr Command::Category catSecondary = 100;
@@ -46,7 +47,20 @@ struct StoreCommand : virtual Command
 {
     StoreCommand();
     void run() override;
+
+    /**
+     * Return the default Nix store.
+     */
     ref<Store> getStore();
+
+    /**
+     * Return the destination Nix store.
+     */
+    virtual ref<Store> getDstStore()
+    {
+        return getStore();
+    }
+
     virtual ref<Store> createStore();
     /**
      * Main entry point, with a `Store` provided
@@ -69,7 +83,7 @@ struct CopyCommand : virtual StoreCommand
 
     ref<Store> createStore() override;
 
-    ref<Store> getDstStore();
+    ref<Store> getDstStore() override;
 };
 
 /**
@@ -239,7 +253,7 @@ public:
 
     BuiltPathsCommand(bool recursive = false);
 
-    virtual void run(ref<Store> store, BuiltPaths && paths) = 0;
+    virtual void run(ref<Store> store, BuiltPaths && allPaths, BuiltPaths && rootPaths) = 0;
 
     void run(ref<Store> store, Installables && installables) override;
 
@@ -252,7 +266,7 @@ struct StorePathsCommand : public BuiltPathsCommand
 
     virtual void run(ref<Store> store, StorePaths && storePaths) = 0;
 
-    void run(ref<Store> store, BuiltPaths && paths) override;
+    void run(ref<Store> store, BuiltPaths && allPaths, BuiltPaths && rootPaths) override;
 };
 
 /**
@@ -353,5 +367,15 @@ std::string showVersions(const std::set<std::string> & versions);
 
 void printClosureDiff(
     ref<Store> store, const StorePath & beforePath, const StorePath & afterPath, std::string_view indent);
+
+/**
+ * Create symlinks prefixed by `outLink` to the store paths in
+ * `buildables`.
+ */
+void createOutLinks(
+    const std::filesystem::path & outLink,
+    const BuiltPaths & buildables,
+    LocalFSStore & store,
+    PathSet & symlinks);
 
 }

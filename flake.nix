@@ -124,20 +124,38 @@
           # without "polluting" the top level "`pkgs`" attrset.
           # This also has the benefit of providing us with a distinct set of packages
           # we can iterate over.
-          nixComponents = lib.makeScope final.nixDependencies.newScope (import ./packaging/components.nix {
-            inherit (final) lib;
-            inherit officialRelease;
-            src = self;
-          });
+          nixComponents =
+            lib.makeScopeWithSplicing'
+              {
+                inherit (final) splicePackages;
+                inherit (final.nixDependencies) newScope;
+              }
+              {
+                otherSplices = final.generateSplicesForMkScope "nixComponents";
+                f = import ./packaging/components.nix {
+                  inherit (final) lib;
+                  inherit officialRelease;
+                  src = self;
+                };
+              };
 
           # The dependencies are in their own scope, so that they don't have to be
           # in Nixpkgs top level `pkgs` or `nixComponents`.
-          nixDependencies = lib.makeScope final.newScope (import ./packaging/dependencies.nix {
-            inherit inputs stdenv;
-            pkgs = final;
-          });
+          nixDependencies =
+            lib.makeScopeWithSplicing'
+              {
+                inherit (final) splicePackages;
+                inherit (final) newScope; # layered directly on pkgs, unlike nixComponents above
+              }
+              {
+                otherSplices = final.generateSplicesForMkScope "nixDependencies";
+                f = import ./packaging/dependencies.nix {
+                  inherit inputs stdenv;
+                  pkgs = final;
+                };
+              };
 
-          nix = final.nixComponents.nix;
+          nix = final.nixComponents.nix-cli;
 
           # See https://github.com/NixOS/nixpkgs/pull/214409
           # Remove when fixed in this flake's nixpkgs
@@ -189,7 +207,6 @@
         # system, we should reenable this.
         #perlBindings = self.hydraJobs.perlBindings.${system};
       }
-      /*
       # Add "passthru" tests
       // flatMapAttrs ({
           "" = nixpkgsFor.${system}.native;
@@ -211,7 +228,6 @@
             "${nixpkgsPrefix}nix-functional-tests" = nixpkgs.nixComponents.nix-functional-tests;
           }
         )
-      */
       // devFlake.checks.${system} or {}
       );
 
@@ -220,7 +236,9 @@
           # for which we don't apply the full build matrix such as cross or static.
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
-          default = self.packages.${system}.nix-ng;
+          default = self.packages.${system}.nix;
+          # TODO probably should be `nix-cli`
+          nix = self.packages.${system}.nix-everything;
           nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
@@ -228,7 +246,6 @@
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         // flatMapAttrs
           { # Components we'll iterate over in the upcoming lambda
-            "nix" = { };
             "nix-util" = { };
             "nix-util-c" = { };
             "nix-util-test-support" = { };
@@ -257,10 +274,11 @@
 
             "nix-cli" = { };
 
+            "nix-everything" = { };
+
             "nix-functional-tests" = { supportsCross = false; };
 
             "nix-perl-bindings" = { supportsCross = false; };
-            "nix-ng" = { };
           }
           (pkgName: { supportsCross ? true }: {
               # These attributes go right into `packages.<system>`.

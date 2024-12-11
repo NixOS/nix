@@ -91,9 +91,6 @@ struct Parser {
 
     /**
      * @brief Parse the next character(s)
-     *
-     * @param r
-     * @return std::shared_ptr<Parser>
      */
     virtual void operator()(std::shared_ptr<Parser> & state, Strings & r) = 0;
 
@@ -351,7 +348,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
 
     /* Now that all the other args are processed, run the deferred completions.
      */
-    for (auto d : deferredCompletions)
+    for (const auto & d : deferredCompletions)
         d.completer(*completions, d.n, d.prefix);
 }
 

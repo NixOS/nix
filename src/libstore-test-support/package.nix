@@ -4,6 +4,7 @@
 
 , nix-util-test-support
 , nix-store
+, nix-store-c
 
 , rapidcheck
 
@@ -22,8 +23,8 @@ mkMesonLibrary (finalAttrs: {
 
   workDir = ./.;
   fileset = fileset.unions [
-    ../../build-utils-meson
-    ./build-utils-meson
+    ../../nix-meson-build-support
+    ./nix-meson-build-support
     ../../.version
     ./.version
     ./meson.build
@@ -35,6 +36,7 @@ mkMesonLibrary (finalAttrs: {
   propagatedBuildInputs = [
     nix-util-test-support
     nix-store
+    nix-store-c
     rapidcheck
   ];
 

@@ -22,8 +22,8 @@ mkMesonExecutable (finalAttrs: {
 
   workDir = ./.;
   fileset = fileset.unions ([
-    ../../build-utils-meson
-    ./build-utils-meson
+    ../../nix-meson-build-support
+    ./nix-meson-build-support
     ../../.version
     ./.version
     ./meson.build

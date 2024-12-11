@@ -33,9 +33,8 @@ void emitTreeAttrs(
 
     // FIXME: support arbitrary input attributes.
 
-    auto narHash = input.getNarHash();
-    assert(narHash);
-    attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
+    if (auto narHash = input.getNarHash())
+        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
 
     if (input.getType() == "git")
         attrs.alloc("submodules").mkBool(
@@ -78,6 +77,7 @@ struct FetchTreeParams {
     bool emptyRevFallback = false;
     bool allowNameArgument = false;
     bool isFetchGit = false;
+    bool isFinal = false;
 };
 
 static void fetchTree(
@@ -194,6 +194,13 @@ static void fetchTree(
     }
 
     state.checkURI(input.toURLString());
+
+    if (params.isFinal) {
+        input.attrs.insert_or_assign("__final", Explicit<bool>(true));
+    } else {
+        if (input.isFinal())
+            throw Error("input '%s' is not allowed to use the '__final' attribute", input.to_string());
+    }
 
     auto [storePath, input2] = input.fetchToStore(state.store);
 
@@ -429,6 +436,18 @@ static RegisterPrimOp primop_fetchTree({
     )",
     .fun = prim_fetchTree,
     .experimentalFeature = Xp::FetchTree,
+});
+
+void prim_fetchFinalTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    fetchTree(state, pos, args, v, {.isFinal = true});
+}
+
+static RegisterPrimOp primop_fetchFinalTree({
+    .name = "fetchFinalTree",
+    .args = {"input"},
+    .fun = prim_fetchFinalTree,
+    .internal = true,
 });
 
 static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,

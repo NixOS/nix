@@ -501,7 +501,7 @@ void deletePath(const fs::path & path, uint64_t & bytesFreed)
 
 AutoDelete::AutoDelete() : del{false} {}
 
-AutoDelete::AutoDelete(const fs::path & p, bool recursive) : _path(p)
+AutoDelete::AutoDelete(const std::filesystem::path & p, bool recursive) : _path(p)
 {
     del = true;
     this->recursive = recursive;
@@ -602,7 +602,11 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
 
 void createSymlink(const Path & target, const Path & link)
 {
-    fs::create_symlink(target, link);
+    try {
+        fs::create_symlink(target, link);
+    } catch (fs::filesystem_error & e) {
+        throw SysError("creating symlink '%1%' -> '%2%'", link, target);
+    }
 }
 
 void replaceSymlink(const fs::path & target, const fs::path & link)
@@ -615,10 +619,16 @@ void replaceSymlink(const fs::path & target, const fs::path & link)
             fs::create_symlink(target, tmp);
         } catch (fs::filesystem_error & e) {
             if (e.code() == std::errc::file_exists) continue;
-            throw;
+            throw SysError("creating symlink '%1%' -> '%2%'", tmp, target);
         }
 
-        fs::rename(tmp, link);
+        try {
+            fs::rename(tmp, link);
+        } catch (fs::filesystem_error & e) {
+            if (e.code() == std::errc::file_exists) continue;
+            throw SysError("renaming '%1%' to '%2%'", tmp, link);
+        }
+
 
         break;
     }

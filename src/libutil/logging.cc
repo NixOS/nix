@@ -38,7 +38,7 @@ void Logger::warn(const std::string & msg)
 
 void Logger::writeToStdout(std::string_view s)
 {
-    Descriptor standard_out = getStandardOut();
+    Descriptor standard_out = getStandardOutput();
     writeFull(standard_out, s);
     writeFull(standard_out, "\n");
 }
@@ -118,11 +118,7 @@ void writeToStderr(std::string_view s)
 {
     try {
         writeFull(
-#ifdef _WIN32
-            GetStdHandle(STD_ERROR_HANDLE),
-#else
-            STDERR_FILENO,
-#endif
+            getStandardError(),
             s, false);
     } catch (SystemError & e) {
         /* Ignore failing writes to stderr.  We need to ignore write
@@ -284,61 +280,72 @@ static Logger::Fields getFields(nlohmann::json & json)
     return fields;
 }
 
-std::optional<nlohmann::json> parseJSONMessage(const std::string & msg)
+std::optional<nlohmann::json> parseJSONMessage(const std::string & msg, std::string_view source)
 {
     if (!hasPrefix(msg, "@nix ")) return std::nullopt;
     try {
         return nlohmann::json::parse(std::string(msg, 5));
     } catch (std::exception & e) {
-        printError("bad JSON log message from builder: %s", e.what());
+        printError("bad JSON log message from %s: %s",
+            Uncolored(source),
+            e.what());
     }
     return std::nullopt;
 }
 
 bool handleJSONLogMessage(nlohmann::json & json,
     const Activity & act, std::map<ActivityId, Activity> & activities,
-    bool trusted)
+    std::string_view source, bool trusted)
 {
-    std::string action = json["action"];
+    try {
+        std::string action = json["action"];
 
-    if (action == "start") {
-        auto type = (ActivityType) json["type"];
-        if (trusted || type == actFileTransfer)
-            activities.emplace(std::piecewise_construct,
-                std::forward_as_tuple(json["id"]),
-                std::forward_as_tuple(*logger, (Verbosity) json["level"], type,
-                    json["text"], getFields(json["fields"]), act.id));
+        if (action == "start") {
+            auto type = (ActivityType) json["type"];
+            if (trusted || type == actFileTransfer)
+                activities.emplace(std::piecewise_construct,
+                    std::forward_as_tuple(json["id"]),
+                    std::forward_as_tuple(*logger, (Verbosity) json["level"], type,
+                        json["text"], getFields(json["fields"]), act.id));
+        }
+
+        else if (action == "stop")
+            activities.erase((ActivityId) json["id"]);
+
+        else if (action == "result") {
+            auto i = activities.find((ActivityId) json["id"]);
+            if (i != activities.end())
+                i->second.result((ResultType) json["type"], getFields(json["fields"]));
+        }
+
+        else if (action == "setPhase") {
+            std::string phase = json["phase"];
+            act.result(resSetPhase, phase);
+        }
+
+        else if (action == "msg") {
+            std::string msg = json["msg"];
+            logger->log((Verbosity) json["level"], msg);
+        }
+
+        return true;
+    } catch (const nlohmann::json::exception &e) {
+        warn(
+            "Unable to handle a JSON message from %s: %s",
+            Uncolored(source),
+            e.what()
+        );
+        return false;
     }
-
-    else if (action == "stop")
-        activities.erase((ActivityId) json["id"]);
-
-    else if (action == "result") {
-        auto i = activities.find((ActivityId) json["id"]);
-        if (i != activities.end())
-            i->second.result((ResultType) json["type"], getFields(json["fields"]));
-    }
-
-    else if (action == "setPhase") {
-        std::string phase = json["phase"];
-        act.result(resSetPhase, phase);
-    }
-
-    else if (action == "msg") {
-        std::string msg = json["msg"];
-        logger->log((Verbosity) json["level"], msg);
-    }
-
-    return true;
 }
 
 bool handleJSONLogMessage(const std::string & msg,
-    const Activity & act, std::map<ActivityId, Activity> & activities, bool trusted)
+    const Activity & act, std::map<ActivityId, Activity> & activities, std::string_view source, bool trusted)
 {
-    auto json = parseJSONMessage(msg);
+    auto json = parseJSONMessage(msg, source);
     if (!json) return false;
 
-    return handleJSONLogMessage(*json, act, activities, trusted);
+    return handleJSONLogMessage(*json, act, activities, source, trusted);
 }
 
 Activity::~Activity()

@@ -992,7 +992,10 @@ Goal::Co DerivationGoal::buildDone()
                 auto nixLogCommand = experimentalFeatureSettings.isEnabled(Xp::NixCommand)
                     ? "nix log"
                     : "nix-store -l";
-                msg += fmt("For full logs, run '" ANSI_BOLD "%s %s" ANSI_NORMAL "'.",
+                // The command is on a separate line for easy copying, such as with triple click.
+                // This message will be indented elsewhere, so removing the indentation before the
+                // command will not put it at the start of the line unfortunately.
+                msg += fmt("For full logs, run:\n  " ANSI_BOLD "%s %s" ANSI_NORMAL,
                     nixLogCommand,
                     worker.store.printStorePath(drvPath));
             }
@@ -1169,7 +1172,7 @@ HookReply DerivationGoal::tryBuildHook()
                     throw;
                 }
             }();
-            if (handleJSONLogMessage(s, worker.act, worker.hook->activities, true))
+            if (handleJSONLogMessage(s, worker.act, worker.hook->activities, "the build hook", true))
                 ;
             else if (s.substr(0, 2) == "# ") {
                 reply = s.substr(2);
@@ -1237,7 +1240,7 @@ HookReply DerivationGoal::tryBuildHook()
     hook->toHook.writeSide.close();
 
     /* Create the log file and pipe. */
-    Path logFile = openLogFile();
+    [[maybe_unused]] Path logFile = openLogFile();
 
     std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());
@@ -1354,9 +1357,9 @@ void DerivationGoal::handleChildOutput(Descriptor fd, std::string_view data)
     if (hook && fd == hook->fromHook.readSide.get()) {
         for (auto c : data)
             if (c == '\n') {
-                auto json = parseJSONMessage(currentHookLine);
+                auto json = parseJSONMessage(currentHookLine, "the derivation builder");
                 if (json) {
-                    auto s = handleJSONLogMessage(*json, worker.act, hook->activities, true);
+                    auto s = handleJSONLogMessage(*json, worker.act, hook->activities, "the derivation builder", true);
                     // ensure that logs from a builder using `ssh-ng://` as protocol
                     // are also available to `nix log`.
                     if (s && !isWrittenToLog && logSink) {
@@ -1398,7 +1401,7 @@ void DerivationGoal::handleEOF(Descriptor fd)
 
 void DerivationGoal::flushLine()
 {
-    if (handleJSONLogMessage(currentLogLine, *act, builderActivities, false))
+    if (handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false))
         ;
 
     else {

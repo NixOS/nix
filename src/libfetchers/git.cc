@@ -514,8 +514,6 @@ struct GitInputScheme : InputScheme
 
         auto origRev = input.getRev();
 
-        std::string name = input.getName();
-
         auto originalRef = input.getRef();
         auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo);
         input.attrs.insert_or_assign("ref", ref);

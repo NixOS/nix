@@ -35,20 +35,20 @@ To build Nix itself in this shell:
 
 ```console
 [nix-shell]$ mesonFlags+=" --prefix=$(pwd)/outputs/out"
-[nix-shell]$ dontAddPrefix=1 mesonConfigurePhase
-[nix-shell]$ ninjaBuildPhase
+[nix-shell]$ dontAddPrefix=1 configurePhase
+[nix-shell]$ buildPhase
 ```
 
 To test it:
 
 ```console
-[nix-shell]$ mesonCheckPhase
+[nix-shell]$ checkPhase
 ```
 
 To install it in `$(pwd)/outputs`:
 
 ```console
-[nix-shell]$ ninjaInstallPhase
+[nix-shell]$ installPhase
 [nix-shell]$ ./outputs/out/bin/nix --version
 nix (Nix) 2.12
 ```
@@ -90,20 +90,20 @@ $ nix develop .#native-clangStdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ mesonConfigurePhase
-[nix-shell]$ ninjaBuildPhase
+[nix-shell]$ configurePhase
+[nix-shell]$ buildPhase
 ```
 
 To test it:
 
 ```console
-[nix-shell]$ mesonCheckPhase
+[nix-shell]$ checkPhase
 ```
 
 To install it in `$(pwd)/outputs`:
 
 ```console
-[nix-shell]$ ninjaInstallPhase
+[nix-shell]$ installPhase
 [nix-shell]$ nix --version
 nix (Nix) 2.12
 ```
@@ -167,7 +167,7 @@ It is useful to perform multiple cross and native builds on the same source tree
 for example to ensure that better support for one platform doesn't break the build for another.
 Meson thankfully makes this very easy by confining all build products to the build directory --- one simple shares the source directory between multiple build directories, each of which contains the build for Nix to a different platform.
 
-Nixpkgs's `mesonConfigurePhase` always chooses `build` in the current directory as the name and location of the build.
+Nixpkgs's `configurePhase` always chooses `build` in the current directory as the name and location of the build.
 This makes having multiple build directories slightly more inconvenient.
 The good news is that Meson/Ninja seem to cope well with relocating the build directory after it is created.
 
@@ -176,13 +176,13 @@ Here's how to do that
 1. Configure as usual
 
    ```bash
-   mesonConfigurePhase
+   configurePhase
    ```
 
 2. Rename the build directory
 
    ```bash
-   cd .. # since `mesonConfigurePhase` cd'd inside
+   cd .. # since `configurePhase` cd'd inside
    mv build build-linux # or whatever name we want
    cd build-linux
    ```
@@ -190,7 +190,7 @@ Here's how to do that
 3. Build as usual
 
    ```bash
-   ninjaBuildPhase
+   buildPhase
    ```
 
 > **N.B.**

@@ -106,7 +106,7 @@ TarArchive::TarArchive(Source & source, bool raw, std::optional<std::string> com
         "Failed to open archive (%s)");
 }
 
-TarArchive::TarArchive(const fs::path & path)
+TarArchive::TarArchive(const std::filesystem::path & path)
     : archive{archive_read_new()}
     , buffer(defaultBufferSize)
 {

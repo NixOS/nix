@@ -690,7 +690,7 @@ place_channel_configuration() {
     if [ -z "${NIX_INSTALLER_NO_CHANNEL_ADD:-}" ]; then
         echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$SCRATCH/.nix-channels"
         _sudo "to set up the default system channel (part 1)" \
-            install -m 0664 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
+            install -m 0644 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
     fi
 }
 
@@ -964,7 +964,7 @@ $NIX_EXTRA_CONF
 build-users-group = $NIX_BUILD_GROUP_NAME
 EOF
     _sudo "to place the default nix daemon configuration (part 2)" \
-          install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
+          install -m 0644 "$SCRATCH/nix.conf" /etc/nix/nix.conf
 }
 
 

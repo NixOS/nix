@@ -118,7 +118,7 @@ std::string NarInfo::to_string(const Store & store) const
     if (deriver)
         res += "Deriver: " + std::string(deriver->to_string()) + "\n";
 
-    for (auto sig : sigs)
+    for (const auto & sig : sigs)
         res += "Sig: " + sig + "\n";
 
     if (ca)

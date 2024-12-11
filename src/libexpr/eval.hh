@@ -91,7 +91,7 @@ struct PrimOp
     const char * doc = nullptr;
 
     /**
-     * Add a trace item, `while calling the '<name>' builtin`
+     * Add a trace item, while calling the `<name>` builtin.
      *
      * This is used to remove the redundant item for `builtins.addErrorContext`.
      */
@@ -106,6 +106,11 @@ struct PrimOp
      * Optional experimental for this to be gated on.
      */
     std::optional<ExperimentalFeature> experimentalFeature;
+
+    /**
+     * If true, this primop is not exposed to the user.
+     */
+    bool internal = false;
 
     /**
      * Validity check to be performed by functions that introduce primops,
@@ -342,7 +347,7 @@ private:
 
     LookupPath lookupPath;
 
-    std::map<std::string, std::optional<std::string>> lookupPathResolved;
+    std::map<std::string, std::optional<SourcePath>> lookupPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -447,9 +452,9 @@ public:
      *
      * If the specified search path element is a URI, download it.
      *
-     * If it is not found, return `std::nullopt`
+     * If it is not found, return `std::nullopt`.
      */
-    std::optional<std::string> resolveLookupPathPath(
+    std::optional<SourcePath> resolveLookupPathPath(
         const LookupPath::Path & elem,
         bool initAccessControl = false);
 
@@ -592,6 +597,11 @@ public:
     std::shared_ptr<StaticEnv> staticBaseEnv; // !!! should be private
 
     /**
+     * Internal primops not exposed to the user.
+     */
+    std::unordered_map<std::string, Value *, std::hash<std::string>, std::equal_to<std::string>, traceable_allocator<std::pair<const std::string, Value *>>> internalPrimOps;
+
+    /**
      * Name and documentation about every constant.
      *
      * Constants from primops are hard to crawl, and their docs will go
@@ -613,7 +623,18 @@ private:
 
 public:
 
+    /**
+     * Retrieve a specific builtin, equivalent to evaluating `builtins.${name}`.
+     * @param name The attribute name of the builtin to retrieve.
+     * @throws EvalError if the builtin does not exist.
+     */
     Value & getBuiltin(const std::string & name);
+
+    /**
+     * Retrieve the `builtins` attrset, equivalent to evaluating the reference `builtins`.
+     * Always returns an attribute set value.
+     */
+    Value & getBuiltins();
 
     struct Doc
     {
@@ -680,20 +701,19 @@ public:
 
     bool isFunctor(Value & fun);
 
-    // FIXME: use std::span
-    void callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos);
+    void callFunction(Value & fun, std::span<Value *> args, Value & vRes, const PosIdx pos);
 
     void callFunction(Value & fun, Value & arg, Value & vRes, const PosIdx pos)
     {
         Value * args[] = {&arg};
-        callFunction(fun, 1, args, vRes, pos);
+        callFunction(fun, args, vRes, pos);
     }
 
     /**
      * Automatically call a function for which each argument has a
      * default value or has a binding in the `args` map.
      */
-    void autoCallFunction(Bindings & args, Value & fun, Value & res);
+    void autoCallFunction(const Bindings & args, Value & fun, Value & res);
 
     /**
      * Allocation primitives.
@@ -799,7 +819,6 @@ public:
     bool callPathFilter(
         Value * filterFun,
         const SourcePath & path,
-        std::string_view pathArg,
         PosIdx pos);
 
     DocComment getDocCommentForPos(PosIdx pos);

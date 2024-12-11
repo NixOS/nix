@@ -179,30 +179,34 @@ BuiltPathsCommand::BuiltPathsCommand(bool recursive)
 
 void BuiltPathsCommand::run(ref<Store> store, Installables && installables)
 {
-    BuiltPaths paths;
+    BuiltPaths rootPaths, allPaths;
+
     if (all) {
         if (installables.size())
             throw UsageError("'--all' does not expect arguments");
         // XXX: Only uses opaque paths, ignores all the realisations
         for (auto & p : store->queryAllValidPaths())
-            paths.emplace_back(BuiltPath::Opaque{p});
+            rootPaths.emplace_back(BuiltPath::Opaque{p});
+        allPaths = rootPaths;
     } else {
-        paths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
+        rootPaths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
+        allPaths = rootPaths;
+
         if (recursive) {
             // XXX: This only computes the store path closure, ignoring
             // intermediate realisations
             StorePathSet pathsRoots, pathsClosure;
-            for (auto & root : paths) {
+            for (auto & root : rootPaths) {
                 auto rootFromThis = root.outPaths();
                 pathsRoots.insert(rootFromThis.begin(), rootFromThis.end());
             }
             store->computeFSClosure(pathsRoots, pathsClosure);
             for (auto & path : pathsClosure)
-                paths.emplace_back(BuiltPath::Opaque{path});
+                allPaths.emplace_back(BuiltPath::Opaque{path});
         }
     }
 
-    run(store, std::move(paths));
+    run(store, std::move(allPaths), std::move(rootPaths));
 }
 
 StorePathsCommand::StorePathsCommand(bool recursive)
@@ -210,10 +214,10 @@ StorePathsCommand::StorePathsCommand(bool recursive)
 {
 }
 
-void StorePathsCommand::run(ref<Store> store, BuiltPaths && paths)
+void StorePathsCommand::run(ref<Store> store, BuiltPaths && allPaths, BuiltPaths && rootPaths)
 {
     StorePathSet storePaths;
-    for (auto & builtPath : paths)
+    for (auto & builtPath : allPaths)
         for (auto & p : builtPath.outPaths())
             storePaths.insert(p);
 
@@ -245,7 +249,7 @@ void MixProfile::updateProfile(const StorePath & storePath)
 {
     if (!profile)
         return;
-    auto store = getStore().dynamic_pointer_cast<LocalFSStore>();
+    auto store = getDstStore().dynamic_pointer_cast<LocalFSStore>();
     if (!store)
         throw Error("'--profile' is not supported for this Nix store");
     auto profile2 = absPath(*profile);
@@ -363,6 +367,39 @@ void MixEnvironment::setEnviron()
     replaceEnv(env);
 
     return;
+}
+
+void createOutLinks(
+    const std::filesystem::path & outLink,
+    const BuiltPaths & buildables,
+    LocalFSStore & store,
+    PathSet & symlinks)
+{
+    for (const auto & [_i, buildable] : enumerate(buildables)) {
+        auto i = _i;
+        std::visit(
+            overloaded{
+                [&](const BuiltPath::Opaque & bo) {
+                    auto symlink = outLink;
+                    if (i)
+                        symlink += fmt("-%d", i);
+                    store.addPermRoot(bo.path, absPath(symlink.string()));
+                    symlinks.insert(symlink);
+                },
+                [&](const BuiltPath::Built & bfd) {
+                    for (auto & output : bfd.outputs) {
+                        auto symlink = outLink;
+                        if (i)
+                            symlink += fmt("-%d", i);
+                        if (output.first != "out")
+                            symlink += fmt("-%s", output.first);
+                        store.addPermRoot(output.second, absPath(symlink.string()));
+                        symlinks.insert(symlink);
+                    }
+                },
+            },
+            buildable.raw());
+    }
 }
 
 }

@@ -14,7 +14,7 @@ project('nix-util', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
@@ -22,7 +22,7 @@ deps_private_maybe_subproject = [
 ]
 deps_public_maybe_subproject = [
 ]
-subdir('build-utils-meson/subprojects')
+subdir('nix-meson-build-support/subprojects')
 
 # Check for each of these functions, and create a define like `#define
 # HAVE_LUTIMES 1`. The `#define` is unconditional, 0 for not found and 1
@@ -53,15 +53,7 @@ endforeach
 
 configdata.set('HAVE_DECL_AT_SYMLINK_NOFOLLOW', cxx.has_header_symbol('fcntl.h', 'AT_SYMLINK_NOFOLLOW').to_int())
 
-subdir('build-utils-meson/threads')
-
-# Check if -latomic is needed
-# This is needed for std::atomic on some platforms
-# We did not manage to test this reliably on all platforms, so we hardcode
-# it for now.
-if host_machine.cpu_family() == 'arm'
-  deps_other += cxx.find_library('atomic')
-endif
+subdir('nix-meson-build-support/libatomic')
 
 if host_machine.system() == 'windows'
   socket = cxx.find_library('ws2_32')
@@ -128,7 +120,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('nix-meson-build-support/common')
 
 sources = files(
   'archive.cc',
@@ -264,8 +256,8 @@ else
   subdir('unix')
 endif
 
-subdir('build-utils-meson/export-all-symbols')
-subdir('build-utils-meson/windows-version')
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 this_library = library(
   'nixutil',
@@ -286,4 +278,4 @@ if host_machine.system() == 'windows'
   libraries_private += ['-lws2_32']
 endif
 
-subdir('build-utils-meson/export')
+subdir('nix-meson-build-support/export')

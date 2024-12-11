@@ -94,12 +94,9 @@ void Registry::add(
 
 void Registry::remove(const Input & input)
 {
-    // FIXME: use C++20 std::erase.
-    for (auto i = entries.begin(); i != entries.end(); )
-        if (i->from == input)
-            i = entries.erase(i);
-        else
-            ++i;
+    entries.erase(
+        std::remove_if(entries.begin(), entries.end(), [&](const Entry & entry) { return entry.from == input; }),
+        entries.end());
 }
 
 static Path getSystemRegistryPath()

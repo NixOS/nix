@@ -26,7 +26,7 @@ bool isTTY()
 
 std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int width)
 {
-    std::string t, e;
+    std::string t;
     size_t w = 0;
     auto i = s.begin();
 
@@ -45,6 +45,13 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
                 while (i != s.end() && *i >= 0x20 && *i <= 0x2f) e += *i++;
                 // eat final byte
                 if (i != s.end() && *i >= 0x40 && *i <= 0x7e) e += last = *i++;
+            } else if (i != s.end() && *i == ']') {
+                // OSC
+                e += *i++;
+                // eat ESC
+                while (i != s.end() && *i != '\e') e += *i++;
+                // eat backslash
+                if (i != s.end() && *i == '\\') e += last = *i++;
             } else {
                 if (i != s.end() && *i >= 0x40 && *i <= 0x5f) e += *i++;
             }

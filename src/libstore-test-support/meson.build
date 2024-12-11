@@ -14,7 +14,7 @@ project('nix-store-test-support', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 deps_private_maybe_subproject = [
 ]
@@ -22,10 +22,9 @@ deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-util-test-support'),
   dependency('nix-store'),
+  dependency('nix-store-c'),
 ]
-subdir('build-utils-meson/subprojects')
-
-subdir('build-utils-meson/threads')
+subdir('nix-meson-build-support/subprojects')
 
 rapidcheck = dependency('rapidcheck')
 deps_public += rapidcheck
@@ -38,7 +37,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('nix-meson-build-support/common')
 
 sources = files(
   'tests/derived-path.cc',
@@ -57,8 +56,8 @@ headers = files(
   'tests/protocol.hh',
 )
 
-subdir('build-utils-meson/export-all-symbols')
-subdir('build-utils-meson/windows-version')
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 this_library = library(
   'nix-store-test-support',
@@ -76,4 +75,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-subdir('build-utils-meson/export')
+subdir('nix-meson-build-support/export')

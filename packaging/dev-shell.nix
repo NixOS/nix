@@ -2,7 +2,7 @@
 
 { pkgs }:
 
-(pkgs.nix.override { forDevShell = true; }).overrideAttrs (attrs:
+pkgs.nixComponents.nix-util.overrideAttrs (attrs:
 
 let
   stdenv = pkgs.nixDependencies.stdenv;
@@ -31,6 +31,35 @@ in {
 
     # Make bash completion work.
     XDG_DATA_DIRS+=:$out/share
+
+    # Make the default phases do the right thing.
+    # FIXME: this wouldn't be needed if the ninja package set buildPhase() instead of $buildPhase.
+    # FIXME: mesonConfigurePhase shouldn't cd to the build directory. It would be better to pass '-C <dir>' to ninja.
+
+    cdToBuildDir() {
+        if [[ ! -e build.ninja ]]; then
+            cd build
+        fi
+    }
+
+    configurePhase() {
+        mesonConfigurePhase
+    }
+
+    buildPhase() {
+        cdToBuildDir
+        ninjaBuildPhase
+    }
+
+    checkPhase() {
+        cdToBuildDir
+        mesonCheckPhase
+    }
+
+    installPhase() {
+        cdToBuildDir
+        ninjaInstallPhase
+    }
   '';
 
   # We use this shell with the local checkout, not unpackPhase.
@@ -88,9 +117,12 @@ in {
   buildInputs = attrs.buildInputs or []
     ++ pkgs.nixComponents.nix-util.buildInputs
     ++ pkgs.nixComponents.nix-store.buildInputs
+    ++ pkgs.nixComponents.nix-store-tests.externalBuildInputs
     ++ pkgs.nixComponents.nix-fetchers.buildInputs
     ++ pkgs.nixComponents.nix-expr.buildInputs
-    ++ pkgs.nixComponents.nix-store-tests.externalBuildInputs
+    ++ pkgs.nixComponents.nix-expr.externalPropagatedBuildInputs
+    ++ pkgs.nixComponents.nix-cmd.buildInputs
+    ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.externalBuildInputs
     ++ lib.optional havePerl pkgs.perl
     ;
 })

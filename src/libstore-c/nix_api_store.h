@@ -166,7 +166,7 @@ nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_cal
  *
  * @param[out] context Optional, stores error information
  * @param[in] srcStore nix source store reference
- * @param[in] srcStore nix destination store reference
+ * @param[in] dstStore nix destination store reference
  * @param[in] path Path to copy
  */
 nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path);

@@ -115,7 +115,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 
         else if (raw) {
             stopProgressBar();
-            writeFull(getStandardOut(), *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
+            writeFull(getStandardOutput(), *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
         }
 
         else if (json) {

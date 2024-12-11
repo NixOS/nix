@@ -87,11 +87,15 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
 {
     if (v.isThunk()) {
         Env * env = v.payload.thunk.env;
+        assert(env || v.isBlackhole());
         Expr * expr = v.payload.thunk.expr;
         try {
             v.mkBlackhole();
             //checkInterrupt();
-            expr->eval(*this, *env, v);
+            if (env) [[likely]]
+                expr->eval(*this, *env, v);
+            else
+                ExprBlackHole::throwInfiniteRecursionError(*this, v);
         } catch (...) {
             v.mkThunk(env, expr);
             tryFixupBlackHolePos(v, pos);

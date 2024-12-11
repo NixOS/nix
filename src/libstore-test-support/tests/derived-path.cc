@@ -7,7 +7,7 @@
 namespace rc {
 using namespace nix;
 
-Gen<DerivedPath::Opaque> Arbitrary<DerivedPath::Opaque>::arbitrary()
+Gen<SingleDerivedPath::Opaque> Arbitrary<SingleDerivedPath::Opaque>::arbitrary()
 {
     return gen::just(DerivedPath::Opaque {
         .path = *gen::arbitrary<StorePath>(),

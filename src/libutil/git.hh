@@ -104,7 +104,7 @@ void parseTree(
 /**
  * Helper putting the previous three `parse*` functions together.
  *
- * @rootModeIfBlob How to interpret a root blob, for which there is no
+ * @param rootModeIfBlob How to interpret a root blob, for which there is no
  * disambiguating dir entry to answer that questino. If the root it not
  * a blob, this is ignored.
  */

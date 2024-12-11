@@ -14,7 +14,7 @@ project('nix-main', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
@@ -24,9 +24,7 @@ deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
 ]
-subdir('build-utils-meson/subprojects')
-
-subdir('build-utils-meson/threads')
+subdir('nix-meson-build-support/subprojects')
 
 pubsetbuf_test = '''
 #include <iostream>
@@ -60,7 +58,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('nix-meson-build-support/common')
 
 sources = files(
   'common-args.cc',
@@ -98,4 +96,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-subdir('build-utils-meson/export')
+subdir('nix-meson-build-support/export')

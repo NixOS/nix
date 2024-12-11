@@ -18,12 +18,8 @@ let
 
   testNixVersions = pkgs: daemon:
     pkgs.nixComponents.nix-functional-tests.override {
-      pname =
-        "nix-tests"
-        + lib.optionalString
-          (lib.versionAtLeast daemon.version "2.4pre20211005" &&
-           lib.versionAtLeast pkgs.nix.version "2.4pre20211005")
-          "-${pkgs.nix.version}-against-${daemon.version}";
+      pname = "nix-daemon-compat-tests";
+      version = "${pkgs.nix.version}-with-daemon-${daemon.version}";
 
       test-daemon = daemon;
     };
@@ -32,7 +28,7 @@ let
   # convention to transpose it, and to transpose it efficiently, we need to
   # enumerate them manually, so that we don't evaluate unnecessary package sets.
   forAllPackages = lib.genAttrs [
-    "nix"
+    "nix-everything"
     "nix-util"
     "nix-util-c"
     "nix-util-test-support"
@@ -54,7 +50,6 @@ let
     "nix-cmd"
     "nix-cli"
     "nix-functional-tests"
-    "nix-ng"
   ];
 in
 {
@@ -62,7 +57,9 @@ in
   build = forAllPackages (pkgName:
     forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.${pkgName}));
 
-  shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
+  shellInputs = removeAttrs
+    (forAllSystems (system: self.devShells.${system}.default.inputDerivation))
+    [ "i686-linux" ];
 
   buildStatic = forAllPackages (pkgName:
     lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.nixComponents.${pkgName}));
@@ -139,11 +136,11 @@ in
   # docker image with Nix inside
   dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
 
-  # Line coverage analysis.
-  coverage = nixpkgsFor.x86_64-linux.native.nix.override {
-    pname = "nix-coverage";
-    withCoverageChecks = true;
-  };
+  # # Line coverage analysis.
+  # coverage = nixpkgsFor.x86_64-linux.native.nix.override {
+  #   pname = "nix-coverage";
+  #   withCoverageChecks = true;
+  # };
 
   # Nix's manual
   manual = nixpkgsFor.x86_64-linux.native.nixComponents.nix-manual;
@@ -180,7 +177,7 @@ in
         import (nixpkgs + "/lib/tests/test-with-nix.nix")
           {
             lib = nixpkgsFor.${system}.native.lib;
-            nix = self.packages.${system}.nix;
+            nix = self.packages.${system}.nix-cli;
             pkgs = nixpkgsFor.${system}.native;
           }
       );

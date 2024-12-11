@@ -25,11 +25,6 @@ in
   version = baseVersion + versionSuffix;
   inherit versionSuffix;
 
-  nix = callPackage ../package.nix {
-    version = fineVersion;
-    versionSuffix = fineVersionSuffix;
-  };
-
   nix-util = callPackage ../src/libutil/package.nix { };
   nix-util-c = callPackage ../src/libutil-c/package.nix { };
   nix-util-test-support = callPackage ../src/libutil-test-support/package.nix { };
@@ -49,6 +44,7 @@ in
   nix-expr-tests = callPackage ../src/libexpr-tests/package.nix { };
 
   nix-flake = callPackage ../src/libflake/package.nix { };
+  nix-flake-c = callPackage ../src/libflake-c/package.nix { };
   nix-flake-tests = callPackage ../src/libflake-tests/package.nix { };
 
   nix-main = callPackage ../src/libmain/package.nix { };
@@ -66,6 +62,5 @@ in
 
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
 
-  # Will replace `nix` once the old build system is gone.
-  nix-ng = callPackage ../packaging/everything.nix { };
+  nix-everything = callPackage ../packaging/everything.nix { };
 }

@@ -857,7 +857,8 @@ std::vector<FlakeRef> RawInstallablesCommand::getFlakeRefsForCompletion()
 {
     applyDefaultInstallables(rawInstallables);
     std::vector<FlakeRef> res;
-    for (auto i : rawInstallables)
+    res.reserve(rawInstallables.size());
+    for (const auto & i : rawInstallables)
         res.push_back(parseFlakeRefWithFragment(
             fetchSettings,
             expandTilde(i),
@@ -915,6 +916,14 @@ void BuiltPathsCommand::applyDefaultInstallables(std::vector<std::string> & rawI
 {
     if (rawInstallables.empty() && !all)
         rawInstallables.push_back(".");
+}
+
+BuiltPaths toBuiltPaths(const std::vector<BuiltPathWithResult> & builtPathsWithResult)
+{
+    BuiltPaths res;
+    for (auto & i : builtPathsWithResult)
+        res.push_back(i.path);
+    return res;
 }
 
 }

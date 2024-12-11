@@ -14,7 +14,7 @@ project('nix-cmd', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
@@ -28,9 +28,7 @@ deps_public_maybe_subproject = [
   dependency('nix-flake'),
   dependency('nix-main'),
 ]
-subdir('build-utils-meson/subprojects')
-
-subdir('build-utils-meson/threads')
+subdir('nix-meson-build-support/subprojects')
 
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
@@ -72,7 +70,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('nix-meson-build-support/common')
 
 sources = files(
   'built-path.cc',
@@ -127,4 +125,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-subdir('build-utils-meson/export')
+subdir('nix-meson-build-support/export')

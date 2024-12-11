@@ -39,6 +39,8 @@ VERSIONED_CHARACTERIZATION_TEST(
         "oh no \0\0\0 what was that!",
     }))
 
+#ifndef DOXYGEN_SKIP
+
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     storePath,
@@ -68,6 +70,8 @@ VERSIONED_CHARACTERIZATION_TEST(
             .hash = hashString(HashAlgorithm::SHA256, "(...)"),
         },
     }))
+
+#endif
 
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
