@@ -157,6 +157,11 @@ struct LockFlags
     bool writeLockFile = true;
 
     /**
+     * Throw an exception when the flake has an unlocked input.
+     */
+    bool failOnUnlocked = false;
+
+    /**
      * Whether to use the registries to lookup indirect flake
      * references like 'nixpkgs'.
      */

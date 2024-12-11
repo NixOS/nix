@@ -162,6 +162,7 @@ struct CmdFlakeLock : FlakeCommand
         settings.tarballTtl = 0;
 
         lockFlags.writeLockFile = true;
+        lockFlags.failOnUnlocked = true;
         lockFlags.applyNixConfig = true;
 
         lockFlake();
