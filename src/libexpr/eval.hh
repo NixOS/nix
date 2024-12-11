@@ -1,49 +1,151 @@
 #pragma once
+///@file
 
 #include "attr-set.hh"
+#include "eval-error.hh"
 #include "types.hh"
 #include "value.hh"
 #include "nixexpr.hh"
 #include "symbol-table.hh"
 #include "config.hh"
 #include "experimental-features.hh"
+#include "position.hh"
+#include "pos-table.hh"
+#include "source-accessor.hh"
+#include "search-path.hh"
+#include "repl-exit-status.hh"
+#include "ref.hh"
 
 #include <map>
 #include <optional>
-#include <unordered_map>
-#include <mutex>
+#include <functional>
 
 namespace nix {
 
+/**
+ * We put a limit on primop arity because it lets us use a fixed size array on
+ * the stack. 8 is already an impractical number of arguments. Use an attrset
+ * argument for such overly complicated functions.
+ */
+constexpr size_t maxPrimOpArity = 8;
 
 class Store;
+namespace fetchers { struct Settings; }
+struct EvalSettings;
 class EvalState;
 class StorePath;
+struct SingleDerivedPath;
 enum RepairFlag : bool;
+struct MemorySourceAccessor;
+namespace eval_cache {
+    class EvalCache;
+}
 
+/**
+ * Increments a count on construction and decrements on destruction.
+ */
+class CallDepth {
+  size_t & count;
 
-typedef void (* PrimOpFun) (EvalState & state, const PosIdx pos, Value * * args, Value & v);
-
-struct PrimOp
-{
-    PrimOpFun fun;
-    size_t arity;
-    std::string name;
-    std::vector<std::string> args;
-    const char * doc = nullptr;
+public:
+  CallDepth(size_t & count) : count(count) {
+    ++count;
+  }
+  ~CallDepth() {
+    --count;
+  }
 };
 
-#if HAVE_BOEHMGC
-    typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
-#else
-    typedef std::map<std::string, Value *> ValMap;
-#endif
+/**
+ * Function that implements a primop.
+ */
+using PrimOpFun = void(EvalState & state, const PosIdx pos, Value * * args, Value & v);
+
+/**
+ * Info about a primitive operation, and its implementation
+ */
+struct PrimOp
+{
+    /**
+     * Name of the primop. `__` prefix is treated specially.
+     */
+    std::string name;
+
+    /**
+     * Names of the parameters of a primop, for primops that take a
+     * fixed number of arguments to be substituted for these parameters.
+     */
+    std::vector<std::string> args;
+
+    /**
+     * Aritiy of the primop.
+     *
+     * If `args` is not empty, this field will be computed from that
+     * field instead, so it doesn't need to be manually set.
+     */
+    size_t arity = 0;
+
+    /**
+     * Optional free-form documentation about the primop.
+     */
+    const char * doc = nullptr;
+
+    /**
+     * Add a trace item, `while calling the '<name>' builtin`
+     *
+     * This is used to remove the redundant item for `builtins.addErrorContext`.
+     */
+    bool addTrace = true;
+
+    /**
+     * Implementation of the primop.
+     */
+    std::function<PrimOpFun> fun;
+
+    /**
+     * Optional experimental for this to be gated on.
+     */
+    std::optional<ExperimentalFeature> experimentalFeature;
+
+    /**
+     * Validity check to be performed by functions that introduce primops,
+     * such as RegisterPrimOp() and Value::mkPrimOp().
+     */
+    void check();
+};
+
+std::ostream & operator<<(std::ostream & output, const PrimOp & primOp);
+
+/**
+ * Info about a constant
+ */
+struct Constant
+{
+    /**
+     * Optional type of the constant (known since it is a fixed value).
+     *
+     * @todo we should use an enum for this.
+     */
+    ValueType type = nThunk;
+
+    /**
+     * Optional free-form documentation about the constant.
+     */
+    const char * doc = nullptr;
+
+    /**
+     * Whether the constant is impure, and not available in pure mode.
+     */
+    bool impureOnly = false;
+};
+
+typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
+
+typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
 
 struct Env
 {
     Env * up;
-    unsigned short prevWith:14; // nr of levels up to next `with' environment
-    enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2;
     Value * values[0];
 };
 
@@ -52,25 +154,11 @@ void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & 
 
 std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env);
 
-void copyContext(const Value & v, PathSet & context);
+void copyContext(const Value & v, NixStringContext & context);
 
 
-/* Cache for calls to addToStore(); maps source paths to the store
-   paths. */
-typedef std::map<Path, StorePath> SrcToStore;
-
-
-std::ostream & printValue(const EvalState & state, std::ostream & str, const Value & v);
-std::string printValue(const EvalState & state, const Value & v);
+std::string printValue(EvalState & state, Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
-
-
-typedef std::pair<std::string, std::string> SearchPathElem;
-typedef std::list<SearchPathElem> SearchPath;
-
-
-/* Initialise the Boehm GC, if applicable. */
-void initGC();
 
 
 struct RegexCache;
@@ -78,58 +166,118 @@ struct RegexCache;
 std::shared_ptr<RegexCache> makeRegexCache();
 
 struct DebugTrace {
-    std::optional<ErrPos> pos;
+    std::shared_ptr<Pos> pos;
     const Expr & expr;
     const Env & env;
-    hintformat hint;
+    HintFmt hint;
     bool isError;
 };
-
-void debugError(Error * e, Env & env, Expr & expr);
 
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
+    const fetchers::Settings & fetchSettings;
+    const EvalSettings & settings;
     SymbolTable symbols;
     PosTable positions;
-
-    static inline std::string derivationNixPath = "//builtin/derivation.nix";
 
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
-        sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
+        sRight, sWrong, sStructuredAttrs,
+        sAllowedReferences, sAllowedRequisites, sDisallowedReferences, sDisallowedRequisites,
+        sMaxSize, sMaxClosureSize,
+        sBuilder, sArgs,
         sContentAddressed, sImpure,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
         sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
         sPrefix,
         sOutputSpecified;
-    Symbol sDerivationNix;
 
-    /* If set, force copying files to the Nix store even if they
-       already exist there. */
+    const Expr::AstSymbols exprSymbols;
+
+    /**
+     * If set, force copying files to the Nix store even if they
+     * already exist there.
+     */
     RepairFlag repair;
-
-    /* The allowed filesystem paths in restricted or pure evaluation
-       mode. */
-    std::optional<PathSet> allowedPaths;
 
     Bindings emptyBindings;
 
-    /* Store used to materialise .drv files. */
+    /**
+     * Empty list constant.
+     */
+    Value vEmptyList;
+
+    /**
+     * `null` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    Value vNull;
+
+    /**
+     * `true` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    Value vTrue;
+
+    /**
+     * `true` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    Value vFalse;
+
+    /** `"regular"` */
+    Value vStringRegular;
+    /** `"directory"` */
+    Value vStringDirectory;
+    /** `"symlink"` */
+    Value vStringSymlink;
+    /** `"unknown"` */
+    Value vStringUnknown;
+
+    /**
+     * The accessor for the root filesystem.
+     */
+    const ref<SourceAccessor> rootFS;
+
+    /**
+     * The in-memory filesystem for <nix/...> paths.
+     */
+    const ref<MemorySourceAccessor> corepkgsFS;
+
+    /**
+     * In-memory filesystem for internal, non-user-callable Nix
+     * expressions like call-flake.nix.
+     */
+    const ref<MemorySourceAccessor> internalFS;
+
+    const SourcePath derivationInternal;
+
+    const SourcePath callFlakeInternal;
+
+    /**
+     * Store used to materialise .drv files.
+     */
     const ref<Store> store;
 
-    /* Store used to build stuff. */
+    /**
+     * Store used to build stuff.
+     */
     const ref<Store> buildStore;
 
-    RootValue vCallFlake = nullptr;
     RootValue vImportedDrvToDerivation = nullptr;
 
-    /* Debugger */
-    void (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
+    /**
+     * Debugger
+     */
+    ReplExitStatus (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
     bool debugStop;
-    bool debugQuit;
+    bool inDebugger = false;
     int trylevel;
     std::list<DebugTrace> debugTraces;
     std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;
@@ -142,282 +290,314 @@ public:
             return std::shared_ptr<const StaticEnv>();;
     }
 
+    /** Whether a debug repl can be started. If `false`, `runDebugRepl(error)` will return without starting a repl. */
+    bool canDebug();
+
+    /** Use front of `debugTraces`; see `runDebugRepl(error,env,expr)` */
+    void runDebugRepl(const Error * error);
+
+    /**
+     * Run a debug repl with the given error, environment and expression.
+     * @param error The error to debug, may be nullptr.
+     * @param env The environment to debug, matching the expression.
+     * @param expr The expression to debug, matching the environment.
+     */
     void runDebugRepl(const Error * error, const Env & env, const Expr & expr);
 
-    template<class E>
-    [[gnu::noinline, gnu::noreturn]]
-    void debugThrow(E && error, const Env & env, const Expr & expr)
-    {
-        if (debugRepl)
-            runDebugRepl(&error, env, expr);
-
-        throw std::move(error);
+    template<class T, typename... Args>
+    [[nodiscard, gnu::noinline]]
+    EvalErrorBuilder<T> & error(const Args & ... args) {
+        // `EvalErrorBuilder::debugThrow` performs the corresponding `delete`.
+        return *new EvalErrorBuilder<T>(*this, args...);
     }
 
-    template<class E>
-    [[gnu::noinline, gnu::noreturn]]
-    void debugThrowLastTrace(E && e)
-    {
-        // Call this in the situation where Expr and Env are inaccessible.
-        // The debugger will start in the last context that's in the
-        // DebugTrace stack.
-        if (debugRepl && !debugTraces.empty()) {
-            const DebugTrace & last = debugTraces.front();
-            runDebugRepl(&e, last.env, last.expr);
-        }
-
-        throw std::move(e);
-    }
-
+    /**
+     * A cache for evaluation caches, so as to reuse the same root value if possible
+     */
+    std::map<const Hash, ref<eval_cache::EvalCache>> evalCaches;
 
 private:
-    SrcToStore srcToStore;
 
-    /* A cache from path names to parse trees. */
-#if HAVE_BOEHMGC
-    typedef std::map<Path, Expr *, std::less<Path>, traceable_allocator<std::pair<const Path, Expr *>>> FileParseCache;
-#else
-    typedef std::map<Path, Expr *> FileParseCache;
-#endif
+    /* Cache for calls to addToStore(); maps source paths to the store
+       paths. */
+    Sync<std::unordered_map<SourcePath, StorePath>> srcToStore;
+
+    /**
+     * A cache from path names to parse trees.
+     */
+    typedef std::unordered_map<SourcePath, Expr *, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
     FileParseCache fileParseCache;
 
-    /* A cache from path names to values. */
-#if HAVE_BOEHMGC
-    typedef std::map<Path, Value, std::less<Path>, traceable_allocator<std::pair<const Path, Value>>> FileEvalCache;
-#else
-    typedef std::map<Path, Value> FileEvalCache;
-#endif
+    /**
+     * A cache from path names to values.
+     */
+    typedef std::unordered_map<SourcePath, Value, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
     FileEvalCache fileEvalCache;
 
-    SearchPath searchPath;
+    /**
+     * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
+     * Grouped by file.
+     */
+    std::unordered_map<SourcePath, DocCommentMap> positionToDocComment;
 
-    std::map<std::string, std::pair<bool, std::string>> searchPathResolved;
+    LookupPath lookupPath;
 
-    /* Cache used by checkSourcePath(). */
-    std::unordered_map<Path, Path> resolvedPaths;
+    std::map<std::string, std::optional<std::string>> lookupPathResolved;
 
-    /* Cache used by prim_match(). */
+    /**
+     * Cache used by prim_match().
+     */
     std::shared_ptr<RegexCache> regexCache;
 
 #if HAVE_BOEHMGC
-    /* Allocation cache for GC'd Value objects. */
+    /**
+     * Allocation cache for GC'd Value objects.
+     */
     std::shared_ptr<void *> valueAllocCache;
 
-    /* Allocation cache for size-1 Env objects. */
+    /**
+     * Allocation cache for size-1 Env objects.
+     */
     std::shared_ptr<void *> env1AllocCache;
 #endif
 
 public:
 
     EvalState(
-        const Strings & _searchPath,
+        const LookupPath & _lookupPath,
         ref<Store> store,
+        const fetchers::Settings & fetchSettings,
+        const EvalSettings & settings,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
-    void addToSearchPath(const std::string & s);
+    LookupPath getLookupPath() { return lookupPath; }
 
-    SearchPath getSearchPath() { return searchPath; }
+    /**
+     * Return a `SourcePath` that refers to `path` in the root
+     * filesystem.
+     */
+    SourcePath rootPath(CanonPath path);
 
-    /* Allow access to a path. */
+    /**
+     * Variant which accepts relative paths too.
+     */
+    SourcePath rootPath(PathView path);
+
+    /**
+     * Allow access to a path.
+     */
     void allowPath(const Path & path);
 
-    /* Allow access to a store path. Note that this gets remapped to
-       the real store path if `store` is a chroot store. */
+    /**
+     * Allow access to a store path. Note that this gets remapped to
+     * the real store path if `store` is a chroot store.
+     */
     void allowPath(const StorePath & storePath);
 
-    /* Allow access to a store path and return it as a string. */
+    /**
+     * Allow access to a store path and return it as a string.
+     */
     void allowAndSetStorePathString(const StorePath & storePath, Value & v);
-
-    /* Check whether access to a path is allowed and throw an error if
-       not. Otherwise return the canonicalised path. */
-    Path checkSourcePath(const Path & path);
 
     void checkURI(const std::string & uri);
 
-    /* When using a diverted store and 'path' is in the Nix store, map
-       'path' to the diverted location (e.g. /nix/store/foo is mapped
-       to /home/alice/my-nix/nix/store/foo). However, this is only
-       done if the context is not empty, since otherwise we're
-       probably trying to read from the actual /nix/store. This is
-       intended to distinguish between import-from-derivation and
-       sources stored in the actual /nix/store. */
-    Path toRealPath(const Path & path, const PathSet & context);
+    /**
+     * When using a diverted store and 'path' is in the Nix store, map
+     * 'path' to the diverted location (e.g. /nix/store/foo is mapped
+     * to /home/alice/my-nix/nix/store/foo). However, this is only
+     * done if the context is not empty, since otherwise we're
+     * probably trying to read from the actual /nix/store. This is
+     * intended to distinguish between import-from-derivation and
+     * sources stored in the actual /nix/store.
+     */
+    Path toRealPath(const Path & path, const NixStringContext & context);
 
-    /* Parse a Nix expression from the specified file. */
-    Expr * parseExprFromFile(const Path & path);
-    Expr * parseExprFromFile(const Path & path, std::shared_ptr<StaticEnv> & staticEnv);
+    /**
+     * Parse a Nix expression from the specified file.
+     */
+    Expr * parseExprFromFile(const SourcePath & path);
+    Expr * parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv);
 
-    /* Parse a Nix expression from the specified string. */
-    Expr * parseExprFromString(std::string s, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv);
-    Expr * parseExprFromString(std::string s, const Path & basePath);
+    /**
+     * Parse a Nix expression from the specified string.
+     */
+    Expr * parseExprFromString(std::string s, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv);
+    Expr * parseExprFromString(std::string s, const SourcePath & basePath);
 
     Expr * parseStdin();
 
-    /* Evaluate an expression read from the given file to normal
-       form. Optionally enforce that the top-level expression is
-       trivial (i.e. doesn't require arbitrary computation). */
-    void evalFile(const Path & path, Value & v, bool mustBeTrivial = false);
-
-    /* Like `evalFile`, but with an already parsed expression. */
-    void cacheFile(
-        const Path & path,
-        const Path & resolvedPath,
-        Expr * e,
-        Value & v,
-        bool mustBeTrivial = false);
+    /**
+     * Evaluate an expression read from the given file to normal
+     * form. Optionally enforce that the top-level expression is
+     * trivial (i.e. doesn't require arbitrary computation).
+     */
+    void evalFile(const SourcePath & path, Value & v, bool mustBeTrivial = false);
 
     void resetFileCache();
 
-    /* Look up a file in the search path. */
-    Path findFile(const std::string_view path);
-    Path findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
+    /**
+     * Look up a file in the search path.
+     */
+    SourcePath findFile(const std::string_view path);
+    SourcePath findFile(const LookupPath & lookupPath, const std::string_view path, const PosIdx pos = noPos);
 
-    /* If the specified search path element is a URI, download it. */
-    std::pair<bool, std::string> resolveSearchPathElem(const SearchPathElem & elem);
+    /**
+     * Try to resolve a search path value (not the optional key part).
+     *
+     * If the specified search path element is a URI, download it.
+     *
+     * If it is not found, return `std::nullopt`
+     */
+    std::optional<std::string> resolveLookupPathPath(
+        const LookupPath::Path & elem,
+        bool initAccessControl = false);
 
-    /* Evaluate an expression to normal form, storing the result in
-       value `v'. */
+    /**
+     * Evaluate an expression to normal form
+     *
+     * @param [out] v The resulting is stored here.
+     */
     void eval(Expr * e, Value & v);
 
-    /* Evaluation the expression, then verify that it has the expected
-       type. */
+    /**
+     * Evaluation the expression, then verify that it has the expected
+     * type.
+     */
     inline bool evalBool(Env & env, Expr * e);
-    inline bool evalBool(Env & env, Expr * e, const PosIdx pos);
-    inline void evalAttrs(Env & env, Expr * e, Value & v);
+    inline bool evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx);
+    inline void evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx);
 
-    /* If `v' is a thunk, enter it and overwrite `v' with the result
-       of the evaluation of the thunk.  If `v' is a delayed function
-       application, call the function and overwrite `v' with the
-       result.  Otherwise, this is a no-op. */
+    /**
+     * If `v` is a thunk, enter it and overwrite `v` with the result
+     * of the evaluation of the thunk.  If `v` is a delayed function
+     * application, call the function and overwrite `v` with the
+     * result.  Otherwise, this is a no-op.
+     */
     inline void forceValue(Value & v, const PosIdx pos);
 
-    template <typename Callable>
-    inline void forceValue(Value & v, Callable getPos);
+    void tryFixupBlackHolePos(Value & v, PosIdx pos);
 
-    /* Force a value, then recursively force list elements and
-       attributes. */
+    /**
+     * Force a value, then recursively force list elements and
+     * attributes.
+     */
     void forceValueDeep(Value & v);
 
-    /* Force `v', and then verify that it has the expected type. */
-    NixInt forceInt(Value & v, const PosIdx pos);
-    NixFloat forceFloat(Value & v, const PosIdx pos);
-    bool forceBool(Value & v, const PosIdx pos);
+    /**
+     * Force `v`, and then verify that it has the expected type.
+     */
+    NixInt forceInt(Value & v, const PosIdx pos, std::string_view errorCtx);
+    NixFloat forceFloat(Value & v, const PosIdx pos, std::string_view errorCtx);
+    bool forceBool(Value & v, const PosIdx pos, std::string_view errorCtx);
 
-    void forceAttrs(Value & v, const PosIdx pos);
+    void forceAttrs(Value & v, const PosIdx pos, std::string_view errorCtx);
 
     template <typename Callable>
-    inline void forceAttrs(Value & v, Callable getPos);
+    inline void forceAttrs(Value & v, Callable getPos, std::string_view errorCtx);
 
-    inline void forceList(Value & v, const PosIdx pos);
-    void forceFunction(Value & v, const PosIdx pos); // either lambda or primop
-    std::string_view forceString(Value & v, const PosIdx pos = noPos);
-    std::string_view forceString(Value & v, PathSet & context, const PosIdx pos = noPos);
-    std::string_view forceStringNoCtx(Value & v, const PosIdx pos = noPos);
+    inline void forceList(Value & v, const PosIdx pos, std::string_view errorCtx);
+    /**
+     * @param v either lambda or primop
+     */
+    void forceFunction(Value & v, const PosIdx pos, std::string_view errorCtx);
+    std::string_view forceString(Value & v, const PosIdx pos, std::string_view errorCtx);
+    std::string_view forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx);
+    std::string_view forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx);
 
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const char * s, const std::string & s2);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const char * s, const std::string & s2,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const char * s, const std::string & s2, const std::string & s3,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2, const std::string & s3,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2, const std::string & s3);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const char * s, const std::string & s2, const std::string & s3);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s, const std::string & s2,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2,
-        Env & env, Expr & expr);
-
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s, const Value & v);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s, const Value & v,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun, const Symbol s2,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s, const ExprLambda & fun, const Symbol s2,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const char * s, const Value & v,
-        Env & env, Expr & expr);
-
-    [[gnu::noinline, gnu::noreturn]]
-    void throwAssertionError(const PosIdx pos, const char * s, const std::string & s1,
-        Env & env, Expr & expr);
-
-    [[gnu::noinline, gnu::noreturn]]
-    void throwUndefinedVarError(const PosIdx pos, const char * s, const std::string & s1,
-        Env & env, Expr & expr);
-
-    [[gnu::noinline, gnu::noreturn]]
-    void throwMissingArgumentError(const PosIdx pos, const char * s, const std::string & s1,
-        Env & env, Expr & expr);
-
+    template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
+    void addErrorTrace(Error & e, const Args & ... formatArgs) const;
+    template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2) const;
+    void addErrorTrace(Error & e, const PosIdx pos, const Args & ... formatArgs) const;
 
 public:
-    /* Return true iff the value `v' denotes a derivation (i.e. a
-       set with attribute `type = "derivation"'). */
+    /**
+     * @return true iff the value `v` denotes a derivation (i.e. a
+     * set with attribute `type = "derivation"`).
+     */
     bool isDerivation(Value & v);
 
     std::optional<std::string> tryAttrsToString(const PosIdx pos, Value & v,
-        PathSet & context, bool coerceMore = false, bool copyToStore = true);
+        NixStringContext & context, bool coerceMore = false, bool copyToStore = true);
 
-    /* String coercion.  Converts strings, paths and derivations to a
-       string.  If `coerceMore' is set, also converts nulls, integers,
-       booleans and lists to a string.  If `copyToStore' is set,
-       referenced paths are copied to the Nix store as a side effect. */
-    BackedStringView coerceToString(const PosIdx pos, Value & v, PathSet & context,
+    /**
+     * String coercion.
+     *
+     * Converts strings, paths and derivations to a
+     * string.  If `coerceMore` is set, also converts nulls, integers,
+     * booleans and lists to a string.  If `copyToStore` is set,
+     * referenced paths are copied to the Nix store as a side effect.
+     */
+    BackedStringView coerceToString(const PosIdx pos, Value & v, NixStringContext & context,
+        std::string_view errorCtx,
         bool coerceMore = false, bool copyToStore = true,
         bool canonicalizePath = true);
 
-    std::string copyPathToStore(PathSet & context, const Path & path);
+    StorePath copyPathToStore(NixStringContext & context, const SourcePath & path);
 
-    /* Path coercion.  Converts strings, paths and derivations to a
-       path.  The result is guaranteed to be a canonicalised, absolute
-       path.  Nothing is copied to the store. */
-    Path coerceToPath(const PosIdx pos, Value & v, PathSet & context);
+    /**
+     * Path coercion.
+     *
+     * Converts strings, paths and derivations to a
+     * path.  The result is guaranteed to be a canonicalised, absolute
+     * path.  Nothing is copied to the store.
+     */
+    SourcePath coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx);
 
-    /* Like coerceToPath, but the result must be a store path. */
-    StorePath coerceToStorePath(const PosIdx pos, Value & v, PathSet & context);
+    /**
+     * Like coerceToPath, but the result must be a store path.
+     */
+    StorePath coerceToStorePath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx);
+
+    /**
+     * Part of `coerceToSingleDerivedPath()` without any store IO which is exposed for unit testing only.
+     */
+    std::pair<SingleDerivedPath, std::string_view> coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx);
+
+    /**
+     * Coerce to `SingleDerivedPath`.
+     *
+     * Must be a string which is either a literal store path or a
+     * "placeholder (see `DownstreamPlaceholder`).
+     *
+     * Even more importantly, the string context must be exactly one
+     * element, which is either a `NixStringContextElem::Opaque` or
+     * `NixStringContextElem::Built`. (`NixStringContextEleme::DrvDeep`
+     * is not permitted).
+     *
+     * The string is parsed based on the context --- the context is the
+     * source of truth, and ultimately tells us what we want, and then
+     * we ensure the string corresponds to it.
+     */
+    SingleDerivedPath coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx);
+
+#if HAVE_BOEHMGC
+    /** A GC root for the baseEnv reference. */
+    std::shared_ptr<Env *> baseEnvP;
+#endif
 
 public:
 
-    /* The base environment, containing the builtin functions and
-       values. */
+    /**
+     * The base environment, containing the builtin functions and
+     * values.
+     */
     Env & baseEnv;
 
-    /* The same, but used during parsing to resolve variables. */
+    /**
+     * The same, but used during parsing to resolve variables.
+     */
     std::shared_ptr<StaticEnv> staticBaseEnv; // !!! should be private
+
+    /**
+     * Name and documentation about every constant.
+     *
+     * Constants from primops are hard to crawl, and their docs will go
+     * here too.
+     */
+    std::vector<std::pair<std::string, Constant>> constantInfos;
 
 private:
 
@@ -425,12 +605,9 @@ private:
 
     void createBaseEnv();
 
-    Value * addConstant(const std::string & name, Value & v);
+    Value * addConstant(const std::string & name, Value & v, Constant info);
 
-    void addConstant(const std::string & name, Value * v);
-
-    Value * addPrimOp(const std::string & name,
-        size_t arity, PrimOpFun primOp);
+    void addConstant(const std::string & name, Value * v, Constant info);
 
     Value * addPrimOp(PrimOp && primOp);
 
@@ -444,9 +621,19 @@ public:
         std::optional<std::string> name;
         size_t arity;
         std::vector<std::string> args;
+        /**
+         * Unlike the other `doc` fields in this file, this one should never be
+         * `null`.
+         */
         const char * doc;
     };
 
+    /**
+     * Retrieve the documentation for a value. This will evaluate the value if
+     * it is a thunk, and it will partially apply __functor if applicable.
+     *
+     * @param v The value to get the documentation for.
+     */
     std::optional<Doc> getDoc(Value & v);
 
 private:
@@ -457,14 +644,39 @@ private:
     friend struct ExprAttrs;
     friend struct ExprLet;
 
-    Expr * parse(char * text, size_t length, FileOrigin origin, const PathView path,
-        const PathView basePath, std::shared_ptr<StaticEnv> & staticEnv);
+    Expr * parse(
+        char * text,
+        size_t length,
+        Pos::Origin origin,
+        const SourcePath & basePath,
+        std::shared_ptr<StaticEnv> & staticEnv);
+
+    /**
+     * Current Nix call stack depth, used with `max-call-depth` setting to throw stack overflow hopefully before we run out of system stack.
+     */
+    size_t callDepth = 0;
 
 public:
 
-    /* Do a deep equality test between two values.  That is, list
-       elements and attributes are compared recursively. */
-    bool eqValues(Value & v1, Value & v2);
+    /**
+     * Check that the call depth is within limits, and increment it, until the returned object is destroyed.
+     */
+    inline CallDepth addCallDepth(const PosIdx pos);
+
+    /**
+     * Do a deep equality test between two values.  That is, list
+     * elements and attributes are compared recursively.
+     */
+    bool eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx);
+
+    /**
+     * Like `eqValues`, but throws an `AssertionError` if not equal.
+     *
+     * WARNING:
+     * Callers should call `eqValues` first and report if `assertEqValues` behaves
+     * incorrectly. (e.g. if it doesn't throw if eqValues returns false or vice versa)
+     */
+    void assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx);
 
     bool isFunctor(Value & fun);
 
@@ -477,16 +689,17 @@ public:
         callFunction(fun, 1, args, vRes, pos);
     }
 
-    /* Automatically call a function for which each argument has a
-       default value or has a binding in the `args' map. */
+    /**
+     * Automatically call a function for which each argument has a
+     * default value or has a binding in the `args` map.
+     */
     void autoCallFunction(Bindings & args, Value & fun, Value & res);
 
-    /* Allocation primitives. */
+    /**
+     * Allocation primitives.
+     */
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
-
-    Value * allocAttr(Value & vAttrs, Symbol name);
-    Value * allocAttr(Value & vAttrs, std::string_view name);
 
     Bindings * allocBindings(size_t capacity);
 
@@ -495,21 +708,119 @@ public:
         return BindingsBuilder(*this, allocBindings(capacity));
     }
 
-    void mkList(Value & v, size_t length);
+    ListBuilder buildList(size_t size)
+    {
+        return ListBuilder(*this, size);
+    }
+
+    /**
+     * Return a boolean `Value *` without allocating.
+     */
+    Value *getBool(bool b);
+
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, PosIdx pos);
 
-    void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos);
-
-    /* Print statistics. */
-    void printStats();
-
-    /* Realise the given context, and return a mapping from the placeholders
-     * used to construct the associated value to their final store path
+    /**
+     * Create a string representing a store path.
+     *
+     * The string is the printed store path with a context containing a
+     * single `NixStringContextElem::Opaque` element of that store path.
      */
-    [[nodiscard]] StringMap realiseContext(const PathSet & context);
+    void mkStorePathString(const StorePath & storePath, Value & v);
+
+    /**
+     * Create a string representing a `SingleDerivedPath::Built`.
+     *
+     * The string is the printed store path with a context containing a
+     * single `NixStringContextElem::Built` element of the drv path and
+     * output name.
+     *
+     * @param value Value we are settings
+     *
+     * @param b the drv whose output we are making a string for, and the
+     * output
+     *
+     * @param optStaticOutputPath Optional output path for that string.
+     * Must be passed if and only if output store object is
+     * input-addressed or fixed output. Will be printed to form string
+     * if passed, otherwise a placeholder will be used (see
+     * `DownstreamPlaceholder`).
+     *
+     * @param xpSettings Stop-gap to avoid globals during unit tests.
+     */
+    void mkOutputString(
+        Value & value,
+        const SingleDerivedPath::Built & b,
+        std::optional<StorePath> optStaticOutputPath,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+    /**
+     * Create a string representing a `SingleDerivedPath`.
+     *
+     * A combination of `mkStorePathString` and `mkOutputString`.
+     */
+    void mkSingleDerivedPathString(
+        const SingleDerivedPath & p,
+        Value & v);
+
+    void concatLists(Value & v, size_t nrLists, Value * const * lists, const PosIdx pos, std::string_view errorCtx);
+
+    /**
+     * Print statistics, if enabled.
+     *
+     * Performs a full memory GC before printing the statistics, so that the
+     * GC statistics are more accurate.
+     */
+    void maybePrintStats();
+
+    /**
+     * Print statistics, unconditionally, cheaply, without performing a GC first.
+     */
+    void printStatistics();
+
+    /**
+     * Perform a full memory garbage collection - not incremental.
+     *
+     * @return true if Nix was built with GC and a GC was performed, false if not.
+     *              The return value is currently not thread safe - just the return value.
+     */
+    bool fullGC();
+
+    /**
+     * Realise the given context
+     * @param[in] context the context to realise
+     * @param[out] maybePaths if not nullptr, all built or referenced store paths will be added to this set
+     * @return a mapping from the placeholders used to construct the associated value to their final store path.
+     */
+    [[nodiscard]] StringMap realiseContext(const NixStringContext & context, StorePathSet * maybePaths = nullptr, bool isIFD = true);
+
+    /* Call the binary path filter predicate used builtins.path etc. */
+    bool callPathFilter(
+        Value * filterFun,
+        const SourcePath & path,
+        std::string_view pathArg,
+        PosIdx pos);
+
+    DocComment getDocCommentForPos(PosIdx pos);
 
 private:
+
+    /**
+     * Like `mkOutputString` but just creates a raw string, not an
+     * string Value, which would also have a string context.
+     */
+    std::string mkOutputStringRaw(
+        const SingleDerivedPath::Built & b,
+        std::optional<StorePath> optStaticOutputPath,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+    /**
+     * Like `mkSingleDerivedPathStringRaw` but just creates a raw string
+     * Value, which would also have a string context.
+     */
+    std::string mkSingleDerivedPathStringRaw(
+        const SingleDerivedPath & p);
 
     unsigned long nrEnvs = 0;
     unsigned long nrValuesInEnvs = 0;
@@ -551,116 +862,39 @@ private:
     friend void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
     friend struct Value;
+    friend class ListBuilder;
 };
 
 struct DebugTraceStacker {
     DebugTraceStacker(EvalState & evalState, DebugTrace t);
     ~DebugTraceStacker()
     {
-        // assert(evalState.debugTraces.front() == trace);
         evalState.debugTraces.pop_front();
     }
     EvalState & evalState;
     DebugTrace trace;
 };
 
-/* Return a string representing the type of the value `v'. */
-std::string_view showType(ValueType type);
+/**
+ * @return A string representing the type of the value `v`.
+ *
+ * @param withArticle Whether to begin with an english article, e.g. "an
+ * integer" vs "integer".
+ */
+std::string_view showType(ValueType type, bool withArticle = true);
 std::string showType(const Value & v);
 
-/* Decode a context string ‘!<name>!<path>’ into a pair <path,
-   name>. */
-NixStringContextElem decodeContext(const Store & store, std::string_view s);
+/**
+ * If `path` refers to a directory, then append "/default.nix".
+ *
+ * @param addDefaultNix Whether to append "/default.nix" after resolving symlinks.
+ */
+SourcePath resolveExprPath(SourcePath path, bool addDefaultNix = true);
 
-/* If `path' refers to a directory, then append "/default.nix". */
-Path resolveExprPath(Path path);
-
-struct InvalidPathError : EvalError
-{
-    Path path;
-    InvalidPathError(const Path & path);
-#ifdef EXCEPTION_NEEDS_THROW_SPEC
-    ~InvalidPathError() throw () { };
-#endif
-};
-
-struct EvalSettings : Config
-{
-    EvalSettings();
-
-    static Strings getDefaultNixPath();
-
-    Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
-        "Whether builtin functions that allow executing native code should be enabled."};
-
-    Setting<Strings> nixPath{
-        this, getDefaultNixPath(), "nix-path",
-        "List of directories to be searched for `<...>` file references."};
-
-    Setting<bool> restrictEval{
-        this, false, "restrict-eval",
-        R"(
-          If set to `true`, the Nix evaluator will not allow access to any
-          files outside of the Nix search path (as set via the `NIX_PATH`
-          environment variable or the `-I` option), or to URIs outside of
-          `allowed-uri`. The default is `false`.
-        )"};
-
-    Setting<bool> pureEval{this, false, "pure-eval",
-        "Whether to restrict file system and network access to files specified by cryptographic hash."};
-
-    Setting<bool> enableImportFromDerivation{
-        this, true, "allow-import-from-derivation",
-        R"(
-          By default, Nix allows you to `import` from a derivation, allowing
-          building at evaluation time. With this option set to false, Nix will
-          throw an error when evaluating an expression that uses this feature,
-          allowing users to ensure their evaluation will not require any
-          builds to take place.
-        )"};
-
-    Setting<Strings> allowedUris{this, {}, "allowed-uris",
-        R"(
-          A list of URI prefixes to which access is allowed in restricted
-          evaluation mode. For example, when set to
-          `https://github.com/NixOS`, builtin functions such as `fetchGit` are
-          allowed to access `https://github.com/NixOS/patchelf.git`.
-        )"};
-
-    Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
-        R"(
-          If set to `true`, the Nix evaluator will trace every function call.
-          Nix will print a log message at the "vomit" level for every function
-          entrance and function exit.
-
-              function-trace entered undefined position at 1565795816999559622
-              function-trace exited undefined position at 1565795816999581277
-              function-trace entered /nix/store/.../example.nix:226:41 at 1565795253249935150
-              function-trace exited /nix/store/.../example.nix:226:41 at 1565795253249941684
-
-          The `undefined position` means the function call is a builtin.
-
-          Use the `contrib/stack-collapse.py` script distributed with the Nix
-          source code to convert the trace logs in to a format suitable for
-          `flamegraph.pl`.
-        )"};
-
-    Setting<bool> useEvalCache{this, true, "eval-cache",
-        "Whether to use the flake evaluation cache."};
-
-    Setting<bool> ignoreExceptionsDuringTry{this, false, "ignore-try",
-        R"(
-          If set to true, ignore exceptions inside 'tryEval' calls when evaluating nix expressions in
-          debug mode (using the --debugger flag). By default the debugger will pause on all exceptions.
-        )"};
-
-    Setting<bool> traceVerbose{this, false, "trace-verbose",
-        "Whether `builtins.traceVerbose` should trace its first argument when evaluated."};
-};
-
-extern EvalSettings evalSettings;
-
-static const std::string corepkgsPrefix{"/__corepkgs__/"};
+/**
+ * Whether a URI is allowed, assuming restrictEval is enabled
+ */
+bool isAllowedURI(std::string_view uri, const Strings & allowedPaths);
 
 }
 

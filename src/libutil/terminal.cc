@@ -1,0 +1,129 @@
+#include "terminal.hh"
+#include "environment-variables.hh"
+#include "sync.hh"
+
+#if _WIN32
+# include <io.h>
+# define WIN32_LEAN_AND_MEAN
+# include <windows.h>
+# define isatty _isatty
+#else
+# include <sys/ioctl.h>
+#endif
+#include <unistd.h>
+
+namespace nix {
+
+bool isTTY()
+{
+    static const bool tty =
+        isatty(STDERR_FILENO)
+        && getEnv("TERM").value_or("dumb") != "dumb"
+        && !(getEnv("NO_COLOR").has_value() || getEnv("NOCOLOR").has_value());
+
+    return tty;
+}
+
+std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int width)
+{
+    std::string t, e;
+    size_t w = 0;
+    auto i = s.begin();
+
+    while (w < (size_t) width && i != s.end()) {
+
+        if (*i == '\e') {
+            std::string e;
+            e += *i++;
+            char last = 0;
+
+            if (i != s.end() && *i == '[') {
+                e += *i++;
+                // eat parameter bytes
+                while (i != s.end() && *i >= 0x30 && *i <= 0x3f) e += *i++;
+                // eat intermediate bytes
+                while (i != s.end() && *i >= 0x20 && *i <= 0x2f) e += *i++;
+                // eat final byte
+                if (i != s.end() && *i >= 0x40 && *i <= 0x7e) e += last = *i++;
+            } else {
+                if (i != s.end() && *i >= 0x40 && *i <= 0x5f) e += *i++;
+            }
+
+            if (!filterAll && last == 'm')
+                t += e;
+        }
+
+        else if (*i == '\t') {
+            i++; t += ' '; w++;
+            while (w < (size_t) width && w % 8) {
+                t += ' '; w++;
+            }
+        }
+
+        else if (*i == '\r' || *i == '\a')
+            // do nothing for now
+            i++;
+
+        else {
+            w++;
+            // Copy one UTF-8 character.
+            if ((*i & 0xe0) == 0xc0) {
+                t += *i++;
+                if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
+            } else if ((*i & 0xf0) == 0xe0) {
+                t += *i++;
+                if (i != s.end() && ((*i & 0xc0) == 0x80)) {
+                    t += *i++;
+                    if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
+                }
+            } else if ((*i & 0xf8) == 0xf0) {
+                t += *i++;
+                if (i != s.end() && ((*i & 0xc0) == 0x80)) {
+                    t += *i++;
+                    if (i != s.end() && ((*i & 0xc0) == 0x80)) {
+                        t += *i++;
+                        if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
+                    }
+                }
+            } else
+                t += *i++;
+        }
+    }
+
+    return t;
+}
+
+
+//////////////////////////////////////////////////////////////////////
+
+static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
+
+
+void updateWindowSize()
+{
+    #ifndef _WIN32
+    struct winsize ws;
+    if (ioctl(2, TIOCGWINSZ, &ws) == 0) {
+        auto windowSize_(windowSize.lock());
+        windowSize_->first = ws.ws_row;
+        windowSize_->second = ws.ws_col;
+    }
+    #else
+    CONSOLE_SCREEN_BUFFER_INFO info;
+    // From https://stackoverflow.com/a/12642749
+    if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info) != 0) {
+        auto windowSize_(windowSize.lock());
+        // From https://github.com/libuv/libuv/blob/v1.48.0/src/win/tty.c#L1130
+        windowSize_->first = info.srWindow.Bottom - info.srWindow.Top + 1;
+        windowSize_->second = info.dwSize.X;
+    }
+    #endif
+}
+
+
+std::pair<unsigned short, unsigned short> getWindowSize()
+{
+    return *windowSize.lock();
+}
+
+}

@@ -68,6 +68,6 @@ The following flake output attributes must be
 In addition, the `hydraJobs` output is evaluated in the same way as
 Hydra's `hydra-eval-jobs` (i.e. as a arbitrarily deeply nested
 attribute set of derivations). Similarly, the
-`legacyPackages`.*system* output is evaluated like `nix-env -qa`.
+`legacyPackages`.*system* output is evaluated like `nix-env --query --available `.
 
 )""

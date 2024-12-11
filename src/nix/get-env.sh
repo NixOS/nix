@@ -1,5 +1,5 @@
 set -e
-if [ -e .attrs.sh ]; then source .attrs.sh; fi
+if [ -e "$NIX_ATTRS_SH_FILE" ]; then source "$NIX_ATTRS_SH_FILE"; fi
 
 export IN_NIX_SHELL=impure
 export dontAddDisableDepTrack=1
@@ -43,6 +43,7 @@ __dumpEnv() {
         local __var_name="${BASH_REMATCH[2]}"
 
         if [[ $__var_name =~ ^BASH_ || \
+              $__var_name =~ ^COMP_ || \
               $__var_name = _ || \
               $__var_name = DIRSTACK || \
               $__var_name = EUID || \
@@ -54,7 +55,9 @@ __dumpEnv() {
               $__var_name = PWD || \
               $__var_name = RANDOM || \
               $__var_name = SHLVL || \
-              $__var_name = SECONDS \
+              $__var_name = SECONDS || \
+              $__var_name = EPOCHREALTIME || \
+              $__var_name = EPOCHSECONDS \
             ]]; then continue; fi
 
         if [[ -z $__first ]]; then printf ',\n'; else __first=; fi
@@ -98,7 +101,21 @@ __dumpEnv() {
 
         printf "}"
     done < <(printf "%s\n" "$__vars")
-    printf '\n  }\n}'
+    printf '\n  }'
+
+    if [ -e "$NIX_ATTRS_SH_FILE" ]; then
+        printf ',\n  "structuredAttrs": {\n    '
+        __escapeString ".attrs.sh"
+        printf ': '
+        __escapeString "$(<"$NIX_ATTRS_SH_FILE")"
+        printf ',\n    '
+        __escapeString ".attrs.json"
+        printf ': '
+        __escapeString "$(<"$NIX_ATTRS_JSON_FILE")"
+        printf '\n  }'
+    fi
+
+    printf '\n}'
 }
 
 __escapeString() {
@@ -111,20 +128,25 @@ __escapeString() {
     printf '"%s"' "$__s"
 }
 
-# In case of `__structuredAttrs = true;` the list of outputs is an associative
-# array with a format like `outname => /nix/store/hash-drvname-outname`, so `__olist`
-# must contain the array's keys (hence `${!...[@]}`) in this case.
-if [ -e .attrs.sh ]; then
-    __olist="${!outputs[@]}"
-else
-    __olist=$outputs
-fi
-
-for __output in $__olist; do
-    if [[ -z $__done ]]; then
-        __dumpEnv > ${!__output}
+__dumpEnvToOutput() {
+    local __output="$1"
+    if [[ -z ${__done-} ]]; then
+        __dumpEnv > "$__output"
         __done=1
     else
-        echo -n >> "${!__output}"
+        echo -n >> "$__output"
     fi
-done
+}
+
+# In case of `__structuredAttrs = true;` the list of outputs is an associative
+# array with a format like `outname => /nix/store/hash-drvname-outname`.
+# Otherwise it is a space-separated list of output variable names.
+if [ -e "$NIX_ATTRS_SH_FILE" ]; then
+    for __output in "${outputs[@]}"; do
+        __dumpEnvToOutput "$__output"
+    done
+else
+    for __outname in $outputs; do
+        __dumpEnvToOutput "${!__outname}"
+    done
+fi

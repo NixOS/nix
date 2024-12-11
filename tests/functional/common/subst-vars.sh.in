@@ -1,0 +1,17 @@
+# NOTE: instances of @variable@ are substituted by the build system
+
+if [[ -z "${COMMON_SUBST_VARS_SH_SOURCED-}" ]]; then
+
+COMMON_SUBST_VARS_SH_SOURCED=1
+
+bash=@bash@
+bindir=@bindir@
+coreutils=@coreutils@
+
+dot=@dot@
+busybox="@sandbox_shell@"
+
+version=@PACKAGE_VERSION@
+system=@system@
+
+fi

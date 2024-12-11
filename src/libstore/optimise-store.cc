@@ -1,6 +1,8 @@
-#include "util.hh"
 #include "local-store.hh"
 #include "globals.hh"
+#include "signals.hh"
+#include "posix-fs-canonicalise.hh"
+#include "posix-source-accessor.hh"
 
 #include <cstdlib>
 #include <cstring>
@@ -33,7 +35,7 @@ struct MakeReadOnly
             /* This will make the path read-only. */
             if (path != "") canonicaliseTimestampAndPermissions(path);
         } catch (...) {
-            ignoreException();
+            ignoreExceptionInDestructor();
         }
     }
 };
@@ -55,7 +57,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     }
     if (errno) throw SysError("reading directory '%1%'", linksDir);
 
-    printMsg(lvlTalkative, format("loaded %1% hash inodes") % inodeHash.size());
+    printMsg(lvlTalkative, "loaded %1% hash inodes", inodeHash.size());
 
     return inodeHash;
 }
@@ -73,7 +75,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
         checkInterrupt();
 
         if (inodeHash.count(dirent->d_ino)) {
-            debug(format("'%1%' is already linked") % dirent->d_name);
+            debug("'%1%' is already linked", dirent->d_name);
             continue;
         }
 
@@ -96,13 +98,14 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
 #if __APPLE__
     /* HFS/macOS has some undocumented security feature disabling hardlinking for
-       special files within .app dirs. *.app/Contents/PkgInfo and
-       *.app/Contents/Resources/\*.lproj seem to be the only paths affected. See
-       https://github.com/NixOS/nix/issues/1443 for more discussion. */
+       special files within .app dirs. Known affected paths include
+       *.app/Contents/{PkgInfo,Resources/\*.lproj,_CodeSignature} and .DS_Store.
+       See https://github.com/NixOS/nix/issues/1443 and 
+       https://github.com/NixOS/nix/pull/2230 for more discussion. */
 
     if (std::regex_search(path, std::regex("\\.app/Contents/.+$")))
     {
-        debug(format("'%1%' is not allowed to be linked in macOS") % path);
+        debug("'%1%' is not allowed to be linked in macOS", path);
         return;
     }
 #endif
@@ -145,62 +148,68 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        Also note that if `path' is a symlink, then we're hashing the
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
-    Hash hash = hashPath(htSHA256, path).first;
-    debug(format("'%1%' has hash '%2%'") % path % hash.to_string(Base32, true));
+    Hash hash = ({
+        hashPath(
+            {make_ref<PosixSourceAccessor>(), CanonPath(path)},
+            FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256).first;
+    });
+    debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Nix32, true));
 
     /* Check if this is a known hash. */
-    Path linkPath = linksDir + "/" + hash.to_string(Base32, false);
+    std::filesystem::path linkPath = std::filesystem::path{linksDir} / hash.to_string(HashFormat::Nix32, false);
 
     /* Maybe delete the link, if it has been corrupted. */
-    if (pathExists(linkPath)) {
-        auto stLink = lstat(linkPath);
+    if (std::filesystem::exists(std::filesystem::symlink_status(linkPath))) {
+        auto stLink = lstat(linkPath.string());
         if (st.st_size != stLink.st_size
-            || (repair && hash != hashPath(htSHA256, linkPath).first))
+            || (repair && hash != ({
+                hashPath(
+                    PosixSourceAccessor::createAtRoot(linkPath),
+                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256).first;
+           })))
         {
             // XXX: Consider overwriting linkPath with our valid version.
-            warn("removing corrupted link '%s'", linkPath);
+            warn("removing corrupted link %s", linkPath);
             warn("There may be more corrupted paths."
                  "\nYou should run `nix-store --verify --check-contents --repair` to fix them all");
-            unlink(linkPath.c_str());
+            std::filesystem::remove(linkPath);
         }
     }
 
-    if (!pathExists(linkPath)) {
+    if (!std::filesystem::exists(std::filesystem::symlink_status(linkPath))) {
         /* Nope, create a hard link in the links directory. */
-        if (link(path.c_str(), linkPath.c_str()) == 0) {
+        try {
+            std::filesystem::create_hard_link(path, linkPath);
             inodeHash.insert(st.st_ino);
-            return;
-        }
+        } catch (std::filesystem::filesystem_error & e) {
+            if (e.code() == std::errc::file_exists) {
+                /* Fall through if another process created ‘linkPath’ before
+                   we did. */
+            }
 
-        switch (errno) {
-        case EEXIST:
-            /* Fall through if another process created ‘linkPath’ before
-               we did. */
-            break;
+            else if (e.code() == std::errc::no_space_on_device) {
+                /* On ext4, that probably means the directory index is
+                   full.  When that happens, it's fine to ignore it: we
+                   just effectively disable deduplication of this
+                   file.  */
+                printInfo("cannot link '%s' to '%s': %s", linkPath, path, strerror(errno));
+                return;
+            }
 
-        case ENOSPC:
-            /* On ext4, that probably means the directory index is
-               full.  When that happens, it's fine to ignore it: we
-               just effectively disable deduplication of this
-               file.  */
-            printInfo("cannot link '%s' to '%s': %s", linkPath, path, strerror(errno));
-            return;
-
-        default:
-            throw SysError("cannot link '%1%' to '%2%'", linkPath, path);
+            else throw;
         }
     }
 
     /* Yes!  We've seen a file with the same contents.  Replace the
        current file with a hard link to that file. */
-    auto stLink = lstat(linkPath);
+    auto stLink = lstat(linkPath.string());
 
     if (st.st_ino == stLink.st_ino) {
-        debug(format("'%1%' is already linked to '%2%'") % path % linkPath);
+        debug("'%1%' is already linked to '%2%'", path, linkPath);
         return;
     }
 
-    printMsg(lvlTalkative, format("linking '%1%' to '%2%'") % path % linkPath);
+    printMsg(lvlTalkative, "linking '%1%' to '%2%'", path, linkPath);
 
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
@@ -213,28 +222,30 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        its timestamp back to 0. */
     MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : "");
 
-    Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
-        % realStoreDir % getpid() % random()).str();
+    std::filesystem::path tempLink = fmt("%1%/.tmp-link-%2%-%3%", realStoreDir, getpid(), rand());
 
-    if (link(linkPath.c_str(), tempLink.c_str()) == -1) {
-        if (errno == EMLINK) {
+    try {
+        std::filesystem::create_hard_link(linkPath, tempLink);
+        inodeHash.insert(st.st_ino);
+    } catch (std::filesystem::filesystem_error & e) {
+        if (e.code() == std::errc::too_many_links) {
             /* Too many links to the same file (>= 32000 on most file
                systems).  This is likely to happen with empty files.
                Just shrug and ignore. */
             if (st.st_size)
-                printInfo(format("'%1%' has maximum number of links") % linkPath);
+                printInfo("'%1%' has maximum number of links", linkPath);
             return;
         }
-        throw SysError("cannot link '%1%' to '%2%'", tempLink, linkPath);
+        throw;
     }
 
     /* Atomically replace the old file with the new hard link. */
     try {
-        renameFile(tempLink, path);
-    } catch (SysError & e) {
-        if (unlink(tempLink.c_str()) == -1)
+        std::filesystem::rename(tempLink, path);
+    } catch (std::filesystem::filesystem_error & e) {
+        std::filesystem::remove(tempLink);
             printError("unable to unlink '%1%'", tempLink);
-        if (errno == EMLINK) {
+        if (e.code() == std::errc::too_many_links) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it
                temporarily increases the st_nlink field before
@@ -247,10 +258,13 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     stats.filesLinked++;
     stats.bytesFreed += st.st_size;
-    stats.blocksFreed += st.st_blocks;
 
     if (act)
-        act->result(resFileLinked, st.st_size, st.st_blocks);
+        act->result(resFileLinked, st.st_size
+#ifndef _WIN32
+            , st.st_blocks
+#endif
+            );
 }
 
 

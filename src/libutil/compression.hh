@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "ref.hh"
 #include "types.hh"
@@ -10,8 +11,8 @@ namespace nix {
 
 struct CompressionSink : BufferedSink, FinishSink
 {
-    using BufferedSink::operator ();
-    using BufferedSink::write;
+    using BufferedSink::operator();
+    using BufferedSink::writeUnbuffered;
     using FinishSink::finish;
 };
 
@@ -21,7 +22,8 @@ std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Si
 
 std::string compress(const std::string & method, std::string_view in, const bool parallel = false, int level = -1);
 
-ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel = false, int level = -1);
+ref<CompressionSink>
+makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel = false, int level = -1);
 
 MakeError(UnknownCompressionMethod, Error);
 

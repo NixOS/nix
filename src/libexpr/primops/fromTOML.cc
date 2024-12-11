@@ -1,13 +1,15 @@
 #include "primops.hh"
 #include "eval-inline.hh"
 
-#include "../../toml11/toml.hpp"
+#include <sstream>
+
+#include <toml.hpp>
 
 namespace nix {
 
 static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, Value & val)
 {
-    auto toml = state.forceStringNoCtx(*args[0], pos);
+    auto toml = state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.fromTOML");
 
     std::istringstream tomlStream(std::string{toml});
 
@@ -36,10 +38,10 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, V
                 {
                     auto array = toml::get<std::vector<toml::value>>(t);
 
-                    size_t size = array.size();
-                    state.mkList(v, size);
-                    for (size_t i = 0; i < size; ++i)
-                        visit(*(v.listElems()[i] = state.allocValue()), array[i]);
+                    auto list = state.buildList(array.size());
+                    for (const auto & [n, v] : enumerate(list))
+                        visit(*(v = state.allocValue()), array[n]);
+                    v.mkList(list);
                 }
                 break;;
             case toml::value_t::boolean:
@@ -58,8 +60,18 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, V
             case toml::value_t::offset_datetime:
             case toml::value_t::local_date:
             case toml::value_t::local_time:
-                // We fail since Nix doesn't have date and time types
-                throw std::runtime_error("Dates and times are not supported");
+                {
+                    if (experimentalFeatureSettings.isEnabled(Xp::ParseTomlTimestamps)) {
+                        auto attrs = state.buildBindings(2);
+                        attrs.alloc("_type").mkString("timestamp");
+                        std::ostringstream s;
+                        s << t;
+                        attrs.alloc("value").mkString(toView(s));
+                        v.mkAttrs(attrs);
+                    } else {
+                        throw std::runtime_error("Dates and times are not supported");
+                    }
+                }
                 break;;
             case toml::value_t::empty:
                 v.mkNull();
@@ -71,13 +83,28 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, V
     try {
         visit(val, toml::parse(tomlStream, "fromTOML" /* the "filename" */));
     } catch (std::exception & e) { // TODO: toml::syntax_error
-        throw EvalError({
-            .msg = hintfmt("while parsing a TOML string: %s", e.what()),
-            .errPos = state.positions[pos]
-        });
+        state.error<EvalError>("while parsing TOML: %s", e.what()).atPos(pos).debugThrow();
     }
 }
 
-static RegisterPrimOp primop_fromTOML("fromTOML", 1, prim_fromTOML);
+static RegisterPrimOp primop_fromTOML({
+    .name = "fromTOML",
+    .args = {"e"},
+    .doc = R"(
+      Convert a TOML string to a Nix value. For example,
+
+      ```nix
+      builtins.fromTOML ''
+        x=1
+        s="a"
+        [table]
+        y=2
+      ''
+      ```
+
+      returns the value `{ s = "a"; table = { y = 2; }; x = 1; }`.
+    )",
+    .fun = prim_fromTOML
+});
 
 }

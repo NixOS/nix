@@ -30,7 +30,7 @@ using `-t`.
 # Template definitions
 
 A flake can declare templates through its `templates` output
-attribute. A template has two attributes:
+attribute. A template has the following attributes:
 
 * `description`: A one-line description of the template, in CommonMark
   syntax.
@@ -56,7 +56,7 @@ outputs = { self }: {
 
       ## More info
       - [Rust language](https://www.rust-lang.org/)
-      - [Rust on the NixOS Wiki](https://nixos.wiki/wiki/Rust)
+      - [Rust on the NixOS Wiki](https://wiki.nixos.org/wiki/Rust)
       - ...
     '';
   };

@@ -1,0 +1,1 @@
+../../doc/manual/source/store/types/index.md.in

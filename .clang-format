@@ -1,0 +1,34 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterStruct: true
+  AfterClass: true
+  AfterFunction: true
+  AfterUnion: true
+  SplitEmptyRecord: false
+PointerAlignment: Middle
+FixNamespaceComments: false
+SortIncludes: Never
+#IndentPPDirectives: BeforeHash
+SpaceAfterCStyleCast: true
+SpaceAfterTemplateKeyword: false
+AccessModifierOffset: -4
+AlignAfterOpenBracket: AlwaysBreak
+AlignEscapedNewlines: Left
+ColumnLimit: 120
+BreakStringLiterals: false
+BitFieldColonSpacing: None
+AllowShortFunctionsOnASingleLine: Empty
+AlwaysBreakTemplateDeclarations: Yes
+BinPackParameters: false
+BreakConstructorInitializers: BeforeComma
+EmptyLineAfterAccessModifier: Leave # change to always/never later?
+EmptyLineBeforeAccessModifier: Leave
+#PackConstructorInitializers: BinPack
+BreakBeforeBinaryOperators: NonAssignment
+AlwaysBreakBeforeMultilineStrings: true
+IndentPPDirectives: AfterHash
+PPIndentWidth: 2
+BinPackArguments: false
+BreakBeforeTernaryOperators: true

@@ -1,15 +1,15 @@
 #include "globals.hh"
+#include "current-process.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "gc-store.hh"
-#include "util.hh"
 #include "loggers.hh"
+#include "progress-bar.hh"
+#include "signals.hh"
 
 #include <algorithm>
-#include <cctype>
 #include <exception>
 #include <iostream>
-#include <mutex>
 
 #include <cstdlib>
 #include <sys/time.h>
@@ -19,19 +19,15 @@
 #ifdef __linux__
 #include <features.h>
 #endif
-#ifdef __GLIBC__
-#include <gnu/lib-names.h>
-#include <nss.h>
-#include <dlfcn.h>
-#endif
 
 #include <openssl/crypto.h>
 
-#include <sodium.h>
-
+#include "exit.hh"
+#include "strings.hh"
 
 namespace nix {
 
+char * * savedArgv;
 
 static bool gcWarning = true;
 
@@ -82,8 +78,18 @@ void printMissing(ref<Store> store, const StorePathSet & willBuild,
                 downloadSizeMiB,
                 narSizeMiB);
         }
-        for (auto & i : willSubstitute)
-            printMsg(lvl, "  %s", store->printStorePath(i));
+        std::vector<const StorePath *> willSubstituteSorted = {};
+        std::for_each(willSubstitute.begin(), willSubstitute.end(),
+                   [&](const StorePath &p) { willSubstituteSorted.push_back(&p); });
+        std::sort(willSubstituteSorted.begin(), willSubstituteSorted.end(),
+                  [](const StorePath *lhs, const StorePath *rhs) {
+                    if (lhs->name() == rhs->name())
+                      return lhs->to_string() < rhs->to_string();
+                    else
+                      return lhs->name() < rhs->name();
+                  });
+        for (auto p : willSubstituteSorted)
+            printMsg(lvl, "  %s", store->printStorePath(*p));
     }
 
     if (!unknown.empty()) {
@@ -103,61 +109,12 @@ std::string getArg(const std::string & opt,
     return *i;
 }
 
-
-#if OPENSSL_VERSION_NUMBER < 0x10101000L
-/* OpenSSL is not thread-safe by default - it will randomly crash
-   unless the user supplies a mutex locking function. So let's do
-   that. */
-static std::vector<std::mutex> opensslLocks;
-
-static void opensslLockCallback(int mode, int type, const char * file, int line)
-{
-    if (mode & CRYPTO_LOCK)
-        opensslLocks[type].lock();
-    else
-        opensslLocks[type].unlock();
-}
-#endif
-
-static std::once_flag dns_resolve_flag;
-
-static void preloadNSS() {
-    /* builtin:fetchurl can trigger a DNS lookup, which with glibc can trigger a dynamic library load of
-       one of the glibc NSS libraries in a sandboxed child, which will fail unless the library's already
-       been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
-       load its lookup libraries in the parent before any child gets a chance to. */
-    std::call_once(dns_resolve_flag, []() {
-#ifdef __GLIBC__
-        /* On linux, glibc will run every lookup through the nss layer.
-         * That means every lookup goes, by default, through nscd, which acts as a local
-         * cache.
-         * Because we run builds in a sandbox, we also remove access to nscd otherwise
-         * lookups would leak into the sandbox.
-         *
-         * But now we have a new problem, we need to make sure the nss_dns backend that
-         * does the dns lookups when nscd is not available is loaded or available.
-         *
-         * We can't make it available without leaking nix's environment, so instead we'll
-         * load the backend, and configure nss so it does not try to run dns lookups
-         * through nscd.
-         *
-         * This is technically only used for builtins:fetch* functions so we only care
-         * about dns.
-         *
-         * All other platforms are unaffected.
-         */
-        if (!dlopen(LIBNSS_DNS_SO, RTLD_NOW))
-            warn("unable to load nss_dns backend");
-        // FIXME: get hosts entry from nsswitch.conf.
-        __nss_configure_lookup("hosts", "files dns");
-#endif
-    });
-}
-
+#ifndef _WIN32
 static void sigHandler(int signo) { }
+#endif
 
 
-void initNix()
+void initNix(bool loadConfig)
 {
     /* Turn on buffering for cerr. */
 #if HAVE_PUBSETBUF
@@ -165,42 +122,52 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
-#if OPENSSL_VERSION_NUMBER < 0x10101000L
-    /* Initialise OpenSSL locking. */
-    opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
-    CRYPTO_set_locking_callback(opensslLockCallback);
-#endif
+    initLibStore(loadConfig);
 
-    if (sodium_init() == -1)
-        throw Error("could not initialise libsodium");
-
-    loadConfFile();
-
-    startSignalHandlerThread();
+#ifndef _WIN32
+    unix::startSignalHandlerThread();
 
     /* Reset SIGCHLD to its default. */
     struct sigaction act;
     sigemptyset(&act.sa_mask);
-    act.sa_handler = SIG_DFL;
     act.sa_flags = 0;
+
+    act.sa_handler = SIG_DFL;
     if (sigaction(SIGCHLD, &act, 0))
         throw SysError("resetting SIGCHLD");
 
     /* Install a dummy SIGUSR1 handler for use with pthread_kill(). */
     act.sa_handler = sigHandler;
     if (sigaction(SIGUSR1, &act, 0)) throw SysError("handling SIGUSR1");
+#endif
 
 #if __APPLE__
     /* HACK: on darwin, we need can’t use sigprocmask with SIGWINCH.
      * Instead, add a dummy sigaction handler, and signalHandlerThread
      * can handle the rest. */
-    struct sigaction sa;
-    sa.sa_handler = sigHandler;
-    if (sigaction(SIGWINCH, &sa, 0)) throw SysError("handling SIGWINCH");
+    act.sa_handler = sigHandler;
+    if (sigaction(SIGWINCH, &act, 0)) throw SysError("handling SIGWINCH");
+
+    /* Disable SA_RESTART for interrupts, so that system calls on this thread
+     * error with EINTR like they do on Linux.
+     * Most signals on BSD systems default to SA_RESTART on, but Nix
+     * expects EINTR from syscalls to properly exit. */
+    act.sa_handler = SIG_DFL;
+    if (sigaction(SIGINT, &act, 0)) throw SysError("handling SIGINT");
+    if (sigaction(SIGTERM, &act, 0)) throw SysError("handling SIGTERM");
+    if (sigaction(SIGHUP, &act, 0)) throw SysError("handling SIGHUP");
+    if (sigaction(SIGPIPE, &act, 0)) throw SysError("handling SIGPIPE");
+    if (sigaction(SIGQUIT, &act, 0)) throw SysError("handling SIGQUIT");
+    if (sigaction(SIGTRAP, &act, 0)) throw SysError("handling SIGTRAP");
 #endif
 
-    /* Register a SIGSEGV handler to detect stack overflows. */
+#ifndef _WIN32
+    /* Register a SIGSEGV handler to detect stack overflows.
+       Why not initLibExpr()? initGC() is essentially that, but
+       detectStackOverflow is not an instance of the init function concept, as
+       it may have to be invoked more than once per process. */
     detectStackOverflow();
+#endif
 
     /* There is no privacy in the Nix system ;-)  At least not for
        now.  In particular, store objects should be readable by
@@ -210,17 +177,12 @@ void initNix()
     /* Initialise the PRNG. */
     struct timeval tv;
     gettimeofday(&tv, 0);
+#ifndef _WIN32
     srandom(tv.tv_usec);
-
-    /* On macOS, don't use the per-session TMPDIR (as set e.g. by
-       sshd). This breaks build users because they don't have access
-       to the TMPDIR, in particular in ‘nix-store --serve’. */
-#if __APPLE__
-    if (hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
-        unsetenv("TMPDIR");
 #endif
+    srand(tv.tv_usec);
 
-    preloadNSS();
+
 }
 
 
@@ -332,7 +294,7 @@ void parseCmdLine(const std::string & programName, const Strings & args,
 
 void printVersion(const std::string & programName)
 {
-    std::cout << format("%1% (Nix) %2%") % programName % nixVersion << std::endl;
+    std::cout << fmt("%1% (Nix) %2%", programName, nixVersion) << std::endl;
     if (verbosity > lvlInfo) {
         Strings cfg;
 #if HAVE_BOEHMGC
@@ -348,6 +310,7 @@ void printVersion(const std::string & programName)
             << "\n";
         std::cout << "Store directory: " << settings.nixStore << "\n";
         std::cout << "State directory: " << settings.nixStateDir << "\n";
+        std::cout << "Data directory: " << settings.nixDataDir << "\n";
     }
     throw Exit();
 }
@@ -356,8 +319,12 @@ void printVersion(const std::string & programName)
 void showManPage(const std::string & name)
 {
     restoreProcessContext();
-    setenv("MANPATH", settings.nixManDir.c_str(), 1);
+    setEnv("MANPATH", settings.nixManDir.c_str());
     execlp("man", "man", name.c_str(), nullptr);
+    if (errno == ENOENT) {
+        // Not SysError because we don't want to suffix the errno, aka No such file or directory.
+        throw Error("The '%1%' command was not found, but it is needed for '%2%' and some other '%3%' commands' help text. Perhaps you could install the '%1%' command?", "man", name.c_str(), "nix-*");
+    }
     throw SysError("command 'man %1%' failed", name.c_str());
 }
 
@@ -388,9 +355,7 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
         return 1;
     } catch (BaseError & e) {
         logError(e.info());
-        if (e.hasTrace() && !loggerSettings.showTrace.get())
-            printError("(use '--show-trace' to show detailed location information)");
-        return e.status;
+        return e.info().status;
     } catch (std::bad_alloc & e) {
         printError(error + "out of memory");
         return 1;
@@ -410,14 +375,19 @@ RunPager::RunPager()
     if (!pager) pager = getenv("PAGER");
     if (pager && ((std::string) pager == "" || (std::string) pager == "cat")) return;
 
+    stopProgressBar();
+
     Pipe toPager;
     toPager.create();
 
+#ifdef _WIN32 // TODO re-enable on Windows, once we can start processes.
+    throw Error("Commit signature verification not implemented on Windows yet");
+#else
     pid = startProcess([&]() {
         if (dup2(toPager.readSide.get(), STDIN_FILENO) == -1)
             throw SysError("dupping stdin");
         if (!getenv("LESS"))
-            setenv("LESS", "FRSXMK", 1);
+            setEnv("LESS", "FRSXMK");
         restoreProcessContext();
         if (pager)
             execl("/bin/sh", "sh", "-c", pager, nullptr);
@@ -428,22 +398,25 @@ RunPager::RunPager()
     });
 
     pid.setKillSignal(SIGINT);
-    stdout = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
+    std_out = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
-        throw SysError("dupping stdout");
+        throw SysError("dupping standard output");
+#endif
 }
 
 
 RunPager::~RunPager()
 {
     try {
+#ifndef _WIN32 // TODO re-enable on Windows, once we can start processes.
         if (pid != -1) {
             std::cout.flush();
-            dup2(stdout, STDOUT_FILENO);
+            dup2(std_out, STDOUT_FILENO);
             pid.wait();
         }
+#endif
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 
@@ -455,7 +428,5 @@ PrintFreed::~PrintFreed()
             results.paths.size(),
             showBytes(results.bytesFreed));
 }
-
-Exit::~Exit() { }
 
 }

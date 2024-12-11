@@ -1,19 +1,19 @@
 #pragma once
+///@file
 
 #include "types.hh"
 #include "config.hh"
-#include "util.hh"
 
 #include <map>
 #include <limits>
 
 #include <sys/types.h>
 
-namespace nix {
+namespace nix::fetchers {
 
-struct FetchSettings : public Config
+struct Settings : public Config
 {
-    FetchSettings();
+    Settings();
 
     Setting<StringMap> accessTokens{this, {}, "access-tokens",
         R"(
@@ -57,7 +57,7 @@ struct FetchSettings : public Config
           ```
 
           This example specifies three tokens, one each for accessing
-          github.com, gitlab.mycompany.com, and sourceforge.net.
+          github.com, gitlab.mycompany.com, and gitlab.com.
 
           The `input.foo` uses the "gitlab" fetcher, which might
           requires specifying the token type along with the token
@@ -70,24 +70,28 @@ struct FetchSettings : public Config
     Setting<bool> warnDirty{this, true, "warn-dirty",
         "Whether to warn about dirty Git/Mercurial trees."};
 
-    Setting<std::string> flakeRegistry{this, "https://channels.nixos.org/flake-registry.json", "flake-registry",
-        "Path or URI of the global flake registry."};
-
-    Setting<bool> useRegistries{this, true, "use-registries",
-        "Whether to use flake registries to resolve flake references."};
-
-    Setting<bool> acceptFlakeConfig{this, false, "accept-flake-config",
-        "Whether to accept nix configuration from a flake without prompting."};
-
-    Setting<std::string> commitLockFileSummary{
-        this, "", "commit-lockfile-summary",
+    Setting<bool> trustTarballsFromGitForges{
+        this, true, "trust-tarballs-from-git-forges",
         R"(
-          The commit summary to use when committing changed flake lock files. If
-          empty, the summary is generated based on the action performed.
-        )"};
-};
+          If enabled (the default), Nix will consider tarballs from
+          GitHub and similar Git forges to be locked if a Git revision
+          is specified,
+          e.g. `github:NixOS/patchelf/7c2f768bf9601268a4e71c2ebe91e2011918a70f`.
+          This requires Nix to trust that the provider will return the
+          correct contents for the specified Git revision.
 
-// FIXME: don't use a global variable.
-extern FetchSettings fetchSettings;
+          If disabled, such tarballs are only considered locked if a
+          `narHash` attribute is specified,
+          e.g. `github:NixOS/patchelf/7c2f768bf9601268a4e71c2ebe91e2011918a70f?narHash=sha256-PPXqKY2hJng4DBVE0I4xshv/vGLUskL7jl53roB8UdU%3D`.
+        )"};
+
+    Setting<std::string> flakeRegistry{this, "https://channels.nixos.org/flake-registry.json", "flake-registry",
+        R"(
+          Path or URI of the global flake registry.
+
+          When empty, disables the global flake registry.
+        )",
+        {}, true, Xp::Flakes};
+};
 
 }

@@ -94,7 +94,7 @@ static bool componentsLT(const std::string_view c1, const std::string_view c2)
 }
 
 
-int compareVersions(const std::string_view v1, const std::string_view v2)
+std::strong_ordering compareVersions(const std::string_view v1, const std::string_view v2)
 {
     auto p1 = v1.begin();
     auto p2 = v2.begin();
@@ -102,11 +102,11 @@ int compareVersions(const std::string_view v1, const std::string_view v2)
     while (p1 != v1.end() || p2 != v2.end()) {
         auto c1 = nextComponent(p1, v1.end());
         auto c2 = nextComponent(p2, v2.end());
-        if (componentsLT(c1, c2)) return -1;
-        else if (componentsLT(c2, c1)) return 1;
+        if (componentsLT(c1, c2)) return std::strong_ordering::less;
+        else if (componentsLT(c2, c1)) return std::strong_ordering::greater;
     }
 
-    return 0;
+    return std::strong_ordering::equal;
 }
 
 

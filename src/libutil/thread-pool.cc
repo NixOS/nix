@@ -1,4 +1,6 @@
 #include "thread-pool.hh"
+#include "signals.hh"
+#include "util.hh"
 
 namespace nix {
 
@@ -77,8 +79,12 @@ void ThreadPool::process()
 
 void ThreadPool::doWork(bool mainThread)
 {
+    ReceiveInterrupts receiveInterrupts;
+
+#ifndef _WIN32 // Does Windows need anything similar for async exit handling?
     if (!mainThread)
-        interruptCheck = [&]() { return (bool) quit; };
+        unix::interruptCheck = [&]() { return (bool) quit; };
+#endif
 
     bool didWork = false;
     std::exception_ptr exc;
@@ -104,11 +110,15 @@ void ThreadPool::doWork(bool mainThread)
                            propagate it. */
                         try {
                             std::rethrow_exception(exc);
+                        } catch (const Interrupted &) {
+                            // The interrupted state may be picked up by multiple
+                            // workers, which is expected, so we should ignore
+                            // it silently and let the first one bubble up,
+                            // rethrown via the original state->exception.
+                        } catch (const ThreadPoolShutDown &) {
+                            // Similarly expected.
                         } catch (std::exception & e) {
-                            if (!dynamic_cast<Interrupted*>(&e) &&
-                                !dynamic_cast<ThreadPoolShutDown*>(&e))
-                                ignoreException();
-                        } catch (...) {
+                            ignoreExceptionExceptInterrupt();
                         }
                     }
                 }

@@ -1,46 +1,230 @@
+#include <nlohmann/json.hpp>
+
 #include "path-info.hh"
-#include "worker-protocol.hh"
+#include "store-api.hh"
+#include "json-utils.hh"
+#include "comparator.hh"
+#include "strings.hh"
 
 namespace nix {
 
-ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned int format)
+GENERATE_CMP_EXT(
+    ,
+    std::weak_ordering,
+    UnkeyedValidPathInfo,
+    me->deriver,
+    me->narHash,
+    me->references,
+    me->registrationTime,
+    me->narSize,
+    //me->id,
+    me->ultimate,
+    me->sigs,
+    me->ca);
+
+std::string ValidPathInfo::fingerprint(const Store & store) const
 {
-    return read(source, store, format, store.parseStorePath(readString(source)));
+    if (narSize == 0)
+        throw Error("cannot calculate fingerprint of path '%s' because its size is not known",
+            store.printStorePath(path));
+    return
+            "1;" + store.printStorePath(path) + ";"
+            + narHash.to_string(HashFormat::Nix32, true) + ";"
+            + std::to_string(narSize) + ";"
+        + concatStringsSep(",", store.printStorePathSet(references));
 }
 
-ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned int format, StorePath && path)
+
+void ValidPathInfo::sign(const Store & store, const Signer & signer)
 {
-    auto deriver = readString(source);
-    auto narHash = Hash::parseAny(readString(source), htSHA256);
-    ValidPathInfo info(path, narHash);
-    if (deriver != "") info.deriver = store.parseStorePath(deriver);
-    info.references = worker_proto::read(store, source, Phantom<StorePathSet> {});
-    source >> info.registrationTime >> info.narSize;
-    if (format >= 16) {
-        source >> info.ultimate;
-        info.sigs = readStrings<StringSet>(source);
-        info.ca = parseContentAddressOpt(readString(source));
+    sigs.insert(signer.signDetached(fingerprint(store)));
+}
+
+std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithReferences() const
+{
+    if (! ca)
+        return std::nullopt;
+
+    switch (ca->method.raw) {
+        case ContentAddressMethod::Raw::Text:
+        {
+            assert(references.count(path) == 0);
+            return TextInfo {
+                .hash = ca->hash,
+                .references = references,
+            };
+        }
+
+        case ContentAddressMethod::Raw::Flat:
+        case ContentAddressMethod::Raw::NixArchive:
+        case ContentAddressMethod::Raw::Git:
+        default:
+        {
+            auto refs = references;
+            bool hasSelfReference = false;
+            if (refs.count(path)) {
+                hasSelfReference = true;
+                refs.erase(path);
+            }
+            return FixedOutputInfo {
+                .method = ca->method.getFileIngestionMethod(),
+                .hash = ca->hash,
+                .references = {
+                    .others = std::move(refs),
+                    .self = hasSelfReference,
+                },
+            };
+        }
     }
-    return info;
 }
 
-void ValidPathInfo::write(
-    Sink & sink,
+bool ValidPathInfo::isContentAddressed(const Store & store) const
+{
+    auto fullCaOpt = contentAddressWithReferences();
+
+    if (! fullCaOpt)
+        return false;
+
+    auto caPath = store.makeFixedOutputPathFromCA(path.name(), *fullCaOpt);
+
+    bool res = caPath == path;
+
+    if (!res)
+        printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
+
+    return res;
+}
+
+
+size_t ValidPathInfo::checkSignatures(const Store & store, const PublicKeys & publicKeys) const
+{
+    if (isContentAddressed(store)) return maxSigs;
+
+    size_t good = 0;
+    for (auto & sig : sigs)
+        if (checkSignature(store, publicKeys, sig))
+            good++;
+    return good;
+}
+
+
+bool ValidPathInfo::checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const
+{
+    return verifyDetached(fingerprint(store), sig, publicKeys);
+}
+
+
+Strings ValidPathInfo::shortRefs() const
+{
+    Strings refs;
+    for (auto & r : references)
+        refs.push_back(std::string(r.to_string()));
+    return refs;
+}
+
+ValidPathInfo::ValidPathInfo(
     const Store & store,
-    unsigned int format,
-    bool includePath) const
+    std::string_view name,
+    ContentAddressWithReferences && ca,
+    Hash narHash)
+      : UnkeyedValidPathInfo(narHash)
+      , path(store.makeFixedOutputPathFromCA(name, ca))
 {
-    if (includePath)
-        sink << store.printStorePath(path);
-    sink << (deriver ? store.printStorePath(*deriver) : "")
-         << narHash.to_string(Base16, false);
-    worker_proto::write(store, sink, references);
-    sink << registrationTime << narSize;
-    if (format >= 16) {
-        sink << ultimate
-             << sigs
-             << renderContentAddress(ca);
+    this->ca = ContentAddress {
+        .method = ca.getMethod(),
+        .hash = ca.getHash(),
+    };
+    std::visit(overloaded {
+        [this](TextInfo && ti) {
+            this->references = std::move(ti.references);
+        },
+        [this](FixedOutputInfo && foi) {
+            this->references = std::move(foi.references.others);
+            if (foi.references.self)
+                this->references.insert(path);
+        },
+    }, std::move(ca).raw);
+}
+
+
+nlohmann::json UnkeyedValidPathInfo::toJSON(
+    const Store & store,
+    bool includeImpureInfo,
+    HashFormat hashFormat) const
+{
+    using nlohmann::json;
+
+    auto jsonObject = json::object();
+
+    jsonObject["narHash"] = narHash.to_string(hashFormat, true);
+    jsonObject["narSize"] = narSize;
+
+    {
+        auto & jsonRefs = jsonObject["references"] = json::array();
+        for (auto & ref : references)
+            jsonRefs.emplace_back(store.printStorePath(ref));
     }
+
+    jsonObject["ca"] = ca ? (std::optional { renderContentAddress(*ca) }) : std::nullopt;
+
+    if (includeImpureInfo) {
+        jsonObject["deriver"] = deriver ? (std::optional { store.printStorePath(*deriver) }) : std::nullopt;
+
+        jsonObject["registrationTime"] = registrationTime ? (std::optional { registrationTime }) : std::nullopt;
+
+        jsonObject["ultimate"] = ultimate;
+
+        auto & sigsObj = jsonObject["signatures"] = json::array();
+        for (auto & sig : sigs)
+            sigsObj.push_back(sig);
+    }
+
+    return jsonObject;
+}
+
+UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
+    const Store & store,
+    const nlohmann::json & _json)
+{
+    UnkeyedValidPathInfo res {
+        Hash(Hash::dummy),
+    };
+
+    auto & json = getObject(_json);
+    res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
+    res.narSize = getInteger(valueAt(json, "narSize"));
+
+    try {
+        auto references = getStringList(valueAt(json, "references"));
+        for (auto & input : references)
+            res.references.insert(store.parseStorePath(static_cast<const std::string &>
+(input)));
+    } catch (Error & e) {
+        e.addTrace({}, "while reading key 'references'");
+        throw;
+    }
+
+    // New format as this as nullable but mandatory field; handling
+    // missing is for back-compat.
+    if (json.contains("ca"))
+        if (auto * rawCa = getNullable(valueAt(json, "ca")))
+            res.ca = ContentAddress::parse(getString(*rawCa));
+
+    if (json.contains("deriver"))
+        if (auto * rawDeriver = getNullable(valueAt(json, "deriver")))
+            res.deriver = store.parseStorePath(getString(*rawDeriver));
+
+    if (json.contains("registrationTime"))
+        if (auto * rawRegistrationTime = getNullable(valueAt(json, "registrationTime")))
+            res.registrationTime = getInteger(*rawRegistrationTime);
+
+    if (json.contains("ultimate"))
+        res.ultimate = getBoolean(valueAt(json, "ultimate"));
+
+    if (json.contains("signatures"))
+        res.sigs = getStringSet(valueAt(json, "signatures"));
+
+    return res;
 }
 
 }

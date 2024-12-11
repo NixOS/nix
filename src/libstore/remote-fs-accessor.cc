@@ -1,6 +1,6 @@
+#include <nlohmann/json.hpp>
 #include "remote-fs-accessor.hh"
 #include "nar-accessor.hh"
-#include "json.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -8,8 +8,9 @@
 
 namespace nix {
 
-RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, const Path & cacheDir)
+RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, bool requireValidPath, const Path & cacheDir)
     : store(store)
+    , requireValidPath(requireValidPath)
     , cacheDir(cacheDir)
 {
     if (cacheDir != "")
@@ -22,14 +23,14 @@ Path RemoteFSAccessor::makeCacheFile(std::string_view hashPart, const std::strin
     return fmt("%s/%s.%s", cacheDir, hashPart, ext);
 }
 
-ref<FSAccessor> RemoteFSAccessor::addToCache(std::string_view hashPart, std::string && nar)
+ref<SourceAccessor> RemoteFSAccessor::addToCache(std::string_view hashPart, std::string && nar)
 {
     if (cacheDir != "") {
         try {
             /* FIXME: do this asynchronously. */
             writeFile(makeCacheFile(hashPart, "nar"), nar);
         } catch (...) {
-            ignoreException();
+            ignoreExceptionExceptInterrupt();
         }
     }
 
@@ -38,23 +39,20 @@ ref<FSAccessor> RemoteFSAccessor::addToCache(std::string_view hashPart, std::str
 
     if (cacheDir != "") {
         try {
-            std::ostringstream str;
-            JSONPlaceholder jsonRoot(str);
-            listNar(jsonRoot, narAccessor, "", true);
-            writeFile(makeCacheFile(hashPart, "ls"), str.str());
+            nlohmann::json j = listNar(narAccessor, CanonPath::root, true);
+            writeFile(makeCacheFile(hashPart, "ls"), j.dump());
         } catch (...) {
-            ignoreException();
+            ignoreExceptionExceptInterrupt();
         }
     }
 
     return narAccessor;
 }
 
-std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_, bool requireValidPath)
+std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPath & path)
 {
-    auto path = canonPath(path_);
-
-    auto [storePath, restPath] = store->toStorePath(path);
+    auto [storePath, restPath_] = store->toStorePath(path.abs());
+    auto restPath = CanonPath(restPath_);
 
     if (requireValidPath && !store->isValidPath(storePath))
         throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
@@ -65,7 +63,7 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_, boo
     std::string listing;
     Path cacheFile;
 
-    if (cacheDir != "" && pathExists(cacheFile = makeCacheFile(storePath.hashPart(), "nar"))) {
+    if (cacheDir != "" && nix::pathExists(cacheFile = makeCacheFile(storePath.hashPart(), "nar"))) {
 
         try {
             listing = nix::readFile(makeCacheFile(storePath.hashPart(), "ls"));
@@ -73,11 +71,15 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_, boo
             auto narAccessor = makeLazyNarAccessor(listing,
                 [cacheFile](uint64_t offset, uint64_t length) {
 
-                    AutoCloseFD fd = open(cacheFile.c_str(), O_RDONLY | O_CLOEXEC);
+                    AutoCloseFD fd = toDescriptor(open(cacheFile.c_str(), O_RDONLY
+                    #ifndef _WIN32
+                        | O_CLOEXEC
+                    #endif
+                        ));
                     if (!fd)
                         throw SysError("opening NAR cache file '%s'", cacheFile);
 
-                    if (lseek(fd.get(), offset, SEEK_SET) != (off_t) offset)
+                    if (lseek(fromDescriptorReadOnly(fd.get()), offset, SEEK_SET) != (off_t) offset)
                         throw SysError("seeking in '%s'", cacheFile);
 
                     std::string buf(length, 0);
@@ -89,13 +91,13 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_, boo
             nars.emplace(storePath.hashPart(), narAccessor);
             return {narAccessor, restPath};
 
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
 
         try {
             auto narAccessor = makeNarAccessor(nix::readFile(cacheFile));
             nars.emplace(storePath.hashPart(), narAccessor);
             return {narAccessor, restPath};
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
     }
 
     StringSink sink;
@@ -103,25 +105,25 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_, boo
     return {addToCache(storePath.hashPart(), std::move(sink.s)), restPath};
 }
 
-FSAccessor::Stat RemoteFSAccessor::stat(const Path & path)
+std::optional<SourceAccessor::Stat> RemoteFSAccessor::maybeLstat(const CanonPath & path)
 {
     auto res = fetch(path);
-    return res.first->stat(res.second);
+    return res.first->maybeLstat(res.second);
 }
 
-StringSet RemoteFSAccessor::readDirectory(const Path & path)
+SourceAccessor::DirEntries RemoteFSAccessor::readDirectory(const CanonPath & path)
 {
     auto res = fetch(path);
     return res.first->readDirectory(res.second);
 }
 
-std::string RemoteFSAccessor::readFile(const Path & path, bool requireValidPath)
+std::string RemoteFSAccessor::readFile(const CanonPath & path)
 {
-    auto res = fetch(path, requireValidPath);
+    auto res = fetch(path);
     return res.first->readFile(res.second);
 }
 
-std::string RemoteFSAccessor::readLink(const Path & path)
+std::string RemoteFSAccessor::readLink(const CanonPath & path)
 {
     auto res = fetch(path);
     return res.first->readLink(res.second);

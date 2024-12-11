@@ -1,12 +1,15 @@
 #include "progress-bar.hh"
-#include "util.hh"
+#include "terminal.hh"
 #include "sync.hh"
 #include "store-api.hh"
 #include "names.hh"
+#include "config-global.hh"
+#include "signals.hh"
 
 #include <atomic>
 #include <map>
 #include <thread>
+#include <sstream>
 #include <iostream>
 #include <chrono>
 #include <future>
@@ -69,7 +72,7 @@ private:
         bool ignored = false;
         ActivityId parent;
         std::optional<std::string> name;
-        std::optional<std::chrono::time_point<std::chrono::steady_clock>> startTime;
+        std::chrono::time_point<std::chrono::steady_clock> startTime;
         PathSet buildsRemaining, substitutionsRemaining;
     };
 
@@ -143,6 +146,7 @@ private:
         uint64_t corruptedPaths = 0, untrustedPaths = 0;
 
         bool active = true;
+        bool paused = false;
         bool haveUpdate = true;
 
         std::map<LineId, std::string> statusLines;
@@ -156,6 +160,9 @@ private:
     };
 
     const bool isTTY;
+
+    /** Helps avoid unnecessary redraws, see `redraw()`. */
+    Sync<std::string> lastOutput_;
 
     Sync<State> state_;
 
@@ -180,13 +187,14 @@ public:
 
         updateThread = std::thread([&]() {
             auto state(state_.lock());
+            auto nextWakeup = std::chrono::milliseconds::max();
             while (state->active) {
                 #if 0
                 if (!state->haveUpdate)
-                    state.wait(updateCV);
+                    state.wait_for(updateCV, nextWakeup);
                 #endif
                 updateStatusLine(*state);
-                draw(*state);
+                nextWakeup = draw(*state);
                 state.wait_for(quitCV, std::chrono::milliseconds(50));
             }
         });
@@ -236,7 +244,7 @@ public:
                         auto state(state_.lock());
                         state->statusLines.insert_or_assign({idQuit, 0}, ANSI_RED "Exiting...");
                         draw(*state);
-                        triggerInterrupt();
+                        unix::triggerInterrupt();
                     }
 
                     {
@@ -329,7 +337,8 @@ public:
         stop();
     }
 
-    void stop() override
+    /* Called by destructor, can't be overridden */
+    void stop() override final
     {
         if (inputThread.joinable()) {
             assert(inputPipe.writeSide);
@@ -355,36 +364,50 @@ public:
         updateThread.join();
     }
 
+    void pause() override {
+        auto state (state_.lock());
+        state->paused = true;
+        if (state->active)
+            writeToStderr("\r\e[K");
+    }
+
+    void resume() override {
+        auto state (state_.lock());
+        state->paused = false;
+        if (state->active)
+            writeToStderr("\r\e[K");
+        state->haveUpdate = true;
+        updateCV.notify_one();
+    }
+
     bool isVerbose() override
     {
         return progressBarSettings.printBuildLogs;
     }
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, std::string_view s) override
     {
         if (lvl > verbosity) return;
         auto state(state_.lock());
-        log(*state, lvl, fs.s);
+        log(*state, lvl, s);
     }
 
-    void logEI(const ErrorInfo &ei) override
+    void logEI(const ErrorInfo & ei) override
     {
         auto state(state_.lock());
 
-        std::stringstream oss;
+        std::ostringstream oss;
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
-        log(*state, ei.level, oss.str());
+        log(*state, ei.level, toView(oss));
     }
 
-    void log(State & state, Verbosity lvl, const std::string & s)
+    void log(State & state, Verbosity lvl, std::string_view s)
     {
         if (state.active) {
             draw(state, filterANSIEscapes(s, !isTTY));
         } else {
-            auto s2 = s + ANSI_NORMAL "\n";
-            if (!isTTY) s2 = filterANSIEscapes(s2, true);
-            writeToStderr(s2);
+            writeToStderr(filterANSIEscapes(s, !isTTY) + "\n");
         }
     }
 
@@ -411,11 +434,13 @@ public:
         if (lvl <= verbosity && !s.empty() && type != actBuildWaiting)
             log(*state, lvl, s + "...");
 
-        state->activities.emplace_back(ActInfo());
+        state->activities.emplace_back(ActInfo {
+            .s = s,
+            .type = type,
+            .parent = parent,
+            .startTime = std::chrono::steady_clock::now()
+        });
         auto i = std::prev(state->activities.end());
-        i->s = s;
-        i->type = type;
-        i->parent = parent;
         state->its.emplace(act, i);
         state->activitiesByType[type].its.emplace(act, i);
 
@@ -427,10 +452,12 @@ public:
             auto machineName = getS(fields, 1);
             if (machineName != "")
                 i->s += fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName);
-            auto curRound = getI(fields, 2);
-            auto nrRounds = getI(fields, 3);
-            if (nrRounds != 1)
-                i->s += fmt(" (round %d/%d)", curRound, nrRounds);
+
+            // Used to be curRound and nrRounds, but the
+            // implementation was broken for a long time.
+            if (getI(fields, 2) != 1 || getI(fields, 3) != 1) {
+                throw Error("log message indicated repeating builds, but this is not currently implemented");
+            }
             i->name = DrvName(name).name;
         }
 
@@ -585,6 +612,14 @@ public:
             }
         }
 
+        else if (type == resFetchStatus) {
+            auto i = state->its.find(act);
+            assert(i != state->its.end());
+            ActInfo & actInfo = *i->second;
+            actInfo.lastLine = getS(fields, 0);
+            update(*state);
+        }
+
         else if (type == resExpectBuild)
             actInfo.buildsRemaining.insert(std::string { getS(fields, 0) });
 
@@ -608,11 +643,26 @@ public:
     {
         std::string line;
 
+        auto now = std::chrono::steady_clock::now();
+
         if (!state.activities.empty()) {
             auto i = state.activities.rbegin();
 
-            while (i != state.activities.rend() && (!i->visible || (i->s.empty() && i->lastLine.empty())))
+            while (i != state.activities.rend()) {
+                if (i->visible && (!i->s.empty() || !i->lastLine.empty())) {
+                    /* Don't show activities until some time has
+                       passed, to avoid displaying very short
+                       activities. */
+                    auto delay = std::chrono::milliseconds(10);
+                    if (i->startTime + delay < now)
+                        break;
+                    #if 0
+                    else
+                        nextWakeup = std::min(nextWakeup, std::chrono::duration_cast<std::chrono::milliseconds>(delay - (now - i->startTime)));
+                    #endif
+                }
                 ++i;
+            }
 
             if (i != state.activities.rend())
                 line += i->s;
@@ -626,8 +676,6 @@ public:
             //{"←", "↖", "↑", "↗", "→", "↘", "↓", "↙"};
             //{"▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▃", "▁"};
             {"⠁", "⠂", "⠄", "⡀", "⢀", "⠠", "⠐", "⠈"};
-
-        auto now = std::chrono::steady_clock::now();
 
         auto busyMark = ANSI_BOLD + spinner[(std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime).count() / 200) % spinner.size()];
 
@@ -757,7 +805,7 @@ public:
                 state.statusLines.insert_or_assign({idBuilds, n++},
                     fmt(ANSI_BOLD "  ‣ %s (%d s)%s: %s",
                         build.second->s,
-                        std::chrono::duration_cast<std::chrono::seconds>(now - *build.second->startTime).count(),
+                        std::chrono::duration_cast<std::chrono::seconds>(now - build.second->startTime).count(),
                         build.second->phase ? fmt(" (%s)", *build.second->phase) : "",
                         build.second->lastLine));
             }
@@ -799,10 +847,12 @@ public:
         }
     }
 
-    void draw(State & state, std::optional<std::string_view> msg = {})
+    std::chrono::milliseconds draw(State & state, std::optional<std::string_view> msg = {})
     {
+        auto nextWakeup = std::chrono::milliseconds::max();
+
         state.haveUpdate = false;
-        if (!state.active) return;
+        if (state.paused || !state.active) return nextWakeup;
 
         auto width = getWindowSize().second;
         if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
@@ -827,6 +877,8 @@ public:
         writeToStderr(s);
 
         state.prevStatusLines = state.statusLines.size();
+
+        return nextWakeup;
     }
 
     void writeToStdout(std::string_view s) override
@@ -869,7 +921,7 @@ public:
 
 Logger * makeProgressBar()
 {
-    return new ProgressBar(shouldANSI() && isatty(STDIN_FILENO));
+    return new ProgressBar(isTTY());
 }
 
 void stopProgressBar()

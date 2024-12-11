@@ -1,8 +1,14 @@
 #include "logging.hh"
+#include "file-descriptor.hh"
+#include "environment-variables.hh"
+#include "terminal.hh"
 #include "util.hh"
-#include "config.hh"
+#include "config-global.hh"
+#include "source-path.hh"
+#include "position.hh"
 
 #include <atomic>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <iostream>
 
@@ -32,7 +38,9 @@ void Logger::warn(const std::string & msg)
 
 void Logger::writeToStdout(std::string_view s)
 {
-    std::cout << s << "\n";
+    Descriptor standard_out = getStandardOut();
+    writeFull(standard_out, s);
+    writeFull(standard_out, "\n");
 }
 
 class SimpleLogger : public Logger
@@ -46,14 +54,14 @@ public:
         : printBuildLogs(printBuildLogs)
     {
         systemd = getEnv("IN_SYSTEMD") == "1";
-        tty = shouldANSI();
+        tty = isTTY();
     }
 
     bool isVerbose() override {
         return printBuildLogs;
     }
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, std::string_view s) override
     {
         if (lvl > verbosity) return;
 
@@ -64,27 +72,28 @@ public:
             switch (lvl) {
             case lvlError: c = '3'; break;
             case lvlWarn: c = '4'; break;
-            case lvlInfo: c = '5'; break;
+            case lvlNotice: case lvlInfo: c = '5'; break;
             case lvlTalkative: case lvlChatty: c = '6'; break;
-            default: c = '7';
+            case lvlDebug: case lvlVomit: c = '7'; break;
+            default: c = '7'; break; // should not happen, and missing enum case is reported by -Werror=switch-enum
             }
             prefix = std::string("<") + c + ">";
         }
 
-        writeToStderr(prefix + filterANSIEscapes(fs.s, !tty) + "\n");
+        writeToStderr(prefix + filterANSIEscapes(s, !tty) + "\n");
     }
 
     void logEI(const ErrorInfo & ei) override
     {
-        std::stringstream oss;
+        std::ostringstream oss;
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
-        log(ei.level, oss.str());
+        log(ei.level, toView(oss));
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent)
-    override
+        override
     {
         if (lvl <= verbosity && !s.empty())
             log(lvl, s + "...");
@@ -105,19 +114,17 @@ public:
 
 Verbosity verbosity = lvlInfo;
 
-void warnOnce(bool & haveWarned, const FormatOrString & fs)
-{
-    if (!haveWarned) {
-        warn(fs.s);
-        haveWarned = true;
-    }
-}
-
 void writeToStderr(std::string_view s)
 {
     try {
-        writeFull(STDERR_FILENO, s, false);
-    } catch (SysError & e) {
+        writeFull(
+#ifdef _WIN32
+            GetStdHandle(STD_ERROR_HANDLE),
+#else
+            STDERR_FILENO,
+#endif
+            s, false);
+    } catch (SystemError & e) {
         /* Ignore failing writes to stderr.  We need to ignore write
            errors to ensure that cleanup code that logs to stderr runs
            to completion if the other side of stderr has been closed
@@ -130,13 +137,37 @@ Logger * makeSimpleLogger(bool printBuildLogs)
     return new SimpleLogger(printBuildLogs);
 }
 
-std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
+std::atomic<uint64_t> nextId{0};
+
+static uint64_t getPid()
+{
+#ifndef _WIN32
+    return getpid();
+#else
+    return GetCurrentProcessId();
+#endif
+}
 
 Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     const std::string & s, const Logger::Fields & fields, ActivityId parent)
-    : logger(logger), id(nextId++)
+    : logger(logger), id(nextId++ + (((uint64_t) getPid()) << 32))
 {
     logger.startActivity(id, lvl, type, s, fields, parent);
+}
+
+void to_json(nlohmann::json & json, std::shared_ptr<Pos> pos)
+{
+    if (pos) {
+        json["line"] = pos->line;
+        json["column"] = pos->column;
+        std::ostringstream str;
+        pos->print(str, true);
+        json["file"] = str.str();
+    } else {
+        json["line"] = nullptr;
+        json["column"] = nullptr;
+        json["file"] = nullptr;
+    }
 }
 
 struct JSONLogger : Logger {
@@ -158,7 +189,7 @@ struct JSONLogger : Logger {
             else if (f.type == Logger::Field::tString)
                 arr.push_back(f.s);
             else
-                abort();
+                unreachable();
     }
 
     void write(const nlohmann::json & json)
@@ -166,12 +197,12 @@ struct JSONLogger : Logger {
         prevLogger.log(lvlError, "@nix " + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
     }
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, std::string_view s) override
     {
         nlohmann::json json;
         json["action"] = "msg";
         json["level"] = lvl;
-        json["msg"] = fs.s;
+        json["msg"] = s;
         write(json);
     }
 
@@ -185,27 +216,14 @@ struct JSONLogger : Logger {
         json["level"] = ei.level;
         json["msg"] = oss.str();
         json["raw_msg"] = ei.msg.str();
-
-        if (ei.errPos.has_value() && (*ei.errPos)) {
-            json["line"] = ei.errPos->line;
-            json["column"] = ei.errPos->column;
-            json["file"] = ei.errPos->file;
-        } else {
-            json["line"] = nullptr;
-            json["column"] = nullptr;
-            json["file"] = nullptr;
-        }
+        to_json(json, ei.pos);
 
         if (loggerSettings.showTrace.get() && !ei.traces.empty()) {
             nlohmann::json traces = nlohmann::json::array();
             for (auto iter = ei.traces.rbegin(); iter != ei.traces.rend(); ++iter) {
                 nlohmann::json stackFrame;
                 stackFrame["raw_msg"] = iter->hint.str();
-                if (iter->pos.has_value() && (*iter->pos)) {
-                    stackFrame["line"] = iter->pos->line;
-                    stackFrame["column"] = iter->pos->column;
-                    stackFrame["file"] = iter->pos->file;
-                }
+                to_json(stackFrame, iter->pos);
                 traces.push_back(stackFrame);
             }
 
@@ -224,8 +242,8 @@ struct JSONLogger : Logger {
         json["level"] = lvl;
         json["type"] = type;
         json["text"] = s;
+        json["parent"] = parent;
         addFields(json, fields);
-        // FIXME: handle parent
         write(json);
     }
 
@@ -328,7 +346,7 @@ Activity::~Activity()
     try {
         logger.stopActivity(id);
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 

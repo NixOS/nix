@@ -1,62 +1,50 @@
 #pragma once
+///@file
 
-#include "lock.hh"
+#include "worker.hh"
 #include "store-api.hh"
 #include "goal.hh"
+#include "muxable-pipe.hh"
+#include <coroutine>
+#include <future>
+#include <source_location>
 
 namespace nix {
 
-class Worker;
-
 struct PathSubstitutionGoal : public Goal
 {
-    /* The store path that should be realised through a substitute. */
+    /**
+     * The store path that should be realised through a substitute.
+     */
     StorePath storePath;
 
-    /* The path the substituter refers to the path as. This will be
-       different when the stores have different names. */
-    std::optional<StorePath> subPath;
-
-    /* The remaining substituters. */
-    std::list<ref<Store>> subs;
-
-    /* The current substituter. */
-    std::shared_ptr<Store> sub;
-
-    /* Whether a substituter failed. */
-    bool substituterFailed = false;
-
-    /* Path info returned by the substituter's query info operation. */
-    std::shared_ptr<const ValidPathInfo> info;
-
-    /* Pipe for the substituter's standard output. */
-    Pipe outPipe;
-
-    /* The substituter thread. */
-    std::thread thr;
-
-    std::promise<void> promise;
-
-    /* Whether to try to repair a valid path. */
+    /**
+     * Whether to try to repair a valid path.
+     */
     RepairFlag repair;
 
-    /* Location where we're downloading the substitute.  Differs from
-       storePath when doing a repair. */
-    Path destPath;
+    /**
+     * Pipe for the substituter's standard output.
+     */
+    MuxablePipe outPipe;
+
+    /**
+     * The substituter thread.
+     */
+    std::thread thr;
 
     std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
         maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
 
-    typedef void (PathSubstitutionGoal::*GoalState)();
-    GoalState state;
-
-    /* Content address for recomputing store path */
+    /**
+     * Content address for recomputing store path
+     */
     std::optional<ContentAddress> ca;
 
     /* Time substitution started. */
     std::chrono::time_point<std::chrono::steady_clock> startTime;
 
-    void done(
+    Done done(
         ExitCode result,
         BuildResult::Status status,
         std::optional<std::string> errorMsg = {});
@@ -65,30 +53,37 @@ public:
     PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
     ~PathSubstitutionGoal();
 
-    void timedOut(Error && ex) override { abort(); };
+    void timedOut(Error && ex) override { unreachable(); };
 
+    /**
+     * We prepend "a$" to the key name to ensure substitution goals
+     * happen before derivation goals.
+     */
     std::string key() override
     {
-        /* "a$" ensures substitution goals happen before derivation
-           goals. */
         return "a$" + std::string(storePath.name()) + "$" + worker.store.printStorePath(storePath);
     }
 
-    void work() override;
+    /**
+     * The states.
+     */
+    Co init() override;
+    Co gotInfo();
+    Co tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool & substituterFailed);
+    Co finished();
 
-    /* The states. */
-    void init();
-    void tryNext();
-    void gotInfo();
-    void referencesValid();
-    void tryToRun();
-    void finished();
+    /**
+     * Callback used by the worker to write to the log.
+     */
+    void handleChildOutput(Descriptor fd, std::string_view data) override {};
+    void handleEOF(Descriptor fd) override;
 
-    /* Callback used by the worker to write to the log. */
-    void handleChildOutput(int fd, std::string_view data) override;
-    void handleEOF(int fd) override;
+    /* Called by destructor, can't be overridden */
+    void cleanup() override final;
 
-    void cleanup() override;
+    JobCategory jobCategory() const override {
+        return JobCategory::Substitution;
+    };
 };
 
 }

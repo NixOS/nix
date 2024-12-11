@@ -3,11 +3,17 @@ libs-list :=
 ifdef HOST_DARWIN
   SO_EXT = dylib
 else
-  ifdef HOST_CYGWIN
+  ifdef HOST_WINDOWS
     SO_EXT = dll
   else
     SO_EXT = so
   endif
+endif
+
+ifdef HOST_UNIX
+  THREAD_LDFLAGS = -pthread
+else
+  THREAD_LDFLAGS =
 endif
 
 # Build a library with symbolic name $(1).  The library is defined by
@@ -59,7 +65,7 @@ define build-library
   $(1)_OBJS := $$(addprefix $(buildprefix), $$(addsuffix .o, $$(basename $$(_srcs))))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
 
-  ifdef HOST_CYGWIN
+  ifdef HOST_WINDOWS
     $(1)_INSTALL_DIR ?= $$(bindir)
   else
     $(1)_INSTALL_DIR ?= $$(libdir)
@@ -67,6 +73,7 @@ define build-library
 
   $(1)_LDFLAGS_USE :=
   $(1)_LDFLAGS_USE_INSTALLED :=
+  $(1)_LIB_CLOSURE := $(1)
 
   $$(eval $$(call create-dir, $$(_d)))
 
@@ -78,8 +85,10 @@ define build-library
       endif
     else
       ifndef HOST_DARWIN
-        ifndef HOST_CYGWIN
-          $(1)_LDFLAGS += -Wl,-z,defs
+        ifndef HOST_WINDOWS
+	  ifndef HOST_OPENBSD
+            $(1)_LDFLAGS += -Wl,-z,defs
+          endif
         endif
       endif
     endif
@@ -125,12 +134,14 @@ define build-library
     $(1)_PATH := $$(_d)/$$($(1)_NAME).a
 
     $$($(1)_PATH): $$($(1)_OBJS) | $$(_d)/
-	+$$(trace-ld) $(LD) -Ur -o $$(_d)/$$($(1)_NAME).o $$^
+	$$(trace-ld) $(LD) $$(ifndef $(HOST_DARWIN),-U) -r -o $$(_d)/$$($(1)_NAME).o $$^
 	$$(trace-ar) $(AR) crs $$@ $$(_d)/$$($(1)_NAME).o
 
-    $(1)_LDFLAGS_USE += $$($(1)_PATH) $$($(1)_LDFLAGS)
+    $(1)_LDFLAGS_USE += $$($(1)_PATH) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
     $(1)_INSTALL_PATH := $$(libdir)/$$($(1)_NAME).a
+
+    $(1)_LIB_CLOSURE += $$($(1)_LIBS)
 
   endif
 

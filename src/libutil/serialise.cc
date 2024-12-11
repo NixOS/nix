@@ -1,4 +1,5 @@
 #include "serialise.hh"
+#include "signals.hh"
 #include "util.hh"
 
 #include <cstring>
@@ -6,6 +7,14 @@
 #include <memory>
 
 #include <boost/coroutine2/coroutine.hpp>
+
+#ifdef _WIN32
+# include <fileapi.h>
+# include <winsock2.h>
+# include "windows-error.hh"
+#else
+# include <poll.h>
+#endif
 
 
 namespace nix {
@@ -20,7 +29,7 @@ void BufferedSink::operator () (std::string_view data)
            buffer size. */
         if (bufPos + data.size() >= bufSize) {
             flush();
-            write(data);
+            writeUnbuffered(data);
             break;
         }
         /* Otherwise, copy the bytes to the buffer.  Flush the buffer
@@ -38,37 +47,22 @@ void BufferedSink::flush()
     if (bufPos == 0) return;
     size_t n = bufPos;
     bufPos = 0; // don't trigger the assert() in ~BufferedSink()
-    write({buffer.get(), n});
+    writeUnbuffered({buffer.get(), n});
 }
 
 
 FdSink::~FdSink()
 {
-    try { flush(); } catch (...) { ignoreException(); }
+    try { flush(); } catch (...) { ignoreExceptionInDestructor(); }
 }
 
 
-size_t threshold = 256 * 1024 * 1024;
-
-static void warnLargeDump()
-{
-    warn("dumping very large path (> 256 MiB); this may run out of memory");
-}
-
-
-void FdSink::write(std::string_view data)
+void FdSink::writeUnbuffered(std::string_view data)
 {
     written += data.size();
-    static bool warned = false;
-    if (warn && !warned) {
-        if (written > threshold) {
-            warnLargeDump();
-            warned = true;
-        }
-    }
     try {
         writeFull(fd, data);
-    } catch (SysError & e) {
+    } catch (SystemError & e) {
         _good = false;
         throw;
     }
@@ -89,11 +83,15 @@ void Source::operator () (char * data, size_t len)
     }
 }
 
+void Source::operator () (std::string_view data)
+{
+    (*this)((char *)data.data(), data.size());
+}
 
 void Source::drainInto(Sink & sink)
 {
     std::string s;
-    std::vector<char> buf(8192);
+    std::array<char, 8192> buf;
     while (true) {
         size_t n;
         try {
@@ -137,13 +135,22 @@ bool BufferedSource::hasData()
 
 size_t FdSource::readUnbuffered(char * data, size_t len)
 {
+#ifdef _WIN32
+    DWORD n;
+    checkInterrupt();
+    if (!::ReadFile(fd, data, len, &n, NULL)) {
+        _good = false;
+        throw windows::WinError("ReadFile when FdSource::readUnbuffered");
+    }
+#else
     ssize_t n;
     do {
         checkInterrupt();
         n = ::read(fd, data, len);
     } while (n == -1 && errno == EINTR);
     if (n == -1) { _good = false; throw SysError("reading from file"); }
-    if (n == 0) { _good = false; throw EndOfFile("unexpected end-of-file"); }
+    if (n == 0) { _good = false; throw EndOfFile(std::string(*endOfFileError)); }
+#endif
     read += n;
     return n;
 }
@@ -152,6 +159,30 @@ size_t FdSource::readUnbuffered(char * data, size_t len)
 bool FdSource::good()
 {
     return _good;
+}
+
+
+bool FdSource::hasData()
+{
+    if (BufferedSource::hasData()) return true;
+
+    while (true) {
+        fd_set fds;
+        FD_ZERO(&fds);
+        int fd_ = fromDescriptorReadOnly(fd);
+        FD_SET(fd_, &fds);
+
+        struct timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 0;
+
+        auto n = select(fd_ + 1, &fds, nullptr, nullptr, &timeout);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            throw SysError("polling file descriptor");
+        }
+        return FD_ISSET(fd, &fds);
+    }
 }
 
 
@@ -167,39 +198,6 @@ size_t StringSource::read(char * data, size_t len)
 #if BOOST_VERSION >= 106300 && BOOST_VERSION < 106600
 #error Coroutines are broken in this version of Boost!
 #endif
-
-/* A concrete datatype allow virtual dispatch of stack allocation methods. */
-struct VirtualStackAllocator {
-    StackAllocator *allocator = StackAllocator::defaultAllocator;
-
-    boost::context::stack_context allocate() {
-        return allocator->allocate();
-    }
-
-    void deallocate(boost::context::stack_context sctx) {
-        allocator->deallocate(sctx);
-    }
-};
-
-
-/* This class reifies the default boost coroutine stack allocation strategy with
-   a virtual interface. */
-class DefaultStackAllocator : public StackAllocator {
-    boost::coroutines2::default_stack stack;
-
-    boost::context::stack_context allocate() {
-        return stack.allocate();
-    }
-
-    void deallocate(boost::context::stack_context sctx) {
-        stack.deallocate(sctx);
-    }
-};
-
-static DefaultStackAllocator defaultAllocatorSingleton;
-
-StackAllocator *StackAllocator::defaultAllocator = &defaultAllocatorSingleton;
-
 
 std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
 {
@@ -221,14 +219,13 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
             if (in.empty()) return;
             cur = in;
 
-            if (!coro)
-                coro = coro_t::push_type(VirtualStackAllocator{}, [&](coro_t::pull_type & yield) {
-                    LambdaSource source([&](char *out, size_t out_len) {
+            if (!coro) {
+                coro = coro_t::push_type([&](coro_t::pull_type & yield) {
+                    LambdaSource source([&](char * out, size_t out_len) {
                         if (cur.empty()) {
                             yield();
-                            if (yield.get()) {
-                                return (size_t)0;
-                            }
+                            if (yield.get())
+                                throw EndOfFile("coroutine has finished");
                         }
 
                         size_t n = std::min(cur.size(), out_len);
@@ -238,18 +235,19 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
                     });
                     fun(source);
                 });
+            }
 
-            if (!*coro) { abort(); }
+            if (!*coro) { unreachable(); }
 
-            if (!cur.empty()) (*coro)(false);
+            if (!cur.empty()) {
+                (*coro)(false);
+            }
         }
 
         void finish() override
         {
-            if (!coro) return;
-            if (!*coro) abort();
-            (*coro)(true);
-            if (*coro) abort();
+            if (coro && *coro)
+                (*coro)(true);
         }
     };
 
@@ -279,18 +277,21 @@ std::unique_ptr<Source> sinkToSource(
 
         size_t read(char * data, size_t len) override
         {
-            if (!coro)
-                coro = coro_t::pull_type(VirtualStackAllocator{}, [&](coro_t::push_type & yield) {
+            if (!coro) {
+                coro = coro_t::pull_type([&](coro_t::push_type & yield) {
                     LambdaSink sink([&](std::string_view data) {
                         if (!data.empty()) yield(std::string(data));
                     });
                     fun(sink);
                 });
+            }
 
-            if (!*coro) { eof(); abort(); }
+            if (!*coro) { eof(); unreachable(); }
 
             if (pos == cur.size()) {
-                if (!cur.empty()) (*coro)();
+                if (!cur.empty()) {
+                    (*coro)();
+                }
                 cur = coro->get();
                 pos = 0;
             }
@@ -353,7 +354,7 @@ Sink & operator << (Sink & sink, const StringSet & s)
 
 Sink & operator << (Sink & sink, const Error & ex)
 {
-    auto info = ex.info();
+    auto & info = ex.info();
     sink
         << "Error"
         << info.level
@@ -430,7 +431,7 @@ Error readError(Source & source)
     auto msg = readString(source);
     ErrorInfo info {
         .level = level,
-        .msg = hintformat(std::move(format("%s") % msg)),
+        .msg = HintFmt(msg),
     };
     auto havePos = readNum<size_t>(source);
     assert(havePos == 0);
@@ -439,7 +440,7 @@ Error readError(Source & source)
         havePos = readNum<size_t>(source);
         assert(havePos == 0);
         info.traces.push_back(Trace {
-            .hint = hintformat(std::move(format("%s") % readString(source)))
+            .hint = HintFmt(readString(source))
         });
     }
     return Error(std::move(info));
@@ -448,11 +449,6 @@ Error readError(Source & source)
 
 void StringSink::operator () (std::string_view data)
 {
-    static bool warned = false;
-    if (!warned && s.size() > threshold) {
-        warnLargeDump();
-        warned = true;
-    }
     s.append(data);
 }
 

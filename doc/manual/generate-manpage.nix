@@ -1,99 +1,207 @@
-{ command, renderLinks ? false }:
+let
+  inherit (builtins)
+    attrNames
+    attrValues
+    concatMap
+    concatStringsSep
+    fromJSON
+    groupBy
+    length
+    lessThan
+    listToAttrs
+    mapAttrs
+    match
+    replaceStrings
+    sort
+    ;
+  inherit (import <nix/utils.nix>)
+    attrsToList
+    concatStrings
+    filterAttrs
+    optionalString
+    squash
+    trim
+    unique
+    ;
+  showStoreDocs = import <nix/generate-store-info.nix>;
+in
 
-with builtins;
-with import ./utils.nix;
+inlineHTML: commandDump:
 
 let
 
-  showCommand =
-    { command, def, filename }:
-    ''
-      **Warning**: This program is **experimental** and its interface is subject to change.
-    ''
-    + "# Name\n\n"
-    + "`${command}` - ${def.description}\n\n"
-    + "# Synopsis\n\n"
-    + showSynopsis { inherit command; args = def.args; }
-    + (if def.commands or {} != {}
-       then
-         let
-           categories = sort (x: y: x.id < y.id) (unique (map (cmd: cmd.category) (attrValues def.commands)));
-           listCommands = cmds:
-             concatStrings (map (name:
-               "* "
-               + (if renderLinks
-                  then "[`${command} ${name}`](./${appendName filename name}.md)"
-                  else "`${command} ${name}`")
-               + " - ${cmds.${name}.description}\n")
-               (attrNames cmds));
-         in
-         "where *subcommand* is one of the following:\n\n"
-         # FIXME: group by category
-         + (if length categories > 1
-            then
-              concatStrings (map
-                (cat:
-                  "**${toString cat.description}:**\n\n"
-                  + listCommands (filterAttrs (n: v: v.category == cat) def.commands)
-                  + "\n"
-                ) categories)
-              + "\n"
-            else
-              listCommands def.commands
-              + "\n")
-       else "")
-    + (if def ? doc
-       then def.doc + "\n\n"
-       else "")
-    + (let s = showOptions def.flags; in
-       if s != ""
-       then "# Options\n\n${s}"
-       else "")
-  ;
+  commandInfo = fromJSON commandDump;
+
+  showCommand = { command, details, filename, toplevel }:
+    let
+
+      result = ''
+        > **Warning** \
+        > This program is
+        > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-nix-command)
+        > and its interface is subject to change.
+
+        # Name
+
+        `${command}` - ${details.description}
+
+        # Synopsis
+
+        ${showSynopsis command details.args}
+
+        ${maybeSubcommands}
+
+        ${maybeProse}
+
+        ${maybeOptions}
+      '';
+
+      showSynopsis = command: args:
+        let
+          showArgument = arg: "*${arg.label}*" + optionalString (! arg ? arity) "...";
+          arguments = concatStringsSep " " (map showArgument args);
+        in ''
+          `${command}` [*option*...] ${arguments}
+        '';
+
+      maybeSubcommands = optionalString (details ? commands && details.commands != {})
+        ''
+          where *subcommand* is one of the following:
+
+          ${subcommands}
+        '';
+
+      subcommands = if length categories > 1
+        then listCategories
+        else listSubcommands details.commands;
+
+      categories = sort (x: y: x.id < y.id) (unique (map (cmd: cmd.category) (attrValues details.commands)));
+
+      listCategories = concatStrings (map showCategory categories);
+
+      showCategory = cat: ''
+        **${toString cat.description}:**
+
+        ${listSubcommands (filterAttrs (n: v: v.category == cat) details.commands)}
+      '';
+
+      listSubcommands = cmds: concatStrings (attrValues (mapAttrs showSubcommand cmds));
+
+      showSubcommand = name: subcmd: ''
+        * [`${command} ${name}`](./${appendName filename name}.md) - ${subcmd.description}
+      '';
+
+      maybeProse =
+        # FIXME: this is a horrible hack to keep `nix help-stores` working.
+        let
+          help-stores = ''
+            ${index}
+
+            ${allStores}
+          '';
+          index = replaceStrings
+            [ "@store-types@" "./local-store.md" "./local-daemon-store.md" ]
+            [ storesOverview "#local-store" "#local-daemon-store" ]
+            details.doc;
+          storesOverview =
+            let
+              showEntry = store:
+                "- [${store.name}](#${store.slug})";
+            in
+            concatStringsSep "\n" (map showEntry storesList) + "\n";
+          allStores = concatStringsSep "\n" (attrValues storePages);
+          storePages = listToAttrs
+            (map (s: { name = s.filename; value = s.page; }) storesList);
+          storesList = showStoreDocs {
+            storeInfo = commandInfo.stores;
+            inherit inlineHTML;
+          };
+          hasInfix = infix: content:
+            builtins.stringLength content != builtins.stringLength (replaceStrings [ infix ] [ "" ] content);
+        in
+        optionalString (details ? doc) (
+          # An alternate implementation with builtins.match stack overflowed on some systems.
+          if hasInfix "@store-types@" details.doc
+          then help-stores
+          else details.doc
+        );
+
+      maybeOptions =
+        let
+          allVisibleOptions = filterAttrs
+            (_: o: ! o.hiddenCategory)
+            (details.flags // toplevel.flags);
+        in
+        optionalString (allVisibleOptions != { }) ''
+          # Options
+
+          ${showOptions inlineHTML allVisibleOptions}
+
+          > **Note**
+          >
+          > See [`man nix.conf`](@docroot@/command-ref/conf-file.md#command-line-flags) for overriding configuration settings with command line flags.
+        '';
+
+      showOptions = inlineHTML: allOptions:
+        let
+          showCategory = cat: opts: ''
+            ${optionalString (cat != "") "## ${cat}"}
+
+            ${concatStringsSep "\n" (attrValues (mapAttrs showOption opts))}
+          '';
+          showOption = name: option:
+            let
+              result = trim ''
+                - ${item}
+
+                  ${option.description}
+              '';
+              item = if inlineHTML
+                then ''<span id="opt-${name}">[`--${name}`](#opt-${name})</span> ${shortName} ${labels}''
+                else "`--${name}` ${shortName} ${labels}";
+              shortName = optionalString
+                (option ? shortName)
+                ("/ `-${option.shortName}`");
+              labels = optionalString
+                (option ? labels)
+                (concatStringsSep " " (map (s: "*${s}*") option.labels));
+            in result;
+          categories = mapAttrs
+            # Convert each group from a list of key-value pairs back to an attrset
+            (_: listToAttrs)
+            (groupBy
+              (cmd: cmd.value.category)
+              (attrsToList allOptions));
+        in concatStrings (attrValues (mapAttrs showCategory categories));
+    in squash result;
 
   appendName = filename: name: (if filename == "nix" then "nix3" else filename) + "-" + name;
 
-  showOptions = flags:
+  processCommand = { command, details, filename, toplevel }:
     let
-      categories = sort builtins.lessThan (unique (map (cmd: cmd.category) (attrValues flags)));
-    in
-      concatStrings (map
-        (cat:
-          (if cat != ""
-           then "**${cat}:**\n\n"
-           else "")
-          + concatStrings
-            (map (longName:
-              let
-                flag = flags.${longName};
-              in
-                "  - `--${longName}`"
-                + (if flag ? shortName then " / `-${flag.shortName}`" else "")
-                + (if flag ? labels then " " + (concatStringsSep " " (map (s: "*${s}*") flag.labels)) else "")
-                + "  \n"
-                + "    " + flag.description + "\n\n"
-            ) (attrNames (filterAttrs (n: v: v.category == cat) flags))))
-        categories);
+      cmd = {
+        inherit command;
+        name = filename + ".md";
+        value = showCommand { inherit command details filename toplevel; };
+      };
+      subcommand = subCmd: processCommand {
+        command = command + " " + subCmd;
+        details = details.commands.${subCmd};
+        filename = appendName filename subCmd;
+        inherit toplevel;
+      };
+    in [ cmd ] ++ concatMap subcommand (attrNames details.commands or {});
 
-  showSynopsis =
-    { command, args }:
-    "`${command}` [*option*...] ${concatStringsSep " "
-      (map (arg: "*${arg.label}*" + (if arg ? arity then "" else "...")) args)}\n\n";
+  manpages = processCommand {
+    command = "nix";
+    details = commandInfo.args;
+    filename = "nix";
+    toplevel = commandInfo.args;
+  };
 
-  processCommand = { command, def, filename }:
-    [ { name = filename + ".md"; value = showCommand { inherit command def filename; }; inherit command; } ]
-    ++ concatMap
-      (name: processCommand {
-        filename = appendName filename name;
-        command = command + " " + name;
-        def = def.commands.${name};
-      })
-      (attrNames def.commands or {});
+  tableOfContents = let
+    showEntry = page:
+      "    - [${page.command}](command-ref/new-cli/${page.name})";
+    in concatStringsSep "\n" (map showEntry manpages) + "\n";
 
-in
-
-let
-  manpages = processCommand { filename = "nix"; command = "nix"; def = builtins.fromJSON command; };
-  summary = concatStrings (map (manpage: "    - [${manpage.command}](command-ref/new-cli/${manpage.name})\n") manpages);
-in
-(listToAttrs manpages) // { "SUMMARY.md" = summary; }
+in (listToAttrs manpages) // { "SUMMARY.md" = tableOfContents; }

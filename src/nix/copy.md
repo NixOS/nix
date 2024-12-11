@@ -11,11 +11,17 @@ R""(
   Note the `file://` - without this, the destination is a chroot
   store, not a binary cache.
 
+* Copy all store paths from a local binary cache in `/tmp/cache` to the local store:
+
+  ```console
+  # nix copy --all --from file:///tmp/cache
+  ```
+
 * Copy the entire current NixOS system closure to another machine via
   SSH:
 
   ```console
-  # nix copy -s --to ssh://server /run/current-system
+  # nix copy --substitute-on-destination --to ssh://server /run/current-system
   ```
 
   The `-s` flag causes the remote machine to try to substitute missing

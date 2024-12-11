@@ -1,5 +1,7 @@
 #if ENABLE_S3
 
+#include <assert.h>
+
 #include "s3.hh"
 #include "s3-binary-cache-store.hh"
 #include "nar-info.hh"
@@ -7,6 +9,7 @@
 #include "globals.hh"
 #include "compression.hh"
 #include "filetransfer.hh"
+#include "signals.hh"
 
 #include <aws/core/Aws.h>
 #include <aws/core/VersionConfig.h>
@@ -40,12 +43,12 @@ struct S3Error : public Error
 /* Helper: given an Outcome<R, E>, return R in case of success, or
    throw an exception in case of an error. */
 template<typename R, typename E>
-R && checkAws(const FormatOrString & fs, Aws::Utils::Outcome<R, E> && outcome)
+R && checkAws(std::string_view s, Aws::Utils::Outcome<R, E> && outcome)
 {
     if (!outcome.IsSuccess())
         throw S3Error(
             outcome.GetError().GetErrorType(),
-            fs.s + ": " + outcome.GetError().GetMessage());
+            s + ": " + outcome.GetError().GetMessage());
     return outcome.GetResultWithOwnership();
 }
 
@@ -58,7 +61,7 @@ class AwsLogger : public Aws::Utils::Logging::FormattedLogSystem
         debug("AWS: %s", chomp(statement));
     }
 
-#if !(AWS_VERSION_MAJOR <= 1 && AWS_VERSION_MINOR <= 7 && AWS_VERSION_PATCH <= 115)
+#if !(AWS_SDK_VERSION_MAJOR <= 1 && AWS_SDK_VERSION_MINOR <= 7 && AWS_SDK_VERSION_PATCH <= 115)
     void Flush() override {}
 #endif
 };
@@ -101,7 +104,7 @@ S3Helper::S3Helper(
                 std::make_shared<Aws::Auth::ProfileConfigFileAWSCredentialsProvider>(profile.c_str())),
             *config,
             // FIXME: https://github.com/aws/aws-sdk-cpp/issues/759
-#if AWS_VERSION_MAJOR == 1 && AWS_VERSION_MINOR < 3
+#if AWS_SDK_VERSION_MAJOR == 1 && AWS_SDK_VERSION_MINOR < 3
             false,
 #else
             Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
@@ -115,6 +118,7 @@ class RetryStrategy : public Aws::Client::DefaultRetryStrategy
 {
     bool ShouldRetry(const Aws::Client::AWSError<Aws::Client::CoreErrors>& error, long attemptedRetries) const override
     {
+        checkInterrupt();
         auto retry = Aws::Client::DefaultRetryStrategy::ShouldRetry(error, attemptedRetries);
         if (retry)
             printError("AWS error '%s' (%s), will retry in %d ms",
@@ -132,6 +136,7 @@ ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(
 {
     initAWS();
     auto res = make_ref<Aws::Client::ClientConfiguration>();
+    res->allowSystemProxy = true;
     res->region = region;
     if (!scheme.empty()) {
         res->scheme = Aws::Http::SchemeMapper::FromString(scheme.c_str());
@@ -189,43 +194,48 @@ S3BinaryCacheStore::S3BinaryCacheStore(const Params & params)
     , BinaryCacheStore(params)
 { }
 
-struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
-{
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
-    const Setting<std::string> profile{(StoreConfig*) this, "", "profile", "The name of the AWS configuration profile to use."};
-    const Setting<std::string> region{(StoreConfig*) this, Aws::Region::US_EAST_1, "region", {"aws-region"}};
-    const Setting<std::string> scheme{(StoreConfig*) this, "", "scheme", "The scheme to use for S3 requests, https by default."};
-    const Setting<std::string> endpoint{(StoreConfig*) this, "", "endpoint", "An optional override of the endpoint to use when talking to S3."};
-    const Setting<std::string> narinfoCompression{(StoreConfig*) this, "", "narinfo-compression", "compression method for .narinfo files"};
-    const Setting<std::string> lsCompression{(StoreConfig*) this, "", "ls-compression", "compression method for .ls files"};
-    const Setting<std::string> logCompression{(StoreConfig*) this, "", "log-compression", "compression method for log/* files"};
-    const Setting<bool> multipartUpload{
-        (StoreConfig*) this, false, "multipart-upload", "whether to use multi-part uploads"};
-    const Setting<uint64_t> bufferSize{
-        (StoreConfig*) this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads"};
 
-    const std::string name() override { return "S3 Binary Cache Store"; }
-};
+S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
+    std::string_view uriScheme,
+    std::string_view bucketName,
+    const Params & params)
+    : StoreConfig(params)
+    , BinaryCacheStoreConfig(params)
+    , bucketName(bucketName)
+{
+    // Don't want to use use AWS SDK in header, so we check the default
+    // here. TODO do this better after we overhaul the store settings
+    // system.
+    assert(std::string{defaultRegion} == std::string{Aws::Region::US_EAST_1});
+
+    if (bucketName.empty())
+        throw UsageError("`%s` store requires a bucket name in its Store URI", uriScheme);
+}
+
+std::string S3BinaryCacheStoreConfig::doc()
+{
+    return
+      #include "s3-binary-cache-store.md"
+      ;
+}
+
 
 struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual S3BinaryCacheStore
 {
-    std::string bucketName;
-
     Stats stats;
 
     S3Helper s3Helper;
 
     S3BinaryCacheStoreImpl(
-        const std::string & uriScheme,
-        const std::string & bucketName,
+        std::string_view uriScheme,
+        std::string_view bucketName,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
-        , S3BinaryCacheStoreConfig(params)
+        , S3BinaryCacheStoreConfig(uriScheme, bucketName, params)
         , Store(params)
         , BinaryCacheStore(params)
         , S3BinaryCacheStore(params)
-        , bucketName(bucketName)
         , s3Helper(profile, region, scheme, endpoint)
     {
         diskCache = getNarInfoDiskCache();
@@ -238,7 +248,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
     void init() override
     {
-        if (auto cacheInfo = diskCache->cacheExists(getUri())) {
+        if (auto cacheInfo = diskCache->upToDateCacheExists(getUri())) {
             wantMassQuery.setDefault(cacheInfo->wantMassQuery);
             priority.setDefault(cacheInfo->priority);
         } else {
@@ -430,9 +440,9 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         std::string marker;
 
         do {
-            debug(format("listing bucket 's3://%s' from key '%s'...") % bucketName % marker);
+            debug("listing bucket 's3://%s' from key '%s'...", bucketName, marker);
 
-            auto res = checkAws(format("AWS error listing bucket '%s'") % bucketName,
+            auto res = checkAws(fmt("AWS error listing bucket '%s'", bucketName),
                 s3Helper.client->ListObjects(
                     Aws::S3::Model::ListObjectsRequest()
                     .WithBucket(bucketName)
@@ -441,8 +451,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
             auto & contents = res.GetContents();
 
-            debug(format("got %d keys, next marker '%s'")
-                % contents.size() % res.GetNextMarker());
+            debug("got %d keys, next marker '%s'",
+                contents.size(), res.GetNextMarker());
 
             for (auto object : contents) {
                 auto & key = object.GetKey();
@@ -456,8 +466,15 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         return paths;
     }
 
-    static std::set<std::string> uriSchemes() { return {"s3"}; }
-
+    /**
+     * For now, we conservatively say we don't know.
+     *
+     * \todo try to expose our S3 authentication status.
+     */
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return std::nullopt;
+    }
 };
 
 static RegisterStoreImplementation<S3BinaryCacheStoreImpl, S3BinaryCacheStoreConfig> regS3BinaryCacheStore;

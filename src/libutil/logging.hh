@@ -1,6 +1,6 @@
 #pragma once
+///@file
 
-#include "types.hh"
 #include "error.hh"
 #include "config.hh"
 
@@ -22,10 +22,11 @@ typedef enum {
     actQueryPathInfo = 109,
     actPostBuildHook = 110,
     actBuildWaiting = 111,
-    actEvaluate = 112,
-    actLockFlake = 113,
-    actQueryMissing = 114,
-    actVerifyPath = 115,
+    actFetchTree = 112,
+    actEvaluate = 113,
+    actLockFlake = 114,
+    actQueryMissing = 115,
+    actVerifyPath = 116,
 } ActivityType;
 
 typedef enum {
@@ -37,10 +38,11 @@ typedef enum {
     resProgress = 105,
     resSetExpected = 106,
     resPostBuildLogLine = 107,
-    resExpectBuild = 108,
-    resUnexpectBuild = 109,
-    resExpectSubstitution = 110,
-    resUnexpectSubstitution = 111,
+    resFetchStatus = 108,
+    resExpectBuild = 109,
+    resUnexpectBuild = 110,
+    resExpectSubstitution = 111,
+    resUnexpectSubstitution = 112,
 } ResultType;
 
 typedef uint64_t ActivityId;
@@ -80,17 +82,20 @@ public:
 
     virtual void stop() { };
 
+    virtual void pause() { };
+    virtual void resume() { };
+
     // Whether the logger prints the whole build log
     virtual bool isVerbose() { return false; }
 
-    virtual void log(Verbosity lvl, const FormatOrString & fs) = 0;
+    virtual void log(Verbosity lvl, std::string_view s) = 0;
 
-    void log(const FormatOrString & fs)
+    void log(std::string_view s)
     {
-        log(lvlInfo, fs);
+        log(lvlInfo, s);
     }
 
-    virtual void logEI(const ErrorInfo &ei) = 0;
+    virtual void logEI(const ErrorInfo & ei) = 0;
 
     void logEI(Verbosity lvl, ErrorInfo ei)
     {
@@ -110,15 +115,24 @@ public:
     virtual void writeToStdout(std::string_view s);
 
     template<typename... Args>
-    inline void cout(const std::string & fs, const Args & ... args)
+    inline void cout(const Args & ... args)
     {
-        boost::format f(fs);
-        formatHelper(f, args...);
-        writeToStdout(f.str());
+        writeToStdout(fmt(args...));
     }
 
     virtual std::optional<char> ask(std::string_view s)
     { return {}; }
+};
+
+/**
+ * A variadic template that does nothing.
+ *
+ * Useful to call a function with each argument in a parameter pack.
+ */
+struct nop
+{
+    template<typename... T> nop(T...)
+    { }
 };
 
 ActivityId getCurActivity();
@@ -186,12 +200,17 @@ bool handleJSONLogMessage(const std::string & msg,
     const Activity & act, std::map<ActivityId, Activity> & activities,
     bool trusted);
 
-extern Verbosity verbosity; /* suppress msgs > this */
+/**
+ * suppress msgs > this
+ */
+extern Verbosity verbosity;
 
-/* Print a message with the standard ErrorInfo format.
-   In general, use these 'log' macros for reporting problems that may require user
-   intervention or that need more explanation.  Use the 'print' macros for more
-   lightweight status messages. */
+/**
+ * Print a message with the standard ErrorInfo format.
+ * In general, use these 'log' macros for reporting problems that may require user
+ * intervention or that need more explanation.  Use the 'print' macros for more
+ * lightweight status messages.
+ */
 #define logErrorInfo(level, errorInfo...) \
     do { \
         if ((level) <= nix::verbosity) {     \
@@ -202,9 +221,11 @@ extern Verbosity verbosity; /* suppress msgs > this */
 #define logError(errorInfo...) logErrorInfo(lvlError, errorInfo)
 #define logWarning(errorInfo...) logErrorInfo(lvlWarn, errorInfo)
 
-/* Print a string message if the current log level is at least the specified
-   level. Note that this has to be implemented as a macro to ensure that the
-   arguments are evaluated lazily. */
+/**
+ * Print a string message if the current log level is at least the specified
+ * level. Note that this has to be implemented as a macro to ensure that the
+ * arguments are evaluated lazily.
+ */
 #define printMsgUsing(loggerParam, level, args...) \
     do { \
         auto __lvl = level; \
@@ -221,7 +242,9 @@ extern Verbosity verbosity; /* suppress msgs > this */
 #define debug(args...) printMsg(lvlDebug, args)
 #define vomit(args...) printMsg(lvlVomit, args)
 
-/* if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix. */
+/**
+ * if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix.
+ */
 template<typename... Args>
 inline void warn(const std::string & fs, const Args & ... args)
 {
@@ -230,7 +253,11 @@ inline void warn(const std::string & fs, const Args & ... args)
     logger->warn(f.str());
 }
 
-void warnOnce(bool & haveWarned, const FormatOrString & fs);
+#define warnOnce(haveWarned, args...) \
+    if (!haveWarned) {                \
+        haveWarned = true;            \
+        warn(args);                   \
+    }
 
 void writeToStderr(std::string_view s);
 

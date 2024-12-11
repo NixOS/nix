@@ -12,13 +12,13 @@
 , executable ? false
 , unpack ? false
 , name ? baseNameOf (toString url)
+, impure ? false
 }:
 
-derivation {
+derivation ({
   builder = "builtin:fetchurl";
 
   # New-style output content requirements.
-  inherit outputHashAlgo outputHash;
   outputHashMode = if unpack || executable then "recursive" else "flat";
 
   inherit name url executable unpack;
@@ -28,14 +28,13 @@ derivation {
   # No need to double the amount of network traffic
   preferLocalBuild = true;
 
+  # This attribute does nothing; it's here to avoid changing evaluation results.
   impureEnvVars = [
-    # We borrow these environment variables from the caller to allow
-    # easy proxy configuration.  This is impure, but a fixed-output
-    # derivation like fetchurl is allowed to do so since its result is
-    # by definition pure.
     "http_proxy" "https_proxy" "ftp_proxy" "all_proxy" "no_proxy"
   ];
 
   # To make "nix-prefetch-url" work.
   urls = [ url ];
-}
+} // (if impure
+      then { __impure = true; }
+      else { inherit outputHashAlgo outputHash; }))

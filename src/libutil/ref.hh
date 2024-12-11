@@ -1,13 +1,15 @@
 #pragma once
+///@file
 
 #include <memory>
-#include <exception>
 #include <stdexcept>
 
 namespace nix {
 
-/* A simple non-nullable reference-counted pointer. Actually a wrapper
-   around std::shared_ptr that prevents null constructions. */
+/**
+ * A simple non-nullable reference-counted pointer. Actually a wrapper
+ * around std::shared_ptr that prevents null constructions.
+ */
 template<typename T>
 class ref
 {
@@ -21,14 +23,14 @@ public:
         : p(r.p)
     { }
 
-    explicit ref<T>(const std::shared_ptr<T> & p)
+    explicit ref(const std::shared_ptr<T> & p)
         : p(p)
     {
         if (!p)
             throw std::invalid_argument("null pointer cast to ref");
     }
 
-    explicit ref<T>(T * p)
+    explicit ref(T * p)
         : p(p)
     {
         if (!p)
@@ -73,6 +75,8 @@ public:
         return ref<T2>((std::shared_ptr<T2>) p);
     }
 
+    ref<T> & operator=(ref<T> const & rhs) = default;
+
     bool operator == (const ref<T> & other) const
     {
         return p == other.p;
@@ -81,6 +85,11 @@ public:
     bool operator != (const ref<T> & other) const
     {
         return p != other.p;
+    }
+
+    auto operator <=> (const ref<T> & other) const
+    {
+        return p <=> other.p;
     }
 
 private:

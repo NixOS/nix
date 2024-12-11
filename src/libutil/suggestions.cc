@@ -1,7 +1,9 @@
 #include "suggestions.hh"
 #include "ansicolor.hh"
-#include "util.hh"
+#include "terminal.hh"
+
 #include <algorithm>
+#include <sstream>
 
 namespace nix {
 
@@ -36,8 +38,8 @@ int levenshteinDistance(std::string_view first, std::string_view second)
 }
 
 Suggestions Suggestions::bestMatches (
-    std::set<std::string> allMatches,
-    std::string query)
+    const std::set<std::string> & allMatches,
+    std::string_view query)
 {
     std::set<Suggestion> res;
     for (const auto & possibleMatch : allMatches) {

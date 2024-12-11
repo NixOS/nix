@@ -1,13 +1,16 @@
-#include "command.hh"
+#include "installable-flake.hh"
+#include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
-#include "fs-accessor.hh"
+#include "eval-inline.hh"
+
+namespace nix::fs { using namespace std::filesystem; }
 
 using namespace nix;
 
-struct CmdBundle : InstallableCommand
+struct CmdBundle : InstallableValueCommand
 {
     std::string bundler = "github:NixOS/bundlers";
     std::optional<Path> outLink;
@@ -19,8 +22,8 @@ struct CmdBundle : InstallableCommand
             .description = fmt("Use a custom bundler instead of the default (`%s`).", bundler),
             .labels = {"flake-url"},
             .handler = {&bundler},
-            .completer = {[&](size_t, std::string_view prefix) {
-                completeFlakeRef(getStore(), prefix);
+            .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+                completeFlakeRef(completions, getStore(), prefix);
             }}
         });
 
@@ -69,16 +72,18 @@ struct CmdBundle : InstallableCommand
         return res;
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         auto evalState = getEvalState();
 
         auto val = installable->toValue(*evalState).first;
 
-        auto [bundlerFlakeRef, bundlerName, outputsSpec] = parseFlakeRefWithFragmentAndOutputsSpec(bundler, absPath("."));
+        auto [bundlerFlakeRef, bundlerName, extendedOutputsSpec] =
+            parseFlakeRefWithFragmentAndExtendedOutputsSpec(
+                fetchSettings, bundler, fs::current_path().string());
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         InstallableFlake bundler{this,
-            evalState, std::move(bundlerFlakeRef), bundlerName, outputsSpec,
+            evalState, std::move(bundlerFlakeRef), bundlerName, std::move(extendedOutputsSpec),
             {"bundlers." + settings.thisSystem.get() + ".default",
              "defaultBundler." + settings.thisSystem.get()
             },
@@ -92,28 +97,33 @@ struct CmdBundle : InstallableCommand
         if (!evalState->isDerivation(*vRes))
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
-        auto attr1 = vRes->attrs->get(evalState->sDrvPath);
+        auto attr1 = vRes->attrs()->get(evalState->sDrvPath);
         if (!attr1)
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
-        PathSet context2;
-        auto drvPath = evalState->coerceToStorePath(attr1->pos, *attr1->value, context2);
+        NixStringContext context2;
+        auto drvPath = evalState->coerceToStorePath(attr1->pos, *attr1->value, context2, "");
 
-        auto attr2 = vRes->attrs->get(evalState->sOutPath);
+        drvPath.requireDerivation();
+
+        auto attr2 = vRes->attrs()->get(evalState->sOutPath);
         if (!attr2)
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
-        auto outPath = evalState->coerceToStorePath(attr2->pos, *attr2->value, context2);
+        auto outPath = evalState->coerceToStorePath(attr2->pos, *attr2->value, context2, "");
 
-        store->buildPaths({ DerivedPath::Built { drvPath } });
-
-        auto outPathS = store->printStorePath(outPath);
+        store->buildPaths({
+            DerivedPath::Built {
+                .drvPath = makeConstantStorePathRef(drvPath),
+                .outputs = OutputsSpec::All { },
+            },
+        });
 
         if (!outLink) {
-            auto * attr = vRes->attrs->get(evalState->sName);
+            auto * attr = vRes->attrs()->get(evalState->sName);
             if (!attr)
                 throw Error("attribute 'name' missing");
-            outLink = evalState->forceStringNoCtx(*attr->value, attr->pos);
+            outLink = evalState->forceStringNoCtx(*attr->value, attr->pos, "");
         }
 
         // TODO: will crash if not a localFSStore?

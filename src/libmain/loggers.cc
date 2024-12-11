@@ -1,6 +1,6 @@
 #include "loggers.hh"
+#include "environment-variables.hh"
 #include "progress-bar.hh"
-#include "util.hh"
 
 namespace nix {
 
@@ -29,7 +29,7 @@ Logger * makeDefaultLogger() {
     case LogFormat::bar:
         return makeProgressBar();
     default:
-        abort();
+        unreachable();
     }
 }
 

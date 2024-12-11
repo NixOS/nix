@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #if ENABLE_S3
 
@@ -7,7 +8,7 @@
 #include <optional>
 #include <string>
 
-namespace Aws { namespace Client { class ClientConfiguration; } }
+namespace Aws { namespace Client { struct ClientConfiguration; } }
 namespace Aws { namespace S3 { class S3Client; } }
 
 namespace nix {

@@ -30,3 +30,7 @@ A clear and concise description of what you expected to happen.
 **Additional context**
 
 Add any other context about the problem here.
+
+**Priorities**
+
+Add :+1: to [issues you find important](https://github.com/NixOS/nix/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc).

@@ -1,27 +1,32 @@
-#include "command.hh"
+#include "command-installable-value.hh"
 #include "globals.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "names.hh"
 #include "get-drvs.hh"
 #include "common-args.hh"
-#include "json.hh"
 #include "shared.hh"
 #include "eval-cache.hh"
 #include "attr-path.hh"
 #include "hilite.hh"
+#include "strings-inline.hh"
 
 #include <regex>
 #include <fstream>
+#include <nlohmann/json.hpp>
+
+#include "strings.hh"
 
 using namespace nix;
+using json = nlohmann::json;
 
 std::string wrap(std::string prefix, std::string s)
 {
     return concatStrings(prefix, s, ANSI_NORMAL);
 }
 
-struct CmdSearch : InstallableCommand, MixJSON
+struct CmdSearch : InstallableValueCommand, MixJSON
 {
     std::vector<std::string> res;
     std::vector<std::string> excludeRes;
@@ -55,21 +60,19 @@ struct CmdSearch : InstallableCommand, MixJSON
     Strings getDefaultFlakeAttrPaths() override
     {
         return {
-            "packages." + settings.thisSystem.get() + ".",
-            "legacyPackages." + settings.thisSystem.get() + "."
+            "packages." + settings.thisSystem.get(),
+            "legacyPackages." + settings.thisSystem.get()
         };
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         settings.readOnlyMode = true;
         evalSettings.enableImportFromDerivation.setDefault(false);
 
-        // Empty search string should match all packages
-        // Use "^" here instead of ".*" due to differences in resulting highlighting
-        // (see #1893 -- libc++ claims empty search string is not in POSIX grammar)
+        // Recommend "^" here instead of ".*" due to differences in resulting highlighting
         if (res.empty())
-            res.push_back("^");
+            throw UsageError("Must provide at least one regex! To match all packages, use '%s'.", "nix search <installable> ^");
 
         std::vector<std::regex> regexes;
         std::vector<std::regex> excludeRegexes;
@@ -84,7 +87,8 @@ struct CmdSearch : InstallableCommand, MixJSON
 
         auto state = getEvalState();
 
-        auto jsonOut = json ? std::make_unique<JSONObject>(std::cout) : nullptr;
+        std::optional<nlohmann::json> jsonOut;
+        if (json) jsonOut = json::object();
 
         uint64_t results = 0;
 
@@ -151,10 +155,11 @@ struct CmdSearch : InstallableCommand, MixJSON
                     {
                         results++;
                         if (json) {
-                            auto jsonElem = jsonOut->object(attrPath2);
-                            jsonElem.attr("pname", name.name);
-                            jsonElem.attr("version", name.version);
-                            jsonElem.attr("description", description);
+                            (*jsonOut)[attrPath2] = {
+                                {"pname", name.name},
+                                {"version", name.version},
+                                {"description", description},
+                            };
                         } else {
                             auto name2 = hiliteMatches(name.name, nameMatches, ANSI_GREEN, "\e[0;2m");
                             if (results > 1) logger->cout("");
@@ -192,6 +197,9 @@ struct CmdSearch : InstallableCommand, MixJSON
 
         for (auto & cursor : installable->getCursors(*state))
             visit(*cursor, cursor->getAttrPath(), true);
+
+        if (json)
+            logger->cout("%s", *jsonOut);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");

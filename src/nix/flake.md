@@ -18,56 +18,64 @@ values such as packages or NixOS modules provided by the flake).
 Flake references (*flakerefs*) are a way to specify the location of a
 flake. These have two different forms:
 
-* An attribute set representation, e.g.
 
-  ```nix
-  {
-    type = "github";
-    owner = "NixOS";
-    repo = "nixpkgs";
-  }
-  ```
+## Attribute set representation
 
-  The only required attribute is `type`. The supported types are
-  listed below.
+Example:
 
-* A URL-like syntax, e.g.
+```nix
+{
+  type = "github";
+  owner = "NixOS";
+  repo = "nixpkgs";
+}
+```
 
-  ```
-  github:NixOS/nixpkgs
-  ```
+The only required attribute is `type`. The supported types are
+listed below.
 
-  These are used on the command line as a more convenient alternative
-  to the attribute set representation. For instance, in the command
+## URL-like syntax
 
-  ```console
-  # nix build github:NixOS/nixpkgs#hello
-  ```
+Example:
 
-  `github:NixOS/nixpkgs` is a flake reference (while `hello` is an
-  output attribute). They are also allowed in the `inputs` attribute
-  of a flake, e.g.
+```
+github:NixOS/nixpkgs
+```
 
-  ```nix
-  inputs.nixpkgs.url = github:NixOS/nixpkgs;
-  ```
+These are used on the command line as a more convenient alternative
+to the attribute set representation. For instance, in the command
 
-  is equivalent to
+```console
+# nix build github:NixOS/nixpkgs#hello
+```
 
-  ```nix
-  inputs.nixpkgs = {
-    type = "github";
-    owner = "NixOS";
-    repo = "nixpkgs";
-  };
-  ```
+`github:NixOS/nixpkgs` is a flake reference (while `hello` is an
+output attribute). They are also allowed in the `inputs` attribute
+of a flake, e.g.
 
-## Examples
+```nix
+inputs.nixpkgs.url = "github:NixOS/nixpkgs";
+```
+
+is equivalent to
+
+```nix
+inputs.nixpkgs = {
+  type = "github";
+  owner = "NixOS";
+  repo = "nixpkgs";
+};
+```
+
+Following [RFC 3986](https://datatracker.ietf.org/doc/html/rfc3986#section-2.1),
+characters outside of the allowed range (i.e. neither [reserved characters](https://datatracker.ietf.org/doc/html/rfc3986#section-2.2)
+nor [unreserved characters](https://datatracker.ietf.org/doc/html/rfc3986#section-2.3))
+must be percent-encoded.
+
+### Examples
 
 Here are some examples of flake references in their URL-like representation:
 
-* `.`: The flake in the current directory.
-* `/home/alice/src/patchelf`: A flake in some other directory.
 * `nixpkgs`: The `nixpkgs` entry in the flake registry.
 * `nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`: The `nixpkgs`
   entry in the flake registry, with its Git revision overridden to a
@@ -88,6 +96,35 @@ Here are some examples of flake references in their URL-like representation:
 * `https://github.com/NixOS/patchelf/archive/master.tar.gz`: A tarball
   flake.
 
+## Path-like syntax
+
+Flakes corresponding to a local path can also be referred to by a direct
+path reference, either `/absolute/path/to/the/flake` or`./relative/path/to/the/flake`.
+Note that the leading `./` is mandatory for relative paths. If it is
+omitted, the path will be interpreted as [URL-like syntax](#url-like-syntax),
+which will cause error messages like this:
+
+```console
+error: cannot find flake 'flake:relative/path/to/the/flake' in the flake registries
+```
+
+The semantic of such a path is as follows:
+
+* If the directory is part of a Git repository, then the input will be treated as a `git+file:` URL, otherwise it will be treated as a `path:` url;
+* If the directory doesn't contain a `flake.nix` file, then Nix will search for such a file upwards in the file system hierarchy until it finds any of:
+    1. The Git repository root, or
+    2. The filesystem root (/), or
+    3. A folder on a different mount point.
+
+Contrary to URL-like references, path-like flake references can contain arbitrary unicode characters (except `#` and `?`).
+
+### Examples
+
+* `.`: The flake to which the current directory belongs.
+* `/home/alice/src/patchelf`: A flake in some other directory.
+* `./../sub directory/with Ûñî©ôδ€`: A flake in another relative directory that
+  has Unicode characters in its name.
+
 ## Flake reference attributes
 
 The following generic flake reference attributes are supported:
@@ -97,7 +134,9 @@ The following generic flake reference attributes are supported:
   repository or tarball. The default is the root directory of the
   flake.
 
-* `narHash`: The hash of the NAR serialisation (in SRI format) of the
+* `narHash`: The hash of the
+  [Nix Archive (NAR) serialisation][Nix Archive]
+  (in SRI format) of the
   contents of the flake. This is useful for flake types such as
   tarballs that lack a unique content identifier such as a Git commit
   hash.
@@ -124,18 +163,39 @@ can occur in *locked* flake references and are available to Nix code:
 
 Currently the `type` attribute can be one of the following:
 
-* `path`: arbitrary local directories, or local Git trees. The
-  required attribute `path` specifies the path of the flake. The URL
-  form is
+* `indirect`: *The default*. Indirection through the flake registry.
+  These have the form
 
   ```
-  [path:]<path>(\?<params)?
+  [flake:]<flake-id>(/<rev-or-ref>(/rev)?)?
   ```
 
-  where *path* is an absolute path.
+  These perform a lookup of `<flake-id>` in the flake registry. For
+  example, `nixpkgs` and `nixpkgs/release-20.09` are indirect flake
+  references. The specified `rev` and/or `ref` are merged with the
+  entry in the registry; see [nix registry](./nix3-registry.md) for
+  details.
 
-  *path* must be a directory in the file system containing a file
-  named `flake.nix`.
+  For example, these are valid indirect flake references:
+
+  * `nixpkgs`
+  * `nixpkgs/nixos-unstable`
+  * `nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`
+  * `nixpkgs/nixos-unstable/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`
+  * `sub/dir` (if a flake named `sub` is in the registry)
+
+* `path`: arbitrary local directories. The required attribute `path`
+  specifies the path of the flake. The URL form is
+
+  ```
+  path:<path>(\?<params>)?
+  ```
+
+  where *path* is an absolute path to a directory in the file system
+  containing a file named `flake.nix`.
+
+  If the flake at *path* is not inside a git repository, the `path:`
+  prefix is implied and can be omitted.
 
   *path* generally must be an absolute path. However, on the command
   line, it can be a relative path (e.g. `.` or `./foo`) which is
@@ -144,14 +204,24 @@ Currently the `type` attribute can be one of the following:
   (e.g. `nixpkgs` is a registry lookup; `./nixpkgs` is a relative
   path).
 
+  For example, these are valid path flake references:
+
+  * `path:/home/user/sub/dir`
+  * `/home/user/sub/dir` (if `dir/flake.nix` is *not* in a git repository)
+  * `./sub/dir` (when used on the command line and `dir/flake.nix` is *not* in a git repository)
+
 * `git`: Git repositories. The location of the repository is specified
   by the attribute `url`.
 
   They have the URL form
 
   ```
-  git(+http|+https|+ssh|+git|+file|):(//<server>)?<path>(\?<params>)?
+  git(+http|+https|+ssh|+git|+file):(//<server>)?<path>(\?<params>)?
   ```
+
+  If *path* starts with `/` (or `./` when used as an argument on the
+  command line) and is a local path to a git repository, the leading
+  `git:` or `+file` prefixes are implied and can be omitted.
 
   The `ref` attribute defaults to resolving the `HEAD` reference.
 
@@ -168,6 +238,9 @@ Currently the `type` attribute can be one of the following:
 
   For example, the following are valid Git flake references:
 
+  * `git:/home/user/sub/dir`
+  * `/home/user/sub/dir` (if `dir/flake.nix` is in a git repository)
+  * `./sub/dir` (when used on the command line and `dir/flake.nix` is in a git repository)
   * `git+https://example.org/my/repo`
   * `git+https://example.org/my/repo?dir=flake1`
   * `git+ssh://git@github.com/NixOS/nix?ref=v1.2.3`
@@ -185,6 +258,8 @@ Currently the `type` attribute can be one of the following:
   If the extension corresponds to a known archive format (`.zip`, `.tar`,
   `.tgz`, `.tar.gz`, `.tar.xz`, `.tar.bz2` or `.tar.zst`), then the `tarball+`
   can be dropped.
+
+  This can also be used to set the location of gitea/forgejo branches. [See here](@docroot@/protocols/tarball-fetcher.md#gitea-and-forgejo-support)
 
 * `file`: Plain files or directory tarballs, either over http(s) or from the local
   disk.
@@ -216,11 +291,46 @@ Currently the `type` attribute can be one of the following:
   commit hash (`rev`). Note that unlike Git, GitHub allows fetching by
   commit hash without specifying a branch or tag.
 
+  You can also specify `host` as a parameter, to point to a custom GitHub
+  Enterprise server.
+
   Some examples:
 
   * `github:edolstra/dwarffs`
   * `github:edolstra/dwarffs/unstable`
   * `github:edolstra/dwarffs/d3f2baba8f425779026c6ec04021b2e927f61e31`
+  * `github:internal/project?host=company-github.example.org`
+
+* `gitlab`: Similar to `github`, is a more efficient way to fetch
+  GitLab repositories. The following attributes are required:
+
+  * `owner`: The owner of the repository.
+
+  * `repo`: The name of the repository.
+
+  Like `github`, these are downloaded as tarball archives.
+
+  The URL syntax for `gitlab` flakes is:
+
+  `gitlab:<owner>/<repo>(/<rev-or-ref>)?(\?<params>)?`
+
+  `<rev-or-ref>` works the same as `github`. Either a branch or tag name
+  (`ref`), or a commit hash (`rev`) can be specified.
+
+  Since GitLab allows for self-hosting, you can specify `host` as
+  a parameter, to point to any instances other than `gitlab.com`.
+
+  Some examples:
+
+  * `gitlab:veloren/veloren`
+  * `gitlab:veloren/veloren/master`
+  * `gitlab:veloren/veloren/80a4d7f13492d916e47d6195be23acae8001985a`
+  * `gitlab:openldap/openldap?host=git.openldap.org`
+
+  When accessing a project in a (nested) subgroup, make sure to URL-encode any
+  slashes, i.e. replace `/` with `%2F`:
+
+  * `gitlab:veloren%2Fdev/rfcs`
 
 * `sourcehut`: Similar to `github`, is a more efficient way to fetch
   SourceHut repositories. The following attributes are required:
@@ -254,30 +364,17 @@ Currently the `type` attribute can be one of the following:
   * `sourcehut:~misterio/nix-colors/182b4b8709b8ffe4e9774a4c5d6877bf6bb9a21c`
   * `sourcehut:~misterio/nix-colors/21c1a380a6915d890d408e9f22203436a35bb2de?host=hg.sr.ht`
 
-* `indirect`: Indirections through the flake registry. These have the
-  form
-
-  ```
-  [flake:]<flake-id>(/<rev-or-ref>(/rev)?)?
-  ```
-
-  These perform a lookup of `<flake-id>` in the flake registry. For
-  example, `nixpkgs` and `nixpkgs/release-20.09` are indirect flake
-  references. The specified `rev` and/or `ref` are merged with the
-  entry in the registry; see [nix registry](./nix3-registry.md) for
-  details.
-
 # Flake format
 
 As an example, here is a simple `flake.nix` that depends on the
-Nixpkgs flake and provides a single package (i.e. an installable
-derivation):
+Nixpkgs flake and provides a single package (i.e. an
+[installable](./nix.md#installables) derivation):
 
 ```nix
 {
   description = "A flake for building Hello World";
 
-  inputs.nixpkgs.url = github:NixOS/nixpkgs/nixos-20.03;
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-20.03";
 
   outputs = { self, nixpkgs }: {
 
@@ -312,6 +409,8 @@ The following attributes are supported in `flake.nix`:
   also contains some metadata about the inputs. These are:
 
   * `outPath`: The path in the Nix store of the flake's source tree.
+     This way, the attribute set can be passed to `import` as if it was a path,
+     as in the example above (`import nixpkgs`).
 
   * `rev`: The commit hash of the flake's repository, if applicable.
 
@@ -328,8 +427,9 @@ The following attributes are supported in `flake.nix`:
   * `lastModified`: The commit time of the revision `rev` as an integer
     denoting the number of seconds since 1970.
 
-  * `narHash`: The SHA-256 (in SRI format) of the NAR serialization of
-    the flake's source tree.
+  * `narHash`: The SHA-256 (in SRI format) of the
+    [Nix Archive (NAR) serialisation][Nix Archive]
+    NAR serialization of the flake's source tree.
 
   The value returned by the `outputs` function must be an attribute
   set. The attributes can have arbitrary values; however, various
@@ -339,10 +439,12 @@ The following attributes are supported in `flake.nix`:
 
 * `nixConfig`: a set of `nix.conf` options to be set when evaluating any
   part of a flake. In the interests of security, only a small set of
-  whitelisted options (currently `bash-prompt`, `bash-prompt-prefix`,
-  `bash-prompt-suffix`, and `flake-registry`) are allowed to be set without
-  confirmation so long as `accept-flake-config` is not set in the global
-  configuration.
+  set of options is allowed to be set without confirmation so long as [`accept-flake-config`](@docroot@/command-ref/conf-file.md#conf-accept-flake-config) is not enabled in the global configuration:
+   - [`bash-prompt`](@docroot@/command-ref/conf-file.md#conf-bash-prompt)
+   - [`bash-prompt-prefix`](@docroot@/command-ref/conf-file.md#conf-bash-prompt-prefix)
+   - [`bash-prompt-suffix`](@docroot@/command-ref/conf-file.md#conf-bash-prompt-suffix)
+   - [`flake-registry`](@docroot@/command-ref/conf-file.md#conf-flake-registry)
+   - [`commit-lock-file-summary`](@docroot@/command-ref/conf-file.md#conf-commit-lock-file-summary)
 
 ## Flake inputs
 
@@ -369,7 +471,7 @@ inputs.nixpkgs = {
 Alternatively, you can use the URL-like syntax:
 
 ```nix
-inputs.import-cargo.url = github:edolstra/import-cargo;
+inputs.import-cargo.url = "github:edolstra/import-cargo";
 inputs.nixpkgs.url = "nixpkgs";
 ```
 
@@ -463,8 +565,9 @@ or NixOS modules, which are composed into the top-level flake's
 Inputs specified in `flake.nix` are typically "unlocked" in the sense
 that they don't specify an exact revision. To ensure reproducibility,
 Nix will automatically generate and use a *lock file* called
-`flake.lock` in the flake's directory. The lock file contains a graph
-structure isomorphic to the graph of dependencies of the root
+`flake.lock` in the flake's directory.
+The lock file is a UTF-8 JSON file.
+It contains a graph structure isomorphic to the graph of dependencies of the root
 flake. Each node in the graph (except the root node) maps the
 (usually) unlocked input specifications in `flake.nix` to locked input
 specifications. Each node also contains some metadata, such as the
@@ -606,4 +709,5 @@ will not look at the lock files of dependencies. However, lock file
 generation itself *does* use the lock files of dependencies by
 default.
 
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 )""

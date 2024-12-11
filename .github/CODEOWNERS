@@ -1,0 +1,26 @@
+# Pull requests concerning the listed files will automatically invite the respective maintainers as reviewers.
+# This file is not used for denoting any kind of ownership, but is merely a tool for handling notifications.
+#
+# Merge permissions are required for maintaining an entry in this file.
+# For documentation on this mechanism, see https://help.github.com/articles/about-codeowners/
+
+# Default reviewers if nothing else matches
+* @edolstra
+
+# This file
+.github/CODEOWNERS @edolstra
+
+# Documentation of built-in functions
+src/libexpr/primops.cc @roberth @fricklerhandwerk
+
+# Documentation of settings
+src/libexpr/eval-settings.hh @fricklerhandwerk
+src/libstore/globals.hh @fricklerhandwerk
+
+# Documentation
+doc/manual @fricklerhandwerk
+maintainers/*.md @fricklerhandwerk
+src/**/*.md @fricklerhandwerk
+
+# Libstore layer
+/src/libstore @ericson2314

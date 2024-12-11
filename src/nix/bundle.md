@@ -29,7 +29,7 @@ R""(
 
 # Description
 
-`nix bundle`, by default, packs the closure of the *installable* into a single
+`nix bundle`, by default, packs the closure of the [*installable*](./nix.md#installables) into a single
 self-extracting executable. See the [`bundlers`
 homepage](https://github.com/NixOS/bundlers) for more details.
 
@@ -44,7 +44,7 @@ flake output attributes:
 
 * `bundlers.<system>.default`
 
-If an attribute *name* is given, `nix run` tries the following flake
+If an attribute *name* is given, `nix bundle` tries the following flake
 output attributes:
 
 * `bundlers.<system>.<name>`
