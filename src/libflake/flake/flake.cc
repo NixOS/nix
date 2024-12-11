@@ -99,7 +99,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     const std::optional<Path> & baseDir, InputPath lockRootPath);
 
 static FlakeInput parseFlakeInput(EvalState & state,
-    std::string_view inputName, Value * value, const PosIdx pos,
+    std::optional<std::string_view> inputName, Value * value, const PosIdx pos,
     const std::optional<Path> & baseDir, InputPath lockRootPath)
 {
     expectType(state, nAttrs, *value, pos);
@@ -185,8 +185,8 @@ static FlakeInput parseFlakeInput(EvalState & state,
             input.ref = parseFlakeRef(state.fetchSettings, *url, baseDir, true, input.isFlake);
     }
 
-    if (!input.follows && !input.ref)
-        input.ref = FlakeRef::fromAttrs(state.fetchSettings, {{"type", "indirect"}, {"id", std::string(inputName)}});
+    if (inputName && !input.follows && !input.ref)
+        input.ref = FlakeRef::fromAttrs(state.fetchSettings, {{"type", "indirect"}, {"id", std::string(*inputName)}});
 
     return input;
 }
@@ -735,7 +735,10 @@ LockedFlake lockFlake(
                 } else
                     throw Error("cannot write modified lock file of flake '%s' (use '--no-write-lock-file' to ignore)", topRef);
             } else {
-                warn("not writing modified lock file of flake '%s':\n%s", topRef, chomp(diff));
+                if (lockFlags.warnModifiedLockFile)
+                    warn("not writing modified lock file of flake '%s':\n%s", topRef, chomp(diff));
+                else
+                    debug("not writing modified lock file of flake '%s':\n%s", topRef, chomp(diff));
                 flake.forceDirty = true;
             }
         }
@@ -823,20 +826,63 @@ void initLib(const Settings & settings)
 {
     auto prim_getFlake = [&settings](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
-        std::string flakeRefS(state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.getFlake"));
-        auto flakeRef = parseFlakeRef(state.fetchSettings, flakeRefS, {}, true);
-        if (state.settings.pureEval && !flakeRef.input.isLocked())
-            throw Error("cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)", flakeRefS, state.positions[pos]);
+        state.forceValue(*args[0], pos);
 
-        callFlake(state,
-            lockFlake(settings, state, flakeRef,
-                LockFlags {
-                    .updateLockFile = false,
-                    .writeLockFile = false,
-                    .useRegistries = !state.settings.pureEval && settings.useRegistries,
-                    .allowUnlocked = !state.settings.pureEval,
-                }),
-            v);
+        LockFlags lockFlags {
+            .updateLockFile = false,
+            .writeLockFile = false,
+            .warnModifiedLockFile = false,
+            .useRegistries = !state.settings.pureEval && settings.useRegistries,
+            .allowUnlocked = !state.settings.pureEval,
+        };
+
+        auto flakeRef =
+            args[0]->type() == nString
+            ? ({
+                std::string flakeRefS(state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.getFlake"));
+                auto flakeRef = parseFlakeRef(state.fetchSettings, flakeRefS, {}, true);
+                if (state.settings.pureEval && !flakeRef.input.isLocked())
+                    throw Error("cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)", flakeRefS, state.positions[pos]);
+                flakeRef;
+            })
+            : ({
+                auto flakeInput = parseFlakeInput(state, std::nullopt, args[0], pos, {}, {});
+
+                /* Convert the result of parseFlakeInput() into a
+                   overrides map and a top-level flakeref. */
+                std::function<void(const InputPath & inputPath, const FlakeInput & input)> recurse;
+
+                recurse = [&](const InputPath & inputPath, const FlakeInput & input)
+                {
+                    if (!input.ref)
+                        state.error<EvalError>("'builtins.getFlake' requires attribute 'url'")
+                            .atPos(*args[0])
+                            .debugThrow();
+                    if (input.follows)
+                        state.error<EvalError>("'builtins.getFlake' does not permit attribute 'follows'")
+                            .atPos(*args[0])
+                            .debugThrow();
+                    if (!input.isFlake)
+                        state.error<EvalError>("'builtins.getFlake' does not permit attribute 'flake = false'")
+                            .atPos(*args[0])
+                            .debugThrow();
+
+                    for (auto & [inputName, input2] : input.overrides) {
+                        auto inputPath2{inputPath};
+                        inputPath2.push_back(inputName);
+
+                        recurse(inputPath2, input2);
+
+                        lockFlags.inputOverrides.insert_or_assign(inputPath2, input2.ref.value());
+                    }
+                };
+
+                recurse({}, flakeInput);
+
+                flakeInput.ref.value();
+            });
+
+        callFlake(state, lockFlake(settings, state, flakeRef, lockFlags), v);
     };
 
     RegisterPrimOp::primOps->push_back({
@@ -855,6 +901,15 @@ void initLib(const Settings & settings)
 
           ```nix
           (builtins.getFlake "github:edolstra/dwarffs").rev
+          ```
+
+          It is possible to override inputs of the flake using the same syntax to specify flake inputs in `flake.nix`, e.g.
+
+          ```nix
+          builtins.getFlake {
+            url = "github:NixOS/nix/55bc52401966fbffa525c574c14f67b00bc4fb3a";
+            inputs.nixpkgs.url = "github:NixOS/nixpkgs/c69a9bffbecde46b4b939465422ddc59493d3e4d";
+          }
           ```
         )",
         .fun = prim_getFlake,

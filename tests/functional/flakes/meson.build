@@ -27,6 +27,7 @@ suites += {
     'shebang.sh',
     'commit-lock-file-summary.sh',
     'non-flake-inputs.sh',
+    'get-flake.sh',
   ],
   'workdir': meson.current_source_dir(),
 }
