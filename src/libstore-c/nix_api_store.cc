@@ -100,6 +100,18 @@ bool nix_store_is_valid_path(nix_c_context * context, Store * store, StorePath *
     NIXC_CATCH_ERRS_RES(false);
 }
 
+nix_err nix_store_real_path(
+    nix_c_context * context, Store * store, StorePath * path, nix_get_string_callback callback, void * user_data)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto res = store->ptr->toRealPath(path->path);
+        return call_nix_get_string_callback(res, callback, user_data);
+    }
+    NIXC_CATCH_ERRS
+}
+
 StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const char * path)
 {
     if (context)
