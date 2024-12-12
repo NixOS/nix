@@ -165,7 +165,8 @@ can occur in *locked* flake references and are available to Nix code:
 
 Currently the `type` attribute can be one of the following:
 
-* `indirect`: *The default*. Indirection through the flake registry.
+* `indirect`: *The default*. These are symbolic references to flakes
+  that are looked up in [the flake registries](./nix3-registry.md).
   These have the form
 
   ```
