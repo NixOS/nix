@@ -41,8 +41,17 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
 {
     auto state(state_.lock());
 
-    for (auto & i : tokenizeString<Strings>(getEnv("NIX_SSHOPTS").value_or("")))
-        args.push_back(i);
+    std::string sshOpts = getEnv("NIX_SSHOPTS").value_or("");
+
+    try {
+        std::list<std::string> opts = shellSplitString(sshOpts);
+        for (auto & i : opts)
+            args.push_back(i);
+    } catch (Error & e) {
+        e.addTrace({}, "while splitting NIX_SSHOPTS '%s'", sshOpts);
+        throw;
+    }
+
     if (!keyFile.empty())
         args.insert(args.end(), {"-i", keyFile});
     if (!sshPublicHostKey.empty()) {
