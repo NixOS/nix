@@ -3,6 +3,8 @@
 #include "sync.hh"
 #include "store-api.hh"
 #include "names.hh"
+#include "config-global.hh"
+#include "signals.hh"
 
 #include <atomic>
 #include <map>
@@ -10,8 +12,16 @@
 #include <sstream>
 #include <iostream>
 #include <chrono>
+#include <future>
+
+#include <termios.h>
+#include <poll.h>
 
 namespace nix {
+
+ProgressBarSettings progressBarSettings;
+
+static GlobalConfig::Register rProgressBarSettings(&progressBarSettings);
 
 static std::string_view getS(const std::vector<Logger::Field> & fields, size_t n)
 {
@@ -34,13 +44,24 @@ static std::string_view storePathToName(std::string_view path)
     return i == std::string::npos ? base.substr(0, 0) : base.substr(i + 1);
 }
 
+std::string repeat(std::string_view s, size_t n)
+{
+    std::string res;
+    for (size_t i = 0; i < n; ++i)
+        res += s;
+    return res;
+}
+
+auto MiB = 1024.0 * 1024.0;
+
 class ProgressBar : public Logger
 {
 private:
 
     struct ActInfo
     {
-        std::string s, lastLine, phase;
+        std::string s, lastLine;
+        std::optional<std::string> phase;
         ActivityType type = actUnknown;
         uint64_t done = 0;
         uint64_t expected = 0;
@@ -48,9 +69,11 @@ private:
         uint64_t failed = 0;
         std::map<ActivityType, uint64_t> expectedByType;
         bool visible = true;
+        bool ignored = false;
         ActivityId parent;
         std::optional<std::string> name;
         std::chrono::time_point<std::chrono::steady_clock> startTime;
+        PathSet buildsRemaining, substitutionsRemaining;
     };
 
     struct ActivitiesByType
@@ -60,6 +83,56 @@ private:
         uint64_t expected = 0;
         uint64_t failed = 0;
     };
+
+    struct ActivityStats
+    {
+        uint64_t done = 0;
+        uint64_t expected = 0;
+        uint64_t running = 0;
+        uint64_t failed = 0;
+        uint64_t left = 0;
+        uint64_t active = 0;
+    };
+
+    ActivityStats getActivityStats(ActivitiesByType & act)
+    {
+        ActivityStats stats {
+            .done = act.done,
+            .expected = act.done,
+            .running = 0,
+            .failed = act.failed
+        };
+
+        for (auto & j : act.its) {
+            if (j.second->ignored) continue;
+            stats.done += j.second->done;
+            stats.expected += j.second->expected;
+            stats.running += j.second->running;
+            stats.failed += j.second->failed;
+            stats.left += j.second->expected > j.second->done ? j.second->expected - j.second->done : 0;
+            stats.active++;
+        }
+
+        stats.expected = std::max(stats.expected, act.expected);
+
+        return stats;
+    }
+
+    enum StatusLineGroup {
+        idHelp,
+        idLockFlake,
+        idDownload,
+        idEvaluate,
+        idQueryMissing,
+        idCopyPaths,
+        idBuilds,
+        idVerifyPaths,
+        idStatus,
+        idQuit,
+        idPrompt,
+    };
+
+    typedef std::pair<StatusLineGroup, uint16_t> LineId;
 
     struct State
     {
@@ -75,36 +148,188 @@ private:
         bool active = true;
         bool paused = false;
         bool haveUpdate = true;
+
+        std::map<LineId, std::string> statusLines;
+
+        /* How many lines need to be erased when redrawing. */
+        size_t prevStatusLines = 0;
+
+        bool helpShown = false;
+
+        std::optional<std::promise<std::optional<char>>> prompt;
     };
 
-    /** Helps avoid unnecessary redraws, see `redraw()` */
+    const bool isTTY;
+
+    /** Helps avoid unnecessary redraws, see `redraw()`. */
     Sync<std::string> lastOutput_;
 
     Sync<State> state_;
 
     std::thread updateThread;
+    std::thread inputThread;
 
     std::condition_variable quitCV, updateCV;
 
-    bool printBuildLogs = false;
-    bool isTTY;
+    std::optional<struct termios> savedTermAttrs;
+
+    Pipe inputPipe;
+
+    const std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
 public:
 
     ProgressBar(bool isTTY)
         : isTTY(isTTY)
+        , state_({ .active = isTTY })
     {
         state_.lock()->active = isTTY;
+
         updateThread = std::thread([&]() {
             auto state(state_.lock());
             auto nextWakeup = std::chrono::milliseconds::max();
             while (state->active) {
+                #if 0
                 if (!state->haveUpdate)
                     state.wait_for(updateCV, nextWakeup);
+                #endif
+                updateStatusLine(*state);
                 nextWakeup = draw(*state);
                 state.wait_for(quitCV, std::chrono::milliseconds(50));
             }
         });
+
+        if (isTTY) {
+
+            struct termios term;
+            if (tcgetattr(STDIN_FILENO, &term))
+                throw SysError("getting terminal attributes");
+
+            savedTermAttrs = term;
+
+            cfmakeraw(&term);
+
+            if (tcsetattr(STDIN_FILENO, TCSANOW, &term))
+                throw SysError("putting terminal into raw mode");
+
+            inputPipe.create();
+
+            inputThread = std::thread([this]() {
+                // FIXME: exceptions
+
+                struct pollfd fds[2];
+                fds[0] = { .fd = STDIN_FILENO, .events = POLLIN, .revents = 0 };
+                fds[1] = { .fd = inputPipe.readSide.get(), .events = POLLIN, .revents = 0 };
+
+                while (true) {
+                    if (poll(fds, 2, -1) != 1) {
+                        if (errno == EINTR) continue;
+                        assert(false);
+                    }
+
+                    if (fds[1].revents & POLLIN) break;
+
+                    assert(fds[0].revents & POLLIN);
+
+                    char c;
+                    auto n = read(STDIN_FILENO, &c, 1);
+                    if (n == 0) break;
+                    if (n == -1) {
+                        if (errno == EINTR) continue;
+                        break;
+                    }
+                    c = std::tolower(c);
+
+                    if (c == 3 || c == 4 || c == 'q') {
+                        auto state(state_.lock());
+                        state->statusLines.insert_or_assign({idQuit, 0}, ANSI_RED "Exiting...");
+                        draw(*state);
+                        unix::triggerInterrupt();
+                    }
+
+                    {
+                        auto state(state_.lock());
+                        if (state->prompt) {
+                            state->prompt->set_value(c != '\n' ? c : std::optional<char>());
+                            state->prompt.reset();
+                            continue;
+                        }
+                    }
+
+                    if (c == 'l') {
+                        auto state(state_.lock());
+                        progressBarSettings.printBuildLogs = !progressBarSettings.printBuildLogs;
+                        updateStatusLine(*state);
+                        draw(*state,
+                            progressBarSettings.printBuildLogs
+                            ? ANSI_BOLD "Enabling build logs."
+                            : ANSI_BOLD "Disabling build logs.");
+                    }
+                    if (c == '+' || c == '=' || c == 'v') {
+                        auto state(state_.lock());
+                        verbosity = (Verbosity) (verbosity + 1);;
+                        log(*state, lvlError, ANSI_BOLD "Increasing verbosity...");
+                    }
+                    if (c == '-') {
+                        auto state(state_.lock());
+                        verbosity = verbosity > lvlError ? (Verbosity) (verbosity - 1) : lvlError;
+                        log(*state, lvlError, ANSI_BOLD "Decreasing verbosity...");
+                    }
+                    if (c == 'h' || c == '?') {
+                        auto state(state_.lock());
+                        if (state->helpShown) {
+                            state->helpShown = false;
+                            resetHelp(*state);
+                        } else {
+                            state->helpShown = true;
+                            size_t n = 0;
+                            state->statusLines.insert_or_assign({idHelp, n++}, "");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "The following keys are available:");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "  'v' to increase verbosity.");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "  '-' to decrease verbosity.");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "  'l' to show build log output.");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "  'r' to show what paths remain to be built/substituted.");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "  'h' to hide this help message.");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "  'q' to quit.");
+                            state->statusLines.insert_or_assign({idHelp, n++}, "");
+                        }
+                        draw(*state);
+                    }
+                    if (c == 'r') {
+                        auto state(state_.lock());
+
+                        PathSet buildsRemaining, substitutionsRemaining;
+                        for (auto & act : state->activities) {
+                            for (auto & path : act.buildsRemaining) buildsRemaining.insert(path);
+                            for (auto & path : act.substitutionsRemaining) substitutionsRemaining.insert(path);
+                        }
+
+                        std::string msg;
+
+                        // FIXME: sort by name?
+
+                        if (!buildsRemaining.empty()) {
+                            msg += fmt("\n" ANSI_BOLD "%d derivations remaining to be built:\n" ANSI_NORMAL, buildsRemaining.size());
+                            for (auto & path : buildsRemaining)
+                                msg += fmt("  • %s\n", path);
+                        }
+
+                        if (!substitutionsRemaining.empty()) {
+                            msg += fmt("\n" ANSI_BOLD "%d paths remaining to be substituted:\n" ANSI_NORMAL, substitutionsRemaining.size());
+                            for (auto & path : substitutionsRemaining)
+                                msg += fmt("  • %s\n", path);
+                        }
+
+                        if (buildsRemaining.empty() && substitutionsRemaining.empty())
+                            msg = "\n" ANSI_BOLD "Nothing left to be built or substituted.";
+
+                        draw(*state, chomp(msg));
+                    }
+                }
+            });
+
+            resetHelp(*state_.lock());
+        }
     }
 
     ~ProgressBar()
@@ -115,14 +340,27 @@ public:
     /* Called by destructor, can't be overridden */
     void stop() override final
     {
+        if (inputThread.joinable()) {
+            assert(inputPipe.writeSide);
+            writeFull(inputPipe.writeSide.get(), "x", false);
+            inputThread.join();
+        }
+
         {
             auto state(state_.lock());
             if (!state->active) return;
+            state->statusLines.clear();
+            draw(*state);
             state->active = false;
-            writeToStderr("\r\e[K");
             updateCV.notify_one();
             quitCV.notify_one();
+
+            if (savedTermAttrs) {
+                tcsetattr(STDIN_FILENO, TCSANOW, &*savedTermAttrs);
+                savedTermAttrs.reset();
+            }
         }
+
         updateThread.join();
     }
 
@@ -144,7 +382,7 @@ public:
 
     bool isVerbose() override
     {
-        return printBuildLogs;
+        return progressBarSettings.printBuildLogs;
     }
 
     void log(Verbosity lvl, std::string_view s) override
@@ -167,11 +405,25 @@ public:
     void log(State & state, Verbosity lvl, std::string_view s)
     {
         if (state.active) {
-            writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
-            draw(state);
+            draw(state, filterANSIEscapes(s, !isTTY));
         } else {
             writeToStderr(filterANSIEscapes(s, !isTTY) + "\n");
         }
+    }
+
+    void removeStatusLines(State & state, StatusLineGroup id)
+    {
+        for (auto i = state.statusLines.lower_bound({id, 0});
+             i != state.statusLines.end() && i->first.first == id; )
+            i = state.statusLines.erase(i);
+    }
+
+    void resetHelp(State & state)
+    {
+        removeStatusLines(state, idHelp);
+        state.statusLines.insert_or_assign({idHelp, 0}, "");
+        state.statusLines.insert_or_assign({idHelp, 1}, ANSI_BOLD "Type 'h' for help.");
+        state.statusLines.insert_or_assign({idHelp, 2}, "");
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
@@ -196,7 +448,7 @@ public:
             std::string name(storePathToName(getS(fields, 0)));
             if (hasSuffix(name, ".drv"))
                 name = name.substr(0, name.size() - 4);
-            i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
+            i->s = fmt(ANSI_BOLD "%s" ANSI_NORMAL, name);
             auto machineName = getS(fields, 1);
             if (machineName != "")
                 i->s += fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName);
@@ -214,8 +466,8 @@ public:
             auto sub = getS(fields, 1);
             i->s = fmt(
                 hasPrefix(sub, "local")
-                ? "copying " ANSI_BOLD "%s" ANSI_NORMAL " from %s"
-                : "fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s",
+                ? ANSI_BOLD "%s" ANSI_NORMAL " from %s"
+                : ANSI_BOLD "%s" ANSI_NORMAL " from %s",
                 name, sub);
         }
 
@@ -232,10 +484,27 @@ public:
             i->s = fmt("querying " ANSI_BOLD "%s" ANSI_NORMAL " on %s", name, getS(fields, 1));
         }
 
-        if ((type == actFileTransfer && hasAncestor(*state, actCopyPath, parent))
-            || (type == actFileTransfer && hasAncestor(*state, actQueryPathInfo, parent))
-            || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)))
+        if (type == actFileTransfer) {
+            i->s = getS(fields, 0);
+            if (hasAncestor(*state, actCopyPath, parent)
+                || hasAncestor(*state, actQueryPathInfo, parent))
+                i->ignored = true;
+        }
+
+        if (type == actVerifyPath)
+            i->s = getS(fields, 0);
+
+        if (type == actFileTransfer
+            || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)) // FIXME?
+            || type == actBuild
+            || type == actSubstitute
+            || type == actLockFlake
+            || type == actQueryMissing
+            || type == actVerifyPath)
             i->visible = false;
+
+        if (type == actBuild)
+            i->startTime = std::chrono::steady_clock::now();
 
         update(*state);
     }
@@ -261,11 +530,14 @@ public:
         if (i != state->its.end()) {
 
             auto & actByType = state->activitiesByType[i->second->type];
-            actByType.done += i->second->done;
-            actByType.failed += i->second->failed;
 
-            for (auto & j : i->second->expectedByType)
-                state->activitiesByType[j.first].expected -= j.second;
+            if (!i->second->ignored) {
+                actByType.done += i->second->done;
+                actByType.failed += i->second->failed;
+
+                for (auto & j : i->second->expectedByType)
+                    state->activitiesByType[j.first].expected -= j.second;
+            }
 
             actByType.its.erase(act);
             state->activities.erase(i->second);
@@ -279,6 +551,10 @@ public:
     {
         auto state(state_.lock());
 
+        auto i = state->its.find(act);
+        assert(i != state->its.end());
+        ActInfo & actInfo = *i->second;
+
         if (type == resFileLinked) {
             state->filesLinked++;
             state->bytesLinked += getI(fields, 0);
@@ -288,22 +564,15 @@ public:
         else if (type == resBuildLogLine || type == resPostBuildLogLine) {
             auto lastLine = chomp(getS(fields, 0));
             if (!lastLine.empty()) {
-                auto i = state->its.find(act);
-                assert(i != state->its.end());
-                ActInfo info = *i->second;
-                if (printBuildLogs) {
+                i->second->lastLine = lastLine;
+                if (progressBarSettings.printBuildLogs) {
                     auto suffix = "> ";
                     if (type == resPostBuildLogLine) {
                         suffix = " (post)> ";
                     }
-                    log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
-                } else {
-                    state->activities.erase(i->second);
-                    info.lastLine = lastLine;
-                    state->activities.emplace_back(info);
-                    i->second = std::prev(state->activities.end());
+                    log(*state, lvlInfo, ANSI_FAINT + i->second->name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
+                } else
                     update(*state);
-                }
             }
         }
 
@@ -318,33 +587,29 @@ public:
         }
 
         else if (type == resSetPhase) {
-            auto i = state->its.find(act);
-            assert(i != state->its.end());
             i->second->phase = getS(fields, 0);
             update(*state);
         }
 
         else if (type == resProgress) {
-            auto i = state->its.find(act);
-            assert(i != state->its.end());
-            ActInfo & actInfo = *i->second;
-            actInfo.done = getI(fields, 0);
-            actInfo.expected = getI(fields, 1);
-            actInfo.running = getI(fields, 2);
-            actInfo.failed = getI(fields, 3);
-            update(*state);
+            if (!actInfo.ignored) {
+                actInfo.done = getI(fields, 0);
+                actInfo.expected = getI(fields, 1);
+                actInfo.running = getI(fields, 2);
+                actInfo.failed = getI(fields, 3);
+                update(*state);
+            }
         }
 
         else if (type == resSetExpected) {
-            auto i = state->its.find(act);
-            assert(i != state->its.end());
-            ActInfo & actInfo = *i->second;
-            auto type = (ActivityType) getI(fields, 0);
-            auto & j = actInfo.expectedByType[type];
-            state->activitiesByType[type].expected -= j;
-            j = getI(fields, 1);
-            state->activitiesByType[type].expected += j;
-            update(*state);
+            if (!actInfo.ignored) {
+                auto type = (ActivityType) getI(fields, 0);
+                auto & j = actInfo.expectedByType[type];
+                state->activitiesByType[type].expected -= j;
+                j = getI(fields, 1);
+                state->activitiesByType[type].expected += j;
+                update(*state);
+            }
         }
 
         else if (type == resFetchStatus) {
@@ -354,6 +619,18 @@ public:
             actInfo.lastLine = getS(fields, 0);
             update(*state);
         }
+
+        else if (type == resExpectBuild)
+            actInfo.buildsRemaining.insert(std::string { getS(fields, 0) });
+
+        else if (type == resUnexpectBuild)
+            actInfo.buildsRemaining.erase(std::string { getS(fields, 0) });
+
+        else if (type == resExpectSubstitution)
+            actInfo.substitutionsRemaining.insert(std::string { getS(fields, 0) });
+
+        else if (type == resUnexpectSubstitution)
+            actInfo.substitutionsRemaining.erase(std::string { getS(fields, 0) });
     }
 
     void update(State & state)
@@ -362,42 +639,13 @@ public:
         updateCV.notify_one();
     }
 
-    /**
-     * Redraw, if the output has changed.
-     *
-     * Excessive redrawing is noticable on slow terminals, and it interferes
-     * with text selection in some terminals, including libvte-based terminal
-     * emulators.
-     */
-    void redraw(std::string newOutput)
+    void updateStatusLine(State & state)
     {
-        auto lastOutput(lastOutput_.lock());
-        if (newOutput != *lastOutput) {
-            writeToStderr(newOutput);
-            *lastOutput = std::move(newOutput);
-        }
-    }
-
-    std::chrono::milliseconds draw(State & state)
-    {
-        auto nextWakeup = std::chrono::milliseconds::max();
-
-        state.haveUpdate = false;
-        if (state.paused || !state.active) return nextWakeup;
-
         std::string line;
-
-        std::string status = getStatus(state);
-        if (!status.empty()) {
-            line += '[';
-            line += status;
-            line += "]";
-        }
 
         auto now = std::chrono::steady_clock::now();
 
         if (!state.activities.empty()) {
-            if (!status.empty()) line += " ";
             auto i = state.activities.rbegin();
 
             while (i != state.activities.rend()) {
@@ -408,161 +656,272 @@ public:
                     auto delay = std::chrono::milliseconds(10);
                     if (i->startTime + delay < now)
                         break;
+                    #if 0
                     else
                         nextWakeup = std::min(nextWakeup, std::chrono::duration_cast<std::chrono::milliseconds>(delay - (now - i->startTime)));
+                    #endif
                 }
                 ++i;
             }
 
-            if (i != state.activities.rend()) {
+            if (i != state.activities.rend())
                 line += i->s;
-                if (!i->phase.empty()) {
-                    line += " (";
-                    line += i->phase;
-                    line += ")";
-                }
-                if (!i->lastLine.empty()) {
-                    if (!i->s.empty()) line += ": ";
-                    line += i->lastLine;
-                }
-            }
         }
+
+        removeStatusLines(state, idStatus);
+        if (line != "")
+            state.statusLines.insert_or_assign({idStatus, 0}, line);
+
+        std::vector<std::string> spinner =
+            //{"←", "↖", "↑", "↗", "→", "↘", "↓", "↙"};
+            //{"▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▃", "▁"};
+            {"⠁", "⠂", "⠄", "⡀", "⢀", "⠠", "⠐", "⠈"};
+
+        auto busyMark = ANSI_BOLD + spinner[(std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime).count() / 200) % spinner.size()];
+
+        auto doneMark = ANSI_GREEN "✓";
+
+        auto failMark = ANSI_RED "✗";
+
+        if (state.activitiesByType.count(actEvaluate)) {
+            state.statusLines.insert_or_assign({idEvaluate, 0},
+                fmt("%s Evaluate",
+                    state.activitiesByType[actEvaluate].its.empty()
+                    ? doneMark : busyMark));
+            state.statusLines.insert_or_assign({idEvaluate, 1}, "");
+        }
+
+        if (state.activitiesByType.count(actLockFlake)) {
+            state.statusLines.insert_or_assign({idLockFlake, 0},
+                fmt("%s Lock flake inputs",
+                    state.activitiesByType[actLockFlake].its.empty()
+                    ? doneMark : busyMark));
+            state.statusLines.insert_or_assign({idLockFlake, 1}, "");
+        }
+
+        if (state.activitiesByType.count(actQueryMissing)) {
+            state.statusLines.insert_or_assign({idQueryMissing, 0},
+                fmt("%s Query missing paths",
+                    state.activitiesByType[actQueryMissing].its.empty()
+                    ? doneMark : busyMark));
+            state.statusLines.insert_or_assign({idQueryMissing, 1}, "");
+        }
+
+        auto renderBar = [](uint64_t done, uint64_t failed, uint64_t running, uint64_t expected)
+        {
+            expected = std::max(expected, (uint64_t) 1);
+            auto pct1 = std::min((double) failed / expected, 1.0);
+            auto pct2 = std::min((double) (failed + done) / expected, 1.0);
+            auto pct3 = std::min((double) (failed + done + running) / expected, 1.0);
+            auto barLength = 70;
+            size_t chars1 = barLength * pct1;
+            size_t chars2 = barLength * pct2;
+            size_t chars3 = barLength * pct3;
+            assert(chars1 <= chars2);
+            assert(chars2 <= chars3);
+            return
+                ANSI_RED + repeat("█", chars1) +
+                ANSI_GREEN + repeat("█", chars2 - chars1) +
+                ANSI_WARNING + repeat("▓", chars3 - chars2) +
+                ANSI_NORMAL + repeat("▒", barLength - chars3);
+        };
+
+        auto fileTransfer = getActivityStats(state.activitiesByType[actFileTransfer]);
+
+        if (fileTransfer.done || fileTransfer.expected) {
+            removeStatusLines(state, idDownload);
+
+            size_t n = 0;
+            state.statusLines.insert_or_assign({idDownload, n++},
+                fmt("%s Download %.1f / %.1f MiB",
+                    fileTransfer.active || fileTransfer.done < fileTransfer.expected
+                    ? busyMark
+                    : doneMark,
+                    fileTransfer.done / MiB, fileTransfer.expected / MiB));
+
+            state.statusLines.insert_or_assign({idDownload, n++},
+                fmt("  %s", renderBar(fileTransfer.done, 0, fileTransfer.left, fileTransfer.expected)));
+
+            for (auto & build : state.activitiesByType[actFileTransfer].its) {
+                if (build.second->ignored) continue;
+                state.statusLines.insert_or_assign({idDownload, n++},
+                    fmt(ANSI_BOLD "  ‣ %s", build.second->s));
+            }
+
+            state.statusLines.insert_or_assign({idDownload, n++}, "");
+        }
+
+        auto copyPath = getActivityStats(state.activitiesByType[actCopyPath]);
+        auto copyPaths = getActivityStats(state.activitiesByType[actCopyPaths]);
+
+        if (copyPath.done || copyPath.expected) {
+            // FIXME: handle failures
+
+            removeStatusLines(state, idCopyPaths);
+
+            size_t n = 0;
+            state.statusLines.insert_or_assign({idCopyPaths, n++},
+                fmt("%s Fetch %d / %d store paths, %.1f / %.1f MiB",
+                    copyPaths.running || copyPaths.done < copyPaths.expected
+                    ? busyMark
+                    : doneMark,
+                    copyPaths.done, copyPaths.expected,
+                    copyPath.done / MiB, copyPath.expected / MiB));
+
+            state.statusLines.insert_or_assign({idCopyPaths, n++},
+                fmt("  %s", renderBar(copyPath.done, 0, copyPath.left, copyPath.expected)));
+
+            for (auto & build : state.activitiesByType[actSubstitute].its) {
+                state.statusLines.insert_or_assign({idCopyPaths, n++},
+                    fmt(ANSI_BOLD "  ‣ %s", build.second->s));
+            }
+
+            state.statusLines.insert_or_assign({idCopyPaths, n++}, "");
+        }
+
+        auto builds = getActivityStats(state.activitiesByType[actBuilds]);
+
+        if (builds.done || builds.expected) {
+            removeStatusLines(state, idBuilds);
+
+            size_t n = 0;
+            state.statusLines.insert_or_assign(
+                {idBuilds, n++},
+                fmt("%s Build %d / %d derivations",
+                    builds.failed
+                    ? failMark
+                    : builds.running || builds.done < builds.expected
+                    ? busyMark
+                    : doneMark,
+                    builds.done, builds.expected)
+                + (builds.running ? fmt(", %d running", builds.running) : "")
+                + (builds.failed ? fmt(", %d failed", builds.failed) : ""));
+
+            state.statusLines.insert_or_assign({idBuilds, n++},
+                fmt("  %s",
+                    renderBar(builds.done, builds.failed, builds.running, builds.expected)));
+
+            for (auto & build : state.activitiesByType[actBuild].its) {
+                state.statusLines.insert_or_assign({idBuilds, n++},
+                    fmt(ANSI_BOLD "  ‣ %s (%d s)%s: %s",
+                        build.second->s,
+                        std::chrono::duration_cast<std::chrono::seconds>(now - build.second->startTime).count(),
+                        build.second->phase ? fmt(" (%s)", *build.second->phase) : "",
+                        build.second->lastLine));
+            }
+
+            state.statusLines.insert_or_assign({idBuilds, n++}, "");
+        }
+
+        auto verify = getActivityStats(state.activitiesByType[actVerifyPaths]);
+
+        if (verify.done || verify.expected) {
+            removeStatusLines(state, idVerifyPaths);
+
+            auto bad = state.corruptedPaths + state.untrustedPaths + verify.failed;
+
+            size_t n = 0;
+            state.statusLines.insert_or_assign(
+                {idVerifyPaths, n++},
+                fmt("%s Verify %d / %d paths",
+                    verify.done < verify.expected
+                    ? busyMark
+                    : bad
+                    ? failMark
+                    : doneMark,
+                    verify.done, verify.expected)
+                + (state.corruptedPaths ? fmt(", %d corrupted", state.corruptedPaths) : "")
+                + (state.untrustedPaths ? fmt(", %d untrusted", state.untrustedPaths) : "")
+                + (verify.failed ? fmt(", %d failed", verify.failed) : "")
+                );
+
+            state.statusLines.insert_or_assign({idVerifyPaths, n++},
+                fmt("  %s", renderBar(verify.done - bad, bad, verify.running, verify.expected)));
+
+            for (auto & build : state.activitiesByType[actVerifyPath].its) {
+                state.statusLines.insert_or_assign({idVerifyPaths, n++},
+                    fmt(ANSI_BOLD "  ‣ %s", build.second->s));
+            }
+
+            state.statusLines.insert_or_assign({idVerifyPaths, n++}, "");
+        }
+    }
+
+    std::chrono::milliseconds draw(State & state, std::optional<std::string_view> msg = {})
+    {
+        auto nextWakeup = std::chrono::milliseconds::max();
+
+        state.haveUpdate = false;
+        if (state.paused || !state.active) return nextWakeup;
 
         auto width = getWindowSize().second;
         if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
 
-        redraw("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");
+        std::string s;
+
+        for (size_t i = 1; i < state.prevStatusLines; ++i)
+            s += "\r\e[K\e[A";
+
+        s += "\r\e[K";
+
+        if (msg) {
+            s += replaceStrings(std::string { *msg }, "\n", "\r\n");
+            s += ANSI_NORMAL "\e[K\n\r";
+        }
+
+        for (const auto & [n, i] : enumerate(state.statusLines)) {
+            s += filterANSIEscapes(i.second, false, width) + ANSI_NORMAL + "\e[K";
+            if (n + 1 < state.statusLines.size()) s += "\r\n";
+        }
+
+        writeToStderr(s);
+
+        state.prevStatusLines = state.statusLines.size();
 
         return nextWakeup;
-    }
-
-    std::string getStatus(State & state)
-    {
-        auto MiB = 1024.0 * 1024.0;
-
-        std::string res;
-
-        auto renderActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
-            auto & act = state.activitiesByType[type];
-            uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
-            for (auto & j : act.its) {
-                done += j.second->done;
-                expected += j.second->expected;
-                running += j.second->running;
-                failed += j.second->failed;
-            }
-
-            expected = std::max(expected, act.expected);
-
-            std::string s;
-
-            if (running || done || expected || failed) {
-                if (running)
-                    if (expected != 0)
-                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                            running / unit, done / unit, expected / unit);
-                    else
-                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL,
-                            running / unit, done / unit);
-                else if (expected != done)
-                    if (expected != 0)
-                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                            done / unit, expected / unit);
-                    else
-                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL, done / unit);
-                else
-                    s = fmt(done ? ANSI_GREEN + numberFmt + ANSI_NORMAL : numberFmt, done / unit);
-                s = fmt(itemFmt, s);
-
-                if (failed)
-                    s += fmt(" (" ANSI_RED "%d failed" ANSI_NORMAL ")", failed / unit);
-            }
-
-            return s;
-        };
-
-        auto showActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
-            auto s = renderActivity(type, itemFmt, numberFmt, unit);
-            if (s.empty()) return;
-            if (!res.empty()) res += ", ";
-            res += s;
-        };
-
-        showActivity(actBuilds, "%s built");
-
-        auto s1 = renderActivity(actCopyPaths, "%s copied");
-        auto s2 = renderActivity(actCopyPath, "%s MiB", "%.1f", MiB);
-
-        if (!s1.empty() || !s2.empty()) {
-            if (!res.empty()) res += ", ";
-            if (s1.empty()) res += "0 copied"; else res += s1;
-            if (!s2.empty()) { res += " ("; res += s2; res += ')'; }
-        }
-
-        showActivity(actFileTransfer, "%s MiB DL", "%.1f", MiB);
-
-        {
-            auto s = renderActivity(actOptimiseStore, "%s paths optimised");
-            if (s != "") {
-                s += fmt(", %.1f MiB / %d inodes freed", state.bytesLinked / MiB, state.filesLinked);
-                if (!res.empty()) res += ", ";
-                res += s;
-            }
-        }
-
-        // FIXME: don't show "done" paths in green.
-        showActivity(actVerifyPaths, "%s paths verified");
-
-        if (state.corruptedPaths) {
-            if (!res.empty()) res += ", ";
-            res += fmt(ANSI_RED "%d corrupted" ANSI_NORMAL, state.corruptedPaths);
-        }
-
-        if (state.untrustedPaths) {
-            if (!res.empty()) res += ", ";
-            res += fmt(ANSI_RED "%d untrusted" ANSI_NORMAL, state.untrustedPaths);
-        }
-
-        return res;
     }
 
     void writeToStdout(std::string_view s) override
     {
         auto state(state_.lock());
-        if (state->active) {
-            std::cerr << "\r\e[K";
+
+        if (state->active)
+            // Note: this assumes that stdout == stderr == a terminal
+            draw(*state, s);
+        else
             Logger::writeToStdout(s);
-            draw(*state);
-        } else {
-            Logger::writeToStdout(s);
-        }
     }
 
     std::optional<char> ask(std::string_view msg) override
     {
-        auto state(state_.lock());
-        if (!state->active) return {};
-        std::cerr << fmt("\r\e[K%s ", msg);
-        auto s = trim(readLine(getStandardInput(), true));
-        if (s.size() != 1) return {};
-        draw(*state);
-        return s[0];
-    }
+        checkInterrupt();
 
-    void setPrintBuildLogs(bool printBuildLogs) override
-    {
-        this->printBuildLogs = printBuildLogs;
+        std::future<std::optional<char>> fut;
+
+        {
+            auto state(state_.lock());
+            if (!inputThread.joinable()) return {};
+            state->statusLines.insert_or_assign({idPrompt, 0}, fmt(ANSI_BOLD "%s " ANSI_NORMAL, msg));
+            draw(*state);
+            state->prompt = std::promise<std::optional<char>>();
+            fut = state->prompt->get_future();
+        }
+
+        auto res = fut.get();
+
+        {
+            auto state(state_.lock());
+            removeStatusLines(*state, idPrompt);
+            draw(*state);
+        }
+
+        return res;
     }
 };
 
 Logger * makeProgressBar()
 {
     return new ProgressBar(isTTY());
-}
-
-void startProgressBar()
-{
-    logger = makeProgressBar();
 }
 
 void stopProgressBar()
