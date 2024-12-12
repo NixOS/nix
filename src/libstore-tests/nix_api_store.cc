@@ -24,6 +24,39 @@ TEST_F(nix_api_store_test, nix_store_get_uri)
     ASSERT_STREQ("local", str.c_str());
 }
 
+TEST_F(nix_api_util_context, nix_store_get_storedir_default)
+{
+    if (nix::getEnv("HOME").value_or("") == "/homeless-shelter") {
+        // skipping test in sandbox because nix_store_open tries to create /nix/var/nix/profiles
+        GTEST_SKIP();
+    }
+    nix_libstore_init(ctx);
+    Store * store = nix_store_open(ctx, nullptr, nullptr);
+    assert_ctx_ok();
+    ASSERT_NE(store, nullptr);
+
+    std::string str;
+    auto ret = nix_store_get_storedir(ctx, store, OBSERVE_STRING(str));
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, ret);
+
+    // These tests run with a unique storeDir, but not a relocated store
+    ASSERT_STREQ(NIX_STORE_DIR, str.c_str());
+
+    nix_store_free(store);
+}
+
+TEST_F(nix_api_store_test, nix_store_get_storedir)
+{
+    std::string str;
+    auto ret = nix_store_get_storedir(ctx, store, OBSERVE_STRING(str));
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, ret);
+
+    // These tests run with a unique storeDir, but not a relocated store
+    ASSERT_STREQ(nixStoreDir.c_str(), str.c_str());
+}
+
 TEST_F(nix_api_store_test, InvalidPathFails)
 {
     nix_store_parse_path(ctx, store, "invalid-path");
