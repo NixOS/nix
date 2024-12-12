@@ -16,8 +16,10 @@ cxx = meson.get_compiler('cpp')
 
 subdir('nix-meson-build-support/deps-lists')
 
+nix_store = dependency('nix-store')
+
 deps_private_maybe_subproject = [
-  dependency('nix-store'),
+  nix_store,
   dependency('nix-store-c'),
   dependency('nix-store-test-support'),
 ]
@@ -90,6 +92,7 @@ this_exe = executable(
   include_directories : include_dirs,
   # TODO: -lrapidcheck, see ../libutil-support/build.meson
   link_args: linker_export_flags + ['-lrapidcheck'],
+  cpp_args : [ '-DNIX_STORE_DIR="' + nix_store.get_variable('storedir') + '"' ],
   # get main from gtest
   install : true,
 )

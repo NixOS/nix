@@ -93,7 +93,18 @@ void nix_store_free(Store * store);
  */
 nix_err nix_store_get_uri(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data);
 
-// returns: owned StorePath*
+/**
+ * @brief get the storeDir of a Nix store, typically `"/nix/store"`
+ * @param[out] context Optional, stores error information
+ * @param[in] store nix store reference
+ * @param[in] callback Called with the URI.
+ * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
+ * @see nix_get_string_callback
+ * @return error code, NIX_OK on success.
+ */
+nix_err
+nix_store_get_storedir(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data);
+
 /**
  * @brief Parse a Nix store path into a StorePath
  *
