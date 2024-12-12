@@ -4,6 +4,7 @@
 
 #include "strings-inline.hh"
 #include "os-string.hh"
+#include "error.hh"
 
 namespace nix {
 
@@ -111,7 +112,7 @@ std::list<std::string> shellSplitString(std::string_view s)
             }
         }
         if (s.empty()) {
-            throw std::runtime_error("unterminated double quote (probably in NIX_SSHOPTS)");
+            throw Error("unterminated double quote (probably in NIX_SSHOPTS)");
         }
     };
 
@@ -125,7 +126,7 @@ std::list<std::string> shellSplitString(std::string_view s)
             pushChar(c);
         }
         if (s.empty()) {
-            throw std::runtime_error("unterminated single quote (probably in NIX_SSHOPTS)");
+            throw Error("unterminated single quote (probably in NIX_SSHOPTS)");
         }
     };
 
