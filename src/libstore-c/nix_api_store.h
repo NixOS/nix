@@ -149,6 +149,26 @@ void nix_store_path_free(StorePath * p);
  * @return true or false, error info in context
  */
 bool nix_store_is_valid_path(nix_c_context * context, Store * store, StorePath * path);
+
+/**
+ * @brief Get the physical location of a store path
+ *
+ * A store may reside at a different location than its `storeDir` suggests.
+ * This situation is called a relocated store.
+ * Relocated stores are used during NixOS installation, as well as in restricted computing environments that don't offer
+ * a writable `/nix/store`.
+ *
+ * Not all types of stores support this operation.
+ *
+ * @param[in] context Optional, stores error information
+ * @param[in] store nix store reference
+ * @param[in] path the path to get the real path from
+ * @param[in] callback called with the real path
+ * @param[in] user_data arbitrary data, passed to the callback when it's called.
+ */
+nix_err nix_store_real_path(
+    nix_c_context * context, Store * store, StorePath * path, nix_get_string_callback callback, void * user_data);
+
 // nix_err nix_store_ensure(Store*, const char*);
 // nix_err nix_store_build_paths(Store*);
 /**
