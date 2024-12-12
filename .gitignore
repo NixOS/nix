@@ -1,110 +1,12 @@
-Makefile.config
-perl/Makefile.config
-
-# /
-/aclocal.m4
-/autom4te.cache
-/precompiled-headers.h.gch
-/config.*
-/configure
-/stamp-h1
-/svn-revision
-/libtool
-/config/config.*
 # Default meson build dir
 /build
 
-# /doc/manual/
-/doc/manual/*.1
-/doc/manual/*.5
-/doc/manual/*.8
-/doc/manual/generated/*
-/doc/manual/nix.json
-/doc/manual/conf-file.json
-/doc/manual/language.json
-/doc/manual/xp-features.json
-/doc/manual/source/SUMMARY.md
-/doc/manual/source/SUMMARY-rl-next.md
-/doc/manual/source/store/types/*
-!/doc/manual/source/store/types/index.md.in
-/doc/manual/source/command-ref/new-cli
-/doc/manual/source/command-ref/conf-file.md
-/doc/manual/source/command-ref/experimental-features-shortlist.md
-/doc/manual/source/contributing/experimental-feature-descriptions.md
-/doc/manual/source/language/builtins.md
-/doc/manual/source/language/builtin-constants.md
-/doc/manual/source/release-notes/rl-next.md
-
-# /scripts/
-/scripts/nix-profile.sh
-/scripts/nix-profile-daemon.sh
-/scripts/nix-profile.fish
-/scripts/nix-profile-daemon.fish
-
-# /src/libexpr/
-/src/libexpr/lexer-tab.cc
-/src/libexpr/lexer-tab.hh
-/src/libexpr/parser-tab.cc
-/src/libexpr/parser-tab.hh
-/src/libexpr/parser-tab.output
-/src/libexpr/nix.tbl
-/src/libexpr/tests
-/src/libexpr-tests/libnixexpr-tests
-
-# /src/libfetchers
-/src/libfetchers-tests/libnixfetchers-tests
-
-# /src/libflake
-/src/libflake-tests/libnixflake-tests
-
-# /src/libstore/
-*.gen.*
-/src/libstore/tests
-/src/libstore-tests/libnixstore-tests
-
-# /src/libutil/
-/src/libutil/tests
-/src/libutil-tests/libnixutil-tests
-
-/src/nix/nix
-
-/src/nix/generated-doc
-
-# /src/nix-env/
-/src/nix-env/nix-env
-
-# /src/nix-instantiate/
-/src/nix-instantiate/nix-instantiate
-
-# /src/nix-store/
-/src/nix-store/nix-store
-
-/src/nix-prefetch-url/nix-prefetch-url
-
-/src/nix-collect-garbage/nix-collect-garbage
-
-# /src/nix-channel/
-/src/nix-channel/nix-channel
-
-# /src/nix-build/
-/src/nix-build/nix-build
-
-/src/nix-copy-closure/nix-copy-closure
-
-/src/error-demo/error-demo
-
-/src/build-remote/build-remote
-
 # /tests/functional/
-/tests/functional/test-tmp
 /tests/functional/common/subst-vars.sh
-/tests/functional/result*
 /tests/functional/restricted-innocent
-/tests/functional/shell
-/tests/functional/shell.drv
-/tests/functional/repl-result-out
 /tests/functional/debugger-test-out
 /tests/functional/test-libstoreconsumer/test-libstoreconsumer
+/tests/functional/nix-shell
 
 # /tests/functional/lang/
 /tests/functional/lang/*.out
@@ -112,27 +14,9 @@ perl/Makefile.config
 /tests/functional/lang/*.err
 /tests/functional/lang/*.ast
 
-/perl/lib/Nix/Config.pm
-/perl/lib/Nix/Store.cc
-
-/misc/systemd/nix-daemon.service
-/misc/systemd/nix-daemon.socket
-/misc/systemd/nix-daemon.conf
-/misc/upstart/nix-daemon.conf
-
 outputs/
 
-*.a
-*.o
-*.o.tmp
-*.so
-*.dylib
-*.dll
-*.exe
-*.dep
 *~
-*.pc
-*.plist
 
 # GNU Global
 GPATH
@@ -146,8 +30,6 @@ GTAGS
 # auto-generated compilation database
 compile_commands.json
 *.compile_commands.json
-
-nix-rust/target
 
 result
 result-*
@@ -163,3 +45,5 @@ result-*
 
 # Mac OS
 .DS_Store
+
+flake-regressions
