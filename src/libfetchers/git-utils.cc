@@ -5,6 +5,7 @@
 #include "signals.hh"
 #include "users.hh"
 #include "fs-sink.hh"
+#include "sync.hh"
 
 #include <git2/attr.h>
 #include <git2/blob.h>
@@ -437,7 +438,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         {
             if (!(statusFlags & GIT_STATUS_INDEX_DELETED) &&
                 !(statusFlags & GIT_STATUS_WT_DELETED))
+            {
                 info.files.insert(CanonPath(path));
+                if (statusFlags != GIT_STATUS_CURRENT)
+                    info.dirtyFiles.insert(CanonPath(path));
+            } else
+                info.deletedFiles.insert(CanonPath(path));
             if (statusFlags != GIT_STATUS_CURRENT)
                 info.isDirty = true;
             return 0;
@@ -1260,6 +1266,19 @@ ref<GitRepo> getTarballCache()
     static auto repoDir = std::filesystem::path(getCacheDir()) / "tarball-cache";
 
     return GitRepo::openRepo(repoDir, true, true);
+}
+
+GitRepo::WorkdirInfo GitRepo::getCachedWorkdirInfo(const std::filesystem::path & path)
+{
+    static Sync<std::map<std::filesystem::path, WorkdirInfo>> _cache;
+    {
+        auto cache(_cache.lock());
+        auto i = cache->find(path);
+        if (i != cache->end()) return i->second;
+    }
+    auto workdirInfo = GitRepo::openRepo(path)->getWorkdirInfo();
+    _cache.lock()->emplace(path, workdirInfo);
+    return workdirInfo;
 }
 
 }
