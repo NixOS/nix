@@ -104,6 +104,11 @@ public:
 
     bool operator ==(const Input & other) const noexcept;
 
+    bool operator <(const Input & other) const
+    {
+        return attrs < other.attrs;
+    }
+
     bool contains(const Input & other) const;
 
     /**
