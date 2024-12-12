@@ -45,13 +45,13 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
 
     try {
         std::list<std::string> opts = shellSplitString(sshOpts);
+        for (auto & i : opts)
+            args.push_back(i);
     } catch (Error & e) {
         e.addTrace({}, "while splitting NIX_SSHOPTS '%s'", sshOpts);
         throw;
     }
 
-    for (auto & i : opts)
-        args.push_back(i);
     if (!keyFile.empty())
         args.insert(args.end(), {"-i", keyFile});
     if (!sshPublicHostKey.empty()) {
