@@ -136,6 +136,9 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
                  above does not make much sense. */
                 return std::move(c);
             },
+            [&](const NixStringContextElem::SourceAccessor & c) -> NixStringContextElem::DrvDeep {
+                abort(); // FIXME
+            },
         }, context.begin()->raw) }),
     };
 
@@ -205,6 +208,9 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
             },
             [&](NixStringContextElem::Opaque && o) {
                 contextInfos[std::move(o.path)].path = true;
+            },
+            [&](NixStringContextElem::SourceAccessor && a) {
+                abort(); // FIXME
             },
         }, ((NixStringContextElem &&) i).raw);
     }

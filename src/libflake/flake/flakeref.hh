@@ -63,7 +63,7 @@ struct FlakeRef
         const fetchers::Settings & fetchSettings,
         const fetchers::Attrs & attrs);
 
-    std::pair<StorePath, FlakeRef> fetchTree(ref<Store> store) const;
+    std::pair<ref<SourceAccessor>, FlakeRef> lazyFetch(ref<Store> store) const;
 };
 
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);
@@ -76,7 +76,8 @@ FlakeRef parseFlakeRef(
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
-    bool isFlake = true);
+    bool isFlake = true,
+    bool allowRelative = false);
 
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
@@ -94,7 +95,8 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
-    bool isFlake = true);
+    bool isFlake = true,
+    bool allowRelative = false);
 
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
