@@ -112,7 +112,7 @@ std::list<std::string> shellSplitString(std::string_view s)
             }
         }
         if (s.empty()) {
-            throw Error("unterminated double quote (probably in NIX_SSHOPTS)");
+            throw Error("unterminated double quote");
         }
     };
 
@@ -126,7 +126,7 @@ std::list<std::string> shellSplitString(std::string_view s)
             pushChar(c);
         }
         if (s.empty()) {
-            throw Error("unterminated single quote (probably in NIX_SSHOPTS)");
+            throw Error("unterminated single quote");
         }
     };
 
