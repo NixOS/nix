@@ -107,7 +107,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         auto whereOpt = ExecutablePath::load().findName(OS_STR("nix-env"));
         if (!whereOpt)
             throw Error("couldn't figure out how Nix is installed, so I can't upgrade it");
-        auto & where = *whereOpt;
+        const auto & where = whereOpt->parent_path();
 
         printInfo("found Nix in '%s'", where);
 

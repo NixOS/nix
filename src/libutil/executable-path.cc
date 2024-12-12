@@ -73,7 +73,7 @@ ExecutablePath::findName(const OsString & exe, std::function<bool(const fs::path
     for (auto & dir : directories) {
         auto candidate = dir / exe;
         if (isExecutable(candidate))
-            return std::filesystem::canonical(candidate);
+            return candidate.lexically_normal();
     }
 
     return std::nullopt;
