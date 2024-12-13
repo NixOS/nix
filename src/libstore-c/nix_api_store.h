@@ -48,12 +48,27 @@ nix_err nix_libstore_init_no_load_config(nix_c_context * context);
  * Store instances may share state and resources behind the scenes.
  *
  * @param[out] context Optional, stores error information
- * @param[in] uri URI of the Nix store, copied. See [*Store URL format* in the Nix Reference
+ *
+ * @param[in] uri @parblock
+ *   URI of the Nix store, copied.
+ *
+ *   If `NULL`, the store from the settings will be used.
+ *   Note that `"auto"` holds a strange middle ground, reading part of the general environment, but not all of it. It
+ * ignores `NIX_REMOTE` and the `store` option. For this reason, `NULL` is most likely the better choice.
+ *
+ *   For supported store URLs, see [*Store URL format* in the Nix Reference
  * Manual](https://nixos.org/manual/nix/stable/store/types/#store-url-format).
- * @param[in] params optional, null-terminated array of key-value pairs, e.g. {{"endpoint",
- * "https://s3.local"}}. See [*Store Types* in the Nix Reference
- * Manual](https://nixos.org/manual/nix/stable/store/types).
+ * @endparblock
+ *
+ * @param[in] params @parblock
+ *   optional, null-terminated array of key-value pairs, e.g. {{"endpoint",
+ * "https://s3.local"}}.
+ *
+ *   See [*Store Types* in the Nix Reference Manual](https://nixos.org/manual/nix/stable/store/types).
+ * @endparblock
+ *
  * @return a Store pointer, NULL in case of errors
+ *
  * @see nix_store_free
  */
 Store * nix_store_open(nix_c_context * context, const char * uri, const char *** params);
