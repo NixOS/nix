@@ -401,6 +401,11 @@ public:
     void allowPath(const StorePath & storePath);
 
     /**
+     * Allow access to the closure of a store path.
+     */
+    void allowClosure(const StorePath & storePath);
+
+    /**
      * Allow access to a store path and return it as a string.
      */
     void allowAndSetStorePathString(const StorePath & storePath, Value & v);
