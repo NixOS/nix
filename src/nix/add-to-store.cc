@@ -37,7 +37,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     {
         if (!namePart) namePart = baseNameOf(path);
 
-        auto sourcePath = PosixSourceAccessor::createAtRoot(path);
+        auto sourcePath = PosixSourceAccessor::createAtRoot(makeParentCanonical(path));
 
         auto storePath = dryRun
             ? store->computeStorePath(
