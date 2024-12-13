@@ -37,13 +37,13 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     {
         if (!namePart) namePart = baseNameOf(path);
 
-        auto [accessor, path2] = PosixSourceAccessor::createAtRoot(path);
+        auto sourcePath = PosixSourceAccessor::createAtRoot(path);
 
         auto storePath = dryRun
             ? store->computeStorePath(
-                *namePart, {accessor, path2}, caMethod, hashAlgo, {}).first
+                *namePart, sourcePath, caMethod, hashAlgo, {}).first
             : store->addToStoreSlow(
-                *namePart, {accessor, path2}, caMethod, hashAlgo, {}).path;
+                *namePart, sourcePath, caMethod, hashAlgo, {}).path;
 
         logger->cout("%s", store->printStorePath(storePath));
     }

@@ -183,9 +183,9 @@ static void opAdd(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
     for (auto & i : opArgs) {
-        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(i);
+        auto sourcePath = PosixSourceAccessor::createAtRoot(i);
         cout << fmt("%s\n", store->printStorePath(store->addToStore(
-            std::string(baseNameOf(i)), {accessor, canonPath})));
+            std::string(baseNameOf(i)), sourcePath)));
     }
 }
 
@@ -207,10 +207,10 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     opArgs.pop_front();
 
     for (auto & i : opArgs) {
-        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(i);
+        auto sourcePath = PosixSourceAccessor::createAtRoot(i);
         std::cout << fmt("%s\n", store->printStorePath(store->addToStoreSlow(
             baseNameOf(i),
-            {accessor, canonPath},
+            sourcePath,
             method,
             hashAlgo).path));
     }
