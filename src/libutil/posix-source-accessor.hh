@@ -43,7 +43,7 @@ struct PosixSourceAccessor : virtual SourceAccessor
     std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override;
 
     /**
-     * Create a `PosixSourceAccessor` and `CanonPath` corresponding to
+     * Create a `PosixSourceAccessor` and `SourcePath` corresponding to
      * some native path.
      *
      * The `PosixSourceAccessor` is rooted as far up the tree as
