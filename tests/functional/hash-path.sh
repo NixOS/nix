@@ -92,3 +92,27 @@ try2 md5 "20f3ffe011d4cfa7d72bfabef7882836"
 rm "$TEST_ROOT/hash-path/hello"
 ln -s x "$TEST_ROOT/hash-path/hello"
 try2 md5 "f78b733a68f5edbdf9413899339eaa4a"
+
+# Flat mode supports process substitution
+h=$(nix hash path --mode flat --type sha256 --base32 <(printf "SMASH THE STATE"))
+[[ 0d9n3r2i4m1zgy0wpqbsyabsfzgs952066bfp8gwvcg4mkr4r5g8 == "$h" ]]
+
+# Flat mode supports process substitution (hash file)
+h=$(nix hash file --type sha256 --base32 <(printf "SMASH THE STATE"))
+[[ 0d9n3r2i4m1zgy0wpqbsyabsfzgs952066bfp8gwvcg4mkr4r5g8 == "$h" ]]
+
+# Symlinks in the ancestry are ok and don't affect the result
+mkdir -p "$TEST_ROOT/simple" "$TEST_ROOT/try/to/mess/with/it"
+echo hi > "$TEST_ROOT/simple/hi"
+ln -s "$TEST_ROOT/simple" "$TEST_ROOT/try/to/mess/with/it/simple-link"
+h=$(nix hash path --type sha256 --base32 "$TEST_ROOT/simple/hi")
+[[ 1xmr8jicvzszfzpz46g37mlpvbzjl2wpwvl2b05psipssyp1sm8h == "$h" ]]
+h=$(nix hash path --type sha256 --base32 "$TEST_ROOT/try/to/mess/with/it/simple-link/hi")
+[[ 1xmr8jicvzszfzpz46g37mlpvbzjl2wpwvl2b05psipssyp1sm8h == "$h" ]]
+
+# nix hash --mode nar does not canonicalize a symlink argument.
+#   Otherwise it can't generate a NAR whose root is a symlink.
+#   If you want to follow the symlink, pass $(realpath -s ...) instead.
+ln -s /non-existent-48cujwe8ndf4as0bne "$TEST_ROOT/symlink-to-nowhere"
+h=$(nix hash path --mode nar --type sha256 --base32 "$TEST_ROOT/symlink-to-nowhere")
+[[ 1bl5ry3x1fcbwgr5c2x50bn572iixh4j1p6ax5isxly2ddgn8pbp == "$h" ]]  # manually verified hash
