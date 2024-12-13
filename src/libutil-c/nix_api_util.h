@@ -47,7 +47,7 @@ extern "C" {
  */
 // Error codes
 /**
- * @brief Type for error codes in the NIX system
+ * @brief Type for error codes in the Nix system
  *
  * This type can have one of several predefined constants:
  * - NIX_OK: No error occurred (0)
