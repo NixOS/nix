@@ -168,7 +168,7 @@
       };
 
       checks = forAllSystems (system: {
-        binaryTarball = self.hydraJobs.binaryTarball.${system};
+        installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
         rl-next =
@@ -221,6 +221,8 @@
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
           default = self.packages.${system}.nix;
+          binaryTarball = self.hydraJobs.binaryTarball.${system};
+          installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
           nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
