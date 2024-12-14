@@ -50,6 +50,7 @@ if isDaemonNewer "2.20.0pre20231220"; then
 fi
 
 requireSandboxSupport
+requiresUnprivilegedUserNamespaces
 
 chmod -R u+w $TEST_ROOT/store0 || true
 rm -rf $TEST_ROOT/store0

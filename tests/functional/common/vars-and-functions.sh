@@ -405,4 +405,15 @@ count() {
 
 trap onError ERR
 
+requiresUnprivilegedUserNamespaces() {
+  if [[ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]] && [[ $(< /proc/sys/kernel/apparmor_restrict_unprivileged_userns) -eq 1 ]]; then
+    skipTest "Unprivileged user namespaces are disabled. Run 'sudo sysctl -w /proc/sys/kernel/apparmor_restrict_unprivileged_userns=0' to allow, and run these tests."
+  fi
+}
+
+execUnshare () {
+  requiresUnprivilegedUserNamespaces
+  exec unshare --mount --map-root-user "$SHELL" "$@"
+}
+
 fi # COMMON_VARS_AND_FUNCTIONS_SH_SOURCED

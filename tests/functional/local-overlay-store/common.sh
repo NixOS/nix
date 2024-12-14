@@ -93,10 +93,6 @@ initLowerStore () {
   pathInLowerStore=$(nix-store --store "$storeA" --realise $drvPath)
 }
 
-execUnshare () {
-  exec unshare --mount --map-root-user "$SHELL" "$@"
-}
-
 addTextToStore() {
   storeDir=$1; shift
   filename=$1; shift

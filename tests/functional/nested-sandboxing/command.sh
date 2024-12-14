@@ -16,6 +16,7 @@ goodStoreUrl () {
 # whether this test is being run in a derivation as part of the nix build or
 # being manually run by a developer outside a derivation
 runNixBuild () {
+
     local storeFun=$1
     local altitude=$2
     nix-build \

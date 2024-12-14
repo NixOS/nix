@@ -7,6 +7,7 @@ source common.sh
 TODO_NixOS
 
 requireSandboxSupport
+requiresUnprivilegedUserNamespaces
 
 source ./nested-sandboxing/command.sh
 
