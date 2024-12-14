@@ -9,6 +9,7 @@ TODO_NixOS
 clearStore
 
 requireSandboxSupport
+requiresUnprivilegedUserNamespaces
 
 # Note: we need to bind-mount $SHELL into the chroot. Currently we
 # only support the case where $SHELL is in the Nix store, because
