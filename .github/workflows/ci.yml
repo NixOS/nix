@@ -7,6 +7,14 @@ on:
 permissions: read-all
 
 jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: cachix/install-nix-action@v30
+    - run: nix --experimental-features 'nix-command flakes' flake show --all-systems --json
 
   tests:
     needs: [check_secrets]
@@ -31,25 +39,7 @@ jobs:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    - if: matrix.os == 'ubuntu-latest'
-      run: |
-        free -h
-        swapon --show
-        swap=$(swapon --show --noheadings | head -n 1 | awk '{print $1}')
-        echo "Found swap: $swap"
-        sudo swapoff $swap
-        # resize it (fallocate)
-        sudo fallocate -l 10G $swap
-        sudo mkswap $swap
-        sudo swapon $swap
-        free -h
-        (
-          while sleep 60; do
-            free -h
-          done
-        ) &
-    - run: nix --experimental-features 'nix-command flakes' flake check -L
-    - run: nix --experimental-features 'nix-command flakes' flake show --all-systems --json
+    - run: scripts/build-checks
 
   # Steps to test CI automation in your own fork.
   # Cachix:

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+system=$(nix eval --raw --impure --expr builtins.currentSystem)
+nix eval --json ".#checks.$system" --apply builtins.attrNames | \
+  jq -r '.[]' | \
+  xargs -P0 -I '{}' sh -c "nix build -L .#checks.$system.{} || { echo 'FAILED: \033[0;31mnix build -L .#checks.$system.{}\\033[0m'; kill 0; }"
