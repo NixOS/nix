@@ -123,15 +123,10 @@ in
     self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
     self.hydraJobs.binaryTarballCross."x86_64-linux"."riscv64-unknown-linux-gnu"
   ];
-  installerScriptForGHA = installScriptFor [
-    # Native
-    self.hydraJobs.binaryTarball."x86_64-linux"
-    self.hydraJobs.binaryTarball."aarch64-darwin"
-    # Cross
-    self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
-    self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
-    self.hydraJobs.binaryTarballCross."x86_64-linux"."riscv64-unknown-linux-gnu"
-  ];
+
+  installerScriptForGHA = forAllSystems (system: nixpkgsFor.${system}.native.callPackage ../scripts/installer.nix {
+    tarballs = [ self.hydraJobs.binaryTarball.${system} ];
+  });
 
   # docker image with Nix inside
   dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
