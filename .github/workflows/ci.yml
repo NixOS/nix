@@ -41,6 +41,10 @@ jobs:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+    # Since ubuntu 22.30, unprivileged usernamespaces are no longer allowed to map to the root user:
+    # https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
+    - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      if: matrix.os == 'ubuntu-latest'
     - run: scripts/build-checks
 
   # Steps to test CI automation in your own fork.
