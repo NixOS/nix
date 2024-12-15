@@ -201,11 +201,7 @@
         # Some perl dependencies are broken on i686-linux.
         # Since the support is only best-effort there, disable the perl
         # bindings
-
-        # Temporarily disabled because GitHub Actions OOM issues. Once
-        # the old build system is gone and we are back to one build
-        # system, we should reenable this.
-        #perlBindings = self.hydraJobs.perlBindings.${system};
+        perlBindings = self.hydraJobs.perlBindings.${system};
       }
       # Add "passthru" tests
       // flatMapAttrs ({
