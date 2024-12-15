@@ -54,10 +54,22 @@ struct NixStringContextElem {
      */
     using Built = SingleDerivedPath::Built;
 
+    /**
+     * The [number of an accessor](SourceAccessor::number) stored in
+     * `EvalState::inputAccessors`.
+     */
+    struct SourceAccessor
+    {
+        size_t accessor;
+
+        GENERATE_CMP(SourceAccessor, me->accessor);
+    };
+
     using Raw = std::variant<
         Opaque,
         DrvDeep,
-        Built
+        Built,
+        SourceAccessor
     >;
 
     Raw raw;

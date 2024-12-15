@@ -19,6 +19,8 @@ rec {
 
   sum = foldl' (x: y: add x y) 0;
 
+  hasPrefix = pref: str: substring 0 (stringLength pref) str == pref;
+
   hasSuffix = ext: fileName:
     let lenFileName = stringLength fileName;
         lenExt = stringLength ext;
