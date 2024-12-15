@@ -126,7 +126,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         if (where.filename() != "bin" ||
             !hasSuffix(userEnv, "user-environment"))
-            throw Error("directory '%s' does not appear to be part of a Nix profile", where);
+            throw Error("directory %s does not appear to be part of a Nix profile", where);
 
         if (!store->isValidPath(store->parseStorePath(userEnv)))
             throw Error("directory '%s' is not in the Nix store", userEnv);
