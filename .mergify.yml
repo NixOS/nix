@@ -7,6 +7,8 @@ queue_rules:
       - check-success=installer_test (ubuntu-latest)
       - check-success=tests (macos-latest)
       - check-success=tests (ubuntu-latest)
+      - check-success=installer_test (macos-latest)
+      - check-success=installer_test (ubuntu-latest)
       - check-success=vm_tests
     merge_method: rebase
     batch_size: 5
