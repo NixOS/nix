@@ -92,7 +92,7 @@ struct Flake
      */
     SourcePath path;
     /**
-     * pretend that 'lockedRef' is dirty
+     * Pretend that 'lockedRef' is dirty.
      */
     bool forceDirty = false;
     std::optional<std::string> description;
@@ -155,6 +155,12 @@ struct LockFlags
      * lock file in memory only, without writing it to disk.
      */
     bool writeLockFile = true;
+
+    /**
+     * When `writeLockFile` is false, whether we're warning about
+     * modified lock files.
+     */
+    bool warnModifiedLockFile = true;
 
     /**
      * Whether to use the registries to lookup indirect flake
