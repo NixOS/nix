@@ -199,6 +199,22 @@ scope: {
     meta.platforms = lib.platforms.all;
   });
 
+  widecharwidth = stdenv.mkDerivation {
+    name = "widecharwidth";
+    dontConfigure = true;
+    dontBuild = true;
+    installPhase = ''
+      mkdir -p $out/include
+      cp $src/widechar_width.h $out/include
+    '';
+    src = pkgs.fetchFromGitHub {
+      owner = "ridiculousfish";
+      repo = "widecharwidth";
+      rev = "533e50efb0b9b122a08f2273337dbf6b44b03cc7";
+      hash = "sha256-Vy1jCv0wqV/4sNCQIYGKiHq5A8QGE6Q+1v8k3Cn6sJ4=";
+    };
+  };
+
   inherit resolvePath filesetToSource;
 
   mkMesonDerivation =

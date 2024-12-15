@@ -9,6 +9,7 @@
 , libsodium
 , nlohmann_json
 , openssl
+, widecharwidth
 
 # Configuration Options
 
@@ -42,6 +43,7 @@ mkMesonLibrary (finalAttrs: {
     brotli
     libsodium
     openssl
+    widecharwidth
   ] ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
   ;
 
