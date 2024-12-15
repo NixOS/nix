@@ -107,7 +107,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         auto whereOpt = ExecutablePath::load().findName(OS_STR("nix-env"));
         if (!whereOpt)
             throw Error("couldn't figure out how Nix is installed, so I can't upgrade it");
-        auto & where = *whereOpt;
+        const auto & where = whereOpt->parent_path();
 
         printInfo("found Nix in '%s'", where);
 
@@ -126,7 +126,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         if (where.filename() != "bin" ||
             !hasSuffix(userEnv, "user-environment"))
-            throw Error("directory '%s' does not appear to be part of a Nix profile", where);
+            throw Error("directory %s does not appear to be part of a Nix profile", where);
 
         if (!store->isValidPath(store->parseStorePath(userEnv)))
             throw Error("directory '%s' is not in the Nix store", userEnv);
