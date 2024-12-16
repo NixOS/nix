@@ -672,6 +672,8 @@ LockedFlake lockFlake(
             if (lockFlags.writeLockFile) {
                 if (sourcePath || lockFlags.outputLockFilePath) {
                     if (auto unlockedInput = newLockFile.isUnlocked()) {
+                        if (lockFlags.failOnUnlocked)
+                            throw Error("cannot write lock file of flake '%s' because it has an unlocked input ('%s').\n", topRef, *unlockedInput);
                         if (state.fetchSettings.warnDirty)
                             warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
                     } else {
