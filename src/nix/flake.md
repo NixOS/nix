@@ -648,7 +648,7 @@ following fields:
 * `inputs`: The dependencies of this node, as a mapping from input
   names (e.g. `nixpkgs`) to node labels (e.g. `n2`).
 
-* `original`: The original input specification from `flake.lock`, as a
+* `original`: The original input specification from `flake.nix`, as a
   set of `builtins.fetchTree` arguments.
 
 * `locked`: The locked input specification, as a set of
