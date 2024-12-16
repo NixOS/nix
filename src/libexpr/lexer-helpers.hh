@@ -4,8 +4,8 @@
 
 // inluding the generated headers twice leads to errors
 #ifndef BISON_HEADER
-#include "lexer-tab.hh"
-#include "parser-tab.hh"
+#  include "lexer-tab.hh"
+#  include "parser-tab.hh"
 #endif
 
 namespace nix::lexer::internal {
