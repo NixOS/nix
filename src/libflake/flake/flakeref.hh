@@ -6,6 +6,7 @@
 #include "types.hh"
 #include "fetchers.hh"
 #include "outputs-spec.hh"
+#include "registry.hh"
 
 namespace nix {
 
@@ -57,7 +58,9 @@ struct FlakeRef
 
     fetchers::Attrs toAttrs() const;
 
-    FlakeRef resolve(ref<Store> store) const;
+    FlakeRef resolve(
+        ref<Store> store,
+        const fetchers::RegistryFilter & filter = {}) const;
 
     static FlakeRef fromAttrs(
         const fetchers::Settings & fetchSettings,

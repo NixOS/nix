@@ -178,7 +178,8 @@ Registries getRegistries(const Settings & settings, ref<Store> store)
 
 std::pair<Input, Attrs> lookupInRegistries(
     ref<Store> store,
-    const Input & _input)
+    const Input & _input,
+    const RegistryFilter & filter)
 {
     Attrs extraAttrs;
     int n = 0;
@@ -190,6 +191,7 @@ std::pair<Input, Attrs> lookupInRegistries(
     if (n > 100) throw Error("cycle detected in flake registry for '%s'", input.to_string());
 
     for (auto & registry : getRegistries(*input.settings, store)) {
+        if (filter && !filter(registry->type)) continue;
         // FIXME: O(n)
         for (auto & entry : registry->entries) {
             if (entry.exact) {
