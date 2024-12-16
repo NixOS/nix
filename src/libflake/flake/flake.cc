@@ -21,7 +21,12 @@ using namespace flake;
 
 namespace flake {
 
-typedef std::pair<StorePath, FlakeRef> FetchedFlake;
+struct FetchedFlake
+{
+    FlakeRef lockedRef;
+    StorePath storePath;
+};
+
 typedef std::vector<std::pair<FlakeRef, FetchedFlake>> FlakeCache;
 
 static std::optional<FetchedFlake> lookupInFlakeCache(
@@ -32,7 +37,7 @@ static std::optional<FetchedFlake> lookupInFlakeCache(
     for (auto & i : flakeCache) {
         if (flakeRef == i.first) {
             debug("mapping '%s' to previously seen input '%s' -> '%s",
-                flakeRef, i.first, i.second.second);
+                flakeRef, i.first, i.second.lockedRef);
             return i.second;
         }
     }
@@ -51,7 +56,8 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
 
     if (!fetched) {
         if (originalRef.input.isDirect()) {
-            fetched.emplace(originalRef.fetchTree(state.store));
+            auto [storePath, lockedRef] = originalRef.fetchTree(state.store);
+            fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .storePath = storePath});
         } else {
             if (allowLookup) {
                 resolvedRef = originalRef.resolve(
@@ -61,10 +67,12 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
                            to resolve indirect flakerefs. */
                         return type == fetchers::Registry::Flag || type == fetchers::Registry::Global;
                     });
-                auto fetchedResolved = lookupInFlakeCache(flakeCache, originalRef);
-                if (!fetchedResolved) fetchedResolved.emplace(resolvedRef.fetchTree(state.store));
-                flakeCache.push_back({resolvedRef, *fetchedResolved});
-                fetched.emplace(*fetchedResolved);
+                fetched = lookupInFlakeCache(flakeCache, originalRef);
+                if (!fetched) {
+                    auto [storePath, lockedRef] = resolvedRef.fetchTree(state.store);
+                    fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .storePath = storePath});
+                }
+                flakeCache.push_back({resolvedRef, *fetched});
             }
             else {
                 throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalRef);
@@ -73,16 +81,14 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
         flakeCache.push_back({originalRef, *fetched});
     }
 
-    auto [storePath, lockedRef] = *fetched;
-
     debug("got tree '%s' from '%s'",
-        state.store->printStorePath(storePath), lockedRef);
+        state.store->printStorePath(fetched->storePath), fetched->lockedRef);
 
-    state.allowPath(storePath);
+    state.allowPath(fetched->storePath);
 
-    assert(!originalRef.input.getNarHash() || storePath == originalRef.input.computeStorePath(*state.store));
+    assert(!originalRef.input.getNarHash() || fetched->storePath == originalRef.input.computeStorePath(*state.store));
 
-    return {std::move(storePath), resolvedRef, lockedRef};
+    return {fetched->storePath, resolvedRef, fetched->lockedRef};
 }
 
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
