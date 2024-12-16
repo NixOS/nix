@@ -2,6 +2,7 @@
 ///@file
 
 #include <string_view>
+#include <string>
 
 namespace nix::regex {
 

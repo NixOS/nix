@@ -5,6 +5,7 @@
  */
 
 #include <limits>
+#include <stddef.h>
 
 namespace nix {
 
