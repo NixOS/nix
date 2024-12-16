@@ -3100,14 +3100,7 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
             allowPath(path);
             if (store->isInStore(path)) {
                 try {
-<<<<<<< HEAD
-                    StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(path).first, closure);
-                    for (auto & p : closure)
-                        allowPath(p);
-=======
-                    allowClosure(store->toStorePath(path.path.abs()).first);
->>>>>>> 08361f031 (EvalState::realiseContext(): Allow access to the entire closure)
+                    allowClosure(store->toStorePath(path).first);
                 } catch (InvalidPath &) { }
             }
         }
