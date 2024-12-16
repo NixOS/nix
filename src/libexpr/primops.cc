@@ -119,11 +119,9 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     if (store != buildStore) copyClosure(*buildStore, *store, outputsToCopyAndAllow);
 
     if (isIFD) {
-        for (auto & outputPath : outputsToCopyAndAllow) {
-            /* Add the output of this derivations to the allowed
-            paths. */
-            allowPath(outputPath);
-        }
+        /* Allow access to the output closures of this derivation. */
+        for (auto & outputPath : outputsToCopyAndAllow)
+            allowClosure(outputPath);
     }
 
     return res;
