@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 with import "${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/config.nix";
+=======
+with import <config>;
+>>>>>>> 08361f031 (EvalState::realiseContext(): Allow access to the entire closure)
 
 rec {
   bar = mkDerivation {
@@ -30,4 +34,23 @@ rec {
         echo -n BLA$(cat $src) > $out
       '';
   };
+
+  step1 = mkDerivation {
+    name = "step1";
+    buildCommand = ''
+      mkdir -p $out
+      echo 'foo' > $out/bla
+    '';
+  };
+
+  addPathExpr = mkDerivation {
+    name = "add-path";
+    inherit step1;
+    buildCommand = ''
+      mkdir -p $out
+      echo "builtins.path { path = \"$step1\"; sha256 = \"7ptL+pnrZXnSa5hwwB+2SXTLkcSb5264WGGokN8OXto=\"; }" > $out/default.nix
+    '';
+  };
+
+  importAddPathExpr = import addPathExpr;
 }
