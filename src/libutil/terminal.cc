@@ -11,6 +11,53 @@
 # include <sys/ioctl.h>
 #endif
 #include <unistd.h>
+#include <widechar_width.h>
+
+namespace {
+
+inline std::pair<int, size_t> charWidthUTF8Helper(std::string_view s)
+{
+    size_t bytes = 1;
+    uint32_t ch = s[0];
+    uint32_t max = 1U << 7;
+    if ((ch & 0x80U) == 0U) {
+    } else if ((ch & 0xe0U) == 0xc0U) {
+        ch &= 0x1fU;
+        bytes = 2;
+        max = 1U << 11;
+    } else if ((ch & 0xf0U) == 0xe0U) {
+        ch &= 0x0fU;
+        bytes = 3;
+        max = 1U << 16;
+    } else if ((ch & 0xf8U) == 0xf0U) {
+        ch &= 0x07U;
+        bytes = 4;
+        max = 0x110000U;
+    } else {
+        return {bytes, bytes}; // invalid UTF-8 start byte
+    }
+    for (size_t i = 1; i < bytes; i++) {
+        if (i < s.size() && (s[i] & 0xc0) == 0x80) {
+            ch = (ch << 6) | (s[i] & 0x3f);
+        } else {
+            return {i, i}; // invalid UTF-8 encoding; assume one character per byte
+        }
+    }
+    int width = bytes; // in case of overlong encoding
+    if (ch < max) {
+        width = widechar_wcwidth(ch);
+        if (width == widechar_ambiguous) {
+            width = 1; // just a guess...
+        } else if (width == widechar_widened_in_9) {
+            width = 2;
+        } else if (width < 0) {
+            width = 0;
+        }
+    }
+    return {width, bytes};
+}
+
+}
 
 namespace nix {
 
@@ -72,34 +119,16 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
             i++;
 
         else {
-            w++;
-            // Copy one UTF-8 character.
-            if ((*i & 0xe0) == 0xc0) {
-                t += *i++;
-                if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
-            } else if ((*i & 0xf0) == 0xe0) {
-                t += *i++;
-                if (i != s.end() && ((*i & 0xc0) == 0x80)) {
-                    t += *i++;
-                    if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
-                }
-            } else if ((*i & 0xf8) == 0xf0) {
-                t += *i++;
-                if (i != s.end() && ((*i & 0xc0) == 0x80)) {
-                    t += *i++;
-                    if (i != s.end() && ((*i & 0xc0) == 0x80)) {
-                        t += *i++;
-                        if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
-                    }
-                }
-            } else
-                t += *i++;
+            auto [chWidth, bytes] = charWidthUTF8Helper({i, s.end()});
+            w += chWidth;
+            if (w <= (size_t) width) {
+                t += {i, i + bytes};
+            }
+            i += bytes;
         }
     }
-
     return t;
 }
-
 
 //////////////////////////////////////////////////////////////////////
 
