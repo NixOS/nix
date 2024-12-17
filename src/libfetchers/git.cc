@@ -15,6 +15,7 @@
 #include "finally.hh"
 #include "fetch-settings.hh"
 #include "json-utils.hh"
+#include "archive.hh"
 
 #include <regex>
 #include <string.h>
@@ -430,7 +431,7 @@ struct GitInputScheme : InputScheme
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
         if (!input.getRef() && !input.getRev() && repoInfo.isLocal)
-            repoInfo.workdirInfo = GitRepo::openRepo(repoInfo.url)->getWorkdirInfo();
+            repoInfo.workdirInfo = GitRepo::getCachedWorkdirInfo(repoInfo.url);
 
         return repoInfo;
     }
@@ -793,10 +794,33 @@ struct GitInputScheme : InputScheme
 
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
+        auto makeFingerprint = [&](const Hash & rev)
+        {
+            return rev.gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
+        };
+
         if (auto rev = input.getRev())
-            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
-        else
+            return makeFingerprint(*rev);
+        else {
+            auto repoInfo = getRepoInfo(input);
+            if (repoInfo.isLocal && repoInfo.workdirInfo.headRev && repoInfo.workdirInfo.submodules.empty()) {
+                /* Calculate a fingerprint that takes into account the
+                   deleted and modified/added files. */
+                HashSink hashSink{HashAlgorithm::SHA512};
+                for (auto & file : repoInfo.workdirInfo.dirtyFiles) {
+                    writeString("modified:", hashSink);
+                    writeString(file.abs(), hashSink);
+                    dumpPath(repoInfo.url + "/" + file.abs(), hashSink);
+                }
+                for (auto & file : repoInfo.workdirInfo.deletedFiles) {
+                    writeString("deleted:", hashSink);
+                    writeString(file.abs(), hashSink);
+                }
+                return makeFingerprint(*repoInfo.workdirInfo.headRev)
+                    + ";d=" + hashSink.finish().first.to_string(HashFormat::Base16, false);
+            }
             return std::nullopt;
+        }
     }
 
     bool isLocked(const Input & input) const override
