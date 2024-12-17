@@ -157,6 +157,8 @@ in
 
   functional_root = runNixOSTestFor "x86_64-linux" ./functional/as-root.nix;
 
+  functional_symlinked-home = runNixOSTestFor "x86_64-linux" ./functional/symlinked-home.nix;
+
   user-sandboxing = runNixOSTestFor "x86_64-linux" ./user-sandboxing;
 
   s3-binary-cache-store = runNixOSTestFor "x86_64-linux" ./s3-binary-cache-store.nix;
