@@ -1,11 +1,11 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
-  inputs.libgit2 = { url = "github:libgit2/libgit2/v1.8.1"; flake = false; };
 
   # dev tooling
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";
@@ -18,7 +18,7 @@
   inputs.git-hooks-nix.inputs.flake-compat.follows = "";
   inputs.git-hooks-nix.inputs.gitignore.follows = "";
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-regression, libgit2, ... }:
+  outputs = inputs@{ self, nixpkgs, nixpkgs-regression, ... }:
 
 
     let
@@ -36,7 +36,8 @@
         "armv6l-unknown-linux-gnueabihf"
         "armv7l-unknown-linux-gnueabihf"
         "riscv64-unknown-linux-gnu"
-        "x86_64-unknown-netbsd"
+        # Disabled because of https://github.com/NixOS/nixpkgs/issues/344423
+        # "x86_64-unknown-netbsd"
         "x86_64-unknown-freebsd"
         "x86_64-w64-mingw32"
       ];
@@ -163,7 +164,6 @@
             if prev.stdenv.hostPlatform.system == "i686-linux"
             then (prev.pre-commit.override (o: { dotnet-sdk = ""; })).overridePythonAttrs (o: { doCheck = false; })
             else prev.pre-commit;
-
         };
 
     in {
