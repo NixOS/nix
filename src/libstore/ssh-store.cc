@@ -52,6 +52,9 @@ public:
         return *uriSchemes().begin() + "://" + host;
     }
 
+    bool uriIsUsefulProvenance() override
+    { return true; }
+
     // FIXME extend daemon protocol, move implementation to RemoteStore
     std::optional<std::string> getBuildLogExact(const StorePath & path) override
     { unsupported("getBuildLogExact"); }

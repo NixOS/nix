@@ -75,6 +75,8 @@ struct SourceAccessor;
 class NarInfoDiskCache;
 class Store;
 
+struct Provenance;
+
 
 typedef std::map<std::string, StorePath> OutputPathMap;
 
@@ -221,6 +223,13 @@ public:
      * those to recover the scheme and authority in all cases.
      */
     virtual std::string getUri() = 0;
+
+    /**
+     * Whether, when copying *from* this store, a "copied" provenance
+     * record should be added.
+     */
+    virtual bool uriIsUsefulProvenance()
+    { return false; }
 
     /**
      * Follow symlinks until we end up with a path in the Nix store.
@@ -445,7 +454,8 @@ public:
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
         PathFilter & filter = defaultPathFilter,
-        RepairFlag repair = NoRepair);
+        RepairFlag repair = NoRepair,
+        std::shared_ptr<const Provenance> provenance = nullptr);
 
     /**
      * Copy the contents of a path to the store and register the
@@ -484,7 +494,8 @@ public:
         ContentAddressMethod hashMethod = ContentAddressMethod::Raw::NixArchive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
-        RepairFlag repair = NoRepair) = 0;
+        RepairFlag repair = NoRepair,
+        std::shared_ptr<const Provenance> provenance = nullptr) = 0;
 
     /**
      * Add a mapping indicating that `deriver!outputName` maps to the output path
