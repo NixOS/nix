@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <cassert>
 #include <future>
 #include <functional>
 
