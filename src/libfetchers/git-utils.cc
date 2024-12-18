@@ -669,31 +669,24 @@ struct GitSourceAccessor : SourceAccessor
 {
     ref<GitRepoImpl> repo;
     Object root;
-    std::optional<lfs::Fetch> lfsFetch;
+    std::optional<lfs::Fetch> lfsFetch = std::nullopt;
 
-    GitSourceAccessor(ref<GitRepoImpl> repo_, const Hash & rev, std::optional<lfs::Fetch> lfsFetch)
+    GitSourceAccessor(ref<GitRepoImpl> repo_, const Hash & rev, bool smudgeLfs)
         : repo(repo_)
         , root(peelToTreeOrBlob(lookupObject(*repo, hashToOID(rev)).get()))
-        , lfsFetch(lfsFetch)
     {
-        if (lfsFetch && !lookup(CanonPath(".gitattributes"))) {
-            warn("Requested to fetch lfs files, but no .gitattributes file was found, ignoring");
-        }
+        if (smudgeLfs)
+            lfsFetch = std::make_optional(lfs::Fetch(*repo, hashToOID(rev)));
     }
 
     std::string readBlob(const CanonPath & path, bool symlink)
     {
         const auto blob = getBlob(path, symlink);
 
-        if (lfsFetch && path != CanonPath(".gitattributes") && lookup(CanonPath(".gitattributes"))) {
+        if (lfsFetch) {
             auto& _lfsFetch = *lfsFetch;
-            if (!_lfsFetch.ready) {
-                const auto contents = readFile(CanonPath(".gitattributes"));
-                _lfsFetch.init(*repo, contents);
-            }
-
             auto pathStr = std::string(path.rel());
-            if (_lfsFetch.hasAttribute(pathStr, "filter", "lfs")) {
+            if (_lfsFetch.shouldFetch(pathStr)) {
                 StringSink s;
                 try {
                     _lfsFetch.fetch(blob.get(), pathStr, s, [&s](uint64_t size){ s.s.reserve(size); });
@@ -714,15 +707,10 @@ struct GitSourceAccessor : SourceAccessor
         std::function<void(uint64_t)> sizeCallback = [](uint64_t size){}) override {
         auto blob = getBlob(path, false);
 
-        if (lfsFetch && path != CanonPath(".gitattributes") && lookup(CanonPath(".gitattributes"))) {
+        if (lfsFetch) {
             auto& _lfsFetch = *lfsFetch;
-            if (!_lfsFetch.ready) {
-                const auto contents = readFile(CanonPath(".gitattributes"));
-                _lfsFetch.init(*repo, contents);
-            }
-
             auto pathStr = std::string(path.rel());
-            if (_lfsFetch.hasAttribute(pathStr, "filter", "lfs")) {
+            if (_lfsFetch.shouldFetch(pathStr)) {
                 try {
                     _lfsFetch.fetch(blob.get(), pathStr, sink, sizeCallback);
                 } catch (Error &e) {
@@ -730,6 +718,8 @@ struct GitSourceAccessor : SourceAccessor
                     throw;
                 }
                 return;
+            } else {
+                debug("Skip git-lfs, not matching .gitattributes patterns: %s", pathStr);
             }
         }
 
@@ -1246,13 +1236,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev, bool smudgeLfs)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
-    if (smudgeLfs) {
-        auto lfsFetch = lfs::Fetch{};
-        return make_ref<GitSourceAccessor>(self, rev, std::make_optional(lfsFetch));
-    }
-    else {
-        return make_ref<GitSourceAccessor>(self, rev, std::nullopt);
-    }
+    return make_ref<GitSourceAccessor>(self, rev, smudgeLfs);
 }
 
 ref<SourceAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore, bool smudgeLfs)

@@ -21,51 +21,6 @@ namespace fs = std::filesystem;
 namespace nix {
 namespace lfs {
 
-// see Fetch::rules
-struct AttrRule
-{
-    std::string pattern;
-    std::unordered_map<std::string, std::string> attributes;
-    git_pathspec * pathspec = nullptr;
-
-    AttrRule() = default;
-
-    explicit AttrRule(std::string pat)
-        : pattern(std::move(pat))
-    {
-        initPathspec();
-    }
-
-    ~AttrRule()
-    {
-        if (pathspec) {
-            git_pathspec_free(pathspec);
-        }
-    }
-
-    AttrRule(const AttrRule & other)
-        : pattern(other.pattern)
-        , attributes(other.attributes)
-        , pathspec(nullptr)
-    {
-        if (!pattern.empty()) {
-            initPathspec();
-        }
-    }
-
-    void initPathspec()
-    {
-        git_strarray patterns = {0};
-        const char * pattern_str = pattern.c_str();
-        patterns.strings = const_cast<char **>(&pattern_str);
-        patterns.count = 1;
-
-        if (git_pathspec_new(&pathspec, &patterns) != 0) {
-            throw std::runtime_error("Failed to create git pathspec");
-        }
-    }
-};
-
 // git-lfs metadata about a file
 struct Md
 {
@@ -105,8 +60,11 @@ struct GitUrl
 
 struct Fetch
 {
-    // only true after init()
-    bool ready = false;
+    // Reference to the repository
+    git_repository const * repo;
+
+    // Git commit being fetched
+    git_oid rev;
 
     // from shelling out to ssh, used  for 2 subsequent fetches:
     // list of URLs to fetch from, and fetching the data itself
@@ -115,13 +73,8 @@ struct Fetch
     // derived from git remote url
     GitUrl gitUrl = GitUrl{};
 
-    // parsed contents of .gitattributes
-    // .gitattributes contains a list of path patterns, and list of attributes (=key-value tags) for each pattern
-    // paths tagged with `filter=lfs` need to be smudged by downloading from lfs server
-    std::vector<AttrRule> rules = {};
-
-    void init(git_repository * repo, const std::string & gitattributesContent);
-    bool hasAttribute(const std::string & path, const std::string & attrName, const std::string & attrValue) const;
+    Fetch(git_repository * repo, git_oid rev);
+    bool shouldFetch(const std::string & path) const;
     void fetch(
         const git_blob * pointerBlob,
         const std::string & pointerFilePath,
@@ -240,22 +193,6 @@ std::string getLfsEndpointUrl(git_repository * repo)
     return std::string(url_c_str);
 }
 
-std::string git_attr_value_to_string(git_attr_value_t value)
-{
-    switch (value) {
-    case GIT_ATTR_VALUE_UNSPECIFIED:
-        return "GIT_ATTR_VALUE_UNSPECIFIED";
-    case GIT_ATTR_VALUE_TRUE:
-        return "GIT_ATTR_VALUE_TRUE";
-    case GIT_ATTR_VALUE_FALSE:
-        return "GIT_ATTR_VALUE_FALSE";
-    case GIT_ATTR_VALUE_STRING:
-        return "GIT_ATTR_VALUE_STRING";
-    default:
-        return "Unknown value";
-    }
-}
-
 std::optional<Md> parseLfsMetadata(const std::string & content, const std::string & filename)
 {
     // https://github.com/git-lfs/git-lfs/blob/2ef4108/docs/spec.md
@@ -343,115 +280,29 @@ GitUrl parseGitUrl(const std::string & url)
     return result;
 }
 
-std::vector<AttrRule> parseGitAttrFile(const std::string & content)
+Fetch::Fetch(git_repository * repo, git_oid rev)
 {
-    std::vector<AttrRule> rules;
-    std::string content_str(content);
-    std::istringstream iss(content_str);
-    std::string line;
+    this->repo = repo;
+    this->rev = rev;
 
-    while (std::getline(iss, line)) {
-        if (line.empty() || line[0] == '#')
-            continue;
-
-        if (!line.empty() && line.back() == '\r')
-            line.pop_back();
-
-        size_t pattern_end = line.find_first_of(" \t"); // matches space OR tab
-        if (pattern_end == std::string::npos)
-            continue;
-
-        AttrRule rule;
-        rule.pattern = line.substr(0, pattern_end);
-        // Workaround for libgit2 matching issues when the pattern starts with a recursive glob
-        // These should effectively match the same files
-        // https://github.com/libgit2/libgit2/issues/6946
-        if (rule.pattern.starts_with("/**/")) {
-            rule.pattern = rule.pattern.substr(4);
-        }
-        while (rule.pattern.starts_with("**/")) {
-            rule.pattern = rule.pattern.substr(3);
-        }
-
-        git_strarray patterns = {0};
-        const char * pattern_str = rule.pattern.c_str();
-        patterns.strings = const_cast<char **>(&pattern_str);
-        patterns.count = 1;
-
-        if (git_pathspec_new(&rule.pathspec, &patterns) != 0) {
-            auto error = git_error_last();
-            std::stringstream ss;
-            ss << "git_pathspec_new parsing '" << line << "': " << (error ? error->message : "unknown error")
-               << std::endl;
-            warn(ss.str());
-            continue;
-        }
-
-        size_t attr_start = line.find_first_not_of(" \t", pattern_end);
-        if (attr_start != std::string::npos) {
-            std::string_view rest(line);
-            rest.remove_prefix(attr_start);
-
-            while (!rest.empty()) {
-                size_t attr_end = rest.find_first_of(" \t");
-                std::string_view attr = rest.substr(0, attr_end);
-
-                if (attr[0] == '-') {
-                    rule.attributes[std::string(attr.substr(1))] = "false";
-                } else if (auto equals_pos = attr.find('='); equals_pos != std::string_view::npos) {
-                    auto key = attr.substr(0, equals_pos);
-                    auto value = attr.substr(equals_pos + 1);
-                    rule.attributes[std::string(key)] = std::string(value);
-                } else {
-                    rule.attributes[std::string(attr)] = "true";
-                }
-
-                if (attr_end == std::string_view::npos)
-                    break;
-
-                rest = rest.substr(attr_end);
-                size_t next_attr = rest.find_first_not_of(" \t");
-                if (next_attr == std::string_view::npos)
-                    break;
-                rest = rest.substr(next_attr);
-            }
-        }
-
-        rules.push_back(std::move(rule));
-    }
-
-    return rules;
-}
-
-void Fetch::init(git_repository * repo, const std::string & gitattributesContent)
-{
     const auto remoteUrl = lfs::getLfsEndpointUrl(repo);
 
     this->gitUrl = parseGitUrl(remoteUrl);
     if (this->gitUrl.protocol == "ssh") {
         this->token = lfs::getLfsApiToken(this->gitUrl);
     }
-    this->rules = lfs::parseGitAttrFile(gitattributesContent);
-    this->ready = true;
 }
 
-bool Fetch::hasAttribute(const std::string & path, const std::string & attrName, const std::string & attrValue) const
+bool Fetch::shouldFetch(const std::string & path) const
 {
-    for (auto it = rules.rbegin(); it != rules.rend(); ++it) {
-        int match = git_pathspec_matches_path(
-            it->pathspec,
-            0, // no flags
-            path.c_str());
-
-        if (match > 0) {
-            auto attr = it->attributes.find(attrName);
-            if (attr != it->attributes.end()) {
-                return attr->second == attrValue;
-            } else {
-            }
-        }
-    }
-    return false;
+    const char * attr = nullptr;
+    git_attr_options opts = GIT_ATTR_OPTIONS_INIT;
+    opts.attr_commit_id = this->rev;
+    opts.flags = GIT_ATTR_CHECK_INCLUDE_COMMIT | GIT_ATTR_CHECK_NO_SYSTEM;
+    if (git_attr_get_ext(&attr, (git_repository *) (this->repo), &opts, path.c_str(), "filter"))
+        throw Error("cannot get git-lfs attribute: %s", git_error_last()->message);
+    debug("Git filter for %s is %s", path, attr ? attr : "null");
+    return attr != nullptr && !std::string(attr).compare("lfs");
 }
 
 nlohmann::json mdToPayload(const std::vector<Md> & items)
@@ -532,6 +383,7 @@ void Fetch::fetch(
     Sink & sink,
     std::function<void(uint64_t)> sizeCallback) const
 {
+    debug("Trying to fetch %s using git-lfs", pointerFilePath);
     constexpr git_object_size_t chunkSize = 128 * 1024; // 128 KiB
     auto pointerSize = git_blob_rawsize(pointerBlob);
 
@@ -575,6 +427,7 @@ void Fetch::fetch(
         const uint64_t size = obj.at("size");
         sizeCallback(size);
         downloadToSink(ourl, authHeader, sink, oid); // oid is also the sha256
+        debug("%s fetched with git-lfs", pointerFilePath);
     } catch (const nlohmann::json::out_of_range & e) {
         std::stringstream ss;
         ss << "bad json from /info/lfs/objects/batch: " << obj << " " << e.what();
