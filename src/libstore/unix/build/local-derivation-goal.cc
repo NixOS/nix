@@ -932,6 +932,7 @@ void LocalDerivationGoal::startBuilder()
     };
 
     buildResult.startTime = time(0);
+    startTime = std::chrono::steady_clock::now();
 
     /* Fork a child to build the package. */
 
