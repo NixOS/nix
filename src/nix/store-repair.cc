@@ -19,8 +19,32 @@ struct CmdStoreRepair : StorePathsCommand
 
     void run(ref<Store> store, StorePaths && storePaths) override
     {
+        size_t errors = 0;
+
+        // Remove duplicates.
+        StorePathSet storePathsSet;
         for (auto & path : storePaths)
-            store->repairPath(path);
+            storePathsSet.insert(path);
+
+        for (auto & path : storePathsSet) {
+            try {
+                store->repairPath(path);
+            } catch (Error & e) {
+                // RepairFailure already has the path in the error message, so we omit the redundant trace.
+                if (!dynamic_cast<RepairFailure *>(&e))
+                    e.addTrace({}, "while repairing path '%s'", store->printStorePath(path));
+
+                if (settings.keepGoing) {
+                    errors++;
+                    ignoreExceptionExceptInterrupt();
+                }
+                else
+                    throw;
+            }
+        }
+
+        if (errors)
+            throw Error("could not repair %d store paths", errors);
     }
 };
 

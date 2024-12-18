@@ -145,7 +145,7 @@ void Store::repairPath(const StorePath & path)
             }, bmRepair));
             worker.run(goals);
         } else
-            throw Error(worker.failingExitStatus(), "cannot repair path '%s'", printStorePath(path));
+            throw RepairFailure(worker.failingExitStatus(), "cannot repair path '%s'", printStorePath(path));
     }
 }
 
