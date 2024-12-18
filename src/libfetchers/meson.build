@@ -32,6 +32,9 @@ deps_public += nlohmann_json
 libgit2 = dependency('libgit2')
 deps_private += libgit2
 
+curl = dependency('libcurl', 'curl')
+deps_private += curl
+
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
@@ -72,6 +75,7 @@ headers = files(
   'fetchers.hh',
   'filtering-source-accessor.hh',
   'git-utils.hh',
+  'git-lfs-fetch.hh',
   'mounted-source-accessor.hh',
   'registry.hh',
   'store-path-accessor.hh',
