@@ -56,6 +56,9 @@ readonly NIX_INSTALLED_CACERT="@cacert@"
 #readonly NIX_INSTALLED_CACERT="/nix/store/7dxhzymvy330i28ii676fl1pqwcahv2f-nss-cacert-3.49.2"
 readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
 
+# allow to override identity change command
+readonly NIX_BECOME=${NIX_BECOME:-sudo}
+
 readonly ROOT_HOME=~root
 
 if [ -t 0 ] && [ -z "${NIX_INSTALLER_YES:-}" ]; then
@@ -123,7 +126,7 @@ uninstall_directions() {
             cat <<EOF
 $step. Restore $profile_target$PROFILE_BACKUP_SUFFIX back to $profile_target
 
-  sudo mv $profile_target$PROFILE_BACKUP_SUFFIX $profile_target
+  $NIX_BECOME mv $profile_target$PROFILE_BACKUP_SUFFIX $profile_target
 
 (after this one, you may need to re-open any terminals that were
 opened while it existed.)
@@ -136,7 +139,7 @@ EOF
     cat <<EOF
 $step. Delete the files Nix added to your system:
 
-  sudo rm -rf "/etc/nix" "$NIX_ROOT" "$ROOT_HOME/.nix-profile" "$ROOT_HOME/.nix-defexpr" "$ROOT_HOME/.nix-channels" "$ROOT_HOME/.local/state/nix" "$ROOT_HOME/.cache/nix" "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels" "$HOME/.local/state/nix" "$HOME/.cache/nix"
+  $NIX_BECOME rm -rf "/etc/nix" "$NIX_ROOT" "$ROOT_HOME/.nix-profile" "$ROOT_HOME/.nix-defexpr" "$ROOT_HOME/.nix-channels" "$ROOT_HOME/.local/state/nix" "$ROOT_HOME/.cache/nix" "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels" "$HOME/.local/state/nix" "$HOME/.cache/nix"
 
 and that is it.
 
@@ -343,7 +346,7 @@ __sudo() {
 
     echo "I am executing:"
     echo ""
-    printf "    $ sudo %s\\n" "$cmd"
+    printf "    $ $NIX_BECOME %s\\n" "$cmd"
     echo ""
     echo "$expl"
     echo ""
@@ -361,7 +364,9 @@ _sudo() {
     if is_root; then
         env "$@"
     else
-        sudo "$@"
+        # env sets environment variables for sudo alternatives
+        # that don't support "VAR=value command" syntax
+        $NIX_BECOME env "$@"
     fi
 }
 
@@ -690,7 +695,7 @@ place_channel_configuration() {
     if [ -z "${NIX_INSTALLER_NO_CHANNEL_ADD:-}" ]; then
         echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$SCRATCH/.nix-channels"
         _sudo "to set up the default system channel (part 1)" \
-            install -m 0664 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
+            install -m 0644 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
     fi
 }
 
@@ -964,7 +969,7 @@ $NIX_EXTRA_CONF
 build-users-group = $NIX_BUILD_GROUP_NAME
 EOF
     _sudo "to place the default nix daemon configuration (part 2)" \
-          install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
+          install -m 0644 "$SCRATCH/nix.conf" /etc/nix/nix.conf
 }
 
 

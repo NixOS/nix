@@ -46,6 +46,11 @@ struct Input
      */
     std::optional<Path> parent;
 
+    /**
+     * Cached result of getFingerprint().
+     */
+    mutable std::optional<std::optional<std::string>> cachedFingerprint;
+
 public:
     /**
      * Create an `Input` from a URL.
@@ -103,6 +108,11 @@ public:
     bool isFinal() const;
 
     bool operator ==(const Input & other) const noexcept;
+
+    bool operator <(const Input & other) const
+    {
+        return attrs < other.attrs;
+    }
 
     bool contains(const Input & other) const;
 

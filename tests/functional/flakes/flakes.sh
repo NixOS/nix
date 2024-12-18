@@ -77,6 +77,7 @@ hash1=$(echo "$json" | jq -r .revision)
 echo foo > "$flake1Dir/foo"
 git -C "$flake1Dir" add $flake1Dir/foo
 [[ $(nix flake metadata flake1 --json --refresh | jq -r .dirtyRevision) == "$hash1-dirty" ]]
+[[ "$(nix flake metadata flake1 --json | jq -r .fingerprint)" != null ]]
 
 echo -n '# foo' >> "$flake1Dir/flake.nix"
 flake1OriginalCommit=$(git -C "$flake1Dir" rev-parse HEAD)

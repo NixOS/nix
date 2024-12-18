@@ -119,11 +119,9 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     if (store != buildStore) copyClosure(*buildStore, *store, outputsToCopyAndAllow);
 
     if (isIFD) {
-        for (auto & outputPath : outputsToCopyAndAllow) {
-            /* Add the output of this derivations to the allowed
-            paths. */
-            allowPath(outputPath);
-        }
+        /* Allow access to the output closures of this derivation. */
+        for (auto & outputPath : outputsToCopyAndAllow)
+            allowClosure(outputPath);
     }
 
     return res;
@@ -1100,7 +1098,7 @@ static RegisterPrimOp primop_warn({
     .name = "__warn",
     .args = {"e1", "e2"},
     .doc = R"(
-      Evaluate *e1*, which must be a string and print iton standard error as a warning.
+      Evaluate *e1*, which must be a string, and print it on standard error as a warning.
       Then return *e2*.
       This function is useful for non-critical situations where attention is advisable.
 
@@ -3259,23 +3257,19 @@ static RegisterPrimOp primop_isList({
     .fun = prim_isList,
 });
 
-static void elemAt(EvalState & state, const PosIdx pos, Value & list, int n, Value & v)
-{
-    state.forceList(list, pos, "while evaluating the first argument passed to builtins.elemAt");
-    if (n < 0 || (unsigned int) n >= list.listSize())
-        state.error<EvalError>(
-            "list index %1% is out of bounds",
-            n
-        ).atPos(pos).debugThrow();
-    state.forceValue(*list.listElems()[n], pos);
-    v = *list.listElems()[n];
-}
-
 /* Return the n-1'th element of a list. */
 static void prim_elemAt(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    NixInt::Inner elem = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.elemAt").value;
-    elemAt(state, pos, *args[0], elem, v);
+    NixInt::Inner n = state.forceInt(*args[1], pos, "while evaluating the second argument passed to 'builtins.elemAt'").value;
+    state.forceList(*args[0], pos, "while evaluating the first argument passed to 'builtins.elemAt'");
+    if (n < 0 || (unsigned int) n >= args[0]->listSize())
+        state.error<EvalError>(
+            "'builtins.elemAt' called with index %d on a list of size %d",
+            n,
+            args[0]->listSize()
+        ).atPos(pos).debugThrow();
+    state.forceValue(*args[0]->listElems()[n], pos);
+    v = *args[0]->listElems()[n];
 }
 
 static RegisterPrimOp primop_elemAt({
@@ -3291,7 +3285,13 @@ static RegisterPrimOp primop_elemAt({
 /* Return the first element of a list. */
 static void prim_head(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    elemAt(state, pos, *args[0], 0, v);
+    state.forceList(*args[0], pos, "while evaluating the first argument passed to 'builtins.head'");
+    if (args[0]->listSize() == 0)
+        state.error<EvalError>(
+            "'builtins.head' called on an empty list"
+        ).atPos(pos).debugThrow();
+    state.forceValue(*args[0]->listElems()[0], pos);
+    v = *args[0]->listElems()[0];
 }
 
 static RegisterPrimOp primop_head({
@@ -3310,9 +3310,9 @@ static RegisterPrimOp primop_head({
    don't want to use it!  */
 static void prim_tail(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.tail");
+    state.forceList(*args[0], pos, "while evaluating the first argument passed to 'builtins.tail'");
     if (args[0]->listSize() == 0)
-        state.error<EvalError>("'tail' called on an empty list").atPos(pos).debugThrow();
+        state.error<EvalError>("'builtins.tail' called on an empty list").atPos(pos).debugThrow();
 
     auto list = state.buildList(args[0]->listSize() - 1);
     for (const auto & [n, v] : enumerate(list))

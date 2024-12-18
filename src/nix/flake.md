@@ -165,7 +165,8 @@ can occur in *locked* flake references and are available to Nix code:
 
 Currently the `type` attribute can be one of the following:
 
-* `indirect`: *The default*. Indirection through the flake registry.
+* `indirect`: *The default*. These are symbolic references to flakes
+  that are looked up in [the flake registries](./nix3-registry.md).
   These have the form
 
   ```
@@ -653,7 +654,7 @@ following fields:
 * `inputs`: The dependencies of this node, as a mapping from input
   names (e.g. `nixpkgs`) to node labels (e.g. `n2`).
 
-* `original`: The original input specification from `flake.lock`, as a
+* `original`: The original input specification from `flake.nix`, as a
   set of `builtins.fetchTree` arguments.
 
 * `locked`: The locked input specification, as a set of

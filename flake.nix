@@ -186,7 +186,7 @@
       };
 
       checks = forAllSystems (system: {
-        binaryTarball = self.hydraJobs.binaryTarball.${system};
+        installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
         rl-next =
@@ -201,11 +201,7 @@
         # Some perl dependencies are broken on i686-linux.
         # Since the support is only best-effort there, disable the perl
         # bindings
-
-        # Temporarily disabled because GitHub Actions OOM issues. Once
-        # the old build system is gone and we are back to one build
-        # system, we should reenable this.
-        #perlBindings = self.hydraJobs.perlBindings.${system};
+        perlBindings = self.hydraJobs.perlBindings.${system};
       }
       # Add "passthru" tests
       // flatMapAttrs ({
@@ -237,6 +233,8 @@
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
           default = self.packages.${system}.nix;
+          installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
+          binaryTarball = self.hydraJobs.binaryTarball.${system};
           # TODO probably should be `nix-cli`
           nix = self.packages.${system}.nix-everything;
           nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
