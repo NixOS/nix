@@ -113,7 +113,15 @@ Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
 
 std::optional<std::string> Input::getFingerprint(ref<Store> store) const
 {
-    return scheme ? scheme->getFingerprint(store, *this) : std::nullopt;
+    if (!scheme) return std::nullopt;
+
+    if (cachedFingerprint) return *cachedFingerprint;
+
+    auto fingerprint = scheme->getFingerprint(store, *this);
+
+    cachedFingerprint = fingerprint;
+
+    return fingerprint;
 }
 
 ParsedURL Input::toURL() const
@@ -313,7 +321,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
             auto accessor = makeStorePathAccessor(store, storePath);
 
-            accessor->fingerprint = scheme->getFingerprint(store, *this);
+            accessor->fingerprint = getFingerprint(store);
 
             return {accessor, *this};
         } catch (Error & e) {
@@ -324,7 +332,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
     auto [accessor, result] = scheme->getAccessor(store, *this);
 
     assert(!accessor->fingerprint);
-    accessor->fingerprint = scheme->getFingerprint(store, result);
+    accessor->fingerprint = result.getFingerprint(store);
 
     return {accessor, std::move(result)};
 }

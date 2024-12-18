@@ -94,7 +94,7 @@ public:
             .label="inputs",
             .optional=true,
             .handler={[&](std::vector<std::string> inputsToUpdate){
-                for (auto inputToUpdate : inputsToUpdate) {
+                for (const auto & inputToUpdate : inputsToUpdate) {
                     InputPath inputPath;
                     try {
                         inputPath = flake::parseInputPath(inputToUpdate);
@@ -162,6 +162,7 @@ struct CmdFlakeLock : FlakeCommand
         settings.tarballTtl = 0;
 
         lockFlags.writeLockFile = true;
+        lockFlags.failOnUnlocked = true;
         lockFlags.applyNixConfig = true;
 
         lockFlake();
@@ -643,10 +644,11 @@ struct CmdFlakeCheck : FlakeCommand
                                             fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
                                             *attr2.value, attr2.pos);
                                         if (drvPath && attr_name == settings.thisSystem.get()) {
-                                            drvPaths.push_back(DerivedPath::Built {
+                                            auto path = DerivedPath::Built {
                                                 .drvPath = makeConstantStorePathRef(*drvPath),
                                                 .outputs = OutputsSpec::All { },
-                                            });
+                                            };
+                                            drvPaths.push_back(std::move(path));
                                         }
                                     }
                                 }
@@ -936,7 +938,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                         }
                         continue;
                     } else
-                        fs::create_symlink(target, to2);
+                        createSymlink(target, to2);
                 }
                 else
                     throw Error("file '%s' has unsupported type", from2);

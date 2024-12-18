@@ -194,6 +194,19 @@ protected:
         }
     }
 
+    std::optional<std::string> getNixCacheInfo() override
+    {
+        try {
+            auto result = getFileTransfer()->download(makeRequest(cacheInfoFile));
+            return result.data;
+        } catch (FileTransferError & e) {
+            if (e.error == FileTransfer::NotFound)
+                return std::nullopt;
+            maybeDisable();
+            throw;
+        }
+    }
+
     /**
      * This isn't actually necessary read only. We support "upsert" now, so we
      * have a notion of authentication via HTTP POST/PUT.

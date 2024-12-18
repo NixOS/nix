@@ -165,7 +165,8 @@ can occur in *locked* flake references and are available to Nix code:
 
 Currently the `type` attribute can be one of the following:
 
-* `indirect`: *The default*. Indirection through the flake registry.
+* `indirect`: *The default*. These are symbolic references to flakes
+  that are looked up in [the flake registries](./nix3-registry.md).
   These have the form
 
   ```
@@ -256,6 +257,9 @@ Currently the `type` attribute can be one of the following:
   * `./sub/dir` (when used on the command line and `dir/flake.nix` is in a git repository)
   * `git+https://example.org/my/repo`
   * `git+https://example.org/my/repo?dir=flake1`
+  * `git+https://example.org/my/repo?shallow=1` A shallow clone of the repository.
+     For large repositories, the shallow clone option can significantly speed up fresh clones compared
+     to non-shallow clones, while still providing faster updates than other fetch methods such as `tarball:` or `github:`.
   * `git+ssh://git@github.com/NixOS/nix?ref=v1.2.3`
   * `git://github.com/edolstra/dwarffs?ref=unstable&rev=e486d8d40e626a20e06d792db8cc5ac5aba9a5b4`
   * `git+file:///home/my-user/some-repo/some-repo`
@@ -661,7 +665,7 @@ following fields:
 * `inputs`: The dependencies of this node, as a mapping from input
   names (e.g. `nixpkgs`) to node labels (e.g. `n2`).
 
-* `original`: The original input specification from `flake.lock`, as a
+* `original`: The original input specification from `flake.nix`, as a
   set of `builtins.fetchTree` arguments.
 
 * `locked`: The locked input specification, as a set of

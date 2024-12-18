@@ -50,6 +50,7 @@ class JSONSax : nlohmann::json_sax<json> {
     public:
         void key(string_t & name, EvalState & state)
         {
+            forceNoNullByte(name);
             attrs.insert_or_assign(state.symbols.create(name), &value(state));
         }
     };
@@ -122,6 +123,7 @@ public:
 
     bool string(string_t & val) override
     {
+        forceNoNullByte(val);
         rs->value(state).mkString(val);
         rs->add();
         return true;

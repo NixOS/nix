@@ -7,6 +7,7 @@ source common.sh
 TODO_NixOS
 
 requireSandboxSupport
+requiresUnprivilegedUserNamespaces
 
 start="$TEST_ROOT/start"
 mkdir -p "$start"

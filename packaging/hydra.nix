@@ -18,12 +18,8 @@ let
 
   testNixVersions = pkgs: daemon:
     pkgs.nixComponents.nix-functional-tests.override {
-      pname =
-        "nix-tests"
-        + lib.optionalString
-          (lib.versionAtLeast daemon.version "2.4pre20211005" &&
-           lib.versionAtLeast pkgs.nix.version "2.4pre20211005")
-          "-${pkgs.nix.version}-against-${daemon.version}";
+      pname = "nix-daemon-compat-tests";
+      version = "${pkgs.nix.version}-with-daemon-${daemon.version}";
 
       test-daemon = daemon;
     };
@@ -127,15 +123,10 @@ in
     self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
     self.hydraJobs.binaryTarballCross."x86_64-linux"."riscv64-unknown-linux-gnu"
   ];
-  installerScriptForGHA = installScriptFor [
-    # Native
-    self.hydraJobs.binaryTarball."x86_64-linux"
-    self.hydraJobs.binaryTarball."aarch64-darwin"
-    # Cross
-    self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
-    self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
-    self.hydraJobs.binaryTarballCross."x86_64-linux"."riscv64-unknown-linux-gnu"
-  ];
+
+  installerScriptForGHA = forAllSystems (system: nixpkgsFor.${system}.native.callPackage ../scripts/installer.nix {
+    tarballs = [ self.hydraJobs.binaryTarball.${system} ];
+  });
 
   # docker image with Nix inside
   dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);

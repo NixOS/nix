@@ -13,14 +13,9 @@ void Store::exportPaths(const StorePathSet & paths, Sink & sink)
     auto sorted = topoSortPaths(paths);
     std::reverse(sorted.begin(), sorted.end());
 
-    std::string doneLabel("paths exported");
-    //logger->incExpected(doneLabel, sorted.size());
-
     for (auto & path : sorted) {
-        //Activity act(*logger, lvlInfo, "exporting path '%s'", path);
         sink << 1;
         exportPath(path, sink);
-        //logger->incProgress(doneLabel);
     }
 
     sink << 0;

@@ -14,6 +14,7 @@
 #include "error.hh"
 #include "logging.hh"
 #include "ansicolor.hh"
+#include "signals.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

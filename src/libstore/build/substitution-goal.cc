@@ -57,7 +57,7 @@ Goal::Co PathSubstitutionGoal::init()
 
     bool substituterFailed = false;
 
-    for (auto sub : subs) {
+    for (const auto & sub : subs) {
         trace("trying next substituter");
 
         cleanup();

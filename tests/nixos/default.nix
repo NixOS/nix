@@ -23,6 +23,9 @@ let
         nix.checkAllErrors = false;
         # TODO: decide which packaging stage to use. `nix-cli` is efficient, but not the same as the user-facing `everything.nix` package (`default`). Perhaps a good compromise is `everything.nix` + `noTests` defined above?
         nix.package = nixpkgsFor.${system}.native.nixComponents.nix-cli;
+
+        # Evaluate VMs faster
+        documentation.enable = false;
       };
       _module.args.nixpkgs = nixpkgs;
       _module.args.system = system;

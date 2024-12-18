@@ -124,18 +124,36 @@
           # without "polluting" the top level "`pkgs`" attrset.
           # This also has the benefit of providing us with a distinct set of packages
           # we can iterate over.
-          nixComponents = lib.makeScope final.nixDependencies.newScope (import ./packaging/components.nix {
-            inherit (final) lib;
-            inherit officialRelease;
-            src = self;
-          });
+          nixComponents =
+            lib.makeScopeWithSplicing'
+              {
+                inherit (final) splicePackages;
+                inherit (final.nixDependencies) newScope;
+              }
+              {
+                otherSplices = final.generateSplicesForMkScope "nixComponents";
+                f = import ./packaging/components.nix {
+                  inherit (final) lib;
+                  inherit officialRelease;
+                  src = self;
+                };
+              };
 
           # The dependencies are in their own scope, so that they don't have to be
           # in Nixpkgs top level `pkgs` or `nixComponents`.
-          nixDependencies = lib.makeScope final.newScope (import ./packaging/dependencies.nix {
-            inherit inputs stdenv;
-            pkgs = final;
-          });
+          nixDependencies =
+            lib.makeScopeWithSplicing'
+              {
+                inherit (final) splicePackages;
+                inherit (final) newScope; # layered directly on pkgs, unlike nixComponents above
+              }
+              {
+                otherSplices = final.generateSplicesForMkScope "nixDependencies";
+                f = import ./packaging/dependencies.nix {
+                  inherit inputs stdenv;
+                  pkgs = final;
+                };
+              };
 
           nix = final.nixComponents.nix-cli;
 
@@ -168,7 +186,7 @@
       };
 
       checks = forAllSystems (system: {
-        binaryTarball = self.hydraJobs.binaryTarball.${system};
+        installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
         rl-next =
@@ -183,11 +201,7 @@
         # Some perl dependencies are broken on i686-linux.
         # Since the support is only best-effort there, disable the perl
         # bindings
-
-        # Temporarily disabled because GitHub Actions OOM issues. Once
-        # the old build system is gone and we are back to one build
-        # system, we should reenable this.
-        #perlBindings = self.hydraJobs.perlBindings.${system};
+        perlBindings = self.hydraJobs.perlBindings.${system};
       }
       # Add "passthru" tests
       // flatMapAttrs ({
@@ -219,6 +233,8 @@
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
           default = self.packages.${system}.nix;
+          installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
+          binaryTarball = self.hydraJobs.binaryTarball.${system};
           # TODO probably should be `nix-cli`
           nix = self.packages.${system}.nix-everything;
           nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;

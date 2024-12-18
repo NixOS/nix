@@ -12,6 +12,8 @@
       hooks = {
         clang-format = {
           enable = true;
+          # https://github.com/cachix/git-hooks.nix/pull/532
+          package = pkgs.llvmPackages_latest.clang-tools;
           excludes = [
             # We don't want to format test data
             # ''tests/(?!nixos/).*\.nix''
@@ -496,7 +498,6 @@
             ''^scripts/create-darwin-volume\.sh$''
             ''^scripts/install-darwin-multi-user\.sh$''
             ''^scripts/install-multi-user\.sh$''
-            ''^scripts/install-nix-from-closure\.sh$''
             ''^scripts/install-systemd-multi-user\.sh$''
             ''^src/nix/get-env\.sh$''
             ''^tests/functional/ca/build-dry\.sh$''
