@@ -10,6 +10,7 @@ let
   env = "AWS_ACCESS_KEY_ID=${accessKey} AWS_SECRET_ACCESS_KEY=${secretKey}";
 
   storeUrl = "s3://my-cache?endpoint=http://server:9000&region=eu-west-1";
+  objectThatDoesNotExist = "s3://my-cache/foo-that-does-not-exist?endpoint=http://server:9000&region=eu-west-1";
 
 in {
   name = "s3-binary-cache-store";
@@ -53,6 +54,12 @@ in {
 
     # Test fetchurl on s3:// URLs while we're at it.
     client.succeed("${env} nix eval --impure --expr 'builtins.fetchurl { name = \"foo\"; url = \"s3://my-cache/nix-cache-info?endpoint=http://server:9000&region=eu-west-1\"; }'")
+
+    # Test that the format string in the error message is properly setup and won't display `%s` instead of the failed URI
+    msg = client.fail("${env} nix eval --impure --expr 'builtins.fetchurl { name = \"foo\"; url = \"${objectThatDoesNotExist}\"; }' 2>&1")
+    if "S3 object '${objectThatDoesNotExist}' does not exist" not in msg:
+      print(msg) # So that you can see the message that was improperly formatted
+      raise Exception("Error message formatting didn't work")
 
     # Copy a package from the binary cache.
     client.fail("nix path-info ${pkgA}")
