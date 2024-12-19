@@ -1007,23 +1007,9 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
     struct Directory
     {
-        #if 0
-        Directory * parent = nullptr; // FIXME: remove
-        std::string name;
-        #endif
         using Child = std::pair<git_filemode_t, std::variant<Directory, git_oid>>;
         std::map<std::string, Child> children;
         std::optional<git_oid> oid;
-
-        #if 0
-        CanonPath toPath() const
-        {
-            if (!parent) return CanonPath::root;
-            auto res = parent->toPath();
-            res.push(name);
-            return res;
-        }
-        #endif
 
         Child & lookup(const CanonPath & path)
         {
@@ -1066,10 +1052,6 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
                     std::string(i),
                     Directory::Child{GIT_FILEMODE_TREE, {Directory()}}).first->second.second);
             assert(child);
-            #if 0
-            child->parent = cur;
-            child->name = i;
-            #endif
             cur = child;
         }
 
