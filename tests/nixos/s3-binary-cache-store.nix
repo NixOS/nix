@@ -21,7 +21,10 @@ in {
         { virtualisation.writableStore = true;
           virtualisation.additionalPaths = [ pkgA ];
           environment.systemPackages = [ pkgs.minio-client ];
-          nix.extraOptions = "experimental-features = nix-command";
+          nix.extraOptions = ''
+            experimental-features = nix-command
+            substituters =
+          '';
           services.minio = {
             enable = true;
             region = "eu-west-1";
@@ -36,7 +39,10 @@ in {
       client =
         { config, pkgs, ... }:
         { virtualisation.writableStore = true;
-          nix.extraOptions = "experimental-features = nix-command";
+          nix.extraOptions = ''
+            experimental-features = nix-command
+            substituters =
+          '';
         };
     };
 
