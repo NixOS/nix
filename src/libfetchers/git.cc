@@ -630,7 +630,7 @@ struct GitInputScheme : InputScheme
                 // everything to ensure we get the rev.
                 Activity act(*logger, lvlTalkative, actUnknown, fmt("making temporary clone of '%s'", repoDir));
                 runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
-                        "--update-head-ok", "--", repoDir, "refs/*:refs/*" }, {}, true);
+                        "--update-head-ok", "--", repoDir, "refs/*:refs/*", input.getRev()->gitRev() }, {}, true);
             }
 
             runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input.getRev()->gitRev() });
