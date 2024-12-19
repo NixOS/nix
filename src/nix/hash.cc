@@ -87,18 +87,35 @@ struct CmdHashBase : Command
                     return std::make_unique<HashSink>(hashAlgo);
             };
 
-            auto path2 = PosixSourceAccessor::createAtRoot(path);
+            auto makeSourcePath = [&]() -> SourcePath {
+                return PosixSourceAccessor::createAtRoot(std::filesystem::weakly_canonical(path));
+            };
+
             Hash h { HashAlgorithm::SHA256 }; // throwaway def to appease C++
             switch (mode) {
             case FileIngestionMethod::Flat:
+            {
+                // While usually we could use the some code as for NixArchive,
+                // the Flat method needs to support FIFOs, such as those
+                // produced by bash process substitution, e.g.:
+                //     nix hash --mode flat <(echo hi)
+                // Also symlinks semantics are unambiguous in the flat case,
+                // so we don't need to go low-level, or reject symlink `path`s.
+                auto hashSink = makeSink();
+                readFile(path, *hashSink);
+                h = hashSink->finish().first;
+                break;
+            }
             case FileIngestionMethod::NixArchive:
             {
+                auto sourcePath = makeSourcePath();
                 auto hashSink = makeSink();
-                dumpPath(path2, *hashSink, (FileSerialisationMethod) mode);
+                dumpPath(sourcePath, *hashSink, (FileSerialisationMethod) mode);
                 h = hashSink->finish().first;
                 break;
             }
             case FileIngestionMethod::Git: {
+                auto sourcePath = PosixSourceAccessor::createAtRoot(path);
                 std::function<git::DumpHook> hook;
                 hook = [&](const SourcePath & path) -> git::TreeEntry {
                     auto hashSink = makeSink();
@@ -109,7 +126,7 @@ struct CmdHashBase : Command
                         .hash = hash,
                     };
                 };
-                h = hook(path2).hash;
+                h = hook(sourcePath).hash;
                 break;
             }
             }
