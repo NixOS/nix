@@ -16,6 +16,7 @@
 namespace nix {
 
 struct StoreDirConfig;
+struct Provenance;
 
 /* Abstract syntax of derivations. */
 
@@ -405,7 +406,8 @@ class Store;
 StorePath writeDerivation(Store & store,
     const Derivation & drv,
     RepairFlag repair = NoRepair,
-    bool readOnly = false);
+    bool readOnly = false,
+    std::shared_ptr<const Provenance> provenance = nullptr);
 
 /**
  * Read a derivation from a file.

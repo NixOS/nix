@@ -72,7 +72,8 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         ContentAddressMethod hashMethod = FileIngestionMethod::NixArchive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
-        RepairFlag repair = NoRepair) override
+        RepairFlag repair = NoRepair,
+        std::shared_ptr<const Provenance> provenance = nullptr) override
     { unsupported("addToStore"); }
 
     void narFromPath(const StorePath & path, Sink & sink) override
