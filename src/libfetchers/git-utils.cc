@@ -7,6 +7,7 @@
 #include "fs-sink.hh"
 #include "sync.hh"
 #include "thread-pool.hh"
+#include "pool.hh"
 
 #include <git2/attr.h>
 #include <git2/blob.h>
@@ -207,7 +208,8 @@ static git_packbuilder_progress PACKBUILDER_PROGRESS_CHECK_INTERRUPT = &packBuil
 
 } // extern "C"
 
-static void initRepoAtomically(std::filesystem::path &path, bool bare) {
+static void initRepoAtomically(std::filesystem::path &path, bool bare)
+{
     if (pathExists(path.string())) return;
 
     Path tmpDir = createTempDir(os_string_to_string(PathViewNG { std::filesystem::path(path).parent_path() }));
@@ -236,12 +238,16 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
     /** Location of the repository on disk. */
     std::filesystem::path path;
+
+    bool bare;
+
     /**
      * libgit2 repository. Note that new objects are not written to disk,
      * because we are using a mempack backend. For writing to disk, see
      * `flush()`, which is also called by `GitFileSystemObjectSink::sync()`.
      */
     Repository repo;
+
     /**
      * In-memory object store for efficient batched writing to packfiles.
      * Owned by `repo`.
@@ -250,6 +256,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     GitRepoImpl(std::filesystem::path _path, bool create, bool bare)
         : path(std::move(_path))
+        , bare(bare)
     {
         initLibGit2();
 
@@ -980,9 +987,20 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 {
     ref<GitRepoImpl> repo;
 
-    ThreadPool workers;
+    Pool<GitRepoImpl> repoPool;
 
-    GitFileSystemObjectSinkImpl(ref<GitRepoImpl> repo) : repo(repo)
+    unsigned int concurrency = std::min(std::thread::hardware_concurrency(), 4U);
+
+    ThreadPool workers{concurrency};
+
+    GitFileSystemObjectSinkImpl(ref<GitRepoImpl> repo)
+        : repo(repo)
+        , repoPool(
+            std::numeric_limits<size_t>::max(),
+            [repo]() -> ref<GitRepoImpl>
+            {
+                return make_ref<GitRepoImpl>(repo->path, false, repo->bare);
+            })
     { }
 
     struct Directory;
@@ -1082,6 +1100,8 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
         workers.enqueue([this, path, data{std::move(crf.data)}, executable(crf.executable)]()
         {
+            auto repo(repoPool.get());
+
             // FIXME: leak
             git_writestream * stream = nullptr;
             if (git_blob_create_from_stream(&stream, *repo, nullptr))
@@ -1115,6 +1135,8 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     {
         workers.enqueue([this, path, target]()
         {
+            auto repo(repoPool.get());
+
             git_oid oid;
             if (git_blob_create_from_buffer(&oid, *repo, target.c_str(), target.size()))
                 throw Error("creating a blob object for tarball symlink member '%s': %s", path, git_error_last()->message);
@@ -1148,7 +1170,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             }
         }
 
-        ThreadPool workers2;
+        ThreadPool workers2{concurrency};
 
         auto & root = _state.lock()->root;
 
@@ -1165,7 +1187,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             },
             [&](Directory * const & node)
             {
-                //auto state(_state.lock());
+                auto repo(repoPool.get());
 
                 git_treebuilder * b;
                 if (git_treebuilder_new(&b, *repo, nullptr))
