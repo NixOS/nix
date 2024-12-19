@@ -384,7 +384,7 @@ static void _deletePath(Descriptor parentfd, const fs::path & path, uint64_t & b
     if (fstatat(parentfd, name.c_str(), &st,
             AT_SYMLINK_NOFOLLOW) == -1) {
         if (errno == ENOENT) return;
-        throw SysError("getting status of '%1%'", path);
+        throw SysError("getting status of %1%", path);
     }
 
     if (!S_ISDIR(st.st_mode)) {
@@ -416,15 +416,15 @@ static void _deletePath(Descriptor parentfd, const fs::path & path, uint64_t & b
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
         if ((st.st_mode & PERM_MASK) != PERM_MASK) {
             if (fchmodat(parentfd, name.c_str(), st.st_mode | PERM_MASK, 0) == -1)
-                throw SysError("chmod '%1%'", path);
+                throw SysError("chmod %1%", path);
         }
 
         int fd = openat(parentfd, path.c_str(), O_RDONLY);
         if (fd == -1)
-            throw SysError("opening directory '%1%'", path);
+            throw SysError("opening directory %1%", path);
         AutoCloseDir dir(fdopendir(fd));
         if (!dir)
-            throw SysError("opening directory '%1%'", path);
+            throw SysError("opening directory %1%", path);
 
         struct dirent * dirent;
         while (errno = 0, dirent = readdir(dir.get())) { /* sic */
@@ -433,13 +433,13 @@ static void _deletePath(Descriptor parentfd, const fs::path & path, uint64_t & b
             if (childName == "." || childName == "..") continue;
             _deletePath(dirfd(dir.get()), path + "/" + childName, bytesFreed);
         }
-        if (errno) throw SysError("reading directory '%1%'", path);
+        if (errno) throw SysError("reading directory %1%", path);
     }
 
     int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
     if (unlinkat(parentfd, name.c_str(), flags) == -1) {
         if (errno == ENOENT) return;
-        throw SysError("cannot unlink '%1%'", path);
+        throw SysError("cannot unlink %1%", path);
     }
 #else
     // TODO implement
