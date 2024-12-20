@@ -108,6 +108,9 @@ deps_private += cpuid
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
+cxx = meson.get_compiler('cpp')
+cxx.has_header('widechar_width.h', required : true)
+
 config_h = configure_file(
   configuration : configdata,
   output : 'config-util.hh',
