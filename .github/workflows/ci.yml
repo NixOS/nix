@@ -21,6 +21,10 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        install_options: [""]
+        include:
+          - os: ubuntu-latest
+            install_options: "--no-daemon"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -29,6 +33,7 @@ jobs:
         fetch-depth: 0
     - uses: cachix/install-nix-action@v30
       with:
+        install_options: ${{ matrix.install_options }}
         # The sandbox would otherwise be disabled by default on Darwin
         extra_nix_config: |
           sandbox = true
