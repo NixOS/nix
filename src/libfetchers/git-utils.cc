@@ -1,4 +1,5 @@
 #include "git-utils.hh"
+#include "git-lfs-fetch.hh"
 #include "cache.hh"
 #include "finally.hh"
 #include "processes.hh"
@@ -505,9 +506,9 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     /**
      * A 'GitSourceAccessor' with no regard for export-ignore or any other transformations.
      */
-    ref<GitSourceAccessor> getRawAccessor(const Hash & rev);
+    ref<GitSourceAccessor> getRawAccessor(const Hash & rev, bool smudgeLfs);
 
-    ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
+    ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore, bool smudgeLfs) override;
 
     ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
 
@@ -629,7 +630,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     Hash treeHashToNarHash(const Hash & treeHash) override
     {
-        auto accessor = getAccessor(treeHash, false);
+        auto accessor = getAccessor(treeHash, false, false);
 
         fetchers::Cache::Key cacheKey{"treeHashToNarHash", {{"treeHash", treeHash.gitRev()}}};
 
@@ -669,24 +670,72 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, 
 /**
  * Raw git tree input accessor.
  */
+
 struct GitSourceAccessor : SourceAccessor
 {
     ref<GitRepoImpl> repo;
     Object root;
+    std::optional<lfs::Fetch> lfsFetch = std::nullopt;
 
-    GitSourceAccessor(ref<GitRepoImpl> repo_, const Hash & rev)
+    GitSourceAccessor(ref<GitRepoImpl> repo_, const Hash & rev, bool smudgeLfs)
         : repo(repo_)
         , root(peelToTreeOrBlob(lookupObject(*repo, hashToOID(rev)).get()))
     {
+        if (smudgeLfs)
+            lfsFetch = std::make_optional(lfs::Fetch(*repo, hashToOID(rev)));
     }
 
     std::string readBlob(const CanonPath & path, bool symlink)
     {
-        auto blob = getBlob(path, symlink);
+        const auto blob = getBlob(path, symlink);
 
-        auto data = std::string_view((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
+        if (lfsFetch) {
+            auto& _lfsFetch = *lfsFetch;
+            auto pathStr = std::string(path.rel());
+            if (_lfsFetch.shouldFetch(pathStr)) {
+                StringSink s;
+                try {
+                    _lfsFetch.fetch(blob.get(), pathStr, s, [&s](uint64_t size){ s.s.reserve(size); });
+                } catch (Error &e) {
+                    e.addTrace({}, "while smudging git-lfs file '%s' (std::string interface)", pathStr);
+                    throw;
+                }
+                return s.s;
+            }
+        }
 
-        return std::string(data);
+        return std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
+    }
+
+    void readFile(
+        const CanonPath & path,
+        Sink & sink,
+        std::function<void(uint64_t)> sizeCallback = [](uint64_t size){}) override {
+        auto blob = getBlob(path, false);
+
+        if (lfsFetch) {
+            auto& _lfsFetch = *lfsFetch;
+            auto pathStr = std::string(path.rel());
+            if (_lfsFetch.shouldFetch(pathStr)) {
+                try {
+                    _lfsFetch.fetch(blob.get(), pathStr, sink, sizeCallback);
+                } catch (Error &e) {
+                    e.addTrace({}, "while reading git-lfs file '%s'", pathStr);
+                    throw;
+                }
+                return;
+            } else {
+                debug("Skip git-lfs, not matching .gitattributes patterns: %s", pathStr);
+            }
+        }
+
+        // lfs disabled or does not apply to this path
+        auto size = git_blob_rawsize(blob.get());
+        sizeCallback(size);
+        constexpr git_object_size_t chunkSize = 128 * 1024; // 128 KiB
+        for (git_object_size_t offset = 0; offset < size; offset += chunkSize) {
+            sink(std::string((const char *) git_blob_rawcontent(blob.get()) + offset, std::min(chunkSize, size - offset)));
+        }
     }
 
     std::string readFile(const CanonPath & path) override
@@ -1190,16 +1239,16 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     }
 };
 
-ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
+ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev, bool smudgeLfs)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
-    return make_ref<GitSourceAccessor>(self, rev);
+    return make_ref<GitSourceAccessor>(self, rev, smudgeLfs);
 }
 
-ref<SourceAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
+ref<SourceAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore, bool smudgeLfs)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
-    ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev);
+    ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev, smudgeLfs);
     if (exportIgnore) {
         return make_ref<GitExportIgnoreSourceAccessor>(self, rawGitAccessor, rev);
     }
@@ -1238,7 +1287,7 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     /* Read the .gitmodules files from this revision. */
     CanonPath modulesFile(".gitmodules");
 
-    auto accessor = getAccessor(rev, exportIgnore);
+    auto accessor = getAccessor(rev, exportIgnore, false);
     if (!accessor->pathExists(modulesFile)) return {};
 
     /* Parse it and get the revision of each submodule. */
@@ -1249,7 +1298,7 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
 
     std::vector<std::tuple<Submodule, Hash>> result;
 
-    auto rawAccessor = getRawAccessor(rev);
+    auto rawAccessor = getRawAccessor(rev, false);
 
     for (auto & submodule : parseSubmodules(pathTemp)) {
         /* Filter out .gitmodules entries that don't exist or are not
