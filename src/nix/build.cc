@@ -115,9 +115,11 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
         if (json) logger->cout("%s", builtPathsWithResultToJSON(buildables, *store).dump());
 
+        PathSet symlinks;
+
         if (outLink != "")
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                createOutLinks(outLink, toBuiltPaths(buildables), *store2);
+                createOutLinks(outLink, toBuiltPaths(buildables), *store2, symlinks);
 
         if (printOutputPaths) {
             stopProgressBar();
@@ -139,6 +141,12 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
         for (auto & b : buildables)
             buildables2.push_back(b.path);
         updateProfile(buildables2);
+
+        if (!json)
+            notice(
+                ANSI_GREEN "Build succeeded." ANSI_NORMAL
+                " The result is available through the symlink " ANSI_BOLD "%s" ANSI_NORMAL ".",
+                showPaths(symlinks));
     }
 };
 
