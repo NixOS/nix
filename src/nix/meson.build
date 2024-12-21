@@ -5,7 +5,8 @@ project('nix', 'cpp',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'debug=true',
-    'optimization=2',
+    'optimization=3',
+    'b_lto=true',
     'errorlogs=true', # Please print logs for tests that fail
     'localstatedir=/nix/var',
   ],
