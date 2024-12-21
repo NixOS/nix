@@ -5,7 +5,8 @@ project('nix-util-test-support', 'cpp',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'debug=true',
-    'optimization=2',
+    'optimization=3',
+    'b_lto=true',
     'errorlogs=true', # Please print logs for tests that fail
   ],
   meson_version : '>= 1.1',
