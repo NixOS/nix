@@ -195,10 +195,6 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
             throw BadURL("flake reference '%s' is not an absolute path", url);
     }
 
-    fetchers::Attrs attrs;
-    attrs.insert_or_assign("type", "path");
-    attrs.insert_or_assign("path", path);
-
     return fromParsedURL(fetchSettings, {
         .url = path,
         .base = path,
