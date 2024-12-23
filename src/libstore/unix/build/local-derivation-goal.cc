@@ -279,9 +279,11 @@ static void chmod_(const Path & path, mode_t mode)
 }
 
 
-/* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
-   it's a directory and we're not root (to be able to update the
-   directory's parent link ".."). */
+/**
+ * Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
+ * it's a directory and we're not root (to be able to update the
+ * directory's parent link "..").
+ */
 static void movePath(const Path & src, const Path & dst)
 {
     auto st = lstat(src);
@@ -298,7 +300,30 @@ static void movePath(const Path & src, const Path & dst)
 }
 
 
-extern void replaceValidPath(const Path & storePath, const Path & tmpPath);
+void LocalDerivationGoal::replaceValidPath(const Path & storePath, const Path & tmpPath)
+{
+    /* We can't atomically replace storePath (the original) with
+       tmpPath (the replacement), so we have to move it out of the
+       way first.  We'd better not be interrupted here, because if
+       we're repairing (say) Glibc, we end up with a broken system. */
+    Path oldPath = fmt("%1%.old-%2%-%3%", storePath, getpid(), getLocalStore().rng());
+    if (pathExists(storePath))
+        movePath(storePath, oldPath);
+
+    try {
+        movePath(tmpPath, storePath);
+    } catch (...) {
+        try {
+            // attempt to recover
+            movePath(oldPath, storePath);
+        } catch (...) {
+            ignoreExceptionExceptInterrupt();
+        }
+        throw;
+    }
+
+    deletePath(oldPath);
+}
 
 
 int LocalDerivationGoal::getChildStatus()
