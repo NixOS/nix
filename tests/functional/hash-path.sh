@@ -116,3 +116,8 @@ h=$(nix hash path --type sha256 --base32 "$TEST_ROOT/try/to/mess/with/it/simple-
 ln -s /non-existent-48cujwe8ndf4as0bne "$TEST_ROOT/symlink-to-nowhere"
 h=$(nix hash path --mode nar --type sha256 --base32 "$TEST_ROOT/symlink-to-nowhere")
 [[ 1bl5ry3x1fcbwgr5c2x50bn572iixh4j1p6ax5isxly2ddgn8pbp == "$h" ]]  # manually verified hash
+if [[ -e /bin ]]; then
+    ln -s /bin "$TEST_ROOT/symlink-to-bin"
+    h=$(nix hash path --mode nar --type sha256 --base32 "$TEST_ROOT/symlink-to-bin")
+    [[ 0z2mdmkd43l0ijdxfbj1y8vzli15yh9b09n3a3rrygmjshbyypsw == "$h" ]] # manually verified hash
+fi
