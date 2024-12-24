@@ -312,6 +312,11 @@ struct GitArchiveInputScheme : InputScheme
                 input.getNarHash().has_value());
     }
 
+    bool isLocal(const Input & input, const ref<Store> & nixStore) const override
+    {
+        return false;
+    }
+
     std::optional<ExperimentalFeature> experimentalFeature() const override
     {
         return Xp::Flakes;

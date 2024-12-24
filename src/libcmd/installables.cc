@@ -449,9 +449,27 @@ ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
     std::shared_ptr<flake::LockedFlake> lockedFlake)
 {
-    auto fingerprint = evalSettings.useEvalCache && evalSettings.pureEval
+    // Heuristic to detect if the flake is on the filesystem and not in the /nix/store.
+    //
+    // We don't want to cache local flakes because they change too much.
+    bool isLocal = lockedFlake->flake.resolvedRef.input.isLocal(state.store);
+
+    auto fingerprint = (!isLocal) && evalSettings.useEvalCache && evalSettings.pureEval
         ? lockedFlake->getFingerprint(state.store)
         : std::nullopt;
+
+    // Print the bool value of lockedFlake->flake.resolvedRef.input.isLocked()
+
+    std::cout << "\nResolvedRef is locked: " << lockedFlake->flake.resolvedRef.input.isLocked() << std::endl;
+    std::cout << "\nResolvedRef is direct: " << lockedFlake->flake.resolvedRef.input.isDirect() << std::endl;
+
+    // Print whenever caching is enabled
+    if (fingerprint == std::nullopt) {
+        std::cout << "\nCaching is disabled" << std::endl;
+    } else {
+        std::cout << "\nCaching is enabled" << std::endl;
+    }
+
     auto rootLoader = [&state, lockedFlake]()
         {
             /* For testing whether the evaluation cache is

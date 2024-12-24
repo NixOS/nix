@@ -827,6 +827,12 @@ struct GitInputScheme : InputScheme
     {
         return (bool) input.getRev();
     }
+
+    bool isLocal(const Input & input, const ref<Store> & store) const override
+    {
+        auto info = getRepoInfo(input);
+        return info.isLocal;
+    }
 };
 
 static auto rGitInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitInputScheme>()); });
