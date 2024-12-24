@@ -45,7 +45,7 @@ rec {
     name = "check-reqs";
     inherit deps;
     builder = builtins.toFile "builder.sh" "mkdir $out; ln -s $deps $out/depdir1";
-    disallowedRequisites = [dep1];
+    disallowedRequisites = [ dep1 dep2 ];
   };
 
   test7 = mkDerivation {
