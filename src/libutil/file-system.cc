@@ -318,6 +318,54 @@ void syncParent(const Path & path)
 }
 
 
+<<<<<<< HEAD
+=======
+void recursiveSync(const Path & path)
+{
+    /* If it's a file or symlink, just fsync and return. */
+    auto st = lstat(path);
+    if (S_ISREG(st.st_mode)) {
+        AutoCloseFD fd = toDescriptor(open(path.c_str(), O_RDONLY, 0));
+        if (!fd)
+            throw SysError("opening file '%1%'", path);
+        fd.fsync();
+        return;
+    } else if (S_ISLNK(st.st_mode))
+        return;
+
+    /* Otherwise, perform a depth-first traversal of the directory and
+       fsync all the files. */
+    std::deque<fs::path> dirsToEnumerate;
+    dirsToEnumerate.push_back(path);
+    std::vector<fs::path> dirsToFsync;
+    while (!dirsToEnumerate.empty()) {
+        auto currentDir = dirsToEnumerate.back();
+        dirsToEnumerate.pop_back();
+        for (auto & entry : std::filesystem::directory_iterator(currentDir)) {
+            auto st = entry.symlink_status();
+            if (fs::is_directory(st)) {
+                dirsToEnumerate.emplace_back(entry.path());
+            } else if (fs::is_regular_file(st)) {
+                AutoCloseFD fd = toDescriptor(open(entry.path().string().c_str(), O_RDONLY, 0));
+                if (!fd)
+                    throw SysError("opening file '%1%'", entry.path());
+                fd.fsync();
+            }
+        }
+        dirsToFsync.emplace_back(std::move(currentDir));
+    }
+
+    /* Fsync all the directories. */
+    for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
+        AutoCloseFD fd = toDescriptor(open(dir->string().c_str(), O_RDONLY, 0));
+        if (!fd)
+            throw SysError("opening directory '%1%'", *dir);
+        fd.fsync();
+    }
+}
+
+
+>>>>>>> 4a91e627a (fix: ignore symlinks in fsync-store-paths)
 static void _deletePath(Descriptor parentfd, const fs::path & path, uint64_t & bytesFreed)
 {
 #ifndef _WIN32
