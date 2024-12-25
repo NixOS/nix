@@ -331,7 +331,7 @@ void syncParent(const Path & path)
 
 void recursiveSync(const Path & path)
 {
-    /* If it's a file, just fsync and return. */
+    /* If it's a file or symlink, just fsync and return. */
     auto st = lstat(path);
     if (S_ISREG(st.st_mode)) {
         AutoCloseFD fd = toDescriptor(open(path.c_str(), O_RDONLY, 0));
@@ -339,7 +339,8 @@ void recursiveSync(const Path & path)
             throw SysError("opening file '%1%'", path);
         fd.fsync();
         return;
-    }
+    } else if (S_ISLNK(st.st_mode))
+        return;
 
     /* Otherwise, perform a depth-first traversal of the directory and
        fsync all the files. */
