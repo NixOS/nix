@@ -2,11 +2,18 @@ queue_rules:
   - name: default
     # all required tests need to go here
     merge_conditions:
+<<<<<<< HEAD
       - check-success=installer
       - check-success=installer_test (macos-latest)
       - check-success=installer_test (ubuntu-latest)
       - check-success=tests (macos-latest)
       - check-success=tests (ubuntu-latest)
+=======
+      - check-success=tests (macos-latest)
+      - check-success=tests (ubuntu-22.04)
+      - check-success=installer_test (macos-latest)
+      - check-success=installer_test (ubuntu-22.04)
+>>>>>>> fe5f02c2c (ci: lock Ubuntu runner to ubuntu-22.04)
       - check-success=vm_tests
     merge_method: rebase
     batch_size: 5
