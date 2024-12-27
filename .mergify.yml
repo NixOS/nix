@@ -5,9 +5,9 @@ queue_rules:
       - check-success=installer
       - check-success=installer_test (macos-latest)
       - check-success=installer_test (ubuntu-latest)
-      - check-success=tests (macos-latest)
+      - check-success=tests (macos-14)
       - check-success=tests (ubuntu-24.04)
-      - check-success=installer_test (macos-latest)
+      - check-success=installer_test (macos-14)
       - check-success=installer_test (ubuntu-24.04)
       - check-success=vm_tests
     merge_method: rebase
