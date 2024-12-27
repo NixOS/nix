@@ -3,9 +3,9 @@ queue_rules:
     # all required tests need to go here
     merge_conditions:
       - check-success=tests (macos-latest)
-      - check-success=tests (ubuntu-22.04)
+      - check-success=tests (ubuntu-24.04)
       - check-success=installer_test (macos-latest)
-      - check-success=installer_test (ubuntu-22.04)
+      - check-success=installer_test (ubuntu-24.04)
       - check-success=vm_tests
     batch_size: 5
 
