@@ -8,7 +8,7 @@ permissions: read-all
 
 jobs:
   eval:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
       with:
@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-24.04, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -42,7 +42,7 @@ jobs:
     # Since ubuntu 22.30, unprivileged usernamespaces are no longer allowed to map to the root user:
     # https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
     - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      if: matrix.os == 'ubuntu-22.04'
+      if: matrix.os == 'ubuntu-24.04'
     - run: scripts/build-checks
 
   # Steps to test CI automation in your own fork.
@@ -101,7 +101,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-latest]
+        os: [ubuntu-24.04, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
@@ -111,7 +111,7 @@ jobs:
         install_url: '${{needs.installer.outputs.installerURL}}'
         install_options: "--tarball-url-prefix https://${{ env.CACHIX_NAME }}.cachix.org/serve"
     - run: sudo apt install fish zsh
-      if: matrix.os == 'ubuntu-22.04'
+      if: matrix.os == 'ubuntu-24.04'
     - run: brew install fish
       if: matrix.os == 'macos-latest'
     - run: exec bash -c "nix-instantiate -E 'builtins.currentTime' --eval"
@@ -121,6 +121,25 @@ jobs:
     - run: exec bash -c "nix-channel --add https://releases.nixos.org/nixos/unstable/nixos-23.05pre466020.60c1d71f2ba nixpkgs"
     - run: exec bash -c "nix-channel --update && nix-env -iA nixpkgs.hello && hello"
 
+  # Steps to test CI automation in your own fork.
+  # 1. Sign-up for https://hub.docker.com/
+  # 2. Store your dockerhub username as DOCKERHUB_USERNAME in "Repository secrets" of your fork repository settings (https://github.com/$githubuser/nix/settings/secrets/actions)
+  # 3. Create an access token in https://hub.docker.com/settings/security and store it as DOCKERHUB_TOKEN in "Repository secrets" of your fork
+  check_secrets:
+    permissions:
+      contents: none
+    name: Check Docker secrets present for installer tests
+    runs-on: ubuntu-24.04
+    outputs:
+      docker: ${{ steps.secret.outputs.docker }}
+    steps:
+      - name: Check for secrets
+        id: secret
+        env:
+          _DOCKER_SECRETS: ${{ secrets.DOCKERHUB_USERNAME }}${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
+
   docker_push_image:
     needs: [check_secrets, tests]
     permissions:
@@ -128,10 +147,8 @@ jobs:
       packages: write
     if: >-
       github.event_name == 'push' &&
-      github.ref_name == 'master' &&
-      needs.check_secrets.outputs.cachix == 'true' &&
-      needs.check_secrets.outputs.docker == 'true'
-    runs-on: ubuntu-22.04
+      github.ref_name == 'master'
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
       with:
@@ -183,7 +200,7 @@ jobs:
         docker push $IMAGE_ID:master
 
   vm_tests:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
@@ -192,7 +209,7 @@ jobs:
 
   flake_regressions:
     needs: vm_tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout nix
         uses: actions/checkout@v4
@@ -209,3 +226,4 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix build --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=25 flake-regressions/eval-all.sh
+  
