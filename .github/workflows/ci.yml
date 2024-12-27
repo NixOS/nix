@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-latest]
+        os: [ubuntu-24.04, macos-14]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -101,7 +101,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-latest]
+        os: [ubuntu-24.04, macos-14]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
@@ -113,7 +113,7 @@ jobs:
     - run: sudo apt install fish zsh
       if: matrix.os == 'ubuntu-24.04'
     - run: brew install fish
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-14'
     - run: exec bash -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec sh -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec zsh -c "nix-instantiate -E 'builtins.currentTime' --eval"

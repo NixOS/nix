@@ -3,6 +3,7 @@ queue_rules:
     # all required tests need to go here
     merge_conditions:
 <<<<<<< HEAD
+<<<<<<< HEAD
       - check-success=installer
       - check-success=installer_test (macos-latest)
       - check-success=installer_test (ubuntu-latest)
@@ -16,6 +17,11 @@ queue_rules:
       - check-success=installer_test (ubuntu-22.04)
 >>>>>>> fe5f02c2c (ci: lock Ubuntu runner to ubuntu-22.04)
 =======
+=======
+      - check-success=tests (macos-14)
+      - check-success=tests (ubuntu-24.04)
+      - check-success=installer_test (macos-14)
+>>>>>>> ce1e9ba85 (ci: lock macOS runner to macos-14)
       - check-success=installer_test (ubuntu-24.04)
 >>>>>>> b5f10655e (ci: update Ubuntu runner to ubuntu-24.04)
       - check-success=vm_tests
