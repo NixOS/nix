@@ -8,7 +8,7 @@ permissions: read-all
 
 jobs:
   eval:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
       with:
@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-latest]
+        os: [ubuntu-24.04, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -42,7 +42,7 @@ jobs:
     # Since ubuntu 22.30, unprivileged usernamespaces are no longer allowed to map to the root user:
     # https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
     - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      if: matrix.os == 'ubuntu-22.04'
+      if: matrix.os == 'ubuntu-24.04'
     - run: scripts/build-checks
 
   # Steps to test CI automation in your own fork.
@@ -101,7 +101,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-latest]
+        os: [ubuntu-24.04, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
@@ -111,7 +111,7 @@ jobs:
         install_url: '${{needs.installer.outputs.installerURL}}'
         install_options: "--tarball-url-prefix https://${{ env.CACHIX_NAME }}.cachix.org/serve"
     - run: sudo apt install fish zsh
-      if: matrix.os == 'ubuntu-22.04'
+      if: matrix.os == 'ubuntu-24.04'
     - run: brew install fish
       if: matrix.os == 'macos-latest'
     - run: exec bash -c "nix-instantiate -E 'builtins.currentTime' --eval"
@@ -131,7 +131,7 @@ jobs:
     permissions:
       contents: none
     name: Check Docker secrets present for installer tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       docker: ${{ steps.secret.outputs.docker }}
     steps:
@@ -157,8 +157,12 @@ jobs:
     runs-on: ubuntu-latest
 =======
       github.ref_name == 'master'
+<<<<<<< HEAD
     runs-on: ubuntu-22.04
 >>>>>>> fe5f02c2c (ci: lock Ubuntu runner to ubuntu-22.04)
+=======
+    runs-on: ubuntu-24.04
+>>>>>>> b5f10655e (ci: update Ubuntu runner to ubuntu-24.04)
     steps:
     - uses: actions/checkout@v4
       with:
@@ -210,7 +214,7 @@ jobs:
         docker push $IMAGE_ID:master
 
   vm_tests:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
@@ -233,7 +237,7 @@ jobs:
 
   flake_regressions:
     needs: vm_tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout nix
         uses: actions/checkout@v4
