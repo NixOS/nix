@@ -57,19 +57,16 @@ jobs:
   check_secrets:
     permissions:
       contents: none
-    name: Check Cachix and Docker secrets present for installer tests
-    runs-on: ubuntu-latest
+    name: Check Docker secrets present for installer tests
+    runs-on: ubuntu-24.04
     outputs:
-      cachix: ${{ steps.secret.outputs.cachix }}
       docker: ${{ steps.secret.outputs.docker }}
     steps:
       - name: Check for secrets
         id: secret
         env:
-          _CACHIX_SECRETS: ${{ secrets.CACHIX_SIGNING_KEY }}${{ secrets.CACHIX_AUTH_TOKEN }}
           _DOCKER_SECRETS: ${{ secrets.DOCKERHUB_USERNAME }}${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          echo "::set-output name=cachix::${{ env._CACHIX_SECRETS != '' }}"
           echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
 
   installer:
@@ -101,7 +98,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-latest]
+        os: [ubuntu-24.04, macos-14]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
@@ -113,7 +110,7 @@ jobs:
     - run: sudo apt install fish zsh
       if: matrix.os == 'ubuntu-24.04'
     - run: brew install fish
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-14'
     - run: exec bash -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec sh -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec zsh -c "nix-instantiate -E 'builtins.currentTime' --eval"
@@ -125,20 +122,6 @@ jobs:
   # 1. Sign-up for https://hub.docker.com/
   # 2. Store your dockerhub username as DOCKERHUB_USERNAME in "Repository secrets" of your fork repository settings (https://github.com/$githubuser/nix/settings/secrets/actions)
   # 3. Create an access token in https://hub.docker.com/settings/security and store it as DOCKERHUB_TOKEN in "Repository secrets" of your fork
-  check_secrets:
-    permissions:
-      contents: none
-    name: Check Docker secrets present for installer tests
-    runs-on: ubuntu-24.04
-    outputs:
-      docker: ${{ steps.secret.outputs.docker }}
-    steps:
-      - name: Check for secrets
-        id: secret
-        env:
-          _DOCKER_SECRETS: ${{ secrets.DOCKERHUB_USERNAME }}${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
 
   docker_push_image:
     needs: [check_secrets, tests]
