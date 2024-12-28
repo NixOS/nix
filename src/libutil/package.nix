@@ -29,6 +29,7 @@ mkMesonLibrary (finalAttrs: {
     ./nix-meson-build-support
     ../../.version
     ./.version
+    ./widecharwidth
     ./meson.build
     ./meson.options
     ./linux/meson.build

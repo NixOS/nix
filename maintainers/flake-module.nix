@@ -356,6 +356,7 @@
             ''^src/libutil/util\.cc$''
             ''^src/libutil/util\.hh$''
             ''^src/libutil/variant-wrapper\.hh$''
+            ''^src/libutil/widecharwidth/widechar_width\.h$'' # vendored source
             ''^src/libutil/windows/file-descriptor\.cc$''
             ''^src/libutil/windows/file-path\.cc$''
             ''^src/libutil/windows/processes\.cc$''
