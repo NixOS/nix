@@ -4059,7 +4059,7 @@ static RegisterPrimOp primop_toString({
 });
 
 /* `substring start len str' returns the substring of `str' starting
-   at character position `min(start, stringLength str)' inclusive and
+   at byte position `min(start, stringLength str)' inclusive and
    ending at `min(start + len, stringLength str)'.  `start' must be
    non-negative. */
 static void prim_substring(EvalState & state, const PosIdx pos, Value * * args, Value & v)
@@ -4098,7 +4098,7 @@ static RegisterPrimOp primop_substring({
     .name = "__substring",
     .args = {"start", "len", "s"},
     .doc = R"(
-      Return the substring of *s* from character position *start*
+      Return the substring of *s* from byte position *start*
       (zero-based) up to but not including *start + len*. If *start* is
       greater than the length of the string, an empty string is returned.
       If *start + len* lies beyond the end of the string or *len* is `-1`,
