@@ -2045,7 +2045,7 @@ static RegisterPrimOp primop_readFileType({
     .args = {"p"},
     .doc = R"(
       Determine the directory entry type of a filesystem node, being
-      one of "directory", "regular", "symlink", or "unknown".
+      one of `"directory"`, `"regular"`, `"symlink"`, or `"unknown"`.
     )",
     .fun = prim_readFileType,
 });
