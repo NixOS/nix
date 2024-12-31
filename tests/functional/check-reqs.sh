@@ -13,6 +13,13 @@ nix-build -o "$RESULT" check-reqs.nix -A test1
 (! nix-build -o "$RESULT" check-reqs.nix -A test4) 2>&1 | grepQuiet 'check-reqs-dep1'
 (! nix-build -o "$RESULT" check-reqs.nix -A test4) 2>&1 | grepQuiet 'check-reqs-dep2'
 (! nix-build -o "$RESULT" check-reqs.nix -A test5)
-(! nix-build -o "$RESULT" check-reqs.nix -A test6)
+if isDaemonNewer "2.23pre"
+then
+  (! nix-build -o "$RESULT" check-reqs.nix -A test6) 2>&1 | grepQuiet '{ /.*-check-reqs -> /.*-check-reqs-deps -> /.*-check-reqs-dep1 }'
+  (! nix-build -o "$RESULT" check-reqs.nix -A test6) 2>&1 | grepQuiet '{ /.*-check-reqs -> /.*-check-reqs-deps -> /.*-check-reqs-dep2 }'
+else
+  (! nix-build -o "$RESULT" check-reqs.nix -A test6) 2>&1 | grepQuiet 'check-reqs-dep1'
+  (! nix-build -o "$RESULT" check-reqs.nix -A test6) 2>&1 | grepQuiet 'check-reqs-dep2'
+fi
 
 nix-build -o "$RESULT" check-reqs.nix -A test7
