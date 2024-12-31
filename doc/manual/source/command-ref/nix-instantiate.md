@@ -5,7 +5,7 @@
 # Synopsis
 
 `nix-instantiate`
-  [`--parse` | `--eval` [`--strict`] [`--json`] [`--xml`] ]
+  [`--parse` | `--eval` [`--strict`] [`--raw` | `--json` | `--xml`] ]
   [`--read-write-mode`]
   [`--arg` *name* *value*]
   [{`--attr`| `-A`} *attrPath*]
@@ -101,6 +101,11 @@ standard input.
   >
   > This option can cause non-termination, because lazy data
   > structures can be infinitely large.
+
+- `--raw`
+
+  When used with `--eval`, the evaluation result must be a string,
+  which is printed verbatim, without quoting, escaping or trailing newline.
 
 - `--json`
 
