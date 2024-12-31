@@ -379,6 +379,16 @@ void EvalState::allowPath(const StorePath & storePath)
         rootFS2->allowPrefix(CanonPath(store->toRealPath(storePath)));
 }
 
+void EvalState::allowClosure(const StorePath & storePath)
+{
+    if (!rootFS.dynamic_pointer_cast<AllowListSourceAccessor>()) return;
+
+    StorePathSet closure;
+    store->computeFSClosure(storePath, closure);
+    for (auto & p : closure)
+        allowPath(p);
+}
+
 void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)
 {
     allowPath(storePath);
@@ -3113,10 +3123,7 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
             allowPath(path);
             if (store->isInStore(path)) {
                 try {
-                    StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(path).first, closure);
-                    for (auto & p : closure)
-                        allowPath(p);
+                    allowClosure(store->toStorePath(path).first);
                 } catch (InvalidPath &) { }
             }
         }
