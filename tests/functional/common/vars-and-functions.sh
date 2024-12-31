@@ -29,6 +29,11 @@ source "$commonDir/test-root.sh"
 test_nix_conf_dir=$TEST_ROOT/etc
 test_nix_conf=$test_nix_conf_dir/nix.conf
 
+# introduced in master in 9d2ed0a7d384a7759d5981425fba41ecf1b4b9e1,
+# https://github.com/NixOS/nix/pull/11792. Could be replaced by a
+# full backport.
+config_nix="${commonDir}/config.nix"
+
 export TEST_HOME=$TEST_ROOT/test-home
 
 if ! isTestOnNixOS; then
