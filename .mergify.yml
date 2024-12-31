@@ -4,6 +4,7 @@ queue_rules:
     merge_conditions:
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
       - check-success=installer
       - check-success=installer_test (macos-latest)
       - check-success=installer_test (ubuntu-latest)
@@ -24,6 +25,12 @@ queue_rules:
 >>>>>>> ce1e9ba85 (ci: lock macOS runner to macos-14)
       - check-success=installer_test (ubuntu-24.04)
 >>>>>>> b5f10655e (ci: update Ubuntu runner to ubuntu-24.04)
+=======
+      - check-success=tests on macos
+      - check-success=tests on ubuntu
+      - check-success=installer_test on macos
+      - check-success=installer_test on ubuntu
+>>>>>>> 5e21bdc62 (.github/ci: Use fixed names)
       - check-success=vm_tests
     merge_method: rebase
     batch_size: 5
