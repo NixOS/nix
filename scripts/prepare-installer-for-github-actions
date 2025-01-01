@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
-script=$(nix-build -A outputs.hydraJobs.installerScriptForGHA --no-out-link)
-installerHash=$(echo "$script" | cut -b12-43 -)
+nix build -L ".#installerScriptForGHA" ".#binaryTarball"
 
-installerURL=https://$CACHIX_NAME.cachix.org/serve/$installerHash/install
-
-echo "::set-output name=installerURL::$installerURL"
+mkdir -p out
+cp ./result/install "out/install"
+name="$(basename "$(realpath ./result-1)")"
+# everything before the first dash
+cp -r ./result-1 "out/${name%%-*}"
