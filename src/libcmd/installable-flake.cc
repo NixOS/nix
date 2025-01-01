@@ -17,6 +17,7 @@
 #include "url.hh"
 #include "registry.hh"
 #include "build-result.hh"
+#include "provenance.hh"
 
 #include <regex>
 #include <queue>
@@ -80,6 +81,14 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
     auto attr = getCursor(*state);
 
     auto attrPath = attr->getAttrPathStr();
+
+    auto lockedRef = getLockedFlake()->flake.lockedRef;
+
+    state->setRootProvenance(std::make_shared<Provenance>(
+            Provenance::ProvFlake {
+                .flake = std::make_shared<nlohmann::json>(fetchers::attrsToJSON(lockedRef.input.attrs)),
+                .flakeOutput = attrPath,
+            }));
 
     if (!attr->isDerivation()) {
 
@@ -147,7 +156,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
             },
             ExtraPathInfoFlake::Flake {
                 .originalRef = flakeRef,
-                .lockedRef = getLockedFlake()->flake.lockedRef,
+                .lockedRef = lockedRef,
             }),
     }};
 }

@@ -5,6 +5,7 @@
 #include "json-utils.hh"
 #include "comparator.hh"
 #include "strings.hh"
+#include "provenance.hh"
 
 namespace nix {
 
@@ -177,6 +178,8 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(
         auto & sigsObj = jsonObject["signatures"] = json::array();
         for (auto & sig : sigs)
             sigsObj.push_back(sig);
+
+        jsonObject["provenance"] = provenance ? nlohmann::json(*provenance) : nlohmann::json();
     }
 
     return jsonObject;
@@ -223,6 +226,9 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
 
     if (json.contains("signatures"))
         res.sigs = getStringSet(valueAt(json, "signatures"));
+
+    auto prov = json.find("provenance");
+    res.provenance = prov == json.end() || prov->second.is_null() ? nullptr : std::make_shared<Provenance>(prov->second.get<Provenance>());
 
     return res;
 }
