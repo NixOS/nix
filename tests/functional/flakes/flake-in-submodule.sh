@@ -63,3 +63,21 @@ flakeref=git+file://$rootRepo\?submodules=1\&dir=submodule
 echo '"foo"' > "$rootRepo"/submodule/sub.nix
 [[ $(nix eval --json "$flakeref#sub" ) = '"foo"' ]]
 [[ $(nix flake metadata --json "$flakeref" | jq -r .locked.rev) = null ]]
+
+# The root repo may use the submodule repo as an input
+# through the relative path. This may change in the future;
+# see: https://discourse.nixos.org/t/57783 and #9708.
+cat > "$rootRepo"/flake.nix <<EOF
+{
+    inputs.subRepo.url = "git+file:./submodule";
+    outputs = { ... }: { };
+}
+EOF
+git -C "$rootRepo" add flake.nix
+git -C "$rootRepo" commit -m "Add subRepo input"
+(
+  cd "$rootRepo"
+  # The submodule must be locked to the relative path,
+  # _not_ the absolute path:
+  [[ $(nix flake metadata --json | jq -r .locks.nodes.subRepo.locked.url) = "file:./submodule" ]]
+)
