@@ -10,6 +10,7 @@
 #include "processes.hh"
 #include "git.hh"
 #include "mounted-source-accessor.hh"
+#include "lazy-source-accessor.hh"
 #include "git-utils.hh"
 #include "logging.hh"
 #include "finally.hh"
@@ -645,22 +646,27 @@ struct GitInputScheme : InputScheme
             std::map<CanonPath, nix::ref<SourceAccessor>> mounts;
 
             for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev, exportIgnore)) {
-                auto resolved = repo->resolveSubmoduleUrl(submodule.url);
-                debug("Git submodule %s: %s %s %s -> %s",
-                    submodule.path, submodule.url, submodule.branch, submoduleRev.gitRev(), resolved);
-                fetchers::Attrs attrs;
-                attrs.insert_or_assign("type", "git");
-                attrs.insert_or_assign("url", resolved);
-                if (submodule.branch != "")
-                    attrs.insert_or_assign("ref", submodule.branch);
-                attrs.insert_or_assign("rev", submoduleRev.gitRev());
-                attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
-                attrs.insert_or_assign("submodules", Explicit<bool>{ true });
-                attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
-                auto submoduleInput = fetchers::Input::fromAttrs(*input.settings, std::move(attrs));
-                auto [submoduleAccessor, submoduleInput2] =
-                    submoduleInput.getAccessor(store);
-                submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
+                auto submoduleAccessor = make_ref<LazySourceAccessor>([repoDir, submodule, submoduleRev, exportIgnore, store, settings(input.settings)]()
+                {
+                    auto repo = GitRepo::openRepo(repoDir);
+                    auto resolved = repo->resolveSubmoduleUrl(submodule.url);
+                    debug("Git submodule %s: %s %s %s -> %s",
+                        submodule.path, submodule.url, submodule.branch, submoduleRev.gitRev(), resolved);
+                    fetchers::Attrs attrs;
+                    attrs.insert_or_assign("type", "git");
+                    attrs.insert_or_assign("url", resolved);
+                    if (submodule.branch != "")
+                        attrs.insert_or_assign("ref", submodule.branch);
+                    attrs.insert_or_assign("rev", submoduleRev.gitRev());
+                    attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
+                    attrs.insert_or_assign("submodules", Explicit<bool>{ true });
+                    attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
+                    auto submoduleInput = fetchers::Input::fromAttrs(*settings, std::move(attrs));
+                    auto [submoduleAccessor, submoduleInput2] =
+                        submoduleInput.getAccessor(store);
+                    submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
+                    return submoduleAccessor;
+                });
                 mounts.insert_or_assign(submodule.path, submoduleAccessor);
             }
 
