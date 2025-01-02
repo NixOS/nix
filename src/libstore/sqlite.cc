@@ -3,6 +3,7 @@
 #include "util.hh"
 #include "url.hh"
 #include "signals.hh"
+#include "rng.hh"
 
 #include <sqlite3.h>
 
@@ -258,7 +259,7 @@ void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
        is likely to fail again. */
     checkInterrupt();
     /* <= 0.1s */
-    std::this_thread::sleep_for(std::chrono::milliseconds { rand() % 100 });
+    std::this_thread::sleep_for(std::chrono::milliseconds { RandomIntGenerator{0, 100}() });
 }
 
 }
