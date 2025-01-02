@@ -108,6 +108,12 @@ struct PathInputScheme : InputScheme
         return (bool) input.getNarHash();
     }
 
+    bool isLocal(const Input & input, const ref<Store> & store) const override
+    {
+        auto path = getStrAttr(input.attrs, "path");
+        return !store->isInStore(path);
+    }
+
     CanonPath getAbsPath(const Input & input) const
     {
         auto path = getStrAttr(input.attrs, "path");

@@ -351,6 +351,12 @@ struct MercurialInputScheme : InputScheme
         return (bool) input.getRev();
     }
 
+    bool isLocal(const Input & input, const ref<Store> & store) const override
+    {
+        auto url = parseURL(getStrAttr(input.attrs, "url"));
+        return url.scheme == "file" && !store->isInStore(url.path);
+    }
+
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
         if (auto rev = input.getRev())
