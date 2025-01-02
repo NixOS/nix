@@ -118,7 +118,7 @@ static DownloadTarballResult downloadTarball_(
             .treeHash = treeHash,
             .lastModified = (time_t) getIntAttr(infoAttrs, "lastModified"),
             .immutableUrl = maybeGetStrAttr(infoAttrs, "immutableUrl"),
-            .accessor = getTarballCache()->getAccessor(treeHash, false),
+            .accessor = getTarballCache()->getAccessor(treeHash, false, false),
         };
     };
 
