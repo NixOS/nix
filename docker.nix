@@ -5,6 +5,7 @@
 , bundleNixpkgs ? true
 , channelName ? "nixpkgs"
 , channelURL ? "https://nixos.org/channels/nixpkgs-unstable"
+, extraBasePkgs ? []
 , extraPkgs ? []
 , maxLayers ? 100
 , nixConf ? {}
@@ -287,7 +288,7 @@ pkgs.dockerTools.buildLayeredImageWithNixDb {
 
   inherit name tag maxLayers uid gid uname gname;
 
-  contents = [ baseSystem ];
+  contents = [ baseSystem ] ++ extraBasePkgs;
 
   extraCommands = ''
     rm -rf nix-support
