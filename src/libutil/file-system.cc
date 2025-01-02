@@ -86,43 +86,23 @@ Path canonPath(PathView path, bool resolveSymlinks)
     if (!isAbsolute(path))
         throw Error("not an absolute path: '%1%'", path);
 
-    // For Windows
-    auto rootName = fs::path { path }.root_name();
+    // This function used to resolve 1024 symlinks via a custom implementation.
+    // The standard filesystem library will behave differently. For example,
+    // libstd++ in GCC will only resolve 40 symlinks.
+    // I hope that isn't a problem!
+    auto result = resolveSymlinks ? fs::weakly_canonical(path) : fs::path { path }.lexically_normal();
 
-    /* This just exists because we cannot set the target of `remaining`
-       (the callback parameter) directly to a newly-constructed string,
-       since it is `std::string_view`. */
-    std::string temp;
+    // Strip trailing slashes
+    while (!result.has_filename() && result.has_parent_path())
+    {
+        // The parent of "D:/" is "D:/" so we need to be careful.
+        fs::path parent = result.parent_path();
+        if (parent == result)
+            break;
+        result = parent;
+    }
 
-    /* Count the number of times we follow a symlink and stop at some
-       arbitrary (but high) limit to prevent infinite loops. */
-    unsigned int followCount = 0, maxFollow = 1024;
-
-    auto ret = canonPathInner<OsPathTrait<char>>(
-        path,
-        [&followCount, &temp, maxFollow, resolveSymlinks]
-        (std::string & result, std::string_view & remaining) {
-            if (resolveSymlinks && fs::is_symlink(result)) {
-                if (++followCount >= maxFollow)
-                    throw Error("infinite symlink recursion in path '%0%'", remaining);
-                remaining = (temp = concatStrings(readLink(result), remaining));
-                if (isAbsolute(remaining)) {
-                    /* restart for symlinks pointing to absolute path */
-                    result.clear();
-                } else {
-                    result = dirOf(result);
-                    if (result == "/") {
-                        /* we don’t want trailing slashes here, which `dirOf`
-                           only produces if `result = /` */
-                        result.clear();
-                    }
-                }
-            }
-        });
-
-    if (!rootName.empty())
-        ret = rootName.string() + std::move(ret);
-    return ret;
+    return result.string();
 }
 
 
