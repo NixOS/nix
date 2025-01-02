@@ -369,7 +369,11 @@ void MixEnvironment::setEnviron()
     return;
 }
 
-void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & buildables, LocalFSStore & store)
+void createOutLinks(
+    const std::filesystem::path & outLink,
+    const BuiltPaths & buildables,
+    LocalFSStore & store,
+    PathSet & symlinks)
 {
     for (const auto & [_i, buildable] : enumerate(buildables)) {
         auto i = _i;
@@ -380,6 +384,7 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
                     if (i)
                         symlink += fmt("-%d", i);
                     store.addPermRoot(bo.path, absPath(symlink.string()));
+                    symlinks.insert(symlink);
                 },
                 [&](const BuiltPath::Built & bfd) {
                     for (auto & output : bfd.outputs) {
@@ -389,6 +394,7 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
                         if (output.first != "out")
                             symlink += fmt("-%s", output.first);
                         store.addPermRoot(output.second, absPath(symlink.string()));
+                        symlinks.insert(symlink);
                     }
                 },
             },
