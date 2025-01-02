@@ -21,6 +21,9 @@ This operation has the following options:
   Use recursive instead of flat hashing mode, used when adding
   directories to the store.
 
+  *paths* that refer to symlinks are not dereferenced, but added to the store
+  as symlinks with the same target.
+
 {{#include ./opt-common.md}}
 
 {{#include ../opt-common.md}}
