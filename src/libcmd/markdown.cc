@@ -64,7 +64,7 @@ static std::string doRenderMarkdownToTerminal(std::string_view markdown)
     if (!rndr_res)
         throw Error("allocation error while rendering Markdown");
 
-    return filterANSIEscapes(std::string(buf->data, buf->size), !isTTY());
+    return filterANSIEscapes(std::string(buf->data, buf->size), !shouldANSI());
 }
 
 std::string renderMarkdownToTerminal(std::string_view markdown)
