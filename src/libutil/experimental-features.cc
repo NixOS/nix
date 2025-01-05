@@ -247,6 +247,19 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .trackingUrl = "https://github.com/NixOS/nix/milestone/39",
     },
     {
+        .tag = Xp::PureStorePathBuiltin,
+        .name = "pure-storepath-builtin",
+        .description = R"(
+            Allow the use of [`storePath`](@docroot@/language/builtins.md#builtins-storePath)
+            in pure evaluation mode. No consensus has been found as to whether `storePath`
+            should be considered pure or impure, see the following issue:
+
+            https://github.com/NixOS/nix/issues/5868
+        )",
+        // NOTE: This is not a milestone, since "tracking" this experimental feature really consists of discussing whether storePath should be pure or not.
+        .trackingUrl = "https://github.com/NixOS/nix/issues/5868",
+    },
+    {
         .tag = Xp::ParseTomlTimestamps,
         .name = "parse-toml-timestamps",
         .description = R"(
