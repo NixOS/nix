@@ -1628,7 +1628,7 @@ static RegisterPrimOp primop_toPath({
    corner cases. */
 static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    if (state.settings.pureEval)
+    if (state.settings.pureEval && !experimentalFeatureSettings.isEnabled(Xp::PureStorePathBuiltin))
         state.error<EvalError>(
             "'%s' is not allowed in pure evaluation mode",
             "builtins.storePath"
