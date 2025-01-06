@@ -41,16 +41,18 @@ namespace nix {
 
 // we make use of the fact that the parser receives a private copy of the input
 // string and can munge around in it.
-static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
+// getting the position is expensive and thus it is implemented lazily.
+static StringToken unescapeStr(char * const s, size_t length, std::function<Pos()> && pos)
 {
-    char * result = s;
+    bool noNullByte = true;
     char * t = s;
-    char c;
     // the input string is terminated with *two* NULs, so we can safely take
     // *one* character after the one being checked against.
-    while ((c = *s++)) {
+    for (size_t i = 0; i < length; t++) {
+        char c = s[i++];
+        noNullByte &= c != '\0';
         if (c == '\\') {
-            c = *s++;
+            c = s[i++];
             if (c == 'n') *t = '\n';
             else if (c == 'r') *t = '\r';
             else if (c == 't') *t = '\t';
@@ -59,12 +61,14 @@ static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
         else if (c == '\r') {
             /* Normalise CR and CR/LF into LF. */
             *t = '\n';
-            if (*s == '\n') s++; /* cr/lf */
+            if (s[i] == '\n') i++; /* cr/lf */
         }
         else *t = c;
-        t++;
     }
-    return {result, size_t(t - result)};
+    if (!noNullByte) {
+        forceNoNullByte({s, size_t(t - s)}, std::move(pos));
+    }
+    return {s, size_t(t - s)};
 }
 
 static void requireExperimentalFeature(const ExperimentalFeature & feature, const Pos & pos)
@@ -175,7 +179,7 @@ or          { return OR_KW; }
                 /* It is impossible to match strings ending with '$' with one
                    regex because trailing contexts are only valid at the end
                    of a rule. (A sane but undocumented limitation.) */
-                yylval->str = unescapeStr(state->symbols, yytext, yyleng);
+                yylval->str = unescapeStr(yytext, yyleng, [&]() { return state->positions[CUR_POS]; });
                 return STR;
               }
 <STRING>\$\{  { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
@@ -191,6 +195,7 @@ or          { return OR_KW; }
 \'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
                    yylval->str = {yytext, (size_t) yyleng, true};
+                   forceNoNullByte(yylval->str, [&]() { return state->positions[CUR_POS]; });
                    return IND_STR;
                  }
 <IND_STRING>\'\'\$ |
@@ -203,7 +208,7 @@ or          { return OR_KW; }
                    return IND_STR;
                  }
 <IND_STRING>\'\'\\{ANY} {
-                   yylval->str = unescapeStr(state->symbols, yytext + 2, yyleng - 2);
+                   yylval->str = unescapeStr(yytext + 2, yyleng - 2, [&]() { return state->positions[CUR_POS]; });
                    return IND_STR;
                  }
 <IND_STRING>\$\{ { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
