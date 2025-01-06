@@ -297,7 +297,7 @@ Creating a Cachix cache for your installer tests and adding its authorisation to
   - `armv7l-linux`
   - `x86_64-darwin`
 
-- The `installer_test` job (which runs on `ubuntu-latest` and `macos-latest`) will try to install Nix with the cached installer and run a trivial Nix command.
+- The `installer_test` job (which runs on `ubuntu-24.04` and `macos-14`) will try to install Nix with the cached installer and run a trivial Nix command.
 
 ### One-time setup
 
