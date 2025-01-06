@@ -1,6 +1,6 @@
 #include "environment-variables.hh"
 
-#ifdef WIN32
+#ifdef _WIN32
 #  include "processenv.h"
 
 namespace nix {

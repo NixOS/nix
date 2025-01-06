@@ -3,7 +3,7 @@
 #include "signals.hh"
 #include "util.hh"
 
-#ifdef WIN32
+#ifdef _WIN32
 #  include <errhandlingapi.h>
 #  include <fileapi.h>
 #  include <windows.h>
