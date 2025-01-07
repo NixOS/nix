@@ -25,7 +25,6 @@ namespace nix {
         auto parsed = parseURL(s);
 
         ParsedURL expected {
-            .base = "http://www.example.org/file.tar.gz",
             .scheme = "http",
             .authority = "www.example.org",
             .path = "/file.tar.gz",
@@ -41,7 +40,6 @@ namespace nix {
         auto parsed = parseURL(s);
 
         ParsedURL expected {
-            .base = "https://www.example.org/file.tar.gz",
             .scheme = "https",
             .authority = "www.example.org",
             .path = "/file.tar.gz",
@@ -57,7 +55,6 @@ namespace nix {
         auto parsed = parseURL(s);
 
         ParsedURL expected {
-            .base = "https://www.example.org/file.tar.gz",
             .scheme = "https",
             .authority = "www.example.org",
             .path = "/file.tar.gz",
@@ -73,7 +70,6 @@ namespace nix {
         auto parsed = parseURL(s);
 
         ParsedURL expected {
-            .base = "http://www.example.org/file.tar.gz",
             .scheme = "http",
             .authority = "www.example.org",
             .path = "/file.tar.gz",
@@ -89,7 +85,6 @@ namespace nix {
         auto parsed = parseURL(s);
 
         ParsedURL expected {
-            .base = "https://www.example.org/video.mp4",
             .scheme = "file+https",
             .authority = "www.example.org",
             .path = "/video.mp4",
@@ -110,7 +105,6 @@ namespace nix {
         auto parsed = parseURL(s);
 
         ParsedURL expected {
-            .base = "https://127.0.0.1:8080/file.tar.gz",
             .scheme = "http",
             .authority = "127.0.0.1:8080",
             .path = "/file.tar.gz",
@@ -126,7 +120,6 @@ namespace nix {
         auto parsed = parseURL(s);
 
         ParsedURL expected {
-            .base = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
             .scheme = "http",
             .authority = "[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
             .path = "",
@@ -143,7 +136,6 @@ namespace nix {
         auto parsed = parseURL(s);
 
         ParsedURL expected {
-            .base = "http://[2a02:8071:8192:c100:311d:192d:81ac:11ea]:8080",
             .scheme = "http",
             .authority = "[2a02:8071:8192:c100:311d:192d:81ac:11ea]:8080",
             .path = "",
@@ -166,7 +158,6 @@ namespace nix {
         auto parsed = parseURL(s);
 
         ParsedURL expected {
-            .base = "http://user:pass@www.example.org/file.tar.gz",
             .scheme = "http",
             .authority = "user:pass@www.example.org:8080",
             .path = "/file.tar.gz",
@@ -183,7 +174,6 @@ namespace nix {
         auto parsed = parseURL(s);
 
         ParsedURL expected {
-            .base = "",
             .scheme = "file",
             .authority = "",
             .path = "/none/of//your/business",
@@ -207,7 +197,6 @@ namespace nix {
         auto parsed = parseURL(s);
 
         ParsedURL expected {
-            .base = "ftp://ftp.nixos.org/downloads/nixos.iso",
             .scheme = "ftp",
             .authority = "ftp.nixos.org",
             .path = "/downloads/nixos.iso",

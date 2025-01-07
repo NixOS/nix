@@ -7,8 +7,6 @@ namespace nix {
 
 struct ParsedURL
 {
-    /// URL without query/fragment
-    std::string base; // FIXME: remove
     std::string scheme;
     std::optional<std::string> authority;
     std::string path;

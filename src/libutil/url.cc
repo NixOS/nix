@@ -40,7 +40,6 @@ ParsedURL parseURL(const std::string & url)
             path = "/";
 
         return ParsedURL{
-            .base = base,
             .scheme = scheme,
             .authority = authority,
             .path = percentDecode(path),
