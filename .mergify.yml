@@ -4,8 +4,8 @@ queue_rules:
     merge_conditions:
       - check-success=tests on macos
       - check-success=tests on ubuntu
-      - check-success=installer_test on macos
-      - check-success=installer_test on ubuntu
+      - check-success=installer test on macos
+      - check-success=installer test on ubuntu
       - check-success=vm_tests
     batch_size: 5
 
