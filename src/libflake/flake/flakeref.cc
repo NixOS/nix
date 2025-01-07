@@ -162,7 +162,6 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                     auto base = std::string("git+file://") + flakeRoot;
 
                     auto parsedURL = ParsedURL{
-                        .url = base, // FIXME
                         .base = base,
                         .scheme = "git+file",
                         .authority = "",
@@ -220,7 +219,6 @@ static std::optional<std::pair<FlakeRef, std::string>> parseFlakeIdRef(
 
     if (std::regex_match(url, match, flakeRegex)) {
         auto parsedURL = ParsedURL{
-            .url = url,
             .base = "flake:" + match.str(1),
             .scheme = "flake",
             .authority = "",
