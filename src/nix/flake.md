@@ -219,7 +219,7 @@ Path inputs can be specified with path values in `flake.nix`. Path values are a 
 2. escaping URL characters (refer to IETF RFC?)
 3. prepending `path:`
 
-Note that the allowed syntax for path values in flake `inputs` may be more restrictive than general Nix, so you may need to use `path:` if your path contains certain special characters. See [Path literals](@docroot@/language/syntax#path-literal)
+Note that the allowed syntax for path values in flake `inputs` may be more restrictive than general Nix, so you may need to use `path:` if your path contains certain special characters. See [Path literals](@docroot@/language/syntax.md#path-literal)
 
   Note that if you omit `path:`, relative paths must start with `.` to
   avoid ambiguity with registry lookups (e.g. `nixpkgs` is a registry
