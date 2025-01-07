@@ -40,7 +40,6 @@ ParsedURL parseURL(const std::string & url)
             path = "/";
 
         return ParsedURL{
-            .url = url,
             .base = base,
             .scheme = scheme,
             .authority = authority,
@@ -134,6 +133,12 @@ std::string ParsedURL::to_string() const
         + percentEncode(path, allowedInPath)
         + (query.empty() ? "" : "?" + encodeQuery(query))
         + (fragment.empty() ? "" : "#" + percentEncode(fragment));
+}
+
+std::ostream & operator << (std::ostream & os, const ParsedURL & url)
+{
+    os << url.to_string();
+    return os;
 }
 
 bool ParsedURL::operator ==(const ParsedURL & other) const noexcept
