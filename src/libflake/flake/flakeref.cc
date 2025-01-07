@@ -49,9 +49,9 @@ FlakeRef parseFlakeRef(
     const std::optional<Path> & baseDir,
     bool allowMissing,
     bool isFlake,
-    bool allowRelative)
+    bool preserveRelativePaths)
 {
-    auto [flakeRef, fragment] = parseFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake, allowRelative);
+    auto [flakeRef, fragment] = parseFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake, preserveRelativePaths);
     if (fragment != "")
         throw Error("unexpected fragment '%s' in flake reference '%s'", fragment, url);
     return flakeRef;
@@ -89,7 +89,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     const std::optional<Path> & baseDir,
     bool allowMissing,
     bool isFlake,
-    bool allowRelative)
+    bool preserveRelativePaths)
 {
     std::string path = url;
     std::string fragment = "";
@@ -191,7 +191,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         }
 
     } else {
-        if (!allowRelative && !hasPrefix(path, "/"))
+        if (!preserveRelativePaths && !hasPrefix(path, "/"))
             throw BadURL("flake reference '%s' is not an absolute path", url);
     }
 
@@ -258,7 +258,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const std::optional<Path> & baseDir,
     bool allowMissing,
     bool isFlake,
-    bool allowRelative)
+    bool preserveRelativePaths)
 {
     using namespace fetchers;
 
@@ -267,7 +267,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     } else if (auto res = parseURLFlakeRef(fetchSettings, url, baseDir, isFlake)) {
         return *res;
     } else {
-        return parsePathFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake, allowRelative);
+        return parsePathFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake, preserveRelativePaths);
     }
 }
 

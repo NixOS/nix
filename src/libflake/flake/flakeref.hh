@@ -85,7 +85,7 @@ FlakeRef parseFlakeRef(
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
     bool isFlake = true,
-    bool allowRelative = false);
+    bool preserveRelativePaths = false);
 
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
@@ -104,7 +104,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
     bool isFlake = true,
-    bool allowRelative = false);
+    bool preserveRelativePaths = false);
 
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
