@@ -66,7 +66,7 @@ Input Input::fromURL(
         }
     }
 
-    throw Error("input '%s' is unsupported", url.url);
+    throw Error("input '%s' is unsupported", url);
 }
 
 Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
