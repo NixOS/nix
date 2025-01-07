@@ -408,14 +408,14 @@ LockedFlake lockFlake(
 
         debug("old lock file: %s", oldLockFile);
 
-        struct Override
+        struct OverrideTarget
         {
             FlakeInput input;
             SourcePath sourcePath;
             std::optional<InputPath> parentInputPath; // FIXME: rename to inputPathPrefix?
         };
 
-        std::map<InputPath, Override> overrides;
+        std::map<InputPath, OverrideTarget> overrides;
         std::set<InputPath> explicitCliOverrides;
         std::set<InputPath> overridesUsed, updatesUsed;
         std::map<ref<Node>, SourcePath> nodePaths;
@@ -423,7 +423,7 @@ LockedFlake lockFlake(
         for (auto & i : lockFlags.inputOverrides) {
             overrides.emplace(
                 i.first,
-                Override {
+                OverrideTarget {
                     .input = FlakeInput { .ref = i.second },
                     /* Note: any relative overrides
                        (e.g. `--override-input B/C "path:./foo/bar"`)
@@ -474,7 +474,7 @@ LockedFlake lockFlake(
                     inputPath.push_back(id);
                     inputPath.push_back(idOverride);
                     overrides.emplace(inputPath,
-                        Override {
+                        OverrideTarget {
                             .input = inputOverride,
                             .sourcePath = sourcePath,
                             .parentInputPath = inputPathPrefix
