@@ -685,4 +685,19 @@ void moveFile(const Path & oldName, const Path & newName)
 
 //////////////////////////////////////////////////////////////////////
 
+std::filesystem::path makeParentCanonical(const std::filesystem::path & rawPath)
+{
+    std::filesystem::path path(absPath(rawPath.string()));;
+    try {
+        auto parent = path.parent_path();
+        if (parent == path) {
+            // `path` is a root directory => trivially canonical
+            return parent;
+        }
+        return std::filesystem::canonical(parent) / path.filename();
+    } catch (fs::filesystem_error & e) {
+        throw SysError("canonicalising parent path of '%1%'", path);
+    }
 }
+
+} // namespace nix
