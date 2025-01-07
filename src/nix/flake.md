@@ -210,7 +210,9 @@ Currently the `type` attribute can be one of the following:
     the directory containing that `flake.nix`. However, the resolved
     path must be in the same tree. For instance, a `flake.nix` in the
     root of a tree can use `path:./foo` to access the flake in
-    subdirectory `foo`, but `path:../bar` is illegal.
+    subdirectory `foo`, but `path:../bar` is illegal. On the other
+    hand, a flake in the `/foo` directory of a tree can use
+    `path:../bar` to refer to the flake in `/bar`.
 
 Path inputs can be specified with path values in `flake.nix`. Path values are a syntax for `path` inputs, and they are converted by
 1. resolving them into relative paths, relative to the base directory of `flake.nix`
