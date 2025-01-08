@@ -62,7 +62,7 @@ These options are for deleting old [profiles] prior to deleting unreachable [sto
   This is the equivalent of invoking [`nix-env --delete-generations <period>`](@docroot@/command-ref/nix-env/delete-generations.md#generations-time) on each found profile.
   See the documentation of that command for additional information about the *period* argument.
 
-  - `--max-freed` *bytes*
+  - <span id="opt-max-freed">[`--max-freed`](#opt-max-freed)</span> *bytes*
 
 <!-- duplication from https://github.com/NixOS/nix/blob/442a2623e48357ff72c77bb11cf2cf06d94d2f90/doc/manual/source/command-ref/nix-store/gc.md?plain=1#L39-L44 -->
 
