@@ -49,11 +49,13 @@ void copyRecursive(
         break;
     }
 
-    case SourceAccessor::tMisc:
-        throw Error("file '%1%' has an unsupported type", from);
-
+    case SourceAccessor::tChar:
+    case SourceAccessor::tBlock:
+    case SourceAccessor::tSocket:
+    case SourceAccessor::tFifo:
+    case SourceAccessor::tUnknown:
     default:
-        unreachable();
+        throw Error("file '%1%' has an unsupported type of %2%", from, stat.typeString());
     }
 }
 
