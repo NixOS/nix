@@ -67,6 +67,9 @@ struct DerivationGoal : public Goal
     /** The path of the derivation. */
     StorePath drvPath;
 
+    /** The provenance of the derivation, if any. */
+    std::shared_ptr<const Provenance> drvProvenance;
+
     /**
      * The goal for the corresponding resolved derivation
      */

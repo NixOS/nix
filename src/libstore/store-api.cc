@@ -18,6 +18,8 @@
 #include "worker-protocol.hh"
 #include "signals.hh"
 #include "users.hh"
+#include "provenance.hh"
+#include "local-fs-store.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -195,7 +197,8 @@ StorePath Store::addToStore(
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
     PathFilter & filter,
-    RepairFlag repair)
+    RepairFlag repair,
+    std::shared_ptr<const Provenance> provenance)
 {
     FileSerialisationMethod fsm;
     switch (method.getFileIngestionMethod()) {
@@ -213,7 +216,7 @@ StorePath Store::addToStore(
     std::optional<StorePath> storePath;
     auto sink = sourceToSink([&](Source & source) {
         LengthSource lengthSource(source);
-        storePath = addToStoreFromDump(lengthSource, name, fsm, method, hashAlgo, references, repair);
+        storePath = addToStoreFromDump(lengthSource, name, fsm, method, hashAlgo, references, repair, provenance);
         if (settings.warnLargePathThreshold && lengthSource.total >= settings.warnLargePathThreshold)
             warn("copied large path '%s' to the store (%s)", path, renderSize(lengthSource.total));
     });
@@ -306,6 +309,7 @@ void Store::addMultipleToStore(
     RepairFlag repair,
     CheckSigsFlag checkSigs)
 {
+    std::set<WorkerProto::Feature> features;
     auto expected = readNum<uint64_t>(source);
     for (uint64_t i = 0; i < expected; ++i) {
         // FIXME we should not be using the worker protocol here, let
@@ -314,6 +318,7 @@ void Store::addMultipleToStore(
             WorkerProto::ReadConn {
                 .from = source,
                 .version = 16,
+                .features = features, // FIXME
             });
         info.ultimate = false;
         addToStore(info, source, repair, checkSigs);
@@ -953,6 +958,25 @@ static std::string makeCopyPathMessage(
 }
 
 
+/**
+ * Wrap upstream provenance in a "copied" provenance record to record
+ * where the path was copied from. But uninformative origins like
+ * LocalStore are omitted.
+ */
+static std::shared_ptr<const Provenance> addCopiedProvenance(
+    std::shared_ptr<const Provenance> prov,
+    Store & srcStore)
+{
+    if (!srcStore.uriIsUsefulProvenance())
+        return prov;
+    return std::make_shared<const Provenance>(
+        Provenance::ProvCopied {
+            .from = srcStore.getUri(),
+            .provenance = prov,
+        });
+}
+
+
 void copyStorePath(
     Store & srcStore,
     Store & dstStore,
@@ -973,26 +997,23 @@ void copyStorePath(
         {storePathS, srcUri, dstUri});
     PushActivity pact(act.id);
 
-    auto info = srcStore.queryPathInfo(storePath);
+    auto srcInfo = srcStore.queryPathInfo(storePath);
+    auto info = make_ref<ValidPathInfo>(*srcInfo);
 
     uint64_t total = 0;
 
     // recompute store path on the chance dstStore does it differently
     if (info->ca && info->references.empty()) {
-        auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->path = dstStore.makeFixedOutputPathFromCA(
+        info->path = dstStore.makeFixedOutputPathFromCA(
             info->path.name(),
             info->contentAddressWithReferences().value());
         if (dstStore.storeDir == srcStore.storeDir)
-            assert(info->path == info2->path);
-        info = info2;
+            assert(info->path == srcInfo->path);
     }
 
-    if (info->ultimate) {
-        auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->ultimate = false;
-        info = info2;
-    }
+    info->ultimate = false;
+
+    info->provenance = addCopiedProvenance(info->provenance, srcStore);
 
     auto source = sinkToSource([&](Sink & sink) {
         LambdaSink progressSink([&](std::string_view data) {
@@ -1119,6 +1140,7 @@ std::map<StorePath, StorePath> copyPaths(
 
         ValidPathInfo infoForDst = *info;
         infoForDst.path = storePathForDst;
+        infoForDst.provenance = addCopiedProvenance(info->provenance, srcStore);
 
         auto source = sinkToSource([&](Sink & sink) {
             // We can reasonably assume that the copy will happen whenever we

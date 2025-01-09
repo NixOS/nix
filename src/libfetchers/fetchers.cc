@@ -4,6 +4,7 @@
 #include "fetch-to-store.hh"
 #include "json-utils.hh"
 #include "store-path-accessor.hh"
+#include "provenance.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -188,7 +189,20 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
         try {
             auto [accessor, result] = getAccessorUnchecked(store);
 
-            auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, result.getName());
+            auto storePath = nix::fetchToStore(
+                *store,
+                SourcePath(accessor),
+                FetchMode::Copy,
+                result.getName(),
+                ContentAddressMethod::Raw::NixArchive,
+                nullptr,
+                NoRepair,
+                std::make_shared<Provenance>(
+                    Provenance::ProvSourcePath {
+                        .tree = std::make_shared<nlohmann::json>(fetchers::attrsToJSON(result.attrs)),
+                        .path = CanonPath::root,
+                    }
+                ));
 
             auto narHash = store->queryPathInfo(storePath)->narHash;
             result.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));

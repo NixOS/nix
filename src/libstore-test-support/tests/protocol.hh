@@ -32,11 +32,13 @@ public:
         CharacterizationTest::readTest(testStem, [&](const auto & encoded) {
             T got = ({
                 StringSource from { encoded };
+                std::set<std::string> features;
                 Proto::template Serialise<T>::read(
                     *LibStoreTest::store,
                     typename Proto::ReadConn {
                         .from = from,
                         .version = version,
+                        .features = features,
                     });
             });
 
@@ -52,11 +54,13 @@ public:
     {
         CharacterizationTest::writeTest(testStem, [&]() {
             StringSink to;
+            std::set<std::string> features;
             Proto::template Serialise<T>::write(
                 *LibStoreTest::store,
                 typename Proto::WriteConn {
                     .to = to,
                     .version = version,
+                    .features = features,
                 },
                 decoded);
             return std::move(to.s);

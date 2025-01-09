@@ -3,6 +3,7 @@
 #include "store-api.hh"
 #include "strings.hh"
 #include "json-utils.hh"
+#include "provenance.hh"
 
 namespace nix {
 
@@ -81,6 +82,9 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             // FIXME: allow blank ca or require skipping field?
             ca = ContentAddress::parseOpt(value);
         }
+        else if (name == "Provenance") {
+            provenance = std::make_shared<const Provenance>(nlohmann::json::parse(value).template get<Provenance>());
+        }
 
         pos = eol + 1;
         line += 1;
@@ -123,6 +127,9 @@ std::string NarInfo::to_string(const Store & store) const
 
     if (ca)
         res += "CA: " + renderContentAddress(*ca) + "\n";
+
+    if (provenance)
+        res += "Provenance: " + nlohmann::json(*provenance).dump() + "\n";
 
     return res;
 }

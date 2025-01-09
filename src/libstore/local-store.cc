@@ -17,6 +17,7 @@
 #include "posix-source-accessor.hh"
 #include "keys.hh"
 #include "users.hh"
+#include "provenance.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -305,13 +306,13 @@ LocalStore::LocalStore(
 
     /* Prepare SQL statements. */
     state->stmts->RegisterValidPath.create(state->db,
-        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs, ca) values (?, ?, ?, ?, ?, ?, ?, ?);");
+        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs, ca, provenance) values (?, ?, ?, ?, ?, ?, ?, ?, ?);");
     state->stmts->UpdatePathInfo.create(state->db,
         "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ?, ca = ? where path = ?;");
     state->stmts->AddReference.create(state->db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
     state->stmts->QueryPathInfo.create(state->db,
-        "select id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca from ValidPaths where path = ?;");
+        "select id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca, provenance from ValidPaths where path = ?;");
     state->stmts->QueryReferences.create(state->db,
         "select path from Refs join ValidPaths on reference = id where referrer = ?;");
     state->stmts->QueryReferrers.create(state->db,
@@ -562,6 +563,10 @@ void LocalStore::upgradeDBSchema(State & state)
             "20220326-ca-derivations",
             #include "ca-specific-schema.sql.gen.hh"
             );
+
+    doUpgrade(
+        "20241024-provenance",
+        "alter table ValidPaths add column provenance text");
 }
 
 
@@ -679,6 +684,10 @@ uint64_t LocalStore::addValidPath(State & state,
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (renderContentAddress(info.ca), (bool) info.ca)
+        (info.provenance
+            ? nlohmann::json(*info.provenance).dump()
+            : "",
+            (bool) info.provenance)
         .exec();
     uint64_t id = state.db.getLastInsertedRowId();
 
@@ -769,6 +778,10 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
 
     while (useQueryReferences.next())
         info->references.insert(parseStorePath(useQueryReferences.getStr(0)));
+
+    auto prov = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 8);
+    if (prov)
+        info->provenance = std::make_shared<const Provenance>(nlohmann::json::parse(prov).template get<Provenance>());
 
     return info;
 }
@@ -1162,7 +1175,8 @@ StorePath LocalStore::addToStoreFromDump(
     ContentAddressMethod hashMethod,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
-    RepairFlag repair)
+    RepairFlag repair,
+    std::shared_ptr<const Provenance> provenance)
 {
     /* For computing the store path. */
     auto hashSink = std::make_unique<HashSink>(hashAlgo);
@@ -1262,7 +1276,6 @@ StorePath LocalStore::addToStoreFromDump(
         PathLocks outputLock({realPath});
 
         if (repair || !isValidPath(dstPath)) {
-
             deletePath(realPath);
 
             autoGC();
@@ -1311,6 +1324,7 @@ StorePath LocalStore::addToStoreFromDump(
                 narHash.first
             };
             info.narSize = narHash.second;
+            info.provenance = provenance;
             registerValidPath(info);
         }
 
