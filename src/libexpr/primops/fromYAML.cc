@@ -6,6 +6,7 @@
 #  include <ryml.hpp>
 #  include <c4/format.hpp>
 #  include <c4/std/string.hpp>
+#  include <boost/lexical_cast.hpp>
 
 namespace {
 
@@ -44,52 +45,6 @@ bool isInt_1_2(ryml::csubstr val)
         result = false;
     }
     return result;
-}
-
-/**
- * Tries to parse a string into a floating point number according to the YAML 1.2 core schema, wrapping ryml::from_chars
- */
-std::optional<NixFloat> parseFloat(std::optional<bool> isInt, ryml::csubstr val)
-{
-    std::optional<NixFloat> maybe_float;
-    NixFloat _float;
-    size_t len = val.size();
-    // first character has to match [0-9+-.]
-    if (isInt.value_or(false)) {
-        NixInt::Inner _int;
-        if (len == 2 && isEqualSameLengthStr<2>(&val[0], "-0")) {
-            // valid int, so that it would be parsed as 0.0 otherwise
-            maybe_float = -0.0;
-        } else if (ryml::from_chars(val.sub(val[0] == '+'), &_int)) {
-            maybe_float.emplace(_int);
-        }
-    } else if (len >= 1 && val[0] >= '+' && val[0] <= '9' && val[0] != ',' && val[0] != '/') {
-        size_t skip = val[0] == '+' || val[0] == '-';
-        if ((len == skip + 4) && val[skip + 0] == '.') {
-            auto sub = &val[skip + 1];
-            if (skip == 0
-                && (isEqualSameLengthStr<3>(sub, "nan")
-                    || (sub[0] == 'N' && (sub[1] == 'a' || sub[1] == 'A') && sub[2] == 'N'))) {
-                maybe_float = std::numeric_limits<NixFloat>::quiet_NaN();
-            } else if (
-                ((sub[0] == 'i' || sub[0] == 'I') && isEqualSameLengthStr<2>(sub + 1, "nf"))
-                || isEqualSameLengthStr<3>(sub, "INF")) {
-                NixFloat inf = std::numeric_limits<NixFloat>::infinity();
-                maybe_float = val[0] == '-' ? -inf : inf;
-            }
-        }
-        auto sub = &val[0] + 1;
-        if (len == skip + 3 && (isEqualSameLengthStr<3>(sub, "nan") || isEqualSameLengthStr<3>(sub, "inf"))) {
-            // ryml::from_chars converts "nan" and "inf"
-        } else if (
-            !maybe_float && ((!isInt && val.is_number()) || (isInt && val.is_real()))
-            && val.sub(1, std::min(size_t(2), len - 1)).first_of("xXoObB") == ryml::npos
-            && ryml::from_chars(val.sub(val[0] == '+'), &_float)) {
-            // isInt => !*isInt because of (isInt && *isInt) == false)
-            maybe_float = _float;
-        }
-    }
-    return maybe_float;
 }
 
 std::optional<bool> parseBool_1_2(ryml::csubstr val)
@@ -184,6 +139,10 @@ struct FromYAMLContext
     }
 
     void visitYAMLNode(Value & v, ryml::ConstNodeRef t, bool isTopNode = false);
+
+    NixInt::Inner parseInt(ryml::csubstr val);
+
+    std::optional<NixFloat> parseFloat(std::optional<bool> isInt, ryml::csubstr val);
 };
 
 FromYAMLContext::FromYAMLContext(EvalState & state, PosIdx pos, std::string_view yaml, const Bindings * options)
@@ -212,6 +171,112 @@ void s_error [[noreturn]] (const char * msg, size_t len, ryml::Location, void * 
     } else {
         throw Error({.msg = fmt("failed assertion in rapidyaml library:\n\n%1%", std::string_view(msg, len))});
     }
+}
+
+/**
+ * Tries to parse a string into an integer according to the YAML 1.2 core schema, wrapping boost::try_lexical_convert
+ * The caller has to ensure that `val` represents an integer!
+ */
+NixInt::Inner FromYAMLContext::parseInt(ryml::csubstr val)
+{
+    size_t len = val.size();
+    NixInt::Inner _int = 0;
+    static_assert(sizeof(NixInt::Inner) == sizeof(int64_t));
+    if (len > 2 && val[1] == 'x') {
+        size_t i = 2;
+        for (; i < len && val[i] == '0'; i++)
+            ;
+        size_t maxChars = i + 64 / 4;
+        if (len > maxChars || (len == maxChars && val[i] >= '8')) {
+            throwError("cannot convert '%2%' to an integer because it would overflow", val);
+        }
+        for (char decoded; i < len; i++) {
+            if (val[i] <= '9') {
+                decoded = val[i] - '0';
+            } else if (val[i] <= 'F') {
+                decoded = val[i] - ('A' - 10);
+            } else {
+                decoded = val[i] - ('a' - 10);
+            }
+            _int = (_int << 4) | decoded;
+        }
+    } else if (len > 2 && val[1] == 'o') {
+        size_t i = 2;
+        for (; i < len && val[i] == '0'; i++)
+            ;
+        size_t maxChars = i + 64 / 3; // MSB of Nix integer is the sign bit
+        if (len > maxChars) {
+            throwError("cannot convert '%2%' to an integer because it would overflow", val);
+        }
+        for (; i < len; i++) {
+            _int = (_int << 3) | (val[i] - '0');
+        }
+    } else if (!boost::conversion::detail::try_lexical_convert(val.data(), val.size(), _int)) {
+        auto reason = val[0] == '-' ? "underflow" : "overflow";
+        throwError("cannot convert '%2%' to an integer because it would %3%", val, reason);
+    }
+    return _int;
+}
+
+/**
+ * Tries to parse a string into a floating point number according to the YAML 1.2 core schema, wrapping ryml::from_chars
+ */
+std::optional<NixFloat> FromYAMLContext::parseFloat(std::optional<bool> isInt, ryml::csubstr val)
+{
+    std::optional<NixFloat> maybe_float;
+    size_t len = val.size();
+    if (isInt.value_or(false)) {
+        try {
+            NixInt::Inner _int = parseInt(val);
+            if (_int != 0 || val[0] != '-') {
+                maybe_float.emplace(_int);
+            } else {
+                maybe_float = -0.0;
+            }
+            return maybe_float;
+        } catch (...) {
+            if (len > 2 && (val[1] == 'x' || val[1] == 'o')) {
+                throw;
+            }
+            // continue with parsing decimal integer as float
+        }
+    }
+    // first character has to match [0-9+-.]
+    if (len >= 1 && val[0] >= '+' && val[0] <= '9' && val[0] != ',' && val[0] != '/') {
+        size_t skip = val[0] == '+' || val[0] == '-';
+        if ((len == skip + 4) && val[skip + 0] == '.') {
+            auto sub = &val[skip + 1];
+            if (skip == 0
+                && (isEqualSameLengthStr<3>(sub, "nan")
+                    || (sub[0] == 'N' && (sub[1] == 'a' || sub[1] == 'A') && sub[2] == 'N'))) {
+                maybe_float = std::numeric_limits<NixFloat>::quiet_NaN();
+            } else if (
+                ((sub[0] == 'i' || sub[0] == 'I') && isEqualSameLengthStr<2>(sub + 1, "nf"))
+                || isEqualSameLengthStr<3>(sub, "INF")) {
+                NixFloat inf = std::numeric_limits<NixFloat>::infinity();
+                maybe_float = val[0] == '-' ? -inf : inf;
+            }
+        }
+        auto sub = &val[0] + 1;
+        if (len == skip + 3 && (isEqualSameLengthStr<3>(sub, "nan") || isEqualSameLengthStr<3>(sub, "inf"))) {
+            // ryml::from_chars converts "nan" and "inf"
+        } else if (
+            !maybe_float && ((!isInt && val.is_number()) || (isInt && val.is_real()))
+            && val.sub(1, std::min(size_t(2), len - 1)).first_of("xXoObB") == ryml::npos) {
+            // isInt => !*isInt because of ((isInt && *isInt) == false)
+            NixFloat _float;
+            if (!ryml::from_chars(val.sub(val[0] == '+'), &_float)) {
+                throwError("cannot convert '%2%' to a floating point number", val);
+            }
+            constexpr NixFloat fmin = std::numeric_limits<NixFloat>::min();
+            // denormals aren't round trip safe
+            if ((_float > 0. && _float < fmin) || (_float < 0. && _float > -fmin)) {
+                throwError("cannot convert '%2%' to a floating point number because it is denormal", val);
+            }
+            maybe_float = _float;
+        }
+    }
+    return maybe_float;
 }
 
 /**
@@ -300,21 +365,15 @@ void FromYAMLContext::visitYAMLNode(Value & v, ryml::ConstNodeRef t, bool isTopN
         std::optional<bool> isInt;
         std::optional<bool> _bool;
         std::optional<NixFloat> _float;
-        NixInt::Inner _int;
-        bool trim = valTag == ryml::TAG_NULL || valTag == ryml::TAG_BOOL || valTag == ryml::TAG_INT
-                    || valTag == ryml::TAG_FLOAT;
-        auto vs = trim ? val.trim("\n\t ") : val;
-        if (scalarTypeCheck(ryml::TAG_NULL) && isNull(vs)) {
+        if (scalarTypeCheck(ryml::TAG_NULL) && isNull(val)) {
             v.mkNull();
-        } else if (scalarTypeCheck(ryml::TAG_BOOL) && (_bool = parseBool(vs))) {
+        } else if (scalarTypeCheck(ryml::TAG_BOOL) && (_bool = parseBool(val))) {
             v.mkBool(*_bool);
+        } else if (scalarTypeCheck(ryml::TAG_INT) && *(isInt = isInt_1_2(val))) {
+            v.mkInt(parseInt(val));
         } else if (
-            scalarTypeCheck(ryml::TAG_INT) && *(isInt = isInt_1_2(vs))
-            && ryml::from_chars(vs.sub(vs[0] == '+'), &_int)) {
-            v.mkInt(_int);
-        } else if (
-            ((valTag == ryml::TAG_FLOAT && (isInt = isInt_1_2(vs))) || (valTag == ryml::TAG_NONE && isPlain))
-            && (_float = parseFloat(isInt, vs))) {
+            ((valTag == ryml::TAG_FLOAT && (isInt = isInt_1_2(val))) || (valTag == ryml::TAG_NONE && isPlain))
+            && (_float = parseFloat(isInt, val))) {
             // if the value is tagged with !!float, then isInt_1_2 evaluation is enforced because the int regex is not a
             // subset of the float regex...
             v.mkFloat(*_float);

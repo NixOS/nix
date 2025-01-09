@@ -256,6 +256,18 @@ TEST_F(FromYAMLTest, Int)
         EXPECT_EQ(item->integer(), NixInt(1));
     }
 
+    std::vector<std::string> stringVec{{std::to_string(INT64_MAX), "0x7fffffffffffffff", "0o777777777777777777777"}};
+    for (const auto & str : stringVec) {
+        val = parseYAML(str.c_str());
+        ASSERT_EQ(val.type(), nInt);
+        EXPECT_EQ(val.integer(), NixInt(INT64_MAX));
+    }
+
+    std::string str = std::to_string(INT64_MIN);
+    val = parseYAML(str.c_str());
+    ASSERT_EQ(val.type(), nInt);
+    EXPECT_EQ(val.integer(), NixInt(INT64_MIN));
+
     const char * strings[] = {"+", "0b1", "0B1", "0O1", "0X1", "+0b1", "-0b1", "+0o1", "-0o1", "+0x1", "-0x1"};
     for (auto str : strings) {
         Value val = parseYAML(str);
@@ -275,11 +287,47 @@ TEST_F(FromYAMLTest, Float)
     ASSERT_EQ(val.type(), nFloat);
     EXPECT_EQ(1. / val.fpoint(), 1. / -0.) << "\"!!float -0\" shall be parsed as -0.0";
 
+    val = parseYAML("!!float -00");
+    ASSERT_EQ(val.type(), nFloat);
+    EXPECT_EQ(1. / val.fpoint(), 1. / -0.) << "\"!!float -00\" shall be parsed as -0.0";
+
+    val = parseYAML("!!float 9223372036854775808"); // INT64_MAX + 1
+    ASSERT_EQ(val.type(), nFloat);
+    EXPECT_EQ(val.fpoint(), 9223372036854775808.) << "shall have no integer overflow";
+
+    val = parseYAML("!!float -9223372036854775809"); // INT64_MIN - 1
+    ASSERT_EQ(val.type(), nFloat);
+    EXPECT_EQ(val.fpoint(), -9223372036854775809.) << "shall have no integer overflow";
+
     const char * strings[] = {"0x1.", "0X1.", "0b1.", "0B1.", "0o1.", "0O1"};
     for (auto str : strings) {
         Value val = parseYAML(str);
         ASSERT_EQ(val.type(), nString) << "'" << str << "' shall not be converted to a float";
         EXPECT_EQ(val.string_view(), str);
+    }
+}
+
+TEST_F(FromYAMLTest, Overflow)
+{
+    const char * strings[] = {
+        "1e310",   // NixFloat overflow
+        "-1e310",  // NixFloat overflow
+        "1e-400",  // NixFloat underflow
+        "-1e-400", // NixFloat underflow
+        "1e-310",  // denormal
+        "-1e-310", // denormal
+        "!!float 11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+        "111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+        "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111", // NixFloat overflow
+        "0x8000000000000000",               // integer overflow (INT64_MAX + 1)
+        "!!float 0x8000000000000000",       // integer overflow (does not match !float regex)
+        "0o1000000000000000000000",         // integer overflow (INT64_MAX + 1)
+        "!!float 0o1000000000000000000000", // integer overflow (does not match !float regex)
+        "9223372036854775808",              // integer overflow (INT64_MAX + 1)
+        "-9223372036854775809"              // integer underflow (INT64_MIN - 1)
+    };
+    for (auto str : strings) {
+        EXPECT_THROW(parseYAML(str), EvalError) << str << ": shall not succeed due to denormal/overflow/underflow";
     }
 }
 

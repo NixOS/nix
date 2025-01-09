@@ -305,6 +305,10 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
     {
         .tag = Xp::FromYaml,
         .name = "from-yaml",
+        .description = R"(
+            Allows parsing of strings as YAML through the [`fromYAML`](@docroot@/language/builtins.md#builtins-fromYAML) built-in.
+        )",
+        .trackingUrl = "https://github.com/NixOS/nix/milestone/57",
     },
 }};
 
