@@ -8,6 +8,8 @@ namespace nix {
 /* ----------- tests for flake/flakeref.hh --------------------------------------------------*/
 
     TEST(parseFlakeRef, path) {
+        experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::Flakes);
+
         fetchers::Settings fetchSettings;
 
         {
