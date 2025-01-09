@@ -701,6 +701,7 @@ Goal::Co DerivationGoal::tryToBuild()
     if (buildMode != bmCheck && allValid) {
         debug("skipping build of derivation '%s', someone beat us to it", worker.store.printStorePath(drvPath));
         outputLocks.setDeletion(true);
+        outputLocks.unlock();
         co_return done(BuildResult::AlreadyValid, std::move(validOutputs));
     }
 
