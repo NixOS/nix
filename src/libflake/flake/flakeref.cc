@@ -183,11 +183,13 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         path = canonPath(path + "/" + getOr(query, "dir", ""));
     }
 
-    fetchers::Attrs attrs;
-    attrs.insert_or_assign("type", "path");
-    attrs.insert_or_assign("path", path);
-
-    return std::make_pair(FlakeRef(fetchers::Input::fromAttrs(fetchSettings, std::move(attrs)), ""), fragment);
+    return fromParsedURL(fetchSettings, {
+        .scheme = "path",
+        .authority = "",
+        .path = path,
+        .query = query,
+        .fragment = fragment
+    }, isFlake);
 }
 
 /**
