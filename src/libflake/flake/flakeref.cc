@@ -89,23 +89,16 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     bool allowMissing,
     bool isFlake)
 {
-    std::string path = url;
-    std::string fragment = "";
-    std::map<std::string, std::string> query;
-    auto pathEnd = url.find_first_of("#?");
-    auto fragmentStart = pathEnd;
-    if (pathEnd != std::string::npos && url[pathEnd] == '?') {
-        fragmentStart = url.find("#");
-    }
-    if (pathEnd != std::string::npos) {
-        path = url.substr(0, pathEnd);
-    }
-    if (fragmentStart != std::string::npos) {
-        fragment = percentDecode(url.substr(fragmentStart+1));
-    }
-    if (pathEnd != std::string::npos && fragmentStart != std::string::npos && url[pathEnd] == '?') {
-        query = decodeQuery(url.substr(pathEnd + 1, fragmentStart - pathEnd - 1));
-    }
+    static std::regex pathFlakeRegex(
+        R"(([^?#]*)(\?([^#]*))?(#(.*))?)",
+        std::regex::ECMAScript);
+
+    std::smatch match;
+    auto succeeds = std::regex_match(url, match, pathFlakeRegex);
+    assert(succeeds);
+    auto path = match[1].str();
+    auto query = decodeQuery(match[3]);
+    auto fragment = percentDecode(match[5].str());
 
     if (baseDir) {
         /* Check if 'url' is a path (either absolute or relative
@@ -190,11 +183,13 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         path = canonPath(path + "/" + getOr(query, "dir", ""));
     }
 
-    fetchers::Attrs attrs;
-    attrs.insert_or_assign("type", "path");
-    attrs.insert_or_assign("path", path);
-
-    return std::make_pair(FlakeRef(fetchers::Input::fromAttrs(fetchSettings, std::move(attrs)), ""), fragment);
+    return fromParsedURL(fetchSettings, {
+        .scheme = "path",
+        .authority = "",
+        .path = path,
+        .query = query,
+        .fragment = fragment
+    }, isFlake);
 }
 
 /**
