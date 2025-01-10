@@ -110,6 +110,7 @@ nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir?ref=HEAD#default"
 # This may change in the future once git submodule support is refined.
 # See: https://discourse.nixos.org/t/57783 and #9708.
 (
+  # This `cd` should not be required and is indicative of aforementioned bug.
   cd "$flake1Dir/.."
   nix build -o "$TEST_ROOT/result" "git+file:./$(basename "$flake1Dir")"
 )
