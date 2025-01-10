@@ -105,6 +105,9 @@ struct BufferedSource : Source
 
     size_t read(char * data, size_t len) override;
 
+    /**
+     * Return true if the buffer is not empty.
+     */
     bool hasData();
 
 protected:
@@ -163,6 +166,13 @@ struct FdSource : BufferedSource
     FdSource & operator=(FdSource && s) = default;
 
     bool good() override;
+
+    /**
+     * Return true if the buffer is not empty after a non-blocking
+     * read.
+     */
+    bool hasData();
+
 protected:
     size_t readUnbuffered(char * data, size_t len) override;
 private:
@@ -530,15 +540,16 @@ struct FramedSource : Source
 /**
  * Write as chunks in the format expected by FramedSource.
  *
- * The exception_ptr reference can be used to terminate the stream when you
- * detect that an error has occurred on the remote end.
+ * The `checkError` function can be used to terminate the stream when you
+ * detect that an error has occurred. It does so by throwing an exception.
  */
 struct FramedSink : nix::BufferedSink
 {
     BufferedSink & to;
-    std::exception_ptr & ex;
+    std::function<void()> checkError;
 
-    FramedSink(BufferedSink & to, std::exception_ptr & ex) : to(to), ex(ex)
+    FramedSink(BufferedSink & to, std::function<void()> && checkError)
+        : to(to), checkError(checkError)
     { }
 
     ~FramedSink()
@@ -553,13 +564,9 @@ struct FramedSink : nix::BufferedSink
 
     void writeUnbuffered(std::string_view data) override
     {
-        /* Don't send more data if the remote has
-            encountered an error. */
-        if (ex) {
-            auto ex2 = ex;
-            ex = nullptr;
-            std::rethrow_exception(ex2);
-        }
+        /* Don't send more data if an error has occured. */
+        checkError();
+
         to << data.size();
         to(data);
     };
