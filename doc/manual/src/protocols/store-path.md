@@ -82,7 +82,7 @@ where
 
   - if `type` = `"source:" ...`:
 
-    the the hash of the [Nix Archive (NAR)] serialization of the [file system object](@docroot@/store/file-system-object.md) of the store object.
+    the hash of the [Nix Archive (NAR)] serialization of the [file system object](@docroot@/store/file-system-object.md) of the store object.
 
   - if `type` = `"output:" id`:
 

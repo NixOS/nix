@@ -85,7 +85,7 @@
 - Store object info JSON format now uses `null` rather than omitting fields [#9995](https://github.com/NixOS/nix/pull/9995)
 
   The [store object info JSON format](@docroot@/protocols/json/store-object-info.md), used for e.g. `nix path-info`, no longer omits fields to indicate absent information, but instead includes the fields with a `null` value.
-  For example, `"ca": null` is used to to indicate a store object that isn't content-addressed rather than omitting the `ca` field entirely.
+  For example, `"ca": null` is used to indicate a store object that isn't content-addressed rather than omitting the `ca` field entirely.
   This makes records of this sort more self-describing, and easier to consume programmatically.
 
   We will follow this design principle going forward;
