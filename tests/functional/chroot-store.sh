@@ -43,6 +43,7 @@ EOF
     removeBuildDirRef "$flakeDir"/*.nix
 
     TODO_NixOS
+    requiresUnprivilegedUserNamespaces
 
     outPath=$(nix build --print-out-paths --no-link --sandbox-paths '/nix? /bin? /lib? /lib64? /usr?' --store "$TEST_ROOT/x" path:"$flakeDir")
 
