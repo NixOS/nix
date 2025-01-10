@@ -61,6 +61,7 @@ MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
 MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
+MakeError(NoCompatibleBuilder, Error);
 
 MakeError(InvalidStoreReference, Error);
 

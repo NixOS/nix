@@ -164,6 +164,7 @@ suites = [
       'debugger.sh',
       'extra-sandbox-profile.sh',
       'help.sh',
+      'keep-going.sh',
     ],
     'workdir': meson.current_source_dir(),
   },

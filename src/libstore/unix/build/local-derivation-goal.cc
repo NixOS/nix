@@ -264,6 +264,10 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
         buildUser.reset();
         worker.permanentFailure = true;
         co_return done(BuildResult::InputRejected, {}, std::move(e));
+    } catch (NoCompatibleBuilder & e) {
+        outputLocks.unlock();
+        buildUser.reset();
+        co_return done(BuildResult::NoCompatibleBuilder, {}, std::move(e));
     }
 
     started();
@@ -532,7 +536,7 @@ void LocalDerivationGoal::startBuilder()
 
     /* Right platform? */
     if (!parsedDrv->canBuildLocally(worker.store))
-        throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
+        throw NoCompatibleBuilder("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
             drv->platform,
             concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
             worker.store.printStorePath(drvPath),

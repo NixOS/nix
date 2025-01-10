@@ -36,6 +36,7 @@ struct BuildResult
         NotDeterministic,
         ResolvesToAlreadyValid,
         NoSubstituters,
+        NoCompatibleBuilder,
     } status = MiscFailure;
 
     /**
@@ -64,6 +65,7 @@ struct BuildResult
                 case NotDeterministic: return "NotDeterministic";
                 case ResolvesToAlreadyValid: return "ResolvesToAlreadyValid";
                 case NoSubstituters: return "NoSubstituters";
+                case NoCompatibleBuilder: return "NoCompatibleBuilder";
                 default: return "Unknown";
             };
         }();
