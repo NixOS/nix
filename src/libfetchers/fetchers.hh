@@ -89,6 +89,30 @@ public:
      */
     bool isLocked() const;
 
+<<<<<<< HEAD
+=======
+    /**
+     * Return whether the input is either locked, or, if
+     * `allow-dirty-locks` is enabled, it has a NAR hash. In the
+     * latter case, we can verify the input but we may not be able to
+     * fetch it from anywhere.
+     */
+    bool isConsideredLocked(
+        const Settings & settings) const;
+
+    /**
+     * Return whether this is a "final" input, meaning that fetching
+     * it will not add, remove or change any attributes. (See
+     * `checkLocks()` for the semantics.) Only "final" inputs can be
+     * substituted from a binary cache.
+     *
+     * The "final" state is denoted by the presence of an attribute
+     * `__final = true`. This attribute is currently undocumented and
+     * for internal use only.
+     */
+    bool isFinal() const;
+
+>>>>>>> e16139329 (Add setting 'allow-dirty-locks')
     bool operator ==(const Input & other) const noexcept;
 
     bool contains(const Input & other) const;

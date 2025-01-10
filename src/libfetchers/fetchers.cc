@@ -3,6 +3,11 @@
 #include "source-path.hh"
 #include "fetch-to-store.hh"
 #include "json-utils.hh"
+<<<<<<< HEAD
+=======
+#include "store-path-accessor.hh"
+#include "fetch-settings.hh"
+>>>>>>> e16139329 (Add setting 'allow-dirty-locks')
 
 #include <nlohmann/json.hpp>
 
@@ -145,6 +150,20 @@ bool Input::isLocked() const
     return scheme && scheme->isLocked(*this);
 }
 
+<<<<<<< HEAD
+=======
+bool Input::isConsideredLocked(
+    const Settings & settings) const
+{
+    return isLocked() || (settings.allowDirtyLocks && getNarHash());
+}
+
+bool Input::isFinal() const
+{
+    return maybeGetBoolAttr(attrs, "__final").value_or(false);
+}
+
+>>>>>>> e16139329 (Add setting 'allow-dirty-locks')
 Attrs Input::toAttrs() const
 {
     return attrs;

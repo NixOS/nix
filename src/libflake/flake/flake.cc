@@ -330,6 +330,7 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup
 }
 
 static LockFile readLockFile(
+    const Settings & settings,
     const fetchers::Settings & fetchSettings,
     const SourcePath & lockFilePath)
 {
@@ -365,6 +366,7 @@ LockedFlake lockFlake(
         }
 
         auto oldLockFile = readLockFile(
+            settings,
             state.fetchSettings,
             lockFlags.referenceLockFilePath.value_or(
                 flake.lockFilePath()));
@@ -601,7 +603,7 @@ LockedFlake lockFlake(
                                 inputFlake.inputs, childNode, inputPath,
                                 oldLock
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
-                                : readLockFile(state.fetchSettings, inputFlake.lockFilePath()).root.get_ptr(),
+                                : readLockFile(settings, state.fetchSettings, inputFlake.lockFilePath()).root.get_ptr(),
                                 oldLock ? lockRootPath : inputPath,
                                 localPath,
                                 false);
@@ -663,7 +665,15 @@ LockedFlake lockFlake(
 
             if (lockFlags.writeLockFile) {
                 if (sourcePath || lockFlags.outputLockFilePath) {
+<<<<<<< HEAD
                     if (auto unlockedInput = newLockFile.isUnlocked()) {
+=======
+                    if (auto unlockedInput = newLockFile.isUnlocked(state.fetchSettings)) {
+                        if (lockFlags.failOnUnlocked)
+                            throw Error(
+                                "Will not write lock file of flake '%s' because it has an unlocked input ('%s'). "
+                                "Use '--allow-dirty-locks' to allow this anyway.", topRef, *unlockedInput);
+>>>>>>> e16139329 (Add setting 'allow-dirty-locks')
                         if (state.fetchSettings.warnDirty)
                             warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
                     } else {
@@ -950,9 +960,11 @@ static RegisterPrimOp r4({
 
 }
 
-std::optional<Fingerprint> LockedFlake::getFingerprint(ref<Store> store) const
+std::optional<Fingerprint> LockedFlake::getFingerprint(
+    ref<Store> store,
+    const fetchers::Settings & fetchSettings) const
 {
-    if (lockFile.isUnlocked()) return std::nullopt;
+    if (lockFile.isUnlocked(fetchSettings)) return std::nullopt;
 
     auto fingerprint = flake.lockedRef.input.getFingerprint(store);
     if (!fingerprint) return std::nullopt;

@@ -448,7 +448,7 @@ ref<eval_cache::EvalCache> openEvalCache(
     std::shared_ptr<flake::LockedFlake> lockedFlake)
 {
     auto fingerprint = evalSettings.useEvalCache && evalSettings.pureEval
-        ? lockedFlake->getFingerprint(state.store)
+        ? lockedFlake->getFingerprint(state.store, state.fetchSettings)
         : std::nullopt;
     auto rootLoader = [&state, lockedFlake]()
         {
