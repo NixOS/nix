@@ -86,7 +86,7 @@ MixFlakeOptions::MixFlakeOptions()
 
     > **DEPRECATED**
     >
-    > Use [`--no-use-registries`](#opt-no-use-registries) instead.
+    > Use [`--no-use-registries`](@docroot@/command-ref/conf-file.md#conf-use-registries) instead.
         )",
         .category = category,
         .handler = {[&]() {
