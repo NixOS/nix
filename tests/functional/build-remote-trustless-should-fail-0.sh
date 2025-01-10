@@ -8,6 +8,7 @@ TODO_NixOS
 restartDaemon
 
 requireSandboxSupport
+requiresUnprivilegedUserNamespaces
 [[ $busybox =~ busybox ]] || skipTest "no busybox"
 
 unset NIX_STORE_DIR
