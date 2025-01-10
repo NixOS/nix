@@ -1,20 +1,13 @@
-#include <array>
-#include <cstdlib>
-#include <curl/curl.h>
-#include <filesystem>
 #include <fstream>
 #include <git2.h>
-#include <iostream>
-#include <memory>
 #include <nlohmann/json.hpp>
-#include <regex>
-#include <sstream>
-#include <stdexcept>
 #include <string>
 
-#include "serialise.hh"
+#include "filetransfer.hh"
 #include "processes.hh"
+#include "sync.hh"
 #include "url.hh"
+#include "users.hh"
 
 namespace fs = std::filesystem;
 
@@ -30,34 +23,6 @@ struct Md
     size_t size;      // in bytes
 };
 
-struct GitUrl
-{
-    std::string protocol;
-    std::string user;
-    std::string host;
-    std::string port;
-    std::string path;
-
-    std::string toHttp() const
-    {
-        if (protocol.empty() || host.empty()) {
-            return "";
-        }
-        std::string prefix = ((protocol == "ssh") ? "https" : protocol) + "://";
-        return prefix + host + (port.empty() ? "" : ":" + port) + "/" + path;
-    }
-
-    // [host, path]
-    std::pair<std::string, std::string> toSsh() const
-    {
-        if (host.empty()) {
-            return {"", ""};
-        }
-        std::string userPart = user.empty() ? "" : user + "@";
-        return {userPart + host, path};
-    }
-};
-
 struct Fetch
 {
     // Reference to the repository
@@ -66,103 +31,56 @@ struct Fetch
     // Git commit being fetched
     git_oid rev;
 
-    // from shelling out to ssh, used  for 2 subsequent fetches:
-    // list of URLs to fetch from, and fetching the data itself
-    std::string token = "";
-
     // derived from git remote url
-    GitUrl gitUrl = GitUrl{};
+    nix::ParsedURL url;
 
     Fetch(git_repository * repo, git_oid rev);
     bool shouldFetch(const std::string & path) const;
     void fetch(
-        const git_blob * pointerBlob,
+        const std::string content,
         const std::string & pointerFilePath,
-        Sink & sink,
+        StringSink & sink,
         std::function<void(uint64_t)> sizeCallback) const;
     std::vector<nlohmann::json> fetchUrls(const std::vector<Md> & metadatas) const;
 };
 
-static size_t writeCallback(void * contents, size_t size, size_t nmemb, std::string * s)
-{
-    size_t newLength = size * nmemb;
-    s->append((char *) contents, newLength);
-    return newLength;
-}
-
-struct SinkCallbackData
-{
-    Sink * sink;
-    std::string_view sha256Expected;
-    HashSink hashSink;
-
-    SinkCallbackData(Sink * sink, std::string_view sha256)
-        : sink(sink)
-        , sha256Expected(sha256)
-        , hashSink(HashAlgorithm::SHA256)
-    {
-    }
-};
-
-static size_t sinkWriteCallback(void * contents, size_t size, size_t nmemb, SinkCallbackData * data)
-{
-    size_t totalSize = size * nmemb;
-    data->hashSink({(char *) contents, totalSize});
-    (*data->sink)({(char *) contents, totalSize});
-    return totalSize;
-}
-
 // if authHeader is "", downloadToSink assumes no auth is expected
 void downloadToSink(
-    const std::string & url, const std::string & authHeader, Sink & sink, std::string_view sha256Expected)
+    const std::string & url,
+    const std::string & authHeader,
+    StringSink & sink,
+    std::string path,
+    std::string sha256Expected,
+    size_t sizeExpected)
 {
-    CURL * curl;
-    CURLcode res;
+    FileTransferRequest request(url);
+    Headers headers;
+    if (!authHeader.empty())
+        headers.push_back({"Authorization", authHeader});
+    request.headers = headers;
+    getFileTransfer()->download(std::move(request), sink);
+    std::string data = sink.s;
 
-    curl = curl_easy_init();
-    SinkCallbackData data(&sink, sha256Expected);
+    const auto sizeActual = data.length();
+    if (sizeExpected != sizeActual)
+        throw Error("size mismatch while fetching %s: expected %d but got %d", url, sizeExpected, sizeActual);
 
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, sinkWriteCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-
-    struct curl_slist * headers = nullptr;
-    if (!authHeader.empty()) {
-        const std::string authHeader_prepend = "Authorization: " + authHeader;
-        headers = curl_slist_append(headers, authHeader_prepend.c_str());
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    }
-
-    res = curl_easy_perform(curl);
-    if (res != CURLE_OK) {
-        curl_slist_free_all(headers);
-        curl_easy_cleanup(curl);
-        throw std::runtime_error(std::string("curl_easy_perform() failed: ") + curl_easy_strerror(res));
-    }
-
-    const auto sha256Actual = data.hashSink.finish().first.to_string(HashFormat::Base16, false);
-    if (sha256Actual != data.sha256Expected) {
-        throw std::runtime_error(
-            "sha256 mismatch: while fetching " + url + ": expected " + std::string(data.sha256Expected) + " but got "
-            + sha256Actual);
-    }
-
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
+    const auto sha256Actual = hashString(HashAlgorithm::SHA256, data).to_string(HashFormat::Base16, false);
+    if (sha256Actual != sha256Expected)
+        throw Error(
+            "hash mismatch while fetching %s: expected sha256:%s but got sha256:%s", url, sha256Expected, sha256Actual);
 }
 
-std::string getLfsApiToken(const GitUrl & u)
+std::string getLfsApiToken(const ParsedURL & url)
 {
-    const auto [maybeUserAndHost, path] = u.toSsh();
     auto [status, output] = runProgram(RunOptions{
         .program = "ssh",
-        .args = {maybeUserAndHost, "git-lfs-authenticate", path, "download"},
+        .args = {*url.authority, "git-lfs-authenticate", url.path, "download"},
     });
 
     if (output.empty())
         throw std::runtime_error(
-            "git-lfs-authenticate: no output (cmd: ssh " + maybeUserAndHost + " git-lfs-authenticate " + path
+            "git-lfs-authenticate: no output (cmd: ssh " + *url.authority + " git-lfs-authenticate " + url.path
             + " download)");
 
     nlohmann::json query_resp = nlohmann::json::parse(output);
@@ -178,17 +96,28 @@ std::string getLfsApiToken(const GitUrl & u)
 
 std::string getLfsEndpointUrl(git_repository * repo)
 {
-    int err;
-    git_remote * remote = NULL;
-    err = git_remote_lookup(&remote, repo, "origin");
-    if (err < 0) {
-        return "";
+    git_config * config = NULL;
+    if (!git_repository_config(&config, repo))
+        ;
+    {
+        git_config_entry * entry = NULL;
+        if (!git_config_get_entry(&entry, config, "lfs.url")) {
+            auto value = std::string(entry->value);
+            if (!value.empty()) {
+                debug("Found explicit lfs.url value: %s", value);
+                return value;
+            }
+        }
+        git_config_entry_free(entry);
     }
+    git_config_free(config);
+    git_remote * remote = NULL;
+    if (git_remote_lookup(&remote, repo, "origin"))
+        return "";
 
     const char * url_c_str = git_remote_url(remote);
-    if (!url_c_str) {
+    if (!url_c_str)
         return "";
-    }
 
     return std::string(url_c_str);
 }
@@ -249,37 +178,6 @@ std::optional<Md> parseLfsMetadata(const std::string & content, const std::strin
     return std::make_optional(Md{filename, oid, std::stoul(size)});
 }
 
-// there's already a ParseURL here
-// https://github.com/NixOS/nix/blob/ef6fa54e05cd4134ec41b0d64c1a16db46237f83/src/libutil/url.cc#L13 but that does
-// not handle git's custom scp-like syntax
-GitUrl parseGitUrl(const std::string & url)
-{
-    GitUrl result;
-
-    // regular protocols
-    const std::regex r_url(R"(^(ssh|git|https?|ftps?)://(?:([^@]+)@)?([^:/]+)(?::(\d+))?/(.*))");
-
-    // "alternative scp-like syntax" https://git-scm.com/docs/git-fetch#_git_urls
-    const std::regex r_scp_like_url(R"(^(?:([^@]+)@)?([^:/]+):(/?.*))");
-
-    std::smatch matches;
-    if (std::regex_match(url, matches, r_url)) {
-        result.protocol = matches[1].str();
-        result.user = matches[2].str();
-        result.host = matches[3].str();
-        result.port = matches[4].str();
-        result.path = matches[5].str();
-    } else if (std::regex_match(url, matches, r_scp_like_url)) {
-        result.protocol = "ssh";
-
-        result.user = matches[1].str();
-        result.host = matches[2].str();
-        result.path = matches[3].str();
-    }
-
-    return result;
-}
-
 Fetch::Fetch(git_repository * repo, git_oid rev)
 {
     this->repo = repo;
@@ -287,10 +185,7 @@ Fetch::Fetch(git_repository * repo, git_oid rev)
 
     const auto remoteUrl = lfs::getLfsEndpointUrl(repo);
 
-    this->gitUrl = parseGitUrl(remoteUrl);
-    if (this->gitUrl.protocol == "ssh") {
-        this->token = lfs::getLfsApiToken(this->gitUrl);
-    }
+    this->url = nix::parseURL(nix::fixGitURL(remoteUrl)).canonicalise();
 }
 
 bool Fetch::shouldFetch(const std::string & path) const
@@ -308,53 +203,30 @@ bool Fetch::shouldFetch(const std::string & path) const
 nlohmann::json mdToPayload(const std::vector<Md> & items)
 {
     nlohmann::json jArray = nlohmann::json::array();
-    for (const auto & md : items) {
+    for (const auto & md : items)
         jArray.push_back({{"oid", md.oid}, {"size", md.size}});
-    }
     return jArray;
 }
 
 std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> & metadatas) const
 {
+    ParsedURL httpUrl(url);
+    httpUrl.scheme = url.scheme == "ssh" ? "https" : url.scheme;
+    FileTransferRequest request(httpUrl.to_string() + "/info/lfs/objects/batch");
+    request.post = true;
+    Headers headers;
+    if (this->url.scheme == "ssh")
+        headers.push_back({"Authorization", lfs::getLfsApiToken(this->url)});
+    headers.push_back({"Content-Type", "application/vnd.git-lfs+json"});
+    headers.push_back({"Accept", "application/vnd.git-lfs+json"});
+    request.headers = headers;
     nlohmann::json oidList = mdToPayload(metadatas);
-    nlohmann::json data = {
-        {"operation", "download"},
-    };
+    nlohmann::json data = {{"operation", "download"}};
     data["objects"] = oidList;
-    auto dataStr = data.dump();
+    request.data = data.dump();
 
-    CURL * curl = curl_easy_init();
-    char curlErrBuf[CURL_ERROR_SIZE];
-    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curlErrBuf);
-    std::string responseString;
-    std::string headerString;
-    const auto lfsUrlBatch = gitUrl.toHttp() + "/info/lfs/objects/batch";
-    curl_easy_setopt(curl, CURLOPT_URL, lfsUrlBatch.c_str());
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, dataStr.c_str());
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-
-    struct curl_slist * headers = NULL;
-    if (this->token != "") {
-        const auto authHeader = "Authorization: " + token;
-        headers = curl_slist_append(headers, authHeader.c_str());
-    }
-
-    headers = curl_slist_append(headers, "Content-Type: application/vnd.git-lfs+json");
-    headers = curl_slist_append(headers, "Accept: application/vnd.git-lfs+json");
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_POST, 1L);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseString);
-
-    CURLcode res = curl_easy_perform(curl);
-    if (res != CURLE_OK) {
-        std::stringstream ss;
-        ss << "lfs::fetchUrls: bad response from info/lfs/objects/batch: code " << res << " " << curlErrBuf;
-        throw std::runtime_error(ss.str());
-    }
-
-    curl_easy_cleanup(curl);
-    curl_slist_free_all(headers);
+    FileTransferResult result = getFileTransfer()->upload(request);
+    auto responseString = result.data;
 
     std::vector<nlohmann::json> objects;
     // example resp here:
@@ -363,11 +235,10 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> & metadatas) 
 
     try {
         auto resp = nlohmann::json::parse(responseString);
-        if (resp.contains("objects")) {
+        if (resp.contains("objects"))
             objects.insert(objects.end(), resp["objects"].begin(), resp["objects"].end());
-        } else {
+        else
             throw std::runtime_error("response does not contain 'objects'");
-        }
 
         return objects;
     } catch (const nlohmann::json::parse_error & e) {
@@ -378,38 +249,48 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> & metadatas) 
 }
 
 void Fetch::fetch(
-    const git_blob * pointerBlob,
+    const std::string content,
     const std::string & pointerFilePath,
-    Sink & sink,
+    StringSink & sink,
     std::function<void(uint64_t)> sizeCallback) const
 {
     debug("Trying to fetch %s using git-lfs", pointerFilePath);
-    constexpr git_object_size_t chunkSize = 128 * 1024; // 128 KiB
-    auto pointerSize = git_blob_rawsize(pointerBlob);
 
-    if (pointerSize >= 1024) {
+    if (content.length() >= 1024) {
         debug("Skip git-lfs, pointer file too large");
         warn("Encountered a file that should have been a pointer, but wasn't: %s", pointerFilePath);
-        sizeCallback(pointerSize);
-        for (git_object_size_t offset = 0; offset < pointerSize; offset += chunkSize) {
-            sink(std::string(
-                (const char *) git_blob_rawcontent(pointerBlob) + offset, std::min(chunkSize, pointerSize - offset)));
-        }
+        sizeCallback(content.length());
+        sink(content);
         return;
     }
 
-    const auto pointerFileContents = std::string((const char *) git_blob_rawcontent(pointerBlob), pointerSize);
-    const auto md = parseLfsMetadata(std::string(pointerFileContents), std::string(pointerFilePath));
+    const auto md = parseLfsMetadata(std::string(content), std::string(pointerFilePath));
     if (md == std::nullopt) {
         debug("Skip git-lfs, invalid pointer file");
         warn("Encountered a file that should have been a pointer, but wasn't: %s", pointerFilePath);
-        sizeCallback(pointerSize);
-        for (git_object_size_t offset = 0; offset < pointerSize; offset += chunkSize) {
-            sink(std::string(
-                (const char *) git_blob_rawcontent(pointerBlob) + offset, std::min(chunkSize, pointerSize - offset)));
-        }
+        sizeCallback(content.length());
+        sink(content);
         return;
     }
+
+    Path cacheDir = getCacheDir() + "/git-lfs";
+    std::string key =
+        hashString(HashAlgorithm::SHA256, pointerFilePath).to_string(HashFormat::Base16, false) + "/" + md->oid;
+    Path cachePath = cacheDir + "/" + key;
+    if (pathExists(cachePath)) {
+        debug("using cache entry %s -> %s", key, cachePath);
+        std::ifstream stream(cachePath);
+        const auto chunkSize = 128 * 1024; // 128 KiB
+        char buffer[chunkSize];
+        do {
+            if (!stream.read(buffer, chunkSize))
+                if (!stream.eof())
+                    throw Error("I/O error while reading cached file");
+            sink(std::string(buffer, stream.gcount()));
+        } while (stream.gcount() > 0);
+        return;
+    }
+    debug("did not find cache entry for %s", key);
 
     std::vector<Md> vMds;
     vMds.push_back(md.value());
@@ -417,7 +298,7 @@ void Fetch::fetch(
 
     const auto obj = objUrls[0];
     try {
-        std::string oid = obj.at("oid");
+        std::string sha256 = obj.at("oid"); // oid is also the sha256
         std::string ourl = obj.at("actions").at("download").at("href");
         std::string authHeader = "";
         if (obj.at("actions").at("download").contains("header")
@@ -426,7 +307,15 @@ void Fetch::fetch(
         }
         const uint64_t size = obj.at("size");
         sizeCallback(size);
-        downloadToSink(ourl, authHeader, sink, oid); // oid is also the sha256
+        downloadToSink(ourl, authHeader, sink, pointerFilePath, sha256, size);
+
+        debug("creating cache entry %s -> %s", key, cachePath);
+        if (!pathExists(dirOf(cachePath)))
+            createDirs(dirOf(cachePath));
+        std::ofstream stream(cachePath);
+        if (!stream.write(sink.s.c_str(), size))
+            throw Error("I/O error while writing cache file");
+
         debug("%s fetched with git-lfs", pointerFilePath);
     } catch (const nlohmann::json::out_of_range & e) {
         std::stringstream ss;

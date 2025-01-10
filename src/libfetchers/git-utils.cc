@@ -690,14 +690,14 @@ struct GitSourceAccessor : SourceAccessor
         const auto blob = getBlob(path, symlink);
 
         if (lfsFetch) {
-            auto& _lfsFetch = *lfsFetch;
             auto pathStr = std::string(path.rel());
-            if (_lfsFetch.shouldFetch(pathStr)) {
+            if (lfsFetch->shouldFetch(pathStr)) {
                 StringSink s;
                 try {
-                    _lfsFetch.fetch(blob.get(), pathStr, s, [&s](uint64_t size){ s.s.reserve(size); });
+                    auto contents = std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
+                    lfsFetch->fetch(contents, pathStr, s, [&s](uint64_t size){ s.s.reserve(size); });
                 } catch (Error &e) {
-                    e.addTrace({}, "while smudging git-lfs file '%s' (std::string interface)", pathStr);
+                    e.addTrace({}, "while smudging git-lfs file '%s'", path);
                     throw;
                 }
                 return s.s;
@@ -705,37 +705,6 @@ struct GitSourceAccessor : SourceAccessor
         }
 
         return std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
-    }
-
-    void readFile(
-        const CanonPath & path,
-        Sink & sink,
-        std::function<void(uint64_t)> sizeCallback = [](uint64_t size){}) override {
-        auto blob = getBlob(path, false);
-
-        if (lfsFetch) {
-            auto& _lfsFetch = *lfsFetch;
-            auto pathStr = std::string(path.rel());
-            if (_lfsFetch.shouldFetch(pathStr)) {
-                try {
-                    _lfsFetch.fetch(blob.get(), pathStr, sink, sizeCallback);
-                } catch (Error &e) {
-                    e.addTrace({}, "while reading git-lfs file '%s'", pathStr);
-                    throw;
-                }
-                return;
-            } else {
-                debug("Skip git-lfs, not matching .gitattributes patterns: %s", pathStr);
-            }
-        }
-
-        // lfs disabled or does not apply to this path
-        auto size = git_blob_rawsize(blob.get());
-        sizeCallback(size);
-        constexpr git_object_size_t chunkSize = 128 * 1024; // 128 KiB
-        for (git_object_size_t offset = 0; offset < size; offset += chunkSize) {
-            sink(std::string((const char *) git_blob_rawcontent(blob.get()) + offset, std::min(chunkSize, size - offset)));
-        }
     }
 
     std::string readFile(const CanonPath & path) override
