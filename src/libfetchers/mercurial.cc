@@ -161,7 +161,7 @@ struct MercurialInputScheme : InputScheme
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         bool isLocal = url.scheme == "file";
-        return {isLocal, isLocal ? url.path : url.base};
+        return {isLocal, isLocal ? url.path : url.to_string()};
     }
 
     StorePath fetchToStore(ref<Store> store, Input & input) const

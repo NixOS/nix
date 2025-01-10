@@ -22,7 +22,6 @@ ParsedURL parseURL(const std::string & url)
     std::smatch match;
 
     if (std::regex_match(url, match, uriRegex)) {
-        auto & base = match[1];
         std::string scheme = match[2];
         auto authority = match[3].matched
             ? std::optional<std::string>(match[3]) : std::nullopt;
@@ -40,8 +39,6 @@ ParsedURL parseURL(const std::string & url)
             path = "/";
 
         return ParsedURL{
-            .url = url,
-            .base = base,
             .scheme = scheme,
             .authority = authority,
             .path = percentDecode(path),
@@ -134,6 +131,12 @@ std::string ParsedURL::to_string() const
         + percentEncode(path, allowedInPath)
         + (query.empty() ? "" : "?" + encodeQuery(query))
         + (fragment.empty() ? "" : "#" + percentEncode(fragment));
+}
+
+std::ostream & operator << (std::ostream & os, const ParsedURL & url)
+{
+    os << url.to_string();
+    return os;
 }
 
 bool ParsedURL::operator ==(const ParsedURL & other) const noexcept
