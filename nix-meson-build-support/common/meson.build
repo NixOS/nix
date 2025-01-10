@@ -16,7 +16,3 @@ add_project_arguments(
   '-Wno-deprecated-declarations',
   language : 'cpp',
 )
-
-if get_option('buildtype') not in ['debug']
-  add_project_arguments('-O3', language : 'cpp')
-endif

@@ -434,7 +434,7 @@ struct GitInputScheme : InputScheme
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         bool isBareRepository = url.scheme == "file" && !pathExists(url.path + "/.git");
         repoInfo.isLocal = url.scheme == "file" && !forceHttp && !isBareRepository;
-        repoInfo.url = repoInfo.isLocal ? url.path : url.base;
+        repoInfo.url = repoInfo.isLocal ? url.path : url.to_string();
 
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.

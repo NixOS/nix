@@ -262,6 +262,7 @@ public:
     operator const T &() const { return value; }
     operator T &() { return value; }
     const T & get() const { return value; }
+    T & get() { return value; }
     template<typename U>
     bool operator ==(const U & v2) const { return value == v2; }
     template<typename U>

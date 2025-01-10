@@ -2,7 +2,7 @@
 ///@file
 
 #include "file-descriptor.hh"
-#ifdef WIN32
+#ifdef _WIN32
 
 namespace nix::windows {
 
