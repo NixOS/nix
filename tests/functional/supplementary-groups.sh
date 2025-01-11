@@ -9,7 +9,7 @@ needLocalStore "The test uses --store always so we would just be bypassing the d
 
 TODO_NixOS
 
-unshare --mount --map-root-user bash <<EOF
+execUnshare <<EOF
   source common.sh
 
   # Avoid store dir being inside sandbox build-dir
