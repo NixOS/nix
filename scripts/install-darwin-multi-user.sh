@@ -145,13 +145,28 @@ poly_user_id_get() {
     dsclattr "/Users/$1" "UniqueID"
 }
 
+dscl_create() {
+    # workaround a bug in dscl where it sometimes fails with eNotYetImplemented:
+    # https://github.com/NixOS/nix/issues/12140
+    while ! _sudo "$1" /usr/bin/dscl . -create "$2" "$3" "$4" 2> "$SCRATCH/dscl.err"; do
+        local err=$?
+        if [[ $err -eq 140 ]] && grep -q "-14988 (eNotYetImplemented)" "$SCRATCH/dscl.err"; then
+            echo "dscl failed with eNotYetImplemented, retrying..."
+            sleep 1
+            continue
+        fi
+        cat "$SCRATCH/dscl.err"
+        return $err
+    done
+}
+
 poly_user_hidden_get() {
     dsclattr "/Users/$1" "IsHidden"
 }
 
 poly_user_hidden_set() {
-    _sudo "in order to make $1 a hidden user" \
-          /usr/bin/dscl . -create "/Users/$1" "IsHidden" "1"
+    dscl_create "in order to make $1 a hidden user" \
+          "/Users/$1" "IsHidden" "1"
 }
 
 poly_user_home_get() {
@@ -161,8 +176,8 @@ poly_user_home_get() {
 poly_user_home_set() {
     # This can trigger a permission prompt now:
     # "Terminal" would like to administer your computer. Administration can include modifying passwords, networking, and system settings.
-    _sudo "in order to give $1 a safe home directory" \
-          /usr/bin/dscl . -create "/Users/$1" "NFSHomeDirectory" "$2"
+    dscl_create "in order to give $1 a safe home directory" \
+          "/Users/$1" "NFSHomeDirectory" "$2"
 }
 
 poly_user_note_get() {
@@ -170,8 +185,8 @@ poly_user_note_get() {
 }
 
 poly_user_note_set() {
-    _sudo "in order to give $username a useful note" \
-          /usr/bin/dscl . -create "/Users/$1" "RealName" "$2"
+    dscl_create "in order to give $1 a useful note" \
+          "/Users/$1" "RealName" "$2"
 }
 
 poly_user_shell_get() {
@@ -179,8 +194,8 @@ poly_user_shell_get() {
 }
 
 poly_user_shell_set() {
-    _sudo "in order to give $1 a safe shell" \
-          /usr/bin/dscl . -create "/Users/$1" "UserShell" "$2"
+    dscl_create "in order to give $1 a safe shell" \
+          "/Users/$1" "UserShell" "$2"
 }
 
 poly_user_in_group_check() {
