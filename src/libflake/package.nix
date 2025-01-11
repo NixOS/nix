@@ -48,7 +48,7 @@ mkMesonLibrary (finalAttrs: {
       echo ${version} > ../../.version
     '';
 
-  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
+  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux") && !(stdenv.hostPlatform.useLLVM or false)) {
     LDFLAGS = "-fuse-ld=gold";
   };
 
