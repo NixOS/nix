@@ -180,22 +180,22 @@ expr_function
       $$ = me;
       SET_DOC_POS(me, @1);
     }
-  | '{' formals '}' ':' expr_function
-    { auto me = new ExprLambda(CUR_POS, state->validateFormals($2), $5);
+  | '{' formals '}' ':' expr_function[body]
+    { auto me = new ExprLambda(CUR_POS, state->validateFormals($formals), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
-  | '{' formals '}' '@' ID ':' expr_function
+  | '{' formals '}' '@' ID ':' expr_function[body]
     {
-      auto arg = state->symbols.create($5);
-      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($2, CUR_POS, arg), $7);
+      auto arg = state->symbols.create($ID);
+      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formals, CUR_POS, arg), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
-  | ID '@' '{' formals '}' ':' expr_function
+  | ID '@' '{' formals '}' ':' expr_function[body]
     {
-      auto arg = state->symbols.create($1);
-      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($4, CUR_POS, arg), $7);
+      auto arg = state->symbols.create($ID);
+      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formals, CUR_POS, arg), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -364,50 +364,39 @@ ind_string_parts
   ;
 
 binds
-  : binds attrpath '=' expr ';' {
-      $$ = $1;
-
-      auto pos = state->at(@2);
-      auto exprPos = state->at(@4);
-      {
-        auto it = state->lexerState.positionToDocComment.find(pos);
-        if (it != state->lexerState.positionToDocComment.end()) {
-          $4->setDocComment(it->second);
-          state->lexerState.positionToDocComment.emplace(exprPos, it->second);
-        }
-      }
-
-      state->addAttr($$, std::move(*$2), $4, pos);
-      delete $2;
+  : binds[accum] attrpath '=' expr ';' {
+      $$ = $accum;
+      state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
+      delete $attrpath;
     }
-  | binds INHERIT attrs ';'
-    { $$ = $1;
-      for (auto & [i, iPos] : *$3) {
-          if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              state->dupAttr(i.symbol, iPos, $$->attrs[i.symbol].pos);
-          $$->attrs.emplace(
+  | binds[accum] INHERIT attrs ';'
+    { $$ = $accum;
+      for (auto & [i, iPos] : *$attrs) {
+          if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
+              state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
+          $accum->attrs.emplace(
               i.symbol,
               ExprAttrs::AttrDef(new ExprVar(iPos, i.symbol), iPos, ExprAttrs::AttrDef::Kind::Inherited));
       }
-      delete $3;
+      delete $attrs;
     }
-  | binds INHERIT '(' expr ')' attrs ';'
-    { $$ = $1;
-      if (!$$->inheritFromExprs)
-          $$->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
-      $$->inheritFromExprs->push_back($4);
-      auto from = new nix::ExprInheritFrom(state->at(@4), $$->inheritFromExprs->size() - 1);
-      for (auto & [i, iPos] : *$6) {
-          if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              state->dupAttr(i.symbol, iPos, $$->attrs[i.symbol].pos);
-          $$->attrs.emplace(
+  | binds[accum] INHERIT '(' expr ')' attrs ';'
+    { $$ = $accum;
+      if (!$accum->inheritFromExprs)
+          $accum->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
+      $accum->inheritFromExprs->push_back($expr);
+      auto from = new nix::ExprInheritFrom(state->at(@expr), $accum->inheritFromExprs->size() - 1);
+      for (auto & [i, iPos] : *$attrs) {
+          if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
+              state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
+          $accum->attrs.emplace(
               i.symbol,
               ExprAttrs::AttrDef(
                   new ExprSelect(iPos, from, i.symbol),
                   iPos,
                   ExprAttrs::AttrDef::Kind::InheritedFrom));
       }
-      delete $6;
+      delete $attrs;
     }
   | { $$ = new ExprAttrs(state->at(@0)); }
   ;
@@ -468,10 +457,10 @@ expr_list
   ;
 
 formals
-  : formal ',' formals
-    { $$ = $3; $$->formals.emplace_back(*$1); delete $1; }
+  : formal ',' formals[accum]
+    { $$ = $accum; $$->formals.emplace_back(*$formal); delete $formal; }
   | formal
-    { $$ = new Formals; $$->formals.emplace_back(*$1); $$->ellipsis = false; delete $1; }
+    { $$ = new Formals; $$->formals.emplace_back(*$formal); $$->ellipsis = false; delete $formal; }
   |
     { $$ = new Formals; $$->ellipsis = false; }
   | ELLIPSIS
