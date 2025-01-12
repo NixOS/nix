@@ -455,7 +455,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     bool gcKeepOutputs = settings.gcKeepOutputs;
     bool gcKeepDerivations = settings.gcKeepDerivations;
 
-    StorePathSet roots, dead, alive;
+    std::unordered_set<StorePath> roots, dead, alive;
 
     struct Shared
     {
@@ -661,7 +661,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     };
 
-    std::map<StorePath, StorePathSet> referrersCache;
+    std::unordered_map<StorePath, StorePathSet> referrersCache;
 
     /* Helper function that visits all paths reachable from `start`
        via the referrers edges and optionally derivers and derivation
