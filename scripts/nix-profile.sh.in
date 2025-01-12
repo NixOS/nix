@@ -3,14 +3,9 @@ if [ -n "${HOME-}" ] && [ -n "${USER-}" ]; then
 
     # Set up the per-user profile.
 
-<<<<<<< HEAD
     NIX_LINK="$HOME/.nix-profile"
     if [ -n "${XDG_STATE_HOME-}" ]; then
         NIX_LINK_NEW="$XDG_STATE_HOME/nix/profile"
-=======
-    if [ -n "${NIX_STATE_HOME-}" ]; then
-        NIX_LINK="$NIX_STATE_HOME/profile"
->>>>>>> 97fffd876 (nix-profile.sh.in: fix envvar condition)
     else
         NIX_LINK_NEW="$HOME/.local/state/nix/profile"
     fi
