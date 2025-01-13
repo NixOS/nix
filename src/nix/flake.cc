@@ -938,10 +938,10 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                         }
                         continue;
                     } else
-                        createSymlink(target, to2);
+                        createSymlink(target, os_string_to_string(PathViewNG { to2 }));
                 }
                 else
-                    throw Error("file '%s' has unsupported type", from2);
+                    throw Error("path '%s' needs to be a symlink, file, or directory but instead is a %s", from2, st.typeString());
                 changedFiles.push_back(to2);
                 notice("wrote: %s", to2);
             }

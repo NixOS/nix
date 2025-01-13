@@ -14,7 +14,7 @@ struct PathInputScheme : InputScheme
         if (url.scheme != "path") return {};
 
         if (url.authority && *url.authority != "")
-            throw Error("path URL '%s' should not have an authority ('%s')", url.url, *url.authority);
+            throw Error("path URL '%s' should not have an authority ('%s')", url, *url.authority);
 
         Input input{settings};
         input.attrs.insert_or_assign("type", "path");
@@ -27,10 +27,10 @@ struct PathInputScheme : InputScheme
                 if (auto n = string2Int<uint64_t>(value))
                     input.attrs.insert_or_assign(name, *n);
                 else
-                    throw Error("path URL '%s' has invalid parameter '%s'", url.to_string(), name);
+                    throw Error("path URL '%s' has invalid parameter '%s'", url, name);
             }
             else
-                throw Error("path URL '%s' has unsupported parameter '%s'", url.to_string(), name);
+                throw Error("path URL '%s' has unsupported parameter '%s'", url, name);
 
         return input;
     }

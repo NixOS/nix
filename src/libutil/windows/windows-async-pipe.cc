@@ -1,7 +1,7 @@
 #include "windows-async-pipe.hh"
 #include "windows-error.hh"
 
-#ifdef WIN32
+#ifdef _WIN32
 
 namespace nix::windows {
 

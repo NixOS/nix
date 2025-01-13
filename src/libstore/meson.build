@@ -4,8 +4,6 @@ project('nix-store', 'cpp',
     'cpp_std=c++2a',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
-    'debug=true',
-    'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
     'localstatedir=/nix/var',
   ],

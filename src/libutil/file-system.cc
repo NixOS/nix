@@ -331,7 +331,7 @@ void syncParent(const Path & path)
 
 void recursiveSync(const Path & path)
 {
-    /* If it's a file, just fsync and return. */
+    /* If it's a file or symlink, just fsync and return. */
     auto st = lstat(path);
     if (S_ISREG(st.st_mode)) {
         AutoCloseFD fd = toDescriptor(open(path.c_str(), O_RDONLY, 0));
@@ -339,7 +339,8 @@ void recursiveSync(const Path & path)
             throw SysError("opening file '%1%'", path);
         fd.fsync();
         return;
-    }
+    } else if (S_ISLNK(st.st_mode))
+        return;
 
     /* Otherwise, perform a depth-first traversal of the directory and
        fsync all the files. */
@@ -384,7 +385,7 @@ static void _deletePath(Descriptor parentfd, const fs::path & path, uint64_t & b
     if (fstatat(parentfd, name.c_str(), &st,
             AT_SYMLINK_NOFOLLOW) == -1) {
         if (errno == ENOENT) return;
-        throw SysError("getting status of '%1%'", path);
+        throw SysError("getting status of %1%", path);
     }
 
     if (!S_ISDIR(st.st_mode)) {
@@ -416,15 +417,15 @@ static void _deletePath(Descriptor parentfd, const fs::path & path, uint64_t & b
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
         if ((st.st_mode & PERM_MASK) != PERM_MASK) {
             if (fchmodat(parentfd, name.c_str(), st.st_mode | PERM_MASK, 0) == -1)
-                throw SysError("chmod '%1%'", path);
+                throw SysError("chmod %1%", path);
         }
 
         int fd = openat(parentfd, path.c_str(), O_RDONLY);
         if (fd == -1)
-            throw SysError("opening directory '%1%'", path);
+            throw SysError("opening directory %1%", path);
         AutoCloseDir dir(fdopendir(fd));
         if (!dir)
-            throw SysError("opening directory '%1%'", path);
+            throw SysError("opening directory %1%", path);
 
         struct dirent * dirent;
         while (errno = 0, dirent = readdir(dir.get())) { /* sic */
@@ -433,13 +434,13 @@ static void _deletePath(Descriptor parentfd, const fs::path & path, uint64_t & b
             if (childName == "." || childName == "..") continue;
             _deletePath(dirfd(dir.get()), path + "/" + childName, bytesFreed);
         }
-        if (errno) throw SysError("reading directory '%1%'", path);
+        if (errno) throw SysError("reading directory %1%", path);
     }
 
     int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
     if (unlinkat(parentfd, name.c_str(), flags) == -1) {
         if (errno == ENOENT) return;
-        throw SysError("cannot unlink '%1%'", path);
+        throw SysError("cannot unlink %1%", path);
     }
 #else
     // TODO implement
@@ -765,4 +766,19 @@ bool isExecutableFileAmbient(const fs::path & exe) {
         ) == 0;
 }
 
+std::filesystem::path makeParentCanonical(const std::filesystem::path & rawPath)
+{
+    std::filesystem::path path(absPath(rawPath));;
+    try {
+        auto parent = path.parent_path();
+        if (parent == path) {
+            // `path` is a root directory => trivially canonical
+            return parent;
+        }
+        return std::filesystem::canonical(parent) / path.filename();
+    } catch (fs::filesystem_error & e) {
+        throw SysError("canonicalising parent path of '%1%'", path);
+    }
 }
+
+} // namespace nix

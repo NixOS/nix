@@ -2,10 +2,10 @@ queue_rules:
   - name: default
     # all required tests need to go here
     merge_conditions:
-      - check-success=tests (macos-latest)
-      - check-success=tests (ubuntu-latest)
-      - check-success=installer_test (macos-latest)
-      - check-success=installer_test (ubuntu-latest)
+      - check-success=tests on macos
+      - check-success=tests on ubuntu
+      - check-success=installer test on macos
+      - check-success=installer test on ubuntu
       - check-success=vm_tests
     batch_size: 5
 

@@ -5,7 +5,7 @@
 #include "windows-error.hh"
 #include "file-path.hh"
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <fileapi.h>
 #include <error.h>
 #include <namedpipeapi.h>

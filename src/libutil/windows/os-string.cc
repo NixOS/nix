@@ -7,7 +7,7 @@
 #include "file-path-impl.hh"
 #include "util.hh"
 
-#ifdef WIN32
+#ifdef _WIN32
 
 namespace nix {
 

@@ -26,6 +26,8 @@ let
 
         # Evaluate VMs faster
         documentation.enable = false;
+        # this links against nix and might break with our git version.
+        system.tools.nixos-option.enable = false;
       };
       _module.args.nixpkgs = nixpkgs;
       _module.args.system = system;
@@ -156,6 +158,8 @@ in
   functional_trusted = runNixOSTestFor "x86_64-linux" ./functional/as-trusted-user.nix;
 
   functional_root = runNixOSTestFor "x86_64-linux" ./functional/as-root.nix;
+
+  functional_symlinked-home = runNixOSTestFor "x86_64-linux" ./functional/symlinked-home.nix;
 
   user-sandboxing = runNixOSTestFor "x86_64-linux" ./user-sandboxing;
 
