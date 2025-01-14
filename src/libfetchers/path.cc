@@ -96,7 +96,7 @@ struct PathInputScheme : InputScheme
     std::optional<std::string> isRelative(const Input & input) const
     {
         auto path = getStrAttr(input.attrs, "path");
-        if (hasPrefix(path, "/"))
+        if (isAbsolute(path))
             return std::nullopt;
         else
             return path;
