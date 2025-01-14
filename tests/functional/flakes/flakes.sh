@@ -97,6 +97,9 @@ nix build -o "$TEST_ROOT/result" flake1
 
 nix build -o "$TEST_ROOT/result" "$flake1Dir"
 nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir"
+(cd "$flake1Dir" && nix build -o "$TEST_ROOT/result" ".")
+(cd "$flake1Dir" && nix build -o "$TEST_ROOT/result" "path:.")
+(cd "$flake1Dir" && nix build -o "$TEST_ROOT/result" "git+file:.")
 
 # Test explicit packages.default.
 nix build -o "$TEST_ROOT/result" "$flake1Dir#default"
