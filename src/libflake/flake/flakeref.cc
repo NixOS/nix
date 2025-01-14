@@ -177,7 +177,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         }
 
     } else {
-        if (!hasPrefix(path, "/"))
+        if (!isAbsolute(path))
             throw BadURL("flake reference '%s' is not an absolute path", url);
         path = canonPath(path + "/" + getOr(query, "dir", ""));
     }
@@ -234,7 +234,7 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
         auto parsed = parseURL(url);
         if (baseDir
             && (parsed.scheme == "path" || parsed.scheme == "git+file")
-            && !hasPrefix(parsed.path, "/"))
+            && !isAbsolute(parsed.path))
             parsed.path = absPath(parsed.path, *baseDir);
         return fromParsedURL(fetchSettings, std::move(parsed), isFlake);
     } catch (BadURL &) {

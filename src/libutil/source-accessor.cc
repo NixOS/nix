@@ -94,7 +94,7 @@ CanonPath SourceAccessor::resolveSymlinks(
                         throw Error("infinite symlink recursion in path '%s'", showPath(path));
                     auto target = readLink(res);
                     res.pop();
-                    if (hasPrefix(target, "/"))
+                    if (isAbsolute(target))
                         res = CanonPath::root;
                     todo.splice(todo.begin(), tokenizeString<std::list<std::string>>(target, "/"));
                 }
