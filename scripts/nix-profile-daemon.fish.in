@@ -1,3 +1,13 @@
+# Only execute this file once per shell.
+if test -z "$HOME" || \
+    test -n "$__ETC_PROFILE_NIX_SOURCED"
+    exit
+end
+
+set --global __ETC_PROFILE_NIX_SOURCED 1
+
+# Local helpers
+
 function add_path --argument-names new_path
     if type -q fish_add_path
         # fish 3.2.0 or newer
@@ -10,13 +20,7 @@ function add_path --argument-names new_path
     end
 end
 
-# Only execute this file once per shell.
-if test -n "$__ETC_PROFILE_NIX_SOURCED"
-    exit
-end
-
-set __ETC_PROFILE_NIX_SOURCED 1
-
+# Main configuration
 set --export NIX_PROFILES "@localstatedir@/nix/profiles/default $HOME/.nix-profile"
 
 # Populate bash completions, .desktop files, etc
@@ -53,5 +57,7 @@ end
 
 add_path "@localstatedir@/nix/profiles/default/bin"
 add_path "$HOME/.nix-profile/bin"
+
+# Cleanup
 
 functions -e add_path
