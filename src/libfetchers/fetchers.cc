@@ -154,6 +154,11 @@ bool Input::isLocked() const
     return scheme && scheme->isLocked(*this);
 }
 
+bool Input::isLocal(const ref<Store> & store) const
+{
+    return !scheme || scheme->isLocal(*this, store);
+}
+
 bool Input::isFinal() const
 {
     return maybeGetBoolAttr(attrs, "__final").value_or(false);

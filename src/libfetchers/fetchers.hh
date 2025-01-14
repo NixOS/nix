@@ -96,6 +96,11 @@ public:
     bool isLocked() const;
 
     /**
+     * Return whenever the input is on the local filesystem and not in the store.
+     */
+    bool isLocal(const ref<Store> & nixStore) const;
+
+    /**
      * Return whether this is a "final" input, meaning that fetching
      * it will not add, remove or change any attributes. (See
      * `checkLocks()` for the semantics.) Only "final" inputs can be
@@ -252,13 +257,16 @@ struct InputScheme
      */
     virtual std::optional<ExperimentalFeature> experimentalFeature() const;
 
+    virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
+        { return std::nullopt; }
+
     virtual bool isDirect(const Input & input) const
     { return true; }
 
-    virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
-    { return std::nullopt; }
-
     virtual bool isLocked(const Input & input) const
+    { return false; }
+
+    virtual bool isLocal(const Input & input, const ref<Store> & store) const
     { return false; }
 };
 
