@@ -4,6 +4,7 @@
 #include "fetch-to-store.hh"
 #include "json-utils.hh"
 #include "store-path-accessor.hh"
+#include "fetch-settings.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -152,6 +153,12 @@ bool Input::isDirect() const
 bool Input::isLocked() const
 {
     return scheme && scheme->isLocked(*this);
+}
+
+bool Input::isConsideredLocked(
+    const Settings & settings) const
+{
+    return isLocked() || (settings.allowDirtyLocks && getNarHash());
 }
 
 bool Input::isFinal() const
