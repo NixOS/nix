@@ -55,10 +55,6 @@ mkMesonExecutable (finalAttrs: {
   mesonFlags = [
   ];
 
-  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
-
   passthru = {
     tests = {
       run = runCommand "${finalAttrs.pname}-run" {
