@@ -1152,12 +1152,10 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             }
         }
 
-        ThreadPool workers2{concurrency};
-
         auto & root = _state.lock()->root;
 
         processGraph<Directory *>(
-            workers2,
+            //workers2,
             {&root},
             [&](Directory * const & node) -> std::set<Directory *>
             {
@@ -1188,7 +1186,8 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
                     throw Error("creating a tree object: %s", git_error_last()->message);
                 node->oid = oid;
             },
-            true);
+            true,
+            concurrency);
 
         #if 0
         repo->flush();

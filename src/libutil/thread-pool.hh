@@ -86,7 +86,8 @@ void processGraph(
     const std::set<T> & nodes,
     std::function<std::set<T>(const T &)> getEdges,
     std::function<void(const T &)> processNode,
-    bool discoverNodes = false)
+    bool discoverNodes = false,
+    size_t maxThreads = 0)
 {
     struct Graph {
         std::set<T> known;
@@ -98,9 +99,9 @@ void processGraph(
 
     std::function<void(const T &)> worker;
 
-    /* Create pool last to ensure threads are stopped before other destructors
-     * run */
-    ThreadPool pool;
+    /* Create pool last to ensure threads are stopped before other
+       destructors run. */
+    ThreadPool pool(maxThreads);
 
     worker = [&](const T & node) {
 
