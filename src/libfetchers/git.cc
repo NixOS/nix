@@ -426,7 +426,16 @@ struct GitInputScheme : InputScheme
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         bool isBareRepository = url.scheme == "file" && !pathExists(url.path + "/.git");
         repoInfo.isLocal = url.scheme == "file" && !forceHttp && !isBareRepository;
-        repoInfo.url = repoInfo.isLocal ? url.path : url.to_string();
+        //
+        // FIXME: here we turn a possibly relative path into an absolute path.
+        // This allows relative git flake inputs to be resolved against the
+        // **current working directory** (as in POSIX), which tends to work out
+        // ok in the context of flakes, but is the wrong behavior,
+        // as it should resolve against the flake.nix base directory instead.
+        //
+        // See: https://discourse.nixos.org/t/57783 and #9708
+        //
+        repoInfo.url = repoInfo.isLocal ? std::filesystem::absolute(url.path).string() : url.to_string();
 
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
