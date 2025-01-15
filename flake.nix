@@ -283,10 +283,6 @@
               # These attributes go right into `packages.<system>`.
               "${pkgName}" = nixpkgsFor.${system}.native.nixComponents.${pkgName};
               "${pkgName}-static" = nixpkgsFor.${system}.static.nixComponents.${pkgName};
-              /**
-                Nix and dependencies built with LLVM and Clang, maintainers:
-                @RossComputerGuy, Nix team
-               */
               "${pkgName}-llvm" = nixpkgsFor.${system}.llvm.nixComponents.${pkgName};
             }
             // lib.optionalAttrs supportsCross (flatMapAttrs (lib.genAttrs crossSystems (_: { })) (crossSystem: {}: {

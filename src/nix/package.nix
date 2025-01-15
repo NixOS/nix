@@ -99,10 +99,6 @@ mkMesonExecutable (finalAttrs: {
   mesonFlags = [
   ];
 
-  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux") && !(stdenv.hostPlatform.useLLVM)) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
-
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;
   };
