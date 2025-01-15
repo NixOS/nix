@@ -1,5 +1,4 @@
 { lib
-, stdenv
 , mkMesonLibrary
 
 , nix-util-c
