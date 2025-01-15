@@ -32,13 +32,8 @@
 [string]: ./types.md#type-string
 [path]: ./types.md#type-path
 [number]: ./types.md#type-float
-<<<<<<< HEAD
-[list]: ./types.md#list
-[attribute set]: ./types.md#attribute-set
-=======
 [list]: ./types.md#type-list
 [attribute set]: ./types.md#type-attrs
->>>>>>> 071ddbed5 (doc/manual: Fix some broken fragments)
 
 <!-- TODO(@rhendric, #10970): ^ rationalize number -> int/float -->
 
