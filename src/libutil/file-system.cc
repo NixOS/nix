@@ -31,12 +31,7 @@ namespace nix {
 
 namespace fs { using namespace std::filesystem; }
 
-/**
- * Treat the string as possibly an absolute path, by inspecting the
- * start of it. Return whether it was probably intended to be
- * absolute.
- */
-static bool isAbsolute(PathView path)
+bool isAbsolute(PathView path)
 {
     return fs::path { path }.is_absolute();
 }
