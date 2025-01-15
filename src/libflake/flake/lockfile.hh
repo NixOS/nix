@@ -71,7 +71,7 @@ struct LockFile
      * Check whether this lock file has any unlocked or non-final
      * inputs. If so, return one.
      */
-    std::optional<FlakeRef> isUnlocked() const;
+    std::optional<FlakeRef> isUnlocked(const fetchers::Settings & fetchSettings) const;
 
     bool operator ==(const LockFile & other) const;
 
