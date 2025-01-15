@@ -101,8 +101,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 
     if (baseDir) {
         /* Check if 'url' is a path (either absolute or relative
-            to 'baseDir'). If so, search upward to the root of the
-            repo (i.e. the directory containing .git). */
+           to 'baseDir'). If so, search upward to the root of the
+           repo (i.e. the directory containing .git). */
 
         path = absPath(path, baseDir);
 
@@ -177,7 +177,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         }
 
     } else {
-        if (!hasPrefix(path, "/"))
+        if (!isAbsolute(path))
             throw BadURL("flake reference '%s' is not an absolute path", url);
         path = canonPath(path + "/" + getOr(query, "dir", ""));
     }
@@ -231,7 +231,12 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
 )
 {
     try {
-        return fromParsedURL(fetchSettings, parseURL(url), isFlake);
+        auto parsed = parseURL(url);
+        if (baseDir
+            && (parsed.scheme == "path" || parsed.scheme == "git+file")
+            && !isAbsolute(parsed.path))
+            parsed.path = absPath(parsed.path, *baseDir);
+        return fromParsedURL(fetchSettings, std::move(parsed), isFlake);
     } catch (BadURL &) {
         return std::nullopt;
     }
