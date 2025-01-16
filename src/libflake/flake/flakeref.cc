@@ -233,7 +233,7 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
     try {
         auto parsed = parseURL(url);
         if (baseDir
-            && (parsed.scheme == "path" || parsed.scheme == "git+file")
+            && parsed.scheme == "path"
             && !isAbsolute(parsed.path))
             parsed.path = absPath(parsed.path, *baseDir);
         return fromParsedURL(fetchSettings, std::move(parsed), isFlake);
