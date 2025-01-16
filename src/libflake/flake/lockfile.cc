@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 
 #include "strings.hh"
+#include "flake/settings.hh"
 
 namespace nix::flake {
 
@@ -45,8 +46,8 @@ LockedNode::LockedNode(
     , parentPath(json.find("parent") != json.end() ? (std::optional<InputPath>) json["parent"] : std::nullopt)
     , patchFiles(json.find("patchFiles") != json.end() ? (std::vector<std::string>) json["patchFiles"] : std::vector<std::string>{})
 {
-    if (!lockedRef.input.isLocked() && !lockedRef.input.isRelative())
-        throw Error("lock file contains unlocked input '%s'",
+    if (!lockedRef.input.isConsideredLocked(fetchSettings) && !lockedRef.input.isRelative())
+        throw Error("Lock file contains unlocked input '%s'. Use '--allow-dirty-locks' to accept this lock file.",
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 
     // For backward compatibility, lock file entries are implicitly final.
@@ -199,7 +200,7 @@ std::pair<nlohmann::json, LockFile::KeyMap> LockFile::toJSON() const
             /* For backward compatibility, omit the "__final"
                attribute. We never allow non-final inputs in lock files
                anyway. */
-            assert(lockedNode->lockedRef.input.isFinal());
+            assert(lockedNode->lockedRef.input.isFinal() || lockedNode->lockedRef.input.isRelative());
             #endif
             n["locked"].erase("__final");
             if (!lockedNode->isFlake)
@@ -235,7 +236,7 @@ std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile)
     return stream;
 }
 
-std::optional<FlakeRef> LockFile::isUnlocked() const
+std::optional<FlakeRef> LockFile::isUnlocked(const fetchers::Settings & fetchSettings) const
 {
     std::set<ref<const Node>> nodes;
 
@@ -255,7 +256,7 @@ std::optional<FlakeRef> LockFile::isUnlocked() const
         if (i == ref<const Node>(root)) continue;
         auto node = i.dynamic_pointer_cast<const LockedNode>();
         if (node
-            && (!node->lockedRef.input.isLocked()
+            && (!node->lockedRef.input.isConsideredLocked(fetchSettings)
                 // FIXME
                 /* || !node->lockedRef.input.isFinal() */)
             && !node->lockedRef.input.isRelative())

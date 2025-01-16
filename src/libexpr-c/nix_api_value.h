@@ -213,7 +213,7 @@ nix_get_string(nix_c_context * context, const nix_value * value, nix_get_string_
 /** @brief Get path as string
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
- * @return string
+ * @return string, if the type is NIX_TYPE_PATH
  * @return NULL in case of error.
  */
 const char * nix_get_path_string(nix_c_context * context, const nix_value * value);

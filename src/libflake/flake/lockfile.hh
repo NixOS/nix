@@ -50,7 +50,11 @@ struct LockedNode : Node
         bool isFlake = true,
         std::optional<InputPath> parentPath = {},
         std::vector<std::string> patchFiles = {})
-        : lockedRef(lockedRef), originalRef(originalRef), isFlake(isFlake), parentPath(parentPath), patchFiles(std::move(patchFiles))
+        : lockedRef(lockedRef)
+        , originalRef(originalRef)
+        , isFlake(isFlake)
+        , parentPath(parentPath)
+        , patchFiles(std::move(patchFiles))
     { }
 
     LockedNode(
@@ -77,7 +81,7 @@ struct LockFile
      * Check whether this lock file has any unlocked or non-final
      * inputs. If so, return one.
      */
-    std::optional<FlakeRef> isUnlocked() const;
+    std::optional<FlakeRef> isUnlocked(const fetchers::Settings & fetchSettings) const;
 
     bool operator ==(const LockFile & other) const;
 

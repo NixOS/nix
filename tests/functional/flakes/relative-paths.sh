@@ -4,17 +4,17 @@ source ./common.sh
 
 requireGit
 
-rootFlake=$TEST_ROOT/flake1
-subflake0=$rootFlake/sub0
-subflake1=$rootFlake/sub1
-subflake2=$rootFlake/sub2
+rootFlake="$TEST_ROOT/flake1"
+subflake0="$rootFlake/sub0"
+subflake1="$rootFlake/sub1"
+subflake2="$rootFlake/sub2"
 
 rm -rf "$rootFlake"
 mkdir -p "$rootFlake" "$subflake0" "$subflake1" "$subflake2"
 
 cat > "$rootFlake/flake.nix" <<EOF
 {
-  inputs.sub0.url = "./sub0";
+  inputs.sub0.url = ./sub0;
   outputs = { self, sub0 }: {
     x = 2;
     y = self.x * sub0.x;
@@ -52,7 +52,7 @@ git -C "$rootFlake" add flake.nix sub0/flake.nix sub1/flake.nix
 
 cat > "$subflake2/flake.nix" <<EOF
 {
-  inputs.root.url = "../";
+  inputs.root.url = ./..;
   inputs.sub1.url = "../sub1";
   outputs = { self, root, sub1 }: {
     x = 5;
@@ -65,9 +65,15 @@ git -C "$rootFlake" add flake.nix sub2/flake.nix
 
 [[ $(nix eval "$subflake2#y") = 15 ]]
 
+# Make sure that this still works after commiting the lock file.
+git -C "$rootFlake" add sub2/flake.lock
+[[ $(nix eval "$subflake2#y") = 15 ]]
+
 # Make sure there are no content locks for relative path flakes.
 (! grep "$TEST_ROOT" "$subflake2/flake.lock")
-(! grep "$NIX_STORE_DIR" "$subflake2/flake.lock")
+if ! isTestOnNixOS; then
+    (! grep "$NIX_STORE_DIR" "$subflake2/flake.lock")
+fi
 (! grep narHash "$subflake2/flake.lock")
 
 # Test circular relative path flakes. FIXME: doesn't work at the moment.

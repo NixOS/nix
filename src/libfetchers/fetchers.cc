@@ -4,6 +4,7 @@
 #include "fetch-to-store.hh"
 #include "json-utils.hh"
 #include "store-path-accessor.hh"
+#include "fetch-settings.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -66,7 +67,7 @@ Input Input::fromURL(
         }
     }
 
-    throw Error("input '%s' is unsupported", url.url);
+    throw Error("input '%s' is unsupported", url);
 }
 
 Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
@@ -113,7 +114,15 @@ Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
 
 std::optional<std::string> Input::getFingerprint(ref<Store> store) const
 {
-    return scheme ? scheme->getFingerprint(store, *this) : std::nullopt;
+    if (!scheme) return std::nullopt;
+
+    if (cachedFingerprint) return *cachedFingerprint;
+
+    auto fingerprint = scheme->getFingerprint(store, *this);
+
+    cachedFingerprint = fingerprint;
+
+    return fingerprint;
 }
 
 ParsedURL Input::toURL() const
@@ -144,6 +153,12 @@ bool Input::isDirect() const
 bool Input::isLocked() const
 {
     return scheme && scheme->isLocked(*this);
+}
+
+bool Input::isConsideredLocked(
+    const Settings & settings) const
+{
+    return isLocked() || (settings.allowDirtyLocks && getNarHash());
 }
 
 bool Input::isFinal() const
@@ -320,7 +335,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
             auto accessor = makeStorePathAccessor(store, storePath);
 
-            accessor->fingerprint = scheme->getFingerprint(store, *this);
+            accessor->fingerprint = getFingerprint(store);
 
             return {accessor, *this};
         } catch (Error & e) {
@@ -332,7 +347,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
     auto [accessor, result] = scheme->getAccessor(store, *this);
 
     assert(!accessor->fingerprint);
-    accessor->fingerprint = scheme->getFingerprint(store, result);
+    accessor->fingerprint = result.getFingerprint(store);
 
     return {accessor, std::move(result)};
 }

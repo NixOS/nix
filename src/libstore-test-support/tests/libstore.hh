@@ -19,12 +19,12 @@ public:
 protected:
     LibStoreTest()
         : store(openStore({
-            .variant =
-                StoreReference::Specified{
-                    .scheme = "dummy",
-                },
-            .params = {},
-        }))
+              .variant =
+                  StoreReference::Specified{
+                      .scheme = "dummy",
+                  },
+              .params = {},
+          }))
     {
     }
 

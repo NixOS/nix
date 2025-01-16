@@ -14,7 +14,7 @@ struct PathInputScheme : InputScheme
         if (url.scheme != "path") return {};
 
         if (url.authority && *url.authority != "")
-            throw Error("path URL '%s' should not have an authority ('%s')", url.url, *url.authority);
+            throw Error("path URL '%s' should not have an authority ('%s')", url, *url.authority);
 
         Input input{settings};
         input.attrs.insert_or_assign("type", "path");
@@ -27,12 +27,12 @@ struct PathInputScheme : InputScheme
                 if (auto n = string2Int<uint64_t>(value))
                     input.attrs.insert_or_assign(name, *n);
                 else
-                    throw Error("path URL '%s' has invalid parameter '%s'", url.to_string(), name);
+                    throw Error("path URL '%s' has invalid parameter '%s'", url, name);
             }
             else if (name == "lock")
                 input.attrs.emplace(name, Explicit<bool> { value == "1" });
             else
-                throw Error("path URL '%s' has unsupported parameter '%s'", url.to_string(), name);
+                throw Error("path URL '%s' has unsupported parameter '%s'", url, name);
 
         return input;
     }
@@ -96,13 +96,13 @@ struct PathInputScheme : InputScheme
         std::string_view contents,
         std::optional<std::string> commitMsg) const override
     {
-        writeFile((CanonPath(getAbsPath(input)) / path).abs(), contents);
+        writeFile(getAbsPath(input) / path.rel(), contents);
     }
 
     std::optional<std::string> isRelative(const Input & input) const override
     {
         auto path = getStrAttr(input.attrs, "path");
-        if (hasPrefix(path, "/"))
+        if (isAbsolute(path))
             return std::nullopt;
         else
             return path;
@@ -113,12 +113,12 @@ struct PathInputScheme : InputScheme
         return (bool) input.getNarHash();
     }
 
-    CanonPath getAbsPath(const Input & input) const
+    std::filesystem::path getAbsPath(const Input & input) const
     {
         auto path = getStrAttr(input.attrs, "path");
 
-        if (path[0] == '/')
-            return CanonPath(path);
+        if (isAbsolute(path))
+            return canonPath(path);
 
         throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
     }
@@ -127,15 +127,15 @@ struct PathInputScheme : InputScheme
     {
         auto absPath = getAbsPath(input);
         auto input2(input);
-        input2.attrs.emplace("path", (std::string) absPath.abs());
+        input2.attrs.emplace("path", (std::string) absPath.string());
 
         if (getLockAttr(input2)) {
 
-            auto storePath = store->maybeParseStorePath(absPath.abs());
+            auto storePath = store->maybeParseStorePath(absPath.string());
 
             if (!storePath || storePath->name() != input.getName() || !store->isValidPath(*storePath)) {
                 Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", absPath));
-                storePath = store->addToStore(input.getName(), {getFSSourceAccessor(), absPath});
+                storePath = store->addToStore(input.getName(), {getFSSourceAccessor(), CanonPath(absPath.string())});
                 auto narHash = store->queryPathInfo(*storePath)->narHash;
                 input2.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
             } else
@@ -146,15 +146,15 @@ struct PathInputScheme : InputScheme
             // not exist in the source directory.
             auto makeNotAllowedError = [absPath](const CanonPath & path) -> RestrictedPathError
             {
-                return RestrictedPathError("path '%s' does not exist'", absPath + path);
+                return RestrictedPathError("path '%s' does not exist'", absPath / path.rel());
             };
             #endif
 
             return {makeStorePathAccessor(store, *storePath), std::move(input2)};
 
         } else {
-            auto accessor = makeFSSourceAccessor(std::filesystem::path(absPath.abs()));
-            accessor->setPathDisplay(absPath.abs());
+            auto accessor = makeFSSourceAccessor(absPath);
+            accessor->setPathDisplay(absPath.string());
             return {accessor, std::move(input2)};
         }
     }
@@ -168,7 +168,7 @@ struct PathInputScheme : InputScheme
            store object and the subpath. */
         auto path = getAbsPath(input);
         try {
-            auto [storePath, subPath] = store->toStorePath(path.abs());
+            auto [storePath, subPath] = store->toStorePath(path.string());
             auto info = store->queryPathInfo(storePath);
             return fmt("path:%s:%s", info->narHash.to_string(HashFormat::Base16, false), subPath);
         } catch (Error &) {

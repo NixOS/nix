@@ -1,11 +1,11 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
-  inputs.libgit2 = { url = "github:libgit2/libgit2/v1.8.1"; flake = false; };
 
   # dev tooling
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";
@@ -18,7 +18,7 @@
   inputs.git-hooks-nix.inputs.flake-compat.follows = "";
   inputs.git-hooks-nix.inputs.gitignore.follows = "";
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-regression, libgit2, ... }:
+  outputs = inputs@{ self, nixpkgs, nixpkgs-regression, ... }:
 
 
     let
@@ -36,7 +36,8 @@
         "armv6l-unknown-linux-gnueabihf"
         "armv7l-unknown-linux-gnueabihf"
         "riscv64-unknown-linux-gnu"
-        "x86_64-unknown-netbsd"
+        # Disabled because of https://github.com/NixOS/nixpkgs/issues/344423
+        # "x86_64-unknown-netbsd"
         "x86_64-unknown-freebsd"
         "x86_64-w64-mingw32"
       ];
@@ -106,6 +107,7 @@
         in {
           inherit stdenvs native;
           static = native.pkgsStatic;
+          llvm = native.pkgsLLVM;
           cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
         });
 
@@ -124,18 +126,36 @@
           # without "polluting" the top level "`pkgs`" attrset.
           # This also has the benefit of providing us with a distinct set of packages
           # we can iterate over.
-          nixComponents = lib.makeScope final.nixDependencies.newScope (import ./packaging/components.nix {
-            inherit (final) lib;
-            inherit officialRelease;
-            src = self;
-          });
+          nixComponents =
+            lib.makeScopeWithSplicing'
+              {
+                inherit (final) splicePackages;
+                inherit (final.nixDependencies) newScope;
+              }
+              {
+                otherSplices = final.generateSplicesForMkScope "nixComponents";
+                f = import ./packaging/components.nix {
+                  inherit (final) lib;
+                  inherit officialRelease;
+                  src = self;
+                };
+              };
 
           # The dependencies are in their own scope, so that they don't have to be
           # in Nixpkgs top level `pkgs` or `nixComponents`.
-          nixDependencies = lib.makeScope final.newScope (import ./packaging/dependencies.nix {
-            inherit inputs stdenv;
-            pkgs = final;
-          });
+          nixDependencies =
+            lib.makeScopeWithSplicing'
+              {
+                inherit (final) splicePackages;
+                inherit (final) newScope; # layered directly on pkgs, unlike nixComponents above
+              }
+              {
+                otherSplices = final.generateSplicesForMkScope "nixDependencies";
+                f = import ./packaging/dependencies.nix {
+                  inherit inputs stdenv;
+                  pkgs = final;
+                };
+              };
 
           nix = final.nixComponents.nix-cli;
 
@@ -145,7 +165,6 @@
             if prev.stdenv.hostPlatform.system == "i686-linux"
             then (prev.pre-commit.override (o: { dotnet-sdk = ""; })).overridePythonAttrs (o: { doCheck = false; })
             else prev.pre-commit;
-
         };
 
     in {
@@ -168,7 +187,7 @@
       };
 
       checks = forAllSystems (system: {
-        binaryTarball = self.hydraJobs.binaryTarball.${system};
+        installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
         rl-next =
@@ -183,11 +202,7 @@
         # Some perl dependencies are broken on i686-linux.
         # Since the support is only best-effort there, disable the perl
         # bindings
-
-        # Temporarily disabled because GitHub Actions OOM issues. Once
-        # the old build system is gone and we are back to one build
-        # system, we should reenable this.
-        #perlBindings = self.hydraJobs.perlBindings.${system};
+        perlBindings = self.hydraJobs.perlBindings.${system};
       }
       # Add "passthru" tests
       // flatMapAttrs ({
@@ -219,6 +234,8 @@
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
           default = self.packages.${system}.nix;
+          installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
+          binaryTarball = self.hydraJobs.binaryTarball.${system};
           # TODO probably should be `nix-cli`
           nix = self.packages.${system}.nix-everything;
           nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
@@ -266,6 +283,7 @@
               # These attributes go right into `packages.<system>`.
               "${pkgName}" = nixpkgsFor.${system}.native.nixComponents.${pkgName};
               "${pkgName}-static" = nixpkgsFor.${system}.static.nixComponents.${pkgName};
+              "${pkgName}-llvm" = nixpkgsFor.${system}.llvm.nixComponents.${pkgName};
             }
             // lib.optionalAttrs supportsCross (flatMapAttrs (lib.genAttrs crossSystems (_: { })) (crossSystem: {}: {
               # These attributes go right into `packages.<system>`.
@@ -304,6 +322,9 @@
           lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin) (
             prefixAttrs "static" (forAllStdenvs (stdenvName: makeShell {
               pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".pkgsStatic;
+            })) //
+            prefixAttrs "llvm" (forAllStdenvs (stdenvName: makeShell {
+              pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".pkgsLLVM;
             })) //
             prefixAttrs "cross" (forAllCrossSystems (crossSystem: makeShell {
               pkgs = nixpkgsFor.${system}.cross.${crossSystem};

@@ -41,6 +41,11 @@ struct Input
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;
 
+    /**
+     * Cached result of getFingerprint().
+     */
+    mutable std::optional<std::optional<std::string>> cachedFingerprint;
+
 public:
     /**
      * Create an `Input` from a URL.
@@ -86,6 +91,15 @@ public:
     bool isLocked() const;
 
     /**
+     * Return whether the input is either locked, or, if
+     * `allow-dirty-locks` is enabled, it has a NAR hash. In the
+     * latter case, we can verify the input but we may not be able to
+     * fetch it from anywhere.
+     */
+    bool isConsideredLocked(
+        const Settings & settings) const;
+
+    /**
      * Only for relative path flakes, i.e. 'path:./foo', returns the
      * relative path, i.e. './foo'.
      */
@@ -104,6 +118,11 @@ public:
     bool isFinal() const;
 
     bool operator ==(const Input & other) const noexcept;
+
+    bool operator <(const Input & other) const
+    {
+        return attrs < other.attrs;
+    }
 
     bool contains(const Input & other) const;
 

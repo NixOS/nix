@@ -2,9 +2,6 @@
 
 source ./common.sh
 
-# FIXME: this test is disabled because relative path flakes are broken. Re-enable this in #10089.
-exit 0
-
 requireGit
 
 flakeFollowsA=$TEST_ROOT/follows/flakeA
@@ -18,6 +15,7 @@ createGitRepo $flakeFollowsA
 mkdir -p $flakeFollowsB
 mkdir -p $flakeFollowsC
 mkdir -p $flakeFollowsD
+mkdir -p $flakeFollowsE
 mkdir -p $flakeFollowsE
 
 cat > $flakeFollowsA/flake.nix <<EOF
@@ -120,14 +118,30 @@ nix flake lock $flakeFollowsA
 [[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '"foobar"' ]]
 jq -r -c '.nodes | keys | .[]' $flakeFollowsA/flake.lock | grep "^foobar$"
 
-# Check that subflakes are allowed to access flakes in the parent.
+# Check that path: inputs cannot escape from their root.
 cat > $flakeFollowsA/flake.nix <<EOF
 {
     description = "Flake A";
     inputs = {
-        B.url = "../flakeB"; # test relative paths without 'path:'
+        B.url = "../escape"; # test relative paths without 'path:'
         E.flake = false;
         E.url = "path:./foo.nix";
+    };
+    outputs = { E, ... }: { e = import E; };
+}
+EOF
+
+echo 123 > $flakeFollowsA/foo.nix
+
+expect 1 nix flake lock $flakeFollowsA 2>&1 | grep "path '/escape' does not exist in Git repository"
+
+# Test relative non-flake inputs.
+cat > $flakeFollowsA/flake.nix <<EOF
+{
+    description = "Flake A";
+    inputs = {
+        E.flake = false;
+        E.url = "./foo.nix"; # test relative paths without 'path:'
     };
     outputs = { E, ... }: { e = import E; };
 }
@@ -344,6 +358,6 @@ json=$(nix flake metadata "$flakeFollowsCustomUrlA" --json)
 rm "$flakeFollowsCustomUrlA"/flake.lock
 
 # if override-input is specified, lock "original" entry should contain original url
-json=$(nix flake metadata "$flakeFollowsCustomUrlA" --override-input B/C "path:./flakeB/flakeD" --json)
+json=$(nix flake metadata "$flakeFollowsCustomUrlA" --override-input B/C "$flakeFollowsCustomUrlD" --json)
 echo "$json" | jq .locks.nodes.C.original
 [[ $(echo "$json" | jq -r .locks.nodes.C.original.path) = './flakeC' ]]

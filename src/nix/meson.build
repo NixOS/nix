@@ -4,8 +4,6 @@ project('nix', 'cpp',
     'cpp_std=c++2a',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
-    'debug=true',
-    'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
     'localstatedir=/nix/var',
   ],
@@ -15,7 +13,7 @@ project('nix', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 nix_store = dependency('nix-store')
 
@@ -30,10 +28,10 @@ deps_private_maybe_subproject = [
 ]
 deps_public_maybe_subproject = [
 ]
-subdir('build-utils-meson/subprojects')
+subdir('nix-meson-build-support/subprojects')
 
-subdir('build-utils-meson/export-all-symbols')
-subdir('build-utils-meson/windows-version')
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 configdata = configuration_data()
 
@@ -63,8 +61,8 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/common')
-subdir('build-utils-meson/generate-header')
+subdir('nix-meson-build-support/common')
+subdir('nix-meson-build-support/generate-header')
 
 nix_sources = [config_h] + files(
   'add-to-store.cc',

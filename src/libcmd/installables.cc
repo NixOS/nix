@@ -450,7 +450,7 @@ ref<eval_cache::EvalCache> openEvalCache(
     std::shared_ptr<flake::LockedFlake> lockedFlake)
 {
     auto fingerprint = evalSettings.useEvalCache && evalSettings.pureEval
-        ? lockedFlake->getFingerprint(state.store)
+        ? lockedFlake->getFingerprint(state.store, state.fetchSettings)
         : std::nullopt;
     auto rootLoader = [&state, lockedFlake]()
         {
@@ -858,7 +858,7 @@ std::vector<FlakeRef> RawInstallablesCommand::getFlakeRefsForCompletion()
     applyDefaultInstallables(rawInstallables);
     std::vector<FlakeRef> res;
     res.reserve(rawInstallables.size());
-    for (auto i : rawInstallables)
+    for (const auto & i : rawInstallables)
         res.push_back(parseFlakeRefWithFragment(
             fetchSettings,
             expandTilde(i),

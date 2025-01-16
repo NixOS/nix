@@ -1,6 +1,7 @@
 #include "environment-variables.hh"
 
-#include "processenv.h"
+#ifdef _WIN32
+#  include "processenv.h"
 
 namespace nix {
 
@@ -43,3 +44,4 @@ int setEnvOs(const OsString & name, const OsString & value)
 }
 
 }
+#endif

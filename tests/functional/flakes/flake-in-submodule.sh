@@ -63,3 +63,15 @@ flakeref=git+file://$rootRepo\?submodules=1\&dir=submodule
 echo '"foo"' > "$rootRepo"/submodule/sub.nix
 [[ $(nix eval --json "$flakeref#sub" ) = '"foo"' ]]
 [[ $(nix flake metadata --json "$flakeref" | jq -r .locked.rev) = null ]]
+
+# Test that `nix flake metadata` parses `submodule` correctly.
+cat > "$rootRepo"/flake.nix <<EOF
+{
+    outputs = { self }: {
+    };
+}
+EOF
+git -C "$rootRepo" add flake.nix
+git -C "$rootRepo" commit -m "Add flake.nix"
+
+nix flake metadata --json "$rootRepo?submodules=1"

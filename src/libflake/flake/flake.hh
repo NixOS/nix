@@ -130,7 +130,9 @@ struct LockedFlake
      */
     std::map<ref<Node>, SourcePath> nodePaths;
 
-    std::optional<Fingerprint> getFingerprint(ref<Store> store) const;
+    std::optional<Fingerprint> getFingerprint(
+        ref<Store> store,
+        const fetchers::Settings & fetchSettings) const;
 };
 
 struct LockFlags
@@ -156,6 +158,11 @@ struct LockFlags
      * lock file in memory only, without writing it to disk.
      */
     bool writeLockFile = true;
+
+    /**
+     * Throw an exception when the flake has an unlocked input.
+     */
+    bool failOnUnlocked = false;
 
     /**
      * Whether to use the registries to lookup indirect flake

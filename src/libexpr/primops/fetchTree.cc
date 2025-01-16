@@ -201,7 +201,7 @@ static void fetchTree(
     if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
         input = lookupInRegistries(state.store, input).first;
 
-    if (state.settings.pureEval && !input.isLocked()) {
+    if (state.settings.pureEval && !input.isConsideredLocked(state.fetchSettings)) {
         auto fetcher = "fetchTree";
         if (params.isFetchGit)
             fetcher = "fetchGit";

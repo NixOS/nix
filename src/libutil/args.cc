@@ -348,7 +348,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
 
     /* Now that all the other args are processed, run the deferred completions.
      */
-    for (auto d : deferredCompletions)
+    for (const auto & d : deferredCompletions)
         d.completer(*completions, d.n, d.prefix);
 }
 

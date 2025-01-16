@@ -258,14 +258,14 @@ let
       mkdir -p $out/nix/var/nix/profiles/per-user/${uname}
 
       ln -s ${profile} $out/nix/var/nix/profiles/default-1-link
-      ln -s $out/nix/var/nix/profiles/default-1-link $out/nix/var/nix/profiles/default
+      ln -s /nix/var/nix/profiles/default-1-link $out/nix/var/nix/profiles/default
       ln -s /nix/var/nix/profiles/default $out${userHome}/.nix-profile
 
       ln -s ${channel} $out/nix/var/nix/profiles/per-user/${uname}/channels-1-link
-      ln -s $out/nix/var/nix/profiles/per-user/${uname}/channels-1-link $out/nix/var/nix/profiles/per-user/${uname}/channels
+      ln -s /nix/var/nix/profiles/per-user/${uname}/channels-1-link $out/nix/var/nix/profiles/per-user/${uname}/channels
 
       mkdir -p $out${userHome}/.nix-defexpr
-      ln -s $out/nix/var/nix/profiles/per-user/${uname}/channels $out${userHome}/.nix-defexpr/channels
+      ln -s /nix/var/nix/profiles/per-user/${uname}/channels $out${userHome}/.nix-defexpr/channels
       echo "${channelURL} ${channelName}" > $out${userHome}/.nix-channels
 
       mkdir -p $out/bin $out/usr/bin

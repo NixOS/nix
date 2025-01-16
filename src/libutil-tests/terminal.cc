@@ -55,6 +55,10 @@ TEST(filterANSIEscapes, utf8)
     ASSERT_EQ(filterANSIEscapes("fóóbär", true, 3), "fóó");
     ASSERT_EQ(filterANSIEscapes("f€€bär", true, 4), "f€€b");
     ASSERT_EQ(filterANSIEscapes("f𐍈𐍈bär", true, 4), "f𐍈𐍈b");
+    ASSERT_EQ(filterANSIEscapes("f🔍bar", true, 6), "f🔍bar");
+    ASSERT_EQ(filterANSIEscapes("f🔍bar", true, 3), "f🔍");
+    ASSERT_EQ(filterANSIEscapes("f🔍bar", true, 2), "f");
+    ASSERT_EQ(filterANSIEscapes("foo\u0301", true, 3), "foó");
 }
 
 TEST(filterANSIEscapes, osc8)

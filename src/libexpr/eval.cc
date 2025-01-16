@@ -353,6 +353,16 @@ void EvalState::allowPath(const StorePath & storePath)
         rootFS2->allowPrefix(CanonPath(store->toRealPath(storePath)));
 }
 
+void EvalState::allowClosure(const StorePath & storePath)
+{
+    if (!rootFS.dynamic_pointer_cast<AllowListSourceAccessor>()) return;
+
+    StorePathSet closure;
+    store->computeFSClosure(storePath, closure);
+    for (auto & p : closure)
+        allowPath(p);
+}
+
 void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)
 {
     allowPath(storePath);
@@ -402,7 +412,7 @@ void EvalState::checkURI(const std::string & uri)
 
     /* If the URI is a path, then check it against allowedPaths as
        well. */
-    if (hasPrefix(uri, "/")) {
+    if (isAbsolute(uri)) {
         if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
             rootFS2->checkAccess(CanonPath(uri));
         return;
@@ -3177,10 +3187,7 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
             allowPath(path.path.abs());
             if (store->isInStore(path.path.abs())) {
                 try {
-                    StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(path.path.abs()).first, closure);
-                    for (auto & p : closure)
-                        allowPath(p);
+                    allowClosure(store->toStorePath(path.path.abs()).first);
                 } catch (InvalidPath &) { }
             }
         }
@@ -3254,6 +3261,19 @@ bool ExternalValueBase::operator==(const ExternalValueBase & b) const noexcept
 
 std::ostream & operator << (std::ostream & str, const ExternalValueBase & v) {
     return v.print(str);
+}
+
+void forceNoNullByte(std::string_view s, std::function<Pos()> pos)
+{
+    if (s.find('\0') != s.npos) {
+        using namespace std::string_view_literals;
+        auto str = replaceStrings(std::string(s), "\0"sv, "␀"sv);
+        Error error("input string '%s' cannot be represented as Nix string because it contains null bytes", str);
+        if (pos) {
+            error.atPos(pos());
+        }
+        throw error;
+    }
 }
 
 
