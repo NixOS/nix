@@ -91,7 +91,7 @@ struct PathInputScheme : InputScheme
         std::string_view contents,
         std::optional<std::string> commitMsg) const override
     {
-        writeFile((CanonPath(getAbsPath(input)) / path).abs(), contents);
+        writeFile(getAbsPath(input) / path.rel(), contents);
     }
 
     std::optional<std::string> isRelative(const Input & input) const override
@@ -108,12 +108,12 @@ struct PathInputScheme : InputScheme
         return (bool) input.getNarHash();
     }
 
-    CanonPath getAbsPath(const Input & input) const
+    std::filesystem::path getAbsPath(const Input & input) const
     {
         auto path = getStrAttr(input.attrs, "path");
 
-        if (path[0] == '/')
-            return CanonPath(path);
+        if (isAbsolute(path))
+            return canonPath(path);
 
         throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
     }
@@ -128,7 +128,7 @@ struct PathInputScheme : InputScheme
         Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to the store", absPath));
 
         // FIXME: check whether access to 'path' is allowed.
-        auto storePath = store->maybeParseStorePath(absPath.abs());
+        auto storePath = store->maybeParseStorePath(absPath.string());
 
         if (storePath)
             store->addTempRoot(*storePath);
@@ -137,7 +137,7 @@ struct PathInputScheme : InputScheme
         if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
             // FIXME: try to substitute storePath.
             auto src = sinkToSource([&](Sink & sink) {
-                mtime = dumpPathAndGetMtime(absPath.abs(), sink, defaultPathFilter);
+                mtime = dumpPathAndGetMtime(absPath.string(), sink, defaultPathFilter);
             });
             storePath = store->addToStoreFromDump(*src, "source");
         }
@@ -159,7 +159,7 @@ struct PathInputScheme : InputScheme
            store object and the subpath. */
         auto path = getAbsPath(input);
         try {
-            auto [storePath, subPath] = store->toStorePath(path.abs());
+            auto [storePath, subPath] = store->toStorePath(path.string());
             auto info = store->queryPathInfo(storePath);
             return fmt("path:%s:%s", info->narHash.to_string(HashFormat::Base16, false), subPath);
         } catch (Error &) {
