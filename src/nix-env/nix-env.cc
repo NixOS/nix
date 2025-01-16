@@ -588,7 +588,9 @@ static void opInstall(Globals & globals, Strings opFlags, Strings opArgs)
         else if (arg == "--priority") {
             if (i == opFlags.end())
                 throw UsageError("'%1%' requires an argument", arg);
-            priority = std::stoi(*i++);
+            priority = string2Int<int>(*i++);
+            if (!priority)
+                throw UsageError("'--priority' requires an integer argument");
         }
         else throw UsageError("unknown flag '%1%'", arg);
     }
