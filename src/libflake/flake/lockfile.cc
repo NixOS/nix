@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 
 #include "strings.hh"
+#include "flake/settings.hh"
 
 namespace nix::flake {
 
@@ -44,8 +45,8 @@ LockedNode::LockedNode(
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
     , parentPath(json.find("parent") != json.end() ? (std::optional<InputPath>) json["parent"] : std::nullopt)
 {
-    if (!lockedRef.input.isLocked() && !lockedRef.input.isRelative())
-        throw Error("lock file contains unlocked input '%s'",
+    if (!lockedRef.input.isConsideredLocked(fetchSettings) && !lockedRef.input.isRelative())
+        throw Error("Lock file contains unlocked input '%s'. Use '--allow-dirty-locks' to accept this lock file.",
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 
     // For backward compatibility, lock file entries are implicitly final.
@@ -231,7 +232,7 @@ std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile)
     return stream;
 }
 
-std::optional<FlakeRef> LockFile::isUnlocked() const
+std::optional<FlakeRef> LockFile::isUnlocked(const fetchers::Settings & fetchSettings) const
 {
     std::set<ref<const Node>> nodes;
 
@@ -251,7 +252,8 @@ std::optional<FlakeRef> LockFile::isUnlocked() const
         if (i == ref<const Node>(root)) continue;
         auto node = i.dynamic_pointer_cast<const LockedNode>();
         if (node
-            && (!node->lockedRef.input.isLocked() || !node->lockedRef.input.isFinal())
+            && (!node->lockedRef.input.isConsideredLocked(fetchSettings)
+                || !node->lockedRef.input.isFinal())
             && !node->lockedRef.input.isRelative())
             return node->lockedRef;
     }

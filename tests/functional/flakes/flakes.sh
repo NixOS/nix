@@ -97,6 +97,9 @@ nix build -o "$TEST_ROOT/result" flake1
 
 nix build -o "$TEST_ROOT/result" "$flake1Dir"
 nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir"
+(cd "$flake1Dir" && nix build -o "$TEST_ROOT/result" ".")
+(cd "$flake1Dir" && nix build -o "$TEST_ROOT/result" "path:.")
+(cd "$flake1Dir" && nix build -o "$TEST_ROOT/result" "git+file:.")
 
 # Test explicit packages.default.
 nix build -o "$TEST_ROOT/result" "$flake1Dir#default"
@@ -105,6 +108,15 @@ nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir#default"
 # Test explicit packages.default with query.
 nix build -o "$TEST_ROOT/result" "$flake1Dir?ref=HEAD#default"
 nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir?ref=HEAD#default"
+
+# Check that relative paths are allowed for git flakes.
+# This may change in the future once git submodule support is refined.
+# See: https://discourse.nixos.org/t/57783 and #9708.
+(
+  # This `cd` should not be required and is indicative of aforementioned bug.
+  cd "$flake1Dir/.."
+  nix build -o "$TEST_ROOT/result" "git+file:./$(basename "$flake1Dir")"
+)
 
 # Check that store symlinks inside a flake are not interpreted as flakes.
 nix build -o "$flake1Dir/result" "git+file://$flake1Dir"

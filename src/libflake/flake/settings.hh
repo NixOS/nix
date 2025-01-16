@@ -29,7 +29,7 @@ struct Settings : public Config
         this,
         false,
         "accept-flake-config",
-        "Whether to accept nix configuration from a flake without prompting.",
+        "Whether to accept Nix configuration settings from a flake without prompting.",
         {},
         true,
         Xp::Flakes};

@@ -91,6 +91,15 @@ public:
     bool isLocked() const;
 
     /**
+     * Return whether the input is either locked, or, if
+     * `allow-dirty-locks` is enabled, it has a NAR hash. In the
+     * latter case, we can verify the input but we may not be able to
+     * fetch it from anywhere.
+     */
+    bool isConsideredLocked(
+        const Settings & settings) const;
+
+    /**
      * Only for relative path flakes, i.e. 'path:./foo', returns the
      * relative path, i.e. './foo'.
      */
