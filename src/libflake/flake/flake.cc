@@ -43,7 +43,7 @@ static std::optional<FetchedFlake> lookupInFlakeCache(
 static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
     EvalState & state,
     const FlakeRef & originalRef,
-    bool allowLookup,
+    bool useRegistries,
     FlakeCache & flakeCache)
 {
     auto fetched = lookupInFlakeCache(flakeCache, originalRef);
@@ -54,7 +54,7 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
             auto [storePath, lockedRef] = originalRef.fetchTree(state.store);
             fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .storePath = storePath});
         } else {
-            if (allowLookup) {
+            if (useRegistries) {
                 resolvedRef = originalRef.resolve(
                     state.store,
                     [](fetchers::Registry::RegistryType type) {
@@ -105,7 +105,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
-    InputPath lockRootPath,
+    const InputPath & lockRootPath,
     const SourcePath & flakeDir);
 
 static FlakeInput parseFlakeInput(
@@ -113,7 +113,7 @@ static FlakeInput parseFlakeInput(
     std::string_view inputName,
     Value * value,
     const PosIdx pos,
-    InputPath lockRootPath,
+    const InputPath & lockRootPath,
     const SourcePath & flakeDir)
 {
     expectType(state, nAttrs, *value, pos);
@@ -220,7 +220,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
-    InputPath lockRootPath,
+    const InputPath & lockRootPath,
     const SourcePath & flakeDir)
 {
     std::map<FlakeId, FlakeInput> inputs;
@@ -345,29 +345,23 @@ static Flake readFlake(
 static Flake getFlake(
     EvalState & state,
     const FlakeRef & originalRef,
-    bool allowLookup,
+    bool useRegistries,
     FlakeCache & flakeCache,
-    InputPath lockRootPath)
+    const InputPath & lockRootPath)
 {
     auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-        state, originalRef, allowLookup, flakeCache);
+        state, originalRef, useRegistries, flakeCache);
 
     return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->toRealPath(storePath)), lockRootPath);
 }
 
-Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup, FlakeCache & flakeCache)
-{
-    return getFlake(state, originalRef, allowLookup, flakeCache, {});
-}
-
-Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup)
+Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
 {
     FlakeCache flakeCache;
-    return getFlake(state, originalRef, allowLookup, flakeCache);
+    return getFlake(state, originalRef, useRegistries, flakeCache, {});
 }
 
 static LockFile readLockFile(
-    const Settings & settings,
     const fetchers::Settings & fetchSettings,
     const SourcePath & lockFilePath)
 {
@@ -390,7 +384,7 @@ LockedFlake lockFlake(
 
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
 
-    auto flake = getFlake(state, topRef, useRegistries, flakeCache);
+    auto flake = getFlake(state, topRef, useRegistries, flakeCache, {});
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
@@ -403,7 +397,6 @@ LockedFlake lockFlake(
         }
 
         auto oldLockFile = readLockFile(
-            settings,
             state.fetchSettings,
             lockFlags.referenceLockFilePath.value_or(
                 flake.lockFilePath()));
@@ -445,7 +438,7 @@ LockedFlake lockFlake(
             ref<Node> node,
             const InputPath & inputPathPrefix,
             std::shared_ptr<const Node> oldNode,
-            const InputPath & lockRootPath,
+            const InputPath & followsPrefix,
             const SourcePath & sourcePath,
             bool trustLock)>
             computeLocks;
@@ -461,7 +454,11 @@ LockedFlake lockFlake(
             /* The old node, if any, from which locks can be
                copied. */
             std::shared_ptr<const Node> oldNode,
-            const InputPath & lockRootPath,
+            /* The prefix relative to which 'follows' should be
+               interpreted. When a node is initially locked, it's
+               relative to the node's flake; when it's already locked,
+               it's relative to the root of the lock file. */
+            const InputPath & followsPrefix,
             /* The source path of this node's flake. */
             const SourcePath & sourcePath,
             bool trustLock)
@@ -633,7 +630,7 @@ LockedFlake lockFlake(
                                             break;
                                         }
                                     }
-                                    auto absoluteFollows(lockRootPath);
+                                    auto absoluteFollows(followsPrefix);
                                     absoluteFollows.insert(absoluteFollows.end(), follows->begin(), follows->end());
                                     fakeInputs.emplace(i.first, FlakeInput {
                                         .follows = absoluteFollows,
@@ -645,9 +642,10 @@ LockedFlake lockFlake(
                         if (mustRefetch) {
                             auto inputFlake = getInputFlake();
                             nodePaths.emplace(childNode, inputFlake.path.parent());
-                            computeLocks(inputFlake.inputs, childNode, inputPath, oldLock, lockRootPath, inputFlake.path, false);
+                            computeLocks(inputFlake.inputs, childNode, inputPath, oldLock, followsPrefix,
+                                inputFlake.path, false);
                         } else {
-                            computeLocks(fakeInputs, childNode, inputPath, oldLock, lockRootPath, sourcePath, true);
+                            computeLocks(fakeInputs, childNode, inputPath, oldLock, followsPrefix, sourcePath, true);
                         }
 
                     } else {
@@ -672,7 +670,11 @@ LockedFlake lockFlake(
                         if (input.isFlake) {
                             auto inputFlake = getInputFlake();
 
-                            auto childNode = make_ref<LockedNode>(inputFlake.lockedRef, ref, true, overridenParentPath);
+                            auto childNode = make_ref<LockedNode>(
+                                inputFlake.lockedRef,
+                                ref,
+                                true,
+                                overridenParentPath);
 
                             node->inputs.insert_or_assign(id, childNode);
 
@@ -692,8 +694,8 @@ LockedFlake lockFlake(
                                 inputFlake.inputs, childNode, inputPath,
                                 oldLock
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
-                                : readLockFile(settings, state.fetchSettings, inputFlake.lockFilePath()).root.get_ptr(),
-                                oldLock ? lockRootPath : inputPath,
+                                : readLockFile(state.fetchSettings, inputFlake.lockFilePath()).root.get_ptr(),
+                                oldLock ? followsPrefix : inputPath,
                                 inputFlake.path,
                                 false);
                         }
@@ -817,8 +819,7 @@ LockedFlake lockFlake(
                            repo, so we should re-read it. FIXME: we could
                            also just clear the 'rev' field... */
                         auto prevLockedRef = flake.lockedRef;
-                        FlakeCache dummyCache;
-                        flake = getFlake(state, topRef, useRegistries, dummyCache);
+                        flake = getFlake(state, topRef, useRegistries);
 
                         if (lockFlags.commitLockFile &&
                             flake.lockedRef.input.getRev() &&
