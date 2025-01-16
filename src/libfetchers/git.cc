@@ -434,7 +434,16 @@ struct GitInputScheme : InputScheme
         //
         // See: https://discourse.nixos.org/t/57783 and #9708
         //
-        repoInfo.url = repoInfo.isLocal ? std::filesystem::absolute(url.path).string() : url.to_string();
+        if (repoInfo.isLocal) {
+            if (!isAbsolute(url.path)) {
+                warn(
+                    "Fetching Git repository '%s', which uses a path relative to the current directory. "
+                    "This is not supported and will stop working in a future release.",
+                    url.to_string());
+            }
+            repoInfo.url = std::filesystem::absolute(url.path).string();
+        } else
+            repoInfo.url = url.to_string();
 
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
