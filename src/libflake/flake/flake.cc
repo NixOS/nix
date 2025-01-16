@@ -385,7 +385,6 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistri
 }
 
 static LockFile readLockFile(
-    const Settings & settings,
     const fetchers::Settings & fetchSettings,
     const SourcePath & lockFilePath)
 {
@@ -421,7 +420,6 @@ LockedFlake lockFlake(
         }
 
         auto oldLockFile = readLockFile(
-            settings,
             state.fetchSettings,
             lockFlags.referenceLockFilePath.value_or(
                 flake.lockFilePath()));
@@ -727,7 +725,7 @@ LockedFlake lockFlake(
                                 inputFlake.inputs, childNode, inputPath,
                                 oldLock
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
-                                : readLockFile(settings, state.fetchSettings, inputFlake.lockFilePath()).root.get_ptr(),
+                                : readLockFile(state.fetchSettings, inputFlake.lockFilePath()).root.get_ptr(),
                                 oldLock ? followsPrefix : inputPath,
                                 inputFlake.path,
                                 false);

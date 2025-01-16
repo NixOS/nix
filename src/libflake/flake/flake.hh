@@ -111,7 +111,7 @@ struct Flake
     }
 };
 
-Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool allowLookup);
+Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool useRegistries);
 
 /**
  * Fingerprint of a locked flake; used as a cache key.
