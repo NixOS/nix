@@ -11,6 +11,7 @@
   [`--from-profile` *path*]
   [`--preserve-installed` | `-P`]
   [`--remove-all` | `-r`]
+  [`--priority` *priority*]
 
 # Description
 
@@ -60,6 +61,10 @@ The arguments *args* map to store paths in a number of possible ways:
 - If `--from-expression` is given, *args* are [Nix language functions](@docroot@/language/syntax.md#functions) that are called with the [default Nix expression] as their single argument.
   The derivations returned by those function calls are installed.
   This allows derivations to be specified in an unambiguous way, which is necessary if there are multiple derivations with the same name.
+
+- If `--priority` *priority* is given, the priority of the derivations being installed is set to *priority*.
+  This can be used to override the priority of the derivations being installed.
+  This is useful if *args* are [store paths], which don't have any priority information.
 
 - If *args* are [store derivations](@docroot@/glossary.md#gloss-store-derivation), then these are [realised], and the resulting output paths are installed.
 
@@ -235,4 +240,3 @@ channel:
 ```console
 $ nix-env --file https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz --install --attr firefox
 ```
-
