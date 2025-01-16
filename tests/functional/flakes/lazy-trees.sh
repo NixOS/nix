@@ -34,7 +34,7 @@ cat > "$flake1Dir/flake.nix" <<EOF
 }
 EOF
 
-cp ../config.nix "$flake1Dir/"
+cp "${config_nix}" "$flake1Dir/"
 echo foo > "$flake1Dir/foo"
 
 # Add an uncopyable file to test laziness.

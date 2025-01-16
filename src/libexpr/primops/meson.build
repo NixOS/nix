@@ -8,5 +8,7 @@ sources += files(
   'fetchClosure.cc',
   'fetchMercurial.cc',
   'fetchTree.cc',
+  'filterPath.cc',
   'fromTOML.cc',
+  'patch.cc',
 )
