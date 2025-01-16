@@ -42,11 +42,6 @@ struct Input
     Attrs attrs;
 
     /**
-     * path of the parent of this input, used for relative path resolution
-     */
-    std::optional<Path> parent;
-
-    /**
      * Cached result of getFingerprint().
      */
     mutable std::optional<std::optional<std::string>> cachedFingerprint;
@@ -103,6 +98,12 @@ public:
      */
     bool isConsideredLocked(
         const Settings & settings) const;
+
+    /**
+     * Only for relative path flakes, i.e. 'path:./foo', returns the
+     * relative path, i.e. './foo'.
+     */
+    std::optional<std::string> isRelative() const;
 
     /**
      * Return whether this is a "final" input, meaning that fetching
@@ -269,6 +270,9 @@ struct InputScheme
 
     virtual bool isLocked(const Input & input) const
     { return false; }
+
+    virtual std::optional<std::string> isRelative(const Input & input) const
+    { return std::nullopt; }
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);

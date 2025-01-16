@@ -43,8 +43,9 @@ LockedNode::LockedNode(
     : lockedRef(getFlakeRef(fetchSettings, json, "locked", "info")) // FIXME: remove "info"
     , originalRef(getFlakeRef(fetchSettings, json, "original", nullptr))
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
+    , parentPath(json.find("parent") != json.end() ? (std::optional<InputPath>) json["parent"] : std::nullopt)
 {
-    if (!lockedRef.input.isConsideredLocked(fetchSettings))
+    if (!lockedRef.input.isConsideredLocked(fetchSettings) && !lockedRef.input.isRelative())
         throw Error("Lock file contains unlocked input '%s'. Use '--allow-dirty-locks' to accept this lock file.",
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 
@@ -198,10 +199,12 @@ std::pair<nlohmann::json, LockFile::KeyMap> LockFile::toJSON() const
             /* For backward compatibility, omit the "__final"
                attribute. We never allow non-final inputs in lock files
                anyway. */
-            assert(lockedNode->lockedRef.input.isFinal());
+            assert(lockedNode->lockedRef.input.isFinal() || lockedNode->lockedRef.input.isRelative());
             n["locked"].erase("__final");
             if (!lockedNode->isFlake)
                 n["flake"] = false;
+            if (lockedNode->parentPath)
+                n["parent"] = *lockedNode->parentPath;
         }
 
         nodes[key] = std::move(n);
@@ -248,7 +251,10 @@ std::optional<FlakeRef> LockFile::isUnlocked(const fetchers::Settings & fetchSet
     for (auto & i : nodes) {
         if (i == ref<const Node>(root)) continue;
         auto node = i.dynamic_pointer_cast<const LockedNode>();
-        if (node && (!node->lockedRef.input.isConsideredLocked(fetchSettings) || !node->lockedRef.input.isFinal()))
+        if (node
+            && (!node->lockedRef.input.isConsideredLocked(fetchSettings)
+                || !node->lockedRef.input.isFinal())
+            && !node->lockedRef.input.isRelative())
             return node->lockedRef;
     }
 

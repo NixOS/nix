@@ -166,6 +166,12 @@ bool Input::isFinal() const
     return maybeGetBoolAttr(attrs, "__final").value_or(false);
 }
 
+std::optional<std::string> Input::isRelative() const
+{
+    assert(scheme);
+    return scheme->isRelative(*this);
+}
+
 Attrs Input::toAttrs() const
 {
     return attrs;

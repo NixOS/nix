@@ -48,9 +48,10 @@ FlakeRef parseFlakeRef(
     const std::string & url,
     const std::optional<Path> & baseDir,
     bool allowMissing,
-    bool isFlake)
+    bool isFlake,
+    bool preserveRelativePaths)
 {
-    auto [flakeRef, fragment] = parseFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake);
+    auto [flakeRef, fragment] = parseFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake, preserveRelativePaths);
     if (fragment != "")
         throw Error("unexpected fragment '%s' in flake reference '%s'", fragment, url);
     return flakeRef;
@@ -87,7 +88,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     const std::string & url,
     const std::optional<Path> & baseDir,
     bool allowMissing,
-    bool isFlake)
+    bool isFlake,
+    bool preserveRelativePaths)
 {
     static std::regex pathFlakeRegex(
         R"(([^?#]*)(\?([^#]*))?(#(.*))?)",
@@ -178,9 +180,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         }
 
     } else {
-        if (!isAbsolute(path))
+        if (!preserveRelativePaths && !isAbsolute(path))
             throw BadURL("flake reference '%s' is not an absolute path", url);
-        path = canonPath(path + "/" + getOr(query, "dir", ""));
     }
 
     return fromParsedURL(fetchSettings, {
@@ -199,8 +200,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 static std::optional<std::pair<FlakeRef, std::string>> parseFlakeIdRef(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
-    bool isFlake
-)
+    bool isFlake)
 {
     std::smatch match;
 
@@ -228,8 +228,7 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
     const std::optional<Path> & baseDir,
-    bool isFlake
-)
+    bool isFlake)
 {
     try {
         auto parsed = parseURL(url);
@@ -248,7 +247,8 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const std::string & url,
     const std::optional<Path> & baseDir,
     bool allowMissing,
-    bool isFlake)
+    bool isFlake,
+    bool preserveRelativePaths)
 {
     using namespace fetchers;
 
@@ -257,7 +257,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     } else if (auto res = parseURLFlakeRef(fetchSettings, url, baseDir, isFlake)) {
         return *res;
     } else {
-        return parsePathFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake);
+        return parsePathFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake, preserveRelativePaths);
     }
 }
 
