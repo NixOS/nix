@@ -229,7 +229,16 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
 {
     ParsedURL parsedURL;
     try {
+<<<<<<< HEAD
         parsedURL = parseURL(url);
+=======
+        auto parsed = parseURL(url);
+        if (baseDir
+            && parsed.scheme == "path"
+            && !isAbsolute(parsed.path))
+            parsed.path = absPath(parsed.path, *baseDir);
+        return fromParsedURL(fetchSettings, std::move(parsed), isFlake);
+>>>>>>> 938f0f4fd (Don't absolutize 'git+file:' in parseURLFlakeRef())
     } catch (BadURL &) {
         return std::nullopt;
     }
