@@ -356,6 +356,6 @@ json=$(nix flake metadata "$flakeFollowsCustomUrlA" --json)
 rm "$flakeFollowsCustomUrlA"/flake.lock
 
 # if override-input is specified, lock "original" entry should contain original url
-json=$(nix flake metadata "$flakeFollowsCustomUrlA" --override-input B/C "path:./flakeB/flakeD" --json)
+json=$(nix flake metadata "$flakeFollowsCustomUrlA" --override-input B/C "$flakeFollowsCustomUrlD" --json)
 echo "$json" | jq .locks.nodes.C.original
 [[ $(echo "$json" | jq -r .locks.nodes.C.original.path) = './flakeC' ]]
