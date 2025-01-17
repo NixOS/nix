@@ -38,11 +38,19 @@ struct LockedNode : Node
     FlakeRef lockedRef, originalRef;
     bool isFlake = true;
 
+    /* The node relative to which relative source paths
+       (e.g. 'path:../foo') are interpreted. */
+    std::optional<InputPath> parentPath;
+
     LockedNode(
         const FlakeRef & lockedRef,
         const FlakeRef & originalRef,
-        bool isFlake = true)
-        : lockedRef(lockedRef), originalRef(originalRef), isFlake(isFlake)
+        bool isFlake = true,
+        std::optional<InputPath> parentPath = {})
+        : lockedRef(lockedRef)
+        , originalRef(originalRef)
+        , isFlake(isFlake)
+        , parentPath(parentPath)
     { }
 
     LockedNode(
@@ -68,15 +76,12 @@ struct LockFile
     std::pair<std::string, KeyMap> to_string() const;
 
     /**
-     * Check whether this lock file has any unlocked inputs. If so,
-     * return one.
+     * Check whether this lock file has any unlocked or non-final
+     * inputs. If so, return one.
      */
-    std::optional<FlakeRef> isUnlocked() const;
+    std::optional<FlakeRef> isUnlocked(const fetchers::Settings & fetchSettings) const;
 
     bool operator ==(const LockFile & other) const;
-    // Needed for old gcc versions that don't synthesize it (like gcc 8.2.2
-    // that is still the default on aarch64-linux)
-    bool operator !=(const LockFile & other) const;
 
     std::shared_ptr<Node> findInput(const InputPath & path);
 

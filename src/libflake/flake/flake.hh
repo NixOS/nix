@@ -110,7 +110,7 @@ struct Flake
     }
 };
 
-Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool allowLookup);
+Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool useRegistries);
 
 /**
  * Fingerprint of a locked flake; used as a cache key.
@@ -129,7 +129,9 @@ struct LockedFlake
      */
     std::map<ref<Node>, SourcePath> nodePaths;
 
-    std::optional<Fingerprint> getFingerprint(ref<Store> store) const;
+    std::optional<Fingerprint> getFingerprint(
+        ref<Store> store,
+        const fetchers::Settings & fetchSettings) const;
 };
 
 struct LockFlags
@@ -155,6 +157,11 @@ struct LockFlags
      * lock file in memory only, without writing it to disk.
      */
     bool writeLockFile = true;
+
+    /**
+     * Throw an exception when the flake has an unlocked input.
+     */
+    bool failOnUnlocked = false;
 
     /**
      * Whether to use the registries to lookup indirect flake
@@ -203,6 +210,10 @@ struct LockFlags
     std::set<InputPath> inputUpdates;
 };
 
+/**
+ * Return a `Flake` object representing the flake read from the
+ * `flake.nix` file in `rootDir`.
+ */
 Flake readFlake(
     EvalState & state,
     const FlakeRef & originalRef,
@@ -233,6 +244,16 @@ void callFlake(
     const LockedFlake & lockedFlake,
     Value & v);
 
+/**
+ * Map a `SourcePath` to the corresponding store path. This is a
+ * temporary hack to support chroot stores while we don't have full
+ * lazy trees. FIXME: Remove this once we can pass a sourcePath rather
+ * than a storePath to call-flake.nix.
+ */
+std::pair<StorePath, Path> sourcePathToStorePath(
+    ref<Store> store,
+    const SourcePath & path);
+
 }
 
 void emitTreeAttrs(
@@ -242,5 +263,12 @@ void emitTreeAttrs(
     Value & v,
     bool emptyRevFallback = false,
     bool forceDirty = false);
+
+/**
+ * An internal builtin similar to `fetchTree`, except that it
+ * always treats the input as final (i.e. no attributes can be
+ * added/removed/changed).
+ */
+void prim_fetchFinalTree(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
 }

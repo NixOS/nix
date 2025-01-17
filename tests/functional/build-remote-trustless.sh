@@ -5,6 +5,7 @@
 # shellcheck disable=SC2154
 
 requireSandboxSupport
+requiresUnprivilegedUserNamespaces
 [[ "$busybox" =~ busybox ]] || skipTest "no busybox"
 
 unset NIX_STORE_DIR

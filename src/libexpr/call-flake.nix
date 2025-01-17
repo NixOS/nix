@@ -10,6 +10,9 @@ lockFileStr:
 # unlocked trees.
 overrides:
 
+# This is `prim_fetchFinalTree`.
+fetchTreeFinal:
+
 let
 
   lockFile = builtins.fromJSON lockFileStr;
@@ -38,13 +41,21 @@ let
       (key: node:
         let
 
+          parentNode = allNodes.${getInputByPath lockFile.root node.parent};
+
           sourceInfo =
             if overrides ? ${key}
             then
               overrides.${key}.sourceInfo
+            else if node.locked.type == "path" && builtins.substring 0 1 node.locked.path != "/"
+            then
+              parentNode.sourceInfo // {
+                outPath = parentNode.outPath + ("/" + node.locked.path);
+              }
             else
               # FIXME: remove obsolete node.info.
-              fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
+              # Note: lock file entries are always final.
+              fetchTreeFinal (node.info or {} // removeAttrs node.locked ["dir"]);
 
           subdir = overrides.${key}.dir or node.locked.dir or "";
 

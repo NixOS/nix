@@ -12,7 +12,7 @@ typedef std::map<std::string, std::map<std::string, bool>> TrustedList;
 
 Path trustedListPath()
 {
-    return getDataDir() + "/nix/trusted-settings.json";
+    return getDataDir() + "/trusted-settings.json";
 }
 
 static TrustedList readTrustedList()
@@ -47,7 +47,7 @@ void ConfigFile::apply(const Settings & flakeSettings)
         else if (auto* b = std::get_if<Explicit<bool>>(&value))
             valueS = b->t ? "true" : "false";
         else if (auto ss = std::get_if<std::vector<std::string>>(&value))
-            valueS = concatStringsSep(" ", *ss); // FIXME: evil
+            valueS = dropEmptyInitThenConcatStringsSep(" ", *ss); // FIXME: evil
         else
             assert(false);
 

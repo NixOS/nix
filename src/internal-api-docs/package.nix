@@ -1,8 +1,6 @@
 { lib
 , mkMesonDerivation
 
-, meson
-, ninja
 , doxygen
 
 # Configuration Options
@@ -32,8 +30,6 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   nativeBuildInputs = [
-    meson
-    ninja
     doxygen
   ];
 
@@ -47,10 +43,6 @@ mkMesonDerivation (finalAttrs: {
     mkdir -p ''${!outputDoc}/nix-support
     echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
   '';
-
-  enableParallelBuilding = true;
-
-  strictDeps = true;
 
   meta = {
     platforms = lib.platforms.all;

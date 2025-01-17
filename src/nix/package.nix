@@ -1,20 +1,10 @@
 { lib
-, stdenv
-, mkMesonDerivation
-, releaseTools
-
-, meson
-, ninja
-, pkg-config
+, mkMesonExecutable
 
 , nix-store
 , nix-expr
 , nix-main
 , nix-cmd
-
-, rapidcheck
-, gtest
-, runCommand
 
 # Configuration Options
 
@@ -25,20 +15,21 @@ let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonExecutable (finalAttrs: {
   pname = "nix";
   inherit version;
 
   workDir = ./.;
   fileset = fileset.unions ([
-    ../../build-utils-meson
-    ./build-utils-meson
+    ../../nix-meson-build-support
+    ./nix-meson-build-support
     ../../.version
     ./.version
     ./meson.build
-    # ./meson.options
+    ./meson.options
 
     # Symbolic links to other dirs
+    ## exes
     ./build-remote
     ./doc
     ./nix-build
@@ -48,6 +39,11 @@ mkMesonDerivation (finalAttrs: {
     ./nix-env
     ./nix-instantiate
     ./nix-store
+    ## dirs
+    ./scripts
+    ../../scripts
+    ./misc
+    ../../misc
 
     # Doc nix files for --help
     ../../doc/manual/generate-manpage.nix
@@ -60,9 +56,9 @@ mkMesonDerivation (finalAttrs: {
     ../nix-env/buildenv.nix
     ./get-env.sh
     ./help-stores.md
-    ../../doc/manual/src/store/types/index.md.in
+    ../../doc/manual/source/store/types/index.md.in
     ./profiles.md
-    ../../doc/manual/src/command-ref/files/profiles.md
+    ../../doc/manual/source/command-ref/files/profiles.md
 
     # Files
   ] ++ lib.concatMap
@@ -84,14 +80,6 @@ mkMesonDerivation (finalAttrs: {
     ]
   );
 
-  outputs = [ "out" "dev" ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-  ];
-
   buildInputs = [
     nix-store
     nix-expr
@@ -109,18 +97,6 @@ mkMesonDerivation (finalAttrs: {
 
   mesonFlags = [
   ];
-
-  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
-
-  enableParallelBuilding = true;
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  strictDeps = true;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

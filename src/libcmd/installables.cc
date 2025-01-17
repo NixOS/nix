@@ -27,7 +27,11 @@
 
 #include <nlohmann/json.hpp>
 
+#include "strings-inline.hh"
+
 namespace nix {
+
+namespace fs { using namespace std::filesystem; }
 
 void completeFlakeInputPath(
     AddCompletions & completions,
@@ -84,7 +88,7 @@ MixFlakeOptions::MixFlakeOptions()
 
     > **DEPRECATED**
     >
-    > Use [`--no-use-registries`](#opt-no-use-registries) instead.
+    > Use [`--no-use-registries`](@docroot@/command-ref/conf-file.md#conf-use-registries) instead.
         )",
         .category = category,
         .handler = {[&]() {
@@ -339,7 +343,7 @@ void completeFlakeRefWithFragment(
             auto flakeRefS = std::string(prefix.substr(0, hash));
 
             // TODO: ideally this would use the command base directory instead of assuming ".".
-            auto flakeRef = parseFlakeRef(fetchSettings, expandTilde(flakeRefS), absPath("."));
+            auto flakeRef = parseFlakeRef(fetchSettings, expandTilde(flakeRefS), fs::current_path().string());
 
             auto evalCache = openEvalCache(*evalState,
                 std::make_shared<flake::LockedFlake>(lockFlake(
@@ -374,6 +378,7 @@ void completeFlakeRefWithFragment(
                         auto attrPath2 = (*attr)->getAttrPath(attr2);
                         /* Strip the attrpath prefix. */
                         attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
+                        // FIXME: handle names with dots
                         completions.add(flakeRefS + "#" + prefixRoot + concatStringsSep(".", evalState->symbols.resolve(attrPath2)));
                     }
                 }
@@ -445,7 +450,7 @@ ref<eval_cache::EvalCache> openEvalCache(
     std::shared_ptr<flake::LockedFlake> lockedFlake)
 {
     auto fingerprint = evalSettings.useEvalCache && evalSettings.pureEval
-        ? lockedFlake->getFingerprint(state.store)
+        ? lockedFlake->getFingerprint(state.store, state.fetchSettings)
         : std::nullopt;
     auto rootLoader = [&state, lockedFlake]()
         {
@@ -847,7 +852,8 @@ std::vector<FlakeRef> RawInstallablesCommand::getFlakeRefsForCompletion()
 {
     applyDefaultInstallables(rawInstallables);
     std::vector<FlakeRef> res;
-    for (auto i : rawInstallables)
+    res.reserve(rawInstallables.size());
+    for (const auto & i : rawInstallables)
         res.push_back(parseFlakeRefWithFragment(
             fetchSettings,
             expandTilde(i),
@@ -905,6 +911,14 @@ void BuiltPathsCommand::applyDefaultInstallables(std::vector<std::string> & rawI
 {
     if (rawInstallables.empty() && !all)
         rawInstallables.push_back(".");
+}
+
+BuiltPaths toBuiltPaths(const std::vector<BuiltPathWithResult> & builtPathsWithResult)
+{
+    BuiltPaths res;
+    for (auto & i : builtPathsWithResult)
+        res.push_back(i.path);
+    return res;
 }
 
 }

@@ -2,17 +2,15 @@
 ///@file
 
 #include <cassert>
-#include <climits>
 #include <span>
 
+#include "eval-gc.hh"
 #include "symbol-table.hh"
 #include "value/context.hh"
 #include "source-path.hh"
 #include "print-options.hh"
+#include "checked-arithmetic.hh"
 
-#if HAVE_BOEHMGC
-#include <gc/gc_allocator.h>
-#endif
 #include <nlohmann/json_fwd.hpp>
 
 namespace nix {
@@ -74,8 +72,8 @@ class EvalState;
 class XMLWriter;
 class Printer;
 
-typedef int64_t NixInt;
-typedef double NixFloat;
+using NixInt = checked::Checked<int64_t>;
+using NixFloat = double;
 
 /**
  * External values must descend from ExternalValueBase, so that
@@ -112,7 +110,7 @@ class ExternalValueBase
      * Compare to another value of the same type. Defaults to uncomparable,
      * i.e. always false.
      */
-    virtual bool operator ==(const ExternalValueBase & b) const;
+    virtual bool operator ==(const ExternalValueBase & b) const noexcept;
 
     /**
      * Print the value as JSON. Defaults to unconvertable, i.e. throws an error
@@ -143,7 +141,9 @@ public:
     Value * * elems;
     ListBuilder(EvalState & state, size_t size);
 
-    ListBuilder(ListBuilder && x)
+    // NOTE: Can be noexcept because we are just copying integral values and
+    // raw pointers.
+    ListBuilder(ListBuilder && x) noexcept
         : size(x.size)
         , inlineElems{x.inlineElems[0], x.inlineElems[1]}
         , elems(size <= 2 ? inlineElems : x.elems)
@@ -286,7 +286,7 @@ public:
         if (invalidIsThunk)
             return nThunk;
         else
-            abort();
+            unreachable();
     }
 
     inline void finishValue(InternalType newType, Payload newPayload)
@@ -303,6 +303,11 @@ public:
     inline bool isValid() const
     {
         return internalType != tUninitialized;
+    }
+
+    inline void mkInt(NixInt::Inner n)
+    {
+        mkInt(NixInt{n});
     }
 
     inline void mkInt(NixInt n)
@@ -326,9 +331,9 @@ public:
 
     void mkStringMove(const char * s, const NixStringContext & context);
 
-    inline void mkString(const Symbol & s)
+    inline void mkString(const SymbolStr & s)
     {
-        mkString(((const std::string &) s).c_str());
+        mkString(s.c_str());
     }
 
     void mkPath(const SourcePath & path);
@@ -493,15 +498,9 @@ void Value::mkBlackhole()
 }
 
 
-#if HAVE_BOEHMGC
 typedef std::vector<Value *, traceable_allocator<Value *>> ValueVector;
-typedef std::map<Symbol, Value *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Value *>>> ValueMap;
+typedef std::unordered_map<Symbol, Value *, std::hash<Symbol>, std::equal_to<Symbol>, traceable_allocator<std::pair<const Symbol, Value *>>> ValueMap;
 typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueVector>>> ValueVectorMap;
-#else
-typedef std::vector<Value *> ValueVector;
-typedef std::map<Symbol, Value *> ValueMap;
-typedef std::map<Symbol, ValueVector> ValueVectorMap;
-#endif
 
 
 /**
@@ -510,5 +509,7 @@ typedef std::map<Symbol, ValueVector> ValueVectorMap;
 typedef std::shared_ptr<Value *> RootValue;
 
 RootValue allocRootValue(Value * v);
+
+void forceNoNullByte(std::string_view s, std::function<Pos()> = nullptr);
 
 }

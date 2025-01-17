@@ -7,12 +7,16 @@ namespace nix {
 
 namespace fetchers { struct PublicKey; }
 
+/**
+ * A sink that writes into a Git repository. Note that nothing may be written
+ * until `flush()` is called.
+ */
 struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
 {
     /**
      * Flush builder and return a final Git hash.
      */
-    virtual Hash sync() = 0;
+    virtual Hash flush() = 0;
 };
 
 struct GitRepo
@@ -55,11 +59,19 @@ struct GitRepo
            modified or added, but excluding deleted files. */
         std::set<CanonPath> files;
 
+        /* All modified or added files. */
+        std::set<CanonPath> dirtyFiles;
+
+        /* The deleted files. */
+        std::set<CanonPath> deletedFiles;
+
         /* The submodules listed in .gitmodules of this workdir. */
         std::vector<Submodule> submodules;
     };
 
     virtual WorkdirInfo getWorkdirInfo() = 0;
+
+    static WorkdirInfo getCachedWorkdirInfo(const std::filesystem::path & path);
 
     /* Get the ref that HEAD points to. */
     virtual std::optional<std::string> getWorkdirRef() = 0;
@@ -80,6 +92,8 @@ struct GitRepo
 
     virtual ref<GitFileSystemObjectSink> getFileSystemObjectSink() = 0;
 
+    virtual void flush() = 0;
+
     virtual void fetch(
         const std::string & url,
         const std::string & refspec,
@@ -98,6 +112,13 @@ struct GitRepo
      * serialisation. This is memoised on-disk.
      */
     virtual Hash treeHashToNarHash(const Hash & treeHash) = 0;
+
+    /**
+     * If the specified Git object is a directory with a single entry
+     * that is a directory, return the ID of that object.
+     * Otherwise, return the passed ID unchanged.
+     */
+    virtual Hash dereferenceSingletonDirectory(const Hash & oid) = 0;
 };
 
 ref<GitRepo> getTarballCache();

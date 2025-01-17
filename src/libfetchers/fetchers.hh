@@ -11,6 +11,8 @@
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
 
+#include "ref.hh"
+
 namespace nix { class Store; class StorePath; struct SourceAccessor; }
 
 namespace nix::fetchers {
@@ -40,9 +42,9 @@ struct Input
     Attrs attrs;
 
     /**
-     * path of the parent of this input, used for relative path resolution
+     * Cached result of getFingerprint().
      */
-    std::optional<Path> parent;
+    mutable std::optional<std::optional<std::string>> cachedFingerprint;
 
 public:
     /**
@@ -76,18 +78,51 @@ public:
     Attrs toAttrs() const;
 
     /**
-     * Check whether this is a "direct" input, that is, not
+     * Return whether this is a "direct" input, that is, not
      * one that goes through a registry.
      */
     bool isDirect() const;
 
     /**
-     * Check whether this is a "locked" input, that is,
-     * one that contains a commit hash or content hash.
+     * Return whether this is a "locked" input, that is, it has
+     * attributes like a Git revision or NAR hash that uniquely
+     * identify its contents.
      */
     bool isLocked() const;
 
-    bool operator ==(const Input & other) const;
+    /**
+     * Return whether the input is either locked, or, if
+     * `allow-dirty-locks` is enabled, it has a NAR hash. In the
+     * latter case, we can verify the input but we may not be able to
+     * fetch it from anywhere.
+     */
+    bool isConsideredLocked(
+        const Settings & settings) const;
+
+    /**
+     * Only for relative path flakes, i.e. 'path:./foo', returns the
+     * relative path, i.e. './foo'.
+     */
+    std::optional<std::string> isRelative() const;
+
+    /**
+     * Return whether this is a "final" input, meaning that fetching
+     * it will not add, remove or change any attributes. (See
+     * `checkLocks()` for the semantics.) Only "final" inputs can be
+     * substituted from a binary cache.
+     *
+     * The "final" state is denoted by the presence of an attribute
+     * `__final = true`. This attribute is currently undocumented and
+     * for internal use only.
+     */
+    bool isFinal() const;
+
+    bool operator ==(const Input & other) const noexcept;
+
+    bool operator <(const Input & other) const
+    {
+        return attrs < other.attrs;
+    }
 
     bool contains(const Input & other) const;
 
@@ -96,6 +131,19 @@ public:
      * location in the Nix store and the locked input.
      */
     std::pair<StorePath, Input> fetchToStore(ref<Store> store) const;
+
+    /**
+     * Check the locking attributes in `result` against
+     * `specified`. E.g. if `specified` has a `rev` attribute, then
+     * `result` must have the same `rev` attribute. Throw an exception
+     * if there is a mismatch.
+     *
+     * If `specified` is marked final (i.e. has the `__final`
+     * attribute), then the intersection of attributes in `specified`
+     * and `result` must be equal, and `final.attrs` is set to
+     * `specified.attrs` (i.e. we discard any new attributes).
+     */
+    static void checkLocks(Input specified, Input & result);
 
     /**
      * Return a `SourceAccessor` that allows access to files in the
@@ -142,6 +190,10 @@ public:
     /**
      * For locked inputs, return a string that uniquely specifies the
      * content of the input (typically a commit hash or content hash).
+     *
+     * Only known-equivalent inputs should return the same fingerprint.
+     *
+     * This is not a stable identifier between Nix versions, but not guaranteed to change either.
      */
     std::optional<std::string> getFingerprint(ref<Store> store) const;
 };
@@ -213,31 +265,14 @@ struct InputScheme
     virtual bool isDirect(const Input & input) const
     { return true; }
 
-    /**
-     * A sufficiently unique string that can be used as a cache key to identify the `input`.
-     *
-     * Only known-equivalent inputs should return the same fingerprint.
-     *
-     * This is not a stable identifier between Nix versions, but not guaranteed to change either.
-     */
     virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
     { return std::nullopt; }
 
-    /**
-     * Return `true` if this input is considered "locked", i.e. it has
-     * attributes like a Git revision or NAR hash that uniquely
-     * identify its contents.
-     */
     virtual bool isLocked(const Input & input) const
     { return false; }
 
-    /**
-     * Check the locking attributes in `final` against
-     * `specified`. E.g. if `specified` has a `rev` attribute, then
-     * `final` must have the same `rev` attribute. Throw an exception
-     * if there is a mismatch.
-     */
-    virtual void checkLocks(const Input & specified, const Input & final) const;
+    virtual std::optional<std::string> isRelative(const Input & input) const
+    { return std::nullopt; }
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);

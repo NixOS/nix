@@ -3,7 +3,6 @@
 
 #include <map>
 #include <stack>
-#include <algorithm>
 
 #include <nlohmann/json.hpp>
 
@@ -74,7 +73,10 @@ struct NarAccessor : public SourceAccessor
         NarMember & createMember(const CanonPath & path, NarMember member)
         {
             size_t level = 0;
-            for (auto _ : path) ++level;
+            for (auto _ : path) {
+                (void)_;
+                ++level;
+            }
 
             while (parents.size() > level) parents.pop();
 
@@ -289,7 +291,11 @@ json listNar(ref<SourceAccessor> accessor, const CanonPath & path, bool recurse)
         obj["type"] = "symlink";
         obj["target"] = accessor->readLink(path);
         break;
-    case SourceAccessor::Type::tMisc:
+    case SourceAccessor::Type::tBlock:
+    case SourceAccessor::Type::tChar:
+    case SourceAccessor::Type::tSocket:
+    case SourceAccessor::Type::tFifo:
+    case SourceAccessor::Type::tUnknown:
         assert(false); // cannot happen for NARs
     }
     return obj;

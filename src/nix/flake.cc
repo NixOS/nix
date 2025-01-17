@@ -19,9 +19,13 @@
 #include "users.hh"
 #include "flake-schemas.hh"
 
+#include <filesystem>
 #include <nlohmann/json.hpp>
-#include <queue>
 #include <iomanip>
+
+#include "strings-inline.hh"
+
+namespace nix::fs { using namespace std::filesystem; }
 
 using namespace nix;
 using namespace nix::flake;
@@ -49,7 +53,7 @@ public:
 
     FlakeRef getFlakeRef()
     {
-        return parseFlakeRef(fetchSettings, flakeUrl, absPath(".")); //FIXME
+        return parseFlakeRef(fetchSettings, flakeUrl, fs::current_path().string()); //FIXME
     }
 
     LockedFlake lockFlake()
@@ -61,7 +65,7 @@ public:
     {
         return {
             // Like getFlakeRef but with expandTilde calld first
-            parseFlakeRef(fetchSettings, expandTilde(flakeUrl), absPath("."))
+            parseFlakeRef(fetchSettings, expandTilde(flakeUrl), fs::current_path().string())
         };
     }
 };
@@ -91,7 +95,7 @@ public:
             .label="inputs",
             .optional=true,
             .handler={[&](std::vector<std::string> inputsToUpdate){
-                for (auto inputToUpdate : inputsToUpdate) {
+                for (const auto & inputToUpdate : inputsToUpdate) {
                     InputPath inputPath;
                     try {
                         inputPath = flake::parseInputPath(inputToUpdate);
@@ -159,6 +163,7 @@ struct CmdFlakeLock : FlakeCommand
         settings.tarballTtl = 0;
 
         lockFlags.writeLockFile = true;
+        lockFlags.failOnUnlocked = true;
         lockFlags.applyNixConfig = true;
 
         lockFlake();
@@ -185,7 +190,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
         auto & flake = lockedFlake.flake;
 
         // Currently, all flakes are in the Nix store via the rootFS accessor.
-        auto storePath = store->printStorePath(store->toStorePath(flake.path.path.abs()).first);
+        auto storePath = store->printStorePath(sourcePathToStorePath(store, flake.path).first);
 
         if (json) {
             nlohmann::json j;
@@ -209,7 +214,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["lastModified"] = *lastModified;
             j["path"] = storePath;
             j["locks"] = lockedFlake.lockFile.toJSON().first;
-            if (auto fingerprint = lockedFlake.getFingerprint(store))
+            if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
             logger->cout("%s", j.dump());
         } else {
@@ -243,7 +248,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Last modified:" ANSI_NORMAL " %s",
                     std::put_time(std::localtime(&*lastModified), "%F %T"));
-            if (auto fingerprint = lockedFlake.getFingerprint(store))
+            if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 logger->cout(
                     ANSI_BOLD "Fingerprint:" ANSI_NORMAL "   %s",
                     fingerprint->to_string(HashFormat::Base16, false));
@@ -353,6 +358,8 @@ struct CmdFlakeCheck : FlakeCommand, flake_schemas::MixFlakeSchemas
         auto reportError = [&](const Error & e) {
             try {
                 throw e;
+            } catch (Interrupted & e) {
+                throw;
             } catch (Error & e) {
                 if (settings.keepGoing) {
                     logError({.msg = e.info().msg});
@@ -431,6 +438,7 @@ struct CmdFlakeCheck : FlakeCommand, flake_schemas::MixFlakeSchemas
             throw Error("some errors were encountered during the evaluation");
 
         if (!omittedSystems.empty()) {
+            // TODO: empty system is not visible; render all as nix strings?
             warn(
                 "The check omitted these incompatible systems: %s\n"
                 "Use '--all-systems' to check all.",
@@ -477,7 +485,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto evalState = getEvalState();
 
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(
-            fetchSettings, templateUrl, absPath("."));
+            fetchSettings, templateUrl, fs::current_path().string());
 
         auto installable = InstallableFlake(nullptr,
             evalState, std::move(templateFlakeRef), templateName, ExtendedOutputsSpec::Default(),
@@ -487,36 +495,32 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         auto cursor = installable.getCursor(*evalState);
 
-        auto templateDirAttr = cursor->getAttr("path");
-        auto templateDir = templateDirAttr->getString();
+        auto templateDirAttr = cursor->getAttr("path")->forceValue();
+        NixStringContext context;
+        auto templateDir = evalState->coerceToPath(noPos, templateDirAttr, context, "");
 
-        if (!store->isInStore(templateDir))
-            evalState->error<TypeError>(
-                "'%s' was not found in the Nix store\n"
-                "If you've set '%s' to a string, try using a path instead.",
-                templateDir, templateDirAttr->getAttrPathStr()).debugThrow();
+        std::vector<fs::path> changedFiles;
+        std::vector<fs::path> conflictedFiles;
 
-        std::vector<Path> changedFiles;
-        std::vector<Path> conflictedFiles;
-
-        std::function<void(const Path & from, const Path & to)> copyDir;
-        copyDir = [&](const Path & from, const Path & to)
+        std::function<void(const SourcePath & from, const fs::path & to)> copyDir;
+        copyDir = [&](const SourcePath & from, const fs::path & to)
         {
-            createDirs(to);
+            fs::create_directories(to);
 
-            for (auto & entry : std::filesystem::directory_iterator{from}) {
+            for (auto & [name, entry] : from.readDirectory()) {
                 checkInterrupt();
-                auto from2 = entry.path().string();
-                auto to2 = to + "/" + entry.path().filename().string();
-                auto st = lstat(from2);
-                if (S_ISDIR(st.st_mode))
+                auto from2 = from / name;
+                auto to2 = to / name;
+                auto st = from2.lstat();
+                auto to_st = fs::symlink_status(to2);
+                if (st.type == SourceAccessor::tDirectory)
                     copyDir(from2, to2);
-                else if (S_ISREG(st.st_mode)) {
-                    auto contents = readFile(from2);
-                    if (pathExists(to2)) {
-                        auto contents2 = readFile(to2);
+                else if (st.type == SourceAccessor::tRegular) {
+                    auto contents = from2.readFile();
+                    if (fs::exists(to_st)) {
+                        auto contents2 = readFile(to2.string());
                         if (contents != contents2) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2, from2);
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
@@ -525,21 +529,21 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     } else
                         writeFile(to2, contents);
                 }
-                else if (S_ISLNK(st.st_mode)) {
-                    auto target = readLink(from2);
-                    if (pathExists(to2)) {
-                        if (readLink(to2) != target) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2, from2);
+                else if (st.type == SourceAccessor::tSymlink) {
+                    auto target = from2.readLink();
+                    if (fs::exists(to_st)) {
+                        if (fs::read_symlink(to2) != target) {
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
                         }
                         continue;
                     } else
-                          createSymlink(target, to2);
+                        createSymlink(target, os_string_to_string(PathViewNG { to2 }));
                 }
                 else
-                    throw Error("file '%s' has unsupported type", from2);
+                    throw Error("path '%s' needs to be a symlink, file, or directory but instead is a %s", from2, st.typeString());
                 changedFiles.push_back(to2);
                 notice("wrote: %s", to2);
             }
@@ -547,19 +551,19 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         copyDir(templateDir, flakeDir);
 
-        if (!changedFiles.empty() && pathExists(flakeDir + "/.git")) {
+        if (!changedFiles.empty() && fs::exists(std::filesystem::path{flakeDir} / ".git")) {
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
-            for (auto & s : changedFiles) args.push_back(s);
+            for (auto & s : changedFiles) args.emplace_back(s.string());
             runProgram("git", true, args);
         }
-        auto welcomeText = cursor->maybeGetAttr("welcomeText");
-        if (welcomeText) {
+
+        if (auto welcomeText = cursor->maybeGetAttr("welcomeText")) {
             notice("\n");
             notice(renderMarkdownToTerminal(welcomeText->getString()));
         }
 
         if (!conflictedFiles.empty())
-            throw Error("Encountered %d conflicts - see above", conflictedFiles.size());
+            throw Error("encountered %d conflicts - see above", conflictedFiles.size());
     }
 };
 
@@ -675,7 +679,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         StorePathSet sources;
 
-        auto storePath = store->toStorePath(flake.flake.path.path.abs()).first;
+        auto storePath = sourcePathToStorePath(store, flake.flake.path).first;
 
         sources.insert(storePath);
 
@@ -774,10 +778,10 @@ struct CmdFlakeShow : FlakeCommand, MixJSON, flake_schemas::MixFlakeSchemas
                         obj.emplace("leaf", true);
 
                         if (auto what = flake_schemas::what(leaf))
-                            obj.emplace("what", what);
+                            obj.emplace("what", *what);
 
                         if (auto shortDescription = flake_schemas::shortDescription(leaf))
-                            obj.emplace("shortDescription", shortDescription);
+                            obj.emplace("shortDescription", *shortDescription);
 
                         if (auto drv = flake_schemas::derivation(leaf))
                             obj.emplace("derivationName", drv->getAttr(state->sName)->getString());

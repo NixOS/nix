@@ -1,13 +1,12 @@
 #pragma once
 ///@file
 
+#include <regex>
+
 #include "types.hh"
-#include "hash.hh"
 #include "fetchers.hh"
 #include "outputs-spec.hh"
-
-#include <regex>
-#include <variant>
+#include "registry.hh"
 
 namespace nix {
 
@@ -48,7 +47,12 @@ struct FlakeRef
      */
     Path subdir;
 
-    bool operator==(const FlakeRef & other) const;
+    bool operator ==(const FlakeRef & other) const = default;
+
+    bool operator <(const FlakeRef & other) const
+    {
+        return std::tie(input, subdir) < std::tie(other.input, other.subdir);
+    }
 
     FlakeRef(fetchers::Input && input, const Path & subdir)
         : input(std::move(input)), subdir(subdir)
@@ -59,7 +63,9 @@ struct FlakeRef
 
     fetchers::Attrs toAttrs() const;
 
-    FlakeRef resolve(ref<Store> store) const;
+    FlakeRef resolve(
+        ref<Store> store,
+        const fetchers::RegistryFilter & filter = {}) const;
 
     static FlakeRef fromAttrs(
         const fetchers::Settings & fetchSettings,
@@ -78,7 +84,8 @@ FlakeRef parseFlakeRef(
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
-    bool isFlake = true);
+    bool isFlake = true,
+    bool preserveRelativePaths = false);
 
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
@@ -96,7 +103,8 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
-    bool isFlake = true);
+    bool isFlake = true,
+    bool preserveRelativePaths = false);
 
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)

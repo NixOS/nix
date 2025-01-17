@@ -92,12 +92,12 @@ private:
      * Number of build slots occupied.  This includes local builds but does not
      * include substitutions or remote builds via the build hook.
      */
-    unsigned int nrLocalBuilds;
+    size_t nrLocalBuilds;
 
     /**
      * Number of substitution slots occupied.
      */
-    unsigned int nrSubstitutions;
+    size_t nrSubstitutions;
 
     /**
      * Maps used to prevent multiple instantiations of a goal for the
@@ -208,7 +208,7 @@ public:
         const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
 
     /**
-     * @ref SubstitutionGoal "substitution goal"
+     * @ref PathSubstitutionGoal "substitution goal"
      */
     std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
     std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
@@ -235,12 +235,12 @@ public:
      * Return the number of local build processes currently running (but not
      * remote builds via the build hook).
      */
-    unsigned int getNrLocalBuilds();
+    size_t getNrLocalBuilds();
 
     /**
      * Return the number of substitution processes currently running.
      */
-    unsigned int getNrSubstitutions();
+    size_t getNrSubstitutions();
 
     /**
      * Registers a running child process.  `inBuildSlot` means that

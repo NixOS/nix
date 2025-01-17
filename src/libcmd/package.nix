@@ -1,11 +1,6 @@
 { lib
 , stdenv
-, mkMesonDerivation
-, releaseTools
-
-, meson
-, ninja
-, pkg-config
+, mkMesonLibrary
 
 , nix-util
 , nix-store
@@ -38,28 +33,20 @@ let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonLibrary (finalAttrs: {
   pname = "nix-cmd";
   inherit version;
 
   workDir = ./.;
   fileset = fileset.unions [
-    ../../build-utils-meson
-    ./build-utils-meson
+    ../../nix-meson-build-support
+    ./nix-meson-build-support
     ../../.version
     ./.version
     ./meson.build
     ./meson.options
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
-  ];
-
-  outputs = [ "out" "dev" ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
   ];
 
   buildInputs = [
@@ -88,20 +75,6 @@ mkMesonDerivation (finalAttrs: {
     (lib.mesonEnable "markdown" enableMarkdown)
     (lib.mesonOption "readline-flavor" readlineFlavor)
   ];
-
-  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
-
-  enableParallelBuilding = true;
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  # TODO `releaseTools.coverageAnalysis` in Nixpkgs needs to be updated
-  # to work with `strictDeps`.
-  strictDeps = true;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

@@ -13,8 +13,9 @@
 #include "git-utils.hh"
 #include "logging.hh"
 #include "finally.hh"
-
 #include "fetch-settings.hh"
+#include "json-utils.hh"
+#include "archive.hh"
 
 #include <regex>
 #include <string.h>
@@ -44,7 +45,7 @@ bool isCacheFileWithinTtl(time_t now, const struct stat & st)
 Path getCachePath(std::string_view key, bool shallow)
 {
     return getCacheDir()
-    + "/nix/gitv3/"
+    + "/gitv3/"
     + hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false)
     + (shallow ? "-shallow" : "");
 }
@@ -425,12 +426,31 @@ struct GitInputScheme : InputScheme
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         bool isBareRepository = url.scheme == "file" && !pathExists(url.path + "/.git");
         repoInfo.isLocal = url.scheme == "file" && !forceHttp && !isBareRepository;
-        repoInfo.url = repoInfo.isLocal ? url.path : url.base;
+        //
+        // FIXME: here we turn a possibly relative path into an absolute path.
+        // This allows relative git flake inputs to be resolved against the
+        // **current working directory** (as in POSIX), which tends to work out
+        // ok in the context of flakes, but is the wrong behavior,
+        // as it should resolve against the flake.nix base directory instead.
+        //
+        // See: https://discourse.nixos.org/t/57783 and #9708
+        //
+        if (repoInfo.isLocal) {
+            if (!isAbsolute(url.path)) {
+                warn(
+                    "Fetching Git repository '%s', which uses a path relative to the current directory. "
+                    "This is not supported and will stop working in a future release. "
+                    "See https://github.com/NixOS/nix/issues/12281 for details.",
+                    url);
+            }
+            repoInfo.url = std::filesystem::absolute(url.path).string();
+        } else
+            repoInfo.url = url.to_string();
 
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
         if (!input.getRef() && !input.getRev() && repoInfo.isLocal)
-            repoInfo.workdirInfo = GitRepo::openRepo(repoInfo.url)->getWorkdirInfo();
+            repoInfo.workdirInfo = GitRepo::getCachedWorkdirInfo(repoInfo.url);
 
         return repoInfo;
     }
@@ -514,8 +534,6 @@ struct GitInputScheme : InputScheme
 
         auto origRev = input.getRev();
 
-        std::string name = input.getName();
-
         auto originalRef = input.getRef();
         auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo);
         input.attrs.insert_or_assign("ref", ref);
@@ -584,9 +602,10 @@ struct GitInputScheme : InputScheme
                 }
 
                 try {
-                    setWriteTime(localRefFile, now, now);
+                    if (!input.getRev())
+                        setWriteTime(localRefFile, now, now);
                 } catch (Error & e) {
-                    warn("could not update mtime for file '%s': %s", localRefFile, e.msg());
+                    warn("could not update mtime for file '%s': %s", localRefFile, e.info().msg);
                 }
                 if (!originalRef && !storeCachedHead(repoInfo.url, ref))
                     warn("could not update cached head '%s' for '%s'", ref, repoInfo.url);
@@ -794,10 +813,33 @@ struct GitInputScheme : InputScheme
 
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
+        auto makeFingerprint = [&](const Hash & rev)
+        {
+            return rev.gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
+        };
+
         if (auto rev = input.getRev())
-            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
-        else
+            return makeFingerprint(*rev);
+        else {
+            auto repoInfo = getRepoInfo(input);
+            if (repoInfo.isLocal && repoInfo.workdirInfo.headRev && repoInfo.workdirInfo.submodules.empty()) {
+                /* Calculate a fingerprint that takes into account the
+                   deleted and modified/added files. */
+                HashSink hashSink{HashAlgorithm::SHA512};
+                for (auto & file : repoInfo.workdirInfo.dirtyFiles) {
+                    writeString("modified:", hashSink);
+                    writeString(file.abs(), hashSink);
+                    dumpPath(repoInfo.url + "/" + file.abs(), hashSink);
+                }
+                for (auto & file : repoInfo.workdirInfo.deletedFiles) {
+                    writeString("deleted:", hashSink);
+                    writeString(file.abs(), hashSink);
+                }
+                return makeFingerprint(*repoInfo.workdirInfo.headRev)
+                    + ";d=" + hashSink.finish().first.to_string(HashFormat::Base16, false);
+            }
             return std::nullopt;
+        }
     }
 
     bool isLocked(const Input & input) const override

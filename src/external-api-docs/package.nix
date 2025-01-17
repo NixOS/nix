@@ -1,8 +1,6 @@
 { lib
 , mkMesonDerivation
 
-, meson
-, ninja
 , doxygen
 
 # Configuration Options
@@ -32,13 +30,12 @@ mkMesonDerivation (finalAttrs: {
       # Source is not compiled, but still must be available for Doxygen
       # to gather comments.
       (cpp ../libexpr-c)
+      (cpp ../libflake-c)
       (cpp ../libstore-c)
       (cpp ../libutil-c)
     ];
 
   nativeBuildInputs = [
-    meson
-    ninja
     doxygen
   ];
 
@@ -52,10 +49,6 @@ mkMesonDerivation (finalAttrs: {
     mkdir -p ''${!outputDoc}/nix-support
     echo "doc external-api-docs $out/share/doc/nix/external-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
   '';
-
-  enableParallelBuilding = true;
-
-  strictDeps = true;
 
   meta = {
     platforms = lib.platforms.all;

@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include "types.hh"
 #include "serialise.hh"
 #include "source-accessor.hh"
 #include "file-system.hh"
@@ -79,6 +78,11 @@ struct NullFileSystemObjectSink : FileSystemObjectSink
 struct RestoreSink : FileSystemObjectSink
 {
     std::filesystem::path dstPath;
+    bool startFsync = false;
+
+    explicit RestoreSink(bool startFsync)
+        : startFsync{startFsync}
+    { }
 
     void createDirectory(const CanonPath & path) override;
 

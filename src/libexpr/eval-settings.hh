@@ -2,10 +2,12 @@
 ///@file
 
 #include "config.hh"
+#include "ref.hh"
+#include "source-path.hh"
 
 namespace nix {
 
-class Store;
+class EvalState;
 
 struct EvalSettings : Config
 {
@@ -17,11 +19,8 @@ struct EvalSettings : Config
      *
      * The return value is (a) whether the entry was valid, and, if so,
      * what does it map to.
-     *
-     * @todo Return (`std::optional` of) `SourceAccssor` or something
-     * more structured instead of mere `std::string`?
      */
-    using LookupPathHook = std::optional<std::string>(ref<Store> store, std::string_view);
+    using LookupPathHook = std::optional<SourcePath>(EvalState & state, std::string_view);
 
     /**
      * Map from "scheme" to a `LookupPathHook`.
@@ -42,9 +41,11 @@ struct EvalSettings : Config
 
     bool & readOnlyMode;
 
-    Strings getDefaultNixPath() const;
+    static Strings getDefaultNixPath();
 
     static bool isPseudoUrl(std::string_view s);
+
+    static Strings parseNixPath(const std::string & s);
 
     static std::string resolvePseudoUrl(std::string_view url);
 
@@ -62,7 +63,7 @@ struct EvalSettings : Config
           extern "C" typedef void (*ValueInitialiser) (EvalState & state, Value & v);
           ```
 
-          The [Nix C++ API documentation](@docroot@/contributing/documentation.md#api-documentation) has more details on evaluator internals.
+          The [Nix C++ API documentation](@docroot@/development/documentation.md#api-documentation) has more details on evaluator internals.
 
         - `builtins.exec` *arguments*
 
@@ -70,25 +71,39 @@ struct EvalSettings : Config
     )"};
 
     Setting<Strings> nixPath{
-        this, getDefaultNixPath(), "nix-path",
+        this, {}, "nix-path",
         R"(
           List of search paths to use for [lookup path](@docroot@/language/constructs/lookup-path.md) resolution.
           This setting determines the value of
           [`builtins.nixPath`](@docroot@/language/builtins.md#builtins-nixPath) and can be used with [`builtins.findFile`](@docroot@/language/builtins.md#builtins-findFile).
 
-          The default value is
+          - The configuration setting is overridden by the [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH)
+          environment variable.
+          - `NIX_PATH` is overridden by [specifying the setting as the command line flag](@docroot@/command-ref/conf-file.md#command-line-flags) `--nix-path`.
+          - Any current value is extended by the [`-I` option](@docroot@/command-ref/opt-common.md#opt-I) or `--extra-nix-path`.
 
-          ```
-          $HOME/.nix-defexpr/channels
-          nixpkgs=$NIX_STATE_DIR/profiles/per-user/root/channels/nixpkgs
-          $NIX_STATE_DIR/profiles/per-user/root/channels
-          ```
+          If the respective paths are accessible, the default values are:
 
-          It can be overridden with the [`NIX_PATH` environment variable](@docroot@/command-ref/env-common.md#env-NIX_PATH) or the [`-I` command line option](@docroot@/command-ref/opt-common.md#opt-I).
+          - `$HOME/.nix-defexpr/channels`
+
+            The [user channel link](@docroot@/command-ref/files/default-nix-expression.md#user-channel-link), pointing to the current state of [channels](@docroot@/command-ref/files/channels.md) for the current user.
+
+          - `nixpkgs=$NIX_STATE_DIR/profiles/per-user/root/channels/nixpkgs`
+
+            The current state of the `nixpkgs` channel for the `root` user.
+
+          - `$NIX_STATE_DIR/profiles/per-user/root/channels`
+
+            The current state of all channels for the `root` user.
+
+          These files are set up by the [Nix installer](@docroot@/installation/installing-binary.md).
+          See [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR) for details on the environment variable.
 
           > **Note**
           >
-          > If [pure evaluation](#conf-pure-eval) is enabled, `nixPath` evaluates to the empty list `[ ]`.
+          > If [restricted evaluation](@docroot@/command-ref/conf-file.md#conf-restrict-eval) is enabled, the default value is empty.
+          >
+          > If [pure evaluation](#conf-pure-eval) is enabled, `builtins.nixPath` *always* evaluates to the empty list `[ ]`.
         )", {}, false};
 
     Setting<std::string> currentSystem{
@@ -177,7 +192,11 @@ struct EvalSettings : Config
         )"};
 
     Setting<bool> useEvalCache{this, true, "eval-cache",
-        "Whether to use the flake evaluation cache."};
+        R"(
+            Whether to use the flake evaluation cache.
+            Certain commands won't have to evaluate when invoked for the second time with a particular version of a flake.
+            Intermediate results are not cached.
+        )"};
 
     Setting<bool> ignoreExceptionsDuringTry{this, false, "ignore-try",
         R"(

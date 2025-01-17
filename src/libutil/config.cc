@@ -1,6 +1,7 @@
 #include "config.hh"
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
+#include "environment-variables.hh"
 #include "experimental-features.hh"
 #include "util.hh"
 #include "file-system.hh"
@@ -8,6 +9,8 @@
 #include "config-impl.hh"
 
 #include <nlohmann/json.hpp>
+
+#include "strings.hh"
 
 namespace nix {
 
@@ -114,7 +117,7 @@ static void parseConfigFiles(const std::string & contents, const std::string & p
         if (tokens.empty()) continue;
 
         if (tokens.size() < 2)
-            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+            throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
 
         auto include = false;
         auto ignoreMissing = false;
@@ -127,7 +130,7 @@ static void parseConfigFiles(const std::string & contents, const std::string & p
 
         if (include) {
             if (tokens.size() != 2)
-                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+                throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
             auto p = absPath(tokens[1], dirOf(path));
             if (pathExists(p)) {
                 try {
@@ -143,7 +146,7 @@ static void parseConfigFiles(const std::string & contents, const std::string & p
         }
 
         if (tokens[1] != "=")
-            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+            throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
 
         std::string name = std::move(tokens[0]);
 
@@ -168,9 +171,18 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
             set(name, value);
 
     // Then apply other settings
-    for (const auto & [name, value] : parsedContents)
-        if (name != "experimental-features" && name != "extra-experimental-features")
+    // XXX: NIX_PATH must override the regular setting! This is done in `initGC()`
+    // Environment variables overriding settings should probably be part of the Config mechanism,
+    // but at the time of writing it's not worth building that for just one thing
+    for (const auto & [name, value] : parsedContents) {
+        if (name != "experimental-features" && name != "extra-experimental-features") {
+            if ((name == "nix-path" || name == "extra-nix-path")
+                && getEnv("NIX_PATH").has_value()) {
+                continue;
+            }
             set(name, value);
+        }
+    }
 }
 
 void Config::resetOverridden()
@@ -290,6 +302,7 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
 {
     args.addFlag({
         .longName = name,
+        .aliases = aliases,
         .description = fmt("Enable the `%s` setting.", name),
         .category = category,
         .handler = {[this] { override(true); }},
@@ -297,6 +310,7 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
     });
     args.addFlag({
         .longName = "no-" + name,
+        .aliases = aliases,
         .description = fmt("Disable the `%s` setting.", name),
         .category = category,
         .handler = {[this] { override(false); }},

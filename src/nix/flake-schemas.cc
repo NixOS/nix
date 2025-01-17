@@ -2,6 +2,7 @@
 #include "eval-settings.hh"
 #include "fetch-to-store.hh"
 #include "memory-source-accessor.hh"
+#include "strings-inline.hh"
 
 namespace nix::flake_schemas {
 
@@ -34,9 +35,12 @@ static LockedFlake getBuiltinDefaultSchemasFlake(EvalState & state)
 }
 
 std::tuple<ref<EvalCache>, ref<eval_cache::AttrCursor>>
-call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::optional<FlakeRef> defaultSchemasFlake)
+call(
+    EvalState & state,
+    std::shared_ptr<flake::LockedFlake> lockedFlake,
+    std::optional<FlakeRef> defaultSchemasFlake)
 {
-    auto fingerprint = lockedFlake->getFingerprint(state.store);
+    auto fingerprint = lockedFlake->getFingerprint(state.store, state.fetchSettings);
 
     std::string callFlakeSchemasNix =
 #include "call-flake-schemas.nix.gen.hh"
@@ -44,7 +48,7 @@ call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::op
 
     auto lockedDefaultSchemasFlake =
         defaultSchemasFlake ? flake::lockFlake(flakeSettings, state, *defaultSchemasFlake, {}) : getBuiltinDefaultSchemasFlake(state);
-    auto lockedDefaultSchemasFlakeFingerprint = lockedDefaultSchemasFlake.getFingerprint(state.store);
+    auto lockedDefaultSchemasFlakeFingerprint = lockedDefaultSchemasFlake.getFingerprint(state.store, state.fetchSettings);
 
     std::optional<Fingerprint> fingerprint2;
     if (fingerprint && lockedDefaultSchemasFlakeFingerprint)
@@ -75,7 +79,7 @@ call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::op
 
             auto vRes = state.allocValue();
             Value * args[] = {vDefaultSchemasFlake, vFlake};
-            state.callFunction(*vCallFlakeSchemas, 2, args, *vRes, noPos);
+            state.callFunction(*vCallFlakeSchemas, args, *vRes, noPos);
 
             return vRes;
         });
@@ -215,7 +219,7 @@ std::optional<FlakeRef> MixFlakeSchemas::getDefaultFlakeSchemas()
     if (!defaultFlakeSchemas)
         return std::nullopt;
     else
-        return parseFlakeRef(fetchSettings, *defaultFlakeSchemas, absPath("."));
+        return parseFlakeRef(fetchSettings, *defaultFlakeSchemas, absPath(getCommandBaseDir()));
 }
 
 }

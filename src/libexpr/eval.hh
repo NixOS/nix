@@ -3,21 +3,21 @@
 
 #include "attr-set.hh"
 #include "eval-error.hh"
-#include "eval-gc.hh"
 #include "types.hh"
 #include "value.hh"
 #include "nixexpr.hh"
 #include "symbol-table.hh"
 #include "config.hh"
 #include "experimental-features.hh"
+#include "position.hh"
+#include "pos-table.hh"
 #include "source-accessor.hh"
 #include "search-path.hh"
 #include "repl-exit-status.hh"
+#include "ref.hh"
 
 #include <map>
 #include <optional>
-#include <unordered_map>
-#include <mutex>
 #include <functional>
 
 namespace nix {
@@ -40,6 +40,21 @@ struct MemorySourceAccessor;
 namespace eval_cache {
     class EvalCache;
 }
+
+/**
+ * Increments a count on construction and decrements on destruction.
+ */
+class CallDepth {
+  size_t & count;
+
+public:
+  CallDepth(size_t & count) : count(count) {
+    ++count;
+  }
+  ~CallDepth() {
+    --count;
+  }
+};
 
 /**
  * Function that implements a primop.
@@ -76,7 +91,7 @@ struct PrimOp
     const char * doc = nullptr;
 
     /**
-     * Add a trace item, `while calling the '<name>' builtin`
+     * Add a trace item, while calling the `<name>` builtin.
      *
      * This is used to remove the redundant item for `builtins.addErrorContext`.
      */
@@ -91,6 +106,11 @@ struct PrimOp
      * Optional experimental for this to be gated on.
      */
     std::optional<ExperimentalFeature> experimentalFeature;
+
+    /**
+     * If true, this primop is not exposed to the user.
+     */
+    bool internal = false;
 
     /**
      * Validity check to be performed by functions that introduce primops,
@@ -124,11 +144,9 @@ struct Constant
     bool impureOnly = false;
 };
 
-#if HAVE_BOEHMGC
-    typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
-#else
-    typedef std::map<std::string, Value *> ValMap;
-#endif
+typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
+
+typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
 
 struct Env
 {
@@ -307,31 +325,29 @@ private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    Sync<std::map<SourcePath, StorePath>> srcToStore;
+    Sync<std::unordered_map<SourcePath, StorePath>> srcToStore;
 
     /**
      * A cache from path names to parse trees.
      */
-#if HAVE_BOEHMGC
-    typedef std::map<SourcePath, Expr *, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
-#else
-    typedef std::map<SourcePath, Expr *> FileParseCache;
-#endif
+    typedef std::unordered_map<SourcePath, Expr *, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
     FileParseCache fileParseCache;
 
     /**
      * A cache from path names to values.
      */
-#if HAVE_BOEHMGC
-    typedef std::map<SourcePath, Value, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
-#else
-    typedef std::map<SourcePath, Value> FileEvalCache;
-#endif
+    typedef std::unordered_map<SourcePath, Value, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
     FileEvalCache fileEvalCache;
+
+    /**
+     * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
+     * Grouped by file.
+     */
+    std::unordered_map<SourcePath, DocCommentMap> positionToDocComment;
 
     LookupPath lookupPath;
 
-    std::map<std::string, std::optional<std::string>> lookupPathResolved;
+    std::map<std::string, std::optional<SourcePath>> lookupPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -385,6 +401,11 @@ public:
     void allowPath(const StorePath & storePath);
 
     /**
+     * Allow access to the closure of a store path.
+     */
+    void allowClosure(const StorePath & storePath);
+
+    /**
      * Allow access to a store path and return it as a string.
      */
     void allowAndSetStorePathString(const StorePath & storePath, Value & v);
@@ -436,9 +457,9 @@ public:
      *
      * If the specified search path element is a URI, download it.
      *
-     * If it is not found, return `std::nullopt`
+     * If it is not found, return `std::nullopt`.
      */
-    std::optional<std::string> resolveLookupPathPath(
+    std::optional<SourcePath> resolveLookupPathPath(
         const LookupPath::Path & elem,
         bool initAccessControl = false);
 
@@ -581,6 +602,11 @@ public:
     std::shared_ptr<StaticEnv> staticBaseEnv; // !!! should be private
 
     /**
+     * Internal primops not exposed to the user.
+     */
+    std::unordered_map<std::string, Value *, std::hash<std::string>, std::equal_to<std::string>, traceable_allocator<std::pair<const std::string, Value *>>> internalPrimOps;
+
+    /**
      * Name and documentation about every constant.
      *
      * Constants from primops are hard to crawl, and their docs will go
@@ -602,7 +628,18 @@ private:
 
 public:
 
+    /**
+     * Retrieve a specific builtin, equivalent to evaluating `builtins.${name}`.
+     * @param name The attribute name of the builtin to retrieve.
+     * @throws EvalError if the builtin does not exist.
+     */
     Value & getBuiltin(const std::string & name);
+
+    /**
+     * Retrieve the `builtins` attrset, equivalent to evaluating the reference `builtins`.
+     * Always returns an attribute set value.
+     */
+    Value & getBuiltins();
 
     struct Doc
     {
@@ -617,6 +654,12 @@ public:
         const char * doc;
     };
 
+    /**
+     * Retrieve the documentation for a value. This will evaluate the value if
+     * it is a thunk, and it will partially apply __functor if applicable.
+     *
+     * @param v The value to get the documentation for.
+     */
     std::optional<Doc> getDoc(Value & v);
 
 private:
@@ -642,27 +685,40 @@ private:
 public:
 
     /**
+     * Check that the call depth is within limits, and increment it, until the returned object is destroyed.
+     */
+    inline CallDepth addCallDepth(const PosIdx pos);
+
+    /**
      * Do a deep equality test between two values.  That is, list
      * elements and attributes are compared recursively.
      */
     bool eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx);
 
+    /**
+     * Like `eqValues`, but throws an `AssertionError` if not equal.
+     *
+     * WARNING:
+     * Callers should call `eqValues` first and report if `assertEqValues` behaves
+     * incorrectly. (e.g. if it doesn't throw if eqValues returns false or vice versa)
+     */
+    void assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx);
+
     bool isFunctor(Value & fun);
 
-    // FIXME: use std::span
-    void callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos);
+    void callFunction(Value & fun, std::span<Value *> args, Value & vRes, const PosIdx pos);
 
     void callFunction(Value & fun, Value & arg, Value & vRes, const PosIdx pos)
     {
         Value * args[] = {&arg};
-        callFunction(fun, 1, args, vRes, pos);
+        callFunction(fun, args, vRes, pos);
     }
 
     /**
      * Automatically call a function for which each argument has a
      * default value or has a binding in the `args` map.
      */
-    void autoCallFunction(Bindings & args, Value & fun, Value & res);
+    void autoCallFunction(const Bindings & args, Value & fun, Value & res);
 
     /**
      * Allocation primitives.
@@ -768,8 +824,9 @@ public:
     bool callPathFilter(
         Value * filterFun,
         const SourcePath & path,
-        std::string_view pathArg,
         PosIdx pos);
+
+    DocComment getDocCommentForPos(PosIdx pos);
 
 private:
 

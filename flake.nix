@@ -1,38 +1,29 @@
 {
   description = "The purely functional package manager";
 
-  # TODO switch to nixos-23.11-small
-  #      https://nixpk.gs/pr-tracker.html?pr=291954
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
-  inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
-  inputs.flake-schemas.url = "github:DeterminateSystems/flake-schemas";
 
   # dev tooling
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";
-  inputs.pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
+  inputs.git-hooks-nix.url = "github:cachix/git-hooks.nix";
   # work around https://github.com/NixOS/nix/issues/7730
   inputs.flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
-  inputs.pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.pre-commit-hooks.inputs.nixpkgs-stable.follows = "nixpkgs";
+  inputs.git-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.git-hooks-nix.inputs.nixpkgs-stable.follows = "nixpkgs";
   # work around 7730 and https://github.com/NixOS/nix/issues/7807
-  inputs.pre-commit-hooks.inputs.flake-compat.follows = "";
-  inputs.pre-commit-hooks.inputs.gitignore.follows = "";
+  inputs.git-hooks-nix.inputs.flake-compat.follows = "";
+  inputs.git-hooks-nix.inputs.gitignore.follows = "";
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-regression, libgit2, flake-schemas, ... }:
+  outputs = inputs@{ self, nixpkgs, nixpkgs-regression, ... }:
 
     let
       inherit (nixpkgs) lib;
 
       officialRelease = false;
-
-      version = lib.fileContents ./.version + versionSuffix;
-      versionSuffix =
-        if officialRelease
-        then ""
-        else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
 
       linux32BitSystems = [ "i686-linux" ];
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
@@ -44,7 +35,8 @@
         "armv6l-unknown-linux-gnueabihf"
         "armv7l-unknown-linux-gnueabihf"
         "riscv64-unknown-linux-gnu"
-        "x86_64-unknown-netbsd"
+        # Disabled because of https://github.com/NixOS/nixpkgs/issues/344423
+        # "x86_64-unknown-netbsd"
         "x86_64-unknown-freebsd"
         "x86_64-w64-mingw32"
       ];
@@ -114,6 +106,7 @@
         in {
           inherit stdenvs native;
           static = native.pkgsStatic;
+          llvm = native.pkgsLLVM;
           cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
         });
 
@@ -132,20 +125,38 @@
           # without "polluting" the top level "`pkgs`" attrset.
           # This also has the benefit of providing us with a distinct set of packages
           # we can iterate over.
-          nixComponents = lib.makeScope final.nixDependencies.newScope (import ./packaging/components.nix);
+          nixComponents =
+            lib.makeScopeWithSplicing'
+              {
+                inherit (final) splicePackages;
+                inherit (final.nixDependencies) newScope;
+              }
+              {
+                otherSplices = final.generateSplicesForMkScope "nixComponents";
+                f = import ./packaging/components.nix {
+                  inherit (final) lib;
+                  inherit officialRelease;
+                  src = self;
+                };
+              };
 
           # The dependencies are in their own scope, so that they don't have to be
           # in Nixpkgs top level `pkgs` or `nixComponents`.
-          nixDependencies = lib.makeScope final.newScope (import ./packaging/dependencies.nix {
-            inherit inputs stdenv versionSuffix;
-            pkgs = final;
-          });
+          nixDependencies =
+            lib.makeScopeWithSplicing'
+              {
+                inherit (final) splicePackages;
+                inherit (final) newScope; # layered directly on pkgs, unlike nixComponents above
+              }
+              {
+                otherSplices = final.generateSplicesForMkScope "nixDependencies";
+                f = import ./packaging/dependencies.nix {
+                  inherit inputs stdenv;
+                  pkgs = final;
+                };
+              };
 
-          nix = final.nixComponents.nix;
-
-          nix_noTests = final.nix.override {
-            doInstallCheck = false;
-          };
+          nix = final.nixComponents.nix-cli;
 
           # See https://github.com/NixOS/nixpkgs/pull/214409
           # Remove when fixed in this flake's nixpkgs
@@ -153,12 +164,9 @@
             if prev.stdenv.hostPlatform.system == "i686-linux"
             then (prev.pre-commit.override (o: { dotnet-sdk = ""; })).overridePythonAttrs (o: { doCheck = false; })
             else prev.pre-commit;
-
         };
 
     in {
-      schemas = flake-schemas.schemas;
-
       # A Nixpkgs overlay that overrides the 'nix' and
       # 'nix-perl-bindings' packages.
       overlays.default = overlayFor (p: p.stdenv);
@@ -173,11 +181,12 @@
           linux64BitSystems
           nixpkgsFor
           self
+          officialRelease
           ;
       };
 
       checks = forAllSystems (system: {
-        binaryTarball = self.hydraJobs.binaryTarball.${system};
+        installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
         rl-next =
@@ -192,11 +201,7 @@
         # Some perl dependencies are broken on i686-linux.
         # Since the support is only best-effort there, disable the perl
         # bindings
-
-        # Temporarily disabled because GitHub Actions OOM issues. Once
-        # the old build system is gone and we are back to one build
-        # system, we should reenable this.
-        #perlBindings = self.hydraJobs.perlBindings.${system};
+        perlBindings = self.hydraJobs.perlBindings.${system};
       }
       # Add "passthru" tests
       // flatMapAttrs ({
@@ -204,7 +209,8 @@
         } // lib.optionalAttrs (! nixpkgsFor.${system}.native.stdenv.hostPlatform.isDarwin) {
           # TODO: enable static builds for darwin, blocked on:
           #       https://github.com/NixOS/nixpkgs/issues/320448
-          "static-" = nixpkgsFor.${system}.static;
+          # TODO: disabled to speed up GHA CI.
+          #"static-" = nixpkgsFor.${system}.static;
         })
         (nixpkgsPrefix: nixpkgs:
           flatMapAttrs nixpkgs.nixComponents
@@ -214,6 +220,9 @@
                 "${nixpkgsPrefix}${pkgName}-${testName}" = test;
               })
             )
+          // lib.optionalAttrs (nixpkgs.stdenv.hostPlatform == nixpkgs.stdenv.buildPlatform) {
+            "${nixpkgsPrefix}nix-functional-tests" = nixpkgs.nixComponents.nix-functional-tests;
+          }
         )
       // devFlake.checks.${system} or {}
       );
@@ -224,29 +233,61 @@
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
           default = self.packages.${system}.nix;
+          installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
+          binaryTarball = self.hydraJobs.binaryTarball.${system};
+          # TODO probably should be `nix-cli`
+          nix = self.packages.${system}.nix-everything;
+          nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
         }
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         // flatMapAttrs
           { # Components we'll iterate over in the upcoming lambda
-            "nix" = { };
-            # Temporarily disabled because GitHub Actions OOM issues. Once
-            # the old build system is gone and we are back to one build
-            # system, we should reenable these.
-            #"nix-util" = { };
-            #"nix-store" = { };
-            #"nix-fetchers" = { };
+            "nix-util" = { };
+            "nix-util-c" = { };
+            "nix-util-test-support" = { };
+            "nix-util-tests" = { };
+
+            "nix-store" = { };
+            "nix-store-c" = { };
+            "nix-store-test-support" = { };
+            "nix-store-tests" = { };
+
+            "nix-fetchers" = { };
+            "nix-fetchers-tests" = { };
+
+            "nix-expr" = { };
+            "nix-expr-c" = { };
+            "nix-expr-test-support" = { };
+            "nix-expr-tests" = { };
+
+            "nix-flake" = { };
+            "nix-flake-tests" = { };
+
+            "nix-main" = { };
+            "nix-main-c" = { };
+
+            "nix-cmd" = { };
+
+            "nix-cli" = { };
+
+            "nix-everything" = { };
+
+            "nix-functional-tests" = { supportsCross = false; };
+
+            "nix-perl-bindings" = { supportsCross = false; };
           }
-          (pkgName: {}: {
+          (pkgName: { supportsCross ? true }: {
               # These attributes go right into `packages.<system>`.
               "${pkgName}" = nixpkgsFor.${system}.native.nixComponents.${pkgName};
               "${pkgName}-static" = nixpkgsFor.${system}.static.nixComponents.${pkgName};
+              "${pkgName}-llvm" = nixpkgsFor.${system}.llvm.nixComponents.${pkgName};
             }
-            // flatMapAttrs (lib.genAttrs crossSystems (_: { })) (crossSystem: {}: {
+            // lib.optionalAttrs supportsCross (flatMapAttrs (lib.genAttrs crossSystems (_: { })) (crossSystem: {}: {
               # These attributes go right into `packages.<system>`.
               "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName};
-            })
+            }))
             // flatMapAttrs (lib.genAttrs stdenvs (_: { })) (stdenvName: {}: {
               # These attributes go right into `packages.<system>`.
               "${pkgName}-${stdenvName}" = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".nixComponents.${pkgName};
@@ -256,10 +297,10 @@
         dockerImage =
           let
             pkgs = nixpkgsFor.${system}.native;
-            image = import ./docker.nix { inherit pkgs; tag = version; };
+            image = import ./docker.nix { inherit pkgs; tag = pkgs.nix.version; };
           in
           pkgs.runCommand
-            "docker-image-tarball-${version}"
+            "docker-image-tarball-${pkgs.nix.version}"
             { meta.description = "Docker image with Nix for ${system}"; }
             ''
               mkdir -p $out/nix-support
@@ -270,94 +311,27 @@
       });
 
       devShells = let
-        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs:
-        let
-          modular = devFlake.getSystem stdenv.buildPlatform.system;
-          transformFlag = prefix: flag:
-            assert builtins.isString flag;
-            let
-              rest = builtins.substring 2 (builtins.stringLength flag) flag;
-            in
-              "-D${prefix}:${rest}";
-          havePerl = stdenv.buildPlatform == stdenv.hostPlatform && stdenv.hostPlatform.isUnix;
-        in {
-          pname = "shell-for-" + attrs.pname;
-
-          # Remove the version suffix to avoid unnecessary attempts to substitute in nix develop
-          version = lib.fileContents ./.version;
-          name = attrs.pname;
-
-          installFlags = "sysconfdir=$(out)/etc";
-          shellHook = ''
-            PATH=$prefix/bin:$PATH
-            unset PYTHONPATH
-            export MANPATH=$out/share/man:$MANPATH
-
-            # Make bash completion work.
-            XDG_DATA_DIRS+=:$out/share
-          '';
-
-          # We use this shell with the local checkout, not unpackPhase.
-          src = null;
-
-          env = {
-            # Needed for Meson to find Boost.
-            # https://github.com/NixOS/nixpkgs/issues/86131.
-            BOOST_INCLUDEDIR = "${lib.getDev pkgs.nixDependencies.boost}/include";
-            BOOST_LIBRARYDIR = "${lib.getLib pkgs.nixDependencies.boost}/lib";
-            # For `make format`, to work without installing pre-commit
-            _NIX_PRE_COMMIT_HOOKS_CONFIG =
-              "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml" modular.pre-commit.settings.rawConfig}";
-          };
-
-          mesonFlags =
-            map (transformFlag "libutil") pkgs.nixComponents.nix-util.mesonFlags
-            ++ map (transformFlag "libstore") pkgs.nixComponents.nix-store.mesonFlags
-            ++ map (transformFlag "libfetchers") pkgs.nixComponents.nix-fetchers.mesonFlags
-            ++ lib.optionals havePerl (map (transformFlag "perl") pkgs.nixComponents.nix-perl-bindings.mesonFlags)
-            ;
-
-          nativeBuildInputs = attrs.nativeBuildInputs or []
-            ++ pkgs.nixComponents.nix-util.nativeBuildInputs
-            ++ pkgs.nixComponents.nix-store.nativeBuildInputs
-            ++ pkgs.nixComponents.nix-fetchers.nativeBuildInputs
-            ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.nativeBuildInputs
-            ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
-            ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
-            ++ [
-              pkgs.buildPackages.cmake
-              modular.pre-commit.settings.package
-              (pkgs.writeScriptBin "pre-commit-hooks-install"
-                modular.pre-commit.settings.installationScript)
-            ]
-            # TODO: Remove the darwin check once
-            # https://github.com/NixOS/nixpkgs/pull/291814 is available
-            ++ lib.optional (stdenv.cc.isClang && !stdenv.buildPlatform.isDarwin) pkgs.buildPackages.bear
-            ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) pkgs.buildPackages.clang-tools;
-
-          buildInputs = attrs.buildInputs or []
-            ++ [
-              pkgs.gtest
-              pkgs.rapidcheck
-            ]
-            ++ lib.optional havePerl pkgs.perl
-            ;
-        });
-        in
+        makeShell = import ./packaging/dev-shell.nix { inherit lib devFlake; };
+        prefixAttrs = prefix: lib.concatMapAttrs (k: v: { "${prefix}-${k}" = v; });
+      in
         forAllSystems (system:
-          let
-            makeShells = prefix: pkgs:
-              lib.mapAttrs'
-              (k: v: lib.nameValuePair "${prefix}-${k}" v)
-              (forAllStdenvs (stdenvName: makeShell pkgs pkgs.${stdenvName}));
-          in
-            (makeShells "native" nixpkgsFor.${system}.native) //
-            (lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin)
-              (makeShells "static" nixpkgsFor.${system}.static) //
-              (forAllCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv))) //
-            {
-              default = self.devShells.${system}.native-stdenvPackages;
-            }
+          prefixAttrs "native" (forAllStdenvs (stdenvName: makeShell {
+            pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages";
+          })) //
+          lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin) (
+            prefixAttrs "static" (forAllStdenvs (stdenvName: makeShell {
+              pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".pkgsStatic;
+            })) //
+            prefixAttrs "llvm" (forAllStdenvs (stdenvName: makeShell {
+              pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".pkgsLLVM;
+            })) //
+            prefixAttrs "cross" (forAllCrossSystems (crossSystem: makeShell {
+              pkgs = nixpkgsFor.${system}.cross.${crossSystem};
+            }))
+          ) //
+          {
+            default = self.devShells.${system}.native-stdenvPackages;
+          }
         );
   };
 }

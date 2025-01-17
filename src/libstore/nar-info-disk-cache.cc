@@ -7,6 +7,8 @@
 #include <sqlite3.h>
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 namespace nix {
 
 static const char * schema = R"sql(
@@ -85,7 +87,7 @@ public:
 
     Sync<State> _state;
 
-    NarInfoDiskCacheImpl(Path dbPath = getCacheDir() + "/nix/binary-cache-v6.sqlite")
+    NarInfoDiskCacheImpl(Path dbPath = getCacheDir() + "/binary-cache-v6.sqlite")
     {
         auto state(_state.lock());
 
@@ -162,7 +164,7 @@ public:
     Cache & getCache(State & state, const std::string & uri)
     {
         auto i = state.caches.find(uri);
-        if (i == state.caches.end()) abort();
+        if (i == state.caches.end()) unreachable();
         return i->second;
     }
 
@@ -209,7 +211,7 @@ public:
 
             {
                 auto r(state->insertCache.use()(uri)(time(0))(storeDir)(wantMassQuery)(priority));
-                if (!r.next()) { abort(); }
+                if (!r.next()) { unreachable(); }
                 ret.id = (int) r.getInt(0);
             }
 

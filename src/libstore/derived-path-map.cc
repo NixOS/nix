@@ -54,17 +54,18 @@ typename DerivedPathMap<V>::ChildNode * DerivedPathMap<V>::findSlot(const Single
 
 namespace nix {
 
-GENERATE_CMP_EXT(
-    template<>,
-    DerivedPathMap<std::set<std::string>>::ChildNode,
-    me->value,
-    me->childMap);
+template<>
+bool DerivedPathMap<std::set<std::string>>::ChildNode::operator == (
+    const DerivedPathMap<std::set<std::string>>::ChildNode &) const noexcept = default;
 
-GENERATE_CMP_EXT(
-    template<>,
-    DerivedPathMap<std::set<std::string>>,
-    me->map);
+// TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
+#if 0
+template<>
+std::strong_ordering DerivedPathMap<std::set<std::string>>::ChildNode::operator <=> (
+    const DerivedPathMap<std::set<std::string>>::ChildNode &) const noexcept = default;
+#endif
 
+template struct DerivedPathMap<std::set<std::string>>::ChildNode;
 template struct DerivedPathMap<std::set<std::string>>;
 
 };

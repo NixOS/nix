@@ -1,10 +1,5 @@
 { lib
-, stdenv
-, mkMesonDerivation
-
-, meson
-, ninja
-, pkg-config
+, mkMesonLibrary
 
 , nix-store-c
 , nix-expr
@@ -18,14 +13,14 @@ let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonLibrary (finalAttrs: {
   pname = "nix-expr-c";
   inherit version;
 
   workDir = ./.;
   fileset = fileset.unions [
-    ../../build-utils-meson
-    ./build-utils-meson
+    ../../nix-meson-build-support
+    ./nix-meson-build-support
     ../../.version
     ./.version
     ./meson.build
@@ -33,14 +28,6 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
     (fileset.fileFilter (file: file.hasExt "h") ./.)
-  ];
-
-  outputs = [ "out" "dev" ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
   ];
 
   propagatedBuildInputs = [
@@ -58,18 +45,6 @@ mkMesonDerivation (finalAttrs: {
 
   mesonFlags = [
   ];
-
-  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
-
-  enableParallelBuilding = true;
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  strictDeps = true;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

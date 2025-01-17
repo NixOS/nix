@@ -8,12 +8,8 @@
 #include "common-args.hh"
 #include "path.hh"
 #include "derived-path.hh"
-#include "exit.hh"
 
 #include <signal.h>
-
-#include <locale>
-
 
 namespace nix {
 

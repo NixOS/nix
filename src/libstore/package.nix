@@ -1,12 +1,9 @@
 { lib
 , stdenv
-, mkMesonDerivation
-, releaseTools
+, mkMesonLibrary
 
-, meson
-, ninja
-, pkg-config
 , unixtools
+, darwin
 
 , nix-util
 , boost
@@ -29,14 +26,14 @@ let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonLibrary (finalAttrs: {
   pname = "nix-store";
   inherit version;
 
   workDir = ./.;
   fileset = fileset.unions [
-    ../../build-utils-meson
-    ./build-utils-meson
+    ../../nix-meson-build-support
+    ./nix-meson-build-support
     ../../.version
     ./.version
     ./meson.build
@@ -51,13 +48,8 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "sql") ./.)
   ];
 
-  outputs = [ "out" "dev" ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-  ] ++ lib.optional embeddedSandboxShell unixtools.hexdump;
+  nativeBuildInputs =
+    lib.optional embeddedSandboxShell unixtools.hexdump;
 
   buildInputs = [
     boost
@@ -65,11 +57,9 @@ mkMesonDerivation (finalAttrs: {
     sqlite
   ] ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
     # There have been issues building these dependencies
+    ++ lib.optional stdenv.hostPlatform.isDarwin darwin.apple_sdk.libs.sandbox
     ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))
-      (aws-sdk-cpp.override {
-        apis = ["s3" "transfer"];
-        customMemoryManagement = false;
-      })
+      aws-sdk-cpp
   ;
 
   propagatedBuildInputs = [
@@ -97,17 +87,7 @@ mkMesonDerivation (finalAttrs: {
     # https://github.com/NixOS/nixpkgs/issues/86131.
     BOOST_INCLUDEDIR = "${lib.getDev boost}/include";
     BOOST_LIBRARYDIR = "${lib.getLib boost}/lib";
-  } // lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
   };
-
-  enableParallelBuilding = true;
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  strictDeps = true;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

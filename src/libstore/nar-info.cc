@@ -1,17 +1,10 @@
 #include "globals.hh"
 #include "nar-info.hh"
 #include "store-api.hh"
+#include "strings.hh"
+#include "json-utils.hh"
 
 namespace nix {
-
-GENERATE_CMP_EXT(
-    ,
-    NarInfo,
-    me->url,
-    me->compression,
-    me->fileHash,
-    me->fileSize,
-    static_cast<const ValidPathInfo &>(*me));
 
 NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
     : ValidPathInfo(StorePath(StorePath::dummy), Hash(Hash::dummy)) // FIXME: hack
@@ -125,7 +118,7 @@ std::string NarInfo::to_string(const Store & store) const
     if (deriver)
         res += "Deriver: " + std::string(deriver->to_string()) + "\n";
 
-    for (auto sig : sigs)
+    for (const auto & sig : sigs)
         res += "Sig: " + sig + "\n";
 
     if (ca)

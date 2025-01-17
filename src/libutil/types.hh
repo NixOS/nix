@@ -1,12 +1,10 @@
 #pragma once
 ///@file
 
-#include "ref.hh"
 
 #include <list>
 #include <set>
 #include <string>
-#include <limits>
 #include <map>
 #include <variant>
 #include <vector>
@@ -45,9 +43,11 @@ template<typename T>
 struct Explicit {
     T t;
 
-    bool operator ==(const Explicit<T> & other) const
+    bool operator ==(const Explicit<T> & other) const = default;
+
+    bool operator <(const Explicit<T> & other) const
     {
-        return t == other.t;
+        return t < other.t;
     }
 };
 

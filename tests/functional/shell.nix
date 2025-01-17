@@ -37,7 +37,7 @@ let pkgs = rec {
       mkdir -p $out
       ln -s ${setupSh} $out/setup
     '';
-  };
+  } // { inherit mkDerivation; };
 
   shellDrv = mkDerivation {
     name = "shellDrv";
@@ -46,6 +46,7 @@ let pkgs = rec {
     ASCII_PERCENT = "%";
     ASCII_AT = "@";
     TEST_inNixShell = if inNixShell then "true" else "false";
+    FOO = fooContents;
     inherit stdenv;
     outputs = ["dev" "out"];
   } // {
@@ -92,6 +93,10 @@ let pkgs = rec {
     echo 'printf %s "$*"' > $out/bin/ruby
     chmod a+rx $out/bin/ruby
   '';
+
+  inherit (cfg) shell;
+
+  callPackage = f: args: f (pkgs // args);
 
   inherit pkgs;
 }; in pkgs

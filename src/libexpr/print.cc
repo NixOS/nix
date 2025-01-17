@@ -299,6 +299,9 @@ private:
             output << ANSI_NORMAL;
     }
 
+    /**
+     * @note This may force items.
+     */
     bool shouldPrettyPrintAttrs(AttrVec & v)
     {
         if (!options.shouldPrettyPrint() || v.empty()) {
@@ -314,6 +317,9 @@ private:
         if (!item) {
             return true;
         }
+
+        // It is ok to force the item(s) here, because they will be printed anyway.
+        state.forceValue(*item, item->determinePos(noPos));
 
         // Pretty-print single-item attrsets only if they contain nested
         // structures.
@@ -371,6 +377,9 @@ private:
         }
     }
 
+    /**
+     * @note This may force items.
+     */
     bool shouldPrettyPrintList(std::span<Value * const> list)
     {
         if (!options.shouldPrettyPrint() || list.empty()) {
@@ -386,6 +395,9 @@ private:
         if (!item) {
             return true;
         }
+
+        // It is ok to force the item(s) here, because they will be printed anyway.
+        state.forceValue(*item, item->determinePos(noPos));
 
         // Pretty-print single-item lists only if they contain nested
         // structures.
@@ -448,7 +460,7 @@ private:
 
                 std::ostringstream s;
                 s << state.positions[v.payload.lambda.fun->pos];
-                output << " @ " << filterANSIEscapes(s.str());
+                output << " @ " << filterANSIEscapes(toView(s));
             }
         } else if (v.isPrimOp()) {
             if (v.primOp())
@@ -463,7 +475,7 @@ private:
             else
                 output << "primop";
         } else {
-            abort();
+            unreachable();
         }
 
         output << "»";
@@ -492,7 +504,7 @@ private:
             if (options.ansiColors)
                     output << ANSI_NORMAL;
         } else {
-            abort();
+            unreachable();
         }
     }
 

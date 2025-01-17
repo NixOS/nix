@@ -2,6 +2,7 @@
 #include "eval-inline.hh"
 
 #include <sstream>
+
 #include <toml.hpp>
 
 namespace nix {
@@ -27,8 +28,10 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, V
 
                     auto attrs = state.buildBindings(size);
 
-                    for(auto & elem : table)
+                    for(auto & elem : table) {
+                        forceNoNullByte(elem.first);
                         visit(attrs.alloc(elem.first), elem.second);
+                    }
 
                     v.mkAttrs(attrs);
                 }
@@ -53,7 +56,11 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, V
                 v.mkFloat(toml::get<NixFloat>(t));
                 break;;
             case toml::value_t::string:
-                v.mkString(toml::get<std::string>(t));
+                {
+                    auto s = toml::get<std::string_view>(t);
+                    forceNoNullByte(s);
+                    v.mkString(s);
+                }
                 break;;
             case toml::value_t::local_datetime:
             case toml::value_t::offset_datetime:
@@ -65,7 +72,9 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, V
                         attrs.alloc("_type").mkString("timestamp");
                         std::ostringstream s;
                         s << t;
-                        attrs.alloc("value").mkString(s.str());
+                        auto str = toView(s);
+                        forceNoNullByte(str);
+                        attrs.alloc("value").mkString(str);
                         v.mkAttrs(attrs);
                     } else {
                         throw std::runtime_error("Dates and times are not supported");

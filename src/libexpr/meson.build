@@ -4,8 +4,6 @@ project('nix-expr', 'cpp',
     'cpp_std=c++2a',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
-    'debug=true',
-    'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
   ],
   meson_version : '>= 1.1',
@@ -14,7 +12,7 @@ project('nix-expr', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
@@ -25,13 +23,12 @@ deps_public_maybe_subproject = [
   dependency('nix-store'),
   dependency('nix-fetchers'),
 ]
-subdir('build-utils-meson/subprojects')
-
-subdir('build-utils-meson/threads')
+subdir('nix-meson-build-support/subprojects')
 
 boost = dependency(
   'boost',
   modules : ['container', 'context'],
+  include_type: 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
@@ -55,7 +52,12 @@ if bdw_gc.found()
 endif
 configdata.set('HAVE_BOEHMGC', bdw_gc.found().to_int())
 
-toml11 = dependency('toml11', version : '>=3.7.0', method : 'cmake')
+toml11 = dependency(
+  'toml11',
+  version : '>=3.7.0',
+  method : 'cmake',
+  include_type: 'system',
+)
 deps_other += toml11
 
 config_h = configure_file(
@@ -73,7 +75,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('nix-meson-build-support/common')
 
 parser_tab = custom_target(
   input : 'parser.y',
@@ -117,7 +119,7 @@ lexer_tab = custom_target(
   install_dir : get_option('includedir') / 'nix',
 )
 
-subdir('build-utils-meson/generate-header')
+subdir('nix-meson-build-support/generate-header')
 
 generated_headers = []
 foreach header : [
@@ -139,6 +141,7 @@ sources = files(
   'function-trace.cc',
   'get-drvs.cc',
   'json-to-value.cc',
+  'lexer-helpers.cc',
   'nixexpr.cc',
   'paths.cc',
   'primops.cc',
@@ -165,6 +168,7 @@ headers = [config_h] + files(
   'gc-small-vector.hh',
   'get-drvs.hh',
   'json-to-value.hh',
+  # internal: 'lexer-helpers.hh',
   'nixexpr.hh',
   'parser-state.hh',
   'pos-idx.hh',
@@ -199,4 +203,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-subdir('build-utils-meson/export')
+subdir('nix-meson-build-support/export')

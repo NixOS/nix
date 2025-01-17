@@ -65,8 +65,15 @@ void overrideRegistry(
     const Input & to,
     const Attrs & extraAttrs);
 
+using RegistryFilter = std::function<bool(Registry::RegistryType)>;
+
+/**
+ * Rewrite a flakeref using the registries. If `filter` is set, only
+ * use the registries for which the filter function returns true.
+ */
 std::pair<Input, Attrs> lookupInRegistries(
     ref<Store> store,
-    const Input & input);
+    const Input & input,
+    const RegistryFilter & filter = {});
 
 }

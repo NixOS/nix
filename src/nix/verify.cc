@@ -1,13 +1,13 @@
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "sync.hh"
 #include "thread-pool.hh"
-#include "references.hh"
 #include "signals.hh"
 #include "keys.hh"
 
 #include <atomic>
+
+#include "exit.hh"
 
 using namespace nix;
 
@@ -129,7 +129,7 @@ struct CmdVerify : StorePathsCommand
                         size_t validSigs = 0;
 
                         auto doSigs = [&](StringSet sigs) {
-                            for (auto sig : sigs) {
+                            for (const auto & sig : sigs) {
                                 if (!sigsSeen.insert(sig).second) continue;
                                 if (validSigs < ValidPathInfo::maxSigs && info->checkSignature(*store, publicKeys, sig))
                                     validSigs++;
