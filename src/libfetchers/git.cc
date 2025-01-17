@@ -311,14 +311,9 @@ struct GitInputScheme : InputScheme
         runProgram("git", true, args, {}, true);
     }
 
-    // FIXME: return std::filesystem::path
-    std::optional<Path> getSourcePath(const Input & input) const override
+    std::optional<std::filesystem::path> getSourcePath(const Input & input) const override
     {
-        auto repoInfo = getRepoInfo(input);
-        if (auto path = repoInfo.getPath())
-            return *path;
-        else
-            return std::nullopt;
+        return getRepoInfo(input).getPath();
     }
 
     void putFile(

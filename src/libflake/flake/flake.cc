@@ -781,7 +781,7 @@ LockedFlake lockFlake(
                             writeFile(*lockFlags.outputLockFilePath, newLockFileS);
                         } else {
                             auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
-                            auto outputLockFilePath = *sourcePath + "/" + relPath;
+                            auto outputLockFilePath = *sourcePath / relPath;
 
                             bool lockFileExists = pathExists(outputLockFilePath);
 

@@ -164,7 +164,7 @@ public:
 
     void clone(const Path & destDir) const;
 
-    std::optional<Path> getSourcePath() const;
+    std::optional<std::filesystem::path> getSourcePath() const;
 
     /**
      * Write a file to this input, for input types that support
@@ -247,7 +247,7 @@ struct InputScheme
 
     virtual void clone(const Input & input, const Path & destDir) const;
 
-    virtual std::optional<Path> getSourcePath(const Input & input) const;
+    virtual std::optional<std::filesystem::path> getSourcePath(const Input & input) const;
 
     virtual void putFile(
         const Input & input,
