@@ -112,7 +112,7 @@ cat > $flakeDir/flake.nix <<EOF
 EOF
 
 checkRes=$(nix flake check --all-systems $flakeDir 2>&1 && fail "nix flake check --all-systems should have failed" || true)
-echo "$checkRes" | grepQuiet "unknown-attr"
+echo "$checkRes" | grepQuiet "Evaluation check.*apps.system-1.default.isValidApp.*failed"
 
 cat > $flakeDir/flake.nix <<EOF
 {

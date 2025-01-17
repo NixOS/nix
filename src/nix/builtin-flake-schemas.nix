@@ -56,7 +56,8 @@
                         app ? type
                         && app.type == "app"
                         && app ? program
-                        && builtins.isString app.program;
+                        && builtins.isString app.program
+                        && builtins.removeAttrs app ["type" "program" "meta"] == {};
                       what = "app";
                     })
                     apps;
