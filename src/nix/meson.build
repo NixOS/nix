@@ -128,6 +128,7 @@ nix_sources += [
   gen_header.process('get-env.sh'),
   gen_header.process('profiles.md'),
   gen_header.process('help-stores.md'),
+  gen_header.process('call-flake-schemas.nix'),
   gen_header.process('builtin-flake-schemas.nix'),
 ]
 

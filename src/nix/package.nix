@@ -59,6 +59,8 @@ mkMesonExecutable (finalAttrs: {
     ../../doc/manual/source/store/types/index.md.in
     ./profiles.md
     ../../doc/manual/source/command-ref/files/profiles.md
+    ./call-flake-schemas.nix
+    ./builtin-flake-schemas.nix
 
     # Files
   ] ++ lib.concatMap
