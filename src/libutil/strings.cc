@@ -8,6 +8,7 @@ namespace nix {
 template std::string concatStringsSep(std::string_view, const Strings &);
 template std::string concatStringsSep(std::string_view, const StringSet &);
 template std::string concatStringsSep(std::string_view, const std::vector<std::string> &);
+template std::string concatStringsSep(std::string_view, const boost::container::small_vector<std::string, 64> &);
 
 typedef std::string_view strings_2[2];
 template std::string concatStringsSep(std::string_view, const strings_2 &);
