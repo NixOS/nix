@@ -80,9 +80,9 @@ struct PathInputScheme : InputScheme
         };
     }
 
-    std::optional<Path> getSourcePath(const Input & input) const override
+    std::optional<std::filesystem::path> getSourcePath(const Input & input) const override
     {
-        return getStrAttr(input.attrs, "path");
+        return getAbsPath(input);
     }
 
     void putFile(
