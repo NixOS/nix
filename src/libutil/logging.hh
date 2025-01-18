@@ -23,6 +23,10 @@ typedef enum {
     actPostBuildHook = 110,
     actBuildWaiting = 111,
     actFetchTree = 112,
+    actEvaluate = 113,
+    actLockFlake = 114,
+    actQueryMissing = 115,
+    actVerifyPath = 116,
 } ActivityType;
 
 typedef enum {
@@ -35,6 +39,10 @@ typedef enum {
     resSetExpected = 106,
     resPostBuildLogLine = 107,
     resFetchStatus = 108,
+    resExpectBuild = 109,
+    resUnexpectBuild = 110,
+    resExpectSubstitution = 111,
+    resUnexpectSubstitution = 112,
 } ResultType;
 
 typedef uint64_t ActivityId;
@@ -114,9 +122,6 @@ public:
 
     virtual std::optional<char> ask(std::string_view s)
     { return {}; }
-
-    virtual void setPrintBuildLogs(bool printBuildLogs)
-    { }
 };
 
 /**

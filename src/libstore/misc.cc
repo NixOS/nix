@@ -101,7 +101,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
     StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
     uint64_t & downloadSize_, uint64_t & narSize_)
 {
-    Activity act(*logger, lvlDebug, actUnknown, "querying info about missing paths");
+    Activity act(*logger, lvlDebug, actQueryMissing, "querying info about missing paths");
 
     downloadSize_ = narSize_ = 0;
 

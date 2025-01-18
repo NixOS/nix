@@ -197,6 +197,8 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
     outPipe.createAsyncPipe(worker.ioport.get());
 #endif
 
+    startTime = std::chrono::steady_clock::now();
+
     auto promise = std::promise<void>();
 
     thr = std::thread([this, &promise, &subPath, &sub]() {
@@ -272,6 +274,16 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
     maintainExpectedNar.reset();
 
     worker.updateProgress();
+
+    auto stopTime = std::chrono::steady_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stopTime - startTime).count() / 1000.0;
+
+    // FIXME: associate with activity 'act'.
+    printMsg(duration > 0.2 ? lvlNotice : lvlInfo,
+        ANSI_BOLD ANSI_GREEN "Substituted" ANSI_NORMAL " '%s' in %.1f s.",
+        worker.store.printStorePath(storePath),
+        duration);
 
     co_return done(ecSuccess, BuildResult::Substituted);
 }

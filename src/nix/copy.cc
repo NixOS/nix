@@ -71,9 +71,10 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile
         updateProfile(rootPaths);
 
         if (outLink) {
-            if (auto store2 = dstStore.dynamic_pointer_cast<LocalFSStore>())
-                createOutLinks(*outLink, rootPaths, *store2);
-            else
+            if (auto store2 = dstStore.dynamic_pointer_cast<LocalFSStore>()) {
+                PathSet symlinks;
+                createOutLinks(*outLink, rootPaths, *store2, symlinks);
+            } else
                 throw Error("'--out-link' is not supported for this Nix store");
         }
     }

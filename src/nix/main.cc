@@ -20,6 +20,7 @@
 #include "flake/flake.hh"
 #include "self-exe.hh"
 #include "json-utils.hh"
+#include "progress-bar.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -122,7 +123,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
             .shortName = 'L',
             .description = "Print full build logs on standard error.",
             .category = loggingCategory,
-            .handler = {[&]() { logger->setPrintBuildLogs(true); }},
+            .handler = {[&]() { progressBarSettings.printBuildLogs = true; }},
             .experimentalFeature = Xp::NixCommand,
         });
 
@@ -408,7 +409,6 @@ void mainWrapped(int argc, char * * argv)
 
     evalSettings.pureEval = true;
 
-    setLogFormat("bar");
     settings.verboseBuild = false;
 
     // If on a terminal, progress will be displayed via progress bars etc. (thus verbosity=notice)
@@ -509,6 +509,8 @@ void mainWrapped(int argc, char * * argv)
         printVersion(programName);
         return;
     }
+
+    setLogFormat(LogFormat::bar);
 
     if (!args.command)
         throw UsageError("no subcommand specified");

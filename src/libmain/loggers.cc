@@ -15,8 +15,6 @@ LogFormat parseLogFormat(const std::string & logFormatStr) {
         return LogFormat::internalJSON;
     else if (logFormatStr == "bar")
         return LogFormat::bar;
-    else if (logFormatStr == "bar-with-logs")
-        return LogFormat::barWithLogs;
     throw Error("option 'log-format' has an invalid value '%s'", logFormatStr);
 }
 
@@ -30,11 +28,6 @@ Logger * makeDefaultLogger() {
         return makeJSONLogger(*makeSimpleLogger(true));
     case LogFormat::bar:
         return makeProgressBar();
-    case LogFormat::barWithLogs: {
-        auto logger = makeProgressBar();
-        logger->setPrintBuildLogs(true);
-        return logger;
-    }
     default:
         unreachable();
     }

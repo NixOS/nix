@@ -728,6 +728,7 @@ Goal::Co DerivationGoal::tryToBuild()
                    EOF from the hook. */
                 actLock.reset();
                 buildResult.startTime = time(0); // inexact
+                startTime = std::chrono::steady_clock::now();
                 started();
                 co_await Suspend{};
                 co_return buildDone();
@@ -1056,6 +1057,16 @@ Goal::Co DerivationGoal::buildDone()
 
         co_return done(st, {}, std::move(e));
     }
+
+    auto stopTime = std::chrono::steady_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stopTime - startTime).count() / 1000.0;
+
+    // FIXME: associate with activity 'act'.
+    printMsg(duration > 0.2 ? lvlNotice : lvlInfo,
+        ANSI_BOLD ANSI_GREEN "Built" ANSI_NORMAL " '%s' in %.1f s.",
+        worker.store.printStorePath(drvPath),
+        duration);
 }
 
 Goal::Co DerivationGoal::resolvedFinished()

@@ -41,6 +41,9 @@ struct PathSubstitutionGoal : public Goal
      */
     std::optional<ContentAddress> ca;
 
+    /* Time substitution started. */
+    std::chrono::time_point<std::chrono::steady_clock> startTime;
+
     Done done(
         ExitCode result,
         BuildResult::Status status,
