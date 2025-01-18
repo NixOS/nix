@@ -56,6 +56,20 @@ extern template std::string concatStringsSep(std::string_view, const std::set<st
 extern template std::string concatStringsSep(std::string_view, const std::vector<std::string> &);
 
 /**
+ * Apply a function to the `iterable`'s items and concat them with `separator`.
+ */
+template<class C, class F>
+std::string concatMapStringsSep(std::string_view separator, const C & iterable, F fn)
+{
+    std::vector<std::string> strings;
+    strings.reserve(iterable.size());
+    for (const auto & elem : iterable) {
+        strings.push_back(fn(elem));
+    }
+    return concatStringsSep(separator, strings);
+}
+
+/**
  * Ignore any empty strings at the start of the list, and then concatenate the
  * given strings with a separator between the elements.
  *
