@@ -74,4 +74,10 @@ rec {
     buildCommand = ''echo ${dep} > "''${outputs[out]}"'';
   };
 
+  test12 = makeTest 12 {
+    builder = builtins.toFile "builder.sh" "mkdir $out $lib";
+    outputs = ["out" "lib"];
+    disallowedReferences = ["dev"];
+  };
+
 }
