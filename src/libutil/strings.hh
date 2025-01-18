@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/container/small_vector.hpp>
+
 namespace nix {
 
 /*
@@ -54,6 +56,7 @@ std::string concatStringsSep(const std::string_view sep, const C & ss);
 extern template std::string concatStringsSep(std::string_view, const std::list<std::string> &);
 extern template std::string concatStringsSep(std::string_view, const std::set<std::string> &);
 extern template std::string concatStringsSep(std::string_view, const std::vector<std::string> &);
+extern template std::string concatStringsSep(std::string_view, const boost::container::small_vector<std::string, 64> &);
 
 /**
  * Apply a function to the `iterable`'s items and concat them with `separator`.
@@ -61,7 +64,7 @@ extern template std::string concatStringsSep(std::string_view, const std::vector
 template<class C, class F>
 std::string concatMapStringsSep(std::string_view separator, const C & iterable, F fn)
 {
-    std::vector<std::string> strings;
+    boost::container::small_vector<std::string, 64> strings;
     strings.reserve(iterable.size());
     for (const auto & elem : iterable) {
         strings.push_back(fn(elem));
