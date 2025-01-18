@@ -2928,15 +2928,10 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
                     else if (auto output = get(outputs, i))
                         spec.insert(output->path);
                     else {
-                        std::string allOutputs;
-                        for (auto & o : outputs) {
-                            if (! allOutputs.empty())
-                                allOutputs.append(", ");
-                            allOutputs.append(o.first);
-                        }
+                        std::string outputsListing = concatMapStringsSep(", ", outputs, [](auto & o) { return o.first; });
                         throw BuildError("derivation '%s' output check for '%s' contains an illegal reference specifier '%s',"
                             " expected store path or output name (one of [%s])",
-                            worker.store.printStorePath(drvPath), outputName, i, allOutputs);
+                            worker.store.printStorePath(drvPath), outputName, i, outputsListing);
                     }
                 }
 
