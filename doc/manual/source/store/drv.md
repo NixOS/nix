@@ -250,15 +250,17 @@ Under this extended model, `DerivingPath`s are thus inductively built up from an
 
 The encoding is adjusted in a very simplest way, merely displaying the same
 
-```
-/nix/store/lxrn8v5aamkikg6agxwdqd1jz7746wz4-firefox-98.0.2.drv^foo.drv^bar.drv^out
-|----------------------------------------------------------------------------| |-|
-inner deriving path (usual encoding)                                           output name
-|--------------------------------------------------------------------| |-----|
-even more inner deriving path (usual encoding)                         output name
-|------------------------------------------------------------| |-----|
-innermost constant store path (usual encoding)                 output name
-```
+> **Example**
+>
+> ```
+> /nix/store/lxrn8v5aamkikg6agxwdqd1jz7746wz4-firefox-98.0.2.drv^foo.drv^bar.drv^out
+> |----------------------------------------------------------------------------| |-|
+> inner deriving path (usual encoding)                                           output name
+> |--------------------------------------------------------------------| |-----|
+> even more inner deriving path (usual encoding)                         output name
+> |------------------------------------------------------------| |-----|
+> innermost constant store path (usual encoding)                 output name
+> ```
 
 ## Extra extensions
 
