@@ -1,12 +1,13 @@
 # Derivations
 
-The most important built-in function is `derivation`, which is used to describe a single derivation:
-a specification for running an executable on precisely defined input files to repeatably produce output files at uniquely determined file system paths.
+The most important built-in function is `derivation`, which is used to describe a single store-layer [derivation].
+Consult the [store chapter](@docroot@/store/drv.md) for what a derivation is;
+this section just concerns how to create one from the Nix language.
 
-It takes as input an attribute set, the attributes of which specify the inputs to the process.
-It outputs an attribute set, and produces a [store derivation] as a side effect of evaluation.
+This builtin function takes as input an attribute set, the attributes of which specify the inputs to the process.
+It outputs an attribute set, and produces a [derivation] as a side effect of evaluation.
 
-[store derivation]: @docroot@/glossary.md#gloss-store-derivation
+[derivation]: @docroot@/glossary.md#gloss-derivation
 
 ## Input attributes
 
@@ -15,7 +16,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 - [`name`]{#attr-name} ([String](@docroot@/language/types.md#type-string))
 
   A symbolic name for the derivation.
-  It is added to the [store path] of the corresponding [store derivation] as well as to its [output paths](@docroot@/glossary.md#gloss-output-path).
+  See [derivation outputs](@docroot@/store/drv.md#outputs) for what this is affects.
 
   [store path]: @docroot@/store/store-path.md
 
@@ -28,17 +29,12 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   > }
   > ```
   >
-  > The store derivation's path will be `/nix/store/<hash>-hello.drv`.
+  > The derivation's path will be `/nix/store/<hash>-hello.drv`.
   > The [output](#attr-outputs) paths will be of the form `/nix/store/<hash>-hello[-<output>]`
 
 - [`system`]{#attr-system} ([String](@docroot@/language/types.md#type-string))
 
-  The system type on which the [`builder`](#attr-builder) executable is meant to be run.
-
-  A necessary condition for Nix to build derivations locally is that the `system` attribute matches the current [`system` configuration option].
-  It can automatically [build on other platforms](@docroot@/language/derivations.md#attr-builder) by forwarding build requests to other machines.
-
-  [`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
+  See [system](@docroot@/store/drv.md#system).
 
   > **Example**
   >
@@ -68,7 +64,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 
 - [`builder`]{#attr-builder} ([Path](@docroot@/language/types.md#type-path) | [String](@docroot@/language/types.md#type-string))
 
-  Path to an executable that will perform the build.
+  See [builder](@docroot@/store/drv.md#builder).
 
   > **Example**
   >
@@ -117,7 +113,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 
   Default: `[ ]`
 
-  Command-line arguments to be passed to the [`builder`](#attr-builder) executable.
+  See [args](@docroot@/store/drv.md#args).
 
   > **Example**
   >
@@ -182,7 +178,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   > }
   > ```
   >
-  > The store derivation path will be `/nix/store/<hash>-example.drv`.
+  > The derivation path will be `/nix/store/<hash>-example.drv`.
   > The output paths will be
   > - `/nix/store/<hash>-example-lib`
   > - `/nix/store/<hash>-example-dev`

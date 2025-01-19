@@ -238,7 +238,7 @@ static RegisterPrimOp primop_getContext({
       Return the string context of *s*.
 
       The string context tracks references to derivations within a string.
-      It is represented as an attribute set of [store derivation](@docroot@/glossary.md#gloss-store-derivation) paths mapping to output names.
+      It is represented as an attribute set of [derivation](@docroot@/glossary.md#gloss-derivation) paths mapping to output names.
 
       Using [string interpolation](@docroot@/language/string-interpolation.md) on a derivation will add that derivation to the string context.
       For example,

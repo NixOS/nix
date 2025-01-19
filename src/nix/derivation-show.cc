@@ -1,5 +1,4 @@
-// FIXME: integrate this with nix path-info?
-// FIXME: rename to 'nix store derivation show' or 'nix debug derivation show'?
+// FIXME: integrate this with `nix path-info`?
 
 #include "command.hh"
 #include "common-args.hh"
@@ -27,7 +26,7 @@ struct CmdShowDerivation : InstallablesCommand
 
     std::string description() override
     {
-        return "show the contents of a store derivation";
+        return "show the contents of a derivation";
     }
 
     std::string doc() override

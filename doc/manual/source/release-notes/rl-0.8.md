@@ -39,29 +39,29 @@ Nix 0.8 has the following improvements:
     notion of “closure store expressions” is gone (and so is the notion
     of “successors”); the file system references of a store path are now
     just stored in the database.
-    
+
     For instance, given any store path, you can query its closure:
-    
+
         $ nix-store -qR $(which firefox)
         ... lots of paths ...
-    
+
     Also, Nix now remembers for each store path the derivation that
     built it (the “deriver”):
-    
+
         $ nix-store -qR $(which firefox)
         /nix/store/4b0jx7vq80l9aqcnkszxhymsf1ffa5jd-firefox-1.0.1.drv
-    
+
     So to see the build-time dependencies, you can do
-    
+
         $ nix-store -qR $(nix-store -qd $(which firefox))
-    
+
     or, in a nicer format:
-    
+
         $ nix-store -q --tree $(nix-store -qd $(which firefox))
-    
+
     File system references are also stored in reverse. For instance, you
     can query all paths that directly or indirectly use a certain Glibc:
-    
+
         $ nix-store -q --referrers-closure \
             /nix/store/8lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4
 
@@ -92,28 +92,28 @@ Nix 0.8 has the following improvements:
   - `nix-channel` has new operations `--list` and `--remove`.
 
   - New ways of installing components into user environments:
-    
+
       - Copy from another user environment:
-        
+
             $ nix-env -i --from-profile .../other-profile firefox
-    
-      - Install a store derivation directly (bypassing the Nix
+
+      - Install a derivation directly (bypassing the Nix
         expression language entirely):
-        
+
             $ nix-env -i /nix/store/z58v41v21xd3...-aterm-2.3.1.drv
-        
+
         (This is used to implement `nix-install-package`, which is
         therefore immune to evolution in the Nix expression language.)
-    
+
       - Install an already built store path directly:
-        
+
             $ nix-env -i /nix/store/hsyj5pbn0d9i...-aterm-2.3.1
-    
+
       - Install the result of a Nix expression specified as a
         command-line argument:
-        
+
             $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'
-        
+
         The difference with the normal installation mode is that `-E`
         does not use the `name` attributes of derivations. Therefore,
         this can be used to disambiguate multiple derivations with the
@@ -127,7 +127,7 @@ Nix 0.8 has the following improvements:
   - Implemented a concurrent garbage collector. It is now always safe to
     run the garbage collector, even if other Nix operations are
     happening simultaneously.
-    
+
     However, there can still be GC races if you use `nix-instantiate`
     and `nix-store
                     --realise` directly to build things. To prevent races, use the
@@ -147,13 +147,13 @@ Nix 0.8 has the following improvements:
 
   - The behaviour of the garbage collector can be changed globally by
     setting options in `/nix/etc/nix/nix.conf`.
-    
+
       - `gc-keep-derivations` specifies whether deriver links should be
         followed when searching for live paths.
-    
+
       - `gc-keep-outputs` specifies whether outputs of derivations
         should be followed when searching for live paths.
-    
+
       - `env-keep-derivations` specifies whether user environments
         should store the paths of derivations when they are added (thus
         keeping the derivations alive).

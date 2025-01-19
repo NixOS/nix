@@ -777,7 +777,7 @@ StorePath AttrCursor::forceDerivation()
            been garbage-collected. So force it to be regenerated. */
         aDrvPath->forceValue();
         if (!root->state.store->isValidPath(drvPath))
-            throw Error("don't know how to recreate store derivation '%s'!",
+            throw Error("don't know how to recreate derivation '%s'!",
                 root->state.store->printStorePath(drvPath));
     }
     return drvPath;

@@ -42,9 +42,9 @@ When using public key authentication, you can avoid typing the passphrase with `
 
 - `--include-outputs`
 
-  Also copy the outputs of [store derivation]s included in the closure.
+  Also copy the outputs of [derivation]s included in the closure.
 
-  [store derivation]: @docroot@/glossary.md#gloss-store-derivation
+  [derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 - `--use-substitutes` / `-s`
 

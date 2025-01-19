@@ -30,7 +30,7 @@
     - [Store Path](store/concrete/path.md)
     - [Content-Addressing Store Objects](store/concrete/ca-object.md)
     - [Reference Scanning & Rewriting](store/concrete/reference-scanning.md)
-    - [Derivation & Derived Paths](store/concrete/drv/index.md)
+    - [Derivation and Deriving Path](store/concrete/drv/index.md)
       - [Input-Addressing](store/concrete/drv/ia.md)
       - [Content-Addressing (Experimental)](store/concrete/drv/ca.md)
     - [Building](store/concrete/building.md)
