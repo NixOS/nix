@@ -143,7 +143,7 @@ In pseudo code:
 type OutputName = String
 
 data DerivingPath
-  = ConstantPath { path : StorePath }
+  = Constant { path : StorePath }
   | Output {
       drvPath : StorePath,
       output  : OutputName,
@@ -235,7 +235,7 @@ Derivations are the same except for using the new extended deriving path data ty
 type OutputName = String
 
 data DerivingPath
-  = ConstantPath { storeObj : StorePath }
+  = Constant { storeObj : StorePath }
   | Output {
       drv    : DerivingPath, -- Note: changed
       output : OutputName,
@@ -244,7 +244,7 @@ data DerivingPath
 
 Now, the `drv` field of `Output` is itself a `DerivingPath` instead of an `StorePath`.
 
-Under this extended model, `DerivingPath`s are thus inductively built up from an `ConstantPath`, contains in 0 or more outer `Output`s.
+Under this extended model, `DerivingPath`s are thus inductively built up from an `Constant`, contains in 0 or more outer `Output`s.
 
 ### Encoding {#deriving-path-encoding}
 
