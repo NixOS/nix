@@ -120,7 +120,7 @@ Args::Flag contentAddressMethod(ContentAddressMethod * method)
 
     - [`text`](@docroot@/store/store-object/content-address.md#method-text):
       Like `flat`, but used for
-      [derivations](@docroot@/glossary.md#store-derivation) serialized in store object and
+      [derivations](@docroot@/glossary.md#gloss-derivation) serialized in store object and
       [`builtins.toFile`](@docroot@/language/builtins.html#builtins-toFile).
       For advanced use-cases only;
       for regular usage prefer `nar` and `flat`.

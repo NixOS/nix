@@ -44,7 +44,7 @@ When using public key authentication, you can avoid typing the passphrase with `
 
   Also copy the outputs of [derivation]s included in the closure.
 
-  [derivation]: @docroot@/glossary.md#gloss-store-derivation
+  [derivation]: @docroot@/glossary.md#gloss-derivation
 
 - `--use-substitutes` / `-s`
 
