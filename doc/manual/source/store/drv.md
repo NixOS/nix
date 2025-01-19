@@ -211,9 +211,9 @@ data DerivingPath
     }
 ```
 
-Now, the `drv` field of `BuiltObject` is itself a `DerivingPath` instead of an `StorePath`.
+Now, the `drv` field of `Output` is itself a `DerivingPath` instead of an `StorePath`.
 
-Under this extended model, `DerivingPath`s are thus inductively built up from an `ConstantPath`, contains in 0 or more outer `Outputs`.
+Under this extended model, `DerivingPath`s are thus inductively built up from an `ConstantPath`, contains in 0 or more outer `Output`s.
 
 ### Encoding
 
