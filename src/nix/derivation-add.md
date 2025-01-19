@@ -13,6 +13,6 @@ a Nix expression evaluates.
 
 `nix derivation add` takes a single derivation in the following format:
 
-{{#include @docroot@/protocols/json/derivation.md}}
+{{#include ../../protocols/json/derivation.md}}
 
 )""
