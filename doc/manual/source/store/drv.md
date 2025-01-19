@@ -21,37 +21,42 @@ A derivation consists of:
 
  - A (base) name
 
- - A set of *outputs*, consisting of names and possibly other data
+ - A set of [*inputs*][inputs], a set of [deriving paths][deriving path]
 
- - A set of *inputs*, a set of [deriving paths](#deriving-path)
+ - A map of [*outputs*][outputs], from names to other data
 
  - Everything needed for an `execve` system call:
-   1. Path to executable
-   2. A list of arguments (except for `argv[0]`, which is taken from the path in the usual way)
-   3. A set of environment variables.
 
- - A two-component "system" name (e.g. `x86_64-linux`) where the executable is to run.
+   - The ["builder"][builder], a path to an executable
+
+   - A list of [arguments][args]
+
+   - A map of [environment variables][env].
+
+ - A two-component ["system" type][system] (e.g. `x86_64-linux`) where the executable is to run.
+
+[derivation]: #derivation
+[outputs]: #outputs
+[inputs]: #inputs
+[builder]: #builder
+[args]: #args
+[env]: #env
+[system]: #system
+
+### Parts of a derivation
+
+#### Inputs {#inputs}
+
+The inputs are a set of [deriving paths][deriving path], refering to all store objects needed in order to perform this build step.
 
 The information needed for the `execve` system call will presumably include many [store paths][store path]:
 
  - The path to the executable is almost surely starts with a store path
  - The arguments and environment variables likely contain many other store paths.
 
-But just as we stored the references contained in the file data separately for store objects, so we store the set of inputs separately.
+But just as we stored the references contained in the file data separately for store objects, so we store the set of inputs separately from the builder, arguments, and environment variables.
 
-Finally, the system name is included take advantage of the fact that Nix allows *heterogenous* build plans, where not all steps can be run on the same machine or same sort of machine.
-
-The process's job is to produce the outputs, but have no other important side effects.
-The rules around this will be discussed in following sections.
-
-### Referencing derivations
-
-Derivations are always referred to by the [store path] of the store object they are encoded to.
-See the encoding [encoding section](#derivation-encoding) for more details on how this encoding works, and thus what exactly what store path we would end up with for a given derivations.
-
-The store path of the store object which encodes a derivation is often called a "derivation path" for brevity.
-
-### Outputs {#outputs}
+#### Outputs {#outputs}
 
 The outputs are the derivations are the [store objects][store object] it is obligated to produce.
 
@@ -73,27 +78,39 @@ This is to allow derivations with a single output to avoid a superfluous `-<outp
 >
 > - The store path of `dev` will be: `/nix/store/<hash>-hello-dev`.
 
-### System {#system}
+#### Builder {#builder}
 
-The system type on which the [`builder`](#attr-builder) executable is meant to be run.
+This is the path to an executable that will perform the build and produce the [outputs].
 
-A necessary condition for Nix to build derivations locally is that the `system` attribute matches the current [`system` configuration option].
-It can automatically [build on other platforms](@docroot@/language/derivations.md#attr-builder) by forwarding build requests to other machines.
-
-[`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
-
-
-### Builder {#builder}
-
-Path to an executable that will perform the build.
-
-### Args {#args}
+#### Arguments {#args}
 
 Command-line arguments to be passed to the [`builder`](#builder) executable.
 
-### Environment Variables {#env}
+Note that these are the arguments after the first argument.
+The first argument, `argv[0]`, is the "base name" of the `builder`, as per the usual convention on Unix.
+See [Wikipedia](https://en.wikipedia.org/w/index.php?title=Argv) for details.
 
-Environment variables which will be passed to the [`builder`](#builder) executable.
+#### Environment Variables {#env}
+
+Environment variables which will be passed to the [builder](#builder) executable.
+
+#### System {#system}
+
+The system type on which the [`builder`](#attr-builder) executable is meant to be run.
+
+A necessary condition for Nix to schedule a given derivation on given Nix instance is for the "system" of that derivation to match that instance's [`system` configuration option].
+
+By putting the `system` in each derivation, Nix allows *heterogenous* build plans, where not all steps can be run on the same machine or same sort of machine.
+A Nix isntance scheduling builds can automatically [build on other platforms](@docroot@/language/derivations.md#attr-builder) by forwarding build requests to other Nix instances.
+
+[`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
+
+### Referencing derivations
+
+Derivations are always referred to by the [store path] of the store object they are encoded to.
+See the [encoding section](#derivation-encoding) for more details on how this encoding works, and thus what exactly what store path we would end up with for a given derivations.
+
+The store path of the store object which encodes a derivation is often called a "derivation path" for brevity.
 
 ### Placeholder
 
@@ -108,15 +125,6 @@ Two types:
 > N.B. Current method of creating hashes which we substitute for string fields should be seen as an artifact of the current "ATerm" serialization format.
 > In order to be more explicit, and avoid gotchas analogous to [SQL injection](https://en.wikipedia.org/wiki/SQL_injection),
 > we ought to consider switching two a different format where we explicitly use a syntax for a oncatentation of plain strings and placeholders written more explicitly.
-
-### Inputs
-
-The inputs are a set of [deriving paths].
-Each of these must be [realised] prior to building the derivation in
-question.
-At that point, the derivation can be normalized replacing each input
-derived path with its store path --- which we now now since we've
-realised it.
 
 ## Deriving path {#deriving-path}
 
@@ -141,6 +149,8 @@ data DerivingPath
       output  : OutputName,
     }
 ```
+
+[deriving path]: #deriving-path
 
 [content-addressed derivation]: @docroot@/glossary.md#gloss-content-addressed-derivation
 [realise]: @docroot@/glossary.md#gloss-realise
