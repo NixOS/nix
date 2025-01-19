@@ -22,7 +22,7 @@
 - [derivation]{#gloss-derivation}
 
   A single build task.
-  See [Derivation](@docroot@/doc/manual/src/store/drv.md#derivation) for details.
+  See [Derivation](@docroot@/store/drv.md#derivation) for details.
 
   [derivation]: #gloss-derivation
 

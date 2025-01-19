@@ -2,7 +2,7 @@
 
 We return to derivations and derived paths in the context of making a build system for conventional software.
 
-## [Derivation]{#derivation}
+## Derivation {#derivation}
 
 A derivation is a specification for running an executable on precisely defined input files to repeatably produce output files at uniquely determined file system paths.
 
@@ -33,10 +33,14 @@ A derivation consists of:
 
  - A two-component "system" name (e.g. `x86_64-linux`) where the executable is to run.
 
-The path and list/set elements of the other two will presumably consist wholly or partly of store paths.
+The information needed for the `execve` system call will presumably include many [store paths][store path]:
+
+ - The path to the executable is almost surely starts with a store path
+ - The arguments and environment variables likely contain many other store paths.
+
 But just as we stored the references contained in the file data separately for store objects, so we store the set of inputs separately.
 
-The last bit of information is to take advantage of the fact that Nix allows *heterogenous* build plans, were not all steps can be run on the same machine or same sort of machine.
+Finally, the system name is included take advantage of the fact that Nix allows *heterogenous* build plans, where not all steps can be run on the same machine or same sort of machine.
 
 All together in pseudo-code:
 
@@ -64,22 +68,16 @@ outputs drv = Map.keys drv.outputs
 The process's job is to produce the outputs, but have no other important side effects.
 The rules around this will be discussed in following sections.
 
-### Referencing
+### Referencing derivations
 
-Derivations are always referred to by the store path of the store object they are encoded to.
-The store path name is the derivation name with `.drv` suffixed at the end.
-The store path digest we will explain in a following section after we go over the different variants of derivations, as the exact algorithm depends on them.
-Suffice to say for now, it is (a form of) content addressing based on the derivation and its inputs.
+Derivations are always referred to by the [store path] of the store object they are encoded to.
+See the encoding [encoding section](#derivation-encoding) for more details on how this encoding works, and thus what exactly what store path we would end up with for a given derivations.
 
-> NOTE:
-> Actually we have defined "text addressing" already in "content-addressing store objects".
-> Note that we reserve the right to format new sorts of derivations on-disk differently in the future.
-> The choice of "text hashing" should be deemd arbitrary along with the choice of "ATerm" serialization.
-> Maybe this should be moved below to "encoding?".
+The store path of the store object which encodes a derivation is often called a "derivation path" for brevity.
 
 ### Outputs {#outputs}
 
-The outputs are the derivations are the store objects it is obligated to produce.
+The outputs are the derivations are the [store objects][store object] it is obligated to produce.
 
 Outputs are assigned names, and also consistent of other information based on the type of derivation.
 
@@ -131,7 +129,7 @@ Two types:
 
 - output derived paths (see below), corresponding to store paths we haven't yet realized.
 
-> N.B. Current method of creating hashes which we substitute for string fields should be seen as an artifact of the current ATerm formula.
+> N.B. Current method of creating hashes which we substitute for string fields should be seen as an artifact of the current "ATerm" serialization format.
 > In order to be more explicit, and avoid gotchas analogous to [SQL injection](https://en.wikipedia.org/wiki/SQL_injection),
 > we ought to consider switching two a different format where we explicitly use a syntax for a oncatentation of plain strings and placeholders written more explicitly.
 
@@ -144,7 +142,7 @@ At that point, the derivation can be normalized replacing each input
 derived path with its store path --- which we now now since we've
 realised it.
 
-## [Deriving path]{#deriving-path}
+## Deriving path {#deriving-path}
 
 Deriving paths are close to their abstract version, but using `StorePath` as the type of all references, matching the end of the previous subsection.
 
@@ -177,15 +175,38 @@ data DerivingPath
 
 ## Encoding
 
-### Derivation
+### Derivation {#derivation-encoding}
 
 There are two formats, documented separately:
 
-- The legacy [ATerm" format](protocols/derivation-aterm.md)
+- The legacy ["ATerm" format](@docroot@/protocols/derivation-aterm.md)
 
-- The modern [JSON format](source/protocols/json/derivation.md)
+- The modern [JSON format](@docroot@/protocols/json/derivation.md)
 
-### Deriving Path
+Currently derivations are always serialized to store objects using the "ATerm" format, but this is subject to change.
+
+Regardless of the format used, when serializing to store object, content-addressing is always used.
+In the common case the inputs to store objects are either:
+
+ - constant deriving paths for content-addressed source objects, which are "initial inputs" rather than the outputs of some other derivation (except in the case of bootstrap binaries).
+
+ - the outputs of other derivations abiding by this same invariant.
+
+This common case makes for the following useful property:
+when we serialize such a derivation graph to store objects, the resulting closures are *entirely* content-addressed.
+
+Here is a sketch at the proof of this:
+
+ - The inputs which are constant deriving paths become references of the serialized derivations, but they are content-addressed per the above.
+
+ - For inputs which are output deriving paths, we cannot directly reference the input because in general it is not built yet.
+   We instead "peal back" the output deriving path to take its underlying serialized derivation (the `drvPath` field), and reference that.
+   Since it is a derivation, it must be content-addressed
+
+ - There are no other ways a store object would end up in an input closure.
+   The references of a derivation in store object form always come from solely from the inputs of the derivation.
+
+### Deriving Path {#deriving-path-encoding}
 
 - *constant*
 
@@ -220,7 +241,7 @@ There are two formats, documented separately:
 
 ## Extending the model to be higher-order
 
-**Experimental feature**: [`dynamic-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-dynamic-derivations)
+**Experimental feature**: [`dynamic-derivations`](@docroot@/development/experimental-features.md#xp-feature-dynamic-derivations)
 
 We can apply the same extension discussed for the abstract model to the concrete model.
 Again, only the data type for Deriving Paths needs to be modified.
@@ -241,7 +262,7 @@ Now, the `drv` field of `Output` is itself a `DerivingPath` instead of an `Store
 
 Under this extended model, `DerivingPath`s are thus inductively built up from an `ConstantPath`, contains in 0 or more outer `Output`s.
 
-### Encoding
+### Encoding {#deriving-path-encoding}
 
 The encoding is adjusted in a very simplest way, merely displaying the same
 
