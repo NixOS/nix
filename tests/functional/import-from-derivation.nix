@@ -1,4 +1,4 @@
-with import ./config.nix;
+with import <config>;
 
 rec {
   bar = mkDerivation {
@@ -30,4 +30,23 @@ rec {
         echo -n BLA$(cat $src) > $out
       '';
   };
+
+  step1 = mkDerivation {
+    name = "step1";
+    buildCommand = ''
+      mkdir -p $out
+      echo 'foo' > $out/bla
+    '';
+  };
+
+  addPathExpr = mkDerivation {
+    name = "add-path";
+    inherit step1;
+    buildCommand = ''
+      mkdir -p $out
+      echo "builtins.path { path = \"$step1\"; sha256 = \"7ptL+pnrZXnSa5hwwB+2SXTLkcSb5264WGGokN8OXto=\"; }" > $out/default.nix
+    '';
+  };
+
+  importAddPathExpr = import addPathExpr;
 }

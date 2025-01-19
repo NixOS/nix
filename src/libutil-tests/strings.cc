@@ -2,10 +2,9 @@
 #include <rapidcheck/gtest.h>
 
 #include "strings.hh"
+#include "error.hh"
 
 namespace nix {
-
-using Strings = std::vector<std::string>;
 
 /* ----------------------------------------------------------------------------
  * concatStringsSep
@@ -343,6 +342,110 @@ RC_GTEST_PROP(splitString, recoveredByConcatStringsSep, (const std::string & s))
 {
     RC_ASSERT(concatStringsSep("/", splitString<Strings>(s, "/")) == s);
     RC_ASSERT(concatStringsSep("a", splitString<Strings>(s, "a")) == s);
+}
+
+/* ----------------------------------------------------------------------------
+ * shellSplitString
+ * --------------------------------------------------------------------------*/
+
+TEST(shellSplitString, empty)
+{
+    std::list<std::string> expected = {};
+
+    ASSERT_EQ(shellSplitString(""), expected);
+}
+
+TEST(shellSplitString, oneWord)
+{
+    std::list<std::string> expected = {"foo"};
+
+    ASSERT_EQ(shellSplitString("foo"), expected);
+}
+
+TEST(shellSplitString, oneWordQuotedWithSpaces)
+{
+    std::list<std::string> expected = {"foo bar"};
+
+    ASSERT_EQ(shellSplitString("'foo bar'"), expected);
+}
+
+TEST(shellSplitString, oneWordQuotedWithSpacesAndDoubleQuoteInSingleQuote)
+{
+    std::list<std::string> expected = {"foo bar\""};
+
+    ASSERT_EQ(shellSplitString("'foo bar\"'"), expected);
+}
+
+TEST(shellSplitString, oneWordQuotedWithDoubleQuotes)
+{
+    std::list<std::string> expected = {"foo bar"};
+
+    ASSERT_EQ(shellSplitString("\"foo bar\""), expected);
+}
+
+TEST(shellSplitString, twoWords)
+{
+    std::list<std::string> expected = {"foo", "bar"};
+
+    ASSERT_EQ(shellSplitString("foo bar"), expected);
+}
+
+TEST(shellSplitString, twoWordsWithSpacesAndQuotesQuoted)
+{
+    std::list<std::string> expected = {"foo bar'", "baz\""};
+
+    ASSERT_EQ(shellSplitString("\"foo bar'\" 'baz\"'"), expected);
+}
+
+TEST(shellSplitString, emptyArgumentsAreAllowedSingleQuotes)
+{
+    std::list<std::string> expected = {"foo", "", "bar", "baz", ""};
+
+    ASSERT_EQ(shellSplitString("foo '' bar baz ''"), expected);
+}
+
+TEST(shellSplitString, emptyArgumentsAreAllowedDoubleQuotes)
+{
+    std::list<std::string> expected = {"foo", "", "bar", "baz", ""};
+
+    ASSERT_EQ(shellSplitString("foo \"\" bar baz \"\""), expected);
+}
+
+TEST(shellSplitString, singleQuoteDoesNotUseEscapes)
+{
+    std::list<std::string> expected = {"foo\\\"bar"};
+
+    ASSERT_EQ(shellSplitString("'foo\\\"bar'"), expected);
+}
+
+TEST(shellSplitString, doubleQuoteDoesUseEscapes)
+{
+    std::list<std::string> expected = {"foo\"bar"};
+
+    ASSERT_EQ(shellSplitString("\"foo\\\"bar\""), expected);
+}
+
+TEST(shellSplitString, backslashEscapesSpaces)
+{
+    std::list<std::string> expected = {"foo bar", "baz", "qux quux"};
+
+    ASSERT_EQ(shellSplitString("foo\\ bar baz qux\\ quux"), expected);
+}
+
+TEST(shellSplitString, backslashEscapesQuotes)
+{
+    std::list<std::string> expected = {"foo\"bar", "baz", "qux'quux"};
+
+    ASSERT_EQ(shellSplitString("foo\\\"bar baz qux\\'quux"), expected);
+}
+
+TEST(shellSplitString, testUnbalancedQuotes)
+{
+    ASSERT_THROW(shellSplitString("foo'"), Error);
+    ASSERT_THROW(shellSplitString("foo\""), Error);
+    ASSERT_THROW(shellSplitString("foo'bar"), Error);
+    ASSERT_THROW(shellSplitString("foo\"bar"), Error);
+    ASSERT_THROW(shellSplitString("foo\"bar\\\""), Error);
 }
 
 } // namespace nix

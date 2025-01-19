@@ -22,13 +22,13 @@ With [nixpkgs-fmt](https://github.com/nix-community/nixpkgs-fmt):
 }
 ```
 
-With [nixfmt](https://github.com/serokell/nixfmt):
+With [nixfmt](https://github.com/NixOS/nixfmt):
 
 ```nix
 # flake.nix
 {
   outputs = { nixpkgs, self }: {
-    formatter.x86_64-linux = nixpkgs.legacyPackages.x86_64-linux.nixfmt;
+    formatter.x86_64-linux = nixpkgs.legacyPackages.x86_64-linux.nixfmt-rfc-style;
   };
 }
 ```

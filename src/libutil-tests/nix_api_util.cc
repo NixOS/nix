@@ -136,7 +136,6 @@ TEST_F(nix_api_util_context, nix_err_name)
     // no error
     EXPECT_THROW(nix_err_name(NULL, ctx, OBSERVE_STRING(err_name)), nix::Error);
 
-    std::string err_msg_ref;
     try {
         throw nix::Error("testing error");
     } catch (...) {

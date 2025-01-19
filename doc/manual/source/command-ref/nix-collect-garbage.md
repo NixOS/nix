@@ -36,7 +36,7 @@ Instead, it looks in a few locations, and acts on all profiles it finds there:
    >
    > Not stable; subject to change
    >
-   > Do not rely on this functionality; it just exists for migration purposes and is may change in the future.
+   > Do not rely on this functionality; it just exists for migration purposes and may change in the future.
    > These deprecated paths remain a private implementation detail of Nix.
 
    `$NIX_STATE_DIR/profiles` and `$NIX_STATE_DIR/profiles/per-user`.
@@ -62,6 +62,15 @@ These options are for deleting old [profiles] prior to deleting unreachable [sto
   This is the equivalent of invoking [`nix-env --delete-generations <period>`](@docroot@/command-ref/nix-env/delete-generations.md#generations-time) on each found profile.
   See the documentation of that command for additional information about the *period* argument.
 
+  - <span id="opt-max-freed">[`--max-freed`](#opt-max-freed)</span> *bytes*
+
+<!-- duplication from https://github.com/NixOS/nix/blob/442a2623e48357ff72c77bb11cf2cf06d94d2f90/doc/manual/source/command-ref/nix-store/gc.md?plain=1#L39-L44 -->
+
+  Keep deleting paths until at least *bytes* bytes have been deleted,
+  then stop. The argument *bytes* can be followed by the
+  multiplicative suffix `K`, `M`, `G` or `T`, denoting KiB, MiB, GiB
+  or TiB units.
+  
 {{#include ./opt-common.md}}
 
 {{#include ./env-common.md}}

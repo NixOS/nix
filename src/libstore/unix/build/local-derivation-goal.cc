@@ -883,7 +883,7 @@ void LocalDerivationGoal::startBuilder()
         printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 
     /* Create the log file. */
-    Path logFile = openLogFile();
+    [[maybe_unused]] Path logFile = openLogFile();
 
     /* Create a pseudoterminal to get the output of the builder. */
     builderOut = posix_openpt(O_RDWR | O_NOCTTY);

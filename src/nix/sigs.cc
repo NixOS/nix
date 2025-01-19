@@ -41,7 +41,6 @@ struct CmdCopySigs : StorePathsCommand
 
         ThreadPool pool;
 
-        std::string doneLabel = "done";
         std::atomic<size_t> added{0};
 
         //logger->setExpected(doneLabel, storePaths.size());

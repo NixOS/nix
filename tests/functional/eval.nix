@@ -1,5 +1,5 @@
 {
   int = 123;
-  str = "foo";
+  str = "foo\nbar";
   attr.foo = "bar";
 }

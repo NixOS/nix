@@ -37,7 +37,7 @@ let pkgs = rec {
       mkdir -p $out
       ln -s ${setupSh} $out/setup
     '';
-  };
+  } // { inherit mkDerivation; };
 
   shellDrv = mkDerivation {
     name = "shellDrv";
@@ -93,6 +93,10 @@ let pkgs = rec {
     echo 'printf %s "$*"' > $out/bin/ruby
     chmod a+rx $out/bin/ruby
   '';
+
+  inherit (cfg) shell;
+
+  callPackage = f: args: f (pkgs // args);
 
   inherit pkgs;
 }; in pkgs

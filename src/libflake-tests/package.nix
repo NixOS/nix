@@ -4,6 +4,7 @@
 , mkMesonExecutable
 
 , nix-flake
+, nix-flake-c
 , nix-expr-test-support
 
 , rapidcheck
@@ -26,8 +27,8 @@ mkMesonExecutable (finalAttrs: {
 
   workDir = ./.;
   fileset = fileset.unions [
-    ../../build-utils-meson
-    ./build-utils-meson
+    ../../nix-meson-build-support
+    ./nix-meson-build-support
     ../../.version
     ./.version
     ./meson.build
@@ -38,6 +39,7 @@ mkMesonExecutable (finalAttrs: {
 
   buildInputs = [
     nix-flake
+    nix-flake-c
     nix-expr-test-support
     rapidcheck
     gtest
@@ -54,10 +56,6 @@ mkMesonExecutable (finalAttrs: {
   mesonFlags = [
   ];
 
-  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
-
   passthru = {
     tests = {
       run = runCommand "${finalAttrs.pname}-run" {
@@ -67,6 +65,7 @@ mkMesonExecutable (finalAttrs: {
         mkdir -p "$HOME"
       '' + ''
         export _NIX_TEST_UNIT_DATA=${resolvePath ./data}
+        export NIX_CONFIG="extra-experimental-features = flakes"
         ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
         touch $out
       '');

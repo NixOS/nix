@@ -84,7 +84,7 @@ When using public key authentication, you can avoid typing the passphrase with `
 > Copy GNU Hello from a remote machine using a known store path, and run it:
 >
 > ```shell-session
-> $ storePath="$(nix-instantiate --eval '<nixpkgs>' -I nixpkgs=channel:nixpkgs-unstable -A hello.outPath | tr -d '"')"
+> $ storePath="$(nix-instantiate --eval --raw '<nixpkgs>' -I nixpkgs=channel:nixpkgs-unstable -A hello.outPath)"
 > $ nix-copy-closure --from alice@itchy.example.org "$storePath"
 > $ "$storePath"/bin/hello
 > Hello, world!

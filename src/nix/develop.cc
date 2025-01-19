@@ -611,7 +611,7 @@ struct CmdDevelop : Common, MixEnvironment
         else if (!command.empty()) {
             std::vector<std::string> args;
             args.reserve(command.size());
-            for (auto s : command)
+            for (const auto & s : command)
                 args.push_back(shellEscape(s));
             script += fmt("exec %s\n", concatStringsSep(" ", args));
         }
@@ -696,7 +696,7 @@ struct CmdDevelop : Common, MixEnvironment
                 auto sourcePath = installableFlake->getLockedFlake()->flake.resolvedRef.input.getSourcePath();
                 if (sourcePath) {
                     if (chdir(sourcePath->c_str()) == -1) {
-                        throw SysError("chdir to '%s' failed", *sourcePath);
+                        throw SysError("chdir to %s failed", *sourcePath);
                     }
                 }
             }

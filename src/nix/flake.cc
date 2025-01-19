@@ -94,7 +94,7 @@ public:
             .label="inputs",
             .optional=true,
             .handler={[&](std::vector<std::string> inputsToUpdate){
-                for (auto inputToUpdate : inputsToUpdate) {
+                for (const auto & inputToUpdate : inputsToUpdate) {
                     InputPath inputPath;
                     try {
                         inputPath = flake::parseInputPath(inputToUpdate);
@@ -162,6 +162,7 @@ struct CmdFlakeLock : FlakeCommand
         settings.tarballTtl = 0;
 
         lockFlags.writeLockFile = true;
+        lockFlags.failOnUnlocked = true;
         lockFlags.applyNixConfig = true;
 
         lockFlake();
@@ -237,7 +238,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["lastModified"] = *lastModified;
             j["path"] = storePath;
             j["locks"] = lockedFlake.lockFile.toJSON().first;
-            if (auto fingerprint = lockedFlake.getFingerprint(store))
+            if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
             logger->cout("%s", j.dump());
         } else {
@@ -271,7 +272,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Last modified:" ANSI_NORMAL " %s",
                     std::put_time(std::localtime(&*lastModified), "%F %T"));
-            if (auto fingerprint = lockedFlake.getFingerprint(store))
+            if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 logger->cout(
                     ANSI_BOLD "Fingerprint:" ANSI_NORMAL "   %s",
                     fingerprint->to_string(HashFormat::Base16, false));
@@ -643,10 +644,11 @@ struct CmdFlakeCheck : FlakeCommand
                                             fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
                                             *attr2.value, attr2.pos);
                                         if (drvPath && attr_name == settings.thisSystem.get()) {
-                                            drvPaths.push_back(DerivedPath::Built {
+                                            auto path = DerivedPath::Built {
                                                 .drvPath = makeConstantStorePathRef(*drvPath),
                                                 .outputs = OutputsSpec::All { },
-                                            });
+                                            };
+                                            drvPaths.push_back(std::move(path));
                                         }
                                     }
                                 }
@@ -891,37 +893,32 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         auto cursor = installable.getCursor(*evalState);
 
-        auto templateDirAttr = cursor->getAttr("path");
-        auto templateDir = templateDirAttr->getString();
-
-        if (!store->isInStore(templateDir))
-            evalState->error<TypeError>(
-                "'%s' was not found in the Nix store\n"
-                "If you've set '%s' to a string, try using a path instead.",
-                templateDir, templateDirAttr->getAttrPathStr()).debugThrow();
+        auto templateDirAttr = cursor->getAttr("path")->forceValue();
+        NixStringContext context;
+        auto templateDir = evalState->coerceToPath(noPos, templateDirAttr, context, "");
 
         std::vector<fs::path> changedFiles;
         std::vector<fs::path> conflictedFiles;
 
-        std::function<void(const fs::path & from, const fs::path & to)> copyDir;
-        copyDir = [&](const fs::path & from, const fs::path & to)
+        std::function<void(const SourcePath & from, const fs::path & to)> copyDir;
+        copyDir = [&](const SourcePath & from, const fs::path & to)
         {
             fs::create_directories(to);
 
-            for (auto & entry : fs::directory_iterator{from}) {
+            for (auto & [name, entry] : from.readDirectory()) {
                 checkInterrupt();
-                auto from2 = entry.path();
-                auto to2 = to / entry.path().filename();
-                auto st = entry.symlink_status();
+                auto from2 = from / name;
+                auto to2 = to / name;
+                auto st = from2.lstat();
                 auto to_st = fs::symlink_status(to2);
-                if (fs::is_directory(st))
+                if (st.type == SourceAccessor::tDirectory)
                     copyDir(from2, to2);
-                else if (fs::is_regular_file(st)) {
-                    auto contents = readFile(from2.string());
+                else if (st.type == SourceAccessor::tRegular) {
+                    auto contents = from2.readFile();
                     if (fs::exists(to_st)) {
                         auto contents2 = readFile(to2.string());
                         if (contents != contents2) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2.string());
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
@@ -930,21 +927,21 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     } else
                         writeFile(to2, contents);
                 }
-                else if (fs::is_symlink(st)) {
-                    auto target = fs::read_symlink(from2);
+                else if (st.type == SourceAccessor::tSymlink) {
+                    auto target = from2.readLink();
                     if (fs::exists(to_st)) {
                         if (fs::read_symlink(to2) != target) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2.string());
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
                         }
                         continue;
                     } else
-                          fs::create_symlink(target, to2);
+                        createSymlink(target, os_string_to_string(PathViewNG { to2 }));
                 }
                 else
-                    throw Error("file '%s' has unsupported type", from2);
+                    throw Error("path '%s' needs to be a symlink, file, or directory but instead is a %s", from2, st.typeString());
                 changedFiles.push_back(to2);
                 notice("wrote: %s", to2);
             }
@@ -957,14 +954,14 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             for (auto & s : changedFiles) args.emplace_back(s.string());
             runProgram("git", true, args);
         }
-        auto welcomeText = cursor->maybeGetAttr("welcomeText");
-        if (welcomeText) {
+
+        if (auto welcomeText = cursor->maybeGetAttr("welcomeText")) {
             notice("\n");
             notice(renderMarkdownToTerminal(welcomeText->getString()));
         }
 
         if (!conflictedFiles.empty())
-            throw Error("Encountered %d conflicts - see above", conflictedFiles.size());
+            throw Error("encountered %d conflicts - see above", conflictedFiles.size());
     }
 };
 

@@ -10,8 +10,31 @@
     # https://flake.parts/options/git-hooks-nix#options
     pre-commit.settings = {
       hooks = {
+        # Conflicts are usually found by other checks, but not those in docs,
+        # and potentially other places.
+        check-merge-conflicts.enable = true;
+        # built-in check-merge-conflicts seems ineffective against those produced by mergify backports
+        check-merge-conflicts-2 = {
+          enable = true;
+          entry = "${pkgs.writeScript "check-merge-conflicts" ''
+            #!${pkgs.runtimeShell}
+            conflicts=false
+            for file in "$@"; do
+              if grep --with-filename --line-number -E '^>>>>>>> ' -- "$file"; then
+                conflicts=true
+              fi
+            done
+            if $conflicts; then
+              echo "ERROR: found merge/patch conflicts in files"
+              exit 1
+            fi
+            touch $out
+          ''}";
+        };
         clang-format = {
           enable = true;
+          # https://github.com/cachix/git-hooks.nix/pull/532
+          package = pkgs.llvmPackages_latest.clang-tools;
           excludes = [
             # We don't want to format test data
             # ''tests/(?!nixos/).*\.nix''
@@ -354,6 +377,7 @@
             ''^src/libutil/util\.cc$''
             ''^src/libutil/util\.hh$''
             ''^src/libutil/variant-wrapper\.hh$''
+            ''^src/libutil/widecharwidth/widechar_width\.h$'' # vendored source
             ''^src/libutil/windows/file-descriptor\.cc$''
             ''^src/libutil/windows/file-path\.cc$''
             ''^src/libutil/windows/processes\.cc$''
@@ -496,7 +520,6 @@
             ''^scripts/create-darwin-volume\.sh$''
             ''^scripts/install-darwin-multi-user\.sh$''
             ''^scripts/install-multi-user\.sh$''
-            ''^scripts/install-nix-from-closure\.sh$''
             ''^scripts/install-systemd-multi-user\.sh$''
             ''^src/nix/get-env\.sh$''
             ''^tests/functional/ca/build-dry\.sh$''

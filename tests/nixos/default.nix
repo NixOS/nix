@@ -23,6 +23,11 @@ let
         nix.checkAllErrors = false;
         # TODO: decide which packaging stage to use. `nix-cli` is efficient, but not the same as the user-facing `everything.nix` package (`default`). Perhaps a good compromise is `everything.nix` + `noTests` defined above?
         nix.package = nixpkgsFor.${system}.native.nixComponents.nix-cli;
+
+        # Evaluate VMs faster
+        documentation.enable = false;
+        # this links against nix and might break with our git version.
+        system.tools.nixos-option.enable = false;
       };
       _module.args.nixpkgs = nixpkgs;
       _module.args.system = system;
@@ -124,6 +129,8 @@ in
 
   nix-copy = runNixOSTestFor "x86_64-linux" ./nix-copy.nix;
 
+  nix-docker = runNixOSTestFor "x86_64-linux" ./nix-docker.nix;
+
   nssPreload = runNixOSTestFor "x86_64-linux" ./nss-preload.nix;
 
   githubFlakes = runNixOSTestFor "x86_64-linux" ./github-flakes.nix;
@@ -151,6 +158,8 @@ in
   functional_trusted = runNixOSTestFor "x86_64-linux" ./functional/as-trusted-user.nix;
 
   functional_root = runNixOSTestFor "x86_64-linux" ./functional/as-root.nix;
+
+  functional_symlinked-home = runNixOSTestFor "x86_64-linux" ./functional/symlinked-home.nix;
 
   user-sandboxing = runNixOSTestFor "x86_64-linux" ./user-sandboxing;
 
