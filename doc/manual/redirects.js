@@ -346,6 +346,9 @@ const redirects = {
     "scoping-rules": "scoping.html",
     "string-literal": "string-literals.html",
   },
+  "language/derivations.md": {
+    "builder-execution": "store/drv/building.md#building"
+  },
   "installation/installing-binary.html": {
     "linux": "uninstall.html#linux",
     "macos": "uninstall.html#macos",
