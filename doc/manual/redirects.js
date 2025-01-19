@@ -347,7 +347,7 @@ const redirects = {
     "string-literal": "string-literals.html",
   },
   "language/derivations.md": {
-    "builder-execution": "store/drv/building.md#builder-execution"
+    "builder-execution": "store/drv/building.md#builder-execution",
   },
   "installation/installing-binary.html": {
     "linux": "uninstall.html#linux",
@@ -375,6 +375,7 @@ const redirects = {
   "glossary.html": {
     "gloss-local-store": "store/types/local-store.html",
     "gloss-chroot-store": "store/types/local-store.html",
+    "gloss-store-derivation": "#gloss-derivation",
   },
 };
 

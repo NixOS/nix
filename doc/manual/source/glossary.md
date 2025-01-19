@@ -26,7 +26,7 @@
 
   [derivation]: #gloss-derivation
 
-- [derivation expression]{#gloss-derivation}
+- [derivation expression]{#gloss-derivation-expression}
 
   A description of a [derivation] in the Nix language.
   The result of a derivation is a store object.
