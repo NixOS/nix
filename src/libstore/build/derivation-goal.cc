@@ -701,6 +701,7 @@ Goal::Co DerivationGoal::tryToBuild()
     if (buildMode != bmCheck && allValid) {
         debug("skipping build of derivation '%s', someone beat us to it", worker.store.printStorePath(drvPath));
         outputLocks.setDeletion(true);
+        outputLocks.unlock();
         co_return done(BuildResult::AlreadyValid, std::move(validOutputs));
     }
 
@@ -1161,7 +1162,7 @@ HookReply DerivationGoal::tryBuildHook()
                     throw;
                 }
             }();
-            if (handleJSONLogMessage(s, worker.act, worker.hook->activities, true))
+            if (handleJSONLogMessage(s, worker.act, worker.hook->activities, "the build hook", true))
                 ;
             else if (s.substr(0, 2) == "# ") {
                 reply = s.substr(2);
@@ -1229,7 +1230,7 @@ HookReply DerivationGoal::tryBuildHook()
     hook->toHook.writeSide.close();
 
     /* Create the log file and pipe. */
-    Path logFile = openLogFile();
+    [[maybe_unused]] Path logFile = openLogFile();
 
     std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());
@@ -1346,9 +1347,9 @@ void DerivationGoal::handleChildOutput(Descriptor fd, std::string_view data)
     if (hook && fd == hook->fromHook.readSide.get()) {
         for (auto c : data)
             if (c == '\n') {
-                auto json = parseJSONMessage(currentHookLine);
+                auto json = parseJSONMessage(currentHookLine, "the derivation builder");
                 if (json) {
-                    auto s = handleJSONLogMessage(*json, worker.act, hook->activities, true);
+                    auto s = handleJSONLogMessage(*json, worker.act, hook->activities, "the derivation builder", true);
                     // ensure that logs from a builder using `ssh-ng://` as protocol
                     // are also available to `nix log`.
                     if (s && !isWrittenToLog && logSink) {
@@ -1390,7 +1391,7 @@ void DerivationGoal::handleEOF(Descriptor fd)
 
 void DerivationGoal::flushLine()
 {
-    if (handleJSONLogMessage(currentLogLine, *act, builderActivities, false))
+    if (handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false))
         ;
 
     else {

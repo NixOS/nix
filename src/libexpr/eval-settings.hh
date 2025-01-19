@@ -3,10 +3,11 @@
 
 #include "config.hh"
 #include "ref.hh"
+#include "source-path.hh"
 
 namespace nix {
 
-class Store;
+class EvalState;
 
 struct EvalSettings : Config
 {
@@ -18,11 +19,8 @@ struct EvalSettings : Config
      *
      * The return value is (a) whether the entry was valid, and, if so,
      * what does it map to.
-     *
-     * @todo Return (`std::optional` of) `SourceAccssor` or something
-     * more structured instead of mere `std::string`?
      */
-    using LookupPathHook = std::optional<std::string>(ref<Store> store, std::string_view);
+    using LookupPathHook = std::optional<SourcePath>(EvalState & state, std::string_view);
 
     /**
      * Map from "scheme" to a `LookupPathHook`.

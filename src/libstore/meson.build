@@ -4,8 +4,6 @@ project('nix-store', 'cpp',
     'cpp_std=c++2a',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
-    'debug=true',
-    'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
     'localstatedir=/nix/var',
   ],
@@ -15,7 +13,7 @@ project('nix-store', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
@@ -29,7 +27,7 @@ deps_private_maybe_subproject = [
 deps_public_maybe_subproject = [
   dependency('nix-util'),
 ]
-subdir('build-utils-meson/subprojects')
+subdir('nix-meson-build-support/subprojects')
 
 run_command('ln', '-s',
   meson.project_build_root() / '__nothing_link_target',
@@ -81,8 +79,7 @@ if host_machine.system() == 'windows'
   deps_other += [wsock32]
 endif
 
-subdir('build-utils-meson/libatomic')
-subdir('build-utils-meson/threads')
+subdir('nix-meson-build-support/libatomic')
 
 boost = dependency(
   'boost',
@@ -132,7 +129,7 @@ if aws_s3.found()
 endif
 deps_other += aws_s3
 
-subdir('build-utils-meson/generate-header')
+subdir('nix-meson-build-support/generate-header')
 
 generated_headers = []
 foreach header : [
@@ -180,7 +177,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('nix-meson-build-support/common')
 
 sources = files(
   'binary-cache-store.cc',
@@ -417,8 +414,8 @@ foreach name, value : cpp_str_defines
   ]
 endforeach
 
-subdir('build-utils-meson/export-all-symbols')
-subdir('build-utils-meson/windows-version')
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 this_library = library(
   'nixstore',
@@ -447,4 +444,4 @@ if host_machine.system() != 'darwin'
   }
 endif
 
-subdir('build-utils-meson/export')
+subdir('nix-meson-build-support/export')

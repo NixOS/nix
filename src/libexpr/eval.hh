@@ -347,7 +347,7 @@ private:
 
     LookupPath lookupPath;
 
-    std::map<std::string, std::optional<std::string>> lookupPathResolved;
+    std::map<std::string, std::optional<SourcePath>> lookupPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -401,6 +401,11 @@ public:
     void allowPath(const StorePath & storePath);
 
     /**
+     * Allow access to the closure of a store path.
+     */
+    void allowClosure(const StorePath & storePath);
+
+    /**
      * Allow access to a store path and return it as a string.
      */
     void allowAndSetStorePathString(const StorePath & storePath, Value & v);
@@ -452,9 +457,9 @@ public:
      *
      * If the specified search path element is a URI, download it.
      *
-     * If it is not found, return `std::nullopt`
+     * If it is not found, return `std::nullopt`.
      */
-    std::optional<std::string> resolveLookupPathPath(
+    std::optional<SourcePath> resolveLookupPathPath(
         const LookupPath::Path & elem,
         bool initAccessControl = false);
 
@@ -623,7 +628,18 @@ private:
 
 public:
 
+    /**
+     * Retrieve a specific builtin, equivalent to evaluating `builtins.${name}`.
+     * @param name The attribute name of the builtin to retrieve.
+     * @throws EvalError if the builtin does not exist.
+     */
     Value & getBuiltin(const std::string & name);
+
+    /**
+     * Retrieve the `builtins` attrset, equivalent to evaluating the reference `builtins`.
+     * Always returns an attribute set value.
+     */
+    Value & getBuiltins();
 
     struct Doc
     {
@@ -808,7 +824,6 @@ public:
     bool callPathFilter(
         Value * filterFun,
         const SourcePath & path,
-        std::string_view pathArg,
         PosIdx pos);
 
     DocComment getDocCommentForPos(PosIdx pos);

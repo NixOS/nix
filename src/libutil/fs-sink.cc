@@ -49,11 +49,13 @@ void copyRecursive(
         break;
     }
 
-    case SourceAccessor::tMisc:
-        throw Error("file '%1%' has an unsupported type", from);
-
+    case SourceAccessor::tChar:
+    case SourceAccessor::tBlock:
+    case SourceAccessor::tSocket:
+    case SourceAccessor::tFifo:
+    case SourceAccessor::tUnknown:
     default:
-        unreachable();
+        throw Error("file '%1%' has an unsupported type of %2%", from, stat.typeString());
     }
 }
 
@@ -110,7 +112,7 @@ void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(C
     crf.startFsync = startFsync;
     crf.fd =
 #ifdef _WIN32
-        CreateFileW(p.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)
+        CreateFileW(p.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL)
 #else
         open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666)
 #endif

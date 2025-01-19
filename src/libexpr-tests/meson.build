@@ -4,8 +4,6 @@ project('nix-expr-tests', 'cpp',
     'cpp_std=c++2a',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
-    'debug=true',
-    'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
   ],
   meson_version : '>= 1.1',
@@ -14,7 +12,7 @@ project('nix-expr-tests', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 deps_private_maybe_subproject = [
   dependency('nix-expr'),
@@ -23,12 +21,10 @@ deps_private_maybe_subproject = [
 ]
 deps_public_maybe_subproject = [
 ]
-subdir('build-utils-meson/subprojects')
+subdir('nix-meson-build-support/subprojects')
 
-subdir('build-utils-meson/threads')
-
-subdir('build-utils-meson/export-all-symbols')
-subdir('build-utils-meson/windows-version')
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 rapidcheck = dependency('rapidcheck')
 deps_private += rapidcheck
@@ -51,7 +47,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('nix-meson-build-support/common')
 
 sources = files(
   'derived-path.cc',

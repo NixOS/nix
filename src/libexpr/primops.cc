@@ -66,14 +66,12 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
                 ensureValid(b.drvPath->getBaseStorePath());
             },
             [&](const NixStringContextElem::Opaque & o) {
-                auto ctxS = store->printStorePath(o.path);
                 ensureValid(o.path);
                 if (maybePathsOut)
                     maybePathsOut->emplace(o.path);
             },
             [&](const NixStringContextElem::DrvDeep & d) {
                 /* Treat same as Opaque */
-                auto ctxS = store->printStorePath(d.drvPath);
                 ensureValid(d.drvPath);
                 if (maybePathsOut)
                     maybePathsOut->emplace(d.drvPath);
@@ -121,11 +119,9 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     if (store != buildStore) copyClosure(*buildStore, *store, outputsToCopyAndAllow);
 
     if (isIFD) {
-        for (auto & outputPath : outputsToCopyAndAllow) {
-            /* Add the output of this derivations to the allowed
-            paths. */
-            allowPath(outputPath);
-        }
+        /* Allow access to the output closures of this derivation. */
+        for (auto & outputPath : outputsToCopyAndAllow)
+            allowClosure(outputPath);
     }
 
     return res;
@@ -1102,7 +1098,7 @@ static RegisterPrimOp primop_warn({
     .name = "__warn",
     .args = {"e1", "e2"},
     .doc = R"(
-      Evaluate *e1*, which must be a string and print iton standard error as a warning.
+      Evaluate *e1*, which must be a string, and print it on standard error as a warning.
       Then return *e2*.
       This function is useful for non-critical situations where attention is advisable.
 
@@ -1603,7 +1599,8 @@ static RegisterPrimOp primop_placeholder({
  *************************************************************/
 
 
-/* Convert the argument to a path.  !!! obsolete? */
+/* Convert the argument to a path and then to a string (confusing,
+   eh?).  !!! obsolete? */
 static void prim_toPath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
@@ -2048,7 +2045,7 @@ static RegisterPrimOp primop_readFileType({
     .args = {"p"},
     .doc = R"(
       Determine the directory entry type of a filesystem node, being
-      one of "directory", "regular", "symlink", or "unknown".
+      one of `"directory"`, `"regular"`, `"symlink"`, or `"unknown"`.
     )",
     .fun = prim_readFileType,
 });
@@ -2437,7 +2434,6 @@ static RegisterPrimOp primop_toFile({
 bool EvalState::callPathFilter(
     Value * filterFun,
     const SourcePath & path,
-    std::string_view pathArg,
     PosIdx pos)
 {
     auto st = path.lstat();
@@ -2445,7 +2441,7 @@ bool EvalState::callPathFilter(
     /* Call the filter function.  The first argument is the path, the
        second is a string indicating the type of the file. */
     Value arg1;
-    arg1.mkString(pathArg);
+    arg1.mkString(path.path.abs());
 
     // assert that type is not "unknown"
     Value * args []{&arg1, fileTypeToString(*this, st.type)};
@@ -2488,7 +2484,7 @@ static void addPath(
         if (filterFun)
             filter = std::make_unique<PathFilter>([&](const Path & p) {
                 auto p2 = CanonPath(p);
-                return state.callPathFilter(filterFun, {path.accessor, p2}, p2.abs(), pos);
+                return state.callPathFilter(filterFun, {path.accessor, p2}, pos);
             });
 
         std::optional<StorePath> expectedStorePath;
@@ -2614,13 +2610,13 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), HashAlgorithm::SHA256);
         else
             state.error<EvalError>(
-                "unsupported argument '%1%' to 'addPath'",
+                "unsupported argument '%1%' to 'builtins.path'",
                 state.symbols[attr.name]
             ).atPos(attr.pos).debugThrow();
     }
     if (!path)
         state.error<EvalError>(
-            "missing required 'path' attribute in the first argument to builtins.path"
+            "missing required 'path' attribute in the first argument to 'builtins.path'"
         ).atPos(pos).debugThrow();
     if (name.empty())
         name = path->baseName();
@@ -3261,23 +3257,19 @@ static RegisterPrimOp primop_isList({
     .fun = prim_isList,
 });
 
-static void elemAt(EvalState & state, const PosIdx pos, Value & list, int n, Value & v)
-{
-    state.forceList(list, pos, "while evaluating the first argument passed to builtins.elemAt");
-    if (n < 0 || (unsigned int) n >= list.listSize())
-        state.error<EvalError>(
-            "list index %1% is out of bounds",
-            n
-        ).atPos(pos).debugThrow();
-    state.forceValue(*list.listElems()[n], pos);
-    v = *list.listElems()[n];
-}
-
 /* Return the n-1'th element of a list. */
 static void prim_elemAt(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    NixInt::Inner elem = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.elemAt").value;
-    elemAt(state, pos, *args[0], elem, v);
+    NixInt::Inner n = state.forceInt(*args[1], pos, "while evaluating the second argument passed to 'builtins.elemAt'").value;
+    state.forceList(*args[0], pos, "while evaluating the first argument passed to 'builtins.elemAt'");
+    if (n < 0 || (unsigned int) n >= args[0]->listSize())
+        state.error<EvalError>(
+            "'builtins.elemAt' called with index %d on a list of size %d",
+            n,
+            args[0]->listSize()
+        ).atPos(pos).debugThrow();
+    state.forceValue(*args[0]->listElems()[n], pos);
+    v = *args[0]->listElems()[n];
 }
 
 static RegisterPrimOp primop_elemAt({
@@ -3293,7 +3285,13 @@ static RegisterPrimOp primop_elemAt({
 /* Return the first element of a list. */
 static void prim_head(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    elemAt(state, pos, *args[0], 0, v);
+    state.forceList(*args[0], pos, "while evaluating the first argument passed to 'builtins.head'");
+    if (args[0]->listSize() == 0)
+        state.error<EvalError>(
+            "'builtins.head' called on an empty list"
+        ).atPos(pos).debugThrow();
+    state.forceValue(*args[0]->listElems()[0], pos);
+    v = *args[0]->listElems()[0];
 }
 
 static RegisterPrimOp primop_head({
@@ -3312,9 +3310,9 @@ static RegisterPrimOp primop_head({
    don't want to use it!  */
 static void prim_tail(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.tail");
+    state.forceList(*args[0], pos, "while evaluating the first argument passed to 'builtins.tail'");
     if (args[0]->listSize() == 0)
-        state.error<EvalError>("'tail' called on an empty list").atPos(pos).debugThrow();
+        state.error<EvalError>("'builtins.tail' called on an empty list").atPos(pos).debugThrow();
 
     auto list = state.buildList(args[0]->listSize() - 1);
     for (const auto & [n, v] : enumerate(list))
@@ -4061,7 +4059,7 @@ static RegisterPrimOp primop_toString({
 });
 
 /* `substring start len str' returns the substring of `str' starting
-   at character position `min(start, stringLength str)' inclusive and
+   at byte position `min(start, stringLength str)' inclusive and
    ending at `min(start + len, stringLength str)'.  `start' must be
    non-negative. */
 static void prim_substring(EvalState & state, const PosIdx pos, Value * * args, Value & v)
@@ -4100,7 +4098,7 @@ static RegisterPrimOp primop_substring({
     .name = "__substring",
     .args = {"start", "len", "s"},
     .doc = R"(
-      Return the substring of *s* from character position *start*
+      Return the substring of *s* from byte position *start*
       (zero-based) up to but not including *start + len*. If *start* is
       greater than the length of the string, an empty string is returned.
       If *start + len* lies beyond the end of the string or *len* is `-1`,
@@ -4385,7 +4383,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 
         for (auto i = begin; i != end; ++i) {
             assert(idx <= 2 * len + 1 - 3);
-            auto match = *i;
+            const auto & match = *i;
 
             // Add a string for non-matched characters.
             list[idx++] = mkString(state, match.prefix());
@@ -4937,7 +4935,7 @@ void EvalState::createBaseEnv()
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
-    baseEnv.values[0]->payload.attrs->sort();
+    getBuiltins().payload.attrs->sort();
 
     staticBaseEnv->sort();
 

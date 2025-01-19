@@ -691,15 +691,15 @@ namespace nix {
         ASSERT_TRACE2("elemAt \"foo\" (-1)",
                       TypeError,
                       HintFmt("expected a list but found %s: %s", "a string", Uncolored(ANSI_MAGENTA "\"foo\"" ANSI_NORMAL)),
-                      HintFmt("while evaluating the first argument passed to builtins.elemAt"));
+                      HintFmt("while evaluating the first argument passed to 'builtins.elemAt'"));
 
         ASSERT_TRACE1("elemAt [] (-1)",
                       Error,
-                      HintFmt("list index %d is out of bounds", -1));
+                      HintFmt("'builtins.elemAt' called with index %d on a list of size %d", -1, 0));
 
         ASSERT_TRACE1("elemAt [\"foo\"] 3",
                       Error,
-                      HintFmt("list index %d is out of bounds", 3));
+                      HintFmt("'builtins.elemAt' called with index %d on a list of size %d", 3, 1));
 
     }
 
@@ -708,11 +708,11 @@ namespace nix {
         ASSERT_TRACE2("head 1",
                       TypeError,
                       HintFmt("expected a list but found %s: %s", "an integer", Uncolored(ANSI_CYAN "1" ANSI_NORMAL)),
-                      HintFmt("while evaluating the first argument passed to builtins.elemAt"));
+                      HintFmt("while evaluating the first argument passed to 'builtins.head'"));
 
         ASSERT_TRACE1("head []",
                       Error,
-                      HintFmt("list index %d is out of bounds", 0));
+                      HintFmt("'builtins.head' called on an empty list"));
 
     }
 
@@ -721,11 +721,11 @@ namespace nix {
         ASSERT_TRACE2("tail 1",
                       TypeError,
                       HintFmt("expected a list but found %s: %s", "an integer", Uncolored(ANSI_CYAN "1" ANSI_NORMAL)),
-                      HintFmt("while evaluating the first argument passed to builtins.tail"));
+                      HintFmt("while evaluating the first argument passed to 'builtins.tail'"));
 
         ASSERT_TRACE1("tail []",
                       Error,
-                      HintFmt("'tail' called on an empty list"));
+                      HintFmt("'builtins.tail' called on an empty list"));
 
     }
 

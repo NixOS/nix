@@ -2,6 +2,8 @@
 ///@file
 
 #include <filesystem>
+#include <optional>
+#include <string_view>
 
 namespace nix {
 

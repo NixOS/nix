@@ -5,6 +5,7 @@
 #include "windows-error.hh"
 #include "file-path.hh"
 
+#ifdef _WIN32
 #include <fileapi.h>
 #include <error.h>
 #include <namedpipeapi.h>
@@ -152,3 +153,4 @@ Path windows::handleToPath(HANDLE handle) {
 #endif
 
 }
+#endif

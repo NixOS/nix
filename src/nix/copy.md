@@ -55,6 +55,15 @@ R""(
   # nix copy --to /tmp/nix nixpkgs#hello --no-check-sigs
   ```
 
+* Update the NixOS system profile to point to a closure copied from a
+  remote machine:
+
+  ```console
+  # nix copy --from ssh://server \
+      --profile /nix/var/nix/profiles/system \
+      /nix/store/r14v3km89zm3prwsa521fab5kgzvfbw4-nixos-system-foobar-24.05.20240925.759537f
+  ```
+
 # Description
 
 `nix copy` copies store path closures between two Nix stores. The
