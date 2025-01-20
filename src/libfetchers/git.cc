@@ -331,7 +331,11 @@ struct GitInputScheme : InputScheme
 
         auto result = runProgram(RunOptions {
             .program = "git",
+<<<<<<< HEAD
             .args = {"-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "check-ignore", "--quiet", std::string(path.rel())},
+=======
+            .args = {"-C", repoPath->string(), "--git-dir", repoInfo.gitDir, "check-ignore", "--quiet", std::string(path.rel())},
+>>>>>>> a78f55ef9 (GitInputScheme: Fix mingw build)
         });
         auto exitCode =
 #ifndef WIN32 // TODO abstract over exit status handling on Windows
@@ -344,7 +348,11 @@ struct GitInputScheme : InputScheme
         if (exitCode != 0) {
             // The path is not `.gitignore`d, we can add the file.
             runProgram("git", true,
+<<<<<<< HEAD
                 { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "add", "--intent-to-add", "--", std::string(path.rel()) });
+=======
+                { "-C", repoPath->string(), "--git-dir", repoInfo.gitDir, "add", "--intent-to-add", "--", std::string(path.rel()) });
+>>>>>>> a78f55ef9 (GitInputScheme: Fix mingw build)
 
 
             if (commitMsg) {
@@ -352,7 +360,11 @@ struct GitInputScheme : InputScheme
                 logger->pause();
                 Finally restoreLogger([]() { logger->resume(); });
                 runProgram("git", true,
+<<<<<<< HEAD
                     { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-F", "-" },
+=======
+                    { "-C", repoPath->string(), "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-F", "-" },
+>>>>>>> a78f55ef9 (GitInputScheme: Fix mingw build)
                     *commitMsg);
             }
         }
@@ -444,7 +456,7 @@ struct GitInputScheme : InputScheme
         return repoInfo;
     }
 
-    uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
+    uint64_t getLastModified(const RepoInfo & repoInfo, const std::filesystem::path & repoDir, const Hash & rev) const
     {
         Cache::Key key{"gitLastModified", {{"rev", rev.gitRev()}}};
 
@@ -460,7 +472,7 @@ struct GitInputScheme : InputScheme
         return lastModified;
     }
 
-    uint64_t getRevCount(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
+    uint64_t getRevCount(const RepoInfo & repoInfo, const std::filesystem::path & repoDir, const Hash & rev) const
     {
         Cache::Key key{"gitRevCount", {{"rev", rev.gitRev()}}};
 
@@ -529,29 +541,34 @@ struct GitInputScheme : InputScheme
         auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo);
         input.attrs.insert_or_assign("ref", ref);
 
-        Path repoDir;
+        std::filesystem::path repoDir;
 
         if (repoInfo.isLocal) {
             repoDir = repoInfo.url;
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev", GitRepo::openRepo(repoDir)->resolveRef(ref).gitRev());
         } else {
+<<<<<<< HEAD
             Path cacheDir = getCachePath(repoInfo.url, getShallowAttr(input));
+=======
+            auto repoUrl = std::get<ParsedURL>(repoInfo.location);
+            std::filesystem::path cacheDir = getCachePath(repoUrl.to_string(), getShallowAttr(input));
+>>>>>>> a78f55ef9 (GitInputScheme: Fix mingw build)
             repoDir = cacheDir;
             repoInfo.gitDir = ".";
 
-            createDirs(dirOf(cacheDir));
-            PathLocks cacheDirLock({cacheDir});
+            std::filesystem::create_directories(cacheDir.parent_path());
+            PathLocks cacheDirLock({cacheDir.string()});
 
             auto repo = GitRepo::openRepo(cacheDir, true, true);
 
             // We need to set the origin so resolving submodule URLs works
             repo->setRemote("origin", repoInfo.url);
 
-            Path localRefFile =
+            auto localRefFile =
                 ref.compare(0, 5, "refs/") == 0
-                ? cacheDir + "/" + ref
-                : cacheDir + "/refs/heads/" + ref;
+                ? cacheDir / ref
+                : cacheDir / "refs/heads" / ref;
 
             bool doFetch;
             time_t now = time(0);
@@ -567,7 +584,7 @@ struct GitInputScheme : InputScheme
                     /* If the local ref is older than ‘tarball-ttl’ seconds, do a
                        git fetch to update the local ref to the remote ref. */
                     struct stat st;
-                    doFetch = stat(localRefFile.c_str(), &st) != 0 ||
+                    doFetch = stat(localRefFile.string().c_str(), &st) != 0 ||
                         !isCacheFileWithinTtl(now, st);
                 }
             }
@@ -587,7 +604,7 @@ struct GitInputScheme : InputScheme
 
                     repo->fetch(repoInfo.url, fmt("%s:%s", fetchRef, fetchRef), getShallowAttr(input));
                 } catch (Error & e) {
-                    if (!pathExists(localRefFile)) throw;
+                    if (!std::filesystem::exists(localRefFile)) throw;
                     logError(e.info());
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", repoInfo.url);
                 }
@@ -805,8 +822,30 @@ struct GitInputScheme : InputScheme
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
         if (auto rev = input.getRev())
+<<<<<<< HEAD
             return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
         else
+=======
+            return makeFingerprint(*rev);
+        else {
+            auto repoInfo = getRepoInfo(input);
+            if (auto repoPath = repoInfo.getPath(); repoPath && repoInfo.workdirInfo.headRev && repoInfo.workdirInfo.submodules.empty()) {
+                /* Calculate a fingerprint that takes into account the
+                   deleted and modified/added files. */
+                HashSink hashSink{HashAlgorithm::SHA512};
+                for (auto & file : repoInfo.workdirInfo.dirtyFiles) {
+                    writeString("modified:", hashSink);
+                    writeString(file.abs(), hashSink);
+                    dumpPath((*repoPath / file.rel()).string(), hashSink);
+                }
+                for (auto & file : repoInfo.workdirInfo.deletedFiles) {
+                    writeString("deleted:", hashSink);
+                    writeString(file.abs(), hashSink);
+                }
+                return makeFingerprint(*repoInfo.workdirInfo.headRev)
+                    + ";d=" + hashSink.finish().first.to_string(HashFormat::Base16, false);
+            }
+>>>>>>> a78f55ef9 (GitInputScheme: Fix mingw build)
             return std::nullopt;
     }
 
