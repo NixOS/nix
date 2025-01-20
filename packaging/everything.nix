@@ -61,6 +61,8 @@ let
       nix-store-c
       nix-util
       nix-util-c
+    ] ++ lib.optionals (!stdenv.hostPlatform.isStatic) [
+      # Currently fails in static build
       nix-perl-bindings
     ];
     installPhase = ''
@@ -131,6 +133,8 @@ in
     # (checkInputs must be empty paths??)
     (runCommand "check-pkg-config" { checked = dev.tests.pkg-config; } "mkdir $out")
   ] ++
+    lib.optionals (!stdenv.hostPlatform.isStatic) (
+    # Perl currently fails in static build
     (if stdenv.buildPlatform.canExecute stdenv.hostPlatform
     then [
       # TODO: add perl.tests
@@ -138,7 +142,7 @@ in
     ]
     else [
       nix-perl-bindings
-    ]);
+    ]));
   installCheckInputs = [
     nix-functional-tests
   ];
