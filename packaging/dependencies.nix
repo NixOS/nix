@@ -61,6 +61,55 @@ let
       workDir = null;
     };
 
+<<<<<<< HEAD
+=======
+  mesonLayer = finalAttrs: prevAttrs:
+    {
+      # NOTE:
+      # As of https://github.com/NixOS/nixpkgs/blob/8baf8241cea0c7b30e0b8ae73474cb3de83c1a30/pkgs/by-name/me/meson/setup-hook.sh#L26,
+      # `mesonBuildType` defaults to `plain` if not specified. We want our Nix-built binaries to be optimized by default.
+      # More on build types here: https://mesonbuild.com/Builtin-options.html#details-for-buildtype.
+      mesonBuildType = "release";
+      # NOTE:
+      # Users who are debugging Nix builds are expected to set the environment variable `mesonBuildType`, per the
+      # guidance in https://github.com/NixOS/nix/blob/8a3fc27f1b63a08ac983ee46435a56cf49ebaf4a/doc/manual/source/development/debugging.md?plain=1#L10.
+      # For this reason, we don't want to refer to `finalAttrs.mesonBuildType` here, but rather use the environment variable.
+      preConfigure = prevAttrs.preConfigure or "" + lib.optionalString (!stdenv.hostPlatform.isWindows) ''
+        case "$mesonBuildType" in
+        release|minsize) appendToVar mesonFlags "-Db_lto=true"  ;;
+        *)               appendToVar mesonFlags "-Db_lto=false" ;;
+        esac
+      '';
+      nativeBuildInputs = [
+        pkgs.buildPackages.meson
+        pkgs.buildPackages.ninja
+      ] ++ prevAttrs.nativeBuildInputs or [];
+      mesonCheckFlags = prevAttrs.mesonCheckFlags or [] ++ [
+        "--print-errorlogs"
+      ];
+    };
+
+  mesonBuildLayer = finalAttrs: prevAttrs:
+    {
+      nativeBuildInputs = prevAttrs.nativeBuildInputs or [] ++ [
+        pkgs.buildPackages.pkg-config
+      ];
+      separateDebugInfo = !stdenv.hostPlatform.isStatic;
+      hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
+      env = prevAttrs.env or {}
+        // lib.optionalAttrs
+          (stdenv.isLinux
+            && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")
+            && !(stdenv.hostPlatform.useLLVM or false))
+          { LDFLAGS = "-fuse-ld=gold"; };
+    };
+
+  mesonLibraryLayer = finalAttrs: prevAttrs:
+    {
+      outputs = prevAttrs.outputs or [ "out" ] ++ [ "dev" ];
+    };
+
+>>>>>>> d8636843b (mingw: Don't do LTO)
   # Work around weird `--as-needed` linker behavior with BSD, see
   # https://github.com/mesonbuild/meson/issues/3593
   bsdNoLinkAsNeeded = finalAttrs: prevAttrs:
