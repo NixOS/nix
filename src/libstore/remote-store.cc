@@ -534,14 +534,16 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 
 
 void RemoteStore::addMultipleToStore(
-    PathsSource & pathsToCopy,
+    PathsSource && pathsToCopy,
     Activity & act,
     RepairFlag repair,
     CheckSigsFlag checkSigs)
 {
     auto source = sinkToSource([&](Sink & sink) {
         sink << pathsToCopy.size();
-        for (auto & [pathInfo, pathSource] : pathsToCopy) {
+        std::reverse(pathsToCopy.begin(), pathsToCopy.end());
+        while (!pathsToCopy.empty()) {
+            auto & [pathInfo, pathSource] = pathsToCopy.back();
             WorkerProto::Serialise<ValidPathInfo>::write(*this,
                  WorkerProto::WriteConn {
                      .to = sink,
@@ -549,6 +551,7 @@ void RemoteStore::addMultipleToStore(
                  },
                  pathInfo);
             pathSource->drainInto(sink);
+            pathsToCopy.pop_back();
         }
     });
 
