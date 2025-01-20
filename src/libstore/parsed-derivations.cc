@@ -87,47 +87,12 @@ std::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name
     }
 }
 
-StringSet ParsedDerivation::getRequiredSystemFeatures() const
+std::optional<StringSet> ParsedDerivation::getStringSetAttr(const std::string & name) const
 {
-    // FIXME: cache this?
-    StringSet res;
-    for (auto & i : getStringsAttr("requiredSystemFeatures").value_or(Strings()))
-        res.insert(i);
-    if (!drv.type().hasKnownOutputPaths())
-        res.insert("ca-derivations");
-    return res;
-}
-
-bool ParsedDerivation::canBuildLocally(Store & localStore) const
-{
-    if (drv.platform != settings.thisSystem.get()
-        && !settings.extraPlatforms.get().count(drv.platform)
-        && !drv.isBuiltin())
-        return false;
-
-    if (settings.maxBuildJobs.get() == 0
-        && !drv.isBuiltin())
-        return false;
-
-    for (auto & feature : getRequiredSystemFeatures())
-        if (!localStore.systemFeatures.get().count(feature)) return false;
-
-    return true;
-}
-
-bool ParsedDerivation::willBuildLocally(Store & localStore) const
-{
-    return getBoolAttr("preferLocalBuild") && canBuildLocally(localStore);
-}
-
-bool ParsedDerivation::substitutesAllowed() const
-{
-    return settings.alwaysAllowSubstitutes ? true : getBoolAttr("allowSubstitutes", true);
-}
-
-bool ParsedDerivation::useUidRange() const
-{
-    return getRequiredSystemFeatures().count("uid-range");
+    auto ss = getStringsAttr(name);
+    return ss
+        ? (std::optional{StringSet{ss->begin(), ss->end()}})
+        : (std::optional<StringSet>{});
 }
 
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
@@ -188,7 +153,6 @@ static nlohmann::json pathInfoToJSON(
 
 std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths)
 {
-    auto structuredAttrs = getStructuredAttrs();
     if (!structuredAttrs) return std::nullopt;
 
     auto json = *structuredAttrs;
