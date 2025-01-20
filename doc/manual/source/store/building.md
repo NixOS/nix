@@ -65,19 +65,28 @@ The [`builder`](./drv.md#builder) is executed as follows:
 - The temporary directory is removed (unless the `-K` option was
   specified).
 
-## Processing outputs and Reference scanning
+## Processing outputs
 
-- After the build, Nix sets the last-modified timestamp on all files
+If the builder exited successfully, the following steps happen in order to turn the output directories left behind by the builder into proper store objects:
+
+- **Normalize the file permissions**
+
+  Nix sets the last-modified timestamp on all files
   in the build result to 1 (00:00:01 1/1/1970 UTC), sets the group to
   the default group, and sets the mode of the file to 0444 or 0555
   (i.e., read-only, with execute permission enabled if the file was
-  originally executable). Note that possible `setuid` and `setgid`
-  bits are cleared. Setuid and setgid programs are not currently
-  supported by Nix. This is because the Nix archives used in
-  deployment have no concept of ownership information, and because it
-  makes the build result dependent on the user performing the build.
+  originally executable). Any possible `setuid` and `setgid`
+  bits are cleared.
 
-- If the build was successful, Nix scans each output path for
+  > **Note**
+  >
+  > Setuid and setgid programs are not currently supported by Nix.
+  > This is because the Nix archives used in deployment have no concept of ownership information,
+  > and because it makes the build result dependent on the user performing the build.
+
+- **Calculate the references**
+
+  Nix scans each output path for
   references to input paths by looking for the hash parts of the input
   paths. Since these are potential runtime dependencies, Nix registers
   them as dependencies of the output paths.
