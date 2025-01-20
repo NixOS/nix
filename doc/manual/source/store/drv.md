@@ -309,22 +309,3 @@ The result of this is that it is possible to have a chain of `^<output-name>` at
 > |------------------------------------------------------------| |-----|
 > innermost constant store path (usual encoding)                 output name
 > ```
-
-## Extra extensions
-
-### `__structuredAttrs`
-
-Historically speaking, most users of Nix made GNU Bash with a script the command run, regardless of what they were doing.
-Bash variable are automatically created from env vars, but bash also supports array and string-keyed map variables in addition to string variables.
-People also usually create derivations using language which also support these richer data types.
-It was thus desired a way to get this data from the language "planning" the derivation to language to bash, the language evaluated at "run time".
-
-`__structuredAttrs` does this by smuggling inside the core derivation format a map of named richer data.
-At run time, this becomes two things:
-
-1. A JSON file containing that map.
-2. A bash script setting those variables.
-
-The bash command can be passed a script which will "source" that Nix-created bash script, setting those variables with the richer data.
-The outer script can then do whatever it likes with those richer variables as input.
-
