@@ -295,7 +295,8 @@ Under this extended model, `DerivingPath`s are thus inductively built up from an
 
 ### Encoding {#deriving-path-encoding}
 
-The encoding is adjusted in a very simplest way, merely displaying the same
+The encoding is adjusted in the natural way, encoding the `drv` field recursively using the same deriving path encoding.
+The result of this is that it is possible to have a chain of `^<output-name>` at the end of the final string, as opposed to just a single one.
 
 > **Example**
 >
