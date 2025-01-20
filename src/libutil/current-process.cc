@@ -15,13 +15,12 @@
 
 #if __linux__
 # include <mutex>
-# include <sys/resource.h>
 # include "cgroup.hh"
 # include "namespaces.hh"
 #endif
 
 #ifndef _WIN32
-# include <sys/mount.h>
+# include <sys/resource.h>
 #endif
 
 namespace nix {
@@ -33,11 +32,7 @@ unsigned int getMaxCPU()
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS) return 0;
 
-        auto cgroups = getCgroups("/proc/self/cgroup");
-        auto cgroup = cgroups[""];
-        if (cgroup == "") return 0;
-
-        auto cpuFile = *cgroupFS + "/" + cgroup + "/cpu.max";
+        auto cpuFile = *cgroupFS + "/" + getCurrentCgroup() + "/cpu.max";
 
         auto cpuMax = readFile(cpuFile);
         auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
@@ -50,7 +45,7 @@ unsigned int getMaxCPU()
         auto period = cpuMaxParts[1];
         if (quota != "max")
                 return std::ceil(std::stoi(quota) / std::stof(period));
-    } catch (Error &) { ignoreException(lvlDebug); }
+    } catch (Error &) { ignoreExceptionInDestructor(lvlDebug); }
     #endif
 
     return 0;
@@ -138,7 +133,7 @@ std::optional<Path> getSelfExe()
 {
     static auto cached = []() -> std::optional<Path>
     {
-        #if __linux__
+        #if __linux__ || __GNU__
         return readLink("/proc/self/exe");
         #elif __APPLE__
         char buf[1024];

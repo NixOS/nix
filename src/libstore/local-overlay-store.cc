@@ -18,11 +18,11 @@ Path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) {
     return upperLayer + "/" + path.to_string();
 }
 
-LocalOverlayStore::LocalOverlayStore(const Params & params)
+LocalOverlayStore::LocalOverlayStore(std::string_view scheme, PathView path, const Params & params)
     : StoreConfig(params)
-    , LocalFSStoreConfig(params)
+    , LocalFSStoreConfig(path, params)
     , LocalStoreConfig(params)
-    , LocalOverlayStoreConfig(params)
+    , LocalOverlayStoreConfig(scheme, path, params)
     , Store(params)
     , LocalFSStore(params)
     , LocalStore(params)
@@ -31,7 +31,7 @@ LocalOverlayStore::LocalOverlayStore(const Params & params)
     if (checkMount.get()) {
         std::smatch match;
         std::string mountInfo;
-        auto mounts = readFile("/proc/self/mounts");
+        auto mounts = readFile(std::filesystem::path{"/proc/self/mounts"});
         auto regex = std::regex(R"((^|\n)overlay )" + realStoreDir.get() + R"( .*(\n|$))");
 
         // Mount points can be stacked, so there might be multiple matching entries.
@@ -156,7 +156,7 @@ void LocalOverlayStore::queryGCReferrers(const StorePath & path, StorePathSet & 
 StorePathSet LocalOverlayStore::queryValidDerivers(const StorePath & path)
 {
     auto res = LocalStore::queryValidDerivers(path);
-    for (auto p : lowerStore->queryValidDerivers(path))
+    for (const auto & p : lowerStore->queryValidDerivers(path))
         res.insert(p);
     return res;
 }

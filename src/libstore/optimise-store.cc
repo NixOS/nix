@@ -35,7 +35,7 @@ struct MakeReadOnly
             /* This will make the path read-only. */
             if (path != "") canonicaliseTimestampAndPermissions(path);
         } catch (...) {
-            ignoreException();
+            ignoreExceptionInDestructor();
         }
     }
 };

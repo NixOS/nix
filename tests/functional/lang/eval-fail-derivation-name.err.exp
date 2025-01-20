@@ -1,26 +1,26 @@
 error:
        … while evaluating the attribute 'outPath'
-         at <nix/derivation-internal.nix>:19:9:
-           18|       value = commonAttrs // {
-           19|         outPath = builtins.getAttr outputName strict;
+         at <nix/derivation-internal.nix>:<number>:<number>:
+     <number>|       value = commonAttrs // {
+     <number>|         outPath = builtins.getAttr outputName strict;
              |         ^
-           20|         drvPath = strict.drvPath;
+     <number>|         drvPath = strict.drvPath;
 
        … while calling the 'getAttr' builtin
-         at <nix/derivation-internal.nix>:19:19:
-           18|       value = commonAttrs // {
-           19|         outPath = builtins.getAttr outputName strict;
+         at <nix/derivation-internal.nix>:<number>:<number>:
+     <number>|       value = commonAttrs // {
+     <number>|         outPath = builtins.getAttr outputName strict;
              |                   ^
-           20|         drvPath = strict.drvPath;
+     <number>|         drvPath = strict.drvPath;
 
        … while calling the 'derivationStrict' builtin
-         at <nix/derivation-internal.nix>:9:12:
-            8|
-            9|   strict = derivationStrict drvAttrs;
+         at <nix/derivation-internal.nix>:<number>:<number>:
+     <number>|
+     <number>|   strict = derivationStrict drvAttrs;
              |            ^
-           10|
+     <number>|
 
        … while evaluating derivation '~jiggle~'
-         whose name attribute is located at /pwd/lang/eval-fail-derivation-name.nix:2:3
+         whose name attribute is located at /pwd/lang/eval-fail-derivation-name.nix:<number>:<number>
 
        error: invalid derivation name: name '~jiggle~' contains illegal character '~'. Please pass a different 'name'.

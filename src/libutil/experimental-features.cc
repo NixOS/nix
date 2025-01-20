@@ -24,7 +24,7 @@ struct ExperimentalFeatureDetails
  * feature, we either have no issue at all if few features are not added
  * at the end of the list, or a proper merge conflict if they are.
  */
-constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::VerifiedFetches);
+constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::PipeOperators);
 
 constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
     {
@@ -293,6 +293,14 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
             Enables verification of git commit signatures through the [`fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) built-in.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/48",
+    },
+    {
+        .tag = Xp::PipeOperators,
+        .name = "pipe-operators",
+        .description = R"(
+            Add `|>` and `<|` operators to the Nix language.
+        )",
+        .trackingUrl = "https://github.com/NixOS/nix/milestone/55",
     },
 }};
 

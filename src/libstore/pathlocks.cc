@@ -27,7 +27,7 @@ PathLocks::~PathLocks()
     try {
         unlock();
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 

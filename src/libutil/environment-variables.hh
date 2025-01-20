@@ -9,13 +9,21 @@
 #include <optional>
 
 #include "types.hh"
+#include "file-path.hh"
 
 namespace nix {
+
+static constexpr auto environmentVariablesCategory = "Options that change environment variables";
 
 /**
  * @return an environment variable.
  */
 std::optional<std::string> getEnv(const std::string & key);
+
+/**
+ * Like `getEnv`, but using `OsString` to avoid coercions.
+ */
+std::optional<OsString> getEnvOs(const OsString & key);
 
 /**
  * @return a non empty environment variable. Returns nullopt if the env
@@ -42,6 +50,11 @@ int unsetenv(const char * name);
  * reimplement on Windows.
  */
 int setEnv(const char * name, const char * value);
+
+/**
+ * Like `setEnv`, but using `OsString` to avoid coercions.
+ */
+int setEnvOs(const OsString & name, const OsString & value);
 
 /**
  * Clear the environment.

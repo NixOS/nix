@@ -45,7 +45,7 @@ bool lockFile(Descriptor desc, LockType lockType, bool wait)
     if (lockType == ltRead) type = LOCK_SH;
     else if (lockType == ltWrite) type = LOCK_EX;
     else if (lockType == ltNone) type = LOCK_UN;
-    else abort();
+    else unreachable();
 
     if (wait) {
         while (flock(desc, type) != 0) {

@@ -22,7 +22,6 @@ ParsedURL parseURL(const std::string & url)
     std::smatch match;
 
     if (std::regex_match(url, match, uriRegex)) {
-        auto & base = match[1];
         std::string scheme = match[2];
         auto authority = match[3].matched
             ? std::optional<std::string>(match[3]) : std::nullopt;
@@ -40,8 +39,6 @@ ParsedURL parseURL(const std::string & url)
             path = "/";
 
         return ParsedURL{
-            .url = url,
-            .base = base,
             .scheme = scheme,
             .authority = authority,
             .path = percentDecode(path),
@@ -77,12 +74,16 @@ std::map<std::string, std::string> decodeQuery(const std::string & query)
 {
     std::map<std::string, std::string> result;
 
-    for (auto s : tokenizeString<Strings>(query, "&")) {
+    for (const auto & s : tokenizeString<Strings>(query, "&")) {
         auto e = s.find('=');
-        if (e != std::string::npos)
-            result.emplace(
-                s.substr(0, e),
-                percentDecode(std::string_view(s).substr(e + 1)));
+        if (e == std::string::npos) {
+            warn("dubious URI query '%s' is missing equal sign '%s', ignoring", s, "=");
+            continue;
+        }
+
+        result.emplace(
+            s.substr(0, e),
+            percentDecode(std::string_view(s).substr(e + 1)));
     }
 
     return result;
@@ -130,6 +131,12 @@ std::string ParsedURL::to_string() const
         + percentEncode(path, allowedInPath)
         + (query.empty() ? "" : "?" + encodeQuery(query))
         + (fragment.empty() ? "" : "#" + percentEncode(fragment));
+}
+
+std::ostream & operator << (std::ostream & os, const ParsedURL & url)
+{
+    os << url.to_string();
+    return os;
 }
 
 bool ParsedURL::operator ==(const ParsedURL & other) const noexcept

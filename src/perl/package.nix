@@ -1,13 +1,10 @@
 { lib
 , stdenv
 , mkMesonDerivation
+, pkg-config
 , perl
 , perlPackages
-, meson
-, ninja
-, pkg-config
 , nix-store
-, darwin
 , version
 , curl
 , bzip2
@@ -36,8 +33,6 @@ perl.pkgs.toPerlModule (mkMesonDerivation (finalAttrs: {
   ]);
 
   nativeBuildInputs = [
-    meson
-    ninja
     pkg-config
     perl
     curl
@@ -45,6 +40,10 @@ perl.pkgs.toPerlModule (mkMesonDerivation (finalAttrs: {
 
   buildInputs = [
     nix-store
+  ] ++ finalAttrs.passthru.externalBuildInputs;
+
+  # Hack for sake of the dev shell
+  passthru.externalBuildInputs = [
     bzip2
     libsodium
   ];
@@ -73,5 +72,5 @@ perl.pkgs.toPerlModule (mkMesonDerivation (finalAttrs: {
     "--print-errorlogs"
   ];
 
-  enableParallelBuilding = true;
+  strictDeps = false;
 }))

@@ -1,0 +1,26 @@
+error:
+       … while evaluating the condition of the assertion '({ foo = { ignored = (abort "not ignored"); outPath = "/nix/store/0"; type = "derivation"; }; } == { foo = { ignored = (abort "not ignored"); outPath = "/nix/store/1"; type = "derivation"; }; })'
+         at /pwd/lang/eval-fail-assert-equal-derivations.nix:1:1:
+            1| assert
+             | ^
+            2|   { foo = { type = "derivation"; outPath = "/nix/store/0"; ignored = abort "not ignored"; }; }
+
+       … while comparing attribute 'foo'
+
+       … where left hand side is
+         at /pwd/lang/eval-fail-assert-equal-derivations.nix:2:5:
+            1| assert
+            2|   { foo = { type = "derivation"; outPath = "/nix/store/0"; ignored = abort "not ignored"; }; }
+             |     ^
+            3|   ==
+
+       … where right hand side is
+         at /pwd/lang/eval-fail-assert-equal-derivations.nix:4:5:
+            3|   ==
+            4|   { foo = { type = "derivation"; outPath = "/nix/store/1"; ignored = abort "not ignored"; }; };
+             |     ^
+            5| throw "unreachable"
+
+       … while comparing a derivation by its 'outPath' attribute
+
+       error: string '"/nix/store/0"' is not equal to string '"/nix/store/1"'

@@ -12,8 +12,8 @@ h1.menu-title::before {
 }
 
 
-h1.menu-title {
-  padding: 0.5em;
+.menu-bar {
+  padding: 0.5em 0em;
 }
 
 .sidebar .sidebar-scrollbox {

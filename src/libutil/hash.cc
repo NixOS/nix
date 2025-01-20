@@ -25,7 +25,7 @@ static size_t regularHashSize(HashAlgorithm type) {
     case HashAlgorithm::SHA256: return sha256HashSize;
     case HashAlgorithm::SHA512: return sha512HashSize;
     }
-    abort();
+    unreachable();
 }
 
 
@@ -134,7 +134,8 @@ std::string Hash::to_string(HashFormat hashFormat, bool includeAlgo) const
 
 Hash Hash::dummy(HashAlgorithm::SHA256);
 
-Hash Hash::parseSRI(std::string_view original) {
+Hash Hash::parseSRI(std::string_view original)
+{
     auto rest = original;
 
     // Parse the has type before the separater, if there was one.
@@ -245,7 +246,12 @@ Hash::Hash(std::string_view rest, HashAlgorithm algo, bool isSRI)
     }
 
     else if (isSRI || rest.size() == base64Len()) {
-        auto d = base64Decode(rest);
+        std::string d;
+        try {
+            d = base64Decode(rest);
+        } catch (Error & e) {
+            e.addTrace({}, "While decoding hash '%s'", rest);
+        }
         if (d.size() != hashSize)
             throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", rest);
         assert(hashSize);

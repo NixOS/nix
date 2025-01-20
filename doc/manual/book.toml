@@ -1,5 +1,6 @@
 [book]
 title = "Nix Reference Manual"
+src = "source"
 
 [output.html]
 additional-css = ["custom.css"]
@@ -7,9 +8,21 @@ additional-js = ["redirects.js"]
 edit-url-template = "https://github.com/NixOS/nix/tree/master/doc/manual/{path}"
 git-repository-url = "https://github.com/NixOS/nix"
 
+# Handles replacing @docroot@ with a path to ./source relative to that markdown file,
+# {{#include handlebars}}, and the @generated@ syntax used within these. it mostly
+# but not entirely replaces the links preprocessor (which we cannot simply use due
+# to @generated@ files living in a different directory to make meson happy). we do
+# not want to disable the links preprocessor entirely though because that requires
+# disabling *all* built-in preprocessors and selectively reenabling those we want.
+[preprocessor.substitute]
+command = "python3 ./substitute.py"
+before = ["anchors", "links"]
+
 [preprocessor.anchors]
 renderers = ["html"]
-command = "jq --from-file doc/manual/anchors.jq"
+command = "jq --from-file ./anchors.jq"
+
+[output.markdown]
 
 [output.linkcheck]
 # no Internet during the build (in the sandbox)

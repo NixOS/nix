@@ -91,13 +91,10 @@ struct WindowsPathTrait
 };
 
 
-/**
- * @todo Revisit choice of `char` or `wchar_t` for `WindowsPathTrait`
- * argument.
- */
-using NativePathTrait =
+template<typename CharT>
+using OsPathTrait =
 #ifdef _WIN32
-    WindowsPathTrait<char>
+    WindowsPathTrait<CharT>
 #else
     UnixPathTrait
 #endif

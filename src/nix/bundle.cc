@@ -6,6 +6,8 @@
 #include "local-fs-store.hh"
 #include "eval-inline.hh"
 
+namespace nix::fs { using namespace std::filesystem; }
+
 using namespace nix;
 
 struct CmdBundle : InstallableValueCommand
@@ -78,7 +80,7 @@ struct CmdBundle : InstallableValueCommand
 
         auto [bundlerFlakeRef, bundlerName, extendedOutputsSpec] =
             parseFlakeRefWithFragmentAndExtendedOutputsSpec(
-                fetchSettings, bundler, absPath("."));
+                fetchSettings, bundler, fs::current_path().string());
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         InstallableFlake bundler{this,
             evalState, std::move(bundlerFlakeRef), bundlerName, std::move(extendedOutputsSpec),
@@ -116,8 +118,6 @@ struct CmdBundle : InstallableValueCommand
                 .outputs = OutputsSpec::All { },
             },
         });
-
-        auto outPathS = store->printStorePath(outPath);
 
         if (!outLink) {
             auto * attr = vRes->attrs()->get(evalState->sName);

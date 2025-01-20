@@ -10,10 +10,13 @@
 #include "eval-cache.hh"
 #include "attr-path.hh"
 #include "hilite.hh"
+#include "strings-inline.hh"
 
 #include <regex>
 #include <fstream>
 #include <nlohmann/json.hpp>
+
+#include "strings.hh"
 
 using namespace nix;
 using json = nlohmann::json;
@@ -158,7 +161,6 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                                 {"description", description},
                             };
                         } else {
-                            auto name2 = hiliteMatches(name.name, nameMatches, ANSI_GREEN, "\e[0;2m");
                             if (results > 1) logger->cout("");
                             logger->cout(
                                 "* %s%s",

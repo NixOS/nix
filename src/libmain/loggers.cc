@@ -36,7 +36,7 @@ Logger * makeDefaultLogger() {
         return logger;
     }
     default:
-        abort();
+        unreachable();
     }
 }
 

@@ -40,7 +40,9 @@ public:
                     #endif
                     ;
                 auto count = poll(fds, 1, -1);
-                if (count == -1) abort(); // can't happen
+                if (count == -1)
+                    unreachable();
+
                 /* This shouldn't happen, but can on macOS due to a bug.
                    See rdar://37550628.
 

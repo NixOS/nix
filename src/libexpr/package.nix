@@ -1,11 +1,7 @@
 { lib
 , stdenv
-, mkMesonDerivation
-, releaseTools
+, mkMesonLibrary
 
-, meson
-, ninja
-, pkg-config
 , bison
 , flex
 , cmake # for resolving toml11 dep
@@ -38,14 +34,14 @@ let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonLibrary (finalAttrs: {
   pname = "nix-expr";
   inherit version;
 
   workDir = ./.;
   fileset = fileset.unions [
-    ../../build-utils-meson
-    ./build-utils-meson
+    ../../nix-meson-build-support
+    ./nix-meson-build-support
     ../../.version
     ./.version
     ./meson.build
@@ -55,15 +51,13 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
     ./lexer.l
     ./parser.y
-    (fileset.fileFilter (file: file.hasExt "nix") ./.)
+    (fileset.difference
+      (fileset.fileFilter (file: file.hasExt "nix") ./.)
+      ./package.nix
+    )
   ];
 
-  outputs = [ "out" "dev" ];
-
   nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
     bison
     flex
     cmake
@@ -77,6 +71,10 @@ mkMesonDerivation (finalAttrs: {
     nix-util
     nix-store
     nix-fetchers
+  ] ++ finalAttrs.passthru.externalPropagatedBuildInputs;
+
+  # Hack for sake of the dev shell
+  passthru.externalPropagatedBuildInputs = [
     boost
     nlohmann_json
   ] ++ lib.optional enableGC boehmgc;
@@ -98,17 +96,7 @@ mkMesonDerivation (finalAttrs: {
     # https://github.com/NixOS/nixpkgs/issues/86131.
     BOOST_INCLUDEDIR = "${lib.getDev boost}/include";
     BOOST_LIBRARYDIR = "${lib.getLib boost}/lib";
-  } // lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
   };
-
-  enableParallelBuilding = true;
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  strictDeps = true;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

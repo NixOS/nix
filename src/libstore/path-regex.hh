@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include <string_view>
+
 namespace nix {
 
 

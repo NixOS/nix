@@ -1,3 +1,5 @@
+set -eu -o pipefail
+
 export NIX_BIN_DIR=$(dirname $(type -p nix))
 # TODO Get Nix and its closure more flexibly
 export EXTRA_SANDBOX="/nix/store $(dirname $NIX_BIN_DIR)"
@@ -16,6 +18,7 @@ goodStoreUrl () {
 # whether this test is being run in a derivation as part of the nix build or
 # being manually run by a developer outside a derivation
 runNixBuild () {
+
     local storeFun=$1
     local altitude=$2
     nix-build \

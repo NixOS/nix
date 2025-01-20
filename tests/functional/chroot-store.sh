@@ -37,9 +37,10 @@ if canUseSandbox; then
 }
 EOF
 
-    cp simple.nix shell.nix simple.builder.sh config.nix "$flakeDir/"
+    cp simple.nix shell.nix simple.builder.sh "${config_nix}" "$flakeDir/"
 
     TODO_NixOS
+    requiresUnprivilegedUserNamespaces
 
     outPath=$(nix build --print-out-paths --no-link --sandbox-paths '/nix? /bin? /lib? /lib64? /usr?' --store "$TEST_ROOT/x" path:"$flakeDir")
 

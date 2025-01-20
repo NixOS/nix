@@ -1,0 +1,5 @@
+error: undefined variable 'd'
+       at /pwd/lang/eval-fail-attrset-merge-drops-later-rec.nix:1:26:
+            1| { a.b = 1; a = rec { c = d + 2; d = 3; }; }.c
+             |                          ^
+            2|

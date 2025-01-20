@@ -29,11 +29,10 @@ SERVE_USE_LENGTH_PREFIX_SERIALISER(template<typename T>, std::vector<T>)
 SERVE_USE_LENGTH_PREFIX_SERIALISER(template<typename T>, std::set<T>)
 SERVE_USE_LENGTH_PREFIX_SERIALISER(template<typename... Ts>, std::tuple<Ts...>)
 
-#define COMMA_ ,
+#define SERVE_USE_LENGTH_PREFIX_SERIALISER_COMMA ,
 SERVE_USE_LENGTH_PREFIX_SERIALISER(
-    template<typename K COMMA_ typename V>,
-    std::map<K COMMA_ V>)
-#undef COMMA_
+    template<typename K SERVE_USE_LENGTH_PREFIX_SERIALISER_COMMA typename V>,
+    std::map<K SERVE_USE_LENGTH_PREFIX_SERIALISER_COMMA V>)
 
 /**
  * Use `CommonProto` where possible.

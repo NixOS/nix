@@ -14,12 +14,6 @@
 
 #include <nlohmann/json.hpp>
 
-#ifdef HAVE_BOEHMGC
-# include "gc/gc.h"
-# define GC_INCLUDE_NEW 1
-# include "gc_cpp.h"
-#endif
-
 void nix_set_string_return(nix_string_return * str, const char * c)
 {
     str->str = c;
@@ -174,7 +168,7 @@ ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalV
         context->last_err_code = NIX_OK;
     try {
         auto ret = new
-#ifdef HAVE_BOEHMGC
+#if HAVE_BOEHMGC
             (GC)
 #endif
                 NixCExternalValue(*desc, v);

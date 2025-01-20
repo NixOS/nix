@@ -304,6 +304,10 @@ struct BasicDerivation
     DerivationOptions options;
 
     BasicDerivation() = default;
+    BasicDerivation(BasicDerivation &&) = default;
+    BasicDerivation(const BasicDerivation &) = default;
+    BasicDerivation& operator=(BasicDerivation &&) = default;
+    BasicDerivation& operator=(const BasicDerivation &) = default;
     virtual ~BasicDerivation() { };
 
     bool isBuiltin() const;
@@ -326,6 +330,12 @@ struct BasicDerivation
     DerivationOutputsAndOptPaths outputsAndOptPaths(const StoreDirConfig & store) const;
 
     static std::string_view nameFromPath(const StorePath & storePath);
+
+    /**
+     * Apply string rewrites to the `env`, `args` and `builder`
+     * fields.
+     */
+    void applyRewrites(const StringMap & rewrites);
 
     bool operator == (const BasicDerivation &) const = default;
     // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.

@@ -29,6 +29,7 @@ struct Completions final : AddCompletions
  */
 class RootArgs : virtual public Args
 {
+protected:
     /**
      * @brief The command's "working directory", but only set when top level.
      *

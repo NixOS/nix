@@ -1,0 +1,5 @@
+:l doc-comments.nix
+:doc nonStrict
+:doc strict
+:doc strictPre
+:doc strictPost

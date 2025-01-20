@@ -86,6 +86,8 @@ struct BuiltPathWithResult
     std::optional<BuildResult> result;
 };
 
+BuiltPaths toBuiltPaths(const std::vector<BuiltPathWithResult> & builtPathsWithResult);
+
 /**
  * Shorthand, for less typing and helping us keep the choice of
  * collection in sync.

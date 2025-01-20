@@ -42,7 +42,8 @@ struct SQLite
     SQLite(const Path & path, SQLiteOpenMode mode = SQLiteOpenMode::Normal);
     SQLite(const SQLite & from) = delete;
     SQLite& operator = (const SQLite & from) = delete;
-    SQLite& operator = (SQLite && from) { db = from.db; from.db = 0; return *this; }
+    // NOTE: This is noexcept since we are only copying and assigning raw pointers.
+    SQLite& operator = (SQLite && from) noexcept { db = from.db; from.db = 0; return *this; }
     ~SQLite();
     operator sqlite3 * () { return db; }
 

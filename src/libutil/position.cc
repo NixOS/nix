@@ -9,7 +9,7 @@ Pos::Pos(const Pos * other)
     }
     line = other->line;
     column = other->column;
-    origin = std::move(other->origin);
+    origin = other->origin;
 }
 
 Pos::operator std::shared_ptr<Pos>() const
@@ -109,5 +109,51 @@ void Pos::LinesIterator::bump(bool atFirst)
     curLine = input.substr(0, eol);
     input.remove_prefix(eol);
 }
+
+std::optional<std::string> Pos::getSnippetUpTo(const Pos & end) const {
+    assert(this->origin == end.origin);
+
+    if (end.line < this->line)
+        return std::nullopt;
+
+    if (auto source = getSource()) {
+
+        auto firstLine = LinesIterator(*source);
+        for (uint32_t i = 1; i < this->line; ++i) {
+            ++firstLine;
+        }
+
+        auto lastLine = LinesIterator(*source);
+        for (uint32_t i = 1; i < end.line; ++i) {
+            ++lastLine;
+        }
+
+        LinesIterator linesEnd;
+
+        std::string result;
+        for (auto i = firstLine; i != linesEnd; ++i) {
+            auto firstColumn = i == firstLine ? (this->column ? this->column - 1 : 0) : 0;
+            if (firstColumn > i->size())
+                firstColumn = i->size();
+
+            auto lastColumn = i == lastLine ? (end.column ? end.column - 1 : 0) : std::numeric_limits<int>::max();
+            if (lastColumn < firstColumn)
+                lastColumn = firstColumn;
+            if (lastColumn > i->size())
+                lastColumn = i->size();
+
+            result += i->substr(firstColumn, lastColumn - firstColumn);
+
+            if (i == lastLine) {
+                break;
+            } else {
+                result += '\n';
+            }
+        }
+        return result;
+    }
+    return std::nullopt;
+}
+
 
 }

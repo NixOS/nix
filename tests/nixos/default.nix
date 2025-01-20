@@ -4,20 +4,30 @@ let
 
   nixos-lib = import (nixpkgs + "/nixos/lib") { };
 
+  noTests = pkg: pkg.overrideAttrs (
+            finalAttrs: prevAttrs: {
+              doCheck = false;
+              doInstallCheck = false;
+            });
+
   # https://nixos.org/manual/nixos/unstable/index.html#sec-calling-nixos-tests
   runNixOSTestFor = system: test:
     (nixos-lib.runTest {
       imports = [
         test
-
-        # Add the quickBuild attribute to the check packages
-        ./quick-build.nix
       ];
 
       hostPkgs = nixpkgsFor.${system}.native;
       defaults = {
         nixpkgs.pkgs = nixpkgsFor.${system}.native;
         nix.checkAllErrors = false;
+        # TODO: decide which packaging stage to use. `nix-cli` is efficient, but not the same as the user-facing `everything.nix` package (`default`). Perhaps a good compromise is `everything.nix` + `noTests` defined above?
+        nix.package = nixpkgsFor.${system}.native.nixComponents.nix-cli;
+
+        # Evaluate VMs faster
+        documentation.enable = false;
+        # this links against nix and might break with our git version.
+        system.tools.nixos-option.enable = false;
       };
       _module.args.nixpkgs = nixpkgs;
       _module.args.system = system;
@@ -29,7 +39,9 @@ let
       forNix = nixVersion: runNixOSTestFor system {
         imports = [test];
         defaults.nixpkgs.overlays = [(curr: prev: {
-          nix = (builtins.getFlake "nix/${nixVersion}").packages.${system}.nix;
+          nix = let
+            packages = (builtins.getFlake "nix/${nixVersion}").packages.${system};
+          in packages.nix-cli or packages.nix;
         })];
       };
     };
@@ -117,6 +129,8 @@ in
 
   nix-copy = runNixOSTestFor "x86_64-linux" ./nix-copy.nix;
 
+  nix-docker = runNixOSTestFor "x86_64-linux" ./nix-docker.nix;
+
   nssPreload = runNixOSTestFor "x86_64-linux" ./nss-preload.nix;
 
   githubFlakes = runNixOSTestFor "x86_64-linux" ./github-flakes.nix;
@@ -145,5 +159,17 @@ in
 
   functional_root = runNixOSTestFor "x86_64-linux" ./functional/as-root.nix;
 
+  functional_symlinked-home = runNixOSTestFor "x86_64-linux" ./functional/symlinked-home.nix;
+
   user-sandboxing = runNixOSTestFor "x86_64-linux" ./user-sandboxing;
+
+  s3-binary-cache-store = runNixOSTestFor "x86_64-linux" ./s3-binary-cache-store.nix;
+
+  fsync = runNixOSTestFor "x86_64-linux" ./fsync.nix;
+
+  cgroups = runNixOSTestFor "x86_64-linux" ./cgroups;
+
+  fetchurl = runNixOSTestFor "x86_64-linux" ./fetchurl.nix;
+
+  chrootStore = runNixOSTestFor "x86_64-linux" ./chroot-store.nix;
 }

@@ -1,0 +1,29 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> :l doc-comments.nix
+Added <number omitted> variables.
+
+nix-repl> :doc nonStrict
+Function `nonStrict`\
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:37:70
+
+My syntax is not strict, but I'm strict anyway.
+
+nix-repl> :doc strict
+Function `strict`\
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:38:63
+
+I don't have to be strict, but I am anyway.
+
+nix-repl> :doc strictPre
+Function `strictPre`\
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:40:48
+
+Here's one way to do this
+
+nix-repl> :doc strictPost
+Function `strictPost`\
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:41:53
+
+Here's another way to do this

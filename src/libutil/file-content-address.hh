@@ -65,12 +65,13 @@ void dumpPath(
 /**
  * Restore a serialisation of the given file system object.
  *
- * @TODO use an arbitrary `FileSystemObjectSink`.
+ * \todo use an arbitrary `FileSystemObjectSink`.
  */
 void restorePath(
     const Path & path,
     Source & source,
-    FileSerialisationMethod method);
+    FileSerialisationMethod method,
+    bool startFsync = false);
 
 
 /**

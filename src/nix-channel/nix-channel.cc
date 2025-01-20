@@ -7,6 +7,7 @@
 #include "eval-settings.hh" // for defexpr
 #include "users.hh"
 #include "tarball.hh"
+#include "self-exe.hh"
 
 #include <fcntl.h>
 #include <regex>
@@ -17,7 +18,7 @@ using namespace nix;
 typedef std::map<std::string, std::string> Channels;
 
 static Channels channels;
-static Path channelsList;
+static std::filesystem::path channelsList;
 
 // Reads the list of channels.
 static void readChannels()
@@ -41,7 +42,7 @@ static void writeChannels()
 {
     auto channelsFD = AutoCloseFD{open(channelsList.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0644)};
     if (!channelsFD)
-        throw SysError("opening '%1%' for writing", channelsList);
+        throw SysError("opening '%1%' for writing", channelsList.string());
     for (const auto & channel : channels)
         writeFull(channelsFD.get(), channel.second + " " + channel.first + "\n");
 }
@@ -67,7 +68,7 @@ static void removeChannel(const std::string & name)
     channels.erase(name);
     writeChannels();
 
-    runProgram(settings.nixBinDir + "/nix-env", true, { "--profile", profile, "--uninstall", name });
+    runProgram(getNixBin("nix-env").string(), true, { "--profile", profile, "--uninstall", name });
 }
 
 static Path nixDefExpr;
@@ -118,7 +119,7 @@ static void update(const StringSet & channelNames)
 
             bool unpacked = false;
             if (std::regex_search(filename, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
-                runProgram(settings.nixBinDir + "/nix-build", false, { "--no-out-link", "--expr", "import " + unpackChannelPath +
+                runProgram(getNixBin("nix-build").string(), false, { "--no-out-link", "--expr", "import " + unpackChannelPath +
                             "{ name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename + "\"; }" });
                 unpacked = true;
             }
@@ -143,7 +144,7 @@ static void update(const StringSet & channelNames)
     for (auto & expr : exprs)
         envArgs.push_back(std::move(expr));
     envArgs.push_back("--quiet");
-    runProgram(settings.nixBinDir + "/nix-env", false, envArgs);
+    runProgram(getNixBin("nix-env").string(), false, envArgs);
 
     // Make the channels appear in nix-env.
     struct stat st;
@@ -244,7 +245,7 @@ static int main_nix_channel(int argc, char ** argv)
             case cListGenerations:
                 if (!args.empty())
                     throw UsageError("'--list-generations' expects no arguments");
-                std::cout << runProgram(settings.nixBinDir + "/nix-env", false, {"--profile", profile, "--list-generations"}) << std::flush;
+                std::cout << runProgram(getNixBin("nix-env").string(), false, {"--profile", profile, "--list-generations"}) << std::flush;
                 break;
             case cRollback:
                 if (args.size() > 1)
@@ -256,7 +257,7 @@ static int main_nix_channel(int argc, char ** argv)
                 } else {
                     envArgs.push_back("--rollback");
                 }
-                runProgram(settings.nixBinDir + "/nix-env", false, envArgs);
+                runProgram(getNixBin("nix-env").string(), false, envArgs);
                 break;
         }
 

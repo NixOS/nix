@@ -3,6 +3,7 @@
 : "${file?must be defined by caller (remote building test case using this)}"
 
 requireSandboxSupport
+requiresUnprivilegedUserNamespaces
 [[ "${busybox-}" =~ busybox ]] || skipTest "no busybox"
 
 # Avoid store dir being inside sandbox build-dir
@@ -26,6 +27,7 @@ builders=(
 
 chmod -R +w "$TEST_ROOT/machine"* || true
 rm -rf "$TEST_ROOT/machine"* || true
+
 
 # Note: ssh://localhost bypasses ssh, directly invoking nix-store as a
 # child process. This allows us to test LegacySSHStore::buildDerivation().

@@ -1,0 +1,9 @@
+:l pretty-print-idempotent.nix
+oneDeep
+oneDeep
+twoDeep
+twoDeep
+oneDeepList
+oneDeepList
+twoDeepList
+twoDeepList

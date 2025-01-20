@@ -104,12 +104,12 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 
     auto drvPath = attr->forceDerivation();
 
-    std::optional<NixInt> priority;
+    std::optional<NixInt::Inner> priority;
 
     if (attr->maybeGetAttr(state->sOutputSpecified)) {
     } else if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
         if (auto aPriority = aMeta->maybeGetAttr("priority"))
-            priority = aPriority->getInt();
+            priority = aPriority->getInt().value;
     }
 
     return {{

@@ -11,16 +11,16 @@ getRemoteNarInfo () {
     echo "$cacheDir/$(getHash "$1").narinfo"
 }
 
-cat <<EOF > $TEST_HOME/good.txt
+cat <<EOF > "$TEST_HOME"/good.txt
 I’m a good path
 EOF
 
-cat <<EOF > $TEST_HOME/bad.txt
+cat <<EOF > "$TEST_HOME"/bad.txt
 I’m a bad path
 EOF
 
-good=$(nix-store --add $TEST_HOME/good.txt)
-bad=$(nix-store --add $TEST_HOME/bad.txt)
+good=$(nix-store --add "$TEST_HOME"/good.txt)
+bad=$(nix-store --add "$TEST_HOME"/bad.txt)
 nix copy --to "$BINARY_CACHE" "$good"
 nix copy --to "$BINARY_CACHE" "$bad"
 nix-collect-garbage >/dev/null 2>&1

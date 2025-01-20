@@ -40,7 +40,7 @@ static void runFetchClosureWithRewrite(EvalState & state, const PosIdx pos, Stor
             });
     }
 
-    auto toPath = *toPathMaybe;
+    const auto & toPath = *toPathMaybe;
 
     // check and return
 

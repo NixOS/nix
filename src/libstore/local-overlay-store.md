@@ -4,7 +4,7 @@ R"(
 
 This store type is a variation of the [local store] designed to leverage Linux's [Overlay Filesystem](https://docs.kernel.org/filesystems/overlayfs.html) (OverlayFS for short).
 Just as OverlayFS combines a lower and upper filesystem by treating the upper one as a patch against the lower, the local overlay store combines a lower store with an upper almost-[local store].
-("almost" because while the upper fileystems for OverlayFS is valid on its own, the upper almost-store is not a valid local store on its own because some references will dangle.)
+("almost" because while the upper filesystems for OverlayFS is valid on its own, the upper almost-store is not a valid local store on its own because some references will dangle.)
 To use this store, you will first need to configure an OverlayFS mountpoint [appropriately](#example-filesystem-layout) as Nix will not do this for you (though it will verify the mountpoint is configured correctly).
 
 ### Conceptual parts of a local overlay store
@@ -77,13 +77,13 @@ The parts of a local overlay store are as follows:
 
     The lower store directory and upper layer directory are combined via OverlayFS to create this directory.
     Nix doesn't do this itself, because it typically wouldn't have the permissions to do so, so it is the responsibility of the user to set this up first.
-    Nix can, however, optionally check that that the OverlayFS mount settings appear as expected, matching Nix's own settings.
+    Nix can, however, optionally check that the OverlayFS mount settings appear as expected, matching Nix's own settings.
 
   - **Upper SQLite database**:
 
     > Not directly specified.
     > The location of the database instead depends on the [`state`](#store-experimental-local-overlay-store-state) setting.
-    > It is is always `${state}/db`.
+    > It is always `${state}/db`.
 
     This contains the metadata of all of the upper layer [store objects][store object] (everything beyond their file system objects), and also duplicate copies of some lower layer store object's metadta.
     The duplication is so the metadata for the [closure](@docroot@/glossary.md#gloss-closure) of upper layer [store objects][store object] can be found entirely within the upper layer.

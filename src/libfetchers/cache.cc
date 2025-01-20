@@ -36,7 +36,7 @@ struct CacheImpl : Cache
     {
         auto state(_state.lock());
 
-        auto dbPath = getCacheDir() + "/nix/fetcher-cache-v2.sqlite";
+        auto dbPath = getCacheDir() + "/fetcher-cache-v3.sqlite";
         createDirs(dirOf(dbPath));
 
         state->db = SQLite(dbPath);

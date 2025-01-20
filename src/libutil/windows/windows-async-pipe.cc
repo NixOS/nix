@@ -1,6 +1,8 @@
 #include "windows-async-pipe.hh"
 #include "windows-error.hh"
 
+#ifdef _WIN32
+
 namespace nix::windows {
 
 void AsyncPipe::createAsyncPipe(HANDLE iocp)
@@ -47,3 +49,5 @@ void AsyncPipe::close()
 }
 
 }
+
+#endif

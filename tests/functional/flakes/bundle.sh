@@ -2,7 +2,7 @@
 
 source common.sh
 
-cp ../simple.nix ../simple.builder.sh ../config.nix "$TEST_HOME"
+cp ../simple.nix ../simple.builder.sh "${config_nix}" "$TEST_HOME"
 
 cd "$TEST_HOME"
 

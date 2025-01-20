@@ -28,7 +28,7 @@ struct NixStringContextElem {
     /**
      * Plain opaque path to some store object.
      *
-     * Encoded as just the path: ‘<path>’.
+     * Encoded as just the path: `<path>`.
      */
     using Opaque = SingleDerivedPath::Opaque;
 
@@ -39,7 +39,7 @@ struct NixStringContextElem {
      * also all outputs of all derivations in that closure (including the
      * root derivation).
      *
-     * Encoded in the form ‘=<drvPath>’.
+     * Encoded in the form `=<drvPath>`.
      */
     struct DrvDeep {
         StorePath drvPath;
@@ -50,7 +50,7 @@ struct NixStringContextElem {
     /**
      * Derivation output.
      *
-     * Encoded in the form ‘!<output>!<drvPath>’.
+     * Encoded in the form `!<output>!<drvPath>`.
      */
     using Built = SingleDerivedPath::Built;
 
@@ -68,9 +68,9 @@ struct NixStringContextElem {
 
     /**
      * Decode a context string, one of:
-     * - ‘<path>’
-     * - ‘=<path>’
-     * - ‘!<name>!<path>’
+     * - `<path>`
+     * - `=<path>`
+     * - `!<name>!<path>`
      *
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */

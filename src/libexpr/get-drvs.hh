@@ -83,11 +83,7 @@ public:
 };
 
 
-#if HAVE_BOEHMGC
 typedef std::list<PackageInfo, traceable_allocator<PackageInfo>> PackageInfos;
-#else
-typedef std::list<PackageInfo> PackageInfos;
-#endif
 
 
 /**

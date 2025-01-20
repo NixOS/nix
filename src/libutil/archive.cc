@@ -23,7 +23,7 @@ struct ArchiveSettings : Config
             false,
         #endif
         "use-case-hack",
-        "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
+        "Whether to enable a macOS-specific hack for dealing with file name case collisions."};
 };
 
 static ArchiveSettings archiveSettings;
@@ -82,7 +82,7 @@ void SourceAccessor::dumpPath(
                         name.erase(pos);
                     }
                     if (!unhacked.emplace(name, i.first).second)
-                        throw Error("file name collision in between '%s' and '%s'",
+                        throw Error("file name collision between '%s' and '%s'",
                             (path / unhacked[name]),
                             (path / i.first));
                 } else
@@ -128,9 +128,10 @@ void dumpString(std::string_view s, Sink & sink)
 }
 
 
-static SerialisationError badArchive(const std::string & s)
+template<typename... Args>
+static SerialisationError badArchive(std::string_view s, const Args & ... args)
 {
-    return SerialisationError("bad archive: " + s);
+    return SerialisationError("bad archive: " + s, args...);
 }
 
 
@@ -167,115 +168,97 @@ struct CaseInsensitiveCompare
 
 static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath & path)
 {
-    std::string s;
-
-    s = readString(source);
-    if (s != "(") throw badArchive("expected open tag");
-
-    std::map<Path, int, CaseInsensitiveCompare> names;
-
     auto getString = [&]() {
         checkInterrupt();
         return readString(source);
     };
 
-    // For first iteration
-    s = getString();
+    auto expectTag = [&](std::string_view expected) {
+        auto tag = getString();
+        if (tag != expected)
+            throw badArchive("expected tag '%s', got '%s'", expected, tag);
+    };
 
-    while (1) {
+    expectTag("(");
 
-        if (s == ")") {
-            break;
-        }
+    expectTag("type");
 
-        else if (s == "type") {
-            std::string t = getString();
+    auto type = getString();
 
-            if (t == "regular") {
-                sink.createRegularFile(path, [&](auto & crf) {
-                    while (1) {
-                        s = getString();
+    if (type == "regular") {
+        sink.createRegularFile(path, [&](auto & crf) {
+            auto tag = getString();
 
-                        if (s == "contents") {
-                            parseContents(crf, source);
-                        }
-
-                        else if (s == "executable") {
-                            auto s2 = getString();
-                            if (s2 != "") throw badArchive("executable marker has non-empty value");
-                            crf.isExecutable();
-                        }
-
-                        else break;
-                    }
-                });
+            if (tag == "executable") {
+                auto s2 = getString();
+                if (s2 != "") throw badArchive("executable marker has non-empty value");
+                crf.isExecutable();
+                tag = getString();
             }
 
-            else if (t == "directory") {
-                sink.createDirectory(path);
+            if (tag == "contents")
+                parseContents(crf, source);
 
-                while (1) {
-                    s = getString();
-
-                    if (s == "entry") {
-                        std::string name, prevName;
-
-                        s = getString();
-                        if (s != "(") throw badArchive("expected open tag");
-
-                        while (1) {
-                            s = getString();
-
-                            if (s == ")") {
-                                break;
-                            } else if (s == "name") {
-                                name = getString();
-                                if (name.empty() || name == "." || name == ".." || name.find('/') != std::string::npos || name.find((char) 0) != std::string::npos)
-                                    throw Error("NAR contains invalid file name '%1%'", name);
-                                if (name <= prevName)
-                                    throw Error("NAR directory is not sorted");
-                                prevName = name;
-                                if (archiveSettings.useCaseHack) {
-                                    auto i = names.find(name);
-                                    if (i != names.end()) {
-                                        debug("case collision between '%1%' and '%2%'", i->first, name);
-                                        name += caseHackSuffix;
-                                        name += std::to_string(++i->second);
-                                    } else
-                                        names[name] = 0;
-                                }
-                            } else if (s == "node") {
-                                if (name.empty()) throw badArchive("entry name missing");
-                                parse(sink, source, path / name);
-                            } else
-                                throw badArchive("unknown field " + s);
-                        }
-                    }
-
-                    else break;
-                }
-            }
-
-            else if (t == "symlink") {
-                s = getString();
-
-                if (s != "target")
-                    throw badArchive("expected 'target' got " + s);
-
-                std::string target = getString();
-                sink.createSymlink(path, target);
-
-                // for the next iteration
-                s = getString();
-            }
-
-            else throw badArchive("unknown file type " + t);
-
-        }
-
-        else
-            throw badArchive("unknown field " + s);
+            expectTag(")");
+        });
     }
+
+    else if (type == "directory") {
+        sink.createDirectory(path);
+
+        std::map<Path, int, CaseInsensitiveCompare> names;
+
+        std::string prevName;
+
+        while (1) {
+            auto tag = getString();
+
+            if (tag == ")") break;
+
+            if (tag != "entry")
+                throw badArchive("expected tag 'entry' or ')', got '%s'", tag);
+
+            expectTag("(");
+
+            expectTag("name");
+
+            auto name = getString();
+            if (name.empty() || name == "." || name == ".." || name.find('/') != std::string::npos || name.find((char) 0) != std::string::npos)
+                throw badArchive("NAR contains invalid file name '%1%'", name);
+            if (name <= prevName)
+                throw badArchive("NAR directory is not sorted");
+            prevName = name;
+            if (archiveSettings.useCaseHack) {
+                auto i = names.find(name);
+                if (i != names.end()) {
+                    debug("case collision between '%1%' and '%2%'", i->first, name);
+                    name += caseHackSuffix;
+                    name += std::to_string(++i->second);
+                    auto j = names.find(name);
+                    if (j != names.end())
+                        throw badArchive("NAR contains file name '%s' that collides with case-hacked file name '%s'", prevName, j->first);
+                } else
+                    names[name] = 0;
+            }
+
+            expectTag("node");
+
+            parse(sink, source, path / name);
+
+            expectTag(")");
+        }
+    }
+
+    else if (type == "symlink") {
+        expectTag("target");
+
+        auto target = getString();
+        sink.createSymlink(path, target);
+
+        expectTag(")");
+    }
+
+    else throw badArchive("unknown file type '%s'", type);
 }
 
 
@@ -294,9 +277,9 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
 }
 
 
-void restorePath(const std::filesystem::path & path, Source & source)
+void restorePath(const std::filesystem::path & path, Source & source, bool startFsync)
 {
-    RestoreSink sink;
+    RestoreSink sink{startFsync};
     sink.dstPath = path;
     parseDump(sink, source);
 }

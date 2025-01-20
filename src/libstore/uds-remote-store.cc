@@ -2,10 +2,8 @@
 #include "unix-domain-socket.hh"
 #include "worker-protocol.hh"
 
-#include <cstring>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -19,6 +17,21 @@
 
 namespace nix {
 
+UDSRemoteStoreConfig::UDSRemoteStoreConfig(
+    std::string_view scheme,
+    std::string_view authority,
+    const Params & params)
+    : StoreConfig(params)
+    , LocalFSStoreConfig(params)
+    , RemoteStoreConfig(params)
+    , path{authority.empty() ? settings.nixDaemonSocketFile : authority}
+{
+    if (scheme != UDSRemoteStoreConfig::scheme) {
+        throw UsageError("Scheme must be 'unix'");
+    }
+}
+
+
 std::string UDSRemoteStoreConfig::doc()
 {
     return
@@ -27,11 +40,20 @@ std::string UDSRemoteStoreConfig::doc()
 }
 
 
+// A bit gross that we now pass empty string but this is knowing that
+// empty string will later default to the same nixDaemonSocketFile. Why
+// don't we just wire it all through? I believe there are cases where it
+// will live reload so we want to continue to account for that.
 UDSRemoteStore::UDSRemoteStore(const Params & params)
+    : UDSRemoteStore(scheme, "", params)
+{}
+
+
+UDSRemoteStore::UDSRemoteStore(std::string_view scheme, std::string_view authority, const Params & params)
     : StoreConfig(params)
     , LocalFSStoreConfig(params)
     , RemoteStoreConfig(params)
-    , UDSRemoteStoreConfig(params)
+    , UDSRemoteStoreConfig(scheme, authority, params)
     , Store(params)
     , LocalFSStore(params)
     , RemoteStore(params)
@@ -39,25 +61,15 @@ UDSRemoteStore::UDSRemoteStore(const Params & params)
 }
 
 
-UDSRemoteStore::UDSRemoteStore(
-    std::string_view scheme,
-    PathView socket_path,
-    const Params & params)
-    : UDSRemoteStore(params)
-{
-    if (!socket_path.empty())
-        path.emplace(socket_path);
-}
-
-
 std::string UDSRemoteStore::getUri()
 {
-    if (path) {
-        return std::string("unix://") + *path;
-    } else {
-        // unix:// with no path also works. Change what we return?
-        return "daemon";
-    }
+    return path == settings.nixDaemonSocketFile
+        ? // FIXME: Not clear why we return daemon here and not default
+          // to settings.nixDaemonSocketFile
+          //
+          // unix:// with no path also works. Change what we return?
+          "daemon"
+        : std::string(scheme) + "://" + path;
 }
 
 
@@ -74,7 +86,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     /* Connect to a daemon that does the privileged work for us. */
     conn->fd = createUnixDomainSocket();
 
-    nix::connect(toSocket(conn->fd.get()), path ? *path : settings.nixDaemonSocketFile);
+    nix::connect(toSocket(conn->fd.get()), path);
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();

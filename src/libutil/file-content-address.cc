@@ -63,7 +63,7 @@ std::string_view renderFileIngestionMethod(FileIngestionMethod method)
     case FileIngestionMethod::Git:
         return "git";
     default:
-        abort();
+        unreachable();
     }
 }
 
@@ -88,14 +88,15 @@ void dumpPath(
 void restorePath(
     const Path & path,
     Source & source,
-    FileSerialisationMethod method)
+    FileSerialisationMethod method,
+    bool startFsync)
 {
     switch (method) {
     case FileSerialisationMethod::Flat:
-        writeFile(path, source);
+        writeFile(path, source, 0666, startFsync);
         break;
     case FileSerialisationMethod::NixArchive:
-        restorePath(path, source);
+        restorePath(path, source, startFsync);
         break;
     }
 }

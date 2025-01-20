@@ -1,0 +1,7 @@
+:l doc-comments.nix
+:doc curriedArgs
+x = curriedArgs 1        
+"Note that users may not expect this to behave as it currently does"
+:doc x
+"This won't produce docs; no support for arbitrary values"
+:doc x 2

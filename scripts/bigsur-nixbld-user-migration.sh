@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-((NEW_NIX_FIRST_BUILD_UID=301))
+((NEW_NIX_FIRST_BUILD_UID=351))
 
-id_available(){
+id_unavailable(){
 	dscl . list /Users UniqueID | grep -E '\b'"$1"'\b' >/dev/null
 }
 
@@ -15,7 +15,7 @@ change_nixbld_names_and_ids(){
 	while read -r name uid; do
 		echo "   Checking $name (uid: $uid)"
 		# iterate for a clean ID
-		while id_available "$next_id"; do
+		while id_unavailable "$next_id"; do
 			((next_id++))
 			if ((next_id >= 400)); then
 				echo "We've hit UID 400 without placing all of your users :("

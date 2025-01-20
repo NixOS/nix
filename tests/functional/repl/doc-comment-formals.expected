@@ -1,0 +1,14 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> :l doc-comments.nix
+Added <number omitted> variables.
+
+nix-repl> "Note that this is not yet complete"
+"Note that this is not yet complete"
+
+nix-repl> :doc documentedFormals
+Function `documentedFormals`\
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:57:5
+
+Finds x

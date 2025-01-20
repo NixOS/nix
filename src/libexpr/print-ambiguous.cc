@@ -94,7 +94,7 @@ void printAmbiguous(
         break;
     default:
         printError("Nix evaluator internal error: printAmbiguous: invalid value type");
-        abort();
+        unreachable();
     }
 }
 

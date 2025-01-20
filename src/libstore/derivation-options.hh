@@ -9,7 +9,7 @@
 
 namespace nix {
 
-class AdditionalAttributes
+struct AdditionalAttributes
 {
     typedef StringPairs Env;
 
@@ -18,6 +18,8 @@ class AdditionalAttributes
     std::optional<std::string> getStringAttr(const std::string & name) const;
     bool getBoolAttr(const std::string & name, bool def = false) const;
     std::optional<Strings> getStringsAttr(const std::string & name) const;
+
+    bool operator==(const AdditionalAttributes &) const = default;
 };
 
 struct DerivationOptions

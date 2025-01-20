@@ -1,0 +1,13 @@
+# vim: filetype=meson
+
+option('doc-gen', type : 'boolean', value : false,
+  description : 'Generate documentation',
+)
+
+option('unit-tests', type : 'boolean', value : true,
+  description : 'Build unit tests',
+)
+
+option('bindings', type : 'boolean', value : true,
+  description : 'Build language bindings (e.g. Perl)',
+)

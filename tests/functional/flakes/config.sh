@@ -2,7 +2,7 @@
 
 source common.sh
 
-cp ../simple.nix ../simple.builder.sh ../config.nix $TEST_HOME
+cp ../simple.nix ../simple.builder.sh "${config_nix}" $TEST_HOME
 
 cd $TEST_HOME
 
@@ -26,7 +26,17 @@ cat <<EOF > flake.nix
 EOF
 
 # Without --accept-flake-config, the post hook should not run.
+# To test variations in stderr tty-ness, we run the command in different ways,
+# none of which should block on stdin or accept the `nixConfig`s.
 nix build < /dev/null
+nix build < /dev/null 2>&1 | cat
+# EOF counts as no, even when interactive (throw EOF error before)
+if type -p script >/dev/null && script -q -c true /dev/null; then
+    echo "script is available and GNU-like, so we can ensure a tty"
+    script -q -c 'nix build < /dev/null' /dev/null
+else
+    echo "script is not available or not GNU-like, so we skip testing with an added tty"
+fi
 (! [[ -f post-hook-ran ]])
 TODO_NixOS
 clearStore

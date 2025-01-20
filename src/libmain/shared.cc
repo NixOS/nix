@@ -23,6 +23,7 @@
 #include <openssl/crypto.h>
 
 #include "exit.hh"
+#include "strings.hh"
 
 namespace nix {
 
@@ -415,7 +416,7 @@ RunPager::~RunPager()
         }
 #endif
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 

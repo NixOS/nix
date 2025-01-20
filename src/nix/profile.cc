@@ -17,6 +17,8 @@
 #include <regex>
 #include <iomanip>
 
+#include "strings.hh"
+
 using namespace nix;
 
 struct ProfileElementSource
@@ -58,7 +60,7 @@ struct ProfileElement
         StringSet names;
         for (auto & path : storePaths)
             names.insert(DrvName(path.name()).name);
-        return concatStringsSep(", ", names);
+        return dropEmptyInitThenConcatStringsSep(", ", names);
     }
 
     /**
@@ -120,12 +122,12 @@ struct ProfileManifest
 
     ProfileManifest() { }
 
-    ProfileManifest(EvalState & state, const Path & profile)
+    ProfileManifest(EvalState & state, const std::filesystem::path & profile)
     {
-        auto manifestPath = profile + "/manifest.json";
+        auto manifestPath = profile / "manifest.json";
 
-        if (pathExists(manifestPath)) {
-            auto json = nlohmann::json::parse(readFile(manifestPath));
+        if (std::filesystem::exists(manifestPath)) {
+            auto json = nlohmann::json::parse(readFile(manifestPath.string()));
 
             auto version = json.value("version", 0);
             std::string sUrl;
@@ -174,12 +176,12 @@ struct ProfileManifest
             }
         }
 
-        else if (pathExists(profile + "/manifest.nix")) {
+        else if (std::filesystem::exists(profile / "manifest.nix")) {
             // FIXME: needed because of pure mode; ugly.
-            state.allowPath(state.store->followLinksToStore(profile));
-            state.allowPath(state.store->followLinksToStore(profile + "/manifest.nix"));
+            state.allowPath(state.store->followLinksToStore(profile.string()));
+            state.allowPath(state.store->followLinksToStore((profile / "manifest.nix").string()));
 
-            auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profile));
+            auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profile.string()));
 
             for (auto & packageInfo : packageInfos) {
                 ProfileElement element;

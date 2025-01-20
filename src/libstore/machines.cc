@@ -33,7 +33,7 @@ Machine::Machine(
     systemTypes(systemTypes),
     sshKey(sshKey),
     maxJobs(maxJobs),
-    speedFactor(speedFactor == 0.0f ? 1.0f : std::move(speedFactor)),
+    speedFactor(speedFactor == 0.0f ? 1.0f : speedFactor),
     supportedFeatures(supportedFeatures),
     mandatoryFeatures(mandatoryFeatures),
     sshPublicHostKey(sshPublicHostKey)
@@ -159,8 +159,9 @@ static Machine parseBuilderLine(const std::set<std::string> & defaultSystems, co
         const auto & str = tokens[fieldIndex];
         try {
             base64Decode(str);
-        } catch (const Error & e) {
-            throw FormatError("bad machine specification: a column #%lu in a row: '%s' is not valid base64 string: %s", fieldIndex, line, e.what());
+        } catch (FormatError & e) {
+            e.addTrace({}, "while parsing machine specification at a column #%lu in a row: '%s'", fieldIndex, line);
+            throw;
         }
         return str;
     };

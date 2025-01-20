@@ -424,11 +424,6 @@ StoreWrapper::addTempRoot(char * storePath)
         }
 
 
-SV * getBinDir()
-    PPCODE:
-        XPUSHs(sv_2mortal(newSVpv(settings.nixBinDir.c_str(), 0)));
-
-
 SV * getStoreDir()
     PPCODE:
         XPUSHs(sv_2mortal(newSVpv(settings.nixStore.c_str(), 0)));

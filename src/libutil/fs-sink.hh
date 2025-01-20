@@ -78,6 +78,11 @@ struct NullFileSystemObjectSink : FileSystemObjectSink
 struct RestoreSink : FileSystemObjectSink
 {
     std::filesystem::path dstPath;
+    bool startFsync = false;
+
+    explicit RestoreSink(bool startFsync)
+        : startFsync{startFsync}
+    { }
 
     void createDirectory(const CanonPath & path) override;
 

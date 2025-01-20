@@ -1,5 +1,7 @@
 #include "config-global.hh"
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
 bool GlobalConfig::set(const std::string & name, const std::string & value)

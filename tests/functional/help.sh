@@ -65,5 +65,6 @@ def recurse($prefix):
 }
 
 nix __dump-cli | subcommands | while IFS= read -r cmd; do
+    # shellcheck disable=SC2086 # word splitting of cmd is intended
     nix $cmd --help
 done

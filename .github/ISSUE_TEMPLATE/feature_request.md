@@ -1,24 +1,39 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
+about: Suggest a new feature
 title: ''
 labels: feature
 assignees: ''
 
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+## Is your feature request related to a problem?
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+<!-- A clear and concise description of what the problem is. Ex. I'm always frustrated when [...] -->
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+## Proposed solution
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+<!-- A clear and concise description of what you want to happen. -->
 
-**Priorities**
+## Alternative solutions
+
+<!-- A clear and concise description of any alternative solutions or features you've considered. -->
+
+## Additional context
+
+<!-- Add any other context or screenshots about the feature request here. -->
+
+## Checklist
+
+<!-- make sure this issue is not redundant or obsolete -->
+
+- [ ] checked [latest Nix manual] \([source])
+- [ ] checked [open feature issues and pull requests] for possible duplicates
+
+[latest Nix manual]: https://nixos.org/manual/nix/unstable/
+[source]: https://github.com/NixOS/nix/tree/master/doc/manual/source
+[open feature issues and pull requests]: https://github.com/NixOS/nix/labels/feature
+
+---
 
 Add :+1: to [issues you find important](https://github.com/NixOS/nix/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc).

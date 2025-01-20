@@ -5,7 +5,7 @@
 %option stack
 %option nodefault
 %option nounput noyy_top_state
-
+%option extra-type="::nix::LexerState *"
 
 %s DEFAULT
 %x STRING
@@ -14,6 +14,10 @@
 %x INPATH_SLASH
 %x PATH_START
 
+%top {
+#include "parser-tab.hh" // YYSTYPE
+#include "parser-state.hh"
+}
 
 %{
 #ifdef __clang__
@@ -22,40 +26,33 @@
 
 #include "nixexpr.hh"
 #include "parser-tab.hh"
+#include "lexer-helpers.hh"
+
+namespace nix {
+  struct LexerState;
+}
 
 using namespace nix;
+using namespace nix::lexer::internal;
 
 namespace nix {
 
 #define CUR_POS state->at(*yylloc)
 
-static void initLoc(YYLTYPE * loc)
-{
-    loc->first_line = loc->last_line = 0;
-    loc->first_column = loc->last_column = 0;
-}
-
-static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
-{
-    loc->stash();
-
-    loc->first_column = loc->last_column;
-    loc->last_column += len;
-}
-
-
 // we make use of the fact that the parser receives a private copy of the input
 // string and can munge around in it.
-static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
+// getting the position is expensive and thus it is implemented lazily.
+static StringToken unescapeStr(char * const s, size_t length, std::function<Pos()> && pos)
 {
-    char * result = s;
+    bool noNullByte = true;
     char * t = s;
-    char c;
     // the input string is terminated with *two* NULs, so we can safely take
     // *one* character after the one being checked against.
-    while ((c = *s++)) {
+    for (size_t i = 0; i < length; t++) {
+        char c = s[i++];
+        noNullByte &= c != '\0';
         if (c == '\\') {
-            c = *s++;
+            c = s[i++];
             if (c == 'n') *t = '\n';
             else if (c == 'r') *t = '\r';
             else if (c == 't') *t = '\t';
@@ -64,14 +61,24 @@ static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
         else if (c == '\r') {
             /* Normalise CR and CR/LF into LF. */
             *t = '\n';
-            if (*s == '\n') s++; /* cr/lf */
+            if (s[i] == '\n') i++; /* cr/lf */
         }
         else *t = c;
-        t++;
     }
-    return {result, size_t(t - result)};
+    if (!noNullByte) {
+        forceNoNullByte({s, size_t(t - s)}, std::move(pos));
+    }
+    return {s, size_t(t - s)};
 }
 
+static void requireExperimentalFeature(const ExperimentalFeature & feature, const Pos & pos)
+{
+    if (!experimentalFeatureSettings.isEnabled(feature))
+        throw ParseError(ErrorInfo{
+            .msg = HintFmt("experimental Nix feature '%1%' is disabled; add '--extra-experimental-features %1%' to enable it", showExperimentalFeature(feature)),
+            .pos = pos,
+        });
+}
 
 }
 
@@ -79,7 +86,7 @@ static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 
 #define YY_USER_INIT initLoc(yylloc)
-#define YY_USER_ACTION adjustLoc(yylloc, yytext, yyleng);
+#define YY_USER_ACTION adjustLoc(yyscanner, yylloc, yytext, yyleng);
 
 #define PUSH_STATE(state) yy_push_state(state, yyscanner)
 #define POP_STATE() yy_pop_state(yyscanner)
@@ -124,12 +131,18 @@ or          { return OR_KW; }
 \-\>        { return IMPL; }
 \/\/        { return UPDATE; }
 \+\+        { return CONCAT; }
+\<\|        { requireExperimentalFeature(Xp::PipeOperators, state->positions[CUR_POS]);
+              return PIPE_FROM;
+            }
+\|\>        { requireExperimentalFeature(Xp::PipeOperators, state->positions[CUR_POS]);
+              return PIPE_INTO;
+            }
 
 {ID}        { yylval->id = {yytext, (size_t) yyleng}; return ID; }
 {INT}       { errno = 0;
               std::optional<int64_t> numMay = string2Int<int64_t>(yytext);
               if (numMay.has_value()) {
-                  yylval->n = *numMay;
+                  yylval->n = NixInt{*numMay};
               } else {
                   throw ParseError(ErrorInfo{
                       .msg = HintFmt("invalid integer '%1%'", yytext),
@@ -166,7 +179,7 @@ or          { return OR_KW; }
                 /* It is impossible to match strings ending with '$' with one
                    regex because trailing contexts are only valid at the end
                    of a rule. (A sane but undocumented limitation.) */
-                yylval->str = unescapeStr(state->symbols, yytext, yyleng);
+                yylval->str = unescapeStr(yytext, yyleng, [&]() { return state->positions[CUR_POS]; });
                 return STR;
               }
 <STRING>\$\{  { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
@@ -182,6 +195,7 @@ or          { return OR_KW; }
 \'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
                    yylval->str = {yytext, (size_t) yyleng, true};
+                   forceNoNullByte(yylval->str, [&]() { return state->positions[CUR_POS]; });
                    return IND_STR;
                  }
 <IND_STRING>\'\'\$ |
@@ -194,7 +208,7 @@ or          { return OR_KW; }
                    return IND_STR;
                  }
 <IND_STRING>\'\'\\{ANY} {
-                   yylval->str = unescapeStr(state->symbols, yytext + 2, yyleng - 2);
+                   yylval->str = unescapeStr(yytext + 2, yyleng - 2, [&]() { return state->positions[CUR_POS]; });
                    return IND_STR;
                  }
 <IND_STRING>\$\{ { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
@@ -279,9 +293,32 @@ or          { return OR_KW; }
 {SPATH}     { yylval->path = {yytext, (size_t) yyleng}; return SPATH; }
 {URI}       { yylval->uri = {yytext, (size_t) yyleng}; return URI; }
 
-[ \t\r\n]+    /* eat up whitespace */
-\#[^\r\n]*    /* single-line comments */
-\/\*([^*]|\*+[^*/])*\*+\/  /* long comments */
+%{
+// Doc comment rule
+//
+//   \/\*\*                            /**
+//         [^/*]                       reject /**/ (empty comment) and /***
+//              ([^*]|\*+[^*/])*\*+\/  same as the long comment rule
+//              (             )*       zero or more non-ending sequences
+//                              \*     end(1)
+//                                 \/  end(2)
+%}
+\/\*\*[^/*]([^*]|\*+[^*/])*\*+\/  /* doc comments */ {
+    LexerState & lexerState = *yyget_extra(yyscanner);
+    lexerState.docCommentDistance = 0;
+    lexerState.lastDocCommentLoc.beginOffset = yylloc->beginOffset;
+    lexerState.lastDocCommentLoc.endOffset = yylloc->endOffset;
+}
+
+
+%{
+// The following rules have docCommentDistance--
+// This compensates for the docCommentDistance++ which happens by default to
+// make all the other rules invalidate the doc comment.
+%}
+[ \t\r\n]+    /* eat up whitespace */ { yyget_extra(yyscanner)->docCommentDistance--; }
+\#[^\r\n]*    /* single-line comments */ { yyget_extra(yyscanner)->docCommentDistance--; }
+\/\*([^*]|\*+[^*/])*\*+\/  /* long comments */ { yyget_extra(yyscanner)->docCommentDistance--; }
 
 {ANY}       {
               /* Don't return a negative number, as this will cause

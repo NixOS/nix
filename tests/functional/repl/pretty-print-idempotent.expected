@@ -1,0 +1,37 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> :l pretty-print-idempotent.nix
+Added <number omitted> variables.
+
+nix-repl> oneDeep
+{ homepage = "https://example.com"; }
+
+nix-repl> oneDeep
+{ homepage = "https://example.com"; }
+
+nix-repl> twoDeep
+{
+  layerOne = { ... };
+}
+
+nix-repl> twoDeep
+{
+  layerOne = { ... };
+}
+
+nix-repl> oneDeepList
+[ "https://example.com" ]
+
+nix-repl> oneDeepList
+[ "https://example.com" ]
+
+nix-repl> twoDeepList
+[
+  [ ... ]
+]
+
+nix-repl> twoDeepList
+[
+  [ ... ]
+]
