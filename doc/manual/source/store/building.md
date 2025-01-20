@@ -4,6 +4,8 @@
 
 - Each input must be [realised] prior to building the derivation in question.
 
+[realised]: @docroot@/glossary.md#gloss-realise
+
 - Once this is done, the derivation is *normalized*, replacing each input deriving path with its store path, which we now know from realising the input.
 
 ## Builder Execution
