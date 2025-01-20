@@ -223,7 +223,7 @@ StorePath Store::addToStore(
 }
 
 void Store::addMultipleToStore(
-    PathsSource & pathsToCopy,
+    PathsSource && pathsToCopy,
     Activity & act,
     RepairFlag repair,
     CheckSigsFlag checkSigs)
@@ -1138,7 +1138,7 @@ std::map<StorePath, StorePath> copyPaths(
         pathsToCopy.push_back(std::pair{infoForDst, std::move(source)});
     }
 
-    dstStore.addMultipleToStore(pathsToCopy, act, repair, checkSigs);
+    dstStore.addMultipleToStore(std::move(pathsToCopy), act, repair, checkSigs);
 
     return pathsMap;
 }
