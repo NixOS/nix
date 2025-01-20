@@ -46,6 +46,7 @@
       remote.wait_for_unit("sshd")
       remote.wait_for_unit("multi-user.target")
       remote.wait_for_unit("network-online.target")
+      client.wait_for_unit("network-online.target")
       client.succeed(f"ssh -o StrictHostKeyChecking=no {remote.name} 'echo hello world'")
 
       remote.succeed("""
