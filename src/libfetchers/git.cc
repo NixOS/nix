@@ -331,7 +331,7 @@ struct GitInputScheme : InputScheme
 
         auto result = runProgram(RunOptions {
             .program = "git",
-            .args = {"-C", *repoPath, "--git-dir", repoInfo.gitDir, "check-ignore", "--quiet", std::string(path.rel())},
+            .args = {"-C", repoPath->string(), "--git-dir", repoInfo.gitDir, "check-ignore", "--quiet", std::string(path.rel())},
         });
         auto exitCode =
 #ifndef WIN32 // TODO abstract over exit status handling on Windows
@@ -344,7 +344,7 @@ struct GitInputScheme : InputScheme
         if (exitCode != 0) {
             // The path is not `.gitignore`d, we can add the file.
             runProgram("git", true,
-                { "-C", *repoPath, "--git-dir", repoInfo.gitDir, "add", "--intent-to-add", "--", std::string(path.rel()) });
+                { "-C", repoPath->string(), "--git-dir", repoInfo.gitDir, "add", "--intent-to-add", "--", std::string(path.rel()) });
 
 
             if (commitMsg) {
@@ -352,7 +352,7 @@ struct GitInputScheme : InputScheme
                 logger->pause();
                 Finally restoreLogger([]() { logger->resume(); });
                 runProgram("git", true,
-                    { "-C", *repoPath, "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-F", "-" },
+                    { "-C", repoPath->string(), "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-F", "-" },
                     *commitMsg);
             }
         }
@@ -470,7 +470,7 @@ struct GitInputScheme : InputScheme
         return repoInfo;
     }
 
-    uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
+    uint64_t getLastModified(const RepoInfo & repoInfo, const std::filesystem::path & repoDir, const Hash & rev) const
     {
         Cache::Key key{"gitLastModified", {{"rev", rev.gitRev()}}};
 
@@ -486,7 +486,7 @@ struct GitInputScheme : InputScheme
         return lastModified;
     }
 
-    uint64_t getRevCount(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
+    uint64_t getRevCount(const RepoInfo & repoInfo, const std::filesystem::path & repoDir, const Hash & rev) const
     {
         Cache::Key key{"gitRevCount", {{"rev", rev.gitRev()}}};
 
@@ -557,7 +557,7 @@ struct GitInputScheme : InputScheme
         auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo);
         input.attrs.insert_or_assign("ref", ref);
 
-        Path repoDir;
+        std::filesystem::path repoDir;
 
         if (auto repoPath = repoInfo.getPath()) {
             repoDir = *repoPath;
@@ -565,22 +565,22 @@ struct GitInputScheme : InputScheme
                 input.attrs.insert_or_assign("rev", GitRepo::openRepo(repoDir)->resolveRef(ref).gitRev());
         } else {
             auto repoUrl = std::get<ParsedURL>(repoInfo.location);
-            Path cacheDir = getCachePath(repoUrl.to_string(), getShallowAttr(input));
+            std::filesystem::path cacheDir = getCachePath(repoUrl.to_string(), getShallowAttr(input));
             repoDir = cacheDir;
             repoInfo.gitDir = ".";
 
-            createDirs(dirOf(cacheDir));
-            PathLocks cacheDirLock({cacheDir});
+            std::filesystem::create_directories(cacheDir.parent_path());
+            PathLocks cacheDirLock({cacheDir.string()});
 
             auto repo = GitRepo::openRepo(cacheDir, true, true);
 
             // We need to set the origin so resolving submodule URLs works
             repo->setRemote("origin", repoUrl.to_string());
 
-            Path localRefFile =
+            auto localRefFile =
                 ref.compare(0, 5, "refs/") == 0
-                ? cacheDir + "/" + ref
-                : cacheDir + "/refs/heads/" + ref;
+                ? cacheDir / ref
+                : cacheDir / "refs/heads" / ref;
 
             bool doFetch;
             time_t now = time(0);
@@ -596,7 +596,7 @@ struct GitInputScheme : InputScheme
                     /* If the local ref is older than ‘tarball-ttl’ seconds, do a
                        git fetch to update the local ref to the remote ref. */
                     struct stat st;
-                    doFetch = stat(localRefFile.c_str(), &st) != 0 ||
+                    doFetch = stat(localRefFile.string().c_str(), &st) != 0 ||
                         !isCacheFileWithinTtl(now, st);
                 }
             }
@@ -616,7 +616,7 @@ struct GitInputScheme : InputScheme
 
                     repo->fetch(repoUrl.to_string(), fmt("%s:%s", fetchRef, fetchRef), getShallowAttr(input));
                 } catch (Error & e) {
-                    if (!pathExists(localRefFile)) throw;
+                    if (!std::filesystem::exists(localRefFile)) throw;
                     logError(e.info());
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", repoInfo.locationToArg());
                 }
@@ -850,7 +850,7 @@ struct GitInputScheme : InputScheme
                 for (auto & file : repoInfo.workdirInfo.dirtyFiles) {
                     writeString("modified:", hashSink);
                     writeString(file.abs(), hashSink);
-                    dumpPath(*repoPath / file.rel(), hashSink);
+                    dumpPath((*repoPath / file.rel()).string(), hashSink);
                 }
                 for (auto & file : repoInfo.workdirInfo.deletedFiles) {
                     writeString("deleted:", hashSink);

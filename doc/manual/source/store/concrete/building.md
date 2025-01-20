@@ -1,13 +1,10 @@
 # Building
 
-TODO
-
 ## Normalizing derivation inputs
 
-TODO
+- Each input must be [realised] prior to building the derivation in question.
 
-Each input must be [realised] prior to building the derivation in question.
-At that point, the derivation can be *normalized*, by replacing each input deriving path with its store path --- which we now know since we've realised it.
+- Once this is done, the derivation is *normalized*, replacing each input deriving path with its store path, which we now know from realising the input.
 
 ## Builder Execution
 
@@ -68,10 +65,7 @@ The [`builder`](./drv.md#builder) is executed as follows:
 - The temporary directory is removed (unless the `-K` option was
   specified).
 
-- If the build was successful, Nix scans each output path for
-  references to input paths by looking for the hash parts of the input
-  paths. Since these are potential runtime dependencies, Nix registers
-  them as dependencies of the output paths.
+## Processing outputs and Reference scanning
 
 - After the build, Nix sets the last-modified timestamp on all files
   in the build result to 1 (00:00:01 1/1/1970 UTC), sets the group to
@@ -83,7 +77,12 @@ The [`builder`](./drv.md#builder) is executed as follows:
   deployment have no concept of ownership information, and because it
   makes the build result dependent on the user performing the build.
 
-## Processing outputs and Reference scanning
+- If the build was successful, Nix scans each output path for
+  references to input paths by looking for the hash parts of the input
+  paths. Since these are potential runtime dependencies, Nix registers
+  them as dependencies of the output paths.
+
+TODO integrete these with the bullet
 
 Before in the section on [store objects](./object.md), we talked abstractly about scanning for references.
 Now we can make this concrete.

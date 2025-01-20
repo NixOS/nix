@@ -43,7 +43,7 @@ standard input.
 
   Just parse and evaluate the input files, and print the resulting
   values on standard output.
-  Derivations are not serialized and written to the store, but instead just discarded.
+  Derivations are not serialized and written to the store, but instead just hashed and discarded.
 
   > **Warning**
   >

@@ -1587,7 +1587,7 @@ static RegisterPrimOp primop_placeholder({
     .args = {"output"},
     .doc = R"(
       Return at
-      [output placeholder string](@docroot@/source/store/drv.md#output-placeholder)
+      [output placeholder string](@docroot@/store/drv.md#output-placeholder)
       for the specified *output* that will be substituted by the corresponding
       [output path](@docroot@/glossary.md#gloss-output-path)
       at build time.
@@ -2132,7 +2132,7 @@ static RegisterPrimOp primop_outputOf({
     .doc = R"(
       Return at
       Return the output path of a derivation, literally or using an
-      [input placeholder string](@docroot@/source/store/drv.md#input-placeholder)
+      [input placeholder string](@docroot@/store/drv.md#input-placeholder)
       if needed.
 
       If the derivation has a statically-known output path (i.e. the derivation output is input-addressed, or fixed content-addresed), the output path will just be returned.
