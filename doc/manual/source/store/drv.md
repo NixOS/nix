@@ -6,20 +6,20 @@ Other system (like Git or IPFS) also store and transfer immutable data, but they
 
 This is where Nix distinguishes itself.
 *Derivations* represent individual build steps, and *deriving paths* are needed to refer to the *outputs* of those build steps before they are built.
-The two concepts need to be introduced together because, as described below, each depends on the other.
+<!-- The two concepts need to be introduced together because, as described below, each depends on the other. -->
 
 ## Derivation {#derivation}
 
 A derivation is a specification for running an executable on precisely defined input files to repeatably produce output files at uniquely determined file system paths.
 
-What is natural Unix analog for a build step *in action*?
-Answer: a process that will eventually exit, leaving behind some output date.
+What is the natural Unix analog for a build step *in action*?
+Answer: a process that will eventually exit, leaving behind some output files.
 What is the natural way to *plan* such a step?
 An `execve` system call.
 
 A derivation consists of:
 
- - A (base) name
+ - A name
 
  - A set of [*inputs*][inputs], a set of [deriving paths][deriving path]
 
@@ -105,8 +105,8 @@ Outputs are assigned names, and also consistent of other information based on th
 
 Output names can be any string which is also a valid [store path] name.
 The store path of the output store object (also called an [output path] for short), has a name based on the derivation name and the output name.
-Most outputs are named `drvMame + '-' + outputName`.
-However, an output named "out" is just has name `drvName`.
+Most outputs' store paths have name `drvMame + '-' + outputName`.
+However, an output named "out" has a store path with name `drvName`.
 This is to allow derivations with a single output to avoid a superfluous `-<outputName>` in their single output's name when no disambiguation is needed.
 
 > **Example**
@@ -205,7 +205,7 @@ There are two formats, documented separately:
 
 - The legacy ["ATerm" format](@docroot@/protocols/derivation-aterm.md)
 
-- The modern [JSON format](@docroot@/protocols/json/derivation.md)
+- The experimental [JSON format](@docroot@/protocols/json/derivation.md)
 
 Every derivation has a canonical choice of encoding used to serialize it to a store object.
 This ensures that there is a canonical [store path] used to refer to the derivation, as described in [Referencing derivations](#derivation-path).
@@ -219,7 +219,7 @@ Regardless of the format used, when serializing to store objects, content-addres
 
 In the common case the inputs to store objects are either:
 
- - constant deriving paths for content-addressed source objects, which are "initial inputs" rather than the outputs of some other derivation (except in the case of bootstrap binaries).
+ - constant deriving paths for content-addressed source objects, which are "initial inputs" rather than the outputs of some other derivation
 
  - the outputs of other derivations abiding by this same invariant.
 
@@ -231,7 +231,7 @@ Here is a sketch at the proof of this:
  - The inputs which are constant deriving paths become references of the serialized derivations, but they are content-addressed per the above.
 
  - For inputs which are output deriving paths, we cannot directly reference the input because in general it is not built yet.
-   We instead "peal back" the output deriving path to take its underlying serialized derivation (the `drvPath` field), and reference that.
+   We instead "peel back" the output deriving path to take its underlying serialized derivation (the `drvPath` field), and reference that.
    Since it is a derivation, it must be content-addressed
 
  - There are no other ways a store object would end up in an input closure.
@@ -250,9 +250,9 @@ Here is a sketch at the proof of this:
 
   - encoding of a store path referring to a derivation
 
-  - a separator (`^` or `!` depending on context)
+  - a `^` separator (or `!` in some legacy contexts)
 
-  - the name of an output
+  - the name of an output of the previously referred derivation
 
   > **Example**
   >
@@ -289,7 +289,7 @@ data DerivingPath
     }
 ```
 
-Now, the `drv` field of `Output` is itself a `DerivingPath` instead of an `StorePath`.
+Now, the `drv` field of `Output` is itself a `DerivingPath` instead of a `StorePath`.
 
 Under this extended model, `DerivingPath`s are thus inductively built up from an `Constant`, contains in 0 or more outer `Output`s.
 
@@ -327,5 +327,3 @@ At run time, this becomes two things:
 The bash command can be passed a script which will "source" that Nix-created bash script, setting those variables with the richer data.
 The outer script can then do whatever it likes with those richer variables as input.
 
-However, since derivations can already contain arbitary input sources, the vast majority of `__structuredAttrs` can be handled by upper layers.
-We might consider implementing `__structuredAttrs` in higher layers in the future, and simplifying the store layer.

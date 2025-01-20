@@ -30,8 +30,8 @@ When derivation is encoded to a [store object] we make the following choices:
 
 - The derivation is content-addressed using the ["Text" method] of content-addressing derivations
 
-Currently we always encode derivations to storee object using the ATerm format (and the previous two choices),
-but we reserve the right to encode new sorts of derivations differently in the future.
+Currently we always encode derivations to store object using the ATerm format (and the previous two choices),
+but we reserve the option to encode new sorts of derivations differently in the future.
 
 [derivation]: @docroot@/glossary.md#gloss-derivation
 [store object]: @docroot@/glossary.md#gloss-store-object

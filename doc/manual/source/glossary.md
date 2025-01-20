@@ -39,10 +39,9 @@
 - [derivation expression]{#gloss-derivation-expression}
 
   A description of a [derivation] in the Nix language.
-  The result of a derivation is a store object.
+  The output(s) of a derivation are store objects.
   Derivations are typically specified in Nix expressions using the [`derivation` primitive](./language/derivations.md).
-  These are translated into low-level *derivations* (implicitly by
-  `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
+  These are translated into store layer *derivations* (implicitly by `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
 
   [derivation expression]: #gloss-derivation-expression
 
@@ -251,7 +250,7 @@
 
 - [deriving path]{#gloss-deriving-path}
 
-  Deriving paths are a way to refer to [store objects][store object] that might not be yet [realised][realise].
+  Deriving paths are a way to refer to [store objects][store object] that might not yet be [realised][realise].
 
   See [Deriving Path](./store/drv.md#deriving-path) for details.
 
