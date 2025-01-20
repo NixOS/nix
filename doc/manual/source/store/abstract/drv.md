@@ -5,7 +5,7 @@ But the point of the Nix store layer is to be a build system.
 Other system (like Git or IPFS) also store and transfer immutable data, but they don't concern themselves with *how* that data was created.
 
 This is where Nix distinguishes itself.
-*Derivations* represent individual build steps, and *deriving reference* are needed to to the *outputs* of those build steps.
+*Derivations* represent individual build steps, and *deriving references* are needed to to the *outputs* of those build steps before they are built.
 In particular, derivations are the nodes and derived references the edges of the graphs that are build plans
 The two concepts need to be introduced together because, as described below, each depends on the other.
 

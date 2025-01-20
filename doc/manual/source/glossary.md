@@ -26,6 +26,16 @@
 
   [derivation]: #gloss-derivation
 
+- [derivation path]{#gloss-derivation-path}
+
+  A [store path] which uniquely identifies a [derivation].
+
+  See [Referencing Derivations](@docroot@/store/drv.md#derivation-path) for details.
+
+  Not to be confused with [deriving path].
+
+  [derivation path]: #gloss-derivation-path
+
 - [derivation expression]{#gloss-derivation-expression}
 
   A description of a [derivation] in the Nix language.
@@ -244,6 +254,8 @@
   Deriving paths are a way to refer to [store objects][store object] that might not be yet [realised][realise].
 
   See [Deriving Path](./store/drv.md#deriving-path) for details.
+
+  Not to be confused with [derivation path].
 
 - [deriver]{#gloss-deriver}
 

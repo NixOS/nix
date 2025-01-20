@@ -26,9 +26,10 @@ A derivation consists of:
 
  - A map of [*outputs*][outputs], from names to other data
 
- - Everything needed for an `execve` system call:
+ - The [process creation fields]: to spawn the arbitrary process which will perform the build step:
 
-   - The ["builder"][builder], a path to an executable
+
+   - The [*builder*][builder], a path to an executable
 
    - A list of [arguments][args]
 
@@ -60,16 +61,58 @@ outputs drv = Map.keys drv.outputs
 ```
 
 [derivation]: #derivation
-[outputs]: #outputs
 [inputs]: #inputs
+[input]: #inputs
+[outputs]: #outputs
+[output]: #outputs
+[process creation fields]: #process-creation-fields
 [builder]: #builder
 [args]: #args
 [env]: #env
 [system]: #system
 
-### Parts of a derivation
+### Referencing derivations {#derivation-path}
 
-#### Inputs {#inputs}
+Derivations are always referred to by the [store path] of the store object they are encoded to.
+See the [encoding section](#derivation-encoding) for more details on how this encoding works, and thus what exactly what store path we would end up with for a given derivation.
+
+The store path of the store object which encodes a derivation is often called a *derivation path* for brevity.
+
+## Deriving path {#deriving-path}
+
+Deriving paths are close to their abstract version, but using `StorePath` as the type of all references, matching the end of the previous subsection.
+
+Deriving paths are a way to refer to [store objects][store object] that might not yet be [realised][realise].
+This is necessary because, in general and particularly for [content-addressed derivations][content-addressed derivation], the [store path] of an [output] is not known in advance.
+There are two forms:
+
+- [*constant*]{#deriving-path-constant}: just a [store path].
+  It can be made [valid][validity] by copying it into the store: from the evaluator, command line interface or another st    ore.
+
+- [*output*]{#deriving-path-output}: a pair of a [store path] to a [derivation] and an [output] name.
+
+In pseudo code:
+
+```idris
+type OutputName = String
+
+data DerivingPath
+  = Constant { path : StorePath }
+  | Output {
+      drvPath : StorePath,
+      output  : OutputName,
+    }
+```
+
+[deriving path]: #deriving-path
+[validity]: @docroot@/glossary.md#gloss-validity
+
+## Parts of a derivation
+
+With both [derivations][derivation] introduced and [deriving paths][deriving path] defined,
+it is now possible to define the parts of a derivation.
+
+### Inputs {#inputs}
 
 The inputs are a set of [deriving paths][deriving path], refering to all store objects needed in order to perform this build step.
 
@@ -80,7 +123,7 @@ The information needed for the `execve` system call will presumably include many
 
 But just as we stored the references contained in the file data separately for store objects, so we store the set of inputs separately from the builder, arguments, and environment variables.
 
-#### Outputs {#outputs}
+### Outputs {#outputs}
 
 The outputs are the derivations are the [store objects][store object] it is obligated to produce.
 
@@ -102,6 +145,11 @@ This is to allow derivations with a single output to avoid a superfluous `-<outp
 >
 > - The store path of `dev` will be: `/nix/store/<hash>-hello-dev`.
 
+### Process creation fields {#process-creation-fields}
+
+These are the three fields which describe out to spawn the process which (along with any of its own child processes) will perform the build.
+As state in the derivation introduction, this is everything needed for an `execve` system call.
+
 #### Builder {#builder}
 
 This is the path to an executable that will perform the build and produce the [outputs].
@@ -118,7 +166,48 @@ See [Wikipedia](https://en.wikipedia.org/w/index.php?title=Argv) for details.
 
 Environment variables which will be passed to the [builder](#builder) executable.
 
-#### System {#system}
+#### Placeholders
+
+Placeholders are opaque values used within the [process creation fields] to [store objects] for which we don't yet know [store path]s.
+The are strings in the form `/<hash>` that are embedded anywhere within the strings of those fields.
+
+> **Note**
+>
+> Output Deriving Path exist to solve the same problem as placeholders --- that is, referring to store objects for which we don't yet know a store path.
+> They also have a string syntax, [descibed in the encoding section](#deriving-path-encoding).
+> We could use that syntax instead of `/<hash>` for placeholders, but its human-legibility would cuse problems.
+
+There are two types of placeholder, corresponding to the two cases where this problem arises:
+
+- [Output placeholder]{#output-placeholder}:
+
+  This is a placeholder for a derivation's own output.
+
+- [Input placeholder]{#input-placeholder}:
+
+  This is a placeholder to a derivation's non-constant [input],
+  i.e. an input that is an [output derived path].
+
+> **Explanation**
+>
+> In general, we need to realise [realise] a [store object] in order to be sure to have a store object for it.
+> But for these two cases this is either impossible or impractical:
+>
+> - In the output case this is impossible:
+>
+>   We cannot built the output until we have a correct derivation, and we cannot have a correct derivation (without using placeholders) until we have the output path.
+>
+> - In the input case this is impractical:
+>
+>   We an always built a dependency, and then refer to its output by store path, but by doing so we loose the ability for a derivation graph to describe an entire build plan consisting of multiple build steps.
+
+> **Note**
+>
+> The current method of creating hashes which we substitute for string fields should be seen as an artifact of the current "ATerm" serialization format.
+> In order to be more explicit, and avoid gotchas analogous to [SQL injection](https://en.wikipedia.org/wiki/SQL_injection),
+> we ought to consider switching two a different format where we explicitly use a syntax for the concatenation of plain strings and [deriving paths] written more explicitly.
+
+### System {#system}
 
 The system type on which the [`builder`](#attr-builder) executable is meant to be run.
 
@@ -128,55 +217,6 @@ By putting the `system` in each derivation, Nix allows *heterogenous* build plan
 A Nix isntance scheduling builds can automatically [build on other platforms](@docroot@/language/derivations.md#attr-builder) by forwarding build requests to other Nix instances.
 
 [`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
-
-### Referencing derivations
-
-Derivations are always referred to by the [store path] of the store object they are encoded to.
-See the [encoding section](#derivation-encoding) for more details on how this encoding works, and thus what exactly what store path we would end up with for a given derivations.
-
-The store path of the store object which encodes a derivation is often called a "derivation path" for brevity.
-
-### Placeholder
-
-TODO
-
-Two types:
-
-- Reference to own outputs
-
-- output derived paths (see below), corresponding to store paths we haven't yet realized.
-
-> N.B. Current method of creating hashes which we substitute for string fields should be seen as an artifact of the current "ATerm" serialization format.
-> In order to be more explicit, and avoid gotchas analogous to [SQL injection](https://en.wikipedia.org/wiki/SQL_injection),
-> we ought to consider switching two a different format where we explicitly use a syntax for a oncatentation of plain strings and placeholders written more explicitly.
-
-## Deriving path {#deriving-path}
-
-Deriving paths are close to their abstract version, but using `StorePath` as the type of all references, matching the end of the previous subsection.
-
-Deriving paths are a way to refer to [store objects][store object] that might not yet be [realised][realise].
-This is necessary because, in general and particularly for [content-addressed derivations][content-addressed derivation], the [store path] of an [output] is not known in advance.
-There are two forms:
-
-- *constant*: just a [store path]
-  It can be made [valid][validity] by copying it into the store: from the evaluator, command line interface or another st    ore.
-
-- *output*: a pair of a [store path] to a [derivation] and an [output] name.
-
-In pseudo code:
-
-```idris
-type OutputName = String
-
-data DerivingPath
-  = ConstantPath { path : StorePath }
-  | Output {
-      drvPath : StorePath,
-      output  : OutputName,
-    }
-```
-
-[deriving path]: #deriving-path
 
 [content-addressed derivation]: @docroot@/glossary.md#gloss-content-addressed-derivation
 [realise]: @docroot@/glossary.md#gloss-realise
@@ -193,9 +233,16 @@ There are two formats, documented separately:
 
 - The modern [JSON format](@docroot@/protocols/json/derivation.md)
 
-Currently derivations are always serialized to store objects using the "ATerm" format, but this is subject to change.
+Every derivation has a canonical choice of encoding used to serialize it to a store object.
+This ensures that there is a canonical [store path] used to refer to the derivation, as described in [Referencing derivations](#derivation-path).
 
-Regardless of the format used, when serializing to store object, content-addressing is always used.
+> **Note**
+>
+> Currently, the canonical encoding for every derivation is the "ATerm" format,
+> but this is subject to change for types derivations which are not yet stable.
+
+Regardless of the format used, when serializing to store objects, content-addressing is always used.
+
 In the common case the inputs to store objects are either:
 
  - constant deriving paths for content-addressed source objects, which are "initial inputs" rather than the outputs of some other derivation (except in the case of bootstrap binaries).
@@ -261,7 +308,7 @@ Derivations are the same except for using the new extended deriving path data ty
 type OutputName = String
 
 data DerivingPath
-  = ConstantPath { storeObj : StorePath }
+  = Constant { storeObj : StorePath }
   | Output {
       drv    : DerivingPath, -- Note: changed
       output : OutputName,
@@ -270,7 +317,7 @@ data DerivingPath
 
 Now, the `drv` field of `Output` is itself a `DerivingPath` instead of an `StorePath`.
 
-Under this extended model, `DerivingPath`s are thus inductively built up from an `ConstantPath`, contains in 0 or more outer `Output`s.
+Under this extended model, `DerivingPath`s are thus inductively built up from an `Constant`, contains in 0 or more outer `Output`s.
 
 ### Encoding {#deriving-path-encoding}
 

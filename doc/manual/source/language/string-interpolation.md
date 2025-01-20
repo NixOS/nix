@@ -22,9 +22,9 @@ Rather than writing
 "--with-freetype2-library=" + freetype + "/lib"
 ```
 
-(where `freetype` is an [output path]), you can instead write
+(where `freetype` is a [derivation expression]), you can instead write
 
-[derivation]: @docroot@/glossary.md#gloss-derivation
+[derivation expression]: @docroot@/glossary.md#gloss-derivation-expression
 
 ```nix
 "--with-freetype2-library=${freetype}/lib"
