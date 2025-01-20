@@ -102,7 +102,7 @@ public:
         CheckSigsFlag checkSigs) override;
 
     void addMultipleToStore(
-        PathsSource & pathsToCopy,
+        PathsSource && pathsToCopy,
         Activity & act,
         RepairFlag repair,
         CheckSigsFlag checkSigs) override;
