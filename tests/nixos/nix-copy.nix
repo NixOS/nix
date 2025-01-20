@@ -55,7 +55,10 @@ in {
     start_all()
 
     server.wait_for_unit("sshd")
-    client.wait_for_unit("network.target")
+    server.wait_for_unit("multi-user.target")
+    server.wait_for_unit("network-online.target")
+
+    client.wait_for_unit("network-online.target")
     client.wait_for_unit("getty@tty1.service")
     # Either the prompt: ]#
     # or an OCR misreading of it: 1#
