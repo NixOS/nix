@@ -541,6 +541,7 @@ void RemoteStore::addMultipleToStore(
 {
     auto source = sinkToSource([&](Sink & sink) {
         sink << pathsToCopy.size();
+        // Reverse, so we can release memory at the original start
         std::reverse(pathsToCopy.begin(), pathsToCopy.end());
         while (!pathsToCopy.empty()) {
             auto & [pathInfo, pathSource] = pathsToCopy.back();
