@@ -14,13 +14,15 @@ namespace fs = std::filesystem;
 namespace nix {
 namespace lfs {
 
-// git-lfs metadata about a file
-struct Md
+/**
+ * git-lfs pointer
+ * @see https://github.com/git-lfs/git-lfs/blob/2ef4108/docs/spec.md
+ */
+struct Pointer
 {
-    std::string path; // fs path relative to repo root, no ./ prefix
-    std::string oid;  // git-lfs managed object id. you give this to the lfs server
-                      // for downloads
-    size_t size;      // in bytes
+    std::string oid; // git-lfs managed object id. you give this to the lfs server
+                     // for downloads
+    size_t size;     // in bytes
 };
 
 struct Fetch
@@ -41,7 +43,7 @@ struct Fetch
         const std::string & pointerFilePath,
         StringSink & sink,
         std::function<void(uint64_t)> sizeCallback) const;
-    std::vector<nlohmann::json> fetchUrls(const std::vector<Md> & metadatas) const;
+    std::vector<nlohmann::json> fetchUrls(const std::vector<Pointer> & pointers) const;
 };
 
 // if authHeader is "", downloadToSink assumes no auth is expected
@@ -79,15 +81,15 @@ std::string getLfsApiToken(const ParsedURL & url)
     });
 
     if (output.empty())
-        throw std::runtime_error(
+        throw Error(
             "git-lfs-authenticate: no output (cmd: ssh " + *url.authority + " git-lfs-authenticate " + url.path
             + " download)");
 
     nlohmann::json query_resp = nlohmann::json::parse(output);
     if (!query_resp.contains("header"))
-        throw std::runtime_error("no header in git-lfs-authenticate response");
+        throw Error("no header in git-lfs-authenticate response");
     if (!query_resp["header"].contains("Authorization"))
-        throw std::runtime_error("no Authorization in git-lfs-authenticate response");
+        throw Error("no Authorization in git-lfs-authenticate response");
 
     std::string res = query_resp["header"]["Authorization"].get<std::string>();
 
@@ -122,7 +124,7 @@ std::string getLfsEndpointUrl(git_repository * repo)
     return std::string(url_c_str);
 }
 
-std::optional<Md> parseLfsMetadata(const std::string & content, const std::string & filename)
+std::optional<Pointer> parseLfsPointer(const std::string & content, const std::string & filename)
 {
     // https://github.com/git-lfs/git-lfs/blob/2ef4108/docs/spec.md
     //
@@ -175,7 +177,7 @@ std::optional<Md> parseLfsMetadata(const std::string & content, const std::strin
         return std::nullopt;
     }
 
-    return std::make_optional(Md{filename, oid, std::stoul(size)});
+    return std::make_optional(Pointer{oid, std::stoul(size)});
 }
 
 Fetch::Fetch(git_repository * repo, git_oid rev)
@@ -200,15 +202,15 @@ bool Fetch::shouldFetch(const std::string & path) const
     return attr != nullptr && !std::string(attr).compare("lfs");
 }
 
-nlohmann::json mdToPayload(const std::vector<Md> & items)
+nlohmann::json pointerToPayload(const std::vector<Pointer> & items)
 {
     nlohmann::json jArray = nlohmann::json::array();
-    for (const auto & md : items)
-        jArray.push_back({{"oid", md.oid}, {"size", md.size}});
+    for (const auto & pointer : items)
+        jArray.push_back({{"oid", pointer.oid}, {"size", pointer.size}});
     return jArray;
 }
 
-std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> & metadatas) const
+std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointers) const
 {
     ParsedURL httpUrl(url);
     httpUrl.scheme = url.scheme == "ssh" ? "https" : url.scheme;
@@ -220,7 +222,7 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> & metadatas) 
     headers.push_back({"Content-Type", "application/vnd.git-lfs+json"});
     headers.push_back({"Accept", "application/vnd.git-lfs+json"});
     request.headers = headers;
-    nlohmann::json oidList = mdToPayload(metadatas);
+    nlohmann::json oidList = pointerToPayload(pointers);
     nlohmann::json data = {{"operation", "download"}};
     data["objects"] = oidList;
     request.data = data.dump();
@@ -238,13 +240,12 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Md> & metadatas) 
         if (resp.contains("objects"))
             objects.insert(objects.end(), resp["objects"].begin(), resp["objects"].end());
         else
-            throw std::runtime_error("response does not contain 'objects'");
+            throw Error("response does not contain 'objects'");
 
         return objects;
     } catch (const nlohmann::json::parse_error & e) {
-        std::stringstream ss;
-        ss << "response did not parse as json: " << responseString;
-        throw std::runtime_error(ss.str());
+        printMsg(lvlTalkative, "Full response: '%1%'", responseString);
+        throw Error("response did not parse as json: %s", e.what());
     }
 }
 
@@ -264,8 +265,8 @@ void Fetch::fetch(
         return;
     }
 
-    const auto md = parseLfsMetadata(std::string(content), std::string(pointerFilePath));
-    if (md == std::nullopt) {
+    const auto pointer = parseLfsPointer(std::string(content), std::string(pointerFilePath));
+    if (pointer == std::nullopt) {
         debug("Skip git-lfs, invalid pointer file");
         warn("Encountered a file that should have been a pointer, but wasn't: %s", pointerFilePath);
         sizeCallback(content.length());
@@ -275,7 +276,7 @@ void Fetch::fetch(
 
     Path cacheDir = getCacheDir() + "/git-lfs";
     std::string key =
-        hashString(HashAlgorithm::SHA256, pointerFilePath).to_string(HashFormat::Base16, false) + "/" + md->oid;
+        hashString(HashAlgorithm::SHA256, pointerFilePath).to_string(HashFormat::Base16, false) + "/" + pointer->oid;
     Path cachePath = cacheDir + "/" + key;
     if (pathExists(cachePath)) {
         debug("using cache entry %s -> %s", key, cachePath);
@@ -292,9 +293,9 @@ void Fetch::fetch(
     }
     debug("did not find cache entry for %s", key);
 
-    std::vector<Md> vMds;
-    vMds.push_back(md.value());
-    const auto objUrls = fetchUrls(vMds);
+    std::vector<Pointer> pointers;
+    pointers.push_back(pointer.value());
+    const auto objUrls = fetchUrls(pointers);
 
     const auto obj = objUrls[0];
     try {
@@ -320,7 +321,7 @@ void Fetch::fetch(
     } catch (const nlohmann::json::out_of_range & e) {
         std::stringstream ss;
         ss << "bad json from /info/lfs/objects/batch: " << obj << " " << e.what();
-        throw std::runtime_error(ss.str());
+        throw Error(ss.str());
     }
 }
 
