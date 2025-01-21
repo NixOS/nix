@@ -43,6 +43,11 @@ struct Sink;
 struct Source;
 
 /**
+ * Return whether the path denotes an absolute path.
+ */
+bool isAbsolute(PathView path);
+
+/**
  * @return An absolutized path, resolving paths relative to the
  * specified directory, or the current directory otherwise.  The path
  * is also canonicalised.
