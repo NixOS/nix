@@ -76,7 +76,7 @@ in
     # Fetching from a server with an untrusted cert should fail.
     err = machine.fail("nix build --no-substitute --expr 'import <nix/fetchurl.nix> { url = \"https://bad/index.html\"; hash = \"sha256-rsBwZF/lPuOzdjBZN2E08FjMM3JHyXit0Xi2zN+wAZ8=\"; }' 2>&1")
     print(err)
-    assert "SSL certificate problem: self-signed certificate" in err
+    assert "SSL peer certificate or SSH remote key was not OK" in err
 
     # Fetching from a server with a trusted cert should work via environment variable override.
     machine.succeed("NIX_SSL_CERT_FILE=/tmp/cafile.pem nix build --no-substitute --expr 'import <nix/fetchurl.nix> { url = \"https://bad/index.html\"; hash = \"sha256-rsBwZF/lPuOzdjBZN2E08FjMM3JHyXit0Xi2zN+wAZ8=\"; }'")
