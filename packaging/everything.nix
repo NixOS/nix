@@ -55,6 +55,7 @@ let
       nix-flake-c
       nix-main
       nix-main-c
+      nix-cmd
     ;
   } // lib.optionalAttrs (!stdenv.hostPlatform.isStatic && stdenv.buildPlatform.canExecute stdenv.hostPlatform) {
     # Currently fails in static build
