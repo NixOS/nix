@@ -358,7 +358,7 @@ void Input::clone(const Path & destDir) const
     scheme->clone(*this, destDir);
 }
 
-std::optional<Path> Input::getSourcePath() const
+std::optional<std::filesystem::path> Input::getSourcePath() const
 {
     assert(scheme);
     return scheme->getSourcePath(*this);
@@ -461,7 +461,7 @@ Input InputScheme::applyOverrides(
     return input;
 }
 
-std::optional<Path> InputScheme::getSourcePath(const Input & input) const
+std::optional<std::filesystem::path> InputScheme::getSourcePath(const Input & input) const
 {
     return {};
 }

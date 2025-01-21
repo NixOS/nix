@@ -287,23 +287,21 @@ public:
 
         else if (type == resBuildLogLine || type == resPostBuildLogLine) {
             auto lastLine = chomp(getS(fields, 0));
-            if (!lastLine.empty()) {
-                auto i = state->its.find(act);
-                assert(i != state->its.end());
-                ActInfo info = *i->second;
-                if (printBuildLogs) {
-                    auto suffix = "> ";
-                    if (type == resPostBuildLogLine) {
-                        suffix = " (post)> ";
-                    }
-                    log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
-                } else {
-                    state->activities.erase(i->second);
-                    info.lastLine = lastLine;
-                    state->activities.emplace_back(info);
-                    i->second = std::prev(state->activities.end());
-                    update(*state);
+            auto i = state->its.find(act);
+            assert(i != state->its.end());
+            ActInfo info = *i->second;
+            if (printBuildLogs) {
+                auto suffix = "> ";
+                if (type == resPostBuildLogLine) {
+                    suffix = " (post)> ";
                 }
+                log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
+            } else {
+                state->activities.erase(i->second);
+                info.lastLine = lastLine;
+                state->activities.emplace_back(info);
+                i->second = std::prev(state->activities.end());
+                update(*state);
             }
         }
 
