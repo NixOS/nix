@@ -28,5 +28,5 @@
       # ensures tests are named like their directories they are defined in
       name = testCaseName;
     })
-    [ "lfs" ]; # (lib.attrNames (builtins.readDir ./test-cases));
+    (lib.attrNames (builtins.readDir ./test-cases));
 }
