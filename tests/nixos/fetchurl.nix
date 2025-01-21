@@ -22,7 +22,7 @@ let
 in
 
 {
-  name = "nss-preload";
+  name = "fetchurl";
 
   nodes = {
     machine = { pkgs, ... }: {
