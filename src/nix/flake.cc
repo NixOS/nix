@@ -238,7 +238,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["lastModified"] = *lastModified;
             j["path"] = storePath;
             j["locks"] = lockedFlake.lockFile.toJSON().first;
-            if (auto fingerprint = lockedFlake.getFingerprint(store))
+            if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
             logger->cout("%s", j.dump());
         } else {
@@ -272,7 +272,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Last modified:" ANSI_NORMAL " %s",
                     std::put_time(std::localtime(&*lastModified), "%F %T"));
-            if (auto fingerprint = lockedFlake.getFingerprint(store))
+            if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 logger->cout(
                     ANSI_BOLD "Fingerprint:" ANSI_NORMAL "   %s",
                     fingerprint->to_string(HashFormat::Base16, false));
@@ -941,7 +941,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                         createSymlink(target, os_string_to_string(PathViewNG { to2 }));
                 }
                 else
-                    throw Error("file '%s' has unsupported type", from2);
+                    throw Error("path '%s' needs to be a symlink, file, or directory but instead is a %s", from2, st.typeString());
                 changedFiles.push_back(to2);
                 notice("wrote: %s", to2);
             }

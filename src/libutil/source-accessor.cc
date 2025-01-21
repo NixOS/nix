@@ -5,6 +5,26 @@ namespace nix {
 
 static std::atomic<size_t> nextNumber{0};
 
+bool SourceAccessor::Stat::isNotNARSerialisable()
+{
+    return this->type != tRegular && this->type != tSymlink && this->type != tDirectory;
+}
+
+std::string SourceAccessor::Stat::typeString() {
+    switch (this->type) {
+        case tRegular: return "regular";
+        case tSymlink: return "symlink";
+        case tDirectory: return "directory";
+        case tChar: return "character device";
+        case tBlock: return "block device";
+        case tSocket: return "socket";
+        case tFifo: return "fifo";
+        case tUnknown:
+        default: return "unknown";
+    }
+    return "unknown";
+}
+
 SourceAccessor::SourceAccessor()
     : number(++nextNumber)
     , displayPrefix{"«unknown»"}
@@ -95,7 +115,7 @@ CanonPath SourceAccessor::resolveSymlinks(
                         throw Error("infinite symlink recursion in path '%s'", showPath(path));
                     auto target = readLink(res);
                     res.pop();
-                    if (hasPrefix(target, "/"))
+                    if (isAbsolute(target))
                         res = CanonPath::root;
                     todo.splice(todo.begin(), tokenizeString<std::list<std::string>>(target, "/"));
                 }

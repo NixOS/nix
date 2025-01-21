@@ -4,6 +4,7 @@
 #include "fetch-to-store.hh"
 #include "json-utils.hh"
 #include "store-path-accessor.hh"
+#include "fetch-settings.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -154,9 +155,21 @@ bool Input::isLocked() const
     return scheme && scheme->isLocked(*this);
 }
 
+bool Input::isConsideredLocked(
+    const Settings & settings) const
+{
+    return isLocked() || (settings.allowDirtyLocks && getNarHash());
+}
+
 bool Input::isFinal() const
 {
     return maybeGetBoolAttr(attrs, "__final").value_or(false);
+}
+
+std::optional<std::string> Input::isRelative() const
+{
+    assert(scheme);
+    return scheme->isRelative(*this);
 }
 
 Attrs Input::toAttrs() const
@@ -345,7 +358,7 @@ void Input::clone(const Path & destDir) const
     scheme->clone(*this, destDir);
 }
 
-std::optional<Path> Input::getSourcePath() const
+std::optional<std::filesystem::path> Input::getSourcePath() const
 {
     assert(scheme);
     return scheme->getSourcePath(*this);
@@ -448,7 +461,7 @@ Input InputScheme::applyOverrides(
     return input;
 }
 
-std::optional<Path> InputScheme::getSourcePath(const Input & input) const
+std::optional<std::filesystem::path> InputScheme::getSourcePath(const Input & input) const
 {
     return {};
 }

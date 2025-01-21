@@ -187,7 +187,7 @@ Currently the `type` attribute can be one of the following:
   * `nixpkgs/nixos-unstable/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`
   * `sub/dir` (if a flake named `sub` is in the registry)
 
-* `path`: arbitrary local directories. The required attribute `path`
+* <a name="path-fetcher"></a>`path`: arbitrary local directories. The required attribute `path`
   specifies the path of the flake. The URL form is
 
   ```
@@ -200,18 +200,38 @@ Currently the `type` attribute can be one of the following:
   If the flake at *path* is not inside a git repository, the `path:`
   prefix is implied and can be omitted.
 
-  *path* generally must be an absolute path. However, on the command
-  line, it can be a relative path (e.g. `.` or `./foo`) which is
-  interpreted as relative to the current directory. In this case, it
-  must start with `.` to avoid ambiguity with registry lookups
-  (e.g. `nixpkgs` is a registry lookup; `./nixpkgs` is a relative
-  path).
+  If *path* is a relative path (i.e. if it does not start with `/`),
+  it is interpreted as follows:
+
+  - If *path* is a command line argument, it is interpreted relative
+    to the current directory.
+
+  - If *path* is used in a `flake.nix`, it is interpreted relative to
+    the directory containing that `flake.nix`. However, the resolved
+    path must be in the same tree. For instance, a `flake.nix` in the
+    root of a tree can use `path:./foo` to access the flake in
+    subdirectory `foo`, but `path:../bar` is illegal. On the other
+    hand, a flake in the `/foo` directory of a tree can use
+    `path:../bar` to refer to the flake in `/bar`.
+
+  Path inputs can be specified with path values in `flake.nix`. Path values are a syntax for `path` inputs, and they are converted by
+  1. resolving them into relative paths, relative to the base directory of `flake.nix`
+  2. escaping URL characters (refer to IETF RFC?)
+  3. prepending `path:`
+
+  Note that the allowed syntax for path values in flake `inputs` may be more restrictive than general Nix, so you may need to use `path:` if your path contains certain special characters. See [Path literals](@docroot@/language/syntax.md#path-literal)
+
+  Note that if you omit `path:`, relative paths must start with `.` to
+  avoid ambiguity with registry lookups (e.g. `nixpkgs` is a registry
+  lookup; `./nixpkgs` is a relative path).
 
   For example, these are valid path flake references:
 
   * `path:/home/user/sub/dir`
   * `/home/user/sub/dir` (if `dir/flake.nix` is *not* in a git repository)
-  * `./sub/dir` (when used on the command line and `dir/flake.nix` is *not* in a git repository)
+  * `path:sub/dir`
+  * `./sub/dir`
+  * `path:../parent`
 
 * `git`: Git repositories. The location of the repository is specified
   by the attribute `url`.

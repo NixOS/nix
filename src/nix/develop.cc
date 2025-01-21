@@ -696,7 +696,7 @@ struct CmdDevelop : Common, MixEnvironment
                 auto sourcePath = installableFlake->getLockedFlake()->flake.resolvedRef.input.getSourcePath();
                 if (sourcePath) {
                     if (chdir(sourcePath->c_str()) == -1) {
-                        throw SysError("chdir to '%s' failed", *sourcePath);
+                        throw SysError("chdir to %s failed", *sourcePath);
                     }
                 }
             }

@@ -110,7 +110,7 @@ struct Flake
     }
 };
 
-Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool allowLookup);
+Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool useRegistries);
 
 /**
  * Fingerprint of a locked flake; used as a cache key.
@@ -129,7 +129,9 @@ struct LockedFlake
      */
     std::map<ref<Node>, SourcePath> nodePaths;
 
-    std::optional<Fingerprint> getFingerprint(ref<Store> store) const;
+    std::optional<Fingerprint> getFingerprint(
+        ref<Store> store,
+        const fetchers::Settings & fetchSettings) const;
 };
 
 struct LockFlags

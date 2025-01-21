@@ -38,11 +38,19 @@ struct LockedNode : Node
     FlakeRef lockedRef, originalRef;
     bool isFlake = true;
 
+    /* The node relative to which relative source paths
+       (e.g. 'path:../foo') are interpreted. */
+    std::optional<InputPath> parentPath;
+
     LockedNode(
         const FlakeRef & lockedRef,
         const FlakeRef & originalRef,
-        bool isFlake = true)
-        : lockedRef(lockedRef), originalRef(originalRef), isFlake(isFlake)
+        bool isFlake = true,
+        std::optional<InputPath> parentPath = {})
+        : lockedRef(lockedRef)
+        , originalRef(originalRef)
+        , isFlake(isFlake)
+        , parentPath(parentPath)
     { }
 
     LockedNode(
@@ -71,7 +79,7 @@ struct LockFile
      * Check whether this lock file has any unlocked or non-final
      * inputs. If so, return one.
      */
-    std::optional<FlakeRef> isUnlocked() const;
+    std::optional<FlakeRef> isUnlocked(const fetchers::Settings & fetchSettings) const;
 
     bool operator ==(const LockFile & other) const;
 

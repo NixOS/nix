@@ -15,7 +15,7 @@ using namespace nix;
 
 struct CmdUpgradeNix : MixDryRun, StoreCommand
 {
-    Path profileDir;
+    std::filesystem::path profileDir;
 
     CmdUpgradeNix()
     {
@@ -64,7 +64,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         if (profileDir == "")
             profileDir = getProfileDir(store);
 
-        printInfo("upgrading Nix in profile '%s'", profileDir);
+        printInfo("upgrading Nix in profile %s", profileDir);
 
         auto storePath = getLatestNix(store);
 
@@ -93,40 +93,44 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         {
             Activity act(*logger, lvlInfo, actUnknown,
-                fmt("installing '%s' into profile '%s'...", store->printStorePath(storePath), profileDir));
+                fmt("installing '%s' into profile %s...", store->printStorePath(storePath), profileDir));
+
+            // FIXME: don't call an external process.
             runProgram(getNixBin("nix-env").string(), false,
-                {"--profile", profileDir, "-i", store->printStorePath(storePath), "--no-sandbox"});
+                {"--profile", profileDir.string(), "-i", store->printStorePath(storePath), "--no-sandbox"});
         }
 
         printInfo(ANSI_GREEN "upgrade to version %s done" ANSI_NORMAL, version);
     }
 
     /* Return the profile in which Nix is installed. */
-    Path getProfileDir(ref<Store> store)
+    std::filesystem::path getProfileDir(ref<Store> store)
     {
         auto whereOpt = ExecutablePath::load().findName(OS_STR("nix-env"));
         if (!whereOpt)
             throw Error("couldn't figure out how Nix is installed, so I can't upgrade it");
         const auto & where = whereOpt->parent_path();
 
-        printInfo("found Nix in '%s'", where);
+        printInfo("found Nix in %s", where);
 
         if (hasPrefix(where.string(), "/run/current-system"))
             throw Error("Nix on NixOS must be upgraded via 'nixos-rebuild'");
 
-        Path profileDir = where.parent_path().string();
+        auto profileDir = where.parent_path();
 
         // Resolve profile to /nix/var/nix/profiles/<name> link.
-        while (canonPath(profileDir).find("/profiles/") == std::string::npos && std::filesystem::is_symlink(profileDir))
-            profileDir = readLink(profileDir);
+        while (canonPath(profileDir.string()).find("/profiles/") == std::string::npos && std::filesystem::is_symlink(profileDir))
+            profileDir = readLink(profileDir.string());
 
-        printInfo("found profile '%s'", profileDir);
+        printInfo("found profile %s", profileDir);
 
-        Path userEnv = canonPath(profileDir, true);
+        Path userEnv = canonPath(profileDir.string(), true);
 
-        if (where.filename() != "bin" ||
-            !hasSuffix(userEnv, "user-environment"))
-            throw Error("directory %s does not appear to be part of a Nix profile", where);
+        if (std::filesystem::exists(profileDir / "manifest.json"))
+            throw Error("directory %s is managed by 'nix profile' and currently cannot be upgraded by 'nix upgrade-nix'", profileDir);
+
+        if (!std::filesystem::exists(profileDir / "manifest.nix"))
+            throw Error("directory %s does not appear to be part of a Nix profile", profileDir);
 
         if (!store->isValidPath(store->parseStorePath(userEnv)))
             throw Error("directory '%s' is not in the Nix store", userEnv);

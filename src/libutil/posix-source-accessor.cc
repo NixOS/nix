@@ -122,7 +122,13 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
             S_ISREG(st->st_mode) ? tRegular :
             S_ISDIR(st->st_mode) ? tDirectory :
             S_ISLNK(st->st_mode) ? tSymlink :
-            tMisc,
+            S_ISCHR(st->st_mode) ? tChar :
+            S_ISBLK(st->st_mode) ? tBlock :
+#ifdef S_ISSOCK
+            S_ISSOCK(st->st_mode) ? tSocket :
+#endif
+            S_ISFIFO(st->st_mode) ? tFifo :
+            tUnknown,
         .fileSize = S_ISREG(st->st_mode) ? std::optional<uint64_t>(st->st_size) : std::nullopt,
         .isExecutable = S_ISREG(st->st_mode) && st->st_mode & S_IXUSR,
     };
@@ -156,7 +162,11 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
             case std::filesystem::file_type::regular: return Type::tRegular; break;
             case std::filesystem::file_type::symlink: return Type::tSymlink; break;
             case std::filesystem::file_type::directory: return Type::tDirectory; break;
-            default: return tMisc;
+            case std::filesystem::file_type::character: return Type::tChar; break;
+            case std::filesystem::file_type::block: return Type::tBlock; break;
+            case std::filesystem::file_type::fifo: return Type::tFifo; break;
+            case std::filesystem::file_type::socket: return Type::tSocket; break;
+            default: return tUnknown;
             }
 #pragma GCC diagnostic pop
             }();

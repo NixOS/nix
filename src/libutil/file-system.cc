@@ -31,12 +31,7 @@ namespace nix {
 
 namespace fs { using namespace std::filesystem; }
 
-/**
- * Treat the string as possibly an absolute path, by inspecting the
- * start of it. Return whether it was probably intended to be
- * absolute.
- */
-static bool isAbsolute(PathView path)
+bool isAbsolute(PathView path)
 {
     return fs::path { path }.is_absolute();
 }
@@ -648,7 +643,7 @@ void setWriteTime(
     // doesn't support access time just modification time.
     //
     // System clock vs File clock issues also make that annoying.
-    warn("Changing file times is not yet implemented on Windows, path is '%s'", path);
+    warn("Changing file times is not yet implemented on Windows, path is %s", path);
 #elif HAVE_UTIMENSAT && HAVE_DECL_AT_SYMLINK_NOFOLLOW
     struct timespec times[2] = {
         {
@@ -661,7 +656,7 @@ void setWriteTime(
         },
     };
     if (utimensat(AT_FDCWD, path.c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
-        throw SysError("changing modification time of '%s' (using `utimensat`)", path);
+        throw SysError("changing modification time of %s (using `utimensat`)", path);
 #else
     struct timeval times[2] = {
         {
@@ -675,7 +670,7 @@ void setWriteTime(
     };
 #if HAVE_LUTIMES
     if (lutimes(path.c_str(), times) == -1)
-        throw SysError("changing modification time of '%s'", path);
+        throw SysError("changing modification time of %s", path);
 #else
     bool isSymlink = optIsSymlink
         ? *optIsSymlink
@@ -683,9 +678,9 @@ void setWriteTime(
 
     if (!isSymlink) {
         if (utimes(path.c_str(), times) == -1)
-            throw SysError("changing modification time of '%s' (not a symlink)", path);
+            throw SysError("changing modification time of %s (not a symlink)", path);
     } else {
-        throw Error("Cannot modification time of symlink '%s'", path);
+        throw Error("Cannot modification time of symlink %s", path);
     }
 #endif
 #endif
@@ -714,7 +709,7 @@ void copyFile(const fs::path & from, const fs::path & to, bool andDelete)
             copyFile(entry, to / entry.path().filename(), andDelete);
         }
     } else {
-        throw Error("file '%s' has an unsupported type", from);
+        throw Error("file %s has an unsupported type", from);
     }
 
     setWriteTime(to, lstat(from.string().c_str()));
@@ -741,7 +736,7 @@ void moveFile(const Path & oldName, const Path & newName)
         auto tempCopyTarget = temp / "copy-target";
         if (e.code().value() == EXDEV) {
             fs::remove(newPath);
-            warn("Can’t rename %s as %s, copying instead", oldName, newName);
+            warn("can’t rename %s as %s, copying instead", oldName, newName);
             copyFile(oldPath, tempCopyTarget, true);
             std::filesystem::rename(
                 os_string_to_string(PathViewNG { tempCopyTarget }),

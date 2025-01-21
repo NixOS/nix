@@ -48,9 +48,10 @@ FlakeRef parseFlakeRef(
     const std::string & url,
     const std::optional<Path> & baseDir,
     bool allowMissing,
-    bool isFlake)
+    bool isFlake,
+    bool preserveRelativePaths)
 {
-    auto [flakeRef, fragment] = parseFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake);
+    auto [flakeRef, fragment] = parseFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake, preserveRelativePaths);
     if (fragment != "")
         throw Error("unexpected fragment '%s' in flake reference '%s'", fragment, url);
     return flakeRef;
@@ -87,7 +88,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     const std::string & url,
     const std::optional<Path> & baseDir,
     bool allowMissing,
-    bool isFlake)
+    bool isFlake,
+    bool preserveRelativePaths)
 {
     static std::regex pathFlakeRegex(
         R"(([^?#]*)(\?([^#]*))?(#(.*))?)",
@@ -102,8 +104,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 
     if (baseDir) {
         /* Check if 'url' is a path (either absolute or relative
-            to 'baseDir'). If so, search upward to the root of the
-            repo (i.e. the directory containing .git). */
+           to 'baseDir'). If so, search upward to the root of the
+           repo (i.e. the directory containing .git). */
 
         path = absPath(path, baseDir);
 
@@ -178,9 +180,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         }
 
     } else {
-        if (!hasPrefix(path, "/"))
+        if (!preserveRelativePaths && !isAbsolute(path))
             throw BadURL("flake reference '%s' is not an absolute path", url);
-        path = canonPath(path + "/" + getOr(query, "dir", ""));
     }
 
     return fromParsedURL(fetchSettings, {
@@ -199,8 +200,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 static std::optional<std::pair<FlakeRef, std::string>> parseFlakeIdRef(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
-    bool isFlake
-)
+    bool isFlake)
 {
     std::smatch match;
 
@@ -228,11 +228,15 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
     const std::optional<Path> & baseDir,
-    bool isFlake
-)
+    bool isFlake)
 {
     try {
-        return fromParsedURL(fetchSettings, parseURL(url), isFlake);
+        auto parsed = parseURL(url);
+        if (baseDir
+            && (parsed.scheme == "path" || parsed.scheme == "git+file")
+            && !isAbsolute(parsed.path))
+            parsed.path = absPath(parsed.path, *baseDir);
+        return fromParsedURL(fetchSettings, std::move(parsed), isFlake);
     } catch (BadURL &) {
         return std::nullopt;
     }
@@ -243,7 +247,8 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const std::string & url,
     const std::optional<Path> & baseDir,
     bool allowMissing,
-    bool isFlake)
+    bool isFlake,
+    bool preserveRelativePaths)
 {
     using namespace fetchers;
 
@@ -252,7 +257,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     } else if (auto res = parseURLFlakeRef(fetchSettings, url, baseDir, isFlake)) {
         return *res;
     } else {
-        return parsePathFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake);
+        return parsePathFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake, preserveRelativePaths);
     }
 }
 

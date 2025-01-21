@@ -126,7 +126,7 @@ struct MercurialInputScheme : InputScheme
         return res;
     }
 
-    std::optional<Path> getSourcePath(const Input & input) const override
+    std::optional<std::filesystem::path> getSourcePath(const Input & input) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         if (url.scheme == "file" && !input.getRef() && !input.getRev())
