@@ -2,6 +2,25 @@
 
 source common.sh
 
+function subcommands() {
+  jq -r '
+def recurse($prefix):
+    to_entries[] |
+    ($prefix + [.key]) as $newPrefix |
+    (if .value | has("commands") then
+      ($newPrefix, (.value.commands | recurse($newPrefix)))
+    else
+      $newPrefix
+    end);
+.args.commands | recurse([]) | join(" ")
+'
+}
+
+nix __dump-cli | subcommands | while IFS= read -r cmd; do
+    # shellcheck disable=SC2086 # word splitting of cmd is intended
+    nix $cmd --help
+done
+
 [[ $(type -p man) ]] || skipTest "'man' not installed"
 
 # test help output
@@ -51,22 +70,3 @@ nix-daemon --help
 nix-hash --help
 nix-instantiate --help
 nix-prefetch-url --help
-
-function subcommands() {
-  jq -r '
-def recurse($prefix):
-    to_entries[] |
-    ($prefix + [.key]) as $newPrefix |
-    (if .value | has("commands") then
-      ($newPrefix, (.value.commands | recurse($newPrefix)))
-    else
-      $newPrefix
-    end);
-.args.commands | recurse([]) | join(" ")
-'
-}
-
-nix __dump-cli | subcommands | while IFS= read -r cmd; do
-    # shellcheck disable=SC2086 # word splitting of cmd is intended
-    nix $cmd --help
-done
