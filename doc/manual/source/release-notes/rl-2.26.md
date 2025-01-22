@@ -70,6 +70,12 @@
 
   This update improves the reliability of SSH-related operations using `NIX_SSHOPTS` across Nix CLIs.
 
+- Nix is now built using Meson
+
+  As proposed in [RFC 132](https://github.com/NixOS/rfcs/pull/132), Nix's build system now uses Meson/Ninja. The old Make-based build system has been removed.
+
+- Evaluation caching now works for dirty Git workdirs [#11992](https://github.com/NixOS/nix/pull/11992)
+
 # Contributors
 
 Querying GitHub API for f0c209fb14cb511370ea2b7787d9a8dd90070162, to get handle for kusold@users.noreply.github.com
