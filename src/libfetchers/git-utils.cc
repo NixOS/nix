@@ -159,7 +159,8 @@ static Object peelToTreeOrBlob(git_object * obj)
         return peelObject<Object>(obj, GIT_OBJECT_TREE);
 }
 
-static void initRepoAtomically(std::filesystem::path &path, bool bare) {
+static void initRepoAtomically(std::filesystem::path &path, bool bare)
+{
     if (pathExists(path.string())) return;
 
     Path tmpDir = createTempDir(std::filesystem::path(path).parent_path());
@@ -416,13 +417,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         //       then use code that was removed in this commit (see blame)
 
         auto dir = this->path;
-        Strings gitArgs;
-        if (shallow) {
-            gitArgs = { "-C", dir.string(), "fetch", "--quiet", "--force", "--depth", "1", "--", url, refspec };
-        }
-        else {
-            gitArgs = { "-C", dir.string(), "fetch", "--quiet", "--force", "--", url, refspec };
-        }
+        Strings gitArgs{"-C", dir.string(), "fetch", "--quiet", "--force"};
+        if (shallow)
+            append(gitArgs, {"--depth", "1"});
+        append(gitArgs, {std::string("--"), url, refspec});
 
         runProgram(RunOptions {
             .program = "git",
