@@ -66,14 +66,7 @@
 
       forAllCrossSystems = lib.genAttrs crossSystems;
 
-      forAllStdenvs = f:
-        lib.listToAttrs
-          (map
-            (stdenvName: {
-              name = "${stdenvName}Packages";
-              value = f stdenvName;
-            })
-            stdenvs);
+      forAllStdenvs = lib.genAttrs stdenvs;
 
 
       # We don't apply flake-parts to the whole flake so that non-development attributes
@@ -89,31 +82,28 @@
       # Memoize nixpkgs for different platforms for efficiency.
       nixpkgsFor = forAllSystems
         (system: let
-          make-pkgs = crossSystem: stdenv: import nixpkgs {
-            localSystem = {
-              inherit system;
-            };
-            crossSystem = if crossSystem == null then null else {
-              config = crossSystem;
-            } // lib.optionalAttrs (crossSystem == "x86_64-unknown-freebsd13") {
-              useLLVM = true;
-            };
-            overlays = [
-              (overlayFor (p: p.${stdenv}))
-            ];
-          };
-          stdenvs = forAllStdenvs (make-pkgs null);
-          native = stdenvs.stdenvPackages;
-        in {
-          inherit stdenvs native;
-          static = native.pkgsStatic;
-          llvm = native.pkgsLLVM;
-          cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
+          make-pkgs = crossSystem:
+            forAllStdenvs (stdenv: import nixpkgs {
+              localSystem = {
+                inherit system;
+              };
+              crossSystem = if crossSystem == null then null else {
+                config = crossSystem;
+              } // lib.optionalAttrs (crossSystem == "x86_64-unknown-freebsd13") {
+                useLLVM = true;
+              };
+              overlays = [
+                (overlayFor (pkgs: pkgs.${stdenv}))
+              ];
+            });
+        in rec {
+          nativeForStdenv = make-pkgs null;
+          crossForStdenv = forAllCrossSystems make-pkgs;
+          # Alias for convenience
+          native = nativeForStdenv.stdenv;
+          cross = forAllCrossSystems (crossSystem:
+            crossForStdenv.${crossSystem}.stdenv);
         });
-
-      binaryTarball = nix: pkgs: pkgs.callPackage ./scripts/binary-tarball.nix {
-        inherit nix;
-      };
 
       overlayFor = getStdenv: final: prev:
         let
@@ -175,7 +165,6 @@
       hydraJobs = import ./packaging/hydra.nix {
         inherit
           inputs
-          binaryTarball
           forAllCrossSystems
           forAllSystems
           lib
@@ -211,7 +200,7 @@
           # TODO: enable static builds for darwin, blocked on:
           #       https://github.com/NixOS/nixpkgs/issues/320448
           # TODO: disabled to speed up GHA CI.
-          #"static-" = nixpkgsFor.${system}.static;
+          #"static-" = nixpkgsFor.${system}.native.pkgsStatic;
         })
         (nixpkgsPrefix: nixpkgs:
           flatMapAttrs nixpkgs.nixComponents
@@ -282,8 +271,8 @@
           (pkgName: { supportsCross ? true }: {
               # These attributes go right into `packages.<system>`.
               "${pkgName}" = nixpkgsFor.${system}.native.nixComponents.${pkgName};
-              "${pkgName}-static" = nixpkgsFor.${system}.static.nixComponents.${pkgName};
-              "${pkgName}-llvm" = nixpkgsFor.${system}.llvm.nixComponents.${pkgName};
+              "${pkgName}-static" = nixpkgsFor.${system}.native.pkgsStatic.nixComponents.${pkgName};
+              "${pkgName}-llvm" = nixpkgsFor.${system}.native.pkgsLLVM.nixComponents.${pkgName};
             }
             // lib.optionalAttrs supportsCross (flatMapAttrs (lib.genAttrs crossSystems (_: { })) (crossSystem: {}: {
               # These attributes go right into `packages.<system>`.
@@ -291,7 +280,7 @@
             }))
             // flatMapAttrs (lib.genAttrs stdenvs (_: { })) (stdenvName: {}: {
               # These attributes go right into `packages.<system>`.
-              "${pkgName}-${stdenvName}" = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".nixComponents.${pkgName};
+              "${pkgName}-${stdenvName}" = nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.nixComponents.${pkgName};
             })
           )
         // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
@@ -317,21 +306,22 @@
       in
         forAllSystems (system:
           prefixAttrs "native" (forAllStdenvs (stdenvName: makeShell {
-            pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages";
+            pkgs = nixpkgsFor.${system}.nativeForStdenv.${stdenvName};
           })) //
           lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin) (
             prefixAttrs "static" (forAllStdenvs (stdenvName: makeShell {
-              pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".pkgsStatic;
+              pkgs = nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.pkgsStatic;
             })) //
             prefixAttrs "llvm" (forAllStdenvs (stdenvName: makeShell {
-              pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".pkgsLLVM;
+              pkgs = nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.pkgsLLVM;
             })) //
             prefixAttrs "cross" (forAllCrossSystems (crossSystem: makeShell {
               pkgs = nixpkgsFor.${system}.cross.${crossSystem};
             }))
           ) //
           {
-            default = self.devShells.${system}.native-stdenvPackages;
+            native = self.devShells.${system}.native-stdenv;
+            default = self.devShells.${system}.native;
           }
         );
   };

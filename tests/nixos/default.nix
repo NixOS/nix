@@ -1,4 +1,4 @@
-{ lib, nixpkgs, nixpkgsFor, self }:
+{ lib, nixpkgs, nixpkgsFor, nixpkgs-23-11 }:
 
 let
 
@@ -64,7 +64,7 @@ let
   otherNixes.nix_2_13.setNixPackage = { lib, pkgs, ... }: {
     imports = [ checkOverrideNixVersion ];
     nix.package = lib.mkForce (
-      self.inputs.nixpkgs-23-11.legacyPackages.${pkgs.stdenv.hostPlatform.system}.nixVersions.nix_2_13.overrideAttrs (o: {
+      nixpkgs-23-11.legacyPackages.${pkgs.stdenv.hostPlatform.system}.nixVersions.nix_2_13.overrideAttrs (o: {
         meta = o.meta // { knownVulnerabilities = []; };
       })
     );
