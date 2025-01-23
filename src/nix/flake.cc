@@ -103,7 +103,7 @@ public:
                         throw e;
                     }
                     if (lockFlags.inputUpdates.contains(inputPath))
-                        warn("Input '%s' was specified multiple times. You may have done this by accident.");
+                        warn("Input '%s' was specified multiple times. You may have done this by accident.", printInputPath(inputPath));
                     lockFlags.inputUpdates.insert(inputPath);
                 }
             }},
