@@ -531,13 +531,19 @@ void LocalDerivationGoal::startBuilder()
     killSandbox(false);
 
     /* Right platform? */
-    if (!parsedDrv->canBuildLocally(worker.store))
-        throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
-            drv->platform,
-            concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
-            worker.store.printStorePath(drvPath),
-            settings.thisSystem,
-            concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
+    if (!parsedDrv->canBuildLocally(worker.store)) {
+        // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware - we should tell them to run the command to install Darwin 2
+        if (drv->platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin") {
+            throw Error("run `/usr/sbin/softwareupdate --install-rosetta --agree-to-license` to enable your %s to run programs for %s", settings.thisSystem, drv->platform);
+        } else {
+            throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
+                drv->platform,
+                concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
+                worker.store.printStorePath(drvPath),
+                settings.thisSystem,
+                concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
+        }
+    }
 
     /* Create a temporary directory where the build will take
        place. */
