@@ -66,4 +66,7 @@ rec {
 
   # Can use "nar" instead of "recursive" now.
   nar-not-recursive = f2 "foo" ./fixed.builder2.sh "nar" "md5" "3670af73070fa14077ad74e0f5ea4e42";
+
+  # Experimental feature
+  git = f2 "foo" ./fixed.builder2.sh "git" "sha1" "cd44baf36915d5dec8374232ea7e2057f3b4494e";
 }

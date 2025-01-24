@@ -60,6 +60,7 @@ unset XDG_DATA_HOME
 unset XDG_CONFIG_HOME
 unset XDG_CONFIG_DIRS
 unset XDG_CACHE_HOME
+unset GIT_DIR
 
 export IMPURE_VAR1=foo
 export IMPURE_VAR2=bar

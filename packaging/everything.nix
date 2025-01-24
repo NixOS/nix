@@ -42,27 +42,35 @@
 }:
 
 let
+  libs = {
+    inherit
+      nix-util
+      nix-util-c
+      nix-store
+      nix-store-c
+      nix-fetchers
+      nix-expr
+      nix-expr-c
+      nix-flake
+      nix-flake-c
+      nix-main
+      nix-main-c
+      nix-cmd
+    ;
+  } // lib.optionalAttrs (!stdenv.hostPlatform.isStatic && stdenv.buildPlatform.canExecute stdenv.hostPlatform) {
+    # Currently fails in static build
+    inherit
+      nix-perl-bindings
+    ;
+  };
+
   dev = stdenv.mkDerivation (finalAttrs: {
     name = "nix-${nix-cli.version}-dev";
     pname = "nix";
     version = nix-cli.version;
     dontUnpack = true;
     dontBuild = true;
-    libs = map lib.getDev [
-      nix-cmd
-      nix-expr
-      nix-expr-c
-      nix-fetchers
-      nix-flake
-      nix-flake-c
-      nix-main
-      nix-main-c
-      nix-store
-      nix-store-c
-      nix-util
-      nix-util-c
-      nix-perl-bindings
-    ];
+    libs = map lib.getDev (lib.attrValues libs);
     installPhase = ''
       mkdir -p $out/nix-support
       echo $libs >> $out/nix-support/propagated-build-inputs
@@ -127,20 +135,16 @@ in
     nix-fetchers-tests.tests.run
     nix-flake-tests.tests.run
 
+    # Make sure the functional tests have passed
+    nix-functional-tests
+
     # dev bundle is ok
     # (checkInputs must be empty paths??)
     (runCommand "check-pkg-config" { checked = dev.tests.pkg-config; } "mkdir $out")
-  ] ++
-    (if stdenv.buildPlatform.canExecute stdenv.hostPlatform
-    then [
-      # TODO: add perl.tests
-      nix-perl-bindings
-    ]
-    else [
-      nix-perl-bindings
-    ]);
-  installCheckInputs = [
-    nix-functional-tests
+  ] ++ lib.optionals (!stdenv.hostPlatform.isStatic && stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
+    # Perl currently fails in static build
+    # TODO: Split out tests into a separate derivation?
+    nix-perl-bindings
   ];
   passthru = prevAttrs.passthru // {
     inherit (nix-cli) version;
@@ -162,21 +166,7 @@ in
         disallowedReferences = nix.all;
       ```
      */
-    libs = {
-      inherit
-        nix-util
-        nix-util-c
-        nix-store
-        nix-store-c
-        nix-fetchers
-        nix-expr
-        nix-expr-c
-        nix-flake
-        nix-flake-c
-        nix-main
-        nix-main-c
-      ;
-    };
+    inherit libs;
 
     tests = prevAttrs.passthru.tests or {} // {
       # TODO: create a proper fixpoint and:

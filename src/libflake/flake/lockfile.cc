@@ -43,7 +43,7 @@ LockedNode::LockedNode(
     : lockedRef(getFlakeRef(fetchSettings, json, "locked", "info")) // FIXME: remove "info"
     , originalRef(getFlakeRef(fetchSettings, json, "original", nullptr))
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
-    , parentPath(json.find("parent") != json.end() ? (std::optional<InputPath>) json["parent"] : std::nullopt)
+    , parentInputAttrPath(json.find("parent") != json.end() ? (std::optional<InputAttrPath>) json["parent"] : std::nullopt)
     , patchFiles(json.find("patchFiles") != json.end() ? (std::vector<std::string>) json["patchFiles"] : std::vector<std::string>{})
 {
     if (!lockedRef.input.isConsideredLocked(fetchSettings) && !lockedRef.input.isRelative())
@@ -57,8 +57,8 @@ LockedNode::LockedNode(
 
 static std::shared_ptr<Node> doFind(
     const ref<Node> & root,
-    const InputPath & path,
-    std::vector<InputPath> & visited)
+    const InputAttrPath & path,
+    std::vector<InputAttrPath> & visited)
 {
     std::shared_ptr<Node> pos = root;
 
@@ -66,8 +66,8 @@ static std::shared_ptr<Node> doFind(
 
     if (found != visited.end()) {
         std::vector<std::string> cycle;
-        std::transform(found, visited.cend(), std::back_inserter(cycle), printInputPath);
-        cycle.push_back(printInputPath(path));
+        std::transform(found, visited.cend(), std::back_inserter(cycle), printInputAttrPath);
+        cycle.push_back(printInputAttrPath(path));
         throw Error("follow cycle detected: [%s]", concatStringsSep(" -> ", cycle));
     }
     visited.push_back(path);
@@ -89,9 +89,9 @@ static std::shared_ptr<Node> doFind(
     return pos;
 }
 
-std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
+std::shared_ptr<Node> LockFile::findInput(const InputAttrPath & path)
 {
-    std::vector<InputPath> visited;
+    std::vector<InputAttrPath> visited;
     return doFind(root, path, visited);
 }
 
@@ -114,7 +114,7 @@ LockFile::LockFile(
         if (jsonNode.find("inputs") == jsonNode.end()) return;
         for (auto & i : jsonNode["inputs"].items()) {
             if (i.value().is_array()) { // FIXME: remove, obsolete
-                InputPath path;
+                InputAttrPath path;
                 for (auto & j : i.value())
                     path.push_back(j);
                 node.inputs.insert_or_assign(i.key(), path);
@@ -205,8 +205,8 @@ std::pair<nlohmann::json, LockFile::KeyMap> LockFile::toJSON() const
             n["locked"].erase("__final");
             if (!lockedNode->isFlake)
                 n["flake"] = false;
-            if (lockedNode->parentPath)
-                n["parent"] = *lockedNode->parentPath;
+            if (lockedNode->parentInputAttrPath)
+                n["parent"] = *lockedNode->parentInputAttrPath;
             if (!lockedNode->patchFiles.empty())
                 n["patchFiles"] = lockedNode->patchFiles;
         }
@@ -272,36 +272,36 @@ bool LockFile::operator ==(const LockFile & other) const
     return toJSON().first == other.toJSON().first;
 }
 
-InputPath parseInputPath(std::string_view s)
+InputAttrPath parseInputAttrPath(std::string_view s)
 {
-    InputPath path;
+    InputAttrPath path;
 
     for (auto & elem : tokenizeString<std::vector<std::string>>(s, "/")) {
         if (!std::regex_match(elem, flakeIdRegex))
-            throw UsageError("invalid flake input path element '%s'", elem);
+            throw UsageError("invalid flake input attribute path element '%s'", elem);
         path.push_back(elem);
     }
 
     return path;
 }
 
-std::map<InputPath, Node::Edge> LockFile::getAllInputs() const
+std::map<InputAttrPath, Node::Edge> LockFile::getAllInputs() const
 {
     std::set<ref<Node>> done;
-    std::map<InputPath, Node::Edge> res;
+    std::map<InputAttrPath, Node::Edge> res;
 
-    std::function<void(const InputPath & prefix, ref<Node> node)> recurse;
+    std::function<void(const InputAttrPath & prefix, ref<Node> node)> recurse;
 
-    recurse = [&](const InputPath & prefix, ref<Node> node)
+    recurse = [&](const InputAttrPath & prefix, ref<Node> node)
     {
         if (!done.insert(node).second) return;
 
         for (auto &[id, input] : node->inputs) {
-            auto inputPath(prefix);
-            inputPath.push_back(id);
-            res.emplace(inputPath, input);
+            auto inputAttrPath(prefix);
+            inputAttrPath.push_back(id);
+            res.emplace(inputAttrPath, input);
             if (auto child = std::get_if<0>(&input))
-                recurse(inputPath, *child);
+                recurse(inputAttrPath, *child);
         }
     };
 
@@ -325,7 +325,7 @@ std::ostream & operator <<(std::ostream & stream, const Node::Edge & edge)
     if (auto node = std::get_if<0>(&edge))
         stream << describe((*node)->lockedRef);
     else if (auto follows = std::get_if<1>(&edge))
-        stream << fmt("follows '%s'", printInputPath(*follows));
+        stream << fmt("follows '%s'", printInputAttrPath(*follows));
     return stream;
 }
 
@@ -352,15 +352,15 @@ std::string LockFile::diff(const LockFile & oldLocks, const LockFile & newLocks)
     while (i != oldFlat.end() || j != newFlat.end()) {
         if (j != newFlat.end() && (i == oldFlat.end() || i->first > j->first)) {
             res += fmt("• " ANSI_GREEN "Added input '%s':" ANSI_NORMAL "\n    %s\n",
-                printInputPath(j->first), j->second);
+                printInputAttrPath(j->first), j->second);
             ++j;
         } else if (i != oldFlat.end() && (j == newFlat.end() || i->first < j->first)) {
-            res += fmt("• " ANSI_RED "Removed input '%s'" ANSI_NORMAL "\n", printInputPath(i->first));
+            res += fmt("• " ANSI_RED "Removed input '%s'" ANSI_NORMAL "\n", printInputAttrPath(i->first));
             ++i;
         } else {
             if (!equals(i->second, j->second)) {
                 res += fmt("• " ANSI_BOLD "Updated input '%s':" ANSI_NORMAL "\n    %s\n  → %s\n",
-                    printInputPath(i->first),
+                    printInputAttrPath(i->first),
                     i->second,
                     j->second);
             }
@@ -376,19 +376,19 @@ void LockFile::check()
 {
     auto inputs = getAllInputs();
 
-    for (auto & [inputPath, input] : inputs) {
+    for (auto & [inputAttrPath, input] : inputs) {
         if (auto follows = std::get_if<1>(&input)) {
             if (!follows->empty() && !findInput(*follows))
                 throw Error("input '%s' follows a non-existent input '%s'",
-                    printInputPath(inputPath),
-                    printInputPath(*follows));
+                    printInputAttrPath(inputAttrPath),
+                    printInputAttrPath(*follows));
         }
     }
 }
 
 void check();
 
-std::string printInputPath(const InputPath & path)
+std::string printInputAttrPath(const InputAttrPath & path)
 {
     return concatStringsSep("/", path);
 }

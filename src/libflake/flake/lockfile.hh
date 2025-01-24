@@ -12,7 +12,7 @@ class StorePath;
 
 namespace nix::flake {
 
-typedef std::vector<FlakeId> InputPath;
+typedef std::vector<FlakeId> InputAttrPath;
 
 struct LockedNode;
 
@@ -23,7 +23,7 @@ struct LockedNode;
  */
 struct Node : std::enable_shared_from_this<Node>
 {
-    typedef std::variant<ref<LockedNode>, InputPath> Edge;
+    typedef std::variant<ref<LockedNode>, InputAttrPath> Edge;
 
     std::map<FlakeId, Edge> inputs;
 
@@ -40,7 +40,7 @@ struct LockedNode : Node
 
     /* The node relative to which relative source paths
        (e.g. 'path:../foo') are interpreted. */
-    std::optional<InputPath> parentPath;
+    std::optional<InputAttrPath> parentInputAttrPath;
 
     std::vector<std::string> patchFiles;
 
@@ -48,12 +48,12 @@ struct LockedNode : Node
         const FlakeRef & lockedRef,
         const FlakeRef & originalRef,
         bool isFlake = true,
-        std::optional<InputPath> parentPath = {},
+        std::optional<InputAttrPath> parentInputAttrPath = {},
         std::vector<std::string> patchFiles = {})
-        : lockedRef(lockedRef)
-        , originalRef(originalRef)
+        : lockedRef(std::move(lockedRef))
+        , originalRef(std::move(originalRef))
         , isFlake(isFlake)
-        , parentPath(parentPath)
+        , parentInputAttrPath(std::move(parentInputAttrPath))
         , patchFiles(std::move(patchFiles))
     { }
 
@@ -85,9 +85,9 @@ struct LockFile
 
     bool operator ==(const LockFile & other) const;
 
-    std::shared_ptr<Node> findInput(const InputPath & path);
+    std::shared_ptr<Node> findInput(const InputAttrPath & path);
 
-    std::map<InputPath, Node::Edge> getAllInputs() const;
+    std::map<InputAttrPath, Node::Edge> getAllInputs() const;
 
     static std::string diff(const LockFile & oldLocks, const LockFile & newLocks);
 
@@ -99,8 +99,8 @@ struct LockFile
 
 std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile);
 
-InputPath parseInputPath(std::string_view s);
+InputAttrPath parseInputAttrPath(std::string_view s);
 
-std::string printInputPath(const InputPath & path);
+std::string printInputAttrPath(const InputAttrPath & path);
 
 }

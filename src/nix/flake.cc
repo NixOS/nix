@@ -95,20 +95,20 @@ public:
             .optional=true,
             .handler={[&](std::vector<std::string> inputsToUpdate){
                 for (const auto & inputToUpdate : inputsToUpdate) {
-                    InputPath inputPath;
+                    InputAttrPath inputAttrPath;
                     try {
-                        inputPath = flake::parseInputPath(inputToUpdate);
+                        inputAttrPath = flake::parseInputAttrPath(inputToUpdate);
                     } catch (Error & e) {
                         warn("Invalid flake input '%s'. To update a specific flake, use 'nix flake update --flake %s' instead.", inputToUpdate, inputToUpdate);
                         throw e;
                     }
-                    if (lockFlags.inputUpdates.contains(inputPath))
-                        warn("Input '%s' was specified multiple times. You may have done this by accident.");
-                    lockFlags.inputUpdates.insert(inputPath);
+                    if (lockFlags.inputUpdates.contains(inputAttrPath))
+                        warn("Input '%s' was specified multiple times. You may have done this by accident.", printInputAttrPath(inputAttrPath));
+                    lockFlags.inputUpdates.insert(inputAttrPath);
                 }
             }},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
-                completeFlakeInputPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
+                completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
             }}
         });
 
@@ -297,7 +297,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                     } else if (auto follows = std::get_if<1>(&input.second)) {
                         logger->cout("%s" ANSI_BOLD "%s" ANSI_NORMAL " follows input '%s'",
                             prefix + (last ? treeLast : treeConn), input.first,
-                            printInputPath(*follows));
+                            printInputAttrPath(*follows));
                     }
                 }
             };
@@ -1075,18 +1075,18 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON
         auto jsonRoot = json ? std::optional<nlohmann::json>() : std::nullopt;
 
         // FIXME: use graph output, handle cycles.
-        std::function<nlohmann::json(const Node & node, const InputPath & parentPath)> traverse;
-        traverse = [&](const Node & node, const InputPath & parentPath)
+        std::function<nlohmann::json(const Node & node, const InputAttrPath & parentInputAttrPath)> traverse;
+        traverse = [&](const Node & node, const InputAttrPath & parentInputAttrPath)
         {
             nlohmann::json jsonObj2 = json ? json::object() : nlohmann::json(nullptr);
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input)) {
-                    auto inputPath = parentPath;
-                    inputPath.push_back(inputName);
+                    auto inputAttrPath = parentInputAttrPath;
+                    inputAttrPath.push_back(inputName);
                     Activity act(*logger, lvlChatty, actUnknown,
-                        fmt("archiving input '%s'", printInputPath(inputPath)));
+                        fmt("archiving input '%s'", printInputAttrPath(inputAttrPath)));
                     auto storePath = (*inputNode)->lockedRef.input.fetchToStore(dstStore).first;
-                    auto res = traverse(**inputNode, inputPath);
+                    auto res = traverse(**inputNode, inputAttrPath);
                     if (json) {
                         auto & jsonObj3 = jsonObj2[inputName];
                         jsonObj3["path"] = store->printStorePath(storePath);

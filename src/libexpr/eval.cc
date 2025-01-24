@@ -3192,7 +3192,7 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
             }
         }
 
-        if (path.pathExists())
+        if (path.resolveSymlinks().pathExists())
             return finish(std::move(path));
         else {
             logWarning({

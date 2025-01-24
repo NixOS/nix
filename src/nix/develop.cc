@@ -697,7 +697,7 @@ struct CmdDevelop : Common, MixEnvironment
                     ->flake.resolvedRef.input.getAccessor(store).first).getPhysicalPath();
                 if (sourcePath) {
                     if (chdir(sourcePath->c_str()) == -1) {
-                        throw SysError("chdir to '%s' failed", *sourcePath);
+                        throw SysError("chdir to %s failed", *sourcePath);
                     }
                 }
             }

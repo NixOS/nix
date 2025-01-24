@@ -79,7 +79,7 @@ This shell also adds `./outputs/bin/nix` to your `$PATH` so you can run `nix` im
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix develop .#native-clangStdenvPackages
+$ nix develop .#native-clangStdenv
 ```
 
 > **Note**
@@ -261,7 +261,8 @@ See [supported compilation environments](#compilation-environments) and instruct
 To use the LSP with your editor, you will want a `compile_commands.json` file telling `clangd` how we are compiling the code.
 Meson's configure always produces this inside the build directory.
 
-Configure your editor to use the `clangd` from the `.#native-clangStdenvPackages` shell. You can do that either by running it inside the development shell, or by using [nix-direnv](https://github.com/nix-community/nix-direnv) and [the appropriate editor plugin](https://github.com/direnv/direnv/wiki#editor-integration).
+Configure your editor to use the `clangd` from the `.#native-clangStdenv` shell.
+You can do that either by running it inside the development shell, or by using [nix-direnv](https://github.com/nix-community/nix-direnv) and [the appropriate editor plugin](https://github.com/direnv/direnv/wiki#editor-integration).
 
 > **Note**
 >

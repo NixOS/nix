@@ -68,4 +68,14 @@ nix-env -i dependencies-top
 [ -e $TEST_HOME/.nix-profile/foobar ]
 
 # Test evaluation through a channel symlink (#9882).
-nix-instantiate '<foo/dependencies.nix>'
+drvPath=$(nix-instantiate '<foo/dependencies.nix>')
+
+# Add a test for the special case behaviour of 'nixpkgs' in the
+# channels for root (see EvalSettings::getDefaultNixPath()).
+if ! isTestOnNixOS; then
+    nix-channel --add file://$TEST_ROOT/foo nixpkgs
+    nix-channel --update
+    mv $TEST_HOME/.local/state/nix/profiles $TEST_ROOT/var/nix/profiles/per-user/root
+    drvPath2=$(nix-instantiate '<nixpkgs>')
+    [[ "$drvPath" = "$drvPath2" ]]
+fi
