@@ -1,17 +1,18 @@
-{ lib
-, stdenv
-, mkMesonDerivation
+{
+  lib,
+  stdenv,
+  mkMesonDerivation,
 
-, meson
-, ninja
-, pkg-config
+  meson,
+  ninja,
+  pkg-config,
 
-, nix-store-c
-, nix-expr
+  nix-store-c,
+  nix-expr,
 
-# Configuration Options
+  # Configuration Options
 
-, version
+  version,
 }:
 
 let
@@ -35,7 +36,10 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "h") ./.)
   ];
 
-  outputs = [ "out" "dev" ];
+  outputs = [
+    "out"
+    "dev"
+  ];
 
   nativeBuildInputs = [
     meson
@@ -59,9 +63,12 @@ mkMesonDerivation (finalAttrs: {
   mesonFlags = [
   ];
 
-  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
+  env =
+    lib.optionalAttrs
+      (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
+      {
+        LDFLAGS = "-fuse-ld=gold";
+      };
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 

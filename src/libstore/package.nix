@@ -1,29 +1,30 @@
-{ lib
-, stdenv
-, mkMesonDerivation
-, releaseTools
+{
+  lib,
+  stdenv,
+  mkMesonDerivation,
+  releaseTools,
 
-, meson
-, ninja
-, pkg-config
-, unixtools
-, darwin
+  meson,
+  ninja,
+  pkg-config,
+  unixtools,
+  darwin,
 
-, nix-util
-, boost
-, curl
-, aws-sdk-cpp
-, libseccomp
-, nlohmann_json
-, sqlite
+  nix-util,
+  boost,
+  curl,
+  aws-sdk-cpp,
+  libseccomp,
+  nlohmann_json,
+  sqlite,
 
-, busybox-sandbox-shell ? null
+  busybox-sandbox-shell ? null,
 
-# Configuration Options
+  # Configuration Options
 
-, version
+  version,
 
-, embeddedSandboxShell ? stdenv.hostPlatform.isStatic
+  embeddedSandboxShell ? stdenv.hostPlatform.isStatic,
 }:
 
 let
@@ -52,7 +53,10 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "sql") ./.)
   ];
 
-  outputs = [ "out" "dev" ];
+  outputs = [
+    "out"
+    "dev"
+  ];
 
   nativeBuildInputs = [
     meson
@@ -60,16 +64,18 @@ mkMesonDerivation (finalAttrs: {
     pkg-config
   ] ++ lib.optional embeddedSandboxShell unixtools.hexdump;
 
-  buildInputs = [
-    boost
-    curl
-    sqlite
-  ] ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
+  buildInputs =
+    [
+      boost
+      curl
+      sqlite
+    ]
+    ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
     # There have been issues building these dependencies
     ++ lib.optional stdenv.hostPlatform.isDarwin darwin.apple_sdk.libs.sandbox
-    ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))
-      aws-sdk-cpp
-  ;
+    ++ lib.optional (
+      stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin)
+    ) aws-sdk-cpp;
 
   propagatedBuildInputs = [
     nix-util
@@ -84,21 +90,27 @@ mkMesonDerivation (finalAttrs: {
       echo ${version} > ../../.version
     '';
 
-  mesonFlags = [
-    (lib.mesonEnable "seccomp-sandboxing" stdenv.hostPlatform.isLinux)
-    (lib.mesonBool "embedded-sandbox-shell" embeddedSandboxShell)
-  ] ++ lib.optionals stdenv.hostPlatform.isLinux [
-    (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")
-  ];
+  mesonFlags =
+    [
+      (lib.mesonEnable "seccomp-sandboxing" stdenv.hostPlatform.isLinux)
+      (lib.mesonBool "embedded-sandbox-shell" embeddedSandboxShell)
+    ]
+    ++ lib.optionals stdenv.hostPlatform.isLinux [
+      (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")
+    ];
 
-  env = {
-    # Needed for Meson to find Boost.
-    # https://github.com/NixOS/nixpkgs/issues/86131.
-    BOOST_INCLUDEDIR = "${lib.getDev boost}/include";
-    BOOST_LIBRARYDIR = "${lib.getLib boost}/lib";
-  } // lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
+  env =
+    {
+      # Needed for Meson to find Boost.
+      # https://github.com/NixOS/nixpkgs/issues/86131.
+      BOOST_INCLUDEDIR = "${lib.getDev boost}/include";
+      BOOST_LIBRARYDIR = "${lib.getLib boost}/lib";
+    }
+    // lib.optionalAttrs
+      (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
+      {
+        LDFLAGS = "-fuse-ld=gold";
+      };
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 

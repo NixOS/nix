@@ -5,7 +5,8 @@
   script = ''
     # add a file to the repo
     client.succeed(f"""
-      echo ${config.name /* to make the git tree and store path unique */} > {repo.path}/test-case \
+      echo ${config.name # to make the git tree and store path unique
+      } > {repo.path}/test-case \
       && echo lutyabrook > {repo.path}/new-york-state \
       && {repo.git} add test-case new-york-state \
       && {repo.git} commit -m 'commit1'
