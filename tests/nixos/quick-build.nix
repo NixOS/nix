@@ -27,21 +27,25 @@ in
   };
 
   config = {
-    passthru.quickBuild = 
-      let withQuickBuild = extendModules { modules = [{ quickBuild = true; }]; };
-      in withQuickBuild.config.test;
+    passthru.quickBuild =
+      let
+        withQuickBuild = extendModules { modules = [ { quickBuild = true; } ]; };
+      in
+      withQuickBuild.config.test;
 
-    defaults = { pkgs, ... }: {
-      config = lib.mkIf test.config.quickBuild {
-        nix.package = pkgs.nix_noTests;
+    defaults =
+      { pkgs, ... }:
+      {
+        config = lib.mkIf test.config.quickBuild {
+          nix.package = pkgs.nix_noTests;
 
-        system.forbiddenDependenciesRegexes = [
-          # This would indicate that the quickBuild feature is broken.
-          # It could happen if NixOS has a dependency on pkgs.nix instead of
-          # config.nix.package somewhere.
-          (builtins.unsafeDiscardStringContext pkgs.nix.outPath)
-        ];
+          system.forbiddenDependenciesRegexes = [
+            # This would indicate that the quickBuild feature is broken.
+            # It could happen if NixOS has a dependency on pkgs.nix instead of
+            # config.nix.package somewhere.
+            (builtins.unsafeDiscardStringContext pkgs.nix.outPath)
+          ];
+        };
       };
-    };
   };
 }

@@ -1,28 +1,31 @@
-{ inputs
-, binaryTarball
-, forAllCrossSystems
-, forAllSystems
-, lib
-, linux64BitSystems
-, nixpkgsFor
-, self
+{
+  inputs,
+  binaryTarball,
+  forAllCrossSystems,
+  forAllSystems,
+  lib,
+  linux64BitSystems,
+  nixpkgsFor,
+  self,
 }:
 let
   inherit (inputs) nixpkgs nixpkgs-regression;
 
-  installScriptFor = tarballs:
+  installScriptFor =
+    tarballs:
     nixpkgsFor.x86_64-linux.native.callPackage ../scripts/installer.nix {
       inherit tarballs;
     };
 
-  testNixVersions = pkgs: client: daemon:
+  testNixVersions =
+    pkgs: client: daemon:
     pkgs.callPackage ../package.nix {
       pname =
         "nix-tests"
-        + lib.optionalString
-          (lib.versionAtLeast daemon.version "2.4pre20211005" &&
-           lib.versionAtLeast client.version "2.4pre20211005")
-          "-${client.version}-against-${daemon.version}";
+        + lib.optionalString (
+          lib.versionAtLeast daemon.version "2.4pre20211005"
+          && lib.versionAtLeast client.version "2.4pre20211005"
+        ) "-${client.version}-against-${daemon.version}";
 
       test-client = client;
       test-daemon = daemon;
@@ -59,27 +62,35 @@ let
 in
 {
   # Binary package for various platforms.
-  build = forAllPackages (pkgName:
-    forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.${pkgName}));
+  build = forAllPackages (
+    pkgName: forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.${pkgName})
+  );
 
   shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
 
-  buildStatic = forAllPackages (pkgName:
-    lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.nixComponents.${pkgName}));
-
-  buildCross = forAllPackages (pkgName:
-    forAllCrossSystems (crossSystem:
-      lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName})));
-
-  buildNoGc = forAllSystems (system:
-    self.packages.${system}.nix.override { enableGC = false; }
+  buildStatic = forAllPackages (
+    pkgName:
+    lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.nixComponents.${pkgName})
   );
+
+  buildCross = forAllPackages (
+    pkgName:
+    forAllCrossSystems (
+      crossSystem:
+      lib.genAttrs [ "x86_64-linux" ] (
+        system: nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName}
+      )
+    )
+  );
+
+  buildNoGc = forAllSystems (system: self.packages.${system}.nix.override { enableGC = false; });
 
   buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nix_noTests);
 
   # Toggles some settings for better coverage. Windows needs these
   # library combinations, and Debian build Nix with GNU readline too.
-  buildReadlineNoMarkdown = forAllSystems (system:
+  buildReadlineNoMarkdown = forAllSystems (
+    system:
     self.packages.${system}.nix.override {
       enableMarkdown = false;
       readlineFlavor = "readline";
@@ -92,13 +103,18 @@ in
   # Binary tarball for various platforms, containing a Nix store
   # with the closure of 'nix' package, and the second half of
   # the installation script.
-  binaryTarball = forAllSystems (system: binaryTarball nixpkgsFor.${system}.native.nix nixpkgsFor.${system}.native);
+  binaryTarball = forAllSystems (
+    system: binaryTarball nixpkgsFor.${system}.native.nix nixpkgsFor.${system}.native
+  );
 
-  binaryTarballCross = lib.genAttrs [ "x86_64-linux" ] (system:
-    forAllCrossSystems (crossSystem:
-      binaryTarball
-        nixpkgsFor.${system}.cross.${crossSystem}.nix
-        nixpkgsFor.${system}.cross.${crossSystem}));
+  binaryTarballCross = lib.genAttrs [ "x86_64-linux" ] (
+    system:
+    forAllCrossSystems (
+      crossSystem:
+      binaryTarball nixpkgsFor.${system}.cross.${crossSystem}.nix
+        nixpkgsFor.${system}.cross.${crossSystem}
+    )
+  );
 
   # The first half of the installation script. This is uploaded
   # to https://nixos.org/nix/install. It downloads the binary
@@ -117,9 +133,12 @@ in
     self.hydraJobs.binaryTarballCross."x86_64-linux"."riscv64-unknown-linux-gnu"
   ];
 
-  installerScriptForGHA = forAllSystems (system: nixpkgsFor.${system}.native.callPackage ../scripts/installer.nix {
-    tarballs = [ self.hydraJobs.binaryTarball.${system} ];
-  });
+  installerScriptForGHA = forAllSystems (
+    system:
+    nixpkgsFor.${system}.native.callPackage ../scripts/installer.nix {
+      tarballs = [ self.hydraJobs.binaryTarball.${system} ];
+    }
+  );
 
   # docker image with Nix inside
   dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
@@ -137,16 +156,24 @@ in
   external-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-external-api-docs;
 
   # System tests.
-  tests = import ../tests/nixos { inherit lib nixpkgs nixpkgsFor self; } // {
+  tests =
+    import ../tests/nixos {
+      inherit
+        lib
+        nixpkgs
+        nixpkgsFor
+        self
+        ;
+    }
+    // {
 
-    # Make sure that nix-env still produces the exact same result
-    # on a particular version of Nixpkgs.
-    evalNixpkgs =
-      let
-        inherit (nixpkgsFor.x86_64-linux.native) runCommand nix;
-      in
-      runCommand "eval-nixos" { buildInputs = [ nix ]; }
-        ''
+      # Make sure that nix-env still produces the exact same result
+      # on a particular version of Nixpkgs.
+      evalNixpkgs =
+        let
+          inherit (nixpkgsFor.x86_64-linux.native) runCommand nix;
+        in
+        runCommand "eval-nixos" { buildInputs = [ nix ]; } ''
           type -p nix-env
           # Note: we're filtering out nixos-install-tools because https://github.com/NixOS/nixpkgs/pull/153594#issuecomment-1020530593.
           (
@@ -157,36 +184,36 @@ in
           mkdir $out
         '';
 
-    nixpkgsLibTests =
-      forAllSystems (system:
-        import (nixpkgs + "/lib/tests/test-with-nix.nix")
-          {
-            lib = nixpkgsFor.${system}.native.lib;
-            nix = self.packages.${system}.nix;
-            pkgs = nixpkgsFor.${system}.native;
-          }
+      nixpkgsLibTests = forAllSystems (
+        system:
+        import (nixpkgs + "/lib/tests/test-with-nix.nix") {
+          lib = nixpkgsFor.${system}.native.lib;
+          nix = self.packages.${system}.nix;
+          pkgs = nixpkgsFor.${system}.native;
+        }
       );
-  };
+    };
 
   metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
     pkgs = nixpkgsFor.x86_64-linux.native;
     nixpkgs = nixpkgs-regression;
   };
 
-  installTests = forAllSystems (system:
-    let pkgs = nixpkgsFor.${system}.native; in
-    pkgs.runCommand "install-tests"
-      {
-        againstSelf = testNixVersions pkgs pkgs.nix pkgs.pkgs.nix;
-        againstCurrentLatest =
-          # FIXME: temporarily disable this on macOS because of #3605.
-          if system == "x86_64-linux"
-          then testNixVersions pkgs pkgs.nix pkgs.nixVersions.latest
-          else null;
-        # Disabled because the latest stable version doesn't handle
-        # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
-        # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
-      } "touch $out");
+  installTests = forAllSystems (
+    system:
+    let
+      pkgs = nixpkgsFor.${system}.native;
+    in
+    pkgs.runCommand "install-tests" {
+      againstSelf = testNixVersions pkgs pkgs.nix pkgs.pkgs.nix;
+      againstCurrentLatest =
+        # FIXME: temporarily disable this on macOS because of #3605.
+        if system == "x86_64-linux" then testNixVersions pkgs pkgs.nix pkgs.nixVersions.latest else null;
+      # Disabled because the latest stable version doesn't handle
+      # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
+      # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
+    } "touch $out"
+  );
 
   installerTests = import ../tests/installer {
     binaryTarballs = self.hydraJobs.binaryTarball;

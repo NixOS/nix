@@ -1,24 +1,25 @@
-{ lib
-, buildPackages
-, stdenv
-, mkMesonDerivation
-, releaseTools
+{
+  lib,
+  buildPackages,
+  stdenv,
+  mkMesonDerivation,
+  releaseTools,
 
-, meson
-, ninja
-, pkg-config
+  meson,
+  ninja,
+  pkg-config,
 
-, nix-util
-, nix-util-c
-, nix-util-test-support
+  nix-util,
+  nix-util-c,
+  nix-util-test-support,
 
-, rapidcheck
-, gtest
-, runCommand
+  rapidcheck,
+  gtest,
+  runCommand,
 
-# Configuration Options
+  # Configuration Options
 
-, version
+  version,
 }:
 
 let
@@ -66,9 +67,12 @@ mkMesonDerivation (finalAttrs: {
   mesonFlags = [
   ];
 
-  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
+  env =
+    lib.optionalAttrs
+      (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
+      {
+        LDFLAGS = "-fuse-ld=gold";
+      };
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 
@@ -76,16 +80,22 @@ mkMesonDerivation (finalAttrs: {
 
   passthru = {
     tests = {
-      run = runCommand "${finalAttrs.pname}-run" {
-        meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
-      } (lib.optionalString stdenv.hostPlatform.isWindows ''
-        export HOME="$PWD/home-dir"
-        mkdir -p "$HOME"
-      '' + ''
-        export _NIX_TEST_UNIT_DATA=${./data}
-        ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
-        touch $out
-      '');
+      run =
+        runCommand "${finalAttrs.pname}-run"
+          {
+            meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
+          }
+          (
+            lib.optionalString stdenv.hostPlatform.isWindows ''
+              export HOME="$PWD/home-dir"
+              mkdir -p "$HOME"
+            ''
+            + ''
+              export _NIX_TEST_UNIT_DATA=${./data}
+              ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
+              touch $out
+            ''
+          );
     };
   };
 

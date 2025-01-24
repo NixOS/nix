@@ -1,37 +1,38 @@
-{ lib
-, stdenv
-, mkMesonDerivation
-, releaseTools
+{
+  lib,
+  stdenv,
+  mkMesonDerivation,
+  releaseTools,
 
-, meson
-, ninja
-, pkg-config
-, bison
-, flex
-, cmake # for resolving toml11 dep
+  meson,
+  ninja,
+  pkg-config,
+  bison,
+  flex,
+  cmake, # for resolving toml11 dep
 
-, nix-util
-, nix-store
-, nix-fetchers
-, boost
-, boehmgc
-, nlohmann_json
-, toml11
+  nix-util,
+  nix-store,
+  nix-fetchers,
+  boost,
+  boehmgc,
+  nlohmann_json,
+  toml11,
 
-# Configuration Options
+  # Configuration Options
 
-, version
+  version,
 
-# Whether to use garbage collection for the Nix language evaluator.
-#
-# If it is disabled, we just leak memory, but this is not as bad as it
-# sounds so long as evaluation just takes places within short-lived
-# processes. (When the process exits, the memory is reclaimed; it is
-# only leaked *within* the process.)
-#
-# Temporarily disabled on Windows because the `GC_throw_bad_alloc`
-# symbol is missing during linking.
-, enableGC ? !stdenv.hostPlatform.isWindows
+  # Whether to use garbage collection for the Nix language evaluator.
+  #
+  # If it is disabled, we just leak memory, but this is not as bad as it
+  # sounds so long as evaluation just takes places within short-lived
+  # processes. (When the process exits, the memory is reclaimed; it is
+  # only leaked *within* the process.)
+  #
+  # Temporarily disabled on Windows because the `GC_throw_bad_alloc`
+  # symbol is missing during linking.
+  enableGC ? !stdenv.hostPlatform.isWindows,
 }:
 
 let
@@ -58,7 +59,10 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "nix") ./.)
   ];
 
-  outputs = [ "out" "dev" ];
+  outputs = [
+    "out"
+    "dev"
+  ];
 
   nativeBuildInputs = [
     meson
@@ -93,14 +97,18 @@ mkMesonDerivation (finalAttrs: {
     (lib.mesonEnable "gc" enableGC)
   ];
 
-  env = {
-    # Needed for Meson to find Boost.
-    # https://github.com/NixOS/nixpkgs/issues/86131.
-    BOOST_INCLUDEDIR = "${lib.getDev boost}/include";
-    BOOST_LIBRARYDIR = "${lib.getLib boost}/lib";
-  } // lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
+  env =
+    {
+      # Needed for Meson to find Boost.
+      # https://github.com/NixOS/nixpkgs/issues/86131.
+      BOOST_INCLUDEDIR = "${lib.getDev boost}/include";
+      BOOST_LIBRARYDIR = "${lib.getLib boost}/lib";
+    }
+    // lib.optionalAttrs
+      (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
+      {
+        LDFLAGS = "-fuse-ld=gold";
+      };
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 

@@ -20,9 +20,7 @@ let
 
   root = ../.;
 
-  stdenv = if prevStdenv.isDarwin && prevStdenv.isx86_64
-    then darwinStdenv
-    else prevStdenv;
+  stdenv = if prevStdenv.isDarwin && prevStdenv.isx86_64 then darwinStdenv else prevStdenv;
 
   # Fix the following error with the default x86_64-darwin SDK:
   #
@@ -39,7 +37,8 @@ let
   # Indirection for Nixpkgs to override when package.nix files are vendored
   filesetToSource = lib.fileset.toSource;
 
-  localSourceLayer = finalAttrs: prevAttrs:
+  localSourceLayer =
+    finalAttrs: prevAttrs:
     let
       workDirPath =
         # Ideally we'd pick finalAttrs.workDir, but for now `mkDerivation` has
@@ -48,8 +47,13 @@ let
         prevAttrs.workDir;
 
       workDirSubpath = lib.path.removePrefix root workDirPath;
-      sources = assert prevAttrs.fileset._type == "fileset"; prevAttrs.fileset;
-      src = lib.fileset.toSource { fileset = sources; inherit root; };
+      sources =
+        assert prevAttrs.fileset._type == "fileset";
+        prevAttrs.fileset;
+      src = lib.fileset.toSource {
+        fileset = sources;
+        inherit root;
+      };
 
     in
     {
@@ -63,30 +67,35 @@ let
 
   # Work around weird `--as-needed` linker behavior with BSD, see
   # https://github.com/mesonbuild/meson/issues/3593
-  bsdNoLinkAsNeeded = finalAttrs: prevAttrs:
+  bsdNoLinkAsNeeded =
+    finalAttrs: prevAttrs:
     lib.optionalAttrs stdenv.hostPlatform.isBSD {
-      mesonFlags = [ (lib.mesonBool "b_asneeded" false) ] ++ prevAttrs.mesonFlags or [];
+      mesonFlags = [ (lib.mesonBool "b_asneeded" false) ] ++ prevAttrs.mesonFlags or [ ];
     };
 
-  miscGoodPractice = finalAttrs: prevAttrs:
-    {
-      strictDeps = prevAttrs.strictDeps or true;
-      enableParallelBuilding = true;
-    };
+  miscGoodPractice = finalAttrs: prevAttrs: {
+    strictDeps = prevAttrs.strictDeps or true;
+    enableParallelBuilding = true;
+  };
 
 in
 scope: {
   inherit stdenv versionSuffix;
   version = lib.fileContents ../.version + versionSuffix;
 
-  aws-sdk-cpp = (pkgs.aws-sdk-cpp.override {
-    apis = [ "s3" "transfer" ];
-    customMemoryManagement = false;
-  }).overrideAttrs {
-    # only a stripped down version is built, which takes a lot less resources
-    # to build, so we don't need a "big-parallel" machine.
-    requiredSystemFeatures = [ ];
-  };
+  aws-sdk-cpp =
+    (pkgs.aws-sdk-cpp.override {
+      apis = [
+        "s3"
+        "transfer"
+      ];
+      customMemoryManagement = false;
+    }).overrideAttrs
+      {
+        # only a stripped down version is built, which takes a lot less resources
+        # to build, so we don't need a "big-parallel" machine.
+        requiredSystemFeatures = [ ];
+      };
 
   libseccomp = pkgs.libseccomp.overrideAttrs (_: rec {
     version = "2.5.5";
@@ -101,48 +110,50 @@ scope: {
   };
 
   # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
-  boost = (pkgs.boost.override {
-    extraB2Args = [
-      "--with-container"
-      "--with-context"
-      "--with-coroutine"
-    ];
-  }).overrideAttrs (old: {
-    # Need to remove `--with-*` to use `--with-libraries=...`
-    buildPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.buildPhase;
-    installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
-  });
+  boost =
+    (pkgs.boost.override {
+      extraB2Args = [
+        "--with-container"
+        "--with-context"
+        "--with-coroutine"
+      ];
+    }).overrideAttrs
+      (old: {
+        # Need to remove `--with-*` to use `--with-libraries=...`
+        buildPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.buildPhase;
+        installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
+      });
 
   libgit2 = pkgs.libgit2.overrideAttrs (attrs: {
     src = inputs.libgit2;
     version = inputs.libgit2.lastModifiedDate;
-    cmakeFlags = attrs.cmakeFlags or []
-      ++ [ "-DUSE_SSH=exec" ];
+    cmakeFlags = attrs.cmakeFlags or [ ] ++ [ "-DUSE_SSH=exec" ];
   });
 
-  busybox-sandbox-shell = pkgs.busybox-sandbox-shell or (pkgs.busybox.override {
-    useMusl = true;
-    enableStatic = true;
-    enableMinimal = true;
-    extraConfig = ''
-      CONFIG_FEATURE_FANCY_ECHO y
-      CONFIG_FEATURE_SH_MATH y
-      CONFIG_FEATURE_SH_MATH_64 y
+  busybox-sandbox-shell =
+    pkgs.busybox-sandbox-shell or (pkgs.busybox.override {
+      useMusl = true;
+      enableStatic = true;
+      enableMinimal = true;
+      extraConfig = ''
+        CONFIG_FEATURE_FANCY_ECHO y
+        CONFIG_FEATURE_SH_MATH y
+        CONFIG_FEATURE_SH_MATH_64 y
 
-      CONFIG_ASH y
-      CONFIG_ASH_OPTIMIZE_FOR_SIZE y
+        CONFIG_ASH y
+        CONFIG_ASH_OPTIMIZE_FOR_SIZE y
 
-      CONFIG_ASH_ALIAS y
-      CONFIG_ASH_BASH_COMPAT y
-      CONFIG_ASH_CMDCMD y
-      CONFIG_ASH_ECHO y
-      CONFIG_ASH_GETOPTS y
-      CONFIG_ASH_INTERNAL_GLOB y
-      CONFIG_ASH_JOB_CONTROL y
-      CONFIG_ASH_PRINTF y
-      CONFIG_ASH_TEST y
-    '';
-  });
+        CONFIG_ASH_ALIAS y
+        CONFIG_ASH_BASH_COMPAT y
+        CONFIG_ASH_CMDCMD y
+        CONFIG_ASH_ECHO y
+        CONFIG_ASH_GETOPTS y
+        CONFIG_ASH_INTERNAL_GLOB y
+        CONFIG_ASH_JOB_CONTROL y
+        CONFIG_ASH_PRINTF y
+        CONFIG_ASH_TEST y
+      '';
+    });
 
   # TODO change in Nixpkgs, Windows works fine. First commit of
   # https://github.com/NixOS/nixpkgs/pull/322977 backported will fix.
@@ -152,14 +163,14 @@ scope: {
 
   inherit resolvePath filesetToSource;
 
-  mkMesonDerivation = f: let
-    exts = [
-      miscGoodPractice
-      bsdNoLinkAsNeeded
-      localSourceLayer
-    ];
-  in stdenv.mkDerivation
-   (lib.extends
-     (lib.foldr lib.composeExtensions (_: _: {}) exts)
-     f);
+  mkMesonDerivation =
+    f:
+    let
+      exts = [
+        miscGoodPractice
+        bsdNoLinkAsNeeded
+        localSourceLayer
+      ];
+    in
+    stdenv.mkDerivation (lib.extends (lib.foldr lib.composeExtensions (_: _: { }) exts) f);
 }
