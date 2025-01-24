@@ -1,4 +1,4 @@
-{ lib, devFlake }:
+{ lib, inputs, devFlake }:
 
 { pkgs }:
 
@@ -108,6 +108,7 @@ in {
       modular.pre-commit.settings.package
       (pkgs.writeScriptBin "pre-commit-hooks-install"
         modular.pre-commit.settings.installationScript)
+      inputs.nixfmt.packages.${pkgs.hostPlatform.system}.default
     ]
     # TODO: Remove the darwin check once
     # https://github.com/NixOS/nixpkgs/pull/291814 is available

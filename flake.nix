@@ -17,6 +17,7 @@
   # work around 7730 and https://github.com/NixOS/nix/issues/7807
   inputs.git-hooks-nix.inputs.flake-compat.follows = "";
   inputs.git-hooks-nix.inputs.gitignore.follows = "";
+  inputs.nixfmt.url = "github:NixOS/nixfmt";
 
   outputs = inputs@{ self, nixpkgs, nixpkgs-regression, ... }:
 
@@ -301,7 +302,7 @@
       });
 
       devShells = let
-        makeShell = import ./packaging/dev-shell.nix { inherit lib devFlake; };
+        makeShell = import ./packaging/dev-shell.nix { inherit inputs lib devFlake; };
         prefixAttrs = prefix: lib.concatMapAttrs (k: v: { "${prefix}-${k}" = v; });
       in
         forAllSystems (system:

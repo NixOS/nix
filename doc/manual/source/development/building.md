@@ -278,6 +278,8 @@ You may run the formatters as a one-off using:
 ./maintainers/format.sh
 ```
 
+### Pre-commit hooks
+
 If you'd like to run the formatters before every commit, install the hooks:
 
 ```
@@ -292,3 +294,30 @@ If it fails, run `git add --patch` to approve the suggestions _and commit again_
 To refresh pre-commit hook's config file, do the following:
 1. Exit the development shell and start it again by running `nix develop`.
 2. If you also use the pre-commit hook, also run `pre-commit-hooks-install` again.
+
+### VSCode
+
+Insert the following json into your `.vscode/settings.json` file to configure `nixfmt`.
+This will be picked up by the _Format Document_ command, `"editor.formatOnSave"`, etc.
+
+```json
+{
+  "nix.formatterPath": "nixfmt",
+  "nix.serverSettings": {
+    "nixd": {
+      "formatting": {
+        "command": [
+          "nixfmt"
+        ],
+      },
+    },
+    "nil": {
+      "formatting": {
+        "command": [
+          "nixfmt"
+        ],
+      },
+    },
+  },
+}
+```
