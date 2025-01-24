@@ -17,6 +17,58 @@
       # https://flake.parts/options/git-hooks-nix#options
       pre-commit.settings = {
         hooks = {
+<<<<<<< HEAD
+=======
+          # Conflicts are usually found by other checks, but not those in docs,
+          # and potentially other places.
+          check-merge-conflicts.enable = true;
+          # built-in check-merge-conflicts seems ineffective against those produced by mergify backports
+          check-merge-conflicts-2 = {
+            enable = true;
+            entry = "${pkgs.writeScript "check-merge-conflicts" ''
+              #!${pkgs.runtimeShell}
+              conflicts=false
+              for file in "$@"; do
+                if grep --with-filename --line-number -E '^>>>>>>> ' -- "$file"; then
+                  conflicts=true
+                fi
+              done
+              if $conflicts; then
+                echo "ERROR: found merge/patch conflicts in files"
+                exit 1
+              fi
+            ''}";
+          };
+          nixfmt-rfc-style = {
+            enable = true;
+            package = inputs.nixfmt.packages.${pkgs.hostPlatform.system}.default;
+            excludes = [
+              # Invalid
+              ''^tests/functional/lang/parse-.*\.nix$''
+
+              # Formatting-sensitive
+              ''^tests/functional/lang/eval-okay-curpos\.nix$''
+              ''^tests/functional/lang/.*comment.*\.nix$''
+              ''^tests/functional/lang/.*newline.*\.nix$''
+              ''^tests/functional/lang/.*eol.*\.nix$''
+
+              # Syntax tests
+              ''^tests/functional/shell.shebang\.nix$''
+              ''^tests/functional/lang/eval-okay-ind-string\.nix$''
+
+              # Not supported by nixfmt
+              ''^tests/functional/lang/eval-okay-deprecate-cursed-or\.nix$''
+              ''^tests/functional/lang/eval-okay-attrs5\.nix$''
+
+              # More syntax tests
+              # These tests, or parts of them, should have been parse-* test cases.
+              ''^tests/functional/lang/eval-fail-eol-2\.nix$''
+              ''^tests/functional/lang/eval-fail-path-slash\.nix$''
+              ''^tests/functional/lang/eval-fail-toJSON-non-utf-8\.nix$''
+              ''^tests/functional/lang/eval-fail-set\.nix$''
+            ];
+          };
+>>>>>>> 73060b497 (pre-commit/check-merge-conflicts-2: fix use outside dev shell)
           clang-format = {
             enable = true;
             excludes = [
