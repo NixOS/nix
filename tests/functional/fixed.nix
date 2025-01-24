@@ -2,15 +2,20 @@ with import "${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/config.nix";
 
 rec {
 
-  f2 = dummy: builder: mode: algo: hash: mkDerivation {
-    name = "fixed";
-    inherit builder;
-    outputHashMode = mode;
-    outputHashAlgo = algo;
-    outputHash = hash;
-    inherit dummy;
-    impureEnvVars = ["IMPURE_VAR1" "IMPURE_VAR2"];
-  };
+  f2 =
+    dummy: builder: mode: algo: hash:
+    mkDerivation {
+      name = "fixed";
+      inherit builder;
+      outputHashMode = mode;
+      outputHashAlgo = algo;
+      outputHash = hash;
+      inherit dummy;
+      impureEnvVars = [
+        "IMPURE_VAR1"
+        "IMPURE_VAR2"
+      ];
+    };
 
   f = f2 "";
 
@@ -37,7 +42,8 @@ rec {
   ];
 
   sameAsAdd =
-    f ./fixed.builder2.sh "recursive" "sha256" "1ixr6yd3297ciyp9im522dfxpqbkhcw0pylkb2aab915278fqaik";
+    f ./fixed.builder2.sh "recursive" "sha256"
+      "1ixr6yd3297ciyp9im522dfxpqbkhcw0pylkb2aab915278fqaik";
 
   bad = [
     (f ./fixed.builder1.sh "flat" "md5" "0ddd8be4b179a529afa5f2ffae4b9858")

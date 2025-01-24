@@ -13,9 +13,11 @@ let
 
   versionSuffix = lib.optionalString (!officialRelease) "pre";
 
-  fineVersionSuffix = lib.optionalString
-    (!officialRelease)
-    "pre${builtins.substring 0 8 (src.lastModifiedDate or src.lastModified or "19700101")}_${src.shortRev or "dirty"}";
+  fineVersionSuffix =
+    lib.optionalString (!officialRelease)
+      "pre${
+        builtins.substring 0 8 (src.lastModifiedDate or src.lastModified or "19700101")
+      }_${src.shortRev or "dirty"}";
 
   fineVersion = baseVersion + fineVersionSuffix;
 in
@@ -58,7 +60,9 @@ in
 
   nix-cli = callPackage ../src/nix/package.nix { version = fineVersion; };
 
-  nix-functional-tests = callPackage ../src/nix-functional-tests/package.nix { version = fineVersion; };
+  nix-functional-tests = callPackage ../src/nix-functional-tests/package.nix {
+    version = fineVersion;
+  };
 
   nix-manual = callPackage ../doc/manual/package.nix { version = fineVersion; };
   nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { version = fineVersion; };

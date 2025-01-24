@@ -1,6 +1,7 @@
 with builtins;
 
-[ (isNull null)
+[
+  (isNull null)
   (isNull (x: x))
   (isFunction (x: x))
   (isFunction "fnord")
@@ -29,7 +30,11 @@ with builtins;
   (typeOf "xyzzy")
   (typeOf null)
   (typeOf { x = 456; })
-  (typeOf [ 1 2 3 ])
+  (typeOf [
+    1
+    2
+    3
+  ])
   (typeOf (x: x))
   (typeOf ((x: y: x) 1))
   (typeOf map)

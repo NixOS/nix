@@ -1,7 +1,6 @@
 # A derivation that would certainly fail if several builders tried to
 # build it at once.
 
-
 with import "${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/ca/config.nix";
 
 mkDerivation {

@@ -1,6 +1,8 @@
 with import "${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/dyn-drv/config.nix";
 
-let innerName = "foo"; in
+let
+  innerName = "foo";
+in
 
 mkDerivation rec {
   name = "${innerName}.drv";

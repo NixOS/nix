@@ -1,15 +1,16 @@
-{ lib
-, stdenv
-, mkMesonLibrary
+{
+  lib,
+  stdenv,
+  mkMesonLibrary,
 
-, nix-util-c
-, nix-store
-, nix-store-c
-, nix-main
+  nix-util-c,
+  nix-store,
+  nix-store-c,
+  nix-main,
 
-# Configuration Options
+  # Configuration Options
 
-, version
+  version,
 }:
 
 let
@@ -51,9 +52,12 @@ mkMesonLibrary (finalAttrs: {
   mesonFlags = [
   ];
 
-  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
+  env =
+    lib.optionalAttrs
+      (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
+      {
+        LDFLAGS = "-fuse-ld=gold";
+      };
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;
