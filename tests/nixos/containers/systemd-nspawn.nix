@@ -2,7 +2,8 @@
 
 let
 
-  machine = { config, pkgs, ... }:
+  machine =
+    { config, pkgs, ... }:
     {
       system.stateVersion = "22.05";
       boot.isContainer = true;
@@ -31,10 +32,12 @@ let
       };
     };
 
-  cfg = (import (nixpkgs + "/nixos/lib/eval-config.nix") {
-    modules = [ machine ];
-    system = "x86_64-linux";
-  });
+  cfg = (
+    import (nixpkgs + "/nixos/lib/eval-config.nix") {
+      modules = [ machine ];
+      system = "x86_64-linux";
+    }
+  );
 
   config = cfg.config;
 
@@ -43,7 +46,8 @@ in
 with cfg._module.args.pkgs;
 
 runCommand "test"
-  { buildInputs = [ config.system.path ];
+  {
+    buildInputs = [ config.system.path ];
     requiredSystemFeatures = [ "uid-range" ];
     toplevel = config.system.build.toplevel;
   }
