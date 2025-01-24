@@ -1,14 +1,18 @@
-{ runCommand
-, system
-, buildPackages
-, cacert
-, nix
+{
+  runCommand,
+  system,
+  buildPackages,
+  cacert,
+  nix,
 }:
 
 let
 
   installerClosureInfo = buildPackages.closureInfo {
-    rootPaths = [ nix cacert ];
+    rootPaths = [
+      nix
+      cacert
+    ];
   };
 
   inherit (nix) version;

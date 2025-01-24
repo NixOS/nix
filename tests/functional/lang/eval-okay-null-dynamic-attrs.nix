@@ -1,1 +1,1 @@
-{ ${null} = true; } == {}
+{ ${null} = true; } == { }

@@ -8,5 +8,5 @@ let {
   y = if builtins ? fnord then builtins.fnord "foo" else "";
 
   body = x + y;
-  
+
 }

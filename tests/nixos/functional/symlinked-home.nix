@@ -16,7 +16,9 @@
   imports = [ ./common.nix ];
 
   nodes.machine = {
-    users.users.alice = { isNormalUser = true; };
+    users.users.alice = {
+      isNormalUser = true;
+    };
   };
 
   testScript = ''
