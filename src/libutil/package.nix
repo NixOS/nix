@@ -1,18 +1,19 @@
-{ lib
-, stdenv
-, mkMesonLibrary
+{
+  lib,
+  stdenv,
+  mkMesonLibrary,
 
-, boost
-, brotli
-, libarchive
-, libcpuid
-, libsodium
-, nlohmann_json
-, openssl
+  boost,
+  brotli,
+  libarchive,
+  libcpuid,
+  libsodium,
+  nlohmann_json,
+  openssl,
 
-# Configuration Options
+  # Configuration Options
 
-, version
+  version,
 }:
 
 let
@@ -42,8 +43,7 @@ mkMesonLibrary (finalAttrs: {
     brotli
     libsodium
     openssl
-  ] ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
-  ;
+  ] ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
   propagatedBuildInputs = [
     boost
@@ -66,14 +66,18 @@ mkMesonLibrary (finalAttrs: {
     (lib.mesonEnable "cpuid" stdenv.hostPlatform.isx86_64)
   ];
 
-  env = {
-    # Needed for Meson to find Boost.
-    # https://github.com/NixOS/nixpkgs/issues/86131.
-    BOOST_INCLUDEDIR = "${lib.getDev boost}/include";
-    BOOST_LIBRARYDIR = "${lib.getLib boost}/lib";
-  } // lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
+  env =
+    {
+      # Needed for Meson to find Boost.
+      # https://github.com/NixOS/nixpkgs/issues/86131.
+      BOOST_INCLUDEDIR = "${lib.getDev boost}/include";
+      BOOST_LIBRARYDIR = "${lib.getLib boost}/lib";
+    }
+    // lib.optionalAttrs
+      (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
+      {
+        LDFLAGS = "-fuse-ld=gold";
+      };
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

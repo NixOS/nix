@@ -4,9 +4,9 @@ let
   y = { inherit d x; };
   z = { inherit (y) d x; };
 in
-  [
-    (builtins.unsafeGetAttrPos "d" y)
-    (builtins.unsafeGetAttrPos "x" y)
-    (builtins.unsafeGetAttrPos "d" z)
-    (builtins.unsafeGetAttrPos "x" z)
-  ]
+[
+  (builtins.unsafeGetAttrPos "d" y)
+  (builtins.unsafeGetAttrPos "x" y)
+  (builtins.unsafeGetAttrPos "d" z)
+  (builtins.unsafeGetAttrPos "x" z)
+]
