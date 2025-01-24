@@ -1,5 +1,7 @@
 let
-  attr = {foo = "bar";};
-  key = {};
+  attr = {
+    foo = "bar";
+  };
+  key = { };
 in
-  attr.${key}
+attr.${key}

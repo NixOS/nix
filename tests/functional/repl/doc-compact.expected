@@ -6,6 +6,7 @@ Added <number omitted> variables.
 
 nix-repl> :doc compact
 Function `compact`\
-  … defined at /path/to/tests/functional/repl/doc-comments.nix:18:20
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:27:5
+
 
 boom

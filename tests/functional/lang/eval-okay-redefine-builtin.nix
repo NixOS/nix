@@ -1,3 +1,4 @@
 let
   throw = abort "Error!";
-in (builtins.tryEval <foobaz>).success
+in
+(builtins.tryEval <foobaz>).success

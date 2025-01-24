@@ -19,18 +19,22 @@
 # - a few frames of A (skip the rest)
 # - a few frames of B (skip the rest, _and_ skip the remaining frames of A)
 let
-  throwAfterB = recurse: n:
-    if n > 0
-    then throwAfterB recurse (n - 1)
-    else if recurse
-    then throwAfterA false 10
-    else throw "Uh oh!";
+  throwAfterB =
+    recurse: n:
+    if n > 0 then
+      throwAfterB recurse (n - 1)
+    else if recurse then
+      throwAfterA false 10
+    else
+      throw "Uh oh!";
 
-  throwAfterA = recurse: n:
-    if n > 0
-    then throwAfterA recurse (n - 1)
-    else if recurse
-    then throwAfterB true 10
-    else throw "Uh oh!";
+  throwAfterA =
+    recurse: n:
+    if n > 0 then
+      throwAfterA recurse (n - 1)
+    else if recurse then
+      throwAfterB true 10
+    else
+      throw "Uh oh!";
 in
-  throwAfterA true 10
+throwAfterA true 10
