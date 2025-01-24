@@ -52,6 +52,18 @@ if bdw_gc.found()
 endif
 configdata.set('HAVE_BOEHMGC', bdw_gc.found().to_int())
 
+ryml = dependency(
+  'ryml',
+  version : '>=0.7.1',
+  method : 'cmake',
+  include_type : 'system',
+  required : false,
+)
+if ryml.found()
+  deps_other += ryml
+  configdata.set('HAVE_RYML', 1)
+endif
+
 toml11 = dependency(
   'toml11',
   version : '>=3.7.0',
@@ -168,6 +180,7 @@ headers = [config_h] + files(
   'gc-small-vector.hh',
   'get-drvs.hh',
   'json-to-value.hh',
+  'json-to-value-sax.hh',
   # internal: 'lexer-helpers.hh',
   'nixexpr.hh',
   'parser-state.hh',

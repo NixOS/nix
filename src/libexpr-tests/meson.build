@@ -64,6 +64,7 @@ sources = files(
   'value/context.cc',
   'value/print.cc',
   'value/value.cc',
+  'yaml.cc'
 )
 
 include_dirs = [include_directories('.')]

@@ -186,6 +186,12 @@ scope: {
       ];
   });
 
+  rapidyaml = pkgs.rapidyaml.overrideAttrs(old: old // {
+    cmakeFlags = [
+      "-DRYML_WITH_TAB_TOKENS=ON"
+    ];
+  });
+
   inherit resolvePath filesetToSource;
 
   mkMesonDerivation =
