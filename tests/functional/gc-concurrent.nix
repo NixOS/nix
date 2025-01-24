@@ -1,6 +1,8 @@
 with import ./config.nix;
 
-{ lockFifo ? null }:
+{
+  lockFifo ? null,
+}:
 
 rec {
 
