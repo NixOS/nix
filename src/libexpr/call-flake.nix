@@ -25,7 +25,7 @@ let
     then getInputByPath lockFile.root inputSpec
     else inputSpec;
 
-  # Follow an input path (e.g. ["dwarffs" "nixpkgs"]) from the
+  # Follow an input attrpath (e.g. ["dwarffs" "nixpkgs"]) from the
   # root node, returning the final node.
   getInputByPath = nodeName: path:
     if path == []
