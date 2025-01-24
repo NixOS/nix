@@ -1,1 +1,5 @@
-{ a."${"b"}" = true; a."${"c"}" = false; }.a.b
+{
+  a."${"b"}" = true;
+  a."${"c"}" = false;
+}
+.a.b
