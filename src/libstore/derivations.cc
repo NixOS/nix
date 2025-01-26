@@ -9,6 +9,7 @@
 #include "util.hh"
 #include "parsed-derivations.hh"
 #include "common-protocol.hh"
+#include "common-protocol-impl.hh"
 #include "strings-inline.hh"
 #include "json-utils.hh"
 
