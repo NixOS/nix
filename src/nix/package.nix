@@ -111,6 +111,7 @@ mkMesonExecutable (finalAttrs: {
       };
 
   meta = {
+    mainProgram = "nix";
     platforms = lib.platforms.unix ++ lib.platforms.windows;
   };
 
