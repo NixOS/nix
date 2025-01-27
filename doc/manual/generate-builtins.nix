@@ -5,7 +5,15 @@ in
 
 builtinsInfo:
 let
-  showBuiltin = name: { doc, type ? null, args ? [ ], experimental-feature ? null, impure-only ? false }:
+  showBuiltin =
+    name:
+    {
+      doc,
+      type ? null,
+      args ? [ ],
+      experimental-feature ? null,
+      impure-only ? false,
+    }:
     let
       type' = optionalString (type != null) " (${type})";
 

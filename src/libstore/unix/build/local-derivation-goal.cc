@@ -2565,7 +2565,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 case FileIngestionMethod::Git: {
                     return git::dumpHash(
                         outputHash.hashAlgo,
-                        {getFSSourceAccessor(), CanonPath(tmpDir + "/tmp")}).hash;
+                        {getFSSourceAccessor(), CanonPath(actualPath)}).hash;
                 }
                 }
                 assert(false);
@@ -2657,10 +2657,14 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                             wanted.to_string(HashFormat::SRI, true),
                             got.to_string(HashFormat::SRI, true)));
                 }
-                if (!newInfo0.references.empty())
+                if (!newInfo0.references.empty()) {
+                    auto numViolations = newInfo.references.size();
                     delayedException = std::make_exception_ptr(
-                        BuildError("illegal path references in fixed-output derivation '%s'",
-                            worker.store.printStorePath(drvPath)));
+                        BuildError("fixed-output derivations must not reference store paths: '%s' references %d distinct paths, e.g. '%s'",
+                            worker.store.printStorePath(drvPath),
+                            numViolations,
+                            worker.store.printStorePath(*newInfo.references.begin())));
+                }
 
                 return newInfo0;
             },

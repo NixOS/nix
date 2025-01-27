@@ -1,9 +1,10 @@
 { }:
 
-with import <nixpkgs> {};
+with import <nixpkgs> { };
 
 runCommand "hang"
-  { requiredSystemFeatures = "uid-range";
+  {
+    requiredSystemFeatures = "uid-range";
   }
   ''
     sleep infinity
