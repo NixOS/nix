@@ -124,6 +124,7 @@ mkMesonDerivation (finalAttrs: {
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
+    mainProgram = "nix";
     platforms = lib.platforms.unix ++ lib.platforms.windows;
   };
 
