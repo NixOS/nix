@@ -40,15 +40,6 @@ namespace nix {
  * Miscellaneous
  *************************************************************/
 
-<<<<<<< HEAD
-=======
-static inline Value * mkString(EvalState & state, const std::csub_match & match)
-{
-    Value * v = state.allocValue();
-    v->mkString({match.first, match.second});
-    return v;
-}
-
 std::string EvalState::realiseString(Value & s, StorePathSet * storePathsOutMaybe, bool isIFD, const PosIdx pos)
 {
     nix::NixStringContext stringContext;
@@ -58,7 +49,6 @@ std::string EvalState::realiseString(Value & s, StorePathSet * storePathsOutMayb
     return nix::rewriteStrings(rawStr, rewrites);
 }
 
->>>>>>> 7465fbe92 (refactor: Extract EvalState::realiseString)
 StringMap EvalState::realiseContext(const NixStringContext & context, StorePathSet * maybePathsOut, bool isIFD)
 {
     std::vector<DerivedPath::Built> drvs;
