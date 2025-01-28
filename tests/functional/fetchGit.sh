@@ -141,12 +141,13 @@ path4=$(nix eval --impure --refresh --raw --expr "(builtins.fetchGit file://$rep
 [[ $(nix eval --impure --expr "builtins.hasAttr \"dirtyRev\" (builtins.fetchGit $repo)") == "false" ]]
 [[ $(nix eval --impure --expr "builtins.hasAttr \"dirtyShortRev\" (builtins.fetchGit $repo)") == "false" ]]
 
-status=0
-nix eval --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; narHash = \"sha256-B5yIPHhEm0eysJKEsO7nqxprh9vcblFxpJG11gXJus1=\"; }).outPath" || status=$?
-[[ "$status" = "102" ]]
+expect 102 nix eval --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; narHash = \"sha256-B5yIPHhEm0eysJKEsO7nqxprh9vcblFxpJG11gXJus1=\"; }).outPath"
 
 path5=$(nix eval --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; narHash = \"sha256-Hr8g6AqANb3xqX28eu1XnjK/3ab8Gv6TJSnkb1LezG9=\"; }).outPath")
 [[ $path = $path5 ]]
+
+# It's allowed to use only a narHash, but you should get a warning.
+expectStderr 0 nix eval --raw --expr "(builtins.fetchGit { url = $repo; ref = \"tag2\"; narHash = \"sha256-Hr8g6AqANb3xqX28eu1XnjK/3ab8Gv6TJSnkb1LezG9=\"; }).outPath" | grepQuiet "warning: Input .* is unlocked"
 
 # tarball-ttl should be ignored if we specify a rev
 echo delft > $repo/hello

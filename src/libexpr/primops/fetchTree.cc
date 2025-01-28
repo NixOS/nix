@@ -184,10 +184,15 @@ static void fetchTree(
         input = lookupInRegistries(state.store, input).first;
 
     if (state.settings.pureEval && !input.isConsideredLocked(state.fetchSettings)) {
-        state.error<EvalError>(
-            "in pure evaluation mode, '%s' will not fetch unlocked input '%s'",
-            fetcher, input.to_string()
-        ).atPos(pos).debugThrow();
+        if (input.getNarHash())
+            warn(
+                "Input '%s' is unlocked (e.g. lacks a Git revision) but does have a NAR hash. "
+                "This is deprecated since such inputs are verifiable but may not be reproducible.",
+                input.to_string());
+        else
+            state.error<EvalError>(
+                "in pure evaluation mode, '%s' will not fetch unlocked input '%s'",
+                fetcher, input.to_string()).atPos(pos).debugThrow();
     }
 
     state.checkURI(input.toURLString());
