@@ -79,7 +79,7 @@ path2=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"
 # In pure eval mode, fetchGit with a revision should succeed.
 [[ $(nix eval --raw --expr "builtins.readFile (fetchGit { url = file://$repo; rev = \"$rev2\"; } + \"/hello\")") = world ]]
 
-# But without a hash, it fails
+# But without a hash, it fails.
 expectStderr 1 nix eval --expr 'builtins.fetchGit "file:///foo"' | grepQuiet "'fetchGit' will not fetch unlocked input"
 
 # Fetch again. This should be cached.

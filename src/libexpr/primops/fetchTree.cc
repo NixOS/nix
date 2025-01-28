@@ -90,24 +90,26 @@ static void fetchTree(
     fetchers::Input input { state.fetchSettings };
     NixStringContext context;
     std::optional<std::string> type;
+    auto fetcher = params.isFetchGit ? "fetchGit" : "fetchTree";
     if (params.isFetchGit) type = "git";
 
     state.forceValue(*args[0], pos);
 
     if (args[0]->type() == nAttrs) {
-        state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.fetchTree");
+        state.forceAttrs(*args[0], pos, fmt("while evaluating the argument passed to '%s'", fetcher));
 
         fetchers::Attrs attrs;
 
         if (auto aType = args[0]->attrs()->get(state.sType)) {
             if (type)
                 state.error<EvalError>(
-                    "unexpected attribute 'type'"
+                    "unexpected argument 'type'"
                 ).atPos(pos).debugThrow();
-            type = state.forceStringNoCtx(*aType->value, aType->pos, "while evaluating the `type` attribute passed to builtins.fetchTree");
+            type = state.forceStringNoCtx(*aType->value, aType->pos,
+                fmt("while evaluating the `type` argument passed to '%s'", fetcher));
         } else if (!type)
             state.error<EvalError>(
-                "attribute 'type' is missing in call to 'fetchTree'"
+                "argument 'type' is missing in call to '%s'", fetcher
             ).atPos(pos).debugThrow();
 
         attrs.emplace("type", type.value());
@@ -127,9 +129,8 @@ static void fetchTree(
             else if (attr.value->type() == nInt) {
                 auto intValue = attr.value->integer().value;
 
-                if (intValue < 0) {
-                    state.error<EvalError>("negative value given for fetchTree attr %1%: %2%", state.symbols[attr.name], intValue).atPos(pos).debugThrow();
-                }
+                if (intValue < 0)
+                    state.error<EvalError>("negative value given for '%s' argument '%s': %d", fetcher, state.symbols[attr.name], intValue).atPos(pos).debugThrow();
 
                 attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
             } else if (state.symbols[attr.name] == "publicKeys") {
@@ -137,8 +138,8 @@ static void fetchTree(
                 attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, context).dump());
             }
             else
-                state.error<TypeError>("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
-                    state.symbols[attr.name], showType(*attr.value)).debugThrow();
+                state.error<TypeError>("argument '%s' to '%s' is %s while a string, Boolean or integer is expected",
+                    state.symbols[attr.name], fetcher, showType(*attr.value)).debugThrow();
         }
 
         if (params.isFetchGit && !attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
@@ -153,14 +154,14 @@ static void fetchTree(
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
                 state.error<EvalError>(
-                    "attribute 'name' isn’t supported in call to 'fetchTree'"
+                    "argument 'name' isn’t supported in call to '%s'", fetcher
                 ).atPos(pos).debugThrow();
 
         input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
     } else {
         auto url = state.coerceToString(pos, *args[0], context,
-                "while evaluating the first argument passed to the fetcher",
-                false, false).toOwned();
+            fmt("while evaluating the first argument passed to '%s'", fetcher),
+            false, false).toOwned();
 
         if (params.isFetchGit) {
             fetchers::Attrs attrs;
@@ -173,7 +174,7 @@ static void fetchTree(
         } else {
             if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
                 state.error<EvalError>(
-                    "passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"
+                    "passing a string argument to '%s' requires the 'flakes' experimental feature", fetcher
                 ).atPos(pos).debugThrow();
             input = fetchers::Input::fromURL(state.fetchSettings, url);
         }
@@ -183,10 +184,6 @@ static void fetchTree(
         input = lookupInRegistries(state.store, input).first;
 
     if (state.settings.pureEval && !input.isConsideredLocked(state.fetchSettings)) {
-        auto fetcher = "fetchTree";
-        if (params.isFetchGit)
-            fetcher = "fetchGit";
-
         state.error<EvalError>(
             "in pure evaluation mode, '%s' will not fetch unlocked input '%s'",
             fetcher, input.to_string()
