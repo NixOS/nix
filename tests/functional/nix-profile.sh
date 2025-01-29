@@ -62,10 +62,11 @@ grep '"priority":10' $TEST_HOME/.nix-profile/manifest.json
 nix profile history
 nix profile history | grep "packages.$system.default: ∅ -> 1.0"
 nix profile diff-closures | grep 'env-manifest.nix: ε → ∅'
+nix profile remove --regex ".*foo-0.1" 2>&1 | grep 'removed 1 packages'
 
 # Test XDG Base Directories support
 export NIX_CONFIG="use-xdg-base-directories = true"
-nix profile remove foo-0.1 flake1 2>&1 | grep 'removed 2 packages'
+nix profile remove flake1 2>&1 | grep 'removed 1 packages'
 nix profile install $flake1Dir
 [[ $($TEST_HOME/.local/state/nix/profile/bin/hello) = "Hello World" ]]
 unset NIX_CONFIG
