@@ -93,6 +93,7 @@ let
       libs = throw "`nix.dev.libs` is not meant to be used; use `nix.libs` instead.";
     };
     meta = {
+      mainProgram = "nix";
       pkgConfigModules = [
         "nix-cmd"
         "nix-expr"
