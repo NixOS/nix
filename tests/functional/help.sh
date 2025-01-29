@@ -25,7 +25,7 @@ done
 
 # FIXME: we don't know whether we built the manpages, so we can't
 # reliably test them here.
-exit 0
+skipTest
 
 # test help output
 
