@@ -65,7 +65,7 @@ nix profile diff-closures | grep 'env-manifest.nix: ε → ∅'
 
 # Test XDG Base Directories support
 export NIX_CONFIG="use-xdg-base-directories = true"
-nix profile remove foo-0.1 flake1 foo 2>&1 | grep 'removed 1 packages'
+nix profile remove foo-0.1 flake1 2>&1 | grep 'removed 2 packages'
 nix profile install $flake1Dir
 [[ $($TEST_HOME/.local/state/nix/profile/bin/hello) = "Hello World" ]]
 unset NIX_CONFIG
