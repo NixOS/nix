@@ -442,9 +442,21 @@ struct GitInputScheme : InputScheme
                     "See https://github.com/NixOS/nix/issues/12281 for details.",
                     url.to_string());
             }
+<<<<<<< HEAD
             repoInfo.url = std::filesystem::absolute(url.path).string();
         } else
             repoInfo.url = url.to_string();
+=======
+            repoInfo.location = std::filesystem::absolute(url.path);
+        } else {
+            if (url.scheme == "file")
+                /* Query parameters are meaningless for file://, but
+                   Git interprets them as part of the file name. So get
+                   rid of them. */
+                url.query.clear();
+            repoInfo.location = url;
+        }
+>>>>>>> 9f72d5bce (Git fetcher: Don't pass URL query parameters for file:// URLs)
 
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
