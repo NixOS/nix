@@ -672,9 +672,7 @@ struct GitInputScheme : InputScheme
         verifyCommit(input, repo);
 
         bool exportIgnore = getExportIgnoreAttr(input);
-        auto accessor = repo->getAccessor(rev, exportIgnore);
-
-        accessor->setPathDisplay("«" + input.to_string() + "»");
+        auto accessor = repo->getAccessor(rev, exportIgnore, "«" + input.to_string() + "»");
 
         /* If the repo has submodules, fetch them and return a mounted
            input accessor consisting of the accessor for the top-level
