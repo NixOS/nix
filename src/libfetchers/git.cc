@@ -598,16 +598,20 @@ struct GitInputScheme : InputScheme
                 try {
                     auto fetchRef =
                         getAllRefsAttr(input)
-                        ? "refs/*"
+                        ? "refs/*:refs/*"
                         : input.getRev()
                         ? input.getRev()->gitRev()
                         : ref.compare(0, 5, "refs/") == 0
-                        ? ref
+                        ? fmt("%1%:%1%", ref)
                         : ref == "HEAD"
                         ? ref
-                        : "refs/heads/" + ref;
+                        : fmt("%1%:%1%", "refs/heads/" + ref);
 
+<<<<<<< HEAD
                     repo->fetch(repoInfo.url, fmt("%s:%s", fetchRef, fetchRef), getShallowAttr(input));
+=======
+                    repo->fetch(repoUrl.to_string(), fetchRef, getShallowAttr(input));
+>>>>>>> ee9fa0d36 (Git fetcher: Don't use refspec <rev>:<rev>)
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
                     logError(e.info());
