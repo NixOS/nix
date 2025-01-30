@@ -192,7 +192,6 @@ Descriptor openDirectory(const std::filesystem::path & path);
  */
 std::string readFile(const Path & path);
 std::string readFile(const std::filesystem::path & path);
-void readFile(const Path & path, Sink & sink);
 
 /**
  * Write a string to a file.

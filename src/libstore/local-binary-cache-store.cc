@@ -72,7 +72,7 @@ protected:
     void getFile(const std::string & path, Sink & sink) override
     {
         try {
-            readFile(binaryCacheDir + "/" + path, sink);
+            sink.readFile(binaryCacheDir + "/" + path);
         } catch (SysError & e) {
             if (e.errNo == ENOENT)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);

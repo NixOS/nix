@@ -1,0 +1,21 @@
+[advisories]
+version = 2
+db-path = ".advisory-db"
+yanked = "deny"
+
+[licenses]
+version = 2
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "LGPL-2.1",
+    "MIT",
+    "Unicode-3.0",
+    "Zlib",
+]
+
+[licenses.private]
+ignore = false
+registries = [
+]

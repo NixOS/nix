@@ -1,3 +1,4 @@
+#include "file-system.hh"
 #include "serialise.hh"
 #include "signals.hh"
 #include "util.hh"
@@ -18,6 +19,20 @@
 
 
 namespace nix {
+
+
+void Sink::readFile(const Path& path)
+{
+    AutoCloseFD fd = toDescriptor(open(path.c_str(), O_RDONLY
+// TODO
+#ifndef _WIN32
+       | O_CLOEXEC
+#endif
+       ));
+    if (!fd)
+        throw SysError("opening file '%s'", path);
+    drainFD(fd.get(), *this);
+}
 
 
 void BufferedSink::operator () (std::string_view data)

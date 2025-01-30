@@ -102,7 +102,7 @@ struct CmdHashBase : Command
                 // Also symlinks semantics are unambiguous in the flat case,
                 // so we don't need to go low-level, or reject symlink `path`s.
                 auto hashSink = makeSink();
-                readFile(path, *hashSink);
+                hashSink->readFile(path);
                 h = hashSink->finish().first;
                 break;
             }

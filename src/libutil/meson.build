@@ -106,7 +106,16 @@ deps_private += cpuid
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
-cxx = meson.get_compiler('cpp')
+nix_util_rust = cxx.find_library(
+  'nix_util_rust',
+  has_headers: [
+    'rust/cxx.h',
+    'nix-util-rust/src/gen/hash/blake3.rs.h'
+  ],
+)
+deps_other += nix_util_rust
+
+nix_util_rust_cxxbridge = get_option('nix_util_rust_cxxbridge')
 
 config_h = configure_file(
   configuration : configdata,
@@ -165,7 +174,9 @@ sources = files(
   'users.cc',
   'util.cc',
   'xml-writer.cc',
-)
+) + [
+  nix_util_rust_cxxbridge + '/cxxbridge/nix-util-rust/src/gen/hash/blake3.rs.cc'
+]
 
 include_dirs = [include_directories('.')]
 if not cxx.has_header('widechar_width.h', required : false)

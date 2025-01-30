@@ -11,9 +11,9 @@ namespace nix {
 MakeError(BadHash, Error);
 
 
-enum struct HashAlgorithm : char { MD5 = 42, SHA1, SHA256, SHA512 };
+enum struct HashAlgorithm : char { MD5 = 42, SHA1, SHA256, SHA512, BLAKE3 };
 
-
+const int blake3HashSize = 32;
 const int md5HashSize = 16;
 const int sha1HashSize = 20;
 const int sha256HashSize = 32;
@@ -210,7 +210,27 @@ std::optional<HashAlgorithm> parseHashAlgoOpt(std::string_view s);
 std::string_view printHashAlgo(HashAlgorithm ha);
 
 
-union Ctx;
+class HashCtx
+{
+protected:
+    HashCtx() = default;
+
+public:
+    static auto create(HashAlgorithm ha) -> std::unique_ptr<HashCtx>;
+
+    virtual auto clone() -> std::unique_ptr<HashCtx> = 0;
+    virtual auto update(const std::string_view data) -> void = 0;
+    virtual auto finish(uint8_t hash[Hash::maxHashSize]) -> void = 0;
+};
+
+class BLAKE3Ctx : public virtual HashCtx
+{
+protected:
+    BLAKE3Ctx() = default;
+
+public:
+    virtual auto update_mmap(const std::string& path) -> void = 0;
+};
 
 struct AbstractHashSink : virtual Sink
 {
@@ -221,7 +241,7 @@ class HashSink : public BufferedSink, public AbstractHashSink
 {
 private:
     HashAlgorithm ha;
-    Ctx * ctx;
+    std::unique_ptr<HashCtx> ctx;
     uint64_t bytes;
 
 public:
@@ -231,6 +251,7 @@ public:
     void writeUnbuffered(std::string_view data) override;
     HashResult finish() override;
     HashResult currentHash();
+    void readFile(const Path& path) override;
 };
 
 

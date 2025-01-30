@@ -1,6 +1,10 @@
 # Default meson build dir
 /build
 
+# Rust
+/src/rust/.advisory-db
+/src/rust/target
+
 # /tests/functional/
 /tests/functional/common/subst-vars.sh
 /tests/functional/restricted-innocent

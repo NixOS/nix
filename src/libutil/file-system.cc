@@ -244,20 +244,6 @@ std::string readFile(const std::filesystem::path & path)
 }
 
 
-void readFile(const Path & path, Sink & sink)
-{
-    AutoCloseFD fd = toDescriptor(open(path.c_str(), O_RDONLY
-// TODO
-#ifndef _WIN32
-       | O_CLOEXEC
-#endif
-       ));
-    if (!fd)
-        throw SysError("opening file '%s'", path);
-    drainFD(fd.get(), sink);
-}
-
-
 void writeFile(const Path & path, std::string_view s, mode_t mode, bool sync)
 {
     AutoCloseFD fd = toDescriptor(open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT

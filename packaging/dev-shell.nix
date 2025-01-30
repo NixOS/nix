@@ -96,6 +96,7 @@ pkgs.nixComponents.nix-util.overrideAttrs (
     nativeBuildInputs =
       attrs.nativeBuildInputs or [ ]
       ++ pkgs.nixComponents.nix-util.nativeBuildInputs
+      ++ pkgs.nixComponents.nix-util-rust.nativeBuildInputs
       ++ pkgs.nixComponents.nix-store.nativeBuildInputs
       ++ pkgs.nixComponents.nix-fetchers.nativeBuildInputs
       ++ pkgs.nixComponents.nix-expr.nativeBuildInputs
@@ -129,6 +130,7 @@ pkgs.nixComponents.nix-util.overrideAttrs (
     buildInputs =
       attrs.buildInputs or [ ]
       ++ pkgs.nixComponents.nix-util.buildInputs
+      ++ pkgs.nixComponents.nix-util-rust.buildInputs
       ++ pkgs.nixComponents.nix-store.buildInputs
       ++ pkgs.nixComponents.nix-store-tests.externalBuildInputs
       ++ pkgs.nixComponents.nix-fetchers.buildInputs
