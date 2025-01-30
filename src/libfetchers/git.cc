@@ -459,8 +459,14 @@ struct GitInputScheme : InputScheme
                     url);
             }
             repoInfo.location = std::filesystem::absolute(url.path);
-        } else
+        } else {
+            if (url.scheme == "file")
+                /* Query parameters are meaningless for file://, but
+                   Git interprets them as part of the file name. So get
+                   rid of them. */
+                url.query.clear();
             repoInfo.location = url;
+        }
 
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
