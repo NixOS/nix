@@ -37,6 +37,7 @@ nix-instantiate --eval -E "builtins.readFile ((builtins.fetchGit file://$TEST_RO
 
 # Fetch a worktree.
 unset _NIX_FORCE_HTTP
+expectStderr 0 nix eval -vvvv --impure --raw --expr "(builtins.fetchGit file://$TEST_ROOT/worktree).outPath" | grepQuiet "copying '$TEST_ROOT/worktree/' to the store"
 path0=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$TEST_ROOT/worktree).outPath")
 path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = file://$TEST_ROOT/worktree; }).outPath")
 [[ $path0 = $path0_ ]]

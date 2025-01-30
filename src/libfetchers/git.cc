@@ -737,8 +737,6 @@ struct GitInputScheme : InputScheme
                 exportIgnore,
                 makeNotAllowedError(repoInfo.locationToArg()));
 
-        accessor->setPathDisplay(repoInfo.locationToArg());
-
         /* If the repo has submodules, return a mounted input accessor
            consisting of the accessor for the top-level repo and the
            accessors for the submodule workdirs. */
