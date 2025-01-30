@@ -434,7 +434,27 @@ struct GitInputScheme : InputScheme
         //
         // See: https://discourse.nixos.org/t/57783 and #9708
         //
+<<<<<<< HEAD
         repoInfo.url = repoInfo.isLocal ? std::filesystem::absolute(url.path).string() : url.to_string();
+=======
+        if (url.scheme == "file" && !forceHttp && !isBareRepository) {
+            if (!isAbsolute(url.path)) {
+                warn(
+                    "Fetching Git repository '%s', which uses a path relative to the current directory. "
+                    "This is not supported and will stop working in a future release. "
+                    "See https://github.com/NixOS/nix/issues/12281 for details.",
+                    url);
+            }
+            repoInfo.location = std::filesystem::absolute(url.path);
+        } else {
+            if (url.scheme == "file")
+                /* Query parameters are meaningless for file://, but
+                   Git interprets them as part of the file name. So get
+                   rid of them. */
+                url.query.clear();
+            repoInfo.location = url;
+        }
+>>>>>>> 9f72d5bce (Git fetcher: Don't pass URL query parameters for file:// URLs)
 
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
