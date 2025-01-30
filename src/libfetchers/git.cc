@@ -611,16 +611,16 @@ struct GitInputScheme : InputScheme
                 try {
                     auto fetchRef =
                         getAllRefsAttr(input)
-                        ? "refs/*"
+                        ? "refs/*:refs/*"
                         : input.getRev()
                         ? input.getRev()->gitRev()
                         : ref.compare(0, 5, "refs/") == 0
-                        ? ref
+                        ? fmt("%1%:%1%", ref)
                         : ref == "HEAD"
                         ? ref
-                        : "refs/heads/" + ref;
+                        : fmt("%1%:%1%", "refs/heads/" + ref);
 
-                    repo->fetch(repoUrl.to_string(), fmt("%s:%s", fetchRef, fetchRef), getShallowAttr(input));
+                    repo->fetch(repoUrl.to_string(), fetchRef, getShallowAttr(input));
                 } catch (Error & e) {
                     if (!std::filesystem::exists(localRefFile)) throw;
                     logError(e.info());
