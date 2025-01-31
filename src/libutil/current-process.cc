@@ -51,11 +51,11 @@ unsigned int getMaxCPU()
 //////////////////////////////////////////////////////////////////////
 
 
+#ifndef _WIN32
 size_t savedStackSize = 0;
 
 void setStackSize(size_t stackSize)
 {
-    #ifndef _WIN32
     struct rlimit limit;
     if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
         savedStackSize = limit.rlim_cur;
@@ -73,8 +73,8 @@ void setStackSize(size_t stackSize)
             );
         }
     }
-    #endif
 }
+#endif
 
 void restoreProcessContext(bool restoreMounts)
 {
