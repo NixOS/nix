@@ -457,18 +457,13 @@ Goal::Co DerivationGoal::repairClosure()
         co_return done(BuildResult::AlreadyValid, assertPathValidity());
     } else {
         co_await Suspend{};
-        co_return closureRepaired();
+
+        trace("closure repaired");
+        if (nrFailed > 0)
+            throw Error("some paths in the output closure of derivation '%s' could not be repaired",
+                worker.store.printStorePath(drvPath));
+        co_return done(BuildResult::AlreadyValid, assertPathValidity());
     }
-}
-
-
-Goal::Co DerivationGoal::closureRepaired()
-{
-    trace("closure repaired");
-    if (nrFailed > 0)
-        throw Error("some paths in the output closure of derivation '%s' could not be repaired",
-            worker.store.printStorePath(drvPath));
-    co_return done(BuildResult::AlreadyValid, assertPathValidity());
 }
 
 

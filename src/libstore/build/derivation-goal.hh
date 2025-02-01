@@ -237,7 +237,6 @@ struct DerivationGoal : public Goal
     Co loadDerivation();
     Co haveDerivation();
     Co gaveUpOnSubstitution();
-    Co closureRepaired();
     Co inputsRealised();
     Co tryToBuild();
     virtual Co tryLocalBuild();
