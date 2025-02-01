@@ -236,7 +236,6 @@ struct DerivationGoal : public Goal
     Co getDerivation();
     Co loadDerivation();
     Co haveDerivation();
-    Co outputsSubstitutionTried();
     Co gaveUpOnSubstitution();
     Co closureRepaired();
     Co inputsRealised();

@@ -270,12 +270,7 @@ Goal::Co DerivationGoal::haveDerivation()
         }
 
     if (!waitees.empty()) co_await Suspend{}; /* to prevent hang (no wake-up event) */
-    co_return outputsSubstitutionTried();
-}
 
-
-Goal::Co DerivationGoal::outputsSubstitutionTried()
-{
     trace("all outputs substituted (maybe)");
 
     assert(!drv->type().isImpure());
