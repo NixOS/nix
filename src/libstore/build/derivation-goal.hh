@@ -233,8 +233,6 @@ struct DerivationGoal : public Goal
      * The states.
      */
     Co init() override;
-    Co getDerivation();
-    Co loadDerivation();
     Co haveDerivation();
     Co gaveUpOnSubstitution();
     Co inputsRealised();
