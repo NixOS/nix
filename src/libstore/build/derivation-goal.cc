@@ -382,12 +382,7 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
     }
 
     if (!waitees.empty()) co_await Suspend{}; /* to prevent hang (no wake-up event) */
-    co_return inputsRealised();
-}
 
-
-Goal::Co DerivationGoal::inputsRealised()
-{
     trace("all inputs realised");
 
     if (nrFailed != 0) {
