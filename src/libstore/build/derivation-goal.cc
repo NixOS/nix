@@ -235,12 +235,14 @@ Goal::Co DerivationGoal::haveDerivation()
             }
         });
 
-    /* Check what outputs paths are not already valid. */
-    auto [allValid, validOutputs] = checkPathValidity();
+    {
+        /* Check what outputs paths are not already valid. */
+        auto [allValid, validOutputs] = checkPathValidity();
 
-    /* If they are all valid, then we're done. */
-    if (allValid && buildMode == bmNormal) {
-        co_return done(BuildResult::AlreadyValid, std::move(validOutputs));
+        /* If they are all valid, then we're done. */
+        if (allValid && buildMode == bmNormal) {
+            co_return done(BuildResult::AlreadyValid, std::move(validOutputs));
+        }
     }
 
     /* We are first going to try to create the invalid output paths
