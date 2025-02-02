@@ -60,7 +60,7 @@
 
 namespace nix {
 
-static const LocalStoreConfigT<config::SettingInfo> localStoreConfigDescriptions = {
+constexpr static const LocalStoreConfigT<config::SettingInfo> localStoreConfigDescriptions = {
     .requireSigs = {
         .name = "require-sigs",
         .description = "Whether store paths copied into this store should have a trusted signature.",

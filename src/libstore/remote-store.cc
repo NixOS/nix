@@ -24,7 +24,7 @@
 
 namespace nix {
 
-static const RemoteStoreConfigT<config::SettingInfo> remoteStoreConfigDescriptions = {
+constexpr static const RemoteStoreConfigT<config::SettingInfo> remoteStoreConfigDescriptions = {
     .maxConnections{
         .name = "max-connections",
         .description = "Maximum number of concurrent connections to the Nix daemon.",

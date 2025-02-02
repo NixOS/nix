@@ -17,7 +17,7 @@
 
 namespace nix {
 
-static const LegacySSHStoreConfigT<config::SettingInfo> legacySSHStoreConfigDescriptions = {
+constexpr static const LegacySSHStoreConfigT<config::SettingInfo> legacySSHStoreConfigDescriptions = {
     .remoteProgram{
         .name = "remote-program",
         .description = "Path to the `nix-store` executable on the remote machine.",

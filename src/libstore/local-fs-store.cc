@@ -10,7 +10,7 @@
 
 namespace nix {
 
-static const LocalFSStoreConfigT<config::SettingInfo> localFSStoreConfigDescriptions = {
+constexpr static const LocalFSStoreConfigT<config::SettingInfo> localFSStoreConfigDescriptions = {
     .rootDir = {
         .name = "root",
         .description = "Directory prefixed to all other paths.",

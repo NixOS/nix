@@ -19,9 +19,9 @@ template<typename T>
 std::pair<std::string, SettingDescription> SettingInfo<T>::describe(const JustValue<T> & def) const
 {
     return {
-        name,
+        std::string { name },
         SettingDescription{
-            .description = description,
+            .description = stripIndentation(description),
             .defaultValue =
                 documentDefault ? (std::optional<nlohmann::json>{}) : (std::optional{nlohmann::json{def.value}}),
         },

@@ -13,7 +13,7 @@
 
 namespace nix {
 
-static const SSHStoreConfigT<config::SettingInfo> sshStoreConfigDescriptions = {
+constexpr static const SSHStoreConfigT<config::SettingInfo> sshStoreConfigDescriptions = {
     .remoteProgram{
         .name = "remote-program",
         .description = "Path to the `nix-daemon` executable on the remote machine.",

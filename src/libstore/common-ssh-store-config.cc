@@ -6,7 +6,7 @@
 
 namespace nix {
 
-static const CommonSSHStoreConfigT<config::SettingInfo> commonSSHStoreConfigDescriptions = {
+constexpr static const CommonSSHStoreConfigT<config::SettingInfo> commonSSHStoreConfigDescriptions = {
     .sshKey{
         .name = "ssh-key",
         .description = "Path to the SSH private key used to authenticate to the remote machine.",

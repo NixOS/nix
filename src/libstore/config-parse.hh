@@ -13,6 +13,9 @@ struct SettingDescription;
 /**
  * Typed version used as source of truth, and for operations like
  * defaulting configurations.
+ *
+ * It is important that this type support `constexpr` values to avoid
+ * running into issues with static initialization order.
  */
 template<typename T>
 struct SettingInfo
@@ -20,19 +23,19 @@ struct SettingInfo
     /**
      * Name of the setting, used when parsing configuration maps
      */
-    std::string name;
+    std::string_view name;
 
     /**
      * Description of the setting. It is used just for documentation.
      */
-    std::string description;
+    std::string_view description;
 
 #if 0
     /**
      * Other names of the setting also used when parsing configuration
      * maps. This is useful for back-compat, etc.
      */
-    std::set<std::string> aliases;
+    std::set<std::string_view> aliases;
 
     /**
      * `ExperimentalFeature` that must be enabled if the setting is

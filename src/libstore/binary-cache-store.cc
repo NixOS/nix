@@ -25,7 +25,7 @@
 
 namespace nix {
 
-static const BinaryCacheStoreConfigT<config::SettingInfo> binaryCacheStoreConfigDescriptions = {
+constexpr static const BinaryCacheStoreConfigT<config::SettingInfo> binaryCacheStoreConfigDescriptions = {
     .compression = {
         .name = "compression",
         .description = "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`).",

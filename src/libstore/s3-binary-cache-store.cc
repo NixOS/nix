@@ -195,7 +195,7 @@ S3Helper::FileTransferResult S3Helper::getObject(
 }
 
 
-static const S3BinaryCacheStoreConfigT<config::SettingInfo> s3BinaryCacheStoreConfigDescriptions = {
+constexpr static const S3BinaryCacheStoreConfigT<config::SettingInfo> s3BinaryCacheStoreConfigDescriptions = {
     .profile{
         .name = "profile",
         .description = R"(

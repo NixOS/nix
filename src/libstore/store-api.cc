@@ -189,7 +189,7 @@ std::pair<StorePath, Hash> MixStoreDirMethods::computeStorePath(
 }
 
 
-static const StoreConfigT<config::SettingInfo> storeConfigDescriptions = {
+constexpr static const StoreConfigT<config::SettingInfo> storeConfigDescriptions = {
     .pathInfoCacheSize{
         .name = "path-info-cache-size",
         .description = "Size of the in-memory store path metadata cache.",
@@ -216,7 +216,7 @@ static const StoreConfigT<config::SettingInfo> storeConfigDescriptions = {
     },
 };
 
-static const SubstituterConfigT<config::SettingInfo> substituterConfigDescriptions = {
+constexpr static const SubstituterConfigT<config::SettingInfo> substituterConfigDescriptions = {
     .priority{
         .name = "priority",
         .description = R"(
