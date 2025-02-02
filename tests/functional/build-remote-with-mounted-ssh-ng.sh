@@ -5,6 +5,11 @@ source common.sh
 requireSandboxSupport
 [[ $busybox =~ busybox ]] || skipTest "no busybox"
 
+# An example of a command that uses the store only for its settings, to
+# make sure we catch needing the XP feature early.
+touch "$TEST_ROOT/foo"
+expect 1 nix --store 'ssh-ng://localhost?mounted=%7B%7D' store add "$TEST_ROOT/foo" --dry-run
+
 enableFeatures mounted-ssh-store
 
 # N.B. encoded query param is `mounted={}`. In the future, we can just
