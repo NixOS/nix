@@ -347,6 +347,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
         , s3Helper(config->profile, config->region, config->scheme, config->endpoint)
     {
         diskCache = getNarInfoDiskCache();
+
+        init();
     }
 
     std::string getUri() override

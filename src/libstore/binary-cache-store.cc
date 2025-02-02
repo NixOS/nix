@@ -118,7 +118,11 @@ BinaryCacheStore::BinaryCacheStore(const Config & config)
     sink << narVersionMagic1;
     narMagic = sink.s;
 
-    init();
+    // Want to call this but cannot, because virtual function lookup is
+    // disabled in a constructor. It is thus left to instances to call
+    // it instead.
+
+    //init();
 }
 
 void BinaryCacheStore::init()

@@ -77,6 +77,8 @@ public:
         , config{config}
     {
         diskCache = getNarInfoDiskCache();
+
+        init();
     }
 
     std::string getUri() override

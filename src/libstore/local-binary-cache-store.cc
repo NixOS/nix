@@ -48,6 +48,7 @@ struct LocalBinaryCacheStore :
         , BinaryCacheStore{*config}
         , config{config}
     {
+        init();
     }
 
     void init() override;
