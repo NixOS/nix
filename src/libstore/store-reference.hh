@@ -5,6 +5,7 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include "types.hh"
+#include "json-impls.hh"
 
 namespace nix {
 
@@ -100,3 +101,5 @@ struct StoreReference
 std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::string & uri);
 
 }
+
+JSON_IMPL(StoreReference)

@@ -7,6 +7,7 @@
 #include "store-reference.hh"
 #include "file-system.hh"
 #include "util.hh"
+#include "json-utils.hh"
 
 namespace nix {
 
@@ -150,6 +151,55 @@ std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::stri
         uri = uri_.substr(0, q);
     }
     return {uri, decodeParamsJson(std::move(params))};
+}
+
+}
+
+namespace nlohmann {
+
+StoreReference adl_serializer<StoreReference>::from_json(const json & json)
+{
+    StoreReference ref;
+    switch (json.type()) {
+
+    case json::value_t::string: {
+        ref = StoreReference::parse(json.get_ref<const std::string &>());
+        break;
+    }
+
+    case json::value_t::object: {
+        auto & obj = json.get_ref<const json::object_t &>();
+        ref = StoreReference{
+            .variant =
+                StoreReference::Specified{
+                    .scheme = getString(valueAt(obj, "scheme")),
+                    .authority = getString(valueAt(obj, "authority")),
+                },
+            .params = obj,
+        };
+        break;
+    }
+
+    case json::value_t::null:
+    case json::value_t::number_unsigned:
+    case json::value_t::number_integer:
+    case json::value_t::number_float:
+    case json::value_t::boolean:
+    case json::value_t::array:
+    case json::value_t::binary:
+    case json::value_t::discarded:
+    default:
+        throw UsageError(
+            "Invalid JSON for Store configuration: is type '%s' but must be string or object", json.type_name());
+    };
+
+    return ref;
+}
+
+void adl_serializer<StoreReference>::to_json(json & obj, StoreReference s)
+{
+    // TODO, for tests maybe
+    assert(false);
 }
 
 }
