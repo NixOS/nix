@@ -87,7 +87,7 @@ StoreReference Machine::completeStoreReference() const
         if (!fs.is_array()) fs = nlohmann::json::array();
         auto features = supportedFeatures;
         features.insert(supportedFeatures.begin(), supportedFeatures.end());
-        fs += features;
+        for (auto & feat : features) fs += feat;
     }
 
     return storeUri;
