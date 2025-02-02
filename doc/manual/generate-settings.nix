@@ -27,11 +27,22 @@ let
     prefix: setting:
     {
       description,
+
+      # Whether we document the default, because it is machine agostic,
+      # or don't because because it is machine-specific.
       documentDefault,
-      defaultValue,
-      aliases,
-      value,
-      experimentalFeature,
+
+      # The default value is JSON for new-style config, rather than then
+      # a string or boolean, for old-style config.
+      json ? false,
+
+      defaultValue ? null,
+
+      aliases ? [ ],
+
+      # The current value for this setting. Purposefully unused.
+      value ? null,
+      experimentalFeature ? null,
     }:
     let
       result = squash ''
@@ -75,6 +86,9 @@ let
       showDefault =
         documentDefault: defaultValue:
         if documentDefault then
+          if json then
+            "`${builtins.toJSON defaultValue}`"
+          else
           # a StringMap value type is specified as a string, but
           # this shows the value type. The empty stringmap is `null` in
           # JSON, but that converts to `{ }` here.

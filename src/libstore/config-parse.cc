@@ -22,9 +22,14 @@ void adl_serializer<SettingDescription>::to_json(json & obj, SettingDescription 
     // obj.emplace("aliases", s.aliases);
     // obj.emplace("experimentalFeature", s.experimentalFeature);
 
-    // Cannot use `null` because the default value might itself be
+    // Indicate this is a JSON default, not a
+    obj.emplace("json", true);
+
+    // Cannot just use `null` because the default value might itself be
     // `null`.
-    if (s.defaultValue)
+    obj.emplace("documentDefault", s.defaultValue.has_value());
+
+    if (s.defaultValue.has_value())
         obj.emplace("defaultValue", *s.defaultValue);
 }
 
