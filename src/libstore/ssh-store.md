@@ -5,7 +5,7 @@ R"(
 Experimental store type that allows full access to a Nix store on a
 remote machine.
 
-### The `mounted` configuration subject
+### The `mounted` configuration setting
 
 This additionally requires that store be mounted in the local file system.
 

@@ -60,4 +60,38 @@ TEST(MountedSSHStore, constructConfig)
     EXPECT_EQ(config.mounted->realStoreDir, "/nix/store");
 }
 
+TEST(MountedSSHStore, constructConfigWithFunnyRealStoreDir)
+{
+    SSHStoreConfig config{
+        "ssh-ng",
+        "localhost",
+        StoreReference::Params{
+            {
+                "remote-program",
+                {
+                    "foo",
+                    "bar",
+                },
+            },
+            {
+                "mounted",
+                nlohmann::json::object_t{
+                    {"real", "/foo/bar"},
+                },
+            },
+        },
+    };
+
+    EXPECT_EQ(
+        config.remoteProgram.get(),
+        (Strings{
+            "foo",
+            "bar",
+        }));
+
+    ASSERT_TRUE(config.mounted);
+
+    EXPECT_EQ(config.mounted->realStoreDir, "/foo/bar");
+}
+
 }
