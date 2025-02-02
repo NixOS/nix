@@ -81,7 +81,7 @@ static StoreReference localExample_2{
         },
     .params =
         {
-            {"trusted", "true"},
+            {"trusted", true},
         },
 };
 
@@ -100,8 +100,8 @@ static StoreReference unixExample{
         },
     .params =
         {
-            {"max-connections", "7"},
-            {"trusted", "true"},
+            {"max-connections", 7},
+            {"trusted", true},
         },
 };
 
