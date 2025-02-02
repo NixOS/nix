@@ -64,7 +64,7 @@ static StoreReference::Params decodeParamsJson(StringMap paramsRaw)
             j = nlohmann::json::parse(v);
         } catch (nlohmann::json::exception &) {
             // if its not valid JSON...
-            if (k == "remoteProgram" || k == "systemFeatures") {
+            if (k == "remote-program" || k == "system-features") {
                 // Back compat hack! Split and take that array
                 j = tokenizeString<std::vector<std::string>>(v);
             } else {
