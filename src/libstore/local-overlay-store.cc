@@ -109,6 +109,13 @@ std::string LocalOverlayStoreConfig::doc()
         ;
 }
 
+ref<Store> LocalOverlayStoreConfig::openStore() const
+{
+    return make_ref<LocalOverlayStore>(ref{
+        std::dynamic_pointer_cast<const LocalOverlayStoreConfig>(shared_from_this())
+    });
+}
+
 
 Path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) const
 {
