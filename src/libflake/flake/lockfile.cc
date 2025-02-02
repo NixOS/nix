@@ -1,7 +1,10 @@
 #include <unordered_set>
 
+#include "fetch-settings.hh"
+#include "flake/settings.hh"
 #include "lockfile.hh"
 #include "store-api.hh"
+#include "strings.hh"
 
 #include <algorithm>
 #include <iomanip>
@@ -9,8 +12,6 @@
 #include <iterator>
 #include <nlohmann/json.hpp>
 
-#include "strings.hh"
-#include "flake/settings.hh"
 
 namespace nix::flake {
 
@@ -45,9 +46,16 @@ LockedNode::LockedNode(
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
     , parentInputAttrPath(json.find("parent") != json.end() ? (std::optional<InputAttrPath>) json["parent"] : std::nullopt)
 {
-    if (!lockedRef.input.isConsideredLocked(fetchSettings) && !lockedRef.input.isRelative())
-        throw Error("Lock file contains unlocked input '%s'. Use '--allow-dirty-locks' to accept this lock file.",
-            fetchers::attrsToJSON(lockedRef.input.toAttrs()));
+    if (!lockedRef.input.isLocked() && !lockedRef.input.isRelative()) {
+        if (lockedRef.input.getNarHash())
+            warn(
+                "Lock file entry '%s' is unlocked (e.g. lacks a Git revision) but does have a NAR hash. "
+                "This is deprecated since such inputs are verifiable but may not be reproducible.",
+                lockedRef.to_string());
+        else
+            throw Error("Lock file contains unlocked input '%s'. Use '--allow-dirty-locks' to accept this lock file.",
+                fetchers::attrsToJSON(lockedRef.input.toAttrs()));
+    }
 
     // For backward compatibility, lock file entries are implicitly final.
     assert(!lockedRef.input.attrs.contains("__final"));
@@ -248,11 +256,20 @@ std::optional<FlakeRef> LockFile::isUnlocked(const fetchers::Settings & fetchSet
 
     visit(root);
 
+    /* Return whether the input is either locked, or, if
+       `allow-dirty-locks` is enabled, it has a NAR hash. In the
+       latter case, we can verify the input but we may not be able to
+       fetch it from anywhere. */
+    auto isConsideredLocked = [&](const fetchers::Input & input)
+    {
+        return input.isLocked() || (fetchSettings.allowDirtyLocks && input.getNarHash());
+    };
+
     for (auto & i : nodes) {
         if (i == ref<const Node>(root)) continue;
         auto node = i.dynamic_pointer_cast<const LockedNode>();
         if (node
-            && (!node->lockedRef.input.isConsideredLocked(fetchSettings)
+            && (!isConsideredLocked(node->lockedRef.input)
                 || !node->lockedRef.input.isFinal())
             && !node->lockedRef.input.isRelative())
             return node->lockedRef;

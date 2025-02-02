@@ -107,7 +107,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
            to 'baseDir'). If so, search upward to the root of the
            repo (i.e. the directory containing .git). */
 
-        path = absPath(path, baseDir);
+        path = absPath(path, baseDir, true);
 
         if (isFlake) {
 

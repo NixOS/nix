@@ -24,6 +24,7 @@ deps_public_maybe_subproject = [
   dependency('nix-fetchers'),
 ]
 subdir('nix-meson-build-support/subprojects')
+subdir('nix-meson-build-support/big-objs')
 
 boost = dependency(
   'boost',
