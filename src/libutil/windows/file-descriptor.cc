@@ -5,6 +5,7 @@
 #include "windows-error.hh"
 #include "file-path.hh"
 
+#ifdef _WIN32
 #include <fileapi.h>
 #include <error.h>
 #include <namedpipeapi.h>
@@ -61,7 +62,7 @@ void writeFull(HANDLE handle, std::string_view s, bool allowInterrupts)
 }
 
 
-std::string readLine(HANDLE handle)
+std::string readLine(HANDLE handle, bool eofOk)
 {
     std::string s;
     while (1) {
@@ -71,8 +72,12 @@ std::string readLine(HANDLE handle)
         DWORD rd;
         if (!ReadFile(handle, &ch, 1, &rd, NULL)) {
             throw WinError("reading a line");
-        } else if (rd == 0)
-            throw EndOfFile("unexpected EOF reading a line");
+        } else if (rd == 0) {
+            if (eofOk)
+                return s;
+            else
+                throw EndOfFile("unexpected EOF reading a line");
+        }
         else {
             if (ch == '\n') return s;
             s += ch;
@@ -148,3 +153,4 @@ Path windows::handleToPath(HANDLE handle) {
 #endif
 
 }
+#endif

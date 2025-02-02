@@ -2,11 +2,16 @@ with import ./config.nix;
 
 rec {
 
-  dep = import ./dependencies.nix {};
+  dep = import ./dependencies.nix { };
 
-  makeTest = nr: args: mkDerivation ({
-    name = "check-refs-" + toString nr;
-  } // args);
+  makeTest =
+    nr: args:
+    mkDerivation (
+      {
+        name = "check-refs-" + toString nr;
+      }
+      // args
+    );
 
   src = builtins.toFile "aux-ref" "bla bla";
 
@@ -22,31 +27,31 @@ rec {
 
   test3 = makeTest 3 {
     builder = builtins.toFile "builder.sh" "mkdir $out; ln -s $dep $out/link";
-    allowedReferences = [];
+    allowedReferences = [ ];
     inherit dep;
   };
 
   test4 = makeTest 4 {
     builder = builtins.toFile "builder.sh" "mkdir $out; ln -s $dep $out/link";
-    allowedReferences = [dep];
+    allowedReferences = [ dep ];
     inherit dep;
   };
 
   test5 = makeTest 5 {
     builder = builtins.toFile "builder.sh" "mkdir $out";
-    allowedReferences = [];
+    allowedReferences = [ ];
     inherit dep;
   };
 
   test6 = makeTest 6 {
     builder = builtins.toFile "builder.sh" "mkdir $out; ln -s $out $out/link";
-    allowedReferences = [];
+    allowedReferences = [ ];
     inherit dep;
   };
 
   test7 = makeTest 7 {
     builder = builtins.toFile "builder.sh" "mkdir $out; ln -s $out $out/link";
-    allowedReferences = ["out"];
+    allowedReferences = [ "out" ];
     inherit dep;
   };
 
@@ -58,19 +63,19 @@ rec {
   test9 = makeTest 9 {
     builder = builtins.toFile "builder.sh" "mkdir $out; ln -s $dep $out/link";
     inherit dep;
-    disallowedReferences = [dep];
+    disallowedReferences = [ dep ];
   };
 
   test10 = makeTest 10 {
     builder = builtins.toFile "builder.sh" "mkdir $out; echo $test5; ln -s $dep $out/link";
     inherit dep test5;
-    disallowedReferences = [test5];
+    disallowedReferences = [ test5 ];
   };
 
   test11 = makeTest 11 {
     __structuredAttrs = true;
     unsafeDiscardReferences.out = true;
-    outputChecks.out.allowedReferences = [];
+    outputChecks.out.allowedReferences = [ ];
     buildCommand = ''echo ${dep} > "''${outputs[out]}"'';
   };
 

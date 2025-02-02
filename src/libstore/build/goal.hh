@@ -107,7 +107,7 @@ protected:
 public:
 
     /**
-     * Suspend our goal and wait until we get @ref work()-ed again.
+     * Suspend our goal and wait until we get `work`-ed again.
      * `co_await`-able by @ref Co.
      */
     struct Suspend {};
@@ -192,7 +192,7 @@ public:
 
         bool await_ready() { return false; };
         /**
-         * When we `co_await` another @ref Co-returning coroutine,
+         * When we `co_await` another `Co`-returning coroutine,
          * we tell the caller of `caller_coroutine.resume()` to switch to our coroutine (@ref handle).
          * To make sure we return to the original coroutine, we set it as the continuation of our
          * coroutine. In @ref promise_type::final_awaiter we check if it's set and if so we return to it.
@@ -208,7 +208,7 @@ public:
     };
 
     /**
-     * Used on initial suspend, does the same as @ref std::suspend_always,
+     * Used on initial suspend, does the same as `std::suspend_always`,
      * but asserts that everything has been set correctly.
      */
     struct InitialSuspend {
@@ -269,8 +269,8 @@ public:
         };
 
         /**
-         * Called by compiler generated code to construct the @ref Co
-         * that is returned from a @ref Co-returning coroutine.
+         * Called by compiler generated code to construct the `Co`
+         * that is returned from a `Co`-returning coroutine.
          */
         Co get_return_object();
 

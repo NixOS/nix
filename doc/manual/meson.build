@@ -55,16 +55,16 @@ generate_manual_deps = files(
 )
 
 # Generates types
-subdir('src/store')
+subdir('source/store')
 # Generates builtins.md and builtin-constants.md.
-subdir('src/language')
+subdir('source/language')
 # Generates new-cli pages, experimental-features-shortlist.md, and conf-file.md.
-subdir('src/command-ref')
+subdir('source/command-ref')
 # Generates experimental-feature-descriptions.md.
-subdir('src/development')
+subdir('source/development')
 # Generates rl-next-generated.md.
-subdir('src/release-notes')
-subdir('src')
+subdir('source/release-notes')
+subdir('source')
 
 # Hacky way to figure out if `nix` is an `ExternalProgram` or
 # `Exectuable`. Only the latter can occur in custom target input lists.
@@ -82,7 +82,7 @@ manual = custom_target(
     '-c',
     '''
         @0@ @INPUT0@ @CURRENT_SOURCE_DIR@ > @DEPFILE@
-        @0@ @INPUT1@ summary @2@ < @CURRENT_SOURCE_DIR@/src/SUMMARY.md.in > @2@/src/SUMMARY.md
+        @0@ @INPUT1@ summary @2@ < @CURRENT_SOURCE_DIR@/source/SUMMARY.md.in > @2@/source/SUMMARY.md
         rsync -r --include='*.md' @CURRENT_SOURCE_DIR@/ @2@/
         (cd @2@; RUST_LOG=warn @1@ build -d @2@ 3>&2 2>&1 1>&3) | { grep -Fv "because fragment resolution isn't implemented" || :; } 3>&2 2>&1 1>&3
         rm -rf @2@/manual
@@ -117,7 +117,7 @@ manual = custom_target(
   depfile : 'manual.d',
   env : {
     'RUST_LOG': 'info',
-    'MDBOOK_SUBSTITUTE_SEARCH': meson.current_build_dir() / 'src',
+    'MDBOOK_SUBSTITUTE_SEARCH': meson.current_build_dir() / 'source',
   },
 )
 manual_html = manual[0]
@@ -199,6 +199,7 @@ nix3_manpages = [
   'nix3-build',
   'nix3-bundle',
   'nix3-config',
+  'nix3-config-check',
   'nix3-config-show',
   'nix3-copy',
   'nix3-daemon',
@@ -206,8 +207,8 @@ nix3_manpages = [
   'nix3-derivation',
   'nix3-derivation-show',
   'nix3-develop',
-  #'nix3-doctor',
   'nix3-edit',
+  'nix3-env-shell',
   'nix3-eval',
   'nix3-flake-archive',
   'nix3-flake-check',
@@ -224,6 +225,7 @@ nix3_manpages = [
   'nix3-fmt',
   'nix3-hash-file',
   'nix3-hash',
+  'nix3-hash-convert',
   'nix3-hash-path',
   'nix3-hash-to-base16',
   'nix3-hash-to-base32',
@@ -238,6 +240,7 @@ nix3_manpages = [
   'nix3-nar-cat',
   'nix3-nar-dump-path',
   'nix3-nar-ls',
+  'nix3-nar-pack',
   'nix3-nar',
   'nix3-path-info',
   'nix3-print-dev-env',
@@ -260,7 +263,7 @@ nix3_manpages = [
   'nix3-repl',
   'nix3-run',
   'nix3-search',
-  #'nix3-shell',
+  'nix3-store-add',
   'nix3-store-add-file',
   'nix3-store-add-path',
   'nix3-store-cat',
@@ -270,6 +273,7 @@ nix3_manpages = [
   'nix3-store-diff-closures',
   'nix3-store-dump-path',
   'nix3-store-gc',
+  'nix3-store-info',
   'nix3-store-ls',
   'nix3-store-make-content-addressed',
   'nix3-store',

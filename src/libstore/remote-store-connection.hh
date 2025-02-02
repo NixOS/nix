@@ -40,7 +40,7 @@ struct RemoteStore::ConnectionHandle
         : handle(std::move(handle))
     { }
 
-    ConnectionHandle(ConnectionHandle && h)
+    ConnectionHandle(ConnectionHandle && h) noexcept
         : handle(std::move(h.handle))
     { }
 

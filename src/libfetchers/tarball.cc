@@ -90,6 +90,7 @@ DownloadFileResult downloadFile(
     /* Cache metadata for all URLs in the redirect chain. */
     for (auto & url : res.urls) {
         key.second.insert_or_assign("url", url);
+        assert(!res.urls.empty());
         infoAttrs.insert_or_assign("url", *res.urls.rbegin());
         getCache()->upsert(key, *store, infoAttrs, *storePath);
     }

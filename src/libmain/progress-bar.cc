@@ -158,10 +158,10 @@ public:
     {
         auto state(state_.lock());
 
-        std::stringstream oss;
+        std::ostringstream oss;
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
-        log(*state, ei.level, oss.str());
+        log(*state, ei.level, toView(oss));
     }
 
     void log(State & state, Verbosity lvl, std::string_view s)
@@ -287,23 +287,21 @@ public:
 
         else if (type == resBuildLogLine || type == resPostBuildLogLine) {
             auto lastLine = chomp(getS(fields, 0));
-            if (!lastLine.empty()) {
-                auto i = state->its.find(act);
-                assert(i != state->its.end());
-                ActInfo info = *i->second;
-                if (printBuildLogs) {
-                    auto suffix = "> ";
-                    if (type == resPostBuildLogLine) {
-                        suffix = " (post)> ";
-                    }
-                    log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
-                } else {
-                    state->activities.erase(i->second);
-                    info.lastLine = lastLine;
-                    state->activities.emplace_back(info);
-                    i->second = std::prev(state->activities.end());
-                    update(*state);
+            auto i = state->its.find(act);
+            assert(i != state->its.end());
+            ActInfo info = *i->second;
+            if (printBuildLogs) {
+                auto suffix = "> ";
+                if (type == resPostBuildLogLine) {
+                    suffix = " (post)> ";
                 }
+                log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
+            } else {
+                state->activities.erase(i->second);
+                info.lastLine = lastLine;
+                state->activities.emplace_back(info);
+                i->second = std::prev(state->activities.end());
+                update(*state);
             }
         }
 
@@ -543,7 +541,7 @@ public:
         auto state(state_.lock());
         if (!state->active) return {};
         std::cerr << fmt("\r\e[K%s ", msg);
-        auto s = trim(readLine(STDIN_FILENO));
+        auto s = trim(readLine(getStandardInput(), true));
         if (s.size() != 1) return {};
         draw(*state);
         return s[0];

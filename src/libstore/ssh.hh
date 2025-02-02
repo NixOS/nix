@@ -59,7 +59,7 @@ public:
     /**
      * @param command The command (arg vector) to execute.
      *
-     * @param extraSShArgs Extra args to pass to SSH (not the command to
+     * @param extraSshArgs Extra arguments to pass to SSH (not the command to
      * execute). Will not be used when "fake SSHing" to the local
      * machine.
      */

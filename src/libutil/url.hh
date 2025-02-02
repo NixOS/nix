@@ -7,9 +7,6 @@ namespace nix {
 
 struct ParsedURL
 {
-    std::string url;
-    /// URL without query/fragment
-    std::string base;
     std::string scheme;
     std::optional<std::string> authority;
     std::string path;
@@ -25,6 +22,8 @@ struct ParsedURL
      */
     ParsedURL canonicalise();
 };
+
+std::ostream & operator << (std::ostream & os, const ParsedURL & url);
 
 MakeError(BadURL, Error);
 

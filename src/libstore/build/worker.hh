@@ -208,7 +208,7 @@ public:
         const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
 
     /**
-     * @ref SubstitutionGoal "substitution goal"
+     * @ref PathSubstitutionGoal "substitution goal"
      */
     std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
     std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);

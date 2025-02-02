@@ -1,5 +1,6 @@
-{ binaryTarballs
-, nixpkgsFor
+{
+  binaryTarballs,
+  nixpkgsFor,
 }:
 
 let
@@ -41,8 +42,9 @@ let
     };
   };
 
-  mockChannel = pkgs:
-    pkgs.runCommandNoCC "mock-channel" {} ''
+  mockChannel =
+    pkgs:
+    pkgs.runCommandNoCC "mock-channel" { } ''
       mkdir nixexprs
       mkdir -p $out/channel
       echo -n 'someContent' > nixexprs/someFile
@@ -54,14 +56,14 @@ let
   images = {
 
     /*
-    "ubuntu-14-04" = {
-      image = import <nix/fetchurl.nix> {
-        url = "https://app.vagrantup.com/ubuntu/boxes/trusty64/versions/20190514.0.0/providers/virtualbox.box";
-        hash = "sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8=";
+      "ubuntu-14-04" = {
+        image = import <nix/fetchurl.nix> {
+          url = "https://app.vagrantup.com/ubuntu/boxes/trusty64/versions/20190514.0.0/providers/virtualbox.box";
+          hash = "sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8=";
+        };
+        rootDisk = "box-disk1.vmdk";
+        system = "x86_64-linux";
       };
-      rootDisk = "box-disk1.vmdk";
-      system = "x86_64-linux";
-    };
     */
 
     "ubuntu-16-04" = {
@@ -95,14 +97,14 @@ let
     # Currently fails with 'error while loading shared libraries:
     # libsodium.so.23: cannot stat shared object: Invalid argument'.
     /*
-    "rhel-6" = {
-      image = import <nix/fetchurl.nix> {
-        url = "https://app.vagrantup.com/generic/boxes/rhel6/versions/4.1.12/providers/libvirt.box";
-        hash = "sha256-QwzbvRoRRGqUCQptM7X/InRWFSP2sqwRt2HaaO6zBGM=";
+      "rhel-6" = {
+        image = import <nix/fetchurl.nix> {
+          url = "https://app.vagrantup.com/generic/boxes/rhel6/versions/4.1.12/providers/libvirt.box";
+          hash = "sha256-QwzbvRoRRGqUCQptM7X/InRWFSP2sqwRt2HaaO6zBGM=";
+        };
+        rootDisk = "box.img";
+        system = "x86_64-linux";
       };
-      rootDisk = "box.img";
-      system = "x86_64-linux";
-    };
     */
 
     "rhel-7" = {
@@ -137,12 +139,18 @@ let
 
   };
 
-  makeTest = imageName: testName:
-    let image = images.${imageName}; in
+  makeTest =
+    imageName: testName:
+    let
+      image = images.${imageName};
+    in
     with nixpkgsFor.${image.system}.native;
-    runCommand
-      "installer-test-${imageName}-${testName}"
-      { buildInputs = [ qemu_kvm openssh ];
+    runCommand "installer-test-${imageName}-${testName}"
+      {
+        buildInputs = [
+          qemu_kvm
+          openssh
+        ];
         image = image.image;
         postBoot = image.postBoot or "";
         installScript = installScripts.${testName}.script;
@@ -247,9 +255,6 @@ let
 
 in
 
-builtins.mapAttrs (imageName: image:
-  { ${image.system} = builtins.mapAttrs (testName: test:
-      makeTest imageName testName
-    ) installScripts;
-  }
-) images
+builtins.mapAttrs (imageName: image: {
+  ${image.system} = builtins.mapAttrs (testName: test: makeTest imageName testName) installScripts;
+}) images

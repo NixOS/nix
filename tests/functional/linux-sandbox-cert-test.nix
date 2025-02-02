@@ -22,9 +22,12 @@ mkDerivation (
       # derivations being cached, and do not want to compute the right hash.
       false;
     '';
-  } // {
-    fixed-output = { outputHash = "sha256:0000000000000000000000000000000000000000000000000000000000000000"; };
+  }
+  // {
+    fixed-output = {
+      outputHash = "sha256:0000000000000000000000000000000000000000000000000000000000000000";
+    };
     normal = { };
-  }.${mode}
+  }
+  .${mode}
 )
-

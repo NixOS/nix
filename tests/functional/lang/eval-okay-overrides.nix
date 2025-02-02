@@ -1,8 +1,12 @@
 let
 
-  overrides = { a = 2; b = 3; };
+  overrides = {
+    a = 2;
+    b = 3;
+  };
 
-in (rec {
+in
+(rec {
   __overrides = overrides;
   x = a;
   a = 1;

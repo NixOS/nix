@@ -29,11 +29,7 @@ We aim to achieve this by improving the contributor experience and attracting mo
 
 ## Members
 
-- Eelco Dolstra (@edolstra) – Team lead
-- Valentin Gagarin (@fricklerhandwerk)
-- Thomas Bereknyei (@tomberek)
-- Robert Hensing (@roberth)
-- John Ericson (@Ericson2314)
+See https://nixos.org/community/teams/nix/ for the current team membership.
 
 The team is on Github as [@NixOS/nix-team](https://github.com/orgs/NixOS/teams/nix-team).
 
@@ -62,6 +58,9 @@ Notes on issues and pull requests are posted as comments and linked from the mee
 Team meetings are generally open to anyone interested.
 We can make exceptions to discuss sensitive issues, such as security incidents or people matters.
 Contact any team member to get a calendar invite for reminders and updates.
+
+> [!IMPORTANT]
+> [Handling security reports](./security-reports.md) always takes priority.
 
 ## Project board protocol
 

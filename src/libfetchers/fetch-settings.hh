@@ -70,6 +70,22 @@ struct Settings : public Config
     Setting<bool> warnDirty{this, true, "warn-dirty",
         "Whether to warn about dirty Git/Mercurial trees."};
 
+    Setting<bool> allowDirtyLocks{
+        this,
+        false,
+        "allow-dirty-locks",
+        R"(
+          Whether to allow dirty inputs (such as dirty Git workdirs)
+          to be locked via their NAR hash. This is generally bad
+          practice since Nix has no way to obtain such inputs if they
+          are subsequently modified. Therefore lock files with dirty
+          locks should generally only be used for local testing, and
+          should not be pushed to other users.
+        )",
+        {},
+        true,
+        Xp::Flakes};
+
     Setting<bool> trustTarballsFromGitForges{
         this, true, "trust-tarballs-from-git-forges",
         R"(

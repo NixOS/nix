@@ -1,8 +1,10 @@
-{ name, uidRange ? false }:
+{
+  name,
+  uidRange ? false,
+}:
 
-with import <nixpkgs> {};
+with import <nixpkgs> { };
 
-runCommand name
-  { requiredSystemFeatures = if uidRange then ["uid-range"] else [];
-  }
-  "id; id > $out"
+runCommand name {
+  requiredSystemFeatures = if uidRange then [ "uid-range" ] else [ ];
+} "id; id > $out"

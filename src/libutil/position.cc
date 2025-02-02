@@ -9,7 +9,7 @@ Pos::Pos(const Pos * other)
     }
     line = other->line;
     column = other->column;
-    origin = std::move(other->origin);
+    origin = other->origin;
 }
 
 Pos::operator std::shared_ptr<Pos>() const

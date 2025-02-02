@@ -8,11 +8,10 @@ COMMON_PATHS_SH_SOURCED=1
 
 commonDir="$(readlink -f "$(dirname "${BASH_SOURCE[0]-$0}")")"
 
-# Since these are generated files
-# shellcheck disable=SC1091
+# Just for `isTestOnNixOS`
 source "$commonDir/functions.sh"
 # shellcheck disable=SC1091
-source "$commonDir/subst-vars.sh"
+source "${_NIX_TEST_BUILD_DIR}/common/subst-vars.sh"
 # Make sure shellcheck knows this will be defined by the above generated snippet
 : "${bash?}" "${bindir?}"
 

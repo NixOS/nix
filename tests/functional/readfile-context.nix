@@ -25,4 +25,5 @@ let
     input = builtins.readFile (dependent + "/file1");
   };
 
-in readDependent
+in
+readDependent

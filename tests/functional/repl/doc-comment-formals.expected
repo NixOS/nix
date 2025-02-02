@@ -9,6 +9,7 @@ nix-repl> "Note that this is not yet complete"
 
 nix-repl> :doc documentedFormals
 Function `documentedFormals`\
-  … defined at /path/to/tests/functional/repl/doc-comments.nix:57:5
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:104:5
+
 
 Finds x

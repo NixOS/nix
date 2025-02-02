@@ -1,3 +1,4 @@
-/** A doc comment for a file that only contains a function */
-{ ... }:
-{ }
+/**
+  A doc comment for a file that only contains a function
+*/
+{ ... }: { }

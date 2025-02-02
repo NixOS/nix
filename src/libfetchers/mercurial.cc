@@ -126,7 +126,7 @@ struct MercurialInputScheme : InputScheme
         return res;
     }
 
-    std::optional<Path> getSourcePath(const Input & input) const override
+    std::optional<std::filesystem::path> getSourcePath(const Input & input) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         if (url.scheme == "file" && !input.getRef() && !input.getRev())
@@ -161,7 +161,7 @@ struct MercurialInputScheme : InputScheme
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         bool isLocal = url.scheme == "file";
-        return {isLocal, isLocal ? url.path : url.base};
+        return {isLocal, isLocal ? url.path : url.to_string()};
     }
 
     StorePath fetchToStore(ref<Store> store, Input & input) const

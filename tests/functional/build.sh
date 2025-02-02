@@ -84,6 +84,7 @@ expectStderr 1 nix build --expr '""' --no-link \
   | grepQuiet "has 0 entries in its context. It should only have exactly one entry"
 
 # Too much string context
+# shellcheck disable=SC2016 # The ${} in this is Nix, not shell
 expectStderr 1 nix build --impure --expr 'with (import ./multiple-outputs.nix).e.a_a; "${drvPath}${outPath}"' --no-link \
   | grepQuiet "has 2 entries in its context. It should only have exactly one entry"
 
@@ -160,7 +161,7 @@ printf "%s\n" "$drv^*" | nix build --no-link --stdin --json | jq --exit-status '
 out="$(nix build -f fod-failing.nix -L 2>&1)" && status=0 || status=$?
 test "$status" = 1
 # one "hash mismatch" error, one "build of ... failed"
-test "$(<<<"$out" grep -E '^error:' | wc -l)" = 2
+test "$(<<<"$out" grep -cE '^error:')" = 2
 <<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x1\\.drv'"
 <<<"$out" grepQuiet -vE "hash mismatch in fixed-output derivation '.*-x3\\.drv'"
 <<<"$out" grepQuiet -vE "hash mismatch in fixed-output derivation '.*-x2\\.drv'"
@@ -169,7 +170,7 @@ test "$(<<<"$out" grep -E '^error:' | wc -l)" = 2
 out="$(nix build -f fod-failing.nix -L x1 x2 x3 --keep-going 2>&1)" && status=0 || status=$?
 test "$status" = 1
 # three "hash mismatch" errors - for each failing fod, one "build of ... failed"
-test "$(<<<"$out" grep -E '^error:' | wc -l)" = 4
+test "$(<<<"$out" grep -cE '^error:')" = 4
 <<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x1\\.drv'"
 <<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x3\\.drv'"
 <<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x2\\.drv'"
@@ -177,13 +178,13 @@ test "$(<<<"$out" grep -E '^error:' | wc -l)" = 4
 
 out="$(nix build -f fod-failing.nix -L x4 2>&1)" && status=0 || status=$?
 test "$status" = 1
-test "$(<<<"$out" grep -E '^error:' | wc -l)" = 2
+test "$(<<<"$out" grep -cE '^error:')" = 2
 <<<"$out" grepQuiet -E "error: 1 dependencies of derivation '.*-x4\\.drv' failed to build"
 <<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x2\\.drv'"
 
 out="$(nix build -f fod-failing.nix -L x4 --keep-going 2>&1)" && status=0 || status=$?
 test "$status" = 1
-test "$(<<<"$out" grep -E '^error:' | wc -l)" = 3
+test "$(<<<"$out" grep -cE '^error:')" = 3
 <<<"$out" grepQuiet -E "error: 2 dependencies of derivation '.*-x4\\.drv' failed to build"
 <<<"$out" grepQuiet -vE "hash mismatch in fixed-output derivation '.*-x3\\.drv'"
 <<<"$out" grepQuiet -vE "hash mismatch in fixed-output derivation '.*-x2\\.drv'"

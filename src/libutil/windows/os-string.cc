@@ -7,6 +7,8 @@
 #include "file-path-impl.hh"
 #include "util.hh"
 
+#ifdef _WIN32
+
 namespace nix {
 
 std::string os_string_to_string(PathViewNG::string_view path)
@@ -22,3 +24,5 @@ std::filesystem::path::string_type string_to_os_string(std::string_view s)
 }
 
 }
+
+#endif

@@ -80,7 +80,7 @@ def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == 'summary':
         print(do_include(
                         sys.stdin.read(),
-                        Path('src/SUMMARY.md'),
+                        Path('source/SUMMARY.md'),
                         Path(sys.argv[2]).resolve(),
                         search_path))
         return
@@ -92,7 +92,7 @@ def main() -> None:
 
     context, book = json.load(sys.stdin)
 
-    # book_root is the directory where book contents leave (ie, src/)
+    # book_root is the directory where book contents leave (ie, source/)
     book_root = Path(context['root']) / context['config']['book']['src']
 
     # Find @var@ in all parts of our recursive book structure.

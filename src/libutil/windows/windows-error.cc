@@ -1,5 +1,6 @@
 #include "windows-error.hh"
 
+#ifdef _WIN32
 #include <error.h>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -29,3 +30,4 @@ std::string WinError::renderError(DWORD lastError)
 }
 
 }
+#endif

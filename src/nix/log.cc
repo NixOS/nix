@@ -57,7 +57,7 @@ struct CmdLog : InstallableCommand
             if (!log) continue;
             stopProgressBar();
             printInfo("got build log for '%s' from '%s'", installable->what(), logSub.getUri());
-            writeFull(getStandardOut(), *log);
+            writeFull(getStandardOutput(), *log);
             return;
         }
 

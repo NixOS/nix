@@ -1,6 +1,8 @@
 #pragma once
 /**
- * @file Checked arithmetic with classes that make it hard to accidentally make something an unchecked operation.
+ * @file
+ *
+ * Checked arithmetic with classes that make it hard to accidentally make something an unchecked operation.
  */
 
 #include <compare>

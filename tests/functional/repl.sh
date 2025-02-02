@@ -309,7 +309,7 @@ runRepl () {
 for test in $(cd "$testDir/repl"; echo *.in); do
     test="$(basename "$test" .in)"
     in="$testDir/repl/$test.in"
-    actual="$testDir/repl/$test.actual"
+    actual="$TEST_ROOT/$test.actual"
     expected="$testDir/repl/$test.expected"
     (cd "$testDir/repl"; set +x; runRepl 2>&1) < "$in" > "$actual" || {
         echo "FAIL: $test (exit code $?)" >&2

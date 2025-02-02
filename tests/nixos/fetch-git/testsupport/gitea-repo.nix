@@ -8,25 +8,27 @@ let
 
   boolPyLiteral = b: if b then "True" else "False";
 
-  testCaseExtension = { config, ... }: {
-    options = {
-      repo.enable = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Whether to provide a repo variable - automatic repo creation.";
+  testCaseExtension =
+    { config, ... }:
+    {
+      options = {
+        repo.enable = mkOption {
+          type = types.bool;
+          default = true;
+          description = "Whether to provide a repo variable - automatic repo creation.";
+        };
+        repo.private = mkOption {
+          type = types.bool;
+          default = false;
+          description = "Whether the repo should be private.";
+        };
       };
-      repo.private = mkOption {
-        type = types.bool;
-        default = false;
-        description = "Whether the repo should be private.";
+      config = mkIf config.repo.enable {
+        setupScript = ''
+          repo = Repo("${config.name}", private=${boolPyLiteral config.repo.private})
+        '';
       };
     };
-    config = mkIf config.repo.enable {
-      setupScript = ''
-        repo = Repo("${config.name}", private=${boolPyLiteral config.repo.private})
-      '';
-    };
-  };
 in
 {
   options = {

@@ -3,23 +3,23 @@ error:
          at /pwd/lang/eval-fail-assert-equal-derivations.nix:1:1:
             1| assert
              | ^
-            2|   { foo = { type = "derivation"; outPath = "/nix/store/0"; ignored = abort "not ignored"; }; }
+            2|   {
 
        … while comparing attribute 'foo'
 
        … where left hand side is
-         at /pwd/lang/eval-fail-assert-equal-derivations.nix:2:5:
-            1| assert
-            2|   { foo = { type = "derivation"; outPath = "/nix/store/0"; ignored = abort "not ignored"; }; }
+         at /pwd/lang/eval-fail-assert-equal-derivations.nix:3:5:
+            2|   {
+            3|     foo = {
              |     ^
-            3|   ==
+            4|       type = "derivation";
 
        … where right hand side is
-         at /pwd/lang/eval-fail-assert-equal-derivations.nix:4:5:
-            3|   ==
-            4|   { foo = { type = "derivation"; outPath = "/nix/store/1"; ignored = abort "not ignored"; }; };
+         at /pwd/lang/eval-fail-assert-equal-derivations.nix:9:5:
+            8|   } == {
+            9|     foo = {
              |     ^
-            5| throw "unreachable"
+           10|       type = "derivation";
 
        … while comparing a derivation by its 'outPath' attribute
 

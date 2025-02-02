@@ -1,6 +1,20 @@
 let
-  inherit (builtins) attrNames listToAttrs concatStringsSep readFile replaceStrings;
-  inherit (import <nix/utils.nix>) optionalString filterAttrs trim squash toLower unique indent;
+  inherit (builtins)
+    attrNames
+    listToAttrs
+    concatStringsSep
+    readFile
+    replaceStrings
+    ;
+  inherit (import <nix/utils.nix>)
+    optionalString
+    filterAttrs
+    trim
+    squash
+    toLower
+    unique
+    indent
+    ;
   showSettings = import <nix/generate-settings.nix>;
 in
 
@@ -14,7 +28,13 @@ in
 
 let
 
-  showStore = { name, slug }: { settings, doc, experimentalFeature }:
+  showStore =
+    { name, slug }:
+    {
+      settings,
+      doc,
+      experimentalFeature,
+    }:
     let
       result = squash ''
         # ${name}
@@ -25,7 +45,10 @@ let
 
         ## Settings
 
-        ${showSettings { prefix = "store-${slug}"; inherit inlineHTML; } settings}
+        ${showSettings {
+          prefix = "store-${slug}";
+          inherit inlineHTML;
+        } settings}
       '';
 
       experimentalFeatureNote = optionalString (experimentalFeature != null) ''
@@ -43,15 +66,15 @@ let
         > extra-experimental-features = ${experimentalFeature}
         > ```
       '';
-    in result;
+    in
+    result;
 
-  storesList = map
-    (name: rec {
-      inherit name;
-      slug = replaceStrings [ " " ] [ "-" ] (toLower name);
-      filename = "${slug}.md";
-      page = showStore { inherit name slug; } storeInfo.${name};
-    })
-    (attrNames storeInfo);
+  storesList = map (name: rec {
+    inherit name;
+    slug = replaceStrings [ " " ] [ "-" ] (toLower name);
+    filename = "${slug}.md";
+    page = showStore { inherit name slug; } storeInfo.${name};
+  }) (attrNames storeInfo);
 
-in storesList
+in
+storesList

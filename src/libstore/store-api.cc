@@ -172,7 +172,7 @@ std::pair<StorePath, Hash> MixStoreDirMethods::computeStorePath(
     PathFilter & filter) const
 {
     auto [h, size] = hashPath(path, method.getFileIngestionMethod(), hashAlgo, filter);
-    if (size && *size >= settings.warnLargePathThreshold)
+    if (settings.warnLargePathThreshold && size && *size >= settings.warnLargePathThreshold)
         warn("hashed large path '%s' (%s)", path, renderSize(*size));
     return {
         makeFixedOutputPathFromCA(
@@ -323,7 +323,7 @@ StorePath Store::addToStore(
     auto sink = sourceToSink([&](Source & source) {
         LengthSource lengthSource(source);
         storePath = addToStoreFromDump(lengthSource, name, fsm, method, hashAlgo, references, repair);
-        if (lengthSource.total >= settings.warnLargePathThreshold)
+        if (settings.warnLargePathThreshold && lengthSource.total >= settings.warnLargePathThreshold)
             warn("copied large path '%s' to the store (%s)", path, renderSize(lengthSource.total));
     });
     dumpPath(path, *sink, fsm, filter);
@@ -332,7 +332,7 @@ StorePath Store::addToStore(
 }
 
 void Store::addMultipleToStore(
-    PathsSource & pathsToCopy,
+    PathsSource && pathsToCopy,
     Activity & act,
     RepairFlag repair,
     CheckSigsFlag checkSigs)
@@ -351,13 +351,11 @@ void Store::addMultipleToStore(
         storePathsToAdd.insert(thingToAdd.first.path);
     }
 
-    auto showProgress = [&]() {
-        act.progress(nrDone, pathsToCopy.size(), nrRunning, nrFailed);
+    auto showProgress = [&, nrTotal = pathsToCopy.size()]() {
+        act.progress(nrDone, nrTotal, nrRunning, nrFailed);
     };
 
-    ThreadPool pool;
-
-    processGraph<StorePath>(pool,
+    processGraph<StorePath>(
         storePathsToAdd,
 
         [&](const StorePath & path) {
@@ -1138,12 +1136,10 @@ std::map<StorePath, StorePath> copyPaths(
     }
     auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
 
-    ThreadPool pool;
-
     try {
         // Copy the realisation closure
         processGraph<Realisation>(
-            pool, Realisation::closure(srcStore, toplevelRealisations),
+            Realisation::closure(srcStore, toplevelRealisations),
             [&](const Realisation & current) -> std::set<Realisation> {
                 std::set<Realisation> children;
                 for (const auto & [drvOutput, _] : current.dependentRealisations) {
@@ -1218,9 +1214,6 @@ std::map<StorePath, StorePath> copyPaths(
         return storePathForDst;
     };
 
-    // total is accessed by each copy, which are each handled in separate threads
-    std::atomic<uint64_t> total = 0;
-
     for (auto & missingPath : sortedMissing) {
         auto info = srcStore.queryPathInfo(missingPath);
 
@@ -1230,9 +1223,10 @@ std::map<StorePath, StorePath> copyPaths(
         ValidPathInfo infoForDst = *info;
         infoForDst.path = storePathForDst;
 
-        auto source = sinkToSource([&](Sink & sink) {
+        auto source = sinkToSource([&, narSize = info->narSize](Sink & sink) {
             // We can reasonably assume that the copy will happen whenever we
             // read the path, so log something about that at that point
+            uint64_t total = 0;
             auto srcUri = srcStore.getUri();
             auto dstUri = dstStore.getUri();
             auto storePathS = srcStore.printStorePath(missingPath);
@@ -1243,16 +1237,16 @@ std::map<StorePath, StorePath> copyPaths(
 
             LambdaSink progressSink([&](std::string_view data) {
                 total += data.size();
-                act.progress(total, info->narSize);
+                act.progress(total, narSize);
             });
             TeeSink tee { sink, progressSink };
 
             srcStore.narFromPath(missingPath, tee);
         });
-        pathsToCopy.push_back(std::pair{infoForDst, std::move(source)});
+        pathsToCopy.emplace_back(std::move(infoForDst), std::move(source));
     }
 
-    dstStore.addMultipleToStore(pathsToCopy, act, repair, checkSigs);
+    dstStore.addMultipleToStore(std::move(pathsToCopy), act, repair, checkSigs);
 
     return pathsMap;
 }

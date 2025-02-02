@@ -4,4 +4,5 @@ let
   # of range
   intMin = -9223372036854775807 - 1;
   b = -1;
-in builtins.seq intMin (builtins.seq b (intMin / b))
+in
+builtins.seq intMin (builtins.seq b (intMin / b))

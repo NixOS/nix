@@ -90,7 +90,6 @@ void Source::operator () (std::string_view data)
 
 void Source::drainInto(Sink & sink)
 {
-    std::string s;
     std::array<char, 8192> buf;
     while (true) {
         size_t n;
@@ -427,7 +426,7 @@ Error readError(Source & source)
     auto type = readString(source);
     assert(type == "Error");
     auto level = (Verbosity) readInt(source);
-    auto name = readString(source); // removed
+    [[maybe_unused]] auto name = readString(source); // removed
     auto msg = readString(source);
     ErrorInfo info {
         .level = level,

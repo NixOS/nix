@@ -168,7 +168,7 @@ struct ExprVar : Expr
        the set stored in the environment that is `level` levels up
        from the current one.*/
     Level level;
-    Displacement displ;
+    Displacement displ = 0;
 
     ExprVar(Symbol name) : name(name) { };
     ExprVar(const PosIdx & pos, Symbol name) : pos(pos), name(name) { };
@@ -206,7 +206,7 @@ struct ExprSelect : Expr
     /**
      * Evaluate the `a.b.c` part of `a.b.c.d`. This exists mostly for the purpose of :doc in the repl.
      *
-     * @param[out] v The attribute set that should contain the last attribute name (if it exists).
+     * @param[out] attrs The attribute set that should contain the last attribute name (if it exists).
      * @return The last attribute name in `attrPath`
      *
      * @note This does *not* evaluate the final attribute, and does not fail if that's the only attribute that does not exist.
@@ -242,7 +242,7 @@ struct ExprAttrs : Expr
         Kind kind;
         Expr * e;
         PosIdx pos;
-        Displacement displ; // displacement
+        Displacement displ = 0; // displacement
         AttrDef(Expr * e, const PosIdx & pos, Kind kind = Kind::Plain)
             : kind(kind), e(e), pos(pos) { };
         AttrDef() { };
@@ -468,6 +468,7 @@ struct ExprBlackHole : Expr
     void show(const SymbolTable & symbols, std::ostream & str) const override {}
     void eval(EvalState & state, Env & env, Value & v) override;
     void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override {}
+    [[noreturn]] static void throwInfiniteRecursionError(EvalState & state, Value & v);
 };
 
 extern ExprBlackHole eBlackHole;

@@ -6,6 +6,17 @@
 #include "eval-settings.hh"
 #include "attr-set.hh"
 #include "nix_api_value.h"
+#include "search-path.hh"
+
+struct nix_eval_state_builder
+{
+    nix::ref<nix::Store> store;
+    nix::EvalSettings settings;
+    nix::fetchers::Settings fetchSettings;
+    nix::LookupPath lookupPath;
+    // TODO: make an EvalSettings setting own this instead?
+    bool readOnlyMode;
+};
 
 struct EvalState
 {

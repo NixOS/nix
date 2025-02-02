@@ -1,13 +1,12 @@
-{ lib
-, mkMesonDerivation
+{
+  lib,
+  mkMesonDerivation,
 
-, meson
-, ninja
-, doxygen
+  doxygen,
 
-# Configuration Options
+  # Configuration Options
 
-, version
+  version,
 }:
 
 let
@@ -32,21 +31,19 @@ mkMesonDerivation (finalAttrs: {
       # Source is not compiled, but still must be available for Doxygen
       # to gather comments.
       (cpp ../libexpr-c)
+      (cpp ../libflake-c)
       (cpp ../libstore-c)
       (cpp ../libutil-c)
     ];
 
   nativeBuildInputs = [
-    meson
-    ninja
     doxygen
   ];
 
-  preConfigure =
-    ''
-      chmod u+w ./.version
-      echo ${finalAttrs.version} > ./.version
-    '';
+  preConfigure = ''
+    chmod u+w ./.version
+    echo ${finalAttrs.version} > ./.version
+  '';
 
   postInstall = ''
     mkdir -p ''${!outputDoc}/nix-support

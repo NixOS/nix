@@ -37,12 +37,14 @@ nix-instantiate --eval -E 'let x = { repeating = x; tracing = builtins.trace x t
   2>&1 | grepQuiet -F 'trace: { repeating = «repeated»; tracing = «potential infinite recursion»; }'
 
 nix-instantiate --eval -E 'builtins.warn "Hello" 123' 2>&1 | grepQuiet 'warning: Hello'
+# shellcheck disable=SC2016 # The ${} in this is Nix, not shell
 nix-instantiate --eval -E 'builtins.addErrorContext "while doing ${"something"} interesting" (builtins.warn "Hello" 123)' 2>/dev/null | grepQuiet 123
 
 # warn does not accept non-strings for now
 expectStderr 1 nix-instantiate --eval -E 'let x = builtins.warn { x = x; } true; in x' \
   | grepQuiet "expected a string but found a set"
 expectStderr 1 nix-instantiate --eval --abort-on-warn -E 'builtins.warn "Hello" 123' | grepQuiet Hello
+# shellcheck disable=SC2016 # The ${} in this is Nix, not shell
 NIX_ABORT_ON_WARN=1 expectStderr 1 nix-instantiate --eval -E 'builtins.addErrorContext "while doing ${"something"} interesting" (builtins.warn "Hello" 123)' | grepQuiet "while doing something interesting"
 
 set +x
@@ -106,6 +108,7 @@ for i in lang/eval-fail-*.nix; do
         fi
     )"
     if
+        # shellcheck disable=SC2086 # word splitting of flags is intended
         expectStderr 1 nix-instantiate $flags "lang/$i.nix" \
             | sed "s!$(pwd)!/pwd!g" > "lang/$i.err"
     then

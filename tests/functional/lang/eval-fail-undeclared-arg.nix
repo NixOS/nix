@@ -1,1 +1,5 @@
-({x, z}: x + z) {x = "foo"; y = "bla"; z = "bar";}
+({ x, z }: x + z) {
+  x = "foo";
+  y = "bla";
+  z = "bar";
+}

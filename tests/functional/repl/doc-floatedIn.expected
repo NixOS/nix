@@ -6,6 +6,7 @@ Added <number omitted> variables.
 
 nix-repl> :doc floatedIn
 Function `floatedIn`\
-  … defined at /path/to/tests/functional/repl/doc-comments.nix:16:5
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:21:5
+
 
 This also works.

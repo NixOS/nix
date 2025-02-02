@@ -4,8 +4,6 @@ project('nix', 'cpp',
     'cpp_std=c++2a',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
-    'debug=true',
-    'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
     'localstatedir=/nix/var',
   ],
@@ -15,7 +13,7 @@ project('nix', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 nix_store = dependency('nix-store')
 
@@ -30,11 +28,10 @@ deps_private_maybe_subproject = [
 ]
 deps_public_maybe_subproject = [
 ]
-subdir('build-utils-meson/subprojects')
+subdir('nix-meson-build-support/subprojects')
 
-subdir('build-utils-meson/threads')
-
-subdir('build-utils-meson/export-all-symbols')
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 configdata = configuration_data()
 
@@ -64,8 +61,8 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
-subdir('build-utils-meson/generate-header')
+subdir('nix-meson-build-support/common')
+subdir('nix-meson-build-support/generate-header')
 
 nix_sources = [config_h] + files(
   'add-to-store.cc',
@@ -212,18 +209,25 @@ nix_symlinks = [
   'nix-store',
 ]
 
+executable_suffix = ''
+if host_machine.system() == 'windows'
+  executable_suffix = '.exe'
+endif
+
 foreach linkname : nix_symlinks
   install_symlink(
-    linkname,
+    linkname + executable_suffix,
     # TODO(Qyriad): should these continue to be relative symlinks?
-    pointing_to : 'nix',
+    pointing_to : fs.name(this_exe),
     install_dir : get_option('bindir'),
     # The 'runtime' tag is what executables default to, which we want to emulate here.
     install_tag : 'runtime'
   )
   t = custom_target(
     command: ['ln', '-sf', fs.name(this_exe), '@OUTPUT@'],
-    output: linkname,
+    output: linkname + executable_suffix,
+    # native doesn't allow dangling symlinks, but the target executable often doesn't exist at this time
+    env : { 'MSYS' : 'winsymlinks:lnk' },
     # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
     build_by_default: true
   )
@@ -233,15 +237,17 @@ endforeach
 
 install_symlink(
   'build-remote',
-  pointing_to : '..' / '..'/ get_option('bindir') / 'nix',
-  install_dir : get_option('libexecdir') / 'nix',
+  pointing_to : '..' / '..'/ get_option('bindir') / fs.name(this_exe),
+  install_dir : get_option('libexecdir') / fs.name(this_exe),
   # The 'runtime' tag is what executables default to, which we want to emulate here.
   install_tag : 'runtime'
 )
 
 custom_target(
   command: ['ln', '-sf', fs.name(this_exe), '@OUTPUT@'],
-  output: 'build-remote',
+  output: 'build-remote' + executable_suffix,
+  # native doesn't allow dangling symlinks, but the target executable often doesn't exist at this time
+  env : { 'MSYS' : 'winsymlinks:lnk' },
   # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
   build_by_default: true
 )

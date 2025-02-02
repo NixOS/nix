@@ -57,7 +57,7 @@ struct FlakeInput
      * false = (fetched) static source path
      */
     bool isFlake = true;
-    std::optional<InputPath> follows;
+    std::optional<InputAttrPath> follows;
     FlakeInputs overrides;
 };
 
@@ -110,7 +110,7 @@ struct Flake
     }
 };
 
-Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool allowLookup);
+Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool useRegistries);
 
 /**
  * Fingerprint of a locked flake; used as a cache key.
@@ -129,7 +129,9 @@ struct LockedFlake
      */
     std::map<ref<Node>, SourcePath> nodePaths;
 
-    std::optional<Fingerprint> getFingerprint(ref<Store> store) const;
+    std::optional<Fingerprint> getFingerprint(
+        ref<Store> store,
+        const fetchers::Settings & fetchSettings) const;
 };
 
 struct LockFlags
@@ -155,6 +157,11 @@ struct LockFlags
      * lock file in memory only, without writing it to disk.
      */
     bool writeLockFile = true;
+
+    /**
+     * Throw an exception when the flake has an unlocked input.
+     */
+    bool failOnUnlocked = false;
 
     /**
      * Whether to use the registries to lookup indirect flake
@@ -194,13 +201,13 @@ struct LockFlags
     /**
      * Flake inputs to be overridden.
      */
-    std::map<InputPath, FlakeRef> inputOverrides;
+    std::map<InputAttrPath, FlakeRef> inputOverrides;
 
     /**
      * Flake inputs to be updated. This means that any existing lock
      * for those inputs will be ignored.
      */
-    std::set<InputPath> inputUpdates;
+    std::set<InputAttrPath> inputUpdates;
 };
 
 LockedFlake lockFlake(
@@ -233,5 +240,12 @@ void emitTreeAttrs(
     Value & v,
     bool emptyRevFallback = false,
     bool forceDirty = false);
+
+/**
+ * An internal builtin similar to `fetchTree`, except that it
+ * always treats the input as final (i.e. no attributes can be
+ * added/removed/changed).
+ */
+void prim_fetchFinalTree(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
 }

@@ -435,7 +435,8 @@ void mainWrapped(int argc, char * * argv)
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"), fetchSettings, evalSettings);
         auto builtinsJson = nlohmann::json::object();
-        for (auto & builtin : *state.baseEnv.values[0]->attrs()) {
+        for (auto & builtinPtr : state.getBuiltins().attrs()->lexicographicOrder(state.symbols)) {
+            auto & builtin = *builtinPtr;
             auto b = nlohmann::json::object();
             if (!builtin.value->isPrimOp()) continue;
             auto primOp = builtin.value->primOp();
@@ -556,9 +557,11 @@ void mainWrapped(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
+#ifndef _WIN32
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
     nix::setStackSize(64 * 1024 * 1024);
+#endif
 
     return nix::handleExceptions(argv[0], [&]() {
         nix::mainWrapped(argc, argv);

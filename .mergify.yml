@@ -2,13 +2,11 @@ queue_rules:
   - name: default
     # all required tests need to go here
     merge_conditions:
-      - check-success=installer
-      - check-success=installer_test (macos-latest)
-      - check-success=installer_test (ubuntu-latest)
-      - check-success=tests (macos-latest)
-      - check-success=tests (ubuntu-latest)
+      - check-success=tests on macos
+      - check-success=tests on ubuntu
+      - check-success=installer test on macos
+      - check-success=installer test on ubuntu
       - check-success=vm_tests
-    merge_method: rebase
     batch_size: 5
 
 pull_request_rules:
@@ -29,6 +27,7 @@ pull_request_rules:
         branches:
           - 2.18-maintenance
         labels:
+          - automatic backport
           - merge-queue
 
   - name: backport patches to 2.19
@@ -39,6 +38,7 @@ pull_request_rules:
         branches:
           - 2.19-maintenance
         labels:
+          - automatic backport
           - merge-queue
 
   - name: backport patches to 2.20
@@ -49,6 +49,7 @@ pull_request_rules:
         branches:
           - 2.20-maintenance
         labels:
+          - automatic backport
           - merge-queue
 
   - name: backport patches to 2.21
@@ -59,6 +60,7 @@ pull_request_rules:
         branches:
           - 2.21-maintenance
         labels:
+          - automatic backport
           - merge-queue
 
   - name: backport patches to 2.22
@@ -69,6 +71,7 @@ pull_request_rules:
         branches:
           - 2.22-maintenance
         labels:
+          - automatic backport
           - merge-queue
 
   - name: backport patches to 2.23
@@ -79,6 +82,7 @@ pull_request_rules:
         branches:
           - 2.23-maintenance
         labels:
+          - automatic backport
           - merge-queue
 
   - name: backport patches to 2.24
@@ -89,4 +93,27 @@ pull_request_rules:
         branches:
           - "2.24-maintenance"
         labels:
+          - automatic backport
+          - merge-queue
+
+  - name: backport patches to 2.25
+    conditions:
+      - label=backport 2.25-maintenance
+    actions:
+      backport:
+        branches:
+          - "2.25-maintenance"
+        labels:
+          - automatic backport
+          - merge-queue
+
+  - name: backport patches to 2.26
+    conditions:
+      - label=backport 2.26-maintenance
+    actions:
+      backport:
+        branches:
+          - "2.26-maintenance"
+        labels:
+          - automatic backport
           - merge-queue
