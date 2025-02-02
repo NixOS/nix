@@ -7,6 +7,7 @@
 #include "finally.hh"
 #include "callback.hh"
 #include "signals.hh"
+#include "rng.hh"
 
 #if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
@@ -26,7 +27,6 @@
 #include <cstring>
 #include <iostream>
 #include <queue>
-#include <random>
 #include <thread>
 #include <regex>
 
@@ -42,8 +42,7 @@ struct curlFileTransfer : public FileTransfer
 {
     CURLM * curlm = 0;
 
-    std::random_device rd;
-    std::mt19937 mt19937;
+    RandomFloatGenerator rng{0.0, 1.0};
 
     struct TransferItem : public std::enable_shared_from_this<TransferItem>
     {
@@ -502,7 +501,7 @@ struct curlFileTransfer : public FileTransfer
                         || writtenToSink == 0
                         || (acceptRanges && encoding.empty())))
                 {
-                    int ms = request.baseRetryTimeMs * std::pow(2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(fileTransfer.mt19937));
+                    int ms = request.baseRetryTimeMs * std::pow(2.0f, attempt - 1 + fileTransfer.rng());
                     if (writtenToSink)
                         warn("%s; retrying from offset %d in %d ms", exc.what(), writtenToSink, ms);
                     else
@@ -539,7 +538,6 @@ struct curlFileTransfer : public FileTransfer
     std::thread workerThread;
 
     curlFileTransfer()
-        : mt19937(rd())
     {
         static std::once_flag globalInit;
         std::call_once(globalInit, curl_global_init, CURL_GLOBAL_ALL);
