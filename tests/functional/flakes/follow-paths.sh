@@ -16,6 +16,7 @@ mkdir -p $flakeFollowsB
 mkdir -p $flakeFollowsC
 mkdir -p $flakeFollowsD
 mkdir -p $flakeFollowsE
+mkdir -p $flakeFollowsE
 
 cat > $flakeFollowsA/flake.nix <<EOF
 {
@@ -26,7 +27,7 @@ cat > $flakeFollowsA/flake.nix <<EOF
             inputs.foobar.follows = "foobar";
         };
 
-        foobar.url = "path:$flakeFollowsA/flakeE";
+        foobar.url = "path:$flakeFollowsA/flakeE?lock=1";
     };
     outputs = { ... }: {};
 }
@@ -36,7 +37,7 @@ cat > $flakeFollowsB/flake.nix <<EOF
 {
     description = "Flake B";
     inputs = {
-        foobar.url = "path:$flakeFollowsA/flakeE";
+        foobar.url = "path:$flakeFollowsA/flakeE?lock=1";
         goodoo.follows = "C/goodoo";
         C = {
             url = "path:./flakeC";
@@ -51,7 +52,7 @@ cat > $flakeFollowsC/flake.nix <<EOF
 {
     description = "Flake C";
     inputs = {
-        foobar.url = "path:$flakeFollowsA/flakeE";
+        foobar.url = "path:$flakeFollowsA/flakeE?lock=1";
         goodoo.follows = "foobar";
     };
     outputs = { ... }: {};
@@ -122,16 +123,17 @@ cat > $flakeFollowsA/flake.nix <<EOF
 {
     description = "Flake A";
     inputs = {
-        B.url = "path:../flakeB";
+        B.url = "../escape"; # test relative paths without 'path:'
+        E.flake = false;
+        E.url = "path:./foo.nix";
     };
-    outputs = { ... }: {};
+    outputs = { E, ... }: { e = import E; };
 }
 EOF
 
-git -C $flakeFollowsA add flake.nix
+echo 123 > $flakeFollowsA/foo.nix
 
-expect 1 nix flake lock $flakeFollowsA 2>&1 | grep '/flakeB.*is forbidden in pure evaluation mode'
-expect 1 nix flake lock --impure $flakeFollowsA 2>&1 | grep '/flakeB.*does not exist'
+expect 1 nix flake lock $flakeFollowsA 2>&1 | grep "path '/escape' does not exist in Git repository"
 
 # Test relative non-flake inputs.
 cat > $flakeFollowsA/flake.nix <<EOF

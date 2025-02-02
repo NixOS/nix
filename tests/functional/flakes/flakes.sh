@@ -23,7 +23,9 @@ for repo in "$flake3Dir" "$flake7Dir"; do
     createGitRepo "$repo" ""
 done
 
-cat > "$flake3Dir/flake.nix" <<EOF
+# Test symlink handling.
+ln -s _flake.nix "$flake3Dir/flake.nix"
+cat > "$flake3Dir/_flake.nix" <<EOF
 {
   description = "Fnord";
 
@@ -41,7 +43,7 @@ cat > "$flake3Dir/default.nix" <<EOF
 { x = 123; }
 EOF
 
-git -C "$flake3Dir" add flake.nix default.nix
+git -C "$flake3Dir" add flake.nix _flake.nix default.nix
 git -C "$flake3Dir" commit -m 'Initial'
 
 # Construct a custom registry, additionally test the --registry flag
@@ -69,7 +71,6 @@ nix flake metadata "$flake1Dir" | grepQuiet 'URL:.*flake1.*'
 # Test 'nix flake metadata --json'.
 json=$(nix flake metadata flake1 --json | jq .)
 [[ $(echo "$json" | jq -r .description) = 'Bla bla' ]]
-[[ -d $(echo "$json" | jq -r .path) ]]
 [[ $(echo "$json" | jq -r .lastModified) = $(git -C "$flake1Dir" log -n1 --format=%ct) ]]
 hash1=$(echo "$json" | jq -r .revision)
 [[ -n $(echo "$json" | jq -r .fingerprint) ]]
@@ -182,7 +183,7 @@ nix build -o "$TEST_ROOT/result" --no-registries "git+file://$percentEncodedFlak
 nix build -o "$TEST_ROOT/result" --no-use-registries "git+file://$percentEncodedFlake2Dir#bar" --refresh
 
 # Test whether indirect dependencies work.
-nix build -o "$TEST_ROOT/result" "$flake3Dir#xyzzy"
+nix build -o $TEST_ROOT/result git+file://$percentEncodedFlake3Dir?ref=master#xyzzy
 git -C "$flake3Dir" add flake.lock
 
 # Add dependency to flake3.

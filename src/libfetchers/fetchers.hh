@@ -164,8 +164,6 @@ public:
 
     void clone(const Path & destDir) const;
 
-    std::optional<std::filesystem::path> getSourcePath() const;
-
     /**
      * Write a file to this input, for input types that support
      * writing. Optionally commit the change (for e.g. Git inputs).
@@ -176,8 +174,6 @@ public:
         std::optional<std::string> commitMsg) const;
 
     std::string getName() const;
-
-    StorePath computeStorePath(Store & store) const;
 
     // Convenience functions for common attributes.
     std::string getType() const;
@@ -246,8 +242,6 @@ struct InputScheme
         std::optional<Hash> rev) const;
 
     virtual void clone(const Input & input, const Path & destDir) const;
-
-    virtual std::optional<std::filesystem::path> getSourcePath(const Input & input) const;
 
     virtual void putFile(
         const Input & input,

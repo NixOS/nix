@@ -194,17 +194,16 @@ bool Input::contains(const Input & other) const
 
 std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 {
-    if (!scheme)
-        throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
-
     auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
         try {
             auto [accessor, result] = getAccessorUnchecked(store);
 
             auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, result.getName());
 
+            #if 0
             auto narHash = store->queryPathInfo(storePath)->narHash;
             result.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
+            #endif
 
             // FIXME: we would like to mark inputs as final in
             // getAccessorUnchecked(), but then we can't add
@@ -283,10 +282,17 @@ void Input::checkLocks(Input specified, Input & result)
             throw Error("'revCount' attribute mismatch in input '%s', expected %d",
                 result.to_string(), *prevRevCount);
     }
+
+    // FIXME: check treeHash
 }
 
 std::pair<ref<SourceAccessor>, Input> Input::getAccessor(ref<Store> store) const
 {
+    // FIXME: cache the accessor
+
+    if (!scheme)
+        throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
+
     try {
         auto [accessor, result] = getAccessorUnchecked(store);
 
@@ -306,6 +312,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
+    #if 0
     /* The tree may already be in the Nix store, or it could be
        substituted (which is often faster than fetching from the
        original source). So check that. We only do this for final
@@ -335,6 +342,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }
     }
+    #endif
 
     auto [accessor, result] = scheme->getAccessor(store, *this);
 
@@ -358,12 +366,6 @@ void Input::clone(const Path & destDir) const
     scheme->clone(*this, destDir);
 }
 
-std::optional<std::filesystem::path> Input::getSourcePath() const
-{
-    assert(scheme);
-    return scheme->getSourcePath(*this);
-}
-
 void Input::putFile(
     const CanonPath & path,
     std::string_view contents,
@@ -376,18 +378,6 @@ void Input::putFile(
 std::string Input::getName() const
 {
     return maybeGetStrAttr(attrs, "name").value_or("source");
-}
-
-StorePath Input::computeStorePath(Store & store) const
-{
-    auto narHash = getNarHash();
-    if (!narHash)
-        throw Error("cannot compute store path for unlocked input '%s'", to_string());
-    return store.makeFixedOutputPath(getName(), FixedOutputInfo {
-        .method = FileIngestionMethod::NixArchive,
-        .hash = *narHash,
-        .references = {},
-    });
 }
 
 std::string Input::getType() const
@@ -459,11 +449,6 @@ Input InputScheme::applyOverrides(
     if (rev)
         throw Error("don't know how to set revision of input '%s' to '%s'", input.to_string(), rev->gitRev());
     return input;
-}
-
-std::optional<std::filesystem::path> InputScheme::getSourcePath(const Input & input) const
-{
-    return {};
 }
 
 void InputScheme::putFile(

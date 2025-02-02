@@ -12,6 +12,7 @@
 #include "flake/settings.hh"
 #include "value-to-json.hh"
 #include "local-fs-store.hh"
+#include "patching-source-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -24,7 +25,7 @@ namespace flake {
 struct FetchedFlake
 {
     FlakeRef lockedRef;
-    StorePath storePath;
+    ref<SourceAccessor> accessor;
 };
 
 typedef std::map<FlakeRef, FetchedFlake> FlakeCache;
@@ -40,7 +41,7 @@ static std::optional<FetchedFlake> lookupInFlakeCache(
     return i->second;
 }
 
-static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
+static std::tuple<ref<SourceAccessor>, FlakeRef, FlakeRef> fetchOrSubstituteTree(
     EvalState & state,
     const FlakeRef & originalRef,
     bool useRegistries,
@@ -51,8 +52,8 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
 
     if (!fetched) {
         if (originalRef.input.isDirect()) {
-            auto [storePath, lockedRef] = originalRef.fetchTree(state.store);
-            fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .storePath = storePath});
+            auto [accessor, lockedRef] = originalRef.lazyFetch(state.store);
+            fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .accessor = accessor});
         } else {
             if (useRegistries) {
                 resolvedRef = originalRef.resolve(
@@ -64,8 +65,8 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
                     });
                 fetched = lookupInFlakeCache(flakeCache, originalRef);
                 if (!fetched) {
-                    auto [storePath, lockedRef] = resolvedRef.fetchTree(state.store);
-                    fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .storePath = storePath});
+                    auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
+                    fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .accessor = accessor});
                 }
                 flakeCache.insert_or_assign(resolvedRef, *fetched);
             }
@@ -76,14 +77,15 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
         flakeCache.insert_or_assign(originalRef, *fetched);
     }
 
-    debug("got tree '%s' from '%s'",
-        state.store->printStorePath(fetched->storePath), fetched->lockedRef);
+    debug("got tree '%s' from '%s'", fetched->accessor, fetched->lockedRef);
 
-    state.allowPath(fetched->storePath);
+    state.registerAccessor(fetched->accessor);
 
+    #if 0
     assert(!originalRef.input.getNarHash() || fetched->storePath == originalRef.input.computeStorePath(*state.store));
+    #endif
 
-    return {fetched->storePath, resolvedRef, fetched->lockedRef};
+    return {fetched->accessor, resolvedRef, fetched->lockedRef};
 }
 
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
@@ -124,6 +126,7 @@ static FlakeInput parseFlakeInput(
     auto sUrl = state.symbols.create("url");
     auto sFlake = state.symbols.create("flake");
     auto sFollows = state.symbols.create("follows");
+    auto sPatchFiles = state.symbols.create("patchFiles");
 
     fetchers::Attrs attrs;
     std::optional<std::string> url;
@@ -155,6 +158,20 @@ static FlakeInput parseFlakeInput(
                 auto follows(parseInputAttrPath(attr.value->c_str()));
                 follows.insert(follows.begin(), lockRootAttrPath.begin(), lockRootAttrPath.end());
                 input.follows = follows;
+            } else if (attr.name == sPatchFiles) {
+                expectType(state, nList, *attr.value, attr.pos);
+                for (auto elem : attr.value->listItems()) {
+                    if (elem->type() == nString)
+                        input.patchFiles.emplace_back(state.forceStringNoCtx(*elem, attr.pos, ""));
+                    else if (elem->type() == nPath) {
+                        if (elem->path().accessor != flakeDir.accessor)
+                            throw Error("patch '%s' is not in the same source tree as flake '%s'", elem->path(), flakeDir);
+                        input.patchFiles.emplace_back(flakeDir.parent().path.makeRelative(elem->path().path));
+                    }
+                    else
+                        state.error<TypeError>("flake input attribute '%s' is %s while a string or path is expected",
+                            state.symbols[attr.name], showType(*elem)).debugThrow();
+                }
             } else {
                 // Allow selecting a subset of enum values
                 #pragma GCC diagnostic push
@@ -304,7 +321,7 @@ static Flake readFlake(
                 NixStringContext emptyContext = {};
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    state.coerceToString(setting.pos, *setting.value, emptyContext, "", false, true, true).toOwned());
+                    state.coerceToString(setting.pos, *setting.value, emptyContext, "", false, true).toOwned());
             }
             else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(
@@ -347,18 +364,24 @@ static Flake getFlake(
     const FlakeRef & originalRef,
     bool useRegistries,
     FlakeCache & flakeCache,
-    const InputAttrPath & lockRootAttrPath)
+    const InputAttrPath & lockRootAttrPath,
+    const std::vector<std::string> & patches)
 {
-    auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
+    auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
         state, originalRef, useRegistries, flakeCache);
 
-    return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->toRealPath(storePath)), lockRootAttrPath);
+    if (!patches.empty()) {
+        accessor = makePatchingSourceAccessor(accessor, patches);
+        state.registerAccessor(accessor);
+    }
+
+    return readFlake(state, originalRef, resolvedRef, lockedRef, SourcePath {accessor, CanonPath::root}, lockRootAttrPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
 {
     FlakeCache flakeCache;
-    return getFlake(state, originalRef, useRegistries, flakeCache, {});
+    return getFlake(state, originalRef, useRegistries, flakeCache, {}, {});
 }
 
 static LockFile readLockFile(
@@ -384,7 +407,7 @@ LockedFlake lockFlake(
 
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
 
-    auto flake = getFlake(state, topRef, useRegistries, flakeCache, {});
+    auto flake = getFlake(state, topRef, useRegistries, flakeCache, {}, {});
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
@@ -557,9 +580,14 @@ LockedFlake lockFlake(
                     auto getInputFlake = [&]()
                     {
                         if (auto resolvedPath = resolveRelativePath()) {
+                            if (!input.patchFiles.empty())
+                                throw UnimplementedError("patching relative flakes is not implemented");
                             return readFlake(state, *input.ref, *input.ref, *input.ref, *resolvedPath, inputAttrPath);
                         } else {
-                            return getFlake(state, *input.ref, useRegistries, flakeCache, inputAttrPath);
+                            std::vector<std::string> patches;
+                            for (auto & patchFile : input.patchFiles)
+                                patches.push_back(sourcePath.accessor->readFile(CanonPath(patchFile, sourcePath.parent().path)));
+                            return getFlake(state, *input.ref, useRegistries, flakeCache, inputAttrPath, patches);
                         }
                     };
 
@@ -588,7 +616,8 @@ LockedFlake lockFlake(
                             oldLock->lockedRef,
                             oldLock->originalRef,
                             oldLock->isFlake,
-                            oldLock->parentInputAttrPath);
+                            oldLock->parentInputAttrPath,
+                            oldLock->patchFiles);
 
                         node->inputs.insert_or_assign(id, childNode);
 
@@ -613,6 +642,7 @@ LockedFlake lockFlake(
                                     fakeInputs.emplace(i.first, FlakeInput {
                                         .ref = (*lockedNode)->originalRef,
                                         .isFlake = (*lockedNode)->isFlake,
+                                        .patchFiles = (*lockedNode)->patchFiles,
                                     });
                                 } else if (auto follows = std::get_if<1>(&i.second)) {
                                     if (!trustLock) {
@@ -674,7 +704,8 @@ LockedFlake lockFlake(
                                 inputFlake.lockedRef,
                                 ref,
                                 true,
-                                overridenParentPath);
+                                overridenParentPath,
+                                input.patchFiles);
 
                             node->inputs.insert_or_assign(id, childNode);
 
@@ -703,17 +734,20 @@ LockedFlake lockFlake(
                         else {
                             auto [path, lockedRef] = [&]() -> std::tuple<SourcePath, FlakeRef>
                             {
+                                if (!input.patchFiles.empty())
+                                    throw UnimplementedError("patching non-flake inputs is not implemented");
+
                                 // Handle non-flake 'path:./...' inputs.
                                 if (auto resolvedPath = resolveRelativePath()) {
                                     return {*resolvedPath, *input.ref};
                                 } else {
-                                    auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
+                                    auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
                                         state, *input.ref, useRegistries, flakeCache);
-                                    return {state.rootPath(state.store->toRealPath(storePath)), lockedRef};
+                                    return {SourcePath(accessor), lockedRef};
                                 }
                             }();
 
-                            auto childNode = make_ref<LockedNode>(lockedRef, ref, false, overridenParentPath);
+                            auto childNode = make_ref<LockedNode>(lockedRef, ref, false, overridenParentPath, input.patchFiles);
 
                             nodePaths.emplace(childNode, path);
 
@@ -753,67 +787,58 @@ LockedFlake lockFlake(
 
         debug("new lock file: %s", newLockFile);
 
-        auto sourcePath = topRef.input.getSourcePath();
-
         /* Check whether we need to / can write the new lock file. */
         if (newLockFile != oldLockFile || lockFlags.outputLockFilePath) {
 
             auto diff = LockFile::diff(oldLockFile, newLockFile);
 
             if (lockFlags.writeLockFile) {
-                if (sourcePath || lockFlags.outputLockFilePath) {
-                    if (auto unlockedInput = newLockFile.isUnlocked(state.fetchSettings)) {
-                        if (lockFlags.failOnUnlocked)
-                            throw Error(
-                                "Will not write lock file of flake '%s' because it has an unlocked input ('%s'). "
-                                "Use '--allow-dirty-locks' to allow this anyway.", topRef, *unlockedInput);
-                        if (state.fetchSettings.warnDirty)
-                            warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
+                if (auto unlockedInput = newLockFile.isUnlocked(state.fetchSettings)) {
+                    if (lockFlags.failOnUnlocked)
+                        throw Error(
+                            "Will not write lock file of flake '%s' because it has an unlocked input ('%s'). "
+                            "Use '--allow-dirty-locks' to allow this anyway.", topRef, *unlockedInput);
+                    if (state.fetchSettings.warnDirty)
+                        warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
+                } else {
+                    if (!lockFlags.updateLockFile)
+                        throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
+
+                    auto newLockFileS = fmt("%s\n", newLockFile);
+
+                    if (lockFlags.outputLockFilePath) {
+                        if (lockFlags.commitLockFile)
+                            throw Error("'--commit-lock-file' and '--output-lock-file' are incompatible");
+                        writeFile(*lockFlags.outputLockFilePath, newLockFileS);
                     } else {
-                        if (!lockFlags.updateLockFile)
-                            throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
+                        bool lockFileExists = flake.lockFilePath().pathExists();
 
-                        auto newLockFileS = fmt("%s\n", newLockFile);
-
-                        if (lockFlags.outputLockFilePath) {
-                            if (lockFlags.commitLockFile)
-                                throw Error("'--commit-lock-file' and '--output-lock-file' are incompatible");
-                            writeFile(*lockFlags.outputLockFilePath, newLockFileS);
-                        } else {
-                            auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
-                            auto outputLockFilePath = *sourcePath / relPath;
-
-                            bool lockFileExists = fs::symlink_exists(outputLockFilePath);
-
+                        if (lockFileExists) {
                             auto s = chomp(diff);
-                            if (lockFileExists) {
-                                if (s.empty())
-                                    warn("updating lock file '%s'", outputLockFilePath);
-                                else
-                                    warn("updating lock file '%s':\n%s", outputLockFilePath, s);
-                            } else
-                                warn("creating lock file '%s': \n%s", outputLockFilePath, s);
+                            if (s.empty())
+                                warn("updating lock file '%s'", flake.lockFilePath());
+                            else
+                                warn("updating lock file '%s':\n%s", flake.lockFilePath(), s);
+                        } else
+                            warn("creating lock file '%s'", flake.lockFilePath());
 
-                            std::optional<std::string> commitMessage = std::nullopt;
+                        std::optional<std::string> commitMessage = std::nullopt;
 
-                            if (lockFlags.commitLockFile) {
-                                std::string cm;
+                        if (lockFlags.commitLockFile) {
+                            std::string cm;
 
-                                cm = settings.commitLockFileSummary.get();
+                            cm = settings.commitLockFileSummary.get();
 
-                                if (cm == "") {
-                                    cm = fmt("%s: %s", relPath, lockFileExists ? "Update" : "Add");
-                                }
-
-                                cm += "\n\nFlake lock file updates:\n\n";
-                                cm += filterANSIEscapes(diff, true);
-                                commitMessage = cm;
+                            if (cm == "") {
+                                cm = fmt("%s: %s", flake.lockFilePath().path.rel(), lockFileExists ? "Update" : "Add");
                             }
 
-                            topRef.input.putFile(
-                                CanonPath((topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock"),
-                                newLockFileS, commitMessage);
+                            cm += "\n\nFlake lock file updates:\n\n";
+                            cm += filterANSIEscapes(diff, true);
+                            commitMessage = cm;
                         }
+
+                        topRef.input.putFile(flake.lockFilePath().path, newLockFileS, commitMessage);
 
                         /* Rewriting the lockfile changed the top-level
                            repo, so we should re-read it. FIXME: we could
@@ -826,8 +851,7 @@ LockedFlake lockFlake(
                             prevLockedRef.input.getRev() != flake.lockedRef.input.getRev())
                             warn("committed new revision '%s'", flake.lockedRef.input.getRev()->gitRev());
                     }
-                } else
-                    throw Error("cannot write modified lock file of flake '%s' (use '--no-write-lock-file' to ignore)", topRef);
+                }
             } else {
                 warn("not writing modified lock file of flake '%s':\n%s", topRef, chomp(diff));
                 flake.forceDirty = true;
@@ -878,11 +902,9 @@ void callFlake(EvalState & state,
 
         auto lockedNode = node.dynamic_pointer_cast<const LockedNode>();
 
-        auto [storePath, subdir] = sourcePathToStorePath(state.store, sourcePath);
-
         emitTreeAttrs(
             state,
-            storePath,
+            SourcePath(sourcePath.accessor),
             lockedNode ? lockedNode->lockedRef.input : lockedFlake.flake.lockedRef.input,
             vSourceInfo,
             false,
@@ -893,7 +915,7 @@ void callFlake(EvalState & state,
 
         override
             .alloc(state.symbols.create("dir"))
-            .mkString(CanonPath(subdir).rel());
+            .mkString(sourcePath.path.rel());
 
         overrides.alloc(state.symbols.create(key->second)).mkAttrs(override);
     }

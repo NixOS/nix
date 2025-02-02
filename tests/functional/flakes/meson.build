@@ -28,6 +28,9 @@ suites += {
     'commit-lock-file-summary.sh',
     'non-flake-inputs.sh',
     'relative-paths.sh',
+    'lazy-trees.sh',
+    #'patch.sh', # FIXME
+    'tree-operators.sh',
   ],
   'workdir': meson.current_source_dir(),
 }

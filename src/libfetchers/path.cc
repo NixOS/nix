@@ -29,6 +29,8 @@ struct PathInputScheme : InputScheme
                 else
                     throw Error("path URL '%s' has invalid parameter '%s'", url, name);
             }
+            else if (name == "lock")
+                input.attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 throw Error("path URL '%s' has unsupported parameter '%s'", url, name);
 
@@ -53,6 +55,7 @@ struct PathInputScheme : InputScheme
             "revCount",
             "lastModified",
             "narHash",
+            "lock",
         };
     }
 
@@ -61,10 +64,17 @@ struct PathInputScheme : InputScheme
         const Attrs & attrs) const override
     {
         getStrAttr(attrs, "path");
+        maybeGetBoolAttr(attrs, "lock");
 
         Input input{settings};
         input.attrs = attrs;
         return input;
+    }
+
+    bool getLockAttr(const Input & input) const
+    {
+        // FIXME: make the default "true"?
+        return maybeGetBoolAttr(input.attrs, "lock").value_or(false);
     }
 
     ParsedURL toURL(const Input & input) const override
@@ -78,11 +88,6 @@ struct PathInputScheme : InputScheme
             .path = getStrAttr(input.attrs, "path"),
             .query = query,
         };
-    }
-
-    std::optional<std::filesystem::path> getSourcePath(const Input & input) const override
-    {
-        return getAbsPath(input);
     }
 
     void putFile(
@@ -118,36 +123,40 @@ struct PathInputScheme : InputScheme
         throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
     }
 
-    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const override
     {
-        Input input(_input);
-        auto path = getStrAttr(input.attrs, "path");
-
         auto absPath = getAbsPath(input);
+        auto input2(input);
+        input2.attrs.emplace("path", (std::string) absPath.string());
 
-        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to the store", absPath));
+        if (getLockAttr(input2)) {
 
-        // FIXME: check whether access to 'path' is allowed.
-        auto storePath = store->maybeParseStorePath(absPath.string());
+            auto storePath = store->maybeParseStorePath(absPath.string());
 
-        if (storePath)
-            store->addTempRoot(*storePath);
+            if (!storePath || storePath->name() != input.getName() || !store->isValidPath(*storePath)) {
+                Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", absPath));
+                storePath = store->addToStore(input.getName(), {getFSSourceAccessor(), CanonPath(absPath.string())});
+                auto narHash = store->queryPathInfo(*storePath)->narHash;
+                input2.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
+            } else
+                input2.attrs.erase("narHash");
 
-        time_t mtime = 0;
-        if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
-            // FIXME: try to substitute storePath.
-            auto src = sinkToSource([&](Sink & sink) {
-                mtime = dumpPathAndGetMtime(absPath.string(), sink, defaultPathFilter);
-            });
-            storePath = store->addToStoreFromDump(*src, "source");
+            #if 0
+            // FIXME: produce a better error message if the path does
+            // not exist in the source directory.
+            auto makeNotAllowedError = [absPath](const CanonPath & path) -> RestrictedPathError
+            {
+                return RestrictedPathError("path '%s' does not exist'", absPath / path.rel());
+            };
+            #endif
+
+            return {makeStorePathAccessor(store, *storePath), std::move(input2)};
+
+        } else {
+            auto accessor = makeFSSourceAccessor(absPath);
+            accessor->setPathDisplay(absPath.string());
+            return {accessor, std::move(input2)};
         }
-
-        /* Trust the lastModified value supplied by the user, if
-           any. It's not a "secure" attribute so we don't care. */
-        if (!input.getLastModified())
-            input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
-
-        return {makeStorePathAccessor(store, *storePath), std::move(input)};
     }
 
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override

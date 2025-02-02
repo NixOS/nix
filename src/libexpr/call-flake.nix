@@ -51,8 +51,23 @@ let
           }
         else
           # FIXME: remove obsolete node.info.
-          # Note: lock file entries are always final.
-          fetchTreeFinal (node.info or { } // removeAttrs node.locked [ "dir" ]);
+          let
+            # Note: lock file entries are always final.
+            tree = fetchTreeFinal (node.info or { } // removeAttrs node.locked [ "dir" ]);
+          in
+          # Apply patches.
+          tree
+          // (
+            if node.patchFiles or [ ] == [ ] then
+              { }
+            else
+              {
+                outPath = builtins.patch {
+                  src = tree;
+                  patchFiles = map (patchFile: parentNode + ("/" + patchFile)) node.patchFiles;
+                };
+              }
+          );
 
       subdir = overrides.${key}.dir or node.locked.dir or "";
 

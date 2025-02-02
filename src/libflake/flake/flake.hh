@@ -59,6 +59,7 @@ struct FlakeInput
     bool isFlake = true;
     std::optional<InputAttrPath> follows;
     FlakeInputs overrides;
+    std::vector<std::string> patchFiles;
 };
 
 struct ConfigFile
@@ -235,7 +236,7 @@ std::pair<StorePath, Path> sourcePathToStorePath(
 
 void emitTreeAttrs(
     EvalState & state,
-    const StorePath & storePath,
+    const SourcePath & path,
     const fetchers::Input & input,
     Value & v,
     bool emptyRevFallback = false,

@@ -213,9 +213,6 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
         auto lockedFlake = lockFlake();
         auto & flake = lockedFlake.flake;
 
-        // Currently, all flakes are in the Nix store via the rootFS accessor.
-        auto storePath = store->printStorePath(sourcePathToStorePath(store, flake.path).first);
-
         if (json) {
             nlohmann::json j;
             if (flake.description)
@@ -236,7 +233,6 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["revCount"] = *revCount;
             if (auto lastModified = flake.lockedRef.input.getLastModified())
                 j["lastModified"] = *lastModified;
-            j["path"] = storePath;
             j["locks"] = lockedFlake.lockFile.toJSON().first;
             if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
@@ -253,9 +249,6 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Description:" ANSI_NORMAL "   %s",
                     *flake.description);
-            logger->cout(
-                ANSI_BOLD "Path:" ANSI_NORMAL "          %s",
-                storePath);
             if (auto rev = flake.lockedRef.input.getRev())
                 logger->cout(
                     ANSI_BOLD "Revision:" ANSI_NORMAL "      %s",
@@ -1045,7 +1038,7 @@ struct CmdFlakeClone : FlakeCommand
     }
 };
 
-struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
+struct CmdFlakeArchive : FlakeCommand, MixJSON
 {
     std::string dstUri;
 
@@ -1073,52 +1066,47 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
     void run(nix::ref<nix::Store> store) override
     {
+        auto dstStore = store;
+        if (!dstUri.empty())
+            dstStore = openStore(dstUri);
+
         auto flake = lockFlake();
 
-        StorePathSet sources;
-
-        auto storePath = sourcePathToStorePath(store, flake.flake.path).first;
-
-        sources.insert(storePath);
+        auto jsonRoot = json ? std::optional<nlohmann::json>() : std::nullopt;
 
         // FIXME: use graph output, handle cycles.
-        std::function<nlohmann::json(const Node & node)> traverse;
-        traverse = [&](const Node & node)
+        std::function<nlohmann::json(const Node & node, const InputAttrPath & parentInputAttrPath)> traverse;
+        traverse = [&](const Node & node, const InputAttrPath & parentInputAttrPath)
         {
             nlohmann::json jsonObj2 = json ? json::object() : nlohmann::json(nullptr);
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input)) {
-                    auto storePath =
-                        dryRun
-                        ? (*inputNode)->lockedRef.input.computeStorePath(*store)
-                        : (*inputNode)->lockedRef.input.fetchToStore(store).first;
+                    auto inputAttrPath = parentInputAttrPath;
+                    inputAttrPath.push_back(inputName);
+                    Activity act(*logger, lvlChatty, actUnknown,
+                        fmt("archiving input '%s'", printInputAttrPath(inputAttrPath)));
+                    auto storePath = (*inputNode)->lockedRef.input.fetchToStore(dstStore).first;
+                    auto res = traverse(**inputNode, inputAttrPath);
                     if (json) {
-                        auto& jsonObj3 = jsonObj2[inputName];
+                        auto & jsonObj3 = jsonObj2[inputName];
                         jsonObj3["path"] = store->printStorePath(storePath);
-                        sources.insert(std::move(storePath));
-                        jsonObj3["inputs"] = traverse(**inputNode);
-                    } else {
-                        sources.insert(std::move(storePath));
-                        traverse(**inputNode);
+                        jsonObj3["inputs"] = res;
                     }
                 }
             }
             return jsonObj2;
         };
 
+        auto res = traverse(*flake.lockFile.root, {});
+
         if (json) {
+            Activity act(*logger, lvlChatty, actUnknown, fmt("archiving root"));
+            auto storePath = flake.flake.lockedRef.input.fetchToStore(dstStore).first;
             nlohmann::json jsonRoot = {
                 {"path", store->printStorePath(storePath)},
-                {"inputs", traverse(*flake.lockFile.root)},
+                {"inputs", res},
             };
             logger->cout("%s", jsonRoot);
-        } else {
-            traverse(*flake.lockFile.root);
-        }
-
-        if (!dryRun && !dstUri.empty()) {
-            ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
-            copyPaths(*store, *dstStore, sources);
         }
     }
 };
@@ -1435,7 +1423,7 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
 
     std::string description() override
     {
-        return "download the source tree denoted by a flake reference into the Nix store";
+        return "fetch the source tree denoted by a flake reference";
     }
 
     std::string doc() override
@@ -1449,21 +1437,15 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
     {
         auto originalRef = getFlakeRef();
         auto resolvedRef = originalRef.resolve(store);
-        auto [storePath, lockedRef] = resolvedRef.fetchTree(store);
-        auto hash = store->queryPathInfo(storePath)->narHash;
+        auto [accessor, lockedRef] = resolvedRef.lazyFetch(store);
 
         if (json) {
             auto res = nlohmann::json::object();
-            res["storePath"] = store->printStorePath(storePath);
-            res["hash"] = hash.to_string(HashFormat::SRI, true);
             res["original"] = fetchers::attrsToJSON(resolvedRef.toAttrs());
             res["locked"] = fetchers::attrsToJSON(lockedRef.toAttrs());
             logger->cout(res.dump());
         } else {
-            notice("Downloaded '%s' to '%s' (hash '%s').",
-                lockedRef.to_string(),
-                store->printStorePath(storePath),
-                hash.to_string(HashFormat::SRI, true));
+            notice("Fetched '%s'.", lockedRef.to_string());
         }
     }
 };

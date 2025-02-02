@@ -311,11 +311,6 @@ struct GitInputScheme : InputScheme
         runProgram("git", true, args, {}, true);
     }
 
-    std::optional<std::filesystem::path> getSourcePath(const Input & input) const override
-    {
-        return getRepoInfo(input).getPath();
-    }
-
     void putFile(
         const Input & input,
         const CanonPath & path,
