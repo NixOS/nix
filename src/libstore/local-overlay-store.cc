@@ -21,6 +21,9 @@ static LocalOverlayStoreConfigT<config::SettingInfo> localOverlayStoreConfigDesc
           Must be a store with a store dir on the file system.
           Must be used as OverlayFS lower layer for this store's store dir.
         )",
+        // It's not actually machine-specific, but we don't yet have a
+        // `to_json` for `StoreConfig`.
+        .documentDefault = false,
     },
     .upperLayer{
         .name = "upper-layer",
