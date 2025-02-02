@@ -76,6 +76,22 @@ static LocalOverlayStoreConfigT<config::JustValue> localOverlayStoreConfigDefaul
 
 MAKE_APPLY_PARSE(LocalOverlayStoreConfig, localOverlayStoreConfig, LOCAL_OVERLAY_STORE_CONFIG_FIELDS)
 
+config::SettingDescriptionMap LocalOverlayStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(LocalFSStoreConfig::descriptions());
+    ret.merge(LocalStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = localOverlayStoreConfigDescriptions;
+        auto defaults = localOverlayStoreConfigDefaults();
+        ret.merge(decltype(ret){
+            LOCAL_OVERLAY_STORE_CONFIG_FIELDS(DESC_ROW)
+        });
+    }
+    return ret;
+}
+
 LocalOverlayStore::Config::LocalOverlayStoreConfig(
     std::string_view scheme,
     std::string_view authority,

@@ -10,6 +10,8 @@
 
 namespace nix {
 
+bool StoreReference::operator==(const StoreReference & rhs) const = default;
+
 static bool isNonUriPath(const std::string & spec)
 {
     return

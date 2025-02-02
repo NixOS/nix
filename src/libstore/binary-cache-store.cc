@@ -97,6 +97,15 @@ BinaryCacheStore::Config::BinaryCacheStoreConfig(
 {
 }
 
+config::SettingDescriptionMap BinaryCacheStoreConfig::descriptions()
+{
+    constexpr auto & descriptions = binaryCacheStoreConfigDescriptions;
+    auto defaults = binaryCacheStoreConfigDefaults();
+    return {
+        BINARY_CACHE_STORE_CONFIG_FIELDS(DESC_ROW)
+    };
+}
+
 BinaryCacheStore::BinaryCacheStore(const Config & config)
     : Store{config.storeConfig}
     , config{config}

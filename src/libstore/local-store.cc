@@ -99,6 +99,21 @@ static LocalStoreConfigT<config::JustValue> localStoreConfigDefaults()
 
 MAKE_APPLY_PARSE(LocalStoreConfig, localStoreConfig, LOCAL_STORE_CONFIG_FIELDS)
 
+config::SettingDescriptionMap LocalStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(LocalFSStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = localStoreConfigDescriptions;
+        auto defaults = localStoreConfigDefaults();
+        ret.merge(decltype(ret){
+            LOCAL_STORE_CONFIG_FIELDS(DESC_ROW)
+        });
+    }
+    return ret;
+}
+
 LocalStore::Config::LocalStoreConfig(
     std::string_view scheme,
     std::string_view authority,
@@ -108,6 +123,8 @@ LocalStore::Config::LocalStoreConfig(
     , LocalStoreConfigT<config::JustValue>{localStoreConfigApplyParse(params)}
 {
 }
+
+LocalStoreConfig::LocalStoreConfig(const LocalStoreConfig &) = default;
 
 std::string LocalStoreConfig::doc()
 {

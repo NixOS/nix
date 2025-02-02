@@ -292,6 +292,21 @@ static S3BinaryCacheStoreConfigT<config::JustValue> s3BinaryCacheStoreConfigDefa
 
 MAKE_APPLY_PARSE(S3BinaryCacheStoreConfig, s3BinaryCacheStoreConfig, S3_BINARY_CACHE_STORE_CONFIG_FIELDS)
 
+config::SettingDescriptionMap S3BinaryCacheStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(BinaryCacheStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = s3BinaryCacheStoreConfigDescriptions;
+        auto defaults = s3BinaryCacheStoreConfigDefaults();
+        ret.merge(decltype(ret){
+            S3_BINARY_CACHE_STORE_CONFIG_FIELDS(DESC_ROW)
+        });
+    }
+    return ret;
+}
+
 S3BinaryCacheStore::Config::S3BinaryCacheStoreConfig(
     std::string_view scheme,
     std::string_view authority,

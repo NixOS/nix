@@ -56,6 +56,16 @@ static RemoteStoreConfigT<config::JustValue> remoteStoreConfigDefaults()
 MAKE_APPLY_PARSE(RemoteStoreConfig, remoteStoreConfig, REMOTE_STORE_CONFIG_FIELDS)
 
 
+config::SettingDescriptionMap RemoteStoreConfig::descriptions()
+{
+    constexpr auto & descriptions = remoteStoreConfigDescriptions;
+    auto defaults = remoteStoreConfigDefaults();
+    return {
+        REMOTE_STORE_CONFIG_FIELDS(DESC_ROW)
+    };
+}
+
+
 RemoteStore::Config::RemoteStoreConfig(const Store::Config & storeConfig, const StoreReference::Params & params)
     : RemoteStoreConfigT<config::JustValue>{remoteStoreConfigApplyParse(params)}
     , storeConfig{storeConfig}

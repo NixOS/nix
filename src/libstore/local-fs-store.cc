@@ -62,6 +62,15 @@ static LocalFSStoreConfigT<config::JustValue> localFSStoreConfigApplyParse(
     return {LOCAL_FS_STORE_CONFIG_FIELDS(APPLY_ROW)};
 }
 
+config::SettingDescriptionMap LocalFSStoreConfig::descriptions()
+{
+    constexpr auto & descriptions = localFSStoreConfigDescriptions;
+    auto defaults = localFSStoreConfigDefaults(settings.nixStore, std::nullopt);
+    return {
+        LOCAL_FS_STORE_CONFIG_FIELDS(DESC_ROW)
+    };
+}
+
 LocalFSStore::Config::LocalFSStoreConfig(
     const Store::Config & storeConfig,
     const StoreReference::Params & params)
@@ -94,15 +103,6 @@ LocalFSStore::Config::LocalFSStoreConfig(
                 rootDir))}
     , storeConfig{storeConfig}
 {
-}
-
-config::SettingDescriptionMap LocalFSStoreConfig::descriptions()
-{
-    constexpr auto & descriptions = localFSStoreConfigDescriptions;
-    auto defaults = localFSStoreConfigDefaults(settings.nixStore, std::nullopt);
-    return {
-        LOCAL_FS_STORE_CONFIG_FIELDS(DESC_ROW)
-    };
 }
 
 LocalFSStore::LocalFSStore(const Config & config)

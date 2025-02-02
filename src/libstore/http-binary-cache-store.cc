@@ -7,7 +7,17 @@
 
 namespace nix {
 
+config::SettingDescriptionMap HttpBinaryCacheStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(BinaryCacheStoreConfig::descriptions());
+    return ret;
+}
+
+
 MakeError(UploadToHTTP, Error);
+
 
 std::set<std::string> HttpBinaryCacheStoreConfig::uriSchemes()
 {
