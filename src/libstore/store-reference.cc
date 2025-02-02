@@ -168,14 +168,19 @@ StoreReference adl_serializer<StoreReference>::from_json(const json & json)
     }
 
     case json::value_t::object: {
-        auto & obj = json.get_ref<const json::object_t &>();
+        auto & obj = getObject(json);
+        auto scheme = getString(valueAt(obj, "scheme"));
+        auto variant = scheme == "auto" ? (StoreReference::Variant{StoreReference::Auto{}})
+                                        : (StoreReference::Variant{StoreReference::Specified{
+                                              .scheme = scheme,
+                                              .authority = getString(valueAt(obj, "authority")),
+                                          }});
+        auto params = obj;
+        params.erase("scheme");
+        params.erase("authority");
         ref = StoreReference{
-            .variant =
-                StoreReference::Specified{
-                    .scheme = getString(valueAt(obj, "scheme")),
-                    .authority = getString(valueAt(obj, "authority")),
-                },
-            .params = obj,
+            .variant = std::move(variant),
+            .params = std::move(params),
         };
         break;
     }
@@ -198,8 +203,16 @@ StoreReference adl_serializer<StoreReference>::from_json(const json & json)
 
 void adl_serializer<StoreReference>::to_json(json & obj, StoreReference s)
 {
-    // TODO, for tests maybe
-    assert(false);
+    obj = s.params;
+    std::visit(
+        overloaded{
+            [&](const StoreReference::Auto &) { obj.emplace("scheme", "auto"); },
+            [&](const StoreReference::Specified & g) {
+                obj.emplace("scheme", g.scheme);
+                obj.emplace("authority", g.authority);
+            },
+        },
+        s.variant);
 }
 
 }

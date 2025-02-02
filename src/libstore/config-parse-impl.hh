@@ -19,7 +19,7 @@ template<typename T>
 std::pair<std::string, SettingDescription> SettingInfo<T>::describe(const JustValue<T> & def) const
 {
     return {
-        std::string { name },
+        std::string{name},
         SettingDescription{
             .description = stripIndentation(description),
             .defaultValue =
