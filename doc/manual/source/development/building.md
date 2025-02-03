@@ -167,11 +167,13 @@ It is useful to perform multiple cross and native builds on the same source tree
 for example to ensure that better support for one platform doesn't break the build for another.
 Meson thankfully makes this very easy by confining all build products to the build directory --- one simple shares the source directory between multiple build directories, each of which contains the build for Nix to a different platform.
 
-Nixpkgs's `configurePhase` always chooses `build` in the current directory as the name and location of the build.
-This makes having multiple build directories slightly more inconvenient.
-The good news is that Meson/Ninja seem to cope well with relocating the build directory after it is created.
+Here's how to do that:
 
-Here's how to do that
+1. Instruct Nixpkgs's infra where we want Meson to put its build directory
+
+   ```bash
+   mesonBuildDir=build-my-variant-name
+   ```
 
 1. Configure as usual
 
@@ -179,23 +181,11 @@ Here's how to do that
    configurePhase
    ```
 
-2. Rename the build directory
-
-   ```bash
-   cd .. # since `configurePhase` cd'd inside
-   mv build build-linux # or whatever name we want
-   cd build-linux
-   ```
-
 3. Build as usual
 
    ```bash
    buildPhase
    ```
-
-> **N.B.**
-> [`nixpkgs#335818`](https://github.com/NixOS/nixpkgs/issues/335818) tracks giving `mesonConfigurePhase` proper support for custom build directories.
-> When it is fixed, we can simplify these instructions and then remove this notice.
 
 ## System type
 
