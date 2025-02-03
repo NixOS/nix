@@ -4,6 +4,7 @@
 #include "path.hh"
 #include "outputs-spec.hh"
 #include "ref.hh"
+#include "experimental-feature-settings.hh"
 
 #include <variant>
 
