@@ -1390,7 +1390,8 @@ nlohmann::json Derivation::toJSON(const StoreDirConfig & store) const
     res["builder"] = builder;
     res["args"] = args;
     res["env"] = env;
-    res["options"] = nlohmann::json(options);
+    res["structureAttrs"] = structuredAttrs;
+    res["options"] = options;
 
     return res;
 }

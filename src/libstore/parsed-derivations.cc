@@ -167,4 +167,23 @@ std::string StructuredAttrs::writeShell(const nlohmann::json & json)
 
     return jsonSh;
 }
+
+}
+
+namespace nlohmann {
+
+using namespace nix;
+
+StructuredAttrs adl_serializer<StructuredAttrs>::from_json(const json & json)
+{
+    return {
+        .structuredAttrs = json,
+    };
+}
+
+void adl_serializer<StructuredAttrs>::to_json(json & json, StructuredAttrs s)
+{
+    json = s.structuredAttrs;
+}
+
 }

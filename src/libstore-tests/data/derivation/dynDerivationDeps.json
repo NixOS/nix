@@ -37,18 +37,24 @@
     "additionalSandboxProfile": "",
     "allowLocalNetworking": false,
     "allowSubstitutes": true,
-    "allowedReferences": null,
-    "allowedRequisites": null,
-    "disallowedReferences": null,
-    "disallowedRequisites": null,
-    "ignoreSelfRefs": true,
     "impureEnvVars": [],
     "impureHostDeps": [],
     "noChroot": false,
-    "outputChecks": {},
+    "outputChecks": {
+      "forAllOutputs": {
+        "allowedReferences": null,
+        "allowedRequisites": null,
+        "disallowedReferences": [],
+        "disallowedRequisites": [],
+        "ignoreSelfRefs": false
+      }
+    },
+    "passAsFile": [],
     "preferLocalBuild": false,
-    "requiredSystemFeatures": []
+    "requiredSystemFeatures": [],
+    "unsafeDiscardReferences": {}
   },
   "outputs": {},
+  "structureAttrs": null,
   "system": "wasm-sel4"
 }

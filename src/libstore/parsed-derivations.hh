@@ -5,6 +5,7 @@
 
 #include "types.hh"
 #include "path.hh"
+#include "json-impls.hh"
 
 namespace nix {
 
@@ -42,4 +43,13 @@ struct StructuredAttrs
     static std::string writeShell(const nlohmann::json & prepared);
 };
 
+template<typename T>
+struct json_avoids_null;
+
+template<>
+struct json_avoids_null<StructuredAttrs> : std::true_type
+{};
+
 }
+
+JSON_IMPL(StructuredAttrs);

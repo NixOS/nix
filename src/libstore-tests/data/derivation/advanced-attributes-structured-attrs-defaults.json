@@ -16,17 +16,16 @@
     "additionalSandboxProfile": "",
     "allowLocalNetworking": false,
     "allowSubstitutes": true,
-    "allowedReferences": null,
-    "allowedRequisites": null,
-    "disallowedReferences": null,
-    "disallowedRequisites": null,
-    "ignoreSelfRefs": false,
     "impureEnvVars": [],
     "impureHostDeps": [],
     "noChroot": false,
-    "outputChecks": {},
+    "outputChecks": {
+      "perOutput": {}
+    },
+    "passAsFile": [],
     "preferLocalBuild": false,
-    "requiredSystemFeatures": []
+    "requiredSystemFeatures": [],
+    "unsafeDiscardReferences": {}
   },
   "outputs": {
     "dev": {
@@ -35,6 +34,15 @@
     "out": {
       "path": "/nix/store/f8f8nvnx32bxvyxyx2ff7akbvwhwd9dw-advanced-attributes-structured-attrs-defaults"
     }
+  },
+  "structureAttrs": {
+    "builder": "/bin/bash",
+    "name": "advanced-attributes-structured-attrs-defaults",
+    "outputs": [
+      "out",
+      "dev"
+    ],
+    "system": "my-system"
   },
   "system": "my-system"
 }
