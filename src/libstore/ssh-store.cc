@@ -86,6 +86,7 @@ static std::optional<LocalFSStore::Config> getMounted(
     auto mountedParamsOpt = optionalValueAt(params, "mounted");
     if (!mountedParamsOpt) return {};
     auto * mountedParamsP = getNullable(*mountedParamsOpt);
+    experimentalFeatureSettings.require(Xp::MountedSSHStore);
     if (!mountedParamsP) return {};
     auto & mountedParams = getObject(*mountedParamsP);
     return {{storeConfig, mountedParams}};

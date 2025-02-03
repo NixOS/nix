@@ -7,6 +7,12 @@
 #include "json-impls.hh"
 #include "experimental-features.hh"
 
+namespace nix {
+
+struct ExperimentalFeatureSettings;
+
+};
+
 namespace nix::config {
 
 struct SettingDescription;
@@ -58,7 +64,7 @@ struct SettingInfo
      */
     std::pair<std::string, SettingDescription> describe(const JustValue<T> & def) const;
 
-    OptValue<T> parseConfig(const nlohmann::json::object_t & map) const;
+    OptValue<T> parseConfig(const nlohmann::json::object_t & map, const ExperimentalFeatureSettings & xpSettings) const;
 };
 
 struct SettingDescription;
