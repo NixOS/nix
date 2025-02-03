@@ -20,7 +20,6 @@
 #include "posix-fs-canonicalise.hh"
 #include "posix-source-accessor.hh"
 
-#include <regex>
 #include <queue>
 
 #include <sys/un.h>
@@ -618,32 +617,11 @@ void LocalDerivationGoal::startBuilder()
 
     /* Handle exportReferencesGraph(), if set. */
     if (!parsedDrv->hasStructuredAttrs()) {
-        /* The `exportReferencesGraph' feature allows the references graph
-           to be passed to a builder.  This attribute should be a list of
-           pairs [name1 path1 name2 path2 ...].  The references graph of
-           each `pathN' will be stored in a text file `nameN' in the
-           temporary build directory.  The text files have the format used
-           by `nix-store --register-validity'.  However, the deriver
-           fields are left empty. */
-        auto s = getOr(drv->env, "exportReferencesGraph", "");
-        Strings ss = tokenizeString<Strings>(s);
-        if (ss.size() % 2 != 0)
-            throw BuildError("odd number of tokens in 'exportReferencesGraph': '%1%'", s);
-        for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
-            auto fileName = *i++;
-            static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
-            if (!std::regex_match(fileName, regex))
-                throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
-
-            auto storePathS = *i++;
-            if (!worker.store.isInStore(storePathS))
-                throw BuildError("'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
-            auto storePath = worker.store.toStorePath(storePathS).first;
-
+        for (auto & [fileName, storePathSet] : drvOptions->exportReferencesGraph) {
             /* Write closure info to <fileName>. */
             writeFile(tmpDir + "/" + fileName,
                 worker.store.makeValidityRegistration(
-                    worker.store.exportReferences({storePath}, inputPaths), false, false));
+                    worker.store.exportReferences(storePathSet, inputPaths), false, false));
         }
     }
 
@@ -1240,7 +1218,7 @@ void LocalDerivationGoal::initEnv()
 
 void LocalDerivationGoal::writeStructuredAttrs()
 {
-    if (auto structAttrsJson = parsedDrv->prepareStructuredAttrs(worker.store, inputPaths)) {
+    if (auto structAttrsJson = parsedDrv->prepareStructuredAttrs(worker.store, *drvOptions, inputPaths)) {
         auto json = structAttrsJson.value();
         nlohmann::json rewritten;
         for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {

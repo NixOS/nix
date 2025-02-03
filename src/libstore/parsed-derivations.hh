@@ -42,7 +42,8 @@ public:
         return static_cast<bool>(structuredAttrs);
     }
 
-    std::optional<nlohmann::json> prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths);
+    std::optional<nlohmann::json>
+    prepareStructuredAttrs(Store & store, const DerivationOptions & drvOptions, const StorePathSet & inputPaths);
 };
 
 std::string writeStructuredAttrsShell(const nlohmann::json & json);
