@@ -96,6 +96,27 @@ struct DerivationOptions
     StringSet passAsFile;
 
     /**
+     * The `exportReferencesGraph' feature allows the references graph
+     * to be passed to a builder
+     *
+     * ### Legacy case
+     *
+     * Given a `name` `pathSet` key-value pair, the references graph of
+     * `pathSet` will be stored in a text file `name' in the temporary
+     * build directory.  The text files have the format used by
+     * `nix-store
+     * --register-validity'.  However, the `deriver` fields are left
+     *  empty.
+     *
+     * ### "Structured attributes" case
+     *
+     * The same information will be put put in the final structured
+     * attributes give to the builder. The set of paths in the original JSON
+     * is replaced with a list of `PathInfo` in JSON format.
+     */
+    std::map<std::string, StringSet> exportReferencesGraph;
+
+    /**
      * env: __sandboxProfile
      *
      * Just for Darwin
