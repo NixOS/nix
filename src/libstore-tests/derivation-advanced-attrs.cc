@@ -108,7 +108,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
         EXPECT_TRUE(!parsedDrv.hasStructuredAttrs());
@@ -143,7 +143,7 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_defaults)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
         EXPECT_EQ(options.getRequiredSystemFeatures(got), StringSet{});
@@ -157,7 +157,7 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_defaults)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
         EXPECT_EQ(options.getRequiredSystemFeatures(got), StringSet{"ca-derivations"});
@@ -171,7 +171,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
         EXPECT_TRUE(!parsedDrv.hasStructuredAttrs());
@@ -195,7 +195,7 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
         EXPECT_EQ(
@@ -243,7 +243,7 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
         EXPECT_EQ(
@@ -296,7 +296,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_d
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
         EXPECT_TRUE(parsedDrv.hasStructuredAttrs());
@@ -330,7 +330,7 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_defaults)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
         EXPECT_EQ(options.getRequiredSystemFeatures(got), StringSet{});
@@ -344,7 +344,7 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_default
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
         EXPECT_EQ(options.getRequiredSystemFeatures(got), StringSet{"ca-derivations"});
@@ -358,7 +358,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
         EXPECT_TRUE(parsedDrv.hasStructuredAttrs());
@@ -392,7 +392,7 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
         EXPECT_EQ(
@@ -445,7 +445,7 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
         EXPECT_EQ(

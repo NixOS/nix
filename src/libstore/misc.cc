@@ -222,7 +222,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
             if (knownOutputPaths && invalid.empty()) return;
 
             auto drv = make_ref<Derivation>(derivationFromPath(drvPath));
-            ParsedDerivation parsedDrv(*drv);
+            ParsedDerivation parsedDrv(drv->env);
             DerivationOptions drvOptions;
             try {
                 drvOptions = DerivationOptions::fromParsedDerivation(parsedDrv);

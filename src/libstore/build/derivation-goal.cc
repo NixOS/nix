@@ -180,7 +180,7 @@ Goal::Co DerivationGoal::haveDerivation()
 {
     trace("have derivation");
 
-    parsedDrv = std::make_unique<ParsedDerivation>(*drv);
+    parsedDrv = std::make_unique<ParsedDerivation>(drv->env);
     try {
         drvOptions = std::make_unique<DerivationOptions>(DerivationOptions::fromParsedDerivation(*parsedDrv));
     } catch (Error & e) {

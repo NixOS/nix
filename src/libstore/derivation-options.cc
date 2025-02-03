@@ -116,7 +116,7 @@ DerivationOptions DerivationOptions::fromParsedDerivation(const ParsedDerivation
         .passAsFile =
             [&] {
                 StringSet res;
-                if (auto * passAsFileString = get(parsed.drv.env, "passAsFile")) {
+                if (auto * passAsFileString = get(parsed.env, "passAsFile")) {
                     if (parsed.hasStructuredAttrs()) {
                         if (shouldWarn) {
                             warn(
@@ -140,7 +140,7 @@ DerivationOptions DerivationOptions::fromParsedDerivation(const ParsedDerivation
                         ret.insert_or_assign(key, storePathsJson);
                     }
                 } else {
-                    auto s = getOr(parsed.drv.env, "exportReferencesGraph", "");
+                    auto s = getOr(parsed.env, "exportReferencesGraph", "");
                     Strings ss = tokenizeString<Strings>(s);
                     if (ss.size() % 2 != 0)
                         throw BuildError("odd number of tokens in 'exportReferencesGraph': '%1%'", s);

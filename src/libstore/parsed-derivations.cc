@@ -6,12 +6,12 @@
 
 namespace nix {
 
-ParsedDerivation::ParsedDerivation(BasicDerivation & drv)
-    : drv(drv)
+ParsedDerivation::ParsedDerivation(const StringPairs & env)
+    : env(env)
 {
     /* Parse the __json attribute, if any. */
-    auto jsonAttr = drv.env.find("__json");
-    if (jsonAttr != drv.env.end()) {
+    auto jsonAttr = env.find("__json");
+    if (jsonAttr != env.end()) {
         try {
             structuredAttrs = std::make_unique<nlohmann::json>(nlohmann::json::parse(jsonAttr->second));
         } catch (std::exception & e) {
@@ -34,8 +34,8 @@ std::optional<std::string> ParsedDerivation::getStringAttr(const std::string & n
             return i->get<std::string>();
         }
     } else {
-        auto i = drv.env.find(name);
-        if (i == drv.env.end())
+        auto i = env.find(name);
+        if (i == env.end())
             return {};
         else
             return i->second;
@@ -54,8 +54,8 @@ bool ParsedDerivation::getBoolAttr(const std::string & name, bool def) const
             return i->get<bool>();
         }
     } else {
-        auto i = drv.env.find(name);
-        if (i == drv.env.end())
+        auto i = env.find(name);
+        if (i == env.end())
             return def;
         else
             return i->second == "1";
@@ -80,8 +80,8 @@ std::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name
             return res;
         }
     } else {
-        auto i = drv.env.find(name);
-        if (i == drv.env.end())
+        auto i = env.find(name);
+        if (i == env.end())
             return {};
         else
             return tokenizeString<Strings>(i->second);
@@ -155,17 +155,18 @@ static nlohmann::json pathInfoToJSON(
 std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(
     Store & store,
     const DerivationOptions & drvOptions,
-    const StorePathSet & inputPaths)
+    const StorePathSet & inputPaths,
+    const DerivationOutputs & outputs)
 {
     if (!structuredAttrs) return std::nullopt;
 
     auto json = *structuredAttrs;
 
     /* Add an "outputs" object containing the output paths. */
-    nlohmann::json outputs;
-    for (auto & i : drv.outputs)
-        outputs[i.first] = hashPlaceholder(i.first);
-    json["outputs"] = outputs;
+    nlohmann::json outputsJson;
+    for (auto & i : outputs)
+        outputsJson[i.first] = hashPlaceholder(i.first);
+    json["outputs"] = std::move(outputsJson);
 
     /* Handle exportReferencesGraph. */
     for (auto & [key, inputPaths] : drvOptions.exportReferencesGraph) {
