@@ -5,7 +5,7 @@ source common.sh
 clearStoreIfPossible
 
 outPath=$(nix-build --no-out-link -E "
-with import ./config.nix;
+with import ${config_nix};
 
 mkDerivation {
   name = \"pass-as-file\";

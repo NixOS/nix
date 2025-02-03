@@ -1,3 +1,4 @@
+#include "json-utils.hh"
 #include "ssh-store.hh"
 #include "local-fs-store.hh"
 #include "remote-store-connection.hh"
@@ -12,7 +13,7 @@
 
 namespace nix {
 
-static const SSHStoreConfigT<config::SettingInfo> sshStoreConfigDescriptions = {
+constexpr static const SSHStoreConfigT<config::SettingInfo> sshStoreConfigDescriptions = {
     .remoteProgram{
         .name = "remote-program",
         .description = "Path to the `nix-daemon` executable on the remote machine.",
@@ -51,18 +52,42 @@ config::SettingDescriptionMap SSHStoreConfig::descriptions()
             SSH_STORE_CONFIG_FIELDS(DESC_ROW)
         });
     }
-    //ret.merge(LocalFSStoreConfig::descriptions());
+    ret.insert_or_assign(
+        "mounted",
+        config::SettingDescription{
+            .description = stripIndentation(R"(
+                If this nested settings object is defined (`{..}` not `null`), additionally requires that store be mounted in the local file system.
+
+                The mounting of that store is not managed by Nix, and must by managed manually.
+                It could be accomplished with SSHFS or NFS, for example.
+
+                The local file system is used to optimize certain operations.
+                For example, rather than serializing Nix archives and sending over the Nix channel,
+                we can directly access the file system data via the mount-point.
+
+                The local file system is also used to make certain operations possible that wouldn't otherwise be.
+                For example, persistent GC roots can be created if they reside on the same file system as the remote store:
+                the remote side will create the symlinks necessary to avoid race conditions.
+            )"),
+            .experimentalFeature = Xp::MountedSSHStore,
+            .info = config::SettingDescription::Sub{
+                .nullable = true,
+                .map = LocalFSStoreConfig::descriptions()
+            },
+        });
     return ret;
 }
 
 
 static std::optional<LocalFSStore::Config> getMounted(
     const Store::Config & storeConfig,
-    const StoreReference::Params & params)
+    const StoreReference::Params & params,
+    const ExperimentalFeatureSettings & xpSettings)
 {
     auto mountedParamsOpt = optionalValueAt(params, "mounted");
     if (!mountedParamsOpt) return {};
     auto * mountedParamsP = getNullable(*mountedParamsOpt);
+    xpSettings.require(Xp::MountedSSHStore);
     if (!mountedParamsP) return {};
     auto & mountedParams = getObject(*mountedParamsP);
     return {{storeConfig, mountedParams}};
@@ -72,18 +97,19 @@ static std::optional<LocalFSStore::Config> getMounted(
 SSHStoreConfig::SSHStoreConfig(
     std::string_view scheme,
     std::string_view authority,
-    const StoreReference::Params & params)
+    const StoreReference::Params & params, const ExperimentalFeatureSettings & xpSettings)
     : Store::Config{params}
     , RemoteStore::Config{*this, params}
     , CommonSSHStoreConfig{scheme, authority, params}
     , SSHStoreConfigT<config::JustValue>{sshStoreConfigApplyParse(params)}
-    , mounted{getMounted(*this, params)}
+    , mounted{getMounted(*this, params, xpSettings)}
 {
 }
 
 
 std::string SSHStoreConfig::doc()
 {
+    return
       #include "ssh-store.md"
       ;
 }

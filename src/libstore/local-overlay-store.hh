@@ -40,6 +40,8 @@ struct LocalOverlayStoreConfig :
 
     static std::string doc();
 
+    ref<Store> openStore() const override;
+
 protected:
     /**
      * @return The host OS path corresponding to the store path for the

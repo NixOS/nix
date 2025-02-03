@@ -48,21 +48,32 @@ void copyRecursive(
         break;
     }
 
-    case SourceAccessor::tMisc:
-        throw Error("file '%1%' has an unsupported type", from);
-
+    case SourceAccessor::tChar:
+    case SourceAccessor::tBlock:
+    case SourceAccessor::tSocket:
+    case SourceAccessor::tFifo:
+    case SourceAccessor::tUnknown:
     default:
-        unreachable();
+        throw Error("file '%1%' has an unsupported type of %2%", from, stat.typeString());
     }
 }
 
 
-RestoreSinkSettings<JustValue> restoreSinkSettings;
+RestoreSinkSettings<config::JustValue> restoreSinkSettings;
 
+static std::filesystem::path append(const std::filesystem::path & src, const CanonPath & path)
+{
+    auto dst = src;
+    if (!path.rel().empty())
+        dst /= path.rel();
+    return dst;
+}
 
 void RestoreSink::createDirectory(const CanonPath & path)
 {
-    std::filesystem::create_directory(dstPath / path.rel());
+    auto p = append(dstPath, path);
+    if (!std::filesystem::create_directory(p))
+        throw Error("path '%s' already exists", p.string());
 };
 
 struct RestoreRegularFile : CreateRegularFileSink {
@@ -84,14 +95,6 @@ struct RestoreRegularFile : CreateRegularFileSink {
     void preallocateContents(uint64_t size) override;
 };
 
-static std::filesystem::path append(const std::filesystem::path & src, const CanonPath & path)
-{
-    auto dst = src;
-    if (!path.rel().empty())
-        dst /= path.rel();
-    return dst;
-}
-
 void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
     auto p = append(dstPath, path);
@@ -100,7 +103,7 @@ void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(C
     crf.startFsync = startFsync;
     crf.fd =
 #ifdef _WIN32
-        CreateFileW(p.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)
+        CreateFileW(p.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL)
 #else
         open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666)
 #endif

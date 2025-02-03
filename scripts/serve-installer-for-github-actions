@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+if [[ ! -d out ]]; then
+  echo "run prepare-installer-for-github-actions first"
+  exit 1
+fi
+cd out
+PORT=${PORT:-8126}
+nohup python -m http.server "$PORT" >/dev/null 2>&1 &
+pid=$!
+
+while ! curl -s "http://localhost:$PORT"; do
+  sleep 1
+  if ! kill -0 $pid; then
+    echo "Failed to start http server"
+    exit 1
+  fi
+done
+
+echo 'To install nix, run the following command:'
+echo "sh <(curl http://localhost:$PORT/install) --tarball-url-prefix http://localhost:$PORT"

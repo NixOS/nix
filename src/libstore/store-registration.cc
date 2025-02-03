@@ -42,7 +42,7 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
                     /* If /nix doesn't exist, there is no daemon socket, and
                        we're not root, then automatically set up a chroot
                        store in ~/.local/share/nix/root. */
-                    auto chrootStore = getDataDir() + "/nix/root";
+                    auto chrootStore = getDataDir() + "/root";
                     if (!pathExists(chrootStore)) {
                         try {
                             createDirs(chrootStore);
@@ -113,41 +113,7 @@ using namespace nix::config;
 
 ref<const StoreConfig> adl_serializer<ref<const StoreConfig>>::from_json(const json & json)
 {
-    StoreReference ref;
-    switch (json.type()) {
-
-    case json::value_t::string: {
-        ref = StoreReference::parse(json.get_ref<const std::string &>());
-        break;
-    }
-
-    case json::value_t::object: {
-        auto & obj = json.get_ref<const json::object_t &>();
-        ref = StoreReference{
-            .variant =
-                StoreReference::Specified{
-                    .scheme = getString(valueAt(obj, "scheme")),
-                    .authority = getString(valueAt(obj, "authority")),
-                },
-            .params = obj,
-        };
-        break;
-    }
-
-    case json::value_t::null:
-    case json::value_t::number_unsigned:
-    case json::value_t::number_integer:
-    case json::value_t::number_float:
-    case json::value_t::boolean:
-    case json::value_t::array:
-    case json::value_t::binary:
-    case json::value_t::discarded:
-    default:
-        throw UsageError(
-            "Invalid JSON for Store configuration: is type '%s' but must be string or object", json.type_name());
-    };
-
-    return resolveStoreConfig(std::move(ref));
+    return resolveStoreConfig(adl_serializer<StoreReference>::from_json(json));
 }
 
 void adl_serializer<ref<const StoreConfig>>::to_json(json & obj, ref<const StoreConfig> s)

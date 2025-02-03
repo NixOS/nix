@@ -2,6 +2,7 @@
 ///@file
 
 #include <memory>
+#include <type_traits>
 
 #include "types.hh"
 #include "util.hh"
@@ -202,7 +203,14 @@ struct StringSource : Source
 {
     std::string_view s;
     size_t pos;
+
+    // NOTE: Prevent unintentional dangling views when an implicit conversion
+    // from std::string -> std::string_view occurs when the string is passed
+    // by rvalue.
+    StringSource(std::string &&) = delete;
     StringSource(std::string_view s) : s(s), pos(0) { }
+    StringSource(const std::string& str): StringSource(std::string_view(str)) {}
+
     size_t read(char * data, size_t len) override;
 };
 
@@ -503,7 +511,7 @@ struct FramedSource : Source
                 }
             }
         } catch (...) {
-            ignoreException();
+            ignoreExceptionInDestructor();
         }
     }
 
@@ -550,7 +558,7 @@ struct FramedSink : nix::BufferedSink
             to << 0;
             to.flush();
         } catch (...) {
-            ignoreException();
+            ignoreExceptionInDestructor();
         }
     }
 

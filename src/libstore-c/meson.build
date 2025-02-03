@@ -4,8 +4,6 @@ project('nix-store-c', 'cpp',
     'cpp_std=c++2a',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
-    'debug=true',
-    'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
   ],
   meson_version : '>= 1.1',
@@ -14,7 +12,7 @@ project('nix-store-c', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
@@ -25,9 +23,7 @@ deps_private_maybe_subproject = [
 deps_public_maybe_subproject = [
   dependency('nix-util-c'),
 ]
-subdir('build-utils-meson/subprojects')
-
-subdir('build-utils-meson/threads')
+subdir('nix-meson-build-support/subprojects')
 
 # TODO rename, because it will conflict with downstream projects
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
@@ -51,7 +47,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('nix-meson-build-support/common')
 
 sources = files(
   'nix_api_store.cc',
@@ -66,7 +62,8 @@ headers = [config_h] + files(
 # TODO don't install this once tests don't use it and/or move the header into `libstore`, non-`c`
 headers += files('nix_api_store_internal.h')
 
-subdir('build-utils-meson/export-all-symbols')
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 this_library = library(
   'nixstorec',
@@ -82,4 +79,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-subdir('build-utils-meson/export')
+subdir('nix-meson-build-support/export')

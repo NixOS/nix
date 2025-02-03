@@ -1,6 +1,25 @@
 let
   sixteenBytes = "0123456789abcdef";
-  times16 = s: builtins.concatStringsSep "" [s s s s s s s s s s s s s s s s];
+  times16 =
+    s:
+    builtins.concatStringsSep "" [
+      s
+      s
+      s
+      s
+      s
+      s
+      s
+      s
+      s
+      s
+      s
+      s
+      s
+      s
+      s
+      s
+    ];
   exp = n: x: if n == 1 then x else times16 (exp (n - 1) x);
   sixteenMegabyte = exp 6 sixteenBytes;
 in

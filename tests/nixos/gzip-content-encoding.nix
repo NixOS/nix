@@ -30,42 +30,45 @@ in
 {
   name = "gzip-content-encoding";
 
-  nodes =
-    { machine =
+  nodes = {
+    machine =
       { config, pkgs, ... }:
-      { networking.firewall.allowedTCPPorts = [ 80 ];
+      {
+        networking.firewall.allowedTCPPorts = [ 80 ];
 
         services.nginx.enable = true;
-        services.nginx.virtualHosts."localhost" =
-          { root = "${ztdCompressedFile}/share/";
-            # Make sure that nginx really tries to compress the
-            # file on the fly with no regard to size/mime.
-            # http://nginx.org/en/docs/http/ngx_http_gzip_module.html
-            extraConfig = ''
-              gzip on;
-              gzip_types *;
-              gzip_proxied any;
-              gzip_min_length 0;
-            '';
-          };
+        services.nginx.virtualHosts."localhost" = {
+          root = "${ztdCompressedFile}/share/";
+          # Make sure that nginx really tries to compress the
+          # file on the fly with no regard to size/mime.
+          # http://nginx.org/en/docs/http/ngx_http_gzip_module.html
+          extraConfig = ''
+            gzip on;
+            gzip_types *;
+            gzip_proxied any;
+            gzip_min_length 0;
+          '';
+        };
         virtualisation.writableStore = true;
         virtualisation.additionalPaths = with pkgs; [ file ];
         nix.settings.substituters = lib.mkForce [ ];
       };
-    };
+  };
 
   # Check that when nix-prefetch-url is used with a zst tarball it does not get decompressed.
-  testScript = { nodes }: ''
-    # fmt: off
-    start_all()
+  testScript =
+    { nodes }:
+    ''
+      # fmt: off
+      start_all()
 
-    machine.wait_for_unit("nginx.service")
-    machine.succeed("""
-      # Make sure that the file is properly compressed as the test would be meaningless otherwise
-      curl --compressed -v http://localhost/archive |& tr -s ' ' |& grep --ignore-case 'content-encoding: gzip'
-      archive_path=$(nix-prefetch-url http://localhost/archive --print-path | tail -n1)
-      [[ $(${fileCmd} --brief --mime-type $archive_path) == "application/zstd" ]]
-      tar --zstd -xf $archive_path
-    """)
-  '';
+      machine.wait_for_unit("nginx.service")
+      machine.succeed("""
+        # Make sure that the file is properly compressed as the test would be meaningless otherwise
+        curl --compressed -v http://localhost/archive |& tr -s ' ' |& grep --ignore-case 'content-encoding: gzip'
+        archive_path=$(nix-prefetch-url http://localhost/archive --print-path | tail -n1)
+        [[ $(${fileCmd} --brief --mime-type $archive_path) == "application/zstd" ]]
+        tar --zstd -xf $archive_path
+      """)
+    '';
 }

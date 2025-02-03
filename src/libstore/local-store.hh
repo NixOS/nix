@@ -358,6 +358,8 @@ private:
 
     void openDB(State & state, bool create);
 
+    void upgradeDBSchema(State & state);
+
     void makeStoreWritable();
 
     uint64_t queryValidPathId(State & state, const StorePath & path);

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <nlohmann/json.hpp>
 
 #include "command.hh"
@@ -9,8 +10,7 @@
 #include "profiles.hh"
 #include "repl.hh"
 #include "strings.hh"
-
-extern char * * environ __attribute__((weak));
+#include "environment-variables.hh"
 
 namespace nix {
 
@@ -23,7 +23,8 @@ nix::Commands RegisterCommand::getCommandsFor(const std::vector<std::string> & p
         if (name.size() == prefix.size() + 1) {
             bool equal = true;
             for (size_t i = 0; i < prefix.size(); ++i)
-                if (name[i] != prefix[i]) equal = false;
+                if (name[i] != prefix[i])
+                    equal = false;
             if (equal)
                 res.insert_or_assign(name[prefix.size()], command);
         }
@@ -42,16 +43,16 @@ void NixMultiCommand::run()
         std::set<std::string> subCommandTextLines;
         for (auto & [name, _] : commands)
             subCommandTextLines.insert(fmt("- `%s`", name));
-        std::string markdownError = fmt("`nix %s` requires a sub-command. Available sub-commands:\n\n%s\n",
-                commandName, concatStringsSep("\n", subCommandTextLines));
+        std::string markdownError =
+            fmt("`nix %s` requires a sub-command. Available sub-commands:\n\n%s\n",
+                commandName,
+                concatStringsSep("\n", subCommandTextLines));
         throw UsageError(renderMarkdownToTerminal(markdownError));
     }
     command->second->run();
 }
 
-StoreCommand::StoreCommand()
-{
-}
+StoreCommand::StoreCommand() {}
 
 ref<Store> StoreCommand::getStore()
 {
@@ -126,15 +127,8 @@ ref<Store> EvalCommand::getEvalStore()
 ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState) {
-        evalState =
-            #if HAVE_BOEHMGC
-            std::allocate_shared<EvalState>(
-                traceable_allocator<EvalState>(),
-            #else
-            std::make_shared<EvalState>(
-            #endif
-                lookupPath, getEvalStore(), fetchSettings, evalSettings, getStore())
-            ;
+        evalState = std::allocate_shared<EvalState>(
+            traceable_allocator<EvalState>(), lookupPath, getEvalStore(), fetchSettings, evalSettings, getStore());
 
         evalState->repair = repair;
 
@@ -149,7 +143,8 @@ MixOperateOnOptions::MixOperateOnOptions()
 {
     addFlag({
         .longName = "derivation",
-        .description = "Operate on the [store derivation](@docroot@/glossary.md#gloss-store-derivation) rather than its outputs.",
+        .description =
+            "Operate on the [store derivation](@docroot@/glossary.md#gloss-store-derivation) rather than its outputs.",
         .category = installablesCategory,
         .handler = {&operateOn, OperateOn::Derivation},
     });
@@ -184,30 +179,34 @@ BuiltPathsCommand::BuiltPathsCommand(bool recursive)
 
 void BuiltPathsCommand::run(ref<Store> store, Installables && installables)
 {
-    BuiltPaths paths;
+    BuiltPaths rootPaths, allPaths;
+
     if (all) {
         if (installables.size())
             throw UsageError("'--all' does not expect arguments");
         // XXX: Only uses opaque paths, ignores all the realisations
         for (auto & p : store->queryAllValidPaths())
-            paths.emplace_back(BuiltPath::Opaque{p});
+            rootPaths.emplace_back(BuiltPath::Opaque{p});
+        allPaths = rootPaths;
     } else {
-        paths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
+        rootPaths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
+        allPaths = rootPaths;
+
         if (recursive) {
             // XXX: This only computes the store path closure, ignoring
             // intermediate realisations
             StorePathSet pathsRoots, pathsClosure;
-            for (auto & root : paths) {
+            for (auto & root : rootPaths) {
                 auto rootFromThis = root.outPaths();
                 pathsRoots.insert(rootFromThis.begin(), rootFromThis.end());
             }
             store->computeFSClosure(pathsRoots, pathsClosure);
             for (auto & path : pathsClosure)
-                paths.emplace_back(BuiltPath::Opaque{path});
+                allPaths.emplace_back(BuiltPath::Opaque{path});
         }
     }
 
-    run(store, std::move(paths));
+    run(store, std::move(allPaths), std::move(rootPaths));
 }
 
 StorePathsCommand::StorePathsCommand(bool recursive)
@@ -215,10 +214,10 @@ StorePathsCommand::StorePathsCommand(bool recursive)
 {
 }
 
-void StorePathsCommand::run(ref<Store> store, BuiltPaths && paths)
+void StorePathsCommand::run(ref<Store> store, BuiltPaths && allPaths, BuiltPaths && rootPaths)
 {
     StorePathSet storePaths;
-    for (auto & builtPath : paths)
+    for (auto & builtPath : allPaths)
         for (auto & p : builtPath.outPaths())
             storePaths.insert(p);
 
@@ -238,46 +237,48 @@ void StorePathCommand::run(ref<Store> store, StorePaths && storePaths)
 
 MixProfile::MixProfile()
 {
-    addFlag({
-        .longName = "profile",
-        .description = "The profile to operate on.",
-        .labels = {"path"},
-        .handler = {&profile},
-        .completer = completePath
-    });
+    addFlag(
+        {.longName = "profile",
+         .description = "The profile to operate on.",
+         .labels = {"path"},
+         .handler = {&profile},
+         .completer = completePath});
 }
 
 void MixProfile::updateProfile(const StorePath & storePath)
 {
-    if (!profile) return;
-    auto store = getStore().dynamic_pointer_cast<LocalFSStore>();
-    if (!store) throw Error("'--profile' is not supported for this Nix store");
+    if (!profile)
+        return;
+    auto store = getDstStore().dynamic_pointer_cast<LocalFSStore>();
+    if (!store)
+        throw Error("'--profile' is not supported for this Nix store");
     auto profile2 = absPath(*profile);
-    switchLink(profile2,
-        createGeneration(*store, profile2, storePath));
+    switchLink(profile2, createGeneration(*store, profile2, storePath));
 }
 
 void MixProfile::updateProfile(const BuiltPaths & buildables)
 {
-    if (!profile) return;
+    if (!profile)
+        return;
 
     StorePaths result;
 
     for (auto & buildable : buildables) {
-        std::visit(overloaded {
-            [&](const BuiltPath::Opaque & bo) {
-                result.push_back(bo.path);
+        std::visit(
+            overloaded{
+                [&](const BuiltPath::Opaque & bo) { result.push_back(bo.path); },
+                [&](const BuiltPath::Built & bfd) {
+                    for (auto & output : bfd.outputs) {
+                        result.push_back(output.second);
+                    }
+                },
             },
-            [&](const BuiltPath::Built & bfd) {
-                for (auto & output : bfd.outputs) {
-                    result.push_back(output.second);
-                }
-            },
-        }, buildable.raw());
+            buildable.raw());
     }
 
     if (result.size() != 1)
-        throw UsageError("'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
+        throw UsageError(
+            "'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
 
     updateProfile(result[0]);
 }
@@ -287,50 +288,111 @@ MixDefaultProfile::MixDefaultProfile()
     profile = getDefaultProfile();
 }
 
-MixEnvironment::MixEnvironment() : ignoreEnvironment(false)
+MixEnvironment::MixEnvironment()
+    : ignoreEnvironment(false)
 {
     addFlag({
-        .longName = "ignore-environment",
+        .longName = "ignore-env",
+        .aliases = {"ignore-environment"},
         .shortName = 'i',
-        .description = "Clear the entire environment (except those specified with `--keep`).",
+        .description = "Clear the entire environment, except for those specified with `--keep-env-var`.",
+        .category = environmentVariablesCategory,
         .handler = {&ignoreEnvironment, true},
     });
 
     addFlag({
-        .longName = "keep",
+        .longName = "keep-env-var",
+        .aliases = {"keep"},
         .shortName = 'k',
-        .description = "Keep the environment variable *name*.",
+        .description = "Keep the environment variable *name*, when using `--ignore-env`.",
+        .category = environmentVariablesCategory,
         .labels = {"name"},
-        .handler = {[&](std::string s) { keep.insert(s); }},
+        .handler = {[&](std::string s) { keepVars.insert(s); }},
     });
 
     addFlag({
-        .longName = "unset",
+        .longName = "unset-env-var",
+        .aliases = {"unset"},
         .shortName = 'u',
         .description = "Unset the environment variable *name*.",
+        .category = environmentVariablesCategory,
         .labels = {"name"},
-        .handler = {[&](std::string s) { unset.insert(s); }},
+        .handler = {[&](std::string name) {
+            if (setVars.contains(name))
+                throw UsageError("Cannot unset environment variable '%s' that is set with '%s'", name, "--set-env-var");
+
+            unsetVars.insert(name);
+        }},
+    });
+
+    addFlag({
+        .longName = "set-env-var",
+        .shortName = 's',
+        .description = "Sets an environment variable *name* with *value*.",
+        .category = environmentVariablesCategory,
+        .labels = {"name", "value"},
+        .handler = {[&](std::string name, std::string value) {
+            if (unsetVars.contains(name))
+                throw UsageError(
+                    "Cannot set environment variable '%s' that is unset with '%s'", name, "--unset-env-var");
+
+            if (setVars.contains(name))
+                throw UsageError(
+                    "Duplicate definition of environment variable '%s' with '%s' is ambiguous", name, "--set-env-var");
+
+            setVars.insert_or_assign(name, value);
+        }},
     });
 }
 
-void MixEnvironment::setEnviron() {
-    if (ignoreEnvironment) {
-        if (!unset.empty())
-            throw UsageError("--unset does not make sense with --ignore-environment");
+void MixEnvironment::setEnviron()
+{
+    if (ignoreEnvironment && !unsetVars.empty())
+        throw UsageError("--unset-env-var does not make sense with --ignore-env");
 
-        for (const auto & var : keep) {
-            auto val = getenv(var.c_str());
-            if (val) stringsEnv.emplace_back(fmt("%s=%s", var.c_str(), val));
-        }
+    if (!ignoreEnvironment && !keepVars.empty())
+        throw UsageError("--keep-env-var does not make sense without --ignore-env");
 
-        vectorEnv = stringsToCharPtrs(stringsEnv);
-        environ = vectorEnv.data();
-    } else {
-        if (!keep.empty())
-            throw UsageError("--keep does not make sense without --ignore-environment");
+    auto env = getEnv();
 
-        for (const auto & var : unset)
-            unsetenv(var.c_str());
+    if (ignoreEnvironment)
+        std::erase_if(env, [&](const auto & var) { return !keepVars.contains(var.first); });
+
+    for (const auto & [name, value] : setVars)
+        env[name] = value;
+
+    if (!unsetVars.empty())
+        std::erase_if(env, [&](const auto & var) { return unsetVars.contains(var.first); });
+
+    replaceEnv(env);
+
+    return;
+}
+
+void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & buildables, LocalFSStore & store)
+{
+    for (const auto & [_i, buildable] : enumerate(buildables)) {
+        auto i = _i;
+        std::visit(
+            overloaded{
+                [&](const BuiltPath::Opaque & bo) {
+                    auto symlink = outLink;
+                    if (i)
+                        symlink += fmt("-%d", i);
+                    store.addPermRoot(bo.path, absPath(symlink.string()));
+                },
+                [&](const BuiltPath::Built & bfd) {
+                    for (auto & output : bfd.outputs) {
+                        auto symlink = outLink;
+                        if (i)
+                            symlink += fmt("-%d", i);
+                        if (output.first != "out")
+                            symlink += fmt("-%s", output.first);
+                        store.addPermRoot(output.second, absPath(symlink.string()));
+                    }
+                },
+            },
+            buildable.raw());
     }
 }
 

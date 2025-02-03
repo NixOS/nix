@@ -1,47 +1,34 @@
-{ lib
-, stdenv
-, mkMesonDerivation
-, releaseTools
+{
+  lib,
+  mkMesonLibrary,
 
-, meson
-, ninja
-, pkg-config
+  openssl,
 
-, openssl
+  nix-util,
+  nix-store,
 
-, nix-util
-, nix-store
+  # Configuration Options
 
-# Configuration Options
-
-, version
+  version,
 }:
 
 let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonLibrary (finalAttrs: {
   pname = "nix-main";
   inherit version;
 
   workDir = ./.;
   fileset = fileset.unions [
-    ../../build-utils-meson
-    ./build-utils-meson
+    ../../nix-meson-build-support
+    ./nix-meson-build-support
     ../../.version
     ./.version
     ./meson.build
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
-  ];
-
-  outputs = [ "out" "dev" ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
   ];
 
   propagatedBuildInputs = [
@@ -57,14 +44,6 @@ mkMesonDerivation (finalAttrs: {
       chmod u+w ./.version
       echo ${version} > ../../.version
     '';
-
-  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

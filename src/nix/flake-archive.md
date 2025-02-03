@@ -22,8 +22,20 @@ R""(
   # nix flake archive --json --dry-run nixops
   ```
 
+* Upload all flake inputs to a different machine for remote evaluation
+
+  ```
+  # nix flake archive --to ssh://some-machine
+  ```
+
+  On the remote machine the flake can then be accessed via its store path. That's computed like this:
+
+  ```
+  # nix flake metadata --json | jq -r '.path'
+  ```
+
 # Description
 
-FIXME
+Copy a flake and all its inputs to a store. This is useful i.e. to evaluate flakes on a different host.
 
 )""

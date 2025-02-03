@@ -108,7 +108,11 @@ json printValueAsJSON(EvalState & state, bool strict,
 void printValueAsJSON(EvalState & state, bool strict,
     Value & v, const PosIdx pos, std::ostream & str, NixStringContext & context, bool copyToStore)
 {
-    str << printValueAsJSON(state, strict, v, pos, context, copyToStore);
+    try {
+        str << printValueAsJSON(state, strict, v, pos, context, copyToStore);
+    } catch (nlohmann::json::exception & e) {
+        throw JSONSerializationError("JSON serialization error: %s", e.what());
+    }
 }
 
 json ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,

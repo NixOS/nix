@@ -28,7 +28,7 @@ clearProfiles() {
 
 # Clear the store, but do not fail if we're in an environment where we can't.
 # This allows the test to run in a NixOS test environment, where we use the system store.
-# See doc/manual/src/contributing/testing.md / Running functional tests on NixOS.
+# See doc/manual/source/contributing/testing.md / Running functional tests on NixOS.
 clearStoreIfPossible() {
     if isTestOnNixOS; then
         echo "clearStoreIfPossible: Not clearing store, because we're on NixOS. Moving on."
@@ -344,5 +344,16 @@ count() {
 }
 
 trap onError ERR
+
+requiresUnprivilegedUserNamespaces() {
+  if [[ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]] && [[ $(< /proc/sys/kernel/apparmor_restrict_unprivileged_userns) -eq 1 ]]; then
+    skipTest "Unprivileged user namespaces are disabled. Run 'sudo sysctl -w /proc/sys/kernel/apparmor_restrict_unprivileged_userns=0' to allow, and run these tests."
+  fi
+}
+
+execUnshare () {
+  requiresUnprivilegedUserNamespaces
+  exec unshare --mount --map-root-user "$SHELL" "$@"
+}
 
 fi # COMMON_FUNCTIONS_SH_SOURCED

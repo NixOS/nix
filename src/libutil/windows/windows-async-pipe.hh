@@ -2,6 +2,7 @@
 ///@file
 
 #include "file-descriptor.hh"
+#ifdef _WIN32
 
 namespace nix::windows {
 
@@ -25,3 +26,4 @@ public:
 };
 
 }
+#endif

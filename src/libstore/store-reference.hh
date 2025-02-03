@@ -5,6 +5,7 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include "types.hh"
+#include "json-impls.hh"
 
 namespace nix {
 
@@ -14,35 +15,45 @@ namespace nix {
  *
  * Supported values are:
  *
- * - ‘local’: The Nix store in /nix/store and database in
+ * - `local`: The Nix store in /nix/store and database in
  *   /nix/var/nix/db, accessed directly.
  *
- * - ‘daemon’: The Nix store accessed via a Unix domain socket
+ * - `daemon`: The Nix store accessed via a Unix domain socket
  *   connection to nix-daemon.
  *
- * - ‘unix://<path>’: The Nix store accessed via a Unix domain socket
- *   connection to nix-daemon, with the socket located at <path>.
+ * - `unix://<path>`: The Nix store accessed via a Unix domain socket
+ *   connection to nix-daemon, with the socket located at `<path>`.
  *
- * - ‘auto’ or ‘’: Equivalent to ‘local’ or ‘daemon’ depending on
+ * - `auto` or ``: Equivalent to `local` or `daemon` depending on
  *   whether the user has write access to the local Nix
  *   store/database.
  *
- * - ‘file://<path>’: A binary cache stored in <path>.
+ * - `file://<path>`: A binary cache stored in `<path>`.
  *
- * - ‘https://<path>’: A binary cache accessed via HTTP.
+ * - `https://<path>`: A binary cache accessed via HTTP.
  *
- * - ‘s3://<path>’: A writable binary cache stored on Amazon's Simple
+ * - `s3://<path>`: A writable binary cache stored on Amazon's Simple
  *   Storage Service.
  *
- * - ‘ssh://[user@]<host>’: A remote Nix store accessed by running
- *   ‘nix-store --serve’ via SSH.
+ * - `ssh://[user@]<host>`: A remote Nix store accessed by running
+ *   `nix-store --serve` via SSH.
  *
  * You can pass parameters to the store type by appending
- * ‘?key=value&key=value&...’ to the URI.
+ * `?key=value&key=value&...` to the URI.
  */
 struct StoreReference
 {
-    using Params = nlohmann::json::object_t;
+    /**
+     * Would do
+     *
+     * ```
+     * using Params = nlohmann::json::object_t;
+     * ```
+     *
+     * but cannot because `<nlohmann/json_fwd.hpp>` doesn't have that.
+     *
+     */
+    using Params = std::map<std::string, nlohmann::json, std::less<>>;
 
     /**
      * Special store reference `""` or `"auto"`
@@ -71,7 +82,7 @@ struct StoreReference
 
     Params params;
 
-    bool operator==(const StoreReference & rhs) const = default;
+    bool operator==(const StoreReference & rhs) const;
 
     /**
      * Render the whole store reference as a URI, including parameters.
@@ -90,3 +101,5 @@ struct StoreReference
 std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::string & uri);
 
 }
+
+JSON_IMPL(StoreReference)

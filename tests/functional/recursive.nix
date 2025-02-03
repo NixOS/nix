@@ -1,4 +1,7 @@
-with import ./config.nix;
+let
+  config_nix = /. + "${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/config.nix";
+in
+with import config_nix;
 
 mkDerivation rec {
   name = "recursive";
@@ -14,7 +17,9 @@ mkDerivation rec {
 
   buildCommand = ''
     mkdir $out
-    opts="--experimental-features nix-command ${if (NIX_TESTS_CA_BY_DEFAULT == "1") then "--extra-experimental-features ca-derivations" else ""}"
+    opts="--experimental-features nix-command ${
+      if (NIX_TESTS_CA_BY_DEFAULT == "1") then "--extra-experimental-features ca-derivations" else ""
+    }"
 
     PATH=${builtins.getEnv "NIX_BIN_DIR"}:$PATH
 
@@ -41,7 +46,7 @@ mkDerivation rec {
 
     # Build a derivation.
     nix $opts build -L --impure --expr '
-      with import ${./config.nix};
+      with import ${config_nix};
       mkDerivation {
         name = "inner1";
         buildCommand = "echo $fnord blaat > $out";

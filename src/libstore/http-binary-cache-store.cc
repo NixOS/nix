@@ -7,7 +7,17 @@
 
 namespace nix {
 
+config::SettingDescriptionMap HttpBinaryCacheStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(BinaryCacheStoreConfig::descriptions());
+    return ret;
+}
+
+
 MakeError(UploadToHTTP, Error);
+
 
 std::set<std::string> HttpBinaryCacheStoreConfig::uriSchemes()
 {
@@ -67,6 +77,8 @@ public:
         , config{config}
     {
         diskCache = getNarInfoDiskCache();
+
+        init();
     }
 
     std::string getUri() override
@@ -179,28 +191,42 @@ protected:
     {
         try {
             checkEnabled();
+
+            auto request(makeRequest(path));
+
+            auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
+            getFileTransfer()->enqueueFileTransfer(request,
+                {[callbackPtr, this](std::future<FileTransferResult> result) {
+                    try {
+                        (*callbackPtr)(std::move(result.get().data));
+                    } catch (FileTransferError & e) {
+                        if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
+                            return (*callbackPtr)({});
+                        maybeDisable();
+                        callbackPtr->rethrow();
+                    } catch (...) {
+                        callbackPtr->rethrow();
+                    }
+            }});
+
         } catch (...) {
             callback.rethrow();
             return;
         }
+    }
 
-        auto request(makeRequest(path));
-
-        auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
-
-        getFileTransfer()->enqueueFileTransfer(request,
-            {[callbackPtr, this](std::future<FileTransferResult> result) {
-                try {
-                    (*callbackPtr)(std::move(result.get().data));
-                } catch (FileTransferError & e) {
-                    if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
-                        return (*callbackPtr)({});
-                    maybeDisable();
-                    callbackPtr->rethrow();
-                } catch (...) {
-                    callbackPtr->rethrow();
-                }
-            }});
+    std::optional<std::string> getNixCacheInfo() override
+    {
+        try {
+            auto result = getFileTransfer()->download(makeRequest(cacheInfoFile));
+            return result.data;
+        } catch (FileTransferError & e) {
+            if (e.error == FileTransfer::NotFound)
+                return std::nullopt;
+            maybeDisable();
+            throw;
+        }
     }
 
     /**

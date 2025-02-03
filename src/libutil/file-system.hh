@@ -43,6 +43,11 @@ struct Sink;
 struct Source;
 
 /**
+ * Return whether the path denotes an absolute path.
+ */
+bool isAbsolute(PathView path);
+
+/**
  * @return An absolutized path, resolving paths relative to the
  * specified directory, or the current directory otherwise.  The path
  * is also canonicalised.
@@ -144,6 +149,23 @@ inline bool symlink_exists(const std::filesystem::path & path) {
 } // namespace fs
 
 /**
+ * Canonicalize a path except for the last component.
+ *
+ * This is useful for getting the canonical location of a symlink.
+ *
+ * Consider the case where `foo/l` is a symlink. `canonical("foo/l")` will
+ * resolve the symlink `l` to its target.
+ * `makeParentCanonical("foo/l")` will not resolve the symlink `l` to its target,
+ * but does ensure that the returned parent part of the path, `foo` is resolved
+ * to `canonical("foo")`, and can therefore be retrieved without traversing any
+ * symlinks.
+ *
+ * If a relative path is passed, it will be made absolute, so that the parent
+ * can always be canonicalized.
+ */
+std::filesystem::path makeParentCanonical(const std::filesystem::path & path);
+
+/**
  * A version of pathExists that returns false on a permission error.
  * Useful for inferring default paths across directories that might not
  * be readable.
@@ -227,7 +249,7 @@ void createDir(const Path & path, mode_t mode = 0755);
  * Set the access and modification times of the given path, not
  * following symlinks.
  *
- * @param accessTime Specified in seconds.
+ * @param accessedTime Specified in seconds.
  *
  * @param modificationTime Specified in seconds.
  *
@@ -250,8 +272,6 @@ void setWriteTime(const std::filesystem::path & path, const struct stat & st);
 /**
  * Create a symlink.
  *
- * In the process of being deprecated for
- * `std::filesystem::create_symlink`.
  */
 void createSymlink(const Path & target, const Path & link);
 

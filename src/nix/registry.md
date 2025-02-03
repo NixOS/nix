@@ -34,6 +34,8 @@ highest precedence:
 * Overrides specified on the command line using the option
   `--override-flake`.
 
+Note that the system and user registries are not used to resolve flake references in `flake.nix`. They are only used to resolve flake references on the command line.
+
 # Registry format
 
 A registry is a JSON file with the following format:

@@ -11,7 +11,7 @@ struct ExperimentalFeatureSettingsT
     R<std::set<ExperimentalFeature>> experimentalFeatures;
 };
 
-struct ExperimentalFeatureSettings : ExperimentalFeatureSettingsT<JustValue>
+struct ExperimentalFeatureSettings : ExperimentalFeatureSettingsT<config::JustValue>
 {
     /**
      * Check whether the given experimental feature is enabled.

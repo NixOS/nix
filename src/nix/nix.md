@@ -302,7 +302,7 @@ or with an **expression**:
 terraform "$@"
 ```
 
-or with cascading interpreters. Note that the `#! nix` lines don't need to follow after the first line, to accomodate other interpreters.
+or with cascading interpreters. Note that the `#! nix` lines don't need to follow after the first line, to accommodate other interpreters.
 
 ```
 #!/usr/bin/env nix

@@ -99,7 +99,7 @@ const std::string & EvalSettings::getCurrentSystem() const
 Path getNixDefExpr()
 {
     return settings.useXDGBaseDirectories
-        ? getStateDir() + "/nix/defexpr"
+        ? getStateDir() + "/defexpr"
         : getHome() + "/.nix-defexpr";
 }
 

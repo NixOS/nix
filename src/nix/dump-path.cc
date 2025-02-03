@@ -20,7 +20,7 @@ struct CmdDumpPath : StorePathCommand
 
     void run(ref<Store> store, const StorePath & storePath) override
     {
-        FdSink sink(getStandardOut());
+        FdSink sink(getStandardOutput());
         store->narFromPath(storePath, sink);
         sink.flush();
     }
@@ -55,7 +55,7 @@ struct CmdDumpPath2 : Command
 
     void run() override
     {
-        FdSink sink(getStandardOut());
+        FdSink sink(getStandardOutput());
         dumpPath(path, sink);
         sink.flush();
     }

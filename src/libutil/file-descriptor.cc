@@ -2,6 +2,7 @@
 #include "signals.hh"
 #include "finally.hh"
 #include "serialise.hh"
+#include "util.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -44,8 +45,9 @@ AutoCloseFD::AutoCloseFD() : fd{INVALID_DESCRIPTOR} {}
 
 AutoCloseFD::AutoCloseFD(Descriptor fd) : fd{fd} {}
 
-
-AutoCloseFD::AutoCloseFD(AutoCloseFD && that) : fd{that.fd}
+// NOTE: This can be noexcept since we are just copying a value and resetting
+// the file descriptor in the rhs.
+AutoCloseFD::AutoCloseFD(AutoCloseFD && that) noexcept : fd{that.fd}
 {
     that.fd = INVALID_DESCRIPTOR;
 }
@@ -65,7 +67,7 @@ AutoCloseFD::~AutoCloseFD()
     try {
         close();
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 

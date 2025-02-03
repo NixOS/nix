@@ -129,7 +129,6 @@ std::pair<SourcePath, uint32_t> findPackageFilename(EvalState & state, Value & v
     try {
         auto colon = fn.rfind(':');
         if (colon == std::string::npos) fail();
-        std::string filename(fn, 0, colon);
         auto lineno = std::stoi(std::string(fn, colon + 1, std::string::npos));
         return {SourcePath{path.accessor, CanonPath(fn.substr(0, colon))}, lineno};
     } catch (std::invalid_argument & e) {

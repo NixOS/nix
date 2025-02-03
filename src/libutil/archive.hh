@@ -15,10 +15,10 @@ struct ArchiveSettings
     R<bool> useCaseHack;
 };
 
-const extern ArchiveSettings<JustValue> archiveSettingsDefaults;
+const extern ArchiveSettings<config::JustValue> archiveSettingsDefaults;
 
 // FIXME: don't use a global variable.
-extern ArchiveSettings<JustValue> archiveSettings;
+extern ArchiveSettings<config::JustValue> archiveSettings;
 
 /**
  * dumpPath creates a Nix archive of the specified path.

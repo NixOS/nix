@@ -109,7 +109,15 @@ public:
         Handle(Pool & pool, std::shared_ptr<R> r) : pool(pool), r(r) { }
 
     public:
-        Handle(Handle && h) : pool(h.pool), r(h.r) { h.r.reset(); }
+        // NOTE: Copying std::shared_ptr and calling a .reset() on it is always noexcept.
+        Handle(Handle && h) noexcept
+            : pool(h.pool)
+            , r(h.r)
+        {
+            static_assert(noexcept(h.r.reset()));
+            static_assert(noexcept(std::shared_ptr(h.r)));
+            h.r.reset();
+        }
 
         Handle(const Handle & l) = delete;
 

@@ -3,8 +3,9 @@
 
 #include "config-abstract.hh"
 #include "error.hh"
-#include "json-utils.hh"
 #include "types.hh"
+
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 
@@ -98,11 +99,5 @@ public:
  */
 void to_json(nlohmann::json &, const ExperimentalFeature &);
 void from_json(const nlohmann::json &, ExperimentalFeature &);
-
-/**
- * It is always rendered as a string
- */
-template<>
-struct json_avoids_null<ExperimentalFeature> : std::true_type {};
 
 }

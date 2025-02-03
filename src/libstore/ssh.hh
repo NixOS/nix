@@ -14,6 +14,9 @@ private:
     const std::string host;
     bool fakeSSH;
     const std::string keyFile;
+    /**
+     * Raw bytes, not Base64 encoding.
+     */
     const std::string sshPublicHostKey;
     const bool useMaster;
     const bool compress;
@@ -56,7 +59,7 @@ public:
     /**
      * @param command The command (arg vector) to execute.
      *
-     * @param extraSShArgs Extra args to pass to SSH (not the command to
+     * @param extraSshArgs Extra arguments to pass to SSH (not the command to
      * execute). Will not be used when "fake SSHing" to the local
      * machine.
      */

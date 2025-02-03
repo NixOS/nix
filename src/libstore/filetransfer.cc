@@ -139,7 +139,7 @@ struct curlFileTransfer : public FileTransfer
                 if (!done)
                     fail(FileTransferError(Interrupted, {}, "download of '%s' was interrupted", request.uri));
             } catch (...) {
-                ignoreException();
+                ignoreExceptionInDestructor();
             }
         }
 
@@ -153,7 +153,7 @@ struct curlFileTransfer : public FileTransfer
         template<class T>
         void fail(T && e)
         {
-            failEx(std::make_exception_ptr(std::move(e)));
+            failEx(std::make_exception_ptr(std::forward<T>(e)));
         }
 
         LambdaSink finalSink;
@@ -759,12 +759,17 @@ struct curlFileTransfer : public FileTransfer
 
                 S3Helper s3Helper(profile, region, scheme, endpoint);
 
+                Activity act(*logger, lvlTalkative, actFileTransfer,
+                    fmt("downloading '%s'", request.uri),
+                    {request.uri}, request.parentAct);
+
                 // FIXME: implement ETag
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
                 if (!s3Res.data)
-                    throw FileTransferError(NotFound, "S3 object '%s' does not exist", request.uri);
+                    throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);
                 res.data = std::move(*s3Res.data);
+                res.urls.push_back(request.uri);
                 callback(std::move(res));
 #else
                 throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri);

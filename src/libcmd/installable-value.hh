@@ -59,7 +59,7 @@ struct ExtraPathInfoValue : ExtraPathInfo
     Value value;
 
     ExtraPathInfoValue(Value && v)
-        : value(v)
+        : value(std::move(v))
     { }
 
     virtual ~ExtraPathInfoValue() = default;

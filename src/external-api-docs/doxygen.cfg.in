@@ -40,8 +40,9 @@ GENERATE_LATEX         = NO
 INPUT                  = \
   @src@/src/libutil-c \
   @src@/src/libexpr-c \
+  @src@/src/libflake-c \
   @src@/src/libstore-c \
-  @src@/doc/external-api/README.md
+  @src@/src/external-api-docs/README.md
 
 FILE_PATTERNS = nix_api_*.h *.md
 
@@ -55,4 +56,8 @@ EXCLUDE_PATTERNS = *_internal.h
 GENERATE_TREEVIEW = YES
 OPTIMIZE_OUTPUT_FOR_C  = YES
 
-USE_MDFILE_AS_MAINPAGE = doc/external-api/README.md
+USE_MDFILE_AS_MAINPAGE = @src@/src/external-api-docs/README.md
+
+WARN_IF_UNDOCUMENTED = NO
+WARN_IF_INCOMPLETE_DOC = NO
+QUIET = YES

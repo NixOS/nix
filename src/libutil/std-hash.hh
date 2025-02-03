@@ -1,14 +1,17 @@
 #pragma once
-
-//!@file Hashing utilities for use with unordered_map, etc. (ie low level implementation logic, not domain logic like
-//! Nix hashing)
+/**
+ * @file
+ *
+ * Hashing utilities for use with `std::unordered_map`, etc. (i.e. low
+ * level implementation logic, not domain logic like Nix hashing).
+ */
 
 #include <functional>
 
 namespace nix {
 
 /**
- * hash_combine() from Boost. Hash several hashable values together
+ * `hash_combine()` from Boost. Hash several hashable values together
  * into a single hash.
  */
 inline void hash_combine(std::size_t & seed) {}

@@ -1,1 +1,4 @@
-let a = {} // a; in a.foo
+let
+  a = { } // a;
+in
+a.foo

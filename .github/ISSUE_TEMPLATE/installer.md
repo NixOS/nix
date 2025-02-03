@@ -23,14 +23,25 @@ assignees: ''
 
 <details><summary>Output</summary>
 
-```log
+<!-- paste console output inside the below code block -->
 
-<!-- paste console output here and remove this comment -->
+```log
 
 ```
 
 </details>
 
-## Priorities
+## Checklist
+
+<!-- make sure this issue is not redundant or obsolete -->
+
+- [ ] checked [latest Nix manual] \([source])
+- [ ] checked [open installer issues and pull requests] for possible duplicates
+
+[latest Nix manual]: https://nixos.org/manual/nix/unstable/
+[source]: https://github.com/NixOS/nix/tree/master/doc/manual/source
+[open installer issues and pull requests]: https://github.com/NixOS/nix/labels/installer
+
+---
 
 Add :+1: to [issues you find important](https://github.com/NixOS/nix/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc).

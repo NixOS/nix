@@ -117,7 +117,7 @@ nix flake lock $flakeFollowsA
 [[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '"foobar"' ]]
 jq -r -c '.nodes | keys | .[]' $flakeFollowsA/flake.lock | grep "^foobar$"
 
-# Ensure a relative path is not allowed to go outside the store path
+# Check that path: inputs cannot escape from their root.
 cat > $flakeFollowsA/flake.nix <<EOF
 {
     description = "Flake A";
@@ -130,7 +130,28 @@ EOF
 
 git -C $flakeFollowsA add flake.nix
 
-expect 1 nix flake lock $flakeFollowsA 2>&1 | grep 'points outside'
+expect 1 nix flake lock $flakeFollowsA 2>&1 | grep '/flakeB.*is forbidden in pure evaluation mode'
+expect 1 nix flake lock --impure $flakeFollowsA 2>&1 | grep '/flakeB.*does not exist'
+
+# Test relative non-flake inputs.
+cat > $flakeFollowsA/flake.nix <<EOF
+{
+    description = "Flake A";
+    inputs = {
+        E.flake = false;
+        E.url = "./foo.nix"; # test relative paths without 'path:'
+    };
+    outputs = { E, ... }: { e = import E; };
+}
+EOF
+
+echo 123 > $flakeFollowsA/foo.nix
+
+git -C $flakeFollowsA add flake.nix foo.nix
+
+nix flake lock $flakeFollowsA
+
+[[ $(nix eval --json $flakeFollowsA#e) = 123 ]]
 
 # Non-existant follows should print a warning.
 cat >$flakeFollowsA/flake.nix <<EOF
@@ -335,6 +356,6 @@ json=$(nix flake metadata "$flakeFollowsCustomUrlA" --json)
 rm "$flakeFollowsCustomUrlA"/flake.lock
 
 # if override-input is specified, lock "original" entry should contain original url
-json=$(nix flake metadata "$flakeFollowsCustomUrlA" --override-input B/C "path:./flakeB/flakeD" --json)
+json=$(nix flake metadata "$flakeFollowsCustomUrlA" --override-input B/C "$flakeFollowsCustomUrlD" --json)
 echo "$json" | jq .locks.nodes.C.original
 [[ $(echo "$json" | jq -r .locks.nodes.C.original.path) = './flakeC' ]]

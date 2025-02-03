@@ -25,4 +25,13 @@ struct CgroupStats
  */
 CgroupStats destroyCgroup(const Path & cgroup);
 
+std::string getCurrentCgroup();
+
+/**
+ * Get the cgroup that should be used as the parent when creating new
+ * sub-cgroups. The first time this is called, the current cgroup will be
+ * returned, and then all subsequent calls will return the original cgroup.
+ */
+std::string getRootCgroup();
+
 }

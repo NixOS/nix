@@ -21,6 +21,9 @@ static LocalOverlayStoreConfigT<config::SettingInfo> localOverlayStoreConfigDesc
           Must be a store with a store dir on the file system.
           Must be used as OverlayFS lower layer for this store's store dir.
         )",
+        // It's not actually machine-specific, but we don't yet have a
+        // `to_json` for `StoreConfig`.
+        .documentDefault = false,
     },
     .upperLayer{
         .name = "upper-layer",
@@ -76,6 +79,22 @@ static LocalOverlayStoreConfigT<config::JustValue> localOverlayStoreConfigDefaul
 
 MAKE_APPLY_PARSE(LocalOverlayStoreConfig, localOverlayStoreConfig, LOCAL_OVERLAY_STORE_CONFIG_FIELDS)
 
+config::SettingDescriptionMap LocalOverlayStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(LocalFSStoreConfig::descriptions());
+    ret.merge(LocalStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = localOverlayStoreConfigDescriptions;
+        auto defaults = localOverlayStoreConfigDefaults();
+        ret.merge(decltype(ret){
+            LOCAL_OVERLAY_STORE_CONFIG_FIELDS(DESC_ROW)
+        });
+    }
+    return ret;
+}
+
 LocalOverlayStore::Config::LocalOverlayStoreConfig(
     std::string_view scheme,
     std::string_view authority,
@@ -91,6 +110,13 @@ std::string LocalOverlayStoreConfig::doc()
     return
         #include "local-overlay-store.md"
         ;
+}
+
+ref<Store> LocalOverlayStoreConfig::openStore() const
+{
+    return make_ref<LocalOverlayStore>(ref{
+        std::dynamic_pointer_cast<const LocalOverlayStoreConfig>(shared_from_this())
+    });
 }
 
 
@@ -235,7 +261,7 @@ void LocalOverlayStore::queryGCReferrers(const StorePath & path, StorePathSet & 
 StorePathSet LocalOverlayStore::queryValidDerivers(const StorePath & path)
 {
     auto res = LocalStore::queryValidDerivers(path);
-    for (auto p : lowerStore->queryValidDerivers(path))
+    for (const auto & p : lowerStore->queryValidDerivers(path))
         res.insert(p);
     return res;
 }

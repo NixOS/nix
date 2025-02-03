@@ -16,7 +16,10 @@ mkDerivation {
 
   __structuredAttrs = true;
 
-  outputs = [ "out" "dev" ];
+  outputs = [
+    "out"
+    "dev"
+  ];
 
   buildCommand = ''
     set -x
@@ -43,12 +46,24 @@ mkDerivation {
     [[ $json =~ '"references":[]' ]]
   '';
 
-  buildInputs = [ "a" "b" "c" 123 "'" "\"" null ];
+  buildInputs = [
+    "a"
+    "b"
+    "c"
+    123
+    "'"
+    "\""
+    null
+  ];
 
   hardening.format = true;
   hardening.fortify = false;
 
-  outer.inner = [ 1 2 3 ];
+  outer.inner = [
+    1
+    2
+    3
+  ];
 
   int = 123456789;
 

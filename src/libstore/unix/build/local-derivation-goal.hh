@@ -211,6 +211,11 @@ struct LocalDerivationGoal : public DerivationGoal
     void initEnv();
 
     /**
+     * Process messages send by the sandbox initialization.
+     */
+    void processSandboxSetupMessages();
+
+    /**
      * Setup tmp dir location.
      */
     void initTmpDir();
@@ -220,8 +225,15 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     void writeStructuredAttrs();
 
+    /**
+     * Start an in-process nix daemon thread for recursive-nix.
+     */
     void startDaemon();
 
+    /**
+     * Stop the in-process nix daemon thread.
+     * @see startDaemon
+     */
     void stopDaemon();
 
     /**

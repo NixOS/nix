@@ -24,12 +24,12 @@ Path getHomeOf(uid_t userId);
 Path getHome();
 
 /**
- * @return $XDG_CACHE_HOME or $HOME/.cache.
+ * @return $NIX_CACHE_HOME or $XDG_CACHE_HOME/nix or $HOME/.cache/nix.
  */
 Path getCacheDir();
 
 /**
- * @return $XDG_CONFIG_HOME or $HOME/.config.
+ * @return $NIX_CONFIG_HOME or $XDG_CONFIG_HOME/nix or $HOME/.config/nix.
  */
 Path getConfigDir();
 
@@ -39,12 +39,12 @@ Path getConfigDir();
 std::vector<Path> getConfigDirs();
 
 /**
- * @return $XDG_DATA_HOME or $HOME/.local/share.
+ * @return $NIX_DATA_HOME or $XDG_DATA_HOME/nix or $HOME/.local/share/nix.
  */
 Path getDataDir();
 
 /**
- * @return $XDG_STATE_HOME or $HOME/.local/state.
+ * @return $NIX_STATE_HOME or $XDG_STATE_HOME/nix or $HOME/.local/state/nix.
  */
 Path getStateDir();
 

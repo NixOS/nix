@@ -374,11 +374,12 @@ static void getDerivations(EvalState & state, Value & vIn,
            bound to the attribute with the "lower" name should take
            precedence). */
         for (auto & i : v.attrs()->lexicographicOrder(state.symbols)) {
+            std::string_view symbol{state.symbols[i->name]};
             try {
-                debug("evaluating attribute '%1%'", state.symbols[i->name]);
-                if (!std::regex_match(std::string(state.symbols[i->name]), attrRegex))
+                debug("evaluating attribute '%1%'", symbol);
+                if (!std::regex_match(symbol.begin(), symbol.end(), attrRegex))
                     continue;
-                std::string pathPrefix2 = addToPath(pathPrefix, state.symbols[i->name]);
+                std::string pathPrefix2 = addToPath(pathPrefix, symbol);
                 if (combineChannels)
                     getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
                 else if (getDerivation(state, *i->value, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
@@ -392,7 +393,7 @@ static void getDerivations(EvalState & state, Value & vIn,
                     }
                 }
             } catch (Error & e) {
-                e.addTrace(state.positions[i->pos], "while evaluating the attribute '%s'", state.symbols[i->name]);
+                e.addTrace(state.positions[i->pos], "while evaluating the attribute '%s'", symbol);
                 throw;
             }
         }

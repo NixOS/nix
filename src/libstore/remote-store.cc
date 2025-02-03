@@ -24,7 +24,7 @@
 
 namespace nix {
 
-static const RemoteStoreConfigT<config::SettingInfo> remoteStoreConfigDescriptions = {
+constexpr static const RemoteStoreConfigT<config::SettingInfo> remoteStoreConfigDescriptions = {
     .maxConnections{
         .name = "max-connections",
         .description = "Maximum number of concurrent connections to the Nix daemon.",
@@ -54,6 +54,16 @@ static RemoteStoreConfigT<config::JustValue> remoteStoreConfigDefaults()
 
 
 MAKE_APPLY_PARSE(RemoteStoreConfig, remoteStoreConfig, REMOTE_STORE_CONFIG_FIELDS)
+
+
+config::SettingDescriptionMap RemoteStoreConfig::descriptions()
+{
+    constexpr auto & descriptions = remoteStoreConfigDescriptions;
+    auto defaults = remoteStoreConfigDefaults();
+    return {
+        REMOTE_STORE_CONFIG_FIELDS(DESC_ROW)
+    };
+}
 
 
 RemoteStore::Config::RemoteStoreConfig(const Store::Config & storeConfig, const StoreReference::Params & params)
@@ -574,14 +584,27 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 
 
 void RemoteStore::addMultipleToStore(
-    PathsSource & pathsToCopy,
+    PathsSource && pathsToCopy,
     Activity & act,
     RepairFlag repair,
     CheckSigsFlag checkSigs)
 {
+    // `addMultipleToStore` is single threaded
+    size_t bytesExpected = 0;
+    for (auto & [pathInfo, _] : pathsToCopy) {
+        bytesExpected += pathInfo.narSize;
+    }
+    act.setExpected(actCopyPath, bytesExpected);
+
     auto source = sinkToSource([&](Sink & sink) {
-        sink << pathsToCopy.size();
-        for (auto & [pathInfo, pathSource] : pathsToCopy) {
+        size_t nrTotal = pathsToCopy.size();
+        sink << nrTotal;
+        // Reverse, so we can release memory at the original start
+        std::reverse(pathsToCopy.begin(), pathsToCopy.end());
+        while (!pathsToCopy.empty()) {
+            act.progress(nrTotal - pathsToCopy.size(), nrTotal, size_t(1), size_t(0));
+
+            auto & [pathInfo, pathSource] = pathsToCopy.back();
             WorkerProto::Serialise<ValidPathInfo>::write(*this,
                  WorkerProto::WriteConn {
                      .to = sink,
@@ -589,6 +612,7 @@ void RemoteStore::addMultipleToStore(
                  },
                  pathInfo);
             pathSource->drainInto(sink);
+            pathsToCopy.pop_back();
         }
     });
 

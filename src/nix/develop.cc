@@ -610,7 +610,8 @@ struct CmdDevelop : Common, MixEnvironment
 
         else if (!command.empty()) {
             std::vector<std::string> args;
-            for (auto s : command)
+            args.reserve(command.size());
+            for (const auto & s : command)
                 args.push_back(shellEscape(s));
             script += fmt("exec %s\n", concatStringsSep(" ", args));
         }
@@ -672,7 +673,7 @@ struct CmdDevelop : Common, MixEnvironment
                 throw Error("package 'nixpkgs#bashInteractive' does not provide a 'bin/bash'");
 
         } catch (Error &) {
-            ignoreException();
+            ignoreExceptionExceptInterrupt();
         }
 
         // Override SHELL with the one chosen for this environment.
@@ -695,7 +696,7 @@ struct CmdDevelop : Common, MixEnvironment
                 auto sourcePath = installableFlake->getLockedFlake()->flake.resolvedRef.input.getSourcePath();
                 if (sourcePath) {
                     if (chdir(sourcePath->c_str()) == -1) {
-                        throw SysError("chdir to '%s' failed", *sourcePath);
+                        throw SysError("chdir to %s failed", *sourcePath);
                     }
                 }
             }

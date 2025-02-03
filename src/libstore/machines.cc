@@ -33,7 +33,7 @@ Machine::Machine(
     systemTypes(systemTypes),
     sshKey(sshKey),
     maxJobs(maxJobs),
-    speedFactor(speedFactor == 0.0f ? 1.0f : std::move(speedFactor)),
+    speedFactor(speedFactor == 0.0f ? 1.0f : speedFactor),
     supportedFeatures(supportedFeatures),
     mandatoryFeatures(mandatoryFeatures),
     sshPublicHostKey(sshPublicHostKey)
@@ -71,8 +71,8 @@ StoreReference Machine::completeStoreReference() const
     auto * generic = std::get_if<StoreReference::Specified>(&storeUri.variant);
 
     if (generic && generic->scheme == "ssh") {
-        storeUri.params["max-connections"] = "1";
-        storeUri.params["log-fd"] = "4";
+        storeUri.params["max-connections"] = 1;
+        storeUri.params["log-fd"] = 4;
     }
 
     if (generic && (generic->scheme == "ssh" || generic->scheme == "ssh-ng")) {
@@ -84,14 +84,10 @@ StoreReference Machine::completeStoreReference() const
 
     {
         auto & fs = storeUri.params["system-features"];
-        auto append = [&](auto feats) {
-            for (auto & f : feats) {
-                if (fs.size() > 0) fs += ' ';
-                fs += f;
-            }
-        };
-        append(supportedFeatures);
-        append(mandatoryFeatures);
+        if (!fs.is_array()) fs = nlohmann::json::array();
+        auto features = supportedFeatures;
+        features.insert(supportedFeatures.begin(), supportedFeatures.end());
+        for (auto & feat : features) fs += feat;
     }
 
     return storeUri;
@@ -159,8 +155,9 @@ static Machine parseBuilderLine(const std::set<std::string> & defaultSystems, co
         const auto & str = tokens[fieldIndex];
         try {
             base64Decode(str);
-        } catch (const Error & e) {
-            throw FormatError("bad machine specification: a column #%lu in a row: '%s' is not valid base64 string: %s", fieldIndex, line, e.what());
+        } catch (FormatError & e) {
+            e.addTrace({}, "while parsing machine specification at a column #%lu in a row: '%s'", fieldIndex, line);
+            throw;
         }
         return str;
     };

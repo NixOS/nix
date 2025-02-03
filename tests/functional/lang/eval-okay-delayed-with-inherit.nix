@@ -4,7 +4,10 @@ let
       name = "a";
       system = builtins.currentSystem;
       builder = "/bin/sh";
-      args = [ "-c" "touch $out" ];
+      args = [
+        "-c"
+        "touch $out"
+      ];
       inherit b;
     };
 
@@ -16,9 +19,13 @@ let
       name = "b-overridden";
       system = builtins.currentSystem;
       builder = "/bin/sh";
-      args = [ "-c" "touch $out" ];
+      args = [
+        "-c"
+        "touch $out"
+      ];
     };
   };
 
   pkgs = pkgs_ // (packageOverrides pkgs_);
-in pkgs.a.b.name
+in
+pkgs.a.b.name

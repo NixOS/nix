@@ -97,8 +97,9 @@ struct ContentAddressMethod
      * were ingested, with the fixed output case not prefixed for back
      * compat.
      *
-     * @param [in] m A string that should begin with the prefix.
-     * @param [out] m The remainder of the string after the prefix.
+     * @param m A string that should begin with the
+     * prefix. On return, the remainder of the string after the
+     * prefix.
      */
     static ContentAddressMethod parsePrefix(std::string_view & m);
 
@@ -139,14 +140,14 @@ struct ContentAddressMethod
 /**
  * We've accumulated several types of content-addressed paths over the
  * years; fixed-output derivations support multiple hash algorithms and
- * serialisation methods (flat file vs NAR). Thus, ‘ca’ has one of the
+ * serialisation methods (flat file vs NAR). Thus, `ca` has one of the
  * following forms:
  *
  * - `TextIngestionMethod`:
- *   ‘text:sha256:<sha256 hash of file contents>’
+ *   `text:sha256:<sha256 hash of file contents>`
  *
  * - `FixedIngestionMethod`:
- *   ‘fixed:<r?>:<hash algorithm>:<hash of file contents>’
+ *   `fixed:<r?>:<hash algorithm>:<hash of file contents>`
  */
 struct ContentAddress
 {

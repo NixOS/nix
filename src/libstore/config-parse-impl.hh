@@ -5,13 +5,17 @@
 
 #include "config-parse.hh"
 #include "util.hh"
+#include "config.hh"
 
 namespace nix::config {
 
 template<typename T>
-OptValue<T> SettingInfo<T>::parseConfig(const nlohmann::json::object_t & map) const
+OptValue<T>
+SettingInfo<T>::parseConfig(const nlohmann::json::object_t & map, const ExperimentalFeatureSettings & xpSettings) const
 {
     const nlohmann::json * p = get(map, name);
+    if (p && experimentalFeature)
+        xpSettings.require(*experimentalFeature);
     return {.optValue = p ? (std::optional<T>{p->get<T>()}) : std::nullopt};
 }
 
@@ -19,11 +23,15 @@ template<typename T>
 std::pair<std::string, SettingDescription> SettingInfo<T>::describe(const JustValue<T> & def) const
 {
     return {
-        name,
+        std::string{name},
         SettingDescription{
-            .description = description,
-            .defaultValue =
-                documentDefault ? (std::optional<nlohmann::json>{}) : (std::optional{nlohmann::json{def.value}}),
+            .description = stripIndentation(description),
+            .experimentalFeature = experimentalFeature,
+            .info =
+                SettingDescription::Single{
+                    .defaultValue = documentDefault ? (std::optional{nlohmann::json(def.value)})
+                                                    : (std::optional<nlohmann::json>{}),
+                },
         },
     };
 }
@@ -32,7 +40,7 @@ std::pair<std::string, SettingDescription> SettingInfo<T>::describe(const JustVa
  * Look up the setting's name in a map, falling back on the default if
  * it does not exist.
  */
-#define CONFIG_ROW(FIELD) .FIELD = descriptions.FIELD.parseConfig(params)
+#define CONFIG_ROW(FIELD) .FIELD = descriptions.FIELD.parseConfig(params, xpSettings)
 
 #define APPLY_ROW(FIELD) .FIELD = {.value = parsed.FIELD.optValue.value_or(std::move(defaults.FIELD))}
 
@@ -41,11 +49,13 @@ std::pair<std::string, SettingDescription> SettingInfo<T>::describe(const JustVa
         descriptions.FIELD.describe(defaults.FIELD), \
     }
 
-#define MAKE_PARSE(CAPITAL, LOWER, FIELDS)                                                  \
-    static CAPITAL##T<config::OptValue> LOWER##Parse(const StoreReference::Params & params) \
-    {                                                                                       \
-        constexpr auto & descriptions = LOWER##Descriptions;                                \
-        return {FIELDS(CONFIG_ROW)};                                                        \
+#define MAKE_PARSE(CAPITAL, LOWER, FIELDS)                                            \
+    static CAPITAL##T<config::OptValue> LOWER##Parse(                                 \
+        const StoreReference::Params & params,                                        \
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings) \
+    {                                                                                 \
+        constexpr auto & descriptions = LOWER##Descriptions;                          \
+        return {FIELDS(CONFIG_ROW)};                                                  \
     }
 
 #define MAKE_APPLY_PARSE(CAPITAL, LOWER, FIELDS)                                                  \

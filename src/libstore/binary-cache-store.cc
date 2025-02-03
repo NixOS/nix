@@ -25,7 +25,7 @@
 
 namespace nix {
 
-static const BinaryCacheStoreConfigT<config::SettingInfo> binaryCacheStoreConfigDescriptions = {
+constexpr static const BinaryCacheStoreConfigT<config::SettingInfo> binaryCacheStoreConfigDescriptions = {
     .compression = {
         .name = "compression",
         .description = "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`).",
@@ -97,6 +97,15 @@ BinaryCacheStore::Config::BinaryCacheStoreConfig(
 {
 }
 
+config::SettingDescriptionMap BinaryCacheStoreConfig::descriptions()
+{
+    constexpr auto & descriptions = binaryCacheStoreConfigDescriptions;
+    auto defaults = binaryCacheStoreConfigDefaults();
+    return {
+        BINARY_CACHE_STORE_CONFIG_FIELDS(DESC_ROW)
+    };
+}
+
 BinaryCacheStore::BinaryCacheStore(const Config & config)
     : Store{config.storeConfig}
     , config{config}
@@ -109,20 +118,22 @@ BinaryCacheStore::BinaryCacheStore(const Config & config)
     sink << narVersionMagic1;
     narMagic = sink.s;
 
-    init();
+    // Want to call this but cannot, because virtual function lookup is
+    // disabled in a constructor. It is thus left to instances to call
+    // it instead.
+
+    //init();
 }
 
 void BinaryCacheStore::init()
 {
-    std::string cacheInfoFile = "nix-cache-info";
-
-    auto cacheInfo = getFile(cacheInfoFile);
+    auto cacheInfo = getNixCacheInfo();
     if (!cacheInfo) {
         upsertFile(cacheInfoFile, "StoreDir: " + storeDir + "\n", "text/x-nix-cache-info");
     } else {
         for (auto & line : tokenizeString<Strings>(*cacheInfo, "\n")) {
-            size_t colon= line.find(':');
-            if (colon ==std::string::npos) continue;
+            size_t colon = line.find(':');
+            if (colon == std::string::npos) continue;
             auto name = line.substr(0, colon);
             auto value = trim(line.substr(colon + 1, std::string::npos));
             if (name == "StoreDir") {
@@ -138,6 +149,11 @@ void BinaryCacheStore::init()
             }
         }
     }
+}
+
+std::optional<std::string> BinaryCacheStore::getNixCacheInfo()
+{
+    return getFile(cacheInfoFile);
 }
 
 void BinaryCacheStore::upsertFile(const std::string & path,

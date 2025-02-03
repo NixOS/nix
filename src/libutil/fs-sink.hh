@@ -31,7 +31,7 @@ struct CreateRegularFileSink : Sink
 };
 
 // FIXME: don't use a global variable.
-extern RestoreSinkSettings<JustValue> restoreSinkSettings;
+extern RestoreSinkSettings<config::JustValue> restoreSinkSettings;
 
 struct FileSystemObjectSink
 {

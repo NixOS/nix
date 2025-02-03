@@ -111,9 +111,7 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
     auto manifestFile = ({
         std::ostringstream str;
         printAmbiguous(manifest, state.symbols, str, nullptr, std::numeric_limits<int>::max());
-        // TODO with C++20 we can use str.view() instead and avoid copy.
-        std::string str2 = str.str();
-        StringSource source { str2 };
+        StringSource source { toView(str) };
         state.store->addToStoreFromDump(
             source, "env-manifest.nix", FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, references);
     });

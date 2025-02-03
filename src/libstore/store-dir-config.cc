@@ -5,7 +5,7 @@
 
 namespace nix {
 
-static const StoreDirConfigT<config::SettingInfo> storeDirConfigDescriptions = {
+constexpr static const StoreDirConfigT<config::SettingInfo> storeDirConfigDescriptions = {
     ._storeDir{
         .name = "store",
         .description = R"(

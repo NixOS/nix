@@ -8,6 +8,15 @@
 
 namespace nix {
 
+config::SettingDescriptionMap LocalBinaryCacheStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(BinaryCacheStoreConfig::descriptions());
+    return ret;
+}
+
+
 LocalBinaryCacheStoreConfig::LocalBinaryCacheStoreConfig(
     std::string_view scheme,
     PathView binaryCacheDir,
@@ -39,6 +48,7 @@ struct LocalBinaryCacheStore :
         , BinaryCacheStore{*config}
         , config{config}
     {
+        init();
     }
 
     void init() override;
