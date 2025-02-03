@@ -81,7 +81,7 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_defaults)
 
         auto drvPath = writeDerivation(*store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(*store, parsedDrv);
 
         EXPECT_TRUE(!parsedDrv.hasStructuredAttrs());
@@ -116,7 +116,7 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes)
 
         auto drvPath = writeDerivation(*store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(*store, parsedDrv);
 
         StringSet systemFeatures{"rainbow", "uid-range"};
@@ -157,7 +157,7 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_structuredAttr
 
         auto drvPath = writeDerivation(*store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(*store, parsedDrv);
 
         EXPECT_TRUE(parsedDrv.hasStructuredAttrs());
@@ -191,7 +191,7 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_structuredAttr
 
         auto drvPath = writeDerivation(*store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(got);
+        ParsedDerivation parsedDrv(got.env);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(*store, parsedDrv);
 
         StringSet systemFeatures{"rainbow", "uid-range"};
