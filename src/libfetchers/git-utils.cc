@@ -509,7 +509,11 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
      */
     ref<GitSourceAccessor> getRawAccessor(const Hash & rev, bool smudgeLfs);
 
-    ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore, bool smudgeLfs) override;
+    ref<SourceAccessor> getAccessor(
+        const Hash & rev,
+        bool exportIgnore,
+        std::string displayPrefix,
+        bool smudgeLfs) override;
 
     ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
 
@@ -628,7 +632,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     Hash treeHashToNarHash(const Hash & treeHash) override
     {
-        auto accessor = getAccessor(treeHash, false, false);
+        auto accessor = getAccessor(treeHash, false, "", false);
 
         fetchers::Cache::Key cacheKey{"treeHashToNarHash", {{"treeHash", treeHash.gitRev()}}};
 
@@ -1212,16 +1216,19 @@ ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev, bool smudge
     return make_ref<GitSourceAccessor>(self, rev, smudgeLfs);
 }
 
-ref<SourceAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore, bool smudgeLfs)
+ref<SourceAccessor> GitRepoImpl::getAccessor(
+    const Hash & rev,
+    bool exportIgnore,
+    std::string displayPrefix,
+    bool smudgeLfs)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
     ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev, smudgeLfs);
-    if (exportIgnore) {
+    rawGitAccessor->setPathDisplay(std::move(displayPrefix));
+    if (exportIgnore)
         return make_ref<GitExportIgnoreSourceAccessor>(self, rawGitAccessor, rev);
-    }
-    else {
+    else
         return rawGitAccessor;
-    }
 }
 
 ref<SourceAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError)
@@ -1254,7 +1261,7 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     /* Read the .gitmodules files from this revision. */
     CanonPath modulesFile(".gitmodules");
 
-    auto accessor = getAccessor(rev, exportIgnore, false);
+    auto accessor = getAccessor(rev, exportIgnore, "", false);
     if (!accessor->pathExists(modulesFile)) return {};
 
     /* Parse it and get the revision of each submodule. */

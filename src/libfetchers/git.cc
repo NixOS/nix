@@ -681,9 +681,7 @@ struct GitInputScheme : InputScheme
 
         bool exportIgnore = getExportIgnoreAttr(input);
         bool smudgeLfs = getLfsAttr(input);
-        auto accessor = repo->getAccessor(rev, exportIgnore, smudgeLfs);
-
-        accessor->setPathDisplay("«" + input.to_string() + "»");
+        auto accessor = repo->getAccessor(rev, exportIgnore, "«" + input.to_string() + "»", smudgeLfs);
 
         /* If the repo has submodules, fetch them and return a mounted
            input accessor consisting of the accessor for the top-level
@@ -746,8 +744,6 @@ struct GitInputScheme : InputScheme
             repo->getAccessor(repoInfo.workdirInfo,
                 exportIgnore,
                 makeNotAllowedError(repoInfo.locationToArg()));
-
-        accessor->setPathDisplay(repoInfo.locationToArg());
 
         /* If the repo has submodules, return a mounted input accessor
            consisting of the accessor for the top-level repo and the

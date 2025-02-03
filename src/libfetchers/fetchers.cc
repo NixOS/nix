@@ -155,12 +155,6 @@ bool Input::isLocked() const
     return scheme && scheme->isLocked(*this);
 }
 
-bool Input::isConsideredLocked(
-    const Settings & settings) const
-{
-    return isLocked() || (settings.allowDirtyLocks && getNarHash());
-}
-
 bool Input::isFinal() const
 {
     return maybeGetBoolAttr(attrs, "__final").value_or(false);

@@ -32,7 +32,10 @@ in
         services.gitea.lfs.enable = true;
         services.gitea.settings = {
           service.DISABLE_REGISTRATION = true;
-          server = { DOMAIN = "gitea"; HTTP_PORT = 3000; };
+          server = {
+            DOMAIN = "gitea";
+            HTTP_PORT = 3000;
+          };
           log.LEVEL = "Info";
           database.LOG_SQL = false;
         };

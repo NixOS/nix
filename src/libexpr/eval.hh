@@ -820,6 +820,15 @@ public:
      */
     [[nodiscard]] StringMap realiseContext(const NixStringContext & context, StorePathSet * maybePaths = nullptr, bool isIFD = true);
 
+    /**
+     * Realise the given string with context, and return the string with outputs instead of downstream output placeholders.
+     * @param[in] str the string to realise
+     * @param[out] paths all referenced store paths will be added to this set
+     * @return the realised string
+     * @throw EvalError if the value is not a string, path or derivation (see `coerceToString`)
+     */
+    std::string realiseString(Value & str, StorePathSet * storePathsOutMaybe, bool isIFD = true, const PosIdx pos = noPos);
+
     /* Call the binary path filter predicate used builtins.path etc. */
     bool callPathFilter(
         Value * filterFun,
