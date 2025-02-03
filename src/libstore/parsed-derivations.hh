@@ -12,7 +12,7 @@ struct DerivationOptions;
 
 class ParsedDerivation
 {
-    BasicDerivation & drv;
+    const StringPairs & env;
     std::unique_ptr<nlohmann::json> structuredAttrs;
 
     std::optional<std::string> getStringAttr(const std::string & name) const;
@@ -33,7 +33,7 @@ class ParsedDerivation
 
 public:
 
-    ParsedDerivation(BasicDerivation & drv);
+    ParsedDerivation(const StringPairs & env);
 
     ~ParsedDerivation();
 
@@ -42,8 +42,11 @@ public:
         return static_cast<bool>(structuredAttrs);
     }
 
-    std::optional<nlohmann::json>
-    prepareStructuredAttrs(Store & store, const DerivationOptions & drvOptions, const StorePathSet & inputPaths);
+    std::optional<nlohmann::json> prepareStructuredAttrs(
+        Store & store,
+        const DerivationOptions & drvOptions,
+        const StorePathSet & inputPaths,
+        const DerivationOutputs & outputs);
 };
 
 std::string writeStructuredAttrsShell(const nlohmann::json & json);

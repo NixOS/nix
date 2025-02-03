@@ -543,7 +543,7 @@ static void main_nix_build(int argc, char * * argv)
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
-        ParsedDerivation parsedDrv(drv);
+        ParsedDerivation parsedDrv(drv.env);
         DerivationOptions drvOptions;
         try {
             drvOptions = DerivationOptions::fromParsedDerivation(*store, parsedDrv);
@@ -583,7 +583,12 @@ static void main_nix_build(int argc, char * * argv)
             for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
                 accumInputClosure(inputDrv, inputNode);
 
-            if (auto structAttrs = parsedDrv.prepareStructuredAttrs(*store, drvOptions, inputs)) {
+            if (auto structAttrs = parsedDrv.prepareStructuredAttrs(
+                    *store,
+                    drvOptions,
+                    inputs,
+                    drv.outputs))
+            {
                 auto json = structAttrs.value();
                 structuredAttrsRC = writeStructuredAttrsShell(json);
 
