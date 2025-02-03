@@ -22,8 +22,12 @@ std::pair<std::string, SettingDescription> SettingInfo<T>::describe(const JustVa
         std::string{name},
         SettingDescription{
             .description = stripIndentation(description),
-            .defaultValue =
-                documentDefault ? (std::optional{nlohmann::json(def.value)}) : (std::optional<nlohmann::json>{}),
+            .experimentalFeature = experimentalFeature,
+            .info =
+                SettingDescription::Single{
+                    .defaultValue = documentDefault ? (std::optional{nlohmann::json(def.value)})
+                                                    : (std::optional<nlohmann::json>{}),
+                },
         },
     };
 }

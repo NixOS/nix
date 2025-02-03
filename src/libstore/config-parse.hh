@@ -5,6 +5,7 @@
 
 #include "config-abstract.hh"
 #include "json-impls.hh"
+#include "experimental-features.hh"
 
 namespace nix::config {
 
@@ -36,13 +37,13 @@ struct SettingInfo
      * maps. This is useful for back-compat, etc.
      */
     std::set<std::string_view> aliases;
+#endif
 
     /**
      * `ExperimentalFeature` that must be enabled if the setting is
      * allowed to be used
      */
     std::optional<ExperimentalFeature> experimentalFeature;
-#endif
 
     /**
      * Whether to document the default value. (Some defaults are
@@ -59,6 +60,13 @@ struct SettingInfo
 
     OptValue<T> parseConfig(const nlohmann::json::object_t & map) const;
 };
+
+struct SettingDescription;
+
+/**
+ * Map of setting names to descriptions of those settings.
+ */
+using SettingDescriptionMap = std::map<std::string, SettingDescription>;
 
 /**
  * Untyped version used for rendering docs. This is not the source of
@@ -79,23 +87,51 @@ struct SettingDescription
      * @see SettingInfo::aliases
      */
     std::set<std::string> aliases;
+#endif
 
     /**
      * @see SettingInfo::experimentalFeature
      */
     std::optional<ExperimentalFeature> experimentalFeature;
-#endif
 
     /**
-     * Optional, for the `SettingInfo::documentDefault = false` case.
+     * A single leaf setting, to be optionally specified by arbitrary
+     * value (of some type) or left default.
      */
-    std::optional<nlohmann::json> defaultValue;
-};
+    struct Single
+    {
+        /**
+         * Optional, for the `SettingInfo::documentDefault = false` case.
+         */
+        std::optional<nlohmann::json> defaultValue;
+    };
 
-/**
- * Map of setting names to descriptions of those settings.
- */
-using SettingDescriptionMap = std::map<std::string, SettingDescription>;
+    /**
+     * A nested settings object
+     */
+    struct Sub
+    {
+        /**
+         * If `false`, this is just pure namespaceing. If `true`, we
+         * have a distinction between `null` and `{}`, meaning
+         * enabling/disabling the entire settings group.
+         */
+        bool nullable = true;
+
+        SettingDescriptionMap map;
+    };
+
+    /**
+     * Variant for `info` below
+     */
+    using Info = std::variant<Single, Sub>;
+
+    /**
+     * More information about this setting, depending on whether its the
+     * single leaf setting or subsettings case
+     */
+    Info info;
+};
 
 }
 
