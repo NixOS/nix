@@ -12,7 +12,6 @@ struct DerivationOptions;
 
 class ParsedDerivation
 {
-    StorePath drvPath;
     BasicDerivation & drv;
     std::unique_ptr<nlohmann::json> structuredAttrs;
 
@@ -34,7 +33,7 @@ class ParsedDerivation
 
 public:
 
-    ParsedDerivation(const StorePath & drvPath, BasicDerivation & drv);
+    ParsedDerivation(BasicDerivation & drv);
 
     ~ParsedDerivation();
 

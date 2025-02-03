@@ -544,8 +544,14 @@ static void main_nix_build(int argc, char * * argv)
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
-        ParsedDerivation parsedDrv(packageInfo.requireDrvPath(), drv);
-        DerivationOptions drvOptions = DerivationOptions::fromParsedDerivation(parsedDrv);
+        ParsedDerivation parsedDrv(drv);
+        DerivationOptions drvOptions;
+        try {
+            drvOptions = DerivationOptions::fromParsedDerivation(parsedDrv);
+        } catch (Error & e) {
+            e.addTrace({}, "while parsing derivation '%s'", store->printStorePath(packageInfo.requireDrvPath()));
+            throw;
+        }
 
         int fileNr = 0;
 

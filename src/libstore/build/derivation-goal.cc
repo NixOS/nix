@@ -180,8 +180,13 @@ Goal::Co DerivationGoal::haveDerivation()
 {
     trace("have derivation");
 
-    parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
-    drvOptions = std::make_unique<DerivationOptions>(DerivationOptions::fromParsedDerivation(*parsedDrv));
+    parsedDrv = std::make_unique<ParsedDerivation>(*drv);
+    try {
+        drvOptions = std::make_unique<DerivationOptions>(DerivationOptions::fromParsedDerivation(*parsedDrv));
+    } catch (Error & e) {
+        e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
+        throw;
+    }
 
     if (!drv->type().hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
