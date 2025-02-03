@@ -613,12 +613,8 @@ nix_realised_string * nix_string_realise(nix_c_context * context, EvalState * st
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_in(value);
-        nix::NixStringContext stringContext;
-        auto rawStr = state->state.coerceToString(nix::noPos, v, stringContext, "while realising a string").toOwned();
         nix::StorePathSet storePaths;
-        auto rewrites = state->state.realiseContext(stringContext, &storePaths);
-
-        auto s = nix::rewriteStrings(rawStr, rewrites);
+        auto s = state->state.realiseString(v, &storePaths, isIFD);
 
         // Convert to the C API StorePath type and convert to vector for index-based access
         std::vector<StorePath> vec;

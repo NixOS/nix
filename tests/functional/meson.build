@@ -242,8 +242,6 @@ foreach suite : suites
       # Used for target dependency/ordering tracking, not adding compiler flags or anything.
       depends : suite['deps'],
       workdir : workdir,
-      # Won't pass until man pages are generated
-      should_fail : suite['name'] == 'main' and script == 'help.sh'
     )
   endforeach
 endforeach

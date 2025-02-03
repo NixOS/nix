@@ -5,4 +5,4 @@ error:
              | ^
             2|   type = "file";
 
-       error: negative value given for fetchTree attr owner: -1
+       error: negative value given for 'fetchTree' argument 'owner': -1

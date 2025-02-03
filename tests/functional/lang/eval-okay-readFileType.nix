@@ -1,6 +1,6 @@
 {
-  bar    = builtins.readFileType ./readDir/bar;
-  foo    = builtins.readFileType ./readDir/foo;
+  bar = builtins.readFileType ./readDir/bar;
+  foo = builtins.readFileType ./readDir/foo;
   linked = builtins.readFileType ./readDir/linked;
-  ldir   = builtins.readFileType ./readDir/ldir;
+  ldir = builtins.readFileType ./readDir/ldir;
 }

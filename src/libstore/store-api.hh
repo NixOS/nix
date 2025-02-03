@@ -425,7 +425,7 @@ public:
         CheckSigsFlag checkSigs = CheckSigs);
 
     virtual void addMultipleToStore(
-        PathsSource & pathsToCopy,
+        PathsSource && pathsToCopy,
         Activity & act,
         RepairFlag repair = NoRepair,
         CheckSigsFlag checkSigs = CheckSigs);

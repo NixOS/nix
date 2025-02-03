@@ -160,6 +160,6 @@ which you may remove.
 To remove a [single-user installation](./installing-binary.md#single-user-installation) of Nix, run:
 
 ```console
-$ rm -rf /nix ~/.nix-channels ~/.nix-defexpr ~/.nix-profile
+rm -rf /nix ~/.nix-channels ~/.nix-defexpr ~/.nix-profile
 ```
 You might also want to manually remove references to Nix from your `~/.profile`.

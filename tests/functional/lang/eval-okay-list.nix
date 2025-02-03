@@ -2,6 +2,11 @@ with import ./lib.nix;
 
 let {
 
-  body = concat ["foo" "bar" "bla" "test"];
-    
+  body = concat [
+    "foo"
+    "bar"
+    "bla"
+    "test"
+  ];
+
 }

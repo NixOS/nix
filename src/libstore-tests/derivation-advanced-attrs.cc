@@ -4,12 +4,14 @@
 #include "error.hh"
 #include "experimental-features.hh"
 #include "derivations.hh"
-
-#include "tests/libstore.hh"
-#include "tests/characterization.hh"
+#include "derivations.hh"
+#include "derivation-options.hh"
 #include "parsed-derivations.hh"
 #include "types.hh"
 #include "json-utils.hh"
+
+#include "tests/libstore.hh"
+#include "tests/characterization.hh"
 
 namespace nix {
 
@@ -80,20 +82,28 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_defaults)
 
         auto drvPath = writeDerivation(*store, got, NoRepair, true);
 
+        EXPECT_TRUE(!got.structuredAttrs);
+
         EXPECT_EQ(got.options.additionalSandboxProfile, "");
         EXPECT_EQ(got.options.noChroot, false);
-        EXPECT_EQ(got.options.impureHostDeps, Strings());
-        EXPECT_EQ(got.options.impureEnvVars, Strings());
+        EXPECT_EQ(got.options.impureHostDeps, StringSet{});
+        EXPECT_EQ(got.options.impureEnvVars, StringSet{});
         EXPECT_EQ(got.options.allowLocalNetworking, false);
-        EXPECT_EQ(got.options.checksAllOutputs.allowedReferences, std::nullopt);
-        EXPECT_EQ(got.options.checksAllOutputs.allowedRequisites, std::nullopt);
-        EXPECT_EQ(got.options.checksAllOutputs.disallowedReferences, std::nullopt);
-        EXPECT_EQ(got.options.checksAllOutputs.disallowedRequisites, std::nullopt);
-        EXPECT_EQ(got.getRequiredSystemFeatures(), StringSet());
-        EXPECT_EQ(got.canBuildLocally(*store), false);
-        EXPECT_EQ(got.willBuildLocally(*store), false);
-        EXPECT_EQ(got.substitutesAllowed(), true);
-        EXPECT_EQ(got.useUidRange(), false);
+        {
+            auto * checksForAllOutputs_ = std::get_if<0>(&got.options.outputChecks);
+            ASSERT_TRUE(checksForAllOutputs_ != nullptr);
+            auto & checksForAllOutputs = *checksForAllOutputs_;
+
+            EXPECT_EQ(checksForAllOutputs.allowedReferences, std::nullopt);
+            EXPECT_EQ(checksForAllOutputs.allowedRequisites, std::nullopt);
+            EXPECT_EQ(checksForAllOutputs.disallowedReferences, StringSet{});
+            EXPECT_EQ(checksForAllOutputs.disallowedRequisites, StringSet{});
+        }
+        EXPECT_EQ(got.options.getRequiredSystemFeatures(got), StringSet());
+        EXPECT_EQ(got.options.canBuildLocally(*store, got), false);
+        EXPECT_EQ(got.options.willBuildLocally(*store, got), false);
+        EXPECT_EQ(got.options.substitutesAllowed(), true);
+        EXPECT_EQ(got.options.useUidRange(got), false);
     });
 };
 
@@ -106,26 +116,32 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes)
 
         StringSet systemFeatures{"rainbow", "uid-range"};
 
+        EXPECT_TRUE(!got.structuredAttrs);
+
         EXPECT_EQ(got.options.additionalSandboxProfile, "sandcastle");
         EXPECT_EQ(got.options.noChroot, true);
-        EXPECT_EQ(got.options.impureHostDeps, Strings{"/usr/bin/ditto"});
-        EXPECT_EQ(got.options.impureEnvVars, Strings{"UNICORN"});
+        EXPECT_EQ(got.options.impureHostDeps, StringSet{"/usr/bin/ditto"});
+        EXPECT_EQ(got.options.impureEnvVars, StringSet{"UNICORN"});
         EXPECT_EQ(got.options.allowLocalNetworking, true);
-        EXPECT_EQ(
-            got.options.checksAllOutputs.allowedReferences, Strings{"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"});
-        EXPECT_EQ(
-            got.options.checksAllOutputs.allowedRequisites, Strings{"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"});
-        EXPECT_EQ(
-            got.options.checksAllOutputs.disallowedReferences,
-            Strings{"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"});
-        EXPECT_EQ(
-            got.options.checksAllOutputs.disallowedRequisites,
-            Strings{"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"});
-        EXPECT_EQ(got.getRequiredSystemFeatures(), systemFeatures);
-        EXPECT_EQ(got.canBuildLocally(*store), false);
-        EXPECT_EQ(got.willBuildLocally(*store), false);
-        EXPECT_EQ(got.substitutesAllowed(), false);
-        EXPECT_EQ(got.useUidRange(), true);
+        {
+            auto * checksForAllOutputs_ = std::get_if<0>(&got.options.outputChecks);
+            ASSERT_TRUE(checksForAllOutputs_ != nullptr);
+            auto & checksForAllOutputs = *checksForAllOutputs_;
+
+            EXPECT_EQ(
+                checksForAllOutputs.allowedReferences, StringSet{"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"});
+            EXPECT_EQ(
+                checksForAllOutputs.allowedRequisites, StringSet{"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"});
+            EXPECT_EQ(
+                checksForAllOutputs.disallowedReferences, StringSet{"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"});
+            EXPECT_EQ(
+                checksForAllOutputs.disallowedRequisites, StringSet{"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"});
+        }
+        EXPECT_EQ(got.options.getRequiredSystemFeatures(got), systemFeatures);
+        EXPECT_EQ(got.options.canBuildLocally(*store, got), false);
+        EXPECT_EQ(got.options.willBuildLocally(*store, got), false);
+        EXPECT_EQ(got.options.substitutesAllowed(), false);
+        EXPECT_EQ(got.options.useUidRange(got), true);
     });
 };
 
@@ -136,28 +152,27 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_structuredAttr
 
         auto drvPath = writeDerivation(*store, got, NoRepair, true);
 
+        EXPECT_TRUE(got.structuredAttrs);
+
         EXPECT_EQ(got.options.additionalSandboxProfile, "");
         EXPECT_EQ(got.options.noChroot, false);
-        EXPECT_EQ(got.options.impureHostDeps, Strings());
-        EXPECT_EQ(got.options.impureEnvVars, Strings());
+        EXPECT_EQ(got.options.impureHostDeps, StringSet{});
+        EXPECT_EQ(got.options.impureEnvVars, StringSet{});
         EXPECT_EQ(got.options.allowLocalNetworking, false);
 
         {
-            ParsedDerivation parsedDrv(got.env);
+            auto * checksPerOutput_ = std::get_if<1>(&got.options.outputChecks);
+            ASSERT_TRUE(checksPerOutput_ != nullptr);
+            auto & checksPerOutput = *checksPerOutput_;
 
-            auto structuredAttrs_ = parsedDrv.getStructuredAttrs();
-            ASSERT_TRUE(structuredAttrs_);
-            auto & structuredAttrs = *structuredAttrs_;
-
-            auto outputChecks_ = get(structuredAttrs, "outputChecks");
-            ASSERT_FALSE(outputChecks_);
+            EXPECT_EQ(checksPerOutput.size(), 0);
         }
 
-        EXPECT_EQ(got.getRequiredSystemFeatures(), StringSet());
-        EXPECT_EQ(got.canBuildLocally(*store), false);
-        EXPECT_EQ(got.willBuildLocally(*store), false);
-        EXPECT_EQ(got.substitutesAllowed(), true);
-        EXPECT_EQ(got.useUidRange(), false);
+        EXPECT_EQ(got.options.getRequiredSystemFeatures(got), StringSet());
+        EXPECT_EQ(got.options.canBuildLocally(*store, got), false);
+        EXPECT_EQ(got.options.willBuildLocally(*store, got), false);
+        EXPECT_EQ(got.options.substitutesAllowed(), true);
+        EXPECT_EQ(got.options.useUidRange(got), false);
     });
 };
 
@@ -170,66 +185,53 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_structuredAttr
 
         StringSet systemFeatures{"rainbow", "uid-range"};
 
+        EXPECT_TRUE(got.structuredAttrs);
+
         EXPECT_EQ(got.options.additionalSandboxProfile, "sandcastle");
         EXPECT_EQ(got.options.noChroot, true);
-        EXPECT_EQ(got.options.impureHostDeps, Strings{"/usr/bin/ditto"});
-        EXPECT_EQ(got.options.impureEnvVars, Strings{"UNICORN"});
+        EXPECT_EQ(got.options.impureHostDeps, StringSet{"/usr/bin/ditto"});
+        EXPECT_EQ(got.options.impureEnvVars, StringSet{"UNICORN"});
         EXPECT_EQ(got.options.allowLocalNetworking, true);
 
         {
-            ParsedDerivation parsedDrv(got.env);
-
-            auto structuredAttrs_ = parsedDrv.getStructuredAttrs();
-            ASSERT_TRUE(structuredAttrs_);
-            auto & structuredAttrs = *structuredAttrs_;
-
-            auto outputChecks_ = get(structuredAttrs, "outputChecks");
-            ASSERT_TRUE(outputChecks_);
-            auto & outputChecks = *outputChecks_;
-
             {
-                auto output_ = get(outputChecks, "out");
+                auto output_ = get(std::get<1>(got.options.outputChecks), "out");
                 ASSERT_TRUE(output_);
                 auto & output = *output_;
-                EXPECT_EQ(
-                    get(output, "allowedReferences")->get<Strings>(),
-                    Strings{"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"});
-                EXPECT_EQ(
-                    get(output, "allowedRequisites")->get<Strings>(),
-                    Strings{"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"});
+
+                EXPECT_EQ(output.allowedReferences, StringSet{"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"});
+                EXPECT_EQ(output.allowedRequisites, StringSet{"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"});
             }
 
             {
-                auto output_ = get(outputChecks, "bin");
+                auto output_ = get(std::get<1>(got.options.outputChecks), "bin");
                 ASSERT_TRUE(output_);
                 auto & output = *output_;
-                EXPECT_EQ(
-                    get(output, "disallowedReferences")->get<Strings>(),
-                    Strings{"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"});
-                EXPECT_EQ(
-                    get(output, "disallowedRequisites")->get<Strings>(),
-                    Strings{"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"});
+
+                EXPECT_EQ(output.disallowedReferences, StringSet{"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"});
+                EXPECT_EQ(output.disallowedRequisites, StringSet{"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"});
             }
 
             {
-                auto output_ = get(outputChecks, "dev");
+                auto output_ = get(std::get<1>(got.options.outputChecks), "dev");
                 ASSERT_TRUE(output_);
                 auto & output = *output_;
-                EXPECT_EQ(get(output, "maxSize")->get<uint64_t>(), 789);
-                EXPECT_EQ(get(output, "maxClosureSize")->get<uint64_t>(), 5909);
+
+                EXPECT_EQ(output.maxSize, 789);
+                EXPECT_EQ(output.maxClosureSize, 5909);
             }
         }
 
-        EXPECT_EQ(got.getRequiredSystemFeatures(), systemFeatures);
-        EXPECT_EQ(got.canBuildLocally(*store), false);
-        EXPECT_EQ(got.willBuildLocally(*store), false);
-        EXPECT_EQ(got.substitutesAllowed(), false);
-        EXPECT_EQ(got.useUidRange(), true);
+        EXPECT_EQ(got.options.getRequiredSystemFeatures(got), systemFeatures);
+        EXPECT_EQ(got.options.canBuildLocally(*store, got), false);
+        EXPECT_EQ(got.options.willBuildLocally(*store, got), false);
+        EXPECT_EQ(got.options.substitutesAllowed(), false);
+        EXPECT_EQ(got.options.useUidRange(got), true);
     });
 };
 
 #define SYNC_CONFLICT(NAME, VALUE)                   \
-    got.options.NAME = VALUE;                        \
+    NAME = VALUE;                                    \
     EXPECT_THROW(got.unparse(*store, false), Error); \
     got.options = options;
 
@@ -239,15 +241,15 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_option_syncCon
         auto got = parseDerivation(*store, std::move(encoded), "foo");
         auto options = got.options;
 
-        SYNC_CONFLICT(additionalSandboxProfile, "foobar");
-        SYNC_CONFLICT(noChroot, true);
-        SYNC_CONFLICT(impureHostDeps, Strings{"/usr/bin/ditto"});
-        SYNC_CONFLICT(impureEnvVars, Strings{"HELLO"});
-        SYNC_CONFLICT(allowLocalNetworking, true);
-        SYNC_CONFLICT(checksAllOutputs.allowedReferences, Strings{"nothing"});
-        SYNC_CONFLICT(checksAllOutputs.allowedRequisites, Strings{"hey"});
-        SYNC_CONFLICT(checksAllOutputs.disallowedReferences, Strings{"BAR"});
-        SYNC_CONFLICT(checksAllOutputs.disallowedRequisites, Strings{"FOO"});
+        SYNC_CONFLICT(got.options.additionalSandboxProfile, "foobar");
+        SYNC_CONFLICT(got.options.noChroot, true);
+        SYNC_CONFLICT(got.options.impureHostDeps, StringSet{"/usr/bin/ditto"});
+        SYNC_CONFLICT(got.options.impureEnvVars, StringSet{"HELLO"});
+        SYNC_CONFLICT(got.options.allowLocalNetworking, true);
+        SYNC_CONFLICT(std::get<0>(got.options.outputChecks).allowedReferences, StringSet{"nothing"});
+        SYNC_CONFLICT(std::get<0>(got.options.outputChecks).allowedRequisites, StringSet{"hey"});
+        SYNC_CONFLICT(std::get<0>(got.options.outputChecks).disallowedReferences, StringSet{"BAR"});
+        SYNC_CONFLICT(std::get<0>(got.options.outputChecks).disallowedRequisites, StringSet{"FOO"});
     });
 };
 

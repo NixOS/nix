@@ -37,8 +37,8 @@ expectStderr 1 nix flake lock "$flake2Dir" --override-input flake1 "$TEST_ROOT/f
 
 nix flake lock "$flake2Dir" --override-input flake1 "$TEST_ROOT/flake1" --allow-dirty-locks
 
-# Using a lock file with a dirty lock requires --allow-dirty-locks as well.
-expectStderr 1 nix eval "$flake2Dir#x" |
-  grepQuiet "Lock file contains unlocked input"
+# Using a lock file with a dirty lock does not require --allow-dirty-locks, but should print a warning.
+expectStderr 0 nix eval "$flake2Dir#x" |
+  grepQuiet "warning: Lock file entry .* is unlocked"
 
-[[ $(nix eval "$flake2Dir#x" --allow-dirty-locks) = 456 ]]
+[[ $(nix eval "$flake2Dir#x") = 456 ]]

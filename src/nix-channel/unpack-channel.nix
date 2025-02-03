@@ -1,4 +1,8 @@
-{ name, channelName, src }:
+{
+  name,
+  channelName,
+  src,
+}:
 
 derivation {
   builder = "builtin:unpack-channel";

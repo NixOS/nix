@@ -27,6 +27,7 @@ pull_request_rules:
         branches:
           - 2.18-maintenance
         labels:
+          - automatic backport
           - merge-queue
 
   - name: backport patches to 2.19
@@ -37,6 +38,7 @@ pull_request_rules:
         branches:
           - 2.19-maintenance
         labels:
+          - automatic backport
           - merge-queue
 
   - name: backport patches to 2.20
@@ -47,6 +49,7 @@ pull_request_rules:
         branches:
           - 2.20-maintenance
         labels:
+          - automatic backport
           - merge-queue
 
   - name: backport patches to 2.21
@@ -57,6 +60,7 @@ pull_request_rules:
         branches:
           - 2.21-maintenance
         labels:
+          - automatic backport
           - merge-queue
 
   - name: backport patches to 2.22
@@ -67,6 +71,7 @@ pull_request_rules:
         branches:
           - 2.22-maintenance
         labels:
+          - automatic backport
           - merge-queue
 
   - name: backport patches to 2.23
@@ -77,6 +82,7 @@ pull_request_rules:
         branches:
           - 2.23-maintenance
         labels:
+          - automatic backport
           - merge-queue
 
   - name: backport patches to 2.24
@@ -87,6 +93,7 @@ pull_request_rules:
         branches:
           - "2.24-maintenance"
         labels:
+          - automatic backport
           - merge-queue
 
   - name: backport patches to 2.25
@@ -97,4 +104,16 @@ pull_request_rules:
         branches:
           - "2.25-maintenance"
         labels:
+          - automatic backport
+          - merge-queue
+
+  - name: backport patches to 2.26
+    conditions:
+      - label=backport 2.26-maintenance
+    actions:
+      backport:
+        branches:
+          - "2.26-maintenance"
+        labels:
+          - automatic backport
           - merge-queue

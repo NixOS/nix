@@ -1,14 +1,18 @@
-{ runCommand
-, system
-, buildPackages
-, cacert
-, nix
+{
+  runCommand,
+  system,
+  buildPackages,
+  cacert,
+  nix,
 }:
 
 let
 
   installerClosureInfo = buildPackages.closureInfo {
-    rootPaths = [ nix cacert ];
+    rootPaths = [
+      nix
+      cacert
+    ];
   };
 
   inherit (nix) version;
@@ -22,18 +26,18 @@ in
 
 runCommand "nix-binary-tarball-${version}" env ''
   cp ${installerClosureInfo}/registration $TMPDIR/reginfo
-  cp ${./create-darwin-volume.sh} $TMPDIR/create-darwin-volume.sh
-  substitute ${./install-nix-from-tarball.sh} $TMPDIR/install \
+  cp ${../scripts/create-darwin-volume.sh} $TMPDIR/create-darwin-volume.sh
+  substitute ${../scripts/install-nix-from-tarball.sh} $TMPDIR/install \
     --subst-var-by nix ${nix} \
     --subst-var-by cacert ${cacert}
 
-  substitute ${./install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user.sh \
+  substitute ${../scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user.sh \
     --subst-var-by nix ${nix} \
     --subst-var-by cacert ${cacert}
-  substitute ${./install-systemd-multi-user.sh} $TMPDIR/install-systemd-multi-user.sh \
+  substitute ${../scripts/install-systemd-multi-user.sh} $TMPDIR/install-systemd-multi-user.sh \
     --subst-var-by nix ${nix} \
     --subst-var-by cacert ${cacert}
-  substitute ${./install-multi-user.sh} $TMPDIR/install-multi-user \
+  substitute ${../scripts/install-multi-user.sh} $TMPDIR/install-multi-user \
     --subst-var-by nix ${nix} \
     --subst-var-by cacert ${cacert}
 

@@ -144,11 +144,9 @@ release:
 
   Make a pull request and auto-merge it.
 
-* Create a milestone for the next release, move all unresolved issues
-  from the previous milestone, and close the previous milestone. Set
-  the date for the next milestone 6 weeks from now.
-
 * Create a backport label.
+
+* Add the new backport label to `.mergify.yml`.
 
 * Post an [announcement on Discourse](https://discourse.nixos.org/c/announcements/8), including the contents of
   `rl-$VERSION.md`.

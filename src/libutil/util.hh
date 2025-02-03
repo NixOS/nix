@@ -274,6 +274,17 @@ std::optional<typename T::value_type> pop(T & c)
 }
 
 
+/**
+ * Append items to a container. TODO: remove this once we can use
+ * C++23's `append_range()`.
+ */
+template<class C, typename T>
+void append(C & c, std::initializer_list<T> l)
+{
+    c.insert(c.end(), l.begin(), l.end());
+}
+
+
 template<typename T>
 class Callback;
 

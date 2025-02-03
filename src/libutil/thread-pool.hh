@@ -150,8 +150,16 @@ void processGraph(
         }
     };
 
-    for (auto & node : nodes)
-        pool.enqueue(std::bind(worker, std::ref(node)));
+    for (auto & node : nodes) {
+        try {
+            pool.enqueue(std::bind(worker, std::ref(node)));
+        } catch (ThreadPoolShutDown &) {
+            /* Stop if the thread pool is shutting down. It means a
+               previous work item threw an exception, so process()
+               below will rethrow it. */
+            break;
+        }
+    }
 
     pool.process();
 

@@ -194,8 +194,6 @@ Goal::Co DerivationGoal::haveDerivation()
 {
     trace("have derivation");
 
-    parsedDrv = std::make_unique<ParsedDerivation>(drv->env);
-
     if (!drv->type().hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
 
@@ -246,7 +244,7 @@ Goal::Co DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    if (settings.useSubstitutes && drv->substitutesAllowed())
+    if (settings.useSubstitutes && drv->options.substitutesAllowed())
         for (auto & [outputName, status] : initialOutputs) {
             if (!status.wanted) continue;
             if (!status.known)
@@ -718,7 +716,7 @@ Goal::Co DerivationGoal::tryToBuild()
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
     bool buildLocally =
-        (buildMode != bmNormal || drv->willBuildLocally(worker.store))
+        (buildMode != bmNormal || drv->options.willBuildLocally(worker.store, *drv))
         && settings.maxBuildJobs.get() != 0;
 
     if (!buildLocally) {
@@ -1147,7 +1145,7 @@ HookReply DerivationGoal::tryBuildHook()
             << (worker.getNrLocalBuilds() < settings.maxBuildJobs ? 1 : 0)
             << drv->platform
             << worker.store.printStorePath(drvPath)
-            << drv->getRequiredSystemFeatures();
+            << drv->options.getRequiredSystemFeatures(*drv);
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating

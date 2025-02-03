@@ -26,27 +26,34 @@
   Note that `derivation` is very bare-bones, and provides almost no commands during the build.
   Most likely, you'll want to use functions like `stdenv.mkDerivation` in Nixpkgs to set up a basic environment.
 */
-drvAttrs @ { outputs ? [ "out" ], ... }:
+drvAttrs@{
+  outputs ? [ "out" ],
+  ...
+}:
 
 let
 
   strict = derivationStrict drvAttrs;
 
-  commonAttrs = drvAttrs // (builtins.listToAttrs outputsList) //
-    { all = map (x: x.value) outputsList;
+  commonAttrs =
+    drvAttrs
+    // (builtins.listToAttrs outputsList)
+    // {
+      all = map (x: x.value) outputsList;
       inherit drvAttrs;
     };
 
-  outputToAttrListElement = outputName:
-    { name = outputName;
-      value = commonAttrs // {
-        outPath = builtins.getAttr outputName strict;
-        drvPath = strict.drvPath;
-        type = "derivation";
-        inherit outputName;
-      };
+  outputToAttrListElement = outputName: {
+    name = outputName;
+    value = commonAttrs // {
+      outPath = builtins.getAttr outputName strict;
+      drvPath = strict.drvPath;
+      type = "derivation";
+      inherit outputName;
     };
+  };
 
   outputsList = map outputToAttrListElement outputs;
 
-in (builtins.head outputsList).value
+in
+(builtins.head outputsList).value

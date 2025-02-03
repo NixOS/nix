@@ -20,7 +20,6 @@
 #include "posix-fs-canonicalise.hh"
 #include "posix-source-accessor.hh"
 
-#include <regex>
 #include <queue>
 
 #include <sys/un.h>
@@ -235,7 +234,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     if (useBuildUsers()) {
         if (!buildUser)
-            buildUser = acquireUserLock(drv->useUidRange() ? 65536 : 1, useChroot);
+            buildUser = acquireUserLock(drv->options.useUidRange(*drv) ? 65536 : 1, useChroot);
 
         if (!buildUser) {
             if (!actLock)
@@ -526,10 +525,10 @@ void LocalDerivationGoal::startBuilder()
     killSandbox(false);
 
     /* Right platform? */
-    if (!drv->canBuildLocally(worker.store))
+    if (!drv->options.canBuildLocally(worker.store, *drv))
         throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
             drv->platform,
-            concatStringsSep(", ", drv->getRequiredSystemFeatures()),
+            concatStringsSep(", ", drv->options.getRequiredSystemFeatures(*drv)),
             worker.store.printStorePath(drvPath),
             settings.thisSystem,
             concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
@@ -617,33 +616,12 @@ void LocalDerivationGoal::startBuilder()
     writeStructuredAttrs();
 
     /* Handle exportReferencesGraph(), if set. */
-    if (!parsedDrv->getStructuredAttrs()) {
-        /* The `exportReferencesGraph' feature allows the references graph
-           to be passed to a builder.  This attribute should be a list of
-           pairs [name1 path1 name2 path2 ...].  The references graph of
-           each `pathN' will be stored in a text file `nameN' in the
-           temporary build directory.  The text files have the format used
-           by `nix-store --register-validity'.  However, the deriver
-           fields are left empty. */
-        auto s = getOr(drv->env, "exportReferencesGraph", "");
-        Strings ss = tokenizeString<Strings>(s);
-        if (ss.size() % 2 != 0)
-            throw BuildError("odd number of tokens in 'exportReferencesGraph': '%1%'", s);
-        for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
-            auto fileName = *i++;
-            static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
-            if (!std::regex_match(fileName, regex))
-                throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
-
-            auto storePathS = *i++;
-            if (!worker.store.isInStore(storePathS))
-                throw BuildError("'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
-            auto storePath = worker.store.toStorePath(storePathS).first;
-
+    if (!drv->structuredAttrs) {
+        for (auto & [fileName, storePathSet] : drv->options.exportReferencesGraph) {
             /* Write closure info to <fileName>. */
             writeFile(tmpDir + "/" + fileName,
                 worker.store.makeValidityRegistration(
-                    worker.store.exportReferences({storePath}, inputPaths), false, false));
+                    worker.store.exportReferences(storePathSet, inputPaths), false, false));
         }
     }
 
@@ -751,10 +729,10 @@ void LocalDerivationGoal::startBuilder()
            nobody account.  The latter is kind of a hack to support
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
-        if (drv->useUidRange())
+        if (drv->options.useUidRange(*drv))
             chownToBuilder(chrootRootDir + "/etc");
 
-        if (drv->useUidRange() && (!buildUser || buildUser->getUIDCount() < 65536))
+        if (drv->options.useUidRange(*drv) && (!buildUser || buildUser->getUIDCount() < 65536))
             throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
 
         /* Declare the build user's group so that programs get a consistent
@@ -813,7 +791,7 @@ void LocalDerivationGoal::startBuilder()
         }
 
 #else
-        if (drv->useUidRange())
+        if (drv->options.useUidRange(*drv))
             throw Error("feature 'uid-range' is not supported on this platform");
         #if __APPLE__
             /* We don't really have any parent prep work to do (yet?)
@@ -823,7 +801,7 @@ void LocalDerivationGoal::startBuilder()
         #endif
 #endif
     } else {
-        if (drv->useUidRange())
+        if (drv->options.useUidRange(*drv))
             throw Error("feature 'uid-range' is only supported in sandboxed builds");
     }
 
@@ -868,7 +846,7 @@ void LocalDerivationGoal::startBuilder()
 
     /* Fire up a Nix daemon to process recursive Nix calls from the
        builder. */
-    if (drv->getRequiredSystemFeatures().count("recursive-nix"))
+    if (drv->options.getRequiredSystemFeatures(*drv).count("recursive-nix"))
         startDaemon();
 
     /* Run the builder. */
@@ -1136,18 +1114,12 @@ void LocalDerivationGoal::initTmpDir()
     tmpDirInSandbox = tmpDir;
 #endif
 
-    /* In non-structured mode, add all bindings specified in the
-       derivation via the environment, except those listed in the
-       passAsFile attribute. Those are passed as file names pointing
-       to temporary files containing the contents. Note that
-       passAsFile is ignored in structure mode because it's not
-       needed (attributes are not passed through the environment, so
-       there is no size constraint). */
-    if (!parsedDrv->getStructuredAttrs()) {
-
-        StringSet passAsFile = tokenizeString<StringSet>(getOr(drv->env, "passAsFile", ""));
+    /* In non-structured mode, set all bindings either directory in the
+       environment or via a file, as specified by
+       `DerivationOptions::passAsFile`. */
+    if (!drv->structuredAttrs) {
         for (auto & i : drv->env) {
-            if (passAsFile.find(i.first) == passAsFile.end()) {
+            if (drv->options.passAsFile.find(i.first) == drv->options.passAsFile.end()) {
                 env[i.first] = i.second;
             } else {
                 auto hash = hashString(HashAlgorithm::SHA256, i.first);
@@ -1246,8 +1218,12 @@ void LocalDerivationGoal::initEnv()
 
 void LocalDerivationGoal::writeStructuredAttrs()
 {
-    if (auto structAttrsJson = parsedDrv->prepareStructuredAttrs(worker.store, inputPaths, *drv)) {
-        auto json = structAttrsJson.value();
+    if (drv->structuredAttrs) {
+        auto json = drv->structuredAttrs->prepareStructuredAttrs(
+            worker.store,
+            drv->options,
+            inputPaths,
+            drv->outputs);
         nlohmann::json rewritten;
         for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {
             /* The placeholder must have a rewrite, so we use it to cover both the
@@ -1257,7 +1233,7 @@ void LocalDerivationGoal::writeStructuredAttrs()
 
         json["outputs"] = rewritten;
 
-        auto jsonSh = writeStructuredAttrsShell(json);
+        auto jsonSh = StructuredAttrs::writeShell(json);
 
         writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
         chownToBuilder(tmpDir + "/.attrs.sh");
@@ -1984,7 +1960,7 @@ void LocalDerivationGoal::runChild()
             }
 
             /* Make /etc unwritable */
-            if (!drv->useUidRange())
+            if (!drv->options.useUidRange(*drv))
                 chmod_(chrootRootDir + "/etc", 0555);
 
             /* Unshare this mount namespace. This is necessary because
@@ -2171,7 +2147,7 @@ void LocalDerivationGoal::runChild()
             }
             sandboxProfile += ")\n";
 
-            sandboxProfile += additionalSandboxProfile;
+            sandboxProfile += drv->options.additionalSandboxProfile;
         } else
             sandboxProfile +=
                 #include "sandbox-minimal.sb"
@@ -2179,8 +2155,6 @@ void LocalDerivationGoal::runChild()
 
         debug("Generated sandbox profile:");
         debug(sandboxProfile);
-
-        bool allowLocalNetworking = parsedDrv->getBoolAttr("__darwinAllowLocalNetworking");
 
         /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
             to find temporary directories, so we want to open up a broader place for them to put their files, if needed. */
@@ -2194,7 +2168,7 @@ void LocalDerivationGoal::runChild()
             Strings sandboxArgs;
             sandboxArgs.push_back("_GLOBAL_TMP_DIR");
             sandboxArgs.push_back(globalTmpDir);
-            if (allowLocalNetworking) {
+            if (drv->options.allowLocalNetworking) {
                 sandboxArgs.push_back("_ALLOW_LOCAL_NETWORKING");
                 sandboxArgs.push_back("1");
             }
@@ -2384,14 +2358,8 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             inodesSeen);
 
         bool discardReferences = false;
-        if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
-            if (auto udr = get(*structuredAttrs, "unsafeDiscardReferences")) {
-                if (auto output = get(*udr, outputName)) {
-                    if (!output->is_boolean())
-                        throw Error("attribute 'unsafeDiscardReferences.\"%s\"' of derivation '%s' must be a Boolean", outputName, drvPath.to_string());
-                    discardReferences = output->get<bool>();
-                }
-            }
+        if (auto udr = get(drv->options.unsafeDiscardReferences, outputName)) {
+            discardReferences = *udr;
         }
 
         StorePathSet references;
@@ -2560,7 +2528,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 case FileIngestionMethod::Git: {
                     return git::dumpHash(
                         outputHash.hashAlgo,
-                        {getFSSourceAccessor(), CanonPath(tmpDir + "/tmp")}).hash;
+                        {getFSSourceAccessor(), CanonPath(actualPath)}).hash;
                 }
                 }
                 assert(false);
@@ -2652,10 +2620,14 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                             wanted.to_string(HashFormat::SRI, true),
                             got.to_string(HashFormat::SRI, true)));
                 }
-                if (!newInfo0.references.empty())
+                if (!newInfo0.references.empty()) {
+                    auto numViolations = newInfo.references.size();
                     delayedException = std::make_exception_ptr(
-                        BuildError("illegal path references in fixed-output derivation '%s'",
-                            worker.store.printStorePath(drvPath)));
+                        BuildError("fixed-output derivations must not reference store paths: '%s' references %d distinct paths, e.g. '%s'",
+                            worker.store.printStorePath(drvPath),
+                            numViolations,
+                            worker.store.printStorePath(*newInfo.references.begin())));
+                }
 
                 return newInfo0;
             },
@@ -2902,15 +2874,13 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
                         worker.store.printStorePath(info.path), closureSize, *checks.maxClosureSize);
             }
 
-            auto checkRefs = [&](const std::optional<Strings> & value, bool allowed, bool recursive)
+            auto checkRefs = [&](const StringSet & value, bool allowed, bool recursive)
             {
-                if (!value) return;
-
                 /* Parse a list of reference specifiers.  Each element must
                    either be a store path, or the symbolic name of the output
                    of the derivation (such as `out'). */
                 StorePathSet spec;
-                for (auto & i : *value) {
+                for (auto & i : value) {
                     if (worker.store.isStorePath(i))
                         spec.insert(worker.store.parseStorePath(i));
                     else if (auto output = get(outputs, i))
@@ -2948,16 +2918,35 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
                 }
             };
 
-            checkRefs(checks.allowedReferences, true, false);
-            checkRefs(checks.allowedRequisites, true, true);
-            checkRefs(checks.disallowedReferences, false, false);
-            checkRefs(checks.disallowedRequisites, false, true);
+            /* Mandatory check: absent whitelist, and present but empty
+               whitelist mean very different things. */
+            if (auto & refs = checks.allowedReferences) {
+                checkRefs(*refs, true, false);
+            }
+            if (auto & refs = checks.allowedRequisites) {
+                checkRefs(*refs, true, true);
+            }
+
+            /* Optimization: don't need to do anything when
+               disallowed and empty set. */
+            if (!checks.disallowedReferences.empty()) {
+                checkRefs(checks.disallowedReferences, false, false);
+            }
+            if (!checks.disallowedRequisites.empty()) {
+                checkRefs(checks.disallowedRequisites, false, true);
+            }
         };
 
-        if (auto outputChecks = get(drv->options.checksPerOutput, outputName))
-            applyChecks(*outputChecks);
+        std::visit(overloaded{
+            [&](const DerivationOptions::OutputChecks & checks) {
+                applyChecks(checks);
+            },
+            [&](const std::map<std::string, DerivationOptions::OutputChecks> & checksPerOutput) {
+                if (auto outputChecks = get(checksPerOutput, outputName))
 
-        applyChecks(drv->options.checksAllOutputs);
+                    applyChecks(*outputChecks);
+            },
+        }, drv->options.outputChecks);
     }
 }
 

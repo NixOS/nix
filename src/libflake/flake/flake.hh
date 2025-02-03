@@ -57,7 +57,7 @@ struct FlakeInput
      * false = (fetched) static source path
      */
     bool isFlake = true;
-    std::optional<InputPath> follows;
+    std::optional<InputAttrPath> follows;
     FlakeInputs overrides;
 };
 
@@ -201,13 +201,13 @@ struct LockFlags
     /**
      * Flake inputs to be overridden.
      */
-    std::map<InputPath, FlakeRef> inputOverrides;
+    std::map<InputAttrPath, FlakeRef> inputOverrides;
 
     /**
      * Flake inputs to be updated. This means that any existing lock
      * for those inputs will be ignored.
      */
-    std::set<InputPath> inputUpdates;
+    std::set<InputAttrPath> inputUpdates;
 };
 
 LockedFlake lockFlake(

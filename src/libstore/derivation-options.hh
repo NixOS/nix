@@ -4,24 +4,35 @@
 #include <cstdint>
 #include <nlohmann/json.hpp>
 #include <optional>
-#include "types.hh"
 #include <variant>
+
+#include "types.hh"
+#include "json-impls.hh"
+#include "store-dir-config.hh"
 
 namespace nix {
 
-struct AdditionalAttributes
-{
-    typedef StringPairs Env;
+class Store;
+struct BasicDerivation;
+struct StructuredAttrs;
 
-    std::variant<Env, nlohmann::json> attrs;
-
-    std::optional<std::string> getStringAttr(const std::string & name) const;
-    bool getBoolAttr(const std::string & name, bool def = false) const;
-    std::optional<Strings> getStringsAttr(const std::string & name) const;
-
-    bool operator==(const AdditionalAttributes &) const = default;
-};
-
+/**
+ * This represents all the special options on a `Derivation`.
+ *
+ * Currently, these options are parsed from the environment variables
+ * with the aid of `StructuredAttrs`.
+ *
+ * The first goal of this data type is to make sure that no other code
+ * uses `StructuredAttrs` to ad-hoc parse some additional options. That
+ * ensures this data type is up to date and fully correct.
+ *
+ * The second goal of this data type is to allow an alternative to
+ * hackily parsing the options from the environment variables. The ATerm
+ * format cannot change, but in alternatives to it (like the JSON
+ * format), we have the option of instead storing the options
+ * separately. That would be nice to separate concerns, and not make any
+ * environment variable names magical.
+ */
 struct DerivationOptions
 {
     struct OutputChecks
@@ -35,39 +46,76 @@ struct DerivationOptions
          * A value of `nullopt` indicates that the check is skipped.
          * This means that all references are allowed.
          */
-        std::optional<Strings> allowedReferences = std::nullopt;
+        std::optional<StringSet> allowedReferences;
 
         /**
          * env: disallowedReferences
          *
-         * A value of `nullopt` indicates that the check is skipped.
-         * This means that there are no disallowed references.
+         * No needed for `std::optional`, because skipping the check is
+         * the same as disallowing the references.
          */
-        std::optional<Strings> disallowedReferences = std::nullopt;
+        StringSet disallowedReferences;
 
         /**
          * env: allowedRequisites
          *
          * See `allowedReferences`
          */
-        std::optional<Strings> allowedRequisites = std::nullopt;
+        std::optional<StringSet> allowedRequisites;
 
         /**
          * env: disallowedRequisites
          *
          * See `disallowedReferences`
          */
-        std::optional<Strings> disallowedRequisites = std::nullopt;
+        StringSet disallowedRequisites;
 
         bool operator==(const OutputChecks &) const = default;
-        auto operator<=>(const OutputChecks &) const = default;
     };
 
-    std::map<std::string, OutputChecks> checksPerOutput;
+    /**
+     * Either one set of checks for all outputs, or separate checks
+     * per-output.
+     */
+    std::variant<OutputChecks, std::map<std::string, OutputChecks>> outputChecks = OutputChecks{};
 
-    OutputChecks checksAllOutputs;
+    /**
+     * Whether to avoid scanning for references for a given output.
+     */
+    std::map<std::string, bool> unsafeDiscardReferences;
 
-    AdditionalAttributes attrs;
+    /**
+     * In non-structured mode, all bindings specified in the derivation
+     * go directly via the environment, except those listed in the
+     * passAsFile attribute. Those are instead passed as file names
+     * pointing to temporary files containing the contents.
+     *
+     * Note that passAsFile is ignored in structure mode because it's
+     * not needed (attributes are not passed through the environment, so
+     * there is no size constraint).
+     */
+    StringSet passAsFile;
+
+    /**
+     * The `exportReferencesGraph' feature allows the references graph
+     * to be passed to a builder
+     *
+     * ### Legacy case
+     *
+     * Given a `name` `pathSet` key-value pair, the references graph of
+     * `pathSet` will be stored in a text file `name' in the temporary
+     * build directory.  The text files have the format used by
+     * `nix-store
+     * --register-validity'.  However, the `deriver` fields are left
+     *  empty.
+     *
+     * ### "Structured attributes" case
+     *
+     * The same information will be put put in the final structured
+     * attributes give to the builder. The set of paths in the original JSON
+     * is replaced with a list of `PathInfo` in JSON format.
+     */
+    std::map<std::string, StorePathSet> exportReferencesGraph;
 
     /**
      * env: __sandboxProfile
@@ -89,12 +137,12 @@ struct DerivationOptions
     /**
      * env: __impureHostDeps
      */
-    Strings impureHostDeps = {};
+    StringSet impureHostDeps = {};
 
     /**
      * env: impureEnvVars
      */
-    Strings impureEnvVars = {};
+    StringSet impureEnvVars = {};
 
     /**
      * env: __darwinAllowLocalNetworking
@@ -106,7 +154,7 @@ struct DerivationOptions
     /**
      * env: requiredSystemFeatures
      */
-    Strings requiredSystemFeatures = {};
+    StringSet requiredSystemFeatures = {};
 
     /**
      * env: preferLocalBuild
@@ -119,7 +167,6 @@ struct DerivationOptions
     bool allowSubstitutes = true;
 
     bool operator==(const DerivationOptions &) const = default;
-    auto operator<=>(const DerivationOptions &) const = default;
 
     /**
      * Parse this information from its legacy encoding as part of the
@@ -127,7 +174,42 @@ struct DerivationOptions
      * (e.g. JSON) but is necessary for supporing old formats (e.g.
      * ATerm).
      */
-    static DerivationOptions fromEnv(const StringPairs & env, bool shouldWarn = true);
+    static DerivationOptions fromStructuredAttrs(
+        const StoreDirConfig & store, const StringMap & env, const StructuredAttrs * parsed, bool shouldWarn = true);
+
+    /**
+     * @param drv Must be the same derivation we parsed this from. In
+     * the future we'll flip things around so a `BasicDerivation` has
+     * `DerivationOptions` instead.
+     */
+    StringSet getRequiredSystemFeatures(const BasicDerivation & drv) const;
+
+    /**
+     * @param drv See note on `getRequiredSystemFeatures`
+     */
+    bool canBuildLocally(Store & localStore, const BasicDerivation & drv) const;
+
+    /**
+     * @param drv See note on `getRequiredSystemFeatures`
+     */
+    bool willBuildLocally(Store & localStore, const BasicDerivation & drv) const;
+
+    bool substitutesAllowed() const;
+
+    /**
+     * @param drv See note on `getRequiredSystemFeatures`
+     */
+    bool useUidRange(const BasicDerivation & drv) const;
 };
 
+template<typename T>
+struct json_avoids_null;
+
+template<>
+struct json_avoids_null<DerivationOptions> : std::true_type
+{};
+
 };
+
+JSON_IMPL(DerivationOptions);
+JSON_IMPL(DerivationOptions::OutputChecks)

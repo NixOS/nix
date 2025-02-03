@@ -8,4 +8,5 @@ let
     builtins = builtins // overrides;
   } // import ./lib.nix;
 
-in scopedImport overrides ./imported.nix
+in
+scopedImport overrides ./imported.nix

@@ -1,6 +1,8 @@
 with import ./config.nix;
 
-let innerName = "foo"; in
+let
+  innerName = "foo";
+in
 
 mkDerivation rec {
   name = "${innerName}.drv";

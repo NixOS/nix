@@ -25,14 +25,14 @@ rec {
   makeOverridable = f: {
     /**
       This is a function that can be overridden.
-     */
+    */
     __functor = self: f;
     override = throw "not implemented";
   };
 
   /**
     Compute x^2
-   */
+  */
   square = x: x * x;
 
   helper = makeOverridable square;
@@ -41,8 +41,14 @@ rec {
   makeVeryOverridable = f: {
     /**
       This is a function that can be overridden.
-     */
-    __functor = self: arg: f arg // { override = throw "not implemented"; overrideAttrs = throw "not implemented"; };
+    */
+    __functor =
+      self: arg:
+      f arg
+      // {
+        override = throw "not implemented";
+        overrideAttrs = throw "not implemented";
+      };
     override = throw "not implemented";
   };
 
@@ -64,7 +70,6 @@ rec {
   */
   helper3 = makeVeryOverridable (x: x * x * x);
 
-
   # ------
 
   # getDoc traverses a potentially infinite structure in case of __functor, so
@@ -73,7 +78,7 @@ rec {
   recursive = {
     /**
       This looks bad, but the docs are ok because of the eta expansion.
-     */
+    */
     __functor = self: x: self x;
   };
 
@@ -81,21 +86,23 @@ rec {
     /**
       Docs probably won't work in this case, because the "partial" application
       of self results in an infinite recursion.
-     */
+    */
     __functor = self: self.__functor self;
   };
 
-  diverging = let
-    /**
-      Docs probably won't work in this case, because the "partial" application
-      of self results in an diverging computation that causes a stack overflow.
-      It's not an infinite recursion because each call is different.
-      This must be handled by the documentation retrieval logic, as it
-      reimplements the __functor invocation to be partial.
-     */
-    f = x: {
-      __functor = self: (f (x + 1));
-    };
-  in f null;
+  diverging =
+    let
+      /**
+        Docs probably won't work in this case, because the "partial" application
+        of self results in an diverging computation that causes a stack overflow.
+        It's not an infinite recursion because each call is different.
+        This must be handled by the documentation retrieval logic, as it
+        reimplements the __functor invocation to be partial.
+      */
+      f = x: {
+        __functor = self: (f (x + 1));
+      };
+    in
+    f null;
 
 }

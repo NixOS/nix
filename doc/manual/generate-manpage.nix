@@ -32,7 +32,13 @@ let
 
   commandInfo = fromJSON commandDump;
 
-  showCommand = { command, details, filename, toplevel }:
+  showCommand =
+    {
+      command,
+      details,
+      filename,
+      toplevel,
+    }:
     let
 
       result = ''
@@ -56,26 +62,27 @@ let
         ${maybeOptions}
       '';
 
-      showSynopsis = command: args:
+      showSynopsis =
+        command: args:
         let
-          showArgument = arg: "*${arg.label}*" + optionalString (! arg ? arity) "...";
+          showArgument = arg: "*${arg.label}*" + optionalString (!arg ? arity) "...";
           arguments = concatStringsSep " " (map showArgument args);
-        in ''
+        in
+        ''
           `${command}` [*option*...] ${arguments}
         '';
 
-      maybeSubcommands = optionalString (details ? commands && details.commands != {})
-        ''
-          where *subcommand* is one of the following:
+      maybeSubcommands = optionalString (details ? commands && details.commands != { }) ''
+        where *subcommand* is one of the following:
 
-          ${subcommands}
-        '';
+        ${subcommands}
+      '';
 
-      subcommands = if length categories > 1
-        then listCategories
-        else listSubcommands details.commands;
+      subcommands = if length categories > 1 then listCategories else listSubcommands details.commands;
 
-      categories = sort (x: y: x.id < y.id) (unique (map (cmd: cmd.category) (attrValues details.commands)));
+      categories = sort (x: y: x.id < y.id) (
+        unique (map (cmd: cmd.category) (attrValues details.commands))
+      );
 
       listCategories = concatStrings (map showCategory categories);
 
@@ -99,38 +106,39 @@ let
 
             ${allStores}
           '';
-          index = replaceStrings
-            [ "@store-types@" "./local-store.md" "./local-daemon-store.md" ]
-            [ storesOverview "#local-store" "#local-daemon-store" ]
-            details.doc;
+          index =
+            replaceStrings
+              [ "@store-types@" "./local-store.md" "./local-daemon-store.md" ]
+              [ storesOverview "#local-store" "#local-daemon-store" ]
+              details.doc;
           storesOverview =
             let
-              showEntry = store:
-                "- [${store.name}](#${store.slug})";
+              showEntry = store: "- [${store.name}](#${store.slug})";
             in
             concatStringsSep "\n" (map showEntry storesList) + "\n";
           allStores = concatStringsSep "\n" (attrValues storePages);
-          storePages = listToAttrs
-            (map (s: { name = s.filename; value = s.page; }) storesList);
+          storePages = listToAttrs (
+            map (s: {
+              name = s.filename;
+              value = s.page;
+            }) storesList
+          );
           storesList = showStoreDocs {
             storeInfo = commandInfo.stores;
             inherit inlineHTML;
           };
-          hasInfix = infix: content:
+          hasInfix =
+            infix: content:
             builtins.stringLength content != builtins.stringLength (replaceStrings [ infix ] [ "" ] content);
         in
         optionalString (details ? doc) (
           # An alternate implementation with builtins.match stack overflowed on some systems.
-          if hasInfix "@store-types@" details.doc
-          then help-stores
-          else details.doc
+          if hasInfix "@store-types@" details.doc then help-stores else details.doc
         );
 
       maybeOptions =
         let
-          allVisibleOptions = filterAttrs
-            (_: o: ! o.hiddenCategory)
-            (details.flags // toplevel.flags);
+          allVisibleOptions = filterAttrs (_: o: !o.hiddenCategory) (details.flags // toplevel.flags);
         in
         optionalString (allVisibleOptions != { }) ''
           # Options
@@ -142,55 +150,73 @@ let
           > See [`man nix.conf`](@docroot@/command-ref/conf-file.md#command-line-flags) for overriding configuration settings with command line flags.
         '';
 
-      showOptions = inlineHTML: allOptions:
+      showOptions =
+        inlineHTML: allOptions:
         let
           showCategory = cat: opts: ''
             ${optionalString (cat != "") "## ${cat}"}
 
             ${concatStringsSep "\n" (attrValues (mapAttrs showOption opts))}
           '';
-          showOption = name: option:
+          showOption =
+            name: option:
             let
               result = trim ''
                 - ${item}
 
                   ${option.description}
               '';
-              item = if inlineHTML
-                then ''<span id="opt-${name}">[`--${name}`](#opt-${name})</span> ${shortName} ${labels}''
-                else "`--${name}` ${shortName} ${labels}";
-              shortName = optionalString
-                (option ? shortName)
-                ("/ `-${option.shortName}`");
-              labels = optionalString
-                (option ? labels)
-                (concatStringsSep " " (map (s: "*${s}*") option.labels));
-            in result;
-          categories = mapAttrs
-            # Convert each group from a list of key-value pairs back to an attrset
-            (_: listToAttrs)
-            (groupBy
-              (cmd: cmd.value.category)
-              (attrsToList allOptions));
-        in concatStrings (attrValues (mapAttrs showCategory categories));
-    in squash result;
+              item =
+                if inlineHTML then
+                  ''<span id="opt-${name}">[`--${name}`](#opt-${name})</span> ${shortName} ${labels}''
+                else
+                  "`--${name}` ${shortName} ${labels}";
+              shortName = optionalString (option ? shortName) ("/ `-${option.shortName}`");
+              labels = optionalString (option ? labels) (concatStringsSep " " (map (s: "*${s}*") option.labels));
+            in
+            result;
+          categories =
+            mapAttrs
+              # Convert each group from a list of key-value pairs back to an attrset
+              (_: listToAttrs)
+              (groupBy (cmd: cmd.value.category) (attrsToList allOptions));
+        in
+        concatStrings (attrValues (mapAttrs showCategory categories));
+    in
+    squash result;
 
   appendName = filename: name: (if filename == "nix" then "nix3" else filename) + "-" + name;
 
-  processCommand = { command, details, filename, toplevel }:
+  processCommand =
+    {
+      command,
+      details,
+      filename,
+      toplevel,
+    }:
     let
       cmd = {
         inherit command;
         name = filename + ".md";
-        value = showCommand { inherit command details filename toplevel; };
+        value = showCommand {
+          inherit
+            command
+            details
+            filename
+            toplevel
+            ;
+        };
       };
-      subcommand = subCmd: processCommand {
-        command = command + " " + subCmd;
-        details = details.commands.${subCmd};
-        filename = appendName filename subCmd;
-        inherit toplevel;
-      };
-    in [ cmd ] ++ concatMap subcommand (attrNames details.commands or {});
+      subcommand =
+        subCmd:
+        processCommand {
+          command = command + " " + subCmd;
+          details = details.commands.${subCmd};
+          filename = appendName filename subCmd;
+          inherit toplevel;
+        };
+    in
+    [ cmd ] ++ concatMap subcommand (attrNames details.commands or { });
 
   manpages = processCommand {
     command = "nix";
@@ -199,9 +225,11 @@ let
     toplevel = commandInfo.args;
   };
 
-  tableOfContents = let
-    showEntry = page:
-      "    - [${page.command}](command-ref/new-cli/${page.name})";
-    in concatStringsSep "\n" (map showEntry manpages) + "\n";
+  tableOfContents =
+    let
+      showEntry = page: "    - [${page.command}](command-ref/new-cli/${page.name})";
+    in
+    concatStringsSep "\n" (map showEntry manpages) + "\n";
 
-in (listToAttrs manpages) // { "SUMMARY.md" = tableOfContents; }
+in
+(listToAttrs manpages) // { "SUMMARY.md" = tableOfContents; }

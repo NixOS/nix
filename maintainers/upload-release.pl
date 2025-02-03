@@ -42,7 +42,7 @@ my $flakeUrl = $evalInfo->{flake};
 my $flakeInfo = decode_json(`nix flake metadata --json "$flakeUrl"` or die) if $flakeUrl;
 my $nixRev = ($flakeInfo ? $flakeInfo->{revision} : $evalInfo->{jobsetevalinputs}->{nix}->{revision}) or die;
 
-my $buildInfo = decode_json(fetch("$evalUrl/job/build.nix.x86_64-linux", 'application/json'));
+my $buildInfo = decode_json(fetch("$evalUrl/job/build.nix-everything.x86_64-linux", 'application/json'));
 #print Dumper($buildInfo);
 
 my $releaseName = $buildInfo->{nixname};
@@ -91,7 +91,7 @@ sub getStorePath {
 sub copyManual {
     my $manual;
     eval {
-        $manual = getStorePath("build.nix.x86_64-linux", "doc");
+        $manual = getStorePath("manual");
     };
     if ($@) {
         warn "$@";
@@ -240,12 +240,12 @@ if ($haveDocker) {
 # Upload nix-fallback-paths.nix.
 write_file("$tmpDir/fallback-paths.nix",
     "{\n" .
-    "  x86_64-linux = \"" . getStorePath("build.nix.x86_64-linux") . "\";\n" .
-    "  i686-linux = \"" . getStorePath("build.nix.i686-linux") . "\";\n" .
-    "  aarch64-linux = \"" . getStorePath("build.nix.aarch64-linux") . "\";\n" .
-    "  riscv64-linux = \"" . getStorePath("buildCross.nix.riscv64-unknown-linux-gnu.x86_64-linux") . "\";\n" .
-    "  x86_64-darwin = \"" . getStorePath("build.nix.x86_64-darwin") . "\";\n" .
-    "  aarch64-darwin = \"" . getStorePath("build.nix.aarch64-darwin") . "\";\n" .
+    "  x86_64-linux = \"" . getStorePath("build.nix-everything.x86_64-linux") . "\";\n" .
+    "  i686-linux = \"" . getStorePath("build.nix-everything.i686-linux") . "\";\n" .
+    "  aarch64-linux = \"" . getStorePath("build.nix-everything.aarch64-linux") . "\";\n" .
+    "  riscv64-linux = \"" . getStorePath("buildCross.nix-everything.riscv64-unknown-linux-gnu.x86_64-linux") . "\";\n" .
+    "  x86_64-darwin = \"" . getStorePath("build.nix-everything.x86_64-darwin") . "\";\n" .
+    "  aarch64-darwin = \"" . getStorePath("build.nix-everything.aarch64-darwin") . "\";\n" .
     "}\n");
 
 # Upload release files to S3.

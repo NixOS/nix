@@ -1,39 +1,45 @@
 #pragma once
 ///@file
 
-#include "derivations.hh"
-#include "store-api.hh"
+#include <nlohmann/json.hpp>
 
-#include <nlohmann/json_fwd.hpp>
+#include "types.hh"
+#include "path.hh"
 
 namespace nix {
 
-class ParsedDerivation
+class Store;
+struct DerivationOptions;
+struct DerivationOutput;
+
+typedef std::map<std::string, DerivationOutput> DerivationOutputs;
+
+struct StructuredAttrs
 {
-    const StringPairs & env;
-    std::unique_ptr<nlohmann::json> structuredAttrs;
+    nlohmann::json structuredAttrs;
 
-public:
+    bool operator==(const StructuredAttrs &) const = default;
 
-    ParsedDerivation(const StringPairs & env);
+    static std::optional<StructuredAttrs> tryParse(const StringPairs & env);
 
-    ~ParsedDerivation();
+    nlohmann::json prepareStructuredAttrs(
+        Store & store,
+        const DerivationOptions & drvOptions,
+        const StorePathSet & inputPaths,
+        const DerivationOutputs & outputs) const;
 
-    const nlohmann::json * getStructuredAttrs() const
-    {
-        return structuredAttrs.get();
-    }
-
-    std::optional<std::string> getStringAttr(const std::string & name) const;
-
-    bool getBoolAttr(const std::string & name, bool def = false) const;
-
-    std::optional<Strings> getStringsAttr(const std::string & name) const;
-
-    std::optional<nlohmann::json>
-    prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths, const BasicDerivation & drv);
+    /**
+     * As a convenience to bash scripts, write a shell file that
+     * maps all attributes that are representable in bash -
+     * namely, strings, integers, nulls, Booleans, and arrays and
+     * objects consisting entirely of those values. (So nested
+     * arrays or objects are not supported.)
+     *
+     * @param prepared This should be the result of
+     * `prepareStructuredAttrs`, *not* the original `structuredAttrs`
+     * field.
+     */
+    static std::string writeShell(const nlohmann::json & prepared);
 };
-
-std::string writeStructuredAttrsShell(const nlohmann::json & json);
 
 }

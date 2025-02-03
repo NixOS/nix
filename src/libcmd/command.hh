@@ -347,7 +347,7 @@ struct MixEnvironment : virtual Args
     void setEnviron();
 };
 
-void completeFlakeInputPath(
+void completeFlakeInputAttrPath(
     AddCompletions & completions,
     ref<EvalState> evalState,
     const std::vector<FlakeRef> & flakeRefs,

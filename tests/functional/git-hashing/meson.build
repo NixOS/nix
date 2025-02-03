@@ -3,6 +3,7 @@ suites += {
   'deps': [],
   'tests': [
     'simple.sh',
+    'fixed.sh',
   ],
   'workdir': meson.current_source_dir(),
 }

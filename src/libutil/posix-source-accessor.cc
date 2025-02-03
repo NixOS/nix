@@ -124,7 +124,9 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
             S_ISLNK(st->st_mode) ? tSymlink :
             S_ISCHR(st->st_mode) ? tChar :
             S_ISBLK(st->st_mode) ? tBlock :
+#ifdef S_ISSOCK
             S_ISSOCK(st->st_mode) ? tSocket :
+#endif
             S_ISFIFO(st->st_mode) ? tFifo :
             tUnknown,
         .fileSize = S_ISREG(st->st_mode) ? std::optional<uint64_t>(st->st_size) : std::nullopt,

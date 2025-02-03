@@ -8,6 +8,7 @@
 #include "types.hh"
 #include "util.hh"
 #include "parsed-derivations.hh"
+#include "split.hh"
 #include "common-protocol.hh"
 #include "common-protocol-impl.hh"
 #include "strings-inline.hh"
@@ -15,7 +16,6 @@
 
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
-#include <optional>
 
 namespace nix {
 
@@ -467,10 +467,16 @@ Derivation parseDerivation(
 
     expect(str, ")");
 
-    drv.options = DerivationOptions::fromEnv(drv.env);
+    drv.structuredAttrs = StructuredAttrs::tryParse(drv.env);
+
+    drv.options = DerivationOptions::fromStructuredAttrs(
+        store,
+        drv.env,
+        drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
 
     return drv;
 }
+
 
 /**
  * Print a derivation string literal to an `std::string`.
@@ -654,7 +660,16 @@ std::string Derivation::unparse(const StoreDirConfig & store, bool maskOutputs,
     s += ','; printString(s, builder);
     s += ','; printStrings(s, args.begin(), args.end());
 
-    auto optionsFromEnv = DerivationOptions::fromEnv(env, false);
+    auto structuredAttrsFromEnv = StructuredAttrs::tryParse(env);
+
+    if (structuredAttrsFromEnv != structuredAttrs)
+        throw Error(
+            "'drv.structuredAttrs' and 'drv.env' are out of sync. This is probably an internal error, please open an issue!");
+
+    auto optionsFromEnv = DerivationOptions::fromStructuredAttrs(
+            store,
+            env,
+            structuredAttrs ? &*structuredAttrs : nullptr);
 
     if (optionsFromEnv != options)
         throw Error(
@@ -976,7 +991,12 @@ Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivati
         drv.env[key] = value;
     }
 
-    drv.options = DerivationOptions::fromEnv(drv.env);
+    drv.structuredAttrs = StructuredAttrs::tryParse(drv.env);
+
+    drv.options = DerivationOptions::fromStructuredAttrs(
+        store,
+        drv.env,
+        drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
 
     return in;
 }
@@ -1322,48 +1342,6 @@ DerivationOutput DerivationOutput::fromJSON(
     }
 }
 
-StringSet Derivation::getRequiredSystemFeatures() const
-{
-    // FIXME: cache this?
-    StringSet res;
-    for (auto & i : this->options.requiredSystemFeatures)
-        res.insert(i);
-    if (!this->type().hasKnownOutputPaths())
-        res.insert("ca-derivations");
-    return res;
-}
-
-bool Derivation::canBuildLocally(Store & localStore) const
-{
-    if (this->platform != settings.thisSystem.get()
-        && !settings.extraPlatforms.get().count(this->platform)
-        && !this->isBuiltin())
-        return false;
-
-    if (settings.maxBuildJobs.get() == 0
-        && !this->isBuiltin())
-        return false;
-
-    for (auto & feature : getRequiredSystemFeatures())
-        if (!localStore.systemFeatures.get().count(feature)) return false;
-
-    return true;
-}
-
-bool Derivation::willBuildLocally(Store & localStore) const
-{
-    return this->options.preferLocalBuild && canBuildLocally(localStore);
-}
-
-bool Derivation::substitutesAllowed() const
-{
-    return settings.alwaysAllowSubstitutes ? true : this->options.allowSubstitutes;
-}
-
-bool Derivation::useUidRange() const
-{
-    return getRequiredSystemFeatures().count("uid-range");
-}
 
 nlohmann::json Derivation::toJSON(const StoreDirConfig & store) const
 {
@@ -1479,71 +1457,6 @@ Derivation Derivation::fromJSON(
     res.options = options.get<DerivationOptions>();
 
     return res;
-}
-
-}
-
-namespace nlohmann {
-
-using namespace nix;
-
-DerivationOptions adl_serializer<DerivationOptions>::from_json(const json & json) {
-    DerivationOptions res;
-
-    res.additionalSandboxProfile = getString(valueAt(json, "additionalSandboxProfile"));
-    res.noChroot = getBoolean(valueAt(json, "noChroot"));
-    res.impureHostDeps = getStringList(valueAt(json, "impureHostDeps"));
-    res.impureEnvVars = getStringList(valueAt(json, "impureEnvVars"));
-    res.allowLocalNetworking = getBoolean(valueAt(json, "allowLocalNetworking"));
-
-    res.checksAllOutputs = json;
-    res.checksPerOutput = valueAt(json, "outputChecks");
-
-    res.requiredSystemFeatures = getStringList(valueAt(json, "requiredSystemFeatures"));
-    res.preferLocalBuild = getBoolean(valueAt(json, "preferLocalBuild"));
-    res.allowSubstitutes = getBoolean(valueAt(json, "allowSubstitutes"));
-
-    return res;
-}
-
-void adl_serializer<DerivationOptions>::to_json(json & json, DerivationOptions o) {
-    json["additionalSandboxProfile"] = o.additionalSandboxProfile;
-    json["noChroot"] = o.noChroot;
-    json["impureHostDeps"] = o.impureHostDeps;
-    json["impureEnvVars"] = o.impureEnvVars;
-    json["allowLocalNetworking"] = o.allowLocalNetworking;
-
-    json["outputChecks"] = o.checksPerOutput;
-
-    json["ignoreSelfRefs"] = o.checksAllOutputs.ignoreSelfRefs;
-    json["allowedReferences"] = o.checksAllOutputs.allowedReferences;
-    json["allowedRequisites"] = o.checksAllOutputs.allowedRequisites;
-    json["disallowedReferences"] = o.checksAllOutputs.disallowedReferences;
-    json["disallowedRequisites"] = o.checksAllOutputs.disallowedRequisites;
-
-    json["requiredSystemFeatures"] = o.requiredSystemFeatures;
-    json["preferLocalBuild"] = o.preferLocalBuild;
-    json["allowSubstitutes"] = o.allowSubstitutes;
-}
-
-DerivationOptions::OutputChecks adl_serializer<DerivationOptions::OutputChecks>::from_json(const json & json) {
-    DerivationOptions::OutputChecks res;
-
-    res.ignoreSelfRefs = getBoolean(valueAt(json, "ignoreSelfRefs"));
-    res.allowedReferences = nullableValueAt(json, "allowedReferences");
-    res.allowedRequisites = nullableValueAt(json, "allowedRequisites");
-    res.disallowedReferences = nullableValueAt(json, "disallowedReferences");
-    res.disallowedRequisites = nullableValueAt(json, "disallowedRequisites");
-
-    return res;
-}
-
-void adl_serializer<DerivationOptions::OutputChecks>::to_json(json & json, DerivationOptions::OutputChecks c) {
-    json["ignoreSelfRefs"] = c.ignoreSelfRefs;
-    json["allowedReferences"] = c.allowedReferences;
-    json["allowedRequisites"] = c.allowedRequisites;
-    json["disallowedReferences"] = c.disallowedReferences;
-    json["disallowedRequisites"] = c.disallowedRequisites;
 }
 
 }

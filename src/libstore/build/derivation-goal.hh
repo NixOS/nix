@@ -1,7 +1,8 @@
 #pragma once
 ///@file
 
-#include "parsed-derivations.hh"
+#include "derivations.hh"
+#include "derivation-options.hh"
 #ifndef _WIN32
 #  include "user-lock.hh"
 #endif
@@ -141,8 +142,6 @@ struct DerivationGoal : public Goal
      * The derivation stored at drvPath.
      */
     std::unique_ptr<Derivation> drv;
-
-    std::unique_ptr<ParsedDerivation> parsedDrv;
 
     /**
      * The remainder is state held during the build.

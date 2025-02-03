@@ -97,7 +97,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
             // FIXME: don't call an external process.
             runProgram(getNixBin("nix-env").string(), false,
-                {"--profile", profileDir, "-i", store->printStorePath(storePath), "--no-sandbox"});
+                {"--profile", profileDir.string(), "-i", store->printStorePath(storePath), "--no-sandbox"});
         }
 
         printInfo(ANSI_GREEN "upgrade to version %s done" ANSI_NORMAL, version);
@@ -120,7 +120,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         // Resolve profile to /nix/var/nix/profiles/<name> link.
         while (canonPath(profileDir.string()).find("/profiles/") == std::string::npos && std::filesystem::is_symlink(profileDir))
-            profileDir = readLink(profileDir);
+            profileDir = readLink(profileDir.string());
 
         printInfo("found profile %s", profileDir);
 

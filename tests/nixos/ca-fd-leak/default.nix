@@ -27,12 +27,15 @@ let
   # domain socket.
   # Compiled statically so that we can easily send it to the VM and use it
   # inside the build sandbox.
-  sender = pkgs.runCommandWith {
-    name = "sender";
-    stdenv = pkgs.pkgsStatic.stdenv;
-  } ''
-    $CC -static -o $out ${./sender.c}
-  '';
+  sender =
+    pkgs.runCommandWith
+      {
+        name = "sender";
+        stdenv = pkgs.pkgsStatic.stdenv;
+      }
+      ''
+        $CC -static -o $out ${./sender.c}
+      '';
 
   # Okay, so we have a file descriptor shipped out of the FOD now. But the
   # Nix store is read-only, right? .. Well, yeah. But this file descriptor
@@ -47,44 +50,57 @@ in
   name = "ca-fd-leak";
 
   nodes.machine =
-    { config, lib, pkgs, ... }:
-    { virtualisation.writableStore = true;
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
+    {
+      virtualisation.writableStore = true;
       nix.settings.substituters = lib.mkForce [ ];
-      virtualisation.additionalPaths = [ pkgs.busybox-sandbox-shell sender smuggler pkgs.socat ];
+      virtualisation.additionalPaths = [
+        pkgs.busybox-sandbox-shell
+        sender
+        smuggler
+        pkgs.socat
+      ];
     };
 
-  testScript = { nodes }: ''
-    start_all()
+  testScript =
+    { nodes }:
+    ''
+      start_all()
 
-    machine.succeed("echo hello")
-    # Start the smuggler server
-    machine.succeed("${smuggler}/bin/smuggler ${socketName} >&2 &")
+      machine.succeed("echo hello")
+      # Start the smuggler server
+      machine.succeed("${smuggler}/bin/smuggler ${socketName} >&2 &")
 
-    # Build the smuggled derivation.
-    # This will connect to the smuggler server and send it the file descriptor
-    machine.succeed(r"""
-      nix-build -E '
-        builtins.derivation {
-          name = "smuggled";
-          system = builtins.currentSystem;
-          # look ma, no tricks!
-          outputHashMode = "flat";
-          outputHashAlgo = "sha256";
-          outputHash = builtins.hashString "sha256" "hello, world\n";
-          builder = "${pkgs.busybox-sandbox-shell}/bin/sh";
-          args = [ "-c" "echo \"hello, world\" > $out; ''${${sender}} ${socketName}" ];
-      }'
-    """.strip())
+      # Build the smuggled derivation.
+      # This will connect to the smuggler server and send it the file descriptor
+      machine.succeed(r"""
+        nix-build -E '
+          builtins.derivation {
+            name = "smuggled";
+            system = builtins.currentSystem;
+            # look ma, no tricks!
+            outputHashMode = "flat";
+            outputHashAlgo = "sha256";
+            outputHash = builtins.hashString "sha256" "hello, world\n";
+            builder = "${pkgs.busybox-sandbox-shell}/bin/sh";
+            args = [ "-c" "echo \"hello, world\" > $out; ''${${sender}} ${socketName}" ];
+        }'
+      """.strip())
 
 
-    # Tell the smuggler server that we're done
-    machine.execute("echo done | ${pkgs.socat}/bin/socat - ABSTRACT-CONNECT:${socketName}")
+      # Tell the smuggler server that we're done
+      machine.execute("echo done | ${pkgs.socat}/bin/socat - ABSTRACT-CONNECT:${socketName}")
 
-    # Check that the file was not modified
-    machine.succeed(r"""
-      cat ./result
-      test "$(cat ./result)" = "hello, world"
-    """.strip())
-  '';
+      # Check that the file was not modified
+      machine.succeed(r"""
+        cat ./result
+        test "$(cat ./result)" = "hello, world"
+      """.strip())
+    '';
 
 }

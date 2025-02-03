@@ -1,4 +1,6 @@
-{ hashInvalidator ? "" }:
+{
+  hashInvalidator ? "",
+}:
 with import ./config.nix;
 
 let

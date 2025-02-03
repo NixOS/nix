@@ -33,7 +33,7 @@ namespace nix {
 
 namespace fs { using namespace std::filesystem; }
 
-void completeFlakeInputPath(
+void completeFlakeInputAttrPath(
     AddCompletions & completions,
     ref<EvalState> evalState,
     const std::vector<FlakeRef> & flakeRefs,
@@ -117,10 +117,10 @@ MixFlakeOptions::MixFlakeOptions()
         .labels = {"input-path"},
         .handler = {[&](std::string s) {
             warn("'--update-input' is a deprecated alias for 'flake update' and will be removed in a future version.");
-            lockFlags.inputUpdates.insert(flake::parseInputPath(s));
+            lockFlags.inputUpdates.insert(flake::parseInputAttrPath(s));
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
-            completeFlakeInputPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
+            completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
         }}
     });
 
@@ -129,15 +129,15 @@ MixFlakeOptions::MixFlakeOptions()
         .description = "Override a specific flake input (e.g. `dwarffs/nixpkgs`). This implies `--no-write-lock-file`.",
         .category = category,
         .labels = {"input-path", "flake-url"},
-        .handler = {[&](std::string inputPath, std::string flakeRef) {
+        .handler = {[&](std::string inputAttrPath, std::string flakeRef) {
             lockFlags.writeLockFile = false;
             lockFlags.inputOverrides.insert_or_assign(
-                flake::parseInputPath(inputPath),
+                flake::parseInputAttrPath(inputAttrPath),
                 parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()), true));
         }},
         .completer = {[&](AddCompletions & completions, size_t n, std::string_view prefix) {
             if (n == 0) {
-                completeFlakeInputPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
+                completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
             } else if (n == 1) {
                 completeFlakeRef(completions, getEvalState()->store, prefix);
             }
