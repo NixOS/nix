@@ -187,6 +187,7 @@ headers = [config_h] + files(
   'comparator.hh',
   'compression.hh',
   'compute-levels.hh',
+  'config-abstract.hh',
   'config-global.hh',
   'config-impl.hh',
   'config.hh',

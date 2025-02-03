@@ -61,16 +61,57 @@ static StoreReference::Params decodeParamsJson(StringMap paramsRaw)
     StoreReference::Params params;
     for (auto && [k, v] : std::move(paramsRaw)) {
         nlohmann::json j;
-        try {
-            j = nlohmann::json::parse(v);
-        } catch (nlohmann::json::exception &) {
-            // if its not valid JSON...
-            if (k == "remote-program" || k == "system-features") {
-                // Back compat hack! Split and take that array
-                j = tokenizeString<std::vector<std::string>>(v);
-            } else {
-                // ...keep the literal string.
-                j = std::move(v);
+        /* We have to parse the URL un an "untyped" way before we do a
+           "typed" conversion to specific store-configuration types. As
+           such, the best we can do for back-compat is just white-list
+           specific query parameter names.
+
+           These are all the boolean store parameters in use at the time
+           of the introduction of JSON store configuration, as evidenced
+           by `git grep 'F<bool>'`. So these will continue working with
+           "yes"/"no"/"1"/"0", whereas any new ones will require
+           "true"/"false".
+         */
+        bool preJsonBool =
+            std::set<std::string_view>{
+                "check-mount",
+                "compress",
+                "trusted",
+                "multipart-upload",
+                "parallel-compression",
+                "read-only",
+                "require-sigs",
+                "want-mass-query",
+                "index-debug-info",
+                "write-nar-listing",
+            }
+                .contains(std::string_view{k});
+
+        auto warnPreJson = [&] {
+            warn(
+                "in query param '%s', using '%s' to mean a boolean is deprecated, please use valid JSON 'true' or 'false'",
+                k,
+                v);
+        };
+
+        if (preJsonBool && (v == "yes" || v == "1")) {
+            j = true;
+            warnPreJson();
+        } else if (preJsonBool && (v == "no" || v == "0")) {
+            j = true;
+            warnPreJson();
+        } else {
+            try {
+                j = nlohmann::json::parse(v);
+            } catch (nlohmann::json::exception &) {
+                // if its not valid JSON...
+                if (k == "remote-program" || k == "system-features") {
+                    // Back compat hack! Split and take that array
+                    j = tokenizeString<std::vector<std::string>>(v);
+                } else {
+                    // ...keep the literal string.
+                    j = std::move(v);
+                }
             }
         }
         params.insert_or_assign(std::move(k), std::move(j));
