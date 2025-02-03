@@ -971,7 +971,7 @@ void LocalDerivationGoal::startBuilder()
     writeStructuredAttrs();
 
     /* Handle exportReferencesGraph(), if set. */
-    if (!parsedDrv->hasStructuredAttrs()) {
+    if (!parsedDrv) {
         for (auto & [fileName, ss] : drvOptions->exportReferencesGraph) {
             StorePathSet storePathSet;
             for (auto & storePathS : ss) {
@@ -1475,7 +1475,7 @@ void LocalDerivationGoal::initTmpDir()
     /* In non-structured mode, set all bindings either directory in the
        environment or via a file, as specified by
        `DerivationOptions::passAsFile`. */
-    if (!parsedDrv->hasStructuredAttrs()) {
+    if (!parsedDrv) {
         for (auto & i : drv->env) {
             if (drvOptions->passAsFile.find(i.first) == drvOptions->passAsFile.end()) {
                 env[i.first] = i.second;
@@ -1576,13 +1576,12 @@ void LocalDerivationGoal::initEnv()
 
 void LocalDerivationGoal::writeStructuredAttrs()
 {
-    if (auto structAttrsJson = parsedDrv->prepareStructuredAttrs(
+    if (parsedDrv) {
+        auto json = parsedDrv->prepareStructuredAttrs(
             worker.store,
             *drvOptions,
             inputPaths,
-            drv->outputs))
-    {
-        auto json = structAttrsJson.value();
+            drv->outputs);
         nlohmann::json rewritten;
         for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {
             /* The placeholder must have a rewrite, so we use it to cover both the
@@ -1592,7 +1591,7 @@ void LocalDerivationGoal::writeStructuredAttrs()
 
         json["outputs"] = rewritten;
 
-        auto jsonSh = writeStructuredAttrsShell(json);
+        auto jsonSh = StructuredAttrs::writeShell(json);
 
         writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
         chownToBuilder(tmpDir + "/.attrs.sh");

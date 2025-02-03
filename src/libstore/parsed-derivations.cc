@@ -1,4 +1,6 @@
 #include "nix/store/parsed-derivations.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/derivations.hh"
 #include "nix/store/derivation-options.hh"
 
 #include <nlohmann/json.hpp>
@@ -6,94 +8,20 @@
 
 namespace nix {
 
-ParsedDerivation::ParsedDerivation(const StringPairs & env)
-    : env(env)
+std::optional<StructuredAttrs> StructuredAttrs::tryParse(const StringPairs & env)
 {
     /* Parse the __json attribute, if any. */
     auto jsonAttr = env.find("__json");
     if (jsonAttr != env.end()) {
         try {
-            structuredAttrs = std::make_unique<nlohmann::json>(nlohmann::json::parse(jsonAttr->second));
+            return StructuredAttrs {
+                .structuredAttrs = nlohmann::json::parse(jsonAttr->second),
+            };
         } catch (std::exception & e) {
             throw Error("cannot process __json attribute: %s", e.what());
         }
     }
-}
-
-ParsedDerivation::~ParsedDerivation() { }
-
-std::optional<std::string> ParsedDerivation::getStringAttr(const std::string & name) const
-{
-    if (structuredAttrs) {
-        auto i = structuredAttrs->find(name);
-        if (i == structuredAttrs->end())
-            return {};
-        else {
-            if (!i->is_string())
-                throw Error("attribute '%s' of must be a string", name);
-            return i->get<std::string>();
-        }
-    } else {
-        auto i = env.find(name);
-        if (i == env.end())
-            return {};
-        else
-            return i->second;
-    }
-}
-
-bool ParsedDerivation::getBoolAttr(const std::string & name, bool def) const
-{
-    if (structuredAttrs) {
-        auto i = structuredAttrs->find(name);
-        if (i == structuredAttrs->end())
-            return def;
-        else {
-            if (!i->is_boolean())
-                throw Error("attribute '%s' must be a Boolean", name);
-            return i->get<bool>();
-        }
-    } else {
-        auto i = env.find(name);
-        if (i == env.end())
-            return def;
-        else
-            return i->second == "1";
-    }
-}
-
-std::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name) const
-{
-    if (structuredAttrs) {
-        auto i = structuredAttrs->find(name);
-        if (i == structuredAttrs->end())
-            return {};
-        else {
-            if (!i->is_array())
-                throw Error("attribute '%s' must be a list of strings", name);
-            Strings res;
-            for (auto j = i->begin(); j != i->end(); ++j) {
-                if (!j->is_string())
-                    throw Error("attribute '%s' must be a list of strings", name);
-                res.push_back(j->get<std::string>());
-            }
-            return res;
-        }
-    } else {
-        auto i = env.find(name);
-        if (i == env.end())
-            return {};
-        else
-            return tokenizeString<Strings>(i->second);
-    }
-}
-
-std::optional<StringSet> ParsedDerivation::getStringSetAttr(const std::string & name) const
-{
-    auto ss = getStringsAttr(name);
-    return ss
-        ? (std::optional{StringSet{ss->begin(), ss->end()}})
-        : (std::optional<StringSet>{});
+    return {};
 }
 
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
@@ -152,15 +80,14 @@ static nlohmann::json pathInfoToJSON(
     return jsonList;
 }
 
-std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(
+nlohmann::json StructuredAttrs::prepareStructuredAttrs(
     Store & store,
     const DerivationOptions & drvOptions,
     const StorePathSet & inputPaths,
-    const DerivationOutputs & outputs)
+    const DerivationOutputs & outputs) const
 {
-    if (!structuredAttrs) return std::nullopt;
-
-    auto json = *structuredAttrs;
+    /* Copy to then modify */
+    auto json = structuredAttrs;
 
     /* Add an "outputs" object containing the output paths. */
     nlohmann::json outputsJson;
@@ -180,12 +107,7 @@ std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(
     return json;
 }
 
-/* As a convenience to bash scripts, write a shell file that
-   maps all attributes that are representable in bash -
-   namely, strings, integers, nulls, Booleans, and arrays and
-   objects consisting entirely of those values. (So nested
-   arrays or objects are not supported.) */
-std::string writeStructuredAttrsShell(const nlohmann::json & json)
+std::string StructuredAttrs::writeShell(const nlohmann::json & json)
 {
 
     auto handleSimpleType = [](const nlohmann::json & value) -> std::optional<std::string> {

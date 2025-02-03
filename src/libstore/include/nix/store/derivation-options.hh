@@ -13,16 +13,16 @@ namespace nix {
 
 class Store;
 struct BasicDerivation;
-class ParsedDerivation;
+struct StructuredAttrs;
 
 /**
  * This represents all the special options on a `Derivation`.
  *
  * Currently, these options are parsed from the environment variables
- * with the aid of `ParsedDerivation`.
+ * with the aid of `StructuredAttrs`.
  *
  * The first goal of this data type is to make sure that no other code
- * uses `ParsedDerivation` to ad-hoc parse some additional options. That
+ * uses `StructuredAttrs` to ad-hoc parse some additional options. That
  * ensures this data type is up to date and fully correct.
  *
  * The second goal of this data type is to allow an alternative to
@@ -173,7 +173,8 @@ struct DerivationOptions
      * (e.g. JSON) but is necessary for supporing old formats (e.g.
      * ATerm).
      */
-    static DerivationOptions fromParsedDerivation(const ParsedDerivation & parsed, bool shouldWarn = true);
+    static DerivationOptions
+    fromStructuredAttrs(const StringMap & env, const StructuredAttrs * parsed, bool shouldWarn = true);
 
     /**
      * @param drv Must be the same derivation we parsed this from. In
