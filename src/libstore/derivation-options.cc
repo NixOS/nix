@@ -3,9 +3,11 @@
 #include "parsed-derivations.hh"
 #include "types.hh"
 #include "util.hh"
+
 #include <optional>
 #include <string>
 #include <variant>
+#include <regex>
 
 namespace nix {
 
@@ -13,7 +15,8 @@ using OutputChecks = DerivationOptions::OutputChecks;
 
 using OutputChecksVariant = std::variant<OutputChecks, std::map<std::string, OutputChecks>>;
 
-DerivationOptions DerivationOptions::fromParsedDerivation(const ParsedDerivation & parsed, bool shouldWarn)
+DerivationOptions
+DerivationOptions::fromParsedDerivation(const StoreDirConfig & store, const ParsedDerivation & parsed, bool shouldWarn)
 {
     DerivationOptions defaults = {};
 
@@ -126,6 +129,39 @@ DerivationOptions DerivationOptions::fromParsedDerivation(const ParsedDerivation
                 }
                 return res;
             }(),
+        .exportReferencesGraph =
+            [&] {
+                std::map<std::string, StorePathSet> ret;
+
+                if (auto structuredAttrs = parsed.structuredAttrs.get()) {
+                    auto e = optionalValueAt(*structuredAttrs, "exportReferencesGraph");
+                    if (!e || !e->is_object())
+                        return ret;
+                    for (auto & [key, storePathsJson] : getObject(*e)) {
+                        StorePathSet storePaths;
+                        for (auto & p : storePathsJson)
+                            storePaths.insert(store.toStorePath(p.get<std::string>()).first);
+                        ret.insert_or_assign(key, std::move(storePaths));
+                    }
+                } else {
+                    auto s = getOr(parsed.drv.env, "exportReferencesGraph", "");
+                    Strings ss = tokenizeString<Strings>(s);
+                    if (ss.size() % 2 != 0)
+                        throw BuildError("odd number of tokens in 'exportReferencesGraph': '%1%'", s);
+                    for (Strings::iterator i = ss.begin(); i != ss.end();) {
+                        auto fileName = std::move(*i++);
+                        static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
+                        if (!std::regex_match(fileName, regex))
+                            throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
+
+                        auto & storePathS = *i++;
+                        if (!store.isInStore(storePathS))
+                            throw Error("'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
+                        ret.insert_or_assign(std::move(fileName), StorePathSet{store.toStorePath(storePathS).first});
+                    }
+                }
+                return ret;
+            }(),
         .additionalSandboxProfile =
             parsed.getStringAttr("__sandboxProfile").value_or(defaults.additionalSandboxProfile),
         .noChroot = parsed.getBoolAttr("__noChroot", defaults.noChroot),
@@ -180,7 +216,6 @@ bool DerivationOptions::useUidRange(const BasicDerivation & drv) const
 {
     return getRequiredSystemFeatures(drv).count("uid-range");
 }
-
 }
 
 namespace nlohmann {

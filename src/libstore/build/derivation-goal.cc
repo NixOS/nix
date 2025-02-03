@@ -182,7 +182,8 @@ Goal::Co DerivationGoal::haveDerivation()
 
     parsedDrv = std::make_unique<ParsedDerivation>(*drv);
     try {
-        drvOptions = std::make_unique<DerivationOptions>(DerivationOptions::fromParsedDerivation(*parsedDrv));
+        drvOptions = std::make_unique<DerivationOptions>(
+            DerivationOptions::fromParsedDerivation(worker.store, *parsedDrv));
     } catch (Error & e) {
         e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
         throw;

@@ -225,7 +225,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
             ParsedDerivation parsedDrv(*drv);
             DerivationOptions drvOptions;
             try {
-                drvOptions = DerivationOptions::fromParsedDerivation(parsedDrv);
+                drvOptions = DerivationOptions::fromParsedDerivation(*this, parsedDrv);
             } catch (Error & e) {
                 e.addTrace({}, "while parsing derivation '%s'", printStorePath(drvPath));
                 throw;
