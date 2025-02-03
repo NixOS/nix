@@ -24,7 +24,11 @@ struct SSHStoreConfig : std::enable_shared_from_this<SSHStoreConfig>,
 
     std::optional<LocalFSStore::Config> mounted;
 
-    SSHStoreConfig(std::string_view scheme, std::string_view authority, const StoreReference::Params & params);
+    SSHStoreConfig(
+        std::string_view scheme,
+        std::string_view authority,
+        const StoreReference::Params & params,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     static const std::string name()
     {

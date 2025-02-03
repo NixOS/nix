@@ -81,12 +81,13 @@ config::SettingDescriptionMap SSHStoreConfig::descriptions()
 
 static std::optional<LocalFSStore::Config> getMounted(
     const Store::Config & storeConfig,
-    const StoreReference::Params & params)
+    const StoreReference::Params & params,
+    const ExperimentalFeatureSettings & xpSettings)
 {
     auto mountedParamsOpt = optionalValueAt(params, "mounted");
     if (!mountedParamsOpt) return {};
     auto * mountedParamsP = getNullable(*mountedParamsOpt);
-    experimentalFeatureSettings.require(Xp::MountedSSHStore);
+    xpSettings.require(Xp::MountedSSHStore);
     if (!mountedParamsP) return {};
     auto & mountedParams = getObject(*mountedParamsP);
     return {{storeConfig, mountedParams}};
@@ -96,12 +97,12 @@ static std::optional<LocalFSStore::Config> getMounted(
 SSHStoreConfig::SSHStoreConfig(
     std::string_view scheme,
     std::string_view authority,
-    const StoreReference::Params & params)
+    const StoreReference::Params & params, const ExperimentalFeatureSettings & xpSettings)
     : Store::Config{params}
     , RemoteStore::Config{*this, params}
     , CommonSSHStoreConfig{scheme, authority, params}
     , SSHStoreConfigT<config::JustValue>{sshStoreConfigApplyParse(params)}
-    , mounted{getMounted(*this, params)}
+    , mounted{getMounted(*this, params, xpSettings)}
 {
 }
 

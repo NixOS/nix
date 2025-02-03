@@ -30,6 +30,9 @@ TEST(SSHStore, constructConfig)
 
 TEST(MountedSSHStore, constructConfig)
 {
+    ExperimentalFeatureSettings mockXpSettings;
+    mockXpSettings.set("experimental-features", "mounted-ssh-store");
+
     SSHStoreConfig config{
         "ssh-ng",
         "localhost",
@@ -46,6 +49,7 @@ TEST(MountedSSHStore, constructConfig)
                 nlohmann::json::object_t{},
             },
         },
+        mockXpSettings,
     };
 
     EXPECT_EQ(
@@ -62,6 +66,9 @@ TEST(MountedSSHStore, constructConfig)
 
 TEST(MountedSSHStore, constructConfigWithFunnyRealStoreDir)
 {
+    ExperimentalFeatureSettings mockXpSettings;
+    mockXpSettings.set("experimental-features", "mounted-ssh-store");
+
     SSHStoreConfig config{
         "ssh-ng",
         "localhost",
@@ -80,6 +87,7 @@ TEST(MountedSSHStore, constructConfigWithFunnyRealStoreDir)
                 },
             },
         },
+        mockXpSettings,
     };
 
     EXPECT_EQ(
