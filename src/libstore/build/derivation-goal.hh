@@ -80,7 +80,7 @@ struct DerivationGoal : public Goal
     /**
      * Mapping from input derivations + output names to actual store
      * paths. This is filled in by waiteeDone() as each dependency
-     * finishes, before inputsRealised() is reached.
+     * finishes, before `trace("all inputs realised")` is reached.
      */
     std::map<std::pair<StorePath, std::string>, StorePath> inputDrvOutputs;
 
@@ -235,7 +235,6 @@ struct DerivationGoal : public Goal
     Co init() override;
     Co haveDerivation();
     Co gaveUpOnSubstitution();
-    Co inputsRealised();
     Co tryToBuild();
     virtual Co tryLocalBuild();
     Co buildDone();
