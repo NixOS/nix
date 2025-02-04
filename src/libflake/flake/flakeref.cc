@@ -283,12 +283,6 @@ FlakeRef FlakeRef::fromAttrs(
         fetchers::maybeGetStrAttr(attrs, "dir").value_or(""));
 }
 
-std::pair<StorePath, FlakeRef> FlakeRef::fetchTree(ref<Store> store) const
-{
-    auto [storePath, lockedInput] = input.fetchToStore(store);
-    return {std::move(storePath), FlakeRef(std::move(lockedInput), subdir)};
-}
-
 std::pair<ref<SourceAccessor>, FlakeRef> FlakeRef::lazyFetch(ref<Store> store) const
 {
     auto [accessor, lockedInput] = input.getAccessor(store);
