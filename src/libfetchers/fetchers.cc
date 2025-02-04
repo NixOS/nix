@@ -186,6 +186,7 @@ bool Input::contains(const Input & other) const
     return false;
 }
 
+// FIXME: remove
 std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 {
     if (!scheme)
