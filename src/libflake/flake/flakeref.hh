@@ -71,7 +71,10 @@ struct FlakeRef
         const fetchers::Settings & fetchSettings,
         const fetchers::Attrs & attrs);
 
+    // FIXME: remove
     std::pair<StorePath, FlakeRef> fetchTree(ref<Store> store) const;
+
+    std::pair<ref<SourceAccessor>, FlakeRef> lazyFetch(ref<Store> store) const;
 };
 
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);

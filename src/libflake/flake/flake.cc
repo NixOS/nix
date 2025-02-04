@@ -12,6 +12,7 @@
 #include "flake/settings.hh"
 #include "value-to-json.hh"
 #include "local-fs-store.hh"
+#include "fetch-to-store.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -24,7 +25,7 @@ namespace flake {
 struct FetchedFlake
 {
     FlakeRef lockedRef;
-    StorePath storePath;
+    ref<SourceAccessor> accessor;
 };
 
 typedef std::map<FlakeRef, FetchedFlake> FlakeCache;
@@ -40,7 +41,7 @@ static std::optional<FetchedFlake> lookupInFlakeCache(
     return i->second;
 }
 
-static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
+static std::tuple<ref<SourceAccessor>, FlakeRef, FlakeRef> fetchOrSubstituteTree(
     EvalState & state,
     const FlakeRef & originalRef,
     bool useRegistries,
@@ -51,8 +52,8 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
 
     if (!fetched) {
         if (originalRef.input.isDirect()) {
-            auto [storePath, lockedRef] = originalRef.fetchTree(state.store);
-            fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .storePath = storePath});
+            auto [accessor, lockedRef] = originalRef.lazyFetch(state.store);
+            fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .accessor = accessor});
         } else {
             if (useRegistries) {
                 resolvedRef = originalRef.resolve(
@@ -64,8 +65,8 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
                     });
                 fetched = lookupInFlakeCache(flakeCache, originalRef);
                 if (!fetched) {
-                    auto [storePath, lockedRef] = resolvedRef.fetchTree(state.store);
-                    fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .storePath = storePath});
+                    auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
+                    fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .accessor = accessor});
                 }
                 flakeCache.insert_or_assign(resolvedRef, *fetched);
             }
@@ -76,14 +77,28 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
         flakeCache.insert_or_assign(originalRef, *fetched);
     }
 
-    debug("got tree '%s' from '%s'",
-        state.store->printStorePath(fetched->storePath), fetched->lockedRef);
+    debug("got tree '%s' from '%s'", fetched->accessor, fetched->lockedRef);
 
-    state.allowPath(fetched->storePath);
+    return {fetched->accessor, resolvedRef, fetched->lockedRef};
+}
 
+static StorePath copyInputToStore(
+    EvalState & state,
+    fetchers::Input & input,
+    ref<SourceAccessor> accessor)
+{
+    auto storePath = fetchToStore(*state.store, accessor, FetchMode::Copy, input.getName());
+
+    state.allowPath(storePath);
+
+    auto narHash = state.store->queryPathInfo(storePath)->narHash;
+    input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
+
+    #if 0
     assert(!originalRef.input.getNarHash() || fetched->storePath == originalRef.input.computeStorePath(*state.store));
+    #endif
 
-    return {fetched->storePath, resolvedRef, fetched->lockedRef};
+    return storePath;
 }
 
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
@@ -136,7 +151,9 @@ static FlakeInput parseFlakeInput(
                     url = attr.value->string_view();
                 else if (attr.value->type() == nPath) {
                     auto path = attr.value->path();
-                    if (path.accessor != flakeDir.accessor)
+                    if (path.accessor != flakeDir.accessor
+                        // FIXME: hack necessary since the parser currently stores all paths as inside rootFS.
+                        && flakeDir.accessor == state.rootFS)
                         throw Error("input attribute path '%s' at %s must be in the same source tree as %s",
                             path, state.positions[attr.pos], flakeDir);
                     url = "path:" + flakeDir.path.makeRelative(path.path);
@@ -301,10 +318,12 @@ static Flake readFlake(
                     state.symbols[setting.name],
                     std::string(state.forceStringNoCtx(*setting.value, setting.pos, "")));
             else if (setting.value->type() == nPath) {
-                NixStringContext emptyContext = {};
+                // FIXME: hack necessary since the parser currently stores all paths as inside rootFS.
+                SourcePath path(rootDir.accessor, setting.value->path().path);
+                auto storePath = fetchToStore(*state.store, path, FetchMode::Copy);
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    state.coerceToString(setting.pos, *setting.value, emptyContext, "", false, true, true).toOwned());
+                    state.store->toRealPath(storePath));
             }
             else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(
@@ -349,9 +368,14 @@ static Flake getFlake(
     FlakeCache & flakeCache,
     const InputAttrPath & lockRootAttrPath)
 {
-    auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
+    // Fetch a lazy tree first.
+    auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
         state, originalRef, useRegistries, flakeCache);
 
+    // Copy the tree to the store.
+    auto storePath = copyInputToStore(state, lockedRef.input, accessor);
+
+    // Re-parse flake.nix from the store.
     return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->toRealPath(storePath)), lockRootAttrPath);
 }
 
@@ -707,8 +731,12 @@ LockedFlake lockFlake(
                                 if (auto resolvedPath = resolveRelativePath()) {
                                     return {*resolvedPath, *input.ref};
                                 } else {
-                                    auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
+                                    auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
                                         state, *input.ref, useRegistries, flakeCache);
+
+                                    // FIXME: allow input to be lazy.
+                                    auto storePath = copyInputToStore(state, lockedRef.input, accessor);
+
                                     return {state.rootPath(state.store->toRealPath(storePath)), lockedRef};
                                 }
                             }();

@@ -289,6 +289,12 @@ std::pair<StorePath, FlakeRef> FlakeRef::fetchTree(ref<Store> store) const
     return {std::move(storePath), FlakeRef(std::move(lockedInput), subdir)};
 }
 
+std::pair<ref<SourceAccessor>, FlakeRef> FlakeRef::lazyFetch(ref<Store> store) const
+{
+    auto [accessor, lockedInput] = input.getAccessor(store);
+    return {accessor, FlakeRef(std::move(lockedInput), subdir)};
+}
+
 std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
