@@ -74,7 +74,7 @@ EOF
 git -C "$rootRepo" add flake.nix
 git -C "$rootRepo" commit -m "Add flake.nix"
 
-storePath=$(nix flake metadata --json "$rootRepo?submodules=1" | jq -r .path)
+storePath=$(nix flake prefetch --json "$rootRepo?submodules=1" | jq -r .storePath)
 [[ -e "$storePath/submodule" ]]
 
 # The root repo may use the submodule repo as an input
