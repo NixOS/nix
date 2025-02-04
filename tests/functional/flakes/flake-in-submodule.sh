@@ -77,6 +77,20 @@ git -C "$rootRepo" commit -m "Add flake.nix"
 storePath=$(nix flake prefetch --json "$rootRepo?submodules=1" | jq -r .storePath)
 [[ -e "$storePath/submodule" ]]
 
+# Test the use of inputs.self.
+cat > "$rootRepo"/flake.nix <<EOF
+{
+  inputs.self.submodules = true;
+  outputs = { self }: {
+    foo = self.outPath;
+  };
+}
+EOF
+git -C "$rootRepo" commit -a -m "Bla"
+
+storePath=$(nix eval --raw "$rootRepo#foo")
+[[ -e "$storePath/submodule" ]]
+
 # The root repo may use the submodule repo as an input
 # through the relative path. This may change in the future;
 # see: https://discourse.nixos.org/t/57783 and #9708.

@@ -116,12 +116,47 @@ static void expectType(EvalState & state, ValueType type,
             showType(type), showType(value.type()), state.positions[pos]);
 }
 
-static std::map<FlakeId, FlakeInput> parseFlakeInputs(
+static std::pair<std::map<FlakeId, FlakeInput>, fetchers::Attrs> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
     const InputAttrPath & lockRootAttrPath,
-    const SourcePath & flakeDir);
+    const SourcePath & flakeDir,
+    bool allowSelf);
+
+static void parseFlakeInputAttr(
+    EvalState & state,
+    const Attr & attr,
+    fetchers::Attrs & attrs)
+{
+    // Allow selecting a subset of enum values
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wswitch-enum"
+    switch (attr.value->type()) {
+        case nString:
+            attrs.emplace(state.symbols[attr.name], attr.value->c_str());
+            break;
+        case nBool:
+            attrs.emplace(state.symbols[attr.name], Explicit<bool> { attr.value->boolean() });
+            break;
+        case nInt: {
+            auto intValue = attr.value->integer().value;
+            if (intValue < 0)
+                state.error<EvalError>("negative value given for flake input attribute %1%: %2%", state.symbols[attr.name], intValue).debugThrow();
+            attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
+            break;
+        }
+        default:
+            if (attr.name == state.symbols.create("publicKeys")) {
+                experimentalFeatureSettings.require(Xp::VerifiedFetches);
+                NixStringContext emptyContext = {};
+                attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, attr.pos, emptyContext).dump());
+            } else
+                state.error<TypeError>("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
+                    state.symbols[attr.name], showType(*attr.value)).debugThrow();
+    }
+    #pragma GCC diagnostic pop
+}
 
 static FlakeInput parseFlakeInput(
     EvalState & state,
@@ -166,44 +201,14 @@ static FlakeInput parseFlakeInput(
                 expectType(state, nBool, *attr.value, attr.pos);
                 input.isFlake = attr.value->boolean();
             } else if (attr.name == sInputs) {
-                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, lockRootAttrPath, flakeDir);
+                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, lockRootAttrPath, flakeDir, false).first;
             } else if (attr.name == sFollows) {
                 expectType(state, nString, *attr.value, attr.pos);
                 auto follows(parseInputAttrPath(attr.value->c_str()));
                 follows.insert(follows.begin(), lockRootAttrPath.begin(), lockRootAttrPath.end());
                 input.follows = follows;
-            } else {
-                // Allow selecting a subset of enum values
-                #pragma GCC diagnostic push
-                #pragma GCC diagnostic ignored "-Wswitch-enum"
-                switch (attr.value->type()) {
-                    case nString:
-                        attrs.emplace(state.symbols[attr.name], attr.value->c_str());
-                        break;
-                    case nBool:
-                        attrs.emplace(state.symbols[attr.name], Explicit<bool> { attr.value->boolean() });
-                        break;
-                    case nInt: {
-                        auto intValue = attr.value->integer().value;
-
-                        if (intValue < 0) {
-                            state.error<EvalError>("negative value given for flake input attribute %1%: %2%", state.symbols[attr.name], intValue).debugThrow();
-                        }
-
-                        attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
-                        break;
-                    }
-                    default:
-                        if (attr.name == state.symbols.create("publicKeys")) {
-                            experimentalFeatureSettings.require(Xp::VerifiedFetches);
-                            NixStringContext emptyContext = {};
-                            attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, emptyContext).dump());
-                        } else
-                            state.error<TypeError>("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
-                                state.symbols[attr.name], showType(*attr.value)).debugThrow();
-                }
-                #pragma GCC diagnostic pop
-            }
+            } else
+                parseFlakeInputAttr(state, attr, attrs);
         } catch (Error & e) {
             e.addTrace(
                 state.positions[attr.pos],
@@ -233,28 +238,39 @@ static FlakeInput parseFlakeInput(
     return input;
 }
 
-static std::map<FlakeId, FlakeInput> parseFlakeInputs(
+static std::pair<std::map<FlakeId, FlakeInput>, fetchers::Attrs> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
     const InputAttrPath & lockRootAttrPath,
-    const SourcePath & flakeDir)
+    const SourcePath & flakeDir,
+    bool allowSelf)
 {
     std::map<FlakeId, FlakeInput> inputs;
+    fetchers::Attrs selfAttrs;
 
     expectType(state, nAttrs, *value, pos);
 
     for (auto & inputAttr : *value->attrs()) {
-        inputs.emplace(state.symbols[inputAttr.name],
-            parseFlakeInput(state,
-                state.symbols[inputAttr.name],
-                inputAttr.value,
-                inputAttr.pos,
-                lockRootAttrPath,
-                flakeDir));
+        auto inputName = state.symbols[inputAttr.name];
+        if (inputName == "self") {
+            if (!allowSelf)
+                throw Error("'self' input attribute not allowed at %s", state.positions[inputAttr.pos]);
+            expectType(state, nAttrs, *inputAttr.value, inputAttr.pos);
+            for (auto & attr : *inputAttr.value->attrs())
+                parseFlakeInputAttr(state, attr, selfAttrs);
+        } else {
+            inputs.emplace(inputName,
+                parseFlakeInput(state,
+                    inputName,
+                    inputAttr.value,
+                    inputAttr.pos,
+                    lockRootAttrPath,
+                    flakeDir));
+        }
     }
 
-    return inputs;
+    return {inputs, selfAttrs};
 }
 
 static Flake readFlake(
@@ -286,8 +302,11 @@ static Flake readFlake(
 
     auto sInputs = state.symbols.create("inputs");
 
-    if (auto inputs = vInfo.attrs()->get(sInputs))
-        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, lockRootAttrPath, flakeDir);
+    if (auto inputs = vInfo.attrs()->get(sInputs)) {
+        auto [flakeInputs, selfAttrs] = parseFlakeInputs(state, inputs->value, inputs->pos, lockRootAttrPath, flakeDir, true);
+        flake.inputs = std::move(flakeInputs);
+        flake.selfAttrs = std::move(selfAttrs);
+    }
 
     auto sOutputs = state.symbols.create("outputs");
 
@@ -361,6 +380,23 @@ static Flake readFlake(
     return flake;
 }
 
+static FlakeRef applySelfAttrs(
+    const FlakeRef & ref,
+    const Flake & flake)
+{
+    auto newRef(ref);
+
+    std::set<std::string> allowedAttrs{"submodules"};
+
+    for (auto & attr : flake.selfAttrs) {
+        if (!allowedAttrs.contains(attr.first))
+            throw Error("flake 'self' attribute '%s' is not supported", attr.first);
+        newRef.input.attrs.insert_or_assign(attr.first, attr.second);
+    }
+
+    return newRef;
+}
+
 static Flake getFlake(
     EvalState & state,
     const FlakeRef & originalRef,
@@ -371,6 +407,22 @@ static Flake getFlake(
     // Fetch a lazy tree first.
     auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
         state, originalRef, useRegistries, flakeCache);
+
+    // Parse/eval flake.nix to get at the input.self attributes.
+    auto flake = readFlake(state, originalRef, resolvedRef, lockedRef, {accessor}, lockRootAttrPath);
+
+    // Re-fetch the tree if necessary.
+    auto newLockedRef = applySelfAttrs(lockedRef, flake);
+
+    if (lockedRef != newLockedRef) {
+        debug("refetching input '%s' due to self attribute", newLockedRef);
+        // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
+        newLockedRef.input.attrs.erase("narHash");
+        auto [accessor2, resolvedRef2, lockedRef2] = fetchOrSubstituteTree(
+            state, newLockedRef, false, flakeCache);
+        accessor = accessor2;
+        lockedRef = lockedRef2;
+    }
 
     // Copy the tree to the store.
     auto storePath = copyInputToStore(state, lockedRef.input, accessor);
@@ -492,6 +544,7 @@ LockedFlake lockFlake(
             /* Get the overrides (i.e. attributes of the form
                'inputs.nixops.inputs.nixpkgs.url = ...'). */
             for (auto & [id, input] : flakeInputs) {
+                //if (id == "self") continue;
                 for (auto & [idOverride, inputOverride] : input.overrides) {
                     auto inputAttrPath(inputAttrPathPrefix);
                     inputAttrPath.push_back(id);
