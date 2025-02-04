@@ -51,7 +51,7 @@ test_symlink_points_to_dir_in_repo
 
 test_symlink_from_repo_to_another() {
     local repoDir="$TEST_ROOT/repo1"
-    createGitRepo "{$repoDir}"
+    createGitRepo "$repoDir"
     echo "Hello" > "$repoDir/file"
     mkdir "$repoDir/subdir"
     cat > "$repoDir/subdir/flake.nix" <<EOF
