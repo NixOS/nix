@@ -36,14 +36,6 @@
 
 namespace nix {
 
-Goal::Co DerivationGoal::init() {
-    if (useDerivation) {
-        co_return getDerivation();
-    } else {
-        co_return haveDerivation();
-    }
-}
-
 DerivationGoal::DerivationGoal(const StorePath & drvPath,
     const OutputsSpec & wantedOutputs, Worker & worker, BuildMode buildMode)
     : Goal(worker, DerivedPath::Built { .drvPath = makeConstantStorePathRef(drvPath), .outputs = wantedOutputs })
@@ -141,50 +133,44 @@ void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
 }
 
 
-Goal::Co DerivationGoal::getDerivation()
-{
+Goal::Co DerivationGoal::init() {
     trace("init");
 
-    /* The first thing to do is to make sure that the derivation
-       exists.  If it doesn't, it may be created through a
-       substitute. */
-    if (buildMode == bmNormal && worker.evalStore.isValidPath(drvPath)) {
-        co_return loadDerivation();
-    }
+    if (useDerivation) {
+        /* The first thing to do is to make sure that the derivation
+           exists.  If it doesn't, it may be created through a
+           substitute. */
 
-    addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
-
-    co_await Suspend{};
-    co_return loadDerivation();
-}
-
-
-Goal::Co DerivationGoal::loadDerivation()
-{
-    trace("loading derivation");
-
-    if (nrFailed != 0) {
-        co_return done(BuildResult::MiscFailure, {}, Error("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath)));
-    }
-
-    /* `drvPath' should already be a root, but let's be on the safe
-       side: if the user forgot to make it a root, we wouldn't want
-       things being garbage collected while we're busy. */
-    worker.evalStore.addTempRoot(drvPath);
-
-    /* Get the derivation. It is probably in the eval store, but it might be inthe main store:
-
-         - Resolved derivation are resolved against main store realisations, and so must be stored there.
-
-         - Dynamic derivations are built, and so are found in the main store.
-     */
-    for (auto * drvStore : { &worker.evalStore, &worker.store }) {
-        if (drvStore->isValidPath(drvPath)) {
-            drv = std::make_unique<Derivation>(drvStore->readDerivation(drvPath));
-            break;
+        if (buildMode != bmNormal || !worker.evalStore.isValidPath(drvPath)) {
+            addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
+            co_await Suspend{};
         }
+
+        trace("loading derivation");
+
+        if (nrFailed != 0) {
+            co_return done(BuildResult::MiscFailure, {}, Error("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath)));
+        }
+
+        /* `drvPath' should already be a root, but let's be on the safe
+           side: if the user forgot to make it a root, we wouldn't want
+           things being garbage collected while we're busy. */
+        worker.evalStore.addTempRoot(drvPath);
+
+        /* Get the derivation. It is probably in the eval store, but it might be inthe main store:
+
+             - Resolved derivation are resolved against main store realisations, and so must be stored there.
+
+             - Dynamic derivations are built, and so are found in the main store.
+         */
+        for (auto * drvStore : { &worker.evalStore, &worker.store }) {
+            if (drvStore->isValidPath(drvPath)) {
+                drv = std::make_unique<Derivation>(drvStore->readDerivation(drvPath));
+                break;
+            }
+        }
+        assert(drv);
     }
-    assert(drv);
 
     co_return haveDerivation();
 }
@@ -235,12 +221,14 @@ Goal::Co DerivationGoal::haveDerivation()
             }
         });
 
-    /* Check what outputs paths are not already valid. */
-    auto [allValid, validOutputs] = checkPathValidity();
+    {
+        /* Check what outputs paths are not already valid. */
+        auto [allValid, validOutputs] = checkPathValidity();
 
-    /* If they are all valid, then we're done. */
-    if (allValid && buildMode == bmNormal) {
-        co_return done(BuildResult::AlreadyValid, std::move(validOutputs));
+        /* If they are all valid, then we're done. */
+        if (allValid && buildMode == bmNormal) {
+            co_return done(BuildResult::AlreadyValid, std::move(validOutputs));
+        }
     }
 
     /* We are first going to try to create the invalid output paths
@@ -268,12 +256,7 @@ Goal::Co DerivationGoal::haveDerivation()
         }
 
     if (!waitees.empty()) co_await Suspend{}; /* to prevent hang (no wake-up event) */
-    co_return outputsSubstitutionTried();
-}
 
-
-Goal::Co DerivationGoal::outputsSubstitutionTried()
-{
     trace("all outputs substituted (maybe)");
 
     assert(!drv->type().isImpure());
@@ -460,18 +443,13 @@ Goal::Co DerivationGoal::repairClosure()
         co_return done(BuildResult::AlreadyValid, assertPathValidity());
     } else {
         co_await Suspend{};
-        co_return closureRepaired();
+
+        trace("closure repaired");
+        if (nrFailed > 0)
+            throw Error("some paths in the output closure of derivation '%s' could not be repaired",
+                worker.store.printStorePath(drvPath));
+        co_return done(BuildResult::AlreadyValid, assertPathValidity());
     }
-}
-
-
-Goal::Co DerivationGoal::closureRepaired()
-{
-    trace("closure repaired");
-    if (nrFailed > 0)
-        throw Error("some paths in the output closure of derivation '%s' could not be repaired",
-            worker.store.printStorePath(drvPath));
-    co_return done(BuildResult::AlreadyValid, assertPathValidity());
 }
 
 
