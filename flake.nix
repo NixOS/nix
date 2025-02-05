@@ -10,6 +10,10 @@
     flake = false;
   };
 
+  inputs.rust-overlay = {
+    url = "github:oxalica/rust-overlay";
+  };
+
   # dev tooling
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";
   inputs.git-hooks-nix.url = "github:cachix/git-hooks.nix";
@@ -27,6 +31,7 @@
       self,
       nixpkgs,
       nixpkgs-regression,
+      rust-overlay,
       ...
     }:
 
@@ -118,6 +123,7 @@
                       useLLVM = true;
                     };
                 overlays = [
+                  rust-overlay.overlays.default
                   (overlayFor (pkgs: pkgs.${stdenv}))
                 ];
               }
@@ -195,7 +201,11 @@
     {
       # A Nixpkgs overlay that overrides the 'nix' and
       # 'nix-perl-bindings' packages.
-      overlays.default = overlayFor (p: p.stdenv);
+      overlays.default = nixpkgs.lib.composeManyExtensions [
+        rust-overlay.overlays.default
+        overlayFor
+        (p: p.stdenv)
+      ];
 
       hydraJobs = import ./packaging/hydra.nix {
         inherit
@@ -289,6 +299,7 @@
               # Components we'll iterate over in the upcoming lambda
               "nix-util" = { };
               "nix-util-c" = { };
+              "nix-util-rust" = { };
               "nix-util-test-support" = { };
               "nix-util-tests" = { };
 

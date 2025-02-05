@@ -29,6 +29,7 @@ in
 
   nix-util = callPackage ../src/libutil/package.nix { };
   nix-util-c = callPackage ../src/libutil-c/package.nix { };
+  nix-util-rust = callPackage ../src/rust/crates/nix-util-rust/package.nix { };
   nix-util-test-support = callPackage ../src/libutil-test-support/package.nix { };
   nix-util-tests = callPackage ../src/libutil-tests/package.nix { };
 

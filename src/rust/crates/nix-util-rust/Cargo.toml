@@ -1,0 +1,21 @@
+[package]
+publish = false
+edition = "2021"
+name = "nix-util-rust"
+license = "(Apache-2.0 WITH LLVM-exception) OR LGPL-2.1-or-later OR MIT"
+authors = ["silvanshade <silvanshade@users.noreply.github.com>"]
+links = "nix-util-rust"
+# DO NOT EDIT `version`: value replaced at build time in nix derivation
+version = "0.0.0"
+# DO NOT EDIT `description`: value replaced at build time in nix derivation
+description = ""
+
+[lib]
+crate-type = [ "staticlib" ]
+
+[build-dependencies]
+cxx-build = { version = "1.0", features = ["parallel"] }
+
+[dependencies]
+cxx.workspace = true
+blake3 = { version = "1.5.5", features = ["mmap", "rayon"] }

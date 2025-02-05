@@ -21,6 +21,7 @@ struct Sink
     virtual ~Sink() { }
     virtual void operator () (std::string_view data) = 0;
     virtual bool good() { return true; }
+    virtual void readFile(const Path& path);
 };
 
 /**

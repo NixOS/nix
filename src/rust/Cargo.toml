@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/nix-util-rust",
+]
+
+[workspace.dependencies]
+cxx = { version = "1.0", features = ["c++20"] }

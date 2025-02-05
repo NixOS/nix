@@ -3,3 +3,10 @@
 option('cpuid', type : 'feature',
   description : 'determine microarchitecture levels with libcpuid (only relevant on x86_64)',
 )
+
+# Location of Rust cxxbridge
+#============================================================================
+option(
+  'nix_util_rust_cxxbridge',
+  type : 'string',
+  description : 'path to nix-util-rust cxxbridge')

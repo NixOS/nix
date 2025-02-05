@@ -3,6 +3,8 @@
   stdenv,
   mkMesonLibrary,
 
+  nix-util-rust,
+
   boost,
   brotli,
   libarchive,
@@ -41,6 +43,7 @@ mkMesonLibrary (finalAttrs: {
   ];
 
   buildInputs = [
+    nix-util-rust
     brotli
     libsodium
     openssl
@@ -64,6 +67,7 @@ mkMesonLibrary (finalAttrs: {
     '';
 
   mesonFlags = [
+    (lib.mesonOption "nix_util_rust_cxxbridge" "${lib.getOutput "cxxbridge" nix-util-rust}")
     (lib.mesonEnable "cpuid" stdenv.hostPlatform.isx86_64)
   ];
 

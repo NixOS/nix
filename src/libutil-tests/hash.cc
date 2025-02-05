@@ -10,6 +10,34 @@ namespace nix {
      * hashString
      * --------------------------------------------------------------------------*/
 
+    TEST(hashString, testKnownBLAKE3Hashes1Base16) {
+        auto s = "abc";
+        auto hash = hashString(HashAlgorithm::BLAKE3, s);
+        ASSERT_EQ(hash.to_string(HashFormat::Base16, true),
+                "blake3:6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85");
+    }
+
+    TEST(hashString, testKnownBLAKE3Hashes1SRI) {
+        auto s = "abc";
+        auto hash = hashString(HashAlgorithm::BLAKE3, s);
+        ASSERT_EQ(hash.to_string(HashFormat::SRI, true),
+                "blake3-ZDezrDhGUTP/tjt1JzqNtUjFWEZdedsD/TWcbNW9nYU=");
+    }
+
+    TEST(hashString, testKnownBLAKE3Hashes2Base16) {
+        auto s = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+        auto hash = hashString(HashAlgorithm::BLAKE3, s);
+        ASSERT_EQ(hash.to_string(HashFormat::Base16, true),
+                "blake3:c19012cc2aaf0dc3d8e5c45a1b79114d2df42abb2a410bf54be09e891af06ff8");
+    }
+
+    TEST(hashString, testKnownBLAKE3Hashes2SRI) {
+        auto s = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+        auto hash = hashString(HashAlgorithm::BLAKE3, s);
+        ASSERT_EQ(hash.to_string(HashFormat::SRI, true),
+                "blake3-wZASzCqvDcPY5cRaG3kRTS30KrsqQQv1S+CeiRrwb/g=");
+    }
+
     TEST(hashString, testKnownMD5Hashes1) {
         // values taken from: https://tools.ietf.org/html/rfc1321
         auto s1 = "";

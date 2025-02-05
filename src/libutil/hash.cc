@@ -1,6 +1,9 @@
 #include <iostream>
 #include <cstring>
 
+#include <rust/cxx.h>
+#include <nix-util-rust/src/gen/hash/blake3.rs.h>
+
 #include <openssl/crypto.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
@@ -20,6 +23,7 @@ namespace nix {
 
 static size_t regularHashSize(HashAlgorithm type) {
     switch (type) {
+    case HashAlgorithm::BLAKE3: return blake3HashSize;
     case HashAlgorithm::MD5: return md5HashSize;
     case HashAlgorithm::SHA1: return sha1HashSize;
     case HashAlgorithm::SHA256: return sha256HashSize;
@@ -282,50 +286,175 @@ Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashAlgorithm> ha
 }
 
 
-union Ctx
+class BLAKE3CtxImpl : public virtual BLAKE3Ctx
 {
-    MD5_CTX md5;
-    SHA_CTX sha1;
-    SHA256_CTX sha256;
-    SHA512_CTX sha512;
+    ::rust::Box<nix::rust::hash::blake3::Blake3Ctx> ctx = nix::rust::hash::blake3::create();
+
+public:
+    auto clone() -> std::unique_ptr<HashCtx> override
+    {
+        BLAKE3CtxImpl* self = new BLAKE3CtxImpl{};
+        self->ctx = nix::rust::hash::blake3::clone(*this->ctx);
+        return std::unique_ptr<HashCtx>{self};
+    }
+
+    auto update(const std::string_view data) -> void override
+    {
+        auto const bytes = reinterpret_cast<uint8_t const*>(data.data());
+        auto const count = data.size();
+        auto const slice = ::rust::Slice { bytes, count };
+        nix::rust::hash::blake3::update(*ctx, slice);
+    }
+
+    auto update_mmap(const std::string & path) -> void override
+    {
+        auto const size = std::filesystem::file_size(path);
+        nix::rust::hash::blake3::update_mmap(*ctx, path, size);
+    }
+
+    auto finish(uint8_t hash[Hash::maxHashSize]) -> void override
+    {
+        auto const bytes = hash;
+        auto const count = Hash::maxHashSize;
+        auto const slice = ::rust::Slice { bytes, count };
+        nix::rust::hash::blake3::finalize(slice, *ctx);
+    }
 };
 
 
-static void start(HashAlgorithm ha, Ctx & ctx)
+class MD5Ctx : public virtual HashCtx
 {
-    if (ha == HashAlgorithm::MD5) MD5_Init(&ctx.md5);
-    else if (ha == HashAlgorithm::SHA1) SHA1_Init(&ctx.sha1);
-    else if (ha == HashAlgorithm::SHA256) SHA256_Init(&ctx.sha256);
-    else if (ha == HashAlgorithm::SHA512) SHA512_Init(&ctx.sha512);
-}
+    MD5_CTX ctx;
+
+public:
+    MD5Ctx()
+    {
+        MD5_Init(&ctx);
+    }
+
+    auto clone() -> std::unique_ptr<HashCtx> override
+    {
+        return std::unique_ptr<HashCtx>{new MD5Ctx{*this}};
+    }
+
+    auto update(const std::string_view data) -> void override
+    {
+        MD5_Update(&ctx, data.data(), data.size());
+    }
+
+    auto finish(uint8_t hash[Hash::maxHashSize]) -> void override
+    {
+        MD5_Final(hash, &ctx);
+    }
+};
 
 
-static void update(HashAlgorithm ha, Ctx & ctx,
-                   std::string_view data)
+class SHA1Ctx : public virtual HashCtx
 {
-    if (ha == HashAlgorithm::MD5) MD5_Update(&ctx.md5, data.data(), data.size());
-    else if (ha == HashAlgorithm::SHA1) SHA1_Update(&ctx.sha1, data.data(), data.size());
-    else if (ha == HashAlgorithm::SHA256) SHA256_Update(&ctx.sha256, data.data(), data.size());
-    else if (ha == HashAlgorithm::SHA512) SHA512_Update(&ctx.sha512, data.data(), data.size());
-}
+    SHA_CTX ctx;
+
+public:
+    SHA1Ctx()
+    {
+        SHA1_Init(&ctx);
+    }
+
+    auto clone() -> std::unique_ptr<HashCtx> override
+    {
+        return std::unique_ptr<HashCtx>{new SHA1Ctx{*this}};
+    }
+
+    auto update(const std::string_view data) -> void override
+    {
+        SHA1_Update(&ctx, data.data(), data.size());
+    }
+
+    auto finish(uint8_t hash[Hash::maxHashSize]) -> void override
+    {
+        SHA1_Final(hash, &ctx);
+    }
+};
 
 
-static void finish(HashAlgorithm ha, Ctx & ctx, unsigned char * hash)
+class SHA256Ctx : public virtual HashCtx
 {
-    if (ha == HashAlgorithm::MD5) MD5_Final(hash, &ctx.md5);
-    else if (ha == HashAlgorithm::SHA1) SHA1_Final(hash, &ctx.sha1);
-    else if (ha == HashAlgorithm::SHA256) SHA256_Final(hash, &ctx.sha256);
-    else if (ha == HashAlgorithm::SHA512) SHA512_Final(hash, &ctx.sha512);
+    SHA256_CTX ctx;
+
+public:
+    SHA256Ctx()
+    {
+        SHA256_Init(&ctx);
+    }
+
+    auto clone() -> std::unique_ptr<HashCtx> override
+    {
+        return std::unique_ptr<HashCtx>{new SHA256Ctx{*this}};
+    }
+
+    auto update(const std::string_view data) -> void override
+    {
+        SHA256_Update(&ctx, data.data(), data.size());
+    }
+
+    auto finish(uint8_t hash[Hash::maxHashSize]) -> void override
+    {
+        SHA256_Final(hash, &ctx);
+    }
+};
+
+
+class SHA512Ctx : public virtual HashCtx
+{
+    SHA512_CTX ctx;
+
+public:
+    SHA512Ctx()
+    {
+        SHA512_Init(&ctx);
+    }
+
+    auto clone() -> std::unique_ptr<HashCtx> override
+    {
+        return std::unique_ptr<HashCtx>{new SHA512Ctx{*this}};
+    }
+
+    auto update(const std::string_view data) -> void override
+    {
+        SHA512_Update(&ctx, data.data(), data.size());
+    }
+
+    auto finish(uint8_t hash[Hash::maxHashSize]) -> void override
+    {
+        SHA512_Final(hash, &ctx);
+    }
+};
+
+
+auto HashCtx::create(HashAlgorithm ha) -> std::unique_ptr<HashCtx>
+{
+    switch (ha) {
+        case HashAlgorithm::BLAKE3:
+            return std::make_unique<BLAKE3CtxImpl>();
+        case nix::HashAlgorithm::MD5:
+            return std::make_unique<MD5Ctx>();
+        case nix::HashAlgorithm::SHA1:
+            return std::make_unique<SHA1Ctx>();
+        case nix::HashAlgorithm::SHA256:
+            return std::make_unique<SHA256Ctx>();
+        case nix::HashAlgorithm::SHA512:
+            return std::make_unique<SHA512Ctx>();
+        default:
+            std::abort();
+    }
 }
 
 
 Hash hashString(HashAlgorithm ha, std::string_view s)
 {
-    Ctx ctx;
+    std::unique_ptr<HashCtx> ctx = HashCtx::create(ha);
     Hash hash(ha);
-    start(ha, ctx);
-    update(ha, ctx, s);
-    finish(ha, ctx, hash.hash);
+    ctx->update(s);
+    ctx->finish(hash.hash);
     return hash;
 }
 
@@ -333,45 +462,52 @@ Hash hashString(HashAlgorithm ha, std::string_view s)
 Hash hashFile(HashAlgorithm ha, const Path & path)
 {
     HashSink sink(ha);
-    readFile(path, sink);
+    sink.readFile(path);
     return sink.finish().first;
 }
 
 
 HashSink::HashSink(HashAlgorithm ha) : ha(ha)
 {
-    ctx = new Ctx;
+    ctx = HashCtx::create(ha);
     bytes = 0;
-    start(ha, *ctx);
 }
 
 HashSink::~HashSink()
 {
     bufPos = 0;
-    delete ctx;
 }
 
 void HashSink::writeUnbuffered(std::string_view data)
 {
     bytes += data.size();
-    update(ha, *ctx, data);
+    ctx->update(data);
 }
 
 HashResult HashSink::finish()
 {
     flush();
     Hash hash(ha);
-    nix::finish(ha, *ctx, hash.hash);
+    ctx->finish(hash.hash);
     return HashResult(hash, bytes);
 }
 
 HashResult HashSink::currentHash()
 {
     flush();
-    Ctx ctx2 = *ctx;
+    std::unique_ptr<HashCtx> ctx2 = ctx->clone();
     Hash hash(ha);
-    nix::finish(ha, ctx2, hash.hash);
+    ctx2->finish(hash.hash);
     return HashResult(hash, bytes);
+}
+
+void HashSink::readFile(const Path& path)
+{
+    if (auto blake3Ctx = dynamic_cast<BLAKE3Ctx*>(ctx.get())) {
+        blake3Ctx->update_mmap(path);
+    } else {
+        this->Sink::readFile(path);
+    }
 }
 
 
@@ -426,6 +562,7 @@ std::string_view printHashFormat(HashFormat HashFormat)
 
 std::optional<HashAlgorithm> parseHashAlgoOpt(std::string_view s)
 {
+    if (s == "blake3") return HashAlgorithm::BLAKE3;
     if (s == "md5") return HashAlgorithm::MD5;
     if (s == "sha1") return HashAlgorithm::SHA1;
     if (s == "sha256") return HashAlgorithm::SHA256;
@@ -439,12 +576,13 @@ HashAlgorithm parseHashAlgo(std::string_view s)
     if (opt_h)
         return *opt_h;
     else
-        throw UsageError("unknown hash algorithm '%1%', expect 'md5', 'sha1', 'sha256', or 'sha512'", s);
+        throw UsageError("unknown hash algorithm '%1%', expect 'blake3', 'md5', 'sha1', 'sha256', or 'sha512'", s);
 }
 
 std::string_view printHashAlgo(HashAlgorithm ha)
 {
     switch (ha) {
+    case HashAlgorithm::BLAKE3: return "blake3";
     case HashAlgorithm::MD5: return "md5";
     case HashAlgorithm::SHA1: return "sha1";
     case HashAlgorithm::SHA256: return "sha256";
