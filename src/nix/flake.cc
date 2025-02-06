@@ -133,6 +133,7 @@ public:
         lockFlags.recreateLockFile = updateAll;
         lockFlags.writeLockFile = true;
         lockFlags.applyNixConfig = true;
+        lockFlags.forceLazy = true;
 
         lockFlake();
     }
@@ -165,6 +166,7 @@ struct CmdFlakeLock : FlakeCommand
         lockFlags.writeLockFile = true;
         lockFlags.failOnUnlocked = true;
         lockFlags.applyNixConfig = true;
+        lockFlags.forceLazy = true;
 
         lockFlake();
     }
@@ -211,11 +213,9 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
 
     void run(nix::ref<nix::Store> store) override
     {
+        lockFlags.forceLazy = true;
         auto lockedFlake = lockFlake();
         auto & flake = lockedFlake.flake;
-
-        // Currently, all flakes are in the Nix store via the rootFS accessor.
-        auto storePath = store->printStorePath(sourcePathToStorePath(store, flake.path).first);
 
         if (json) {
             nlohmann::json j;
@@ -237,7 +237,6 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["revCount"] = *revCount;
             if (auto lastModified = flake.lockedRef.input.getLastModified())
                 j["lastModified"] = *lastModified;
-            j["path"] = storePath;
             j["locks"] = lockedFlake.lockFile.toJSON().first;
             if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
@@ -254,9 +253,6 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Description:" ANSI_NORMAL "   %s",
                     *flake.description);
-            logger->cout(
-                ANSI_BOLD "Path:" ANSI_NORMAL "          %s",
-                storePath);
             if (auto rev = flake.lockedRef.input.getRev())
                 logger->cout(
                     ANSI_BOLD "Revision:" ANSI_NORMAL "      %s",

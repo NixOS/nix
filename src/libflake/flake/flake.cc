@@ -397,7 +397,8 @@ static Flake getFlake(
     const FlakeRef & originalRef,
     bool useRegistries,
     FlakeCache & flakeCache,
-    const InputAttrPath & lockRootAttrPath)
+    const InputAttrPath & lockRootAttrPath,
+    bool forceLazy)
 {
     // Fetch a lazy tree first.
     auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
@@ -419,17 +420,22 @@ static Flake getFlake(
         lockedRef = lockedRef2;
     }
 
-    // Copy the tree to the store.
-    auto storePath = copyInputToStore(state, lockedRef.input, originalRef.input, accessor);
-
     // Re-parse flake.nix from the store.
-    return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->toRealPath(storePath)), lockRootAttrPath);
+    return readFlake(
+        state, originalRef, resolvedRef, lockedRef,
+        forceLazy && lockedRef.input.isLocked()
+        ? SourcePath(accessor)
+        : // Copy the tree to the store.
+          state.rootPath(
+            state.store->toRealPath(
+                copyInputToStore(state, lockedRef.input, originalRef.input, accessor))),
+        lockRootAttrPath);
 }
 
-Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
+Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries, bool forceLazy)
 {
     FlakeCache flakeCache;
-    return getFlake(state, originalRef, useRegistries, flakeCache, {});
+    return getFlake(state, originalRef, useRegistries, flakeCache, {}, forceLazy);
 }
 
 static LockFile readLockFile(
@@ -455,7 +461,7 @@ LockedFlake lockFlake(
 
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
 
-    auto flake = getFlake(state, topRef, useRegistries, flakeCache, {});
+    auto flake = getFlake(state, topRef, useRegistries, flakeCache, {}, lockFlags.forceLazy);
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
@@ -630,7 +636,7 @@ LockedFlake lockFlake(
                         if (auto resolvedPath = resolveRelativePath()) {
                             return readFlake(state, *input.ref, *input.ref, *input.ref, *resolvedPath, inputAttrPath);
                         } else {
-                            return getFlake(state, *input.ref, useRegistries, flakeCache, inputAttrPath);
+                            return getFlake(state, *input.ref, useRegistries, flakeCache, inputAttrPath, lockFlags.forceLazy);
                         }
                     };
 
@@ -781,10 +787,14 @@ LockedFlake lockFlake(
                                     auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
                                         state, *input.ref, useRegistries, flakeCache);
 
-                                    // FIXME: allow input to be lazy.
-                                    auto storePath = copyInputToStore(state, lockedRef.input, input.ref->input, accessor);
-
-                                    return {state.rootPath(state.store->toRealPath(storePath)), lockedRef};
+                                    return {
+                                        lockFlags.forceLazy && lockedRef.input.isLocked()
+                                        ? SourcePath(accessor)
+                                        : state.rootPath(
+                                            state.store->toRealPath(
+                                                copyInputToStore(state, lockedRef.input, input.ref->input, accessor))),
+                                        lockedRef
+                                    };
                                 }
                             }();
 
@@ -894,7 +904,7 @@ LockedFlake lockFlake(
                            repo, so we should re-read it. FIXME: we could
                            also just clear the 'rev' field... */
                         auto prevLockedRef = flake.lockedRef;
-                        flake = getFlake(state, topRef, useRegistries);
+                        flake = getFlake(state, topRef, useRegistries, lockFlags.forceLazy);
 
                         if (lockFlags.commitLockFile &&
                             flake.lockedRef.input.getRev() &&

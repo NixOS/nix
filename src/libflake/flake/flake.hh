@@ -123,7 +123,11 @@ struct Flake
     }
 };
 
-Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool useRegistries);
+Flake getFlake(
+    EvalState & state,
+    const FlakeRef & flakeRef,
+    bool useRegistries,
+    bool forceLazy = false);
 
 /**
  * Fingerprint of a locked flake; used as a cache key.
@@ -221,6 +225,11 @@ struct LockFlags
      * for those inputs will be ignored.
      */
     std::set<InputAttrPath> inputUpdates;
+
+    /**
+     * If set, do not copy the flake to the Nix store.
+     */
+    bool forceLazy = false;
 };
 
 LockedFlake lockFlake(
