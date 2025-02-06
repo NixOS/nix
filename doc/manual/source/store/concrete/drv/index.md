@@ -1,8 +1,8 @@
-# Derivation and Deriving Path
+# Store Derivation and Deriving Path
 
 We return to derivations and derived paths in the context of making a build system for conventional software.
 
-## Derivation {#derivation}
+## Store Derivation {#store-derivation}
 
 A derivation is a specification for running an executable on precisely defined input files to repeatably produce output files at uniquely determined file system paths.
 
@@ -60,7 +60,7 @@ inputs drv = drv.inputs
 outputs drv = Map.keys drv.outputs
 ```
 
-[derivation]: #derivation
+[store derivation]: #store-derivation
 [inputs]: #inputs
 [input]: #inputs
 [outputs]: #outputs
@@ -89,7 +89,7 @@ There are two forms:
 - [*constant*]{#deriving-path-constant}: just a [store path].
   It can be made [valid][validity] by copying it into the store: from the evaluator, command line interface or another st    ore.
 
-- [*output*]{#deriving-path-output}: a pair of a [store path] to a [derivation] and an [output] name.
+- [*output*]{#deriving-path-output}: a pair of a [store path] to a [store derivation] and an [output] name.
 
 In pseudo code:
 
@@ -109,7 +109,7 @@ data DerivingPath
 
 ## Parts of a derivation
 
-With both [derivations][derivation] introduced and [deriving paths][deriving path] defined,
+With both [store derivations][store derivation] introduced and [deriving paths][deriving path] defined,
 it is now possible to define the parts of a derivation.
 
 ### Inputs {#inputs}

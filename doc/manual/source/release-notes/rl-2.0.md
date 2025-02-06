@@ -198,7 +198,7 @@ This release has the following new features:
         NAR format. This replaces `nix-store --dump`.
 
       - `nix
-                                                                        show-derivation` displays a derivation in JSON format.
+                                                                        show-derivation` displays a store derivation in JSON format.
         This is an alternative to `pp-aterm`.
 
       - `nix

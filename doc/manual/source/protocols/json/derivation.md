@@ -7,7 +7,7 @@
 > and subject to change.
 
 The JSON serialization of a
-[derivations](@docroot@/glossary.md#gloss-derivation)
+[derivations](@docroot@/glossary.md#gloss-store-derivation)
 is a JSON object with the following fields:
 
 * `name`:

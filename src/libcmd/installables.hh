@@ -24,7 +24,7 @@ enum class Realise {
     /**
      * Don't build the derivation.
      *
-     * Postcondition: the derivation exists.
+     * Postcondition: the store derivation exists.
      */
     Derivation,
     /**

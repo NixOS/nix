@@ -19,18 +19,18 @@
 
   Besides content addressing, the Nix store also uses [input addressing](#gloss-input-addressed-store-object).
 
-- [derivation]{#gloss-derivation}
+- [store derivation]{#gloss-store-derivation}
 
   A single build task.
-  See [Derivation](@docroot@/store/drv.md#derivation) for details.
+  See [Store Derivation](@docroot@/store/drv.md#store-derivation) for details.
 
-  [derivation]: #gloss-derivation
+  [store derivation]: #gloss-store-derivation
 
 - [derivation path]{#gloss-derivation-path}
 
-  A [store path] which uniquely identifies a [derivation].
+  A [store path] which uniquely identifies a [store derivation].
 
-  See [Referencing Derivations](@docroot@/store/drv.md#derivation-path) for details.
+  See [Referencing Store Derivations](@docroot@/store/drv.md#derivation-path) for details.
 
   Not to be confused with [deriving path].
 
@@ -38,7 +38,7 @@
 
 - [derivation expression]{#gloss-derivation-expression}
 
-  A description of a [derivation] in the Nix language.
+  A description of a [store derivation] in the Nix language.
   The output(s) of a derivation are store objects.
   Derivations are typically specified in Nix expressions using the [`derivation` primitive](./language/derivations.md).
   These are translated into store layer *derivations* (implicitly by `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
@@ -47,9 +47,9 @@
 
 - [instantiate]{#gloss-instantiate}, instantiation
 
-  Translate a [derivation expression] into a [derivation].
+  Translate a [derivation expression] into a [store derivation].
 
-  See [`nix-instantiate`](./command-ref/nix-instantiate.md), which produces a derivation from a Nix expression that evaluates to a derivation.
+  See [`nix-instantiate`](./command-ref/nix-instantiate.md), which produces a store derivation from a Nix expression that evaluates to a derivation.
 
   [instantiate]: #gloss-instantiate
 
@@ -59,7 +59,7 @@
 
   This can be achieved by:
   - Fetching a pre-built [store object] from a [substituter]
-  - Running the [`builder`](@docroot@/language/derivations.md#attr-builder) executable as specified in the corresponding [derivation]
+  - Running the [`builder`](@docroot@/language/derivations.md#attr-builder) executable as specified in the corresponding [store derivation]
   - Delegating to a [remote machine](@docroot@/command-ref/conf-file.md#conf-builders) and retrieving the outputs
   <!-- TODO: link [running] to build process page, #8888 -->
 
@@ -77,7 +77,7 @@
 
 - [fixed-output derivation]{#gloss-fixed-output-derivation} (FOD)
 
-  A [derivation] where a cryptographic hash of the [output] is determined in advance using the [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute, and where the [`builder`](@docroot@/language/derivations.md#attr-builder) executable has access to the network.
+  A [store derivation] where a cryptographic hash of the [output] is determined in advance using the [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute, and where the [`builder`](@docroot@/language/derivations.md#attr-builder) executable has access to the network.
 
 - [store]{#gloss-store}
 
@@ -192,7 +192,7 @@
   >
   > The contents of a `.nix` file form a Nix expression.
 
-  Nix expressions specify [derivation expressions][derivation expression], which are [instantiated][instantiate] into the Nix store as [derivations][derivation].
+  Nix expressions specify [derivation expressions][derivation expression], which are [instantiated][instantiate] into the Nix store as [store derivations][store derivation].
   These derivations can then be [realised][realise] to produce [outputs][output].
 
   > **Example**
@@ -234,14 +234,14 @@
 
 - [output]{#gloss-output}
 
-  A [store object] produced by a [derivation].
+  A [store object] produced by a [store derivation].
   See [the `outputs` argument to the `derivation` function](@docroot@/language/derivations.md#attr-outputs) for details.
 
   [output]: #gloss-output
 
 - [output path]{#gloss-output-path}
 
-  The [store path] to the [output] of a [derivation].
+  The [store path] to the [output] of a [store derivation].
 
   [output path]: #gloss-output-path
 
@@ -258,7 +258,7 @@
 
 - [deriver]{#gloss-deriver}
 
-  The [derivation] that produced an [output path].
+  The [store derivation] that produced an [output path].
 
   The deriver for an output path can be queried with the `--deriver` option to
   [`nix-store --query`](@docroot@/command-ref/nix-store/query.md).
