@@ -1963,7 +1963,7 @@ void LocalDerivationGoal::runChild()
             if (chdir(chrootRootDir.c_str()) == -1)
                 throw SysError("cannot change directory to '%1%'", chrootRootDir);
 
-            if (mkdir("real-root", 0) == -1)
+            if (mkdir("real-root", 0500) == -1)
                 throw SysError("cannot create real-root directory");
 
             if (pivot_root(".", "real-root") == -1)
