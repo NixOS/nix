@@ -26,14 +26,12 @@ HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
         cacheUri.pop_back();
 }
 
-
 std::string HttpBinaryCacheStoreConfig::doc()
 {
     return
-      #include "http-binary-cache-store.md"
-      ;
+#include "http-binary-cache-store.md"
+        ;
 }
-
 
 class HttpBinaryCacheStore : public virtual HttpBinaryCacheStoreConfig, public virtual BinaryCacheStore
 {
@@ -143,10 +141,12 @@ protected:
 
     FileTransferRequest makeRequest(const std::string & path)
     {
-        return FileTransferRequest(
+        auto request = FileTransferRequest(
             hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
             ? path
             : cacheUri + "/" + path);
+        request.negotiate = negotiate;
+        return request;
 
     }
 
