@@ -1,4 +1,4 @@
-# Derivation and Deriving Path
+# Store Derivation and Deriving Path
 
 So far, we have covered "inert" [store objects][store object].
 But the point of the Nix store layer is to be a build system.
@@ -8,7 +8,7 @@ This is where Nix distinguishes itself.
 *Derivations* represent individual build steps, and *deriving paths* are needed to refer to the *outputs* of those build steps before they are built.
 <!-- The two concepts need to be introduced together because, as described below, each depends on the other. -->
 
-## Derivation {#derivation}
+## Store Derivation {#store-derivation}
 
 A derivation is a specification for running an executable on precisely defined input files to repeatably produce output files at uniquely determined file system paths.
 
@@ -36,7 +36,7 @@ A derivation consists of:
 
  - A two-component ["system" type][system] (e.g. `x86_64-linux`) where the executable is to run.
 
-[derivation]: #derivation
+[store derivation]: #store-derivation
 [inputs]: #inputs
 [input]: #inputs
 [outputs]: #outputs
@@ -63,7 +63,7 @@ There are two forms:
 - [*constant*]{#deriving-path-constant}: just a [store path].
   It can be made [valid][validity] by copying it into the store: from the evaluator, command line interface or another st    ore.
 
-- [*output*]{#deriving-path-output}: a pair of a [store path] to a [derivation] and an [output] name.
+- [*output*]{#deriving-path-output}: a pair of a [store path] to a [store derivation] and an [output] name.
 
 In pseudo code:
 
@@ -83,7 +83,7 @@ data DerivingPath
 
 ## Parts of a derivation
 
-With both [derivations][derivation] introduced and [deriving paths][deriving path] defined,
+With both [store derivations][store derivation] introduced and [deriving paths][deriving path] defined,
 it is now possible to define the parts of a derivation.
 
 ### Inputs {#inputs}

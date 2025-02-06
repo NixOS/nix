@@ -69,7 +69,7 @@ It can also execute build plans to produce new data, which are made available to
 A build plan itself is a series of *build tasks*, together with their build inputs.
 
 > **Important**
-> A build task in Nix is called [derivation](@docroot@/glossary.md#gloss-derivation).
+> A build task in Nix is called [store derivation](@docroot@/glossary.md#gloss-store-derivation).
 
 Each build task has a special build input executed as *build instructions* in order to perform the build.
 The result of a build task can be input to another build task.

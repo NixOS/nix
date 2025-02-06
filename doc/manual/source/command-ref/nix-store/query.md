@@ -26,14 +26,14 @@ symlink.
 
 - `--use-output` / `-u`
 
-  For each argument to the query that is a [derivation], apply the
+  For each argument to the query that is a [store derivation], apply the
   query to the output path of the derivation instead.
 
 - `--force-realise` / `-f`
 
   Realise each argument to the query first (see [`nix-store --realise`](./realise.md)).
 
-[derivation]: @docroot@/glossary.md#gloss-derivation
+[store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 # Queries
 
@@ -54,12 +54,12 @@ symlink.
   This query has one option:
 
     - `--include-outputs`
-      Also include the existing output paths of [derivation]s,
+      Also include the existing output paths of [store derivation]s,
       and their closures.
 
   This query can be used to implement various kinds of deployment. A
   *source deployment* is obtained by distributing the closure of a
-  derivation. A *binary deployment* is obtained by distributing
+  store derivation. A *binary deployment* is obtained by distributing
   the closure of an output path. A *cache deployment* (combined
   source/binary deployment, including binaries of build-time-only
   dependencies) is obtained by distributing the closure of a store
@@ -112,7 +112,7 @@ symlink.
   of the `dot` tool of AT\&T's [Graphviz
   package](http://www.graphviz.org/). This can be used to visualise
   dependency graphs. To obtain a build-time dependency graph, apply
-  this to a derivation. To obtain a runtime dependency graph,
+  this to a store derivation. To obtain a runtime dependency graph,
   apply it to an output path.
 
 - `--tree`
@@ -128,13 +128,13 @@ symlink.
   Prints the references graph of the store paths *paths* in the
   [GraphML](http://graphml.graphdrawing.org/) file format. This can be
   used to visualise dependency graphs. To obtain a build-time
-  dependency graph, apply this to a [derivation]. To obtain a
+  dependency graph, apply this to a [store derivation]. To obtain a
   runtime dependency graph, apply it to an output path.
 
 - `--binding` *name* / `-b` *name*
 
   Prints the value of the attribute *name* (i.e., environment
-  variable) of the [derivation]s *paths*. It is an error for a
+  variable) of the [store derivation]s *paths*. It is an error for a
   derivation to not have the specified attribute.
 
 - `--hash`

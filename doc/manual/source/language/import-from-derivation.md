@@ -72,9 +72,9 @@ Boxes are data structures, arrow labels are transformations.
 |          |           |             |                        |
 |          V           |             |                        |
 |    .------------.    |             |                        |
-|    | derivation |    |             |     .------------.     |
-|    | expression |----|-instantiate-|---->| derivation |     |
-|    '------------'    |             |     '------------'     |
+|    | derivation |    |             |  .------------------.  |
+|    | expression |----|-instantiate-|->| store derivation |  |
+|    '------------'    |             |  '------------------'  |
 |                      |             |           |            |
 |                      |             |        realise         |
 |                      |             |           |            |

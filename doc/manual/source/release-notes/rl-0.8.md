@@ -97,7 +97,7 @@ Nix 0.8 has the following improvements:
 
             $ nix-env -i --from-profile .../other-profile firefox
 
-      - Install a derivation directly (bypassing the Nix
+      - Install a store derivation directly (bypassing the Nix
         expression language entirely):
 
             $ nix-env -i /nix/store/z58v41v21xd3...-aterm-2.3.1.drv

@@ -1,13 +1,13 @@
 # Derivations
 
-The most important built-in function is `derivation`, which is used to describe a single store-layer [derivation].
-Consult the [store chapter](@docroot@/store/drv.md) for what a derivation is;
+The most important built-in function is `derivation`, which is used to describe a single store-layer [store derivation].
+Consult the [store chapter](@docroot@/store/drv.md) for what a store derivation is;
 this section just concerns how to create one from the Nix language.
 
 This builtin function takes as input an attribute set, the attributes of which specify the inputs to the process.
-It outputs an attribute set, and produces a [derivation] as a side effect of evaluation.
+It outputs an attribute set, and produces a [store derivation] as a side effect of evaluation.
 
-[derivation]: @docroot@/glossary.md#gloss-derivation
+[store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 ## Input attributes
 
@@ -178,7 +178,7 @@ It outputs an attribute set, and produces a [derivation] as a side effect of eva
   > }
   > ```
   >
-  > The derivation path will be `/nix/store/<hash>-example.drv`.
+  > The store derivation path will be `/nix/store/<hash>-example.drv`.
   > The output paths will be
   > - `/nix/store/<hash>-example-lib`
   > - `/nix/store/<hash>-example-dev`

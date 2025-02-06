@@ -68,9 +68,9 @@ R""(
   ]
   ```
 
-* Print the path of the [derivation] produced by `nixpkgs#hello`:
+* Print the path of the [store derivation] produced by `nixpkgs#hello`:
 
-  [derivation]: @docroot@/glossary.md#gloss-derivation
+  [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
   ```console
   # nix path-info --derivation nixpkgs#hello

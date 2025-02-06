@@ -144,11 +144,11 @@ Example: `/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10`
 
 These are paths inside the Nix store, or symlinks that resolve to a path in the Nix store.
 
-A [derivation] is also addressed by store path.
+A [store derivation] is also addressed by store path.
 
 Example: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv`
 
-If you want to refer to an output path of that derivation, add the output name preceded by a caret (`^`).
+If you want to refer to an output path of that store derivation, add the output name preceded by a caret (`^`).
 
 Example: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv^out`
 
@@ -244,10 +244,10 @@ operate are determined as follows:
   a command like `nix shell nixpkgs#libxml2` will provide only those
   two outputs by default.
 
-  Note that a [derivation] (given by its `.drv` file store path) doesn't have
+  Note that a [store derivation] (given by its `.drv` file store path) doesn't have
   any attributes like `meta`, and thus this case doesn't apply to it.
 
-  [derivation]: @docroot@/glossary.md#gloss-derivation
+  [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 * Otherwise, Nix will use all outputs of the derivation.
 

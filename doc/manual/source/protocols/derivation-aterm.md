@@ -1,6 +1,6 @@
 # Derivation "ATerm" file format
 
-For historical reasons, [derivations][derivation] are stored on-disk in [ATerm](https://homepages.cwi.nl/~daybuild/daily-books/technology/aterm-guide/aterm-guide.html) format.
+For historical reasons, [store derivations][store derivation] are stored on-disk in [ATerm](https://homepages.cwi.nl/~daybuild/daily-books/technology/aterm-guide/aterm-guide.html) format.
 
 ## The ATerm format used
 
@@ -33,6 +33,6 @@ When derivation is encoded to a [store object] we make the following choices:
 Currently we always encode derivations to store object using the ATerm format (and the previous two choices),
 but we reserve the option to encode new sorts of derivations differently in the future.
 
-[derivation]: @docroot@/glossary.md#gloss-derivation
+[store derivation]: @docroot@/glossary.md#gloss-store-derivation
 [store object]: @docroot@/glossary.md#gloss-store-object
 ["Text" method]: @docroot@/store/store-object/content-address.md#method-text
