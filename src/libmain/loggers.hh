@@ -11,6 +11,7 @@ enum class LogFormat {
   internalJSON,
   bar,
   barWithLogs,
+  json,
 };
 
 void setLogFormat(const std::string & logFormatStr);

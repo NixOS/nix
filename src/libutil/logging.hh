@@ -183,7 +183,7 @@ extern Logger * logger;
 
 Logger * makeSimpleLogger(bool printBuildLogs = true);
 
-Logger * makeJSONLogger(Logger & prevLogger);
+Logger * makeJSONLogger(Logger & prevLogger, bool internalJSON = true);
 
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".
