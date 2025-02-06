@@ -1,15 +1,15 @@
 error:
        … while evaluating the attribute 'body'
-         at /pwd/lang/eval-fail-remove.nix:4:3:
-            3|
-            4|   body = (removeAttrs attrs ["x"]).x;
+         at /pwd/lang/eval-fail-remove.nix:7:3:
+            6|
+            7|   body = (removeAttrs attrs [ "x" ]).x;
              |   ^
-            5| }
+            8| }
 
        error: attribute 'x' missing
-       at /pwd/lang/eval-fail-remove.nix:4:10:
-            3|
-            4|   body = (removeAttrs attrs ["x"]).x;
+       at /pwd/lang/eval-fail-remove.nix:7:10:
+            6|
+            7|   body = (removeAttrs attrs [ "x" ]).x;
              |          ^
-            5| }
+            8| }
        Did you mean y?

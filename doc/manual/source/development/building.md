@@ -79,7 +79,7 @@ This shell also adds `./outputs/bin/nix` to your `$PATH` so you can run `nix` im
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix develop .#native-clangStdenvPackages
+$ nix develop .#native-clangStdenv
 ```
 
 > **Note**
@@ -167,11 +167,13 @@ It is useful to perform multiple cross and native builds on the same source tree
 for example to ensure that better support for one platform doesn't break the build for another.
 Meson thankfully makes this very easy by confining all build products to the build directory --- one simple shares the source directory between multiple build directories, each of which contains the build for Nix to a different platform.
 
-Nixpkgs's `configurePhase` always chooses `build` in the current directory as the name and location of the build.
-This makes having multiple build directories slightly more inconvenient.
-The good news is that Meson/Ninja seem to cope well with relocating the build directory after it is created.
+Here's how to do that:
 
-Here's how to do that
+1. Instruct Nixpkgs's infra where we want Meson to put its build directory
+
+   ```bash
+   mesonBuildDir=build-my-variant-name
+   ```
 
 1. Configure as usual
 
@@ -179,23 +181,11 @@ Here's how to do that
    configurePhase
    ```
 
-2. Rename the build directory
-
-   ```bash
-   cd .. # since `configurePhase` cd'd inside
-   mv build build-linux # or whatever name we want
-   cd build-linux
-   ```
-
 3. Build as usual
 
    ```bash
    buildPhase
    ```
-
-> **N.B.**
-> [`nixpkgs#335818`](https://github.com/NixOS/nixpkgs/issues/335818) tracks giving `mesonConfigurePhase` proper support for custom build directories.
-> When it is fixed, we can simplify these instructions and then remove this notice.
 
 ## System type
 
@@ -261,7 +251,8 @@ See [supported compilation environments](#compilation-environments) and instruct
 To use the LSP with your editor, you will want a `compile_commands.json` file telling `clangd` how we are compiling the code.
 Meson's configure always produces this inside the build directory.
 
-Configure your editor to use the `clangd` from the `.#native-clangStdenvPackages` shell. You can do that either by running it inside the development shell, or by using [nix-direnv](https://github.com/nix-community/nix-direnv) and [the appropriate editor plugin](https://github.com/direnv/direnv/wiki#editor-integration).
+Configure your editor to use the `clangd` from the `.#native-clangStdenv` shell.
+You can do that either by running it inside the development shell, or by using [nix-direnv](https://github.com/nix-community/nix-direnv) and [the appropriate editor plugin](https://github.com/direnv/direnv/wiki#editor-integration).
 
 > **Note**
 >
@@ -277,6 +268,8 @@ You may run the formatters as a one-off using:
 ./maintainers/format.sh
 ```
 
+### Pre-commit hooks
+
 If you'd like to run the formatters before every commit, install the hooks:
 
 ```
@@ -291,3 +284,30 @@ If it fails, run `git add --patch` to approve the suggestions _and commit again_
 To refresh pre-commit hook's config file, do the following:
 1. Exit the development shell and start it again by running `nix develop`.
 2. If you also use the pre-commit hook, also run `pre-commit-hooks-install` again.
+
+### VSCode
+
+Insert the following json into your `.vscode/settings.json` file to configure `nixfmt`.
+This will be picked up by the _Format Document_ command, `"editor.formatOnSave"`, etc.
+
+```json
+{
+  "nix.formatterPath": "nixfmt",
+  "nix.serverSettings": {
+    "nixd": {
+      "formatting": {
+        "command": [
+          "nixfmt"
+        ],
+      },
+    },
+    "nil": {
+      "formatting": {
+        "command": [
+          "nixfmt"
+        ],
+      },
+    },
+  },
+}
+```

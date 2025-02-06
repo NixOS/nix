@@ -2,15 +2,20 @@ with import ./config.nix;
 
 rec {
 
-  f2 = dummy: builder: mode: algo: hash: mkDerivation {
-    name = "fixed";
-    inherit builder;
-    outputHashMode = mode;
-    outputHashAlgo = algo;
-    outputHash = hash;
-    inherit dummy;
-    impureEnvVars = ["IMPURE_VAR1" "IMPURE_VAR2"];
-  };
+  f2 =
+    dummy: builder: mode: algo: hash:
+    mkDerivation {
+      name = "fixed";
+      inherit builder;
+      outputHashMode = mode;
+      outputHashAlgo = algo;
+      outputHash = hash;
+      inherit dummy;
+      impureEnvVars = [
+        "IMPURE_VAR1"
+        "IMPURE_VAR2"
+      ];
+    };
 
   f = f2 "";
 
@@ -37,7 +42,8 @@ rec {
   ];
 
   sameAsAdd =
-    f ./fixed.builder2.sh "recursive" "sha256" "1ixr6yd3297ciyp9im522dfxpqbkhcw0pylkb2aab915278fqaik";
+    f ./fixed.builder2.sh "recursive" "sha256"
+      "1ixr6yd3297ciyp9im522dfxpqbkhcw0pylkb2aab915278fqaik";
 
   bad = [
     (f ./fixed.builder1.sh "flat" "md5" "0ddd8be4b179a529afa5f2ffae4b9858")
@@ -66,4 +72,7 @@ rec {
 
   # Can use "nar" instead of "recursive" now.
   nar-not-recursive = f2 "foo" ./fixed.builder2.sh "nar" "md5" "3670af73070fa14077ad74e0f5ea4e42";
+
+  # Experimental feature
+  git = f2 "foo" ./fixed.builder2.sh "git" "sha1" "cd44baf36915d5dec8374232ea7e2057f3b4494e";
 }

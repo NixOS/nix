@@ -2,6 +2,8 @@
 
 This section shows how to build and debug Nix with debug symbols enabled.
 
+Additionally, see [Testing Nix](./testing.md) for further instructions on how to debug Nix in the context of a unit test or functional test.
+
 ## Building Nix with Debug Symbols
 
 In the development shell, set the `mesonBuildType` environment variable to `debug` before configuring the build:
@@ -12,6 +14,15 @@ In the development shell, set the `mesonBuildType` environment variable to `debu
 
 Then, proceed to build Nix as described in [Building Nix](./building.md).
 This will build Nix with debug symbols, which are essential for effective debugging.
+
+It is also possible to build without debugging for faster build:
+
+```console
+[nix-shell]$ NIX_HARDENING_ENABLE=$(printLines $NIX_HARDENING_ENABLE | grep -v fortify)
+[nix-shell]$ export mesonBuildType=debug
+```
+
+(The first line is needed because `fortify` hardening requires at least some optimization.)
 
 ## Debugging the Nix Binary
 

@@ -36,14 +36,6 @@
 
 namespace nix {
 
-Goal::Co DerivationGoal::init() {
-    if (useDerivation) {
-        co_return getDerivation();
-    } else {
-        co_return haveDerivation();
-    }
-}
-
 DerivationGoal::DerivationGoal(const StorePath & drvPath,
     const OutputsSpec & wantedOutputs, Worker & worker, BuildMode buildMode)
     : Goal(worker, DerivedPath::Built { .drvPath = makeConstantStorePathRef(drvPath), .outputs = wantedOutputs })
@@ -141,50 +133,44 @@ void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
 }
 
 
-Goal::Co DerivationGoal::getDerivation()
-{
+Goal::Co DerivationGoal::init() {
     trace("init");
 
-    /* The first thing to do is to make sure that the derivation
-       exists.  If it doesn't, it may be created through a
-       substitute. */
-    if (buildMode == bmNormal && worker.evalStore.isValidPath(drvPath)) {
-        co_return loadDerivation();
-    }
+    if (useDerivation) {
+        /* The first thing to do is to make sure that the derivation
+           exists.  If it doesn't, it may be created through a
+           substitute. */
 
-    addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
-
-    co_await Suspend{};
-    co_return loadDerivation();
-}
-
-
-Goal::Co DerivationGoal::loadDerivation()
-{
-    trace("loading derivation");
-
-    if (nrFailed != 0) {
-        co_return done(BuildResult::MiscFailure, {}, Error("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath)));
-    }
-
-    /* `drvPath' should already be a root, but let's be on the safe
-       side: if the user forgot to make it a root, we wouldn't want
-       things being garbage collected while we're busy. */
-    worker.evalStore.addTempRoot(drvPath);
-
-    /* Get the derivation. It is probably in the eval store, but it might be inthe main store:
-
-         - Resolved derivation are resolved against main store realisations, and so must be stored there.
-
-         - Dynamic derivations are built, and so are found in the main store.
-     */
-    for (auto * drvStore : { &worker.evalStore, &worker.store }) {
-        if (drvStore->isValidPath(drvPath)) {
-            drv = std::make_unique<Derivation>(drvStore->readDerivation(drvPath));
-            break;
+        if (buildMode != bmNormal || !worker.evalStore.isValidPath(drvPath)) {
+            addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
+            co_await Suspend{};
         }
+
+        trace("loading derivation");
+
+        if (nrFailed != 0) {
+            co_return done(BuildResult::MiscFailure, {}, Error("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath)));
+        }
+
+        /* `drvPath' should already be a root, but let's be on the safe
+           side: if the user forgot to make it a root, we wouldn't want
+           things being garbage collected while we're busy. */
+        worker.evalStore.addTempRoot(drvPath);
+
+        /* Get the derivation. It is probably in the eval store, but it might be inthe main store:
+
+             - Resolved derivation are resolved against main store realisations, and so must be stored there.
+
+             - Dynamic derivations are built, and so are found in the main store.
+         */
+        for (auto * drvStore : { &worker.evalStore, &worker.store }) {
+            if (drvStore->isValidPath(drvPath)) {
+                drv = std::make_unique<Derivation>(drvStore->readDerivation(drvPath));
+                break;
+            }
+        }
+        assert(drv);
     }
-    assert(drv);
 
     co_return haveDerivation();
 }
@@ -235,12 +221,14 @@ Goal::Co DerivationGoal::haveDerivation()
             }
         });
 
-    /* Check what outputs paths are not already valid. */
-    auto [allValid, validOutputs] = checkPathValidity();
+    {
+        /* Check what outputs paths are not already valid. */
+        auto [allValid, validOutputs] = checkPathValidity();
 
-    /* If they are all valid, then we're done. */
-    if (allValid && buildMode == bmNormal) {
-        co_return done(BuildResult::AlreadyValid, std::move(validOutputs));
+        /* If they are all valid, then we're done. */
+        if (allValid && buildMode == bmNormal) {
+            co_return done(BuildResult::AlreadyValid, std::move(validOutputs));
+        }
     }
 
     /* We are first going to try to create the invalid output paths
@@ -268,12 +256,7 @@ Goal::Co DerivationGoal::haveDerivation()
         }
 
     if (!waitees.empty()) co_await Suspend{}; /* to prevent hang (no wake-up event) */
-    co_return outputsSubstitutionTried();
-}
 
-
-Goal::Co DerivationGoal::outputsSubstitutionTried()
-{
     trace("all outputs substituted (maybe)");
 
     assert(!drv->type().isImpure());
@@ -399,84 +382,7 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
     }
 
     if (!waitees.empty()) co_await Suspend{}; /* to prevent hang (no wake-up event) */
-    co_return inputsRealised();
-}
 
-
-Goal::Co DerivationGoal::repairClosure()
-{
-    assert(!drv->type().isImpure());
-
-    /* If we're repairing, we now know that our own outputs are valid.
-       Now check whether the other paths in the outputs closure are
-       good.  If not, then start derivation goals for the derivations
-       that produced those outputs. */
-
-    /* Get the output closure. */
-    auto outputs = queryDerivationOutputMap();
-    StorePathSet outputClosure;
-    for (auto & i : outputs) {
-        if (!wantedOutputs.contains(i.first)) continue;
-        worker.store.computeFSClosure(i.second, outputClosure);
-    }
-
-    /* Filter out our own outputs (which we have already checked). */
-    for (auto & i : outputs)
-        outputClosure.erase(i.second);
-
-    /* Get all dependencies of this derivation so that we know which
-       derivation is responsible for which path in the output
-       closure. */
-    StorePathSet inputClosure;
-    if (useDerivation) worker.store.computeFSClosure(drvPath, inputClosure);
-    std::map<StorePath, StorePath> outputsToDrv;
-    for (auto & i : inputClosure)
-        if (i.isDerivation()) {
-            auto depOutputs = worker.store.queryPartialDerivationOutputMap(i, &worker.evalStore);
-            for (auto & j : depOutputs)
-                if (j.second)
-                    outputsToDrv.insert_or_assign(*j.second, i);
-        }
-
-    /* Check each path (slow!). */
-    for (auto & i : outputClosure) {
-        if (worker.pathContentsGood(i)) continue;
-        printError(
-            "found corrupted or missing path '%s' in the output closure of '%s'",
-            worker.store.printStorePath(i), worker.store.printStorePath(drvPath));
-        auto drvPath2 = outputsToDrv.find(i);
-        if (drvPath2 == outputsToDrv.end())
-            addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i, Repair)));
-        else
-            addWaitee(worker.makeGoal(
-                DerivedPath::Built {
-                    .drvPath = makeConstantStorePathRef(drvPath2->second),
-                    .outputs = OutputsSpec::All { },
-                },
-                bmRepair));
-    }
-
-    if (waitees.empty()) {
-        co_return done(BuildResult::AlreadyValid, assertPathValidity());
-    } else {
-        co_await Suspend{};
-        co_return closureRepaired();
-    }
-}
-
-
-Goal::Co DerivationGoal::closureRepaired()
-{
-    trace("closure repaired");
-    if (nrFailed > 0)
-        throw Error("some paths in the output closure of derivation '%s' could not be repaired",
-            worker.store.printStorePath(drvPath));
-    co_return done(BuildResult::AlreadyValid, assertPathValidity());
-}
-
-
-Goal::Co DerivationGoal::inputsRealised()
-{
     trace("all inputs realised");
 
     if (nrFailed != 0) {
@@ -763,6 +669,73 @@ Goal::Co DerivationGoal::tryLocalBuild() {
         For more information check 'man nix.conf' and search for '/machines'.
         )"
     );
+}
+
+
+Goal::Co DerivationGoal::repairClosure()
+{
+    assert(!drv->type().isImpure());
+
+    /* If we're repairing, we now know that our own outputs are valid.
+       Now check whether the other paths in the outputs closure are
+       good.  If not, then start derivation goals for the derivations
+       that produced those outputs. */
+
+    /* Get the output closure. */
+    auto outputs = queryDerivationOutputMap();
+    StorePathSet outputClosure;
+    for (auto & i : outputs) {
+        if (!wantedOutputs.contains(i.first)) continue;
+        worker.store.computeFSClosure(i.second, outputClosure);
+    }
+
+    /* Filter out our own outputs (which we have already checked). */
+    for (auto & i : outputs)
+        outputClosure.erase(i.second);
+
+    /* Get all dependencies of this derivation so that we know which
+       derivation is responsible for which path in the output
+       closure. */
+    StorePathSet inputClosure;
+    if (useDerivation) worker.store.computeFSClosure(drvPath, inputClosure);
+    std::map<StorePath, StorePath> outputsToDrv;
+    for (auto & i : inputClosure)
+        if (i.isDerivation()) {
+            auto depOutputs = worker.store.queryPartialDerivationOutputMap(i, &worker.evalStore);
+            for (auto & j : depOutputs)
+                if (j.second)
+                    outputsToDrv.insert_or_assign(*j.second, i);
+        }
+
+    /* Check each path (slow!). */
+    for (auto & i : outputClosure) {
+        if (worker.pathContentsGood(i)) continue;
+        printError(
+            "found corrupted or missing path '%s' in the output closure of '%s'",
+            worker.store.printStorePath(i), worker.store.printStorePath(drvPath));
+        auto drvPath2 = outputsToDrv.find(i);
+        if (drvPath2 == outputsToDrv.end())
+            addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i, Repair)));
+        else
+            addWaitee(worker.makeGoal(
+                DerivedPath::Built {
+                    .drvPath = makeConstantStorePathRef(drvPath2->second),
+                    .outputs = OutputsSpec::All { },
+                },
+                bmRepair));
+    }
+
+    if (waitees.empty()) {
+        co_return done(BuildResult::AlreadyValid, assertPathValidity());
+    } else {
+        co_await Suspend{};
+
+        trace("closure repaired");
+        if (nrFailed > 0)
+            throw Error("some paths in the output closure of derivation '%s' could not be repaired",
+                worker.store.printStorePath(drvPath));
+        co_return done(BuildResult::AlreadyValid, assertPathValidity());
+    }
 }
 
 
