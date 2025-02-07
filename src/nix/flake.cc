@@ -133,7 +133,7 @@ public:
         lockFlags.recreateLockFile = updateAll;
         lockFlags.writeLockFile = true;
         lockFlags.applyNixConfig = true;
-        lockFlags.forceLazy = true;
+        lockFlags.copyMode = CopyMode::Lazy;
 
         lockFlake();
     }
@@ -166,7 +166,7 @@ struct CmdFlakeLock : FlakeCommand
         lockFlags.writeLockFile = true;
         lockFlags.failOnUnlocked = true;
         lockFlags.applyNixConfig = true;
-        lockFlags.forceLazy = true;
+        lockFlags.copyMode = CopyMode::Lazy;
 
         lockFlake();
     }
@@ -213,9 +213,13 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
 
     void run(nix::ref<nix::Store> store) override
     {
-        lockFlags.forceLazy = true;
+        lockFlags.copyMode = CopyMode::Lazy;
         auto lockedFlake = lockFlake();
         auto & flake = lockedFlake.flake;
+
+        std::optional<StorePath> storePath;
+        if (flake.lockedRef.input.getNarHash())
+            storePath = flake.lockedRef.input.computeStorePath(*store);
 
         if (json) {
             nlohmann::json j;
@@ -237,6 +241,8 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["revCount"] = *revCount;
             if (auto lastModified = flake.lockedRef.input.getLastModified())
                 j["lastModified"] = *lastModified;
+            if (storePath)
+                j["path"] = store->printStorePath(*storePath);
             j["locks"] = lockedFlake.lockFile.toJSON().first;
             if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
@@ -253,6 +259,10 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Description:" ANSI_NORMAL "   %s",
                     *flake.description);
+            if (storePath)
+                logger->cout(
+                    ANSI_BOLD "Path:" ANSI_NORMAL "          %s",
+                    store->printStorePath(*storePath));
             if (auto rev = flake.lockedRef.input.getRev())
                 logger->cout(
                     ANSI_BOLD "Revision:" ANSI_NORMAL "      %s",
