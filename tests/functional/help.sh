@@ -25,7 +25,7 @@ done
 
 # FIXME: we don't know whether we built the manpages, so we can't
 # reliably test them here.
-if false; then
+skipTest "we don't know whether we built the manpages, so we can't reliably test them here."
 
 # test help output
 
@@ -74,5 +74,3 @@ nix-daemon --help
 nix-hash --help
 nix-instantiate --help
 nix-prefetch-url --help
-
-fi
