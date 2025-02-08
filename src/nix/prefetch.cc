@@ -191,7 +191,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
 
         Finally f([]() { stopProgressBar(); });
 
-        if (isTTY())
+        if (isOutputARealTerminal(StandardOutputStream::Stderr))
           startProgressBar();
 
         auto store = openStore();

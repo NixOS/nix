@@ -555,7 +555,7 @@ public:
 
 Logger * makeProgressBar()
 {
-    return new ProgressBar(isTTY());
+    return new ProgressBar(shouldANSI());
 }
 
 void startProgressBar()
