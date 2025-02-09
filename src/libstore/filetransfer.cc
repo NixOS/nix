@@ -298,6 +298,14 @@ struct curlFileTransfer : public FileTransfer
             return ((TransferItem *) userp)->readCallback(buffer, size, nitems);
         }
 
+        #if !defined(_WIN32) && LIBCURL_VERSION_NUM >= 0x071000
+        static int cloexec_callback(void *, curl_socket_t curlfd, curlsocktype purpose) {
+            unix::closeOnExec(curlfd);
+            vomit("cloexec set for fd %i", curlfd);
+            return CURL_SOCKOPT_OK;
+        }
+        #endif
+
         void init()
         {
             if (!req) req = curl_easy_init();
@@ -356,6 +364,10 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, 0);
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
             }
+
+            #if !defined(_WIN32) && LIBCURL_VERSION_NUM >= 0x071000
+            curl_easy_setopt(req, CURLOPT_SOCKOPTFUNCTION, cloexec_callback);
+            #endif
 
             curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, fileTransferSettings.connectTimeout.get());
 
