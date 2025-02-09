@@ -1,7 +1,6 @@
 # Store Derivation and Deriving Path
 
-So far, we have covered "inert" [store objects][store object].
-But the point of the Nix store layer is to be a build system.
+Besides functioning as a [content addressed store] the Nix store layer works as a [build system].
 Other system (like Git or IPFS) also store and transfer immutable data, but they don't concern themselves with *how* that data was created.
 
 This is where Nix distinguishes itself.
@@ -12,11 +11,6 @@ This is where Nix distinguishes itself.
 
 A derivation is a specification for running an executable on precisely defined input files to repeatably produce output files at uniquely determined file system paths.
 
-What is the natural Unix analog for a build step *in action*?
-Answer: a process that will eventually exit, leaving behind some output files.
-What is the natural way to *plan* such a step?
-An `execve` system call.
-
 A derivation consists of:
 
  - A name
@@ -25,16 +19,9 @@ A derivation consists of:
 
  - A map of [*outputs*][outputs], from names to other data
 
- - The [process creation fields]: to spawn the arbitrary process which will perform the build step:
+ - The ["system" type][system] (e.g. `x86_64-linux`) where the executable is to run.
 
-
-   - The [*builder*][builder], a path to an executable
-
-   - A list of [arguments][args]
-
-   - A map of [environment variables][env].
-
- - A two-component ["system" type][system] (e.g. `x86_64-linux`) where the executable is to run.
+ - The [process creation fields]: to spawn the arbitrary process which will perform the build step.
 
 [store derivation]: #store-derivation
 [inputs]: #inputs
@@ -56,35 +43,34 @@ The store path of the store object which encodes a derivation is often called a 
 
 ## Deriving path {#deriving-path}
 
-Deriving paths are a way to refer to [store objects][store object] that might not yet be [realised][realise].
-This is necessary because, in general and particularly for [content-addressed derivations][content-addressed derivation], the [store path] of an [output] is not known in advance.
+Deriving paths are a way to refer to [store objects][store object] that may or may not yet be [realised][realise].
 There are two forms:
 
 - [*constant*]{#deriving-path-constant}: just a [store path].
-  It can be made [valid][validity] by copying it into the store: from the evaluator, command line interface or another st    ore.
+  It can be made [valid][validity] by copying it into the store: from the evaluator, command line interface or another store.
 
 - [*output*]{#deriving-path-output}: a pair of a [store path] to a [store derivation] and an [output] name.
 
 In pseudo code:
 
-```idris
-type OutputName = String
+```typescript
+type OutputName = String;
 
-data DerivingPath
-  = Constant { path : StorePath }
-  | Output {
-      drvPath : StorePath,
-      output  : OutputName,
-    }
+type ConstantPath = { path: StorePath; }
+type OutputPath = { drvPath: StorePath; output: OutputName; }
+
+type DerivingPath = ConstantPath | OutputPath
 ```
+
+Deriving paths are necessary because, in general and particularly for [content-addressed derivations][content-addressed derivation], the [store path] of an [output] is not known in advance.
+We can use an output deriving path to refer to such an out, instead of the store path which we do not yet know.
 
 [deriving path]: #deriving-path
 [validity]: @docroot@/glossary.md#gloss-validity
 
 ## Parts of a derivation
 
-With both [store derivations][store derivation] introduced and [deriving paths][deriving path] defined,
-it is now possible to define the parts of a derivation.
+A derivation is constructed from the parts documented in the following subsections.
 
 ### Inputs {#inputs}
 
