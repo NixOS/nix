@@ -15,7 +15,7 @@ Each of *paths* is processed as follows:
   1. If it is not [valid], substitute the store derivation file itself.
   2. Realise its [output paths]:
     - Try to fetch from [substituters] the [store objects] associated with the output paths in the store derivation's [closure].
-      - With [content-addressed derivations] (experimental):
+      - With [content-addressing derivations] (experimental):
         Determine the output paths to realise by querying content-addressed realisation entries in the [Nix database].
     - For any store paths that cannot be substituted, produce the required store objects:
       1. Realise all outputs of the derivation's dependencies
@@ -32,7 +32,7 @@ If no substitutes are available and no store derivation is given, realisation fa
 [store objects]: @docroot@/store/store-object.md
 [closure]: @docroot@/glossary.md#gloss-closure
 [substituters]: @docroot@/command-ref/conf-file.md#conf-substituters
-[content-addressed derivations]: @docroot@/development/experimental-features.md#xp-feature-ca-derivations
+[content-addressing derivations]: @docroot@/development/experimental-features.md#xp-feature-ca-derivations
 [Nix database]: @docroot@/glossary.md#gloss-nix-database
 
 The resulting paths are printed on standard output.

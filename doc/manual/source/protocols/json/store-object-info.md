@@ -41,10 +41,10 @@ In other words, the same store object residing in different store could have dif
 
 * `deriver`:
 
-  If known, the path to the [derivation] from which this store object was produced.
+  If known, the path to the [store derivation] from which this store object was produced.
   Otherwise `null`.
 
-  [derivation]: @docroot@/glossary.md#gloss-store-derivation
+  [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 * `registrationTime` (optional):
 

@@ -24,7 +24,7 @@ end
 
 # Set up the per-user profile.
 
-set NIX_LINK $HOME/.nix-profile
+set --local NIX_LINK $HOME/.nix-profile
 
 # Set up environment.
 # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
@@ -63,7 +63,6 @@ if set --query MANPATH
 end
 
 add_path "$NIX_LINK/bin"
-set --erase NIX_LINK
 
 # Cleanup
 

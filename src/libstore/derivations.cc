@@ -300,7 +300,7 @@ static DerivationOutput parseDerivationOutput(
         } else {
             xpSettings.require(Xp::CaDerivations);
             if (pathS != "")
-                throw FormatError("content-addressed derivation output should not specify output path");
+                throw FormatError("content-addressing derivation output should not specify output path");
             return DerivationOutput::CAFloating {
                 .method = std::move(method),
                 .hashAlgo = std::move(hashAlgo),

@@ -1,9 +1,10 @@
 # Derivations
 
-The most important built-in function is `derivation`, which is used to describe a single derivation:
-a specification for running an executable on precisely defined input files to repeatably produce output files at uniquely determined file system paths.
+The most important built-in function is `derivation`, which is used to describe a single store-layer [store derivation].
+Consult the [store chapter](@docroot@/store/drv.md) for what a store derivation is;
+this section just concerns how to create one from the Nix language.
 
-It takes as input an attribute set, the attributes of which specify the inputs to the process.
+This builtin function takes as input an attribute set, the attributes of which specify the inputs to the process.
 It outputs an attribute set, and produces a [store derivation] as a side effect of evaluation.
 
 [store derivation]: @docroot@/glossary.md#gloss-store-derivation
@@ -15,7 +16,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 - [`name`]{#attr-name} ([String](@docroot@/language/types.md#type-string))
 
   A symbolic name for the derivation.
-  It is added to the [store path] of the corresponding [store derivation] as well as to its [output paths](@docroot@/glossary.md#gloss-output-path).
+  See [derivation outputs](@docroot@/store/drv.md#outputs) for what this is affects.
 
   [store path]: @docroot@/store/store-path.md
 
@@ -28,17 +29,12 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   > }
   > ```
   >
-  > The store derivation's path will be `/nix/store/<hash>-hello.drv`.
+  > The derivation's path will be `/nix/store/<hash>-hello.drv`.
   > The [output](#attr-outputs) paths will be of the form `/nix/store/<hash>-hello[-<output>]`
 
 - [`system`]{#attr-system} ([String](@docroot@/language/types.md#type-string))
 
-  The system type on which the [`builder`](#attr-builder) executable is meant to be run.
-
-  A necessary condition for Nix to build derivations locally is that the `system` attribute matches the current [`system` configuration option].
-  It can automatically [build on other platforms](@docroot@/language/derivations.md#attr-builder) by forwarding build requests to other machines.
-
-  [`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
+  See [system](@docroot@/store/drv.md#system).
 
   > **Example**
   >
@@ -68,7 +64,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 
 - [`builder`]{#attr-builder} ([Path](@docroot@/language/types.md#type-path) | [String](@docroot@/language/types.md#type-string))
 
-  Path to an executable that will perform the build.
+  See [builder](@docroot@/store/drv.md#builder).
 
   > **Example**
   >
@@ -117,7 +113,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 
   Default: `[ ]`
 
-  Command-line arguments to be passed to the [`builder`](#attr-builder) executable.
+  See [args](@docroot@/store/drv.md#args).
 
   > **Example**
   >
@@ -239,77 +235,3 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
       passed as an empty string.
 
 <!-- FIXME: add a section on output attributes -->
-
-## Builder execution
-
-The [`builder`](#attr-builder) is executed as follows:
-
-- A temporary directory is created under the directory specified by
-  `TMPDIR` (default `/tmp`) where the build will take place. The
-  current directory is changed to this directory.
-
-- The environment is cleared and set to the derivation attributes, as
-  specified above.
-
-- In addition, the following variables are set:
-
-  - `NIX_BUILD_TOP` contains the path of the temporary directory for
-    this build.
-
-  - Also, `TMPDIR`, `TEMPDIR`, `TMP`, `TEMP` are set to point to the
-    temporary directory. This is to prevent the builder from
-    accidentally writing temporary files anywhere else. Doing so
-    might cause interference by other processes.
-
-  - `PATH` is set to `/path-not-set` to prevent shells from
-    initialising it to their built-in default value.
-
-  - `HOME` is set to `/homeless-shelter` to prevent programs from
-    using `/etc/passwd` or the like to find the user's home
-    directory, which could cause impurity. Usually, when `HOME` is
-    set, it is used as the location of the home directory, even if
-    it points to a non-existent path.
-
-  - `NIX_STORE` is set to the path of the top-level Nix store
-    directory (typically, `/nix/store`).
-
-  - `NIX_ATTRS_JSON_FILE` & `NIX_ATTRS_SH_FILE` if `__structuredAttrs`
-    is set to `true` for the derivation. A detailed explanation of this
-    behavior can be found in the
-    [section about structured attrs](./advanced-attributes.md#adv-attr-structuredAttrs).
-
-  - For each output declared in `outputs`, the corresponding
-    environment variable is set to point to the intended path in the
-    Nix store for that output. Each output path is a concatenation
-    of the cryptographic hash of all build inputs, the `name`
-    attribute and the output name. (The output name is omitted if
-    it’s `out`.)
-
-- If an output path already exists, it is removed. Also, locks are
-  acquired to prevent multiple Nix instances from performing the same
-  build at the same time.
-
-- A log of the combined standard output and error is written to
-  `/nix/var/log/nix`.
-
-- The builder is executed with the arguments specified by the
-  attribute `args`. If it exits with exit code 0, it is considered to
-  have succeeded.
-
-- The temporary directory is removed (unless the `-K` option was
-  specified).
-
-- If the build was successful, Nix scans each output path for
-  references to input paths by looking for the hash parts of the input
-  paths. Since these are potential runtime dependencies, Nix registers
-  them as dependencies of the output paths.
-
-- After the build, Nix sets the last-modified timestamp on all files
-  in the build result to 1 (00:00:01 1/1/1970 UTC), sets the group to
-  the default group, and sets the mode of the file to 0444 or 0555
-  (i.e., read-only, with execute permission enabled if the file was
-  originally executable). Note that possible `setuid` and `setgid`
-  bits are cleared. Setuid and setgid programs are not currently
-  supported by Nix. This is because the Nix archives used in
-  deployment have no concept of ownership information, and because it
-  makes the build result dependent on the user performing the build.

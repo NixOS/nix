@@ -187,7 +187,7 @@ struct DerivationType {
     };
 
     /**
-     * Content-addressed derivation types
+     * Content-addressing derivation types
      */
     struct ContentAddressed {
         /**
