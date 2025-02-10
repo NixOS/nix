@@ -1,4 +1,5 @@
 #include "git-lfs-fetch.hh"
+#include "git-utils.hh"
 #include "filetransfer.hh"
 #include "processes.hh"
 #include "url.hh"
@@ -60,22 +61,23 @@ static std::string getLfsApiToken(const ParsedURL & url)
     return queryResp["header"]["Authorization"].get<std::string>();
 }
 
+typedef std::unique_ptr<git_config, Deleter<git_config_free>> GitConfig;
+typedef std::unique_ptr<git_config_entry, Deleter<git_config_entry_free>> GitConfigEntry;
+
 static std::string getLfsEndpointUrl(git_repository * repo)
 {
-    // FIXME: use Deleter
-    git_config * config = nullptr;
-    if (git_repository_config(&config, repo)) {
-        git_config_entry * entry = nullptr;
-        if (!git_config_get_entry(&entry, config, "lfs.url")) {
+    GitConfig config;
+    if (git_repository_config(Setter(config), repo)) {
+        GitConfigEntry entry;
+        if (!git_config_get_entry(Setter(entry), config.get(), "lfs.url")) {
             auto value = std::string(entry->value);
             if (!value.empty()) {
                 debug("Found explicit lfs.url value: %s", value);
                 return value;
             }
         }
-        git_config_entry_free(entry);
     }
-    git_config_free(config);
+
     git_remote * remote = nullptr;
     if (git_remote_lookup(&remote, repo, "origin"))
         return "";

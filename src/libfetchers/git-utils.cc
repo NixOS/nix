@@ -61,14 +61,6 @@ namespace nix {
 
 struct GitSourceAccessor;
 
-// Some wrapper types that ensure that the git_*_free functions get called.
-template<auto del>
-struct Deleter
-{
-    template <typename T>
-    void operator()(T * p) const { del(p); };
-};
-
 typedef std::unique_ptr<git_repository, Deleter<git_repository_free>> Repository;
 typedef std::unique_ptr<git_tree_entry, Deleter<git_tree_entry_free>> TreeEntry;
 typedef std::unique_ptr<git_tree, Deleter<git_tree_free>> Tree;
@@ -85,20 +77,6 @@ typedef std::unique_ptr<git_config_iterator, Deleter<git_config_iterator_free>> 
 typedef std::unique_ptr<git_odb, Deleter<git_odb_free>> ObjectDb;
 typedef std::unique_ptr<git_packbuilder, Deleter<git_packbuilder_free>> PackBuilder;
 typedef std::unique_ptr<git_indexer, Deleter<git_indexer_free>> Indexer;
-
-// A helper to ensure that we don't leak objects returned by libgit2.
-template<typename T>
-struct Setter
-{
-    T & t;
-    typename T::pointer p = nullptr;
-
-    Setter(T & t) : t(t) { }
-
-    ~Setter() { if (p) t = T(p); }
-
-    operator typename T::pointer * () { return &p; }
-};
 
 Hash toHash(const git_oid & oid)
 {
