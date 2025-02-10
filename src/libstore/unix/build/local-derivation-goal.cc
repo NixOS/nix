@@ -800,7 +800,7 @@ void LocalDerivationGoal::startBuilder()
            out. */
         for (auto & i : drv->outputsAndOptPaths(worker.store)) {
             /* If the name isn't known a priori (i.e. floating
-               content-addressed derivation), the temporary location we use
+               content-addressing derivation), the temporary location we use
                should be fresh.  Freshness means it is impossible that the path
                is already in the sandbox, so we don't need to worry about
                removing it.  */
@@ -2291,7 +2291,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
        to do anything here.
 
        We can only early return when the outputs are known a priori. For
-       floating content-addressed derivations this isn't the case.
+       floating content-addressing derivations this isn't the case.
      */
     if (hook)
         return DerivationGoal::registerOutputs();
