@@ -111,6 +111,22 @@ This is to allow derivations with a single output to avoid a superfluous `"-${ou
 >
 > - The store path of `dev` will be: `/nix/store/<hash>-hello-dev`.
 
+### System {#system}
+
+The system type on which the [`builder`](#attr-builder) executable is meant to be run.
+
+A necessary condition for Nix to schedule a given derivation on some Nix instance is for the "system" of that derivation to match that instance's [`system` configuration option].
+
+By putting the `system` in each derivation, Nix allows *heterogenous* build plans, where not all steps can be run on the same machine or same sort of machine.
+Nix can schedule builds such that it automatically builds on other platforms by [forwarding build requests](@docroot@/advanced-topics/distributed-builds.md) to other Nix instances.
+
+[`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
+
+[content-addressed derivation]: @docroot@/glossary.md#gloss-content-addressed-derivation
+[realise]: @docroot@/glossary.md#gloss-realise
+[store object]: @docroot@/store/store-object.md
+[store path]: @docroot@/store/store-path.md
+
 ### Process creation fields {#process-creation-fields}
 
 These are the three fields which describe how to spawn the process which (along with any of its own child processes) will perform the build.
@@ -166,22 +182,6 @@ There are two types of placeholder, corresponding to the two cases where this pr
 > - In the input case this is impractical:
 >
 >   If we always build a dependency first, and then refer to its output by store path, we would lose the ability for a derivation graph to describe an entire build plan consisting of multiple build steps.
-
-### System {#system}
-
-The system type on which the [`builder`](#attr-builder) executable is meant to be run.
-
-A necessary condition for Nix to schedule a given derivation on some Nix instance is for the "system" of that derivation to match that instance's [`system` configuration option].
-
-By putting the `system` in each derivation, Nix allows *heterogenous* build plans, where not all steps can be run on the same machine or same sort of machine.
-Nix can schedule builds such that it automatically builds on other platforms by [forwarding build requests](@docroot@/advanced-topics/distributed-builds.md) to other Nix instances.
-
-[`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
-
-[content-addressed derivation]: @docroot@/glossary.md#gloss-content-addressed-derivation
-[realise]: @docroot@/glossary.md#gloss-realise
-[store object]: @docroot@/store/store-object.md
-[store path]: @docroot@/store/store-path.md
 
 ## Encoding
 
