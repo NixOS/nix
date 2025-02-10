@@ -98,11 +98,10 @@ std::string getLfsApiToken(const ParsedURL & url)
 
 std::string getLfsEndpointUrl(git_repository * repo)
 {
-    git_config * config = NULL;
-    if (!git_repository_config(&config, repo))
-        ;
-    {
-        git_config_entry * entry = NULL;
+    // FIXME: use Deleter
+    git_config * config = nullptr;
+    if (git_repository_config(&config, repo)) {
+        git_config_entry * entry = nullptr;
         if (!git_config_get_entry(&entry, config, "lfs.url")) {
             auto value = std::string(entry->value);
             if (!value.empty()) {
@@ -113,7 +112,7 @@ std::string getLfsEndpointUrl(git_repository * repo)
         git_config_entry_free(entry);
     }
     git_config_free(config);
-    git_remote * remote = NULL;
+    git_remote * remote = nullptr;
     if (git_remote_lookup(&remote, repo, "origin"))
         return "";
 
