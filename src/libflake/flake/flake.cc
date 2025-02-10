@@ -539,7 +539,6 @@ LockedFlake lockFlake(
             /* Get the overrides (i.e. attributes of the form
                'inputs.nixops.inputs.nixpkgs.url = ...'). */
             for (auto & [id, input] : flakeInputs) {
-                //if (id == "self") continue;
                 for (auto & [idOverride, inputOverride] : input.overrides) {
                     auto inputAttrPath(inputAttrPathPrefix);
                     inputAttrPath.push_back(id);
