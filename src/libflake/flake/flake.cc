@@ -85,6 +85,7 @@ static std::tuple<ref<SourceAccessor>, FlakeRef, FlakeRef> fetchOrSubstituteTree
 static StorePath copyInputToStore(
     EvalState & state,
     fetchers::Input & input,
+    const fetchers::Input & originalInput,
     ref<SourceAccessor> accessor)
 {
     auto storePath = fetchToStore(*state.store, accessor, FetchMode::Copy, input.getName());
@@ -94,9 +95,7 @@ static StorePath copyInputToStore(
     auto narHash = state.store->queryPathInfo(storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
-    #if 0
-    assert(!originalRef.input.getNarHash() || fetched->storePath == originalRef.input.computeStorePath(*state.store));
-    #endif
+    assert(!originalInput.getNarHash() || storePath == originalInput.computeStorePath(*state.store));
 
     return storePath;
 }
@@ -421,7 +420,7 @@ static Flake getFlake(
     }
 
     // Copy the tree to the store.
-    auto storePath = copyInputToStore(state, lockedRef.input, accessor);
+    auto storePath = copyInputToStore(state, lockedRef.input, originalRef.input, accessor);
 
     // Re-parse flake.nix from the store.
     return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->toRealPath(storePath)), lockRootAttrPath);
@@ -784,7 +783,7 @@ LockedFlake lockFlake(
                                         state, *input.ref, useRegistries, flakeCache);
 
                                     // FIXME: allow input to be lazy.
-                                    auto storePath = copyInputToStore(state, lockedRef.input, accessor);
+                                    auto storePath = copyInputToStore(state, lockedRef.input, input.ref->input, accessor);
 
                                     return {state.rootPath(state.store->toRealPath(storePath)), lockedRef};
                                 }
