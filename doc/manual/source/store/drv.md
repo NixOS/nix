@@ -87,7 +87,7 @@ The [process creation fields] will presumably include many [store paths][store p
  - The path to the executable normally starts with a store path
  - The arguments and environment variables likely contain many other store paths.
 
-But just as we stored the references contained in the file data separately for store objects, so we store the set of inputs separately from the builder, arguments, and environment variables.
+But rather than somehow scanning all the other fields for inputs, Nix requires that all inputs be explicitly collected in the inputs field. It is instead the responsibility of the creator of a derivation (e.g. the evaluator) to  ensure that every store object referenced in another field (e.g. referenced by store path) is included in this inputs field.
 
 ### Outputs {#outputs}
 
