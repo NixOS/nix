@@ -22,7 +22,7 @@
 - [store derivation]{#gloss-store-derivation}
 
   A single build task.
-  See [Store Derivation](@docroot@/store/drv.md#store-derivation) for details.
+  See [Store Derivation](@docroot@/store/derivation/index.md#store-derivation) for details.
 
   [store derivation]: #gloss-store-derivation
 
@@ -30,7 +30,7 @@
 
   A [store path] which uniquely identifies a [store derivation].
 
-  See [Referencing Store Derivations](@docroot@/store/drv.md#derivation-path) for details.
+  See [Referencing Store Derivations](@docroot@/store/derivation/index.md#derivation-path) for details.
 
   Not to be confused with [deriving path].
 
@@ -252,7 +252,7 @@
 
   Deriving paths are a way to refer to [store objects][store object] that might not yet be [realised][realise].
 
-  See [Deriving Path](./store/drv.md#deriving-path) for details.
+  See [Deriving Path](./store/derivation/index.md#deriving-path) for details.
 
   Not to be confused with [derivation path].
 

@@ -10,7 +10,7 @@
 
 ## Builder Execution
 
-The [`builder`](./drv.md#builder) is executed as follows:
+The [`builder`](./derivation/index.md#builder) is executed as follows:
 
 - A temporary directory is created under the directory specified by
   `TMPDIR` (default `/tmp`) where the build will take place. The

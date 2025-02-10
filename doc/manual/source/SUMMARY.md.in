@@ -22,7 +22,10 @@
   - [Store Object](store/store-object.md)
     - [Content-Addressing Store Objects](store/store-object/content-address.md)
   - [Store Path](store/store-path.md)
-  - [Store Derivation and Deriving Path](store/drv.md)
+  - [Store Derivation and Deriving Path](store/derivation/index.md)
+    - [Derivation Outputs and Types of Derivations](store/derivation/outputs/index.md)
+      - [Content-addressing derivation outputs](store/derivation/outputs/content-address.md)
+      - [Input-addressing derivation outputs](store/derivation/outputs/input-address.md)
   - [Building](store/building.md)
   - [Store Types](store/types/index.md)
 {{#include ./store/types/SUMMARY.md}}
