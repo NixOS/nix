@@ -13,7 +13,7 @@
 
     - [Content-Addressing File System Objects](@docroot@/store/file-system-object/content-address.md)
     - [Content-Addressing Store Objects](@docroot@/store/store-object/content-address.md)
-    - [content-addressed derivation](#gloss-content-addressed-derivation)
+    - [content-addressing derivation](#gloss-content-addressing-derivation)
 
   Software Heritage's writing on [*Intrinsic and Extrinsic identifiers*](https://www.softwareheritage.org/2020/07/09/intrinsic-vs-extrinsic-identifiers) is also a good introduction to the value of content-addressing over other referencing schemes.
 
@@ -69,7 +69,7 @@
 
   [realise]: #gloss-realise
 
-- [content-addressed derivation]{#gloss-content-addressed-derivation}
+- [content-addressing derivation]{#gloss-content-addressing-derivation}
 
   A derivation which has the
   [`__contentAddressed`](./language/advanced-attributes.md#adv-attr-__contentAddressed)
@@ -134,7 +134,7 @@
 - [input-addressed store object]{#gloss-input-addressed-store-object}
 
   A store object produced by building a
-  non-[content-addressed](#gloss-content-addressed-derivation),
+  non-[content-addressed](#gloss-content-addressing-derivation),
   non-[fixed-output](#gloss-fixed-output-derivation)
   derivation.
 
@@ -142,7 +142,7 @@
 
   A [store object] which is [content-addressed](#gloss-content-address),
   i.e. whose [store path] is determined by its contents.
-  This includes derivations, the outputs of [content-addressed derivations](#gloss-content-addressed-derivation), and the outputs of [fixed-output derivations](#gloss-fixed-output-derivation).
+  This includes derivations, the outputs of [content-addressing derivations](#gloss-content-addressing-derivation), and the outputs of [fixed-output derivations](#gloss-fixed-output-derivation).
 
   See [Content-Addressing Store Objects](@docroot@/store/store-object/content-address.md) for details.
 

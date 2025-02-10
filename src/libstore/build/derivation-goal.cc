@@ -1222,7 +1222,7 @@ SingleDrvOutputs DerivationGoal::registerOutputs()
        to do anything here.
 
        We can only early return when the outputs are known a priori. For
-       floating content-addressed derivations this isn't the case.
+       floating content-addressing derivations this isn't the case.
      */
     return assertPathValidity();
 }
