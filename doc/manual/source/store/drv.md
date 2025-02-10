@@ -56,7 +56,7 @@ In pseudo code:
 ```typescript
 type OutputName = String;
 
-type ConstantPath = { 
+type ConstantPath = {
   path: StorePath;
 };
 
@@ -263,20 +263,34 @@ But what about a dynamic derivations output?
 (i.e. how do we refer to the output of an output of a derivation?)
 For that we need to generalize the definition of deriving path, replacing the store path used to refer to the derivation with a nested deriving path:
 
-```idris
-type OutputName = String
-
-data DerivingPath
-  = Constant { storeObj : StorePath }
-  | Output {
-      drv    : DerivingPath, -- Note: changed
-      output : OutputName,
-    }
+```diff
+ type OutputPath = {
+-  drvPath: StorePath;
++  drvPath: DerivingPath;
+   output: OutputName;
+ };
 ```
 
-Now, the `drv` field of `Output` is itself a `DerivingPath` instead of a `StorePath`.
+Now, the `drvPath` field of `OutputPath` is itself a `DerivingPath` instead of a `StorePath`.
 
-Under this extended model, `DerivingPath`s are thus inductively built up from an `Constant`, contains in 0 or more outer `Output`s.
+With that change, here is updated definition:
+
+```typescript
+type OutputName = String;
+
+type ConstantPath = {
+  path: StorePath;
+};
+
+type OutputPath = {
+  drvPath: DerivingPath;
+  output: OutputName;
+};
+
+type DerivingPath = ConstantPath | OutputPath;
+```
+
+Under this extended model, `DerivingPath`s are thus inductively built up from a root `ConstantPath`, wrapped with zero or more outer `OutputPath`s.
 
 ### Encoding {#deriving-path-encoding}
 
