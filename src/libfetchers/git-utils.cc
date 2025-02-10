@@ -692,13 +692,12 @@ struct GitSourceAccessor : SourceAccessor
         const auto blob = getBlob(path, symlink);
 
         if (lfsFetch) {
-            auto pathStr = std::string(path.rel());
-            if (lfsFetch->shouldFetch(pathStr)) {
+            if (lfsFetch->shouldFetch(path)) {
                 StringSink s;
                 try {
                     auto contents = std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
-                    lfsFetch->fetch(contents, pathStr, s, [&s](uint64_t size){ s.s.reserve(size); });
-                } catch (Error &e) {
+                    lfsFetch->fetch(contents, path, s, [&s](uint64_t size){ s.s.reserve(size); });
+                } catch (Error & e) {
                     e.addTrace({}, "while smudging git-lfs file '%s'", path);
                     throw;
                 }
