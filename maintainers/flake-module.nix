@@ -35,7 +35,6 @@
                 echo "ERROR: found merge/patch conflicts in files"
                 exit 1
               fi
-              touch $out
             ''}";
           };
           clang-format = {
