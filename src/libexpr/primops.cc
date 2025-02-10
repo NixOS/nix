@@ -2139,7 +2139,6 @@ static RegisterPrimOp primop_outputOf({
     .name = "__outputOf",
     .args = {"derivation-reference", "output-name"},
     .doc = R"(
-      Return at
       Return the output path of a derivation, literally or using an
       [input placeholder string](@docroot@/store/drv.md#input-placeholder)
       if needed.
