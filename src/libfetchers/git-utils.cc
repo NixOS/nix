@@ -485,13 +485,15 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     /**
      * A 'GitSourceAccessor' with no regard for export-ignore or any other transformations.
      */
-    ref<GitSourceAccessor> getRawAccessor(const Hash & rev, bool smudgeLfs);
+    ref<GitSourceAccessor> getRawAccessor(
+        const Hash & rev,
+        bool smudgeLfs = false);
 
     ref<SourceAccessor> getAccessor(
         const Hash & rev,
         bool exportIgnore,
         std::string displayPrefix,
-        bool smudgeLfs) override;
+        bool smudgeLfs = false) override;
 
     ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
 
@@ -610,7 +612,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     Hash treeHashToNarHash(const Hash & treeHash) override
     {
-        auto accessor = getAccessor(treeHash, false, "", false);
+        auto accessor = getAccessor(treeHash, false, "");
 
         fetchers::Cache::Key cacheKey{"treeHashToNarHash", {{"treeHash", treeHash.gitRev()}}};
 
@@ -1187,7 +1189,9 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     }
 };
 
-ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev, bool smudgeLfs)
+ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(
+    const Hash & rev,
+    bool smudgeLfs)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
     return make_ref<GitSourceAccessor>(self, rev, smudgeLfs);
@@ -1238,7 +1242,7 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     /* Read the .gitmodules files from this revision. */
     CanonPath modulesFile(".gitmodules");
 
-    auto accessor = getAccessor(rev, exportIgnore, "", false);
+    auto accessor = getAccessor(rev, exportIgnore, "");
     if (!accessor->pathExists(modulesFile)) return {};
 
     /* Parse it and get the revision of each submodule. */
@@ -1249,7 +1253,7 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
 
     std::vector<std::tuple<Submodule, Hash>> result;
 
-    auto rawAccessor = getRawAccessor(rev, false);
+    auto rawAccessor = getRawAccessor(rev);
 
     for (auto & submodule : parseSubmodules(pathTemp)) {
         /* Filter out .gitmodules entries that don't exist or are not

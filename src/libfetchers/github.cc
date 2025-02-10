@@ -297,8 +297,7 @@ struct GitArchiveInputScheme : InputScheme
         auto accessor = getTarballCache()->getAccessor(
             tarballInfo.treeHash,
             false,
-            "«" + input.to_string() + "»",
-            false);
+            "«" + input.to_string() + "»");
 
         return {accessor, input};
     }
