@@ -56,10 +56,16 @@ In pseudo code:
 ```typescript
 type OutputName = String;
 
-type ConstantPath = { path: StorePath; }
-type OutputPath = { drvPath: StorePath; output: OutputName; }
+type ConstantPath = { 
+  path: StorePath;
+};
 
-type DerivingPath = ConstantPath | OutputPath
+type OutputPath = {
+  drvPath: StorePath;
+  output: OutputName;
+};
+
+type DerivingPath = ConstantPath | OutputPath;
 ```
 
 Deriving paths are necessary because, in general and particularly for [content-addressed derivations][content-addressed derivation], the [store path] of an [output] is not known in advance.
@@ -76,9 +82,9 @@ A derivation is constructed from the parts documented in the following subsectio
 
 The inputs are a set of [deriving paths][deriving path], refering to all store objects needed in order to perform this build step.
 
-The information needed for the `execve` system call will presumably include many [store paths][store path]:
+The [process creation fields] will presumably include many [store paths][store path]:
 
- - The path to the executable is almost surely starts with a store path
+ - The path to the executable normally starts with a store path
  - The arguments and environment variables likely contain many other store paths.
 
 But just as we stored the references contained in the file data separately for store objects, so we store the set of inputs separately from the builder, arguments, and environment variables.
@@ -91,9 +97,9 @@ Outputs are assigned names, and also consistent of other information based on th
 
 Output names can be any string which is also a valid [store path] name.
 The store path of the output store object (also called an [output path] for short), has a name based on the derivation name and the output name.
-Most outputs' store paths have name `drvMame + '-' + outputName`.
-However, an output named "out" has a store path with name `drvName`.
-This is to allow derivations with a single output to avoid a superfluous `-<outputName>` in their single output's name when no disambiguation is needed.
+In the general case, store paths have name `derivationName + "-" + outputName`.
+However, an output named "out" has a store path with name is just the derivation name.
+This is to allow derivations with a single output to avoid a superfluous `"-${outputName}"` in their single output's name when no disambiguation is needed.
 
 > **Example**
 >
@@ -107,8 +113,8 @@ This is to allow derivations with a single output to avoid a superfluous `-<outp
 
 ### Process creation fields {#process-creation-fields}
 
-These are the three fields which describe out to spawn the process which (along with any of its own child processes) will perform the build.
-As state in the derivation introduction, this is everything needed for an `execve` system call.
+These are the three fields which describe how to spawn the process which (along with any of its own child processes) will perform the build.
+You may note that this has everything needed for an `execve` system call.
 
 #### Builder {#builder}
 
@@ -119,23 +125,23 @@ This is the path to an executable that will perform the build and produce the [o
 Command-line arguments to be passed to the [`builder`](#builder) executable.
 
 Note that these are the arguments after the first argument.
-The first argument, `argv[0]`, is the "base name" of the `builder`, as per the usual convention on Unix.
-See [Wikipedia](https://en.wikipedia.org/w/index.php?title=Argv) for details.
+The first argument passed to the `builder` will be the value of `builder`, as per the usual convention on Unix.
+See [Wikipedia](https://en.wikipedia.org/wiki/Argv) for details.
 
 #### Environment Variables {#env}
 
 Environment variables which will be passed to the [builder](#builder) executable.
 
-#### Placeholders
+### Placeholders
 
 Placeholders are opaque values used within the [process creation fields] to [store objects] for which we don't yet know [store path]s.
-The are strings in the form `/<hash>` that are embedded anywhere within the strings of those fields.
+They are strings in the form `/<hash>` that are embedded anywhere within the strings of those fields, and we are [considering](https://github.com/NixOS/nix/issues/12361) to add store-path-like placeholders.
 
 > **Note**
 >
 > Output Deriving Path exist to solve the same problem as placeholders --- that is, referring to store objects for which we don't yet know a store path.
-> They also have a string syntax, [descibed in the encoding section](#deriving-path-encoding).
-> We could use that syntax instead of `/<hash>` for placeholders, but its human-legibility would cuse problems.
+> They also have a string syntax with `^`, [described in the encoding section](#deriving-path-encoding).
+> We could use that syntax instead of `/<hash>` for placeholders, but its human-legibility would cause problems.
 
 There are two types of placeholder, corresponding to the two cases where this problem arises:
 
