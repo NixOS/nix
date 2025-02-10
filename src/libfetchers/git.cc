@@ -69,7 +69,7 @@ std::optional<std::string> readHead(const Path & path)
 
     std::string_view line = output;
     line = line.substr(0, line.find("\n"));
-    if (const auto parseResult = git::parseLsRemoteLine(line)) {
+    if (const auto parseResult = git::parseLsRemoteLine(line); parseResult && parseResult->reference == "HEAD") {
         switch (parseResult->kind) {
             case git::LsRemoteRefLine::Kind::Symbolic:
                 debug("resolved HEAD ref '%s' for repo '%s'", parseResult->target, path);
@@ -459,8 +459,14 @@ struct GitInputScheme : InputScheme
                     url);
             }
             repoInfo.location = std::filesystem::absolute(url.path);
-        } else
+        } else {
+            if (url.scheme == "file")
+                /* Query parameters are meaningless for file://, but
+                   Git interprets them as part of the file name. So get
+                   rid of them. */
+                url.query.clear();
             repoInfo.location = url;
+        }
 
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
@@ -605,16 +611,16 @@ struct GitInputScheme : InputScheme
                 try {
                     auto fetchRef =
                         getAllRefsAttr(input)
-                        ? "refs/*"
+                        ? "refs/*:refs/*"
                         : input.getRev()
                         ? input.getRev()->gitRev()
                         : ref.compare(0, 5, "refs/") == 0
-                        ? ref
+                        ? fmt("%1%:%1%", ref)
                         : ref == "HEAD"
                         ? ref
-                        : "refs/heads/" + ref;
+                        : fmt("%1%:%1%", "refs/heads/" + ref);
 
-                    repo->fetch(repoUrl.to_string(), fmt("%s:%s", fetchRef, fetchRef), getShallowAttr(input));
+                    repo->fetch(repoUrl.to_string(), fetchRef, getShallowAttr(input));
                 } catch (Error & e) {
                     if (!std::filesystem::exists(localRefFile)) throw;
                     logError(e.info());
@@ -672,9 +678,7 @@ struct GitInputScheme : InputScheme
         verifyCommit(input, repo);
 
         bool exportIgnore = getExportIgnoreAttr(input);
-        auto accessor = repo->getAccessor(rev, exportIgnore);
-
-        accessor->setPathDisplay("«" + input.to_string() + "»");
+        auto accessor = repo->getAccessor(rev, exportIgnore, "«" + input.to_string() + "»");
 
         /* If the repo has submodules, fetch them and return a mounted
            input accessor consisting of the accessor for the top-level
@@ -736,8 +740,6 @@ struct GitInputScheme : InputScheme
             repo->getAccessor(repoInfo.workdirInfo,
                 exportIgnore,
                 makeNotAllowedError(repoInfo.locationToArg()));
-
-        accessor->setPathDisplay(repoInfo.locationToArg());
 
         /* If the repo has submodules, return a mounted input accessor
            consisting of the accessor for the top-level repo and the

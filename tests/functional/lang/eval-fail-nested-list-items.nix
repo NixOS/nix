@@ -8,4 +8,27 @@
 #
 #        error: cannot coerce a list to a string: [ [ 1 2 3 4 5 6 7 8 ] [ 1 «4294967290 items elided» ] ]
 
-"" + (let v = [ [ 1 2 3 4 5 6 7 8 ] [1 2 3 4]]; in builtins.deepSeq v v)
+""
++ (
+  let
+    v = [
+      [
+        1
+        2
+        3
+        4
+        5
+        6
+        7
+        8
+      ]
+      [
+        1
+        2
+        3
+        4
+      ]
+    ];
+  in
+  builtins.deepSeq v v
+)

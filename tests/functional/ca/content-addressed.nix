@@ -1,14 +1,22 @@
 with import ./config.nix;
 
-let mkCADerivation = args: mkDerivation ({
-    __contentAddressed = true;
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
-} // args);
+let
+  mkCADerivation =
+    args:
+    mkDerivation (
+      {
+        __contentAddressed = true;
+        outputHashMode = "recursive";
+        outputHashAlgo = "sha256";
+      }
+      // args
+    );
 in
 
-{ seed ? 0 }:
-# A simple content-addressed derivation.
+{
+  seed ? 0,
+}:
+# A simple content-addressing derivation.
 # The derivation can be arbitrarily modified by passing a different `seed`,
 # but the output will always be the same
 rec {
@@ -23,7 +31,11 @@ rec {
   };
   rootCA = mkCADerivation {
     name = "rootCA";
-    outputs = [ "out" "dev" "foo" ];
+    outputs = [
+      "out"
+      "dev"
+      "foo"
+    ];
     buildCommand = ''
       echo "building a CA derivation"
       echo "The seed is ${toString seed}"

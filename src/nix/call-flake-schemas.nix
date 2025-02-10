@@ -1,7 +1,7 @@
-/* The flake providing default schemas. */
+# The flake providing default schemas.
 defaultSchemasFlake:
 
-/* The flake whose contents we want to extract. */
+# The flake whose contents we want to extract.
 flake:
 
 let
@@ -17,27 +17,33 @@ rec {
 
   allSchemas = (flake.outputs.schemas or defaultSchemasFlake.schemas) // schemaOverrides;
 
-  schemaOverrides = {}; # FIXME
+  schemaOverrides = { }; # FIXME
 
-  schemas =
-    builtins.listToAttrs (builtins.concatLists (mapAttrsToList
-      (outputName: output:
+  schemas = builtins.listToAttrs (
+    builtins.concatLists (
+      mapAttrsToList (
+        outputName: output:
         if allSchemas ? ${outputName} then
-          [{ name = outputName; value = allSchemas.${outputName}; }]
+          [
+            {
+              name = outputName;
+              value = allSchemas.${outputName};
+            }
+          ]
         else
-          [ ])
-      flake.outputs));
+          [ ]
+      ) flake.outputs
+    )
+  );
 
-  inventory =
-    builtins.mapAttrs
-      (outputName: output:
-        if schemas ? ${outputName} && schemas.${outputName}.version == 1
-        then
-          { output = schemas.${outputName}.inventory output;
-            inherit (schemas.${outputName}) doc;
-          }
-        else
-          { unknown = true; }
-      )
-      flake.outputs;
+  inventory = builtins.mapAttrs (
+    outputName: output:
+    if schemas ? ${outputName} && schemas.${outputName}.version == 1 then
+      {
+        output = schemas.${outputName}.inventory output;
+        inherit (schemas.${outputName}) doc;
+      }
+    else
+      { unknown = true; }
+  ) flake.outputs;
 }

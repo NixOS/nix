@@ -96,20 +96,20 @@ public:
             .optional=true,
             .handler={[&](std::vector<std::string> inputsToUpdate){
                 for (const auto & inputToUpdate : inputsToUpdate) {
-                    InputPath inputPath;
+                    InputAttrPath inputAttrPath;
                     try {
-                        inputPath = flake::parseInputPath(inputToUpdate);
+                        inputAttrPath = flake::parseInputAttrPath(inputToUpdate);
                     } catch (Error & e) {
                         warn("Invalid flake input '%s'. To update a specific flake, use 'nix flake update --flake %s' instead.", inputToUpdate, inputToUpdate);
                         throw e;
                     }
-                    if (lockFlags.inputUpdates.contains(inputPath))
-                        warn("Input '%s' was specified multiple times. You may have done this by accident.");
-                    lockFlags.inputUpdates.insert(inputPath);
+                    if (lockFlags.inputUpdates.contains(inputAttrPath))
+                        warn("Input '%s' was specified multiple times. You may have done this by accident.", printInputAttrPath(inputAttrPath));
+                    lockFlags.inputUpdates.insert(inputAttrPath);
                 }
             }},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
-                completeFlakeInputPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
+                completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
             }}
         });
 
@@ -280,7 +280,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                     } else if (auto follows = std::get_if<1>(&input.second)) {
                         logger->cout("%s" ANSI_BOLD "%s" ANSI_NORMAL " follows input '%s'",
                             prefix + (last ? treeLast : treeConn), input.first,
-                            printInputPath(*follows));
+                            printInputAttrPath(*follows));
                     }
                 }
             };

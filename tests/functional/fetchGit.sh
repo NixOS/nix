@@ -37,6 +37,7 @@ nix-instantiate --eval -E "builtins.readFile ((builtins.fetchGit file://$TEST_RO
 
 # Fetch a worktree.
 unset _NIX_FORCE_HTTP
+expectStderr 0 nix eval -vvvv --impure --raw --expr "(builtins.fetchGit file://$TEST_ROOT/worktree).outPath" | grepQuiet "copying '$TEST_ROOT/worktree/' to the store"
 path0=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$TEST_ROOT/worktree).outPath")
 path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = file://$TEST_ROOT/worktree; }).outPath")
 [[ $path0 = $path0_ ]]
@@ -64,7 +65,7 @@ git -C $repo add differentbranch
 git -C $repo commit -m 'Test2'
 git -C $repo checkout master
 devrev=$(git -C $repo rev-parse devtest)
-nix eval --impure --raw --expr "builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; }"
+nix eval --raw --expr "builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; }"
 
 [[ $(nix eval --raw --expr "builtins.readFile (builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; allRefs = true; } + \"/differentbranch\")") = 'different file' ]]
 
@@ -79,7 +80,7 @@ path2=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"
 # In pure eval mode, fetchGit with a revision should succeed.
 [[ $(nix eval --raw --expr "builtins.readFile (fetchGit { url = file://$repo; rev = \"$rev2\"; } + \"/hello\")") = world ]]
 
-# But without a hash, it fails
+# But without a hash, it fails.
 expectStderr 1 nix eval --expr 'builtins.fetchGit "file:///foo"' | grepQuiet "'fetchGit' will not fetch unlocked input"
 
 # Fetch again. This should be cached.
@@ -141,12 +142,16 @@ path4=$(nix eval --impure --refresh --raw --expr "(builtins.fetchGit file://$rep
 [[ $(nix eval --impure --expr "builtins.hasAttr \"dirtyRev\" (builtins.fetchGit $repo)") == "false" ]]
 [[ $(nix eval --impure --expr "builtins.hasAttr \"dirtyShortRev\" (builtins.fetchGit $repo)") == "false" ]]
 
-status=0
-nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; narHash = \"sha256-B5yIPHhEm0eysJKEsO7nqxprh9vcblFxpJG11gXJus1=\"; }).outPath" || status=$?
-[[ "$status" = "102" ]]
+expect 102 nix eval --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; narHash = \"sha256-B5yIPHhEm0eysJKEsO7nqxprh9vcblFxpJG11gXJus1=\"; }).outPath"
 
-path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; narHash = \"sha256-Hr8g6AqANb3xqX28eu1XnjK/3ab8Gv6TJSnkb1LezG9=\"; }).outPath")
+path5=$(nix eval --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; narHash = \"sha256-Hr8g6AqANb3xqX28eu1XnjK/3ab8Gv6TJSnkb1LezG9=\"; }).outPath")
 [[ $path = $path5 ]]
+
+# Ensure that NAR hashes are checked.
+expectStderr 102 nix eval --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; narHash = \"sha256-Hr8g6AqANb4xqX28eu1XnjK/3ab8Gv6TJSnkb1LezG9=\"; }).outPath" | grepQuiet "error: NAR hash mismatch"
+
+# It's allowed to use only a narHash, but you should get a warning.
+expectStderr 0 nix eval --raw --expr "(builtins.fetchGit { url = $repo; ref = \"tag2\"; narHash = \"sha256-Hr8g6AqANb3xqX28eu1XnjK/3ab8Gv6TJSnkb1LezG9=\"; }).outPath" | grepQuiet "warning: Input .* is unlocked"
 
 # tarball-ttl should be ignored if we specify a rev
 echo delft > $repo/hello
@@ -255,7 +260,7 @@ echo "/exported-wonky export-ignore=wonk" >> $repo/.gitattributes
 git -C $repo add not-exported-file exported-wonky .gitattributes
 git -C $repo commit -m 'Bla6'
 rev5=$(git -C $repo rev-parse HEAD)
-path12=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev5\"; }).outPath")
+path12=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev5\"; }).outPath")
 [[ ! -e $path12/not-exported-file ]]
 [[ -e $path12/exported-wonky ]]
 

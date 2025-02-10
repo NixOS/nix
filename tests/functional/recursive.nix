@@ -1,4 +1,6 @@
-let config_nix = /. + "${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/config.nix"; in
+let
+  config_nix = /. + "${builtins.getEnv "_NIX_TEST_BUILD_DIR"}/config.nix";
+in
 with import config_nix;
 
 mkDerivation rec {
@@ -15,7 +17,9 @@ mkDerivation rec {
 
   buildCommand = ''
     mkdir $out
-    opts="--experimental-features nix-command ${if (NIX_TESTS_CA_BY_DEFAULT == "1") then "--extra-experimental-features ca-derivations" else ""}"
+    opts="--experimental-features nix-command ${
+      if (NIX_TESTS_CA_BY_DEFAULT == "1") then "--extra-experimental-features ca-derivations" else ""
+    }"
 
     PATH=${builtins.getEnv "NIX_BIN_DIR"}:$PATH
 

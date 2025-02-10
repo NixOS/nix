@@ -6,9 +6,51 @@
 
 namespace nix {
 
+class BLAKE3HashTest : public virtual ::testing::Test
+{
+public:
+
+    /**
+     * We set these in tests rather than the regular globals so we don't have
+     * to worry about race conditions if the tests run concurrently.
+     */
+    ExperimentalFeatureSettings mockXpSettings;
+
+private:
+
+    void SetUp() override
+    {
+        mockXpSettings.set("experimental-features", "blake3-hashes");
+    }
+};
+
     /* ----------------------------------------------------------------------------
      * hashString
      * --------------------------------------------------------------------------*/
+
+    TEST_F(BLAKE3HashTest, testKnownBLAKE3Hashes1) {
+        // values taken from: https://tools.ietf.org/html/rfc4634
+        auto s = "abc";
+        auto hash = hashString(HashAlgorithm::BLAKE3, s, mockXpSettings);
+        ASSERT_EQ(hash.to_string(HashFormat::Base16, true),
+                "blake3:6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85");
+    }
+
+    TEST_F(BLAKE3HashTest, testKnownBLAKE3Hashes2) {
+        // values taken from: https://tools.ietf.org/html/rfc4634
+        auto s = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+        auto hash = hashString(HashAlgorithm::BLAKE3, s, mockXpSettings);
+        ASSERT_EQ(hash.to_string(HashFormat::Base16, true),
+                "blake3:c19012cc2aaf0dc3d8e5c45a1b79114d2df42abb2a410bf54be09e891af06ff8");
+    }
+
+    TEST_F(BLAKE3HashTest, testKnownBLAKE3Hashes3) {
+        // values taken from: https://www.ietf.org/archive/id/draft-aumasson-blake3-00.txt
+        auto s = "IETF";
+        auto hash = hashString(HashAlgorithm::BLAKE3, s, mockXpSettings);
+        ASSERT_EQ(hash.to_string(HashFormat::Base16, true),
+                "blake3:83a2de1ee6f4e6ab686889248f4ec0cf4cc5709446a682ffd1cbb4d6165181e2");
+    }
 
     TEST(hashString, testKnownMD5Hashes1) {
         // values taken from: https://tools.ietf.org/html/rfc1321

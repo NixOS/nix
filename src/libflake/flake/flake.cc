@@ -105,7 +105,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
-    const InputPath & lockRootPath,
+    const InputAttrPath & lockRootAttrPath,
     const SourcePath & flakeDir);
 
 static FlakeInput parseFlakeInput(
@@ -113,7 +113,7 @@ static FlakeInput parseFlakeInput(
     std::string_view inputName,
     Value * value,
     const PosIdx pos,
-    const InputPath & lockRootPath,
+    const InputAttrPath & lockRootAttrPath,
     const SourcePath & flakeDir)
 {
     expectType(state, nAttrs, *value, pos);
@@ -137,7 +137,7 @@ static FlakeInput parseFlakeInput(
                 else if (attr.value->type() == nPath) {
                     auto path = attr.value->path();
                     if (path.accessor != flakeDir.accessor)
-                        throw Error("input path '%s' at %s must be in the same source tree as %s",
+                        throw Error("input attribute path '%s' at %s must be in the same source tree as %s",
                             path, state.positions[attr.pos], flakeDir);
                     url = "path:" + flakeDir.path.makeRelative(path.path);
                 }
@@ -149,11 +149,11 @@ static FlakeInput parseFlakeInput(
                 expectType(state, nBool, *attr.value, attr.pos);
                 input.isFlake = attr.value->boolean();
             } else if (attr.name == sInputs) {
-                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, lockRootPath, flakeDir);
+                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, lockRootAttrPath, flakeDir);
             } else if (attr.name == sFollows) {
                 expectType(state, nString, *attr.value, attr.pos);
-                auto follows(parseInputPath(attr.value->c_str()));
-                follows.insert(follows.begin(), lockRootPath.begin(), lockRootPath.end());
+                auto follows(parseInputAttrPath(attr.value->c_str()));
+                follows.insert(follows.begin(), lockRootAttrPath.begin(), lockRootAttrPath.end());
                 input.follows = follows;
             } else {
                 // Allow selecting a subset of enum values
@@ -220,7 +220,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
-    const InputPath & lockRootPath,
+    const InputAttrPath & lockRootAttrPath,
     const SourcePath & flakeDir)
 {
     std::map<FlakeId, FlakeInput> inputs;
@@ -233,7 +233,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
                 state.symbols[inputAttr.name],
                 inputAttr.value,
                 inputAttr.pos,
-                lockRootPath,
+                lockRootAttrPath,
                 flakeDir));
     }
 
@@ -246,7 +246,7 @@ Flake readFlake(
     const FlakeRef & resolvedRef,
     const FlakeRef & lockedRef,
     const SourcePath & rootDir,
-    const InputPath & lockRootPath)
+    const InputAttrPath & lockRootAttrPath)
 {
     auto flakeDir = rootDir / CanonPath(resolvedRef.subdir);
     auto flakePath = flakeDir / "flake.nix";
@@ -270,7 +270,7 @@ Flake readFlake(
     auto sInputs = state.symbols.create("inputs");
 
     if (auto inputs = vInfo.attrs()->get(sInputs))
-        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, lockRootPath, flakeDir);
+        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, lockRootAttrPath, flakeDir);
 
     auto sOutputs = state.symbols.create("outputs");
 
@@ -347,12 +347,12 @@ static Flake getFlake(
     const FlakeRef & originalRef,
     bool useRegistries,
     FlakeCache & flakeCache,
-    const InputPath & lockRootPath)
+    const InputAttrPath & lockRootAttrPath)
 {
     auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
         state, originalRef, useRegistries, flakeCache);
 
-    return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->toRealPath(storePath)), lockRootPath);
+    return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->toRealPath(storePath)), lockRootAttrPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
@@ -403,12 +403,12 @@ LockedFlake lockFlake(
         {
             FlakeInput input;
             SourcePath sourcePath;
-            std::optional<InputPath> parentInputPath; // FIXME: rename to inputPathPrefix?
+            std::optional<InputAttrPath> parentInputAttrPath; // FIXME: rename to inputAttrPathPrefix?
         };
 
-        std::map<InputPath, OverrideTarget> overrides;
-        std::set<InputPath> explicitCliOverrides;
-        std::set<InputPath> overridesUsed, updatesUsed;
+        std::map<InputAttrPath, OverrideTarget> overrides;
+        std::set<InputAttrPath> explicitCliOverrides;
+        std::set<InputAttrPath> overridesUsed, updatesUsed;
         std::map<ref<Node>, SourcePath> nodePaths;
 
         for (auto & i : lockFlags.inputOverrides) {
@@ -432,9 +432,9 @@ LockedFlake lockFlake(
         std::function<void(
             const FlakeInputs & flakeInputs,
             ref<Node> node,
-            const InputPath & inputPathPrefix,
+            const InputAttrPath & inputAttrPathPrefix,
             std::shared_ptr<const Node> oldNode,
-            const InputPath & followsPrefix,
+            const InputAttrPath & followsPrefix,
             const SourcePath & sourcePath,
             bool trustLock)>
             computeLocks;
@@ -446,7 +446,7 @@ LockedFlake lockFlake(
             /* The node whose locks are to be updated.*/
             ref<Node> node,
             /* The path to this node in the lock file graph. */
-            const InputPath & inputPathPrefix,
+            const InputAttrPath & inputAttrPathPrefix,
             /* The old node, if any, from which locks can be
                copied. */
             std::shared_ptr<const Node> oldNode,
@@ -454,59 +454,59 @@ LockedFlake lockFlake(
                interpreted. When a node is initially locked, it's
                relative to the node's flake; when it's already locked,
                it's relative to the root of the lock file. */
-            const InputPath & followsPrefix,
+            const InputAttrPath & followsPrefix,
             /* The source path of this node's flake. */
             const SourcePath & sourcePath,
             bool trustLock)
         {
-            debug("computing lock file node '%s'", printInputPath(inputPathPrefix));
+            debug("computing lock file node '%s'", printInputAttrPath(inputAttrPathPrefix));
 
             /* Get the overrides (i.e. attributes of the form
                'inputs.nixops.inputs.nixpkgs.url = ...'). */
             for (auto & [id, input] : flakeInputs) {
                 for (auto & [idOverride, inputOverride] : input.overrides) {
-                    auto inputPath(inputPathPrefix);
-                    inputPath.push_back(id);
-                    inputPath.push_back(idOverride);
-                    overrides.emplace(inputPath,
+                    auto inputAttrPath(inputAttrPathPrefix);
+                    inputAttrPath.push_back(id);
+                    inputAttrPath.push_back(idOverride);
+                    overrides.emplace(inputAttrPath,
                         OverrideTarget {
                             .input = inputOverride,
                             .sourcePath = sourcePath,
-                            .parentInputPath = inputPathPrefix
+                            .parentInputAttrPath = inputAttrPathPrefix
                         });
                 }
             }
 
             /* Check whether this input has overrides for a
                non-existent input. */
-            for (auto [inputPath, inputOverride] : overrides) {
-                auto inputPath2(inputPath);
-                auto follow = inputPath2.back();
-                inputPath2.pop_back();
-                if (inputPath2 == inputPathPrefix && !flakeInputs.count(follow))
+            for (auto [inputAttrPath, inputOverride] : overrides) {
+                auto inputAttrPath2(inputAttrPath);
+                auto follow = inputAttrPath2.back();
+                inputAttrPath2.pop_back();
+                if (inputAttrPath2 == inputAttrPathPrefix && !flakeInputs.count(follow))
                     warn(
                         "input '%s' has an override for a non-existent input '%s'",
-                        printInputPath(inputPathPrefix), follow);
+                        printInputAttrPath(inputAttrPathPrefix), follow);
             }
 
             /* Go over the flake inputs, resolve/fetch them if
                necessary (i.e. if they're new or the flakeref changed
                from what's in the lock file). */
             for (auto & [id, input2] : flakeInputs) {
-                auto inputPath(inputPathPrefix);
-                inputPath.push_back(id);
-                auto inputPathS = printInputPath(inputPath);
-                debug("computing input '%s'", inputPathS);
+                auto inputAttrPath(inputAttrPathPrefix);
+                inputAttrPath.push_back(id);
+                auto inputAttrPathS = printInputAttrPath(inputAttrPath);
+                debug("computing input '%s'", inputAttrPathS);
 
                 try {
 
                     /* Do we have an override for this input from one of the
                        ancestors? */
-                    auto i = overrides.find(inputPath);
+                    auto i = overrides.find(inputAttrPath);
                     bool hasOverride = i != overrides.end();
-                    bool hasCliOverride = explicitCliOverrides.contains(inputPath);
+                    bool hasCliOverride = explicitCliOverrides.contains(inputAttrPath);
                     if (hasOverride)
-                        overridesUsed.insert(inputPath);
+                        overridesUsed.insert(inputAttrPath);
                     auto input = hasOverride ? i->second.input : input2;
 
                     /* Resolve relative 'path:' inputs relative to
@@ -521,11 +521,11 @@ LockedFlake lockFlake(
                     /* Resolve 'follows' later (since it may refer to an input
                        path we haven't processed yet. */
                     if (input.follows) {
-                        InputPath target;
+                        InputAttrPath target;
 
                         target.insert(target.end(), input.follows->begin(), input.follows->end());
 
-                        debug("input '%s' follows '%s'", inputPathS, printInputPath(target));
+                        debug("input '%s' follows '%s'", inputAttrPathS, printInputAttrPath(target));
                         node->inputs.insert_or_assign(id, target);
                         continue;
                     }
@@ -534,7 +534,7 @@ LockedFlake lockFlake(
 
                     auto overridenParentPath =
                         input.ref->input.isRelative()
-                        ? std::optional<InputPath>(hasOverride ? i->second.parentInputPath : inputPathPrefix)
+                        ? std::optional<InputAttrPath>(hasOverride ? i->second.parentInputAttrPath : inputAttrPathPrefix)
                         : std::nullopt;
 
                     auto resolveRelativePath = [&]() -> std::optional<SourcePath>
@@ -553,9 +553,9 @@ LockedFlake lockFlake(
                     auto getInputFlake = [&]()
                     {
                         if (auto resolvedPath = resolveRelativePath()) {
-                            return readFlake(state, *input.ref, *input.ref, *input.ref, *resolvedPath, inputPath);
+                            return readFlake(state, *input.ref, *input.ref, *input.ref, *resolvedPath, inputAttrPath);
                         } else {
-                            return getFlake(state, *input.ref, useRegistries, flakeCache, inputPath);
+                            return getFlake(state, *input.ref, useRegistries, flakeCache, inputAttrPath);
                         }
                     };
 
@@ -563,19 +563,19 @@ LockedFlake lockFlake(
                        And the input is not in updateInputs? */
                     std::shared_ptr<LockedNode> oldLock;
 
-                    updatesUsed.insert(inputPath);
+                    updatesUsed.insert(inputAttrPath);
 
-                    if (oldNode && !lockFlags.inputUpdates.count(inputPath))
+                    if (oldNode && !lockFlags.inputUpdates.count(inputAttrPath))
                         if (auto oldLock2 = get(oldNode->inputs, id))
                             if (auto oldLock3 = std::get_if<0>(&*oldLock2))
                                 oldLock = *oldLock3;
 
                     if (oldLock
                         && oldLock->originalRef == *input.ref
-                        && oldLock->parentPath == overridenParentPath
+                        && oldLock->parentInputAttrPath == overridenParentPath
                         && !hasCliOverride)
                     {
-                        debug("keeping existing input '%s'", inputPathS);
+                        debug("keeping existing input '%s'", inputAttrPathS);
 
                         /* Copy the input from the old lock since its flakeref
                            didn't change and there is no override from a
@@ -584,18 +584,18 @@ LockedFlake lockFlake(
                             oldLock->lockedRef,
                             oldLock->originalRef,
                             oldLock->isFlake,
-                            oldLock->parentPath);
+                            oldLock->parentInputAttrPath);
 
                         node->inputs.insert_or_assign(id, childNode);
 
                         /* If we have this input in updateInputs, then we
                            must fetch the flake to update it. */
-                        auto lb = lockFlags.inputUpdates.lower_bound(inputPath);
+                        auto lb = lockFlags.inputUpdates.lower_bound(inputAttrPath);
 
                         auto mustRefetch =
                             lb != lockFlags.inputUpdates.end()
-                            && lb->size() > inputPath.size()
-                            && std::equal(inputPath.begin(), inputPath.end(), lb->begin());
+                            && lb->size() > inputAttrPath.size()
+                            && std::equal(inputAttrPath.begin(), inputAttrPath.end(), lb->begin());
 
                         FlakeInputs fakeInputs;
 
@@ -614,7 +614,7 @@ LockedFlake lockFlake(
                                     if (!trustLock) {
                                         // It is possible that the flake has changed,
                                         // so we must confirm all the follows that are in the lock file are also in the flake.
-                                        auto overridePath(inputPath);
+                                        auto overridePath(inputAttrPath);
                                         overridePath.push_back(i.first);
                                         auto o = overrides.find(overridePath);
                                         // If the override disappeared, we have to refetch the flake,
@@ -638,21 +638,21 @@ LockedFlake lockFlake(
                         if (mustRefetch) {
                             auto inputFlake = getInputFlake();
                             nodePaths.emplace(childNode, inputFlake.path.parent());
-                            computeLocks(inputFlake.inputs, childNode, inputPath, oldLock, followsPrefix,
+                            computeLocks(inputFlake.inputs, childNode, inputAttrPath, oldLock, followsPrefix,
                                 inputFlake.path, false);
                         } else {
-                            computeLocks(fakeInputs, childNode, inputPath, oldLock, followsPrefix, sourcePath, true);
+                            computeLocks(fakeInputs, childNode, inputAttrPath, oldLock, followsPrefix, sourcePath, true);
                         }
 
                     } else {
                         /* We need to create a new lock file entry. So fetch
                            this input. */
-                        debug("creating new input '%s'", inputPathS);
+                        debug("creating new input '%s'", inputAttrPathS);
 
                         if (!lockFlags.allowUnlocked
                             && !input.ref->input.isLocked()
                             && !input.ref->input.isRelative())
-                            throw Error("cannot update unlocked flake input '%s' in pure mode", inputPathS);
+                            throw Error("cannot update unlocked flake input '%s' in pure mode", inputAttrPathS);
 
                         /* Note: in case of an --override-input, we use
                             the *original* ref (input2.ref) for the
@@ -661,7 +661,7 @@ LockedFlake lockFlake(
                             nuked the next time we update the lock
                             file. That is, overrides are sticky unless you
                             use --no-write-lock-file. */
-                        auto ref = (input2.ref && explicitCliOverrides.contains(inputPath)) ? *input2.ref : *input.ref;
+                        auto ref = (input2.ref && explicitCliOverrides.contains(inputAttrPath)) ? *input2.ref : *input.ref;
 
                         if (input.isFlake) {
                             auto inputFlake = getInputFlake();
@@ -687,11 +687,11 @@ LockedFlake lockFlake(
                                own lock file. */
                             nodePaths.emplace(childNode, inputFlake.path.parent());
                             computeLocks(
-                                inputFlake.inputs, childNode, inputPath,
+                                inputFlake.inputs, childNode, inputAttrPath,
                                 oldLock
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
                                 : readLockFile(state.fetchSettings, inputFlake.lockFilePath()).root.get_ptr(),
-                                oldLock ? followsPrefix : inputPath,
+                                oldLock ? followsPrefix : inputAttrPath,
                                 inputFlake.path,
                                 false);
                         }
@@ -718,7 +718,7 @@ LockedFlake lockFlake(
                     }
 
                 } catch (Error & e) {
-                    e.addTrace({}, "while updating the flake input '%s'", inputPathS);
+                    e.addTrace({}, "while updating the flake input '%s'", inputAttrPathS);
                     throw;
                 }
             }
@@ -738,11 +738,11 @@ LockedFlake lockFlake(
         for (auto & i : lockFlags.inputOverrides)
             if (!overridesUsed.count(i.first))
                 warn("the flag '--override-input %s %s' does not match any input",
-                    printInputPath(i.first), i.second);
+                    printInputAttrPath(i.first), i.second);
 
         for (auto & i : lockFlags.inputUpdates)
             if (!updatesUsed.count(i))
-                warn("'%s' does not match any input of this flake", printInputPath(i));
+                warn("'%s' does not match any input of this flake", printInputAttrPath(i));
 
         /* Check 'follows' inputs. */
         newLockFile.check();

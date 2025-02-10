@@ -1,2 +1,8 @@
-assert { a = true; b = true; } == { a = true; };
+assert
+  {
+    a = true;
+    b = true;
+  } == {
+    a = true;
+  };
 throw "unreachable"

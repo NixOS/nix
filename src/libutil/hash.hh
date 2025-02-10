@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "config.hh"
 #include "types.hh"
 #include "serialise.hh"
 #include "file-system.hh"
@@ -11,9 +12,9 @@ namespace nix {
 MakeError(BadHash, Error);
 
 
-enum struct HashAlgorithm : char { MD5 = 42, SHA1, SHA256, SHA512 };
+enum struct HashAlgorithm : char { MD5 = 42, SHA1, SHA256, SHA512, BLAKE3 };
 
-
+const int blake3HashSize = 32;
 const int md5HashSize = 16;
 const int sha1HashSize = 20;
 const int sha256HashSize = 32;
@@ -52,7 +53,7 @@ struct Hash
     /**
      * Create a zero-filled hash object.
      */
-    explicit Hash(HashAlgorithm algo);
+    explicit Hash(HashAlgorithm algo, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     /**
      * Parse the hash from a string representation in the format
@@ -157,7 +158,7 @@ std::string printHash16or32(const Hash & hash);
 /**
  * Compute the hash of the given string.
  */
-Hash hashString(HashAlgorithm ha, std::string_view s);
+Hash hashString(HashAlgorithm ha, std::string_view s, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * Compute the hash of the given file, hashing its contents directly.

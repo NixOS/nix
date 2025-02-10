@@ -87,13 +87,33 @@ A environment variables that Google Test accepts are also worth knowing:
 
    This is used to avoid logging passing tests.
 
-Putting the two together, one might run
+3. [`GTEST_BREAK_ON_FAILURE`](https://google.github.io/googletest/advanced.html#turning-assertion-failures-into-break-points)
+
+   This is used to create a debugger breakpoint when an assertion failure occurs.
+
+Putting the first two together, one might run
 
 ```bash
 GTEST_BRIEF=1 GTEST_FILTER='ErrorTraceTest.*' meson test nix-expr-tests -v
 ```
 
 for short but comprensive output.
+
+### Debugging tests
+
+For debugging, it is useful to combine the third option above with Meson's [`--gdb`](https://mesonbuild.com/Unit-tests.html#other-test-options) flag:
+
+```bash
+GTEST_BRIEF=1 GTEST_FILTER='Group.my-failing-test' meson test nix-expr-tests --gdb
+```
+
+This will:
+
+1. Run the unit test with GDB
+
+2. Run just `Group.my-failing-test`
+
+3. Stop the program when the test fails, allowing the user to then issue arbitrary commands to GDB.
 
 ### Characterisation testing { #characaterisation-testing-unit }
 
@@ -144,7 +164,7 @@ $ checkPhase
 
 Sometimes it is useful to group related tests so they can be easily run together without running the entire test suite.
 Each test group is in a subdirectory of `tests`.
-For example, `tests/functional/ca/meson.build` defines a `ca` test group for content-addressed derivation outputs.
+For example, `tests/functional/ca/meson.build` defines a `ca` test group for content-addressing derivation outputs.
 
 That test group can be run like this:
 
@@ -213,10 +233,10 @@ edit it like so:
  bar
 ```
 
-Then, running the test with `./mk/debug-test.sh` will drop you into GDB once the script reaches that point:
+Then, running the test with [`--interactive`](https://mesonbuild.com/Unit-tests.html#other-test-options) will prevent Meson from hijacking the terminal so you can drop you into GDB once the script reaches that point:
 
 ```shell-session
-$ ./mk/debug-test.sh tests/functional/${testName}.sh
+$ meson test ${testName} --interactive
 ...
 + gdb blash blub
 GNU gdb (GDB) 12.1
