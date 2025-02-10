@@ -593,7 +593,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         auto drvType = drv.type();
 
-        /* Content-addressed derivations are trustless because their output paths
+        /* Content-addressing derivations are trustless because their output paths
            are verified by their content alone, so any derivation is free to
            try to produce such a path.
 

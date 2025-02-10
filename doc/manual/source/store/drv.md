@@ -68,7 +68,7 @@ type OutputPath = {
 type DerivingPath = ConstantPath | OutputPath;
 ```
 
-Deriving paths are necessary because, in general and particularly for [content-addressed derivations][content-addressed derivation], the [store path] of an [output] is not known in advance.
+Deriving paths are necessary because, in general and particularly for [content-addressing derivations][content-addressing derivation], the [store path] of an [output] is not known in advance.
 We can use an output deriving path to refer to such an out, instead of the store path which we do not yet know.
 
 [deriving path]: #deriving-path
@@ -122,7 +122,7 @@ Nix can schedule builds such that it automatically builds on other platforms by 
 
 [`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
 
-[content-addressed derivation]: @docroot@/glossary.md#gloss-content-addressed-derivation
+[content-addressing derivation]: @docroot@/glossary.md#gloss-content-addressing-derivation
 [realise]: @docroot@/glossary.md#gloss-realise
 [store object]: @docroot@/store/store-object.md
 [store path]: @docroot@/store/store-path.md

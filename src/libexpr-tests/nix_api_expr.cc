@@ -172,7 +172,7 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_build)
 
 TEST_F(nix_api_expr_test, nix_expr_realise_context)
 {
-    // TODO (ca-derivations): add a content-addressed derivation output, which produces a placeholder
+    // TODO (ca-derivations): add a content-addressing derivation output, which produces a placeholder
     auto expr = R"(
         ''
             a derivation output: ${

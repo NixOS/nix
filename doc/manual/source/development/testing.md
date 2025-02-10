@@ -164,7 +164,7 @@ $ checkPhase
 
 Sometimes it is useful to group related tests so they can be easily run together without running the entire test suite.
 Each test group is in a subdirectory of `tests`.
-For example, `tests/functional/ca/meson.build` defines a `ca` test group for content-addressed derivation outputs.
+For example, `tests/functional/ca/meson.build` defines a `ca` test group for content-addressing derivation outputs.
 
 That test group can be run like this:
 
