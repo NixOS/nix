@@ -99,8 +99,8 @@ Derivations can declare some infrequently used optional attributes.
     to make it use the proxy server configuration specified by the user
     in the environment variables `http_proxy` and friends.
 
-    This attribute is only allowed in *fixed-output derivations* (see
-    below), where impurities such as these are okay since (the hash
+    This attribute is only allowed in [fixed-output derivations][fixed-output derivation],
+    where impurities such as these are okay since (the hash
     of) the output is known in advance. It is ignored for all other
     derivations.
 
@@ -118,135 +118,6 @@ Derivations can declare some infrequently used optional attributes.
     through the
     [`impure-env`](@docroot@/command-ref/conf-file.md#conf-impure-env)
     configuration setting.
-
-  - [`outputHash`]{#adv-attr-outputHash}; [`outputHashAlgo`]{#adv-attr-outputHashAlgo}; [`outputHashMode`]{#adv-attr-outputHashMode}\
-    These attributes declare that the derivation is a so-called *fixed-output derivation* (FOD), which means that a cryptographic hash of the output is already known in advance.
-
-    As opposed to regular derivations, the [`builder`] executable of a fixed-output derivation has access to the network.
-    Nix computes a cryptographic hash of its output and compares that to the hash declared with these attributes.
-    If there is a mismatch, the derivation fails.
-
-    The rationale for fixed-output derivations is derivations such as
-    those produced by the `fetchurl` function. This function downloads a
-    file from a given URL. To ensure that the downloaded file has not
-    been modified, the caller must also specify a cryptographic hash of
-    the file. For example,
-
-    ```nix
-    fetchurl {
-      url = "http://ftp.gnu.org/pub/gnu/hello/hello-2.1.1.tar.gz";
-      sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
-    }
-    ```
-
-    It sometimes happens that the URL of the file changes, e.g., because
-    servers are reorganised or no longer available. We then must update
-    the call to `fetchurl`, e.g.,
-
-    ```nix
-    fetchurl {
-      url = "ftp://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz";
-      sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
-    }
-    ```
-
-    If a `fetchurl` derivation was treated like a normal derivation, the
-    output paths of the derivation and *all derivations depending on it*
-    would change. For instance, if we were to change the URL of the
-    Glibc source distribution in Nixpkgs (a package on which almost all
-    other packages depend) massive rebuilds would be needed. This is
-    unfortunate for a change which we know cannot have a real effect as
-    it propagates upwards through the dependency graph.
-
-    For fixed-output derivations, on the other hand, the name of the
-    output path only depends on the `outputHash*` and `name` attributes,
-    while all other attributes are ignored for the purpose of computing
-    the output path. (The `name` attribute is included because it is
-    part of the path.)
-
-    As an example, here is the (simplified) Nix expression for
-    `fetchurl`:
-
-    ```nix
-    { stdenv, curl }: # The curl program is used for downloading.
-
-    { url, sha256 }:
-
-    stdenv.mkDerivation {
-      name = baseNameOf (toString url);
-      builder = ./builder.sh;
-      buildInputs = [ curl ];
-
-      # This is a fixed-output derivation; the output must be a regular
-      # file with SHA256 hash sha256.
-      outputHashMode = "flat";
-      outputHashAlgo = "sha256";
-      outputHash = sha256;
-
-      inherit url;
-    }
-    ```
-
-    The `outputHash` attribute must be a string containing the hash in either hexadecimal or "nix32" encoding, or following the format for integrity metadata as defined by [SRI](https://www.w3.org/TR/SRI/).
-    The "nix32" encoding is an adaptation of base-32 encoding.
-    The [`convertHash`](@docroot@/language/builtins.md#builtins-convertHash) function shows how to convert between different encodings, and the [`nix-hash` command](../command-ref/nix-hash.md) has information about obtaining the hash for some contents, as well as converting to and from encodings.
-
-    The `outputHashAlgo` attribute specifies the hash algorithm used to compute the hash.
-    It can currently be `"blake3", "sha1"`, `"sha256"`, `"sha512"`, or `null`.
-    `outputHashAlgo` can only be `null` when `outputHash` follows the SRI format.
-
-    The `outputHashMode` attribute determines how the hash is computed.
-    It must be one of the following values:
-
-      - [`"flat"`](@docroot@/store/store-object/content-address.md#method-flat)
-
-        This is the default.
-
-      - [`"recursive"` or `"nar"`](@docroot@/store/store-object/content-address.md#method-nix-archive)
-
-        > **Compatibility**
-        >
-        > `"recursive"` is the traditional way of indicating this,
-        > and is supported since 2005 (virtually the entire history of Nix).
-        > `"nar"` is more clear, and consistent with other parts of Nix (such as the CLI),
-        > however support for it is only added in Nix version 2.21.
-
-      - [`"text"`](@docroot@/store/store-object/content-address.md#method-text)
-
-        > **Warning**
-        >
-        > The use of this method for derivation outputs is part of the [`dynamic-derivations`][xp-feature-dynamic-derivations] experimental feature.
-
-      - [`"git"`](@docroot@/store/store-object/content-address.md#method-git)
-
-        > **Warning**
-        >
-        > This method is part of the [`git-hashing`][xp-feature-git-hashing] experimental feature.
-
-  - [`__contentAddressed`]{#adv-attr-__contentAddressed}
-
-    > **Warning**
-    > This attribute is part of an [experimental feature](@docroot@/development/experimental-features.md).
-    >
-    > To use this attribute, you must enable the
-    > [`ca-derivations`][xp-feature-ca-derivations] experimental feature.
-    > For example, in [nix.conf](../command-ref/conf-file.md) you could add:
-    >
-    > ```
-    > extra-experimental-features = ca-derivations
-    > ```
-
-    If this attribute is set to `true`, then the derivation
-    outputs will be stored in a content-addressed location rather than the
-    traditional input-addressed one.
-
-    Setting this attribute also requires setting
-    [`outputHashMode`](#adv-attr-outputHashMode)
-    and
-    [`outputHashAlgo`](#adv-attr-outputHashAlgo)
-    like for *fixed-output derivations* (see above).
-
-    It also implicitly requires that the machine to build the derivation must have the `ca-derivations` [system feature](@docroot@/command-ref/conf-file.md#conf-system-features).
 
   - [`passAsFile`]{#adv-attr-passAsFile}\
     A list of names of attributes that should be passed via files rather
@@ -370,6 +241,134 @@ Derivations can declare some infrequently used optional attributes.
 
   ensures that the derivation can only be built on a machine with the `kvm` feature.
 
-[xp-feature-ca-derivations]: @docroot@/development/experimental-features.md#xp-feature-ca-derivations
+## Setting the derivation type
+
+As discussed in [Derivation Outputs and Types of Derivations](@docroot@/store/derivation/outputs/index.md), there are multiples kinds of derivations / kinds of derivation outputs.
+The choice of the following attributes determines which kind of derivation we are making.
+
+- [`__contentAddressed`]
+
+- [`outputHash`]
+
+- [`outputHashAlgo`]
+
+- [`outputHashMode`]
+
+The three types of derivations are chosen based on the following combinations of these attributes.
+All other combinations are invalid.
+
+- [Input-addressing derivations](@docroot@/store/derivation/outputs/input-address.md)
+
+  This is the default for `builtins.derivation`.
+  Nix only currently supports one kind of input-addressing, so no other information is needed.
+
+  `__contentAddressed = false;` may also be included, but is not needed, and will trigger the experimental feature check.
+
+- [Fixed-output derivations][fixed-output derivation]
+
+  All of [`outputHash`], [`outputHashAlgo`], and [`outputHashMode`].
+
+  <!--
+
+  `__contentAddressed` is ignored, becaused fixed-output derivations always content-address their outputs, by definition.
+
+  **TODO CHECK**
+
+  -->
+
+- [(Floating) content-addressing derivations](@docroot@/store/derivation/outputs/content-address.md)
+
+  Both [`outputHashAlgo`] and [`outputHashMode`], `__contentAddressed = true;`, and *not* `outputHash`.
+
+  If an output hash was given, then the derivation output would be "fixed" not "floating".
+
+Here is more information on the `output*` attributes, and what values they may be set to:
+
+  - [`outputHashMode`]{#adv-attr-outputHashMode}
+
+    This specifies how the files of a content-addressing derivation output are digested to produce a content address.
+
+    This works in conjunction with [`outputHashAlgo`](#adv-attr-outputHashAlgo).
+    Specifying one without the other is an error (unless [`outputHash` is also specified and includes its own hash algorithm as described below).
+
+    The `outputHashMode` attribute determines how the hash is computed.
+    It must be one of the following values:
+
+      - [`"flat"`](@docroot@/store/store-object/content-address.md#method-flat)
+
+        This is the default.
+
+      - [`"recursive"` or `"nar"`](@docroot@/store/store-object/content-address.md#method-nix-archive)
+
+        > **Compatibility**
+        >
+        > `"recursive"` is the traditional way of indicating this,
+        > and is supported since 2005 (virtually the entire history of Nix).
+        > `"nar"` is more clear, and consistent with other parts of Nix (such as the CLI),
+        > however support for it is only added in Nix version 2.21.
+
+      - [`"text"`](@docroot@/store/store-object/content-address.md#method-text)
+
+        > **Warning**
+        >
+        > The use of this method for derivation outputs is part of the [`dynamic-derivations`][xp-feature-dynamic-derivations] experimental feature.
+
+      - [`"git"`](@docroot@/store/store-object/content-address.md#method-git)
+
+        > **Warning**
+        >
+        > This method is part of the [`git-hashing`][xp-feature-git-hashing] experimental feature.
+
+    See [content-addressing store objects](@docroot@/store/store-object/content-address.md) for more information about the process this flag controls.
+
+  - [`outputHashAlgo`]{#adv-attr-outputHashAlgo}
+
+    This specifies the hash alorithm used to digest the [file system object] data of a content-addressing derivation output.
+
+    This works in conjunction with [`outputHashMode`](#adv-attr-outputHashAlgo).
+    Specifying one without the other is an error (unless [`outputHash` is also specified and includes its own hash algorithm as described below).
+
+    The `outputHashAlgo` attribute specifies the hash algorithm used to compute the hash.
+    It can currently be `"blake3"`, "sha1"`, `"sha256"`, `"sha512"`, or `null`.
+
+    `outputHashAlgo` can only be `null` when `outputHash` follows the SRI format, because in that case the choice of hash algorithm is determined by `outputHash`.
+
+  - [`outputHash`]{#adv-attr-outputHashAlgo}; [`outputHash`]{#adv-attr-outputHashMode}\
+
+    This will specify the output hash of the single output of a [fixed-output derivation].
+
+    The `outputHash` attribute must be a string containing the hash in either hexadecimal or "nix32" encoding, or following the format for integrity metadata as defined by [SRI](https://www.w3.org/TR/SRI/).
+    The "nix32" encoding is an adaptation of base-32 encoding.
+
+    > **Note**
+    >
+    > The [`convertHash`](@docroot@/language/builtins.md#builtins-convertHash) function shows how to convert between different encodings.
+    > The [`nix-hash` command](../command-ref/nix-hash.md) has information about obtaining the hash for some contents, as well as converting to and from encodings.
+
+  - [`__contentAddressed`]{#adv-attr-__contentAddressed}
+
+    > **Warning**
+    >
+    > This attribute is part of an [experimental feature](@docroot@/development/experimental-features.md).
+    >
+    > To use this attribute, you must enable the
+    > [`ca-derivations`][xp-feature-ca-derivations] experimental feature.
+    > For example, in [nix.conf](../command-ref/conf-file.md) you could add:
+    >
+    > ```
+    > extra-experimental-features = ca-derivations
+    > ```
+
+    This is a boolean with a default of `false`.
+    It determines whether the derivation is floating content-addressing.
+
+[`__contentAddressed`]: #adv-attr-__contentAddressed
+[`outputHash`]: #adv-attr-outputHash
+[`outputHashAlgo`]: #adv-attr-outputHashAlgo
+[`outputHashMode`]: #adv-attr-outputHashMode
+
+[fixed-output derivation]: @docroot@/glossary.md#gloss-fixed-output-derivation
+[file system object]: @docroot@/store/file-system-object.md
+[store object]: @docroot@/store/store-object.md
 [xp-feature-dynamic-derivations]: @docroot@/development/experimental-features.md#xp-feature-dynamic-derivations
 [xp-feature-git-hashing]: @docroot@/development/experimental-features.md#xp-feature-git-hashing

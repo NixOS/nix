@@ -9,15 +9,24 @@ This is where Nix distinguishes itself.
 
 ## Store Derivation {#store-derivation}
 
-A derivation is a specification for running an executable on precisely defined input files to repeatably produce output files at uniquely determined file system paths.
+A derivation is a specification for running an executable on precisely defined input to produce on more [store objects][store object].
+These store objects are known as the derivation's *outputs*.
+
+Derivations are *built*, in which case the process is spawned according to the spec, and when it exits, required to leave behind files which will (after post-processing) become the outputs of the derivation.
+This process is described in detail in [Building](@docroot@/store/building.md).
+
+<!--
+Some of these things are described directly below, but we envision with more material the exposition will probably want to migrate to separate pages benough this.
+See outputs spec for an example of this one that migrated to its own page.
+-->
 
 A derivation consists of:
 
  - A name
 
- - A set of [*inputs*][inputs], a set of [deriving paths][deriving path]
+ - An [inputs specification][inputs], a set of [deriving paths][deriving path]
 
- - A map of [*outputs*][outputs], from names to other data
+ - An [outputs specification][outputs], specifying which outputs should be produced, and various metadata about them.
 
  - The ["system" type][system] (e.g. `x86_64-linux`) where the executable is to run.
 
@@ -26,8 +35,8 @@ A derivation consists of:
 [store derivation]: #store-derivation
 [inputs]: #inputs
 [input]: #inputs
-[outputs]: #outputs
-[output]: #outputs
+[outputs]: ./outputs/index.md
+[output]: ./outputs/index.md
 [process creation fields]: #process-creation-fields
 [builder]: #builder
 [args]: #args
@@ -88,28 +97,6 @@ The [process creation fields] will presumably include many [store paths][store p
  - The arguments and environment variables likely contain many other store paths.
 
 But rather than somehow scanning all the other fields for inputs, Nix requires that all inputs be explicitly collected in the inputs field. It is instead the responsibility of the creator of a derivation (e.g. the evaluator) to  ensure that every store object referenced in another field (e.g. referenced by store path) is included in this inputs field.
-
-### Outputs {#outputs}
-
-The outputs are the derivations are the [store objects][store object] it is obligated to produce.
-
-Outputs are assigned names, and also consistent of other information based on the type of derivation.
-
-Output names can be any string which is also a valid [store path] name.
-The store path of the output store object (also called an [output path] for short), has a name based on the derivation name and the output name.
-In the general case, store paths have name `derivationName + "-" + outputName`.
-However, an output named "out" has a store path with name is just the derivation name.
-This is to allow derivations with a single output to avoid a superfluous `"-${outputName}"` in their single output's name when no disambiguation is needed.
-
-> **Example**
->
-> A derivation is named `hello`, and has two outputs, `out`, and `dev`
->
-> - The derivation's path will be: `/nix/store/<hash>-hello.drv`.
->
-> - The store path of `out` will be: `/nix/store/<hash>-hello`.
->
-> - The store path of `dev` will be: `/nix/store/<hash>-hello-dev`.
 
 ### System {#system}
 
