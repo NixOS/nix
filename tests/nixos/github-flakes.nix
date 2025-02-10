@@ -205,7 +205,7 @@ in
       cat_log()
 
       # ... otherwise it should use the API
-      out = client.succeed("nix flake metadata private-flake --json --access-tokens github.com=ghp_000000000000000000000000000000000000 --tarball-ttl 0")
+      out = client.succeed("nix flake metadata private-flake --json --access-tokens github.com=ghp_000000000000000000000000000000000000 --tarball-ttl 0 --no-trust-tarballs-from-git-forges")
       print(out)
       info = json.loads(out)
       assert info["revision"] == "${private-flake-rev}", f"revision mismatch: {info['revision']} != ${private-flake-rev}"
