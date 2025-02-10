@@ -161,26 +161,20 @@ There are two types of placeholder, corresponding to the two cases where this pr
 >
 > - In the output case this is impossible:
 >
->   We cannot built the output until we have a correct derivation, and we cannot have a correct derivation (without using placeholders) until we have the output path.
+>   We cannot build the output until we have a correct derivation, and we cannot have a correct derivation (without using placeholders) until we have the output path.
 >
 > - In the input case this is impractical:
 >
->   We an always built a dependency, and then refer to its output by store path, but by doing so we loose the ability for a derivation graph to describe an entire build plan consisting of multiple build steps.
-
-> **Note**
->
-> The current method of creating hashes which we substitute for string fields should be seen as an artifact of the current "ATerm" serialization format.
-> In order to be more explicit, and avoid gotchas analogous to [SQL injection](https://en.wikipedia.org/wiki/SQL_injection),
-> we ought to consider switching two a different format where we explicitly use a syntax for the concatenation of plain strings and [deriving paths] written more explicitly.
+>   If we always build a dependency first, and then refer to its output by store path, we would lose the ability for a derivation graph to describe an entire build plan consisting of multiple build steps.
 
 ### System {#system}
 
 The system type on which the [`builder`](#attr-builder) executable is meant to be run.
 
-A necessary condition for Nix to schedule a given derivation on given Nix instance is for the "system" of that derivation to match that instance's [`system` configuration option].
+A necessary condition for Nix to schedule a given derivation on some Nix instance is for the "system" of that derivation to match that instance's [`system` configuration option].
 
 By putting the `system` in each derivation, Nix allows *heterogenous* build plans, where not all steps can be run on the same machine or same sort of machine.
-A Nix isntance scheduling builds can automatically [build on other platforms](@docroot@/language/derivations.md#attr-builder) by forwarding build requests to other Nix instances.
+Nix can schedule builds such that it automatically builds on other platforms by [forwarding build requests](@docroot@/advanced-topics/distributed-builds.md) to other Nix instances.
 
 [`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
 
@@ -197,7 +191,7 @@ There are two formats, documented separately:
 
 - The legacy ["ATerm" format](@docroot@/protocols/derivation-aterm.md)
 
-- The experimental [JSON format](@docroot@/protocols/json/derivation.md)
+- The experimental, currently under development and changing [JSON format](@docroot@/protocols/json/derivation.md)
 
 Every derivation has a canonical choice of encoding used to serialize it to a store object.
 This ensures that there is a canonical [store path] used to refer to the derivation, as described in [Referencing derivations](#derivation-path).
@@ -207,27 +201,15 @@ This ensures that there is a canonical [store path] used to refer to the derivat
 > Currently, the canonical encoding for every derivation is the "ATerm" format,
 > but this is subject to change for types derivations which are not yet stable.
 
-Regardless of the format used, when serializing to store objects, content-addressing is always used.
+Regardless of the format used, when serializing a derivation to a store object, that store object will be content-addressed.
 
-In the common case the inputs to store objects are either:
+In the common case, the inputs to store objects are either:
 
- - constant deriving paths for content-addressed source objects, which are "initial inputs" rather than the outputs of some other derivation
+ - [constant deriving paths](#deriving-path-constant) for content-addressed source objects, which are "initial inputs" rather than the outputs of some other derivation
 
- - the outputs of other derivations abiding by this same invariant.
+ - the outputs of other derivations
 
-This common case makes for the following useful property:
-when we serialize such a derivation graph to store objects, the resulting closures are *entirely* content-addressed.
-
-Here is a sketch at the proof of this:
-
- - The inputs which are constant deriving paths become references of the serialized derivations, but they are content-addressed per the above.
-
- - For inputs which are output deriving paths, we cannot directly reference the input because in general it is not built yet.
-   We instead "peel back" the output deriving path to take its underlying serialized derivation (the `drvPath` field), and reference that.
-   Since it is a derivation, it must be content-addressed
-
- - There are no other ways a store object would end up in an input closure.
-   The references of a derivation in store object form always come from solely from the inputs of the derivation.
+If those other derivations *also* abide by this common case (and likewise for transitive inputs), then the entire closure of the serialized derivation will be content-addressed.
 
 ### Deriving Path {#deriving-path-encoding}
 
@@ -266,9 +248,20 @@ Here is a sketch at the proof of this:
 
 **Experimental feature**: [`dynamic-derivations`](@docroot@/development/experimental-features.md#xp-feature-dynamic-derivations)
 
-We can apply the same extension discussed for the abstract model to the concrete model.
-Again, only the data type for Deriving Paths needs to be modified.
-Derivations are the same except for using the new extended deriving path data type.
+So far, we have used store paths to refer to derivations.
+That works because we've implicitly assumed that all derivations are created *statically* --- created by some mechanism out of band, and then manually inserted into the store.
+But what if derivations could also be created dynamically within Nix?
+In other words, what if derivations could be the outputs of other derivations?
+
+:::{.note}
+In the parlance of "Build Systems à la carte", we are generalizing the Nix store layer to be a "Monadic" instead of "Applicative" build system.
+:::
+
+How should we refer to such derivations?
+A deriving path works, the same as how we refer to other derivation outputs.
+But what about a dynamic derivations output?
+(i.e. how do we refer to the output of an output of a derivation?)
+For that we need to generalize the definition of deriving path, replacing the store path used to refer to the derivation with a nested deriving path:
 
 ```idris
 type OutputName = String
