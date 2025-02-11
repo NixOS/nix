@@ -15,7 +15,7 @@ release:
 
 * (Optionally) Updated `fallback-paths.nix` in Nixpkgs
 
-* An updated manual on https://nixos.org/manual/nix/stable/
+* An updated manual on https://nix.dev/manual/nix/latest/
 
 ## Creating a new release from the `master` branch
 
@@ -144,11 +144,9 @@ release:
 
   Make a pull request and auto-merge it.
 
-* Create a milestone for the next release, move all unresolved issues
-  from the previous milestone, and close the previous milestone. Set
-  the date for the next milestone 6 weeks from now.
-
 * Create a backport label.
+
+* Add the new backport label to `.mergify.yml`.
 
 * Post an [announcement on Discourse](https://discourse.nixos.org/c/announcements/8), including the contents of
   `rl-$VERSION.md`.
@@ -194,8 +192,58 @@ release:
 
 * Bump the version number of the release branch as above (e.g. to
   `2.12.2`).
-  
+
 ## Recovering from mistakes
 
 `upload-release.pl` should be idempotent. For instance a wrong `IS_LATEST` value can be fixed that way, by running the script on the actual latest release.
 
+## Security releases
+
+> See also the instructions for [handling security reports](./security-reports.md).
+
+Once a security fix is ready for merging:
+
+1. Summarize *all* past communication in the report.
+
+1. Request a CVE in the [GitHub security advisory](https://github.com/NixOS/nix/security/advisories) for the security fix.
+
+1. Notify all collaborators on the advisory with a timeline for the release.
+
+1. Merge the fix. Publish the advisory.
+
+1. [Make point releases](#creating-point-releases) for all affected versions.
+
+1. Update the affected Nix releases in Nixpkgs to the patched version.
+
+   For each Nix release, change the `version = ` strings and run
+
+   ```shell-session
+   nix-build -A nixVersions.nix_<major>_<minor>
+   ```
+
+   to get the correct hash for the `hash =` field.
+
+1. Once the release is built by Hydra, update fallback paths.
+
+   For the Nix release `${version}` shipped with Nixpkgs, run:
+
+   ```shell-session
+   curl https://releases.nixos.org/nix/nix-${version}/fallback-paths.nix > nixos/modules/installer/tools/nix-fallback-paths.nix
+   ```
+
+   Starting with Nixpkgs 24.11, there is an automatic check that fallback paths with Nix binaries match the Nix release shipped with Nixpkgs.
+
+1. Backport the updates to the two most recent stable releases of Nixpkgs.
+
+   Add `backport release-<version>` labels, which will trigger GitHub Actions to attempt automatic backports.
+
+1. Once the pull request against `master` lands on `nixpkgs-unstable`, post a Discourse announcement with
+
+   - Links to the CVE and GitHub security advisory
+   - A description of the vulnerability and its fix
+   - Credits to the reporters of the vulnerability and contributors of the fix
+   - A list of affected and patched Nix releases
+   - Instructions for updating
+   - A link to the [pull request tracker](https://nixpk.gs/pr-tracker.html) to follow when the patched Nix versions will appear on the various release channels
+
+   Check [past announcements](https://discourse.nixos.org/search?expanded=true&q=Security%20fix%20in%3Atitle%20order%3Alatest_topic) for reference.

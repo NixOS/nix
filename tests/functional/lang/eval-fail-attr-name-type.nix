@@ -1,7 +1,7 @@
 let
   attrs = {
-    puppy.doggy = {};
+    puppy.doggy = { };
   };
   key = 1;
 in
-  attrs.puppy.${key}
+attrs.puppy.${key}

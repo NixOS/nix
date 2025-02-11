@@ -463,7 +463,7 @@ EOF
 
     EDITOR="$SCRATCH/ex_cleanroom_wrapper" _sudo "to add nix to fstab" "$@" <<EOF
 :a
-UUID=$uuid $escaped_mountpoint apfs rw,noauto,nobrowse,suid,owners
+UUID=$uuid $escaped_mountpoint apfs rw,noauto,nobrowse,nosuid,noatime,owners
 .
 :x
 EOF

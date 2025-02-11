@@ -141,7 +141,9 @@ public:
     Value * * elems;
     ListBuilder(EvalState & state, size_t size);
 
-    ListBuilder(ListBuilder && x)
+    // NOTE: Can be noexcept because we are just copying integral values and
+    // raw pointers.
+    ListBuilder(ListBuilder && x) noexcept
         : size(x.size)
         , inlineElems{x.inlineElems[0], x.inlineElems[1]}
         , elems(size <= 2 ? inlineElems : x.elems)
@@ -507,5 +509,7 @@ typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std
 typedef std::shared_ptr<Value *> RootValue;
 
 RootValue allocRootValue(Value * v);
+
+void forceNoNullByte(std::string_view s, std::function<Pos()> = nullptr);
 
 }

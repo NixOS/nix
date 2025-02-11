@@ -50,6 +50,8 @@
 
 #include <sqlite3.h>
 
+#include <nlohmann/json.hpp>
+
 #include "strings.hh"
 
 
@@ -92,104 +94,6 @@ struct LocalStore::State::Stmts {
     SQLiteStmt QueryRealisationReferences;
     SQLiteStmt AddRealisationReference;
 };
-
-int getSchema(Path schemaPath)
-{
-    int curSchema = 0;
-    if (pathExists(schemaPath)) {
-        auto s = readFile(schemaPath);
-        auto n = string2Int<int>(s);
-        if (!n)
-            throw Error("'%1%' is corrupt", schemaPath);
-        curSchema = *n;
-    }
-    return curSchema;
-}
-
-void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
-{
-    const int nixCASchemaVersion = 4;
-    int curCASchema = getSchema(schemaPath);
-    if (curCASchema != nixCASchemaVersion) {
-        if (curCASchema > nixCASchemaVersion) {
-            throw Error("current Nix store ca-schema is version %1%, but I only support %2%",
-                 curCASchema, nixCASchemaVersion);
-        }
-
-        if (!lockFile(lockFd.get(), ltWrite, false)) {
-            printInfo("waiting for exclusive access to the Nix store for ca drvs...");
-            lockFile(lockFd.get(), ltNone, false); // We have acquired a shared lock; release it to prevent deadlocks
-            lockFile(lockFd.get(), ltWrite, true);
-        }
-
-        if (curCASchema == 0) {
-            static const char schema[] =
-              #include "ca-specific-schema.sql.gen.hh"
-                ;
-            db.exec(schema);
-            curCASchema = nixCASchemaVersion;
-        }
-
-        if (curCASchema < 2) {
-            SQLiteTxn txn(db);
-            // Ugly little sql dance to add a new `id` column and make it the primary key
-            db.exec(R"(
-                create table Realisations2 (
-                    id integer primary key autoincrement not null,
-                    drvPath text not null,
-                    outputName text not null, -- symbolic output id, usually "out"
-                    outputPath integer not null,
-                    signatures text, -- space-separated list
-                    foreign key (outputPath) references ValidPaths(id) on delete cascade
-                );
-                insert into Realisations2 (drvPath, outputName, outputPath, signatures)
-                    select drvPath, outputName, outputPath, signatures from Realisations;
-                drop table Realisations;
-                alter table Realisations2 rename to Realisations;
-            )");
-            db.exec(R"(
-                create index if not exists IndexRealisations on Realisations(drvPath, outputName);
-
-                create table if not exists RealisationsRefs (
-                    referrer integer not null,
-                    realisationReference integer,
-                    foreign key (referrer) references Realisations(id) on delete cascade,
-                    foreign key (realisationReference) references Realisations(id) on delete restrict
-                );
-            )");
-            txn.commit();
-        }
-
-        if (curCASchema < 3) {
-            SQLiteTxn txn(db);
-            // Apply new indices added in this schema update.
-            db.exec(R"(
-                -- used by QueryRealisationReferences
-                create index if not exists IndexRealisationsRefs on RealisationsRefs(referrer);
-                -- used by cascade deletion when ValidPaths is deleted
-                create index if not exists IndexRealisationsRefsOnOutputPath on Realisations(outputPath);
-            )");
-            txn.commit();
-        }
-        if (curCASchema < 4) {
-            SQLiteTxn txn(db);
-            db.exec(R"(
-                create trigger if not exists DeleteSelfRefsViaRealisations before delete on ValidPaths
-                begin
-                    delete from RealisationsRefs where realisationReference in (
-                    select id from Realisations where outputPath = old.id
-                    );
-                end;
-                -- used by deletion trigger
-                create index if not exists IndexRealisationsRefsRealisationReference on RealisationsRefs(realisationReference);
-            )");
-            txn.commit();
-        }
-
-        writeFile(schemaPath, fmt("%d", nixCASchemaVersion), 0666, true);
-        lockFile(lockFd.get(), ltRead, true);
-    }
-}
 
 LocalStore::LocalStore(
     std::string_view scheme,
@@ -263,16 +167,15 @@ LocalStore::LocalStore(
 
     /* Ensure that the store and its parents are not symlinks. */
     if (!settings.allowSymlinkedStore) {
-        Path path = realStoreDir;
-        struct stat st;
-        while (path != "/") {
-            st = lstat(path);
-            if (S_ISLNK(st.st_mode))
+        std::filesystem::path path = realStoreDir.get();
+        std::filesystem::path root = path.root_path();
+        while (path != root) {
+            if (std::filesystem::is_symlink(path))
                 throw Error(
                         "the path '%1%' is a symlink; "
                         "this is not allowed for the Nix store and its parent directories",
                         path);
-            path = dirOf(path);
+            path = path.parent_path();
         }
     }
 
@@ -367,6 +270,10 @@ LocalStore::LocalStore(
 
         openDB(*state, false);
 
+        /* Legacy database schema migrations. Don't bump 'schema' for
+           new migrations; instead, add a migration to
+           upgradeDBSchema(). */
+
         if (curSchema < 8) {
             SQLiteTxn txn(state->db);
             state->db.exec("alter table ValidPaths add column ultimate integer");
@@ -393,13 +300,7 @@ LocalStore::LocalStore(
 
     else openDB(*state, false);
 
-    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-        if (!readOnly) {
-            migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
-        } else {
-            throw Error("need to migrate to content-addressed schema, but this cannot be done in read-only mode");
-        }
-    }
+    upgradeDBSchema(*state);
 
     /* Prepare SQL statements. */
     state->stmts->RegisterValidPath.create(state->db,
@@ -522,7 +423,7 @@ LocalStore::~LocalStore()
             unlink(fnTempRoots.c_str());
         }
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 
@@ -534,7 +435,17 @@ std::string LocalStore::getUri()
 
 
 int LocalStore::getSchema()
-{ return nix::getSchema(schemaPath); }
+{
+    int curSchema = 0;
+    if (pathExists(schemaPath)) {
+        auto s = readFile(schemaPath);
+        auto n = string2Int<int>(s);
+        if (!n)
+            throw Error("'%1%' is corrupt", schemaPath);
+        curSchema = *n;
+    }
+    return curSchema;
+}
 
 void LocalStore::openDB(State & state, bool create)
 {
@@ -614,6 +525,42 @@ void LocalStore::openDB(State & state, bool create)
             ;
         db.exec(schema);
     }
+}
+
+
+void LocalStore::upgradeDBSchema(State & state)
+{
+    state.db.exec("create table if not exists SchemaMigrations (migration text primary key not null);");
+
+    std::set<std::string> schemaMigrations;
+
+    {
+        SQLiteStmt querySchemaMigrations;
+        querySchemaMigrations.create(state.db, "select migration from SchemaMigrations;");
+        auto useQuerySchemaMigrations(querySchemaMigrations.use());
+        while (useQuerySchemaMigrations.next())
+            schemaMigrations.insert(useQuerySchemaMigrations.getStr(0));
+    }
+
+    auto doUpgrade = [&](const std::string & migrationName, const std::string & stmt)
+    {
+        if (schemaMigrations.contains(migrationName))
+            return;
+
+        debug("executing Nix database schema migration '%s'...", migrationName);
+
+        SQLiteTxn txn(state.db);
+        state.db.exec(stmt + fmt(";\ninsert into SchemaMigrations values('%s')", migrationName));
+        txn.commit();
+
+        schemaMigrations.insert(migrationName);
+    };
+
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
+        doUpgrade(
+            "20220326-ca-derivations",
+            #include "ca-specific-schema.sql.gen.hh"
+            );
 }
 
 
@@ -1096,108 +1043,114 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     if (checkSigs && pathInfoIsUntrusted(info))
         throw Error("cannot add path '%s' because it lacks a signature by a trusted key", printStorePath(info.path));
 
-    /* In case we are not interested in reading the NAR: discard it. */
-    bool narRead = false;
-    Finally cleanup = [&]() {
-        if (!narRead) {
-            NullFileSystemObjectSink sink;
-            try {
-                parseDump(sink, source);
-            } catch (...) {
-                ignoreException();
+    {
+        /* In case we are not interested in reading the NAR: discard it. */
+        bool narRead = false;
+        Finally cleanup = [&]() {
+            if (!narRead) {
+                NullFileSystemObjectSink sink;
+                try {
+                    parseDump(sink, source);
+                } catch (...) {
+                    // TODO: should Interrupted be handled here?
+                    ignoreExceptionInDestructor();
+                }
             }
-        }
-    };
+        };
 
-    addTempRoot(info.path);
-
-    if (repair || !isValidPath(info.path)) {
-
-        PathLocks outputLock;
-
-        auto realPath = Store::toRealPath(info.path);
-
-        /* Lock the output path.  But don't lock if we're being called
-           from a build hook (whose parent process already acquired a
-           lock on this path). */
-        if (!locksHeld.count(printStorePath(info.path)))
-            outputLock.lockPaths({realPath});
+        addTempRoot(info.path);
 
         if (repair || !isValidPath(info.path)) {
 
-            deletePath(realPath);
+            PathLocks outputLock;
 
-            /* While restoring the path from the NAR, compute the hash
-               of the NAR. */
-            HashSink hashSink(HashAlgorithm::SHA256);
+            auto realPath = Store::toRealPath(info.path);
 
-            TeeSource wrapperSource { source, hashSink };
+            /* Lock the output path.  But don't lock if we're being called
+            from a build hook (whose parent process already acquired a
+            lock on this path). */
+            if (!locksHeld.count(printStorePath(info.path)))
+                outputLock.lockPaths({realPath});
 
-            narRead = true;
-            restorePath(realPath, wrapperSource, settings.fsyncStorePaths);
+            if (repair || !isValidPath(info.path)) {
 
-            auto hashResult = hashSink.finish();
+                deletePath(realPath);
 
-            if (hashResult.first != info.narHash)
-                throw Error("hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                            printStorePath(info.path), info.narHash.to_string(HashFormat::Nix32, true), hashResult.first.to_string(HashFormat::Nix32, true));
+                /* While restoring the path from the NAR, compute the hash
+                of the NAR. */
+                HashSink hashSink(HashAlgorithm::SHA256);
 
-            if (hashResult.second != info.narSize)
-                throw Error("size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                    printStorePath(info.path), info.narSize, hashResult.second);
+                TeeSource wrapperSource { source, hashSink };
 
-            if (info.ca) {
-                auto & specified = *info.ca;
-                auto actualHash = ({
-                    auto accessor = getFSAccessor(false);
-                    CanonPath path { printStorePath(info.path) };
-                    Hash h { HashAlgorithm::SHA256 }; // throwaway def to appease C++
-                    auto fim = specified.method.getFileIngestionMethod();
-                    switch (fim) {
-                    case FileIngestionMethod::Flat:
-                    case FileIngestionMethod::NixArchive:
-                    {
-                        HashModuloSink caSink {
-                            specified.hash.algo,
-                            std::string { info.path.hashPart() },
+                narRead = true;
+                restorePath(realPath, wrapperSource, settings.fsyncStorePaths);
+
+                auto hashResult = hashSink.finish();
+
+                if (hashResult.first != info.narHash)
+                    throw Error("hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                                printStorePath(info.path), info.narHash.to_string(HashFormat::Nix32, true), hashResult.first.to_string(HashFormat::Nix32, true));
+
+                if (hashResult.second != info.narSize)
+                    throw Error("size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                        printStorePath(info.path), info.narSize, hashResult.second);
+
+                if (info.ca) {
+                    auto & specified = *info.ca;
+                    auto actualHash = ({
+                        auto accessor = getFSAccessor(false);
+                        CanonPath path { printStorePath(info.path) };
+                        Hash h { HashAlgorithm::SHA256 }; // throwaway def to appease C++
+                        auto fim = specified.method.getFileIngestionMethod();
+                        switch (fim) {
+                        case FileIngestionMethod::Flat:
+                        case FileIngestionMethod::NixArchive:
+                        {
+                            HashModuloSink caSink {
+                                specified.hash.algo,
+                                std::string { info.path.hashPart() },
+                            };
+                            dumpPath({accessor, path}, caSink, (FileSerialisationMethod) fim);
+                            h = caSink.finish().first;
+                            break;
+                        }
+                        case FileIngestionMethod::Git:
+                            h = git::dumpHash(specified.hash.algo, {accessor, path}).hash;
+                            break;
+                        }
+                        ContentAddress {
+                            .method = specified.method,
+                            .hash = std::move(h),
                         };
-                        dumpPath({accessor, path}, caSink, (FileSerialisationMethod) fim);
-                        h = caSink.finish().first;
-                        break;
+                    });
+                    if (specified.hash != actualHash.hash) {
+                        throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                            printStorePath(info.path),
+                            specified.hash.to_string(HashFormat::Nix32, true),
+                            actualHash.hash.to_string(HashFormat::Nix32, true));
                     }
-                    case FileIngestionMethod::Git:
-                        h = git::dumpHash(specified.hash.algo, {accessor, path}).hash;
-                        break;
-                    }
-                    ContentAddress {
-                        .method = specified.method,
-                        .hash = std::move(h),
-                    };
-                });
-                if (specified.hash != actualHash.hash) {
-                    throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                        printStorePath(info.path),
-                        specified.hash.to_string(HashFormat::Nix32, true),
-                        actualHash.hash.to_string(HashFormat::Nix32, true));
                 }
+
+                autoGC();
+
+                canonicalisePathMetaData(realPath);
+
+                optimisePath(realPath, repair); // FIXME: combine with hashPath()
+
+                if (settings.fsyncStorePaths) {
+                    recursiveSync(realPath);
+                    syncParent(realPath);
+                }
+
+                registerValidPath(info);
             }
 
-            autoGC();
-
-            canonicalisePathMetaData(realPath);
-
-            optimisePath(realPath, repair); // FIXME: combine with hashPath()
-
-            if (settings.fsyncStorePaths) {
-                recursiveSync(realPath);
-                syncParent(realPath);
-            }
-
-            registerValidPath(info);
+            outputLock.setDeletion(true);
         }
-
-        outputLock.setDeletion(true);
     }
+
+    // In case `cleanup` ignored an `Interrupted` exception
+    checkInterrupt();
 }
 
 

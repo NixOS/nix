@@ -130,7 +130,7 @@ struct LocalDerivationGoal : public DerivationGoal
      *   rewrite after the build. Otherwise the regular predetermined paths are
      *   put here.
      *
-     * - Floating content-addressed derivations do not know their final build
+     * - Floating content-addressing derivations do not know their final build
      *   output paths until the outputs are hashed, so random locations are
      *   used, and then renamed. The randomness helps guard against hidden
      *   self-references.
@@ -211,6 +211,11 @@ struct LocalDerivationGoal : public DerivationGoal
     void initEnv();
 
     /**
+     * Process messages send by the sandbox initialization.
+     */
+    void processSandboxSetupMessages();
+
+    /**
      * Setup tmp dir location.
      */
     void initTmpDir();
@@ -220,8 +225,15 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     void writeStructuredAttrs();
 
+    /**
+     * Start an in-process nix daemon thread for recursive-nix.
+     */
     void startDaemon();
 
+    /**
+     * Stop the in-process nix daemon thread.
+     * @see startDaemon
+     */
     void stopDaemon();
 
     /**

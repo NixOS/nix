@@ -167,10 +167,9 @@ void chrootHelper(int argc, char * * argv)
     /* Bind-mount realStoreDir on /nix/store. If the latter mount
        point doesn't already exists, we have to create a chroot
        environment containing the mount point and bind mounts for the
-       children of /. Would be nice if we could use overlayfs here,
-       but that doesn't work in a user namespace yet (Ubuntu has a
-       patch for this:
-       https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1478578). */
+       children of /.
+       Overlayfs for user namespaces is fixed in Linux since ac519625ed
+       (v5.11, 14 February 2021) */
     if (!pathExists(storeDir)) {
         // FIXME: Use overlayfs?
 
@@ -181,9 +180,9 @@ void chrootHelper(int argc, char * * argv)
         if (mount(realStoreDir.c_str(), (tmpDir + storeDir).c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-        for (auto entry : fs::directory_iterator{"/"}) {
+        for (const auto & entry : fs::directory_iterator{"/"}) {
             checkInterrupt();
-            auto src = entry.path();
+            const auto & src = entry.path();
             fs::path dst = tmpDir / entry.path().filename();
             if (pathExists(dst)) continue;
             auto st = entry.symlink_status();
@@ -206,8 +205,9 @@ void chrootHelper(int argc, char * * argv)
         if (chdir(cwd) == -1)
             throw SysError("chdir to '%s' in chroot", cwd);
     } else
-        if (mount(realStoreDir.c_str(), storeDir.c_str(), "", MS_BIND, 0) == -1)
-            throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
+        if (mount("overlay", storeDir.c_str(), "overlay", MS_MGC_VAL, fmt("lowerdir=%s:%s", storeDir, realStoreDir).c_str()) == -1)
+            if (mount(realStoreDir.c_str(), storeDir.c_str(), "", MS_BIND, 0) == -1)
+                throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
     writeFile(fs::path{"/proc/self/setgroups"}, "deny");
     writeFile(fs::path{"/proc/self/uid_map"}, fmt("%d %d %d", uid, uid, 1));

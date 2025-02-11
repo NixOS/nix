@@ -1,1 +1,1 @@
-doc/manual/src/development/building.md
+doc/manual/source/development/building.md

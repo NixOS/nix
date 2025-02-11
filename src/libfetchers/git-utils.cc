@@ -5,6 +5,7 @@
 #include "signals.hh"
 #include "users.hh"
 #include "fs-sink.hh"
+#include "sync.hh"
 
 #include <git2/attr.h>
 #include <git2/blob.h>
@@ -205,6 +206,32 @@ static git_packbuilder_progress PACKBUILDER_PROGRESS_CHECK_INTERRUPT = &packBuil
 
 } // extern "C"
 
+static void initRepoAtomically(std::filesystem::path &path, bool bare)
+{
+    if (pathExists(path.string())) return;
+
+    Path tmpDir = createTempDir(os_string_to_string(PathViewNG { std::filesystem::path(path).parent_path() }));
+    AutoDelete delTmpDir(tmpDir, true);
+    Repository tmpRepo;
+
+    if (git_repository_init(Setter(tmpRepo), tmpDir.c_str(), bare))
+        throw Error("creating Git repository %s: %s", path, git_error_last()->message);
+    try {
+        std::filesystem::rename(tmpDir, path);
+    } catch (std::filesystem::filesystem_error & e) {
+        // Someone may race us to create the repository.
+        if (e.code() == std::errc::file_exists
+            // `path` may be attempted to be deleted by s::f::rename, in which case the code is:
+            || e.code() == std::errc::directory_not_empty) {
+            return;
+        }
+        else
+            throw SysError("moving temporary git repository from %s to %s", tmpDir, path);
+    }
+    // we successfully moved the repository, so the temporary directory no longer exists.
+    delTmpDir.cancel();
+}
+
 struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
     /** Location of the repository on disk. */
@@ -226,13 +253,9 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         initLibGit2();
 
-        if (pathExists(path.string())) {
-            if (git_repository_open(Setter(repo), path.string().c_str()))
-                throw Error("opening Git repository '%s': %s", path, git_error_last()->message);
-        } else {
-            if (git_repository_init(Setter(repo), path.string().c_str(), bare))
-                throw Error("creating Git repository '%s': %s", path, git_error_last()->message);
-        }
+        initRepoAtomically(path, bare);
+        if (git_repository_open(Setter(repo), path.string().c_str()))
+            throw Error("opening Git repository %s: %s", path, git_error_last()->message);
 
         ObjectDb odb;
         if (git_repository_odb(Setter(odb), repo.get()))
@@ -416,7 +439,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         {
             if (!(statusFlags & GIT_STATUS_INDEX_DELETED) &&
                 !(statusFlags & GIT_STATUS_WT_DELETED))
+            {
                 info.files.insert(CanonPath(path));
+                if (statusFlags != GIT_STATUS_CURRENT)
+                    info.dirtyFiles.insert(CanonPath(path));
+            } else
+                info.deletedFiles.insert(CanonPath(path));
             if (statusFlags != GIT_STATUS_CURRENT)
                 info.isDirty = true;
             return 0;
@@ -480,7 +508,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
      */
     ref<GitSourceAccessor> getRawAccessor(const Hash & rev);
 
-    ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
+    ref<SourceAccessor> getAccessor(
+        const Hash & rev,
+        bool exportIgnore,
+        std::string displayPrefix) override;
 
     ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
 
@@ -517,13 +548,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         //       then use code that was removed in this commit (see blame)
 
         auto dir = this->path;
-        Strings gitArgs;
-        if (shallow) {
-            gitArgs = { "-C", dir.string(), "fetch", "--quiet", "--force", "--depth", "1", "--", url, refspec };
-        }
-        else {
-            gitArgs = { "-C", dir.string(), "fetch", "--quiet", "--force", "--", url, refspec };
-        }
+        Strings gitArgs{"-C", dir.string(), "--git-dir", ".", "fetch", "--quiet", "--force"};
+        if (shallow)
+            append(gitArgs, {"--depth", "1"});
+        append(gitArgs, {std::string("--"), url, refspec});
 
         runProgram(RunOptions {
             .program = "git",
@@ -583,7 +611,13 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         std::string re = R"(Good "git" signature for \* with .* key SHA256:[)";
         for (const fetchers::PublicKey & k : publicKeys){
             // Calculate sha256 fingerprint from public key and escape the regex symbol '+' to match the key literally
-            auto fingerprint = trim(hashString(HashAlgorithm::SHA256, base64Decode(k.key)).to_string(nix::HashFormat::Base64, false), "=");
+            std::string keyDecoded;
+            try {
+                keyDecoded = base64Decode(k.key);
+            } catch (Error & e) {
+                e.addTrace({}, "while decoding public key '%s' used for git signature", k.key);
+            }
+            auto fingerprint = trim(hashString(HashAlgorithm::SHA256, keyDecoded).to_string(nix::HashFormat::Base64, false), "=");
             auto escaped_fingerprint = std::regex_replace(fingerprint, std::regex("\\+"), "\\+" );
             re += "(" + escaped_fingerprint + ")";
         }
@@ -596,7 +630,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     Hash treeHashToNarHash(const Hash & treeHash) override
     {
-        auto accessor = getAccessor(treeHash, false);
+        auto accessor = getAccessor(treeHash, false, "");
 
         fetchers::Cache::Key cacheKey{"treeHashToNarHash", {{"treeHash", treeHash.gitRev()}}};
 
@@ -954,8 +988,24 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
     void pushBuilder(std::string name)
     {
+        const git_tree_entry * entry;
+        Tree prevTree = nullptr;
+
+        if (!pendingDirs.empty() &&
+            (entry = git_treebuilder_get(pendingDirs.back().builder.get(), name.c_str())))
+        {
+            /* Clone a tree that we've already finished. This happens
+               if a tarball has directory entries that are not
+               contiguous. */
+            if (git_tree_entry_type(entry) != GIT_OBJECT_TREE)
+                throw Error("parent of '%s' is not a directory", name);
+
+            if (git_tree_entry_to_object((git_object * *) (git_tree * *) Setter(prevTree), *repo, entry))
+                throw Error("looking up parent of '%s': %s", name, git_error_last()->message);
+        }
+
         git_treebuilder * b;
-        if (git_treebuilder_new(&b, *repo, nullptr))
+        if (git_treebuilder_new(&b, *repo, prevTree.get()))
             throw Error("creating a tree builder: %s", git_error_last()->message);
         pendingDirs.push_back({ .name = std::move(name), .builder = TreeBuilder(b) });
     };
@@ -1147,16 +1197,18 @@ ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
     return make_ref<GitSourceAccessor>(self, rev);
 }
 
-ref<SourceAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
+ref<SourceAccessor> GitRepoImpl::getAccessor(
+    const Hash & rev,
+    bool exportIgnore,
+    std::string displayPrefix)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
     ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev);
-    if (exportIgnore) {
+    rawGitAccessor->setPathDisplay(std::move(displayPrefix));
+    if (exportIgnore)
         return make_ref<GitExportIgnoreSourceAccessor>(self, rawGitAccessor, rev);
-    }
-    else {
+    else
         return rawGitAccessor;
-    }
 }
 
 ref<SourceAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError)
@@ -1195,7 +1247,7 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     /* Read the .gitmodules files from this revision. */
     CanonPath modulesFile(".gitmodules");
 
-    auto accessor = getAccessor(rev, exportIgnore);
+    auto accessor = getAccessor(rev, exportIgnore, "");
     if (!accessor->pathExists(modulesFile)) return {};
 
     /* Parse it and get the revision of each submodule. */
@@ -1223,6 +1275,19 @@ ref<GitRepo> getTarballCache()
     static auto repoDir = std::filesystem::path(getCacheDir()) / "tarball-cache";
 
     return GitRepo::openRepo(repoDir, true, true);
+}
+
+GitRepo::WorkdirInfo GitRepo::getCachedWorkdirInfo(const std::filesystem::path & path)
+{
+    static Sync<std::map<std::filesystem::path, WorkdirInfo>> _cache;
+    {
+        auto cache(_cache.lock());
+        auto i = cache->find(path);
+        if (i != cache->end()) return i->second;
+    }
+    auto workdirInfo = GitRepo::openRepo(path)->getWorkdirInfo();
+    _cache.lock()->emplace(path, workdirInfo);
+    return workdirInfo;
 }
 
 }

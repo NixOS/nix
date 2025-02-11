@@ -17,7 +17,7 @@
 #include "eval-cache.hh"
 #include "markdown.hh"
 #include "users.hh"
-#include "terminal.hh"
+#include "fetch-to-store.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -95,21 +95,21 @@ public:
             .label="inputs",
             .optional=true,
             .handler={[&](std::vector<std::string> inputsToUpdate){
-                for (auto inputToUpdate : inputsToUpdate) {
-                    InputPath inputPath;
+                for (const auto & inputToUpdate : inputsToUpdate) {
+                    InputAttrPath inputAttrPath;
                     try {
-                        inputPath = flake::parseInputPath(inputToUpdate);
+                        inputAttrPath = flake::parseInputAttrPath(inputToUpdate);
                     } catch (Error & e) {
                         warn("Invalid flake input '%s'. To update a specific flake, use 'nix flake update --flake %s' instead.", inputToUpdate, inputToUpdate);
                         throw e;
                     }
-                    if (lockFlags.inputUpdates.contains(inputPath))
-                        warn("Input '%s' was specified multiple times. You may have done this by accident.");
-                    lockFlags.inputUpdates.insert(inputPath);
+                    if (lockFlags.inputUpdates.contains(inputAttrPath))
+                        warn("Input '%s' was specified multiple times. You may have done this by accident.", printInputAttrPath(inputAttrPath));
+                    lockFlags.inputUpdates.insert(inputAttrPath);
                 }
             }},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
-                completeFlakeInputPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
+                completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
             }}
         });
 
@@ -163,6 +163,7 @@ struct CmdFlakeLock : FlakeCommand
         settings.tarballTtl = 0;
 
         lockFlags.writeLockFile = true;
+        lockFlags.failOnUnlocked = true;
         lockFlags.applyNixConfig = true;
 
         lockFlake();
@@ -238,7 +239,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["lastModified"] = *lastModified;
             j["path"] = storePath;
             j["locks"] = lockedFlake.lockFile.toJSON().first;
-            if (auto fingerprint = lockedFlake.getFingerprint(store))
+            if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
             logger->cout("%s", j.dump());
         } else {
@@ -272,7 +273,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Last modified:" ANSI_NORMAL " %s",
                     std::put_time(std::localtime(&*lastModified), "%F %T"));
-            if (auto fingerprint = lockedFlake.getFingerprint(store))
+            if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 logger->cout(
                     ANSI_BOLD "Fingerprint:" ANSI_NORMAL "   %s",
                     fingerprint->to_string(HashFormat::Base16, false));
@@ -304,7 +305,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                     } else if (auto follows = std::get_if<1>(&input.second)) {
                         logger->cout("%s" ANSI_BOLD "%s" ANSI_NORMAL " follows input '%s'",
                             prefix + (last ? treeLast : treeConn), input.first,
-                            printInputPath(*follows));
+                            printInputAttrPath(*follows));
                     }
                 }
             };
@@ -372,9 +373,11 @@ struct CmdFlakeCheck : FlakeCommand
         auto reportError = [&](const Error & e) {
             try {
                 throw e;
+            } catch (Interrupted & e) {
+                throw;
             } catch (Error & e) {
                 if (settings.keepGoing) {
-                    ignoreException();
+                    ignoreExceptionExceptInterrupt();
                     hasErrors = true;
                 }
                 else
@@ -642,10 +645,11 @@ struct CmdFlakeCheck : FlakeCommand
                                             fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
                                             *attr2.value, attr2.pos);
                                         if (drvPath && attr_name == settings.thisSystem.get()) {
-                                            drvPaths.push_back(DerivedPath::Built {
+                                            auto path = DerivedPath::Built {
                                                 .drvPath = makeConstantStorePathRef(*drvPath),
                                                 .outputs = OutputsSpec::All { },
-                                            });
+                                            };
+                                            drvPaths.push_back(std::move(path));
                                         }
                                     }
                                 }
@@ -890,37 +894,32 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         auto cursor = installable.getCursor(*evalState);
 
-        auto templateDirAttr = cursor->getAttr("path");
-        auto templateDir = templateDirAttr->getString();
-
-        if (!store->isInStore(templateDir))
-            evalState->error<TypeError>(
-                "'%s' was not found in the Nix store\n"
-                "If you've set '%s' to a string, try using a path instead.",
-                templateDir, templateDirAttr->getAttrPathStr()).debugThrow();
+        auto templateDirAttr = cursor->getAttr("path")->forceValue();
+        NixStringContext context;
+        auto templateDir = evalState->coerceToPath(noPos, templateDirAttr, context, "");
 
         std::vector<fs::path> changedFiles;
         std::vector<fs::path> conflictedFiles;
 
-        std::function<void(const fs::path & from, const fs::path & to)> copyDir;
-        copyDir = [&](const fs::path & from, const fs::path & to)
+        std::function<void(const SourcePath & from, const fs::path & to)> copyDir;
+        copyDir = [&](const SourcePath & from, const fs::path & to)
         {
             fs::create_directories(to);
 
-            for (auto & entry : fs::directory_iterator{from}) {
+            for (auto & [name, entry] : from.readDirectory()) {
                 checkInterrupt();
-                auto from2 = entry.path();
-                auto to2 = to / entry.path().filename();
-                auto st = entry.symlink_status();
+                auto from2 = from / name;
+                auto to2 = to / name;
+                auto st = from2.lstat();
                 auto to_st = fs::symlink_status(to2);
-                if (fs::is_directory(st))
+                if (st.type == SourceAccessor::tDirectory)
                     copyDir(from2, to2);
-                else if (fs::is_regular_file(st)) {
-                    auto contents = readFile(from2.string());
+                else if (st.type == SourceAccessor::tRegular) {
+                    auto contents = from2.readFile();
                     if (fs::exists(to_st)) {
                         auto contents2 = readFile(to2.string());
                         if (contents != contents2) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2.string());
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
@@ -929,21 +928,21 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     } else
                         writeFile(to2, contents);
                 }
-                else if (fs::is_symlink(st)) {
-                    auto target = fs::read_symlink(from2);
+                else if (st.type == SourceAccessor::tSymlink) {
+                    auto target = from2.readLink();
                     if (fs::exists(to_st)) {
                         if (fs::read_symlink(to2) != target) {
-                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2.string());
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
                             conflictedFiles.push_back(to2);
                         } else {
                             notice("skipping identical file: %s", from2);
                         }
                         continue;
                     } else
-                          fs::create_symlink(target, to2);
+                        createSymlink(target, os_string_to_string(PathViewNG { to2 }));
                 }
                 else
-                    throw Error("file '%s' has unsupported type", from2);
+                    throw Error("path '%s' needs to be a symlink, file, or directory but instead is a %s", from2, st.typeString());
                 changedFiles.push_back(to2);
                 notice("wrote: %s", to2);
             }
@@ -956,14 +955,14 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             for (auto & s : changedFiles) args.emplace_back(s.string());
             runProgram("git", true, args);
         }
-        auto welcomeText = cursor->maybeGetAttr("welcomeText");
-        if (welcomeText) {
+
+        if (auto welcomeText = cursor->maybeGetAttr("welcomeText")) {
             notice("\n");
             notice(renderMarkdownToTerminal(welcomeText->getString()));
         }
 
         if (!conflictedFiles.empty())
-            throw Error("Encountered %d conflicts - see above", conflictedFiles.size());
+            throw Error("encountered %d conflicts - see above", conflictedFiles.size());
     }
 };
 
@@ -1273,97 +1272,25 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 auto showDerivation = [&]()
                 {
                     auto name = visitor.getAttr(state->sName)->getString();
-                    std::optional<std::string> description;
-                    if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
-                        if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
-                            description = aDescription->getString();
-                    }
 
                     if (json) {
+                        std::optional<std::string> description;
+                        if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
+                            if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
+                                description = aDescription->getString();
+                        }
                         j.emplace("type", "derivation");
                         j.emplace("name", name);
                         j.emplace("description", description ? *description : "");
                     } else {
-                        auto type =
+                        logger->cout("%s: %s '%s'",
+                            headerPrefix,
                             attrPath.size() == 2 && attrPathS[0] == "devShell" ? "development environment" :
                             attrPath.size() >= 2 && attrPathS[0] == "devShells" ? "development environment" :
                             attrPath.size() == 3 && attrPathS[0] == "checks" ? "derivation" :
                             attrPath.size() >= 1 && attrPathS[0] == "hydraJobs" ? "derivation" :
-                            "package";
-                        if (description && !description->empty()) {
-
-                            // Takes a string and returns the # of characters displayed
-                            auto columnLengthOfString = [](std::string_view s) -> unsigned int {
-                                unsigned int columnCount = 0;
-                                for (auto i = s.begin(); i < s.end();) {
-                                    // Test first character to determine if it is one of
-                                    // treeConn, treeLast, treeLine
-                                    if (*i == -30) {
-                                        i += 3;
-                                        ++columnCount;
-                                    }
-                                    // Escape sequences
-                                    // https://en.wikipedia.org/wiki/ANSI_escape_code
-                                    else if (*i == '\e') {
-                                        // Eat '['
-                                        if (*(++i) == '[') {
-                                            ++i;
-                                            // Eat parameter bytes
-                                            while(*i >= 0x30 && *i <= 0x3f) ++i;
-
-                                            // Eat intermediate bytes
-                                            while(*i >= 0x20 && *i <= 0x2f) ++i;
-
-                                            // Eat final byte
-                                            if(*i >= 0x40 && *i <= 0x73) ++i;
-                                        }
-                                        else {
-                                            // Eat Fe Escape sequence
-                                            if (*i >= 0x40 && *i <= 0x5f) ++i;
-                                        }
-                                    }
-                                    else {
-                                        ++i;
-                                        ++columnCount;
-                                    }
-                                }
-
-                                return columnCount;
-                            };
-
-                            // Maximum length to print
-                            size_t maxLength = getWindowSize().second > 0 ? getWindowSize().second : 80;
-
-                            // Trim the description and only use the first line
-                            auto trimmed = trim(*description);
-                            auto newLinePos = trimmed.find('\n');
-                            auto length = newLinePos != std::string::npos ? newLinePos : trimmed.length();
-
-                            auto beginningOfLine = fmt("%s: %s '%s'", headerPrefix, type, name);
-                            auto line = fmt("%s: %s '%s' - '%s'", headerPrefix, type, name, trimmed.substr(0, length));
-
-                            // If we are already over the maximum length then do not trim
-                            // and don't print the description (preserves existing behavior)
-                            if (columnLengthOfString(beginningOfLine) >= maxLength) {
-                                logger->cout("%s", beginningOfLine);
-                            }
-                            // If the entire line fits then print that
-                            else if (columnLengthOfString(line) < maxLength) {
-                                logger->cout("%s", line);
-                            }
-                            // Otherwise we need to truncate
-                            else {
-                                auto lineLength = columnLengthOfString(line);
-                                auto chopOff = lineLength - maxLength;
-                                line.resize(line.length() - chopOff);
-                                line = line.replace(line.length() - 3, 3, "...");
-
-                                logger->cout("%s", line);
-                            }
-                        }
-                        else {
-                            logger->cout("%s: %s '%s'", headerPrefix, type, name);
-                        }
+                            "package",
+                            name);
                     }
                 };
 
@@ -1523,7 +1450,8 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
     {
         auto originalRef = getFlakeRef();
         auto resolvedRef = originalRef.resolve(store);
-        auto [storePath, lockedRef] = resolvedRef.fetchTree(store);
+        auto [accessor, lockedRef] = resolvedRef.lazyFetch(store);
+        auto storePath = fetchToStore(*store, accessor, FetchMode::Copy, lockedRef.input.getName());
         auto hash = store->queryPathInfo(storePath)->narHash;
 
         if (json) {

@@ -9,6 +9,7 @@
 #include "globals.hh"
 #include "compression.hh"
 #include "filetransfer.hh"
+#include "signals.hh"
 
 #include <aws/core/Aws.h>
 #include <aws/core/VersionConfig.h>
@@ -47,7 +48,11 @@ R && checkAws(std::string_view s, Aws::Utils::Outcome<R, E> && outcome)
     if (!outcome.IsSuccess())
         throw S3Error(
             outcome.GetError().GetErrorType(),
-            s + ": " + outcome.GetError().GetMessage());
+            fmt(
+                "%s: %s (request id: %s)",
+                s,
+                outcome.GetError().GetMessage(),
+                outcome.GetError().GetRequestId()));
     return outcome.GetResultWithOwnership();
 }
 
@@ -117,11 +122,13 @@ class RetryStrategy : public Aws::Client::DefaultRetryStrategy
 {
     bool ShouldRetry(const Aws::Client::AWSError<Aws::Client::CoreErrors>& error, long attemptedRetries) const override
     {
+        checkInterrupt();
         auto retry = Aws::Client::DefaultRetryStrategy::ShouldRetry(error, attemptedRetries);
         if (retry)
-            printError("AWS error '%s' (%s), will retry in %d ms",
+            printError("AWS error '%s' (%s; request id: %s), will retry in %d ms",
                 error.GetExceptionName(),
                 error.GetMessage(),
+                error.GetRequestId(),
                 CalculateDelayBeforeNextRetry(error, attemptedRetries));
         return retry;
     }
@@ -452,7 +459,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
             debug("got %d keys, next marker '%s'",
                 contents.size(), res.GetNextMarker());
 
-            for (auto object : contents) {
+            for (const auto & object : contents) {
                 auto & key = object.GetKey();
                 if (key.size() != 40 || !hasSuffix(key, ".narinfo")) continue;
                 paths.insert(parseStorePath(storeDir + "/" + key.substr(0, key.size() - 8) + "-" + MissingName));

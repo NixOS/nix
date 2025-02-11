@@ -50,7 +50,7 @@ struct GitArchiveInputScheme : InputScheme
             else if (std::regex_match(path[2], refRegex))
                 ref = path[2];
             else
-                throw BadURL("in URL '%s', '%s' is not a commit hash or branch/tag name", url.url, path[2]);
+                throw BadURL("in URL '%s', '%s' is not a commit hash or branch/tag name", url, path[2]);
         } else if (size > 3) {
             std::string rs;
             for (auto i = std::next(path.begin(), 2); i != path.end(); i++) {
@@ -63,34 +63,34 @@ struct GitArchiveInputScheme : InputScheme
             if (std::regex_match(rs, refRegex)) {
                 ref = rs;
             } else {
-                throw BadURL("in URL '%s', '%s' is not a branch/tag name", url.url, rs);
+                throw BadURL("in URL '%s', '%s' is not a branch/tag name", url, rs);
             }
         } else if (size < 2)
-            throw BadURL("URL '%s' is invalid", url.url);
+            throw BadURL("URL '%s' is invalid", url);
 
         for (auto &[name, value] : url.query) {
             if (name == "rev") {
                 if (rev)
-                    throw BadURL("URL '%s' contains multiple commit hashes", url.url);
+                    throw BadURL("URL '%s' contains multiple commit hashes", url);
                 rev = Hash::parseAny(value, HashAlgorithm::SHA1);
             }
             else if (name == "ref") {
                 if (!std::regex_match(value, refRegex))
-                    throw BadURL("URL '%s' contains an invalid branch/tag name", url.url);
+                    throw BadURL("URL '%s' contains an invalid branch/tag name", url);
                 if (ref)
-                    throw BadURL("URL '%s' contains multiple branch/tag names", url.url);
+                    throw BadURL("URL '%s' contains multiple branch/tag names", url);
                 ref = value;
             }
             else if (name == "host") {
                 if (!std::regex_match(value, hostRegex))
-                    throw BadURL("URL '%s' contains an invalid instance host", url.url);
+                    throw BadURL("URL '%s' contains an invalid instance host", url);
                 host_url = value;
             }
             // FIXME: barf on unsupported attributes
         }
 
         if (ref && rev)
-            throw BadURL("URL '%s' contains both a commit hash and a branch/tag name %s %s", url.url, *ref, rev->gitRev());
+            throw BadURL("URL '%s' contains both a commit hash and a branch/tag name %s %s", url, *ref, rev->gitRev());
 
         Input input{settings};
         input.attrs.insert_or_assign("type", std::string { schemeName() });
@@ -294,9 +294,10 @@ struct GitArchiveInputScheme : InputScheme
         #endif
         input.attrs.insert_or_assign("lastModified", uint64_t(tarballInfo.lastModified));
 
-        auto accessor = getTarballCache()->getAccessor(tarballInfo.treeHash, false);
-
-        accessor->setPathDisplay("«" + input.to_string() + "»");
+        auto accessor = getTarballCache()->getAccessor(
+            tarballInfo.treeHash,
+            false,
+            "«" + input.to_string() + "»");
 
         return {accessor, input};
     }

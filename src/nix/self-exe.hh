@@ -2,6 +2,8 @@
 ///@file
 
 #include <filesystem>
+#include <optional>
+#include <string_view>
 
 namespace nix {
 
@@ -17,9 +19,9 @@ namespace nix {
  * Instead, we'll query the OS for the path to the current executable,
  * using `getSelfExe()`.
  *
- * As a last resort, we resort to `PATH`. Hopefully we find a `nix`
- * there that's compatible. If you're porting Nix to a new platform,
- * that might be good enough for a while, but you'll want to improve
+ * As a last resort, we rely on `PATH`. Hopefully we find a `nix` there
+ * that's compatible. If you're porting Nix to a new platform, that
+ * might be good enough for a while, but you'll want to improve
  * `getSelfExe()` to work on your platform.
  *
  * @param binary_name the exact binary name we're looking up. Might be

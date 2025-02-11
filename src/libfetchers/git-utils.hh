@@ -59,11 +59,19 @@ struct GitRepo
            modified or added, but excluding deleted files. */
         std::set<CanonPath> files;
 
+        /* All modified or added files. */
+        std::set<CanonPath> dirtyFiles;
+
+        /* The deleted files. */
+        std::set<CanonPath> deletedFiles;
+
         /* The submodules listed in .gitmodules of this workdir. */
         std::vector<Submodule> submodules;
     };
 
     virtual WorkdirInfo getWorkdirInfo() = 0;
+
+    static WorkdirInfo getCachedWorkdirInfo(const std::filesystem::path & path);
 
     /* Get the ref that HEAD points to. */
     virtual std::optional<std::string> getWorkdirRef() = 0;
@@ -78,7 +86,10 @@ struct GitRepo
 
     virtual bool hasObject(const Hash & oid) = 0;
 
-    virtual ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
+    virtual ref<SourceAccessor> getAccessor(
+        const Hash & rev,
+        bool exportIgnore,
+        std::string displayPrefix) = 0;
 
     virtual ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
 

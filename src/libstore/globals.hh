@@ -189,7 +189,7 @@ public:
         this, SYSTEM, "system",
         R"(
           The system type of the current Nix installation.
-          Nix will only build a given [derivation](@docroot@/language/derivations.md) locally when its `system` attribute equals any of the values specified here or in [`extra-platforms`](#conf-extra-platforms).
+          Nix will only build a given [store derivation](@docroot@/glossary.md#gloss-store-derivation) locally when its `system` attribute equals any of the values specified here or in [`extra-platforms`](#conf-extra-platforms).
 
           The default value is set when Nix itself is compiled for the system it will run on.
           The following system types are widely used, as Nix is actively supported on these platforms:
@@ -825,7 +825,7 @@ public:
         R"(
           System types of executables that can be run on this machine.
 
-          Nix will only build a given [derivation](@docroot@/language/derivations.md) locally when its `system` attribute equals any of the values specified here or in the [`system` option](#conf-system).
+          Nix will only build a given [store derivation](@docroot@/glossary.md#gloss-store-derivation) locally when its `system` attribute equals any of the values specified here or in the [`system` option](#conf-system).
 
           Setting this can be useful to build derivations locally on compatible machines:
           - `i686-linux` executables can be run on `x86_64-linux` machines (set by default)
@@ -1227,14 +1227,13 @@ public:
 
     Setting<uint64_t> warnLargePathThreshold{
         this,
-        // n.b. this is deliberately int64 max rather than uint64 max because
-        // this goes through the Nix language JSON parser and thus needs to be
-        // representable in Nix language integers.
-        std::numeric_limits<int64_t>::max(),
+        0,
         "warn-large-path-threshold",
         R"(
           Warn when copying a path larger than this number of bytes to the Nix store
           (as determined by its NAR serialisation).
+          Default is 0, which disables the warning.
+          Set it to 1 to warn on all paths.
         )"
     };
 };

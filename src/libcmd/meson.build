@@ -4,8 +4,6 @@ project('nix-cmd', 'cpp',
     'cpp_std=c++2a',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
-    'debug=true',
-    'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
   ],
   meson_version : '>= 1.1',
@@ -14,7 +12,7 @@ project('nix-cmd', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
@@ -28,9 +26,7 @@ deps_public_maybe_subproject = [
   dependency('nix-flake'),
   dependency('nix-main'),
 ]
-subdir('build-utils-meson/subprojects')
-
-subdir('build-utils-meson/threads')
+subdir('nix-meson-build-support/subprojects')
 
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
@@ -38,6 +34,8 @@ deps_public += nlohmann_json
 lowdown = dependency('lowdown', version : '>= 0.9.0', required : get_option('markdown'))
 deps_private += lowdown
 configdata.set('HAVE_LOWDOWN', lowdown.found().to_int())
+# The API changed slightly around terminal initialization.
+configdata.set('HAVE_LOWDOWN_1_4', lowdown.version().version_compare('>= 1.4.0').to_int())
 
 readline_flavor = get_option('readline-flavor')
 if readline_flavor == 'editline'
@@ -72,7 +70,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('nix-meson-build-support/common')
 
 sources = files(
   'built-path.cc',
@@ -127,4 +125,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-subdir('build-utils-meson/export')
+subdir('nix-meson-build-support/export')

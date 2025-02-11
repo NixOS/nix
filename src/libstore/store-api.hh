@@ -260,11 +260,11 @@ public:
 
     /**
      * Query the set of all valid paths. Note that for some store
-     * backends, the name part of store paths may be replaced by 'x'
-     * (i.e. you'll get /nix/store/<hash>-x rather than
-     * /nix/store/<hash>-<name>). Use queryPathInfo() to obtain the
+     * backends, the name part of store paths may be replaced by `x`
+     * (i.e. you'll get `/nix/store/<hash>-x` rather than
+     * `/nix/store/<hash>-<name>`). Use queryPathInfo() to obtain the
      * full store path. FIXME: should return a set of
-     * std::variant<StorePath, HashPart> to get rid of this hack.
+     * `std::variant<StorePath, HashPart>` to get rid of this hack.
      */
     virtual StorePathSet queryAllValidPaths()
     { unsupported("queryAllValidPaths"); }
@@ -425,7 +425,7 @@ public:
         CheckSigsFlag checkSigs = CheckSigs);
 
     virtual void addMultipleToStore(
-        PathsSource & pathsToCopy,
+        PathsSource && pathsToCopy,
         Activity & act,
         RepairFlag repair = NoRepair,
         CheckSigsFlag checkSigs = CheckSigs);
@@ -715,7 +715,7 @@ public:
 
     /**
      * Given a store path, return the realisation actually used in the realisation of this path:
-     * - If the path is a content-addressed derivation, try to resolve it
+     * - If the path is a content-addressing derivation, try to resolve it
      * - Otherwise, find one of its derivers
      */
     std::optional<StorePath> getBuildDerivationPath(const StorePath &);

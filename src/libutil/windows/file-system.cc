@@ -1,5 +1,6 @@
 #include "file-system.hh"
 
+#ifdef _WIN32
 namespace nix {
 
 Descriptor openDirectory(const std::filesystem::path & path)
@@ -15,3 +16,4 @@ Descriptor openDirectory(const std::filesystem::path & path)
 }
 
 }
+#endif

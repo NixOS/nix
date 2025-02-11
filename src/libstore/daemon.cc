@@ -90,11 +90,11 @@ struct TunnelLogger : public Logger
     {
         if (ei.level > verbosity) return;
 
-        std::stringstream oss;
+        std::ostringstream oss;
         showErrorInfo(oss, ei, false);
 
         StringSink buf;
-        buf << STDERR_NEXT << oss.str();
+        buf << STDERR_NEXT << toView(oss);
         enqueueMsg(buf.s);
     }
 
@@ -593,7 +593,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         auto drvType = drv.type();
 
-        /* Content-addressed derivations are trustless because their output paths
+        /* Content-addressing derivations are trustless because their output paths
            are verified by their content alone, so any derivation is free to
            try to produce such a path.
 

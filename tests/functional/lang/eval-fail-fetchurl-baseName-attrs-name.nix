@@ -1,1 +1,4 @@
-builtins.fetchurl { url = "https://example.com/foo.tar.gz"; name = "~wobble~"; }
+builtins.fetchurl {
+  url = "https://example.com/foo.tar.gz";
+  name = "~wobble~";
+}

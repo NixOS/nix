@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <cassert>
 #include <future>
 #include <functional>
 
@@ -21,7 +22,9 @@ public:
 
     Callback(std::function<void(std::future<T>)> fun) : fun(fun) { }
 
-    Callback(Callback && callback) : fun(std::move(callback.fun))
+    // NOTE: std::function is noexcept move-constructible since C++20.
+    Callback(Callback && callback) noexcept(std::is_nothrow_move_constructible_v<decltype(fun)>)
+        : fun(std::move(callback.fun))
     {
         auto prev = callback.done.test_and_set();
         if (prev) done.test_and_set();

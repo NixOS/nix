@@ -1,12 +1,14 @@
 error:
        … in the right operand of the update (//) operator
-         at /pwd/lang/eval-fail-recursion.nix:1:12:
-            1| let a = {} // a; in a.foo
-             |            ^
-            2|
+         at /pwd/lang/eval-fail-recursion.nix:2:11:
+            1| let
+            2|   a = { } // a;
+             |           ^
+            3| in
 
        error: infinite recursion encountered
-       at /pwd/lang/eval-fail-recursion.nix:1:15:
-            1| let a = {} // a; in a.foo
-             |               ^
-            2|
+       at /pwd/lang/eval-fail-recursion.nix:2:14:
+            1| let
+            2|   a = { } // a;
+             |              ^
+            3| in

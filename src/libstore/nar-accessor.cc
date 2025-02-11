@@ -291,7 +291,11 @@ json listNar(ref<SourceAccessor> accessor, const CanonPath & path, bool recurse)
         obj["type"] = "symlink";
         obj["target"] = accessor->readLink(path);
         break;
-    case SourceAccessor::Type::tMisc:
+    case SourceAccessor::Type::tBlock:
+    case SourceAccessor::Type::tChar:
+    case SourceAccessor::Type::tSocket:
+    case SourceAccessor::Type::tFifo:
+    case SourceAccessor::Type::tUnknown:
         assert(false); // cannot happen for NARs
     }
     return obj;

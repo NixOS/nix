@@ -90,6 +90,7 @@ DownloadFileResult downloadFile(
     /* Cache metadata for all URLs in the redirect chain. */
     for (auto & url : res.urls) {
         key.second.insert_or_assign("url", url);
+        assert(!res.urls.empty());
         infoAttrs.insert_or_assign("url", *res.urls.rbegin());
         getCache()->upsert(key, *store, infoAttrs, *storePath);
     }
@@ -104,7 +105,8 @@ DownloadFileResult downloadFile(
 
 static DownloadTarballResult downloadTarball_(
     const std::string & url,
-    const Headers & headers)
+    const Headers & headers,
+    const std::string & displayPrefix)
 {
     Cache::Key cacheKey{"tarball", {{"url", url}}};
 
@@ -117,7 +119,7 @@ static DownloadTarballResult downloadTarball_(
             .treeHash = treeHash,
             .lastModified = (time_t) getIntAttr(infoAttrs, "lastModified"),
             .immutableUrl = maybeGetStrAttr(infoAttrs, "immutableUrl"),
-            .accessor = getTarballCache()->getAccessor(treeHash, false),
+            .accessor = getTarballCache()->getAccessor(treeHash, false, displayPrefix),
         };
     };
 
@@ -370,9 +372,10 @@ struct TarballInputScheme : CurlInputScheme
     {
         auto input(_input);
 
-        auto result = downloadTarball_(getStrAttr(input.attrs, "url"), {});
-
-        result.accessor->setPathDisplay("«" + input.to_string() + "»");
+        auto result = downloadTarball_(
+            getStrAttr(input.attrs, "url"),
+            {},
+            "«" + input.to_string() + "»");
 
         if (result.immutableUrl) {
             auto immutableInput = Input::fromURL(*input.settings, *result.immutableUrl);

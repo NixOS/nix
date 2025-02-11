@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#
+
 source common.sh
 
 export NIX_TESTS_CA_BY_DEFAULT=1
@@ -12,7 +12,7 @@ drvPath2=$(nix derivation add < "$TEST_HOME"/simple.json)
 
 [[ "$drvPath" = "$drvPath2" ]]
 
-# Content-addressed derivations can be renamed.
+# Content-addressing derivations can be renamed.
 jq '.name = "foo"' < "$TEST_HOME"/simple.json > "$TEST_HOME"/foo.json
 drvPath3=$(nix derivation add --dry-run < "$TEST_HOME"/foo.json)
 # With --dry-run nothing is actually written

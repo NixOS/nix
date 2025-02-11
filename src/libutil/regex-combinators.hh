@@ -2,6 +2,8 @@
 ///@file
 
 #include <string_view>
+#include <string>
+#include <sstream>
 
 namespace nix::regex {
 
@@ -10,22 +12,23 @@ namespace nix::regex {
 
 static inline std::string either(std::string_view a, std::string_view b)
 {
-    return std::string { a } + "|" + b;
+    std::stringstream ss;
+    ss << a << "|" << b;
+    return ss.str();
 }
 
 static inline std::string group(std::string_view a)
 {
-    return std::string { "(" } + a + ")";
-}
-
-static inline std::string many(std::string_view a)
-{
-    return std::string { "(?:" } + a + ")*";
+    std::stringstream ss;
+    ss << "(" << a << ")";
+    return ss.str();
 }
 
 static inline std::string list(std::string_view a)
 {
-    return std::string { a } + many(group("," + a));
+    std::stringstream ss;
+    ss << a << "(," << a << ")*";
+    return ss.str();
 }
 
 }

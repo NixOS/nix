@@ -19,9 +19,7 @@ let
 
   root = ../.;
 
-  stdenv = if prevStdenv.isDarwin && prevStdenv.isx86_64
-    then darwinStdenv
-    else prevStdenv;
+  stdenv = if prevStdenv.isDarwin && prevStdenv.isx86_64 then darwinStdenv else prevStdenv;
 
   # Fix the following error with the default x86_64-darwin SDK:
   #
@@ -38,7 +36,14 @@ let
   # Indirection for Nixpkgs to override when package.nix files are vendored
   filesetToSource = lib.fileset.toSource;
 
-  localSourceLayer = finalAttrs: prevAttrs:
+  /**
+    Given a set of layers, create a mkDerivation-like function
+  */
+  mkPackageBuilder =
+    exts: userFn: stdenv.mkDerivation (lib.extends (lib.composeManyExtensions exts) userFn);
+
+  localSourceLayer =
+    finalAttrs: prevAttrs:
     let
       workDirPath =
         # Ideally we'd pick finalAttrs.workDir, but for now `mkDerivation` has
@@ -47,8 +52,13 @@ let
         prevAttrs.workDir;
 
       workDirSubpath = lib.path.removePrefix root workDirPath;
-      sources = assert prevAttrs.fileset._type == "fileset"; prevAttrs.fileset;
-      src = lib.fileset.toSource { fileset = sources; inherit root; };
+      sources =
+        assert prevAttrs.fileset._type == "fileset";
+        prevAttrs.fileset;
+      src = lib.fileset.toSource {
+        fileset = sources;
+        inherit root;
+      };
 
     in
     {
@@ -60,75 +70,129 @@ let
       workDir = null;
     };
 
+  mesonLayer = finalAttrs: prevAttrs: {
+    # NOTE:
+    # As of https://github.com/NixOS/nixpkgs/blob/8baf8241cea0c7b30e0b8ae73474cb3de83c1a30/pkgs/by-name/me/meson/setup-hook.sh#L26,
+    # `mesonBuildType` defaults to `plain` if not specified. We want our Nix-built binaries to be optimized by default.
+    # More on build types here: https://mesonbuild.com/Builtin-options.html#details-for-buildtype.
+    mesonBuildType = "release";
+    # NOTE:
+    # Users who are debugging Nix builds are expected to set the environment variable `mesonBuildType`, per the
+    # guidance in https://github.com/NixOS/nix/blob/8a3fc27f1b63a08ac983ee46435a56cf49ebaf4a/doc/manual/source/development/debugging.md?plain=1#L10.
+    # For this reason, we don't want to refer to `finalAttrs.mesonBuildType` here, but rather use the environment variable.
+    preConfigure =
+      prevAttrs.preConfigure or ""
+      +
+        lib.optionalString
+          (
+            !stdenv.hostPlatform.isWindows
+            # build failure
+            && !stdenv.hostPlatform.isStatic
+            # LTO breaks exception handling on x86-64-darwin.
+            && stdenv.system != "x86_64-darwin"
+          )
+          ''
+            case "$mesonBuildType" in
+            release|minsize) appendToVar mesonFlags "-Db_lto=true"  ;;
+            *)               appendToVar mesonFlags "-Db_lto=false" ;;
+            esac
+          '';
+    nativeBuildInputs = [
+      pkgs.buildPackages.meson
+      pkgs.buildPackages.ninja
+    ] ++ prevAttrs.nativeBuildInputs or [ ];
+    mesonCheckFlags = prevAttrs.mesonCheckFlags or [ ] ++ [
+      "--print-errorlogs"
+    ];
+  };
+
+  mesonBuildLayer = finalAttrs: prevAttrs: {
+    nativeBuildInputs = prevAttrs.nativeBuildInputs or [ ] ++ [
+      pkgs.buildPackages.pkg-config
+    ];
+    separateDebugInfo = !stdenv.hostPlatform.isStatic;
+    hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
+    env =
+      prevAttrs.env or { }
+      // lib.optionalAttrs (
+        stdenv.isLinux
+        && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")
+        && !(stdenv.hostPlatform.useLLVM or false)
+      ) { LDFLAGS = "-fuse-ld=gold"; };
+  };
+
+  mesonLibraryLayer = finalAttrs: prevAttrs: {
+    outputs = prevAttrs.outputs or [ "out" ] ++ [ "dev" ];
+  };
+
   # Work around weird `--as-needed` linker behavior with BSD, see
   # https://github.com/mesonbuild/meson/issues/3593
-  bsdNoLinkAsNeeded = finalAttrs: prevAttrs:
+  bsdNoLinkAsNeeded =
+    finalAttrs: prevAttrs:
     lib.optionalAttrs stdenv.hostPlatform.isBSD {
-      mesonFlags = [ (lib.mesonBool "b_asneeded" false) ] ++ prevAttrs.mesonFlags or [];
+      mesonFlags = [ (lib.mesonBool "b_asneeded" false) ] ++ prevAttrs.mesonFlags or [ ];
     };
 
-  miscGoodPractice = finalAttrs: prevAttrs:
-    {
-      strictDeps = prevAttrs.strictDeps or true;
-      enableParallelBuilding = true;
-    };
+  miscGoodPractice = finalAttrs: prevAttrs: {
+    strictDeps = prevAttrs.strictDeps or true;
+    enableParallelBuilding = true;
+  };
 in
 scope: {
   inherit stdenv;
 
-  aws-sdk-cpp = (pkgs.aws-sdk-cpp.override {
-    apis = [ "s3" "transfer" ];
-    customMemoryManagement = false;
-  }).overrideAttrs {
-    # only a stripped down version is built, which takes a lot less resources
-    # to build, so we don't need a "big-parallel" machine.
-    requiredSystemFeatures = [ ];
-  };
-
-  libseccomp = pkgs.libseccomp.overrideAttrs (_: rec {
-    version = "2.5.5";
-    src = pkgs.fetchurl {
-      url = "https://github.com/seccomp/libseccomp/releases/download/v${version}/libseccomp-${version}.tar.gz";
-      hash = "sha256-JIosik2bmFiqa69ScSw0r+/PnJ6Ut23OAsHJqiX7M3U=";
-    };
-  });
+  aws-sdk-cpp =
+    (pkgs.aws-sdk-cpp.override {
+      apis = [
+        "s3"
+        "transfer"
+      ];
+      customMemoryManagement = false;
+    }).overrideAttrs
+      {
+        # only a stripped down version is built, which takes a lot less resources
+        # to build, so we don't need a "big-parallel" machine.
+        requiredSystemFeatures = [ ];
+      };
 
   boehmgc = pkgs.boehmgc.override {
     enableLargeConfig = true;
   };
 
   # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
-  boost = (pkgs.boost.override {
-    extraB2Args = [
-      "--with-container"
-      "--with-context"
-      "--with-coroutine"
-    ];
-  }).overrideAttrs (old: {
-    # Need to remove `--with-*` to use `--with-libraries=...`
-    buildPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.buildPhase;
-    installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
-  });
+  boost =
+    (pkgs.boost.override {
+      extraB2Args = [
+        "--with-container"
+        "--with-context"
+        "--with-coroutine"
+      ];
+    }).overrideAttrs
+      (old: {
+        # Need to remove `--with-*` to use `--with-libraries=...`
+        buildPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.buildPhase;
+        installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
+      });
 
   libgit2 = pkgs.libgit2.overrideAttrs (attrs: {
-    src = inputs.libgit2;
-    version = inputs.libgit2.lastModifiedDate;
-    cmakeFlags = attrs.cmakeFlags or []
-      ++ [ "-DUSE_SSH=exec" ];
-    nativeBuildInputs = attrs.nativeBuildInputs or []
+    cmakeFlags = attrs.cmakeFlags or [ ] ++ [ "-DUSE_SSH=exec" ];
+    nativeBuildInputs =
+      attrs.nativeBuildInputs or [ ]
       # gitMinimal does not build on Windows. See packbuilder patch.
       ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
         # Needed for `git apply`; see `prePatch`
         pkgs.buildPackages.gitMinimal
       ];
     # Only `git apply` can handle git binary patches
-    prePatch = attrs.prePatch or ""
+    prePatch =
+      attrs.prePatch or ""
       + lib.optionalString (!stdenv.hostPlatform.isWindows) ''
         patch() {
           git apply
         }
       '';
-    patches = attrs.patches or []
+    patches =
+      attrs.patches or [ ]
       ++ [
         ./patches/libgit2-mempack-thin-packfile.patch
       ]
@@ -140,46 +204,26 @@ scope: {
       ];
   });
 
-  busybox-sandbox-shell = pkgs.busybox-sandbox-shell or (pkgs.busybox.override {
-    useMusl = true;
-    enableStatic = true;
-    enableMinimal = true;
-    extraConfig = ''
-      CONFIG_FEATURE_FANCY_ECHO y
-      CONFIG_FEATURE_SH_MATH y
-      CONFIG_FEATURE_SH_MATH_64 y
-
-      CONFIG_ASH y
-      CONFIG_ASH_OPTIMIZE_FOR_SIZE y
-
-      CONFIG_ASH_ALIAS y
-      CONFIG_ASH_BASH_COMPAT y
-      CONFIG_ASH_CMDCMD y
-      CONFIG_ASH_ECHO y
-      CONFIG_ASH_GETOPTS y
-      CONFIG_ASH_INTERNAL_GLOB y
-      CONFIG_ASH_JOB_CONTROL y
-      CONFIG_ASH_PRINTF y
-      CONFIG_ASH_TEST y
-    '';
-  });
-
-  # TODO change in Nixpkgs, Windows works fine. First commit of
-  # https://github.com/NixOS/nixpkgs/pull/322977 backported will fix.
-  toml11 = pkgs.toml11.overrideAttrs (old: {
-    meta.platforms = lib.platforms.all;
-  });
-
   inherit resolvePath filesetToSource;
 
-  mkMesonDerivation = f: let
-    exts = [
-      miscGoodPractice
-      bsdNoLinkAsNeeded
-      localSourceLayer
-    ];
-  in stdenv.mkDerivation
-   (lib.extends
-     (lib.foldr lib.composeExtensions (_: _: {}) exts)
-     f);
+  mkMesonDerivation = mkPackageBuilder [
+    miscGoodPractice
+    localSourceLayer
+    mesonLayer
+  ];
+  mkMesonExecutable = mkPackageBuilder [
+    miscGoodPractice
+    bsdNoLinkAsNeeded
+    localSourceLayer
+    mesonLayer
+    mesonBuildLayer
+  ];
+  mkMesonLibrary = mkPackageBuilder [
+    miscGoodPractice
+    bsdNoLinkAsNeeded
+    localSourceLayer
+    mesonLayer
+    mesonBuildLayer
+    mesonLibraryLayer
+  ];
 }
