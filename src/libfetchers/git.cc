@@ -637,7 +637,7 @@ struct GitInputScheme : InputScheme
                     if (!input.getRev())
                         setWriteTime(localRefFile, now, now);
                 } catch (Error & e) {
-                    warn("could not update mtime for file '%s': %s", localRefFile, e.info().msg);
+                    warn("could not update mtime for file %s: %s", localRefFile, e.info().msg);
                 }
                 if (!originalRef && !storeCachedHead(repoUrl.to_string(), ref))
                     warn("could not update cached head '%s' for '%s'", ref, repoInfo.locationToArg());
