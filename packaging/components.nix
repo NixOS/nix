@@ -36,8 +36,18 @@ in
   # Will replace `nix` once the old build system is gone.
   nix-ng = callPackage ../src/nix/package.nix { };
 
+<<<<<<< HEAD
   nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { };
   nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { };
+=======
+  nix-functional-tests = callPackage ../tests/functional/package.nix {
+    version = fineVersion;
+  };
+
+  nix-manual = callPackage ../doc/manual/package.nix { version = fineVersion; };
+  nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { version = fineVersion; };
+  nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { version = fineVersion; };
+>>>>>>> 2e20a5f82 (Don't import a symlink)
 
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
 }
