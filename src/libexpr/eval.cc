@@ -2400,7 +2400,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
         : [&]() {
             auto dstPath = fetchToStore(
                 *store,
-                path.resolveSymlinks(),
+                path.resolveSymlinks(SymlinkResolution::Ancestors),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
                 path.baseName(),
                 ContentAddressMethod::Raw::NixArchive,
