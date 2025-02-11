@@ -35,6 +35,10 @@
 #include <sys/sysctl.h>
 #endif
 
+#ifdef __linux__
+#include <sys/auxv.h>
+#endif
+
 #include "strings.hh"
 
 namespace nix {
@@ -194,6 +198,16 @@ StringSet Settings::getDefaultSystemFeatures()
     if (hasVirt())
         features.insert("apple-virt");
     #endif
+
+    #if __linux__
+    unsigned long pgsize = getauxval(AT_PAGESZ);
+    #else
+    unsigned long pgsize = getpagesize();
+    #endif
+
+    for (; pgsize <= (64 * 1024); pgsize *= 2) {
+        features.insert(fmt("pages-%1%k", pgsize / 1024));
+    }
 
     return features;
 }
