@@ -52,7 +52,8 @@ static std::string getLfsApiToken(const ParsedURL & url)
     if (output.empty())
         throw Error(
             "git-lfs-authenticate: no output (cmd: ssh %s git-lfs-authenticate %s download)",
-            url.authority.value_or(""), url.path);
+            url.authority.value_or(""),
+            url.path);
 
     auto queryResp = nlohmann::json::parse(output);
     if (!queryResp.contains("header"))
@@ -237,8 +238,8 @@ void Fetch::fetch(
     }
 
     Path cacheDir = getCacheDir() + "/git-lfs";
-    std::string key =
-        hashString(HashAlgorithm::SHA256, pointerFilePath.rel()).to_string(HashFormat::Base16, false) + "/" + pointer->oid;
+    std::string key = hashString(HashAlgorithm::SHA256, pointerFilePath.rel()).to_string(HashFormat::Base16, false)
+                      + "/" + pointer->oid;
     Path cachePath = cacheDir + "/" + key;
     if (pathExists(cachePath)) {
         debug("using cache entry %s -> %s", key, cachePath);
