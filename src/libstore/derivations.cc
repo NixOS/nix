@@ -843,16 +843,6 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
         };
     }
 
-    if (type.isImpure()) {
-        std::map<std::string, Hash> outputHashes;
-        for (const auto & [outputName, _] : drv.outputs)
-            outputHashes.insert_or_assign(outputName, impureOutputHash);
-        return DrvHash {
-            .hashes = outputHashes,
-            .kind = DrvHash::Kind::Deferred,
-        };
-    }
-
     auto kind = std::visit(overloaded {
         [](const DerivationType::InputAddressed & ia) {
             /* This might be a "pesimistically" deferred output, so we don't
@@ -865,7 +855,7 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
                 : DrvHash::Kind::Deferred;
         },
         [](const DerivationType::Impure &) -> DrvHash::Kind {
-            assert(false);
+            return DrvHash::Kind::Deferred;
         }
     }, drv.type().raw);
 
