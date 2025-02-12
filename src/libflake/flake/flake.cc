@@ -554,12 +554,18 @@ LockedFlake lockFlake(
 
                     /* Get the input flake, resolve 'path:./...'
                        flakerefs relative to the parent flake. */
-                    auto getInputFlake = [&]()
+                    auto getInputFlake = [&](const FlakeRef & ref)
                     {
                         if (auto resolvedPath = resolveRelativePath()) {
+<<<<<<< HEAD
                             return readFlake(state, *input.ref, *input.ref, *input.ref, *resolvedPath, inputPath);
                         } else {
                             return getFlake(state, *input.ref, useRegistries, flakeCache, inputPath);
+=======
+                            return readFlake(state, ref, ref, ref, *resolvedPath, inputAttrPath);
+                        } else {
+                            return getFlake(state, ref, useRegistries, flakeCache, inputAttrPath);
+>>>>>>> 5c552b62f (lockFlake(): When refetching a locked flake, use the locked ref)
                         }
                     };
 
@@ -640,7 +646,7 @@ LockedFlake lockFlake(
                         }
 
                         if (mustRefetch) {
-                            auto inputFlake = getInputFlake();
+                            auto inputFlake = getInputFlake(oldLock->lockedRef);
                             nodePaths.emplace(childNode, inputFlake.path.parent());
                             computeLocks(inputFlake.inputs, childNode, inputPath, oldLock, followsPrefix,
                                 inputFlake.path, false);
@@ -668,7 +674,7 @@ LockedFlake lockFlake(
                         auto ref = (input2.ref && explicitCliOverrides.contains(inputPath)) ? *input2.ref : *input.ref;
 
                         if (input.isFlake) {
-                            auto inputFlake = getInputFlake();
+                            auto inputFlake = getInputFlake(*input.ref);
 
                             auto childNode = make_ref<LockedNode>(
                                 inputFlake.lockedRef,
