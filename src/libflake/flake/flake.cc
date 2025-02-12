@@ -625,12 +625,12 @@ LockedFlake lockFlake(
 
                     /* Get the input flake, resolve 'path:./...'
                        flakerefs relative to the parent flake. */
-                    auto getInputFlake = [&]()
+                    auto getInputFlake = [&](const FlakeRef & ref)
                     {
                         if (auto resolvedPath = resolveRelativePath()) {
-                            return readFlake(state, *input.ref, *input.ref, *input.ref, *resolvedPath, inputAttrPath);
+                            return readFlake(state, ref, ref, ref, *resolvedPath, inputAttrPath);
                         } else {
-                            return getFlake(state, *input.ref, useRegistries, flakeCache, inputAttrPath);
+                            return getFlake(state, ref, useRegistries, flakeCache, inputAttrPath);
                         }
                     };
 
@@ -711,7 +711,7 @@ LockedFlake lockFlake(
                         }
 
                         if (mustRefetch) {
-                            auto inputFlake = getInputFlake();
+                            auto inputFlake = getInputFlake(oldLock->lockedRef);
                             nodePaths.emplace(childNode, inputFlake.path.parent());
                             computeLocks(inputFlake.inputs, childNode, inputAttrPath, oldLock, followsPrefix,
                                 inputFlake.path, false);
@@ -739,7 +739,7 @@ LockedFlake lockFlake(
                         auto ref = (input2.ref && explicitCliOverrides.contains(inputAttrPath)) ? *input2.ref : *input.ref;
 
                         if (input.isFlake) {
-                            auto inputFlake = getInputFlake();
+                            auto inputFlake = getInputFlake(*input.ref);
 
                             auto childNode = make_ref<LockedNode>(
                                 inputFlake.lockedRef,
