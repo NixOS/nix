@@ -60,7 +60,7 @@ in
 
   nix-cli = callPackage ../src/nix/package.nix { version = fineVersion; };
 
-  nix-functional-tests = callPackage ../src/nix-functional-tests/package.nix {
+  nix-functional-tests = callPackage ../tests/functional/package.nix {
     version = fineVersion;
   };
 
