@@ -557,15 +557,9 @@ LockedFlake lockFlake(
                     auto getInputFlake = [&](const FlakeRef & ref)
                     {
                         if (auto resolvedPath = resolveRelativePath()) {
-<<<<<<< HEAD
-                            return readFlake(state, *input.ref, *input.ref, *input.ref, *resolvedPath, inputPath);
+                            return readFlake(state, ref, ref, ref, *resolvedPath, inputPath);
                         } else {
-                            return getFlake(state, *input.ref, useRegistries, flakeCache, inputPath);
-=======
-                            return readFlake(state, ref, ref, ref, *resolvedPath, inputAttrPath);
-                        } else {
-                            return getFlake(state, ref, useRegistries, flakeCache, inputAttrPath);
->>>>>>> 5c552b62f (lockFlake(): When refetching a locked flake, use the locked ref)
+                            return getFlake(state, ref, useRegistries, flakeCache, inputPath);
                         }
                     };
 
