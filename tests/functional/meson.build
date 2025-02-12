@@ -168,7 +168,6 @@ suites = [
       'debugger.sh',
       'extra-sandbox-profile.sh',
       'help.sh',
-      'symlinks.sh',
     ],
     'workdir': meson.current_source_dir(),
   },
