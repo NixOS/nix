@@ -172,6 +172,7 @@ struct GitArchiveInputScheme : InputScheme
         return input;
     }
 
+    // Search for the longest possible match starting from the begining and ending at either the end or a path segment.
     std::optional<std::string> getAccessToken(const fetchers::Settings & settings, const std::string & host, const std::string & url) const override
     {
         auto tokens = settings.accessTokens.get();
