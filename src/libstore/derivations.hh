@@ -9,8 +9,11 @@
 #include "derived-path-map.hh"
 #include "sync.hh"
 #include "variant-wrapper.hh"
+#include "derivation-options.hh"
+#include "parsed-derivations.hh"
 
 #include <map>
+#include <optional>
 #include <variant>
 
 namespace nix {
@@ -296,6 +299,10 @@ struct BasicDerivation
     Strings args;
     StringPairs env;
     std::string name;
+
+    std::optional<StructuredAttrs> structuredAttrs;
+
+    DerivationOptions options;
 
     BasicDerivation() = default;
     BasicDerivation(BasicDerivation &&) = default;

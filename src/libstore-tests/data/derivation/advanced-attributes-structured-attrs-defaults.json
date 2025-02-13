@@ -12,6 +12,21 @@
   "inputDrvs": {},
   "inputSrcs": [],
   "name": "advanced-attributes-structured-attrs-defaults",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "outputChecks": {
+      "perOutput": {}
+    },
+    "passAsFile": [],
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": [],
+    "unsafeDiscardReferences": {}
+  },
   "outputs": {
     "dev": {
       "path": "/nix/store/8bazivnbipbyi569623skw5zm91z6kc2-advanced-attributes-structured-attrs-defaults-dev"
@@ -19,6 +34,15 @@
     "out": {
       "path": "/nix/store/f8f8nvnx32bxvyxyx2ff7akbvwhwd9dw-advanced-attributes-structured-attrs-defaults"
     }
+  },
+  "structureAttrs": {
+    "builder": "/bin/bash",
+    "name": "advanced-attributes-structured-attrs-defaults",
+    "outputs": [
+      "out",
+      "dev"
+    ],
+    "system": "my-system"
   },
   "system": "my-system"
 }

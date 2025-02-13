@@ -1,9 +1,13 @@
 #include "derivations.hh"
+#include "derivation-options.hh"
 #include "downstream-placeholder.hh"
+#include "error.hh"
+#include "json-utils.hh"
 #include "store-api.hh"
 #include "globals.hh"
 #include "types.hh"
 #include "util.hh"
+#include "parsed-derivations.hh"
 #include "split.hh"
 #include "common-protocol.hh"
 #include "common-protocol-impl.hh"
@@ -462,6 +466,14 @@ Derivation parseDerivation(
     }
 
     expect(str, ")");
+
+    drv.structuredAttrs = StructuredAttrs::tryParse(drv.env);
+
+    drv.options = DerivationOptions::fromStructuredAttrs(
+        store,
+        drv.env,
+        drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
+
     return drv;
 }
 
@@ -647,6 +659,21 @@ std::string Derivation::unparse(const StoreDirConfig & store, bool maskOutputs,
     s += ','; printUnquotedString(s, platform);
     s += ','; printString(s, builder);
     s += ','; printStrings(s, args.begin(), args.end());
+
+    auto structuredAttrsFromEnv = StructuredAttrs::tryParse(env);
+
+    if (structuredAttrsFromEnv != structuredAttrs)
+        throw Error(
+            "'drv.structuredAttrs' and 'drv.env' are out of sync. This is probably an internal error, please open an issue!");
+
+    auto optionsFromEnv = DerivationOptions::fromStructuredAttrs(
+            store,
+            env,
+            structuredAttrs ? &*structuredAttrs : nullptr);
+
+    if (optionsFromEnv != options)
+        throw Error(
+            "'drv.options' and 'drv.env' are out of sync. This is probably an internal error, please open an issue!");
 
     s += ",[";
     first = true;
@@ -953,6 +980,13 @@ Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivati
         auto value = readString(in);
         drv.env[key] = value;
     }
+
+    drv.structuredAttrs = StructuredAttrs::tryParse(drv.env);
+
+    drv.options = DerivationOptions::fromStructuredAttrs(
+        store,
+        drv.env,
+        drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
 
     return in;
 }
@@ -1346,6 +1380,8 @@ nlohmann::json Derivation::toJSON(const StoreDirConfig & store) const
     res["builder"] = builder;
     res["args"] = args;
     res["env"] = env;
+    res["structureAttrs"] = structuredAttrs;
+    res["options"] = options;
 
     return res;
 }
@@ -1403,10 +1439,13 @@ Derivation Derivation::fromJSON(
         throw;
     }
 
+    auto options = valueAt(json, "options");
+
     res.platform = getString(valueAt(json, "system"));
     res.builder = getString(valueAt(json, "builder"));
     res.args = getStringList(valueAt(json, "args"));
     res.env = getStringMap(valueAt(json, "env"));
+    res.options = options.get<DerivationOptions>();
 
     return res;
 }

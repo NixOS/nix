@@ -226,6 +226,7 @@ Derivation makeSimpleDrv(const Store & store) {
             "WOLF",
         },
     };
+
     return drv;
 }
 
@@ -284,6 +285,7 @@ Derivation makeDynDepDerivation(const Store & store) {
             "WOLF",
         },
     };
+
     return drv;
 }
 

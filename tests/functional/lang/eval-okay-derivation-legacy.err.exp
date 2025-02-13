@@ -4,3 +4,9 @@ warning: In a derivation named 'eval-okay-derivation-legacy', 'structuredAttrs' 
 warning: In a derivation named 'eval-okay-derivation-legacy', 'structuredAttrs' disables the effect of the derivation attribute 'disallowedRequisites'; use 'outputChecks.<output>.disallowedRequisites' instead
 warning: In a derivation named 'eval-okay-derivation-legacy', 'structuredAttrs' disables the effect of the derivation attribute 'maxClosureSize'; use 'outputChecks.<output>.maxClosureSize' instead
 warning: In a derivation named 'eval-okay-derivation-legacy', 'structuredAttrs' disables the effect of the derivation attribute 'maxSize'; use 'outputChecks.<output>.maxSize' instead
+warning: 'structuredAttrs' disables the effect of the top-level attribute 'allowedReferences'; use 'outputChecks' instead
+warning: 'structuredAttrs' disables the effect of the top-level attribute 'allowedRequisites'; use 'outputChecks' instead
+warning: 'structuredAttrs' disables the effect of the top-level attribute 'disallowedRequisites'; use 'outputChecks' instead
+warning: 'structuredAttrs' disables the effect of the top-level attribute 'disallowedReferences'; use 'outputChecks' instead
+warning: 'structuredAttrs' disables the effect of the top-level attribute 'maxSize'; use 'outputChecks' instead
+warning: 'structuredAttrs' disables the effect of the top-level attribute 'maxClosureSize'; use 'outputChecks' instead

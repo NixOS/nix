@@ -1391,7 +1391,6 @@ static void derivationStrictInternal(
                     else if (i->name == state.sOutputs)
                         handleOutputs(tokenizeString<Strings>(s));
                 }
-
             }
 
         } catch (Error & e) {
@@ -1458,6 +1457,13 @@ static void derivationStrictInternal(
             drvExtension
         ).atPos(v).debugThrow();
     }
+
+    drv.structuredAttrs = StructuredAttrs::tryParse(drv.env);
+
+    drv.options = DerivationOptions::fromStructuredAttrs(
+        *state.store,
+        drv.env,
+        drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
 
     if (outputHash) {
         /* Handle fixed-output derivations.
