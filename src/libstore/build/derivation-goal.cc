@@ -185,41 +185,44 @@ Goal::Co DerivationGoal::haveDerivation()
     if (!drv->type().hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
 
-    if (drv->type().isImpure()) {
-        experimentalFeatureSettings.require(Xp::ImpureDerivations);
-
-        for (auto & [outputName, output] : drv->outputs) {
-            auto randomPath = StorePath::random(outputPathName(drv->name, outputName));
-            assert(!worker.store.isValidPath(randomPath));
-            initialOutputs.insert({
-                outputName,
-                InitialOutput {
-                    .wanted = true,
-                    .outputHash = impureOutputHash,
-                    .known = InitialOutputStatus {
-                        .path = randomPath,
-                        .status = PathStatus::Absent
-                    }
-                }
-            });
-        }
-
-        co_return gaveUpOnSubstitution();
-    }
-
     for (auto & i : drv->outputsAndOptPaths(worker.store))
         if (i.second.second)
             worker.store.addTempRoot(*i.second.second);
 
-    auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
-    for (auto & [outputName, outputHash] : outputHashes)
-        initialOutputs.insert({
-            outputName,
-            InitialOutput {
+    {
+        bool impure = drv->type().isImpure();
+
+        if (impure) experimentalFeatureSettings.require(Xp::ImpureDerivations);
+
+        auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
+        for (auto & [outputName, outputHash] : outputHashes) {
+            InitialOutput v{
                 .wanted = true, // Will be refined later
                 .outputHash = outputHash
+            };
+
+            /* TODO we might want to also allow randomizing the paths
+               for regular CA derivations, e.g. for sake of checking
+               determinism. */
+            if (impure) {
+                v.known = InitialOutputStatus {
+                    .path = StorePath::random(outputPathName(drv->name, outputName)),
+                    .status = PathStatus::Absent,
+                };
             }
-        });
+
+            initialOutputs.insert({
+                outputName,
+                std::move(v),
+            });
+        }
+
+        if (impure) {
+            /* We don't yet have any safe way to cache an impure derivation at
+               this step. */
+            co_return gaveUpOnSubstitution();
+        }
+    }
 
     {
         /* Check what outputs paths are not already valid. */
