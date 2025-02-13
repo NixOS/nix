@@ -1,7 +1,6 @@
 #include <fcntl.h>
 
 #include "error.hh"
-#include "config-global.hh"
 #include "fs-sink.hh"
 
 #if _WIN32
@@ -60,15 +59,7 @@ void copyRecursive(
 }
 
 
-struct RestoreSinkSettings : Config
-{
-    Setting<bool> preallocateContents{this, false, "preallocate-contents",
-        "Whether to preallocate files when writing objects with known size."};
-};
-
-static RestoreSinkSettings restoreSinkSettings;
-
-static GlobalConfig::Register r1(&restoreSinkSettings);
+RestoreSinkSettings<config::JustValue> restoreSinkSettings;
 
 static std::filesystem::path append(const std::filesystem::path & src, const CanonPath & path)
 {

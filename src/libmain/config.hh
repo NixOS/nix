@@ -180,12 +180,11 @@ public:
     const std::string name;
     const std::string description;
     const std::set<std::string> aliases;
+    std::optional<ExperimentalFeature> experimentalFeature;
 
     int created = 123;
 
     bool overridden = false;
-
-    std::optional<ExperimentalFeature> experimentalFeature;
 
 protected:
 
@@ -259,10 +258,6 @@ public:
         , documentDefault(documentDefault)
     { }
 
-    operator const T &() const { return value; }
-    operator T &() { return value; }
-    const T & get() const { return value; }
-    T & get() { return value; }
     template<typename U>
     bool operator ==(const U & v2) const { return value == v2; }
     template<typename U>

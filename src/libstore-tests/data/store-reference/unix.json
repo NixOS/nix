@@ -1,0 +1,6 @@
+{
+  "authority": "",
+  "max-connections": 7,
+  "scheme": "unix",
+  "trusted": true
+}

@@ -59,7 +59,10 @@ add_project_arguments(
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'args.cc',
   'common-args.cc',
+  'config.cc',
+  'config-global.hh',
   'loggers.cc',
   'plugin.cc',
   'progress-bar.cc',
@@ -75,7 +78,12 @@ endif
 include_dirs = [include_directories('.')]
 
 headers = [config_h] + files(
+  'abstract-setting-to-json.hh',
+  'args.hh',
+  'args/root.hh',
   'common-args.hh',
+  'config-impl.hh',
+  'config.hh',
   'loggers.hh',
   'plugin.hh',
   'progress-bar.hh',

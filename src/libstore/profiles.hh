@@ -86,7 +86,7 @@ typedef std::list<Generation> Generations;
  */
 std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path profile);
 
-class LocalFSStore;
+struct LocalFSStore;
 
 /**
  * Create a new generation of the given profile
