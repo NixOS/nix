@@ -1,0 +1,10 @@
+{
+  "drvPath": {
+    "drvPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv",
+    "output": "bar"
+  },
+  "outputs": [
+    "baz",
+    "quux"
+  ]
+}

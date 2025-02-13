@@ -8,11 +8,79 @@
 
 using namespace nix;
 
+/* This serialization code is diferent from the canonical (single)
+   derived path serialization because:
+
+   - It looks up output paths where possible
+
+   - It includes the store dir in store paths
+
+   We might want to replace it with the canonical format at some point,
+   but that would be a breaking change (to a still-experimental but
+   widely-used command, so that isn't being done at this time just yet.
+ */
+
+static nlohmann::json toJSON(Store & store, const SingleDerivedPath::Opaque & o)
+{
+    return store.printStorePath(o.path);
+}
+
+static nlohmann::json toJSON(Store & store, const SingleDerivedPath & sdp);
+static nlohmann::json toJSON(Store & store, const DerivedPath & dp);
+
+static nlohmann::json toJSON(Store & store, const SingleDerivedPath::Built & sdpb)
+{
+    nlohmann::json res;
+    res["drvPath"] = toJSON(store, *sdpb.drvPath);
+    // Fallback for the input-addressed derivation case: We expect to always be
+    // able to print the output paths, so let’s do it
+    // FIXME try-resolve on drvPath
+    const auto outputMap = store.queryPartialDerivationOutputMap(resolveDerivedPath(store, *sdpb.drvPath));
+    res["output"] = sdpb.output;
+    auto outputPathIter = outputMap.find(sdpb.output);
+    if (outputPathIter == outputMap.end())
+        res["outputPath"] = nullptr;
+    else if (std::optional p = outputPathIter->second)
+        res["outputPath"] = store.printStorePath(*p);
+    else
+        res["outputPath"] = nullptr;
+    return res;
+}
+
+static nlohmann::json toJSON(Store & store, const DerivedPath::Built & dpb)
+{
+    nlohmann::json res;
+    res["drvPath"] = toJSON(store, *dpb.drvPath);
+    // Fallback for the input-addressed derivation case: We expect to always be
+    // able to print the output paths, so let’s do it
+    // FIXME try-resolve on drvPath
+    const auto outputMap = store.queryPartialDerivationOutputMap(resolveDerivedPath(store, *dpb.drvPath));
+    for (const auto & [output, outputPathOpt] : outputMap) {
+        if (!dpb.outputs.contains(output))
+            continue;
+        if (outputPathOpt)
+            res["outputs"][output] = store.printStorePath(*outputPathOpt);
+        else
+            res["outputs"][output] = nullptr;
+    }
+    return res;
+}
+
+static nlohmann::json toJSON(Store & store, const SingleDerivedPath & sdp)
+{
+    return std::visit([&](const auto & buildable) { return toJSON(store, buildable); }, sdp.raw());
+}
+
+static nlohmann::json toJSON(Store & store, const DerivedPath & dp)
+{
+    return std::visit([&](const auto & buildable) { return toJSON(store, buildable); }, dp.raw());
+}
+
 static nlohmann::json derivedPathsToJSON(const DerivedPaths & paths, Store & store)
 {
     auto res = nlohmann::json::array();
     for (auto & t : paths) {
-        res.push_back(t.toJSON(store));
+        res.push_back(toJSON(store, t));
     }
     return res;
 }
