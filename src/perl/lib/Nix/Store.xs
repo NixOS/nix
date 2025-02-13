@@ -40,7 +40,7 @@ O_OBJECT
     }
     else {
         warn( \"${Package}::$func_name() -- \"
-		\"$var not a blessed SV reference\");
+        \"$var not a blessed SV reference\");
         XSRETURN_UNDEF;
     }
 HERE
@@ -162,12 +162,15 @@ StoreWrapper::queryPathInfo(char * path, int base32)
         }
 
 SV *
-StoreWrapper::queryRawRealisation(char * outputId)
+StoreWrapper::queryRawRealisation(char * drvPath, char * outputName)
     PPCODE:
       try {
-        auto realisation = THIS->store->queryRealisation(DrvOutput::parse(outputId));
+        auto realisation = THIS->store->queryRealisation(DrvOutput{
+            .drvPath = THIS->store->parseStorePath(drvPath),
+            .outputName = outputName,
+        });
         if (realisation)
-            XPUSHs(sv_2mortal(newSVpv(realisation->toJSON().dump().c_str(), 0)));
+            XPUSHs(sv_2mortal(newSVpv(realisation->toJSON(*THIS->store).dump().c_str(), 0)));
         else
             XPUSHs(sv_2mortal(newSVpv("", 0)));
       } catch (Error & e) {

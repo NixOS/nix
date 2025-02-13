@@ -35,11 +35,13 @@ public:
         RepairFlag repair = NoRepair,
         std::optional<ContentAddress> ca = std::nullopt);
 
-    typedef void (DrvOutputSubstitutionGoal::*GoalState)();
-    GoalState state;
+    /**
+     * The realisation corresponding to the given output id.
+     * Will be filled once we can get it.
+     */
+    std::shared_ptr<const UnkeyedRealisation> outputInfo;
 
     Co init();
-    Co realisationFetched(Goals waitees, std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub);
 
     void timedOut(Error && ex) override
     {
