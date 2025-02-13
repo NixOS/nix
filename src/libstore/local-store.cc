@@ -358,14 +358,14 @@ LocalStore::LocalStore(ref<const Config> config)
         state->stmts->RegisterRealisedOutput.create(
             state->db,
             R"(
-                insert into Realisations (drvPath, outputName, outputPath, signatures)
+                insert into BuildTrace (drvPath, outputName, outputPath, signatures)
                 values (?, ?, (select id from ValidPaths where path = ?), ?)
                 ;
             )");
         state->stmts->UpdateRealisedOutput.create(
             state->db,
             R"(
-                update Realisations
+                update BuildTrace
                     set signatures = ?
                 where
                     drvPath = ? and
@@ -375,16 +375,16 @@ LocalStore::LocalStore(ref<const Config> config)
         state->stmts->QueryRealisedOutput.create(
             state->db,
             R"(
-                select Realisations.id, Output.path, Realisations.signatures from Realisations
-                    inner join ValidPaths as Output on Output.id = Realisations.outputPath
+                select BuildTrace.id, Output.path, BuildTrace.signatures from BuildTrace
+                    inner join ValidPaths as Output on Output.id = BuildTrace.outputPath
                     where drvPath = ? and outputName = ?
                     ;
             )");
         state->stmts->QueryAllRealisedOutputs.create(
             state->db,
             R"(
-                select outputName, Output.path from Realisations
-                    inner join ValidPaths as Output on Output.id = Realisations.outputPath
+                select outputName, Output.path from BuildTrace
+                    inner join ValidPaths as Output on Output.id = BuildTrace.outputPath
                     where drvPath = ?
                     ;
             )");
@@ -582,7 +582,7 @@ void LocalStore::upgradeDBSchema(State & state)
     if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
         if (!schemaMigrations.contains("20220326-ca-derivations")) {
             /* Freshly enabling this extension: use current schema and
-               mark both migrations as done. */
+               mark all migrations as done. */
             constexpr static const char schema[] =
 #include "ca-specific-schema.sql.gen.hh"
                 ;
@@ -596,8 +596,11 @@ void LocalStore::upgradeDBSchema(State & state)
                 {
                     "20220326-ca-derivations",
                     "20251013-remove-realisations-refs",
+                    "20251213-realisations-use-drvPath",
                 });
-        } else if (!schemaMigrations.contains("20251013-remove-realisations-refs")) {
+        } else if (schemaMigrations.contains("20251213-realisations-use-drvPath")) {
+            /* Up to date, do nothing */
+        } else {
             /* CA drvs previously enabled with old schema. */
             throw Error(
                 "Migrating the database schema for the '%s' experimental feature is not yet supported.\n\n"
@@ -649,7 +652,7 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                 auto combinedSignatures = oldR->signatures;
                 combinedSignatures.insert(info.signatures.begin(), info.signatures.end());
                 state->stmts->UpdateRealisedOutput
-                    .use()(concatStringsSep(" ", combinedSignatures))(info.id.strHash())(info.id.outputName)
+                    .use()(concatStringsSep(" ", combinedSignatures))(info.id.drvPath.to_string())(info.id.outputName)
                     .exec();
             } else {
                 throw Error(
@@ -663,7 +666,7 @@ void LocalStore::registerDrvOutput(const Realisation & info)
             }
         } else {
             state->stmts->RegisterRealisedOutput
-                .use()(info.id.strHash())(info.id.outputName)(printStorePath(info.outPath))(
+                .use()(info.id.drvPath.to_string())(info.id.outputName)(printStorePath(info.outPath))(
                     concatStringsSep(" ", info.signatures))
                 .exec();
         }
@@ -1578,7 +1581,7 @@ void LocalStore::addSignatures(const StorePath & storePath, const StringSet & si
 std::optional<std::pair<int64_t, UnkeyedRealisation>>
 LocalStore::queryRealisationCore_(LocalStore::State & state, const DrvOutput & id)
 {
-    auto useQueryRealisedOutput(state.stmts->QueryRealisedOutput.use()(id.strHash())(id.outputName));
+    auto useQueryRealisedOutput(state.stmts->QueryRealisedOutput.use()(id.drvPath.to_string())(id.outputName));
     if (!useQueryRealisedOutput.next())
         return std::nullopt;
     auto realisationDbId = useQueryRealisedOutput.getInt(0);

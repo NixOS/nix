@@ -84,8 +84,13 @@ protected:
 
     /**
      * The prefix under which realisation infos will be stored
+     *
+     * @note The previous (still experimental, though) hash-keyed
+     * realisations were under "realisations". "build trace" is a better
+     * name anyways (issue #11895), and this serves as some light
+     * versioning.
      */
-    constexpr const static std::string realisationsPrefix = "realisations";
+    constexpr const static std::string realisationsPrefix = "build-trace";
 
     constexpr const static std::string cacheInfoFile = "nix-cache-info";
 
@@ -94,7 +99,7 @@ protected:
     /**
      * Compute the path to the given realisation
      *
-     * It's `${realisationsPrefix}/${drvOutput}.doi`.
+     * It's `${realisationsPrefix}/${drvPath}/${outputName}`.
      */
     std::string makeRealisationPath(const DrvOutput & id);
 
