@@ -2,7 +2,16 @@
 -- Won't be loaded unless the experimental feature `ca-derivations`
 -- is enabled
 
-create table if not exists Realisations (
+-- Why the `*V<N>` tables
+--
+-- We are trying to keep different versions of the experiment to have
+-- completely independent extra schemas from one another. This will
+-- enable people to switch between versions of the experiment (including
+-- newer to older) without migrating between them, but at the cost
+-- of having many abandoned tables lying around. Closer to the end of
+-- the experiment, we'll provide guidance on how to clean this up.
+
+create table if not exists BuildTraceV2 (
     id integer primary key autoincrement not null,
     drvPath text not null,
     outputName text not null, -- symbolic output id, usually "out"
@@ -11,31 +20,4 @@ create table if not exists Realisations (
     foreign key (outputPath) references ValidPaths(id) on delete cascade
 );
 
-create index if not exists IndexRealisations on Realisations(drvPath, outputName);
-
--- We can end-up in a weird edge-case where a path depends on itself because
--- it’s an output of a CA derivation, that happens to be the same as one of its
--- dependencies.
--- In that case we have a dependency loop (path -> realisation1 -> realisation2
--- -> path) that we need to break by removing the dependencies between the
--- realisations
-create trigger if not exists DeleteSelfRefsViaRealisations before delete on ValidPaths
-  begin
-    delete from RealisationsRefs where realisationReference in (
-      select id from Realisations where outputPath = old.id
-    );
-  end;
-
-create table if not exists RealisationsRefs (
-    referrer integer not null,
-    realisationReference integer,
-    foreign key (referrer) references Realisations(id) on delete cascade,
-    foreign key (realisationReference) references Realisations(id) on delete restrict
-);
--- used by deletion trigger
-create index if not exists IndexRealisationsRefsRealisationReference on RealisationsRefs(realisationReference);
-
--- used by QueryRealisationReferences
-create index if not exists IndexRealisationsRefs on RealisationsRefs(referrer);
--- used by cascade deletion when ValidPaths is deleted
-create index if not exists IndexRealisationsRefsOnOutputPath on Realisations(outputPath);
+create index if not exists IndexBuildTraceV2 on BuildTraceV2(drvPath, outputName);
