@@ -608,7 +608,7 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
         auto conn(getConnection());
 
         if (GET_PROTOCOL_MINOR(conn->protoVersion) < 27) {
-            warn("the daemon is too old to support content-addressed derivations, please upgrade it to 2.4");
+            warn("the daemon is too old to support content-addressing derivations, please upgrade it to 2.4");
             return callback(nullptr);
         }
 

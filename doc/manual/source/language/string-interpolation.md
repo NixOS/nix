@@ -22,9 +22,9 @@ Rather than writing
 "--with-freetype2-library=" + freetype + "/lib"
 ```
 
-(where `freetype` is a [derivation]), you can instead write
+(where `freetype` is a [derivation expression]), you can instead write
 
-[derivation]: @docroot@/glossary.md#gloss-derivation
+[derivation expression]: @docroot@/glossary.md#gloss-derivation-expression
 
 ```nix
 "--with-freetype2-library=${freetype}/lib"
@@ -148,7 +148,7 @@ An expression that is interpolated must evaluate to one of the following:
   - `__toString` must be a function that takes the attribute set itself and returns a string
   - `outPath` must be a string
 
-  This includes [derivations](./derivations.md) or [flake inputs](@docroot@/command-ref/new-cli/nix3-flake.md#flake-inputs) (experimental).
+  This includes [derivation expressions](./derivations.md) or [flake inputs](@docroot@/command-ref/new-cli/nix3-flake.md#flake-inputs) (experimental).
 
 A string interpolates to itself.
 

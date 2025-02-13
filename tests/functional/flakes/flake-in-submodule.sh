@@ -27,6 +27,7 @@ git config --global protocol.file.allow always
 
 rootRepo=$TEST_ROOT/rootRepo
 subRepo=$TEST_ROOT/submodule
+otherRepo=$TEST_ROOT/otherRepo
 
 
 createGitRepo "$subRepo"
@@ -74,8 +75,49 @@ EOF
 git -C "$rootRepo" add flake.nix
 git -C "$rootRepo" commit -m "Add flake.nix"
 
-storePath=$(nix flake metadata --json "$rootRepo?submodules=1" | jq -r .path)
+storePath=$(nix flake prefetch --json "$rootRepo?submodules=1" | jq -r .storePath)
 [[ -e "$storePath/submodule" ]]
+
+# Test the use of inputs.self.
+cat > "$rootRepo"/flake.nix <<EOF
+{
+  inputs.self.submodules = true;
+  outputs = { self }: {
+    foo = self.outPath;
+  };
+}
+EOF
+git -C "$rootRepo" commit -a -m "Bla"
+
+storePath=$(nix eval --raw "$rootRepo#foo")
+[[ -e "$storePath/submodule" ]]
+
+
+# Test another repo referring to a repo that uses inputs.self.
+createGitRepo "$otherRepo"
+cat > "$otherRepo"/flake.nix <<EOF
+{
+  inputs.root.url = "git+file://$rootRepo";
+  outputs = { self, root }: {
+    foo = root.foo;
+  };
+}
+EOF
+git -C "$otherRepo" add flake.nix
+
+# The first call should refetch the root repo...
+expectStderr 0 nix eval --raw "$otherRepo#foo" -vvvvv | grepQuiet "refetching"
+
+[[ $(jq .nodes.root_2.locked.submodules "$otherRepo/flake.lock") == true ]]
+
+# ... but the second call should have 'submodules = true' in flake.lock, so it should not refetch.
+rm -rf "$TEST_HOME/.cache"
+clearStore
+expectStderr 0 nix eval --raw "$otherRepo#foo" -vvvvv | grepQuietInverse "refetching"
+
+storePath=$(nix eval --raw "$otherRepo#foo")
+[[ -e "$storePath/submodule" ]]
+
 
 # The root repo may use the submodule repo as an input
 # through the relative path. This may change in the future;

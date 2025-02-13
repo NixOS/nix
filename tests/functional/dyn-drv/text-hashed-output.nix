@@ -1,6 +1,6 @@
 with import ./config.nix;
 
-# A simple content-addressed derivation.
+# A simple content-addressing derivation.
 # The derivation can be arbitrarily modified by passing a different `seed`,
 # but the output will always be the same
 rec {

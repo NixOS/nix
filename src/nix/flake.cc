@@ -17,6 +17,8 @@
 #include "eval-cache.hh"
 #include "markdown.hh"
 #include "users.hh"
+#include "fetch-to-store.hh"
+#include "local-fs-store.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -1429,8 +1431,18 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
 struct CmdFlakePrefetch : FlakeCommand, MixJSON
 {
+    std::optional<std::filesystem::path> outLink;
+
     CmdFlakePrefetch()
     {
+        addFlag({
+            .longName = "out-link",
+            .shortName = 'o',
+            .description = "Create symlink named *path* to the resulting store path.",
+            .labels = {"path"},
+            .handler = {&outLink},
+            .completer = completePath
+        });
     }
 
     std::string description() override
@@ -1449,7 +1461,8 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
     {
         auto originalRef = getFlakeRef();
         auto resolvedRef = originalRef.resolve(store);
-        auto [storePath, lockedRef] = resolvedRef.fetchTree(store);
+        auto [accessor, lockedRef] = resolvedRef.lazyFetch(store);
+        auto storePath = fetchToStore(*store, accessor, FetchMode::Copy, lockedRef.input.getName());
         auto hash = store->queryPathInfo(storePath)->narHash;
 
         if (json) {
@@ -1464,6 +1477,13 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
                 lockedRef.to_string(),
                 store->printStorePath(storePath),
                 hash.to_string(HashFormat::SRI, true));
+        }
+
+        if (outLink) {
+            if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
+                createOutLinks(*outLink, {BuiltPath::Opaque{storePath}}, *store2);
+            else
+                throw Error("'--out-link' is not supported for this Nix store");
         }
     }
 };

@@ -192,7 +192,7 @@ Derivations can declare some infrequently used optional attributes.
     The [`convertHash`](@docroot@/language/builtins.md#builtins-convertHash) function shows how to convert between different encodings, and the [`nix-hash` command](../command-ref/nix-hash.md) has information about obtaining the hash for some contents, as well as converting to and from encodings.
 
     The `outputHashAlgo` attribute specifies the hash algorithm used to compute the hash.
-    It can currently be `"sha1"`, `"sha256"`, `"sha512"`, or `null`.
+    It can currently be `"blake3", "sha1"`, `"sha256"`, `"sha512"`, or `null`.
     `outputHashAlgo` can only be `null` when `outputHash` follows the SRI format.
 
     The `outputHashMode` attribute determines how the hash is computed.

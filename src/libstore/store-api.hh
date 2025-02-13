@@ -715,7 +715,7 @@ public:
 
     /**
      * Given a store path, return the realisation actually used in the realisation of this path:
-     * - If the path is a content-addressed derivation, try to resolve it
+     * - If the path is a content-addressing derivation, try to resolve it
      * - Otherwise, find one of its derivers
      */
     std::optional<StorePath> getBuildDerivationPath(const StorePath &);

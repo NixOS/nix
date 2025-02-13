@@ -62,8 +62,8 @@ R""(
 
 # Description
 
-`nix search` searches [*installable*](./nix.md#installables) (which can be evaluated, that is, a
-flake or Nix expression, but not a store path or store derivation path) for packages whose name or description matches all of the
+`nix search` searches [*installable*](./nix.md#installables) that can be evaluated, that is, a
+flake or Nix expression, but not a [store path] or [deriving path]) for packages whose name or description matches all of the
 regular expressions *regex*. For each matching package, It prints the
 full attribute name (from the root of the [installable](./nix.md#installables)), the version
 and the `meta.description` field, highlighting the substrings that
@@ -74,6 +74,9 @@ it avoids highlighting the entire name and description of every package.
 
 > Note that in this context, `^` is the regex character to match the beginning of a string, *not* the delimiter for
 > [selecting a derivation output](@docroot@/command-ref/new-cli/nix.md#derivation-output-selection).
+
+[store path]: @docroot@/glossary.md#gloss-store-path
+[deriving path]: @docroot@/glossary.md#gloss-deriving-path
 
 # Flake output attributes
 

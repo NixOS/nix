@@ -187,7 +187,7 @@ struct DerivationType {
     };
 
     /**
-     * Content-addressed derivation types
+     * Content-addressing derivation types
      */
     struct ContentAddressed {
         /**
@@ -525,7 +525,5 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
  * itself, making the hash near-impossible to calculate.
  */
 std::string hashPlaceholder(const OutputNameView outputName);
-
-extern const Hash impureOutputHash;
 
 }

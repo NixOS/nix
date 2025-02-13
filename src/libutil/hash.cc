@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstring>
 
+#include <blake3.h>
 #include <openssl/crypto.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
@@ -8,6 +9,7 @@
 #include "args.hh"
 #include "hash.hh"
 #include "archive.hh"
+#include "config.hh"
 #include "split.hh"
 
 #include <sys/types.h>
@@ -20,6 +22,7 @@ namespace nix {
 
 static size_t regularHashSize(HashAlgorithm type) {
     switch (type) {
+    case HashAlgorithm::BLAKE3: return blake3HashSize;
     case HashAlgorithm::MD5: return md5HashSize;
     case HashAlgorithm::SHA1: return sha1HashSize;
     case HashAlgorithm::SHA256: return sha256HashSize;
@@ -29,12 +32,15 @@ static size_t regularHashSize(HashAlgorithm type) {
 }
 
 
-const std::set<std::string> hashAlgorithms = {"md5", "sha1", "sha256", "sha512" };
+const std::set<std::string> hashAlgorithms = {"blake3", "md5", "sha1", "sha256", "sha512" };
 
 const std::set<std::string> hashFormats = {"base64", "nix32", "base16", "sri" };
 
-Hash::Hash(HashAlgorithm algo) : algo(algo)
+Hash::Hash(HashAlgorithm algo, const ExperimentalFeatureSettings & xpSettings) : algo(algo)
 {
+    if (algo == HashAlgorithm::BLAKE3) {
+        xpSettings.require(Xp::BLAKE3Hashes);
+    }
     hashSize = regularHashSize(algo);
     assert(hashSize <= maxHashSize);
     memset(hash, 0, maxHashSize);
@@ -284,6 +290,7 @@ Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashAlgorithm> ha
 
 union Ctx
 {
+    blake3_hasher blake3;
     MD5_CTX md5;
     SHA_CTX sha1;
     SHA256_CTX sha256;
@@ -293,7 +300,8 @@ union Ctx
 
 static void start(HashAlgorithm ha, Ctx & ctx)
 {
-    if (ha == HashAlgorithm::MD5) MD5_Init(&ctx.md5);
+    if (ha == HashAlgorithm::BLAKE3) blake3_hasher_init(&ctx.blake3);
+    else if (ha == HashAlgorithm::MD5) MD5_Init(&ctx.md5);
     else if (ha == HashAlgorithm::SHA1) SHA1_Init(&ctx.sha1);
     else if (ha == HashAlgorithm::SHA256) SHA256_Init(&ctx.sha256);
     else if (ha == HashAlgorithm::SHA512) SHA512_Init(&ctx.sha512);
@@ -303,7 +311,8 @@ static void start(HashAlgorithm ha, Ctx & ctx)
 static void update(HashAlgorithm ha, Ctx & ctx,
                    std::string_view data)
 {
-    if (ha == HashAlgorithm::MD5) MD5_Update(&ctx.md5, data.data(), data.size());
+    if (ha == HashAlgorithm::BLAKE3) blake3_hasher_update(&ctx.blake3, data.data(), data.size());
+    else if (ha == HashAlgorithm::MD5) MD5_Update(&ctx.md5, data.data(), data.size());
     else if (ha == HashAlgorithm::SHA1) SHA1_Update(&ctx.sha1, data.data(), data.size());
     else if (ha == HashAlgorithm::SHA256) SHA256_Update(&ctx.sha256, data.data(), data.size());
     else if (ha == HashAlgorithm::SHA512) SHA512_Update(&ctx.sha512, data.data(), data.size());
@@ -312,23 +321,23 @@ static void update(HashAlgorithm ha, Ctx & ctx,
 
 static void finish(HashAlgorithm ha, Ctx & ctx, unsigned char * hash)
 {
-    if (ha == HashAlgorithm::MD5) MD5_Final(hash, &ctx.md5);
+    if (ha == HashAlgorithm::BLAKE3) blake3_hasher_finalize(&ctx.blake3, hash, BLAKE3_OUT_LEN);
+    else if (ha == HashAlgorithm::MD5) MD5_Final(hash, &ctx.md5);
     else if (ha == HashAlgorithm::SHA1) SHA1_Final(hash, &ctx.sha1);
     else if (ha == HashAlgorithm::SHA256) SHA256_Final(hash, &ctx.sha256);
     else if (ha == HashAlgorithm::SHA512) SHA512_Final(hash, &ctx.sha512);
 }
 
-
-Hash hashString(HashAlgorithm ha, std::string_view s)
+Hash hashString(
+    HashAlgorithm ha, std::string_view s, const ExperimentalFeatureSettings & xpSettings)
 {
     Ctx ctx;
-    Hash hash(ha);
+    Hash hash(ha, xpSettings);
     start(ha, ctx);
     update(ha, ctx, s);
     finish(ha, ctx, hash.hash);
     return hash;
 }
-
 
 Hash hashFile(HashAlgorithm ha, const Path & path)
 {
@@ -426,6 +435,7 @@ std::string_view printHashFormat(HashFormat HashFormat)
 
 std::optional<HashAlgorithm> parseHashAlgoOpt(std::string_view s)
 {
+    if (s == "blake3") return HashAlgorithm::BLAKE3;
     if (s == "md5") return HashAlgorithm::MD5;
     if (s == "sha1") return HashAlgorithm::SHA1;
     if (s == "sha256") return HashAlgorithm::SHA256;
@@ -439,12 +449,13 @@ HashAlgorithm parseHashAlgo(std::string_view s)
     if (opt_h)
         return *opt_h;
     else
-        throw UsageError("unknown hash algorithm '%1%', expect 'md5', 'sha1', 'sha256', or 'sha512'", s);
+        throw UsageError("unknown hash algorithm '%1%', expect 'blake3', 'md5', 'sha1', 'sha256', or 'sha512'", s);
 }
 
 std::string_view printHashAlgo(HashAlgorithm ha)
 {
     switch (ha) {
+    case HashAlgorithm::BLAKE3: return "blake3";
     case HashAlgorithm::MD5: return "md5";
     case HashAlgorithm::SHA1: return "sha1";
     case HashAlgorithm::SHA256: return "sha256";

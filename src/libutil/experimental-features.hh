@@ -37,6 +37,7 @@ enum struct ExperimentalFeature
     MountedSSHStore,
     VerifiedFetches,
     PipeOperators,
+    BLAKE3Hashes,
 };
 
 /**

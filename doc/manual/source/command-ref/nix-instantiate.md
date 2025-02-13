@@ -42,8 +42,8 @@ standard input.
 - `--eval`
 
   Just parse and evaluate the input files, and print the resulting
-  values on standard output. No instantiation of store derivations
-  takes place.
+  values on standard output.
+  Store derivations are not serialized and written to the store, but instead just hashed and discarded.
 
   > **Warning**
   >

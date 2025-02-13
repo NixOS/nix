@@ -130,7 +130,7 @@ struct LocalDerivationGoal : public DerivationGoal
      *   rewrite after the build. Otherwise the regular predetermined paths are
      *   put here.
      *
-     * - Floating content-addressed derivations do not know their final build
+     * - Floating content-addressing derivations do not know their final build
      *   output paths until the outputs are hashed, so random locations are
      *   used, and then renamed. The randomness helps guard against hidden
      *   self-references.

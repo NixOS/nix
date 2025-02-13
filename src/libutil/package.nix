@@ -6,6 +6,7 @@
   boost,
   brotli,
   libarchive,
+  libblake3,
   libcpuid,
   libsodium,
   nlohmann_json,
@@ -42,6 +43,7 @@ mkMesonLibrary (finalAttrs: {
 
   buildInputs = [
     brotli
+    libblake3
     libsodium
     openssl
   ] ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;

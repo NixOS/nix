@@ -38,6 +38,7 @@ is a JSON object with the following fields:
     For an output which will be [content addresed], the name of the hash algorithm used.
     Valid algorithm strings are:
 
+    - `blake3`
     - `md5`
     - `sha1`
     - `sha256`

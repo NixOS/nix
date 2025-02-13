@@ -79,24 +79,37 @@ struct Flake
      * The original flake specification (by the user)
      */
     FlakeRef originalRef;
+
     /**
      * registry references and caching resolved to the specific underlying flake
      */
     FlakeRef resolvedRef;
+
     /**
      * the specific local store result of invoking the fetcher
      */
     FlakeRef lockedRef;
+
     /**
      * The path of `flake.nix`.
      */
     SourcePath path;
+
     /**
-     * pretend that 'lockedRef' is dirty
+     * Pretend that `lockedRef` is dirty.
      */
     bool forceDirty = false;
+
     std::optional<std::string> description;
+
     FlakeInputs inputs;
+
+    /**
+     * Attributes to be retroactively applied to the `self` input
+     * (such as `submodules = true`).
+     */
+    fetchers::Attrs selfAttrs;
+
     /**
      * 'nixConfig' attribute
      */

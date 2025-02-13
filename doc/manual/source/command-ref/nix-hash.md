@@ -67,7 +67,7 @@ md5sum`.
 - `--type` *hashAlgo*
 
   Use the specified cryptographic hash algorithm, which can be one of
-  `md5`, `sha1`, `sha256`, and `sha512`.
+  `blake3`, `md5`, `sha1`, `sha256`, and `sha512`.
 
 - `--to-base16`
 

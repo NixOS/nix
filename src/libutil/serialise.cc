@@ -227,8 +227,7 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
                                 throw EndOfFile("coroutine has finished");
                         }
 
-                        size_t n = std::min(cur.size(), out_len);
-                        memcpy(out, cur.data(), n);
+                        size_t n = cur.copy(out, out_len);
                         cur.remove_prefix(n);
                         return n;
                     });
@@ -260,7 +259,7 @@ std::unique_ptr<Source> sinkToSource(
 {
     struct SinkToSource : Source
     {
-        typedef boost::coroutines2::coroutine<std::string> coro_t;
+        typedef boost::coroutines2::coroutine<std::string_view> coro_t;
 
         std::function<void(Sink &)> fun;
         std::function<void()> eof;
@@ -271,33 +270,37 @@ std::unique_ptr<Source> sinkToSource(
         {
         }
 
-        std::string cur;
-        size_t pos = 0;
+        std::string_view cur;
 
         size_t read(char * data, size_t len) override
         {
-            if (!coro) {
+            bool hasCoro = coro.has_value();
+            if (!hasCoro) {
                 coro = coro_t::pull_type([&](coro_t::push_type & yield) {
                     LambdaSink sink([&](std::string_view data) {
-                        if (!data.empty()) yield(std::string(data));
+                        if (!data.empty()) {
+                            yield(data);
+                        }
                     });
                     fun(sink);
                 });
             }
 
-            if (!*coro) { eof(); unreachable(); }
-
-            if (pos == cur.size()) {
-                if (!cur.empty()) {
+            if (cur.empty()) {
+                if (hasCoro) {
                     (*coro)();
                 }
-                cur = coro->get();
-                pos = 0;
+                if (*coro) {
+                    cur = coro->get();
+                } else {
+                    coro.reset();
+                    eof();
+                    unreachable();
+                }
             }
 
-            auto n = std::min(cur.size() - pos, len);
-            memcpy(data, cur.data() + pos, n);
-            pos += n;
+            size_t n = cur.copy(data, len);
+            cur.remove_prefix(n);
 
             return n;
         }

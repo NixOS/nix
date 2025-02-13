@@ -15,7 +15,7 @@ echo "output path is $outPath"
 [[ ! -w $outPath ]]
 
 text=$(cat "$outPath/hello")
-if test "$text" != "Hello World!"; then exit 1; fi
+[[ "$text" = "Hello World!" ]]
 
 TODO_NixOS
 

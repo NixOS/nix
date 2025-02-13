@@ -1,4 +1,4 @@
--- Extension of the sql schema for content-addressed derivations.
+-- Extension of the sql schema for content-addressing derivations.
 -- Won't be loaded unless the experimental feature `ca-derivations`
 -- is enabled
 
