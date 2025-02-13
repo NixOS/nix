@@ -697,7 +697,9 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
     if (env.up && se.up) {
         mapStaticEnvBindings(st, *se.up, *env.up, vm);
 
-        if (se.isWith && !env.values[0]->isThunk()) {
+        if (se.isWith &&
+            se.isWith->binding == ExprWith::Binding::Outermost &&
+            !env.values[0]->isThunk()) {
             // add 'with' bindings.
             for (auto & j : *env.values[0]->attrs())
                 vm.insert_or_assign(std::string(st[j.name]), j.value);
