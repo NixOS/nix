@@ -18,64 +18,97 @@ struct OutputsSpec;
 /**
  * A general `Realisation` key.
  *
- * This is similar to a `DerivedPath::Opaque`, but the derivation is
- * identified by its "hash modulo" instead of by its store path.
+ * This is similar to a `DerivedPath::Built`, except it is only a single
+ * step: `drvPath` is a `StorePath` rather than a `DerivedPath`.
  */
-struct DrvOutput {
+struct DrvOutput
+{
     /**
-     * The hash modulo of the derivation.
-     *
-     * Computed from the derivation itself for most types of
-     * derivations, but computed from the (fixed) content address of the
-     * output for fixed-output derivations.
+     * The store path to the derivation
      */
-    Hash drvHash;
+    StorePath drvPath;
 
     /**
      * The name of the output.
      */
     OutputName outputName;
 
+    /**
+     * Skips the store dir on the `drvPath`
+     */
     std::string to_string() const;
 
-    std::string strHash() const
-    { return drvHash.to_string(HashFormat::Base16, true); }
+    /**
+     * Skips the store dir on the `drvPath`
+     */
+    static DrvOutput from_string(std::string_view);
 
-    static DrvOutput parse(const std::string &);
+    /**
+     * Includes the store dir on `drvPath`
+     */
+    std::string render(const StoreDirConfig & store) const;
 
-    GENERATE_CMP(DrvOutput, me->drvHash, me->outputName);
+    /**
+     * Includes the store dir on `drvPath`
+     */
+    static DrvOutput parse(const StoreDirConfig & store, std::string_view);
+
+    nlohmann::json toJSON(const StoreDirConfig & store) const;
+    static DrvOutput fromJSON(const StoreDirConfig & store, const nlohmann::json & json);
+
+    bool operator==(const DrvOutput &) const = default;
+    auto operator<=>(const DrvOutput &) const = default;
 };
 
-struct Realisation {
-    DrvOutput id;
+struct UnkeyedRealisation
+{
     StorePath outPath;
 
     StringSet signatures;
 
+    nlohmann::json toJSON(const StoreDirConfig & store) const;
+    static UnkeyedRealisation fromJSON(const StoreDirConfig & store, const nlohmann::json & json);
+
+    std::string fingerprint(const StoreDirConfig & store, const DrvOutput & key) const;
+
+    void sign(const StoreDirConfig & store, const DrvOutput & key, const Signer &);
+
+    bool checkSignature(
+        const StoreDirConfig & store,
+        const DrvOutput & key,
+        const PublicKeys & publicKeys,
+        const std::string & sig) const;
+
+    size_t checkSignatures(const StoreDirConfig & store, const DrvOutput & key, const PublicKeys & publicKeys) const;
+
     /**
-     * The realisations that are required for the current one to be valid.
-     *
-     * When importing this realisation, the store will first check that all its
-     * dependencies exist, and map to the correct output path
+     * Just check the `outPath`. Signatures don't matter for this.
+     * Callers must ensure that the corresponding key is the same for
+     * most use-cases.
      */
-    std::map<DrvOutput, StorePath> dependentRealisations;
+    bool isCompatibleWith(const UnkeyedRealisation & other) const
+    {
+        return outPath == other.outPath;
+    }
 
-    nlohmann::json toJSON() const;
-    static Realisation fromJSON(const nlohmann::json& json, const std::string& whence);
+    const StorePath & getPath() const
+    {
+        return outPath;
+    }
 
-    std::string fingerprint() const;
-    void sign(const Signer &);
-    bool checkSignature(const PublicKeys & publicKeys, const std::string & sig) const;
-    size_t checkSignatures(const PublicKeys & publicKeys) const;
+    // TODO sketchy that it avoids signatures
+    GENERATE_CMP(UnkeyedRealisation, me->outPath);
+};
 
-    static std::set<Realisation> closure(Store &, const std::set<Realisation> &);
-    static void closure(Store &, const std::set<Realisation> &, std::set<Realisation> & res);
+struct Realisation : UnkeyedRealisation
+{
+    DrvOutput id;
 
-    bool isCompatibleWith(const Realisation & other) const;
+    nlohmann::json toJSON(const StoreDirConfig & store) const;
+    static Realisation fromJSON(const StoreDirConfig & store, const nlohmann::json & json);
 
-    StorePath getPath() const { return outPath; }
-
-    GENERATE_CMP(Realisation, me->id, me->outPath);
+    bool operator==(const Realisation &) const = default;
+    auto operator<=>(const Realisation &) const = default;
 };
 
 /**
@@ -84,7 +117,7 @@ struct Realisation {
  * Since these are the outputs of a single derivation, we know the
  * output names are unique so we can use them as the map key.
  */
-typedef std::map<OutputName, Realisation> SingleDrvOutputs;
+typedef std::map<OutputName, UnkeyedRealisation> SingleDrvOutputs;
 
 /**
  * Collection type for multiple derivations' outputs' `Realisation`s.
@@ -93,30 +126,34 @@ typedef std::map<OutputName, Realisation> SingleDrvOutputs;
  * the same, so we need to identify firstly which derivation, and
  * secondly which output of that derivation.
  */
-typedef std::map<DrvOutput, Realisation> DrvOutputs;
+typedef std::map<DrvOutput, UnkeyedRealisation> DrvOutputs;
 
 /**
  * Filter a SingleDrvOutputs to include only specific output names
  *
  * Moves the `outputs` input.
  */
-SingleDrvOutputs filterDrvOutputs(const OutputsSpec&, SingleDrvOutputs&&);
+SingleDrvOutputs filterDrvOutputs(const OutputsSpec &, SingleDrvOutputs && outputs);
 
-
-struct OpaquePath {
+struct OpaquePath
+{
     StorePath path;
 
-    StorePath getPath() const { return path; }
+    const StorePath & getPath() const
+    {
+        return path;
+    }
 
-    GENERATE_CMP(OpaquePath, me->path);
+    bool operator==(const OpaquePath &) const = default;
+    auto operator<=>(const OpaquePath &) const = default;
 };
-
 
 /**
  * A store path with all the history of how it went into the store
  */
-struct RealisedPath {
-    /*
+struct RealisedPath
+{
+    /**
      * A path is either the result of the realisation of a derivation or
      * an opaque blob that has been directly added to the store
      */
@@ -125,33 +162,38 @@ struct RealisedPath {
 
     using Set = std::set<RealisedPath>;
 
-    RealisedPath(StorePath path) : raw(OpaquePath{path}) {}
-    RealisedPath(Realisation r) : raw(r) {}
+    RealisedPath(StorePath path)
+        : raw(OpaquePath{path})
+    {
+    }
+
+    RealisedPath(Realisation r)
+        : raw(r)
+    {
+    }
 
     /**
      * Get the raw store path associated to this
      */
-    StorePath path() const;
+    const StorePath & path() const;
 
-    void closure(Store& store, Set& ret) const;
-    static void closure(Store& store, const Set& startPaths, Set& ret);
-    Set closure(Store& store) const;
-
-    GENERATE_CMP(RealisedPath, me->raw);
+    bool operator==(const RealisedPath &) const = default;
+    auto operator<=>(const RealisedPath &) const = default;
 };
 
 class MissingRealisation : public Error
 {
 public:
-    MissingRealisation(DrvOutput & outputId)
-        : MissingRealisation(outputId.outputName, outputId.strHash())
-    {}
-    MissingRealisation(std::string_view drv, OutputName outputName)
-        : Error( "cannot operate on output '%s' of the "
-                "unbuilt derivation '%s'",
-                outputName,
-                drv)
-    {}
+    MissingRealisation(const StoreDirConfig & store, DrvOutput & outputId)
+        : MissingRealisation(store, outputId.drvPath, outputId.outputName)
+    {
+    }
+    MissingRealisation(const StoreDirConfig & store, const StorePath & drvPath, const OutputName & outputName);
+    MissingRealisation(
+        const StoreDirConfig & store,
+        const SingleDerivedPath & drvPath,
+        const StorePath & drvPathResolved,
+        const OutputName & outputName);
 };
 
 }

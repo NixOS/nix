@@ -481,22 +481,36 @@ StorePath BinaryCacheStore::addToStore(
     })->path;
 }
 
-void BinaryCacheStore::queryRealisationUncached(const DrvOutput & id,
-    Callback<std::shared_ptr<const Realisation>> callback) noexcept
+std::string BinaryCacheStore::makeRealisationPath(const DrvOutput & id)
 {
-    auto outputInfoFilePath = realisationsPrefix + "/" + id.to_string() + ".doi";
+    return realisationsPrefix
+        + "/" + id.drvPath.to_string()
+        + "/" + id.outputName
+        + ".doi";
+}
+
+void BinaryCacheStore::queryRealisationUncached(const DrvOutput & id,
+    Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
+{
+    auto outputInfoFilePath = makeRealisationPath(id);
 
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
     Callback<std::optional<std::string>> newCallback = {
-        [=](std::future<std::optional<std::string>> fut) {
+        [=,this](std::future<std::optional<std::string>> fut) {
             try {
                 auto data = fut.get();
                 if (!data) return (*callbackPtr)({});
 
-                auto realisation = Realisation::fromJSON(
-                    nlohmann::json::parse(*data), outputInfoFilePath);
-                return (*callbackPtr)(std::make_shared<const Realisation>(realisation));
+                UnkeyedRealisation realisation { .outPath = StorePath::dummy, };
+                auto json = nlohmann::json::parse(*data);
+                try {
+                    realisation = UnkeyedRealisation::fromJSON(*this, json);
+                } catch (Error & e) {
+                    e.addTrace({}, "reading build trace key-value file '%s'", outputInfoFilePath);
+                    throw;
+                }
+                return (*callbackPtr)(std::make_shared<const UnkeyedRealisation>(realisation));
             } catch (...) {
                 callbackPtr->rethrow();
             }
@@ -506,11 +520,14 @@ void BinaryCacheStore::queryRealisationUncached(const DrvOutput & id,
     getFile(outputInfoFilePath, std::move(newCallback));
 }
 
-void BinaryCacheStore::registerDrvOutput(const Realisation& info) {
+void BinaryCacheStore::registerDrvOutput(const Realisation & info)
+{
     if (diskCache)
         diskCache->upsertRealisation(getUri(), info);
-    auto filePath = realisationsPrefix + "/" + info.id.to_string() + ".doi";
-    upsertFile(filePath, info.toJSON().dump(), "application/json");
+    upsertFile(
+        makeRealisationPath(info.id),
+        info.toJSON(*this).dump(),
+        "application/json");
 }
 
 ref<SourceAccessor> BinaryCacheStore::getFSAccessor(bool requireValidPath)

@@ -28,13 +28,15 @@ class DrvOutputSubstitutionGoal : public Goal {
     DrvOutput id;
 
 public:
-    DrvOutputSubstitutionGoal(const DrvOutput& id, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    DrvOutputSubstitutionGoal(const DrvOutput & id, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
-    typedef void (DrvOutputSubstitutionGoal::*GoalState)();
-    GoalState state;
+    /**
+     * The realisation corresponding to the given output id.
+     * Will be filled once we can get it.
+     */
+    std::shared_ptr<const UnkeyedRealisation> outputInfo;
 
     Co init() override;
-    Co realisationFetched(std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub);
 
     void timedOut(Error && ex) override { unreachable(); };
 

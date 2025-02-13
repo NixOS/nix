@@ -14,7 +14,7 @@ DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(
     : Goal(worker, DerivedPath::Opaque { StorePath::dummy })
     , id(id)
 {
-    name = fmt("substitution of '%s'", id.to_string());
+    name = fmt("substitution of '%s'", id.render(worker.store));
     trace("created");
 }
 
@@ -45,11 +45,11 @@ Goal::Co DrvOutputSubstitutionGoal::init()
         outPipe->createAsyncPipe(worker.ioport.get());
     #endif
 
-        auto promise = std::make_shared<std::promise<std::shared_ptr<const Realisation>>>();
+        auto promise = std::make_shared<std::promise<std::shared_ptr<const UnkeyedRealisation>>>();
 
         sub->queryRealisation(
             id,
-            { [outPipe(outPipe), promise(promise)](std::future<std::shared_ptr<const Realisation>> res) {
+            { [outPipe(outPipe), promise(promise)](std::future<std::shared_ptr<const UnkeyedRealisation>> res) {
                 try {
                     Finally updateStats([&]() { outPipe->writeSide.close(); });
                     promise->set_value(res.get());
@@ -70,12 +70,6 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 
         worker.childTerminated(this);
 
-        /*
-         * The realisation corresponding to the given output id.
-         * Will be filled once we can get it.
-         */
-        std::shared_ptr<const Realisation> outputInfo;
-
         try {
             outputInfo = promise->get_future().get();
         } catch (std::exception & e) {
@@ -85,36 +79,25 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 
         if (!outputInfo) continue;
 
-        bool failed = false;
+        addWaitee(worker.makePathSubstitutionGoal(outputInfo->outPath));
+        co_await Suspend{};
 
-        for (const auto & [depId, depPath] : outputInfo->dependentRealisations) {
-            if (depId != id) {
-                if (auto localOutputInfo = worker.store.queryRealisation(depId);
-                    localOutputInfo && localOutputInfo->outPath != depPath) {
-                    warn(
-                        "substituter '%s' has an incompatible realisation for '%s', ignoring.\n"
-                        "Local:  %s\n"
-                        "Remote: %s",
-                        sub->getUri(),
-                        depId.to_string(),
-                        worker.store.printStorePath(localOutputInfo->outPath),
-                        worker.store.printStorePath(depPath)
-                    );
-                    failed = true;
-                    break;
-                }
-                addWaitee(worker.makeDrvOutputSubstitutionGoal(depId));
-            }
+        trace("output path substituted");
+
+        if (nrFailed > 0) {
+            debug("The output path of the derivation output '%s' could not be substituted", id.render(worker.store));
+            co_return amDone(nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed);
         }
 
-        if (failed) continue;
+        worker.store.registerDrvOutput({*outputInfo, id});
 
-        co_return realisationFetched(outputInfo, sub);
+        trace("finished");
+        co_return amDone(ecSuccess);
     }
 
     /* None left.  Terminate this goal and let someone else deal
        with it. */
-    debug("derivation output '%s' is required, but there is no substituter that can provide it", id.to_string());
+    debug("derivation output '%s' is required, but there is no substituter that can provide it", id.render(worker.store));
 
     if (substituterFailed) {
         worker.failedSubstitutions++;
@@ -127,29 +110,11 @@ Goal::Co DrvOutputSubstitutionGoal::init()
     co_return amDone(substituterFailed ? ecFailed : ecNoSubstituters);
 }
 
-Goal::Co DrvOutputSubstitutionGoal::realisationFetched(std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub) {
-    addWaitee(worker.makePathSubstitutionGoal(outputInfo->outPath));
-
-    if (!waitees.empty()) co_await Suspend{};
-
-    trace("output path substituted");
-
-    if (nrFailed > 0) {
-        debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
-        co_return amDone(nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed);
-    }
-
-    worker.store.registerDrvOutput(*outputInfo);
-
-    trace("finished");
-    co_return amDone(ecSuccess);
-}
-
 std::string DrvOutputSubstitutionGoal::key()
 {
     /* "a$" ensures substitution goals happen before derivation
        goals. */
-    return "a$" + std::string(id.to_string());
+    return "a$" + std::string(id.render(worker.store));
 }
 
 void DrvOutputSubstitutionGoal::handleEOF(Descriptor fd)

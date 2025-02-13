@@ -257,8 +257,6 @@
               ''^src/libstore/pathlocks\.hh$''
               ''^src/libstore/profiles\.cc$''
               ''^src/libstore/profiles\.hh$''
-              ''^src/libstore/realisation\.cc$''
-              ''^src/libstore/realisation\.hh$''
               ''^src/libstore/remote-fs-accessor\.cc$''
               ''^src/libstore/remote-fs-accessor\.hh$''
               ''^src/libstore/remote-store-connection\.hh$''

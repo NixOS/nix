@@ -270,16 +270,8 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
             output.second = DerivationOutput::Deferred { };
             drv.env[output.first] = "";
         }
-        auto hashesModulo = hashDerivationModulo(*evalStore, drv, true);
 
-        for (auto & output : drv.outputs) {
-            Hash h = hashesModulo.hashes.at(output.first);
-            auto outPath = store->makeOutputPath(output.first, h, drv.name);
-            output.second = DerivationOutput::InputAddressed {
-                .path = outPath,
-            };
-            drv.env[output.first] = store->printStorePath(outPath);
-        }
+        resolveInputAddressed(*evalStore, drv);
     }
 
     auto shellDrvPath = writeDerivation(*evalStore, drv);

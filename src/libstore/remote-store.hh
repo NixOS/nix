@@ -110,7 +110,7 @@ public:
     void registerDrvOutput(const Realisation & info) override;
 
     void queryRealisationUncached(const DrvOutput &,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+        Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
 
