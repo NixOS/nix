@@ -180,7 +180,16 @@ Goal::Co DerivationGoal::haveDerivation()
 {
     trace("have derivation");
 
-    parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
+    if (auto parsedOpt = StructuredAttrs::tryParse(drv->env)) {
+        parsedDrv = std::make_unique<StructuredAttrs>(*parsedOpt);
+    }
+    try {
+        drvOptions = std::make_unique<DerivationOptions>(
+            DerivationOptions::fromStructuredAttrs(worker.store, drv->env, parsedDrv.get()));
+    } catch (Error & e) {
+        e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
+        throw;
+    }
 
     if (!drv->type().hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -237,7 +246,7 @@ Goal::Co DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    if (settings.useSubstitutes && parsedDrv->substitutesAllowed())
+    if (settings.useSubstitutes && drvOptions->substitutesAllowed())
         for (auto & [outputName, status] : initialOutputs) {
             if (!status.wanted) continue;
             if (!status.known)
@@ -627,7 +636,7 @@ Goal::Co DerivationGoal::tryToBuild()
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
     bool buildLocally =
-        (buildMode != bmNormal || parsedDrv->willBuildLocally(worker.store))
+        (buildMode != bmNormal || drvOptions->willBuildLocally(worker.store, *drv))
         && settings.maxBuildJobs.get() != 0;
 
     if (!buildLocally) {
@@ -1123,7 +1132,7 @@ HookReply DerivationGoal::tryBuildHook()
             << (worker.getNrLocalBuilds() < settings.maxBuildJobs ? 1 : 0)
             << drv->platform
             << worker.store.printStorePath(drvPath)
-            << parsedDrv->getRequiredSystemFeatures();
+            << drvOptions->getRequiredSystemFeatures(*drv);
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating

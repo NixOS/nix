@@ -25,6 +25,7 @@ const nlohmann::json & valueAt(
     const std::string & key);
 
 std::optional<nlohmann::json> optionalValueAt(const nlohmann::json::object_t & value, const std::string & key);
+std::optional<nlohmann::json> nullableValueAt(const nlohmann::json::object_t & value, const std::string & key);
 
 /**
  * Downcast the json object, failing with a nice error if the conversion fails.
@@ -68,6 +69,9 @@ struct json_avoids_null<std::vector<T>> : std::true_type {};
 
 template<typename T>
 struct json_avoids_null<std::list<T>> : std::true_type {};
+
+template<typename T>
+struct json_avoids_null<std::set<T>> : std::true_type {};
 
 template<typename K, typename V>
 struct json_avoids_null<std::map<K, V>> : std::true_type {};

@@ -2,6 +2,7 @@
 
 #include "derivations.hh"
 #include "parsed-derivations.hh"
+#include "derivation-options.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "thread-pool.hh"
@@ -221,9 +222,19 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
             if (knownOutputPaths && invalid.empty()) return;
 
             auto drv = make_ref<Derivation>(derivationFromPath(drvPath));
-            ParsedDerivation parsedDrv(StorePath(drvPath), *drv);
+            auto parsedDrv = StructuredAttrs::tryParse(drv->env);
+            DerivationOptions drvOptions;
+            try {
+                drvOptions = DerivationOptions::fromStructuredAttrs(
+                    *this,
+                    drv->env,
+                    parsedDrv ? &*parsedDrv : nullptr);
+            } catch (Error & e) {
+                e.addTrace({}, "while parsing derivation '%s'", printStorePath(drvPath));
+                throw;
+            }
 
-            if (!knownOutputPaths && settings.useSubstitutes && parsedDrv.substitutesAllowed()) {
+            if (!knownOutputPaths && settings.useSubstitutes && drvOptions.substitutesAllowed()) {
                 experimentalFeatureSettings.require(Xp::CaDerivations);
 
                 // If there are unknown output paths, attempt to find if the
@@ -253,7 +264,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
                 }
             }
 
-            if (knownOutputPaths && settings.useSubstitutes && parsedDrv.substitutesAllowed()) {
+            if (knownOutputPaths && settings.useSubstitutes && drvOptions.substitutesAllowed()) {
                 auto drvState = make_ref<Sync<DrvState>>(DrvState(invalid.size()));
                 for (auto & output : invalid)
                     pool.enqueue(std::bind(checkOutput, drvPath, drv, output, drvState));

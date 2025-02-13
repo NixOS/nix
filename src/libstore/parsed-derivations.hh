@@ -1,49 +1,43 @@
 #pragma once
 ///@file
 
-#include "derivations.hh"
-#include "store-api.hh"
+#include <nlohmann/json.hpp>
 
-#include <nlohmann/json_fwd.hpp>
+#include "types.hh"
+#include "path.hh"
 
 namespace nix {
 
-class ParsedDerivation
+class Store;
+struct DerivationOptions;
+struct DerivationOutput;
+
+typedef std::map<std::string, DerivationOutput> DerivationOutputs;
+
+struct StructuredAttrs
 {
-    StorePath drvPath;
-    BasicDerivation & drv;
-    std::unique_ptr<nlohmann::json> structuredAttrs;
+    nlohmann::json structuredAttrs;
 
-public:
+    static std::optional<StructuredAttrs> tryParse(const StringPairs & env);
 
-    ParsedDerivation(const StorePath & drvPath, BasicDerivation & drv);
+    nlohmann::json prepareStructuredAttrs(
+        Store & store,
+        const DerivationOptions & drvOptions,
+        const StorePathSet & inputPaths,
+        const DerivationOutputs & outputs) const;
 
-    ~ParsedDerivation();
-
-    const nlohmann::json * getStructuredAttrs() const
-    {
-        return structuredAttrs.get();
-    }
-
-    std::optional<std::string> getStringAttr(const std::string & name) const;
-
-    bool getBoolAttr(const std::string & name, bool def = false) const;
-
-    std::optional<Strings> getStringsAttr(const std::string & name) const;
-
-    StringSet getRequiredSystemFeatures() const;
-
-    bool canBuildLocally(Store & localStore) const;
-
-    bool willBuildLocally(Store & localStore) const;
-
-    bool substitutesAllowed() const;
-
-    bool useUidRange() const;
-
-    std::optional<nlohmann::json> prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths);
+    /**
+     * As a convenience to bash scripts, write a shell file that
+     * maps all attributes that are representable in bash -
+     * namely, strings, integers, nulls, Booleans, and arrays and
+     * objects consisting entirely of those values. (So nested
+     * arrays or objects are not supported.)
+     *
+     * @param prepared This should be the result of
+     * `prepareStructuredAttrs`, *not* the original `structuredAttrs`
+     * field.
+     */
+    static std::string writeShell(const nlohmann::json & prepared);
 };
-
-std::string writeStructuredAttrsShell(const nlohmann::json & json);
 
 }
