@@ -77,7 +77,7 @@ struct SingleDerivedPathBuilt {
         const StoreDirConfig & store, ref<SingleDerivedPath> drvPath,
         OutputNameView outputs,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
-    nlohmann::json toJSON(Store & store) const;
+    nlohmann::json toJSON(const StoreDirConfig & store) const;
 
     bool operator == (const SingleDerivedPathBuilt &) const noexcept;
     std::strong_ordering operator <=> (const SingleDerivedPathBuilt &) const noexcept;
@@ -151,7 +151,7 @@ struct SingleDerivedPath : _SingleDerivedPathRaw {
         const StoreDirConfig & store,
         std::string_view,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
-    nlohmann::json toJSON(Store & store) const;
+    nlohmann::json toJSON(const StoreDirConfig & store) const;
 };
 
 static inline ref<SingleDerivedPath> makeConstantStorePathRef(StorePath drvPath)
@@ -204,7 +204,7 @@ struct DerivedPathBuilt {
         const StoreDirConfig & store, ref<SingleDerivedPath>,
         std::string_view,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
-    nlohmann::json toJSON(Store & store) const;
+    nlohmann::json toJSON(const StoreDirConfig & store) const;
 
     bool operator == (const DerivedPathBuilt &) const noexcept;
     // TODO libc++ 16 (used by darwin) missing `std::set::operator <=>`, can't do yet.
@@ -285,7 +285,7 @@ struct DerivedPath : _DerivedPathRaw {
      */
     static DerivedPath fromSingle(const SingleDerivedPath &);
 
-    nlohmann::json toJSON(Store & store) const;
+    nlohmann::json toJSON(const StoreDirConfig & store) const;
 };
 
 typedef std::vector<DerivedPath> DerivedPaths;
