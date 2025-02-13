@@ -17,15 +17,12 @@ TEST(DummyStore, realisation_read)
     }();
 
     DrvOutput key{
-        .drvHash = Hash::parseExplicitFormatUnprefixed(
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-            HashAlgorithm::SHA256,
-            HashFormat::Base16),
+        .drvPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv"},
         .outputName = "foo",
     };
 
     UnkeyedRealisation value{
-        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
+        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
     };
 
     store->buildTrace.insert({key, make_ref<UnkeyedRealisation>(value)});

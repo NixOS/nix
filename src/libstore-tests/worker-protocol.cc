@@ -128,54 +128,42 @@ VERSIONED_CHARACTERIZATION_TEST(
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     drvOutput,
-    "drv-output",
-    defaultVersion,
+    "drv-output-1.39",
+    1 << 8 | 39,
     (std::tuple<DrvOutput, DrvOutput>{
         {
-            .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+            .drvPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
             .outputName = "baz",
         },
         DrvOutput{
-            .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
+            .drvPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
             .outputName = "quux",
         },
     }))
 
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
+    unkeyedRealisation,
+    "unkeyed-realisation-1.39",
+    1 << 8 | 39,
+    (UnkeyedRealisation{
+        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+        .signatures = {"asdf", "qwer"},
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     realisation,
-    "realisation",
-    defaultVersion,
-    (std::tuple<Realisation, Realisation>{
-        Realisation{
-            {
-                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                .signatures = {"asdf", "qwer"},
-            },
-            DrvOutput{
-                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-                .outputName = "baz",
-            },
+    "realisation-1.39",
+    1 << 8 | 39,
+    (Realisation{
+        UnkeyedRealisation{
+            .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+            .signatures = {"asdf", "qwer"},
         },
-        Realisation{
-            {
-                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                .signatures = {"asdf", "qwer"},
-                .dependentRealisations =
-                    {
-                        {
-                            DrvOutput{
-                                .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                .outputName = "quux",
-                            },
-                            StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                        },
-                    },
-            },
-            DrvOutput{
-                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-                .outputName = "baz",
-            },
+        DrvOutput{
+            .drvPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
+            .outputName = "baz",
         },
     }))
 
@@ -216,25 +204,13 @@ VERSIONED_CHARACTERIZATION_TEST(
                         {
                             "foo",
                             {
-                                {
-                                    .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                                },
-                                DrvOutput{
-                                    .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                    .outputName = "foo",
-                                },
+                                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
                             },
                         },
                         {
                             "bar",
                             {
-                                {
-                                    .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar"},
-                                },
-                                DrvOutput{
-                                    .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                    .outputName = "bar",
-                                },
+                                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar"},
                             },
                         },
                     },
@@ -269,27 +245,13 @@ VERSIONED_CHARACTERIZATION_TEST(
                             {
                                 "foo",
                                 {
-                                    {
-                                        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                                    },
-                                    DrvOutput{
-                                        .drvHash =
-                                            Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                        .outputName = "foo",
-                                    },
+                                    .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
                                 },
                             },
                             {
                                 "bar",
                                 {
-                                    {
-                                        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar"},
-                                    },
-                                    DrvOutput{
-                                        .drvHash =
-                                            Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                        .outputName = "bar",
-                                    },
+                                    .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar"},
                                 },
                             },
                         },
@@ -328,27 +290,13 @@ VERSIONED_CHARACTERIZATION_TEST(
                             {
                                 "foo",
                                 {
-                                    {
-                                        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                                    },
-                                    DrvOutput{
-                                        .drvHash =
-                                            Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                        .outputName = "foo",
-                                    },
+                                    .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
                                 },
                             },
                             {
                                 "bar",
                                 {
-                                    {
-                                        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar"},
-                                    },
-                                    DrvOutput{
-                                        .drvHash =
-                                            Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                        .outputName = "bar",
-                                    },
+                                    .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar"},
                                 },
                             },
                         },

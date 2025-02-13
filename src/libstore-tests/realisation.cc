@@ -58,13 +58,10 @@ INSTANTIATE_TEST_SUITE_P(
     ([] {
         Realisation simple{
             {
-                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
+                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
             },
             {
-                .drvHash = Hash::parseExplicitFormatUnprefixed(
-                    "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-                    HashAlgorithm::SHA256,
-                    HashFormat::Base16),
+                .drvPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv"},
                 .outputName = "foo",
             },
         };
@@ -79,22 +76,6 @@ INSTANTIATE_TEST_SUITE_P(
                     auto r = simple;
                     // FIXME actually sign properly
                     r.signatures = {"asdfasdfasdf"};
-                    return r;
-                }()},
-            std::pair{
-                "with-dependent-realisations",
-                [&] {
-                    auto r = simple;
-                    r.dependentRealisations = {{
-                        {
-                            .drvHash = Hash::parseExplicitFormatUnprefixed(
-                                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-                                HashAlgorithm::SHA256,
-                                HashFormat::Base16),
-                            .outputName = "foo",
-                        },
-                        StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
-                    }};
                     return r;
                 }(),
             });

@@ -504,7 +504,7 @@ StorePath BinaryCacheStore::addToStore(
 
 std::string BinaryCacheStore::makeRealisationPath(const DrvOutput & id)
 {
-    return realisationsPrefix + "/" + id.to_string() + ".doi";
+    return realisationsPrefix + "/" + id.drvPath.to_string() + "/" + id.outputName + ".doi";
 }
 
 void BinaryCacheStore::queryRealisationUncached(
@@ -525,7 +525,10 @@ void BinaryCacheStore::queryRealisationUncached(
                 realisation = std::make_shared<const UnkeyedRealisation>(nlohmann::json::parse(*data));
             } catch (Error & e) {
                 e.addTrace(
-                    {}, "while parsing file '%s' as a realisation for key '%s'", outputInfoFilePath, id.to_string());
+                    {},
+                    "while parsing file '%s' as a build trace value for key '%s'",
+                    outputInfoFilePath,
+                    id.to_string());
                 throw;
             }
             return (*callbackPtr)(std::move(realisation));
