@@ -12,7 +12,7 @@ DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(const DrvOutput & id, Worke
     : Goal(worker, init())
     , id(id)
 {
-    name = fmt("substitution of '%s'", id.to_string());
+    name = fmt("substitution of '%s'", id.render(worker.store));
     trace("created");
 }
 
@@ -91,7 +91,8 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 
     /* None left.  Terminate this goal and let someone else deal
        with it. */
-    debug("derivation output '%s' is required, but there is no substituter that can provide it", id.to_string());
+    debug(
+        "derivation output '%s' is required, but there is no substituter that can provide it", id.render(worker.store));
 
     if (substituterFailed) {
         worker.failedSubstitutions++;
@@ -128,7 +129,7 @@ Goal::Co DrvOutputSubstitutionGoal::realisationFetched(
 
 std::string DrvOutputSubstitutionGoal::key()
 {
-    return "a$" + std::string(id.to_string());
+    return "a$" + std::string(id.render(worker.store));
 }
 
 void DrvOutputSubstitutionGoal::handleEOF(Descriptor fd)
