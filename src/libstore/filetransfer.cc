@@ -94,7 +94,7 @@ struct curlFileTransfer : public FileTransfer
             : fileTransfer(fileTransfer)
             , request(request)
             , act(*logger, lvlTalkative, actFileTransfer,
-                fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
+                request.post ? "" : fmt(request.data ?  "uploading '%s'" : "downloading '%s'", request.uri),
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
@@ -271,9 +271,19 @@ struct curlFileTransfer : public FileTransfer
             return getInterrupted();
         }
 
+        int silentProgressCallback(double dltotal, double dlnow)
+        {
+            return getInterrupted();
+        }
+
         static int progressCallbackWrapper(void * userp, double dltotal, double dlnow, double ultotal, double ulnow)
         {
             return ((TransferItem *) userp)->progressCallback(dltotal, dlnow);
+        }
+
+        static int silentProgressCallbackWrapper(void * userp, double dltotal, double dlnow, double ultotal, double ulnow)
+        {
+            return ((TransferItem *) userp)->silentProgressCallback(dltotal, dlnow);
         }
 
         static int debugCallback(CURL * handle, curl_infotype type, char * data, size_t size, void * userptr)
@@ -340,8 +350,11 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_HEADERFUNCTION, TransferItem::headerCallbackWrapper);
             curl_easy_setopt(req, CURLOPT_HEADERDATA, this);
 
-            curl_easy_setopt(req, CURLOPT_PROGRESSFUNCTION, progressCallbackWrapper);
-            curl_easy_setopt(req, CURLOPT_PROGRESSDATA, this);
+            if (request.post)
+                curl_easy_setopt(req, CURLOPT_XFERINFOFUNCTION, silentProgressCallbackWrapper);
+            else
+                curl_easy_setopt(req, CURLOPT_XFERINFOFUNCTION, progressCallbackWrapper);
+            curl_easy_setopt(req, CURLOPT_XFERINFODATA, this);
             curl_easy_setopt(req, CURLOPT_NOPROGRESS, 0);
 
             curl_easy_setopt(req, CURLOPT_HTTPHEADER, requestHeaders);
@@ -353,7 +366,10 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
             if (request.data) {
-                curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
+                if (request.post)
+                    curl_easy_setopt(req, CURLOPT_POST, 1L);
+                else
+                    curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
                 curl_easy_setopt(req, CURLOPT_READFUNCTION, readCallbackWrapper);
                 curl_easy_setopt(req, CURLOPT_READDATA, this);
                 curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->length());
@@ -430,7 +446,8 @@ struct curlFileTransfer : public FileTransfer
                 if (httpStatus == 304 && result.etag == "")
                     result.etag = request.expectedETag;
 
-                act.progress(result.bodySize, result.bodySize);
+                if (!request.post)
+                    act.progress(result.bodySize, result.bodySize);
                 done = true;
                 callback(std::move(result));
             }
