@@ -442,7 +442,7 @@ void Goal::trace(const FormatOrString & fs)
 
 
 /* Common initialisation performed in child processes. */
-static void commonChildInit(Pipe & logPipe)
+static void commonChildInit(int stderrFd)
 {
     restoreSignals();
 
@@ -454,7 +454,7 @@ static void commonChildInit(Pipe & logPipe)
         throw SysError(format("creating a new session"));
 
     /* Dup the write side of the logger pipe into stderr. */
-    if (dup2(logPipe.writeSide.get(), STDERR_FILENO) == -1)
+    if (stderrFd != -1 && dup2(stderrFd, STDERR_FILENO) == -1)
         throw SysError("cannot pipe standard error into log file");
 
     /* Dup stderr to stdout. */
@@ -678,7 +678,7 @@ HookInstance::HookInstance()
     /* Fork the hook. */
     pid = startProcess([&]() {
 
-        commonChildInit(fromHook);
+        commonChildInit(fromHook.writeSide.get());
 
         if (chdir("/") == -1) throw SysError("changing into /");
 
@@ -824,8 +824,13 @@ private:
 
     std::string currentHookLine;
 
-    /* Pipe for the builder's standard output/error. */
-    Pipe builderOut;
+    /* Master side of the pseudoterminal used for the builder's
+       standard output/error. */
+    AutoCloseFD builderOut;
+
+    /* Slave side of the pseudoterminal used for the builder's
+       standard output/error. */
+    Path slaveName;
 
     /* Pipe for synchronising updates to the builder user namespace. */
     Pipe userNamespaceSync;
@@ -1602,7 +1607,7 @@ void DerivationGoal::buildDone()
         hook->builderOut.readSide = -1;
         hook->fromHook.readSide = -1;
     } else
-        builderOut.readSide = -1;
+        builderOut.close();
 
     /* Close the log file. */
     closeLogFile();
@@ -2238,14 +2243,12 @@ void DerivationGoal::startBuilder()
     /* Create the log file. */
     Path logFile = openLogFile();
 
-    /* Create a pipe to get the output of the builder. */
-    //builderOut.create();
-
-    builderOut.readSide = posix_openpt(O_RDWR | O_NOCTTY);
-    if (!builderOut.readSide)
+    /* Create a pseudoterminal to get the output of the builder. */
+    builderOut = posix_openpt(O_RDWR | O_NOCTTY);
+    if (!builderOut)
         throw SysError("opening pseudoterminal master");
 
-    std::string slaveName(ptsname(builderOut.readSide.get()));
+    slaveName = ptsname(builderOut.get());
 
     if (buildUser) {
         if (chmod(slaveName.c_str(), 0600))
@@ -2254,33 +2257,33 @@ void DerivationGoal::startBuilder()
         if (chown(slaveName.c_str(), buildUser->getUID(), 0))
             throw SysError("changing owner of pseudoterminal slave");
     } else {
-        if (grantpt(builderOut.readSide.get()))
+        if (grantpt(builderOut.get()))
             throw SysError("granting access to pseudoterminal slave");
     }
 
-    #if 0
-    // Mount the pt in the sandbox so that the "tty" command works.
-    // FIXME: this doesn't work with the new devpts in the sandbox.
-    if (useChroot)
-        dirsInChroot[slaveName] = {slaveName, false};
-    #endif
-
-    if (unlockpt(builderOut.readSide.get()))
+    if (unlockpt(builderOut.get()))
         throw SysError("unlocking pseudoterminal");
 
-    builderOut.writeSide = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
-    if (!builderOut.writeSide)
-        throw SysError("opening pseudoterminal slave");
+    /* Open the slave side of the pseudoterminal and use it as stderr. */
+    auto openSlave = [&]()
+    {
+        AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
+        if (!builderOut)
+            throw SysError("opening pseudoterminal slave");
 
-    // Put the pt into raw mode to prevent \n -> \r\n translation.
-    struct termios term;
-    if (tcgetattr(builderOut.writeSide.get(), &term))
-        throw SysError("getting pseudoterminal attributes");
+        // Put the pt into raw mode to prevent \n -> \r\n translation.
+        struct termios term;
+        if (tcgetattr(builderOut.get(), &term))
+            throw SysError("getting pseudoterminal attributes");
 
-    cfmakeraw(&term);
+        cfmakeraw(&term);
 
-    if (tcsetattr(builderOut.writeSide.get(), TCSANOW, &term))
-        throw SysError("putting pseudoterminal into raw mode");
+        if (tcsetattr(builderOut.get(), TCSANOW, &term))
+            throw SysError("putting pseudoterminal into raw mode");
+
+        if (dup2(builderOut.get(), STDERR_FILENO) == -1)
+            throw SysError("cannot pipe standard error into log file");
+    };
 
     result.startTime = time(0);
 
@@ -2330,7 +2333,16 @@ void DerivationGoal::startBuilder()
 
         options.allowVfork = false;
 
+        Pipe sendPid;
+        sendPid.create();
+
         Pid helper = startProcess([&]() {
+            sendPid.readSide.close();
+
+            /* We need to open the slave early, before
+               CLONE_NEWUSER. Otherwise we get EPERM when running as
+               root. */
+            openSlave();
 
             /* Drop additional groups here because we can't do it
                after we've created the new user namespace.  FIXME:
@@ -2374,9 +2386,11 @@ void DerivationGoal::startBuilder()
                 _exit(1);
             if (child == -1) throw SysError("cloning builder process");
 
-            writeFull(builderOut.writeSide.get(), std::to_string(child) + "\n");
+            writeFull(sendPid.writeSide.get(), std::to_string(child) + "\n");
             _exit(0);
         }, options);
+
+        sendPid.writeSide.close();
 
         int res = helper.wait();
         if (res != 0 && settings.sandboxFallback) {
@@ -2395,7 +2409,7 @@ void DerivationGoal::startBuilder()
         });
 
         pid_t tmp;
-        if (!string2Int<pid_t>(readLine(builderOut.readSide.get()), tmp)) abort();
+        if (!string2Int<pid_t>(readLine(sendPid.readSide.get()), tmp)) abort();
         pid = tmp;
 
         /* Set the UID/GID mapping of the builder's user namespace
@@ -2422,18 +2436,18 @@ void DerivationGoal::startBuilder()
     fallback:
         options.allowVfork = !buildUser && !drv->isBuiltin();
         pid = startProcess([&]() {
+            openSlave();
             runChild();
         }, options);
     }
 
     /* parent */
     pid.setSeparatePG(true);
-    builderOut.writeSide = -1;
-    worker.childStarted(shared_from_this(), {builderOut.readSide.get()}, true, true);
+    worker.childStarted(shared_from_this(), {builderOut.get()}, true, true);
 
     /* Check if setting up the build environment failed. */
     while (true) {
-        string msg = readLine(builderOut.readSide.get());
+        string msg = readLine(builderOut.get());
         if (string(msg, 0, 1) == "\1") {
             if (msg.size() == 1) break;
             throw Error(string(msg, 1));
@@ -2736,7 +2750,7 @@ void DerivationGoal::runChild()
 
     try { /* child */
 
-        commonChildInit(builderOut);
+        commonChildInit(-1);
 
         try {
             setupSeccomp();
@@ -3728,7 +3742,7 @@ void DerivationGoal::deleteTmpDir(bool force)
 void DerivationGoal::handleChildOutput(int fd, const string & data)
 {
     if ((hook && fd == hook->builderOut.readSide.get()) ||
-        (!hook && fd == builderOut.readSide.get()))
+        (!hook && fd == builderOut.get()))
     {
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
