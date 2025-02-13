@@ -381,7 +381,7 @@ static FlakeRef applySelfAttrs(
 {
     auto newRef(ref);
 
-    std::set<std::string> allowedAttrs{"submodules"};
+    std::set<std::string> allowedAttrs{"submodules", "lfs"};
 
     for (auto & attr : flake.selfAttrs) {
         if (!allowedAttrs.contains(attr.first))

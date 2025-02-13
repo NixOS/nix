@@ -193,5 +193,36 @@
 
       assert fetched_lfs == fetched_flake, \
         f"fetching as flake input (store path {fetched_flake}) yielded a different result than using fetchGit (store path {fetched_lfs})"
+
+
+    with subtest("Check self.lfs"):
+      client.succeed(f"""
+        printf '{{
+          inputs.self.lfs = true;
+          outputs = {{ self }}: {{ }};
+        }}' >{repo.path}/flake.nix
+      """)
+      client.succeed(f"{repo.git} add : >&2")
+      client.succeed(f"{repo.git} commit -m 'add flake' >&2")
+      client.succeed(f"{repo.git} push origin main >&2")
+
+      # memorize the revision
+      self_lfs_rev = client.succeed(f"{repo.git} rev-parse HEAD").strip()
+
+      with TemporaryDirectory() as tempdir:
+        client.succeed(f"mkdir -p {tempdir}")
+        client.succeed(f"""
+          printf '{{
+            inputs.foo = {{
+              url = "git+{repo.remote}?ref=main&rev={self_lfs_rev}";
+            }};
+            outputs = {{ foo, self }}: {{ inherit (foo) outPath; }};
+          }}' >{tempdir}/flake.nix
+        """)
+        fetched_self_lfs = client.succeed(f"""
+          nix eval --debug --raw {tempdir}#.outPath
+        """)
+
+    client.succeed(f"cmp {repo.path}/beeg {fetched_self_lfs}/beeg >&2")
   '';
 }
