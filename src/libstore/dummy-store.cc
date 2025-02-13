@@ -330,7 +330,7 @@ struct DummyStoreImpl : DummyStore
 
     void registerDrvOutput(const Realisation & output) override
     {
-        buildTrace.insert_or_visit({output.id.drvHash, {{output.id.outputName, output}}}, [&](auto & kv) {
+        buildTrace.insert_or_visit({output.id.drvPath, {{output.id.outputName, output}}}, [&](auto & kv) {
             kv.second.insert_or_assign(output.id.outputName, output);
         });
     }
@@ -339,7 +339,7 @@ struct DummyStoreImpl : DummyStore
         const DrvOutput & drvOutput, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
     {
         bool visited = false;
-        buildTrace.cvisit(drvOutput.drvHash, [&](const auto & kv) {
+        buildTrace.cvisit(drvOutput.drvPath, [&](const auto & kv) {
             if (auto it = kv.second.find(drvOutput.outputName); it != kv.second.end()) {
                 visited = true;
                 callback(std::make_shared<UnkeyedRealisation>(it->second));
@@ -436,11 +436,7 @@ ref<DummyStore> adl_serializer<ref<DummyStore>>::from_json(const json & json)
         for (auto & [k1, v2] : getObject(v)) {
             UnkeyedRealisation realisation = v2;
             res->buildTrace.insert_or_visit(
-                {
-                    Hash::parseExplicitFormatUnprefixed(k0, HashAlgorithm::SHA256, HashFormat::Base64),
-                    {{k1, realisation}},
-                },
-                [&](auto & kv) { kv.second.insert_or_assign(k1, realisation); });
+                {StorePath{k0}, {{k1, realisation}}}, [&](auto & kv) { kv.second.insert_or_assign(k1, realisation); });
         }
     }
     return res;
@@ -473,7 +469,7 @@ void adl_serializer<DummyStore>::to_json(json & json, const DummyStore & val)
              auto obj = json::object();
              val.buildTrace.cvisit_all([&](const auto & kv) {
                  auto & [k, v] = kv;
-                 auto & obj2 = obj[k.to_string(HashFormat::Base64, false)] = json::object();
+                 auto & obj2 = obj[k.to_string()] = json::object();
                  for (auto & [k2, v2] : kv.second)
                      obj2[k2] = v2;
              });

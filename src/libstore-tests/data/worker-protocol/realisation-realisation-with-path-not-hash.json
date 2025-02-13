@@ -1,0 +1,13 @@
+{
+  "key": {
+    "drvPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv",
+    "outputName": "baz"
+  },
+  "value": {
+    "outPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo",
+    "signatures": [
+      "asdf:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+      "qwer:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+    ]
+  }
+}
