@@ -33,12 +33,6 @@ DerivationGoal::DerivationGoal(
     : Goal(worker, haveDerivation())
     , drvPath(drvPath)
     , wantedOutput(wantedOutput)
-    , outputHash{[&] {
-        auto outputHashes = staticOutputHashes(worker.evalStore, drv);
-        if (auto * mOutputHash = get(outputHashes, wantedOutput))
-            return *mOutputHash;
-        throw Error("derivation '%s' does not have output '%s'", worker.store.printStorePath(drvPath), wantedOutput);
-    }()}
     , buildMode(buildMode)
 {
     this->drv = std::make_unique<Derivation>(drv);
@@ -105,7 +99,7 @@ Goal::Co DerivationGoal::haveDerivation()
         if (settings.useSubstitutes && drvOptions.substitutesAllowed()) {
             if (!checkResult)
                 waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(
-                    DrvOutput{outputHash, wantedOutput}, buildMode == bmRepair ? Repair : NoRepair)));
+                    DrvOutput{drvPath, wantedOutput}, buildMode == bmRepair ? Repair : NoRepair)));
             else {
                 auto * cap = getDerivationCA(*drv);
                 waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
@@ -282,18 +276,20 @@ Goal::Co DerivationGoal::repairClosure()
     co_return doneSuccess(BuildResult::AlreadyValid, assertPathValidity());
 }
 
-std::optional<std::pair<Realisation, PathStatus>> DerivationGoal::checkPathValidity()
+std::optional<std::pair<UnkeyedRealisation, PathStatus>> DerivationGoal::checkPathValidity()
 {
     if (drv->type().isImpure())
         return std::nullopt;
 
-    auto drvOutput = DrvOutput{outputHash, wantedOutput};
+    auto drvOutput = DrvOutput{drvPath, wantedOutput};
 
-    std::optional<Realisation> mRealisation;
+    std::optional<UnkeyedRealisation> mRealisation;
 
     if (auto * mOutput = get(drv->outputs, wantedOutput)) {
         if (auto mPath = mOutput->path(worker.store, drv->name, wantedOutput)) {
-            mRealisation = Realisation{drvOutput, std::move(*mPath)};
+            mRealisation = UnkeyedRealisation{
+                .outPath = std::move(*mPath),
+            };
         }
     } else {
         throw Error(
@@ -321,56 +317,62 @@ std::optional<std::pair<Realisation, PathStatus>> DerivationGoal::checkPathValid
             // derivation, and the output path is valid, but we don't have
             // its realisation stored (probably because it has been built
             // without the `ca-derivations` experimental flag).
-            worker.store.registerDrvOutput(*mRealisation);
+            worker.store.registerDrvOutput(Realisation{
+                *mRealisation,
+                {
+                    .drvPath = drvPath,
+                    .outputName = wantedOutput,
+                },
+            });
         }
 
         return {{*mRealisation, status}};
-    } else
-        return std::nullopt;
-}
+        } else
+            return std::nullopt;
+    }
 
-Realisation DerivationGoal::assertPathValidity()
-{
-    auto checkResult = checkPathValidity();
-    if (!(checkResult && checkResult->second == PathStatus::Valid))
-        throw Error("some outputs are unexpectedly invalid");
-    return checkResult->first;
-}
+    UnkeyedRealisation DerivationGoal::assertPathValidity()
+    {
+        auto checkResult = checkPathValidity();
+        if (!(checkResult && checkResult->second == PathStatus::Valid))
+            throw Error("some outputs are unexpectedly invalid");
+        return checkResult->first;
+    }
 
-Goal::Done DerivationGoal::doneSuccess(BuildResult::Status status, Realisation builtOutput)
-{
-    buildResult.status = status;
+    Goal::Done DerivationGoal::doneSuccess(BuildResult::Status status, UnkeyedRealisation builtOutput)
+    {
+        buildResult.status = status;
 
-    assert(buildResult.success());
+        assert(buildResult.success());
 
-    mcExpectedBuilds.reset();
+        mcExpectedBuilds.reset();
 
-    buildResult.builtOutputs = {{wantedOutput, std::move(builtOutput)}};
-    if (status == BuildResult::Built)
-        worker.doneBuilds++;
+        buildResult.builtOutputs = {{wantedOutput, std::move(builtOutput)}};
+        if (status == BuildResult::Built)
+            worker.doneBuilds++;
 
-    worker.updateProgress();
+        worker.updateProgress();
 
-    return amDone(ecSuccess, std::nullopt);
-}
+        return amDone(ecSuccess, std::nullopt);
+    }
 
-Goal::Done DerivationGoal::doneFailure(BuildError ex)
-{
-    buildResult.status = ex.status;
-    buildResult.errorMsg = fmt("%s", Uncolored(ex.info().msg));
-    if (buildResult.status == BuildResult::TimedOut)
-        worker.timedOut = true;
-    if (buildResult.status == BuildResult::PermanentFailure)
-        worker.permanentFailure = true;
+    Goal::Done DerivationGoal::doneFailure(BuildError ex)
+    {
+        buildResult.status = ex.status;
+        buildResult.errorMsg = fmt("%s", Uncolored(ex.info().msg));
+        if (buildResult.status == BuildResult::TimedOut)
+            worker.timedOut = true;
+        if (buildResult.status == BuildResult::PermanentFailure)
+            worker.permanentFailure = true;
 
-    mcExpectedBuilds.reset();
+        mcExpectedBuilds.reset();
 
-    if (ex.status != BuildResult::DependencyFailed)
-        worker.failedBuilds++;
+        if (ex.status != BuildResult::DependencyFailed)
+            worker.failedBuilds++;
 
-    worker.updateProgress();
+        worker.updateProgress();
 
-    return amDone(ecFailed, {std::move(ex)});
-}
+        return amDone(ecFailed, {std::move(ex)});
+    }
 
 } // namespace nix

@@ -110,8 +110,6 @@ struct LocalStore::State::Stmts
     SQLiteStmt QueryAllRealisedOutputs;
     SQLiteStmt QueryPathFromHashPart;
     SQLiteStmt QueryValidPaths;
-    SQLiteStmt QueryRealisationReferences;
-    SQLiteStmt AddRealisationReference;
 };
 
 LocalStore::LocalStore(ref<const Config> config)
@@ -390,21 +388,6 @@ LocalStore::LocalStore(ref<const Config> config)
                     where drvPath = ?
                     ;
             )");
-        state->stmts->QueryRealisationReferences.create(
-            state->db,
-            R"(
-                select drvPath, outputName from Realisations
-                    join RealisationsRefs on realisationReference = Realisations.id
-                    where referrer = ?;
-            )");
-        state->stmts->AddRealisationReference.create(
-            state->db,
-            R"(
-                insert or replace into RealisationsRefs (referrer, realisationReference)
-                values (
-                    (select id from Realisations where drvPath = ? and outputName = ?),
-                    (select id from Realisations where drvPath = ? and outputName = ?));
-            )");
     }
 }
 
@@ -636,7 +619,7 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                 auto combinedSignatures = oldR->signatures;
                 combinedSignatures.insert(info.signatures.begin(), info.signatures.end());
                 state->stmts->UpdateRealisedOutput
-                    .use()(concatStringsSep(" ", combinedSignatures))(info.id.strHash())(info.id.outputName)
+                    .use()(concatStringsSep(" ", combinedSignatures))(info.id.drvPath.to_string())(info.id.outputName)
                     .exec();
             } else {
                 throw Error(
@@ -650,27 +633,8 @@ void LocalStore::registerDrvOutput(const Realisation & info)
             }
         } else {
             state->stmts->RegisterRealisedOutput
-                .use()(info.id.strHash())(info.id.outputName)(printStorePath(info.outPath))(
+                .use()(info.id.drvPath.to_string())(info.id.outputName)(printStorePath(info.outPath))(
                     concatStringsSep(" ", info.signatures))
-                .exec();
-        }
-        for (auto & [outputId, depPath] : info.dependentRealisations) {
-            auto localRealisation = queryRealisationCore_(*state, outputId);
-            if (!localRealisation)
-                throw Error(
-                    "unable to register the derivation '%s' as it "
-                    "depends on the non existent '%s'",
-                    info.id.to_string(),
-                    outputId.to_string());
-            if (localRealisation->second.outPath != depPath)
-                throw Error(
-                    "unable to register the derivation '%s' as it "
-                    "depends on a realisation of '%s' that doesn’t"
-                    "match what we have locally",
-                    info.id.to_string(),
-                    outputId.to_string());
-            state->stmts->AddRealisationReference
-                .use()(info.id.strHash())(info.id.outputName)(outputId.strHash())(outputId.outputName)
                 .exec();
         }
     });
@@ -1036,7 +1000,7 @@ bool LocalStore::pathInfoIsUntrusted(const ValidPathInfo & info)
 
 bool LocalStore::realisationIsUntrusted(const Realisation & realisation)
 {
-    return config->requireSigs && !realisation.checkSignatures(getPublicKeys());
+    return config->requireSigs && !realisation.checkSignatures(realisation.id, getPublicKeys());
 }
 
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
@@ -1586,10 +1550,10 @@ void LocalStore::addSignatures(const StorePath & storePath, const StringSet & si
     });
 }
 
-std::optional<std::pair<int64_t, Realisation>>
+std::optional<std::pair<int64_t, UnkeyedRealisation>>
 LocalStore::queryRealisationCore_(LocalStore::State & state, const DrvOutput & id)
 {
-    auto useQueryRealisedOutput(state.stmts->QueryRealisedOutput.use()(id.strHash())(id.outputName));
+    auto useQueryRealisedOutput(state.stmts->QueryRealisedOutput.use()(id.drvPath.to_string())(id.outputName));
     if (!useQueryRealisedOutput.next())
         return std::nullopt;
     auto realisationDbId = useQueryRealisedOutput.getInt(0);
@@ -1598,46 +1562,30 @@ LocalStore::queryRealisationCore_(LocalStore::State & state, const DrvOutput & i
 
     return {
         {realisationDbId,
-         Realisation{
-             .id = id,
+         UnkeyedRealisation{
              .outPath = outputPath,
              .signatures = signatures,
          }}};
 }
 
-std::optional<const Realisation> LocalStore::queryRealisation_(LocalStore::State & state, const DrvOutput & id)
+std::optional<const UnkeyedRealisation> LocalStore::queryRealisation_(LocalStore::State & state, const DrvOutput & id)
 {
     auto maybeCore = queryRealisationCore_(state, id);
     if (!maybeCore)
         return std::nullopt;
     auto [realisationDbId, res] = *maybeCore;
 
-    std::map<DrvOutput, StorePath> dependentRealisations;
-    auto useRealisationRefs(state.stmts->QueryRealisationReferences.use()(realisationDbId));
-    while (useRealisationRefs.next()) {
-        auto depId = DrvOutput{
-            Hash::parseAnyPrefixed(useRealisationRefs.getStr(0)),
-            useRealisationRefs.getStr(1),
-        };
-        auto dependentRealisation = queryRealisationCore_(state, depId);
-        assert(dependentRealisation); // Enforced by the db schema
-        auto outputPath = dependentRealisation->second.outPath;
-        dependentRealisations.insert({depId, outputPath});
-    }
-
-    res.dependentRealisations = dependentRealisations;
-
     return {res};
 }
 
 void LocalStore::queryRealisationUncached(
-    const DrvOutput & id, Callback<std::shared_ptr<const Realisation>> callback) noexcept
+    const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
     try {
-        auto maybeRealisation =
-            retrySQLite<std::optional<const Realisation>>([&]() { return queryRealisation_(*_state->lock(), id); });
+        auto maybeRealisation = retrySQLite<std::optional<const UnkeyedRealisation>>(
+            [&]() { return queryRealisation_(*_state->lock(), id); });
         if (maybeRealisation)
-            callback(std::make_shared<const Realisation>(maybeRealisation.value()));
+            callback(std::make_shared<const UnkeyedRealisation>(maybeRealisation.value()));
         else
             callback(nullptr);
 

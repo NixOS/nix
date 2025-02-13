@@ -1,6 +1,5 @@
 #include "nix/store/realisation.hh"
 #include "nix/store/store-api.hh"
-#include "nix/util/closure.hh"
 #include "nix/util/signature/local-keys.hh"
 #include "nix/util/json-utils.hh"
 #include <nlohmann/json.hpp>
@@ -9,76 +8,49 @@ namespace nix {
 
 MakeError(InvalidDerivationOutputId, Error);
 
-DrvOutput DrvOutput::parse(const std::string & strRep)
+DrvOutput DrvOutput::parse(const StoreDirConfig & store, std::string_view s)
 {
-    size_t n = strRep.find("!");
-    if (n == strRep.npos)
-        throw InvalidDerivationOutputId("Invalid derivation output id %s", strRep);
-
+    size_t n = s.rfind('^');
+    if (n == s.npos)
+        throw InvalidDerivationOutputId("Invalid derivation output id '%s': missing '^'", s);
     return DrvOutput{
-        .drvHash = Hash::parseAnyPrefixed(strRep.substr(0, n)),
-        .outputName = strRep.substr(n + 1),
+        .drvPath = store.parseStorePath(s.substr(0, n)),
+        .outputName = OutputName{s.substr(n + 1)},
     };
+}
+
+std::string DrvOutput::render(const StoreDirConfig & store) const
+{
+    return std::string(store.printStorePath(drvPath)) + "^" + outputName;
 }
 
 std::string DrvOutput::to_string() const
 {
-    return strHash() + "!" + outputName;
+    return std::string(drvPath.to_string()) + "^" + outputName;
 }
 
-std::set<Realisation> Realisation::closure(Store & store, const std::set<Realisation> & startOutputs)
+std::string UnkeyedRealisation::fingerprint(const DrvOutput & key) const
 {
-    std::set<Realisation> res;
-    Realisation::closure(store, startOutputs, res);
-    return res;
+    auto serialised = static_cast<nlohmann::json>(Realisation{*this, key});
+    auto value = serialised.find("value");
+    assert(value != serialised.end());
+    value->erase("signatures");
+    return serialised.dump();
 }
 
-void Realisation::closure(Store & store, const std::set<Realisation> & startOutputs, std::set<Realisation> & res)
+void UnkeyedRealisation::sign(const DrvOutput & key, const Signer & signer)
 {
-    auto getDeps = [&](const Realisation & current) -> std::set<Realisation> {
-        std::set<Realisation> res;
-        for (auto & [currentDep, _] : current.dependentRealisations) {
-            if (auto currentRealisation = store.queryRealisation(currentDep))
-                res.insert(*currentRealisation);
-            else
-                throw Error("Unrealised derivation '%s'", currentDep.to_string());
-        }
-        return res;
-    };
-
-    computeClosure<Realisation>(
-        startOutputs,
-        res,
-        [&](const Realisation & current, std::function<void(std::promise<std::set<Realisation>> &)> processEdges) {
-            std::promise<std::set<Realisation>> promise;
-            try {
-                auto res = getDeps(current);
-                promise.set_value(res);
-            } catch (...) {
-                promise.set_exception(std::current_exception());
-            }
-            return processEdges(promise);
-        });
+    signatures.insert(signer.signDetached(fingerprint(key)));
 }
 
-std::string Realisation::fingerprint() const
+bool UnkeyedRealisation::checkSignature(
+    const DrvOutput & key, const PublicKeys & publicKeys, const std::string & sig) const
 {
-    nlohmann::json serialized = *this;
-    serialized.erase("signatures");
-    return serialized.dump();
+    return verifyDetached(fingerprint(key), sig, publicKeys);
 }
 
-void Realisation::sign(const Signer & signer)
-{
-    signatures.insert(signer.signDetached(fingerprint()));
-}
-
-bool Realisation::checkSignature(const PublicKeys & publicKeys, const std::string & sig) const
-{
-    return verifyDetached(fingerprint(), sig, publicKeys);
-}
-
-size_t Realisation::checkSignatures(const PublicKeys & publicKeys) const
+size_t UnkeyedRealisation::checkSignatures(
+    const DrvOutput & key, const PublicKeys & publicKeys) const
 {
     // FIXME: Maybe we should return `maxSigs` if the realisation corresponds to
     // an input-addressed one − because in that case the drv is enough to check
@@ -86,56 +58,30 @@ size_t Realisation::checkSignatures(const PublicKeys & publicKeys) const
 
     size_t good = 0;
     for (auto & sig : signatures)
-        if (checkSignature(publicKeys, sig))
+        if (checkSignature(key, publicKeys, sig))
             good++;
     return good;
 }
 
-StorePath RealisedPath::path() const
+const StorePath & RealisedPath::path() const
 {
-    return std::visit([](auto && arg) { return arg.getPath(); }, raw);
+    return std::visit([](auto && arg) -> auto & { return arg.getPath(); }, raw);
 }
 
-bool Realisation::isCompatibleWith(const Realisation & other) const
+MissingRealisation::MissingRealisation(
+    const StoreDirConfig & store, const StorePath & drvPath, const OutputName & outputName)
+    : Error("cannot operate on output '%s' of the unbuilt derivation '%s'", outputName, store.printStorePath(drvPath))
 {
-    assert(id == other.id);
-    if (outPath == other.outPath) {
-        if (dependentRealisations.empty() != other.dependentRealisations.empty()) {
-            warn(
-                "Encountered a realisation for '%s' with an empty set of "
-                "dependencies. This is likely an artifact from an older Nix. "
-                "I’ll try to fix the realisation if I can",
-                id.to_string());
-            return true;
-        } else if (dependentRealisations == other.dependentRealisations) {
-            return true;
-        }
-    }
-    return false;
 }
 
-void RealisedPath::closure(Store & store, const RealisedPath::Set & startPaths, RealisedPath::Set & ret)
+MissingRealisation::MissingRealisation(
+    const StoreDirConfig & store,
+    const SingleDerivedPath & drvPath,
+    const StorePath & drvPathResolved,
+    const OutputName & outputName)
+    : MissingRealisation{store, drvPathResolved, outputName}
 {
-    // FIXME: This only builds the store-path closure, not the real realisation
-    // closure
-    StorePathSet initialStorePaths, pathsClosure;
-    for (auto & path : startPaths)
-        initialStorePaths.insert(path.path());
-    store.computeFSClosure(initialStorePaths, pathsClosure);
-    ret.insert(startPaths.begin(), startPaths.end());
-    ret.insert(pathsClosure.begin(), pathsClosure.end());
-}
-
-void RealisedPath::closure(Store & store, RealisedPath::Set & ret) const
-{
-    RealisedPath::closure(store, {*this}, ret);
-}
-
-RealisedPath::Set RealisedPath::closure(Store & store) const
-{
-    RealisedPath::Set ret;
-    closure(store, ret);
-    return ret;
+    addTrace({}, "looking up realisation for derivation '%s'", drvPath.to_string(store));
 }
 
 } // namespace nix
@@ -144,37 +90,61 @@ namespace nlohmann {
 
 using namespace nix;
 
-Realisation adl_serializer<Realisation>::from_json(const json & json0)
+DrvOutput adl_serializer<DrvOutput>::from_json(const json & json)
 {
-    auto json = getObject(json0);
+    auto obj = getObject(json);
+
+    return {
+        .drvPath = valueAt(obj, "drvPath"),
+        .outputName = getString(valueAt(obj, "outputName")),
+    };
+}
+
+void adl_serializer<DrvOutput>::to_json(json & json, const DrvOutput & drvOutput)
+{
+    json = {
+        {"drvPath", drvOutput.drvPath},
+        {"outputName", drvOutput.outputName},
+    };
+}
+
+UnkeyedRealisation adl_serializer<UnkeyedRealisation>::from_json(const json & json)
+{
+    auto obj = getObject(json);
 
     StringSet signatures;
-    if (auto signaturesOpt = optionalValueAt(json, "signatures"))
-        signatures = *signaturesOpt;
+    if (auto * signaturesJson = get(obj, "signatures"))
+        signatures = getStringSet(*signaturesJson);
 
-    std::map<DrvOutput, StorePath> dependentRealisations;
-    if (auto jsonDependencies = optionalValueAt(json, "dependentRealisations"))
-        for (auto & [jsonDepId, jsonDepOutPath] : getObject(*jsonDependencies))
-            dependentRealisations.insert({DrvOutput::parse(jsonDepId), jsonDepOutPath});
-
-    return Realisation{
-        .id = DrvOutput::parse(valueAt(json, "id")),
-        .outPath = valueAt(json, "outPath"),
+    return {
+        .outPath = valueAt(obj, "outPath"),
         .signatures = signatures,
-        .dependentRealisations = dependentRealisations,
+    };
+}
+
+void adl_serializer<UnkeyedRealisation>::to_json(json & json, const UnkeyedRealisation & r)
+{
+    json = {
+        {"outPath", r.outPath},
+        {"signatures", r.signatures},
+    };
+}
+
+Realisation adl_serializer<Realisation>::from_json(const nlohmann::json & json)
+{
+    auto obj = getObject(json);
+
+    return {
+        static_cast<UnkeyedRealisation>(valueAt(obj, "value")),
+        static_cast<DrvOutput>(valueAt(obj, "key")),
     };
 }
 
 void adl_serializer<Realisation>::to_json(json & json, const Realisation & r)
 {
-    auto jsonDependentRealisations = nlohmann::json::object();
-    for (auto & [depId, depOutPath] : r.dependentRealisations)
-        jsonDependentRealisations.emplace(depId.to_string(), depOutPath);
     json = {
-        {"id", r.id.to_string()},
-        {"outPath", r.outPath},
-        {"signatures", r.signatures},
-        {"dependentRealisations", jsonDependentRealisations},
+        {"key", r.id},
+        {"value", static_cast<const UnkeyedRealisation &>(r)},
     };
 }
 

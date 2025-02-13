@@ -309,15 +309,10 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
             if (resolvedResult.success()) {
                 SingleDrvOutputs builtOutputs;
 
-                auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
-                auto resolvedHashes = staticOutputHashes(worker.store, drvResolved);
-
                 StorePathSet outputPaths;
 
                 for (auto & outputName : drvResolved.outputNames()) {
-                    auto outputHash = get(outputHashes, outputName);
-                    auto resolvedHash = get(resolvedHashes, outputName);
-                    if ((!outputHash) || (!resolvedHash))
+                    if (!drv->outputs.contains(outputName))
                         throw Error(
                             "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolve)",
                             worker.store.printStorePath(drvPath),
@@ -332,7 +327,11 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                            outputs in resolvedResult, this can get out of sync with the
                            store, which is our actual source of truth. For now we just
                            check the store directly if it fails. */
-                        auto take2 = worker.evalStore.queryRealisation(DrvOutput{*resolvedHash, outputName});
+                        auto take2 = worker.evalStore.queryRealisation(
+                            DrvOutput{
+                                .drvPath = pathResolved,
+                                .outputName = outputName,
+                            });
                         if (take2)
                             return *take2;
 
@@ -342,18 +341,6 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                             outputName);
                     }();
 
-                    if (!drv->type().isImpure()) {
-                        auto newRealisation = realisation;
-                        newRealisation.id = DrvOutput{*outputHash, outputName};
-                        newRealisation.signatures.clear();
-                        if (!drv->type().isFixed()) {
-                            auto & drvStore = worker.evalStore.isValidPath(drvPath) ? worker.evalStore : worker.store;
-                            newRealisation.dependentRealisations =
-                                drvOutputReferences(worker.store, *drv, realisation.outPath, &drvStore);
-                        }
-                        worker.store.signRealisation(newRealisation);
-                        worker.store.registerDrvOutput(newRealisation);
-                    }
                     outputPaths.insert(realisation.outPath);
                     builtOutputs.emplace(outputName, realisation);
                 }
@@ -423,9 +410,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
        given this information by the downstream goal, that cannot happen
        anymore if the downstream goal only cares about one output, but
        we care about all outputs. */
-    auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
-    for (auto & [outputName, outputHash] : outputHashes) {
-        InitialOutput v{.outputHash = outputHash};
+    for (auto & [outputName, _] : drv->outputs) {
+        InitialOutput v;
 
         /* TODO we might want to also allow randomizing the paths
            for regular CA derivations, e.g. for sake of checking
@@ -1272,7 +1258,7 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
                                                                               : PathStatus::Corrupt,
             };
         }
-        auto drvOutput = DrvOutput{info.outputHash, i.first};
+        auto drvOutput = DrvOutput{drvPath, i.first};
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
             if (auto real = worker.store.queryRealisation(drvOutput)) {
                 info.known = {
@@ -1286,13 +1272,22 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
                 // without the `ca-derivations` experimental flag).
                 worker.store.registerDrvOutput(
                     Realisation{
+                        {
+                            .outPath = info.known->path,
+                        },
                         drvOutput,
-                        info.known->path,
                     });
             }
         }
         if (info.known && info.known->isValid())
-            validOutputs.emplace(i.first, Realisation{drvOutput, info.known->path});
+            validOutputs.emplace(
+                i.first,
+                Realisation{
+                    {
+                        .outPath = info.known->path,
+                    },
+                    drvOutput,
+                });
     }
 
     bool allValid = true;
