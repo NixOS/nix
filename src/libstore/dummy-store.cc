@@ -253,7 +253,7 @@ struct DummyStoreImpl : DummyStore
     void registerDrvOutput(const Realisation & output) override
     {
         auto ref = make_ref<UnkeyedRealisation>(output);
-        buildTrace.insert_or_visit({output.id.drvHash, {{output.id.outputName, ref}}}, [&](auto & kv) {
+        buildTrace.insert_or_visit({output.id.drvPath, {{output.id.outputName, ref}}}, [&](auto & kv) {
             kv.second.insert_or_assign(output.id.outputName, make_ref<UnkeyedRealisation>(output));
         });
     }
@@ -274,7 +274,7 @@ struct DummyStoreImpl : DummyStore
         const DrvOutput & drvOutput, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
     {
         bool visited = false;
-        buildTrace.cvisit(drvOutput.drvHash, [&](const auto & kv) {
+        buildTrace.cvisit(drvOutput.drvPath, [&](const auto & kv) {
             if (auto it = kv.second.find(drvOutput.outputName); it != kv.second.end()) {
                 visited = true;
                 callback(it->second.get_ptr());
