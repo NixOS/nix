@@ -346,13 +346,11 @@ static int main_build_remote(int argc, char ** argv)
             optResult = std::move(res[0]);
         }
 
-        auto outputHashes = staticOutputHashes(*store, drv);
         std::set<Realisation> missingRealisations;
         StorePathSet missingPaths;
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !drv.type().hasKnownOutputPaths()) {
             for (auto & outputName : wantedOutputs) {
-                auto thisOutputHash = outputHashes.at(outputName);
-                auto thisOutputId = DrvOutput{thisOutputHash, outputName};
+                auto thisOutputId = DrvOutput{*drvPath, outputName};
                 if (!store->queryRealisation(thisOutputId)) {
                     debug("missing output %s", outputName);
                     assert(optResult);
@@ -362,7 +360,7 @@ static int main_build_remote(int argc, char ** argv)
                         auto i = success.builtOutputs.find(outputName);
                         assert(i != success.builtOutputs.end());
                         auto & newRealisation = i->second;
-                        missingRealisations.insert(newRealisation);
+                        missingRealisations.insert({newRealisation, thisOutputId});
                         missingPaths.insert(newRealisation.outPath);
                     }
                 }
