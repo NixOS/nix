@@ -20,14 +20,34 @@ public:
     void TearDown() override { }
 };
 
-TEST_F(AccessKeysTest, singleGitHub)
+TEST_F(AccessKeysTest, singleOrgGitHub)
 {
     fetchers::Settings fetchSettings = fetchers::Settings{};
-    fetchSettings.accessTokens.get().insert({"github.com","token"});
+    fetchSettings.accessTokens.get().insert({"github.com/a","token"});
     auto i = Input::fromURL(fetchSettings, "github:a/b");
 
     auto token = i.scheme->getAccessToken(fetchSettings, "github.com", "github.com/a/b");
     ASSERT_EQ(token,"token");
+}
+
+TEST_F(AccessKeysTest, nonMatches)
+{
+    fetchers::Settings fetchSettings = fetchers::Settings{};
+    fetchSettings.accessTokens.get().insert({"github.com","token"});
+    auto i = Input::fromURL(fetchSettings, "gitlab:github.com/evil");
+
+    auto token = i.scheme->getAccessToken(fetchSettings, "gitlab.com", "gitlab.com/github.com/evil");
+    ASSERT_EQ(token,std::nullopt);
+}
+
+TEST_F(AccessKeysTest, noPartialMatches)
+{
+    fetchers::Settings fetchSettings = fetchers::Settings{};
+    fetchSettings.accessTokens.get().insert({"github.com/partial","token"});
+    auto i = Input::fromURL(fetchSettings, "github:partial-match/repo");
+
+    auto token = i.scheme->getAccessToken(fetchSettings, "github.com", "github.com/partial-match");
+    ASSERT_EQ(token,std::nullopt);
 }
 
 TEST_F(AccessKeysTest, repoGitHub)
