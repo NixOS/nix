@@ -602,12 +602,12 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
 }
 
 void RemoteStore::queryRealisationUncached(const DrvOutput & id,
-    Callback<std::shared_ptr<const Realisation>> callback) noexcept
+    Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
     try {
         auto conn(getConnection());
 
-        if (GET_PROTOCOL_MINOR(conn->protoVersion) < 27) {
+        if (GET_PROTOCOL_MINOR(conn->protoVersion) < 39) {
             warn("the daemon is too old to support content-addressing derivations, please upgrade it to 2.4");
             return callback(nullptr);
         }
@@ -616,23 +616,13 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
         conn->to << id.to_string();
         conn.processStderr();
 
-        auto real = [&]() -> std::shared_ptr<const Realisation> {
-            if (GET_PROTOCOL_MINOR(conn->protoVersion) < 31) {
-                auto outPaths = WorkerProto::Serialise<std::set<StorePath>>::read(
-                    *this, *conn);
-                if (outPaths.empty())
-                    return nullptr;
-                return std::make_shared<const Realisation>(Realisation { .id = id, .outPath = *outPaths.begin() });
-            } else {
-                auto realisations = WorkerProto::Serialise<std::set<Realisation>>::read(
-                    *this, *conn);
-                if (realisations.empty())
-                    return nullptr;
-                return std::make_shared<const Realisation>(*realisations.begin());
-            }
-        }();
-
-        callback(std::shared_ptr<const Realisation>(real));
+        callback([&]() -> std::shared_ptr<const UnkeyedRealisation> {
+            auto realisation = WorkerProto::Serialise<std::optional<UnkeyedRealisation>>::read(
+                *this, *conn);
+            if (!realisation)
+                return nullptr;
+            return std::make_shared<const UnkeyedRealisation>(*realisation);
+        }());
     } catch (...) { return callback.rethrow(); }
 }
 
@@ -724,27 +714,19 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
 
                         OutputPathMap outputs;
                         auto drvPath = resolveDerivedPath(*evalStore, *bfd.drvPath);
-                        auto drv = evalStore->readDerivation(drvPath);
-                        const auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
                         auto built = resolveDerivedPath(*this, bfd, &*evalStore);
                         for (auto & [output, outputPath] : built) {
-                            auto outputHash = get(outputHashes, output);
-                            if (!outputHash)
-                                throw Error(
-                                    "the derivation '%s' doesn't have an output named '%s'",
-                                    printStorePath(drvPath), output);
-                            auto outputId = DrvOutput{ *outputHash, output };
+                            auto outputId = DrvOutput{ drvPath, output };
                             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                                 auto realisation =
                                     queryRealisation(outputId);
                                 if (!realisation)
-                                    throw MissingRealisation(outputId);
+                                    throw MissingRealisation(*this, outputId);
                                 res.builtOutputs.emplace(output, *realisation);
                             } else {
                                 res.builtOutputs.emplace(
                                     output,
-                                    Realisation {
-                                        .id = outputId,
+                                    UnkeyedRealisation {
                                         .outPath = outputPath,
                                     });
                             }

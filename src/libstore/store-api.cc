@@ -479,9 +479,8 @@ std::map<std::string, std::optional<StorePath>> Store::queryPartialDerivationOut
         return outputs;
 
     auto drv = evalStore.readInvalidDerivation(path);
-    auto drvHashes = staticOutputHashes(*this, drv);
-    for (auto & [outputName, hash] : drvHashes) {
-        auto realisation = queryRealisation(DrvOutput{hash, outputName});
+    for (auto & [outputName, _] : drv.outputs) {
+        auto realisation = queryRealisation(DrvOutput{path, outputName});
         if (realisation) {
             outputs.insert_or_assign(outputName, realisation->outPath);
         } else {
@@ -500,7 +499,7 @@ OutputPathMap Store::queryDerivationOutputMap(const StorePath & path, Store * ev
     OutputPathMap result;
     for (auto & [outName, optOutPath] : resp) {
         if (!optOutPath)
-            throw MissingRealisation(printStorePath(path), outName);
+            throw MissingRealisation(*this, path, outName);
         result.insert_or_assign(outName, *optOutPath);
     }
     return result;
@@ -716,7 +715,7 @@ void Store::queryPathInfo(const StorePath & storePath,
 }
 
 void Store::queryRealisation(const DrvOutput & id,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept
+        Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
 
     try {
@@ -748,18 +747,18 @@ void Store::queryRealisation(const DrvOutput & id,
     queryRealisationUncached(
         id,
         { [this, id, callbackPtr](
-              std::future<std::shared_ptr<const Realisation>> fut) {
+              std::future<std::shared_ptr<const UnkeyedRealisation>> fut) {
             try {
                 auto info = fut.get();
 
                 if (diskCache) {
                     if (info)
-                        diskCache->upsertRealisation(getUri(), *info);
+                        diskCache->upsertRealisation(getUri(), {*info, id});
                     else
                         diskCache->upsertAbsentRealisation(getUri(), id);
                 }
 
-                (*callbackPtr)(std::shared_ptr<const Realisation>(info));
+                (*callbackPtr)(std::shared_ptr<const UnkeyedRealisation>(info));
 
             } catch (...) {
                 callbackPtr->rethrow();
@@ -767,9 +766,9 @@ void Store::queryRealisation(const DrvOutput & id,
         } });
 }
 
-std::shared_ptr<const Realisation> Store::queryRealisation(const DrvOutput & id)
+std::shared_ptr<const UnkeyedRealisation> Store::queryRealisation(const DrvOutput & id)
 {
-    using RealPtr = std::shared_ptr<const Realisation>;
+    using RealPtr = std::shared_ptr<const UnkeyedRealisation>;
     std::promise<RealPtr> promise;
 
     queryRealisation(id,
@@ -1019,36 +1018,21 @@ std::map<StorePath, StorePath> copyPaths(
     SubstituteFlag substitute)
 {
     StorePathSet storePaths;
-    std::set<Realisation> toplevelRealisations;
+    std::vector<const Realisation *> realisations;
     for (auto & path : paths) {
         storePaths.insert(path.path());
-        if (auto realisation = std::get_if<Realisation>(&path.raw)) {
+        if (auto * realisation = std::get_if<Realisation>(&path.raw)) {
             experimentalFeatureSettings.require(Xp::CaDerivations);
-            toplevelRealisations.insert(*realisation);
+            realisations.push_back(realisation);
         }
     }
+
     auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
 
     try {
         // Copy the realisation closure
-        processGraph<Realisation>(
-            Realisation::closure(srcStore, toplevelRealisations),
-            [&](const Realisation & current) -> std::set<Realisation> {
-                std::set<Realisation> children;
-                for (const auto & [drvOutput, _] : current.dependentRealisations) {
-                    auto currentChild = srcStore.queryRealisation(drvOutput);
-                    if (!currentChild)
-                        throw Error(
-                            "incomplete realisation closure: '%s' is a "
-                            "dependency of '%s' but isn't registered",
-                            drvOutput.to_string(), current.id.to_string());
-                    children.insert(*currentChild);
-                }
-                return children;
-            },
-            [&](const Realisation& current) -> void {
-                dstStore.registerDrvOutput(current, checkSigs);
-            });
+        for (const auto * realisation : realisations)
+            dstStore.registerDrvOutput(*realisation, checkSigs);
     } catch (MissingExperimentalFeature & e) {
         // Don't fail if the remote doesn't support CA derivations is it might
         // not be within our control to change that, and we might still want
@@ -1154,8 +1138,19 @@ void copyClosure(
 {
     if (&srcStore == &dstStore) return;
 
-    RealisedPath::Set closure;
-    RealisedPath::closure(srcStore, paths, closure);
+    StorePathSet closure0;
+    for (auto & path : paths) {
+        if (auto * opaquePath = std::get_if<OpaquePath>(&path.raw)) {
+            closure0.insert(opaquePath->path);
+        }
+    }
+
+    StorePathSet closure1;
+    srcStore.computeFSClosure(closure0, closure1);
+
+    RealisedPath::Set closure = paths;
+    for (auto && path : closure1)
+        closure.insert({std::move(path)});
 
     copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
 }
@@ -1300,7 +1295,7 @@ void Store::signRealisation(Realisation & realisation)
     for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
         LocalSigner signer(std::move(secretKey));
-        realisation.sign(signer);
+        realisation.sign(*this, realisation.id, signer);
     }
 }
 

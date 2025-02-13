@@ -255,8 +255,6 @@
               ''^src/libstore/include/nix/store/pathlocks\.hh$''
               ''^src/libstore/profiles\.cc$''
               ''^src/libstore/include/nix/store/profiles\.hh$''
-              ''^src/libstore/realisation\.cc$''
-              ''^src/libstore/include/nix/store/realisation\.hh$''
               ''^src/libstore/remote-fs-accessor\.cc$''
               ''^src/libstore/include/nix/store/remote-fs-accessor\.hh$''
               ''^src/libstore/include/nix/store/remote-store-connection\.hh$''

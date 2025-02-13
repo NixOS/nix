@@ -118,11 +118,9 @@ Goal::Co DerivationGoal::haveDerivation()
 
         if (impure) experimentalFeatureSettings.require(Xp::ImpureDerivations);
 
-        auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
-        for (auto & [outputName, outputHash] : outputHashes) {
+        for (auto & [outputName, _] : drv->outputs) {
             InitialOutput v{
                 .wanted = true, // Will be refined later
-                .outputHash = outputHash
             };
 
             /* TODO we might want to also allow randomizing the paths
@@ -170,7 +168,7 @@ Goal::Co DerivationGoal::haveDerivation()
                 waitees.insert(
                     upcast_goal(
                         worker.makeDrvOutputSubstitutionGoal(
-                            DrvOutput{status.outputHash, outputName},
+                            DrvOutput{drvPath, outputName},
                             buildMode == bmRepair ? Repair : NoRepair
                         )
                     )
@@ -358,7 +356,7 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
                     : PathStatus::Corrupt,
             };
         }
-        auto drvOutput = DrvOutput{info.outputHash, i.first};
+        auto drvOutput = DrvOutput{drvPath, i.first};
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
             if (auto real = worker.store.queryRealisation(drvOutput)) {
                 info.known = {
@@ -370,16 +368,21 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
                 // derivation, and the output path is valid, but we don't have
                 // its realisation stored (probably because it has been built
                 // without the `ca-derivations` experimental flag).
-                worker.store.registerDrvOutput(
-                    Realisation {
-                        drvOutput,
-                        info.known->path,
-                    }
-                );
+                worker.store.registerDrvOutput(Realisation {
+                    {
+                        .outPath = info.known->path,
+                    },
+                    drvOutput,
+                });
             }
         }
         if (info.known && info.known->isValid())
-            validOutputs.emplace(i.first, Realisation { drvOutput, info.known->path });
+            validOutputs.emplace(i.first, Realisation {
+                {
+                    .outPath = info.known->path,
+                },
+                drvOutput,
+            });
     }
 
     // If we requested all the outputs, we are always fine.

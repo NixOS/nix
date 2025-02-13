@@ -111,7 +111,7 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
     void registerDrvOutput(const Realisation & info) override;
 
     void queryRealisationUncached(
-        const DrvOutput & id, Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+        const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     void
     buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
@@ -254,7 +254,7 @@ void RestrictedStore::registerDrvOutput(const Realisation & info)
 }
 
 void RestrictedStore::queryRealisationUncached(
-    const DrvOutput & id, Callback<std::shared_ptr<const Realisation>> callback) noexcept
+    const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 // XXX: This should probably be allowed if the realisation corresponds to
 // an allowed derivation
 {
@@ -290,9 +290,19 @@ std::vector<KeyedBuildResult> RestrictedStore::buildPathsWithResults(
     auto results = next->buildPathsWithResults(paths, buildMode);
 
     for (auto & result : results) {
-        for (auto & [outputName, output] : result.builtOutputs) {
-            newPaths.insert(output.outPath);
-            newRealisations.insert(output);
+        if (auto * pathBuilt = std::get_if<DerivedPathBuilt>(&result.path)) {
+            // TODO ugly extra IO
+            auto drvPath = resolveDerivedPath(*next, *pathBuilt->drvPath);
+            for (auto & [outputName, output] : result.builtOutputs) {
+                newPaths.insert(output.outPath);
+                newRealisations.insert({
+                    output,
+                    {
+                        .drvPath = drvPath,
+                        .outputName = outputName,
+                    }
+                });
+            }
         }
     }
 
@@ -300,7 +310,7 @@ std::vector<KeyedBuildResult> RestrictedStore::buildPathsWithResults(
     next->computeFSClosure(newPaths, closure);
     for (auto & path : closure)
         goal.addDependency(path);
-    for (auto & real : Realisation::closure(*next, newRealisations))
+    for (auto & real : newRealisations)
         goal.addedDrvOutputs.insert(real.id);
 
     return results;

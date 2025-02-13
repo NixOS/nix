@@ -45,7 +45,7 @@ struct DerivationCreationAndRealisationGoal : public Goal
      *
      * - For input-addressed derivations, always the precomputed paths
      *
-     * - For content-addressed derivations, calcuated from whatever the
+     * - For content-addressing derivations, calcuated from whatever the
      *   hash ends up being. (Note that fixed outputs derivations that
      *   produce the "wrong" output still install that data under its
      *   true content-address.)

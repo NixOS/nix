@@ -2886,11 +2886,13 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto oldinfo = get(initialOutputs, outputName);
         assert(oldinfo);
         auto thisRealisation = Realisation {
-            .id = DrvOutput {
-                oldinfo->outputHash,
-                outputName
+            {
+                .outPath = newInfo.path,
             },
-            .outPath = newInfo.path
+            DrvOutput {
+                .drvPath = drvPath,
+                .outputName = outputName,
+            },
         };
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
             && !drv.type().isImpure())
