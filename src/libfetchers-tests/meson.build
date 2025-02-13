@@ -44,6 +44,7 @@ subdir('nix-meson-build-support/common')
 
 sources = files(
   'public-key.cc',
+  'access-tokens.cc',
 )
 
 include_dirs = [include_directories('.')]

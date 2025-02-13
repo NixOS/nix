@@ -172,7 +172,7 @@ struct GitArchiveInputScheme : InputScheme
         return input;
     }
 
-    std::optional<std::string> getAccessToken(const fetchers::Settings & settings, const std::string & host, const std::string & url) const
+    std::optional<std::string> getAccessToken(const fetchers::Settings & settings, const std::string & host, const std::string & url) const override
     {
         auto tokens = settings.accessTokens.get();
         std::string answer;
