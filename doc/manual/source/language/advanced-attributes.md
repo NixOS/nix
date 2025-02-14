@@ -370,6 +370,18 @@ Derivations can declare some infrequently used optional attributes.
 
   ensures that the derivation can only be built on a machine with the `kvm` feature.
 
+- [`rejectSystemFeatures`]{#adv-attr-rejectSystemFeatures}\
+
+  If a derivation has the `rejectSystemFeatures` attribute, then Nix will only build it on a machine that does not have the corresponding features set in its [`system-features` configuration](@docroot@/command-ref/conf-file.md#conf-system-features).
+
+  For example, setting
+
+  ```nix
+  rejectSystemFeatures = [ "pages-16k" ];
+  ```
+
+  ensures that the derivation can only be built on a machine which does not have the `pages-16k` feature.
+
 [xp-feature-ca-derivations]: @docroot@/development/experimental-features.md#xp-feature-ca-derivations
 [xp-feature-dynamic-derivations]: @docroot@/development/experimental-features.md#xp-feature-dynamic-derivations
 [xp-feature-git-hashing]: @docroot@/development/experimental-features.md#xp-feature-git-hashing
