@@ -223,8 +223,41 @@ let
         FONTCONFIG_FILE = texFunctions.fontsConf;
       };
 
+    testNixVersions = client: daemon: pkgs:
+
+      with import ./release-common.nix { inherit pkgs; };
+
+      pkgs.releaseTools.nixBuild {
+        NIX_DAEMON_PACKAGE = daemon;
+        NIX_CLIENT_PACKAGE = client;
+        name = "nix-tests-${client.src.version}-against-${daemon.src.version}";
+
+        src = tarball;
+
+        VERSION_SUFFIX = tarball.versionSuffix;
+
+        buildInputs = buildDeps;
+        propagatedBuildInputs = propagatedDeps;
+
+        enableParallelBuilding = true;
+
+        dontBuild = true;
+        doInstallCheck = true;
+
+        installPhase = ''
+          mkdir -p $out
+        '';
+        installCheckPhase = "make installcheck";
+      };
+
+    testAgainstSelf = pkgs.lib.genAttrs systems (system:
+
+      let pkgs = import nixpkgs { inherit system; }; in
+
+      testNixVersions build.${system} build.${system} pkgs);
 
     # System tests.
+
     tests.remoteBuilds = (import ./tests/remote-builds.nix rec {
       inherit nixpkgs;
       nix = build.x86_64-linux; system = "x86_64-linux";
