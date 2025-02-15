@@ -6,6 +6,7 @@
 #include "nix/store/serve-protocol-impl.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/path-info.hh"
+#include "nix/util/json-utils.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -28,8 +29,15 @@ BuildResult ServeProto::Serialise<BuildResult>::read(const StoreDirConfig & stor
     if (GET_PROTOCOL_MINOR(conn.version) >= 8) {
         success.builtOutputs = ServeProto::Serialise<std::map<OutputName, UnkeyedRealisation>>::read(store, conn);
     } else if (GET_PROTOCOL_MINOR(conn.version) >= 6) {
-        // We no longer support these types of realisations
-        (void) ServeProto::Serialise<StringMap>::read(store, conn);
+        for (auto & [output, realisation] : ServeProto::Serialise<StringMap>::read(store, conn)) {
+            size_t n = output.find("!");
+            if (n == output.npos)
+                throw Error("Invalid derivation output id %s", output);
+            success.builtOutputs.insert_or_assign(
+                output.substr(n + 1),
+                UnkeyedRealisation{
+                    StorePath{getString(valueAt(getObject(nlohmann::json::parse(realisation)), "outPath"))}});
+        }
     }
 
     if (BuildResult::Success::statusIs(rawStatus)) {

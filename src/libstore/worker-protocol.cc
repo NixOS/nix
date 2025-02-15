@@ -6,6 +6,7 @@
 #include "nix/store/worker-protocol-impl.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/path-info.hh"
+#include "nix/util/json-utils.hh"
 
 #include <chrono>
 #include <nlohmann/json.hpp>
@@ -183,9 +184,15 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
     if (GET_PROTOCOL_MINOR(conn.version) >= 39) {
         success.builtOutputs = WorkerProto::Serialise<std::map<OutputName, UnkeyedRealisation>>::read(store, conn);
     } else if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
-        auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(store, conn);
-        for (auto && [output, realisation] : builtOutputs)
-            success.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
+        for (auto && [output, realisation] : WorkerProto::Serialise<StringMap>::read(store, conn)) {
+            size_t n = output.find("!");
+            if (n == output.npos)
+                throw Error("Invalid derivation output id %s", output);
+            success.builtOutputs.insert_or_assign(
+                output.substr(n + 1),
+                UnkeyedRealisation{
+                    StorePath{getString(valueAt(getObject(nlohmann::json::parse(realisation)), "outPath"))}});
+        }
     }
 
     if (BuildResult::Success::statusIs(rawStatus)) {
