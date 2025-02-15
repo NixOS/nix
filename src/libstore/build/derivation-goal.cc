@@ -99,18 +99,17 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             if (!checkResult) {
                 DrvOutput id{drvPath, wantedOutput};
                 auto g = worker.makeDrvOutputSubstitutionGoal(id);
-                waitees.insert(g);
+                waitees.insert(upcast_goal(g));
                 co_await await(std::move(waitees));
 
                 if (nrFailed == 0) {
+                    assert(g->outputInfo);
                     waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(g->outputInfo->outPath)));
                     co_await await(std::move(waitees));
 
                     trace("output path substituted");
 
-                    if (nrFailed == 0)
-                        worker.store.registerDrvOutput({*g->outputInfo, id});
-                    else
+                    if (nrFailed > 0)
                         debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
                 }
             } else {

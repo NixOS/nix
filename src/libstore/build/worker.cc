@@ -4,6 +4,7 @@
 #include "nix/store/build/worker.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/drv-output-substitution-goal.hh"
+#include "nix/store/build/build-trace-trampoline-goal.hh"
 #include "nix/store/build/derivation-goal.hh"
 #include "nix/store/build/derivation-resolution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
@@ -110,6 +111,11 @@ std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal
     return initGoalIfNeeded(drvOutputSubstitutionGoals[id], id, *this);
 }
 
+std::shared_ptr<BuildTraceTrampolineGoal> Worker::makeBuildTraceTrampolineGoal(const SingleDerivedPath::Built & id)
+{
+    return initGoalIfNeeded(buildTraceTrampolineGoals.ensureSlot(id).value, id, *this);
+}
+
 GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
 {
     return std::visit(
@@ -166,6 +172,14 @@ removeGoal(std::shared_ptr<G> goal, typename DerivedPathMap<std::map<OutputsSpec
     return valueKeep || childMapKeep;
 }
 
+template<typename G>
+static bool removeGoal(std::shared_ptr<G> goal, typename DerivedPathMap<std::weak_ptr<G>>::ChildNode & node)
+{
+    bool valueKeep = removeGoal(goal, node.value);
+    bool childMapKeep = removeGoal(goal, node.childMap);
+    return valueKeep || childMapKeep;
+}
+
 void Worker::removeGoal(GoalPtr goal)
 {
     if (auto drvGoal = std::dynamic_pointer_cast<DerivationTrampolineGoal>(goal))
@@ -180,6 +194,8 @@ void Worker::removeGoal(GoalPtr goal)
         nix::removeGoal(subGoal, substitutionGoals);
     else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal))
         nix::removeGoal(subGoal, drvOutputSubstitutionGoals);
+    else if (auto subGoal = std::dynamic_pointer_cast<BuildTraceTrampolineGoal>(goal))
+        nix::removeGoal(subGoal, buildTraceTrampolineGoals.map);
     else
         assert(false);
 
@@ -546,7 +562,17 @@ GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal)
     return subGoal;
 }
 
+GoalPtr upcast_goal(std::shared_ptr<BuildTraceTrampolineGoal> subGoal)
+{
+    return subGoal;
+}
+
 GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal)
+{
+    return subGoal;
+}
+
+GoalPtr upcast_goal(std::shared_ptr<DerivationResolutionGoal> subGoal)
 {
     return subGoal;
 }

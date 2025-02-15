@@ -278,6 +278,7 @@ sources = files(
   'binary-cache-store.cc',
   'build-result.cc',
   'build/build-log.cc',
+  'build/build-trace-trampoline-goal.cc',
   'build/derivation-builder.cc',
   'build/derivation-building-goal.cc',
   'build/derivation-check.cc',
