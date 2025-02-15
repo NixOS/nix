@@ -10,6 +10,8 @@
 #ifndef _WIN32 // TODO Enable building on Windows
 #  include "nix/store/build/hook-instance.hh"
 #endif
+#include "nix/store/build/build-trace-goal.hh"
+#include "nix/store/build/derivation-resolution-goal.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/globals.hh"
 
@@ -108,6 +110,11 @@ std::shared_ptr<DrvOutputSubstitutionGoal>
 Worker::makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair, std::optional<ContentAddress> ca)
 {
     return initGoalIfNeeded(drvOutputSubstitutionGoals[id], id, *this, repair, ca);
+}
+
+std::shared_ptr<BuildTraceGoal> Worker::makeBuildTraceGoal(const SingleDerivedPath::Built & req)
+{
+    return initGoalIfNeeded(buildTraceGoals.ensureSlot(req).value, req, *this);
 }
 
 GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
@@ -563,6 +570,16 @@ GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal)
 }
 
 GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal)
+{
+    return subGoal;
+}
+
+GoalPtr upcast_goal(std::shared_ptr<BuildTraceGoal> subGoal)
+{
+    return subGoal;
+}
+
+GoalPtr upcast_goal(std::shared_ptr<DerivationResolutionGoal> subGoal)
 {
     return subGoal;
 }

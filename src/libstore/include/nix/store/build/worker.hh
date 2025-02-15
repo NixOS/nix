@@ -20,6 +20,7 @@ struct DerivationResolutionGoal;
 struct DerivationBuildingGoal;
 struct PathSubstitutionGoal;
 class DrvOutputSubstitutionGoal;
+class BuildTraceGoal;
 
 /**
  * Workaround for not being able to declare a something like
@@ -36,6 +37,8 @@ class DrvOutputSubstitutionGoal;
 GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal);
 GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal);
 GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<BuildTraceGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<DerivationResolutionGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
 
@@ -109,6 +112,7 @@ private:
      * same derivation / path.
      */
 
+    DerivedPathMap<std::weak_ptr<BuildTraceGoal>> buildTraceGoals;
     DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<DerivationTrampolineGoal>>> derivationTrampolineGoals;
 
     std::map<StorePath, std::map<OutputName, std::weak_ptr<DerivationGoal>>> derivationGoals;
@@ -242,12 +246,21 @@ public:
         bool storeDerivation = false);
 
     /**
-     * @ref PathSubstitutionGoal "substitution goal"
+     * @ref PathSubstitutionGoal "path substitution goal"
      */
     std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(
         const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+
+    /**
+     * @ref DrvOutputSubstitutionGoal "derivation output substitution goal"
+     */
     std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(
         const DrvOutput & id, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+
+    /**
+     * @ref BuildTraceGoal "derivation output substitution goal"
+     */
+    std::shared_ptr<BuildTraceGoal> makeBuildTraceGoal(const SingleDerivedPath::Built & key);
 
     /**
      * Make a goal corresponding to the `DerivedPath`.
