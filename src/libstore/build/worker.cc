@@ -9,6 +9,8 @@
 #ifndef _WIN32 // TODO Enable building on Windows
 #  include "nix/store/build/hook-instance.hh"
 #endif
+#include "nix/store/build/build-trace-goal.hh"
+#include "nix/store/build/derivation-resolution-goal.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/globals.hh"
 
@@ -96,6 +98,30 @@ std::shared_ptr<DrvOutputSubstitutionGoal>
 Worker::makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair, std::optional<ContentAddress> ca)
 {
     return initGoalIfNeeded(drvOutputSubstitutionGoals[id], id, *this, repair, ca);
+}
+
+std::shared_ptr<BuildTraceGoal> Worker::makeBuildTraceGoal(const SingleDerivedPath::Built & req)
+{
+    std::weak_ptr<BuildTraceGoal> & goal_weak = buildTraceGoals.ensureSlot(req).value;
+    std::shared_ptr<BuildTraceGoal> goal = goal_weak.lock();
+    if (!goal) {
+        goal = std::make_shared<BuildTraceGoal>(req, *this);
+        goal_weak = goal;
+        wakeUp(goal);
+    }
+    return goal;
+}
+
+std::shared_ptr<DerivationResolutionGoal> Worker::makeDerivationResolutionGoal(const StorePath & drvPath)
+{
+    std::weak_ptr<DerivationResolutionGoal> & goal_weak = derivationResolutionGoals[drvPath];
+    auto goal = goal_weak.lock(); // FIXME
+    if (!goal) {
+        goal = std::make_shared<DerivationResolutionGoal>(drvPath, *this);
+        goal_weak = goal;
+        wakeUp(goal);
+    }
+    return goal;
 }
 
 GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
@@ -549,6 +575,16 @@ GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal)
 }
 
 GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal)
+{
+    return subGoal;
+}
+
+GoalPtr upcast_goal(std::shared_ptr<BuildTraceGoal> subGoal)
+{
+    return subGoal;
+}
+
+GoalPtr upcast_goal(std::shared_ptr<DerivationResolutionGoal> subGoal)
 {
     return subGoal;
 }
