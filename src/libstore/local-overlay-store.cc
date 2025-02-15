@@ -62,7 +62,7 @@ void LocalOverlayStore::registerDrvOutput(const Realisation & info)
     // First do queryRealisation on lower layer to populate DB
     auto res = lowerStore->queryRealisation(info.id);
     if (res)
-        LocalStore::registerDrvOutput(*res);
+        LocalStore::registerDrvOutput({*res, info.id});
 
     LocalStore::registerDrvOutput(info);
 }
@@ -96,12 +96,12 @@ void LocalOverlayStore::queryPathInfoUncached(const StorePath & path,
 
 
 void LocalOverlayStore::queryRealisationUncached(const DrvOutput & drvOutput,
-    Callback<std::shared_ptr<const Realisation>> callback) noexcept
+    Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
     LocalStore::queryRealisationUncached(drvOutput,
-        {[this, drvOutput, callbackPtr](std::future<std::shared_ptr<const Realisation>> fut) {
+        {[this, drvOutput, callbackPtr](std::future<std::shared_ptr<const UnkeyedRealisation>> fut) {
             try {
                 auto info = fut.get();
                 if (info)
@@ -111,7 +111,7 @@ void LocalOverlayStore::queryRealisationUncached(const DrvOutput & drvOutput,
             }
             // If we don't have it, check lower store
             lowerStore->queryRealisation(drvOutput,
-                {[callbackPtr](std::future<std::shared_ptr<const Realisation>> fut) {
+                {[callbackPtr](std::future<std::shared_ptr<const UnkeyedRealisation>> fut) {
                     try {
                         (*callbackPtr)(fut.get());
                     } catch (...) {

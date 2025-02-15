@@ -3,6 +3,7 @@
 
 #include "types.hh"
 #include "store-api.hh"
+#include "derived-path-map.hh"
 #include "goal.hh"
 #include "realisation.hh"
 #include "muxable-pipe.hh"
@@ -13,9 +14,12 @@
 namespace nix {
 
 /* Forward definition. */
+struct DerivationCreationAndRealisationGoal;
 struct DerivationGoal;
 struct PathSubstitutionGoal;
 class DrvOutputSubstitutionGoal;
+class BuildTraceGoal;
+class DerivationResolutionGoal;
 
 /**
  * Workaround for not being able to declare a something like
@@ -31,8 +35,26 @@ class DrvOutputSubstitutionGoal;
  */
 GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal);
 GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<BuildTraceGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<DerivationResolutionGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
+
+/**
+ * The current implementation of impure derivations has
+ * `DerivationGoal`s accumulate realisations from their waitees.
+ * Unfortunately, `DerivationGoal`s don't directly depend on other
+ * goals, but instead depend on `DerivationCreationAndRealisationGoal`s.
+ *
+ * We try not to share any of the details of any goal type with any
+ * other, for sake of modularity and quicker rebuilds. This means we
+ * cannot "just" downcast and fish out the field. So as an escape hatch,
+ * we have made the function, written in `worker.cc` where all the goal
+ * types are visible, and use it instead.
+ */
+
+std::optional<std::pair<std::reference_wrapper<const DerivationGoal>, std::reference_wrapper<const SingleDerivedPath>>> tryGetConcreteDrvGoal(GoalPtr waitee);
 
 /**
  * A mapping used to remember for each child process to what goal it
@@ -103,9 +125,14 @@ private:
      * Maps used to prevent multiple instantiations of a goal for the
      * same derivation / path.
      */
+
+    DerivedPathMap<std::weak_ptr<DerivationCreationAndRealisationGoal>> outerDerivationGoals;
+    DerivedPathMap<std::weak_ptr<BuildTraceGoal>> buildTraceGoals;
+
     std::map<StorePath, std::weak_ptr<DerivationGoal>> derivationGoals;
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
+    std::map<DrvOutput, std::weak_ptr<DerivationResolutionGoal>> derivationResolutionGoals;
 
     /**
      * Goals waiting for busy paths to be unlocked.
@@ -196,6 +223,9 @@ public:
      * @ref DerivationGoal "derivation goal"
      */
 private:
+    std::shared_ptr<DerivationCreationAndRealisationGoal> makeDerivationCreationAndRealisationGoal(
+        ref<SingleDerivedPath> drvPath,
+        const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
     std::shared_ptr<DerivationGoal> makeDerivationGoalCommon(
         const StorePath & drvPath, const OutputsSpec & wantedOutputs,
         std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal);
@@ -208,10 +238,26 @@ public:
         const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
 
     /**
-     * @ref PathSubstitutionGoal "substitution goal"
+     * @ref PathSubstitutionGoal "path substitution goal"
      */
     std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+
+    /**
+     * @ref DrvOutputSubstitutionGoal "derivation output substitution goal"
+     */
     std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+
+    /**
+     * @ref BuildTraceGoal "derivation output substitution goal"
+     */
+    std::shared_ptr<BuildTraceGoal> makeBuildTraceGoal(
+        ref<SingleDerivedPath> drvPath,
+        const std::string & outputName);
+
+    /**
+     * @ref DerivationResolutionGoal "derivation resolution goal"
+     */
+    std::shared_ptr<DerivationResolutionGoal> makeDerivationResolutionGoal(const StorePath & drvPath);
 
     /**
      * Make a goal corresponding to the `DerivedPath`.

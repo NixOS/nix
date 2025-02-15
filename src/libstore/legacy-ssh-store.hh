@@ -133,7 +133,7 @@ public:
     }
 
     void queryRealisationUncached(const DrvOutput &,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
+        Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
     // TODO: Implement
     { unsupported("queryRealisation"); }
 };

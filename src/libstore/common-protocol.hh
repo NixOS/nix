@@ -12,7 +12,6 @@ struct Source;
 class StorePath;
 struct ContentAddress;
 struct DrvOutput;
-struct Realisation;
 
 
 /**
@@ -69,8 +68,6 @@ template<>
 DECLARE_COMMON_SERIALISER(ContentAddress);
 template<>
 DECLARE_COMMON_SERIALISER(DrvOutput);
-template<>
-DECLARE_COMMON_SERIALISER(Realisation);
 
 template<typename T>
 DECLARE_COMMON_SERIALISER(std::vector<T>);

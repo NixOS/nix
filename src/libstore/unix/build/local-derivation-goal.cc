@@ -1435,7 +1435,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
     { throw Error("registerDrvOutput"); }
 
     void queryRealisationUncached(const DrvOutput & id,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
+        Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
     // XXX: This should probably be allowed if the realisation corresponds to
     // an allowed derivation
     {
@@ -1471,9 +1471,19 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
         auto results = next->buildPathsWithResults(paths, buildMode);
 
         for (auto & result : results) {
-            for (auto & [outputName, output] : result.builtOutputs) {
-                newPaths.insert(output.outPath);
-                newRealisations.insert(output);
+            if (auto * pathBuilt = std::get_if<DerivedPathBuilt>(&result.path)) {
+                // TODO ugly extra IO
+                auto drvPath = resolveDerivedPath(*next, *pathBuilt->drvPath);
+                for (auto & [outputName, output] : result.builtOutputs) {
+                    newPaths.insert(output.outPath);
+                    newRealisations.insert({
+                        output,
+                        {
+                            .drvPath = drvPath,
+                            .outputName = outputName,
+                        }
+                    });
+                }
             }
         }
 
@@ -1481,7 +1491,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
         next->computeFSClosure(newPaths, closure);
         for (auto & path : closure)
             goal.addDependency(path);
-        for (auto & real : Realisation::closure(*next, newRealisations))
+        for (auto & real : newRealisations)
             goal.addedDrvOutputs.insert(real.id);
 
         return results;
@@ -2839,11 +2849,13 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
         auto oldinfo = get(initialOutputs, outputName);
         assert(oldinfo);
         auto thisRealisation = Realisation {
-            .id = DrvOutput {
-                oldinfo->outputHash,
-                outputName
+            {
+                .outPath = newInfo.path,
             },
-            .outPath = newInfo.path
+            DrvOutput {
+                .drvPath = drvPath,
+                .outputName = outputName,
+            },
         };
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
             && !drv->type().isImpure())

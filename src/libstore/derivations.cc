@@ -787,7 +787,7 @@ Sync<DrvHashes> drvHashes;
 /* Look up the derivation by value and memoize the
    `hashDerivationModulo` call.
  */
-static const DrvHash pathDerivationModulo(Store & store, const StorePath & drvPath)
+static const DrvHashModulo & pathDerivationModulo(Store & store, const StorePath & drvPath)
 {
     {
         auto hashes = drvHashes.lock();
@@ -796,13 +796,16 @@ static const DrvHash pathDerivationModulo(Store & store, const StorePath & drvPa
             return h->second;
         }
     }
-    auto h = hashDerivationModulo(
-        store,
-        store.readInvalidDerivation(drvPath),
-        false);
+
     // Cache it
-    drvHashes.lock()->insert_or_assign(drvPath, h);
-    return h;
+    auto [iter, _] = drvHashes.lock()->insert_or_assign(
+        drvPath,
+        hashDerivationModulo(
+            store,
+            store.readInvalidDerivation(drvPath),
+            false));
+
+    return iter->second;
 }
 
 /* See the header for interface details. These are the implementation details.
@@ -822,12 +825,10 @@ static const DrvHash pathDerivationModulo(Store & store, const StorePath & drvPa
    don't leak the provenance of fixed outputs, reducing pointless cache
    misses as the build itself won't know this.
  */
-DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
+DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
 {
-    auto type = drv.type();
-
     /* Return a fixed hash for fixed-output derivations. */
-    if (type.isFixed()) {
+    if (drv.type().isFixed()) {
         std::map<std::string, Hash> outputHashes;
         for (const auto & i : drv.outputs) {
             auto & dof = std::get<DerivationOutput::CAFixed>(i.second.raw);
@@ -837,58 +838,69 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
                 + store.printStorePath(dof.path(store, drv.name, i.first)));
             outputHashes.insert_or_assign(i.first, std::move(hash));
         }
-        return DrvHash {
-            .hashes = outputHashes,
-            .kind = DrvHash::Kind::Regular,
-        };
+        return outputHashes;
     }
 
-    auto kind = std::visit(overloaded {
+    if (std::visit(overloaded {
         [](const DerivationType::InputAddressed & ia) {
             /* This might be a "pesimistically" deferred output, so we don't
                "taint" the kind yet. */
-            return DrvHash::Kind::Regular;
+            return false;
         },
         [](const DerivationType::ContentAddressed & ca) {
-            return ca.fixed
-                ? DrvHash::Kind::Regular
-                : DrvHash::Kind::Deferred;
+            // Already covered
+            assert(!ca.fixed);
+            return true;
         },
-        [](const DerivationType::Impure &) -> DrvHash::Kind {
-            return DrvHash::Kind::Deferred;
+        [](const DerivationType::Impure &) {
+            return true;
         }
-    }, drv.type().raw);
+    }, drv.type().raw)) {
+        return DrvHashModulo::DeferredDrv{};
+    }
 
+    /* For other derivations, replace the inputs paths with recursive
+       calls to this function. */
     DerivedPathMap<StringSet>::ChildNode::Map inputs2;
     for (auto & [drvPath, node] : drv.inputDrvs.map) {
+        /* Need to build and resolve dynamic derivations first */
+        if (!node.childMap.empty()) {
+            return DrvHashModulo::DeferredDrv{};
+        }
+
         const auto & res = pathDerivationModulo(store, drvPath);
-        if (res.kind == DrvHash::Kind::Deferred)
-            kind = DrvHash::Kind::Deferred;
-        for (auto & outputName : node.value) {
-            const auto h = get(res.hashes, outputName);
-            if (!h)
-                throw Error("no hash for output '%s' of derivation '%s'", outputName, drv.name);
-            inputs2[h->to_string(HashFormat::Base16, false)].value.insert(outputName);
+        if (std::visit(overloaded {
+            [&](const DrvHashModulo::DeferredDrv &) {
+                return true;
+            },
+            // Regular non-CA derivation, replace derivation
+            [&](const DrvHashModulo::DrvHash & drvHash) {
+                inputs2.insert_or_assign(
+                    drvHash.to_string(HashFormat::Base16, false),
+                    node);
+                return false;
+            },
+            // CA derivation's output hashes
+            [&](const DrvHashModulo::CaOutputHashes & outputHashes) {
+                for (auto & outputName : node.value) {
+                    /* Put each one in with a single "out" output.. */
+                    const auto h = get(outputHashes, outputName);
+                    if (!h)
+                        throw Error("no hash for output '%s' of derivation '%s'", outputName, drv.name);
+                    inputs2.insert_or_assign(
+                        h->to_string(HashFormat::Base16, false),
+                        DerivedPathMap<StringSet>::ChildNode{
+                            .value = {"out"},
+                        });
+                }
+                return false;
+            },
+        }, res.raw)) {
+            return DrvHashModulo::DeferredDrv{};
         }
     }
 
-    auto hash = hashString(HashAlgorithm::SHA256, drv.unparse(store, maskOutputs, &inputs2));
-
-    std::map<std::string, Hash> outputHashes;
-    for (const auto & [outputName, _] : drv.outputs) {
-        outputHashes.insert_or_assign(outputName, hash);
-    }
-
-    return DrvHash {
-        .hashes = outputHashes,
-        .kind = kind,
-    };
-}
-
-
-std::map<std::string, Hash> staticOutputHashes(Store & store, const Derivation & drv)
-{
-    return hashDerivationModulo(store, drv, true).hashes;
+    return hashString(HashAlgorithm::SHA256, drv.unparse(store, maskOutputs, &inputs2));
 }
 
 
@@ -1029,25 +1041,39 @@ void BasicDerivation::applyRewrites(const StringMap & rewrites)
     env = std::move(newEnv);
 }
 
-static void rewriteDerivation(Store & store, BasicDerivation & drv, const StringMap & rewrites)
+void resolveInputAddressed(Store & store, Derivation & drv)
 {
-    drv.applyRewrites(rewrites);
+    std::optional<DrvHashModulo> hashModulo_;
 
-    auto hashModulo = hashDerivationModulo(store, Derivation(drv), true);
+    auto hashModulo = [&]() -> const auto & {
+        if (!hashModulo_) {
+            // somewhat expensive so we do lazily
+            hashModulo_ = hashDerivationModulo(store, drv, true);
+        }
+        return *hashModulo_;
+    };
+
     for (auto & [outputName, output] : drv.outputs) {
         if (std::holds_alternative<DerivationOutput::Deferred>(output.raw)) {
-            auto h = get(hashModulo.hashes, outputName);
-            if (!h)
-                throw Error("derivation '%s' output '%s' has no hash (derivations.cc/rewriteDerivation)",
-                    drv.name, outputName);
-            auto outPath = store.makeOutputPath(outputName, *h, drv.name);
-            drv.env[outputName] = store.printStorePath(outPath);
-            output = DerivationOutput::InputAddressed {
-                .path = std::move(outPath),
-            };
+            std::visit(overloaded {
+                [&](const DrvHashModulo::DrvHash & drvHash) {
+                    auto outPath = store.makeOutputPath(outputName, drvHash, drv.name);
+                    drv.env.insert_or_assign(outputName, store.printStorePath(outPath));
+                    output = DerivationOutput::InputAddressed {
+                        .path = std::move(outPath),
+                    };
+                },
+                [&](const DrvHashModulo::CaOutputHashes &) {
+                    /* Shouldn't happen as the original output is
+                       deferred (waiting to be input-addressed). */
+                    assert(false);
+                },
+                [&](const DrvHashModulo::DeferredDrv &) {
+                    // Nothing to do, already deferred
+                },
+            }, hashModulo().raw);
         }
     }
-
 }
 
 std::optional<BasicDerivation> Derivation::tryResolve(Store & store, Store * evalStore) const
@@ -1132,9 +1158,13 @@ std::optional<BasicDerivation> Derivation::tryResolve(
             nullptr, inputDrv, inputNode, inputDrvOutputs))
             return std::nullopt;
 
-    rewriteDerivation(store, resolved, inputRewrites);
+    resolved.applyRewrites(inputRewrites);
 
-    return resolved;
+    Derivation resolved2{std::move(resolved)};
+
+    resolveInputAddressed(store, resolved2);
+
+    return resolved2;
 }
 
 
@@ -1162,38 +1192,73 @@ void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
     // combinations that are currently prohibited.
     type();
 
-    std::optional<DrvHash> hashesModulo;
-    for (auto & i : outputs) {
+    std::optional<DrvHashModulo> hashModulo_;
+
+    auto hashModulo = [&]() -> const auto & {
+        if (!hashModulo_) {
+            // somewhat expensive so we do lazily
+            hashModulo_ = hashDerivationModulo(store, *this, true);
+        }
+        return *hashModulo_;
+    };
+
+    for (auto & [outputName, output] : outputs) {
         std::visit(overloaded {
             [&](const DerivationOutput::InputAddressed & doia) {
-                if (!hashesModulo) {
-                    // somewhat expensive so we do lazily
-                    hashesModulo = hashDerivationModulo(store, *this, true);
-                }
-                auto currentOutputHash = get(hashesModulo->hashes, i.first);
-                if (!currentOutputHash)
-                    throw Error("derivation '%s' has unexpected output '%s' (local-store / hashesModulo) named '%s'",
-                        store.printStorePath(drvPath), store.printStorePath(doia.path), i.first);
-                StorePath recomputed = store.makeOutputPath(i.first, *currentOutputHash, drvName);
-                if (doia.path != recomputed)
-                    throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
-                        store.printStorePath(drvPath), store.printStorePath(doia.path), store.printStorePath(recomputed));
-                envHasRightPath(doia.path, i.first);
+                std::visit(overloaded {
+                    [&](const DrvHashModulo::DrvHash & drvHash) {
+                        StorePath recomputed = store.makeOutputPath(outputName, drvHash, drvName);
+                        if (doia.path != recomputed)
+                            throw Error(
+                                "derivation '%s' has incorrect output '%s', should be '%s'",
+                                store.printStorePath(drvPath),
+                                store.printStorePath(doia.path),
+                                store.printStorePath(recomputed));
+                    },
+                    [&](const DrvHashModulo::CaOutputHashes &) {
+                        /* Shouldn't happen as the original output is
+                           input-addressed. */
+                        assert(false);
+                    },
+                    [&](const DrvHashModulo::DeferredDrv &) {
+                        throw Error(
+                            "derivation '%s' has output '%s', but derivation is not yet ready to be input-addressed",
+                            store.printStorePath(drvPath),
+                            store.printStorePath(doia.path));
+                    },
+                }, hashModulo().raw);
+                envHasRightPath(doia.path, outputName);
             },
             [&](const DerivationOutput::CAFixed & dof) {
-                auto path = dof.path(store, drvName, i.first);
-                envHasRightPath(path, i.first);
+                auto path = dof.path(store, drvName, outputName);
+                envHasRightPath(path, outputName);
             },
             [&](const DerivationOutput::CAFloating &) {
                 /* Nothing to check */
             },
             [&](const DerivationOutput::Deferred &) {
                 /* Nothing to check */
+                std::visit(overloaded {
+                    [&](const DrvHashModulo::DrvHash & drvHash) {
+                        throw Error(
+                            "derivation '%s' has deferred output '%s', yet is ready to be input-addressed",
+                            store.printStorePath(drvPath),
+                            outputName);
+                    },
+                    [&](const DrvHashModulo::CaOutputHashes &) {
+                        /* Shouldn't happen as the original output is
+                           input-addressed. */
+                        assert(false);
+                    },
+                    [&](const DrvHashModulo::DeferredDrv &) {
+                        /* Nothing to check */
+                    },
+                }, hashModulo().raw);
             },
             [&](const DerivationOutput::Impure &) {
                 /* Nothing to check */
             },
-        }, i.second.raw);
+        }, output.raw);
     }
 }
 

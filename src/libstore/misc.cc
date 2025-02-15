@@ -228,16 +228,15 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
 
                 // If there are unknown output paths, attempt to find if the
                 // paths are known to substituters through a realisation.
-                auto outputHashes = staticOutputHashes(*this, *drv);
                 knownOutputPaths = true;
 
-                for (auto [outputName, hash] : outputHashes) {
+                for (auto & [outputName, _] : drv->outputs) {
                     if (!bfd.outputs.contains(outputName))
                         continue;
 
                     bool found = false;
                     for (auto &sub : getDefaultSubstituters()) {
-                        auto realisation = sub->queryRealisation({hash, outputName});
+                        auto realisation = sub->queryRealisation({drvPath, outputName});
                         if (!realisation)
                             continue;
                         found = true;
@@ -315,72 +314,6 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
         }});
 }
 
-std::map<DrvOutput, StorePath> drvOutputReferences(
-    const std::set<Realisation> & inputRealisations,
-    const StorePathSet & pathReferences)
-{
-    std::map<DrvOutput, StorePath> res;
-
-    for (const auto & input : inputRealisations) {
-        if (pathReferences.count(input.outPath)) {
-            res.insert({input.id, input.outPath});
-        }
-    }
-
-    return res;
-}
-
-std::map<DrvOutput, StorePath> drvOutputReferences(
-    Store & store,
-    const Derivation & drv,
-    const StorePath & outputPath,
-    Store * evalStore_)
-{
-    auto & evalStore = evalStore_ ? *evalStore_ : store;
-
-    std::set<Realisation> inputRealisations;
-
-    std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumRealisations;
-
-    accumRealisations = [&](const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
-        if (!inputNode.value.empty()) {
-            auto outputHashes =
-                staticOutputHashes(evalStore, evalStore.readDerivation(inputDrv));
-            for (const auto & outputName : inputNode.value) {
-                auto outputHash = get(outputHashes, outputName);
-                if (!outputHash)
-                    throw Error(
-                        "output '%s' of derivation '%s' isn't realised", outputName,
-                        store.printStorePath(inputDrv));
-                auto thisRealisation = store.queryRealisation(
-                    DrvOutput{*outputHash, outputName});
-                if (!thisRealisation)
-                    throw Error(
-                        "output '%s' of derivation '%s' isn’t built", outputName,
-                        store.printStorePath(inputDrv));
-                inputRealisations.insert(*thisRealisation);
-            }
-        }
-        if (!inputNode.value.empty()) {
-            auto d = makeConstantStorePathRef(inputDrv);
-            for (const auto & [outputName, childNode] : inputNode.childMap) {
-                SingleDerivedPath next = SingleDerivedPath::Built { d, outputName };
-                accumRealisations(
-                    // TODO deep resolutions for dynamic derivations, issue #8947, would go here.
-                    resolveDerivedPath(store, next, evalStore_),
-                    childNode);
-            }
-        }
-    };
-
-    for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
-        accumRealisations(inputDrv, inputNode);
-
-    auto info = store.queryPathInfo(outputPath);
-
-    return drvOutputReferences(Realisation::closure(store, inputRealisations), info->references);
-}
-
 OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, Store * evalStore_)
 {
     auto drvPath = resolveDerivedPath(store, *bfd.drvPath, evalStore_);
@@ -410,7 +343,7 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, 
     OutputPathMap outputs;
     for (auto & [outputName, outputPathOpt] : outputsOpt) {
         if (!outputPathOpt)
-            throw MissingRealisation(bfd.drvPath->to_string(store), outputName);
+            throw MissingRealisation(store, *bfd.drvPath, drvPath, outputName);
         auto & outputPath = *outputPathOpt;
         outputs.insert_or_assign(outputName, outputPath);
     }
@@ -434,7 +367,7 @@ StorePath resolveDerivedPath(Store & store, const SingleDerivedPath & req, Store
                     store.printStorePath(drvPath), bfd.output);
             auto & optPath = outputPaths.at(bfd.output);
             if (!optPath)
-                throw MissingRealisation(bfd.drvPath->to_string(store), bfd.output);
+                throw MissingRealisation(store, *bfd.drvPath, drvPath, bfd.output);
             return *optPath;
         },
     }, req.raw());
