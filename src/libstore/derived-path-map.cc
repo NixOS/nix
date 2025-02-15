@@ -48,6 +48,21 @@ typename DerivedPathMap<V>::ChildNode * DerivedPathMap<V>::findSlot(const Single
     return initIter(k);
 }
 
+/* A node is still live if it holds a value or has children. The value is a
+   container for goal maps but a bare `weak_ptr` for the single-goal trampoline
+   maps, so dispatch on which "emptiness" notion applies. */
+template<typename ChildNode>
+static bool childNodeNonEmpty(const ChildNode & node)
+{
+    bool valueNonEmpty = [&] {
+        if constexpr (requires { node.value.empty(); })
+            return !node.value.empty();
+        else
+            return !node.value.expired();
+    }();
+    return valueNonEmpty || !node.childMap.empty();
+}
+
 template<typename V>
 void DerivedPathMap<V>::removeSlot(const SingleDerivedPath & k, fun<bool(ChildNode &)> callback)
 {
@@ -63,10 +78,10 @@ void DerivedPathMap<V>::removeSlot(const SingleDerivedPath & k, fun<bool(ChildNo
                     self(*bfd.drvPath, [&](ChildNode & parent) -> bool {
                         auto it = parent.childMap.find(bfd.output);
                         if (it == parent.childMap.end())
-                            return !parent.value.empty() || !parent.childMap.empty();
+                            return childNodeNonEmpty(parent);
                         if (!onNode(it->second))
                             parent.childMap.erase(it);
-                        return !parent.value.empty() || !parent.childMap.empty();
+                        return childNodeNonEmpty(parent);
                     });
                 },
             },
@@ -80,6 +95,7 @@ void DerivedPathMap<V>::removeSlot(const SingleDerivedPath & k, fun<bool(ChildNo
 
 // instantiations
 
+#include "nix/store/build/build-trace-trampoline-goal.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
 
 namespace nix {
@@ -98,6 +114,7 @@ std::strong_ordering DerivedPathMap<StringSet>::ChildNode::operator <=> (
 template struct DerivedPathMap<StringSet>::ChildNode;
 template struct DerivedPathMap<StringSet>;
 
+template struct DerivedPathMap<std::weak_ptr<BuildTraceTrampolineGoal>>;
 template struct DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<DerivationTrampolineGoal>>>;
 
 }; // namespace nix

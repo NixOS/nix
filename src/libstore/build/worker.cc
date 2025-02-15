@@ -4,6 +4,7 @@
 #include "nix/store/build/worker.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/drv-output-substitution-goal.hh"
+#include "nix/store/build/build-trace-trampoline-goal.hh"
 #include "nix/store/build/derivation-goal.hh"
 #include "nix/store/build/derivation-resolution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
@@ -126,6 +127,11 @@ std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal
     return initGoalIfNeeded(drvOutputSubstitutionGoals[id], id, *this);
 }
 
+std::shared_ptr<BuildTraceTrampolineGoal> Worker::makeBuildTraceTrampolineGoal(const SingleDerivedPath::Built & id)
+{
+    return initGoalIfNeeded(buildTraceTrampolineGoals.ensureSlot(id).value, id, *this);
+}
+
 GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
 {
     return std::visit(
@@ -138,6 +144,47 @@ GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
             },
         },
         req.raw());
+}
+
+/**
+ * This function is polymorphic (both via type parameters and
+ * overloading) and recursive in order to work on a various types of
+ * trees
+ *
+ * @return Whether the tree node we are processing is not empty / should
+ * be kept alive. In the case of this overloading the node in question
+ * is the leaf, the weak reference itself. If the weak reference points
+ * to the goal we are looking for, our caller can delete it. In the
+ * inductive case where the node is an interior node, we'll likewise
+ * return whether the interior node is non-empty. If it is empty
+ * (because we just deleted its last child), then our caller can
+ * likewise delete it.
+ */
+template<typename G>
+static bool removeGoal(std::shared_ptr<G> goal, std::weak_ptr<G> & gp)
+{
+    return gp.lock() != goal;
+}
+
+template<typename K, typename G, typename Inner>
+static bool removeGoal(std::shared_ptr<G> goal, std::map<K, Inner> & goalMap)
+{
+    /* !!! inefficient */
+    for (auto i = goalMap.begin(); i != goalMap.end();) {
+        if (!removeGoal(goal, i->second))
+            i = goalMap.erase(i);
+        else
+            ++i;
+    }
+    return !goalMap.empty();
+}
+
+template<typename G>
+static bool removeGoal(std::shared_ptr<G> goal, typename DerivedPathMap<std::weak_ptr<G>>::ChildNode & node)
+{
+    bool valueKeep = removeGoal(goal, node.value);
+    bool childMapKeep = removeGoal(goal, node.childMap);
+    return valueKeep || childMapKeep;
 }
 
 void Worker::removeGoal(GoalPtr goal)
@@ -162,6 +209,8 @@ void Worker::removeGoal(GoalPtr goal)
         substitutionGoals.erase(subGoal->storePath);
     } else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal)) {
         drvOutputSubstitutionGoals.erase(subGoal->id);
+    } else if (auto subGoal = std::dynamic_pointer_cast<BuildTraceTrampolineGoal>(goal)) {
+        nix::removeGoal(subGoal, buildTraceTrampolineGoals.map);
     } else {
         unreachable();
     }
@@ -579,7 +628,17 @@ GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal)
     return subGoal;
 }
 
+GoalPtr upcast_goal(std::shared_ptr<BuildTraceTrampolineGoal> subGoal)
+{
+    return subGoal;
+}
+
 GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal)
+{
+    return subGoal;
+}
+
+GoalPtr upcast_goal(std::shared_ptr<DerivationResolutionGoal> subGoal)
 {
     return subGoal;
 }
