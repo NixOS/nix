@@ -14,26 +14,35 @@ namespace nix {
 class Worker;
 
 /**
- * Substitution of a derivation output.
- * This is done in three steps:
- * 1. Fetch the output info from a substituter
- * 2. Substitute the corresponding output path
- * 3. Register the output info
+ * The purpose of this is to resolve the given derivation, so that it
+ * only has constant deriving paths as inputs.
  */
-class DrvOutputSubstitutionGoal : public Goal
+class DerivationResolutionGoal : public Goal
 {
 
     /**
-     * The drv output we're trying to substitute
+     * The derivation we're trying to substitute
      */
-    DrvOutput id;
+    StorePath drvPath;
 
 public:
-    DrvOutputSubstitutionGoal(
+    DerivationResolutionGoal(
         const DrvOutput & id,
         Worker & worker,
         RepairFlag repair = NoRepair,
         std::optional<ContentAddress> ca = std::nullopt);
+
+    /**
+     * The resolved derivation, if we succeeded.
+     */
+    std::shared_ptr<BasicDerivation> drv;
+
+    /**
+     * The path to derivation above, if we succeeded.
+     *
+     * Garbage that should not be read otherwise.
+     */
+    StorePath resolvedDrvPath = StorePath::dummy;
 
     Co init() override;
 

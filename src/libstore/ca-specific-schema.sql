@@ -8,7 +8,11 @@ create table if not exists Realisations (
     outputName text not null, -- symbolic output id, usually "out"
     outputPath integer not null,
     signatures text, -- space-separated list
-    foreign key (outputPath) references ValidPaths(id) on delete cascade
+
+    -- No such foreign key because we may well want realisations for
+    -- garbage-collected dependencies
+
+    --foreign key (outputPath) references ValidPaths(id) on delete cascade
 );
 
 create index if not exists IndexRealisations on Realisations(drvPath, outputName);

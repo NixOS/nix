@@ -182,8 +182,10 @@ subdir('nix-meson-build-support/common')
 sources = files(
   'binary-cache-store.cc',
   'build-result.cc',
-  'build/derivation-goal.cc',
+  'build/build-trace-goal.cc',
   'build/derivation-creation-and-realisation-goal.cc',
+  'build/derivation-goal.cc',
+  'build/derivation-resolution-goal.cc',
   'build/drv-output-substitution-goal.cc',
   'build/entry-points.cc',
   'build/goal.cc',
@@ -255,8 +257,10 @@ include_dirs = [
 headers = [config_h] + files(
   'binary-cache-store.hh',
   'build-result.hh',
+  'build/build-trace-goal.hh',
   'build/derivation-goal.hh',
   'build/derivation-creation-and-realisation-goal.hh',
+  'build/derivation-resolution-goal.hh',
   'build/drv-output-substitution-goal.hh',
   'build/goal.hh',
   'build/substitution-goal.hh',

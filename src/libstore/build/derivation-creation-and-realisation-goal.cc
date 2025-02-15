@@ -42,7 +42,7 @@ std::string DerivationCreationAndRealisationGoal::key()
        i.e. a derivation named "aardvark" always comes before "baboon". And
        substitution goals and inner derivation goals always happen before
        derivation goals (due to "b$"). */
-    return "c$" + std::string(pathPartOfReq(*drvReq).name()) + "$" + drvReq->to_string(worker.store);
+    return "d$" + std::string(pathPartOfReq(*drvReq).name()) + "$" + drvReq->to_string(worker.store);
 }
 
 void DerivationCreationAndRealisationGoal::timedOut(Error && ex) {}
