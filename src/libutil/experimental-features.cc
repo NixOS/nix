@@ -125,6 +125,8 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
 
             runCommand "foo"
               {
+                 # Optional: let Nix know "foo" requires the experimental feature
+                 requiredSystemFeatures = [ "recursive-nix" ];
                  buildInputs = [ nix jq ];
                  NIX_PATH = "nixpkgs=${<nixpkgs>}";
               }
