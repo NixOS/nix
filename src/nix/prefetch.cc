@@ -1,7 +1,7 @@
 #include "command.hh"
 #include "common-args.hh"
 #include "shared.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "filetransfer.hh"
 #include "finally.hh"
 #include "progress-bar.hh"

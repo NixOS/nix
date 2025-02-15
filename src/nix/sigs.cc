@@ -1,7 +1,7 @@
 #include "signals.hh"
 #include "command.hh"
 #include "shared.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "thread-pool.hh"
 #include "progress-bar.hh"
 
