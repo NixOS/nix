@@ -6,6 +6,7 @@
 #include "worker-protocol-impl.hh"
 #include "archive.hh"
 #include "path-info.hh"
+#include "json-utils.hh"
 
 #include <chrono>
 #include <nlohmann/json.hpp>
@@ -124,7 +125,7 @@ void WorkerProto::Serialise<DerivedPath>::write(const StoreDirConfig & store, Wo
             [&](const StorePath & drvPath) {
                 throw Error("trying to request '%s', but daemon protocol %d.%d is too old (< 1.29) to request a derivation file",
                     store.printStorePath(drvPath),
-                    GET_PROTOCOL_MAJOR(conn.version),
+                    GET_PROTOCOL_MAJOR(conn.version) >> 8,
                     GET_PROTOCOL_MINOR(conn.version));
             },
             [&](std::monostate) {
@@ -157,6 +158,7 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
     BuildResult res;
     res.status = static_cast<BuildResult::Status>(readInt(conn.from));
     conn.from >> res.errorMsg;
+
     if (GET_PROTOCOL_MINOR(conn.version) >= 29) {
         conn.from
             >> res.timesBuilt
@@ -164,17 +166,27 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
             >> res.startTime
             >> res.stopTime;
     }
+
     if (GET_PROTOCOL_MINOR(conn.version) >= 37) {
         res.cpuUser = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
         res.cpuSystem = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
     }
-    if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
-        auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(store, conn);
-        for (auto && [output, realisation] : builtOutputs)
+
+    if (GET_PROTOCOL_MINOR(conn.version) >= 39) {
+        res.builtOutputs = WorkerProto::Serialise<std::map<OutputName, UnkeyedRealisation>>::read(store, conn);
+    } else if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
+        for (auto && [output, realisation] : WorkerProto::Serialise<StringMap>::read(store, conn)) {
+            size_t n = output.find("!");
+            if (n == output.npos)
+                throw Error("Invalid derivation output id %s", output);
             res.builtOutputs.insert_or_assign(
-                std::move(output.outputName),
-                std::move(realisation));
+                output.substr(n + 1),
+                UnkeyedRealisation{StorePath{
+                    getString(valueAt(getObject(nlohmann::json::parse(realisation)), "outPath"))
+                }});
+        }
     }
+
     return res;
 }
 
@@ -183,6 +195,7 @@ void WorkerProto::Serialise<BuildResult>::write(const StoreDirConfig & store, Wo
     conn.to
         << res.status
         << res.errorMsg;
+
     if (GET_PROTOCOL_MINOR(conn.version) >= 29) {
         conn.to
             << res.timesBuilt
@@ -190,16 +203,17 @@ void WorkerProto::Serialise<BuildResult>::write(const StoreDirConfig & store, Wo
             << res.startTime
             << res.stopTime;
     }
+
     if (GET_PROTOCOL_MINOR(conn.version) >= 37) {
         WorkerProto::write(store, conn, res.cpuUser);
         WorkerProto::write(store, conn, res.cpuSystem);
     }
-    if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
-        // Don't support those types of realisations anymore.
-        WorkerProto::write(store, conn, StringMap{});
-    }
+
     if (GET_PROTOCOL_MINOR(conn.version) >= 39) {
         WorkerProto::write(store, conn, res.builtOutputs);
+    } else if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
+        // Don't support those types of realisations anymore.
+        WorkerProto::write(store, conn, StringMap{});
     }
 }
 
@@ -286,8 +300,8 @@ void WorkerProto::Serialise<WorkerProto::ClientHandshakeInfo>::write(const Store
 UnkeyedRealisation WorkerProto::Serialise<UnkeyedRealisation>::read(const StoreDirConfig & store, ReadConn conn)
 {
     if (GET_PROTOCOL_MINOR(conn.version) < 39) {
-        throw Error("daemon protocol %d.%d is too old (< 1.29) to understand build trace",
-            GET_PROTOCOL_MAJOR(conn.version),
+        throw Error("daemon protocol %d.%d is too old (< 1.39) to understand build trace",
+            GET_PROTOCOL_MAJOR(conn.version) >> 8,
             GET_PROTOCOL_MINOR(conn.version));
     }
 
@@ -303,8 +317,8 @@ UnkeyedRealisation WorkerProto::Serialise<UnkeyedRealisation>::read(const StoreD
 void WorkerProto::Serialise<UnkeyedRealisation>::write(const StoreDirConfig & store, WriteConn conn, const UnkeyedRealisation & info)
 {
     if (GET_PROTOCOL_MINOR(conn.version) < 39) {
-        throw Error("daemon protocol %d.%d is too old (< 1.29) to understand build trace",
-            GET_PROTOCOL_MAJOR(conn.version),
+        throw Error("daemon protocol %d.%d is too old (< 1.39) to understand build trace",
+            GET_PROTOCOL_MAJOR(conn.version) >> 8,
             GET_PROTOCOL_MINOR(conn.version));
     }
     WorkerProto::write(store, conn, info.outPath);
@@ -346,7 +360,7 @@ DrvOutput WorkerProto::Serialise<DrvOutput>::read(const StoreDirConfig & store, 
 {
     if (GET_PROTOCOL_MINOR(conn.version) < 39) {
         throw Error("daemon protocol %d.%d is too old (< 1.29) to understand build trace",
-            GET_PROTOCOL_MAJOR(conn.version),
+            GET_PROTOCOL_MAJOR(conn.version) >> 8,
             GET_PROTOCOL_MINOR(conn.version));
     }
 
@@ -363,7 +377,7 @@ void WorkerProto::Serialise<DrvOutput>::write(const StoreDirConfig & store, Writ
 {
     if (GET_PROTOCOL_MINOR(conn.version) < 39) {
         throw Error("daemon protocol %d.%d is too old (< 1.29) to understand build trace",
-            GET_PROTOCOL_MAJOR(conn.version),
+            GET_PROTOCOL_MAJOR(conn.version) >> 8,
             GET_PROTOCOL_MINOR(conn.version));
     }
     WorkerProto::write(store, conn, info.drvPath);
