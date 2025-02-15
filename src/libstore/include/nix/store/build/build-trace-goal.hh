@@ -14,26 +14,25 @@ namespace nix {
 class Worker;
 
 /**
- * Substitution of a derivation output.
- * This is done in three steps:
- * 1. Fetch the output info from a substituter
- * 2. Substitute the corresponding output path
- * 3. Register the output info
+ * Try to recursively obtain build trace key-value pairs in order to
+ * resolve the given output deriving path.
  */
-class DrvOutputSubstitutionGoal : public Goal
+class BuildTraceGoal : public Goal
 {
 
     /**
-     * The drv output we're trying to substitute
+     * The output derivation path we're trying to reasolve.
      */
-    DrvOutput id;
+    SingleDerivedPath::Built id;
 
 public:
-    DrvOutputSubstitutionGoal(
-        const DrvOutput & id,
-        Worker & worker,
-        RepairFlag repair = NoRepair,
-        std::optional<ContentAddress> ca = std::nullopt);
+    BuildTraceGoal(const SingleDerivedPath::Built & id, Worker & worker);
+
+    /**
+     * The realisation corresponding to the given output id.
+     * Will be filled once we can get it.
+     */
+    std::shared_ptr<const UnkeyedRealisation> outputInfo;
 
     Co init();
 

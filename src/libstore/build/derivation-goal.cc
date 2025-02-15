@@ -50,7 +50,7 @@ std::string DerivationGoal::key()
        i.e. a derivation named "aardvark" always comes before
        "baboon". And substitution goals always happen before
        derivation goals (due to "b$"). */
-    return "b$" + std::string(drvPath.name()) + "$" + SingleDerivedPath::Built{
+    return "c$" + std::string(drvPath.name()) + "$" + SingleDerivedPath::Built{
         .drvPath = makeConstantStorePathRef(drvPath),
         .output = wantedOutput,
     }.to_string(worker.store);
