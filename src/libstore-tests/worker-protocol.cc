@@ -140,7 +140,7 @@ VERSIONED_CHARACTERIZATION_TEST(
 
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
-    unkeyedRealisation,
+    unkeyedRealisation_1_39,
     "unkeyed-realisation-1.39",
     1 << 8 | 39,
     (UnkeyedRealisation {
@@ -150,7 +150,7 @@ VERSIONED_CHARACTERIZATION_TEST(
 
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
-    realisation,
+    realisation_1_39,
     "realisation-1.39",
     1 << 8 | 39,
     (Realisation {
@@ -187,7 +187,10 @@ VERSIONED_CHARACTERIZATION_TEST(
         t;
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+/* We now do a lossy read which does not allow us to faithfully right
+   back, since we changed the data type. We still however want to test
+   that this read works, and so for that we have a one-way test. */
+VERSIONED_READ_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     buildResult_1_28,
     "build-result-1.28",
@@ -224,7 +227,8 @@ VERSIONED_CHARACTERIZATION_TEST(
         t;
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+// See above note
+VERSIONED_READ_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     buildResult_1_29,
     "build-result-1.29",
@@ -268,11 +272,58 @@ VERSIONED_CHARACTERIZATION_TEST(
         t;
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+// See above note
+VERSIONED_READ_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     buildResult_1_37,
     "build-result-1.37",
     1 << 8 | 37,
+    ({
+        using namespace std::literals::chrono_literals;
+        std::tuple<BuildResult, BuildResult, BuildResult> t {
+            BuildResult {
+                .status = BuildResult::OutputRejected,
+                .errorMsg = "no idea why",
+            },
+            BuildResult {
+                .status = BuildResult::NotDeterministic,
+                .errorMsg = "no idea why",
+                .timesBuilt = 3,
+                .isNonDeterministic = true,
+                .startTime = 30,
+                .stopTime = 50,
+            },
+            BuildResult {
+                .status = BuildResult::Built,
+                .timesBuilt = 1,
+                .builtOutputs = {
+                    {
+                        "foo",
+                        {
+                            .outPath = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
+                        },
+                    },
+                    {
+                        "bar",
+                        {
+                            .outPath = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar" },
+                        },
+                    },
+                },
+                .startTime = 30,
+                .stopTime = 50,
+                .cpuUser = std::chrono::microseconds(500s),
+                .cpuSystem = std::chrono::microseconds(604s),
+            },
+        };
+        t;
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    buildResult_1_39,
+    "build-result-1.39",
+    1 << 8 | 39,
     ({
         using namespace std::literals::chrono_literals;
         std::tuple<BuildResult, BuildResult, BuildResult> t {

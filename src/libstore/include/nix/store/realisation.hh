@@ -120,15 +120,6 @@ struct Realisation : UnkeyedRealisation
 typedef std::map<OutputName, UnkeyedRealisation> SingleDrvOutputs;
 
 /**
- * Collection type for multiple derivations' outputs' `Realisation`s.
- *
- * `DrvOutput` is used because in general the derivations are not all
- * the same, so we need to identify firstly which derivation, and
- * secondly which output of that derivation.
- */
-typedef std::map<DrvOutput, UnkeyedRealisation> DrvOutputs;
-
-/**
  * Filter a SingleDrvOutputs to include only specific output names
  *
  * Moves the `outputs` input.
