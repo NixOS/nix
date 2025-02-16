@@ -146,17 +146,25 @@ StorePath writeDerivation(Store & store,
        held during a garbage collection). */
     auto suffix = std::string(drv.name) + drvExtension;
     auto contents = drv.unparse(store, false);
-    return readOnly || settings.readOnlyMode
-        ? store.makeFixedOutputPathFromCA(suffix, TextInfo {
+    auto path = store.makeFixedOutputPathFromCA(suffix, TextInfo {
             .hash = hashString(HashAlgorithm::SHA256, contents),
-            .references = std::move(references),
-        })
-        : ({
-            StringSource s { contents };
-            store.addToStoreFromDump(s, suffix, FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, references, repair);
+            .references = references,
         });
-}
 
+    auto writesAllowed = !(readOnly || settings.readOnlyMode);
+
+    if (writesAllowed)
+        store.addTempRoot(path);
+
+    auto repairRequested = repair == RepairFlag::Repair;
+    auto shouldWriteDrv = writesAllowed && (repairRequested || !store.isValidPath(path));
+    return shouldWriteDrv
+        ? ({
+            StringSource s { contents };
+            store.addToStoreFromDump(s, suffix, FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, std::move(references), repair);
+        })
+        : path;
+}
 
 namespace {
 /**
