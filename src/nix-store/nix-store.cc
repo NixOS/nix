@@ -562,7 +562,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
 #endif
             if (!hashGiven) {
                 HashResult hash = hashPath(
-                    {store->getFSAccessor(false), CanonPath { store->printStorePath(info->path) }},
+                    {store->getFSAccessor(false), store->canonStorePath(info->path) },
                     FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 info->narHash = hash.first;
                 info->narSize = hash.second;

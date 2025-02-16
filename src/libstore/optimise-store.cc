@@ -139,6 +139,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
         return;
     }
 
+    auto root = std::filesystem::path { storeDir }.root_path();
     /* Hash the file.  Note that hashPath() returns the hash over the
        NAR serialisation, which includes the execute bit on the file.
        Thus, executable and non-executable files with the same
@@ -150,7 +151,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        the contents of the target (which may not even exist). */
     Hash hash = ({
         hashPath(
-            {make_ref<PosixSourceAccessor>(), CanonPath(path)},
+            {make_ref<PosixSourceAccessor>(std::move(root)), CanonPath(path)},
             FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256).first;
     });
     debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Nix32, true));

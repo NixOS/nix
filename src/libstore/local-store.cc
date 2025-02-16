@@ -1099,7 +1099,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                     auto & specified = *info.ca;
                     auto actualHash = ({
                         auto accessor = getFSAccessor(false);
-                        CanonPath path { printStorePath(info.path) };
+                        auto path = canonStorePath(info.path);
                         Hash h { HashAlgorithm::SHA256 }; // throwaway def to appease C++
                         auto fim = specified.method.getFileIngestionMethod();
                         switch (fim) {
@@ -1383,7 +1383,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             checkInterrupt();
             auto name = link.path().filename();
             printMsg(lvlTalkative, "checking contents of '%s'", name);
-            PosixSourceAccessor accessor;
+            PosixSourceAccessor accessor(std::filesystem::current_path().root_path());
             std::string hash = hashPath(
                 PosixSourceAccessor::createAtRoot(link.path()),
                 FileIngestionMethod::NixArchive, HashAlgorithm::SHA256).first.to_string(HashFormat::Nix32, false);

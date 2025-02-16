@@ -568,7 +568,7 @@ bool Worker::pathContentsGood(const StorePath & path)
         res = false;
     else {
         auto current = hashPath(
-            {store.getFSAccessor(), CanonPath(store.printStorePath(path))},
+            {store.getFSAccessor(), store.canonStorePath(path)},
             FileIngestionMethod::NixArchive, info->narHash.algo).first;
         Hash nullHash(HashAlgorithm::SHA256);
         res = info->narHash == nullHash || info->narHash == current;

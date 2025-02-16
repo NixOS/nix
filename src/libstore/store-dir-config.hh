@@ -44,6 +44,17 @@ struct StoreDirConfig : public Config
     std::string printStorePath(const StorePath & path) const;
 
     /**
+     * Temporary.
+     *
+     * At the moment FS accessors usually have a root of / or C: or similar.
+     * Eventually FS accessors will have roots of /nix/store or C:\nix\store
+     * but for now, we have this helper function which will remove the root.
+     *
+     * \todo remove
+     */
+    CanonPath canonStorePath(const StorePath & path) const;
+
+    /**
      * Deprecated
      *
      * \todo remove

@@ -18,7 +18,6 @@ struct PosixSourceAccessor : virtual SourceAccessor
      */
     const std::filesystem::path root;
 
-    PosixSourceAccessor();
     PosixSourceAccessor(std::filesystem::path && root);
 
     /**
@@ -41,6 +40,8 @@ struct PosixSourceAccessor : virtual SourceAccessor
     std::string readLink(const CanonPath & path) override;
 
     std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override;
+
+    virtual std::string showPath(const CanonPath & path) override;
 
     /**
      * Create a `PosixSourceAccessor` and `SourcePath` corresponding to
