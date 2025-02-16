@@ -13,3 +13,6 @@ define run-install-test
 endef
 
 .PHONY: check installcheck
+
+print-top-help += \
+  echo "  installcheck: Run functional tests";
