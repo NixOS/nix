@@ -3070,8 +3070,11 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
     auto i = lookupPathResolved.find(value);
     if (i != lookupPathResolved.end()) return i->second;
 
-    auto finish = [&](SourcePath res) {
-        debug("resolved search path element '%s' to '%s'", value, res);
+    auto finish = [&](std::optional<SourcePath> res) {
+        if (res)
+            debug("resolved search path element '%s' to '%s'", value, *res);
+        else
+            debug("failed to resolve search path element '%s'", value);
         lookupPathResolved.emplace(value, res);
         return res;
     };
@@ -3123,8 +3126,7 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
         }
     }
 
-    debug("failed to resolve search path element '%s'", value);
-    return std::nullopt;
+    return finish(std::nullopt);
 }
 
 
