@@ -19,3 +19,7 @@ option('store-dir', type : 'string', value : '/nix/store',
 option('log-dir', type : 'string', value : '/nix/var/log/nix',
   description : 'path to store logs in for Nix',
 )
+
+option('nix-manual-mandir', type : 'string', value : '',
+  description : 'path to the nix manual directory (empty means the project\'s mandir)'
+)

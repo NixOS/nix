@@ -7,6 +7,7 @@
   darwin,
 
   nix-util,
+  nix-manual,
   boost,
   curl,
   aws-sdk-cpp,
@@ -21,6 +22,7 @@
   version,
 
   embeddedSandboxShell ? stdenv.hostPlatform.isStatic,
+  nixManDir ? "${lib.getOutput "man" nix-manual}/share/man",
 }:
 
 let
@@ -81,6 +83,7 @@ mkMesonLibrary (finalAttrs: {
     [
       (lib.mesonEnable "seccomp-sandboxing" stdenv.hostPlatform.isLinux)
       (lib.mesonBool "embedded-sandbox-shell" embeddedSandboxShell)
+      (lib.mesonOption "nix-manual-mandir" nixManDir)
     ]
     ++ lib.optionals stdenv.hostPlatform.isLinux [
       (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")

@@ -372,6 +372,10 @@ if not fs.is_absolute(sysconfdir)
 endif
 
 lsof = find_program('lsof', required : false)
+nix_man_dir = get_option('nix-manual-mandir')
+if nix_man_dir == ''
+   nix_man_dir = mandir
+endif
 
 # Aside from prefix itself, each of these was made into an absolute path
 # by joining it with prefix, unless it was already an absolute path
@@ -383,7 +387,7 @@ cpp_str_defines = {
   'NIX_STATE_DIR': localstatedir / 'nix',
   'NIX_LOG_DIR':   log_dir,
   'NIX_CONF_DIR':  sysconfdir / 'nix',
-  'NIX_MAN_DIR':   mandir,
+  'NIX_MAN_DIR':   nix_man_dir,
 }
 
 if lsof.found()
