@@ -57,10 +57,10 @@ libdir = join_paths(prefix, get_option('libdir'))
 
 # Required Programs
 #-------------------------------------------------
-xz = find_program('xz')
+find_program('xz')
 xsubpp = find_program('xsubpp')
 perl = find_program('perl')
-curl = find_program('curl')
+find_program('curl')
 yath = find_program('yath', required : false)
 
 # Required Libraries
@@ -157,7 +157,7 @@ subdir(lib_dir)
 if get_option('tests').enabled()
   yath_rc_conf = configuration_data()
   yath_rc_conf.set('lib_dir', lib_dir)
-  yath_rc = configure_file(
+  configure_file(
     output : '.yath.rc',
     input : '.yath.rc.in',
     configuration : yath_rc_conf,
