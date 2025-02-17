@@ -15,6 +15,7 @@
 #include "finally.hh"
 #include "legacy.hh"
 #include "daemon.hh"
+#include "man-pages.hh"
 
 #include <algorithm>
 #include <climits>
