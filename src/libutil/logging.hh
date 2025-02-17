@@ -5,6 +5,8 @@
 #include "config.hh"
 #include "file-descriptor.hh"
 
+#include <filesystem>
+
 #include <nlohmann/json_fwd.hpp>
 
 namespace nix {
@@ -185,7 +187,11 @@ extern Logger * logger;
 
 Logger * makeSimpleLogger(bool printBuildLogs = true);
 
+Logger * makeTeeLogger(std::vector<Logger *> loggers);
+
 Logger * makeJSONLogger(Descriptor fd);
+
+Logger * makeJSONLogger(const std::filesystem::path & path);
 
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".

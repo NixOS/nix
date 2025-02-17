@@ -267,6 +267,24 @@ Logger * makeJSONLogger(Descriptor fd)
     return new JSONLogger(fd);
 }
 
+Logger * makeJSONLogger(const std::filesystem::path & path)
+{
+    struct JSONFileLogger : JSONLogger {
+        AutoCloseFD fd;
+
+        JSONFileLogger(AutoCloseFD && fd)
+            : JSONLogger(fd.get())
+            , fd(std::move(fd))
+        { }
+    };
+
+    auto fd{toDescriptor(open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0644))};
+    if (!fd)
+        throw SysError("opening log file '%1%'", path);
+
+    return new JSONFileLogger(std::move(fd));
+}
+
 static Logger::Fields getFields(nlohmann::json & json)
 {
     Logger::Fields fields;

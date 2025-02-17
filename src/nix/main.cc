@@ -485,6 +485,10 @@ void mainWrapped(int argc, char * * argv)
         if (!args.helpRequested && !args.completions) throw;
     }
 
+    if (auto logFile = getEnv("NIX_LOG_FILE")) {
+        logger = makeTeeLogger({logger, makeJSONLogger(*logFile)});
+    }
+
     if (args.helpRequested) {
         std::vector<std::string> subcommand;
         MultiCommand * command = &args;
