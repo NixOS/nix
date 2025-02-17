@@ -743,7 +743,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
 
 static void processConnection(bool trusted,
-    const std::string & userName, uid_t userId)
+    /* Arbitrary hook to check authorization / initialize user data / whatever
+       after the protocol has been negotiated. The idea is that this function
+       and everything it calls doesn't know about this stuff, and the
+       `nix-daemon` handles that instead. */
+    std::function<void(Store &)> authHook)
 {
     MonitorFdHup monitor(from.fd);
 
@@ -781,20 +785,13 @@ static void processConnection(bool trusted,
         /* If we can't accept clientVersion, then throw an error
            *here* (not above). */
 
-#if 0
-        /* Prevent users from doing something very dangerous. */
-        if (geteuid() == 0 &&
-            querySetting("build-users-group", "") == "")
-            throw Error("if you run 'nix-daemon' as root, then you MUST set 'build-users-group'!");
-#endif
-
         /* Open the store. */
         Store::Params params; // FIXME: get params from somewhere
         // Disable caching since the client already does that.
         params["path-info-cache-size"] = "0";
         auto store = openStore(settings.storeUri, params);
 
-        store->createUser(userName, userId);
+        authHook(*store);
 
         tunnelLogger->stopWork();
         to.flush();
@@ -1060,7 +1057,15 @@ static void daemonLoop(char * * argv)
                 /* Handle the connection. */
                 from.fd = remote.get();
                 to.fd = remote.get();
-                processConnection(trusted, user, peer.uid);
+                processConnection(trusted, [&](Store & store) {
+#if 0
+                    /* Prevent users from doing something very dangerous. */
+                    if (geteuid() == 0 &&
+                        querySetting("build-users-group", "") == "")
+                        throw Error("if you run 'nix-daemon' as root, then you MUST set 'build-users-group'!");
+#endif
+                    store.createUser(user, peer.uid);
+                });
 
                 exit(0);
             }, options);
@@ -1140,7 +1145,10 @@ static int _main(int argc, char * * argv)
                     }
                 }
             } else {
-                processConnection(true, "root", 0);
+                /* Auth hook is empty because in this mode we blindly trust the
+                   standard streams. Limitting access to thoses is explicitly
+                   not `nix-daemon`'s responsibility. */
+                processConnection(true, [&](Store & _){});
             }
         } else {
             daemonLoop(argv);

@@ -2,6 +2,9 @@ source common.sh
 
 clearStore
 
+# Ensure "fake ssh" remote store works just as legacy fake ssh would.
+nix --store ssh-ng://localhost?remote-store=$TEST_ROOT/other-store doctor
+
 startDaemon
 
 storeCleared=1 NIX_REMOTE_=$NIX_REMOTE $SHELL ./user-envs.sh
