@@ -2219,7 +2219,7 @@ void LocalDerivationGoal::runChild()
         /* Execute the program.  This should not return. */
         if (drv->isBuiltin()) {
             try {
-                logger = makeJSONLogger(*logger);
+                logger = makeJSONLogger(STDERR_FILENO);
 
                 std::map<std::string, Path> outputs;
                 for (auto & e : drv->outputs)
