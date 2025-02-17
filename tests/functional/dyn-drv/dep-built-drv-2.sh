@@ -13,4 +13,4 @@ restartDaemon
 NIX_BIN_DIR="$(dirname "$(type -p nix)")"
 export NIX_BIN_DIR
 
-nix build -L --file ./non-trivial.nix
+nix build -L --file ./non-trivial.nix --no-link
