@@ -79,9 +79,15 @@ let
   };
 
 in
+<<<<<<< HEAD
 scope: {
   inherit stdenv versionSuffix;
   version = lib.fileContents ../.version + versionSuffix;
+=======
+scope:
+{
+  inherit stdenv;
+>>>>>>> b0bbb1252 (Support libgit2 1.9.0)
 
   aws-sdk-cpp =
     (pkgs.aws-sdk-cpp.override {
@@ -124,6 +130,31 @@ scope: {
         installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
       });
 
+  inherit resolvePath filesetToSource;
+
+  mkMesonDerivation = mkPackageBuilder [
+    miscGoodPractice
+    localSourceLayer
+    mesonLayer
+  ];
+  mkMesonExecutable = mkPackageBuilder [
+    miscGoodPractice
+    bsdNoLinkAsNeeded
+    localSourceLayer
+    mesonLayer
+    mesonBuildLayer
+  ];
+  mkMesonLibrary = mkPackageBuilder [
+    miscGoodPractice
+    bsdNoLinkAsNeeded
+    localSourceLayer
+    mesonLayer
+    mesonBuildLayer
+    mesonLibraryLayer
+  ];
+}
+# libgit2: Nixpkgs 24.11 has < 1.9.0
+// lib.optionalAttrs (!lib.versionAtLeast pkgs.libgit2.version "1.9.0") {
   libgit2 = pkgs.libgit2.overrideAttrs (attrs: {
     src = inputs.libgit2;
     version = inputs.libgit2.lastModifiedDate;
@@ -160,6 +191,7 @@ scope: {
   toml11 = pkgs.toml11.overrideAttrs (old: {
     meta.platforms = lib.platforms.all;
   });
+<<<<<<< HEAD
 
   inherit resolvePath filesetToSource;
 
@@ -173,4 +205,6 @@ scope: {
       ];
     in
     stdenv.mkDerivation (lib.extends (lib.foldr lib.composeExtensions (_: _: { }) exts) f);
+=======
+>>>>>>> b0bbb1252 (Support libgit2 1.9.0)
 }
