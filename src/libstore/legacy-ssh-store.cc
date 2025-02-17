@@ -70,6 +70,9 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
         command.push_back(remoteStore.get());
     }
     conn->sshConn = master.startCommand(std::move(command), std::list{extraSshArgs});
+    if (connPipeSize) {
+        conn->sshConn->trySetBufferSize(*connPipeSize);
+    }
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
 

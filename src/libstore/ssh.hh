@@ -54,6 +54,18 @@ public:
         Pid sshPid;
 #endif
         AutoCloseFD out, in;
+
+        /**
+         * Try to set the buffer size in both directions to the
+         * designated amount, if possible. If not possible, does
+         * nothing.
+         *
+         * Current implementation is to use `fcntl` with `F_SETPIPE_SZ`,
+         * which is Linux-only. For this implementation, `size` must
+         * convertable to an `int`. In other words, it must be within
+         * `[0, INT_MAX]`.
+         */
+        void trySetBufferSize(size_t size);
     };
 
     /**
