@@ -3,6 +3,7 @@
 
 #include "error.hh"
 #include "config.hh"
+#include "file-descriptor.hh"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -183,7 +184,7 @@ extern Logger * logger;
 
 Logger * makeSimpleLogger(bool printBuildLogs = true);
 
-Logger * makeJSONLogger(Logger & prevLogger);
+Logger * makeJSONLogger(Descriptor fd);
 
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".
