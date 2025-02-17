@@ -14,7 +14,7 @@ cxx = meson.get_compiler('cpp')
 
 subdir('nix-meson-build-support/deps-lists')
 
-configdata = configuration_data()
+configuration_data()
 
 deps_private_maybe_subproject = [
 ]

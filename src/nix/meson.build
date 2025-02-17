@@ -223,7 +223,7 @@ foreach linkname : nix_symlinks
     # The 'runtime' tag is what executables default to, which we want to emulate here.
     install_tag : 'runtime'
   )
-  t = custom_target(
+  custom_target(
     command: ['ln', '-sf', fs.name(this_exe), '@OUTPUT@'],
     output: linkname + executable_suffix,
     # native doesn't allow dangling symlinks, but the target executable often doesn't exist at this time
