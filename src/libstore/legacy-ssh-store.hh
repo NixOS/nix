@@ -30,6 +30,11 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
      */
     Strings extraSshArgs = {};
 
+    /**
+     * Exposed for hydra
+     */
+    std::optional<size_t> connPipeSize;
+
     const std::string name() override { return "SSH Store"; }
 
     static std::set<std::string> uriSchemes() { return {"ssh"}; }
