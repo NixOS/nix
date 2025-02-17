@@ -28,6 +28,7 @@
 #include "users.hh"
 #include "network-proxy.hh"
 #include "compatibility-settings.hh"
+#include "man-pages.hh"
 
 using namespace nix;
 using namespace std::string_literals;
