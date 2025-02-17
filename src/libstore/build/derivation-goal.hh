@@ -2,6 +2,7 @@
 ///@file
 
 #include "parsed-derivations.hh"
+#include "derivation-options.hh"
 #ifndef _WIN32
 #  include "user-lock.hh"
 #endif
@@ -147,6 +148,7 @@ struct DerivationGoal : public Goal
     std::unique_ptr<Derivation> drv;
 
     std::unique_ptr<ParsedDerivation> parsedDrv;
+    std::unique_ptr<DerivationOptions> drvOptions;
 
     /**
      * The remainder is state held during the build.
