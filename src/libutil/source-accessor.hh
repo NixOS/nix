@@ -214,4 +214,6 @@ ref<SourceAccessor> getFSSourceAccessor();
  */
 ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root);
 
+ref<SourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts);
+
 }

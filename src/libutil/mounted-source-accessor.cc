@@ -1,4 +1,4 @@
-#include "mounted-source-accessor.hh"
+#include "source-accessor.hh"
 
 namespace nix {
 
