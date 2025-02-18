@@ -367,7 +367,12 @@ unsigned int LegacySSHStore::getProtocol()
 pid_t LegacySSHStore::getConnectionPid()
 {
     auto conn(connections->get());
+#ifndef _WIN32
     return conn->sshConn->sshPid;
+#else
+    // TODO: Implement
+    return 0;
+#endif
 }
 
 

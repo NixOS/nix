@@ -4,8 +4,8 @@
 #include "substitution-goal.hh"
 #include "drv-output-substitution-goal.hh"
 #include "derivation-goal.hh"
+#include "derivation-creation-and-realisation-goal.hh"
 #ifndef _WIN32 // TODO Enable building on Windows
-#  include "derivation-creation-and-realisation-goal.hh"
 #  include "local-derivation-goal.hh"
 #  include "hook-instance.hh"
 #endif
