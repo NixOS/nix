@@ -102,7 +102,7 @@ let
       src = finalScope.patchedSrc;
       version =
         let
-          n = lib.count (p: p != null) finalScope.patches;
+          n = lib.length finalScope.patches;
         in
         if n == 0 then finalAttrs.version else finalAttrs.version + "+${toString n}";
 
