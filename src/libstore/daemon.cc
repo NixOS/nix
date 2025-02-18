@@ -1041,11 +1041,15 @@ void processConnection(
     conn.protoVersion = protoVersion;
     conn.features = features;
 
-    auto tunnelLogger = new TunnelLogger(conn.to, protoVersion);
-    auto prevLogger = nix::logger;
+    auto tunnelLogger_ = std::make_unique<TunnelLogger>(conn.to, protoVersion);
+    auto tunnelLogger = tunnelLogger_.get();
+    std::unique_ptr<Logger> prevLogger_;
+    auto prevLogger = logger.get();
     // FIXME
-    if (!recursive)
-        logger = tunnelLogger;
+    if (!recursive) {
+        prevLogger_ = std::move(logger);
+        logger = std::move(tunnelLogger_);
+    }
 
     unsigned int opCount = 0;
 
