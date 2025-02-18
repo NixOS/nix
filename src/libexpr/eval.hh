@@ -251,6 +251,11 @@ public:
     const ref<SourceAccessor> rootFS;
 
     /**
+     * The accessor for the store.
+     */
+    const ref<SourceAccessor> storeFS;
+
+    /**
      * The in-memory filesystem for <nix/...> paths.
      */
     const ref<MemorySourceAccessor> corepkgsFS;
@@ -390,6 +395,18 @@ public:
     SourcePath rootPath(PathView path);
 
     /**
+     * Convert `s` to a path. If `context` is not empty, the resulting
+     * path will use the `storeFS` accessor; otherwise it will use
+     * `rootFS`. When using a chroot store, this allows us to
+     * distinguish between store paths resulting from
+     * import-from-derivation and sources stored in the actual
+     * /nix/store.
+     */
+    SourcePath stringWithContextToPath(
+        std::string_view s,
+        const NixStringContext & context);
+
+    /**
      * Allow access to a path.
      */
     void allowPath(const Path & path);
@@ -411,17 +428,6 @@ public:
     void allowAndSetStorePathString(const StorePath & storePath, Value & v);
 
     void checkURI(const std::string & uri);
-
-    /**
-     * When using a diverted store and 'path' is in the Nix store, map
-     * 'path' to the diverted location (e.g. /nix/store/foo is mapped
-     * to /home/alice/my-nix/nix/store/foo). However, this is only
-     * done if the context is not empty, since otherwise we're
-     * probably trying to read from the actual /nix/store. This is
-     * intended to distinguish between import-from-derivation and
-     * sources stored in the actual /nix/store.
-     */
-    Path toRealPath(const Path & path, const NixStringContext & context);
 
     /**
      * Parse a Nix expression from the specified file.

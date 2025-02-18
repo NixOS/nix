@@ -255,6 +255,12 @@ EvalState::EvalState(
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))
         : getFSSourceAccessor())
+    , storeFS(
+        makeMountedSourceAccessor(
+            {
+                {CanonPath::root, makeEmptySourceAccessor()},
+                {CanonPath(store->storeDir), makeFSSourceAccessor(dirOf(store->toRealPath(StorePath::dummy)))}
+            }))
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{corepkgsFS->addFile(
@@ -419,16 +425,6 @@ void EvalState::checkURI(const std::string & uri)
     }
 
     throw RestrictedPathError("access to URI '%s' is forbidden in restricted mode", uri);
-}
-
-
-Path EvalState::toRealPath(const Path & path, const NixStringContext & context)
-{
-    // FIXME: check whether 'path' is in 'context'.
-    return
-        !context.empty() && store->isInStore(path)
-        ? store->toRealPath(path)
-        : path;
 }
 
 
@@ -2432,7 +2428,7 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
     auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
     if (path == "" || path[0] != '/')
         error<EvalError>("string '%1%' doesn't represent an absolute path", path).withTrace(pos, errorCtx).debugThrow();
-    return rootPath(CanonPath(path));
+    return stringWithContextToPath(path, context);
 }
 
 

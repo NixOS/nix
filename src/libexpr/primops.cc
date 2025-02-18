@@ -143,10 +143,9 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, st
     auto path = state.coerceToPath(noPos, v, context, "while realising the context of a path");
 
     try {
-        if (!context.empty() && path.accessor == state.rootFS) {
+        if (!context.empty() && path.accessor == state.storeFS) {
             auto rewrites = state.realiseContext(context);
-            auto realPath = state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context);
-            path = {path.accessor, CanonPath(realPath)};
+            path = {path.accessor, CanonPath(rewriteStrings(path.path.abs(), rewrites))};
         }
         return resolveSymlinks ? path.resolveSymlinks(*resolveSymlinks) : path;
     } catch (Error & e) {
@@ -2481,19 +2480,11 @@ static void addPath(
     try {
         StorePathSet refs;
 
-        if (path.accessor == state.rootFS && state.store->isInStore(path.path.abs())) {
+        if (path.accessor == state.storeFS && state.store->isInStore(path.path.abs())) {
             // FIXME: handle CA derivation outputs (where path needs to
             // be rewritten to the actual output).
             auto rewrites = state.realiseContext(context);
-            path = {state.rootFS, CanonPath(state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context))};
-
-            try {
-                auto [storePath, subPath] = state.store->toStorePath(path.path.abs());
-                // FIXME: we should scanForReferences on the path before adding it
-                refs = state.store->queryPathInfo(storePath)->references;
-                path = {state.rootFS, CanonPath(state.store->toRealPath(storePath) + subPath)};
-            } catch (Error &) { // FIXME: should be InvalidPathError
-            }
+            path = {path.accessor, CanonPath(rewriteStrings(path.path.abs(), rewrites))};
         }
 
         std::unique_ptr<PathFilter> filter;
