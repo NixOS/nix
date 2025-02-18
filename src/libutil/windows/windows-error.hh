@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#ifdef _WIN32
 #include <errhandlingapi.h>
 
 #include "error.hh"
@@ -49,3 +50,4 @@ private:
 };
 
 }
+#endif

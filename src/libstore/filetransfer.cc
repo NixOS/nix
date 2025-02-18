@@ -54,6 +54,8 @@ struct curlFileTransfer : public FileTransfer
         bool done = false; // whether either the success or failure function has been called
         Callback<FileTransferResult> callback;
         CURL * req = 0;
+        // buffer to accompany the `req` above
+        char errbuf[CURL_ERROR_SIZE];
         bool active = false; // whether the handle has been added to the multi object
         std::string statusMsg;
 
@@ -137,7 +139,7 @@ struct curlFileTransfer : public FileTransfer
                 if (!done)
                     fail(FileTransferError(Interrupted, {}, "download of '%s' was interrupted", request.uri));
             } catch (...) {
-                ignoreException();
+                ignoreExceptionInDestructor();
             }
         }
 
@@ -151,7 +153,7 @@ struct curlFileTransfer : public FileTransfer
         template<class T>
         void fail(T && e)
         {
-            failEx(std::make_exception_ptr(std::move(e)));
+            failEx(std::make_exception_ptr(std::forward<T>(e)));
         }
 
         LambdaSink finalSink;
@@ -370,6 +372,9 @@ struct curlFileTransfer : public FileTransfer
             if (writtenToSink)
                 curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);
 
+            curl_easy_setopt(req, CURLOPT_ERRORBUFFER, errbuf);
+            errbuf[0] = 0;
+
             result.data.clear();
             result.bodySize = 0;
         }
@@ -484,8 +489,8 @@ struct curlFileTransfer : public FileTransfer
                         code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                     : FileTransferError(err,
                         std::move(response),
-                        "unable to %s '%s': %s (%d)",
-                        request.verb(), request.uri, curl_easy_strerror(code), code);
+                        "unable to %s '%s': %s (%d) %s",
+                        request.verb(), request.uri, curl_easy_strerror(code), code, errbuf);
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a
@@ -762,7 +767,7 @@ struct curlFileTransfer : public FileTransfer
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
                 if (!s3Res.data)
-                    throw FileTransferError(NotFound, "S3 object '%s' does not exist", request.uri);
+                    throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);
                 res.data = std::move(*s3Res.data);
                 res.urls.push_back(request.uri);
                 callback(std::move(res));

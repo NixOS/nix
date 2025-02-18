@@ -1,77 +1,82 @@
-{ lib
-, stdenv
-, mkMesonDerivation
-, perl
-, perlPackages
-, meson
-, ninja
-, pkg-config
-, nix-store
-, darwin
-, version
-, curl
-, bzip2
-, libsodium
+{
+  lib,
+  stdenv,
+  mkMesonDerivation,
+  pkg-config,
+  perl,
+  perlPackages,
+  nix-store,
+  version,
+  curl,
+  bzip2,
+  libsodium,
 }:
 
 let
   inherit (lib) fileset;
 in
 
-perl.pkgs.toPerlModule (mkMesonDerivation (finalAttrs: {
-  pname = "nix-perl";
-  inherit version;
+perl.pkgs.toPerlModule (
+  mkMesonDerivation (finalAttrs: {
+    pname = "nix-perl";
+    inherit version;
 
-  workDir = ./.;
-  fileset = fileset.unions ([
-    ./.version
-    ../../.version
-    ./MANIFEST
-    ./lib
-    ./meson.build
-    ./meson.options
-  ] ++ lib.optionals finalAttrs.doCheck [
-    ./.yath.rc.in
-    ./t
-  ]);
+    workDir = ./.;
+    fileset = fileset.unions (
+      [
+        ./.version
+        ../../.version
+        ./MANIFEST
+        ./lib
+        ./meson.build
+        ./meson.options
+      ]
+      ++ lib.optionals finalAttrs.doCheck [
+        ./.yath.rc.in
+        ./t
+      ]
+    );
 
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-    perl
-    curl
-  ];
+    nativeBuildInputs = [
+      pkg-config
+      perl
+      curl
+    ];
 
-  buildInputs = [
-    nix-store
-    bzip2
-    libsodium
-  ];
+    buildInputs = [
+      nix-store
+    ] ++ finalAttrs.passthru.externalBuildInputs;
 
-  # `perlPackages.Test2Harness` is marked broken for Darwin
-  doCheck = !stdenv.isDarwin;
+    # Hack for sake of the dev shell
+    passthru.externalBuildInputs = [
+      bzip2
+      libsodium
+    ];
 
-  nativeCheckInputs = [
-    perlPackages.Test2Harness
-  ];
+    # `perlPackages.Test2Harness` is marked broken for Darwin
+    doCheck = !stdenv.isDarwin;
 
-  preConfigure =
-    # "Inline" .version so its not a symlink, and includes the suffix
-    ''
-      chmod u+w .version
-      echo ${finalAttrs.version} > .version
-    '';
+    nativeCheckInputs = [
+      perlPackages.Test2Harness
+    ];
 
-  mesonFlags = [
-    (lib.mesonOption "dbi_path" "${perlPackages.DBI}/${perl.libPrefix}")
-    (lib.mesonOption "dbd_sqlite_path" "${perlPackages.DBDSQLite}/${perl.libPrefix}")
-    (lib.mesonEnable "tests" finalAttrs.doCheck)
-  ];
+    preConfigure =
+      # "Inline" .version so its not a symlink, and includes the suffix
+      ''
+        chmod u+w .version
+        echo ${finalAttrs.version} > .version
+      '';
 
-  mesonCheckFlags = [
-    "--print-errorlogs"
-  ];
+    mesonFlags = [
+      (lib.mesonOption "dbi_path" "${perlPackages.DBI}/${perl.libPrefix}")
+      (lib.mesonOption "dbd_sqlite_path" "${perlPackages.DBDSQLite}/${perl.libPrefix}")
+      (lib.mesonEnable "tests" finalAttrs.doCheck)
+    ];
 
-  strictDeps = false;
-}))
+    mesonCheckFlags = [
+      "--print-errorlogs"
+    ];
+
+    strictDeps = false;
+  })
+)

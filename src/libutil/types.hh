@@ -43,9 +43,11 @@ template<typename T>
 struct Explicit {
     T t;
 
-    bool operator ==(const Explicit<T> & other) const
+    bool operator ==(const Explicit<T> & other) const = default;
+
+    bool operator <(const Explicit<T> & other) const
     {
-        return t == other.t;
+        return t < other.t;
     }
 };
 

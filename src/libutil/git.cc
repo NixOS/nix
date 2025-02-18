@@ -200,7 +200,11 @@ std::optional<Mode> convertMode(SourceAccessor::Type type)
     case SourceAccessor::tSymlink:   return Mode::Symlink;
     case SourceAccessor::tRegular:   return Mode::Regular;
     case SourceAccessor::tDirectory: return Mode::Directory;
-    case SourceAccessor::tMisc:      return std::nullopt;
+    case SourceAccessor::tChar:
+    case SourceAccessor::tBlock:
+    case SourceAccessor::tSocket:
+    case SourceAccessor::tFifo:      return std::nullopt;
+    case SourceAccessor::tUnknown:
     default: unreachable();
     }
 }
@@ -314,9 +318,13 @@ Mode dump(
         return Mode::Symlink;
     }
 
-    case SourceAccessor::tMisc:
+    case SourceAccessor::tChar:
+    case SourceAccessor::tBlock:
+    case SourceAccessor::tSocket:
+    case SourceAccessor::tFifo:
+    case SourceAccessor::tUnknown:
     default:
-        throw Error("file '%1%' has an unsupported type", path);
+        throw Error("file '%1%' has an unsupported type of %2%", path, st.typeString());
     }
 }
 

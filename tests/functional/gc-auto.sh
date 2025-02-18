@@ -23,7 +23,7 @@ fifoLock=$TEST_ROOT/fifoLock
 mkfifo "$fifoLock"
 
 expr=$(cat <<EOF
-with import ./config.nix; mkDerivation {
+with import ${config_nix}; mkDerivation {
   name = "gc-A";
   buildCommand = ''
     set -x
@@ -51,7 +51,7 @@ EOF
 )
 
 expr2=$(cat <<EOF
-with import ./config.nix; mkDerivation {
+with import ${config_nix}; mkDerivation {
   name = "gc-B";
   buildCommand = ''
     set -x

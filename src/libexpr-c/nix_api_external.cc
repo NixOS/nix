@@ -14,12 +14,6 @@
 
 #include <nlohmann/json.hpp>
 
-#if HAVE_BOEHMGC
-# include "gc/gc.h"
-# define GC_INCLUDE_NEW 1
-# include "gc_cpp.h"
-#endif
-
 void nix_set_string_return(nix_string_return * str, const char * c)
 {
     str->str = c;

@@ -1,14 +1,18 @@
-{ runCommand
-, system
-, buildPackages
-, cacert
-, nix
+{
+  runCommand,
+  system,
+  buildPackages,
+  cacert,
+  nix,
 }:
 
 let
 
   installerClosureInfo = buildPackages.closureInfo {
-    rootPaths = [ nix cacert ];
+    rootPaths = [
+      nix
+      cacert
+    ];
   };
 
   inherit (nix) version;
@@ -23,7 +27,7 @@ in
 runCommand "nix-binary-tarball-${version}" env ''
   cp ${installerClosureInfo}/registration $TMPDIR/reginfo
   cp ${./create-darwin-volume.sh} $TMPDIR/create-darwin-volume.sh
-  substitute ${./install-nix-from-closure.sh} $TMPDIR/install \
+  substitute ${./install-nix-from-tarball.sh} $TMPDIR/install \
     --subst-var-by nix ${nix} \
     --subst-var-by cacert ${cacert}
 
@@ -65,7 +69,7 @@ runCommand "nix-binary-tarball-${version}" env ''
   fn=$out/$dir.tar.xz
   mkdir -p $out/nix-support
   echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
-  tar cvfJ $fn \
+  tar cfJ $fn \
     --owner=0 --group=0 --mode=u+rw,uga+r \
     --mtime='1970-01-01' \
     --absolute-names \

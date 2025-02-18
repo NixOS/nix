@@ -139,12 +139,12 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
 
     Category category() override { return catSecondary; }
 
-    void printSize(uint64_t value)
+    void printSize(std::ostream & str, uint64_t value)
     {
         if (humanReadable)
-            std::cout << fmt("\t%s", renderSize(value, true));
+            str << fmt("\t%s", renderSize(value, true));
         else
-            std::cout << fmt("\t%11d", value);
+            str << fmt("\t%11d", value);
     }
 
     void run(ref<Store> store, StorePaths && storePaths) override
@@ -154,11 +154,11 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             pathLen = std::max(pathLen, store->printStorePath(storePath).size());
 
         if (json) {
-            std::cout << pathInfoToJSON(
+            logger->cout(pathInfoToJSON(
                 *store,
                 // FIXME: preserve order?
                 StorePathSet(storePaths.begin(), storePaths.end()),
-                showClosureSize).dump();
+                showClosureSize).dump());
         }
 
         else {
@@ -167,30 +167,32 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                 auto info = store->queryPathInfo(storePath);
                 auto storePathS = store->printStorePath(info->path);
 
-                std::cout << storePathS;
+                std::ostringstream str;
+
+                str << storePathS;
 
                 if (showSize || showClosureSize || showSigs)
-                    std::cout << std::string(std::max(0, (int) pathLen - (int) storePathS.size()), ' ');
+                    str << std::string(std::max(0, (int) pathLen - (int) storePathS.size()), ' ');
 
                 if (showSize)
-                    printSize(info->narSize);
+                    printSize(str, info->narSize);
 
                 if (showClosureSize) {
                     StorePathSet closure;
                     store->computeFSClosure(storePath, closure, false, false);
-                    printSize(getStoreObjectsTotalSize(*store, closure));
+                    printSize(str, getStoreObjectsTotalSize(*store, closure));
                 }
 
                 if (showSigs) {
-                    std::cout << '\t';
+                    str << '\t';
                     Strings ss;
                     if (info->ultimate) ss.push_back("ultimate");
                     if (info->ca) ss.push_back("ca:" + renderContentAddress(*info->ca));
                     for (auto & sig : info->sigs) ss.push_back(sig);
-                    std::cout << concatStringsSep(" ", ss);
+                    str << concatStringsSep(" ", ss);
                 }
 
-                std::cout << std::endl;
+                logger->cout(str.str());
             }
 
         }

@@ -4,6 +4,7 @@ sources += files(
   'file-path.cc',
   'file-system.cc',
   'muxable-pipe.cc',
+  'os-string.cc',
   'processes.cc',
   'users.cc',
   'windows-async-pipe.cc',

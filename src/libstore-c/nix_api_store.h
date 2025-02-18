@@ -48,12 +48,27 @@ nix_err nix_libstore_init_no_load_config(nix_c_context * context);
  * Store instances may share state and resources behind the scenes.
  *
  * @param[out] context Optional, stores error information
- * @param[in] uri URI of the Nix store, copied. See [*Store URL format* in the Nix Reference
+ *
+ * @param[in] uri @parblock
+ *   URI of the Nix store, copied.
+ *
+ *   If `NULL`, the store from the settings will be used.
+ *   Note that `"auto"` holds a strange middle ground, reading part of the general environment, but not all of it. It
+ * ignores `NIX_REMOTE` and the `store` option. For this reason, `NULL` is most likely the better choice.
+ *
+ *   For supported store URLs, see [*Store URL format* in the Nix Reference
  * Manual](https://nixos.org/manual/nix/stable/store/types/#store-url-format).
- * @param[in] params optional, null-terminated array of key-value pairs, e.g. {{"endpoint",
- * "https://s3.local"}}. See [*Store Types* in the Nix Reference
- * Manual](https://nixos.org/manual/nix/stable/store/types).
+ * @endparblock
+ *
+ * @param[in] params @parblock
+ *   optional, null-terminated array of key-value pairs, e.g. {{"endpoint",
+ * "https://s3.local"}}.
+ *
+ *   See [*Store Types* in the Nix Reference Manual](https://nixos.org/manual/nix/stable/store/types).
+ * @endparblock
+ *
  * @return a Store pointer, NULL in case of errors
+ *
  * @see nix_store_free
  */
 Store * nix_store_open(nix_c_context * context, const char * uri, const char *** params);
@@ -78,7 +93,18 @@ void nix_store_free(Store * store);
  */
 nix_err nix_store_get_uri(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data);
 
-// returns: owned StorePath*
+/**
+ * @brief get the storeDir of a Nix store, typically `"/nix/store"`
+ * @param[out] context Optional, stores error information
+ * @param[in] store nix store reference
+ * @param[in] callback Called with the URI.
+ * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
+ * @see nix_get_string_callback
+ * @return error code, NIX_OK on success.
+ */
+nix_err
+nix_store_get_storedir(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data);
+
 /**
  * @brief Parse a Nix store path into a StorePath
  *
@@ -123,6 +149,26 @@ void nix_store_path_free(StorePath * p);
  * @return true or false, error info in context
  */
 bool nix_store_is_valid_path(nix_c_context * context, Store * store, StorePath * path);
+
+/**
+ * @brief Get the physical location of a store path
+ *
+ * A store may reside at a different location than its `storeDir` suggests.
+ * This situation is called a relocated store.
+ * Relocated stores are used during NixOS installation, as well as in restricted computing environments that don't offer
+ * a writable `/nix/store`.
+ *
+ * Not all types of stores support this operation.
+ *
+ * @param[in] context Optional, stores error information
+ * @param[in] store nix store reference
+ * @param[in] path the path to get the real path from
+ * @param[in] callback called with the real path
+ * @param[in] user_data arbitrary data, passed to the callback when it's called.
+ */
+nix_err nix_store_real_path(
+    nix_c_context * context, Store * store, StorePath * path, nix_get_string_callback callback, void * user_data);
+
 // nix_err nix_store_ensure(Store*, const char*);
 // nix_err nix_store_build_paths(Store*);
 /**
@@ -160,6 +206,16 @@ nix_err nix_store_realise(
  */
 nix_err
 nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data);
+
+/**
+ * @brief Copy the closure of `path` from `srcStore` to `dstStore`.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] srcStore nix source store reference
+ * @param[in] dstStore nix destination store reference
+ * @param[in] path Path to copy
+ */
+nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path);
 
 // cffi end
 #ifdef __cplusplus

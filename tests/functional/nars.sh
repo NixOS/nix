@@ -67,6 +67,12 @@ expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | gre
 rm -rf "$TEST_ROOT/case"
 opts=("--option" "use-case-hack" "true")
 nix-store "${opts[@]}" --restore "$TEST_ROOT/case" < case.nar
+[[ -e "$TEST_ROOT/case/xt_CONNMARK.h" ]]
+[[ -e "$TEST_ROOT/case/xt_CONNmark.h~nix~case~hack~1" ]]
+[[ -e "$TEST_ROOT/case/xt_connmark.h~nix~case~hack~2" ]]
+[[ -e "$TEST_ROOT/case/x/FOO" ]]
+[[ -d "$TEST_ROOT/case/x/Foo~nix~case~hack~1" ]]
+[[ -e "$TEST_ROOT/case/x/foo~nix~case~hack~2/a~nix~case~hack~1/foo" ]]
 nix-store "${opts[@]}" --dump "$TEST_ROOT/case" > "$TEST_ROOT/case.nar"
 cmp case.nar "$TEST_ROOT/case.nar"
 [ "$(nix-hash "${opts[@]}" --type sha256 "$TEST_ROOT/case")" = "$(nix-hash --flat --type sha256 case.nar)" ]
@@ -82,13 +88,74 @@ touch "$TEST_ROOT/case/xt_CONNMARK.h~nix~case~hack~3"
 rm -rf "$TEST_ROOT/case"
 expectStderr 1 nix-store "${opts[@]}" --restore "$TEST_ROOT/case" < case-collision.nar | grepQuiet "NAR contains file name 'test' that collides with case-hacked file name 'Test~nix~case~hack~1'"
 
-# Deserializing a NAR that contains file names that Unicode-normalize
-# to the same name should fail on macOS but succeed on Linux.
+# Deserializing a NAR that contains file names that Unicode-normalize to the
+# same name should fail on macOS and specific Linux setups (typically ZFS with
+# `utf8only` enabled and `normalization` set to anything else than `none`). The
+# deserialization should succeed on most Linux, where file names aren't
+# unicode-normalized.
+#
+# We test that:
+#
+# 1. It either succeeds or fails with "already exists" error.
+# 2. Nix has the same behavior with respect to unicode normalization than
+#    $TEST_ROOT's filesystem (when using basic Unix commands)
 rm -rf "$TEST_ROOT/out"
-if [[ $(uname) = Darwin ]]; then
-    expectStderr 1 nix-store --restore "$TEST_ROOT/out" < unnormalized.nar | grepQuiet "path '.*/out/â' already exists"
-else
-    nix-store --restore "$TEST_ROOT/out" < unnormalized.nar
+set +e
+unicodeTestOut=$(nix-store --restore "$TEST_ROOT/out" < unnormalized.nar 2>&1)
+unicodeTestCode=$?
+set -e
+
+touch "$TEST_ROOT/unicode-â" # non-canonical version
+touch "$TEST_ROOT/unicode-â"
+
+touchFilesCount=$(find "$TEST_ROOT" -maxdepth 1 -name "unicode-*" -type f | wc -l)
+
+if (( unicodeTestCode == 1 )); then
+    # If the command failed (MacOS or ZFS + normalization), checks that it failed
+    # with the expected "already exists" error, and that this is the same
+    # behavior as `touch`
+    echo "$unicodeTestOut" | grepQuiet "path '.*/out/â' already exists"
+
+    (( touchFilesCount == 1 ))
+elif (( unicodeTestCode == 0 )); then
+    # If the command succeeded, check that both files are present, and that this
+    # is the same behavior as `touch`
     [[ -e $TEST_ROOT/out/â ]]
     [[ -e $TEST_ROOT/out/â ]]
+
+    (( touchFilesCount == 2 ))
+else
+    # if the return code is neither 0 or 1, fail the test.
+    echo "NAR deserialization of files with the same Unicode normalization failed with unexpected return code $unicodeTestCode" >&2
+    exit 1
 fi
+
+rm -f "$TEST_ROOT/unicode-*"
+
+# Unpacking a NAR with a NUL character in a file name should fail.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < nul-character.nar | grepQuiet "NAR contains invalid file name 'f"
+
+# Likewise for a '.' filename.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < dot.nar | grepQuiet "NAR contains invalid file name '.'"
+
+# Likewise for a '..' filename.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < dotdot.nar | grepQuiet "NAR contains invalid file name '..'"
+
+# Likewise for a filename containing a slash.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < slash.nar | grepQuiet "NAR contains invalid file name 'x/y'"
+
+# Likewise for an empty filename.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < empty.nar | grepQuiet "NAR contains invalid file name ''"
+
+# Test that the 'executable' field cannot come before the 'contents' field.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < executable-after-contents.nar | grepQuiet "expected tag ')', got 'executable'"
+
+# Test that the 'name' field cannot come before the 'node' field in a directory entry.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < name-after-node.nar | grepQuiet "expected tag 'name'"

@@ -204,15 +204,15 @@ static void loadDerivations(EvalState & state, const SourcePath & nixExprPath,
 }
 
 
-static long getPriority(EvalState & state, PackageInfo & drv)
+static NixInt getPriority(EvalState & state, PackageInfo & drv)
 {
-    return drv.queryMetaInt("priority", 0);
+    return drv.queryMetaInt("priority", NixInt(0));
 }
 
 
-static long comparePriorities(EvalState & state, PackageInfo & drv1, PackageInfo & drv2)
+static std::strong_ordering comparePriorities(EvalState & state, PackageInfo & drv1, PackageInfo & drv2)
 {
-    return getPriority(state, drv2) - getPriority(state, drv1);
+    return getPriority(state, drv2) <=> getPriority(state, drv1);
 }
 
 
@@ -280,7 +280,7 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
         auto & oneDrv = match.packageInfo;
 
         const auto drvName = DrvName { oneDrv.queryName() };
-        long comparison = 1;
+        std::strong_ordering comparison = std::strong_ordering::greater;
 
         const auto itOther = newest.find(drvName.name);
 
@@ -288,9 +288,9 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
             auto & newestDrv = itOther->second.packageInfo;
 
             comparison =
-                oneDrv.querySystem() == newestDrv.querySystem() ? 0 :
-                oneDrv.querySystem() == settings.thisSystem ? 1 :
-                newestDrv.querySystem() == settings.thisSystem ? -1 : 0;
+                oneDrv.querySystem() == newestDrv.querySystem() ? std::strong_ordering::equal :
+                oneDrv.querySystem() == settings.thisSystem ? std::strong_ordering::greater :
+                newestDrv.querySystem() == settings.thisSystem ? std::strong_ordering::less : std::strong_ordering::equal;
             if (comparison == 0)
                 comparison = comparePriorities(state, oneDrv, newestDrv);
             if (comparison == 0)
@@ -481,12 +481,13 @@ static void printMissing(EvalState & state, PackageInfos & elems)
 {
     std::vector<DerivedPath> targets;
     for (auto & i : elems)
-        if (auto drvPath = i.queryDrvPath())
-            targets.emplace_back(DerivedPath::Built{
+        if (auto drvPath = i.queryDrvPath()) {
+            auto path = DerivedPath::Built{
                 .drvPath = makeConstantStorePathRef(*drvPath),
                 .outputs = OutputsSpec::All { },
-            });
-        else
+            };
+            targets.emplace_back(std::move(path));
+        } else
             targets.emplace_back(DerivedPath::Opaque{
                 .path = i.queryOutPath(),
             });
@@ -500,9 +501,17 @@ static bool keep(PackageInfo & drv)
     return drv.queryMetaBool("keep", false);
 }
 
+static void setMetaFlag(EvalState & state, PackageInfo & drv,
+    const std::string & name, const std::string & value)
+{
+    auto v = state.allocValue();
+    v->mkString(value);
+    drv.setMeta(name, v);
+}
+
 
 static void installDerivations(Globals & globals,
-    const Strings & args, const Path & profile)
+    const Strings & args, const Path & profile, std::optional<int> priority)
 {
     debug("installing derivations");
 
@@ -526,6 +535,11 @@ static void installDerivations(Globals & globals,
         newNames.insert(DrvName(i.queryName()).name);
     }
 
+    if (priority) {
+        for (auto & drv : newElems) {
+            setMetaFlag(*globals.state, drv, "priority", std::to_string((priority.value())));
+        }
+    }
 
     while (true) {
         auto lockToken = optimisticLockProfile(profile);
@@ -563,6 +577,7 @@ static void installDerivations(Globals & globals,
 
 static void opInstall(Globals & globals, Strings opFlags, Strings opArgs)
 {
+    std::optional<int> priority;
     for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
         auto arg = *i++;
         if (parseInstallSourceOptions(globals, i, opFlags, arg)) ;
@@ -570,10 +585,17 @@ static void opInstall(Globals & globals, Strings opFlags, Strings opArgs)
             globals.preserveInstalled = true;
         else if (arg == "--remove-all" || arg == "-r")
             globals.removeAll = true;
+        else if (arg == "--priority") {
+            if (i == opFlags.end())
+                throw UsageError("'%1%' requires an argument", arg);
+            priority = string2Int<int>(*i++);
+            if (!priority)
+                throw UsageError("'--priority' requires an integer argument");
+        }
         else throw UsageError("unknown flag '%1%'", arg);
     }
 
-    installDerivations(globals, opArgs, globals.profile);
+    installDerivations(globals, opArgs, globals.profile, priority);
 }
 
 
@@ -625,13 +647,13 @@ static void upgradeDerivations(Globals & globals,
                         continue;
                     DrvName newName(j->queryName());
                     if (newName.name == drvName.name) {
-                        int d = compareVersions(drvName.version, newName.version);
+                        std::strong_ordering d = compareVersions(drvName.version, newName.version);
                         if ((upgradeType == utLt && d < 0) ||
                             (upgradeType == utLeq && d <= 0) ||
                             (upgradeType == utEq && d == 0) ||
                             upgradeType == utAlways)
                         {
-                            long d2 = -1;
+                            std::strong_ordering d2 = std::strong_ordering::less;
                             if (bestElem != availElems.end()) {
                                 d2 = comparePriorities(*globals.state, *bestElem, *j);
                                 if (d2 == 0) d2 = compareVersions(bestVersion, newName.version);
@@ -685,15 +707,6 @@ static void opUpgrade(Globals & globals, Strings opFlags, Strings opArgs)
     }
 
     upgradeDerivations(globals, opArgs, upgradeType);
-}
-
-
-static void setMetaFlag(EvalState & state, PackageInfo & drv,
-    const std::string & name, const std::string & value)
-{
-    auto v = state.allocValue();
-    v->mkString(value);
-    drv.setMeta(name, v);
 }
 
 
@@ -902,7 +915,7 @@ static VersionDiff compareVersionAgainstSet(
     for (auto & i : elems) {
         DrvName name2(i.queryName());
         if (name.name == name2.name) {
-            int d = compareVersions(name.version, name2.version);
+            std::strong_ordering d = compareVersions(name.version, name2.version);
             if (d < 0) {
                 diff = cvGreater;
                 version = name2.version;
@@ -1506,7 +1519,8 @@ static int main_nix_env(int argc, char * * argv)
                 opFlags.push_back(*arg);
                 /* FIXME: hacky */
                 if (*arg == "--from-profile" ||
-                    (op == opQuery && (*arg == "--attr" || *arg == "-A")))
+                    (op == opQuery && (*arg == "--attr" || *arg == "-A")) ||
+                    (op == opInstall && (*arg == "--priority")))
                     opFlags.push_back(getArg(*arg, arg, end));
             }
             else

@@ -4,9 +4,8 @@ project('nix-store', 'cpp',
     'cpp_std=c++2a',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
-    'debug=true',
-    'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
+    'localstatedir=/nix/var',
   ],
   meson_version : '>= 1.1',
   license : 'LGPL-2.1-or-later',
@@ -16,7 +15,7 @@ fs = import('fs')
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
@@ -25,18 +24,20 @@ configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
 configdata.set_quoted('DETERMINATE_NIX_VERSION', fs.read('.version-determinate').strip())
 
-configdata.set_quoted('SYSTEM', host_machine.system())
+configdata.set_quoted('SYSTEM', host_machine.cpu_family() + '-' + host_machine.system())
 
 deps_private_maybe_subproject = [
 ]
 deps_public_maybe_subproject = [
   dependency('nix-util'),
 ]
-subdir('build-utils-meson/subprojects')
+subdir('nix-meson-build-support/subprojects')
 
 run_command('ln', '-s',
   meson.project_build_root() / '__nothing_link_target',
   meson.project_build_root() / '__nothing_symlink',
+  # native doesn't allow dangling symlinks, which the tests require
+  env : { 'MSYS' : 'winsymlinks:lnk' },
   check : true,
 )
 can_link_symlink = run_command('ln',
@@ -77,7 +78,12 @@ if host_machine.system() == 'darwin'
   deps_other += [sandbox]
 endif
 
-subdir('build-utils-meson/threads')
+if host_machine.system() == 'windows'
+  wsock32 = cxx.find_library('wsock32')
+  deps_other += [wsock32]
+endif
+
+subdir('nix-meson-build-support/libatomic')
 
 boost = dependency(
   'boost',
@@ -127,7 +133,7 @@ if aws_s3.found()
 endif
 deps_other += aws_s3
 
-subdir('build-utils-meson/generate-header')
+subdir('nix-meson-build-support/generate-header')
 
 generated_headers = []
 foreach header : [
@@ -175,7 +181,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('nix-meson-build-support/common')
 
 sources = files(
   'binary-cache-store.cc',
@@ -331,24 +337,23 @@ endif
 
 prefix = get_option('prefix')
 # For each of these paths, assume that it is relative to the prefix unless
-# it is already an absolute path (which is the default for store-dir, state-dir, and log-dir).
+# it is already an absolute path (which is the default for store-dir, localstatedir, and log-dir).
 path_opts = [
   # Meson built-ins.
   'datadir',
-  'bindir',
   'mandir',
   'libdir',
   'includedir',
   'libexecdir',
   # Homecooked Nix directories.
   'store-dir',
-  'state-dir',
+  'localstatedir',
   'log-dir',
 ]
 # For your grepping pleasure, this loop sets the following variables that aren't mentioned
 # literally above:
 # store_dir
-# state_dir
+# localstatedir
 # log_dir
 # profile_dir
 foreach optname : path_opts
@@ -372,15 +377,14 @@ lsof = find_program('lsof', required : false)
 
 # Aside from prefix itself, each of these was made into an absolute path
 # by joining it with prefix, unless it was already an absolute path
-# (which is the default for store-dir, state-dir, and log-dir).
+# (which is the default for store-dir, localstatedir, and log-dir).
 cpp_str_defines = {
   'NIX_PREFIX':    prefix,
   'NIX_STORE_DIR': store_dir,
   'NIX_DATA_DIR':  datadir,
-  'NIX_STATE_DIR': state_dir / 'nix',
+  'NIX_STATE_DIR': localstatedir / 'nix',
   'NIX_LOG_DIR':   log_dir,
   'NIX_CONF_DIR':  sysconfdir / 'nix',
-  'NIX_BIN_DIR':   bindir,
   'NIX_MAN_DIR':   mandir,
 }
 
@@ -412,7 +416,8 @@ foreach name, value : cpp_str_defines
   ]
 endforeach
 
-subdir('build-utils-meson/export-all-symbols')
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 this_library = library(
   'nixstore',
@@ -430,4 +435,15 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-subdir('build-utils-meson/export')
+extra_pkg_config_variables = {
+  'storedir' : get_option('store-dir'),
+}
+
+# Working around https://github.com/mesonbuild/meson/issues/13584
+if host_machine.system() != 'darwin'
+  extra_pkg_config_variables += {
+    'localstatedir' : get_option('localstatedir'),
+  }
+endif
+
+subdir('nix-meson-build-support/export')

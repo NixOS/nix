@@ -176,16 +176,17 @@ struct ValidPathInfo : UnkeyedValidPathInfo {
      */
     Strings shortRefs() const;
 
-    ValidPathInfo(const ValidPathInfo & other) = default;
-
     ValidPathInfo(StorePath && path, UnkeyedValidPathInfo info) : UnkeyedValidPathInfo(info), path(std::move(path)) { };
     ValidPathInfo(const StorePath & path, UnkeyedValidPathInfo info) : UnkeyedValidPathInfo(info), path(path) { };
 
     ValidPathInfo(const Store & store,
         std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
-
-    virtual ~ValidPathInfo() { }
 };
+
+static_assert(std::is_move_assignable_v<ValidPathInfo>);
+static_assert(std::is_copy_assignable_v<ValidPathInfo>);
+static_assert(std::is_copy_constructible_v<ValidPathInfo>);
+static_assert(std::is_move_constructible_v<ValidPathInfo>);
 
 using ValidPathInfos = std::map<StorePath, ValidPathInfo>;
 

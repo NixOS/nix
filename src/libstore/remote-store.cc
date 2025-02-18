@@ -153,9 +153,9 @@ RemoteStore::ConnectionHandle::~ConnectionHandle()
     }
 }
 
-void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, bool flush)
+void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, bool flush, bool block)
 {
-    handle->processStderr(&daemonException, sink, source, flush);
+    handle->processStderr(&daemonException, sink, source, flush, block);
 }
 
 
@@ -534,14 +534,27 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 
 
 void RemoteStore::addMultipleToStore(
-    PathsSource & pathsToCopy,
+    PathsSource && pathsToCopy,
     Activity & act,
     RepairFlag repair,
     CheckSigsFlag checkSigs)
 {
+    // `addMultipleToStore` is single threaded
+    size_t bytesExpected = 0;
+    for (auto & [pathInfo, _] : pathsToCopy) {
+        bytesExpected += pathInfo.narSize;
+    }
+    act.setExpected(actCopyPath, bytesExpected);
+
     auto source = sinkToSource([&](Sink & sink) {
-        sink << pathsToCopy.size();
-        for (auto & [pathInfo, pathSource] : pathsToCopy) {
+        size_t nrTotal = pathsToCopy.size();
+        sink << nrTotal;
+        // Reverse, so we can release memory at the original start
+        std::reverse(pathsToCopy.begin(), pathsToCopy.end());
+        while (!pathsToCopy.empty()) {
+            act.progress(nrTotal - pathsToCopy.size(), nrTotal, size_t(1), size_t(0));
+
+            auto & [pathInfo, pathSource] = pathsToCopy.back();
             WorkerProto::Serialise<ValidPathInfo>::write(*this,
                  WorkerProto::WriteConn {
                      .to = sink,
@@ -549,6 +562,7 @@ void RemoteStore::addMultipleToStore(
                  },
                  pathInfo);
             pathSource->drainInto(sink);
+            pathsToCopy.pop_back();
         }
     });
 
@@ -926,43 +940,17 @@ void RemoteStore::ConnectionHandle::withFramedSink(std::function<void(Sink & sin
 {
     (*this)->to.flush();
 
-    std::exception_ptr ex;
-
-    /* Handle log messages / exceptions from the remote on a separate
-       thread. */
-    std::thread stderrThread([&]()
     {
-        try {
-            ReceiveInterrupts receiveInterrupts;
-            processStderr(nullptr, nullptr, false);
-        } catch (...) {
-            ex = std::current_exception();
-        }
-    });
-
-    Finally joinStderrThread([&]()
-    {
-        if (stderrThread.joinable()) {
-            stderrThread.join();
-            if (ex) {
-                try {
-                    std::rethrow_exception(ex);
-                } catch (...) {
-                    ignoreException();
-                }
-            }
-        }
-    });
-
-    {
-        FramedSink sink((*this)->to, ex);
+        FramedSink sink((*this)->to, [&]() {
+            /* Periodically process stderr messages and exceptions
+               from the daemon. */
+            processStderr(nullptr, nullptr, false, false);
+        });
         fun(sink);
         sink.flush();
     }
 
-    stderrThread.join();
-    if (ex)
-        std::rethrow_exception(ex);
+    processStderr(nullptr, nullptr, false);
 }
 
 }

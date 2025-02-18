@@ -7,10 +7,10 @@ if isTestOnNixOS; then
 
   mkdir -p "$test_nix_conf_dir" "$TEST_HOME"
 
-  export NIX_USER_CONF_FILES="$test_nix_conf_dir/nix.conf"
+  export NIX_USER_CONF_FILES="$test_nix_conf"
   mkdir -p "$test_nix_conf_dir" "$TEST_HOME"
   ! test -e "$test_nix_conf"
-  cat > "$test_nix_conf_dir/nix.conf" <<EOF
+  cat > "$test_nix_conf" <<EOF
 # TODO: this is not needed for all tests and prevents stable commands from be tested in isolation
 flake-registry = $TEST_ROOT/registry.json
 show-trace = true
@@ -18,7 +18,7 @@ EOF
 
   # When we're doing everything in the same store, we need to bring
   # dependencies into context.
-  sed -i "$(dirname "${BASH_SOURCE[0]}")"/../config.nix \
+  sed -i "${_NIX_TEST_BUILD_DIR}/config.nix" \
     -e 's^\(shell\) = "/nix/store/\([^/]*\)/\(.*\)";^\1 = builtins.appendContext "/nix/store/\2" { "/nix/store/\2".path = true; } + "/\3";^' \
     -e 's^\(path\) = "/nix/store/\([^/]*\)/\(.*\)";^\1 = builtins.appendContext "/nix/store/\2" { "/nix/store/\2".path = true; } + "/\3";^' \
     ;

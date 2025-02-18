@@ -1,5 +1,7 @@
 #include "util.hh"
 #include "fmt.hh"
+#include "file-path.hh"
+#include "signals.hh"
 
 #include <array>
 #include <cctype>
@@ -51,24 +53,6 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 
 
 //////////////////////////////////////////////////////////////////////
-
-
-template<class C> C tokenizeString(std::string_view s, std::string_view separators)
-{
-    C result;
-    auto pos = s.find_first_not_of(separators, 0);
-    while (pos != s.npos) {
-        auto end = s.find_first_of(separators, pos + 1);
-        if (end == s.npos) end = s.size();
-        result.insert(result.end(), std::string(s, pos, end - pos));
-        pos = s.find_first_not_of(separators, end);
-    }
-    return result;
-}
-
-template Strings tokenizeString(std::string_view s, std::string_view separators);
-template StringSet tokenizeString(std::string_view s, std::string_view separators);
-template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
 
 
 std::string chomp(std::string_view s)
@@ -199,7 +183,7 @@ std::string shellEscape(const std::string_view s)
 }
 
 
-void ignoreException(Verbosity lvl)
+void ignoreExceptionInDestructor(Verbosity lvl)
 {
     /* Make sure no exceptions leave this function.
        printError() also throws when remote is closed. */
@@ -210,6 +194,17 @@ void ignoreException(Verbosity lvl)
             printMsg(lvl, "error (ignored): %1%", e.what());
         }
     } catch (...) { }
+}
+
+void ignoreExceptionExceptInterrupt(Verbosity lvl)
+{
+    try {
+        throw;
+    } catch (const Interrupted & e) {
+        throw;
+    } catch (std::exception & e) {
+        printMsg(lvl, "error (ignored): %1%", e.what());
+    }
 }
 
 

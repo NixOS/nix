@@ -70,14 +70,15 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
 
     virtual void closeWrite() = 0;
 
-    std::exception_ptr processStderrReturn(Sink * sink = 0, Source * source = 0, bool flush = true);
+    std::exception_ptr processStderrReturn(Sink * sink = 0, Source * source = 0, bool flush = true, bool block = true);
 
-    void processStderr(bool * daemonException, Sink * sink = 0, Source * source = 0, bool flush = true);
+    void
+    processStderr(bool * daemonException, Sink * sink = 0, Source * source = 0, bool flush = true, bool block = true);
 
     /**
      * Establishes connection, negotiating version.
      *
-     * @return the minimum version supported by both sides and the set
+     * @return The minimum version supported by both sides and the set
      * of protocol features supported by both sides.
      *
      * @param to Taken by reference to allow for various error handling
@@ -86,9 +87,9 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
      * @param from Taken by reference to allow for various error
      * handling mechanisms.
      *
-     * @param localVersion Our version which is sent over
+     * @param localVersion Our version which is sent over.
      *
-     * @param features The protocol features that we support
+     * @param supportedFeatures The protocol features that we support.
      */
     // FIXME: this should probably be a constructor.
     static std::tuple<Version, std::set<Feature>> handshake(
@@ -140,7 +141,7 @@ struct WorkerProto::BasicServerConnection : WorkerProto::BasicConnection
     /**
      * Establishes connection, negotiating version.
      *
-     * @return the version provided by the other side of the
+     * @return The version provided by the other side of the
      * connection.
      *
      * @param to Taken by reference to allow for various error handling
@@ -149,9 +150,9 @@ struct WorkerProto::BasicServerConnection : WorkerProto::BasicConnection
      * @param from Taken by reference to allow for various error
      * handling mechanisms.
      *
-     * @param localVersion Our version which is sent over
+     * @param localVersion Our version which is sent over.
      *
-     * @param features The protocol features that we support
+     * @param supportedFeatures The protocol features that we support.
      */
     // FIXME: this should probably be a constructor.
     static std::tuple<Version, std::set<Feature>> handshake(

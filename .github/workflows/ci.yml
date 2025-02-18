@@ -13,6 +13,16 @@ permissions:
   contents: "read"
 
 jobs:
+  eval:
+    runs-on: UbuntuLatest32Cores128G
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: DeterminateSystems/nix-installer-action@main
+      with:
+        flakehub: true
+    - run: nix flake show --all-systems --json
 
   build_x86_64-linux:
     uses: ./.github/workflows/build.yml
@@ -49,17 +59,23 @@ jobs:
 
   vm_tests:
     needs: build_x86_64-linux
-    runs-on: ubuntu-22.04
+    runs-on: UbuntuLatest32Cores128G
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
         with:
           flakehub: true
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix build -L .#hydraJobs.tests.githubFlakes .#hydraJobs.tests.tarballFlakes
+      - run: |
+          nix build -L \
+            .#hydraJobs.tests.functional_user \
+            .#hydraJobs.tests.githubFlakes \
+            .#hydraJobs.tests.nix-docker \
+            .#hydraJobs.tests.tarballFlakes \
+            ;
 
   flake_regressions:
-    needs: build_x86_64-linux
+    needs: vm_tests
     runs-on: UbuntuLatest32Cores128G
     steps:
       - name: Checkout nix
@@ -78,4 +94,4 @@ jobs:
         with:
           flakehub: true
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix build --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=25 flake-regressions/eval-all.sh
+      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=25 flake-regressions/eval-all.sh

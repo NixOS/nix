@@ -52,6 +52,20 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
 
      Link related issues to inform interested parties and future contributors about your change.
      If your pull request closes one or multiple issues, mention that in the description using `Closes: #<number>`, as it will then happen automatically when your change is merged.
+   * Credit original authors when you're reusing or building on their work.
+   * Link to relevant changes in other projects, so that others can understand the full context of the change in the future when you or someone else will change or troubleshoot the code.
+     This is especially important when your change is based on work done in other repositories.
+
+     Example:
+     ```
+     This is based on the work of @user in <url>.
+     This solution took inspiration from <url>.
+
+     Co-authored-by: User Name <user@example.com>
+     ```
+
+     When cherry-picking from a different repository, use the `-x` flag, and then amend the commits to turn the hashes into URLs.
+
    * Make sure to have [a clean history of commits on your branch by using rebase](https://www.digitalocean.com/community/tutorials/how-to-rebase-and-update-a-pull-request).
    * [Mark the pull request as draft](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request) if you're not done with the changes.
 
@@ -65,7 +79,7 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
      - Functional tests – [`tests/functional/**.sh`](./tests/functional)
      - Unit tests – [`src/*/tests`](./src/)
      - Integration tests – [`tests/nixos/*`](./tests/nixos)
-   - [ ] User documentation in the [manual](./doc/manual/src)
+   - [ ] User documentation in the [manual](./doc/manual/source)
    - [ ] API documentation in header files
    - [ ] Code and comments are self-explanatory
    - [ ] Commit message explains **why** the change was made
@@ -76,11 +90,11 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
 ## Making changes to the Nix manual
 
 The Nix reference manual is hosted on https://nixos.org/manual/nix.
-The underlying source files are located in [`doc/manual/src`](./doc/manual/src).
+The underlying source files are located in [`doc/manual/source`](./doc/manual/source).
 For small changes you can [use GitHub to edit these files](https://docs.github.com/en/repositories/working-with-files/managing-files/editing-files)
 For larger changes see the [Nix reference manual](https://nix.dev/manual/nix/development/development/contributing.html).
 
 ## Getting help
 
 Whenever you're stuck or do not know how to proceed, you can always ask for help.
-The appropriate channels to do so can be found on the [NixOS Community](https://nixos.org/community/) page.
+We invite you to use our [Matrix room](https://matrix.to/#/#nix-dev:nixos.org) to ask questions.

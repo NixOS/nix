@@ -60,7 +60,7 @@ The following types of installable are supported by most commands:
 - [Nix file](#nix-file), optionally qualified by an attribute path
   - Specified with `--file`/`-f`
 - [Nix expression](#nix-expression), optionally qualified by an attribute path
-  - Specified with `--expr`/`-E`
+  - Specified with `--expr`
 
 For most commands, if no installable is specified, `.` is assumed.
 That is, Nix will operate on the default flake output attribute of the flake in the current directory.
@@ -188,17 +188,17 @@ operate are determined as follows:
   …
   ```
 
-  For `-e`/`--expr` and `-f`/`--file`, the derivation output is specified as part of the attribute path:
+  For `--expr` and `-f`/`--file`, the derivation output is specified as part of the attribute path:
 
   ```console
   $ nix build -f '<nixpkgs>' 'glibc^dev,static'
-  $ nix build --impure -E 'import <nixpkgs> { }' 'glibc^dev,static'
+  $ nix build --impure --expr 'import <nixpkgs> { }' 'glibc^dev,static'
   ```
 
   This syntax is the same even if the actual attribute path is empty:
 
   ```console
-  $ nix build -E 'let pkgs = import <nixpkgs> { }; in pkgs.glibc' '^dev,static'
+  $ nix build --impure --expr 'let pkgs = import <nixpkgs> { }; in pkgs.glibc' '^dev,static'
   ```
 
 * You can also specify that *all* outputs should be used using the
@@ -290,7 +290,7 @@ or with an **expression**:
 terraform "$@"
 ```
 
-or with cascading interpreters. Note that the `#! nix` lines don't need to follow after the first line, to accomodate other interpreters.
+or with cascading interpreters. Note that the `#! nix` lines don't need to follow after the first line, to accommodate other interpreters.
 
 ```
 #!/usr/bin/env nix

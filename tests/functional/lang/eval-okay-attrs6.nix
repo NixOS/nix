@@ -1,4 +1,6 @@
 rec {
   "${"foo"}" = "bar";
-   __overrides = { bar = "qux"; };
+  __overrides = {
+    bar = "qux";
+  };
 }

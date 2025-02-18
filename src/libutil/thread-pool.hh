@@ -83,7 +83,6 @@ private:
  */
 template<typename T>
 void processGraph(
-    ThreadPool & pool,
     const std::set<T> & nodes,
     std::function<std::set<T>(const T &)> getEdges,
     std::function<void(const T &)> processNode)
@@ -96,6 +95,10 @@ void processGraph(
     Sync<Graph> graph_(Graph{nodes, {}, {}});
 
     std::function<void(const T &)> worker;
+
+    /* Create pool last to ensure threads are stopped before other destructors
+     * run */
+    ThreadPool pool;
 
     worker = [&](const T & node) {
 
@@ -147,8 +150,16 @@ void processGraph(
         }
     };
 
-    for (auto & node : nodes)
-        pool.enqueue(std::bind(worker, std::ref(node)));
+    for (auto & node : nodes) {
+        try {
+            pool.enqueue(std::bind(worker, std::ref(node)));
+        } catch (ThreadPoolShutDown &) {
+            /* Stop if the thread pool is shutting down. It means a
+               previous work item threw an exception, so process()
+               below will rethrow it. */
+            break;
+        }
+    }
 
     pool.process();
 

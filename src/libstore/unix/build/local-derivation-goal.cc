@@ -69,6 +69,7 @@ extern "C" int sandbox_init_with_parameters(const char *profile, uint64_t flags,
 #include <iostream>
 
 #include "strings.hh"
+#include "signals.hh"
 
 namespace nix {
 
@@ -113,9 +114,9 @@ LocalDerivationGoal::~LocalDerivationGoal()
 {
     /* Careful: we should never ever throw an exception from a
        destructor. */
-    try { deleteTmpDir(false); } catch (...) { ignoreException(); }
-    try { killChild(); } catch (...) { ignoreException(); }
-    try { stopDaemon(); } catch (...) { ignoreException(); }
+    try { deleteTmpDir(false); } catch (...) { ignoreExceptionInDestructor(); }
+    try { killChild(); } catch (...) { ignoreExceptionInDestructor(); }
+    try { stopDaemon(); } catch (...) { ignoreExceptionInDestructor(); }
 }
 
 
@@ -437,6 +438,41 @@ static void doBind(const Path & source, const Path & target, bool optional = fal
 };
 #endif
 
+/**
+ * Rethrow the current exception as a subclass of `Error`.
+ */
+static void rethrowExceptionAsError()
+{
+    try {
+        throw;
+    } catch (Error &) {
+        throw;
+    } catch (std::exception & e) {
+        throw Error(e.what());
+    } catch (...) {
+        throw Error("unknown exception");
+    }
+}
+
+/**
+ * Send the current exception to the parent in the format expected by
+ * `LocalDerivationGoal::processSandboxSetupMessages()`.
+ */
+static void handleChildException(bool sendException)
+{
+    try {
+        rethrowExceptionAsError();
+    } catch (Error & e) {
+        if (sendException) {
+            writeFull(STDERR_FILENO, "\1\n");
+            FdSink sink(STDERR_FILENO);
+            sink << e;
+            sink.flush();
+        } else
+            std::cerr << e.msg();
+    }
+}
+
 void LocalDerivationGoal::startBuilder()
 {
     if ((buildUser && buildUser->getUIDCount() != 1)
@@ -448,25 +484,22 @@ void LocalDerivationGoal::startBuilder()
         #if __linux__
         experimentalFeatureSettings.require(Xp::Cgroups);
 
+        /* If we're running from the daemon, then this will return the
+           root cgroup of the service. Otherwise, it will return the
+           current cgroup. */
+        auto rootCgroup = getRootCgroup();
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS)
             throw Error("cannot determine the cgroups file system");
-
-        auto ourCgroups = getCgroups("/proc/self/cgroup");
-        auto ourCgroup = ourCgroups[""];
-        if (ourCgroup == "")
-            throw Error("cannot determine cgroup name from /proc/self/cgroup");
-
-        auto ourCgroupPath = canonPath(*cgroupFS + "/" + ourCgroup);
-
-        if (!pathExists(ourCgroupPath))
-            throw Error("expected cgroup directory '%s'", ourCgroupPath);
+        auto rootCgroupPath = canonPath(*cgroupFS + "/" + rootCgroup);
+        if (!pathExists(rootCgroupPath))
+            throw Error("expected cgroup directory '%s'", rootCgroupPath);
 
         static std::atomic<unsigned int> counter{0};
 
         cgroup = buildUser
-            ? fmt("%s/nix-build-uid-%d", ourCgroupPath, buildUser->getUID())
-            : fmt("%s/nix-build-pid-%d-%d", ourCgroupPath, getpid(), counter++);
+            ? fmt("%s/nix-build-uid-%d", rootCgroupPath, buildUser->getUID())
+            : fmt("%s/nix-build-pid-%d-%d", rootCgroupPath, getpid(), counter++);
 
         debug("using cgroup '%s'", *cgroup);
 
@@ -850,7 +883,7 @@ void LocalDerivationGoal::startBuilder()
         printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 
     /* Create the log file. */
-    Path logFile = openLogFile();
+    [[maybe_unused]] Path logFile = openLogFile();
 
     /* Create a pseudoterminal to get the output of the builder. */
     builderOut = posix_openpt(O_RDWR | O_NOCTTY);
@@ -956,32 +989,40 @@ void LocalDerivationGoal::startBuilder()
                root. */
             openSlave();
 
-            /* Drop additional groups here because we can't do it
-               after we've created the new user namespace. */
-            if (setgroups(0, 0) == -1) {
-                if (errno != EPERM)
-                    throw SysError("setgroups failed");
-                if (settings.requireDropSupplementaryGroups)
-                    throw Error("setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
+            try {
+                /* Drop additional groups here because we can't do it
+                   after we've created the new user namespace. */
+                if (setgroups(0, 0) == -1) {
+                    if (errno != EPERM)
+                        throw SysError("setgroups failed");
+                    if (settings.requireDropSupplementaryGroups)
+                        throw Error("setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
+                }
+
+                ProcessOptions options;
+                options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
+                if (privateNetwork)
+                    options.cloneFlags |= CLONE_NEWNET;
+                if (usingUserNamespace)
+                    options.cloneFlags |= CLONE_NEWUSER;
+
+                pid_t child = startProcess([&]() { runChild(); }, options);
+
+                writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
+                _exit(0);
+            } catch (...) {
+                handleChildException(true);
+                _exit(1);
             }
-
-            ProcessOptions options;
-            options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
-            if (privateNetwork)
-                options.cloneFlags |= CLONE_NEWNET;
-            if (usingUserNamespace)
-                options.cloneFlags |= CLONE_NEWUSER;
-
-            pid_t child = startProcess([&]() { runChild(); }, options);
-
-            writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
-            _exit(0);
         });
 
         sendPid.writeSide.close();
 
-        if (helper.wait() != 0)
+        if (helper.wait() != 0) {
+            processSandboxSetupMessages();
+            // Only reached if the child process didn't send an exception.
             throw Error("unable to start build process");
+        }
 
         userNamespaceSync.readSide = -1;
 
@@ -1057,7 +1098,12 @@ void LocalDerivationGoal::startBuilder()
     pid.setSeparatePG(true);
     worker.childStarted(shared_from_this(), {builderOut.get()}, true, true);
 
-    /* Check if setting up the build environment failed. */
+    processSandboxSetupMessages();
+}
+
+
+void LocalDerivationGoal::processSandboxSetupMessages()
+{
     std::vector<std::string> msgs;
     while (true) {
         std::string msg = [&]() {
@@ -1085,7 +1131,8 @@ void LocalDerivationGoal::startBuilder()
 }
 
 
-void LocalDerivationGoal::initTmpDir() {
+void LocalDerivationGoal::initTmpDir()
+{
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
 #if __linux__
@@ -1537,8 +1584,10 @@ void LocalDerivationGoal::startDaemon()
                         FdSink(remote.get()),
                         NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
+                } catch (const Interrupted &) {
+                    debug("interrupted daemon connection");
                 } catch (SystemError &) {
-                    ignoreException();
+                    ignoreExceptionExceptInterrupt();
                 }
             });
 
@@ -1966,7 +2015,7 @@ void LocalDerivationGoal::runChild()
             if (chdir(chrootRootDir.c_str()) == -1)
                 throw SysError("cannot change directory to '%1%'", chrootRootDir);
 
-            if (mkdir("real-root", 0) == -1)
+            if (mkdir("real-root", 0500) == -1)
                 throw SysError("cannot create real-root directory");
 
             if (pivot_root(".", "real-root") == -1)
@@ -1997,7 +2046,7 @@ void LocalDerivationGoal::runChild()
             throw SysError("changing into '%1%'", tmpDir);
 
         /* Close all other file descriptors. */
-        unix::closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
+        unix::closeExtraFDs();
 
 #if __linux__
         linux::setPersonality(drv->platform);
@@ -2228,14 +2277,8 @@ void LocalDerivationGoal::runChild()
 
         throw SysError("executing '%1%'", drv->builder);
 
-    } catch (Error & e) {
-        if (sendException) {
-            writeFull(STDERR_FILENO, "\1\n");
-            FdSink sink(STDERR_FILENO);
-            sink << e;
-            sink.flush();
-        } else
-            std::cerr << e.msg();
+    } catch (...) {
+        handleChildException(sendException);
         _exit(1);
     }
 }
@@ -2614,10 +2657,14 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                             wanted.to_string(HashFormat::SRI, true),
                             got.to_string(HashFormat::SRI, true)));
                 }
-                if (!newInfo0.references.empty())
+                if (!newInfo0.references.empty()) {
+                    auto numViolations = newInfo.references.size();
                     delayedException = std::make_exception_ptr(
-                        BuildError("illegal path references in fixed-output derivation '%s'",
-                            worker.store.printStorePath(drvPath)));
+                        BuildError("fixed-output derivations must not reference store paths: '%s' references %d distinct paths, e.g. '%s'",
+                            worker.store.printStorePath(drvPath),
+                            numViolations,
+                            worker.store.printStorePath(*newInfo.references.begin())));
+                }
 
                 return newInfo0;
             },
@@ -3016,7 +3063,7 @@ bool LocalDerivationGoal::isReadDesc(int fd)
 StorePath LocalDerivationGoal::makeFallbackPath(OutputNameView outputName)
 {
     // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
-    // See doc/manual/src/protocols/store-path.md for details
+    // See doc/manual/source/protocols/store-path.md for details
     // TODO: We may want to separate the responsibilities of constructing the path fingerprint and of actually doing the hashing
     auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName);
     return worker.store.makeStorePath(
@@ -3029,7 +3076,7 @@ StorePath LocalDerivationGoal::makeFallbackPath(OutputNameView outputName)
 StorePath LocalDerivationGoal::makeFallbackPath(const StorePath & path)
 {
     // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
-    // See doc/manual/src/protocols/store-path.md for details
+    // See doc/manual/source/protocols/store-path.md for details
     auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string());
     return worker.store.makeStorePath(
         pathType,
