@@ -42,6 +42,18 @@ let
   mkPackageBuilder =
     exts: userFn: stdenv.mkDerivation (lib.extends (lib.composeManyExtensions exts) userFn);
 
+  setVersionLayer = finalAttrs: prevAttrs: {
+    preConfigure =
+      prevAttrs.prevAttrs or ""
+      +
+        # Update the repo-global .version file.
+        # Symlink ./.version points there, but by default only workDir is writable.
+        ''
+          chmod u+w ./.version
+          echo ${finalAttrs.version} > ./.version
+        '';
+  };
+
   localSourceLayer =
     finalAttrs: prevAttrs:
     let
@@ -180,12 +192,14 @@ scope:
   mkMesonDerivation = mkPackageBuilder [
     miscGoodPractice
     localSourceLayer
+    setVersionLayer
     mesonLayer
   ];
   mkMesonExecutable = mkPackageBuilder [
     miscGoodPractice
     bsdNoLinkAsNeeded
     localSourceLayer
+    setVersionLayer
     mesonLayer
     mesonBuildLayer
   ];
@@ -194,6 +208,7 @@ scope:
     bsdNoLinkAsNeeded
     localSourceLayer
     mesonLayer
+    setVersionLayer
     mesonBuildLayer
     mesonLibraryLayer
   ];
