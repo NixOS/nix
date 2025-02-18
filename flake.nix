@@ -238,15 +238,18 @@
               nix = self.packages.${system}.nix;
             in
             assert (nix.appendPatches [ pkgs.emptyFile ]).libs.nix-util.src.patches == [ pkgs.emptyFile ];
-            # If this fails, something might be wrong with how we've wired the scope,
-            # or something could be broken in Nixpkgs.
-            pkgs.testers.testEqualContents {
-              assertion = "trivial patch does not change source contents";
-              expected = "${./.}";
-              actual =
-                # Same for all components; nix-util is an arbitrary pick
-                (nix.appendPatches [ pkgs.emptyFile ]).libs.nix-util.src;
-            };
+            if pkgs.stdenv.buildPlatform.isDarwin then
+              lib.warn "packaging-overriding check currently disabled because of a permissions issue on macOS" pkgs.emptyFile
+            else
+              # If this fails, something might be wrong with how we've wired the scope,
+              # or something could be broken in Nixpkgs.
+              pkgs.testers.testEqualContents {
+                assertion = "trivial patch does not change source contents";
+                expected = "${./.}";
+                actual =
+                  # Same for all components; nix-util is an arbitrary pick
+                  (nix.appendPatches [ pkgs.emptyFile ]).libs.nix-util.src;
+              };
         }
         // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
           dockerImage = self.hydraJobs.dockerImage.${system};
