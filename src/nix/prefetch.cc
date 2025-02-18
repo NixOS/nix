@@ -4,7 +4,7 @@
 #include "store-api.hh"
 #include "filetransfer.hh"
 #include "finally.hh"
-#include "progress-bar.hh"
+#include "loggers.hh"
 #include "tarfile.hh"
 #include "attr-path.hh"
 #include "eval-inline.hh"
@@ -190,10 +190,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
         if (args.size() > 2)
             throw UsageError("too many arguments");
 
-        Finally f([]() { logger->stop(); });
-
-        if (isTTY())
-            startProgressBar();
+        setLogFormat("bar");
 
         auto store = openStore();
         auto state = std::make_unique<EvalState>(myArgs.lookupPath, store, fetchSettings, evalSettings);
