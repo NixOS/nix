@@ -93,8 +93,6 @@ let
         prevAttrs.workDir;
 
       workDirSubpath = resolveRelPath workDirPath;
-      # sources = assert prevAttrs.fileset._type == "fileset"; prevAttrs.fileset;
-      # src = lib.fileset.toSource { fileset = sources; inherit root; };
 
     in
     {
