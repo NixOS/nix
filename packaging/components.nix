@@ -161,11 +161,28 @@ in
 
   inherit resolvePath filesetToSource;
 
+  /**
+    A user-provided extension function to apply to each component derivation.
+  */
+  mesonComponentOverrides = finalAttrs: prevAttrs: { };
+
+  /**
+    Apply an extension function (i.e. overlay-shaped) to all component derivations.
+  */
+  overrideAllMesonComponents =
+    f:
+    scope.overrideScope (
+      finalScope: prevScope: {
+        mesonComponentOverrides = lib.composeExtensions scope.mesonComponentOverrides f;
+      }
+    );
+
   mkMesonDerivation = mkPackageBuilder [
     miscGoodPractice
     localSourceLayer
     setVersionLayer
     mesonLayer
+    scope.mesonComponentOverrides
   ];
   mkMesonExecutable = mkPackageBuilder [
     miscGoodPractice
@@ -174,6 +191,7 @@ in
     setVersionLayer
     mesonLayer
     mesonBuildLayer
+    scope.mesonComponentOverrides
   ];
   mkMesonLibrary = mkPackageBuilder [
     miscGoodPractice
@@ -183,6 +201,7 @@ in
     setVersionLayer
     mesonBuildLayer
     mesonLibraryLayer
+    scope.mesonComponentOverrides
   ];
 
   nix-util = callPackage ../src/libutil/package.nix { };
@@ -224,5 +243,18 @@ in
 
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
 
-  nix-everything = callPackage ../packaging/everything.nix { };
+  nix-everything = callPackage ../packaging/everything.nix { } // {
+    # Note: no `passthru.overrideAllMesonComponents`
+    #       This would propagate into `nix.overrideAttrs f`, but then discard
+    #       `f` when `.overrideAllMesonComponents` is used.
+    #       Both "methods" should be views on the same fixpoint overriding mechanism
+    #       for that to work. For now, we intentionally don't support the broken
+    #       two-fixpoint solution.
+    /**
+      Apply an extension function (i.e. overlay-shaped) to all component derivations, and return the nix package.
+    */
+    overrideAllMesonComponents = f: (scope.overrideAllMesonComponents f).nix-everything;
+
+    scope = scope;
+  };
 }
