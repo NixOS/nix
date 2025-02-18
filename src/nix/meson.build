@@ -35,6 +35,9 @@ subdir('nix-meson-build-support/windows-version')
 
 configdata = configuration_data()
 
+# The CLI has a more detailed version string than the libraries; see `nixVersion`
+configdata.set_quoted('NIX_CLI_VERSION', meson.project_version())
+
 fs = import('fs')
 
 bindir = get_option('bindir')

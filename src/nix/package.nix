@@ -92,11 +92,11 @@ mkMesonExecutable (finalAttrs: {
   ];
 
   preConfigure =
-    # "Inline" .version so it's not a symlink, and includes the suffix.
-    # Do the meson utils, without modification.
+    # Update the repo-global .version file.
+    # Symlink ./.version points there, but by default only workDir is writable.
     ''
       chmod u+w ./.version
-      echo ${version} > ../../../.version
+      echo ${version} > ./.version
     '';
 
   mesonFlags = [
