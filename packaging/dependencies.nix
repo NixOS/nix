@@ -138,7 +138,8 @@ let
     enableParallelBuilding = true;
   };
 in
-scope: {
+scope:
+{
   inherit stdenv;
 
   aws-sdk-cpp =
@@ -174,6 +175,31 @@ scope: {
         installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
       });
 
+  inherit resolvePath filesetToSource;
+
+  mkMesonDerivation = mkPackageBuilder [
+    miscGoodPractice
+    localSourceLayer
+    mesonLayer
+  ];
+  mkMesonExecutable = mkPackageBuilder [
+    miscGoodPractice
+    bsdNoLinkAsNeeded
+    localSourceLayer
+    mesonLayer
+    mesonBuildLayer
+  ];
+  mkMesonLibrary = mkPackageBuilder [
+    miscGoodPractice
+    bsdNoLinkAsNeeded
+    localSourceLayer
+    mesonLayer
+    mesonBuildLayer
+    mesonLibraryLayer
+  ];
+}
+# libgit2: Nixpkgs 24.11 has < 1.9.0
+// lib.optionalAttrs (!lib.versionAtLeast pkgs.libgit2.version "1.9.0") {
   libgit2 = pkgs.libgit2.overrideAttrs (attrs: {
     cmakeFlags = attrs.cmakeFlags or [ ] ++ [ "-DUSE_SSH=exec" ];
     nativeBuildInputs =
@@ -203,27 +229,4 @@ scope: {
         ./patches/libgit2-packbuilder-callback-interruptible.patch
       ];
   });
-
-  inherit resolvePath filesetToSource;
-
-  mkMesonDerivation = mkPackageBuilder [
-    miscGoodPractice
-    localSourceLayer
-    mesonLayer
-  ];
-  mkMesonExecutable = mkPackageBuilder [
-    miscGoodPractice
-    bsdNoLinkAsNeeded
-    localSourceLayer
-    mesonLayer
-    mesonBuildLayer
-  ];
-  mkMesonLibrary = mkPackageBuilder [
-    miscGoodPractice
-    bsdNoLinkAsNeeded
-    localSourceLayer
-    mesonLayer
-    mesonBuildLayer
-    mesonLibraryLayer
-  ];
 }
