@@ -680,7 +680,7 @@ class LocalFSStore : public virtual Store
 public:
 
     // FIXME: the (Store*) cast works around a bug in gcc that causes
-    // it to emit the call to the Option constructor. Clang works fine
+    // it to omit the call to the Setting constructor. Clang works fine
     // either way.
     const PathSetting rootDir{(Store*) this, true, "",
         "root", "directory prefixed to all other paths"};
