@@ -16,4 +16,7 @@ nlohmann::json printValueAsJSON(EvalState & state, bool strict,
 void printValueAsJSON(EvalState & state, bool strict,
     Value & v, const PosIdx pos, std::ostream & str, NixStringContext & context, bool copyToStore = true);
 
+
+MakeError(JSONSerializationError, Error);
+
 }

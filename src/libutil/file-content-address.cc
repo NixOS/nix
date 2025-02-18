@@ -88,14 +88,15 @@ void dumpPath(
 void restorePath(
     const Path & path,
     Source & source,
-    FileSerialisationMethod method)
+    FileSerialisationMethod method,
+    bool startFsync)
 {
     switch (method) {
     case FileSerialisationMethod::Flat:
-        writeFile(path, source);
+        writeFile(path, source, 0666, startFsync);
         break;
     case FileSerialisationMethod::NixArchive:
-        restorePath(path, source);
+        restorePath(path, source, startFsync);
         break;
     }
 }

@@ -4,6 +4,8 @@
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "store-api.hh"
+// Need specialization involving `SymbolStr` just in this one module.
+#include "strings-inline.hh"
 
 namespace nix::eval_cache {
 
@@ -67,7 +69,7 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        Path cacheDir = getCacheDir() + "/nix/eval-cache-v5";
+        Path cacheDir = getCacheDir() + "/eval-cache-v5";
         createDirs(cacheDir);
 
         Path dbPath = cacheDir + "/" + fingerprint.to_string(HashFormat::Base16, false) + ".sqlite";
@@ -99,7 +101,7 @@ struct AttrDb
                 state->txn->commit();
             state->txn.reset();
         } catch (...) {
-            ignoreException();
+            ignoreExceptionInDestructor();
         }
     }
 
@@ -110,7 +112,7 @@ struct AttrDb
         try {
             return fun();
         } catch (SQLiteError &) {
-            ignoreException();
+            ignoreExceptionExceptInterrupt();
             failed = true;
             return 0;
         }
@@ -326,7 +328,7 @@ struct AttrDb
             case AttrType::Bool:
                 return {{rowId, queryAttribute.getInt(2) != 0}};
             case AttrType::Int:
-                return {{rowId, int_t{queryAttribute.getInt(2)}}};
+                return {{rowId, int_t{NixInt{queryAttribute.getInt(2)}}}};
             case AttrType::ListOfStrings:
                 return {{rowId, tokenizeString<std::vector<std::string>>(queryAttribute.getStr(2), "\t")}};
             case AttrType::Missing:
@@ -349,7 +351,7 @@ static std::shared_ptr<AttrDb> makeAttrDb(
     try {
         return std::make_shared<AttrDb>(cfg, fingerprint, symbols);
     } catch (SQLiteError &) {
-        ignoreException();
+        ignoreExceptionExceptInterrupt();
         return nullptr;
     }
 }
@@ -469,7 +471,7 @@ Value & AttrCursor::forceValue()
         else if (v.type() == nBool)
             cachedValue = {root->db->setBool(getKey(), v.boolean()), v.boolean()};
         else if (v.type() == nInt)
-            cachedValue = {root->db->setInt(getKey(), v.integer()), int_t{v.integer()}};
+            cachedValue = {root->db->setInt(getKey(), v.integer().value), int_t{v.integer()}};
         else if (v.type() == nAttrs)
             ; // FIXME: do something?
         else

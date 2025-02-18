@@ -41,21 +41,22 @@ INPUT                  = \
   @src@/libcmd \
   @src@/libexpr \
   @src@/libexpr/flake \
-  @src@/nix-expr-tests \
-  @src@/nix-expr-tests/value \
-  @src@/nix-expr-test-support/test \
-  @src@/nix-expr-test-support/test/value \
+  @src@/libexpr-tests \
+  @src@/libexpr-tests/value \
+  @src@/libexpr-test-support/tests \
+  @src@/libexpr-test-support/tests/value \
   @src@/libexpr/value \
   @src@/libfetchers \
   @src@/libmain \
   @src@/libstore \
   @src@/libstore/build \
   @src@/libstore/builtins \
-  @src@/nix-store-tests \
-  @src@/nix-store-test-support/test \
+  @src@/libstore-tests \
+  @src@/libstore-test-support/tests \
   @src@/libutil \
-  @src@/nix-util-tests \
-  @src@/nix-util-test-support/test \
+  @src@/libutil/args \
+  @src@/libutil-tests \
+  @src@/libutil-test-support/tests \
   @src@/nix \
   @src@/nix-env \
   @src@/nix-store
@@ -83,7 +84,9 @@ EXPAND_ONLY_PREDEF     = YES
 # RECURSIVE has no effect here.
 # This tag requires that the tag SEARCH_INCLUDES is set to YES.
 
-INCLUDE_PATH           =
+INCLUDE_PATH           = \
+  @BUILD_ROOT@/src/libexpr/libnixexpr.so.p \
+  @BUILD_ROOT@/src/nix/nix.p \
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this
 # tag can be used to specify a list of macro names that should be expanded. The
@@ -96,4 +99,18 @@ EXPAND_AS_DEFINED      = \
   DECLARE_COMMON_SERIALISER \
   DECLARE_WORKER_SERIALISER \
   DECLARE_SERVE_SERIALISER \
-  LENGTH_PREFIXED_PROTO_HELPER
+  LENGTH_PREFIXED_PROTO_HELPER \
+  LENGTH_PREFIXED_PROTO_HELPER_X \
+  WORKER_USE_LENGTH_PREFIX_SERIALISER \
+  WORKER_USE_LENGTH_PREFIX_SERIALISER_COMMA \
+  SERVE_USE_LENGTH_PREFIX_SERIALISER \
+  SERVE_USE_LENGTH_PREFIX_SERIALISER_COMMA \
+  COMMON_METHODS \
+  JSON_IMPL \
+  MakeBinOp
+
+PREDEFINED = DOXYGEN_SKIP
+
+WARN_IF_UNDOCUMENTED = NO
+WARN_IF_INCOMPLETE_DOC = NO
+QUIET = YES

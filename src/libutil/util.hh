@@ -28,49 +28,11 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss);
 MakeError(FormatError, Error);
 
 
-/**
- * String tokenizer.
- */
-template<class C> C tokenizeString(std::string_view s, std::string_view separators = " \t\n\r");
-
-
-/**
- * Ignore any empty strings at the start of the list, and then concatenate the
- * given strings with a separator between the elements.
- *
- * @deprecated This function exists for historical reasons. You probably just
- *             want to use `concatStringsSep`.
- */
-template<class C>
-[[deprecated("Consider removing the empty string dropping behavior. If acceptable, use concatStringsSep instead.")]]
-std::string dropEmptyInitThenConcatStringsSep(const std::string_view sep, const C & ss)
-{
-    size_t size = 0;
-
-    // TODO? remove to make sure we don't rely on the empty item ignoring behavior,
-    //       or just get rid of this function by understanding the remaining calls.
-    // for (auto & i : ss) {
-    //     // Make sure we don't rely on the empty item ignoring behavior
-    //     assert(!i.empty());
-    //     break;
-    // }
-
-    // need a cast to string_view since this is also called with Symbols
-    for (const auto & s : ss) size += sep.size() + std::string_view(s).size();
-    std::string s;
-    s.reserve(size);
-    for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
-        s += i;
-    }
-    return s;
-}
-
-template<class ... Parts>
-auto concatStrings(Parts && ... parts)
+template<class... Parts>
+auto concatStrings(Parts &&... parts)
     -> std::enable_if_t<(... && std::is_convertible_v<Parts, std::string_view>), std::string>
 {
-    std::string_view views[sizeof...(parts)] = { parts... };
+    std::string_view views[sizeof...(parts)] = {parts...};
     return concatStringsSep({}, views);
 }
 
@@ -194,9 +156,26 @@ std::string toLower(std::string s);
 std::string shellEscape(const std::string_view s);
 
 
-/* Exception handling in destructors: print an error message, then
-   ignore the exception. */
-void ignoreException(Verbosity lvl = lvlError);
+/**
+ * Exception handling in destructors: print an error message, then
+ * ignore the exception.
+ *
+ * If you're not in a destructor, you usually want to use `ignoreExceptionExceptInterrupt()`.
+ *
+ * This function might also be used in callbacks whose caller may not handle exceptions,
+ * but ideally we propagate the exception using an exception_ptr in such cases.
+ * See e.g. `PackBuilderContext`
+ */
+void ignoreExceptionInDestructor(Verbosity lvl = lvlError);
+
+/**
+ * Not destructor-safe.
+ * Print an error message, then ignore the exception.
+ * If the exception is an `Interrupted` exception, rethrow it.
+ *
+ * This may be used in a few places where Interrupt can't happen, but that's ok.
+ */
+void ignoreExceptionExceptInterrupt(Verbosity lvl = lvlError);
 
 
 
@@ -295,6 +274,17 @@ std::optional<typename T::value_type> pop(T & c)
 }
 
 
+/**
+ * Append items to a container. TODO: remove this once we can use
+ * C++23's `append_range()`.
+ */
+template<class C, typename T>
+void append(C & c, std::initializer_list<T> l)
+{
+    c.insert(c.end(), l.begin(), l.end());
+}
+
+
 template<typename T>
 class Callback;
 
@@ -359,7 +349,9 @@ std::string showBytes(uint64_t bytes);
  */
 inline std::string operator + (const std::string & s1, std::string_view s2)
 {
-    auto s = s1;
+    std::string s;
+    s.reserve(s1.size() + s2.size());
+    s.append(s1);
     s.append(s2);
     return s;
 }
@@ -372,10 +364,11 @@ inline std::string operator + (std::string && s, std::string_view s2)
 
 inline std::string operator + (std::string_view s1, const char * s2)
 {
+    auto s2Size = strlen(s2);
     std::string s;
-    s.reserve(s1.size() + strlen(s2));
+    s.reserve(s1.size() + s2Size);
     s.append(s1);
-    s.append(s2);
+    s.append(s2, s2Size);
     return s;
 }
 

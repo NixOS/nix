@@ -91,3 +91,47 @@ nix flake check $flakeDir
 checkRes=$(nix flake check --all-systems --keep-going $flakeDir 2>&1 && fail "nix flake check --all-systems should have failed" || true)
 echo "$checkRes" | grepQuiet "packages.system-1.default"
 echo "$checkRes" | grepQuiet "packages.system-2.default"
+
+cat > $flakeDir/flake.nix <<EOF
+{
+  outputs = { self }: {
+    apps.system-1.default = {
+      type = "app";
+      program = "foo";
+    };
+    apps.system-2.default = {
+      type = "app";
+      program = "bar";
+      meta.description = "baz";
+    };
+  };
+}
+EOF
+
+nix flake check --all-systems $flakeDir
+
+cat > $flakeDir/flake.nix <<EOF
+{
+  outputs = { self }: {
+    apps.system-1.default = {
+      type = "app";
+      program = "foo";
+      unknown-attr = "bar";
+    };
+  };
+}
+EOF
+
+checkRes=$(nix flake check --all-systems $flakeDir 2>&1 && fail "nix flake check --all-systems should have failed" || true)
+echo "$checkRes" | grepQuiet "unknown-attr"
+
+cat > $flakeDir/flake.nix <<EOF
+{
+  outputs = { self }: {
+    formatter.system-1 = "foo";
+  };
+}
+EOF
+
+checkRes=$(nix flake check --all-systems $flakeDir 2>&1 && fail "nix flake check --all-systems should have failed" || true)
+echo "$checkRes" | grepQuiet "formatter.system-1"

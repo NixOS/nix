@@ -18,6 +18,8 @@
 
 namespace nix {
 
+namespace fs { using namespace std::filesystem; }
+
 fetchers::Settings fetchSettings;
 
 static GlobalConfig::Register rFetchSettings(&fetchSettings);
@@ -27,12 +29,12 @@ EvalSettings evalSettings {
     {
         {
             "flake",
-            [](ref<Store> store, std::string_view rest) {
+            [](EvalState & state, std::string_view rest) {
                 // FIXME `parseFlakeRef` should take a `std::string_view`.
                 auto flakeRef = parseFlakeRef(fetchSettings, std::string { rest }, {}, true, false);
                 debug("fetching flake search path element '%s''", rest);
-                auto storePath = flakeRef.resolve(store).fetchTree(store).first;
-                return store->toRealPath(storePath);
+                auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first;
+                return state.rootPath(state.store->toRealPath(storePath));
             },
         },
     },
@@ -118,8 +120,8 @@ MixEvalArgs::MixEvalArgs()
         .category = category,
         .labels = {"original-ref", "resolved-ref"},
         .handler = {[&](std::string _from, std::string _to) {
-            auto from = parseFlakeRef(fetchSettings, _from, absPath("."));
-            auto to = parseFlakeRef(fetchSettings, _to, absPath("."));
+            auto from = parseFlakeRef(fetchSettings, _from, fs::current_path().string());
+            auto to = parseFlakeRef(fetchSettings, _to, fs::current_path().string());
             fetchers::Attrs extraAttrs;
             if (to.subdir != "") extraAttrs["dir"] = to.subdir;
             fetchers::overrideRegistry(from.input, to.input, extraAttrs);

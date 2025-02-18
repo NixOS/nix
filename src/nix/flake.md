@@ -84,6 +84,8 @@ Here are some examples of flake references in their URL-like representation:
   repository on GitHub.
 * `github:NixOS/nixpkgs/nixos-20.09`: The `nixos-20.09` branch of the
   `nixpkgs` repository.
+* `github:NixOS/nixpkgs/pull/357207/head`: The `357207` pull request
+   of the nixpkgs repository.
 * `github:NixOS/nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`: A
   specific revision of the `nixpkgs` repository.
 * `github:edolstra/nix-warez?dir=blender`: A flake in a subdirectory
@@ -120,7 +122,7 @@ Contrary to URL-like references, path-like flake references can contain arbitrar
 
 ### Examples
 
-* `.`: The flake to which the current directory belongs to.
+* `.`: The flake to which the current directory belongs.
 * `/home/alice/src/patchelf`: A flake in some other directory.
 * `./../sub directory/with Ûñî©ôδ€`: A flake in another relative directory that
   has Unicode characters in its name.
@@ -148,7 +150,7 @@ reference types:
 
 * `ref`: A Git or Mercurial branch or tag name.
 
-Finally, some attribute are typically not specified by the user, but
+Finally, some attributes are typically not specified by the user, but
 can occur in *locked* flake references and are available to Nix code:
 
 * `revCount`: The number of ancestors of the commit `rev`.
@@ -163,7 +165,8 @@ can occur in *locked* flake references and are available to Nix code:
 
 Currently the `type` attribute can be one of the following:
 
-* `indirect`: *The default*. Indirection through the flake registry.
+* `indirect`: *The default*. These are symbolic references to flakes
+  that are looked up in [the flake registries](./nix3-registry.md).
   These have the form
 
   ```
@@ -184,7 +187,7 @@ Currently the `type` attribute can be one of the following:
   * `nixpkgs/nixos-unstable/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`
   * `sub/dir` (if a flake named `sub` is in the registry)
 
-* `path`: arbitrary local directories. The required attribute `path`
+* <a name="path-fetcher"></a>`path`: arbitrary local directories. The required attribute `path`
   specifies the path of the flake. The URL form is
 
   ```
@@ -197,18 +200,38 @@ Currently the `type` attribute can be one of the following:
   If the flake at *path* is not inside a git repository, the `path:`
   prefix is implied and can be omitted.
 
-  *path* generally must be an absolute path. However, on the command
-  line, it can be a relative path (e.g. `.` or `./foo`) which is
-  interpreted as relative to the current directory. In this case, it
-  must start with `.` to avoid ambiguity with registry lookups
-  (e.g. `nixpkgs` is a registry lookup; `./nixpkgs` is a relative
-  path).
+  If *path* is a relative path (i.e. if it does not start with `/`),
+  it is interpreted as follows:
+
+  - If *path* is a command line argument, it is interpreted relative
+    to the current directory.
+
+  - If *path* is used in a `flake.nix`, it is interpreted relative to
+    the directory containing that `flake.nix`. However, the resolved
+    path must be in the same tree. For instance, a `flake.nix` in the
+    root of a tree can use `path:./foo` to access the flake in
+    subdirectory `foo`, but `path:../bar` is illegal. On the other
+    hand, a flake in the `/foo` directory of a tree can use
+    `path:../bar` to refer to the flake in `/bar`.
+
+  Path inputs can be specified with path values in `flake.nix`. Path values are a syntax for `path` inputs, and they are converted by
+  1. resolving them into relative paths, relative to the base directory of `flake.nix`
+  2. escaping URL characters (refer to IETF RFC?)
+  3. prepending `path:`
+
+  Note that the allowed syntax for path values in flake `inputs` may be more restrictive than general Nix, so you may need to use `path:` if your path contains certain special characters. See [Path literals](@docroot@/language/syntax.md#path-literal)
+
+  Note that if you omit `path:`, relative paths must start with `.` to
+  avoid ambiguity with registry lookups (e.g. `nixpkgs` is a registry
+  lookup; `./nixpkgs` is a relative path).
 
   For example, these are valid path flake references:
 
   * `path:/home/user/sub/dir`
   * `/home/user/sub/dir` (if `dir/flake.nix` is *not* in a git repository)
-  * `./sub/dir` (when used on the command line and `dir/flake.nix` is *not* in a git repository)
+  * `path:sub/dir`
+  * `./sub/dir`
+  * `path:../parent`
 
 * `git`: Git repositories. The location of the repository is specified
   by the attribute `url`.
@@ -243,6 +266,9 @@ Currently the `type` attribute can be one of the following:
   * `./sub/dir` (when used on the command line and `dir/flake.nix` is in a git repository)
   * `git+https://example.org/my/repo`
   * `git+https://example.org/my/repo?dir=flake1`
+  * `git+https://example.org/my/repo?shallow=1` A shallow clone of the repository.
+     For large repositories, the shallow clone option can significantly speed up fresh clones compared
+     to non-shallow clones, while still providing faster updates than other fetch methods such as `tarball:` or `github:`.
   * `git+ssh://git@github.com/NixOS/nix?ref=v1.2.3`
   * `git://github.com/edolstra/dwarffs?ref=unstable&rev=e486d8d40e626a20e06d792db8cc5ac5aba9a5b4`
   * `git+file:///home/my-user/some-repo/some-repo`
@@ -565,8 +591,9 @@ or NixOS modules, which are composed into the top-level flake's
 Inputs specified in `flake.nix` are typically "unlocked" in the sense
 that they don't specify an exact revision. To ensure reproducibility,
 Nix will automatically generate and use a *lock file* called
-`flake.lock` in the flake's directory. The lock file contains a graph
-structure isomorphic to the graph of dependencies of the root
+`flake.lock` in the flake's directory.
+The lock file is a UTF-8 JSON file.
+It contains a graph structure isomorphic to the graph of dependencies of the root
 flake. Each node in the graph (except the root node) maps the
 (usually) unlocked input specifications in `flake.nix` to locked input
 specifications. Each node also contains some metadata, such as the
@@ -647,7 +674,7 @@ following fields:
 * `inputs`: The dependencies of this node, as a mapping from input
   names (e.g. `nixpkgs`) to node labels (e.g. `n2`).
 
-* `original`: The original input specification from `flake.lock`, as a
+* `original`: The original input specification from `flake.nix`, as a
   set of `builtins.fetchTree` arguments.
 
 * `locked`: The locked input specification, as a set of
@@ -664,6 +691,11 @@ following fields:
   cache: `narHash` allows the store path to be computed, while the
   other attributes are necessary because they provide information not
   stored in the store path.
+
+  The attributes in `locked` are considered "final", meaning that they are the only ones that are passed via the arguments of the `outputs` function of a flake.
+  For instance, if `locked` contains a `lastModified` attribute while the fetcher does not return a `lastModified` attribute, then the `lastModified` attribute will be passed to the `outputs` function.
+  Conversely, if `locked` does *not* contain a `lastModified` attribute while the fetcher *does* return a `lastModified` attribute, then no `lastModified` attribute will be passed.
+  If `locked` contains a `lastModifed` attribute and the fetcher returns a `lastModified` attribute, then they must have the same value.
 
 * `flake`: A Boolean denoting whether this is a flake or non-flake
   dependency. Corresponds to the `flake` attribute in the `inputs`

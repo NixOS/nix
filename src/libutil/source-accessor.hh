@@ -88,12 +88,13 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
 
         Unlike `DT_UNKNOWN`, this must not be used for deferring the lookup of types.
       */
-      tMisc
+      tChar, tBlock, tSocket, tFifo,
+      tUnknown
     };
 
     struct Stat
     {
-        Type type = tMisc;
+        Type type = tUnknown;
 
         /**
          * For regular files only: the size of the file. Not all
@@ -112,6 +113,9 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
          * file in the NAR. Only returned by NAR accessors.
          */
         std::optional<uint64_t> narOffset;
+
+        bool isNotNARSerialisable();
+        std::string typeString();
     };
 
     Stat lstat(const CanonPath & path);

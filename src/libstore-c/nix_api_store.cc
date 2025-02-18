@@ -68,6 +68,17 @@ nix_err nix_store_get_uri(nix_c_context * context, Store * store, nix_get_string
 }
 
 nix_err
+nix_store_get_storedir(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        return call_nix_get_string_callback(store->ptr->storeDir, callback, user_data);
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err
 nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data)
 {
     if (context)
@@ -87,6 +98,18 @@ bool nix_store_is_valid_path(nix_c_context * context, Store * store, StorePath *
         return store->ptr->isValidPath(path->path);
     }
     NIXC_CATCH_ERRS_RES(false);
+}
+
+nix_err nix_store_real_path(
+    nix_c_context * context, Store * store, StorePath * path, nix_get_string_callback callback, void * user_data)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto res = store->ptr->toRealPath(path->path);
+        return call_nix_get_string_callback(res, callback, user_data);
+    }
+    NIXC_CATCH_ERRS
 }
 
 StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const char * path)
@@ -143,4 +166,16 @@ void nix_store_path_free(StorePath * sp)
 StorePath * nix_store_path_clone(const StorePath * p)
 {
     return new StorePath{p->path};
+}
+
+nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        nix::RealisedPath::Set paths;
+        paths.insert(path->path);
+        nix::copyClosure(*srcStore->ptr, *dstStore->ptr, paths);
+    }
+    NIXC_CATCH_ERRS
 }

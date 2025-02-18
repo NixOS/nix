@@ -1,5 +1,6 @@
 #include "serialise.hh"
 #include "signals.hh"
+#include "util.hh"
 
 #include <cstring>
 #include <cerrno>
@@ -9,7 +10,10 @@
 
 #ifdef _WIN32
 # include <fileapi.h>
+# include <winsock2.h>
 # include "windows-error.hh"
+#else
+# include <poll.h>
 #endif
 
 
@@ -49,7 +53,7 @@ void BufferedSink::flush()
 
 FdSink::~FdSink()
 {
-    try { flush(); } catch (...) { ignoreException(); }
+    try { flush(); } catch (...) { ignoreExceptionInDestructor(); }
 }
 
 
@@ -86,7 +90,6 @@ void Source::operator () (std::string_view data)
 
 void Source::drainInto(Sink & sink)
 {
-    std::string s;
     std::array<char, 8192> buf;
     while (true) {
         size_t n;
@@ -155,6 +158,30 @@ size_t FdSource::readUnbuffered(char * data, size_t len)
 bool FdSource::good()
 {
     return _good;
+}
+
+
+bool FdSource::hasData()
+{
+    if (BufferedSource::hasData()) return true;
+
+    while (true) {
+        fd_set fds;
+        FD_ZERO(&fds);
+        int fd_ = fromDescriptorReadOnly(fd);
+        FD_SET(fd_, &fds);
+
+        struct timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 0;
+
+        auto n = select(fd_ + 1, &fds, nullptr, nullptr, &timeout);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            throw SysError("polling file descriptor");
+        }
+        return FD_ISSET(fd, &fds);
+    }
 }
 
 
@@ -399,7 +426,7 @@ Error readError(Source & source)
     auto type = readString(source);
     assert(type == "Error");
     auto level = (Verbosity) readInt(source);
-    auto name = readString(source); // removed
+    [[maybe_unused]] auto name = readString(source); // removed
     auto msg = readString(source);
     ErrorInfo info {
         .level = level,

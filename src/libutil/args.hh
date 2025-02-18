@@ -2,6 +2,7 @@
 ///@file
 
 #include <functional>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <optional>
@@ -109,6 +110,16 @@ protected:
         { }
 
         Handler(std::optional<std::string> * dest)
+            : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
+            , arity(1)
+        { }
+
+        Handler(std::filesystem::path * dest)
+            : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
+            , arity(1)
+        { }
+
+        Handler(std::optional<std::filesystem::path> * dest)
             : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
             , arity(1)
         { }
@@ -284,6 +295,18 @@ public:
     }
 
     /**
+     * Expect a path argument.
+     */
+    void expectArg(const std::string & label, std::filesystem::path * dest, bool optional = false)
+    {
+        expectArgs({
+            .label = label,
+            .optional = optional,
+            .handler = {dest}
+        });
+    }
+
+    /**
      * Expect 0 or more arguments.
      */
     void expectArgs(const std::string & label, std::vector<std::string> * dest)
@@ -348,7 +371,7 @@ using Commands = std::map<std::string, std::function<ref<Command>()>>;
 
 /**
  * An argument parser that supports multiple subcommands,
- * i.e. ‘<command> <subcommand>’.
+ * i.e. `<command> <subcommand>`.
  */
 class MultiCommand : virtual public Args
 {

@@ -2,12 +2,12 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "error.hh"
 #include "repl-interacter.hh"
 #include "repl.hh"
 
 #include "ansicolor.hh"
 #include "shared.hh"
-#include "config-global.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "attr-path.hh"
@@ -28,11 +28,6 @@
 #include "print.hh"
 #include "ref.hh"
 #include "value.hh"
-
-#if HAVE_BOEHMGC
-#define GC_INCLUDE_NEW
-#include <gc/gc_cpp.h>
-#endif
 
 #include "strings.hh"
 
@@ -62,9 +57,7 @@ enum class ProcessLineResult {
 struct NixRepl
     : AbstractNixRepl
     , detail::ReplCompleterMixin
-    #if HAVE_BOEHMGC
     , gc
-    #endif
 {
     size_t debugTraceIndex;
 
@@ -77,10 +70,14 @@ struct NixRepl
     int displ;
     StringSet varNames;
 
+    RunNix * runNixPtr;
+
+    void runNix(Path program, const Strings & args, const std::optional<std::string> & input = {});
+
     std::unique_ptr<ReplInteracter> interacter;
 
     NixRepl(const LookupPath & lookupPath, nix::ref<Store> store,ref<EvalState> state,
-            std::function<AnnotatedValues()> getValues);
+            std::function<AnnotatedValues()> getValues, RunNix * runNix);
     virtual ~NixRepl() = default;
 
     ReplExitStatus mainLoop() override;
@@ -125,30 +122,14 @@ std::string removeWhitespace(std::string s)
 
 
 NixRepl::NixRepl(const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalState> state,
-            std::function<NixRepl::AnnotatedValues()> getValues)
+            std::function<NixRepl::AnnotatedValues()> getValues, RunNix * runNix = nullptr)
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
     , getValues(getValues)
     , staticEnv(new StaticEnv(nullptr, state->staticBaseEnv.get()))
-    , interacter(make_unique<ReadlineLikeInteracter>(getDataDir() + "/nix/repl-history"))
+    , runNixPtr{runNix}
+    , interacter(make_unique<ReadlineLikeInteracter>(getDataDir() + "/repl-history"))
 {
-}
-
-void runNix(Path program, const Strings & args,
-    const std::optional<std::string> & input = {})
-{
-    auto subprocessEnv = getEnv();
-    subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
-    //isInteractive avoid grabling interactive commands
-    runProgram2(RunOptions {
-        .program = settings.nixBinDir+ "/" + program,
-        .args = args,
-        .environment = subprocessEnv,
-        .input = input,
-        .isInteractive = true,
-    });
-
-    return;
 }
 
 static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positions, const DebugTrace & dt)
@@ -635,7 +616,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 // When missing, trigger the normal exception
                 // e.g. :doc builtins.foo
                 // behaves like
-                // nix-repl> builtins.foo      
+                // nix-repl> builtins.foo<tab>
                 // error: attribute 'foo' missing
                 evalString(arg, v);
                 assert(false);
@@ -664,7 +645,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
         } else if (fallbackPos) {
-            std::stringstream ss;
+            std::ostringstream ss;
             ss << "Attribute `" << fallbackName << "`\n\n";
             ss << "  … defined at " << state->positions[fallbackPos] << "\n\n";
             if (fallbackDoc) {
@@ -673,7 +654,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 ss << "No documentation found.\n\n";
             }
 
-            auto markdown = ss.str();
+            auto markdown = toView(ss);
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
 
         } else
@@ -733,7 +714,14 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
     if (flakeRefS.empty())
         throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
 
-    auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, absPath("."), true);
+    std::filesystem::path cwd;
+    try {
+        cwd = std::filesystem::current_path();
+    } catch (std::filesystem::filesystem_error & e) {
+        throw SysError("cannot determine current working directory");
+    }
+
+    auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, cwd.string(), true);
     if (evalSettings.pureEval && !flakeRef.input.isLocked())
         throw Error("cannot use ':load-flake' on locked flake reference '%s' (use --impure to override)", flakeRefS);
 
@@ -833,9 +821,18 @@ void NixRepl::evalString(std::string s, Value & v)
 }
 
 
+void NixRepl::runNix(Path program, const Strings & args, const std::optional<std::string> & input)
+{
+    if (runNixPtr)
+        (*runNixPtr)(program, args, input);
+    else
+        throw Error("Cannot run '%s' because no method of calling the Nix CLI was provided. This is a configuration problem pertaining to how this program was built. See Nix 2.25 release notes", program);
+}
+
+
 std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
    const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalState> state,
-   std::function<AnnotatedValues()> getValues)
+   std::function<AnnotatedValues()> getValues, RunNix * runNix)
 {
     return std::make_unique<NixRepl>(
         lookupPath,

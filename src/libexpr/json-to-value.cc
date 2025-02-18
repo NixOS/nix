@@ -2,6 +2,7 @@
 #include "value.hh"
 #include "eval.hh"
 
+#include <limits>
 #include <variant>
 #include <nlohmann/json.hpp>
 
@@ -49,6 +50,7 @@ class JSONSax : nlohmann::json_sax<json> {
     public:
         void key(string_t & name, EvalState & state)
         {
+            forceNoNullByte(name);
             attrs.insert_or_assign(state.symbols.create(name), &value(state));
         }
     };
@@ -101,8 +103,12 @@ public:
         return true;
     }
 
-    bool number_unsigned(number_unsigned_t val) override
+    bool number_unsigned(number_unsigned_t val_) override
     {
+        if (val_ > std::numeric_limits<NixInt::Inner>::max()) {
+            throw Error("unsigned json number %1% outside of Nix integer range", val_);
+        }
+        NixInt::Inner val = val_;
         rs->value(state).mkInt(val);
         rs->add();
         return true;
@@ -117,6 +123,7 @@ public:
 
     bool string(string_t & val) override
     {
+        forceNoNullByte(val);
         rs->value(state).mkString(val);
         rs->add();
         return true;

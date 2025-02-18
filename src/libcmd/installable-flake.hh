@@ -26,7 +26,7 @@ struct ExtraPathInfoFlake : ExtraPathInfoValue
     Flake flake;
 
     ExtraPathInfoFlake(Value && v, Flake && f)
-        : ExtraPathInfoValue(std::move(v)), flake(f)
+        : ExtraPathInfoValue(std::move(v)), flake(std::move(f))
     { }
 };
 
