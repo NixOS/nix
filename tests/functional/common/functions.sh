@@ -67,7 +67,7 @@ startDaemon() {
       die "startDaemon: not supported when testing on NixOS. Is it really needed? If so add conditionals; e.g. if ! isTestOnNixOS; then ..."
     fi
 
-    # Don’t start the daemon twice, as this would just make it loop indefinitely
+    # Don't start the daemon twice, as this would just make it loop indefinitely.
     if [[ "${_NIX_TEST_DAEMON_PID-}" != '' ]]; then
         return
     fi
@@ -76,15 +76,19 @@ startDaemon() {
     PATH=$DAEMON_PATH nix --extra-experimental-features 'nix-command' daemon &
     _NIX_TEST_DAEMON_PID=$!
     export _NIX_TEST_DAEMON_PID
-    for ((i = 0; i < 300; i++)); do
+    for ((i = 0; i < 60; i++)); do
         if [[ -S $NIX_DAEMON_SOCKET_PATH ]]; then
           DAEMON_STARTED=1
           break;
         fi
+        if ! kill -0 "$_NIX_TEST_DAEMON_PID"; then
+          echo "daemon died unexpectedly" >&2
+          exit 1
+        fi
         sleep 0.1
     done
     if [[ -z ${DAEMON_STARTED+x} ]]; then
-      fail "Didn’t manage to start the daemon"
+      fail "Didn't manage to start the daemon"
     fi
     trap "killDaemon" EXIT
     # Save for if daemon is killed
@@ -97,7 +101,7 @@ killDaemon() {
       die "killDaemon: not supported when testing on NixOS. Is it really needed? If so add conditionals; e.g. if ! isTestOnNixOS; then ..."
     fi
 
-    # Don’t fail trying to stop a non-existant daemon twice
+    # Don't fail trying to stop a non-existant daemon twice.
     if [[ "${_NIX_TEST_DAEMON_PID-}" == '' ]]; then
         return
     fi
@@ -219,7 +223,7 @@ assertStderr() {
 
 needLocalStore() {
   if [[ "$NIX_REMOTE" == "daemon" ]]; then
-    skipTest "Can’t run through the daemon ($1)"
+    skipTest "Can't run through the daemon ($1)"
   fi
 }
 
