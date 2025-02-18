@@ -99,6 +99,8 @@ mkMesonDerivation (
 
   }
   // lib.optionalAttrs (test-daemon != null) {
+    # TODO rename to _NIX_TEST_DAEMON_PACKAGE
     NIX_DAEMON_PACKAGE = test-daemon;
+    _NIX_TEST_CLIENT_VERSION = nix-cli.version;
   }
 )
