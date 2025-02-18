@@ -13,7 +13,7 @@ std::filesystem::path getNixManDir()
 void showManPage(const std::string & name)
 {
     restoreProcessContext();
-    setEnv("MANPATH", getNixManDir().c_str());
+    setEnv("MANPATH", (getNixManDir().string() + ":").c_str());
     execlp("man", "man", name.c_str(), nullptr);
     if (errno == ENOENT) {
         // Not SysError because we don't want to suffix the errno, aka No such file or directory.
