@@ -32,9 +32,6 @@ let
 
   root = ../.;
 
-  # Nixpkgs implements this by returning a subpath into the fetched Nix sources.
-  resolvePath = p: p;
-
   # Indirection for Nixpkgs to override when package.nix files are vendored
   filesetToSource = lib.fileset.toSource;
 
@@ -78,6 +75,31 @@ let
     {
       sourceRoot = "${src.name}/" + workDirSubpath;
       inherit src;
+
+      # Clear what `derivation` can't/shouldn't serialize; see prevAttrs.workDir.
+      fileset = null;
+      workDir = null;
+    };
+
+  resolveRelPath = p: lib.path.removePrefix root p;
+
+  makeFetchedSourceLayer =
+    finalScope: finalAttrs: prevAttrs:
+    let
+      workDirPath =
+        # Ideally we'd pick finalAttrs.workDir, but for now `mkDerivation` has
+        # the requirement that everything except passthru and meta must be
+        # serialized by mkDerivation, which doesn't work for this.
+        prevAttrs.workDir;
+
+      workDirSubpath = resolveRelPath workDirPath;
+      # sources = assert prevAttrs.fileset._type == "fileset"; prevAttrs.fileset;
+      # src = lib.fileset.toSource { fileset = sources; inherit root; };
+
+    in
+    {
+      sourceRoot = "${finalScope.patchedSrc.name}/" + workDirSubpath;
+      src = finalScope.patchedSrc;
 
       # Clear what `derivation` can't/shouldn't serialize; see prevAttrs.workDir.
       fileset = null;
@@ -152,6 +174,17 @@ let
     enableParallelBuilding = true;
   };
 
+  /**
+    Append patches to the source layer.
+  */
+  appendPatches =
+    scope: patches:
+    scope.overrideScope (
+      finalScope: prevScope: {
+        patches = prevScope.patches ++ patches;
+      }
+    );
+
 in
 
 # This becomes the pkgs.nixComponents attribute set
@@ -159,12 +192,23 @@ in
   version = baseVersion + versionSuffix;
   inherit versionSuffix;
 
-  inherit resolvePath filesetToSource;
+  inherit filesetToSource;
 
   /**
     A user-provided extension function to apply to each component derivation.
   */
   mesonComponentOverrides = finalAttrs: prevAttrs: { };
+
+  /**
+    An overridable derivation layer for handling the sources.
+  */
+  sourceLayer = localSourceLayer;
+
+  /**
+    Resolve a path value to either itself or a path in the `src`, depending
+    whether `overrideSource` was called.
+  */
+  resolvePath = p: p;
 
   /**
     Apply an extension function (i.e. overlay-shaped) to all component derivations.
@@ -177,9 +221,57 @@ in
       }
     );
 
+  /**
+    Provide an alternate source. This allows the expressions to be vendored without copying the sources,
+    but it does make the build non-granular; all components will use a complete source.
+
+    Packaging expressions will be ignored.
+  */
+  overrideSource =
+    src:
+    scope.overrideScope (
+      finalScope: prevScope: {
+        sourceLayer = makeFetchedSourceLayer finalScope;
+        /**
+          Unpatched source for the build of Nix. Packaging expressions will be ignored.
+        */
+        src = src;
+        /**
+          Patches for the whole Nix source. Changes to packaging expressions will be ignored.
+        */
+        patches = [ ];
+        /**
+          Fetched and patched source to be used in component derivations.
+        */
+        patchedSrc =
+          if finalScope.patches == [ ] then
+            src
+          else
+            pkgs.buildPackages.srcOnly (
+              pkgs.buildPackages.stdenvNoCC.mkDerivation {
+                name = "${finalScope.src.name or "nix-source"}-patched";
+                inherit (finalScope) src patches;
+              }
+            );
+        resolvePath = p: finalScope.patchedSrc + "/${resolveRelPath p}";
+        appendPatches = appendPatches finalScope;
+      }
+    );
+
+  /**
+    Append patches to be applied to the whole Nix source.
+    This affects all components.
+
+    Changes to the packaging expressions will be ignored.
+  */
+  appendPatches =
+    patches:
+    # switch to "fetched" source first, so that patches apply to the whole tree.
+    (scope.overrideSource "${./..}").appendPatches patches;
+
   mkMesonDerivation = mkPackageBuilder [
     miscGoodPractice
-    localSourceLayer
+    scope.sourceLayer
     setVersionLayer
     mesonLayer
     scope.mesonComponentOverrides
@@ -187,7 +279,7 @@ in
   mkMesonExecutable = mkPackageBuilder [
     miscGoodPractice
     bsdNoLinkAsNeeded
-    localSourceLayer
+    scope.sourceLayer
     setVersionLayer
     mesonLayer
     mesonBuildLayer
@@ -196,7 +288,7 @@ in
   mkMesonLibrary = mkPackageBuilder [
     miscGoodPractice
     bsdNoLinkAsNeeded
-    localSourceLayer
+    scope.sourceLayer
     mesonLayer
     setVersionLayer
     mesonBuildLayer
@@ -255,6 +347,21 @@ in
     */
     overrideAllMesonComponents = f: (scope.overrideAllMesonComponents f).nix-everything;
 
-    scope = scope;
+    /**
+      Append patches to be applied to the whole Nix source.
+      This affects all components.
+
+      Changes to the packaging expressions will be ignored.
+    */
+    appendPatches = ps: (scope.appendPatches ps).nix-everything;
+
+    /**
+      Provide an alternate source. This allows the expressions to be vendored without copying the sources,
+      but it does make the build non-granular; all components will use a complete source.
+
+      Packaging expressions will be ignored.
+    */
+    overrideSource = src: (scope.overrideSource src).nix-everything;
+
   };
 }
