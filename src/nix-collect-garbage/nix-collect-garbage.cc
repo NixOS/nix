@@ -7,6 +7,7 @@
 #include "shared.hh"
 #include "globals.hh"
 #include "legacy.hh"
+#include "man-pages.hh"
 
 #include <iostream>
 #include <cerrno>

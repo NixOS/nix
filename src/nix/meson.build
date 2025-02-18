@@ -90,6 +90,7 @@ nix_sources = [config_h] + files(
   'ls.cc',
   'main.cc',
   'make-content-addressed.cc',
+  'man-pages.cc',
   'nar.cc',
   'optimise-store.cc',
   'path-from-hash-part.cc',
@@ -182,6 +183,16 @@ if host_machine.system() != 'windows'
   ]
 endif
 
+fs = import('fs')
+prefix = get_option('prefix')
+
+mandir = get_option('mandir')
+mandir = fs.is_absolute(mandir) ? mandir : prefix / mandir
+
+cpp_args= [
+  '-DNIX_MAN_DIR="@0@"'.format(mandir)
+]
+
 include_dirs = [include_directories('.')]
 
 this_exe = executable(
@@ -189,6 +200,7 @@ this_exe = executable(
   sources,
   dependencies : deps_private_subproject + deps_private + deps_other,
   include_directories : include_dirs,
+  cpp_args : cpp_args,
   link_args: linker_export_flags,
   install : true,
 )

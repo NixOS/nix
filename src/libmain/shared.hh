@@ -71,11 +71,6 @@ struct LegacyArgs : public MixCommonArgs, public RootArgs
 
 
 /**
- * Show the manual page for the specified program.
- */
-void showManPage(const std::string & name);
-
-/**
  * The constructor of this class starts a pager if standard output is a
  * terminal and $PAGER is set. Standard output is redirected to the
  * pager.

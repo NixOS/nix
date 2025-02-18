@@ -2,6 +2,7 @@
 #include "realisation.hh"
 #include "store-api.hh"
 #include "legacy.hh"
+#include "man-pages.hh"
 
 using namespace nix;
 
