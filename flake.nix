@@ -34,7 +34,9 @@
 
       officialRelease = true;
 
-      linux32BitSystems = [ /* "i686-linux" */ ];
+      linux32BitSystems = [
+        # "i686-linux"
+      ];
       linux64BitSystems = [
         "x86_64-linux"
         "aarch64-linux"
@@ -345,7 +347,7 @@
                 # These attributes go right into `packages.<system>`.
                 "${pkgName}" = nixpkgsFor.${system}.native.nixComponents.${pkgName};
                 #"${pkgName}-static" = nixpkgsFor.${system}.static.nixComponents.${pkgName};
-                "${pkgName}-llvm" = nixpkgsFor.${system}.llvm.nixComponents.${pkgName};
+                #"${pkgName}-llvm" = nixpkgsFor.${system}.llvm.nixComponents.${pkgName};
               }
               // lib.optionalAttrs supportsCross (
                 flatMapAttrs (lib.genAttrs crossSystems (_: { })) (
@@ -402,35 +404,34 @@
               }
             )
           )
-          // lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin) (
-            /*
-            prefixAttrs "static" (
-              forAllStdenvs (
-                stdenvName:
-                makeShell {
-                  pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".pkgsStatic;
-                }
+          /*
+            // lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin) (
+              prefixAttrs "static" (
+                forAllStdenvs (
+                  stdenvName:
+                  makeShell {
+                    pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".pkgsStatic;
+                  }
+                )
+              )
+              // prefixAttrs "llvm" (
+                forAllStdenvs (
+                  stdenvName:
+                  makeShell {
+                    pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".pkgsLLVM;
+                  }
+                )
+              )
+              // prefixAttrs "cross" (
+                forAllCrossSystems (
+                  crossSystem:
+                  makeShell {
+                    pkgs = nixpkgsFor.${system}.cross.${crossSystem};
+                  }
+                )
               )
             )
-            //
-            */
-            prefixAttrs "llvm" (
-              forAllStdenvs (
-                stdenvName:
-                makeShell {
-                  pkgs = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".pkgsLLVM;
-                }
-              )
-            )
-            // prefixAttrs "cross" (
-              forAllCrossSystems (
-                crossSystem:
-                makeShell {
-                  pkgs = nixpkgsFor.${system}.cross.${crossSystem};
-                }
-              )
-            )
-          )
+          */
           // {
             default = self.devShells.${system}.native-stdenvPackages;
           }
