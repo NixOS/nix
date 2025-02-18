@@ -190,10 +190,10 @@ static int main_nix_prefetch_url(int argc, char * * argv)
         if (args.size() > 2)
             throw UsageError("too many arguments");
 
-        Finally f([]() { stopProgressBar(); });
+        Finally f([]() { logger->stop(); });
 
         if (isTTY())
-          startProgressBar();
+            startProgressBar();
 
         auto store = openStore();
         auto state = std::make_unique<EvalState>(myArgs.lookupPath, store, fetchSettings, evalSettings);
@@ -247,7 +247,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
         auto [storePath, hash] = prefetchFile(
             store, resolveMirrorUrl(*state, url), name, ha, expectedHash, unpack, executable);
 
-        stopProgressBar();
+        logger->stop();
 
         if (!printPath)
             printInfo("path is '%s'", store->printStorePath(storePath));

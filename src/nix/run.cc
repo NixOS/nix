@@ -9,7 +9,6 @@
 #include "local-fs-store.hh"
 #include "finally.hh"
 #include "source-accessor.hh"
-#include "progress-bar.hh"
 #include "eval.hh"
 #include <filesystem>
 
@@ -34,7 +33,7 @@ void execProgramInStore(ref<Store> store,
     const Strings & args,
     std::optional<std::string_view> system)
 {
-    stopProgressBar();
+    logger->stop();
 
     restoreProcessContext();
 

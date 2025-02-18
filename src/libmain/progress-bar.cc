@@ -565,10 +565,4 @@ void startProgressBar()
     logger = makeProgressBar();
 }
 
-void stopProgressBar()
-{
-    if (auto progressBar = dynamic_cast<ProgressBar *>(logger.get()))
-        progressBar->stop();
-}
-
 }
