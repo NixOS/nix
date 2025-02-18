@@ -100,6 +100,11 @@ let
     {
       sourceRoot = "${finalScope.patchedSrc.name}/" + workDirSubpath;
       src = finalScope.patchedSrc;
+      version =
+        let
+          n = lib.count (p: p != null) finalScope.patches;
+        in
+        if n == 0 then finalAttrs.version else finalAttrs.version + "+${toString n}";
 
       # Clear what `derivation` can't/shouldn't serialize; see prevAttrs.workDir.
       fileset = null;
