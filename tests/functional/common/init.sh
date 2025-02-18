@@ -12,6 +12,7 @@ if isTestOnNixOS; then
   ! test -e "$test_nix_conf"
   cat > "$test_nix_conf" <<EOF
 # TODO: this is not needed for all tests and prevents stable commands from be tested in isolation
+experimental-features =
 flake-registry = $TEST_ROOT/registry.json
 show-trace = true
 EOF
