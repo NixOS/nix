@@ -1,7 +1,6 @@
 #pragma once
 
 #include "parsed-derivations.hh"
-#include "user-lock.hh"
 #include "store-api.hh"
 #include "pathlocks.hh"
 #include "goal.hh"
