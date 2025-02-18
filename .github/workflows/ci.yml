@@ -34,6 +34,11 @@ jobs:
     with:
       os: UbuntuLatest32Cores128GArm
 
+  build_x86_64-darwin:
+    uses: ./.github/workflows/build.yml
+    with:
+      os: macos-13
+
   build_aarch64-darwin:
     uses: ./.github/workflows/build.yml
     with:
@@ -50,6 +55,12 @@ jobs:
     needs: build_aarch64-linux
     with:
       os: UbuntuLatest32Cores128GArm
+
+  test_x86_64-darwin:
+    uses: ./.github/workflows/test.yml
+    needs: build_aarch64-darwin
+    with:
+      os: macos-13
 
   test_aarch64-darwin:
     uses: ./.github/workflows/test.yml
