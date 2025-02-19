@@ -165,6 +165,8 @@
                 f = import ./packaging/components.nix {
                   inherit (final) lib;
                   inherit officialRelease;
+                  inherit stdenv;
+                  pkgs = final;
                   src = self;
                 };
               };
@@ -235,6 +237,30 @@
               LANG=C.UTF-8 ${pkgs.changelog-d}/bin/changelog-d ${./doc/manual/rl-next} >$out
             '';
           repl-completion = nixpkgsFor.${system}.native.callPackage ./tests/repl-completion.nix { };
+
+          /**
+            Checks for our packaging expressions.
+            This shouldn't build anything significant; just check that things
+            (including derivations) are _set up_ correctly.
+          */
+          packaging-overriding =
+            let
+              pkgs = nixpkgsFor.${system}.native;
+              nix = self.packages.${system}.nix;
+            in
+            assert (nix.appendPatches [ pkgs.emptyFile ]).libs.nix-util.src.patches == [ pkgs.emptyFile ];
+            if pkgs.stdenv.buildPlatform.isDarwin then
+              lib.warn "packaging-overriding check currently disabled because of a permissions issue on macOS" pkgs.emptyFile
+            else
+              # If this fails, something might be wrong with how we've wired the scope,
+              # or something could be broken in Nixpkgs.
+              pkgs.testers.testEqualContents {
+                assertion = "trivial patch does not change source contents";
+                expected = "${./.}";
+                actual =
+                  # Same for all components; nix-util is an arbitrary pick
+                  (nix.appendPatches [ pkgs.emptyFile ]).libs.nix-util.src;
+              };
         }
         // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
           dockerImage = self.hydraJobs.dockerImage.${system};
