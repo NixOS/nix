@@ -16,7 +16,7 @@ struct UnionSourceAccessor : SourceAccessor
     {
         for (auto & accessor : accessors) {
             auto st = accessor->maybeLstat(path);
-            if (st && st->type == Type::tRegular)
+            if (st)
                 return accessor->readFile(path);
         }
         throw FileNotFound("path '%s' does not exist", showPath(path));
@@ -37,7 +37,7 @@ struct UnionSourceAccessor : SourceAccessor
         DirEntries result;
         for (auto & accessor : accessors) {
             auto st = accessor->maybeLstat(path);
-            if (!st || st->type != Type::tDirectory)
+            if (!st)
                 continue;
             for (auto & entry : accessor->readDirectory(path))
                 // Don't override entries from previous accessors.
@@ -50,7 +50,7 @@ struct UnionSourceAccessor : SourceAccessor
     {
         for (auto & accessor : accessors) {
             auto st = accessor->maybeLstat(path);
-            if (st && st->type == Type::tSymlink)
+            if (st)
                 return accessor->readLink(path);
         }
         throw FileNotFound("path '%s' does not exist", showPath(path));
