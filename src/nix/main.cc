@@ -557,6 +557,9 @@ void mainWrapped(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
+    // The CLI has a more detailed version than the libraries; see nixVersion.
+    nix::nixVersion = NIX_CLI_VERSION;
+
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
     nix::setStackSize(64 * 1024 * 1024);
