@@ -251,11 +251,6 @@ public:
     const ref<SourceAccessor> rootFS;
 
     /**
-     * The accessor for the store.
-     */
-    const ref<SourceAccessor> storeFS;
-
-    /**
      * The in-memory filesystem for <nix/...> paths.
      */
     const ref<MemorySourceAccessor> corepkgsFS;
@@ -393,18 +388,6 @@ public:
      * Variant which accepts relative paths too.
      */
     SourcePath rootPath(PathView path);
-
-    /**
-     * Convert `s` to a path. If `context` is not empty, the resulting
-     * path will use the `storeFS` accessor; otherwise it will use
-     * `rootFS`. When using a chroot store, this allows us to
-     * distinguish between store paths resulting from
-     * import-from-derivation and sources stored in the actual
-     * /nix/store.
-     */
-    SourcePath stringWithContextToPath(
-        std::string_view s,
-        const NixStringContext & context);
 
     /**
      * Allow access to a path.

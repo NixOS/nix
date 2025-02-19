@@ -143,7 +143,7 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, st
     auto path = state.coerceToPath(noPos, v, context, "while realising the context of a path");
 
     try {
-        if (!context.empty() && path.accessor == state.storeFS) {
+        if (!context.empty() && path.accessor == state.rootFS) {
             auto rewrites = state.realiseContext(context);
             path = {path.accessor, CanonPath(rewriteStrings(path.path.abs(), rewrites))};
         }
@@ -2480,7 +2480,7 @@ static void addPath(
     try {
         StorePathSet refs;
 
-        if (path.accessor == state.storeFS && state.store->isInStore(path.path.abs())) {
+        if (path.accessor == state.rootFS && state.store->isInStore(path.path.abs())) {
             // FIXME: handle CA derivation outputs (where path needs to
             // be rewritten to the actual output).
             auto rewrites = state.realiseContext(context);

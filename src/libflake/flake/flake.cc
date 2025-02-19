@@ -337,7 +337,7 @@ static Flake readFlake(
                 auto storePath = fetchToStore(*state.store, setting.value->path(), FetchMode::Copy);
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    state.store->toRealPath(storePath));
+                    state.store->printStorePath(storePath));
             }
             else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(
@@ -423,7 +423,7 @@ static Flake getFlake(
     auto storePath = copyInputToStore(state, lockedRef.input, originalRef.input, accessor);
 
     // Re-parse flake.nix from the store.
-    return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->toRealPath(storePath)), lockRootAttrPath);
+    return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->printStorePath(storePath)), lockRootAttrPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
@@ -784,7 +784,7 @@ LockedFlake lockFlake(
                                     // FIXME: allow input to be lazy.
                                     auto storePath = copyInputToStore(state, lockedRef.input, input.ref->input, accessor);
 
-                                    return {state.rootPath(state.store->toRealPath(storePath)), lockedRef};
+                                    return {state.rootPath(state.store->printStorePath(storePath)), lockedRef};
                                 }
                             }();
 
