@@ -216,7 +216,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
         auto & flake = lockedFlake.flake;
 
         // Currently, all flakes are in the Nix store via the rootFS accessor.
-        auto storePath = store->printStorePath(sourcePathToStorePath(store, flake.path).first);
+        auto storePath = store->printStorePath(store->toStorePath(flake.path.path.abs()).first);
 
         if (json) {
             nlohmann::json j;
@@ -1079,7 +1079,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         StorePathSet sources;
 
-        auto storePath = sourcePathToStorePath(store, flake.flake.path).first;
+        auto storePath = store->toStorePath(flake.flake.path.path.abs()).first;
 
         sources.insert(storePath);
 

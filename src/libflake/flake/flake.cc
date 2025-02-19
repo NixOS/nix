@@ -921,21 +921,6 @@ LockedFlake lockFlake(
     }
 }
 
-std::pair<StorePath, Path> sourcePathToStorePath(
-    ref<Store> store,
-    const SourcePath & _path)
-{
-    auto path = _path.path.abs();
-
-    if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
-        auto realStoreDir = store2->getRealStoreDir();
-        if (isInDir(path, realStoreDir))
-            path = store2->storeDir + path.substr(realStoreDir.size());
-    }
-
-    return store->toStorePath(path);
-}
-
 void callFlake(EvalState & state,
     const LockedFlake & lockedFlake,
     Value & vRes)
@@ -953,7 +938,7 @@ void callFlake(EvalState & state,
 
         auto lockedNode = node.dynamic_pointer_cast<const LockedNode>();
 
-        auto [storePath, subdir] = sourcePathToStorePath(state.store, sourcePath);
+        auto [storePath, subdir] = state.store->toStorePath(sourcePath.path.abs());
 
         emitTreeAttrs(
             state,
