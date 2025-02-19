@@ -102,8 +102,7 @@ let
     enableParallelBuilding = true;
   };
 in
-scope:
-{
+scope: {
   inherit stdenv;
 
   aws-sdk-cpp =
@@ -200,38 +199,42 @@ scope:
     mesonBuildLayer
     mesonLibraryLayer
   ];
-}
-# libgit2: Nixpkgs 24.11 has < 1.9.0
-// lib.optionalAttrs (!lib.versionAtLeast pkgs.libgit2.version "1.9.0") {
-  libgit2 = pkgs.libgit2.overrideAttrs (attrs: {
-    src = inputs.libgit2;
-    version = inputs.libgit2.lastModifiedDate;
-    cmakeFlags = attrs.cmakeFlags or [ ] ++ [ "-DUSE_SSH=exec" ];
-    nativeBuildInputs =
-      attrs.nativeBuildInputs or [ ]
-      # gitMinimal does not build on Windows. See packbuilder patch.
-      ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
-        # Needed for `git apply`; see `prePatch`
-        pkgs.buildPackages.gitMinimal
-      ];
-    # Only `git apply` can handle git binary patches
-    prePatch =
-      attrs.prePatch or ""
-      + lib.optionalString (!stdenv.hostPlatform.isWindows) ''
-        patch() {
-          git apply
-        }
-      '';
-    patches =
-      attrs.patches or [ ]
-      ++ [
-        ./patches/libgit2-mempack-thin-packfile.patch
-      ]
-      # gitMinimal does not build on Windows, but fortunately this patch only
-      # impacts interruptibility
-      ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
-        # binary patch; see `prePatch`
-        ./patches/libgit2-packbuilder-callback-interruptible.patch
-      ];
-  });
+
+  libgit2 = pkgs.libgit2.overrideAttrs (
+    attrs:
+    {
+      cmakeFlags = attrs.cmakeFlags or [ ] ++ [ "-DUSE_SSH=exec" ];
+    }
+    # libgit2: Nixpkgs 24.11 has < 1.9.0, which needs our patches
+    // lib.optionalAttrs (!lib.versionAtLeast pkgs.libgit2.version "1.9.0") {
+      src = inputs.libgit2;
+      version = inputs.libgit2.lastModifiedDate;
+      nativeBuildInputs =
+        attrs.nativeBuildInputs or [ ]
+        # gitMinimal does not build on Windows. See packbuilder patch.
+        ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
+          # Needed for `git apply`; see `prePatch`
+          pkgs.buildPackages.gitMinimal
+        ];
+      # Only `git apply` can handle git binary patches
+      prePatch =
+        attrs.prePatch or ""
+        + lib.optionalString (!stdenv.hostPlatform.isWindows) ''
+          patch() {
+            git apply
+          }
+        '';
+      patches =
+        attrs.patches or [ ]
+        ++ [
+          ./patches/libgit2-mempack-thin-packfile.patch
+        ]
+        # gitMinimal does not build on Windows, but fortunately this patch only
+        # impacts interruptibility
+        ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
+          # binary patch; see `prePatch`
+          ./patches/libgit2-packbuilder-callback-interruptible.patch
+        ];
+    }
+  );
 }
