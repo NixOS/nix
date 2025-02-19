@@ -403,7 +403,7 @@
 
       devShells =
         let
-          makeShell = import ./packaging/dev-shell.nix { inherit inputs lib devFlake; };
+          makeShell = import ./packaging/dev-shell.nix { inherit lib devFlake; };
           prefixAttrs = prefix: lib.concatMapAttrs (k: v: { "${prefix}-${k}" = v; });
         in
         forAllSystems (
