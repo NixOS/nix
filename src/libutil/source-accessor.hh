@@ -222,4 +222,10 @@ ref<SourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAcce
  */
 ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors);
 
+/**
+ * Creates a new source accessor which is confined to the subdirectory
+ * of the given source accessor.
+ */
+ref<SourceAccessor> projectSubdirSourceAccessor(ref<SourceAccessor>, CanonPath subdirectory);
+
 }
