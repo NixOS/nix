@@ -789,10 +789,6 @@ struct curlFileTransfer : public FileTransfer
 
                 S3Helper s3Helper(profile, region, scheme, endpoint);
 
-                Activity act(*logger, lvlTalkative, actFileTransfer,
-                    fmt("downloading '%s'", request.uri),
-                    {request.uri}, request.parentAct);
-
                 // FIXME: implement ETag
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
