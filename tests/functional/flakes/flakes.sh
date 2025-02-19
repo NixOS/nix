@@ -161,6 +161,9 @@ nix build -o "$TEST_ROOT/result" "$flake2Dir#bar" --commit-lock-file
 [[ -e "$flake2Dir/flake.lock" ]]
 [[ -z $(git -C "$flake2Dir" diff main || echo failed) ]]
 
+# Test that pathExist on the parent of a flake returns false.
+[[ $(nix eval "$flake2Dir#foo") = false ]]
+
 # Rerunning the build should not change the lockfile.
 nix build -o "$TEST_ROOT/result" "$flake2Dir#bar"
 [[ -z $(git -C "$flake2Dir" diff main || echo failed) ]]

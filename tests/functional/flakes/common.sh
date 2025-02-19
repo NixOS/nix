@@ -66,6 +66,7 @@ createFlake2() {
 
   outputs = { self, flake1 }: rec {
     packages.$system.bar = flake1.packages.$system.foo;
+    foo = builtins.pathExists (self + "/..");
   };
 }
 EOF
