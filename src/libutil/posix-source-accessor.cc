@@ -10,13 +10,10 @@ namespace nix {
 PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && argRoot)
     : root(std::move(argRoot))
 {
-    assert(root.empty() || root.is_absolute());
-    displayPrefix = root.string();
+    assert(root.is_absolute());
+    displayPrefix = "";
 }
 
-PosixSourceAccessor::PosixSourceAccessor()
-    : PosixSourceAccessor(std::filesystem::path {})
-{ }
 
 SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
 {
@@ -199,9 +196,18 @@ void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
     }
 }
 
+std::string PosixSourceAccessor::showPath(const CanonPath & path)
+{
+    return displayPrefix + (root / std::filesystem::path(path.rel())).make_preferred().string() + displaySuffix;
+}
+
 ref<SourceAccessor> getFSSourceAccessor()
 {
-    static auto rootFS = make_ref<PosixSourceAccessor>();
+    // HACK: We need a root, so grab one, even if it has a good chance of being incorrect on Windows.
+    // For example, nix.exe could be on Z: but the store could actually be in C:
+    // TODO: Remove getFSSourceAccessor() and only use makeFSSourceAccessor(root)
+    auto root = std::filesystem::current_path().root_path();
+    static auto rootFS = make_ref<PosixSourceAccessor>(std::move(root));
     return rootFS;
 }
 

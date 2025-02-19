@@ -32,14 +32,15 @@ struct LocalStoreAccessor : PosixSourceAccessor
     ref<LocalFSStore> store;
     bool requireValidPath;
 
-    LocalStoreAccessor(ref<LocalFSStore> store, bool requireValidPath)
-        : store(store)
+    LocalStoreAccessor(ref<LocalFSStore> store, bool requireValidPath, std::filesystem::path && root)
+        : PosixSourceAccessor(std::move(root))
+        , store(store)
         , requireValidPath(requireValidPath)
     { }
 
     CanonPath toRealPath(const CanonPath & path)
     {
-        auto [storePath, rest] = store->toStorePath(path.abs());
+        auto [storePath, rest] = store->toStorePath((root / path.rel()).string());
         if (requireValidPath && !store->isValidPath(storePath))
             throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
         return CanonPath(store->getRealStoreDir()) / storePath.to_string() / CanonPath(rest);
@@ -75,9 +76,11 @@ struct LocalStoreAccessor : PosixSourceAccessor
 
 ref<SourceAccessor> LocalFSStore::getFSAccessor(bool requireValidPath)
 {
+    auto root = std::filesystem::path { storeDir }.root_path();
     return make_ref<LocalStoreAccessor>(ref<LocalFSStore>(
             std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())),
-        requireValidPath);
+        requireValidPath,
+        std::move(root));
 }
 
 void LocalFSStore::narFromPath(const StorePath & path, Sink & sink)
