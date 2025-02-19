@@ -247,22 +247,27 @@ EvalState::EvalState(
     , emptyBindings(0)
     , rootFS(
         ({
+            /* In pure eval mode, we provide a filesystem that only
+               contains the Nix store.
+
+               If we have a chroot store and pure eval is not enabled,
+               use a union accessor to make the chroot store available
+               at its logical location while still having the
+               underlying directory available. This is necessary for
+               instance if we're evaluating a file from the physical
+               /nix/store while using a chroot store. */
             auto accessor = getFSSourceAccessor();
 
-            /* If we have a chroot store, make a union accessor to
-               make the chroot store available at its logical location
-               while still having the underlying directory
-               available. This is necessary for instance if we're
-               evaluating a file from the physical /nix/store while
-               using a chroot store. */
             auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
-            if (store->storeDir != realStoreDir) {
+            if (settings.pureEval || store->storeDir != realStoreDir) {
                 auto storeFS = makeMountedSourceAccessor(
                     {
                         {CanonPath::root, makeEmptySourceAccessor()},
                         {CanonPath(store->storeDir), makeFSSourceAccessor(realStoreDir)}
                     });
-                accessor = makeUnionSourceAccessor({accessor, storeFS});
+                accessor = settings.pureEval
+                    ? storeFS
+                    : makeUnionSourceAccessor({accessor, storeFS});
             }
 
             /* Apply access control if needed. */

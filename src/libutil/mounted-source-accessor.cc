@@ -63,6 +63,12 @@ struct MountedSourceAccessor : SourceAccessor
             path.pop();
         }
     }
+
+    std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
+    {
+        auto [accessor, subpath] = resolve(path);
+        return accessor->getPhysicalPath(subpath);
+    }
 };
 
 ref<SourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts)
