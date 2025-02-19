@@ -153,6 +153,7 @@ sources = files(
   'json-utils.cc',
   'logging.cc',
   'memory-source-accessor.cc',
+  'mounted-source-accessor.cc',
   'position.cc',
   'posix-source-accessor.cc',
   'references.cc',

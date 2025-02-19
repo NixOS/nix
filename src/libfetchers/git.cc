@@ -9,7 +9,6 @@
 #include "pathlocks.hh"
 #include "processes.hh"
 #include "git.hh"
-#include "mounted-source-accessor.hh"
 #include "git-utils.hh"
 #include "logging.hh"
 #include "finally.hh"
