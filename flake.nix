@@ -20,7 +20,6 @@
   # work around 7730 and https://github.com/NixOS/nix/issues/7807
   inputs.git-hooks-nix.inputs.flake-compat.follows = "";
   inputs.git-hooks-nix.inputs.gitignore.follows = "";
-  inputs.nixfmt.url = "github:NixOS/nixfmt";
 
   outputs =
     inputs@{
