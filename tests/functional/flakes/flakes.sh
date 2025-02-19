@@ -69,14 +69,13 @@ nix flake metadata "$flake1Dir" | grepQuiet 'URL:.*flake1.*'
 # Test 'nix flake metadata --json'.
 json=$(nix flake metadata flake1 --json | jq .)
 [[ $(echo "$json" | jq -r .description) = 'Bla bla' ]]
-[[ -d $(echo "$json" | jq -r .path) ]]
 [[ $(echo "$json" | jq -r .lastModified) = $(git -C "$flake1Dir" log -n1 --format=%ct) ]]
 hash1=$(echo "$json" | jq -r .revision)
 [[ -n $(echo "$json" | jq -r .fingerprint) ]]
 
 echo foo > "$flake1Dir/foo"
 git -C "$flake1Dir" add $flake1Dir/foo
-[[ $(nix flake metadata flake1 --json --refresh | jq -r .dirtyRevision) == "$hash1-dirty" ]]
+[[ $(_NIX_TEST_FAIL_ON_LARGE_PATH=1 nix flake metadata flake1 --json --refresh --warn-large-path-threshold 1 | jq -r .dirtyRevision) == "$hash1-dirty" ]]
 [[ "$(nix flake metadata flake1 --json | jq -r .fingerprint)" != null ]]
 
 echo -n '# foo' >> "$flake1Dir/flake.nix"

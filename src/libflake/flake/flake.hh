@@ -123,7 +123,20 @@ struct Flake
     }
 };
 
-Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool useRegistries);
+enum struct CopyMode {
+    //! Copy the input to the store.
+    RequireStorePath,
+    //! Ensure that the input is locked or has a NAR hash.
+    RequireLockable,
+    //! Just return a lazy source accessor.
+    Lazy,
+};
+
+Flake getFlake(
+    EvalState & state,
+    const FlakeRef & flakeRef,
+    bool useRegistries,
+    CopyMode copyMode = CopyMode::RequireStorePath);
 
 /**
  * Fingerprint of a locked flake; used as a cache key.
@@ -221,6 +234,11 @@ struct LockFlags
      * for those inputs will be ignored.
      */
     std::set<InputAttrPath> inputUpdates;
+
+    /**
+     * If set, do not copy the flake to the Nix store.
+     */
+    CopyMode copyMode = CopyMode::RequireStorePath;
 };
 
 LockedFlake lockFlake(

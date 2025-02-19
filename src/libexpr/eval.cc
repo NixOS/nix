@@ -2441,7 +2441,7 @@ StorePath EvalState::coerceToStorePath(const PosIdx pos, Value & v, NixStringCon
     auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
     if (auto storePath = store->maybeParseStorePath(path))
         return *storePath;
-    error<EvalError>("path '%1%' is not in the Nix store", path).withTrace(pos, errorCtx).debugThrow();
+    error<EvalError>("cannot coerce '%s' to a store path because it does not denote a subpath of the Nix store", path).withTrace(pos, errorCtx).debugThrow();
 }
 
 
