@@ -177,6 +177,39 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
         SymlinkResolution mode = SymlinkResolution::Full);
 
     /**
+     * When `resolveSymlinks` encounters an absolute target, that path
+     * may or may not denote a local inside the current source accessor
+     * --- there is no general answer to the question, it depends on
+     *  what the current source accessor "represents".
+     *
+     * For now, we use this variable to decide: if the path has this
+     * path as a prefix, then the suffix points inside this store
+     * prefix. If the path does not have path as prefix, than the
+     * symlink escapes the source acccessor.
+     *
+     * Note, that we do *not* want this to become a general "location of
+     * this source accessor" variable: That would further violate the
+     * "don't know your own name principle. Indeed, the same source
+     * accessor may be used in multiple different contexts, at different
+     * locations, and so its "location" is a property of the caller
+     * rather than the thing itself.
+     *
+     * @todo Based on the above observations,  we should instead get rid
+     * of this field, and separate out symlink resolving (other than the
+     * low-level, interpretation-*agnostic* `readLink`) from the source
+     * accessor itself.
+     *
+     * Until we do the above proper fix, the best we can do is *only*
+     * use this for `resolveSymlinks`.
+     *
+     * This variable does not include a trailing directory separator.
+     * Rather a directory separate must come after the prefix. For
+     * example, the empty string means the root path, i.e. any absolute
+     * path points within the source accessor.
+     */
+    std::string ownLocationForSymlinkResolution = "";
+
+    /**
      * A string that uniquely represents the contents of this
      * accessor. This is used for caching lookups (see `fetchToStore()`).
      */
@@ -221,5 +254,11 @@ ref<SourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAcce
  * underlying accessors. Earlier accessors take precedence over later.
  */
 ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors);
+
+/**
+ * Creates a new source accessor which is confined to the subdirectory
+ * of the given source accessor.
+ */
+ref<SourceAccessor> projectSubdirSourceAccessor(ref<SourceAccessor>, CanonPath subdirectory);
 
 }
