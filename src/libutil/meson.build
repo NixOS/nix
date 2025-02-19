@@ -142,6 +142,7 @@ sources = [config_priv_h] + files(
   'signature/signer.cc',
   'source-accessor.cc',
   'source-path.cc',
+  'subdir-source-accessor.cc',
   'strings.cc',
   'suggestions.cc',
   'tarfile.cc',

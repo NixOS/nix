@@ -1102,7 +1102,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                     auto & specified = *info.ca;
                     auto actualHash = ({
                         auto accessor = getFSAccessor(false);
-                        CanonPath path { printStorePath(info.path) };
+                        CanonPath path { info.path.to_string() };
                         Hash h { HashAlgorithm::SHA256 }; // throwaway def to appease C++
                         auto fim = specified.method.getFileIngestionMethod();
                         switch (fim) {
