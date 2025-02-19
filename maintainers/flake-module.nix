@@ -39,7 +39,6 @@
           };
           nixfmt-rfc-style = {
             enable = true;
-            package = inputs.nixfmt.packages.${pkgs.hostPlatform.system}.default;
             excludes = [
               # Invalid
               ''^tests/functional/lang/parse-.*\.nix$''
