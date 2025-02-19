@@ -34,6 +34,11 @@ jobs:
     with:
       os: UbuntuLatest32Cores128GArm
 
+  build_x86_64-darwin:
+    uses: ./.github/workflows/build.yml
+    with:
+      os: macos-13
+
   build_aarch64-darwin:
     uses: ./.github/workflows/build.yml
     with:
@@ -51,6 +56,12 @@ jobs:
     with:
       os: UbuntuLatest32Cores128GArm
 
+  test_x86_64-darwin:
+    uses: ./.github/workflows/test.yml
+    needs: build_aarch64-darwin
+    with:
+      os: macos-13
+
   test_aarch64-darwin:
     uses: ./.github/workflows/test.yml
     needs: build_aarch64-darwin
@@ -65,7 +76,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
         with:
           flakehub: true
-      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: DeterminateSystems/flakehub-cache-action@main
       - run: |
           nix build -L \
             .#hydraJobs.tests.functional_user \
@@ -93,5 +104,5 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
         with:
           flakehub: true
-      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: DeterminateSystems/flakehub-cache-action@main
       - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=25 flake-regressions/eval-all.sh
