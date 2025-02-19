@@ -94,7 +94,7 @@ struct curlFileTransfer : public FileTransfer
             : fileTransfer(fileTransfer)
             , request(request)
             , act(*logger, lvlTalkative, actFileTransfer,
-                request.post ? "" : fmt(request.data ?  "uploading '%s'" : "downloading '%s'", request.uri),
+                fmt("%sing '%s'", request.verb(), request.uri),
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
@@ -278,7 +278,9 @@ struct curlFileTransfer : public FileTransfer
 
         static int progressCallbackWrapper(void * userp, double dltotal, double dlnow, double ultotal, double ulnow)
         {
-            return ((TransferItem *) userp)->progressCallback(dltotal, dlnow);
+            auto & item = *static_cast<TransferItem *>(userp);
+            bool isUpload = item.request.data.has_value();
+            return item.progressCallback(isUpload ? ultotal : dltotal, isUpload ? ulnow : dlnow);
         }
 
         static int silentProgressCallbackWrapper(void * userp, double dltotal, double dlnow, double ultotal, double ulnow)
@@ -787,10 +789,6 @@ struct curlFileTransfer : public FileTransfer
                 std::string endpoint = getOr(params, "endpoint", "");
 
                 S3Helper s3Helper(profile, region, scheme, endpoint);
-
-                Activity act(*logger, lvlTalkative, actFileTransfer,
-                    fmt("downloading '%s'", request.uri),
-                    {request.uri}, request.parentAct);
 
                 // FIXME: implement ETag
                 auto s3Res = s3Helper.getObject(bucketName, key);
