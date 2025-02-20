@@ -18,4 +18,4 @@ jobs:
         with:
           flakehub: true
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix build -L
+      - run: nix build . .#binaryTarball -L
