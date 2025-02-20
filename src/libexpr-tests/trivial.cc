@@ -1,4 +1,4 @@
-#include "tests/libexpr.hh"
+#include "nix/tests/libexpr.hh"
 
 namespace nix {
     // Testing of trivial expressions

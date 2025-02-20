@@ -1,8 +1,8 @@
-#include "command.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
+#include "nix/command.hh"
+#include "nix/common-args.hh"
+#include "nix/shared.hh"
+#include "nix/store-api.hh"
+#include "nix/local-fs-store.hh"
 
 #include <nlohmann/json.hpp>
 

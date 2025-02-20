@@ -32,11 +32,11 @@ add_project_arguments(
   # It would be nice for our headers to be idempotent instead.
 
   # From C++ libraries, only for internals
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  '-include', 'config-expr.hh',
+  '-include', 'nix/config-util.hh',
+  '-include', 'nix/config-store.hh',
+  '-include', 'nix/config-expr.hh',
   # not generated (yet?)
-  # '-include', 'config-flake.hh',
+  # '-include', 'nix/config-flake.hh',
 
   language : 'cpp',
 )
@@ -69,7 +69,7 @@ this_library = library(
   install : true,
 )
 
-install_headers(headers, subdir : 'nix', preserve_path : true)
+install_headers(headers, preserve_path : true)
 
 libraries_private = []
 

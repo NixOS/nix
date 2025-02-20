@@ -1,8 +1,8 @@
-#include "sqlite.hh"
-#include "globals.hh"
-#include "util.hh"
-#include "url.hh"
-#include "signals.hh"
+#include "nix/sqlite.hh"
+#include "nix/globals.hh"
+#include "nix/util.hh"
+#include "nix/url.hh"
+#include "nix/signals.hh"
 
 #include <sqlite3.h>
 

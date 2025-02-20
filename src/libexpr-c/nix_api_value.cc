@@ -1,10 +1,10 @@
-#include "attr-set.hh"
-#include "config.hh"
-#include "eval.hh"
-#include "globals.hh"
-#include "path.hh"
-#include "primops.hh"
-#include "value.hh"
+#include "nix/attr-set.hh"
+#include "nix/config.hh"
+#include "nix/eval.hh"
+#include "nix/globals.hh"
+#include "nix/path.hh"
+#include "nix/primops.hh"
+#include "nix/value.hh"
 
 #include "nix_api_expr.h"
 #include "nix_api_expr_internal.h"
@@ -12,7 +12,7 @@
 #include "nix_api_util_internal.h"
 #include "nix_api_store_internal.h"
 #include "nix_api_value.h"
-#include "value/context.hh"
+#include "nix/value/context.hh"
 
 // Internal helper functions to check [in] and [out] `Value *` parameters
 static const nix::Value & check_value_not_null(const nix_value * value)

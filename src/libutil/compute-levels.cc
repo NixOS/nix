@@ -1,4 +1,4 @@
-#include "types.hh"
+#include "nix/types.hh"
 
 #if HAVE_LIBCPUID
 #include <libcpuid/libcpuid.h>

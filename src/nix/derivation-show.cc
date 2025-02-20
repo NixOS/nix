@@ -1,11 +1,11 @@
 // FIXME: integrate this with `nix path-info`?
 // FIXME: rename to 'nix store derivation show'?
 
-#include "command.hh"
-#include "common-args.hh"
-#include "store-api.hh"
-#include "archive.hh"
-#include "derivations.hh"
+#include "nix/command.hh"
+#include "nix/common-args.hh"
+#include "nix/store-api.hh"
+#include "nix/archive.hh"
+#include "nix/derivations.hh"
 #include <nlohmann/json.hpp>
 
 using namespace nix;

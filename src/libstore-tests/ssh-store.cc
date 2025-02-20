@@ -3,7 +3,7 @@
 #if 0
 #  include <gtest/gtest.h>
 
-#  include "ssh-store.hh"
+#  include "nix/ssh-store.hh"
 
 namespace nix {
 

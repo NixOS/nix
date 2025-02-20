@@ -1,22 +1,21 @@
-#include "terminal.hh"
-#include "flake.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "lockfile.hh"
-#include "primops.hh"
-#include "eval-inline.hh"
-#include "store-api.hh"
-#include "fetchers.hh"
-#include "finally.hh"
-#include "fetch-settings.hh"
-#include "flake/settings.hh"
-#include "value-to-json.hh"
-#include "local-fs-store.hh"
-#include "fetch-to-store.hh"
+#include "nix/terminal.hh"
+#include "nix/flake/flake.hh"
+#include "nix/eval.hh"
+#include "nix/eval-settings.hh"
+#include "nix/flake/lockfile.hh"
+#include "nix/primops.hh"
+#include "nix/eval-inline.hh"
+#include "nix/store-api.hh"
+#include "nix/fetchers.hh"
+#include "nix/finally.hh"
+#include "nix/fetch-settings.hh"
+#include "nix/flake/settings.hh"
+#include "nix/value-to-json.hh"
+#include "nix/local-fs-store.hh"
+#include "nix/fetch-to-store.hh"
+#include "nix/memory-source-accessor.hh"
 
 #include <nlohmann/json.hpp>
-
-#include "memory-source-accessor.hh"
 
 namespace nix {
 

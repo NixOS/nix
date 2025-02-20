@@ -1,7 +1,7 @@
-#include "worker-protocol-connection.hh"
-#include "worker-protocol-impl.hh"
-#include "build-result.hh"
-#include "derivations.hh"
+#include "nix/worker-protocol-connection.hh"
+#include "nix/worker-protocol-impl.hh"
+#include "nix/build-result.hh"
+#include "nix/derivations.hh"
 
 namespace nix {
 

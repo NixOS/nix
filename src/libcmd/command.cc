@@ -1,16 +1,16 @@
 #include <algorithm>
 #include <nlohmann/json.hpp>
 
-#include "command.hh"
-#include "markdown.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
-#include "derivations.hh"
-#include "nixexpr.hh"
-#include "profiles.hh"
-#include "repl.hh"
-#include "strings.hh"
-#include "environment-variables.hh"
+#include "nix/command.hh"
+#include "nix/markdown.hh"
+#include "nix/store-api.hh"
+#include "nix/local-fs-store.hh"
+#include "nix/derivations.hh"
+#include "nix/nixexpr.hh"
+#include "nix/profiles.hh"
+#include "nix/repl.hh"
+#include "nix/strings.hh"
+#include "nix/environment-variables.hh"
 
 namespace nix {
 

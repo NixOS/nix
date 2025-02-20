@@ -1,4 +1,4 @@
-#include "chunked-vector.hh"
+#include "nix/chunked-vector.hh"
 
 #include <gtest/gtest.h>
 

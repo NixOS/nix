@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include "search-path.hh"
+#include "nix/search-path.hh"
 
 namespace nix {
 

@@ -1,9 +1,9 @@
-#include "file-system.hh"
-#include "signals.hh"
-#include "finally.hh"
-#include "serialise.hh"
-#include "windows-error.hh"
-#include "file-path.hh"
+#include "nix/file-system.hh"
+#include "nix/signals.hh"
+#include "nix/finally.hh"
+#include "nix/serialise.hh"
+#include "nix/windows-error.hh"
+#include "nix/file-path.hh"
 
 #ifdef _WIN32
 #include <fileapi.h>

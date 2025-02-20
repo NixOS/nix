@@ -17,14 +17,14 @@
 
 #include <variant>
 
-#include "finally.hh"
-#include "util.hh"
-#include "users.hh"
+#include "nix/finally.hh"
+#include "nix/util.hh"
+#include "nix/users.hh"
 
-#include "nixexpr.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "parser-state.hh"
+#include "nix/nixexpr.hh"
+#include "nix/eval.hh"
+#include "nix/eval-settings.hh"
+#include "nix/parser-state.hh"
 
 // Bison seems to have difficulty growing the parser stack when using C++ with
 // a custom location type. This undocumented macro tells Bison that our
@@ -514,7 +514,7 @@ formal
 
 %%
 
-#include "eval.hh"
+#include "nix/eval.hh"
 
 
 namespace nix {

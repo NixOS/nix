@@ -1,10 +1,10 @@
 #ifdef _WIN32
 #  include <ioapiset.h>
-#  include "windows-error.hh"
+#  include "nix/windows-error.hh"
 
-#  include "logging.hh"
-#  include "util.hh"
-#  include "muxable-pipe.hh"
+#  include "nix/logging.hh"
+#  include "nix/util.hh"
+#  include "nix/muxable-pipe.hh"
 
 namespace nix {
 

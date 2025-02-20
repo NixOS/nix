@@ -1,6 +1,6 @@
-#include "command.hh"
-#include "store-api.hh"
-#include "archive.hh"
+#include "nix/command.hh"
+#include "nix/store-api.hh"
+#include "nix/archive.hh"
 
 using namespace nix;
 

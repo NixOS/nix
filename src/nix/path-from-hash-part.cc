@@ -1,5 +1,5 @@
-#include "command.hh"
-#include "store-api.hh"
+#include "nix/command.hh"
+#include "nix/store-api.hh"
 
 using namespace nix;
 

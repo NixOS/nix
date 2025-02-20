@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ref.hh"
-#include "flake/settings.hh"
+#include "nix/ref.hh"
+#include "nix/flake/settings.hh"
 
 struct nix_flake_settings
 {

@@ -5,9 +5,9 @@
 #include <rapidcheck/gtest.h>
 #include <rapidcheck/gen/Arbitrary.hpp>
 
-#include <checked-arithmetic.hh>
+#include "nix/checked-arithmetic.hh"
 
-#include "tests/gtest-with-params.hh"
+#include "nix/tests/gtest-with-params.hh"
 
 namespace rc {
 using namespace nix;
