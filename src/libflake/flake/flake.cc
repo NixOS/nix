@@ -14,6 +14,7 @@
 #include "nix/store/local-fs-store.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/util/mounted-source-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -92,6 +93,8 @@ static StorePath copyInputToStore(
     auto storePath = fetchToStore(*state.store, accessor, FetchMode::Copy, input.getName());
 
     state.allowPath(storePath);
+
+    state.storeFS->mount(CanonPath(state.store->printStorePath(storePath)), accessor);
 
     auto narHash = state.store->queryPathInfo(storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));

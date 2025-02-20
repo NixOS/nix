@@ -43,6 +43,7 @@ headers = files(
   'logging.hh',
   'lru-cache.hh',
   'memory-source-accessor.hh',
+  'mounted-source-accessor.hh',
   'muxable-pipe.hh',
   'os-string.hh',
   'pool.hh',
