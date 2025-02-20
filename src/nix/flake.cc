@@ -1093,9 +1093,9 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
                     auto storePath =
                         dryRun
                         ? (*inputNode)->lockedRef.input.computeStorePath(*store)
-                        : (*inputNode)->lockedRef.input.fetchToStore(store).first;
+                        : std::get<0>((*inputNode)->lockedRef.input.fetchToStore(store));
                     if (json) {
-                        auto& jsonObj3 = jsonObj2[inputName];
+                        auto & jsonObj3 = jsonObj2[inputName];
                         jsonObj3["path"] = store->printStorePath(storePath);
                         sources.insert(std::move(storePath));
                         jsonObj3["inputs"] = traverse(**inputNode);
