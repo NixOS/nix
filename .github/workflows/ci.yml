@@ -31,11 +31,13 @@ jobs:
       os: UbuntuLatest32Cores128G
 
   build_aarch64-linux:
+    if: github.event_name == 'merge_group'
     uses: ./.github/workflows/build.yml
     with:
       os: UbuntuLatest32Cores128GArm
 
   build_x86_64-darwin:
+    if: github.event_name == 'merge_group'
     uses: ./.github/workflows/build.yml
     with:
       os: macos-13
@@ -52,18 +54,21 @@ jobs:
       os: UbuntuLatest32Cores128G
 
   test_aarch64-linux:
+    if: github.event_name == 'merge_group'
     uses: ./.github/workflows/test.yml
     needs: build_aarch64-linux
     with:
       os: UbuntuLatest32Cores128GArm
 
   test_x86_64-darwin:
+    if: github.event_name == 'merge_group'
     uses: ./.github/workflows/test.yml
     needs: build_aarch64-darwin
     with:
       os: macos-13
 
   test_aarch64-darwin:
+    if: github.event_name == 'merge_group'
     uses: ./.github/workflows/test.yml
     needs: build_aarch64-darwin
     with:
@@ -107,6 +112,7 @@ jobs:
               | head -n5) # FIXME: for testing the merge queue
 
   flake_regressions:
+    if: github.event_name == 'merge_group'
     needs: build_x86_64-linux
     runs-on: UbuntuLatest32Cores128G
     steps:
@@ -126,4 +132,4 @@ jobs:
         with:
           flakehub: true
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=25 flake-regressions/eval-all.sh
+      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=50 flake-regressions/eval-all.sh
