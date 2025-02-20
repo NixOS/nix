@@ -15,6 +15,7 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/util/archive.hh"
+#include "nix/util/mounted-source-accessor.hh"
 
 #include <regex>
 #include <string.h>

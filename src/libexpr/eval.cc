@@ -15,11 +15,11 @@
 #include "nix/expr/print.hh"
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/util/mounted-source-accessor.hh"
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/util/url.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/tarball.hh"
-
 #include "parser-tab.hh"
 
 #include <algorithm>
@@ -246,6 +246,12 @@ EvalState::EvalState(
     }
     , repair(NoRepair)
     , emptyBindings(0)
+    , storeFS(
+        makeMountedSourceAccessor(
+            {
+                {CanonPath::root, makeEmptySourceAccessor()},
+                {CanonPath(store->storeDir), makeFSSourceAccessor(dirOf(store->toRealPath(StorePath::dummy)))}
+            }))
     , rootFS(
         ({
             /* In pure eval mode, we provide a filesystem that only
@@ -261,13 +267,8 @@ EvalState::EvalState(
 
             auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
             if (settings.pureEval || store->storeDir != realStoreDir) {
-                auto storeFS = makeMountedSourceAccessor(
-                    {
-                        {CanonPath::root, makeEmptySourceAccessor()},
-                        {CanonPath(store->storeDir), makeFSSourceAccessor(realStoreDir)}
-                    });
                 accessor = settings.pureEval
-                    ? storeFS
+                    ? storeFS.cast<SourceAccessor>()
                     : makeUnionSourceAccessor({accessor, storeFS});
             }
 

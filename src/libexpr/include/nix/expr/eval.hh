@@ -40,6 +40,7 @@ class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct MemorySourceAccessor;
+struct MountedSourceAccessor;
 namespace eval_cache {
     class EvalCache;
 }
@@ -264,6 +265,11 @@ public:
     Value vStringSymlink;
     /** `"unknown"` */
     Value vStringUnknown;
+
+    /**
+     * The accessor corresponding to `store`.
+     */
+    const ref<MountedSourceAccessor> storeFS;
 
     /**
      * The accessor for the root filesystem.

@@ -118,7 +118,7 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
         std::string typeString();
     };
 
-    Stat lstat(const CanonPath & path);
+    virtual Stat lstat(const CanonPath & path);
 
     virtual std::optional<Stat> maybeLstat(const CanonPath & path) = 0;
 
@@ -213,8 +213,6 @@ ref<SourceAccessor> getFSSourceAccessor();
  * `root`.
  */
 ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root);
-
-ref<SourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts);
 
 /**
  * Construct an accessor that presents a "union" view of a vector of
