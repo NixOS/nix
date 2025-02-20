@@ -1,0 +1,29 @@
+on:
+  workflow_dispatch:
+    inputs:
+      reference-id:
+        type: string
+        required: true
+      version:
+        type: string
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  propose-release:
+    uses: DeterminateSystems/propose-release/.github/workflows/workflow.yml@main
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+    with:
+      update-flake: false
+      reference-id: ${{ inputs.reference-id }}
+      version: ${{ inputs.version }}
+      extra-commands-early: |
+        echo ${{ inputs.version }} > .version-determinate
+        git add .version-determinate
+        git commit -m "Set .version-determinate to ${{ inputs.version }}"
