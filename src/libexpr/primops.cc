@@ -2478,8 +2478,6 @@ static void addPath(
     const NixStringContext & context)
 {
     try {
-        StorePathSet refs;
-
         if (path.accessor == state.rootFS && state.store->isInStore(path.path.abs())) {
             // FIXME: handle CA derivation outputs (where path needs to
             // be rewritten to the actual output).
