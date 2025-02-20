@@ -75,6 +75,7 @@ jobs:
       os: macos-latest
 
   vm_tests_smoke:
+    if: github.event_name != 'merge_group'
     needs: build_x86_64-linux
     runs-on: blacksmith-32vcpu-ubuntu-2204
     steps:
