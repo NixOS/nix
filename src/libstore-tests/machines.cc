@@ -1,8 +1,8 @@
-#include "machines.hh"
-#include "file-system.hh"
-#include "util.hh"
+#include "nix/machines.hh"
+#include "nix/file-system.hh"
+#include "nix/util.hh"
 
-#include "tests/characterization.hh"
+#include "nix/tests/characterization.hh"
 
 #include <gtest/gtest.h>
 #include <gmock/gmock-matchers.h>

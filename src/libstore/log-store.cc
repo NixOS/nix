@@ -1,4 +1,4 @@
-#include "log-store.hh"
+#include "nix/log-store.hh"
 
 namespace nix {
 

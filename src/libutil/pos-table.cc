@@ -1,4 +1,4 @@
-#include "pos-table.hh"
+#include "nix/pos-table.hh"
 
 #include <algorithm>
 

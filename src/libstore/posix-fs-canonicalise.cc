@@ -2,12 +2,12 @@
 # include <sys/xattr.h>
 #endif
 
-#include "posix-fs-canonicalise.hh"
-#include "file-system.hh"
-#include "signals.hh"
-#include "util.hh"
-#include "globals.hh"
-#include "store-api.hh"
+#include "nix/posix-fs-canonicalise.hh"
+#include "nix/file-system.hh"
+#include "nix/signals.hh"
+#include "nix/util.hh"
+#include "nix/globals.hh"
+#include "nix/store-api.hh"
 
 namespace nix {
 

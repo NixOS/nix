@@ -1,6 +1,6 @@
-#include "fetchers.hh"
-#include "url-parts.hh"
-#include "path.hh"
+#include "nix/fetchers.hh"
+#include "nix/url-parts.hh"
+#include "nix/path.hh"
 
 namespace nix::fetchers {
 

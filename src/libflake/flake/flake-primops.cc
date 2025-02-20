@@ -1,8 +1,8 @@
-#include "flake-primops.hh"
-#include "eval.hh"
-#include "flake.hh"
-#include "flakeref.hh"
-#include "settings.hh"
+#include "nix/flake/flake-primops.hh"
+#include "nix/eval.hh"
+#include "nix/flake/flake.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/flake/settings.hh"
 
 namespace nix::flake::primops {
 

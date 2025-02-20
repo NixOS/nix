@@ -1,4 +1,4 @@
-#include "exit.hh"
+#include "nix/exit.hh"
 
 namespace nix {
 

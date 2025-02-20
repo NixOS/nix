@@ -1,5 +1,5 @@
-#include "derived-path-map.hh"
-#include "util.hh"
+#include "nix/derived-path-map.hh"
+#include "nix/util.hh"
 
 namespace nix {
 

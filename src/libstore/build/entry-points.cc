@@ -1,10 +1,10 @@
-#include "worker.hh"
-#include "substitution-goal.hh"
+#include "nix/build/worker.hh"
+#include "nix/build/substitution-goal.hh"
 #ifndef _WIN32 // TODO Enable building on Windows
-#  include "derivation-goal.hh"
+#  include "nix/build/derivation-goal.hh"
 #endif
-#include "local-store.hh"
-#include "strings.hh"
+#include "nix/local-store.hh"
+#include "nix/strings.hh"
 
 namespace nix {
 

@@ -1,8 +1,8 @@
-#include "attr-set.hh"
-#include "config.hh"
-#include "eval.hh"
-#include "globals.hh"
-#include "value.hh"
+#include "nix/attr-set.hh"
+#include "nix/config.hh"
+#include "nix/eval.hh"
+#include "nix/globals.hh"
+#include "nix/value.hh"
 
 #include "nix_api_expr.h"
 #include "nix_api_expr_internal.h"
@@ -10,7 +10,7 @@
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
 #include "nix_api_value.h"
-#include "value/context.hh"
+#include "nix/value/context.hh"
 
 #include <nlohmann/json.hpp>
 

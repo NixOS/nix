@@ -1,4 +1,4 @@
-#include "suggestions.hh"
+#include "nix/suggestions.hh"
 #include <gtest/gtest.h>
 
 namespace nix {
