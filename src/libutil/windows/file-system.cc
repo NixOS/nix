@@ -1,4 +1,4 @@
-#include "file-system.hh"
+#include "nix/file-system.hh"
 
 #ifdef _WIN32
 namespace nix {

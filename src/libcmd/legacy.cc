@@ -1,4 +1,4 @@
-#include "legacy.hh"
+#include "nix/legacy.hh"
 
 namespace nix {
 

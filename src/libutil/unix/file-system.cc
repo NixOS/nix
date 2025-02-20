@@ -1,4 +1,4 @@
-#include "file-system.hh"
+#include "nix/file-system.hh"
 
 namespace nix {
 

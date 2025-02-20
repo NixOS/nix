@@ -1,11 +1,11 @@
-#include "environment-variables.hh"
-#include "file-system.hh"
-#include "file-path.hh"
-#include "file-path-impl.hh"
-#include "signals.hh"
-#include "finally.hh"
-#include "serialise.hh"
-#include "util.hh"
+#include "nix/environment-variables.hh"
+#include "nix/file-system.hh"
+#include "nix/file-path.hh"
+#include "nix/file-path-impl.hh"
+#include "nix/signals.hh"
+#include "nix/finally.hh"
+#include "nix/serialise.hh"
+#include "nix/util.hh"
 
 #include <atomic>
 #include <cerrno>
@@ -25,7 +25,7 @@
 # include <io.h>
 #endif
 
-#include "strings-inline.hh"
+#include "nix/strings-inline.hh"
 
 namespace nix {
 

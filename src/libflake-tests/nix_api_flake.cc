@@ -6,8 +6,8 @@
 #include "nix_api_value.h"
 #include "nix_api_flake.h"
 
-#include "tests/nix_api_expr.hh"
-#include "tests/string_callback.hh"
+#include "nix/tests/nix_api_expr.hh"
+#include "nix/tests/string_callback.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

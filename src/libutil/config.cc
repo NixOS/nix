@@ -1,16 +1,16 @@
-#include "config.hh"
-#include "args.hh"
-#include "abstract-setting-to-json.hh"
-#include "environment-variables.hh"
-#include "experimental-features.hh"
-#include "util.hh"
-#include "file-system.hh"
+#include "nix/config.hh"
+#include "nix/args.hh"
+#include "nix/abstract-setting-to-json.hh"
+#include "nix/environment-variables.hh"
+#include "nix/experimental-features.hh"
+#include "nix/util.hh"
+#include "nix/file-system.hh"
 
-#include "config-impl.hh"
+#include "nix/config-impl.hh"
 
 #include <nlohmann/json.hpp>
 
-#include "strings.hh"
+#include "nix/strings.hh"
 
 namespace nix {
 

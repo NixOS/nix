@@ -16,12 +16,12 @@ extern "C" {
 }
 #endif
 
-#include "signals.hh"
-#include "finally.hh"
-#include "repl-interacter.hh"
-#include "file-system.hh"
-#include "repl.hh"
-#include "environment-variables.hh"
+#include "nix/signals.hh"
+#include "nix/finally.hh"
+#include "nix/repl-interacter.hh"
+#include "nix/file-system.hh"
+#include "nix/repl.hh"
+#include "nix/environment-variables.hh"
 
 namespace nix {
 

@@ -34,9 +34,13 @@ mkMesonLibrary (finalAttrs: {
     ./widecharwidth
     ./meson.build
     ./meson.options
+    ./include/nix/meson.build
     ./linux/meson.build
+    ./linux/include/nix/meson.build
     ./unix/meson.build
+    ./unix/include/nix/meson.build
     ./windows/meson.build
+    ./windows/include/nix/meson.build
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];

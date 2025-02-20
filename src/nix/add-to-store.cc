@@ -1,10 +1,10 @@
-#include "command.hh"
-#include "common-args.hh"
-#include "store-api.hh"
-#include "archive.hh"
-#include "git.hh"
-#include "posix-source-accessor.hh"
-#include "misc-store-flags.hh"
+#include "nix/command.hh"
+#include "nix/common-args.hh"
+#include "nix/store-api.hh"
+#include "nix/archive.hh"
+#include "nix/git.hh"
+#include "nix/posix-source-accessor.hh"
+#include "nix/misc-store-flags.hh"
 
 using namespace nix;
 

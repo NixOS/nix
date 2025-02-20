@@ -1,11 +1,11 @@
-#include "serialise.hh"
-#include "path-with-outputs.hh"
-#include "store-api.hh"
-#include "build-result.hh"
-#include "serve-protocol.hh"
-#include "serve-protocol-impl.hh"
-#include "archive.hh"
-#include "path-info.hh"
+#include "nix/serialise.hh"
+#include "nix/path-with-outputs.hh"
+#include "nix/store-api.hh"
+#include "nix/build-result.hh"
+#include "nix/serve-protocol.hh"
+#include "nix/serve-protocol-impl.hh"
+#include "nix/archive.hh"
+#include "nix/path-info.hh"
 
 #include <nlohmann/json.hpp>
 

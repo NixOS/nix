@@ -3,8 +3,8 @@
 #include <iostream>
 #include <locale>
 
-#include "file-path.hh"
-#include "util.hh"
+#include "nix/file-path.hh"
+#include "nix/util.hh"
 
 namespace nix {
 

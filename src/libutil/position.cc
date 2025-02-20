@@ -1,4 +1,4 @@
-#include "position.hh"
+#include "nix/position.hh"
 
 namespace nix {
 

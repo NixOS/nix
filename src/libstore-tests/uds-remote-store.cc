@@ -3,7 +3,7 @@
 #if 0
 #  include <gtest/gtest.h>
 
-#  include "uds-remote-store.hh"
+#  include "nix/uds-remote-store.hh"
 
 namespace nix {
 

@@ -1,8 +1,8 @@
 #include <poll.h>
 
-#include "logging.hh"
-#include "util.hh"
-#include "muxable-pipe.hh"
+#include "nix/logging.hh"
+#include "nix/util.hh"
+#include "nix/muxable-pipe.hh"
 
 namespace nix {
 

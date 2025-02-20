@@ -1,4 +1,4 @@
-#include "closure.hh"
+#include "nix/closure.hh"
 #include <gtest/gtest.h>
 
 namespace nix {

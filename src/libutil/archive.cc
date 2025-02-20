@@ -5,12 +5,12 @@
 
 #include <strings.h> // for strcasecmp
 
-#include "archive.hh"
-#include "config-global.hh"
-#include "posix-source-accessor.hh"
-#include "source-path.hh"
-#include "file-system.hh"
-#include "signals.hh"
+#include "nix/archive.hh"
+#include "nix/config-global.hh"
+#include "nix/posix-source-accessor.hh"
+#include "nix/source-path.hh"
+#include "nix/file-system.hh"
+#include "nix/signals.hh"
 
 namespace nix {
 

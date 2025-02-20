@@ -1,10 +1,10 @@
-#include "fetch-settings.hh"
-#include "registry.hh"
-#include "tarball.hh"
-#include "users.hh"
-#include "globals.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
+#include "nix/fetch-settings.hh"
+#include "nix/registry.hh"
+#include "nix/tarball.hh"
+#include "nix/users.hh"
+#include "nix/globals.hh"
+#include "nix/store-api.hh"
+#include "nix/local-fs-store.hh"
 
 #include <nlohmann/json.hpp>
 

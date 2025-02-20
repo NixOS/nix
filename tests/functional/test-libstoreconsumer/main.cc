@@ -1,6 +1,6 @@
-#include "globals.hh"
-#include "store-api.hh"
-#include "build-result.hh"
+#include "nix/globals.hh"
+#include "nix/store-api.hh"
+#include "nix/build-result.hh"
 #include <iostream>
 
 using namespace nix;

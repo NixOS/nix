@@ -1,12 +1,12 @@
-#include "profiles.hh"
-#include "shared.hh"
-#include "globals.hh"
-#include "filetransfer.hh"
-#include "store-api.hh"
-#include "legacy.hh"
-#include "eval-settings.hh" // for defexpr
-#include "users.hh"
-#include "tarball.hh"
+#include "nix/profiles.hh"
+#include "nix/shared.hh"
+#include "nix/globals.hh"
+#include "nix/filetransfer.hh"
+#include "nix/store-api.hh"
+#include "nix/legacy.hh"
+#include "nix/eval-settings.hh" // for defexpr
+#include "nix/users.hh"
+#include "nix/tarball.hh"
 #include "self-exe.hh"
 #include "man-pages.hh"
 

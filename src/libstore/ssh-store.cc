@@ -1,12 +1,12 @@
-#include "ssh-store.hh"
-#include "local-fs-store.hh"
-#include "remote-store-connection.hh"
-#include "source-accessor.hh"
-#include "archive.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
-#include "pool.hh"
-#include "ssh.hh"
+#include "nix/ssh-store.hh"
+#include "nix/local-fs-store.hh"
+#include "nix/remote-store-connection.hh"
+#include "nix/source-accessor.hh"
+#include "nix/archive.hh"
+#include "nix/worker-protocol.hh"
+#include "nix/worker-protocol-impl.hh"
+#include "nix/pool.hh"
+#include "nix/ssh.hh"
 
 namespace nix {
 

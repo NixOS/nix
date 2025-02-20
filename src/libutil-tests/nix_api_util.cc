@@ -1,9 +1,9 @@
-#include "config-global.hh"
-#include "args.hh"
+#include "nix/config-global.hh"
+#include "nix/args.hh"
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
-#include "tests/nix_api_util.hh"
-#include "tests/string_callback.hh"
+#include "nix/tests/nix_api_util.hh"
+#include "nix/tests/string_callback.hh"
 
 #include <gtest/gtest.h>
 

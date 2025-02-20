@@ -1,5 +1,5 @@
-#include "util.hh"
-#include "environment-variables.hh"
+#include "nix/util.hh"
+#include "nix/environment-variables.hh"
 
 extern char ** environ __attribute__((weak));
 

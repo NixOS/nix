@@ -1,13 +1,13 @@
-#include "nixexpr.hh"
-#include "eval.hh"
-#include "symbol-table.hh"
-#include "util.hh"
-#include "print.hh"
+#include "nix/nixexpr.hh"
+#include "nix/eval.hh"
+#include "nix/symbol-table.hh"
+#include "nix/util.hh"
+#include "nix/print.hh"
 
 #include <cstdlib>
 #include <sstream>
 
-#include "strings-inline.hh"
+#include "nix/strings-inline.hh"
 
 namespace nix {
 

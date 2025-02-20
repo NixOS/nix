@@ -1,8 +1,8 @@
-#include "util.hh"
-#include "users.hh"
-#include "environment-variables.hh"
-#include "file-system.hh"
-#include "windows-error.hh"
+#include "nix/util.hh"
+#include "nix/users.hh"
+#include "nix/environment-variables.hh"
+#include "nix/file-system.hh"
+#include "nix/windows-error.hh"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN

@@ -1,13 +1,13 @@
-#include "fetchers.hh"
-#include "processes.hh"
-#include "users.hh"
-#include "cache.hh"
-#include "globals.hh"
-#include "tarfile.hh"
-#include "store-api.hh"
-#include "url-parts.hh"
-#include "store-path-accessor.hh"
-#include "fetch-settings.hh"
+#include "nix/fetchers.hh"
+#include "nix/processes.hh"
+#include "nix/users.hh"
+#include "nix/cache.hh"
+#include "nix/globals.hh"
+#include "nix/tarfile.hh"
+#include "nix/store-api.hh"
+#include "nix/url-parts.hh"
+#include "nix/store-path-accessor.hh"
+#include "nix/fetch-settings.hh"
 
 #include <sys/time.h>
 

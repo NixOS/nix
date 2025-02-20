@@ -1,8 +1,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "eval.hh"
-#include "tests/libexpr.hh"
+#include "nix/eval.hh"
+#include "nix/tests/libexpr.hh"
 
 namespace nix {
 

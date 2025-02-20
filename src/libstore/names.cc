@@ -1,5 +1,5 @@
-#include "names.hh"
-#include "util.hh"
+#include "nix/names.hh"
+#include "nix/util.hh"
 
 #include <regex>
 

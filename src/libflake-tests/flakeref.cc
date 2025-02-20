@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "fetch-settings.hh"
-#include "flake/flakeref.hh"
+#include "nix/fetch-settings.hh"
+#include "nix/flake/flakeref.hh"
 
 namespace nix {
 
