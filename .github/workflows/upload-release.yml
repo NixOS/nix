@@ -1,0 +1,71 @@
+name: Upload release
+
+concurrency:
+  group: upload-release
+
+on:
+  workflow_call:
+
+permissions:
+  id-token: "write"
+  contents: "read"
+
+jobs:
+  build-x86_64-linux:
+    uses: ./.github/workflows/build.yml
+    with:
+      os: blacksmith-32vcpu-ubuntu-2204
+  build-aarch64-linux:
+    uses: ./.github/workflows/build.yml
+    with:
+      os: blacksmith-32vcpu-ubuntu-2204-arm
+  build-x86_64-darwin:
+    uses: ./.github/workflows/build.yml
+    with:
+      os: macos-13
+  build-aarch64-darwin:
+    uses: ./.github/workflows/build.yml
+    with:
+      os: macos-latest
+
+  release:
+    runs-on: ubuntu-latest
+    needs:
+      - build-x86_64-linux
+      - build-aarch64-linux
+      - build-x86_64-darwin
+      - build-aarch64-darwin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: "DeterminateSystems/nix-installer-action@main"
+        with:
+          determinate: true
+
+      - name: Create artifacts directory
+        run: mkdir -p ./artifacts
+
+      - name: Fetch artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded
+      - name: Move downloaded artifacts to artifacts directory
+        run: |
+          for dir in ./downloaded/*; do
+            arch="$(basename "$dir")"
+            mv "$dir"/*.xz ./artifacts/"${arch}"
+          done
+
+      - name: Build fallback-paths.nix
+        run: |
+          nix build .#fallbackPathsNix --out-link fallback
+          cat fallback > ./artifacts/fallback-paths.nix
+
+      - uses: DeterminateSystems/push-artifact-ids@main
+        with:
+          s3_upload_role: ${{ secrets.AWS_S3_UPLOAD_ROLE_ARN }}
+          bucket: ${{ secrets.AWS_S3_UPLOAD_BUCKET_NAME }}
+          directory: ./artifacts
+          ids_project_name: determinate-nix
+          ids_binary_prefix: determinate-nix
+          skip_acl: true

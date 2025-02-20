@@ -18,4 +18,11 @@ jobs:
         with:
           flakehub: true
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix build . .#binaryTarball -L
+      - run: echo "system=$(nix eval --impure --raw --expr 'builtins.currentSystem')" >> "$GITHUB_OUTPUT"
+        id: system
+      - run: nix build .# .#binaryTarball --no-link -L
+      - run: nix build .#binaryTarball --out-link tarball
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.system.outputs.system }}
+          path: ./tarball/*.xz

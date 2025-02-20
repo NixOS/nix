@@ -1,0 +1,30 @@
+name: Release PR
+
+concurrency:
+  group: release
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
+
+permissions:
+  id-token: "write"
+  contents: "read"
+
+jobs:
+  release-pr:
+    # Only intra-repo PRs are allowed to have PR artifacts uploaded
+    # We only want to trigger once the upload once in the case the upload label is added, not when any label is added
+    if: |
+      always() && !failure() && !cancelled()
+      && github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-priv'
+      && (
+        (github.event.action == 'labeled' && github.event.label.name == 'upload to s3')
+        || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'upload to s3'))
+      )
+    uses: ./.github/workflows/upload-release.yml
+    secrets: inherit
