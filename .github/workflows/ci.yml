@@ -7,6 +7,7 @@ on:
       - detsys-main
       - main
       - master
+  merge_group:
 
 permissions:
   id-token: "write"
@@ -68,8 +69,25 @@ jobs:
     with:
       os: macos-latest
 
-  # Build hydraJobs.tests.*.
-  vm_tests:
+  vm_tests_smoke:
+    needs: build_x86_64-linux
+    runs-on: UbuntuLatest32Cores128G
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          flakehub: true
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - run: |
+          nix build -L \
+            .#hydraJobs.tests.functional_user \
+            .#hydraJobs.tests.githubFlakes \
+            .#hydraJobs.tests.nix-docker \
+            .#hydraJobs.tests.tarballFlakes \
+            ;
+
+  vm_tests_all:
+    if: github.event_name == 'merge_group'
     needs: build_x86_64-linux
     runs-on: UbuntuLatest32Cores128G
     steps:
@@ -85,7 +103,8 @@ jobs:
                 .hydraJobs.tests
                 | with_entries(select(.value.type == "derivation"))
                 | keys[]
-                | ".#hydraJobs.tests." + .')
+                | ".#hydraJobs.tests." + .'
+              | head -n5) # FIXME: for testing the merge queue
 
   flake_regressions:
     needs: build_x86_64-linux
