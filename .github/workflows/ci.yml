@@ -68,6 +68,7 @@ jobs:
     with:
       os: macos-latest
 
+  # Build hydraJobs.tests.*.
   vm_tests:
     needs: build_x86_64-linux
     runs-on: UbuntuLatest32Cores128G
@@ -78,12 +79,13 @@ jobs:
           flakehub: true
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: |
-          nix build -L \
-            .#hydraJobs.tests.functional_user \
-            .#hydraJobs.tests.githubFlakes \
-            .#hydraJobs.tests.nix-docker \
-            .#hydraJobs.tests.tarballFlakes \
-            ;
+          nix build -L --keep-going \
+            $(nix flake show --json \
+              | jq -r '
+                .hydraJobs.tests
+                | with_entries(select(.value.type == "derivation"))
+                | keys[]
+                | ".#hydraJobs.tests." + .')
 
   flake_regressions:
     needs: build_x86_64-linux
