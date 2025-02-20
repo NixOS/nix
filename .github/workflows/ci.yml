@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   eval:
-    runs-on: UbuntuLatest32Cores128G
+    runs-on: blacksmith-32vcpu-ubuntu-2204
     steps:
     - uses: actions/checkout@v4
       with:
@@ -28,13 +28,13 @@ jobs:
   build_x86_64-linux:
     uses: ./.github/workflows/build.yml
     with:
-      os: UbuntuLatest32Cores128G
+      os: blacksmith-32vcpu-ubuntu-2204
 
   build_aarch64-linux:
     if: github.event_name == 'merge_group'
     uses: ./.github/workflows/build.yml
     with:
-      os: UbuntuLatest32Cores128GArm
+      os: blacksmith-32vcpu-ubuntu-2204-arm
 
   build_x86_64-darwin:
     if: github.event_name == 'merge_group'
@@ -51,14 +51,14 @@ jobs:
     uses: ./.github/workflows/test.yml
     needs: build_x86_64-linux
     with:
-      os: UbuntuLatest32Cores128G
+      os: blacksmith-32vcpu-ubuntu-2204
 
   test_aarch64-linux:
     if: github.event_name == 'merge_group'
     uses: ./.github/workflows/test.yml
     needs: build_aarch64-linux
     with:
-      os: UbuntuLatest32Cores128GArm
+      os: blacksmith-32vcpu-ubuntu-2204-arm
 
   test_x86_64-darwin:
     if: github.event_name == 'merge_group'
@@ -75,8 +75,9 @@ jobs:
       os: macos-latest
 
   vm_tests_smoke:
+    if: github.event_name != 'merge_group'
     needs: build_x86_64-linux
-    runs-on: UbuntuLatest32Cores128G
+    runs-on: blacksmith-32vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
@@ -94,7 +95,7 @@ jobs:
   vm_tests_all:
     if: github.event_name == 'merge_group'
     needs: build_x86_64-linux
-    runs-on: UbuntuLatest32Cores128G
+    runs-on: blacksmith-32vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
@@ -108,13 +109,13 @@ jobs:
                 .hydraJobs.tests
                 | with_entries(select(.value.type == "derivation"))
                 | keys[]
-                | ".#hydraJobs.tests." + .'
+                | ".#hydraJobs.tests." + .' \
               | head -n5) # FIXME: for testing the merge queue
 
   flake_regressions:
     if: github.event_name == 'merge_group'
     needs: build_x86_64-linux
-    runs-on: UbuntuLatest32Cores128G
+    runs-on: blacksmith-32vcpu-ubuntu-2204
     steps:
       - name: Checkout nix
         uses: actions/checkout@v4
