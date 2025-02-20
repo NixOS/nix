@@ -102,7 +102,7 @@ let
         let
           n = lib.length finalScope.patches;
         in
-        if n == 0 then finalAttrs.version else finalAttrs.version + "+${toString n}";
+        if n == 0 then prevAttrs.version else prevAttrs.version + "+${toString n}";
 
       # Clear what `derivation` can't/shouldn't serialize; see prevAttrs.workDir.
       fileset = null;
@@ -256,7 +256,10 @@ in
                 inherit (finalScope) src patches;
               }
             );
+
         resolvePath = p: finalScope.patchedSrc + "/${resolveRelPath p}";
+        filesetToSource = { root, fileset }: finalScope.resolvePath root;
+
         appendPatches = appendPatches finalScope;
       }
     );
