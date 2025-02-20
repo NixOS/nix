@@ -167,6 +167,7 @@ sources = files(
   'tarfile.cc',
   'terminal.cc',
   'thread-pool.cc',
+  'union-source-accessor.cc',
   'unix-domain-socket.cc',
   'url.cc',
   'users.cc',

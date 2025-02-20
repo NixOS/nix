@@ -337,7 +337,7 @@ static Flake readFlake(
                 auto storePath = fetchToStore(*state.store, setting.value->path(), FetchMode::Copy);
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    state.store->toRealPath(storePath));
+                    state.store->printStorePath(storePath));
             }
             else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(
@@ -423,7 +423,7 @@ static Flake getFlake(
     auto storePath = copyInputToStore(state, lockedRef.input, originalRef.input, accessor);
 
     // Re-parse flake.nix from the store.
-    return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->toRealPath(storePath)), lockRootAttrPath);
+    return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->printStorePath(storePath)), lockRootAttrPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
@@ -784,7 +784,7 @@ LockedFlake lockFlake(
                                     // FIXME: allow input to be lazy.
                                     auto storePath = copyInputToStore(state, lockedRef.input, input.ref->input, accessor);
 
-                                    return {state.rootPath(state.store->toRealPath(storePath)), lockedRef};
+                                    return {state.rootPath(state.store->printStorePath(storePath)), lockedRef};
                                 }
                             }();
 
@@ -921,21 +921,6 @@ LockedFlake lockFlake(
     }
 }
 
-std::pair<StorePath, Path> sourcePathToStorePath(
-    ref<Store> store,
-    const SourcePath & _path)
-{
-    auto path = _path.path.abs();
-
-    if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
-        auto realStoreDir = store2->getRealStoreDir();
-        if (isInDir(path, realStoreDir))
-            path = store2->storeDir + path.substr(realStoreDir.size());
-    }
-
-    return store->toStorePath(path);
-}
-
 void callFlake(EvalState & state,
     const LockedFlake & lockedFlake,
     Value & vRes)
@@ -953,7 +938,7 @@ void callFlake(EvalState & state,
 
         auto lockedNode = node.dynamic_pointer_cast<const LockedNode>();
 
-        auto [storePath, subdir] = sourcePathToStorePath(state.store, sourcePath);
+        auto [storePath, subdir] = state.store->toStorePath(sourcePath.path.abs());
 
         emitTreeAttrs(
             state,

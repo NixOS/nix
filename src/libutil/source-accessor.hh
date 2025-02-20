@@ -216,4 +216,10 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root);
 
 ref<SourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts);
 
+/**
+ * Construct an accessor that presents a "union" view of a vector of
+ * underlying accessors. Earlier accessors take precedence over later.
+ */
+ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors);
+
 }

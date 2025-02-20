@@ -23,12 +23,6 @@ struct MountedSourceAccessor : SourceAccessor
         return accessor->readFile(subpath);
     }
 
-    bool pathExists(const CanonPath & path) override
-    {
-        auto [accessor, subpath] = resolve(path);
-        return accessor->pathExists(subpath);
-    }
-
     std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
         auto [accessor, subpath] = resolve(path);
@@ -68,6 +62,12 @@ struct MountedSourceAccessor : SourceAccessor
             subpath.push_back(std::string(*path.baseName()));
             path.pop();
         }
+    }
+
+    std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
+    {
+        auto [accessor, subpath] = resolve(path);
+        return accessor->getPhysicalPath(subpath);
     }
 };
 

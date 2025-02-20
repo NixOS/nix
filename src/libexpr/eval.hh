@@ -413,17 +413,6 @@ public:
     void checkURI(const std::string & uri);
 
     /**
-     * When using a diverted store and 'path' is in the Nix store, map
-     * 'path' to the diverted location (e.g. /nix/store/foo is mapped
-     * to /home/alice/my-nix/nix/store/foo). However, this is only
-     * done if the context is not empty, since otherwise we're
-     * probably trying to read from the actual /nix/store. This is
-     * intended to distinguish between import-from-derivation and
-     * sources stored in the actual /nix/store.
-     */
-    Path toRealPath(const Path & path, const NixStringContext & context);
-
-    /**
      * Parse a Nix expression from the specified file.
      */
     Expr * parseExprFromFile(const SourcePath & path);
