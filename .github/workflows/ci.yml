@@ -12,9 +12,6 @@ on:
 permissions:
   id-token: "write"
   contents: "read"
-  pull-requests: "write"
-  statuses: "write"
-  deployments: "write"
 
 jobs:
   eval:
@@ -142,6 +139,12 @@ jobs:
     if: github.event_name != 'merge_group'
     needs: build_x86_64-linux
     runs-on: blacksmith
+    permissions:
+      id-token: "write"
+      contents: "read"
+      pull-requests: "write"
+      statuses: "write"
+      deployments: "write"
     steps:
       - name: Checkout nix
         uses: actions/checkout@v4
