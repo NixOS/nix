@@ -230,17 +230,21 @@ void Store::addMultipleToStore(
 {
     std::atomic<size_t> nrDone{0};
     std::atomic<size_t> nrFailed{0};
-    std::atomic<uint64_t> bytesExpected{0};
     std::atomic<uint64_t> nrRunning{0};
 
     using PathWithInfo = std::pair<ValidPathInfo, std::unique_ptr<Source>>;
 
+    uint64_t bytesExpected = 0;
+
     std::map<StorePath, PathWithInfo *> infosMap;
     StorePathSet storePathsToAdd;
     for (auto & thingToAdd : pathsToCopy) {
+        bytesExpected += thingToAdd.first.narSize;
         infosMap.insert_or_assign(thingToAdd.first.path, &thingToAdd);
         storePathsToAdd.insert(thingToAdd.first.path);
     }
+
+    act.setExpected(actCopyPath, bytesExpected);
 
     auto showProgress = [&, nrTotal = pathsToCopy.size()]() {
         act.progress(nrDone, nrTotal, nrRunning, nrFailed);
@@ -258,9 +262,6 @@ void Store::addMultipleToStore(
                 showProgress();
                 return StorePathSet();
             }
-
-            bytesExpected += info.narSize;
-            act.setExpected(actCopyPath, bytesExpected);
 
             return info.references;
         },
