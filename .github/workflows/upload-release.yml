@@ -83,3 +83,21 @@ jobs:
           ids_project_name: determinate-nix
           ids_binary_prefix: determinate-nix
           skip_acl: true
+
+  publish:
+    needs:
+      - release
+    if: (!github.repository.fork && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/')))
+    environment: ${{ github.event_name == 'release' && 'production' || '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: "DeterminateSystems/flakehub-push@main"
+        with:
+          rolling: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+          visibility: "private"
+          tag: "${{ github.ref_name }}"
