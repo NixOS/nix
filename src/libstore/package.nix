@@ -39,7 +39,6 @@ mkMesonLibrary (finalAttrs: {
     ../../.version
     ./.version
     ../../.version-determinate
-    ./.version-determinate
     ./meson.build
     ./meson.options
     ./linux/meson.build
