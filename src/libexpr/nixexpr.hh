@@ -480,13 +480,16 @@ extern ExprBlackHole eBlackHole;
 struct StaticEnv
 {
     ExprWith * isWith;
-    const StaticEnv * up;
+    std::shared_ptr<const StaticEnv> up;
 
     // Note: these must be in sorted order.
     typedef std::vector<std::pair<Symbol, Displacement>> Vars;
     Vars vars;
 
-    StaticEnv(ExprWith * isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
+    StaticEnv(ExprWith * isWith, std::shared_ptr<const StaticEnv> up, size_t expectedSize = 0)
+        : isWith(isWith)
+        , up(std::move(up))
+    {
         vars.reserve(expectedSize);
     };
 
