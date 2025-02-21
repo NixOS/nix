@@ -133,4 +133,5 @@
   - [Release 1.0 (2024-11-??)](release-notes-determinate/rl-1.0.md)
 - [Nix Release Notes](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
+  - [Release 1.0.0 (2025-??-??)](release-notes-determinate/rl-1.0.0.md)
   - [Release 2.26 (2025-01-22)](release-notes/rl-2.26.md)
