@@ -1,0 +1,169 @@
+name: "CI"
+
+on:
+  pull_request:
+  push:
+    branches:
+      - detsys-main
+      - main
+      - master
+  merge_group:
+
+permissions:
+  id-token: "write"
+  contents: "read"
+
+jobs:
+  eval:
+    runs-on: blacksmith-32vcpu-ubuntu-2204
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: DeterminateSystems/nix-installer-action@main
+      with:
+        flakehub: true
+    - run: nix flake show --all-systems --json
+
+  build_x86_64-linux:
+    uses: ./.github/workflows/build.yml
+    with:
+      os: blacksmith-32vcpu-ubuntu-2204
+
+  build_aarch64-linux:
+    if: github.event_name == 'merge_group'
+    uses: ./.github/workflows/build.yml
+    with:
+      os: blacksmith-32vcpu-ubuntu-2204-arm
+
+  build_x86_64-darwin:
+    if: github.event_name == 'merge_group'
+    uses: ./.github/workflows/build.yml
+    with:
+      os: macos-13
+
+  build_aarch64-darwin:
+    uses: ./.github/workflows/build.yml
+    with:
+      os: macos-latest
+
+  test_x86_64-linux:
+    uses: ./.github/workflows/test.yml
+    needs: build_x86_64-linux
+    with:
+      os: blacksmith-32vcpu-ubuntu-2204
+
+  test_aarch64-linux:
+    if: github.event_name == 'merge_group'
+    uses: ./.github/workflows/test.yml
+    needs: build_aarch64-linux
+    with:
+      os: blacksmith-32vcpu-ubuntu-2204-arm
+
+  test_x86_64-darwin:
+    if: github.event_name == 'merge_group'
+    uses: ./.github/workflows/test.yml
+    needs: build_aarch64-darwin
+    with:
+      os: macos-13
+
+  test_aarch64-darwin:
+    if: github.event_name == 'merge_group'
+    uses: ./.github/workflows/test.yml
+    needs: build_aarch64-darwin
+    with:
+      os: macos-latest
+
+  vm_tests_smoke:
+    if: github.event_name != 'merge_group'
+    needs: build_x86_64-linux
+    runs-on: blacksmith-32vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          flakehub: true
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - run: |
+          nix build -L \
+            .#hydraJobs.tests.functional_user \
+            .#hydraJobs.tests.githubFlakes \
+            .#hydraJobs.tests.nix-docker \
+            .#hydraJobs.tests.tarballFlakes \
+            ;
+
+  vm_tests_all:
+    if: github.event_name == 'merge_group'
+    needs: build_x86_64-linux
+    runs-on: blacksmith-32vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          flakehub: true
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - run: |
+          nix build -L --keep-going \
+            $(nix flake show --json \
+              | jq -r '
+                .hydraJobs.tests
+                | with_entries(select(.value.type == "derivation"))
+                | keys[]
+                | ".#hydraJobs.tests." + .' \
+              | head -n5) # FIXME: for testing the merge queue
+
+  flake_regressions:
+    if: github.event_name == 'merge_group'
+    needs: build_x86_64-linux
+    runs-on: blacksmith-32vcpu-ubuntu-2204
+    steps:
+      - name: Checkout nix
+        uses: actions/checkout@v4
+      - name: Checkout flake-regressions
+        uses: actions/checkout@v4
+        with:
+          repository: DeterminateSystems/flake-regressions
+          path: flake-regressions
+      - name: Checkout flake-regressions-data
+        uses: actions/checkout@v4
+        with:
+          repository: DeterminateSystems/flake-regressions-data
+          path: flake-regressions/tests
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          flakehub: true
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=50 flake-regressions/eval-all.sh
+
+  manual:
+    if: github.event_name != 'merge_group'
+    needs: build_x86_64-linux
+    runs-on: blacksmith
+    permissions:
+      id-token: "write"
+      contents: "read"
+      pull-requests: "write"
+      statuses: "write"
+      deployments: "write"
+    steps:
+      - name: Checkout nix
+        uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          flakehub: true
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - name: Build manual
+        run: nix build .#hydraJobs.manual
+      - uses: nwtgck/actions-netlify@v3.0
+        with:
+          publish-dir: './result/share/doc/nix/manual'
+          production-branch: detsys-main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Deploy from GitHub Actions"
+          enable-pull-request-comment: true
+          enable-commit-comment: true
+          enable-commit-status: true
+          overwrites-pull-request-comment: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
