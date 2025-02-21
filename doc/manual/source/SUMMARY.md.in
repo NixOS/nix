@@ -128,7 +128,7 @@
   - [C++ style guide](development/cxx.md)
   - [Experimental Features](development/experimental-features.md)
   - [Contributing](development/contributing.md)
-- [Determinate Nix Releases Notes](release-notes-determinate/index.md)
+- [Determinate Nix Release Notes](release-notes-determinate/index.md)
   - [Changes between Nix and Determinate Nix](release-notes-determinate/changes.md)
   - [Release 1.0.0 (2025-??-??)](release-notes-determinate/rl-1.0.0.md)
 - [Nix Release Notes](release-notes/index.md)
