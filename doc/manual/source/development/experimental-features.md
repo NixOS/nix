@@ -6,7 +6,7 @@ Experimental features are considered unstable, which means that they can be chan
 Users must explicitly enable them by toggling the associated [experimental feature flags](@docroot@/command-ref/conf-file.md#conf-experimental-features).
 This allows accessing unstable functionality without unwittingly relying on it.
 
-Experimental feature flags were first introduced in [Nix 2.4](@docroot@/release-notes/rl-2.4.md).
+Experimental feature flags were first introduced in [Nix 2.4](https://nix.dev/manual/nix/2.24/release-notes/rl-2.4).
 Before that, Nix did have experimental features, but they were not guarded by flags and were merely documented as unstable.
 This was a source of confusion and controversy.
 
