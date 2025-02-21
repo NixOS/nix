@@ -299,8 +299,7 @@
             let
               pkgs = nixpkgsFor.${system}.native;
 
-              # NOTE(cole-h): discard string context so that it doesn't try to build, we just care about the outPaths
-              closures = forAllSystems (system: builtins.unsafeDiscardStringContext self.packages.${system}.default.outPath);
+              closures = forAllSystems (system: self.packages.${system}.default.outPath);
 
               closures_json = pkgs.runCommand "versions.json"
                 {
