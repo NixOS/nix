@@ -181,15 +181,6 @@ in
   # Nix's manual
   manual = nixpkgsFor.x86_64-linux.native.nixComponents.nix-manual;
 
-  manualTarball =
-    with nixpkgsFor.x86_64-linux.native;
-    runCommand "determinate-nix-manual-${self.hydraJobs.manual.version}"
-      { }
-      ''
-        mkdir -p $out/tarballs
-        tar cvfz $out/tarballs/$name.tar.gz -C ${self.hydraJobs.manual}/share/doc/nix/manual . --transform "s/^./$name/"
-      '';
-
   # API docs for Nix's unstable internal C++ interfaces.
   internal-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-internal-api-docs;
 
