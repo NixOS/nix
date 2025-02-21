@@ -1,5 +1,5 @@
 :root {
-    --sidebar-width: 23em;
+  --sidebar-width: 23em;
 }
 
 h1.menu-title::before {
@@ -7,10 +7,9 @@ h1.menu-title::before {
   background-image: url("./favicon.svg");
   padding: 1.25em;
   background-position: center center;
-  background-size: 2em;
+  background-size: 1.5em;
   background-repeat: no-repeat;
 }
-
 
 .menu-bar {
   padding: 0.5em 0em;
@@ -21,13 +20,13 @@ h1.menu-title::before {
 }
 
 h1:not(:first-of-type) {
-    margin-top: 1.3em;
+  margin-top: 1.3em;
 }
 
 h2 {
-    margin-top: 1em;
+  margin-top: 1em;
 }
 
 .hljs-meta {
-    user-select: none;
+  user-select: none;
 }
