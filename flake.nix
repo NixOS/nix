@@ -294,6 +294,36 @@
           nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
+
+          fallbackPathsNix =
+            let
+              pkgs = nixpkgsFor.${system}.native;
+
+              closures = forAllSystems (system: self.packages.${system}.default.outPath);
+
+              closures_json = pkgs.runCommand "versions.json"
+                {
+                  buildInputs = [ pkgs.jq ];
+                  passAsFile = [ "json" ];
+                  json = builtins.toJSON closures;
+                } ''
+                cat "$jsonPath" | jq . > $out
+              '';
+
+              closures_nix = pkgs.runCommand "versions.nix"
+                {
+                  buildInputs = [ pkgs.jq ];
+                  passAsFile = [ "template" ];
+                  jsonPath = closures_json;
+                  template = ''
+                    builtins.fromJSON('''@closures@''')
+                  '';
+                } ''
+                export closures=$(cat "$jsonPath");
+                substituteAll "$templatePath" "$out"
+              '';
+            in
+            closures_nix;
         }
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         //
