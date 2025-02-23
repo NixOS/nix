@@ -30,6 +30,7 @@ enum struct ExperimentalFeature
     Cgroups,
     DaemonTrustOverride,
     DynamicDerivations,
+    PureStorePathBuiltin,
     ParseTomlTimestamps,
     ReadOnlyLocalStore,
     LocalOverlayStore,
