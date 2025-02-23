@@ -519,14 +519,27 @@ void prim_valueSize(EvalState & state, const Pos & pos, Value * * args, Value & 
  *************************************************************/
 
 
+/* Add a wrapper around the derivation primop that computes the
+   `drvPath', `outPath', `inputSrcs' and `inputDrvs' attributes lazily. */
+static void prim_derivation(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    Value fun;
+    state.evalFile(state.sDerivationNix, fun);
+    state.forceFunction(fun, pos);
+    mkApp(v, fun, *args[0]);
+    state.forceAttrs(v, pos);
+}
+
+
 /* Construct (as a unobservable side effect) a Nix derivation
    expression that performs the derivation described by the argument
    set.  Returns the original set extended with the following
    attributes: `outPath' containing the primary output path of the
    derivation; `drvPath' containing the path of the Nix expression;
    and `type' set to `derivation' to indicate that this is a
-   derivation. */
-static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * args, Value & v)
+   derivation; `inputSrcs' and `inputDrvs' containing the build-time
+   dependencies. */
+static void prim_derivationStrict2(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos);
 
@@ -764,12 +777,48 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
        case we don't actually write store derivations, so we can't
        read them later. */
     drvHashes[drvPath] = hashDerivationModulo(*state.store, drv);
+    state.derivationCache[drvPath] = *args[1];
 
-    state.mkAttrs(v, 1 + drv.outputs.size());
+    state.mkAttrs(v, 1 + drv.outputs.size() + 2);
     mkString(*state.allocAttr(v, state.sDrvPath), drvPath, {"=" + drvPath});
     for (auto & i : drv.outputs) {
         mkString(*state.allocAttr(v, state.symbols.create(i.first)),
             i.second.path, {"!" + i.first + "!" + drvPath});
+    }
+
+    {
+        Value * inputSrcsVal = state.allocAttr(v, state.symbols.create("inputSrcs"));
+        state.mkList(*inputSrcsVal, drv.inputSrcs.size());
+        int i=0;
+        for (auto & p : drv.inputSrcs) {
+            inputSrcsVal->listElems()[i] = state.allocValue();
+            mkString(*(inputSrcsVal->listElems()[i]), p, /*context=*/{"=" + p});
+            i++;
+        }
+    }
+    {
+        Value * inputDrvsVal = state.allocAttr(v, state.symbols.create("inputDrvs"));
+
+        int size=0;
+        for (auto & d : drv.inputDrvs)
+            for (auto & outputName : d.second)
+                size++;
+        state.mkList(*inputDrvsVal, size);
+
+        int i=0;
+        for (auto & d : drv.inputDrvs) {
+            auto j = state.derivationCache.find(d.first);
+            if (j == state.derivationCache.end()) {
+                throw TypeError(format("derivation '%1%' is not cached, at %2%") % d.first % pos);
+
+            for (auto & outputName : d.second) {
+                Bindings::iterator k = j->second.attrs->find(state.symbols.create(outputName));
+                if (k == v.attrs->end())
+                    throw TypeError(format("derivation '%1%' is missing output '.%2%', at %3%") % d.first % outputName % pos);
+                inputDrvsVal->listElems()[i] = k->value;
+                i++;
+            }
+        }
     }
     v.attrs->sort();
 }
@@ -1392,6 +1441,31 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
     }
 }
 
+
+/* Given a set of attribute names, return the set of the corresponding
+   attributes from the given set. Former `lib.genAttrs'
+ */
+static void prim_genAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceList(*args[0], pos);
+
+    state.mkAttrs(v, args[0]->listSize());
+
+    std::set<Symbol> seen;
+
+    for (unsigned int i = 0; i < args[0]->listSize(); ++i) {
+        Value & vName(*args[0]->listElems()[i]);
+        string name = state.forceStringNoCtx(vName, pos);
+
+        Symbol sym = state.symbols.create(name);
+        if (seen.find(sym) == seen.end()) {
+            seen.insert(sym);
+            mkApp(*state.allocAttr(v, sym), *args[1], vName);
+        }
+    }
+
+    v.attrs->sort();
+}
 
 
 /*************************************************************
@@ -2250,6 +2324,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__hasAttr", 2, prim_hasAttr);
     addPrimOp("__isAttrs", 1, prim_isAttrs);
     addPrimOp("removeAttrs", 2, prim_removeAttrs);
+    addPrimOp("__genAttrs", 2, prim_genAttrs);
     addPrimOp("__listToAttrs", 1, prim_listToAttrs);
     addPrimOp("__intersectAttrs", 2, prim_intersectAttrs);
     addPrimOp("__catAttrs", 2, prim_catAttrs);
@@ -2300,19 +2375,16 @@ void EvalState::createBaseEnv()
     addPrimOp("__splitVersion", 1, prim_splitVersion);
 
     // Derivations
-    addPrimOp("derivationStrict", 1, prim_derivationStrict);
+    addPrimOp("derivationStrict2", 2, prim_derivationStrict2);
     addPrimOp("placeholder", 1, prim_placeholder);
+    addPrimOp("derivation", 1, prim_derivation);
 
     // Networking
     addPrimOp("__fetchurl", 1, prim_fetchurl);
     addPrimOp("fetchTarball", 1, prim_fetchTarball);
 
-    /* Add a wrapper around the derivation primop that computes the
-       `drvPath' and `outPath' attributes lazily. */
     string path = canonPath(settings.nixDataDir + "/nix/corepkgs/derivation.nix", true);
     sDerivationNix = symbols.create(path);
-    evalFile(path, v);
-    addConstant("derivation", v);
 
     /* Add a value containing the current Nix expression search path. */
     mkList(v, searchPath.size());
