@@ -76,6 +76,23 @@ Settings::Settings()
     if (sslOverride != "")
         caFile = sslOverride;
 
+#ifdef __APPLE__
+    if(caFile.get().starts_with("keychain:")){
+        debug("reading %s",caFile.get());
+        auto caContents = runProgram("/usr/bin/security", false, {"find-certificate", "-a", "-p", caFile.get().substr(9)});
+        if (caContents.empty()){
+            warn("reading '%s' found no certificates",caFile.get());
+        }
+        auto caFilePath = settings.nixConfDir + "/ssl-cert-file.keychain";
+        auto caFilePathTmp = caFilePath + ".tmp";
+        debug("writing to %s",caFilePathTmp);
+        writeFile(caFilePathTmp.c_str(),caContents);
+        // check failure?
+        std::rename(caFilePathTmp.c_str(), caFilePath.c_str());
+        caFile = caFilePath;
+    }
+#endif
+
     /* Backwards compatibility. */
     auto s = getEnv("NIX_REMOTE_SYSTEMS");
     if (s) {

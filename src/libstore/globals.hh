@@ -1059,6 +1059,12 @@ public:
 
           1. `NIX_SSL_CERT_FILE`
           2. `SSL_CERT_FILE`
+
+          Darwin only: The path can also be of form keychain:/path-to-keychain
+          which will read the OSX keychain and write it to the config directory
+          and use that file as the CA file. For example, setting
+          "keychain:/System/Library/Keychains/SystemRootCertificates.keychain"
+          will write to "/etc/nix/ssl-cert-file.keychain".
         )"};
 
 #if __linux__
