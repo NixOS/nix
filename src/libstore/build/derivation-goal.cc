@@ -959,7 +959,7 @@ Goal::Co DerivationGoal::buildDone()
                 // The command is on a separate line for easy copying, such as with triple click.
                 // This message will be indented elsewhere, so removing the indentation before the
                 // command will not put it at the start of the line unfortunately.
-                msg += fmt("For full logs, run:\n  " ANSI_BOLD "%s %s" ANSI_NORMAL,
+                msg += fmt("For full logs, run:\n  " ANSI_BOLD "%s %s^*" ANSI_NORMAL,
                     nixLogCommand,
                     worker.store.printStorePath(drvPath));
             }
