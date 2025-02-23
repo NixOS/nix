@@ -28,7 +28,7 @@ $ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
 
 > **Note**
 >
-> You can use `native-ccacheStdenvPackages` to drastically improve rebuild time.
+> You can use `native-ccacheStdenv` to drastically improve rebuild time.
 > By default, [ccache](https://ccache.dev) keeps artifacts in `~/.cache/ccache/`.
 
 To build Nix itself in this shell:

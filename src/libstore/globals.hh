@@ -85,11 +85,6 @@ public:
     std::vector<Path> nixUserConfFiles;
 
     /**
-     * The directory where the man pages are stored.
-     */
-    Path nixManDir;
-
-    /**
      * File name of the socket the daemon listens to.
      */
     Path nixDaemonSocketFile;
@@ -1253,7 +1248,15 @@ void loadConfFile(AbstractConfig & config);
 // Used by the Settings constructor
 std::vector<Path> getUserConfigFiles();
 
-extern const std::string nixVersion;
+/**
+ * The version of Nix itself.
+ *
+ * This is not `const`, so that the Nix CLI can provide a more detailed version
+ * number including the git revision, without having to "re-compile" the entire
+ * set of Nix libraries to include that version, even when those libraries are
+ * not affected by the change.
+ */
+extern std::string nixVersion;
 
 /**
  * @param loadConfig Whether to load configuration from `nix.conf`, `NIX_CONFIG`, etc. May be disabled for unit tests.

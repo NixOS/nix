@@ -526,6 +526,4 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
  */
 std::string hashPlaceholder(const OutputNameView outputName);
 
-extern const Hash impureOutputHash;
-
 }

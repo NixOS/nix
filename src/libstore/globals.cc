@@ -65,7 +65,6 @@ Settings::Settings()
     , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
     , nixConfDir(canonPath(getEnvNonEmpty("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
     , nixUserConfFiles(getUserConfigFiles())
-    , nixManDir(canonPath(NIX_MAN_DIR))
     , nixDaemonSocketFile(canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
 #ifndef _WIN32
@@ -243,7 +242,7 @@ Path Settings::getDefaultSSLCertFile()
     return "";
 }
 
-const std::string nixVersion = PACKAGE_VERSION;
+std::string nixVersion = PACKAGE_VERSION;
 
 NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
     {SandboxMode::smEnabled, true},

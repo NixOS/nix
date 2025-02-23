@@ -31,6 +31,9 @@ deps_private += rapidcheck
 gtest = dependency('gtest', main : true)
 deps_private += gtest
 
+libgit2 = dependency('libgit2')
+deps_private += libgit2
+
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
@@ -44,6 +47,7 @@ subdir('nix-meson-build-support/common')
 
 sources = files(
   'public-key.cc',
+  'git-utils.cc'
 )
 
 include_dirs = [include_directories('.')]

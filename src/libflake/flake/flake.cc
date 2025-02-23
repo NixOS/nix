@@ -12,6 +12,7 @@
 #include "flake/settings.hh"
 #include "value-to-json.hh"
 #include "local-fs-store.hh"
+#include "fetch-to-store.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -24,7 +25,7 @@ namespace flake {
 struct FetchedFlake
 {
     FlakeRef lockedRef;
-    StorePath storePath;
+    ref<SourceAccessor> accessor;
 };
 
 typedef std::map<FlakeRef, FetchedFlake> FlakeCache;
@@ -40,7 +41,7 @@ static std::optional<FetchedFlake> lookupInFlakeCache(
     return i->second;
 }
 
-static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
+static std::tuple<ref<SourceAccessor>, FlakeRef, FlakeRef> fetchOrSubstituteTree(
     EvalState & state,
     const FlakeRef & originalRef,
     bool useRegistries,
@@ -51,8 +52,8 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
 
     if (!fetched) {
         if (originalRef.input.isDirect()) {
-            auto [storePath, lockedRef] = originalRef.fetchTree(state.store);
-            fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .storePath = storePath});
+            auto [accessor, lockedRef] = originalRef.lazyFetch(state.store);
+            fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .accessor = accessor});
         } else {
             if (useRegistries) {
                 resolvedRef = originalRef.resolve(
@@ -64,8 +65,8 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
                     });
                 fetched = lookupInFlakeCache(flakeCache, originalRef);
                 if (!fetched) {
-                    auto [storePath, lockedRef] = resolvedRef.fetchTree(state.store);
-                    fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .storePath = storePath});
+                    auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
+                    fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .accessor = accessor});
                 }
                 flakeCache.insert_or_assign(resolvedRef, *fetched);
             }
@@ -76,14 +77,27 @@ static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
         flakeCache.insert_or_assign(originalRef, *fetched);
     }
 
-    debug("got tree '%s' from '%s'",
-        state.store->printStorePath(fetched->storePath), fetched->lockedRef);
+    debug("got tree '%s' from '%s'", fetched->accessor, fetched->lockedRef);
 
-    state.allowPath(fetched->storePath);
+    return {fetched->accessor, resolvedRef, fetched->lockedRef};
+}
 
-    assert(!originalRef.input.getNarHash() || fetched->storePath == originalRef.input.computeStorePath(*state.store));
+static StorePath copyInputToStore(
+    EvalState & state,
+    fetchers::Input & input,
+    const fetchers::Input & originalInput,
+    ref<SourceAccessor> accessor)
+{
+    auto storePath = fetchToStore(*state.store, accessor, FetchMode::Copy, input.getName());
 
-    return {fetched->storePath, resolvedRef, fetched->lockedRef};
+    state.allowPath(storePath);
+
+    auto narHash = state.store->queryPathInfo(storePath)->narHash;
+    input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
+
+    assert(!originalInput.getNarHash() || storePath == originalInput.computeStorePath(*state.store));
+
+    return storePath;
 }
 
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
@@ -101,12 +115,47 @@ static void expectType(EvalState & state, ValueType type,
             showType(type), showType(value.type()), state.positions[pos]);
 }
 
-static std::map<FlakeId, FlakeInput> parseFlakeInputs(
+static std::pair<std::map<FlakeId, FlakeInput>, fetchers::Attrs> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
     const InputAttrPath & lockRootAttrPath,
-    const SourcePath & flakeDir);
+    const SourcePath & flakeDir,
+    bool allowSelf);
+
+static void parseFlakeInputAttr(
+    EvalState & state,
+    const Attr & attr,
+    fetchers::Attrs & attrs)
+{
+    // Allow selecting a subset of enum values
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wswitch-enum"
+    switch (attr.value->type()) {
+        case nString:
+            attrs.emplace(state.symbols[attr.name], attr.value->c_str());
+            break;
+        case nBool:
+            attrs.emplace(state.symbols[attr.name], Explicit<bool> { attr.value->boolean() });
+            break;
+        case nInt: {
+            auto intValue = attr.value->integer().value;
+            if (intValue < 0)
+                state.error<EvalError>("negative value given for flake input attribute %1%: %2%", state.symbols[attr.name], intValue).debugThrow();
+            attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
+            break;
+        }
+        default:
+            if (attr.name == state.symbols.create("publicKeys")) {
+                experimentalFeatureSettings.require(Xp::VerifiedFetches);
+                NixStringContext emptyContext = {};
+                attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, attr.pos, emptyContext).dump());
+            } else
+                state.error<TypeError>("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
+                    state.symbols[attr.name], showType(*attr.value)).debugThrow();
+    }
+    #pragma GCC diagnostic pop
+}
 
 static FlakeInput parseFlakeInput(
     EvalState & state,
@@ -149,44 +198,14 @@ static FlakeInput parseFlakeInput(
                 expectType(state, nBool, *attr.value, attr.pos);
                 input.isFlake = attr.value->boolean();
             } else if (attr.name == sInputs) {
-                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, lockRootAttrPath, flakeDir);
+                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, lockRootAttrPath, flakeDir, false).first;
             } else if (attr.name == sFollows) {
                 expectType(state, nString, *attr.value, attr.pos);
                 auto follows(parseInputAttrPath(attr.value->c_str()));
                 follows.insert(follows.begin(), lockRootAttrPath.begin(), lockRootAttrPath.end());
                 input.follows = follows;
-            } else {
-                // Allow selecting a subset of enum values
-                #pragma GCC diagnostic push
-                #pragma GCC diagnostic ignored "-Wswitch-enum"
-                switch (attr.value->type()) {
-                    case nString:
-                        attrs.emplace(state.symbols[attr.name], attr.value->c_str());
-                        break;
-                    case nBool:
-                        attrs.emplace(state.symbols[attr.name], Explicit<bool> { attr.value->boolean() });
-                        break;
-                    case nInt: {
-                        auto intValue = attr.value->integer().value;
-
-                        if (intValue < 0) {
-                            state.error<EvalError>("negative value given for flake input attribute %1%: %2%", state.symbols[attr.name], intValue).debugThrow();
-                        }
-
-                        attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
-                        break;
-                    }
-                    default:
-                        if (attr.name == state.symbols.create("publicKeys")) {
-                            experimentalFeatureSettings.require(Xp::VerifiedFetches);
-                            NixStringContext emptyContext = {};
-                            attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, emptyContext).dump());
-                        } else
-                            state.error<TypeError>("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
-                                state.symbols[attr.name], showType(*attr.value)).debugThrow();
-                }
-                #pragma GCC diagnostic pop
-            }
+            } else
+                parseFlakeInputAttr(state, attr, attrs);
         } catch (Error & e) {
             e.addTrace(
                 state.positions[attr.pos],
@@ -216,28 +235,39 @@ static FlakeInput parseFlakeInput(
     return input;
 }
 
-static std::map<FlakeId, FlakeInput> parseFlakeInputs(
+static std::pair<std::map<FlakeId, FlakeInput>, fetchers::Attrs> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
     const InputAttrPath & lockRootAttrPath,
-    const SourcePath & flakeDir)
+    const SourcePath & flakeDir,
+    bool allowSelf)
 {
     std::map<FlakeId, FlakeInput> inputs;
+    fetchers::Attrs selfAttrs;
 
     expectType(state, nAttrs, *value, pos);
 
     for (auto & inputAttr : *value->attrs()) {
-        inputs.emplace(state.symbols[inputAttr.name],
-            parseFlakeInput(state,
-                state.symbols[inputAttr.name],
-                inputAttr.value,
-                inputAttr.pos,
-                lockRootAttrPath,
-                flakeDir));
+        auto inputName = state.symbols[inputAttr.name];
+        if (inputName == "self") {
+            if (!allowSelf)
+                throw Error("'self' input attribute not allowed at %s", state.positions[inputAttr.pos]);
+            expectType(state, nAttrs, *inputAttr.value, inputAttr.pos);
+            for (auto & attr : *inputAttr.value->attrs())
+                parseFlakeInputAttr(state, attr, selfAttrs);
+        } else {
+            inputs.emplace(inputName,
+                parseFlakeInput(state,
+                    inputName,
+                    inputAttr.value,
+                    inputAttr.pos,
+                    lockRootAttrPath,
+                    flakeDir));
+        }
     }
 
-    return inputs;
+    return {inputs, selfAttrs};
 }
 
 Flake readFlake(
@@ -269,8 +299,11 @@ Flake readFlake(
 
     auto sInputs = state.symbols.create("inputs");
 
-    if (auto inputs = vInfo.attrs()->get(sInputs))
-        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, lockRootAttrPath, flakeDir);
+    if (auto inputs = vInfo.attrs()->get(sInputs)) {
+        auto [flakeInputs, selfAttrs] = parseFlakeInputs(state, inputs->value, inputs->pos, lockRootAttrPath, flakeDir, true);
+        flake.inputs = std::move(flakeInputs);
+        flake.selfAttrs = std::move(selfAttrs);
+    }
 
     auto sOutputs = state.symbols.create("outputs");
 
@@ -301,10 +334,10 @@ Flake readFlake(
                     state.symbols[setting.name],
                     std::string(state.forceStringNoCtx(*setting.value, setting.pos, "")));
             else if (setting.value->type() == nPath) {
-                NixStringContext emptyContext = {};
+                auto storePath = fetchToStore(*state.store, setting.value->path(), FetchMode::Copy);
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    state.coerceToString(setting.pos, *setting.value, emptyContext, "", false, true, true).toOwned());
+                    state.store->printStorePath(storePath));
             }
             else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(
@@ -342,6 +375,23 @@ Flake readFlake(
     return flake;
 }
 
+static FlakeRef applySelfAttrs(
+    const FlakeRef & ref,
+    const Flake & flake)
+{
+    auto newRef(ref);
+
+    std::set<std::string> allowedAttrs{"submodules", "lfs"};
+
+    for (auto & attr : flake.selfAttrs) {
+        if (!allowedAttrs.contains(attr.first))
+            throw Error("flake 'self' attribute '%s' is not supported", attr.first);
+        newRef.input.attrs.insert_or_assign(attr.first, attr.second);
+    }
+
+    return newRef;
+}
+
 static Flake getFlake(
     EvalState & state,
     const FlakeRef & originalRef,
@@ -349,10 +399,31 @@ static Flake getFlake(
     FlakeCache & flakeCache,
     const InputAttrPath & lockRootAttrPath)
 {
-    auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
+    // Fetch a lazy tree first.
+    auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
         state, originalRef, useRegistries, flakeCache);
 
-    return readFlake(state, originalRef, resolvedRef, lockedRef, state.rootPath(state.store->toRealPath(storePath)), lockRootAttrPath);
+    // Parse/eval flake.nix to get at the input.self attributes.
+    auto flake = readFlake(state, originalRef, resolvedRef, lockedRef, {accessor}, lockRootAttrPath);
+
+    // Re-fetch the tree if necessary.
+    auto newLockedRef = applySelfAttrs(lockedRef, flake);
+
+    if (lockedRef != newLockedRef) {
+        debug("refetching input '%s' due to self attribute", newLockedRef);
+        // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
+        newLockedRef.input.attrs.erase("narHash");
+        auto [accessor2, resolvedRef2, lockedRef2] = fetchOrSubstituteTree(
+            state, newLockedRef, false, flakeCache);
+        accessor = accessor2;
+        lockedRef = lockedRef2;
+    }
+
+    // Copy the tree to the store.
+    auto storePath = copyInputToStore(state, lockedRef.input, originalRef.input, accessor);
+
+    // Re-parse flake.nix from the store.
+    return readFlake(state, originalRef, resolvedRef, lockedRef, state.storePath(storePath), lockRootAttrPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
@@ -550,12 +621,12 @@ LockedFlake lockFlake(
 
                     /* Get the input flake, resolve 'path:./...'
                        flakerefs relative to the parent flake. */
-                    auto getInputFlake = [&]()
+                    auto getInputFlake = [&](const FlakeRef & ref)
                     {
                         if (auto resolvedPath = resolveRelativePath()) {
-                            return readFlake(state, *input.ref, *input.ref, *input.ref, *resolvedPath, inputAttrPath);
+                            return readFlake(state, ref, ref, ref, *resolvedPath, inputAttrPath);
                         } else {
-                            return getFlake(state, *input.ref, useRegistries, flakeCache, inputAttrPath);
+                            return getFlake(state, ref, useRegistries, flakeCache, inputAttrPath);
                         }
                     };
 
@@ -636,7 +707,7 @@ LockedFlake lockFlake(
                         }
 
                         if (mustRefetch) {
-                            auto inputFlake = getInputFlake();
+                            auto inputFlake = getInputFlake(oldLock->lockedRef);
                             nodePaths.emplace(childNode, inputFlake.path.parent());
                             computeLocks(inputFlake.inputs, childNode, inputAttrPath, oldLock, followsPrefix,
                                 inputFlake.path, false);
@@ -664,7 +735,7 @@ LockedFlake lockFlake(
                         auto ref = (input2.ref && explicitCliOverrides.contains(inputAttrPath)) ? *input2.ref : *input.ref;
 
                         if (input.isFlake) {
-                            auto inputFlake = getInputFlake();
+                            auto inputFlake = getInputFlake(*input.ref);
 
                             auto childNode = make_ref<LockedNode>(
                                 inputFlake.lockedRef,
@@ -703,9 +774,13 @@ LockedFlake lockFlake(
                                 if (auto resolvedPath = resolveRelativePath()) {
                                     return {*resolvedPath, *input.ref};
                                 } else {
-                                    auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
+                                    auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
                                         state, *input.ref, useRegistries, flakeCache);
-                                    return {state.rootPath(state.store->toRealPath(storePath)), lockedRef};
+
+                                    // FIXME: allow input to be lazy.
+                                    auto storePath = copyInputToStore(state, lockedRef.input, input.ref->input, accessor);
+
+                                    return {state.storePath(storePath), lockedRef};
                                 }
                             }();
 
@@ -866,21 +941,6 @@ LockedFlake lockFlake(
     return lockFlake(settings, state, topRef, lockFlags, std::move(flake), flakeCache);
 }
 
-std::pair<StorePath, Path> sourcePathToStorePath(
-    ref<Store> store,
-    const SourcePath & _path)
-{
-    auto path = _path.path.abs();
-
-    if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
-        auto realStoreDir = store2->getRealStoreDir();
-        if (isInDir(path, realStoreDir))
-            path = store2->storeDir + path.substr(realStoreDir.size());
-    }
-
-    return store->toStorePath(path);
-}
-
 void callFlake(EvalState & state,
     const LockedFlake & lockedFlake,
     Value & vRes)
@@ -898,7 +958,7 @@ void callFlake(EvalState & state,
 
         auto lockedNode = node.dynamic_pointer_cast<const LockedNode>();
 
-        auto [storePath, subdir] = sourcePathToStorePath(state.store, sourcePath);
+        auto [storePath, subdir] = state.store->toStorePath(sourcePath.path.abs());
 
         emitTreeAttrs(
             state,

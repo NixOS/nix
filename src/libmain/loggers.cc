@@ -6,7 +6,8 @@ namespace nix {
 
 LogFormat defaultLogFormat = LogFormat::raw;
 
-LogFormat parseLogFormat(const std::string & logFormatStr) {
+LogFormat parseLogFormat(const std::string & logFormatStr)
+{
     if (logFormatStr == "raw" || getEnv("NIX_GET_COMPLETIONS"))
         return LogFormat::raw;
     else if (logFormatStr == "raw-with-logs")
@@ -20,14 +21,15 @@ LogFormat parseLogFormat(const std::string & logFormatStr) {
     throw Error("option 'log-format' has an invalid value '%s'", logFormatStr);
 }
 
-Logger * makeDefaultLogger() {
+std::unique_ptr<Logger> makeDefaultLogger()
+{
     switch (defaultLogFormat) {
     case LogFormat::raw:
         return makeSimpleLogger(false);
     case LogFormat::rawWithLogs:
         return makeSimpleLogger(true);
     case LogFormat::internalJSON:
-        return makeJSONLogger(*makeSimpleLogger(true));
+        return makeJSONLogger(getStandardError());
     case LogFormat::bar:
         return makeProgressBar();
     case LogFormat::barWithLogs: {
@@ -40,16 +42,19 @@ Logger * makeDefaultLogger() {
     }
 }
 
-void setLogFormat(const std::string & logFormatStr) {
+void setLogFormat(const std::string & logFormatStr)
+{
     setLogFormat(parseLogFormat(logFormatStr));
 }
 
-void setLogFormat(const LogFormat & logFormat) {
+void setLogFormat(const LogFormat & logFormat)
+{
     defaultLogFormat = logFormat;
     createDefaultLogger();
 }
 
-void createDefaultLogger() {
+void createDefaultLogger()
+{
     logger = makeDefaultLogger();
 }
 
