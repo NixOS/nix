@@ -248,6 +248,9 @@ write_file("$tmpDir/fallback-paths.nix",
     "  aarch64-darwin = \"" . getStorePath("build.nix-everything.aarch64-darwin") . "\";\n" .
     "}\n");
 
+# Allows Nixpkgs to assemble nix-fallback-paths.nix from the Hydra release builds
+write_file("$tmpDir/hydra-eval-id", "$evalId");
+
 # Upload release files to S3.
 for my $fn (glob "$tmpDir/*") {
     my $name = basename($fn);
