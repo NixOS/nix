@@ -6,6 +6,8 @@ TODO_NixOS
 
 clearStoreIfPossible
 
+export NIX_PATH=config="${config_nix}"
+
 if nix-instantiate --readonly-mode ./import-from-derivation.nix -A result; then
     echo "read-only evaluation of an imported derivation unexpectedly failed"
     exit 1
@@ -14,6 +16,9 @@ fi
 outPath=$(nix-build ./import-from-derivation.nix -A result --no-out-link)
 
 [ "$(cat "$outPath")" = FOO579 ]
+
+# Check that we can have access to the entire closure of a derivation output.
+nix build --no-link --restrict-eval -I src=. -f ./import-from-derivation.nix importAddPathExpr -v
 
 # FIXME: the next tests are broken on CA.
 if [[ -n "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
