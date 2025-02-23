@@ -2,6 +2,9 @@
 
 set -eo pipefail
 
+# stock path to avoid unexpected command versions
+PATH="$(/usr/bin/getconf PATH)"
+
 ((NEW_NIX_FIRST_BUILD_UID=351))
 ((TEMP_NIX_FIRST_BUILD_UID=31000))
 
