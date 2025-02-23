@@ -97,9 +97,10 @@ struct NixRepl
     void evalString(std::string s, Value & v);
     void loadDebugTraceEnv(DebugTrace & dt);
 
-    void printValue(std::ostream & str,
-                              Value & v,
-                              unsigned int maxDepth = std::numeric_limits<unsigned int>::max())
+    /**
+     * Print a value to a maximum depth of 1.
+     */
+    void printValueShallow(std::ostream & str, Value & v)
     {
         // Hide the progress bar during printing because it might interfere
         logger->pause();
@@ -108,9 +109,24 @@ struct NixRepl
             .ansiColors = true,
             .force = true,
             .derivationPaths = true,
-            .maxDepth = maxDepth,
+            .maxDepth = 1,
             .prettyIndent = 2,
             .errors = ErrorPrintBehavior::ThrowTopLevel,
+        });
+    }
+
+    /**
+     * Print a value recursively.
+     */
+    void printValueDeep(std::ostream & str, Value & v)
+    {
+        ::nix::printValue(*state, str, v, PrintOptions {
+            .ansiColors = true,
+            .force = true,
+            .derivationPaths = true,
+            .maxDepth = std::numeric_limits<size_t>::max(),
+            .prettyIndent = 2,
+            .errors = ErrorPrintBehavior::Throw,
         });
     }
 };
@@ -589,7 +605,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         if (v.type() == nString) {
             std::cout << v.string_view();
         } else {
-            printValue(std::cout, v);
+            printValueDeep(std::cout, v);
         }
         std::cout << std::endl;
     }
@@ -694,7 +710,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         } else {
             Value v;
             evalString(line, v);
-            printValue(std::cout, v, 1);
+            printValueShallow(std::cout, v);
             std::cout << std::endl;
         }
     }
