@@ -793,8 +793,27 @@ public:
 
           Nix caches tarballs in `$XDG_CACHE_HOME/nix/tarballs`.
 
-          Files fetched via `NIX_PATH`, `fetchGit`, `fetchMercurial`,
-          `fetchTarball`, and `fetchurl` respect this TTL.
+          This option affects:
+
+          - files fetched via `NIX_PATH`, `fetchGit`, `fetchMercurial`,
+            `fetchTarball`, and `fetchurl`
+
+          - how often the global flake registry is updated (i.e. how often
+            indirect flake references are updated)
+
+          - how often unpinned flake references (e.g. `github:NixOS/nixpkgs`)
+            are updated
+
+          For example, for a flake reference like `nixpkgs#hello` this option
+          affects how that flake resolves in two separate ways:
+
+          - It affects how often the `nixpkgs` indirect flake reference is
+            updated (which is rare: it usually resolves to
+            `github:NixOS/nixpkgs/nixpkgs-unstable`).
+
+          - It affects how often the `github:NixOS/nixpkgs/nixpkgs-unstable`
+            flake reference is updated (which is common: the `nixpkgs-unstable`
+            branch of the repository changes frequently).
         )"};
 
     Setting<bool> requireSigs{
