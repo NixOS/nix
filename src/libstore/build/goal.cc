@@ -146,12 +146,19 @@ Co Goal::await(Goals new_waitees)
     co_return Return{};
 }
 
+
+bool Goal::finalExitCode(ExitCode result)
+{
+    return result == ecSuccess || result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure;
+}
+
+
 Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
 {
     trace("done");
     assert(top_co);
     assert(exitCode == ecBusy);
-    assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure);
+    assert(finalExitCode(result));
     exitCode = result;
 
     if (ex) {

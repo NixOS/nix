@@ -51,16 +51,23 @@ void DerivationCreationAndRealisationGoal::addWantedOutputs(const OutputsSpec & 
 {
     /* If we already want all outputs, there is nothing to do. */
     auto newWanted = wantedOutputs.union_(outputs);
-    bool needRestart = !newWanted.isSubsetOf(wantedOutputs);
+    bool moreWanted = !newWanted.isSubsetOf(wantedOutputs);
     wantedOutputs = newWanted;
 
-    if (!needRestart)
+    if (!moreWanted)
         return;
 
     if (!optDrvPath)
         // haven't started steps where the outputs matter yet
         return;
-    worker.makeDerivationGoal(*optDrvPath, outputs, buildMode);
+    auto g = worker.makeDerivationGoal(*optDrvPath, outputs, buildMode);
+
+    if (!finalExitCode(upcast_goal(g)->exitCode)) {
+        /* The original concrete goal has already finished and been
+           destroyed, so reset this variable and double-suspend */
+        concreteDrvGoal = g;
+        needsRestart = true;
+    }
 }
 
 Goal::Co DerivationCreationAndRealisationGoal::init()
@@ -108,10 +115,12 @@ Goal::Co DerivationCreationAndRealisationGoal::init()
         g->preserveException = true;
     }
     optDrvPath = std::move(drvPath);
-    {
+
+    do {
+        needsRestart = false;
         Goals waitees{upcast_goal(concreteDrvGoal)};
         co_await await(std::move(waitees));
-    }
+    } while (needsRestart);
 
     trace("outer build done");
 

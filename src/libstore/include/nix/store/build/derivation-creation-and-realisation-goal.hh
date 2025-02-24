@@ -48,6 +48,11 @@ struct DerivationCreationAndRealisationGoal : public Goal
     OutputsSpec wantedOutputs;
 
     /**
+     * Inner goal got recreated, need to wait again potentially.
+     */
+    bool needsRestart = false;
+
+    /**
      * The final output paths of the build.
      *
      * - For input-addressed derivations, always the precomputed paths

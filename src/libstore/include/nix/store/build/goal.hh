@@ -372,6 +372,18 @@ protected:
      */
     Done amDone(ExitCode result, std::optional<Error> ex = {});
 
+    /**
+     * @return true just for those `ExitCode`s that are avalid argument
+     * to `amDone`.
+     *
+     * Used for an assert in `amDone`, and also in some not-so-pretty
+     * goal-retry logic.
+     *
+     * @todo If the latter caller is removed, then this function no
+     * longer needs to be exposed.
+     */
+    static bool finalExitCode(ExitCode result);
+
 public:
     virtual void cleanup() { }
 
