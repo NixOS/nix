@@ -136,7 +136,12 @@ LocalStore::LocalStore(
     for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
         createDirs(perUserDir);
         if (!readOnly) {
-            if (chmod(perUserDir.c_str(), 0755) == -1)
+            auto st = lstat(perUserDir);
+
+            // Skip chmod call if the directory already has the correct permissions (0755).
+            // This is to avoid failing when the executing user lacks permissions to change the directory's permissions
+            // even if it would be no-op.
+            if ((st.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) != 0755 && chmod(perUserDir.c_str(), 0755) == -1)
                 throw SysError("could not set permissions on '%s' to 755", perUserDir);
         }
     }

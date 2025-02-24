@@ -12,6 +12,7 @@
 #include "local-fs-store.hh"
 #include "common-eval-args.hh"
 #include "legacy.hh"
+#include "man-pages.hh"
 
 #include <map>
 #include <iostream>

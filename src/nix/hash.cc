@@ -8,6 +8,7 @@
 #include "git.hh"
 #include "posix-source-accessor.hh"
 #include "misc-store-flags.hh"
+#include "man-pages.hh"
 
 using namespace nix;
 

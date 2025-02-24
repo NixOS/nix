@@ -12,6 +12,7 @@
 #include "legacy.hh"
 #include "posix-source-accessor.hh"
 #include "path-with-outputs.hh"
+#include "man-pages.hh"
 
 #ifndef _WIN32 // TODO implement on Windows or provide allowed-to-noop interface
 # include "local-store.hh"
