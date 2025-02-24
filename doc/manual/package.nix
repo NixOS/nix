@@ -22,7 +22,7 @@ let
 in
 
 mkMesonDerivation (finalAttrs: {
-  pname = "nix-manual";
+  pname = "determinate-nix-manual";
   inherit version;
 
   workDir = ./.;

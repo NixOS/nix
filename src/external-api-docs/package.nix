@@ -14,7 +14,7 @@ let
 in
 
 mkMesonDerivation (finalAttrs: {
-  pname = "nix-external-api-docs";
+  pname = "determinate-nix-external-api-docs";
   inherit version;
 
   workDir = ./.;

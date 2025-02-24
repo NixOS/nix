@@ -35,7 +35,7 @@ let
 in
 
 mkMesonLibrary (finalAttrs: {
-  pname = "nix-cmd";
+  pname = "determinate-nix-cmd";
   inherit version;
 
   workDir = ./.;

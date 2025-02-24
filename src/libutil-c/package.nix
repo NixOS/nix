@@ -14,7 +14,7 @@ let
 in
 
 mkMesonLibrary (finalAttrs: {
-  pname = "nix-util-c";
+  pname = "determinate-nix-util-c";
   inherit version;
 
   workDir = ./.;
