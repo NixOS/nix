@@ -12,6 +12,7 @@
 #include "posix-source-accessor.hh"
 #include "misc-store-flags.hh"
 #include "terminal.hh"
+#include "man-pages.hh"
 
 #include <nlohmann/json.hpp>
 
