@@ -1059,7 +1059,10 @@ public:
 
           1. `NIX_SSL_CERT_FILE`
           2. `SSL_CERT_FILE`
-        )"};
+        )",
+        {},
+        // Don't document the machine-specific default value
+        false};
 
 #if __linux__
     Setting<bool> filterSyscalls{
