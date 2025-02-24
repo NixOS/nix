@@ -165,7 +165,6 @@
                 f = import ./packaging/components.nix {
                   inherit (final) lib;
                   inherit officialRelease;
-                  inherit stdenv;
                   pkgs = final;
                   src = self;
                 };
