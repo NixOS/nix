@@ -396,7 +396,7 @@ public:
 
     void addWaitee(GoalPtr waitee);
 
-    virtual void waiteeDone(GoalPtr waitee, ExitCode result);
+    void waiteeDone(GoalPtr waitee, ExitCode result);
 
     virtual void handleChildOutput(Descriptor fd, std::string_view data)
     {

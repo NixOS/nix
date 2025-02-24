@@ -1052,49 +1052,36 @@ static void rewriteDerivation(Store & store, BasicDerivation & drv, const String
 
 std::optional<BasicDerivation> Derivation::tryResolve(Store & store, Store * evalStore) const
 {
-    std::map<std::pair<StorePath, std::string>, StorePath> inputDrvOutputs;
-
-    std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accum;
-    accum = [&](auto & inputDrv, auto & node) {
-        for (auto & [outputName, outputPath] : store.queryPartialDerivationOutputMap(inputDrv, evalStore)) {
-            if (outputPath) {
-                inputDrvOutputs.insert_or_assign({inputDrv, outputName}, *outputPath);
-                if (auto p = get(node.childMap, outputName))
-                    accum(*outputPath, *p);
+    return tryResolve(
+        store,
+        [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
+            try {
+                return resolveDerivedPath(store, SingleDerivedPath::Built{drvPath, outputName}, evalStore);
+            } catch (Error &) {
+                return std::nullopt;
             }
-        }
-    };
-
-    for (auto & [inputDrv, node] : inputDrvs.map)
-        accum(inputDrv, node);
-
-    return tryResolve(store, inputDrvOutputs);
+        });
 }
 
 static bool tryResolveInput(
     Store & store, StorePathSet & inputSrcs, StringMap & inputRewrites,
     const DownstreamPlaceholder * placeholderOpt,
-    const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode,
-    const std::map<std::pair<StorePath, std::string>, StorePath> & inputDrvOutputs)
+    ref<const SingleDerivedPath> drvPath, const DerivedPathMap<StringSet>::ChildNode & inputNode,
+    std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)> queryResolutionChain)
 {
-    auto getOutput = [&](const std::string & outputName) {
-        auto * actualPathOpt = get(inputDrvOutputs, { inputDrv, outputName });
-        if (!actualPathOpt)
-            warn("output %s of input %s missing, aborting the resolving",
-                outputName,
-                store.printStorePath(inputDrv)
-            );
-        return actualPathOpt;
-    };
-
     auto getPlaceholder = [&](const std::string & outputName) {
         return placeholderOpt
             ? DownstreamPlaceholder::unknownDerivation(*placeholderOpt, outputName)
-            : DownstreamPlaceholder::unknownCaOutput(inputDrv, outputName);
+            : [&]{
+                auto * p = std::get_if<SingleDerivedPath::Opaque>(&drvPath->raw());
+                // otherwise we should have had a placeholder to build-upon already
+                assert(p);
+                return DownstreamPlaceholder::unknownCaOutput(p->path, outputName);
+            }();
     };
 
     for (auto & outputName : inputNode.value) {
-        auto actualPathOpt = getOutput(outputName);
+        auto actualPathOpt = queryResolutionChain(drvPath, outputName);
         if (!actualPathOpt) return false;
         auto actualPath = *actualPathOpt;
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
@@ -1106,13 +1093,12 @@ static bool tryResolveInput(
     }
 
     for (auto & [outputName, childNode] : inputNode.childMap) {
-        auto actualPathOpt = getOutput(outputName);
-        if (!actualPathOpt) return false;
-        auto actualPath = *actualPathOpt;
         auto nextPlaceholder = getPlaceholder(outputName);
         if (!tryResolveInput(store, inputSrcs, inputRewrites,
-            &nextPlaceholder, actualPath, childNode,
-            inputDrvOutputs))
+            &nextPlaceholder,
+            make_ref<const SingleDerivedPath>(SingleDerivedPath::Built{drvPath, outputName}),
+            childNode,
+            queryResolutionChain))
             return false;
     }
     return true;
@@ -1120,7 +1106,7 @@ static bool tryResolveInput(
 
 std::optional<BasicDerivation> Derivation::tryResolve(
     Store & store,
-    const std::map<std::pair<StorePath, std::string>, StorePath> & inputDrvOutputs) const
+    std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)> queryResolutionChain) const
 {
     BasicDerivation resolved { *this };
 
@@ -1129,7 +1115,7 @@ std::optional<BasicDerivation> Derivation::tryResolve(
 
     for (auto & [inputDrv, inputNode] : inputDrvs.map)
         if (!tryResolveInput(store, resolved.inputSrcs, inputRewrites,
-            nullptr, inputDrv, inputNode, inputDrvOutputs))
+            nullptr, make_ref<const SingleDerivedPath>(SingleDerivedPath::Opaque{inputDrv}), inputNode, queryResolutionChain))
             return std::nullopt;
 
     rewriteDerivation(store, resolved, inputRewrites);

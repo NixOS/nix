@@ -79,13 +79,6 @@ struct DerivationGoal : public Goal
     OutputsSpec wantedOutputs;
 
     /**
-     * Mapping from input derivations + output names to actual store
-     * paths. This is filled in by waiteeDone() as each dependency
-     * finishes, before `trace("all inputs realised")` is reached.
-     */
-    std::map<std::pair<StorePath, std::string>, StorePath> inputDrvOutputs;
-
-    /**
      * See `needRestart`; just for that field.
      */
     enum struct NeedRestartForMoreOutputs {
@@ -330,8 +323,6 @@ struct DerivationGoal : public Goal
         BuildResult::Status status,
         SingleDrvOutputs builtOutputs = {},
         std::optional<Error> ex = {});
-
-    void waiteeDone(GoalPtr waitee, ExitCode result) override;
 
     StorePathSet exportReferences(const StorePathSet & storePaths);
 
