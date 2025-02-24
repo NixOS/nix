@@ -76,6 +76,9 @@ if ! isTestOnNixOS; then
 fi
 (! grep narHash "$subflake2/flake.lock")
 
+# Test `nix flake archive` with relative path flakes.
+nix flake archive --json "$rootFlake"
+
 # Test circular relative path flakes. FIXME: doesn't work at the moment.
 if false; then
 
