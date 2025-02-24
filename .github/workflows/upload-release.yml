@@ -83,6 +83,7 @@ jobs:
           ids_project_name: determinate-nix
           ids_binary_prefix: determinate-nix
           skip_acl: true
+          allowed_branches: '["detsys-main"]'
 
   publish:
     needs:
