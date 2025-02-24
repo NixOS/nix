@@ -23,7 +23,7 @@ pkgs.nixComponents.nix-util.overrideAttrs (
     pname = "shell-for-" + attrs.pname;
 
     # Remove the version suffix to avoid unnecessary attempts to substitute in nix develop
-    version = lib.fileContents ../.version;
+    version = lib.fileContents ../.version-determinate;
     name = attrs.pname;
 
     installFlags = "sysconfdir=$(out)/etc";

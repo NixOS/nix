@@ -26,7 +26,7 @@ let
     pkg-config
     ;
 
-  baseVersion = lib.fileContents ../.version;
+  baseVersion = lib.fileContents ../.version-determinate;
 
   versionSuffix = lib.optionalString (!officialRelease) "pre";
 
