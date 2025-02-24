@@ -50,6 +50,7 @@ let
     exts: userFn: stdenv.mkDerivation (lib.extends (lib.composeManyExtensions exts) userFn);
 
   setVersionLayer = finalAttrs: prevAttrs: {
+    /*
     preConfigure =
       prevAttrs.prevAttrs or ""
       +
@@ -59,6 +60,7 @@ let
           chmod u+w ./.version
           echo ${finalAttrs.version} > ./.version
         '';
+    */
   };
 
   localSourceLayer =
