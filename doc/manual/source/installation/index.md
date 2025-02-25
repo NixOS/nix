@@ -1,18 +1,11 @@
 # Installation
 
 This section describes how to install and configure Nix for first-time use.
+Nix follows a [multi-user](./multi-user.md) model on both Linux and macOS.
 
-The current recommended option on Linux and MacOS is [multi-user](#multi-user).
-
-## Multi-user
-
-This installation offers better sharing, improved isolation, and more security
-over a single user installation.
-
-This option requires either:
-
-* Linux running systemd, with SELinux disabled
-* MacOS
+```console
+$ curl -L https://nixos.org/nix/install | sh -s -- --daemon
+```
 
 > **Updating to macOS 15 Sequoia**
 >
@@ -21,23 +14,6 @@ This option requires either:
 > error: the user '_nixbld1' in the group 'nixbld' does not exist
 > ```
 > when running Nix commands, refer to GitHub issue [NixOS/nix#10892](https://github.com/NixOS/nix/issues/10892) for instructions to fix your installation without reinstalling.
-
-```console
-$ curl -L https://nixos.org/nix/install | sh -s -- --daemon
-```
-
-## Single-user
-
-> Single-user is not supported on Mac.
-
-This installation has less requirements than the multi-user install, however it
-cannot offer equivalent sharing, isolation, or security.
-
-This option is suitable for systems without systemd.
-
-```console
-$ curl -L https://nixos.org/nix/install | sh -s -- --no-daemon
-```
 
 ## Distributions
 

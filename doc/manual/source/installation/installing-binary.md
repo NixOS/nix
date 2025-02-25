@@ -19,11 +19,6 @@ This performs the default type of installation for your platform:
 - [Multi-user](#multi-user-installation):
   - Linux with systemd and without SELinux
   - macOS
-- [Single-user](#single-user-installation):
-  - Linux without systemd
-  - Linux with SELinux
-
-We recommend the multi-user installation if it supports your platform and you can authenticate with `sudo`.
 
 The installer can configured with various command line arguments and environment variables.
 To show available command line flags:
@@ -42,7 +37,7 @@ The directory for each version contains the corresponding SHA-256 hash.
 All installation scripts are invoked the same way:
 
 ```console
-$ export VERSION=2.19.2 
+$ export VERSION=2.19.2
 $ curl -L https://releases.nixos.org/nix/nix-$VERSION/install | sh
 ```
 
@@ -63,24 +58,6 @@ $ bash <(curl -L https://nixos.org/nix/install) --daemon
 
 You can run this under your usual user account or `root`.
 The script will invoke `sudo` as needed.
-
-# Single User Installation
-
-To explicitly select a single-user installation on your system:
-
-```console
-$ bash <(curl -L https://nixos.org/nix/install) --no-daemon
-```
-
-In a single-user installation, `/nix` is owned by the invoking user.
-The script will invoke `sudo` to create `/nix` if it doesn’t already exist.
-If you don’t have `sudo`, manually create `/nix` as `root`:
-
-```console
-$ su root
-# mkdir /nix
-# chown alice /nix
-```
 
 # Installing from a binary tarball
 
