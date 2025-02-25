@@ -546,7 +546,8 @@ Installables SourceExprCommand::parseInstallables(
                         std::move(extendedOutputsSpec),
                         getDefaultFlakeAttrPaths(),
                         getDefaultFlakeAttrPathPrefixes(),
-                        lockFlags));
+                        lockFlags,
+                        getDefaultFlakeSchemas()));
                 continue;
             } catch (...) {
                 ex = std::current_exception();

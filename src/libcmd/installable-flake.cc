@@ -17,6 +17,7 @@
 #include "url.hh"
 #include "registry.hh"
 #include "build-result.hh"
+#include "flake-schemas.hh"
 
 #include <regex>
 #include <queue>
@@ -61,13 +62,15 @@ InstallableFlake::InstallableFlake(
     ExtendedOutputsSpec extendedOutputsSpec,
     Strings attrPaths,
     Strings prefixes,
-    const flake::LockFlags & lockFlags)
+    const flake::LockFlags & lockFlags,
+    std::optional<FlakeRef> defaultFlakeSchemas)
     : InstallableValue(state),
       flakeRef(flakeRef),
       attrPaths(fragment == "" ? attrPaths : Strings{(std::string) fragment}),
       prefixes(fragment == "" ? Strings{} : prefixes),
       extendedOutputsSpec(std::move(extendedOutputsSpec)),
-      lockFlags(lockFlags)
+      lockFlags(lockFlags),
+      defaultFlakeSchemas(defaultFlakeSchemas)
 {
     if (cmd && cmd->getAutoArgs(*state)->size())
         throw UsageError("'--arg' and '--argstr' are incompatible with flakes");

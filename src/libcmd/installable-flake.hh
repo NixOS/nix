@@ -38,6 +38,7 @@ struct InstallableFlake : InstallableValue
     ExtendedOutputsSpec extendedOutputsSpec;
     const flake::LockFlags & lockFlags;
     mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
+    std::optional<FlakeRef> defaultFlakeSchemas;
 
     InstallableFlake(
         SourceExprCommand * cmd,
@@ -47,7 +48,8 @@ struct InstallableFlake : InstallableValue
         ExtendedOutputsSpec extendedOutputsSpec,
         Strings attrPaths,
         Strings prefixes,
-        const flake::LockFlags & lockFlags);
+        const flake::LockFlags & lockFlags,
+        std::optional<FlakeRef> defaultFlakeSchemas);
 
     std::string what() const override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
 

@@ -202,6 +202,10 @@ std::shared_ptr<AttrCursor> derivation(ref<AttrCursor> leaf)
     return leaf->maybeGetAttr("derivation");
 }
 
+}
+
+namespace nix {
+
 MixFlakeSchemas::MixFlakeSchemas()
 {
     addFlag(

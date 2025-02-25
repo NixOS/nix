@@ -132,7 +132,16 @@ struct MixFlakeOptions : virtual Args, EvalCommand
     }
 };
 
-struct SourceExprCommand : virtual Args, MixFlakeOptions
+struct MixFlakeSchemas : virtual Args, virtual StoreCommand
+{
+    std::optional<std::string> defaultFlakeSchemas;
+
+    MixFlakeSchemas();
+
+    std::optional<FlakeRef> getDefaultFlakeSchemas();
+};
+
+struct SourceExprCommand : virtual Args, MixFlakeOptions, MixFlakeSchemas
 {
     std::optional<Path> file;
     std::optional<std::string> expr;

@@ -734,7 +734,8 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 element.source->outputs,
                 Strings{element.source->attrPath},
                 Strings{},
-                lockFlags);
+                lockFlags,
+                getDefaultFlakeSchemas());
 
             auto derivedPaths = installable->toDerivedPaths();
             if (derivedPaths.empty()) continue;

@@ -88,7 +88,8 @@ struct CmdBundle : InstallableValueCommand
              "defaultBundler." + settings.thisSystem.get()
             },
             {"bundlers." + settings.thisSystem.get() + "."},
-            lockFlags
+            lockFlags,
+            std::nullopt
         };
 
         auto vRes = evalState->allocValue();

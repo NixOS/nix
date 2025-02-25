@@ -32,14 +32,4 @@ std::optional<std::string> shortDescription(ref<AttrCursor> leaf);
 
 std::shared_ptr<AttrCursor> derivation(ref<AttrCursor> leaf);
 
-/* Some helper functions for processing flake schema output. */
-struct MixFlakeSchemas : virtual Args, virtual StoreCommand
-{
-    std::optional<std::string> defaultFlakeSchemas;
-
-    MixFlakeSchemas();
-
-    std::optional<FlakeRef> getDefaultFlakeSchemas();
-};
-
 }

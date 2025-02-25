@@ -302,7 +302,7 @@ struct CmdFlakeInfo : CmdFlakeMetadata
     }
 };
 
-struct CmdFlakeCheck : FlakeCommand, flake_schemas::MixFlakeSchemas
+struct CmdFlakeCheck : FlakeCommand, MixFlakeSchemas
 {
     bool build = true;
     bool checkAllSystems = false;
@@ -453,7 +453,7 @@ struct CmdFlakeCheck : FlakeCommand, flake_schemas::MixFlakeSchemas
 static Strings defaultTemplateAttrPathsPrefixes{"templates."};
 static Strings defaultTemplateAttrPaths = {"templates.default", "defaultTemplate"};
 
-struct CmdFlakeInitCommon : virtual Args, EvalCommand
+struct CmdFlakeInitCommon : virtual Args, EvalCommand, MixFlakeSchemas
 {
     std::string templateUrl = "templates";
     Path destDir;
@@ -493,7 +493,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             evalState, std::move(templateFlakeRef), templateName, ExtendedOutputsSpec::Default(),
             defaultTemplateAttrPaths,
             defaultTemplateAttrPathsPrefixes,
-            lockFlags);
+            lockFlags,
+            getDefaultFlakeSchemas());
 
         auto cursor = installable.getCursor(*evalState);
 
@@ -727,7 +728,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
     }
 };
 
-struct CmdFlakeShow : FlakeCommand, MixJSON, flake_schemas::MixFlakeSchemas
+struct CmdFlakeShow : FlakeCommand, MixJSON, MixFlakeSchemas
 {
     bool showLegacy = false;
     bool showAllSystems = false;

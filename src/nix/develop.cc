@@ -656,7 +656,8 @@ struct CmdDevelop : Common, MixEnvironment
                 ExtendedOutputsSpec::Default(),
                 Strings{},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
-                nixpkgsLockFlags);
+                nixpkgsLockFlags,
+                std::nullopt);
 
             bool found = false;
 
