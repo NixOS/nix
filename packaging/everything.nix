@@ -69,7 +69,7 @@ let
       };
 
   dev = stdenv.mkDerivation (finalAttrs: {
-    name = "nix-${nix-cli.version}-dev";
+    name = "determinate-nix-${nix-cli.version}-dev";
     pname = "nix";
     version = nix-cli.version;
     dontUnpack = true;
@@ -120,7 +120,7 @@ let
 
 in
 (buildEnv {
-  name = "nix-${nix-cli.version}";
+  name = "determinate-nix-${nix-cli.version}";
   paths = [
     nix-cli
     nix-manual.man

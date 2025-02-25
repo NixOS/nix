@@ -18,7 +18,7 @@ in
 
 perl.pkgs.toPerlModule (
   mkMesonDerivation (finalAttrs: {
-    pname = "nix-perl";
+    pname = "determinate-nix-perl";
     inherit version;
 
     workDir = ./.;

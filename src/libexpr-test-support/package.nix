@@ -18,7 +18,7 @@ let
 in
 
 mkMesonLibrary (finalAttrs: {
-  pname = "nix-util-test-support";
+  pname = "determinate-nix-util-test-support";
   inherit version;
 
   workDir = ./.;

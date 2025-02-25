@@ -17,7 +17,7 @@ let
 in
 
 mkMesonLibrary (finalAttrs: {
-  pname = "nix-fetchers";
+  pname = "determinate-nix-fetchers";
   inherit version;
 
   workDir = ./.;

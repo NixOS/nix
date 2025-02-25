@@ -18,7 +18,7 @@ let
 in
 
 mkMesonLibrary (finalAttrs: {
-  pname = "nix-flake";
+  pname = "determinate-nix-flake";
   inherit version;
 
   workDir = ./.;
