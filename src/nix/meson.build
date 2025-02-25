@@ -86,7 +86,6 @@ nix_sources = [config_h] + files(
   'edit.cc',
   'env.cc',
   'eval.cc',
-  'flake-schemas.cc',
   'flake.cc',
   'fmt.cc',
   'hash.cc',
@@ -132,8 +131,6 @@ nix_sources += [
   gen_header.process('get-env.sh'),
   gen_header.process('profiles.md'),
   gen_header.process('help-stores.md'),
-  gen_header.process('call-flake-schemas.nix'),
-  gen_header.process('builtin-flake-schemas.nix'),
 ]
 
 # The rest of the subdirectories aren't separate components,
