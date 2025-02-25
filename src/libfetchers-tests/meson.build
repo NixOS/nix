@@ -46,8 +46,9 @@ add_project_arguments(
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'access-tokens.cc',
+  'git-utils.cc',
   'public-key.cc',
-  'git-utils.cc'
 )
 
 include_dirs = [include_directories('.')]
