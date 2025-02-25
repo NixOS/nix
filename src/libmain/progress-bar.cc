@@ -560,15 +560,4 @@ std::unique_ptr<Logger> makeProgressBar()
     return std::make_unique<ProgressBar>(isTTY());
 }
 
-void startProgressBar()
-{
-    logger = makeProgressBar();
-}
-
-void stopProgressBar()
-{
-    if (auto progressBar = dynamic_cast<ProgressBar *>(logger.get()))
-        progressBar->stop();
-}
-
 }

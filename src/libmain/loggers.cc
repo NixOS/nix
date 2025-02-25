@@ -50,11 +50,6 @@ void setLogFormat(const std::string & logFormatStr)
 void setLogFormat(const LogFormat & logFormat)
 {
     defaultLogFormat = logFormat;
-    createDefaultLogger();
-}
-
-void createDefaultLogger()
-{
     logger = makeDefaultLogger();
 }
 

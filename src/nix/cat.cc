@@ -1,7 +1,6 @@
 #include "command.hh"
 #include "store-api.hh"
 #include "nar-accessor.hh"
-#include "progress-bar.hh"
 
 using namespace nix;
 
@@ -14,7 +13,7 @@ struct MixCat : virtual Args
         auto st = accessor->lstat(CanonPath(path));
         if (st.type != SourceAccessor::Type::tRegular)
             throw Error("path '%1%' is not a regular file", path);
-        stopProgressBar();
+        logger->stop();
 
         writeFull(getStandardOutput(), accessor->readFile(CanonPath(path)));
     }

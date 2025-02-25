@@ -7,7 +7,6 @@
 #include "eval-settings.hh"
 #include "attr-path.hh"
 #include "names.hh"
-#include "progress-bar.hh"
 #include "executable-path.hh"
 #include "self-exe.hh"
 
@@ -71,7 +70,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         auto version = DrvName(storePath.name()).version;
 
         if (dryRun) {
-            stopProgressBar();
+            logger->stop();
             warn("would upgrade to version %s", version);
             return;
         }
@@ -89,7 +88,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
                 throw Error("could not verify that '%s' works", program);
         }
 
-        stopProgressBar();
+        logger->stop();
 
         {
             Activity act(*logger, lvlInfo, actUnknown,
