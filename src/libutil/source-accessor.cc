@@ -114,9 +114,29 @@ CanonPath SourceAccessor::resolveSymlinks(
                     if (!linksAllowed--)
                         throw Error("infinite symlink recursion in path '%s'", showPath(path));
                     auto target = readLink(res);
-                    res.pop();
-                    if (isAbsolute(target))
+                    if (isAbsolute(target)) {
+                        auto prefixLen = ownLocationForSymlinkResolution.size();
+                        /* TODO need to support windows paths without making
+                           Unix vulnerability. The problem is we don't know whether
+                           the target (which is *not* a `CanonPath`) is a
+                           Windows or Unix path. Because of remote stores to
+                           other OSes, and abstract stores (which should
+                           have host-OS-agnostic designs), we cannot simply
+                           use whether we are running on Unix or Windows for
+                           this. */
+                        if (!(hasPrefix(target, ownLocationForSymlinkResolution) && (target.size() == prefixLen || target[prefixLen] == '/'))) {
+                            throw Error(
+                                "cannot resolve '%s': "
+                                "symlink target '%s' points outside source accessor that is considered to reside at '%s'",
+                                showPath(path),
+                                target,
+                                ownLocationForSymlinkResolution);
+                        }
+                        target = std::move(target).substr(prefixLen);
                         res = CanonPath::root;
+                    } else {
+                        res.pop();
+                    }
                     todo.splice(todo.begin(), tokenizeString<std::list<std::string>>(target, "/"));
                 }
             }
