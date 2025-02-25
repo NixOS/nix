@@ -208,17 +208,17 @@ struct GitArchiveInputScheme : InputScheme
     {
         auto owner = getStrAttr(input.attrs, "owner");
         auto repo = getStrAttr(input.attrs, "repo");
-        auto urlGen = fmt( "%s/%s/%s", host, owner, repo);
-        return makeHeadersWithAuthTokens(settings, host, urlGen);
+        auto hostAndPath = fmt( "%s/%s/%s", host, owner, repo);
+        return makeHeadersWithAuthTokens(settings, host, hostAndPath);
     }
 
     Headers makeHeadersWithAuthTokens(
         const fetchers::Settings & settings,
         const std::string & host,
-        const std::string & url) const
+        const std::string & hostAndPath) const
     {
         Headers headers;
-        auto accessToken = getAccessToken(settings, host, url);
+        auto accessToken = getAccessToken(settings, host, hostAndPath);
         if (accessToken) {
             auto hdr = accessHeaderFromToken(*accessToken);
             if (hdr)
