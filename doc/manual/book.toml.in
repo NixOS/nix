@@ -1,5 +1,5 @@
 [book]
-title = "Nix Reference Manual"
+title = "Nix @version@ Reference Manual"
 src = "source"
 
 [output.html]

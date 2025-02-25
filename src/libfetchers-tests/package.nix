@@ -7,6 +7,7 @@
   nix-fetchers,
   nix-store-test-support,
 
+  libgit2,
   rapidcheck,
   gtest,
   runCommand,
@@ -42,15 +43,8 @@ mkMesonExecutable (finalAttrs: {
     nix-store-test-support
     rapidcheck
     gtest
+    libgit2
   ];
-
-  preConfigure =
-    # "Inline" .version so it's not a symlink, and includes the suffix.
-    # Do the meson utils, without modification.
-    ''
-      chmod u+w ./.version
-      echo ${version} > ../../.version
-    '';
 
   mesonFlags = [
   ];

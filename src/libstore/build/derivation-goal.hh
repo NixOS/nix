@@ -2,6 +2,7 @@
 ///@file
 
 #include "parsed-derivations.hh"
+#include "derivation-options.hh"
 #ifndef _WIN32
 #  include "user-lock.hh"
 #endif
@@ -56,6 +57,10 @@ struct InitialOutput {
 
 /**
  * A goal for building some or all of the outputs of a derivation.
+ *
+ * The derivation must already be present, either in the store in a drv
+ * or in memory. If the derivation itself needs to be gotten first, a
+ * `DerivationCreationAndRealisationGoal` goal must be used instead.
  */
 struct DerivationGoal : public Goal
 {
@@ -143,6 +148,7 @@ struct DerivationGoal : public Goal
     std::unique_ptr<Derivation> drv;
 
     std::unique_ptr<ParsedDerivation> parsedDrv;
+    std::unique_ptr<DerivationOptions> drvOptions;
 
     /**
      * The remainder is state held during the build.

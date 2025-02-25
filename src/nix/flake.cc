@@ -216,7 +216,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
         auto & flake = lockedFlake.flake;
 
         // Currently, all flakes are in the Nix store via the rootFS accessor.
-        auto storePath = store->printStorePath(sourcePathToStorePath(store, flake.path).first);
+        auto storePath = store->printStorePath(store->toStorePath(flake.path.path.abs()).first);
 
         if (json) {
             nlohmann::json j;
@@ -1079,7 +1079,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         StorePathSet sources;
 
-        auto storePath = sourcePathToStorePath(store, flake.flake.path).first;
+        auto storePath = store->toStorePath(flake.flake.path.path.abs()).first;
 
         sources.insert(storePath);
 
@@ -1090,19 +1090,21 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
             nlohmann::json jsonObj2 = json ? json::object() : nlohmann::json(nullptr);
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input)) {
-                    auto storePath =
-                        dryRun
-                        ? (*inputNode)->lockedRef.input.computeStorePath(*store)
-                        : (*inputNode)->lockedRef.input.fetchToStore(store).first;
-                    if (json) {
-                        auto& jsonObj3 = jsonObj2[inputName];
-                        jsonObj3["path"] = store->printStorePath(storePath);
-                        sources.insert(std::move(storePath));
-                        jsonObj3["inputs"] = traverse(**inputNode);
-                    } else {
-                        sources.insert(std::move(storePath));
-                        traverse(**inputNode);
+                    std::optional<StorePath> storePath;
+                    if (!(*inputNode)->lockedRef.input.isRelative()) {
+                        storePath =
+                            dryRun
+                            ? (*inputNode)->lockedRef.input.computeStorePath(*store)
+                            : (*inputNode)->lockedRef.input.fetchToStore(store).first;
+                        sources.insert(*storePath);
                     }
+                    if (json) {
+                        auto & jsonObj3 = jsonObj2[inputName];
+                        if (storePath)
+                            jsonObj3["path"] = store->printStorePath(*storePath);
+                        jsonObj3["inputs"] = traverse(**inputNode);
+                    } else
+                        traverse(**inputNode);
                 }
             }
             return jsonObj2;

@@ -11,6 +11,7 @@
 
 #include "current-process.hh"
 #include "parsed-derivations.hh"
+#include "derivation-options.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
@@ -27,6 +28,7 @@
 #include "users.hh"
 #include "network-proxy.hh"
 #include "compatibility-settings.hh"
+#include "man-pages.hh"
 
 using namespace nix;
 using namespace std::string_literals;
@@ -542,12 +544,13 @@ static void main_nix_build(int argc, char * * argv)
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
-        auto passAsFile = tokenizeString<StringSet>(getOr(drv.env, "passAsFile", ""));
+        ParsedDerivation parsedDrv(packageInfo.requireDrvPath(), drv);
+        DerivationOptions drvOptions = DerivationOptions::fromParsedDerivation(parsedDrv);
 
         int fileNr = 0;
 
         for (auto & var : drv.env)
-            if (passAsFile.count(var.first)) {
+            if (drvOptions.passAsFile.count(var.first)) {
                 auto fn = ".attr-" + std::to_string(fileNr++);
                 Path p = (tmpDir.path() / fn).string();
                 writeFile(p, var.second);
@@ -557,7 +560,7 @@ static void main_nix_build(int argc, char * * argv)
 
         std::string structuredAttrsRC;
 
-        if (env.count("__json")) {
+        if (parsedDrv.hasStructuredAttrs()) {
             StorePathSet inputs;
 
             std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputClosure;
@@ -574,8 +577,6 @@ static void main_nix_build(int argc, char * * argv)
 
             for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
                 accumInputClosure(inputDrv, inputNode);
-
-            ParsedDerivation parsedDrv(packageInfo.requireDrvPath(), drv);
 
             if (auto structAttrs = parsedDrv.prepareStructuredAttrs(*store, inputs)) {
                 auto json = structAttrs.value();

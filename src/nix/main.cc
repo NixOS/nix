@@ -388,8 +388,6 @@ void mainWrapped(int argc, char * * argv)
     }
     #endif
 
-    Finally f([] { logger->stop(); });
-
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
     auto extensionPos = programName.find_last_of(".");
@@ -557,6 +555,8 @@ void mainWrapped(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
+    // The CLI has a more detailed version than the libraries; see nixVersion.
+    nix::nixVersion = NIX_CLI_VERSION;
 #ifndef _WIN32
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.

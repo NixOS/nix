@@ -117,13 +117,15 @@ public:
     {
         {
             auto state(state_.lock());
-            if (!state->active) return;
-            state->active = false;
-            writeToStderr("\r\e[K");
-            updateCV.notify_one();
-            quitCV.notify_one();
+            if (state->active) {
+                state->active = false;
+                writeToStderr("\r\e[K");
+                updateCV.notify_one();
+                quitCV.notify_one();
+            }
         }
-        updateThread.join();
+        if (updateThread.joinable())
+            updateThread.join();
     }
 
     void pause() override {
@@ -553,9 +555,9 @@ public:
     }
 };
 
-Logger * makeProgressBar()
+std::unique_ptr<Logger> makeProgressBar()
 {
-    return new ProgressBar(isTTY());
+    return std::make_unique<ProgressBar>(isTTY());
 }
 
 void startProgressBar()
@@ -565,9 +567,8 @@ void startProgressBar()
 
 void stopProgressBar()
 {
-    auto progressBar = dynamic_cast<ProgressBar *>(logger);
-    if (progressBar) progressBar->stop();
-
+    if (auto progressBar = dynamic_cast<ProgressBar *>(logger.get()))
+        progressBar->stop();
 }
 
 }

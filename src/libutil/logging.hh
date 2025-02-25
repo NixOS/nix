@@ -3,6 +3,7 @@
 
 #include "error.hh"
 #include "config.hh"
+#include "file-descriptor.hh"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -179,11 +180,11 @@ struct PushActivity
     ~PushActivity() { setCurActivity(prevAct); }
 };
 
-extern Logger * logger;
+extern std::unique_ptr<Logger> logger;
 
-Logger * makeSimpleLogger(bool printBuildLogs = true);
+std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
 
-Logger * makeJSONLogger(Logger & prevLogger);
+std::unique_ptr<Logger> makeJSONLogger(Descriptor fd);
 
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".

@@ -3,6 +3,7 @@
 #include "types.hh"
 #include <nlohmann/json_fwd.hpp>
 #include <iostream>
+#include <optional>
 
 namespace nix {
 
@@ -38,6 +39,15 @@ std::optional<nlohmann::json> optionalValueAt(const nlohmann::json::object_t & m
     return std::optional { map.at(key) };
 }
 
+std::optional<nlohmann::json> nullableValueAt(const nlohmann::json::object_t & map, const std::string & key)
+{
+    auto value = valueAt(map, key);
+
+    if (value.is_null())
+        return std::nullopt;
+
+    return std::optional { std::move(value) };
+}
 
 const nlohmann::json * getNullable(const nlohmann::json & value)
 {

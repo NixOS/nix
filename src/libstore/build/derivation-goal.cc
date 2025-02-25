@@ -137,20 +137,7 @@ Goal::Co DerivationGoal::init() {
     trace("init");
 
     if (useDerivation) {
-        /* The first thing to do is to make sure that the derivation
-           exists.  If it doesn't, it may be created through a
-           substitute. */
-
-        if (buildMode != bmNormal || !worker.evalStore.isValidPath(drvPath)) {
-            addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
-            co_await Suspend{};
-        }
-
         trace("loading derivation");
-
-        if (nrFailed != 0) {
-            co_return done(BuildResult::MiscFailure, {}, Error("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath)));
-        }
 
         /* `drvPath' should already be a root, but let's be on the safe
            side: if the user forgot to make it a root, we wouldn't want
@@ -181,6 +168,7 @@ Goal::Co DerivationGoal::haveDerivation()
     trace("have derivation");
 
     parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
+    drvOptions = std::make_unique<DerivationOptions>(DerivationOptions::fromParsedDerivation(*parsedDrv));
 
     if (!drv->type().hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -237,7 +225,7 @@ Goal::Co DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    if (settings.useSubstitutes && parsedDrv->substitutesAllowed())
+    if (settings.useSubstitutes && drvOptions->substitutesAllowed())
         for (auto & [outputName, status] : initialOutputs) {
             if (!status.wanted) continue;
             if (!status.known)
@@ -627,7 +615,7 @@ Goal::Co DerivationGoal::tryToBuild()
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
     bool buildLocally =
-        (buildMode != bmNormal || parsedDrv->willBuildLocally(worker.store))
+        (buildMode != bmNormal || drvOptions->willBuildLocally(worker.store, *drv))
         && settings.maxBuildJobs.get() != 0;
 
     if (!buildLocally) {
@@ -1123,7 +1111,7 @@ HookReply DerivationGoal::tryBuildHook()
             << (worker.getNrLocalBuilds() < settings.maxBuildJobs ? 1 : 0)
             << drv->platform
             << worker.store.printStorePath(drvPath)
-            << parsedDrv->getRequiredSystemFeatures();
+            << drvOptions->getRequiredSystemFeatures(*drv);
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating
@@ -1552,23 +1540,24 @@ void DerivationGoal::waiteeDone(GoalPtr waitee, ExitCode result)
     if (!useDerivation || !drv) return;
     auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
-    auto * dg = dynamic_cast<DerivationGoal *>(&*waitee);
-    if (!dg) return;
+    std::optional info = tryGetConcreteDrvGoal(waitee);
+    if (!info) return;
+    const auto & [dg, drvReq] = *info;
 
-    auto * nodeP = fullDrv.inputDrvs.findSlot(DerivedPath::Opaque { .path = dg->drvPath });
+    auto * nodeP = fullDrv.inputDrvs.findSlot(drvReq.get());
     if (!nodeP) return;
     auto & outputs = nodeP->value;
 
     for (auto & outputName : outputs) {
-        auto buildResult = dg->getBuildResult(DerivedPath::Built {
-            .drvPath = makeConstantStorePathRef(dg->drvPath),
+        auto buildResult = dg.get().getBuildResult(DerivedPath::Built {
+            .drvPath = makeConstantStorePathRef(dg.get().drvPath),
             .outputs = OutputsSpec::Names { outputName },
         });
         if (buildResult.success()) {
             auto i = buildResult.builtOutputs.find(outputName);
             if (i != buildResult.builtOutputs.end())
                 inputDrvOutputs.insert_or_assign(
-                    { dg->drvPath, outputName },
+                    { dg.get().drvPath, outputName },
                     i->second.outPath);
         }
     }
