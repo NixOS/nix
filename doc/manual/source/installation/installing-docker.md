@@ -57,21 +57,3 @@ $ nix build ./\#hydraJobs.dockerImage.x86_64-linux
 $ docker load -i ./result/image.tar.gz
 $ docker run -ti nix:2.5pre20211105
 ```
-
-# Docker image with non-root Nix
-
-If you would like to run Nix in a container under a user other than `root`,
-you can build an image with a non-root single-user installation of Nix
-by specifying the `uid`, `gid`, `uname`, and `gname` arguments to `docker.nix`:
-
-```console
-$ nix build --file docker.nix \
-    --arg uid 1000 \
-    --arg gid 1000 \
-    --argstr uname user \
-    --argstr gname user \
-    --argstr name nix-user \
-    --out-link nix-user.tar.gz
-$ docker load -i nix-user.tar.gz
-$ docker run -ti nix-user
-```

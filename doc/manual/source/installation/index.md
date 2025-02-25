@@ -26,19 +26,6 @@ This option requires either:
 $ curl -L https://nixos.org/nix/install | sh -s -- --daemon
 ```
 
-## Single-user
-
-> Single-user is not supported on Mac.
-
-This installation has less requirements than the multi-user install, however it
-cannot offer equivalent sharing, isolation, or security.
-
-This option is suitable for systems without systemd.
-
-```console
-$ curl -L https://nixos.org/nix/install | sh -s -- --no-daemon
-```
-
 ## Distributions
 
 The Nix community maintains installers for several distributions.

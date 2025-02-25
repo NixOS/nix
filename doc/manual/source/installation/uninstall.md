@@ -154,12 +154,3 @@ which you may remove.
 > You do not have to reboot to finish uninstalling Nix.
 > The uninstall is complete.
 > macOS (Catalina+) directly controls root directories, and its read-only root will prevent you from manually deleting the empty `/nix` mountpoint.
-
-## Single User
-
-To remove a [single-user installation](./installing-binary.md#single-user-installation) of Nix, run:
-
-```console
-rm -rf /nix ~/.nix-channels ~/.nix-defexpr ~/.nix-profile
-```
-You might also want to manually remove references to Nix from your `~/.profile`.
