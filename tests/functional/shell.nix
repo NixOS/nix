@@ -88,7 +88,7 @@ let
       name = "shellDrvFakeBash4";
       builder = "/does/not/exist";
       inherit stdenv;
-      PATH="${fakeBash4}/bin:${path}";
+      PATH = "${fakeBash4}/bin:${path}";
     };
 
     # Used by nix-shell -p
@@ -127,7 +127,7 @@ let
       chmod a+rx $out/bin/ruby
     '';
 
-    fakeBash4 = runCommand "fakeBash4" {} ''
+    fakeBash4 = runCommand "fakeBash4" { } ''
       mkdir -p $out/bin
       echo 'echo 4' > $out/bin/bash
       chmod a+rx $out/bin/bash
