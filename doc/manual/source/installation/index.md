@@ -1,7 +1,8 @@
 # Installation
 
 This section describes how to install and configure Nix for first-time use.
-Nix follows a [multi-user](./multi-user.md) model on both Linux and macOS.
+Nix follows a [multi-user](./security.md#multi-user-model) model on both Linux
+and macOS.
 
 ```console
 $ curl -L https://nixos.org/nix/install | sh -s -- --daemon

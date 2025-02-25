@@ -102,7 +102,7 @@ Most Nix commands interpret the following environment variables:
 
   This variable should be set to `daemon` if you want to use the Nix
   daemon to execute Nix operations. This is necessary in [multi-user
-  Nix installations](@docroot@/installation/multi-user.md). If the Nix
+  Nix installations](@docroot@/installation/security.md#multi-user-model). If the Nix
   daemon's Unix socket is at some non-standard path, this variable
   should be set to `unix://path/to/socket`. Otherwise, it should be
   left unset.
