@@ -23,9 +23,15 @@ jobs:
         include:
           - scenario: on ubuntu
             runs-on: ubuntu-24.04
+            system: x86_64-linux
             os: linux
-          - scenario: on macos
+          - scenario: on macos (aarch64)
             runs-on: macos-14
+            system: aarch64-darwin
+            os: darwin
+          - scenario: on macos (x86_64)
+            runs-on: macos-14
+            system: x86_64-darwin
             os: darwin
     name: tests ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
@@ -40,6 +46,7 @@ jobs:
         extra_nix_config: |
           sandbox = true
           max-jobs = 1
+          system = ${{ matrix.system }}
     - uses: DeterminateSystems/magic-nix-cache-action@main
     # Since ubuntu 22.30, unprivileged usernamespaces are no longer allowed to map to the root user:
     # https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
@@ -58,6 +65,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # No x86_64-darwin (yet?) because of poor performance and similarity to aarch64-darwin
         include:
           - scenario: on ubuntu
             runs-on: ubuntu-24.04
