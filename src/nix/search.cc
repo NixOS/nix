@@ -92,9 +92,9 @@ struct CmdSearch : InstallableValueCommand, MixJSON
 
         uint64_t results = 0;
 
-        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
+        std::function<void(eval_cache::AttrCursor & cursor, const eval_cache::AttrPath & attrPath, bool initialRecurse)> visit;
 
-        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)
+        visit = [&](eval_cache::AttrCursor & cursor, const eval_cache::AttrPath & attrPath, bool initialRecurse)
         {
             auto attrPathS = state->symbols.resolve(attrPath);
 

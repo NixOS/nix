@@ -13,6 +13,8 @@ namespace nix::eval_cache {
 struct AttrDb;
 class AttrCursor;
 
+using AttrPath = std::vector<Symbol>;
+
 struct CachedEvalError : EvalError
 {
     const ref<AttrCursor> cursor;
@@ -77,7 +79,7 @@ typedef std::pair<AttrId, Symbol> AttrKey;
 typedef std::pair<std::string, NixStringContext> string_t;
 
 typedef std::variant<
-    std::vector<Symbol>,
+    AttrPath,
     string_t,
     placeholder_t,
     missing_t,
@@ -114,9 +116,9 @@ public:
         Value * value = nullptr,
         std::optional<std::pair<AttrId, AttrValue>> && cachedValue = {});
 
-    std::vector<Symbol> getAttrPath() const;
+    AttrPath getAttrPath() const;
 
-    std::vector<Symbol> getAttrPath(Symbol name) const;
+    AttrPath getAttrPath(Symbol name) const;
 
     std::string getAttrPathStr() const;
 
@@ -136,7 +138,7 @@ public:
      * Get an attribute along a chain of attrsets. Note that this does
      * not auto-call functors or functions.
      */
-    OrSuggestions<ref<AttrCursor>> findAlongAttrPath(const std::vector<Symbol> & attrPath);
+    OrSuggestions<ref<AttrCursor>> findAlongAttrPath(const AttrPath & attrPath);
 
     std::string getString();
 
@@ -148,7 +150,7 @@ public:
 
     std::vector<std::string> getListOfStrings();
 
-    std::vector<Symbol> getAttrs();
+    AttrPath getAttrs();
 
     bool isDerivation();
 

@@ -90,10 +90,10 @@ call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::op
 /* Derive the flake output attribute path from the cursor used to
    traverse the inventory. We do this so we don't have to maintain a
    separate attrpath for that. */
-std::vector<Symbol> toAttrPath(ref<AttrCursor> cursor)
+eval_cache::AttrPath toAttrPath(ref<AttrCursor> cursor)
 {
     auto attrPath = cursor->getAttrPath();
-    std::vector<Symbol> res;
+    eval_cache::AttrPath res;
     auto i = attrPath.begin();
     assert(i != attrPath.end());
     ++i; // skip "inventory"

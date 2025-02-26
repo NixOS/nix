@@ -120,7 +120,7 @@ struct AttrDb
 
     AttrId setAttrs(
         AttrKey key,
-        const std::vector<Symbol> & attrs)
+        const AttrPath & attrs)
     {
         return doSQLite([&]()
         {
@@ -312,7 +312,7 @@ struct AttrDb
                 return {{rowId, placeholder_t()}};
             case AttrType::FullAttrs: {
                 // FIXME: expensive, should separate this out.
-                std::vector<Symbol> attrs;
+                AttrPath attrs;
                 auto queryAttributes(state->queryAttributes.use()(rowId));
                 while (queryAttributes.next())
                     attrs.emplace_back(symbols.create(queryAttributes.getStr(0)));
@@ -424,7 +424,7 @@ Value & AttrCursor::getValue()
     return **_value;
 }
 
-std::vector<Symbol> AttrCursor::getAttrPath() const
+AttrPath AttrCursor::getAttrPath() const
 {
     if (parent) {
         auto attrPath = parent->first->getAttrPath();
@@ -434,7 +434,7 @@ std::vector<Symbol> AttrCursor::getAttrPath() const
         return {};
 }
 
-std::vector<Symbol> AttrCursor::getAttrPath(Symbol name) const
+AttrPath AttrCursor::getAttrPath(Symbol name) const
 {
     auto attrPath = getAttrPath();
     attrPath.push_back(name);
@@ -504,7 +504,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
             cachedValue = root->db->getAttr(getKey());
 
         if (cachedValue) {
-            if (auto attrs = std::get_if<std::vector<Symbol>>(&cachedValue->second)) {
+            if (auto attrs = std::get_if<AttrPath>(&cachedValue->second)) {
                 for (auto & attr : *attrs)
                     if (attr == name)
                         return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), attr));
@@ -574,7 +574,7 @@ ref<AttrCursor> AttrCursor::getAttr(std::string_view name)
     return getAttr(root->state.symbols.create(name));
 }
 
-OrSuggestions<ref<AttrCursor>> AttrCursor::findAlongAttrPath(const std::vector<Symbol> & attrPath)
+OrSuggestions<ref<AttrCursor>> AttrCursor::findAlongAttrPath(const AttrPath & attrPath)
 {
     auto res = shared_from_this();
     for (auto & attr : attrPath) {
@@ -734,13 +734,13 @@ std::vector<std::string> AttrCursor::getListOfStrings()
     return res;
 }
 
-std::vector<Symbol> AttrCursor::getAttrs()
+AttrPath AttrCursor::getAttrs()
 {
     if (root->db) {
         if (!cachedValue)
             cachedValue = root->db->getAttr(getKey());
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
-            if (auto attrs = std::get_if<std::vector<Symbol>>(&cachedValue->second)) {
+            if (auto attrs = std::get_if<AttrPath>(&cachedValue->second)) {
                 debug("using cached attrset attribute '%s'", getAttrPathStr());
                 return *attrs;
             } else
@@ -753,7 +753,7 @@ std::vector<Symbol> AttrCursor::getAttrs()
     if (v.type() != nAttrs)
         root->state.error<TypeError>("'%s' is not an attribute set", getAttrPathStr()).debugThrow();
 
-    std::vector<Symbol> attrs;
+    AttrPath attrs;
     for (auto & attr : *getValue().attrs())
         attrs.push_back(attr.name);
     std::sort(attrs.begin(), attrs.end(), [&](Symbol a, Symbol b) {
