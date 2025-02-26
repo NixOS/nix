@@ -30,7 +30,7 @@ public:
         // Create the repo with libgit2
         git_libgit2_init();
         git_repository * repo = nullptr;
-        auto r = git_repository_init(&repo, tmpDir.c_str(), 0);
+        auto r = git_repository_init(&repo, tmpDir.string().c_str(), 0);
         ASSERT_EQ(r, 0);
         git_repository_free(repo);
     }
@@ -49,7 +49,7 @@ public:
 
     std::string getRepoName() const
     {
-        return tmpDir.filename();
+        return tmpDir.filename().string();
     }
 };
 
