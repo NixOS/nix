@@ -378,7 +378,7 @@ public:
      */
     std::optional<Error> ex;
 
-    Goal(Worker & worker, DerivedPath path)
+    Goal(Worker & worker)
         : worker(worker), top_co(init_wrapper())
     {
         // top_co shouldn't have a goal already, should be nullptr.
