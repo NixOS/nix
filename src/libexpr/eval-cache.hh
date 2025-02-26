@@ -15,6 +15,10 @@ class AttrCursor;
 
 using AttrPath = std::vector<Symbol>;
 
+std::string toAttrPathStr(
+    EvalState & state,
+    const AttrPath & attrPath);
+
 struct CachedEvalError : EvalError
 {
     const ref<AttrCursor> cursor;
@@ -39,6 +43,12 @@ class EvalCache : public std::enable_shared_from_this<EvalCache>
 
 public:
     EvalState & state;
+
+    std::function<AttrPath(AttrPath &&)> cleanupAttrPath =
+        [](AttrPath && attrPath)
+        {
+            return std::move(attrPath);
+        };
 
 private:
     typedef std::function<Value *()> RootLoader;
@@ -118,7 +128,11 @@ public:
 
     AttrPath getAttrPath() const;
 
+    AttrPath getAttrPathRaw() const;
+
     AttrPath getAttrPath(Symbol name) const;
+
+    AttrPath getAttrPathRaw(Symbol name) const;
 
     std::string getAttrPathStr() const;
 

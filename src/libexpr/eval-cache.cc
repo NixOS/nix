@@ -424,31 +424,48 @@ Value & AttrCursor::getValue()
     return **_value;
 }
 
-AttrPath AttrCursor::getAttrPath() const
+AttrPath AttrCursor::getAttrPathRaw() const
 {
     if (parent) {
-        auto attrPath = parent->first->getAttrPath();
+        auto attrPath = parent->first->getAttrPathRaw();
         attrPath.push_back(parent->second);
         return attrPath;
     } else
         return {};
 }
 
-AttrPath AttrCursor::getAttrPath(Symbol name) const
+AttrPath AttrCursor::getAttrPath() const
 {
-    auto attrPath = getAttrPath();
+    return root->cleanupAttrPath(getAttrPathRaw());
+}
+
+AttrPath AttrCursor::getAttrPathRaw(Symbol name) const
+{
+    auto attrPath = getAttrPathRaw();
     attrPath.push_back(name);
     return attrPath;
 }
 
+AttrPath AttrCursor::getAttrPath(Symbol name) const
+{
+    return root->cleanupAttrPath(getAttrPathRaw(name));
+}
+
+std::string toAttrPathStr(
+    EvalState & state,
+    const AttrPath & attrPath)
+{
+    return dropEmptyInitThenConcatStringsSep(".", state.symbols.resolve(attrPath));
+}
+
 std::string AttrCursor::getAttrPathStr() const
 {
-    return dropEmptyInitThenConcatStringsSep(".", root->state.symbols.resolve(getAttrPath()));
+    return toAttrPathStr(root->state, getAttrPath());
 }
 
 std::string AttrCursor::getAttrPathStr(Symbol name) const
 {
-    return dropEmptyInitThenConcatStringsSep(".", root->state.symbols.resolve(getAttrPath(name)));
+    return toAttrPathStr(root->state, getAttrPath(name));
 }
 
 Value & AttrCursor::forceValue()

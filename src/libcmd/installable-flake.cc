@@ -163,24 +163,37 @@ std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state)
 std::vector<ref<eval_cache::AttrCursor>>
 InstallableFlake::getCursors(EvalState & state)
 {
-    auto evalCache = openEvalCache(state, getLockedFlake());
+    auto [cache, inventory] = flake_schemas::call(
+        state,
+        getLockedFlake(),
+        defaultFlakeSchemas);
 
-    auto root = evalCache->getRoot();
+    auto outputs = cache->getRoot()->getAttr("outputs");
 
     std::vector<ref<eval_cache::AttrCursor>> res;
 
     Suggestions suggestions;
     auto attrPaths = getActualAttrPaths();
 
-    for (auto & attrPath : attrPaths) {
-        debug("trying flake output attribute '%s'", attrPath);
+    for (auto & attrPathS : attrPaths) {
+        debug("trying flake output attribute '%s'", attrPathS);
 
-        auto attr = root->findAlongAttrPath(parseAttrPath(state, attrPath));
-        if (attr) {
-            res.push_back(ref(*attr));
-        } else {
-            suggestions += attr.getSuggestions();
+        auto attrPath = parseAttrPath(state, attrPathS);
+
+        auto outputInfo = flake_schemas::getOutput(inventory, attrPath);
+
+        if (outputInfo && outputInfo->leafAttrPath.empty()) {
+            if (auto drv = outputInfo->nodeInfo->maybeGetAttr("derivation")) {
+                res.push_back(ref(drv));
+                continue;
+            }
         }
+
+        auto attr = outputs->findAlongAttrPath(attrPath);
+        if (attr)
+            res.push_back(ref(*attr));
+        else
+            suggestions += attr.getSuggestions();
     }
 
     if (res.size() == 0)

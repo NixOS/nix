@@ -36,6 +36,8 @@ rec {
     )
   );
 
+  outputs = flake.outputs;
+
   inventory = builtins.mapAttrs (
     outputName: output:
     if schemas ? ${outputName} && schemas.${outputName}.version == 1 then
@@ -45,5 +47,5 @@ rec {
       }
     else
       { unknown = true; }
-  ) flake.outputs;
+  ) outputs;
 }

@@ -84,34 +84,40 @@ call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::op
             return vRes;
         });
 
+    /* Derive the flake output attribute path from the cursor used to
+       traverse the inventory. We do this so we don't have to maintain
+       a separate attrpath for that. */
+    cache->cleanupAttrPath = [&](eval_cache::AttrPath && attrPath)
+    {
+        eval_cache::AttrPath res;
+        auto i = attrPath.begin();
+        if (i == attrPath.end()) return attrPath;
+
+        if (state.symbols[*i] == "inventory") {
+            ++i;
+            if (i != attrPath.end()) {
+                res.push_back(*i++); // copy output name
+                if (i != attrPath.end())
+                    ++i; // skip "outputs"
+                while (i != attrPath.end()) {
+                    ++i; // skip "children"
+                    if (i != attrPath.end())
+                        res.push_back(*i++);
+                }
+            }
+        }
+
+        else if (state.symbols[*i] == "outputs") {
+            res.insert(res.begin(), ++i, attrPath.end());
+        }
+
+        else
+            abort();
+
+        return res;
+    };
+
     return {cache, cache->getRoot()->getAttr("inventory")};
-}
-
-/* Derive the flake output attribute path from the cursor used to
-   traverse the inventory. We do this so we don't have to maintain a
-   separate attrpath for that. */
-eval_cache::AttrPath toAttrPath(ref<AttrCursor> cursor)
-{
-    auto attrPath = cursor->getAttrPath();
-    eval_cache::AttrPath res;
-    auto i = attrPath.begin();
-    assert(i != attrPath.end());
-    ++i; // skip "inventory"
-    assert(i != attrPath.end());
-    res.push_back(*i++); // copy output name
-    if (i != attrPath.end())
-        ++i; // skip "outputs"
-    while (i != attrPath.end()) {
-        ++i; // skip "children"
-        if (i != attrPath.end())
-            res.push_back(*i++);
-    }
-    return res;
-}
-
-std::string toAttrPathStr(ref<AttrCursor> cursor)
-{
-    return concatStringsSep(".", cursor->root->state.symbols.resolve(toAttrPath(cursor)));
 }
 
 void forEachOutput(
@@ -126,13 +132,13 @@ void forEachOutput(
         auto output = inventory->getAttr(outputName);
         try {
             auto isUnknown = (bool) output->maybeGetAttr("unknown");
-            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", toAttrPathStr(output)));
+            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", output->getAttrPathStr()));
             f(outputName,
               isUnknown ? std::shared_ptr<AttrCursor>() : output->getAttr("output"),
               isUnknown ? "" : output->getAttr("doc")->getString(),
               i + 1 == outputNames.size());
         } catch (Error & e) {
-            e.addTrace(nullptr, "while evaluating the flake output '%s':", toAttrPathStr(output));
+            e.addTrace(nullptr, "while evaluating the flake output '%s':", output->getAttrPathStr());
             throw;
         }
     }
@@ -145,7 +151,7 @@ void visit(
     std::function<void(std::function<void(ForEachChild)>)> visitNonLeaf,
     std::function<void(ref<AttrCursor> node, const std::vector<std::string> & systems)> visitFiltered)
 {
-    Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", toAttrPathStr(node)));
+    Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", node->getAttrPathStr()));
 
     /* Apply the system type filter. */
     if (system) {
@@ -166,8 +172,8 @@ void visit(
                     f(attrName, children->getAttr(attrName), i + 1 == attrNames.size());
                 } catch (Error & e) {
                     // FIXME: make it a flake schema attribute whether to ignore evaluation errors.
-                    if (node->root->state.symbols[toAttrPath(node)[0]] != "legacyPackages") {
-                        e.addTrace(nullptr, "while evaluating the flake output attribute '%s':", toAttrPathStr(node));
+                    if (node->root->state.symbols[node->getAttrPath()[0]] != "legacyPackages") {
+                        e.addTrace(nullptr, "while evaluating the flake output attribute '%s':", node->getAttrPathStr());
                         throw;
                     }
                 }
@@ -200,6 +206,41 @@ std::optional<std::string> shortDescription(ref<AttrCursor> leaf)
 std::shared_ptr<AttrCursor> derivation(ref<AttrCursor> leaf)
 {
     return leaf->maybeGetAttr("derivation");
+}
+
+std::optional<OutputInfo> getOutput(
+    ref<AttrCursor> inventory,
+    eval_cache::AttrPath attrPath)
+{
+    if (attrPath.empty())
+        return std::nullopt;
+
+    auto outputName = attrPath.front();
+
+    auto schemaInfo = inventory->maybeGetAttr(outputName);
+    if (!schemaInfo) // FIXME: shouldn't be needed
+        return std::nullopt;
+
+    auto node = schemaInfo->maybeGetAttr("output");
+    if (!node)
+        return std::nullopt;
+
+    auto pathLeft = std::span(attrPath).subspan(1);
+
+    while (!pathLeft.empty()) {
+        auto children = node->maybeGetAttr("children");
+        if (!children) break;
+        auto attr = pathLeft.front();
+        node = children->maybeGetAttr(attr); // FIXME: add suggestions
+        if (!node) return std::nullopt;
+        pathLeft = pathLeft.subspan(1);
+    }
+
+    return OutputInfo {
+        .schemaInfo = ref(schemaInfo),
+        .nodeInfo = ref(node),
+        .leafAttrPath = std::vector(pathLeft.begin(), pathLeft.end()),
+    };
 }
 
 }

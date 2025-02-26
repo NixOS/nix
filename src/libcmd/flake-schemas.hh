@@ -9,10 +9,6 @@ using namespace eval_cache;
 std::tuple<ref<eval_cache::EvalCache>, ref<AttrCursor>>
 call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::optional<FlakeRef> defaultSchemasFlake);
 
-eval_cache::AttrPath toAttrPath(ref<AttrCursor> cursor);
-
-std::string toAttrPathStr(ref<AttrCursor> cursor);
-
 void forEachOutput(
     ref<AttrCursor> inventory,
     std::function<void(Symbol outputName, std::shared_ptr<AttrCursor> output, const std::string & doc, bool isLast)> f);
@@ -31,5 +27,16 @@ std::optional<std::string> what(ref<AttrCursor> leaf);
 std::optional<std::string> shortDescription(ref<AttrCursor> leaf);
 
 std::shared_ptr<AttrCursor> derivation(ref<AttrCursor> leaf);
+
+struct OutputInfo
+{
+    ref<AttrCursor> schemaInfo;
+    ref<AttrCursor> nodeInfo;
+    eval_cache::AttrPath leafAttrPath;
+};
+
+std::optional<OutputInfo> getOutput(
+    ref<AttrCursor> inventory,
+    eval_cache::AttrPath attrPath);
 
 }

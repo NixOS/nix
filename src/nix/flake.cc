@@ -387,7 +387,7 @@ struct CmdFlakeCheck : FlakeCommand, MixFlakeSchemas
                             auto cursor = evalChecks->getAttr(checkName);
                             auto b = cursor->getBool();
                             if (!b)
-                                reportError(Error("Evaluation check '%s' failed.", flake_schemas::toAttrPathStr(cursor)));
+                                reportError(Error("Evaluation check '%s' failed.", cursor->getAttrPathStr()));
                         }
                     }
 
@@ -802,7 +802,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON, MixFlakeSchemas
                                 visit(node, j);
                             } catch (EvalError & e) {
                                 // FIXME: make it a flake schema attribute whether to ignore evaluation errors.
-                                if (node->root->state.symbols[flake_schemas::toAttrPath(node)[0]] == "legacyPackages")
+                                if (node->root->state.symbols[node->getAttrPath()[0]] == "legacyPackages")
                                     j.emplace("failed", true);
                                 else
                                     throw;
