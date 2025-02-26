@@ -132,6 +132,7 @@
   - [Contributing](development/contributing.md)
 - [Releases](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
+  - [Release 2.27 (2025-02-26)](release-notes/rl-2.27.md)
   - [Release 2.26 (2025-01-22)](release-notes/rl-2.26.md)
   - [Release 2.25 (2024-11-07)](release-notes/rl-2.25.md)
   - [Release 2.24 (2024-07-31)](release-notes/rl-2.24.md)
