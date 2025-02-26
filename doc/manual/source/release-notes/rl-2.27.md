@@ -26,6 +26,14 @@
 
   Author: [**@b-camacho**](https://github.com/b-camacho), [**@kip93**](https://github.com/kip93)
 
+- Handle the case where a chroot store is used and some inputs are in the "host" `/nix/store` [#12512](https://github.com/NixOS/nix/pull/12512)
+
+  The evaluator now presents a "union" filesystem view of the `/nix/store` in the host and the chroot.
+
+  This change also removes some hacks that broke `builtins.{path,filterSource}` in chroot stores [#11503](https://github.com/NixOS/nix/issue/11503).
+
+- `nix flake prefetch` now has a `--out-link` option [#12443](https://github.com/NixOS/nix/issue/12443)
+
 - Set `FD_CLOEXEC` on sockets created by curl [#12439](https://github.com/NixOS/nix/pull/12439)
 
   Curl created sockets without setting `FD_CLOEXEC`/`SOCK_CLOEXEC`. This could previously cause connections to remain open forever when using commands like `nix shell`. This change sets the `FD_CLOEXEC` flag using a `CURLOPT_SOCKOPTFUNCTION` callback.
