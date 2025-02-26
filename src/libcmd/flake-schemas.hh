@@ -35,8 +35,6 @@ struct OutputInfo
     eval_cache::AttrPath leafAttrPath;
 };
 
-std::optional<OutputInfo> getOutput(
-    ref<AttrCursor> inventory,
-    eval_cache::AttrPath attrPath);
+std::optional<OutputInfo> getOutput(ref<AttrCursor> inventory, eval_cache::AttrPath attrPath);
 
 }

@@ -87,11 +87,11 @@ call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::op
     /* Derive the flake output attribute path from the cursor used to
        traverse the inventory. We do this so we don't have to maintain
        a separate attrpath for that. */
-    cache->cleanupAttrPath = [&](eval_cache::AttrPath && attrPath)
-    {
+    cache->cleanupAttrPath = [&](eval_cache::AttrPath && attrPath) {
         eval_cache::AttrPath res;
         auto i = attrPath.begin();
-        if (i == attrPath.end()) return attrPath;
+        if (i == attrPath.end())
+            return attrPath;
 
         if (state.symbols[*i] == "inventory") {
             ++i;
@@ -173,7 +173,8 @@ void visit(
                 } catch (Error & e) {
                     // FIXME: make it a flake schema attribute whether to ignore evaluation errors.
                     if (node->root->state.symbols[node->getAttrPath()[0]] != "legacyPackages") {
-                        e.addTrace(nullptr, "while evaluating the flake output attribute '%s':", node->getAttrPathStr());
+                        e.addTrace(
+                            nullptr, "while evaluating the flake output attribute '%s':", node->getAttrPathStr());
                         throw;
                     }
                 }
@@ -208,9 +209,7 @@ std::shared_ptr<AttrCursor> derivation(ref<AttrCursor> leaf)
     return leaf->maybeGetAttr("derivation");
 }
 
-std::optional<OutputInfo> getOutput(
-    ref<AttrCursor> inventory,
-    eval_cache::AttrPath attrPath)
+std::optional<OutputInfo> getOutput(ref<AttrCursor> inventory, eval_cache::AttrPath attrPath)
 {
     if (attrPath.empty())
         return std::nullopt;
@@ -229,14 +228,16 @@ std::optional<OutputInfo> getOutput(
 
     while (!pathLeft.empty()) {
         auto children = node->maybeGetAttr("children");
-        if (!children) break;
+        if (!children)
+            break;
         auto attr = pathLeft.front();
         node = children->maybeGetAttr(attr); // FIXME: add suggestions
-        if (!node) return std::nullopt;
+        if (!node)
+            return std::nullopt;
         pathLeft = pathLeft.subspan(1);
     }
 
-    return OutputInfo {
+    return OutputInfo{
         .schemaInfo = ref(schemaInfo),
         .nodeInfo = ref(node),
         .leafAttrPath = std::vector(pathLeft.begin(), pathLeft.end()),
