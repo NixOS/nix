@@ -32,4 +32,27 @@
 
 # Contributors
 
-Querying GitHub API for 5cf9e18167b86f39864e39e5fe129e5f6c1a15e0, to get handle for fabianm88@gmail.com
+This release was made possible by the following 21 contributors:
+
+- Aiden Fox Ivey [**(@aidenfoxivey)**](https://github.com/aidenfoxivey)
+- Ben Millwood [**(@bmillwood)**](https://github.com/bmillwood)
+- Brian Camacho [**(@b-camacho)**](https://github.com/b-camacho)
+- Brian McKenna [**(@puffnfresh)**](https://github.com/puffnfresh)
+- Eelco Dolstra [**(@edolstra)**](https://github.com/edolstra)
+- Fabian Möller [**(@B4dM4n)**](https://github.com/B4dM4n)
+- Illia Bobyr [**(@ilya-bobyr)**](https://github.com/ilya-bobyr)
+- Ivan Trubach [**(@tie)**](https://github.com/tie)
+- John Ericson [**(@Ericson2314)**](https://github.com/Ericson2314)
+- Jörg Thalheim [**(@Mic92)**](https://github.com/Mic92)
+- Leandro Emmanuel Reina Kiperman [**(@kip93)**](https://github.com/kip93)
+- MaxHearnden [**(@MaxHearnden)**](https://github.com/MaxHearnden)
+- Philipp Otterbein
+- Robert Hensing [**(@roberth)**](https://github.com/roberth)
+- Sandro [**(@SuperSandro2000)**](https://github.com/SuperSandro2000)
+- Sergei Zimmerman [**(@xokdvium)**](https://github.com/xokdvium)
+- Silvan Mosberger [**(@infinisil)**](https://github.com/infinisil)
+- Someone [**(@SomeoneSerge)**](https://github.com/SomeoneSerge)
+- Steve Walker [**(@stevalkr)**](https://github.com/stevalkr)
+- bcamacho2 [**(@bcamacho2)**](https://github.com/bcamacho2)
+- silvanshade [**(@silvanshade)**](https://github.com/silvanshade)
+- tomberek [**(@tomberek)**](https://github.com/tomberek)
