@@ -50,16 +50,6 @@ enum struct JobCategory {
      * A substitution an arbitrary store object; it will use network resources.
      */
     Substitution,
-    /**
-     * A goal that does no "real" work by itself, and just exists to depend on
-     * other goals which *do* do real work. These goals therefore are not
-     * limited.
-     *
-     * These goals cannot infinitely create themselves, so there is no risk of
-     * a "fork bomb" type situation (which would be a problem even though the
-     * goal do no real work) either.
-     */
-    Administration,
 };
 
 struct Goal : public std::enable_shared_from_this<Goal>
@@ -382,17 +372,6 @@ public:
      * ensures we don't.
      */
     BuildResult getBuildResult(const DerivedPath &) const;
-
-    /**
-     * Hack to say that this goal should not log `ex`, but instead keep
-     * it around. Set by a waitee which sees itself as the designated
-     * continuation of this goal, responsible for reporting its
-     * successes or failures.
-     *
-     * @todo this is yet another not-nice hack in the goal system that
-     * we ought to get rid of. See #11927
-     */
-    bool preserveException = false;
 
     /**
      * Exception containing an error message, if any.
