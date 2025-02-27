@@ -13,4 +13,4 @@ restartDaemon
 NIX_BIN_DIR="$(dirname "$(type -p nix)")"
 export NIX_BIN_DIR
 
-nix build -L --file ./non-trivial.nix --no-link
+expectStderr 1 nix build -L --file ./non-trivial.nix --no-link | grepQuiet "Building dynamic derivations in one shot is not yet implemented"

@@ -57,10 +57,6 @@ struct InitialOutput {
 
 /**
  * A goal for building some or all of the outputs of a derivation.
- *
- * The derivation must already be present, either in the store in a drv
- * or in memory. If the derivation itself needs to be gotten first, a
- * `DerivationCreationAndRealisationGoal` goal must be used instead.
  */
 struct DerivationGoal : public Goal
 {
