@@ -98,7 +98,7 @@ writeIfdFlake() {
 }
 EOF
 
-    cp ../ifd.nix "${config_nix}" "$flakeDir/"
+    cp -n ../ifd.nix ../dependencies.nix ../dependencies.builder0.sh "${config_nix}" "$flakeDir/"
 }
 
 writeTrivialFlake() {
