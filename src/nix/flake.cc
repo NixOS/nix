@@ -1131,6 +1131,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 {
     bool showLegacy = false;
     bool showAllSystems = false;
+    bool allowImportFromDerivation = false;
 
     CmdFlakeShow()
     {
@@ -1143,6 +1144,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             .longName = "all-systems",
             .description = "Show the contents of outputs for all systems.",
             .handler = {&showAllSystems, true}
+        });
+        addFlag({
+            .longName = "allow-import-from-derivation",
+            .description = "Show the contents of outputs which require builds to evaluate.",
+            .handler = {&allowImportFromDerivation, true}
         });
     }
 
@@ -1160,7 +1166,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
     void run(nix::ref<nix::Store> store) override
     {
-        evalSettings.enableImportFromDerivation.setDefault(false);
+        evalSettings.enableImportFromDerivation.setDefault(allowImportFromDerivation);
 
         auto state = getEvalState();
         auto flake = std::make_shared<LockedFlake>(lockFlake());
@@ -1274,6 +1280,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
                 auto showDerivation = [&]()
                 {
+                    // logger->cout("getting visitor...");
                     auto name = visitor.getAttr(state->sName)->getString();
 
                     if (json) {
@@ -1329,18 +1336,26 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
                         }
                     } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else
-                            throw Error("expected a derivation");
+                        try {
+                            if (visitor.isDerivation())
+                                showDerivation();
+                            else
+                                throw Error("expected a derivation");
+                        } catch (IFDError & e) {
+                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--allow-import-from-derivation' to show)", headerPrefix));
+                        }
                     }
                 }
 
                 else if (attrPath.size() > 0 && attrPathS[0] == "hydraJobs") {
-                    if (visitor.isDerivation())
-                        showDerivation();
-                    else
-                        recurse();
+                    try {
+                        if (visitor.isDerivation())
+                            showDerivation();
+                        else
+                            recurse();
+                    } catch (IFDError & e) {
+                        logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--allow-import-from-derivation' to show)", headerPrefix));
+                    }
                 }
 
                 else if (attrPath.size() > 0 && attrPathS[0] == "legacyPackages") {
@@ -1359,11 +1374,15 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
                         }
                     } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else if (attrPath.size() <= 2)
-                            // FIXME: handle recurseIntoAttrs
-                            recurse();
+                        try {
+                            if (visitor.isDerivation())
+                                showDerivation();
+                            else if (attrPath.size() <= 2)
+                                // FIXME: handle recurseIntoAttrs
+                                recurse();
+                        } catch (IFDError & e) {
+                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--allow-import-from-derivation' to show)", headerPrefix));
+                        }
                     }
                 }
 
