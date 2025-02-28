@@ -1342,7 +1342,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             else
                                 throw Error("expected a derivation");
                         } catch (IFDError & e) {
-                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--allow-import-from-derivation' to show)", headerPrefix));
+                            if (!json) {
+                                logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--allow-import-from-derivation' to show)", headerPrefix));
+                            } else {
+                                logger->warn(fmt("%s omitted (use '--allow-import-from-derivation' to show)", concatStringsSep(".", attrPathS))); 
+                            }
                         }
                     }
                 }
@@ -1354,7 +1358,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         else
                             recurse();
                     } catch (IFDError & e) {
-                        logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--allow-import-from-derivation' to show)", headerPrefix));
+                        if (!json) {
+                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--allow-import-from-derivation' to show)", headerPrefix));
+                        } else {
+                            logger->warn(fmt("%s omitted (use '--allow-import-from-derivation' to show)", concatStringsSep(".", attrPathS))); 
+                        }
                     }
                 }
 
@@ -1381,7 +1389,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                 // FIXME: handle recurseIntoAttrs
                                 recurse();
                         } catch (IFDError & e) {
-                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--allow-import-from-derivation' to show)", headerPrefix));
+                            if (!json) {
+                                logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--allow-import-from-derivation' to show)", headerPrefix));
+                            } else {
+                                logger->warn(fmt("%s omitted (use '--allow-import-from-derivation' to show)", concatStringsSep(".", attrPathS))); 
+                            }
                         }
                     }
                 }
