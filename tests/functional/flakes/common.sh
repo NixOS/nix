@@ -88,6 +88,19 @@ writeDependentFlake() {
 EOF
 }
 
+writeIfdFlake() {
+    local flakeDir="$1"
+    cat > "$flakeDir/flake.nix" <<EOF
+{
+  outputs = { self }: {
+    packages.$system.default = import ./ifd.nix;
+  };
+}
+EOF
+
+    cp ../ifd.nix "${config_nix}" "$flakeDir/"
+}
+
 writeTrivialFlake() {
     local flakeDir="$1"
     cat > "$flakeDir/flake.nix" <<EOF

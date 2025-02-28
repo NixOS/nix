@@ -87,3 +87,14 @@ assert show_output.legacyPackages.${builtins.currentSystem}.AAAAAASomeThingsFail
 assert show_output.legacyPackages.${builtins.currentSystem}.simple.name == "simple";
 true
 '
+
+# Test that nix flake show doesn't fail if one of the outputs contains
+# an IFD
+writeIfdFlake .
+nix flake show --json > show-output.json
+nix eval --impure --expr '
+let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
+in
+assert show_output.packages.${builtins.currentSystem}.default == { };
+true
+'
