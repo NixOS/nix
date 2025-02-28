@@ -1280,7 +1280,6 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
                 auto showDerivation = [&]()
                 {
-                    // logger->cout("getting visitor...");
                     auto name = visitor.getAttr(state->sName)->getString();
 
                     if (json) {
