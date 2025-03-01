@@ -264,6 +264,9 @@ struct InputScheme
 
     virtual std::optional<std::string> isRelative(const Input & input) const
     { return std::nullopt; }
+
+    virtual std::optional<std::string> getAccessToken(const fetchers::Settings & settings, const std::string & host, const std::string & url) const
+    { return {};}
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);

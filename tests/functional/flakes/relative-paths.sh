@@ -45,7 +45,7 @@ EOF
 
 [[ $(nix eval "$rootFlake?dir=sub1#y") = 6 ]]
 
-git init "$rootFlake"
+initGitRepo "$rootFlake"
 git -C "$rootFlake" add flake.nix sub0/flake.nix sub1/flake.nix
 
 [[ $(nix eval "$subflake1#y") = 6 ]]
@@ -75,6 +75,19 @@ if ! isTestOnNixOS; then
     (! grep "$NIX_STORE_DIR" "$subflake2/flake.lock")
 fi
 (! grep narHash "$subflake2/flake.lock")
+
+# Test `nix flake archive` with relative path flakes.
+git -C "$rootFlake" add flake.lock
+git -C "$rootFlake" commit -a -m Foo
+
+json=$(nix flake archive --json "$rootFlake" --to "$TEST_ROOT/store2")
+[[ $(echo "$json" | jq .inputs.sub0.inputs) = {} ]]
+[[ -n $(echo "$json" | jq .path) ]]
+
+nix flake prefetch --out-link "$TEST_ROOT/result" "$rootFlake"
+outPath=$(readlink "$TEST_ROOT/result")
+
+[ -e "$TEST_ROOT/store2/nix/store/$(basename "$outPath")" ]
 
 # Test circular relative path flakes. FIXME: doesn't work at the moment.
 if false; then
