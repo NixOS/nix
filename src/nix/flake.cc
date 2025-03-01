@@ -346,7 +346,9 @@ struct CmdFlakeCheck : FlakeCommand, MixFlakeSchemas
         auto flake = std::make_shared<LockedFlake>(lockFlake());
         auto localSystem = std::string(settings.thisSystem.get());
 
-        auto [cache, inventory] = flake_schemas::call(*state, flake, getDefaultFlakeSchemas());
+        auto cache = flake_schemas::call(*state, flake, getDefaultFlakeSchemas());
+
+        auto inventory = cache->getRoot()->getAttr("inventory");
 
         std::vector<DerivedPath> drvPaths;
 
@@ -765,7 +767,9 @@ struct CmdFlakeShow : FlakeCommand, MixJSON, MixFlakeSchemas
         auto flake = std::make_shared<LockedFlake>(lockFlake());
         auto localSystem = std::string(settings.thisSystem.get());
 
-        auto [cache, inventory] = flake_schemas::call(*state, flake, getDefaultFlakeSchemas());
+        auto cache = flake_schemas::call(*state, flake, getDefaultFlakeSchemas());
+
+        auto inventory = cache->getRoot()->getAttr("inventory");
 
         if (json) {
             std::function<void(ref<eval_cache::AttrCursor> node, nlohmann::json & obj)> visit;

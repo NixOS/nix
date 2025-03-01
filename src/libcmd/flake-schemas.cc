@@ -35,8 +35,10 @@ static LockedFlake getBuiltinDefaultSchemasFlake(EvalState & state)
     return lockFlake(flakeSettings, state, flakeRef, {}, flake);
 }
 
-std::tuple<ref<EvalCache>, ref<eval_cache::AttrCursor>>
-call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::optional<FlakeRef> defaultSchemasFlake)
+ref<EvalCache> call(
+    EvalState & state,
+    std::shared_ptr<flake::LockedFlake> lockedFlake,
+    std::optional<FlakeRef> defaultSchemasFlake)
 {
     auto fingerprint = lockedFlake->getFingerprint(state.store, state.fetchSettings);
 
@@ -117,7 +119,7 @@ call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::op
         return res;
     };
 
-    return {cache, cache->getRoot()->getAttr("inventory")};
+    return cache;
 }
 
 void forEachOutput(

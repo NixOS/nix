@@ -1,3 +1,5 @@
+#pragma once
+
 #include "eval-cache.hh"
 #include "flake/flake.hh"
 #include "command.hh"
@@ -6,8 +8,10 @@ namespace nix::flake_schemas {
 
 using namespace eval_cache;
 
-std::tuple<ref<eval_cache::EvalCache>, ref<AttrCursor>>
-call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::optional<FlakeRef> defaultSchemasFlake);
+ref<eval_cache::EvalCache> call(
+    EvalState & state,
+    std::shared_ptr<flake::LockedFlake> lockedFlake,
+    std::optional<FlakeRef> defaultSchemasFlake);
 
 void forEachOutput(
     ref<AttrCursor> inventory,

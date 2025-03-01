@@ -69,6 +69,12 @@ struct InstallableFlake : InstallableValue
     std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
 
     FlakeRef nixpkgsFlakeRef() const;
+
+    ref<eval_cache::EvalCache> openEvalCache() const;
+
+private:
+
+    mutable std::shared_ptr<eval_cache::EvalCache> _evalCache;
 };
 
 /**

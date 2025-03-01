@@ -163,11 +163,12 @@ std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state)
 std::vector<ref<eval_cache::AttrCursor>>
 InstallableFlake::getCursors(EvalState & state)
 {
-    auto [cache, inventory] = flake_schemas::call(
+    auto cache = flake_schemas::call(
         state,
         getLockedFlake(),
         defaultFlakeSchemas);
 
+    auto inventory = cache->getRoot()->getAttr("inventory");
     auto outputs = cache->getRoot()->getAttr("outputs");
 
     std::vector<ref<eval_cache::AttrCursor>> res;
@@ -217,6 +218,18 @@ std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const
     }
     return _lockedFlake;
 }
+
+ref<eval_cache::EvalCache> InstallableFlake::openEvalCache() const
+{
+    if (!_evalCache) {
+        _evalCache = flake_schemas::call(
+            *state,
+            getLockedFlake(),
+            defaultFlakeSchemas);
+    }
+    return ref(_evalCache);
+}
+
 
 FlakeRef InstallableFlake::nixpkgsFlakeRef() const
 {

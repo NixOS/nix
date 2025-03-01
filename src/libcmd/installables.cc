@@ -445,6 +445,7 @@ static StorePath getDeriver(
     return *derivers.begin();
 }
 
+// FIXME: remove
 ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
     std::shared_ptr<flake::LockedFlake> lockedFlake)
