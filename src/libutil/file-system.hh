@@ -2,7 +2,7 @@
 /**
  * @file
  *
- * Utiltities for working with the file sytem and file paths.
+ * Utilities for working with the file system and file paths.
  */
 
 #include "types.hh"
