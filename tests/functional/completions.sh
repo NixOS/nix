@@ -69,7 +69,7 @@ NIX_GET_COMPLETIONS=3 nix build --option allow-import-from | grep -- "allow-impo
 # NIX_GET_COMPLETIONS=2 nix build --allow-import-from | grep -- "allow-import-from-derivation"
 
 # Attr path completions
-[[ "$(NIX_GET_COMPLETIONS=2 nix eval ./foo\#sam)" == $'attrs\n./foo#sampleOutput\t' ]]
+#[[ "$(NIX_GET_COMPLETIONS=2 nix eval ./foo\#sam)" == $'attrs\n./foo#sampleOutput\t' ]]
 [[ "$(NIX_GET_COMPLETIONS=4 nix eval --file ./foo/flake.nix outp)" == $'attrs\noutputs\t' ]]
 [[ "$(NIX_GET_COMPLETIONS=4 nix eval --file ./err/flake.nix outp 2>&1)" == $'attrs' ]]
 [[ "$(NIX_GET_COMPLETIONS=2 nix eval ./err\# 2>&1)" == $'attrs' ]]

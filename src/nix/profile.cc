@@ -730,10 +730,9 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 this,
                 getEvalState(),
                 FlakeRef(element.source->originalRef),
-                "",
+                "." + element.source->attrPath, // absolute lookup
                 element.source->outputs,
-                Strings{element.source->attrPath},
-                Strings{},
+                StringSet{},
                 lockFlags,
                 getDefaultFlakeSchemas());
 

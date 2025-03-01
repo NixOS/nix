@@ -57,14 +57,6 @@ struct CmdSearch : InstallableValueCommand, MixJSON
           ;
     }
 
-    Strings getDefaultFlakeAttrPaths() override
-    {
-        return {
-            "packages." + settings.thisSystem.get(),
-            "legacyPackages." + settings.thisSystem.get()
-        };
-    }
-
     void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         settings.readOnlyMode = true;

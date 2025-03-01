@@ -35,10 +35,8 @@ static LockedFlake getBuiltinDefaultSchemasFlake(EvalState & state)
     return lockFlake(flakeSettings, state, flakeRef, {}, flake);
 }
 
-ref<EvalCache> call(
-    EvalState & state,
-    std::shared_ptr<flake::LockedFlake> lockedFlake,
-    std::optional<FlakeRef> defaultSchemasFlake)
+ref<EvalCache>
+call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::optional<FlakeRef> defaultSchemasFlake)
 {
     auto fingerprint = lockedFlake->getFingerprint(state.store, state.fetchSettings);
 
@@ -244,6 +242,39 @@ std::optional<OutputInfo> getOutput(ref<AttrCursor> inventory, eval_cache::AttrP
         .nodeInfo = ref(node),
         .leafAttrPath = std::vector(pathLeft.begin(), pathLeft.end()),
     };
+}
+
+Schemas getSchema(ref<AttrCursor> inventory)
+{
+    auto & state(inventory->root->state);
+
+    Schemas schemas;
+
+    for (auto & schemaName : inventory->getAttrs()) {
+        auto schema = inventory->getAttr(schemaName);
+
+        SchemaInfo schemaInfo;
+
+        if (auto roles = schema->maybeGetAttr("roles")) {
+            for (auto & roleName : roles->getAttrs()) {
+                schemaInfo.roles.insert(std::string(state.symbols[roleName]));
+            }
+        }
+
+        if (auto appendSystem = schema->maybeGetAttr("appendSystem"))
+            schemaInfo.appendSystem = appendSystem->getBool();
+
+        if (auto defaultAttrPath = schema->maybeGetAttr("defaultAttrPath")) {
+            eval_cache::AttrPath attrPath;
+            for (auto & s : defaultAttrPath->getListOfStrings())
+                attrPath.push_back(state.symbols.create(s));
+            schemaInfo.defaultAttrPath = std::move(attrPath);
+        }
+
+        schemas.insert_or_assign(std::string(state.symbols[schemaName]), std::move(schemaInfo));
+    }
+
+    return schemas;
 }
 
 }

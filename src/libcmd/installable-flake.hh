@@ -33,8 +33,8 @@ struct ExtraPathInfoFlake : ExtraPathInfoValue
 struct InstallableFlake : InstallableValue
 {
     FlakeRef flakeRef;
-    Strings attrPaths;
-    Strings prefixes;
+    std::string fragment;
+    StringSet roles;
     ExtendedOutputsSpec extendedOutputsSpec;
     const flake::LockFlags & lockFlags;
     mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
@@ -46,14 +46,11 @@ struct InstallableFlake : InstallableValue
         FlakeRef && flakeRef,
         std::string_view fragment,
         ExtendedOutputsSpec extendedOutputsSpec,
-        Strings attrPaths,
-        Strings prefixes,
+        StringSet roles,
         const flake::LockFlags & lockFlags,
         std::optional<FlakeRef> defaultFlakeSchemas);
 
-    std::string what() const override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
-
-    std::vector<std::string> getActualAttrPaths();
+    std::string what() const override { return flakeRef.to_string() + "#" + fragment; }
 
     DerivedPathsWithInfo toDerivedPaths() override;
 

@@ -41,9 +41,12 @@ rec {
   inventory = builtins.mapAttrs (
     outputName: output:
     if schemas ? ${outputName} && schemas.${outputName}.version == 1 then
-      {
-        output = schemas.${outputName}.inventory output;
-        inherit (schemas.${outputName}) doc;
+      let
+        schema = schemas.${outputName};
+      in
+      schema
+      // {
+        output = schema.inventory output;
       }
     else
       { unknown = true; }

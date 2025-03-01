@@ -452,9 +452,6 @@ struct CmdFlakeCheck : FlakeCommand, MixFlakeSchemas
     };
 };
 
-static Strings defaultTemplateAttrPathsPrefixes{"templates."};
-static Strings defaultTemplateAttrPaths = {"templates.default", "defaultTemplate"};
-
 struct CmdFlakeInitCommon : virtual Args, EvalCommand, MixFlakeSchemas
 {
     std::string templateUrl = "templates";
@@ -475,8 +472,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand, MixFlakeSchemas
                     completions,
                     getEvalState(),
                     lockFlags,
-                    defaultTemplateAttrPathsPrefixes,
-                    defaultTemplateAttrPaths,
+                    {"nix-template"},
                     prefix);
             }}
         });
@@ -493,8 +489,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand, MixFlakeSchemas
 
         auto installable = InstallableFlake(nullptr,
             evalState, std::move(templateFlakeRef), templateName, ExtendedOutputsSpec::Default(),
-            defaultTemplateAttrPaths,
-            defaultTemplateAttrPathsPrefixes,
+            {"nix-template"},
             lockFlags,
             getDefaultFlakeSchemas());
 

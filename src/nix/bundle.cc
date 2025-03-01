@@ -52,24 +52,9 @@ struct CmdBundle : InstallableValueCommand
 
     Category category() override { return catSecondary; }
 
-    // FIXME: cut&paste from CmdRun.
-    Strings getDefaultFlakeAttrPaths() override
+    StringSet getRoles() override
     {
-        Strings res{
-            "apps." + settings.thisSystem.get() + ".default",
-            "defaultApp." + settings.thisSystem.get()
-        };
-        for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
-            res.push_back(s);
-        return res;
-    }
-
-    Strings getDefaultFlakeAttrPathPrefixes() override
-    {
-        Strings res{"apps." + settings.thisSystem.get() + "."};
-        for (auto & s : SourceExprCommand::getDefaultFlakeAttrPathPrefixes())
-            res.push_back(s);
-        return res;
+        return {"nix-run"};
     }
 
     void run(ref<Store> store, ref<InstallableValue> installable) override
@@ -84,10 +69,7 @@ struct CmdBundle : InstallableValueCommand
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         InstallableFlake bundler{this,
             evalState, std::move(bundlerFlakeRef), bundlerName, std::move(extendedOutputsSpec),
-            {"bundlers." + settings.thisSystem.get() + ".default",
-             "defaultBundler." + settings.thisSystem.get()
-            },
-            {"bundlers." + settings.thisSystem.get() + "."},
+            {"nix-bundler"},
             lockFlags,
             std::nullopt
         };

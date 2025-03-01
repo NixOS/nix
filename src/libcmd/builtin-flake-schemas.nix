@@ -38,6 +38,9 @@
         doc = ''
           The `apps` output provides commands available via `nix run`.
         '';
+        roles.nix-run = { };
+        appendSystem = true;
+        defaultAttrPath = [ "default" ];
         inventory =
           output:
           self.lib.mkChildren (
@@ -73,6 +76,11 @@
         doc = ''
           The `packages` flake output contains packages that can be added to a shell using `nix shell`.
         '';
+        roles.nix-build = { };
+        roles.nix-run = { };
+        roles.nix-develop = { };
+        appendSystem = true;
+        defaultAttrPath = [ "default" ];
         inventory = self.lib.derivationsInventory "package" false;
       };
 
@@ -90,6 +98,9 @@
           The `legacyPackages` flake output is similar to `packages` but different in that it can be nested and thus contain attribute sets that contain more packages.
           Since enumerating packages in nested attribute sets can be inefficient, you should favor `packages` over `legacyPackages`.
         '';
+        roles.nix-build = { };
+        roles.nix-run = { };
+        appendSystem = true;
         inventory =
           output:
           self.lib.mkChildren (
@@ -99,48 +110,31 @@
                 let
                   recurse =
                     prefix: attrs:
-                    builtins.listToAttrs (
-                      builtins.concatLists (
-                        mapAttrsToList (
-                          attrName: attrs:
-                          # Necessary to deal with `AAAAAASomeThingsFailToEvaluate` etc. in Nixpkgs.
-                          self.lib.try
-                            (
-                              if attrs.type or null == "derivation" then
-                                [
-                                  {
-                                    name = attrName;
-                                    value = {
-                                      forSystems = [ attrs.system ];
-                                      shortDescription = attrs.meta.description or "";
-                                      derivation = attrs;
-                                      evalChecks.isDerivation = checkDerivation attrs;
-                                      what = "package";
-                                    };
-                                  }
-                                ]
-                              else
-                              # Recurse at the first and second levels, or if the
-                              # recurseForDerivations attribute if set.
-                              if attrs.recurseForDerivations or false then
-                                [
-                                  {
-                                    name = attrName;
-                                    value.children = recurse (prefix + attrName + ".") attrs;
-                                  }
-                                ]
-                              else
-                                [ ]
-                            )
-                            [
-                              {
-                                name = attrName;
-                                value = throw "failed";
-                              }
-                            ]
-                        ) attrs
-                      )
-                    );
+                    builtins.mapAttrs (
+                      attrName: attrs:
+                      # Necessary to deal with `AAAAAASomeThingsFailToEvaluate` etc. in Nixpkgs.
+                      self.lib.try (
+                        if attrs.type or null == "derivation" then
+                          {
+                            forSystems = [ attrs.system ];
+                            shortDescription = attrs.meta.description or "";
+                            derivation = attrs;
+                            evalChecks.isDerivation = checkDerivation attrs;
+                            what = "package";
+                          }
+                        else
+                        # Recurse at the first and second levels, or if the
+                        # recurseForDerivations attribute if set.
+                        if attrs.recurseForDerivations or false then
+                          {
+                            children = recurse (prefix + attrName + ".") attrs;
+                          }
+                        else
+                          {
+                            what = "unknown";
+                          }
+                      ) (throw "failed")
+                    ) attrs;
                 in
                 # The top-level cannot be a derivation.
                 assert packagesForSystem.type or null != "derivation";
@@ -154,6 +148,7 @@
         doc = ''
           The `checks` flake output contains derivations that will be built by `nix flake check`.
         '';
+        # FIXME: add role
         inventory = self.lib.derivationsInventory "CI test" true;
       };
 
@@ -162,6 +157,9 @@
         doc = ''
           The `devShells` flake output contains derivations that provide a development environment for `nix develop`.
         '';
+        roles.nix-develop = { };
+        appendSystem = true;
+        defaultAttrPath = [ "default" ];
         inventory = self.lib.derivationsInventory "development environment" false;
       };
 
@@ -170,6 +168,9 @@
         doc = ''
           The `formatter` output specifies the package to use to format the project.
         '';
+        roles.nix-fmt = { };
+        appendSystem = true;
+        defaultAttrPath = [ ];
         inventory =
           output:
           self.lib.mkChildren (
@@ -189,6 +190,8 @@
         doc = ''
           The `templates` output provides project templates.
         '';
+        roles.nix-template = { };
+        defaultAttrPath = [ "default" ];
         inventory =
           output:
           self.lib.mkChildren (
@@ -352,6 +355,35 @@
             }) output
           );
       };
+
+      bundlersSchema = {
+        version = 1;
+        doc = ''
+          The `bundlers` flake output defines ["bundlers"](https://nix.dev/manual/nix/2.26/command-ref/new-cli/nix3-bundle) that transform derivation outputs into other formats, typically self-extracting executables or container images.
+        '';
+        roles.nix-bundler = { };
+        appendSystem = true;
+        defaultAttrPath = [ "default" ];
+        inventory =
+          output:
+          self.lib.mkChildren (
+            builtins.mapAttrs (
+              system: bundlers:
+              let
+                forSystems = [ system ];
+              in
+              {
+                inherit forSystems;
+                children = builtins.mapAttrs (bundlerName: bundler: {
+                  inherit forSystems;
+                  evalChecks.isValidBundler = builtins.isFunction bundler;
+                  what = "bundler";
+                }) bundlers;
+              }
+            ) output
+          );
+      };
+
     in
 
     {
@@ -401,5 +433,6 @@
       schemas.darwinConfigurations = darwinConfigurationsSchema;
       schemas.darwinModules = darwinModulesSchema;
       schemas.dockerImages = dockerImagesSchema;
+      schemas.bundlers = bundlersSchema;
     };
 }

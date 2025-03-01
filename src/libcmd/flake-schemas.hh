@@ -8,10 +8,8 @@ namespace nix::flake_schemas {
 
 using namespace eval_cache;
 
-ref<eval_cache::EvalCache> call(
-    EvalState & state,
-    std::shared_ptr<flake::LockedFlake> lockedFlake,
-    std::optional<FlakeRef> defaultSchemasFlake);
+ref<eval_cache::EvalCache>
+call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::optional<FlakeRef> defaultSchemasFlake);
 
 void forEachOutput(
     ref<AttrCursor> inventory,
@@ -40,5 +38,17 @@ struct OutputInfo
 };
 
 std::optional<OutputInfo> getOutput(ref<AttrCursor> inventory, eval_cache::AttrPath attrPath);
+
+struct SchemaInfo
+{
+    std::string doc;
+    StringSet roles;
+    bool appendSystem = false;
+    std::optional<eval_cache::AttrPath> defaultAttrPath;
+};
+
+using Schemas = std::map<std::string, SchemaInfo>;
+
+Schemas getSchema(ref<AttrCursor> root);
 
 }
