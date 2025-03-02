@@ -1090,19 +1090,21 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
             nlohmann::json jsonObj2 = json ? json::object() : nlohmann::json(nullptr);
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input)) {
-                    auto storePath =
-                        dryRun
-                        ? (*inputNode)->lockedRef.input.computeStorePath(*store)
-                        : std::get<0>((*inputNode)->lockedRef.input.fetchToStore(store));
+                    std::optional<StorePath> storePath;
+                    if (!(*inputNode)->lockedRef.input.isRelative()) {
+                        storePath =
+                            dryRun
+                            ? (*inputNode)->lockedRef.input.computeStorePath(*store)
+                            : std::get<0>((*inputNode)->lockedRef.input.fetchToStore(store));
+                        sources.insert(*storePath);
+                    }
                     if (json) {
                         auto & jsonObj3 = jsonObj2[inputName];
-                        jsonObj3["path"] = store->printStorePath(storePath);
-                        sources.insert(std::move(storePath));
+                        if (storePath)
+                            jsonObj3["path"] = store->printStorePath(*storePath);
                         jsonObj3["inputs"] = traverse(**inputNode);
-                    } else {
-                        sources.insert(std::move(storePath));
+                    } else
                         traverse(**inputNode);
-                    }
                 }
             }
             return jsonObj2;

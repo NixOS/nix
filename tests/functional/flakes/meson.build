@@ -28,7 +28,8 @@ suites += {
     'commit-lock-file-summary.sh',
     'non-flake-inputs.sh',
     'relative-paths.sh',
-    'symlink-paths.sh'
+    'symlink-paths.sh',
+    'debugger.sh'
   ],
   'workdir': meson.current_source_dir(),
 }

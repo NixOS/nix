@@ -11,10 +11,14 @@
 
 namespace nix {
 
+namespace fs {
+using namespace std::filesystem;
+}
+
 class GitUtilsTest : public ::testing::Test
 {
     // We use a single repository for all tests.
-    Path tmpDir;
+    fs::path tmpDir;
     std::unique_ptr<AutoDelete> delTmpDir;
 
 public:
@@ -26,7 +30,7 @@ public:
         // Create the repo with libgit2
         git_libgit2_init();
         git_repository * repo = nullptr;
-        auto r = git_repository_init(&repo, tmpDir.c_str(), 0);
+        auto r = git_repository_init(&repo, tmpDir.string().c_str(), 0);
         ASSERT_EQ(r, 0);
         git_repository_free(repo);
     }
@@ -41,6 +45,11 @@ public:
     ref<GitRepo> openRepo()
     {
         return GitRepo::openRepo(tmpDir, true, false);
+    }
+
+    std::string getRepoName() const
+    {
+        return tmpDir.filename().string();
     }
 };
 
@@ -79,7 +88,7 @@ TEST_F(GitUtilsTest, sink_basic)
     // sink->createHardlink("foo-1.1/links/foo-2", CanonPath("foo-1.1/hello"));
 
     auto result = repo->dereferenceSingletonDirectory(sink->flush());
-    auto accessor = repo->getAccessor(result, false);
+    auto accessor = repo->getAccessor(result, false, getRepoName());
     auto entries = accessor->readDirectory(CanonPath::root);
     ASSERT_EQ(entries.size(), 5);
     ASSERT_EQ(accessor->readFile(CanonPath("hello")), "hello world");
@@ -109,132 +118,5 @@ TEST_F(GitUtilsTest, sink_hardlink)
         ASSERT_THAT(e.msg(), testing::HasSubstr("foo-1.1/link"));
     }
 };
-
-namespace lfs {
-
-TEST_F(GitUtilsTest, parseGitRemoteUrl)
-{
-    {
-        GitUrl result = parseGitUrl("git@example.com:path/repo.git");
-        EXPECT_EQ(result.protocol, "ssh");
-        EXPECT_EQ(result.user, "git");
-        EXPECT_EQ(result.host, "example.com");
-        EXPECT_EQ(result.port, "");
-        EXPECT_EQ(result.path, "path/repo.git");
-    }
-
-    {
-        GitUrl result = parseGitUrl("example.com:/path/repo.git");
-        EXPECT_EQ(result.protocol, "ssh");
-        EXPECT_EQ(result.user, "");
-        EXPECT_EQ(result.host, "example.com");
-        EXPECT_EQ(result.port, "");
-        EXPECT_EQ(result.path, "/path/repo.git");
-    }
-
-    {
-        GitUrl result = parseGitUrl("example.com:path/repo.git");
-        EXPECT_EQ(result.protocol, "ssh");
-        EXPECT_EQ(result.user, "");
-        EXPECT_EQ(result.host, "example.com");
-        EXPECT_EQ(result.port, "");
-        EXPECT_EQ(result.path, "path/repo.git");
-    }
-
-    {
-        GitUrl result = parseGitUrl("https://example.com/path/repo.git");
-        EXPECT_EQ(result.protocol, "https");
-        EXPECT_EQ(result.user, "");
-        EXPECT_EQ(result.host, "example.com");
-        EXPECT_EQ(result.port, "");
-        EXPECT_EQ(result.path, "path/repo.git");
-    }
-
-    {
-        GitUrl result = parseGitUrl("ssh://git@example.com/path/repo.git");
-        EXPECT_EQ(result.protocol, "ssh");
-        EXPECT_EQ(result.user, "git");
-        EXPECT_EQ(result.host, "example.com");
-        EXPECT_EQ(result.port, "");
-        EXPECT_EQ(result.path, "path/repo.git");
-    }
-
-    {
-        GitUrl result = parseGitUrl("ssh://example/path/repo.git");
-        EXPECT_EQ(result.protocol, "ssh");
-        EXPECT_EQ(result.user, "");
-        EXPECT_EQ(result.host, "example");
-        EXPECT_EQ(result.port, "");
-        EXPECT_EQ(result.path, "path/repo.git");
-    }
-
-    {
-        GitUrl result = parseGitUrl("http://example.com:8080/path/repo.git");
-        EXPECT_EQ(result.protocol, "http");
-        EXPECT_EQ(result.user, "");
-        EXPECT_EQ(result.host, "example.com");
-        EXPECT_EQ(result.port, "8080");
-        EXPECT_EQ(result.path, "path/repo.git");
-    }
-
-    {
-        GitUrl result = parseGitUrl("invalid-url");
-        EXPECT_EQ(result.protocol, "");
-        EXPECT_EQ(result.user, "");
-        EXPECT_EQ(result.host, "");
-        EXPECT_EQ(result.port, "");
-        EXPECT_EQ(result.path, "");
-    }
-
-    {
-        GitUrl result = parseGitUrl("");
-        EXPECT_EQ(result.protocol, "");
-        EXPECT_EQ(result.user, "");
-        EXPECT_EQ(result.host, "");
-        EXPECT_EQ(result.port, "");
-        EXPECT_EQ(result.path, "");
-    }
-}
-TEST_F(GitUtilsTest, gitUrlToHttp)
-{
-    {
-        const GitUrl url = parseGitUrl("git@github.com:user/repo.git");
-        EXPECT_EQ(url.toHttp(), "https://github.com/user/repo.git");
-    }
-    {
-        const GitUrl url = parseGitUrl("https://github.com/user/repo.git");
-        EXPECT_EQ(url.toHttp(), "https://github.com/user/repo.git");
-    }
-    {
-        const GitUrl url = parseGitUrl("http://github.com/user/repo.git");
-        EXPECT_EQ(url.toHttp(), "http://github.com/user/repo.git");
-    }
-    {
-        const GitUrl url = parseGitUrl("ssh://git@github.com:22/user/repo.git");
-        EXPECT_EQ(url.toHttp(), "https://github.com:22/user/repo.git");
-    }
-    {
-        const GitUrl url = parseGitUrl("invalid-url");
-        EXPECT_EQ(url.toHttp(), "");
-    }
-}
-
-TEST_F(GitUtilsTest, gitUrlToSsh)
-{
-    {
-        const GitUrl url = parseGitUrl("https://example.com/user/repo.git");
-        const auto [host, path] = url.toSsh();
-        EXPECT_EQ(host, "example.com");
-        EXPECT_EQ(path, "user/repo.git");
-    }
-    {
-        const GitUrl url = parseGitUrl("git@example.com:user/repo.git");
-        const auto [host, path] = url.toSsh();
-        EXPECT_EQ(host, "git@example.com");
-        EXPECT_EQ(path, "user/repo.git");
-    }
-}
-
-} // namespace lfs
 
 } // namespace nix

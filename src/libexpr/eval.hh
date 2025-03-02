@@ -400,6 +400,15 @@ public:
     SourcePath rootPath(PathView path);
 
     /**
+     * Return a `SourcePath` that refers to `path` in the store.
+     *
+     * For now, this has to also be within the root filesystem for
+     * backwards compat, but for Windows and maybe also pure eval, we'll
+     * probably want to do something different.
+     */
+    SourcePath storePath(const StorePath & path);
+
+    /**
      * Allow access to a path.
      */
     void allowPath(const Path & path);

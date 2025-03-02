@@ -154,7 +154,6 @@
                 f = import ./packaging/components.nix {
                   inherit (final) lib;
                   inherit officialRelease;
-                  inherit stdenv;
                   pkgs = final;
                   src = self;
                 };
@@ -403,7 +402,7 @@
 
       devShells =
         let
-          makeShell = import ./packaging/dev-shell.nix { inherit inputs lib devFlake; };
+          makeShell = import ./packaging/dev-shell.nix { inherit lib devFlake; };
           prefixAttrs = prefix: lib.concatMapAttrs (k: v: { "${prefix}-${k}" = v; });
         in
         forAllSystems (
