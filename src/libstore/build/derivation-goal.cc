@@ -123,20 +123,7 @@ Goal::Co DerivationGoal::init() {
     trace("init");
 
     if (useDerivation) {
-        /* The first thing to do is to make sure that the derivation
-           exists.  If it doesn't, it may be created through a
-           substitute. */
-
-        if (buildMode != bmNormal || !worker.evalStore.isValidPath(drvPath)) {
-            Goals waitees{upcast_goal(worker.makePathSubstitutionGoal(drvPath))};
-            co_await await(std::move(waitees));
-        }
-
         trace("loading derivation");
-
-        if (nrFailed != 0) {
-            co_return done(BuildResult::MiscFailure, {}, Error("cannot build missing derivation '%s'", worker.store.printStorePath(drvPath)));
-        }
 
         /* `drvPath' should already be a root, but let's be on the safe
            side: if the user forgot to make it a root, we wouldn't want

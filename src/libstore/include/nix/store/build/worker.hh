@@ -3,6 +3,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/derived-path-map.hh"
 #include "nix/store/build/goal.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/muxable-pipe.hh"
@@ -13,6 +14,7 @@
 namespace nix {
 
 /* Forward definition. */
+struct DerivationCreationAndRealisationGoal;
 struct DerivationGoal;
 struct PathSubstitutionGoal;
 class DrvOutputSubstitutionGoal;
@@ -31,6 +33,7 @@ class DrvOutputSubstitutionGoal;
  */
 GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal);
 GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
 
@@ -103,6 +106,9 @@ private:
      * Maps used to prevent multiple instantiations of a goal for the
      * same derivation / path.
      */
+
+    DerivedPathMap<std::weak_ptr<DerivationCreationAndRealisationGoal>> outerDerivationGoals;
+
     std::map<StorePath, std::weak_ptr<DerivationGoal>> derivationGoals;
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
@@ -196,6 +202,9 @@ public:
      * @ref DerivationGoal "derivation goal"
      */
 private:
+    std::shared_ptr<DerivationCreationAndRealisationGoal> makeDerivationCreationAndRealisationGoal(
+        ref<const SingleDerivedPath> drvPath,
+        const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
     std::shared_ptr<DerivationGoal> makeDerivationGoalCommon(
         const StorePath & drvPath, const OutputsSpec & wantedOutputs,
         std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal);
