@@ -397,10 +397,11 @@ struct CmdFlakeCheck : FlakeCommand, MixFlakeSchemas
                         if (auto isFlakeCheck = leaf->maybeGetAttr("isFlakeCheck")) {
                             if (isFlakeCheck->getBool()) {
                                 auto drvPath = drv->forceDerivation();
-                                drvPaths.push_back(DerivedPath::Built {
+                                auto path = DerivedPath::Built {
                                     .drvPath = makeConstantStorePathRef(drvPath),
                                     .outputs = OutputsSpec::All { },
-                                });
+                                };
+                                drvPaths.push_back(std::move(path));
                             }
                         }
                     }
