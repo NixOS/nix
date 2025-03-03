@@ -333,9 +333,9 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
     /* The inputs must be built before we can build this goal. */
     inputDrvOutputs.clear();
     if (useDerivation) {
-        std::function<void(ref<SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)> addWaiteeDerivedPath;
+        std::function<void(ref<const SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)> addWaiteeDerivedPath;
 
-        addWaiteeDerivedPath = [&](ref<SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+        addWaiteeDerivedPath = [&](ref<const SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
             if (!inputNode.value.empty())
                 addWaitee(worker.makeGoal(
                     DerivedPath::Built {
