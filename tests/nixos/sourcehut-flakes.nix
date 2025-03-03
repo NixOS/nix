@@ -1,22 +1,27 @@
-{ lib, config, hostPkgs, nixpkgs, ... }:
+{
+  lib,
+  config,
+  hostPkgs,
+  nixpkgs,
+  ...
+}:
 
 let
   pkgs = config.nodes.sourcehut.nixpkgs.pkgs;
 
   # Generate a fake root CA and a fake git.sr.ht certificate.
-  cert = pkgs.runCommand "cert" { buildInputs = [ pkgs.openssl ]; }
-    ''
-      mkdir -p $out
+  cert = pkgs.runCommand "cert" { buildInputs = [ pkgs.openssl ]; } ''
+    mkdir -p $out
 
-      openssl genrsa -out ca.key 2048
-      openssl req -new -x509 -days 36500 -key ca.key \
-        -subj "/C=NL/ST=Denial/L=Springfield/O=Dis/CN=Root CA" -out $out/ca.crt
+    openssl genrsa -out ca.key 2048
+    openssl req -new -x509 -days 36500 -key ca.key \
+      -subj "/C=NL/ST=Denial/L=Springfield/O=Dis/CN=Root CA" -out $out/ca.crt
 
-      openssl req -newkey rsa:2048 -nodes -keyout $out/server.key \
-        -subj "/C=CN/ST=Denial/L=Springfield/O=Dis/CN=git.sr.ht" -out server.csr
-      openssl x509 -req -extfile <(printf "subjectAltName=DNS:git.sr.ht") \
-        -days 36500 -in server.csr -CA $out/ca.crt -CAkey ca.key -CAcreateserial -out $out/server.crt
-    '';
+    openssl req -newkey rsa:2048 -nodes -keyout $out/server.key \
+      -subj "/C=CN/ST=Denial/L=Springfield/O=Dis/CN=git.sr.ht" -out server.csr
+    openssl x509 -req -extfile <(printf "subjectAltName=DNS:git.sr.ht") \
+      -days 36500 -in server.csr -CA $out/ca.crt -CAkey ca.key -CAcreateserial -out $out/server.crt
+  '';
 
   registry = pkgs.writeTextFile {
     name = "registry";
@@ -41,80 +46,92 @@ let
     destination = "/flake-registry.json";
   };
 
-  nixpkgs-repo = pkgs.runCommand "nixpkgs-flake" { }
-    ''
-      dir=NixOS-nixpkgs-${nixpkgs.shortRev}
-      cp -prd ${nixpkgs} $dir
+  nixpkgs-repo = pkgs.runCommand "nixpkgs-flake" { } ''
+    dir=NixOS-nixpkgs-${nixpkgs.shortRev}
+    cp -prd ${nixpkgs} $dir
 
-      # Set the correct timestamp in the tarball.
-      find $dir -print0 | xargs -0 touch -h -t ${builtins.substring 0 12 nixpkgs.lastModifiedDate}.${builtins.substring 12 2 nixpkgs.lastModifiedDate} --
+    # Set the correct timestamp in the tarball.
+    find $dir -print0 | xargs -0 touch -h -t ${builtins.substring 0 12 nixpkgs.lastModifiedDate}.${
+      builtins.substring 12 2 nixpkgs.lastModifiedDate
+    } --
 
-      mkdir -p $out/archive
-      tar cfz $out/archive/${nixpkgs.rev}.tar.gz $dir --hard-dereference
+    mkdir -p $out/archive
+    tar cfz $out/archive/${nixpkgs.rev}.tar.gz $dir --hard-dereference
 
-      echo 'ref: refs/heads/master' > $out/HEAD
+    echo 'ref: refs/heads/master' > $out/HEAD
 
-      mkdir -p $out/info
-      echo -e '${nixpkgs.rev}\trefs/heads/master\n${nixpkgs.rev}\trefs/tags/foo-bar' > $out/info/refs
-    '';
+    mkdir -p $out/info
+    echo -e '${nixpkgs.rev}\trefs/heads/master\n${nixpkgs.rev}\trefs/tags/foo-bar' > $out/info/refs
+  '';
 
 in
 
-  {
-    name = "sourcehut-flakes";
+{
+  name = "sourcehut-flakes";
 
-    nodes =
+  nodes = {
+    # Impersonate git.sr.ht
+    sourcehut =
+      { config, pkgs, ... }:
       {
-        # Impersonate git.sr.ht
-        sourcehut =
-          { config, pkgs, ... }:
-          {
-            networking.firewall.allowedTCPPorts = [ 80 443 ];
+        networking.firewall.allowedTCPPorts = [
+          80
+          443
+        ];
 
-            services.httpd.enable = true;
-            services.httpd.adminAddr = "foo@example.org";
-            services.httpd.extraConfig = ''
-              ErrorLog syslog:local6
-            '';
-            services.httpd.virtualHosts."git.sr.ht" =
-              {
-                forceSSL = true;
-                sslServerKey = "${cert}/server.key";
-                sslServerCert = "${cert}/server.crt";
-                servedDirs =
-                  [
-                    {
-                      urlPath = "/~NixOS/nixpkgs";
-                      dir = nixpkgs-repo;
-                    }
-                    {
-                      urlPath = "/~NixOS/flake-registry/blob/master";
-                      dir = registry;
-                    }
-                  ];
-              };
-          };
-
-        client =
-          { config, lib, pkgs, nodes, ... }:
-          {
-            virtualisation.writableStore = true;
-            virtualisation.diskSize = 2048;
-            virtualisation.additionalPaths = [ pkgs.hello pkgs.fuse ];
-            virtualisation.memorySize = 4096;
-            nix.settings.substituters = lib.mkForce [ ];
-            nix.extraOptions = ''
-              experimental-features = nix-command flakes
-              flake-registry = https://git.sr.ht/~NixOS/flake-registry/blob/master/flake-registry.json
-            '';
-            environment.systemPackages = [ pkgs.jq ];
-            networking.hosts.${(builtins.head nodes.sourcehut.networking.interfaces.eth1.ipv4.addresses).address} =
-              [ "git.sr.ht" ];
-            security.pki.certificateFiles = [ "${cert}/ca.crt" ];
-          };
+        services.httpd.enable = true;
+        services.httpd.adminAddr = "foo@example.org";
+        services.httpd.extraConfig = ''
+          ErrorLog syslog:local6
+        '';
+        services.httpd.virtualHosts."git.sr.ht" = {
+          forceSSL = true;
+          sslServerKey = "${cert}/server.key";
+          sslServerCert = "${cert}/server.crt";
+          servedDirs = [
+            {
+              urlPath = "/~NixOS/nixpkgs";
+              dir = nixpkgs-repo;
+            }
+            {
+              urlPath = "/~NixOS/flake-registry/blob/master";
+              dir = registry;
+            }
+          ];
+        };
       };
 
-    testScript = { nodes }: ''
+    client =
+      {
+        config,
+        lib,
+        pkgs,
+        nodes,
+        ...
+      }:
+      {
+        virtualisation.writableStore = true;
+        virtualisation.diskSize = 2048;
+        virtualisation.additionalPaths = [
+          pkgs.hello
+          pkgs.fuse
+        ];
+        virtualisation.memorySize = 4096;
+        nix.settings.substituters = lib.mkForce [ ];
+        nix.extraOptions = ''
+          experimental-features = nix-command flakes
+          flake-registry = https://git.sr.ht/~NixOS/flake-registry/blob/master/flake-registry.json
+        '';
+        environment.systemPackages = [ pkgs.jq ];
+        networking.hosts.${(builtins.head nodes.sourcehut.networking.interfaces.eth1.ipv4.addresses).address} =
+          [ "git.sr.ht" ];
+        security.pki.certificateFiles = [ "${cert}/ca.crt" ];
+      };
+  };
+
+  testScript =
+    { nodes }:
+    ''
       # fmt: off
       import json
       import time
@@ -122,6 +139,8 @@ in
       start_all()
 
       sourcehut.wait_for_unit("httpd.service")
+      sourcehut.wait_for_unit("network-online.target")
+      client.wait_for_unit("network-online.target")
 
       client.succeed("curl -v https://git.sr.ht/ >&2")
       client.succeed("nix registry list | grep nixpkgs")

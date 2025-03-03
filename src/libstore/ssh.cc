@@ -240,4 +240,19 @@ Path SSHMaster::startMaster()
 
 #endif
 
+void SSHMaster::Connection::trySetBufferSize(size_t size)
+{
+#ifdef F_SETPIPE_SZ
+    /* This `fcntl` method of doing this takes a positive `int`. Check
+       and convert accordingly.
+
+       The function overall still takes `size_t` because this is more
+       portable for a platform-agnostic interface. */
+    assert(size <= INT_MAX);
+    int pipesize = size;
+    fcntl(in.get(), F_SETPIPE_SZ, pipesize);
+    fcntl(out.get(), F_SETPIPE_SZ, pipesize);
+#endif
+}
+
 }

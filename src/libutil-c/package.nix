@@ -1,11 +1,12 @@
-{ lib
-, mkMesonLibrary
+{
+  lib,
+  mkMesonLibrary,
 
-, nix-util
+  nix-util,
 
-# Configuration Options
+  # Configuration Options
 
-, version
+  version,
 }:
 
 let
@@ -32,14 +33,6 @@ mkMesonLibrary (finalAttrs: {
   propagatedBuildInputs = [
     nix-util
   ];
-
-  preConfigure =
-    # "Inline" .version so it's not a symlink, and includes the suffix.
-    # Do the meson utils, without modification.
-    ''
-      chmod u+w ./.version
-      echo ${version} > ../../.version
-    '';
 
   mesonFlags = [
   ];

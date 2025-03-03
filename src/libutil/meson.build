@@ -62,6 +62,12 @@ elif host_machine.system() == 'sunos'
   deps_other += [socket, network_service_library]
 endif
 
+blake3 = dependency(
+  'libblake3',
+  version: '>= 1.5.5',
+)
+deps_private += blake3
+
 boost = dependency(
   'boost',
   modules : ['context', 'coroutine'],
@@ -147,6 +153,7 @@ sources = files(
   'json-utils.cc',
   'logging.cc',
   'memory-source-accessor.cc',
+  'mounted-source-accessor.cc',
   'position.cc',
   'posix-source-accessor.cc',
   'references.cc',
@@ -160,6 +167,7 @@ sources = files(
   'tarfile.cc',
   'terminal.cc',
   'thread-pool.cc',
+  'union-source-accessor.cc',
   'unix-domain-socket.cc',
   'url.cc',
   'users.cc',

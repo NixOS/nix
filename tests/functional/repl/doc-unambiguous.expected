@@ -6,6 +6,7 @@ Added <number omitted> variables.
 
 nix-repl> :doc unambiguous
 Function `unambiguous`\
-  … defined at /path/to/tests/functional/repl/doc-comments.nix:24:5
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:37:5
+
 
 Very close

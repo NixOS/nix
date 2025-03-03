@@ -4,11 +4,13 @@
 
 - Each input must be [realised] prior to building the derivation in question.
 
+[realised]: @docroot@/glossary.md#gloss-realise
+
 - Once this is done, the derivation is *normalized*, replacing each input deriving path with its store path, which we now know from realising the input.
 
 ## Builder Execution
 
-The [`builder`](./drv.md#builder) is executed as follows:
+The [`builder`](./derivation/index.md#builder) is executed as follows:
 
 - A temporary directory is created under the directory specified by
   `TMPDIR` (default `/tmp`) where the build will take place. The
@@ -52,7 +54,7 @@ The [`builder`](./drv.md#builder) is executed as follows:
     it’s `out`.)
 
 - If an output path already exists, it is removed. Also, locks are
-  acquired to prevent multiple Nix instances from performing the same
+  acquired to prevent multiple [Nix instances][Nix instance] from performing the same
   build at the same time.
 
 - A log of the combined standard output and error is written to
@@ -65,22 +67,37 @@ The [`builder`](./drv.md#builder) is executed as follows:
 - The temporary directory is removed (unless the `-K` option was
   specified).
 
-## Processing outputs and Reference scanning
+## Processing outputs
 
-- After the build, Nix sets the last-modified timestamp on all files
+If the builder exited successfully, the following steps happen in order to turn the output directories left behind by the builder into proper store objects:
+
+- **Normalize the file permissions**
+
+  Nix sets the last-modified timestamp on all files
   in the build result to 1 (00:00:01 1/1/1970 UTC), sets the group to
   the default group, and sets the mode of the file to 0444 or 0555
   (i.e., read-only, with execute permission enabled if the file was
-  originally executable). Note that possible `setuid` and `setgid`
-  bits are cleared. Setuid and setgid programs are not currently
-  supported by Nix. This is because the Nix archives used in
-  deployment have no concept of ownership information, and because it
-  makes the build result dependent on the user performing the build.
+  originally executable). Any possible `setuid` and `setgid`
+  bits are cleared.
 
-- If the build was successful, Nix scans each output path for
+  > **Note**
+  >
+  > Setuid and setgid programs are not currently supported by Nix.
+  > This is because the Nix archives used in deployment have no concept of ownership information,
+  > and because it makes the build result dependent on the user performing the build.
+
+- **Calculate the references**
+
+  Nix scans each output path for
   references to input paths by looking for the hash parts of the input
   paths. Since these are potential runtime dependencies, Nix registers
   them as dependencies of the output paths.
+
+  Nix also scans for references to other outputs' paths in the same way, because outputs are allowed to refer to each other.
+  If the outputs' references to each other form a cycle, this is an error, because the references of store objects much be acyclic.
+
+
+[Nix instance]: @docroot@/glossary.md#gloss-nix-instance
 
 TODO integrete these with the bullet
 

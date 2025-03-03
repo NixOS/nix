@@ -1,19 +1,21 @@
-{ lib
-, buildPackages
-, stdenv
-, mkMesonExecutable
+{
+  lib,
+  buildPackages,
+  stdenv,
+  mkMesonExecutable,
 
-, nix-fetchers
-, nix-store-test-support
+  nix-fetchers,
+  nix-store-test-support,
 
-, rapidcheck
-, gtest
-, runCommand
+  libgit2,
+  rapidcheck,
+  gtest,
+  runCommand,
 
-# Configuration Options
+  # Configuration Options
 
-, version
-, resolvePath
+  version,
+  resolvePath,
 }:
 
 let
@@ -41,31 +43,30 @@ mkMesonExecutable (finalAttrs: {
     nix-store-test-support
     rapidcheck
     gtest
+    libgit2
   ];
-
-  preConfigure =
-    # "Inline" .version so it's not a symlink, and includes the suffix.
-    # Do the meson utils, without modification.
-    ''
-      chmod u+w ./.version
-      echo ${version} > ../../.version
-    '';
 
   mesonFlags = [
   ];
 
   passthru = {
     tests = {
-      run = runCommand "${finalAttrs.pname}-run" {
-        meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
-      } (lib.optionalString stdenv.hostPlatform.isWindows ''
-        export HOME="$PWD/home-dir"
-        mkdir -p "$HOME"
-      '' + ''
-        export _NIX_TEST_UNIT_DATA=${resolvePath ./data}
-        ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
-        touch $out
-      '');
+      run =
+        runCommand "${finalAttrs.pname}-run"
+          {
+            meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
+          }
+          (
+            lib.optionalString stdenv.hostPlatform.isWindows ''
+              export HOME="$PWD/home-dir"
+              mkdir -p "$HOME"
+            ''
+            + ''
+              export _NIX_TEST_UNIT_DATA=${resolvePath ./data}
+              ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
+              touch $out
+            ''
+          );
     };
   };
 

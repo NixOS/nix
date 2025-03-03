@@ -375,6 +375,7 @@ const redirects = {
   "glossary.html": {
     "gloss-local-store": "store/types/local-store.html",
     "gloss-chroot-store": "store/types/local-store.html",
+    "gloss-content-addressed-derivation": "#gloss-content-addressing-derivation",
   },
 };
 

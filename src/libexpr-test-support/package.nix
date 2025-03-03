@@ -1,15 +1,16 @@
-{ lib
-, mkMesonLibrary
+{
+  lib,
+  mkMesonLibrary,
 
-, nix-store-test-support
-, nix-expr
-, nix-expr-c
+  nix-store-test-support,
+  nix-expr,
+  nix-expr-c,
 
-, rapidcheck
+  rapidcheck,
 
-# Configuration Options
+  # Configuration Options
 
-, version
+  version,
 }:
 
 let
@@ -38,14 +39,6 @@ mkMesonLibrary (finalAttrs: {
     nix-expr-c
     rapidcheck
   ];
-
-  preConfigure =
-    # "Inline" .version so it's not a symlink, and includes the suffix.
-    # Do the meson utils, without modification.
-    ''
-      chmod u+w ./.version
-      echo ${version} > ../../.version
-    '';
 
   mesonFlags = [
   ];

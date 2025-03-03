@@ -1,7 +1,7 @@
 # Abstract Derivation and Derived Reference
 
 So far, we have covered "inert" [store objects](./object.md).
-But the point of the Nix store layer is to be a build system.
+But the point of the Nix store layer is to be a [build system], not just a [content-addressed store].
 Other system (like Git or IPFS) also store and transfer immutable data, but they don't concern themselves with *how* that data was created.
 
 This is where Nix distinguishes itself.

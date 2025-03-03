@@ -8,22 +8,13 @@
 
 namespace nix {
 
+struct DerivationOptions;
+
 class ParsedDerivation
 {
     StorePath drvPath;
     BasicDerivation & drv;
     std::unique_ptr<nlohmann::json> structuredAttrs;
-
-public:
-
-    ParsedDerivation(const StorePath & drvPath, BasicDerivation & drv);
-
-    ~ParsedDerivation();
-
-    const nlohmann::json * getStructuredAttrs() const
-    {
-        return structuredAttrs.get();
-    }
 
     std::optional<std::string> getStringAttr(const std::string & name) const;
 
@@ -31,15 +22,26 @@ public:
 
     std::optional<Strings> getStringsAttr(const std::string & name) const;
 
-    StringSet getRequiredSystemFeatures() const;
+    std::optional<StringSet> getStringSetAttr(const std::string & name) const;
 
-    bool canBuildLocally(Store & localStore) const;
+    /**
+     * Only `DerivationOptions` is allowed to parse individual fields
+     * from `ParsedDerivation`. This ensure that it includes all
+     * derivation options, and, the likes of `LocalDerivationGoal` are
+     * incapable of more ad-hoc options.
+     */
+    friend struct DerivationOptions;
 
-    bool willBuildLocally(Store & localStore) const;
+public:
 
-    bool substitutesAllowed() const;
+    ParsedDerivation(const StorePath & drvPath, BasicDerivation & drv);
 
-    bool useUidRange() const;
+    ~ParsedDerivation();
+
+    bool hasStructuredAttrs() const
+    {
+        return static_cast<bool>(structuredAttrs);
+    }
 
     std::optional<nlohmann::json> prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths);
 };

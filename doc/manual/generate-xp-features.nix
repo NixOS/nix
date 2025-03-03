@@ -2,7 +2,8 @@ with builtins;
 with import <nix/utils.nix>;
 
 let
-  showExperimentalFeature = name: doc:
+  showExperimentalFeature =
+    name: doc:
     squash ''
       ## [`${name}`]{#xp-feature-${name}}
 

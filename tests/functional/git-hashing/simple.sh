@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 repo="$TEST_ROOT/scratch"

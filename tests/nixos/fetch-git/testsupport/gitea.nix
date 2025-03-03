@@ -1,4 +1,11 @@
-{ lib, nixpkgs, system, pkgs, ... }: let
+{
+  lib,
+  nixpkgs,
+  system,
+  pkgs,
+  ...
+}:
+let
   clientPrivateKey = pkgs.writeText "id_ed25519" ''
     -----BEGIN OPENSSH PRIVATE KEY-----
     b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
@@ -9,41 +16,62 @@
     -----END OPENSSH PRIVATE KEY-----
   '';
 
-  clientPublicKey =
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFt5a8eH8BYZYjoQhzXGVKKHJe1pw1D0p7O2Vb9VTLzB";
+  clientPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFt5a8eH8BYZYjoQhzXGVKKHJe1pw1D0p7O2Vb9VTLzB";
 
-in {
+in
+{
   imports = [
     ../testsupport/setup.nix
     ../testsupport/gitea-repo.nix
   ];
   nodes = {
-    gitea = { pkgs, ... }: {
-      services.gitea.enable = true;
-      services.gitea.settings.service.DISABLE_REGISTRATION = true;
-      services.gitea.settings.log.LEVEL = "Info";
-      services.gitea.settings.database.LOG_SQL = false;
-      services.openssh.enable = true;
-      networking.firewall.allowedTCPPorts = [ 3000 ];
-      environment.systemPackages = [ pkgs.git pkgs.gitea ];
-
-      users.users.root.openssh.authorizedKeys.keys = [clientPublicKey];
-
-      # TODO: remove this after updating to nixos-23.11
-      nixpkgs.pkgs = lib.mkForce (import nixpkgs {
-        inherit system;
-        config.permittedInsecurePackages = [
-          "gitea-1.19.4"
+    gitea =
+      { pkgs, ... }:
+      {
+        services.gitea.enable = true;
+        services.gitea.lfs.enable = true;
+        services.gitea.settings = {
+          service.DISABLE_REGISTRATION = true;
+          server = {
+            DOMAIN = "gitea";
+            HTTP_PORT = 3000;
+          };
+          log.LEVEL = "Info";
+          database.LOG_SQL = false;
+        };
+        services.openssh.enable = true;
+        networking.firewall.allowedTCPPorts = [ 3000 ];
+        environment.systemPackages = [
+          pkgs.git
+          pkgs.gitea
         ];
-      });
-    };
-    client = { pkgs, ... }: {
-      environment.systemPackages = [ pkgs.git ];
-    };
+
+        users.users.root.openssh.authorizedKeys.keys = [ clientPublicKey ];
+
+        # TODO: remove this after updating to nixos-23.11
+        nixpkgs.pkgs = lib.mkForce (
+          import nixpkgs {
+            inherit system;
+            config.permittedInsecurePackages = [
+              "gitea-1.19.4"
+            ];
+          }
+        );
+      };
+    client =
+      { pkgs, ... }:
+      {
+        environment.systemPackages = [
+          pkgs.git
+          pkgs.git-lfs
+        ];
+      };
   };
-  defaults = { pkgs, ... }: {
-    environment.systemPackages = [ pkgs.jq ];
-  };
+  defaults =
+    { pkgs, ... }:
+    {
+      environment.systemPackages = [ pkgs.jq ];
+    };
 
   setupScript = ''
     import shlex

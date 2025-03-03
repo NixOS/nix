@@ -1,21 +1,22 @@
-{ lib
-, buildPackages
-, stdenv
-, mkMesonExecutable
+{
+  lib,
+  buildPackages,
+  stdenv,
+  mkMesonExecutable,
 
-, nix-store
-, nix-store-c
-, nix-store-test-support
-, sqlite
+  nix-store,
+  nix-store-c,
+  nix-store-test-support,
+  sqlite,
 
-, rapidcheck
-, gtest
-, runCommand
+  rapidcheck,
+  gtest,
+  runCommand,
 
-# Configuration Options
+  # Configuration Options
 
-, version
-, filesetToSource
+  version,
+  filesetToSource,
 }:
 
 let
@@ -51,39 +52,38 @@ mkMesonExecutable (finalAttrs: {
     nix-store-test-support
   ];
 
-  preConfigure =
-    # "Inline" .version so it's not a symlink, and includes the suffix.
-    # Do the meson utils, without modification.
-    ''
-      chmod u+w ./.version
-      echo ${version} > ../../.version
-    '';
-
   mesonFlags = [
   ];
 
   passthru = {
     tests = {
-      run = let
-        # Some data is shared with the functional tests: they create it,
-        # we consume it.
-        data = filesetToSource {
-          root = ../..;
-          fileset = lib.fileset.unions [
-            ./data
-            ../../tests/functional/derivation
-          ];
-        };
-      in runCommand "${finalAttrs.pname}-run" {
-        meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
-      } (lib.optionalString stdenv.hostPlatform.isWindows ''
-        export HOME="$PWD/home-dir"
-        mkdir -p "$HOME"
-      '' + ''
-        export _NIX_TEST_UNIT_DATA=${data + "/src/libstore-tests/data"}
-        ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
-        touch $out
-      '');
+      run =
+        let
+          # Some data is shared with the functional tests: they create it,
+          # we consume it.
+          data = filesetToSource {
+            root = ../..;
+            fileset = lib.fileset.unions [
+              ./data
+              ../../tests/functional/derivation
+            ];
+          };
+        in
+        runCommand "${finalAttrs.pname}-run"
+          {
+            meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
+          }
+          (
+            lib.optionalString stdenv.hostPlatform.isWindows ''
+              export HOME="$PWD/home-dir"
+              mkdir -p "$HOME"
+            ''
+            + ''
+              export _NIX_TEST_UNIT_DATA=${data + "/src/libstore-tests/data"}
+              ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
+              touch $out
+            ''
+          );
     };
   };
 

@@ -155,12 +155,6 @@ bool Input::isLocked() const
     return scheme && scheme->isLocked(*this);
 }
 
-bool Input::isConsideredLocked(
-    const Settings & settings) const
-{
-    return isLocked() || (settings.allowDirtyLocks && getNarHash());
-}
-
 bool Input::isFinal() const
 {
     return maybeGetBoolAttr(attrs, "__final").value_or(false);
@@ -192,6 +186,7 @@ bool Input::contains(const Input & other) const
     return false;
 }
 
+// FIXME: remove
 std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 {
     if (!scheme)
@@ -206,10 +201,6 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
             auto narHash = store->queryPathInfo(storePath)->narHash;
             result.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
-            // FIXME: we would like to mark inputs as final in
-            // getAccessorUnchecked(), but then we can't add
-            // narHash. Or maybe narHash should be excluded from the
-            // concept of "final" inputs?
             result.attrs.insert_or_assign("__final", Explicit<bool>(true));
 
             assert(result.isFinal());
@@ -289,6 +280,8 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessor(ref<Store> store) const
 {
     try {
         auto [accessor, result] = getAccessorUnchecked(store);
+
+        result.attrs.insert_or_assign("__final", Explicit<bool>(true));
 
         checkLocks(*this, result);
 

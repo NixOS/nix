@@ -50,7 +50,7 @@ Args::Flag hashAlgo(std::string && longName, HashAlgorithm * ha)
 {
     return Args::Flag {
             .longName = std::move(longName),
-            .description = "Hash algorithm (`md5`, `sha1`, `sha256`, or `sha512`).",
+            .description = "Hash algorithm (`blake3`, `md5`, `sha1`, `sha256`, or `sha512`).",
             .labels = {"hash-algo"},
             .handler = {[ha](std::string s) {
                 *ha = parseHashAlgo(s);
@@ -63,7 +63,7 @@ Args::Flag hashAlgoOpt(std::string && longName, std::optional<HashAlgorithm> * o
 {
     return Args::Flag {
             .longName = std::move(longName),
-            .description = "Hash algorithm (`md5`, `sha1`, `sha256`, or `sha512`). Can be omitted for SRI hashes.",
+            .description = "Hash algorithm (`blake3`, `md5`, `sha1`, `sha256`, or `sha512`). Can be omitted for SRI hashes.",
             .labels = {"hash-algo"},
             .handler = {[oha](std::string s) {
                 *oha = std::optional<HashAlgorithm>{parseHashAlgo(s)};

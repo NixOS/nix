@@ -17,6 +17,7 @@
 #include "legacy.hh"
 #include "eval-settings.hh" // for defexpr
 #include "terminal.hh"
+#include "man-pages.hh"
 
 #include <cerrno>
 #include <ctime>

@@ -57,7 +57,7 @@ struct FlakeInput
      * false = (fetched) static source path
      */
     bool isFlake = true;
-    std::optional<InputPath> follows;
+    std::optional<InputAttrPath> follows;
     FlakeInputs overrides;
 };
 
@@ -79,24 +79,37 @@ struct Flake
      * The original flake specification (by the user)
      */
     FlakeRef originalRef;
+
     /**
      * registry references and caching resolved to the specific underlying flake
      */
     FlakeRef resolvedRef;
+
     /**
      * the specific local store result of invoking the fetcher
      */
     FlakeRef lockedRef;
+
     /**
      * The path of `flake.nix`.
      */
     SourcePath path;
+
     /**
-     * pretend that 'lockedRef' is dirty
+     * Pretend that `lockedRef` is dirty.
      */
     bool forceDirty = false;
+
     std::optional<std::string> description;
+
     FlakeInputs inputs;
+
+    /**
+     * Attributes to be retroactively applied to the `self` input
+     * (such as `submodules = true`).
+     */
+    fetchers::Attrs selfAttrs;
+
     /**
      * 'nixConfig' attribute
      */
@@ -201,13 +214,13 @@ struct LockFlags
     /**
      * Flake inputs to be overridden.
      */
-    std::map<InputPath, FlakeRef> inputOverrides;
+    std::map<InputAttrPath, FlakeRef> inputOverrides;
 
     /**
      * Flake inputs to be updated. This means that any existing lock
      * for those inputs will be ignored.
      */
-    std::set<InputPath> inputUpdates;
+    std::set<InputAttrPath> inputUpdates;
 };
 
 LockedFlake lockFlake(
@@ -220,16 +233,6 @@ void callFlake(
     EvalState & state,
     const LockedFlake & lockedFlake,
     Value & v);
-
-/**
- * Map a `SourcePath` to the corresponding store path. This is a
- * temporary hack to support chroot stores while we don't have full
- * lazy trees. FIXME: Remove this once we can pass a sourcePath rather
- * than a storePath to call-flake.nix.
- */
-std::pair<StorePath, Path> sourcePathToStorePath(
-    ref<Store> store,
-    const SourcePath & path);
 
 }
 

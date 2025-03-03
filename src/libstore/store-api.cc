@@ -230,20 +230,24 @@ void Store::addMultipleToStore(
 {
     std::atomic<size_t> nrDone{0};
     std::atomic<size_t> nrFailed{0};
-    std::atomic<uint64_t> bytesExpected{0};
     std::atomic<uint64_t> nrRunning{0};
 
     using PathWithInfo = std::pair<ValidPathInfo, std::unique_ptr<Source>>;
 
+    uint64_t bytesExpected = 0;
+
     std::map<StorePath, PathWithInfo *> infosMap;
     StorePathSet storePathsToAdd;
     for (auto & thingToAdd : pathsToCopy) {
+        bytesExpected += thingToAdd.first.narSize;
         infosMap.insert_or_assign(thingToAdd.first.path, &thingToAdd);
         storePathsToAdd.insert(thingToAdd.first.path);
     }
 
-    auto showProgress = [&]() {
-        act.progress(nrDone, pathsToCopy.size(), nrRunning, nrFailed);
+    act.setExpected(actCopyPath, bytesExpected);
+
+    auto showProgress = [&, nrTotal = pathsToCopy.size()]() {
+        act.progress(nrDone, nrTotal, nrRunning, nrFailed);
     };
 
     processGraph<StorePath>(
@@ -258,9 +262,6 @@ void Store::addMultipleToStore(
                 showProgress();
                 return StorePathSet();
             }
-
-            bytesExpected += info.narSize;
-            act.setExpected(actCopyPath, bytesExpected);
 
             return info.references;
         },
@@ -1104,9 +1105,6 @@ std::map<StorePath, StorePath> copyPaths(
         return storePathForDst;
     };
 
-    // total is accessed by each copy, which are each handled in separate threads
-    std::atomic<uint64_t> total = 0;
-
     for (auto & missingPath : sortedMissing) {
         auto info = srcStore.queryPathInfo(missingPath);
 
@@ -1116,9 +1114,10 @@ std::map<StorePath, StorePath> copyPaths(
         ValidPathInfo infoForDst = *info;
         infoForDst.path = storePathForDst;
 
-        auto source = sinkToSource([&](Sink & sink) {
+        auto source = sinkToSource([&, narSize = info->narSize](Sink & sink) {
             // We can reasonably assume that the copy will happen whenever we
             // read the path, so log something about that at that point
+            uint64_t total = 0;
             auto srcUri = srcStore.getUri();
             auto dstUri = dstStore.getUri();
             auto storePathS = srcStore.printStorePath(missingPath);
@@ -1129,13 +1128,13 @@ std::map<StorePath, StorePath> copyPaths(
 
             LambdaSink progressSink([&](std::string_view data) {
                 total += data.size();
-                act.progress(total, info->narSize);
+                act.progress(total, narSize);
             });
             TeeSink tee { sink, progressSink };
 
             srcStore.narFromPath(missingPath, tee);
         });
-        pathsToCopy.push_back(std::pair{infoForDst, std::move(source)});
+        pathsToCopy.emplace_back(std::move(infoForDst), std::move(source));
     }
 
     dstStore.addMultipleToStore(std::move(pathsToCopy), act, repair, checkSigs);

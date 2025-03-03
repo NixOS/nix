@@ -86,7 +86,11 @@ struct GitRepo
 
     virtual bool hasObject(const Hash & oid) = 0;
 
-    virtual ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
+    virtual ref<SourceAccessor> getAccessor(
+        const Hash & rev,
+        bool exportIgnore,
+        std::string displayPrefix,
+        bool smudgeLfs = false) = 0;
 
     virtual ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
 
@@ -122,5 +126,27 @@ struct GitRepo
 };
 
 ref<GitRepo> getTarballCache();
+
+// A helper to ensure that the `git_*_free` functions get called.
+template<auto del>
+struct Deleter
+{
+    template <typename T>
+    void operator()(T * p) const { del(p); };
+};
+
+// A helper to ensure that we don't leak objects returned by libgit2.
+template<typename T>
+struct Setter
+{
+    T & t;
+    typename T::pointer p = nullptr;
+
+    Setter(T & t) : t(t) { }
+
+    ~Setter() { if (p) t = T(p); }
+
+    operator typename T::pointer * () { return &p; }
+};
 
 }

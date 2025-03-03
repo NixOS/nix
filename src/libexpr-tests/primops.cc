@@ -28,20 +28,15 @@ namespace nix {
     };
 
     class CaptureLogging {
-        Logger * oldLogger;
-        std::unique_ptr<CaptureLogger> tempLogger;
+        std::unique_ptr<Logger> oldLogger;
         public:
-            CaptureLogging() : tempLogger(std::make_unique<CaptureLogger>()) {
-                oldLogger = logger;
-                logger = tempLogger.get();
+            CaptureLogging() {
+                oldLogger = std::move(logger);
+                logger = std::make_unique<CaptureLogger>();
             }
 
             ~CaptureLogging() {
-                logger = oldLogger;
-            }
-
-            std::string get() const {
-                return tempLogger->get();
+                logger = std::move(oldLogger);
             }
     };
 
@@ -113,7 +108,7 @@ namespace nix {
         CaptureLogging l;
         auto v = eval("builtins.trace \"test string 123\" 123");
         ASSERT_THAT(v, IsIntEq(123));
-        auto text = l.get();
+        auto text = (dynamic_cast<CaptureLogger *>(logger.get()))->get();
         ASSERT_NE(text.find("test string 123"), std::string::npos);
     }
 

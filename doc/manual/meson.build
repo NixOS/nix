@@ -83,6 +83,7 @@ manual = custom_target(
     '''
         @0@ @INPUT0@ @CURRENT_SOURCE_DIR@ > @DEPFILE@
         @0@ @INPUT1@ summary @2@ < @CURRENT_SOURCE_DIR@/source/SUMMARY.md.in > @2@/source/SUMMARY.md
+        sed -e 's|@version@|@3@|g' < @INPUT2@ > @2@/book.toml
         rsync -r --include='*.md' @CURRENT_SOURCE_DIR@/ @2@/
         (cd @2@; RUST_LOG=warn @1@ build -d @2@ 3>&2 2>&1 1>&3) | { grep -Fv "because fragment resolution isn't implemented" || :; } 3>&2 2>&1 1>&3
         rm -rf @2@/manual
@@ -92,12 +93,13 @@ manual = custom_target(
       python.full_path(),
       mdbook.full_path(),
       meson.current_build_dir(),
+      meson.project_version(),
     ),
   ],
   input : [
     generate_manual_deps,
     'substitute.py',
-    'book.toml',
+    'book.toml.in',
     'anchors.jq',
     'custom.css',
     nix3_cli_files,

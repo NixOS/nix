@@ -390,6 +390,15 @@ public:
     SourcePath rootPath(PathView path);
 
     /**
+     * Return a `SourcePath` that refers to `path` in the store.
+     *
+     * For now, this has to also be within the root filesystem for
+     * backwards compat, but for Windows and maybe also pure eval, we'll
+     * probably want to do something different.
+     */
+    SourcePath storePath(const StorePath & path);
+
+    /**
      * Allow access to a path.
      */
     void allowPath(const Path & path);
@@ -411,17 +420,6 @@ public:
     void allowAndSetStorePathString(const StorePath & storePath, Value & v);
 
     void checkURI(const std::string & uri);
-
-    /**
-     * When using a diverted store and 'path' is in the Nix store, map
-     * 'path' to the diverted location (e.g. /nix/store/foo is mapped
-     * to /home/alice/my-nix/nix/store/foo). However, this is only
-     * done if the context is not empty, since otherwise we're
-     * probably trying to read from the actual /nix/store. This is
-     * intended to distinguish between import-from-derivation and
-     * sources stored in the actual /nix/store.
-     */
-    Path toRealPath(const Path & path, const NixStringContext & context);
 
     /**
      * Parse a Nix expression from the specified file.
@@ -819,6 +817,15 @@ public:
      * @return a mapping from the placeholders used to construct the associated value to their final store path.
      */
     [[nodiscard]] StringMap realiseContext(const NixStringContext & context, StorePathSet * maybePaths = nullptr, bool isIFD = true);
+
+    /**
+     * Realise the given string with context, and return the string with outputs instead of downstream output placeholders.
+     * @param[in] str the string to realise
+     * @param[out] paths all referenced store paths will be added to this set
+     * @return the realised string
+     * @throw EvalError if the value is not a string, path or derivation (see `coerceToString`)
+     */
+    std::string realiseString(Value & str, StorePathSet * storePathsOutMaybe, bool isIFD = true, const PosIdx pos = noPos);
 
     /* Call the binary path filter predicate used builtins.path etc. */
     bool callPathFilter(

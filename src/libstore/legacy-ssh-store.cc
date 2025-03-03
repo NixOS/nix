@@ -69,7 +69,10 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
         command.push_back("--store");
         command.push_back(remoteStore.get());
     }
-    conn->sshConn = master.startCommand(std::move(command));
+    conn->sshConn = master.startCommand(std::move(command), std::list{extraSshArgs});
+    if (connPipeSize) {
+        conn->sshConn->trySetBufferSize(*connPipeSize);
+    }
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
 
@@ -100,28 +103,37 @@ std::string LegacySSHStore::getUri()
     return *uriSchemes().begin() + "://" + host;
 }
 
+std::map<StorePath, UnkeyedValidPathInfo> LegacySSHStore::queryPathInfosUncached(
+    const StorePathSet & paths)
+{
+    auto conn(connections->get());
+
+    /* No longer support missing NAR hash */
+    assert(GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4);
+
+    debug("querying remote host '%s' for info on '%s'", host, concatStringsSep(", ", printStorePathSet(paths)));
+
+    auto infos = conn->queryPathInfos(*this, paths);
+
+    for (const auto & [_, info] : infos) {
+        if (info.narHash == Hash::dummy)
+            throw Error("NAR hash is now mandatory");
+    }
+
+    return infos;
+}
 
 void LegacySSHStore::queryPathInfoUncached(const StorePath & path,
     Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     try {
-        auto conn(connections->get());
-
-        /* No longer support missing NAR hash */
-        assert(GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4);
-
-        debug("querying remote host '%s' for info on '%s'", host, printStorePath(path));
-
-        auto infos = conn->queryPathInfos(*this, {path});
+        auto infos = queryPathInfosUncached({path});
 
         switch (infos.size()) {
         case 0:
             return callback(nullptr);
         case 1: {
             auto & [path2, info] = *infos.begin();
-
-            if (info.narHash == Hash::dummy)
-                throw Error("NAR hash is now mandatory");
 
             assert(path == path2);
             return callback(std::make_shared<ValidPathInfo>(
@@ -193,10 +205,16 @@ void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source,
 
 void LegacySSHStore::narFromPath(const StorePath & path, Sink & sink)
 {
-    auto conn(connections->get());
-    conn->narFromPath(*this, path, [&](auto & source) {
+    narFromPath(path, [&](auto & source) {
         copyNAR(source, sink);
     });
+}
+
+
+void LegacySSHStore::narFromPath(const StorePath & path, std::function<void(Source &)> fun)
+{
+    auto conn(connections->get());
+    conn->narFromPath(*this, path, fun);
 }
 
 
@@ -221,6 +239,19 @@ BuildResult LegacySSHStore::buildDerivation(const StorePath & drvPath, const Bas
     conn->putBuildDerivationRequest(*this, drvPath, drv, buildSettings());
 
     return conn->getBuildDerivationResponse(*this);
+}
+
+std::function<BuildResult()> LegacySSHStore::buildDerivationAsync(
+    const StorePath & drvPath, const BasicDerivation & drv,
+    const ServeProto::BuildOptions & options)
+{
+    // Until we have C++23 std::move_only_function
+    auto conn = std::make_shared<Pool<Connection>::Handle>(connections->get());
+    (*conn)->putBuildDerivationRequest(*this, drvPath, drv, options);
+
+    return [this,conn]() -> BuildResult {
+        return (*conn)->getBuildDerivationResponse(*this);
+    };
 }
 
 
@@ -294,6 +325,32 @@ StorePathSet LegacySSHStore::queryValidPaths(const StorePathSet & paths,
 }
 
 
+StorePathSet LegacySSHStore::queryValidPaths(const StorePathSet & paths,
+    bool lock, SubstituteFlag maybeSubstitute)
+{
+    auto conn(connections->get());
+    return conn->queryValidPaths(*this,
+        lock, paths, maybeSubstitute);
+}
+
+
+void LegacySSHStore::addMultipleToStoreLegacy(Store & srcStore, const StorePathSet & paths)
+{
+    auto conn(connections->get());
+    conn->to << ServeProto::Command::ImportPaths;
+    try {
+        srcStore.exportPaths(paths, conn->to);
+    } catch (...) {
+        conn->good = false;
+        throw;
+    }
+    conn->to.flush();
+
+    if (readInt(conn->from) != 1)
+        throw Error("remote machine failed to import closure");
+}
+
+
 void LegacySSHStore::connect()
 {
     auto conn(connections->get());
@@ -304,6 +361,28 @@ unsigned int LegacySSHStore::getProtocol()
 {
     auto conn(connections->get());
     return conn->remoteVersion;
+}
+
+
+pid_t LegacySSHStore::getConnectionPid()
+{
+    auto conn(connections->get());
+#ifndef _WIN32
+    return conn->sshConn->sshPid;
+#else
+    // TODO: Implement
+    return 0;
+#endif
+}
+
+
+LegacySSHStore::ConnectionStats LegacySSHStore::getConnectionStats()
+{
+    auto conn(connections->get());
+    return {
+        .bytesReceived = conn->from.read,
+        .bytesSent = conn->to.written,
+    };
 }
 
 

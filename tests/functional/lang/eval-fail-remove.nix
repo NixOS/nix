@@ -1,5 +1,8 @@
 let {
-  attrs = {x = 123; y = 456;};
+  attrs = {
+    x = 123;
+    y = 456;
+  };
 
-  body = (removeAttrs attrs ["x"]).x;
+  body = (removeAttrs attrs [ "x" ]).x;
 }

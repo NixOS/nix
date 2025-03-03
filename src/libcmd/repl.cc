@@ -101,6 +101,9 @@ struct NixRepl
                               Value & v,
                               unsigned int maxDepth = std::numeric_limits<unsigned int>::max())
     {
+        // Hide the progress bar during printing because it might interfere
+        logger->pause();
+        Finally resumeLoggerDefer([]() { logger->resume(); });
         ::nix::printValue(*state, str, v, PrintOptions {
             .ansiColors = true,
             .force = true,
@@ -126,7 +129,7 @@ NixRepl::NixRepl(const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalS
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
     , getValues(getValues)
-    , staticEnv(new StaticEnv(nullptr, state->staticBaseEnv.get()))
+    , staticEnv(new StaticEnv(nullptr, state->staticBaseEnv))
     , runNixPtr{runNix}
     , interacter(make_unique<ReadlineLikeInteracter>(getDataDir() + "/repl-history"))
 {
