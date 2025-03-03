@@ -255,6 +255,7 @@ sources = files(
   'build-result.cc',
   'build/derivation-goal.cc',
   'build/derivation-building-goal.cc',
+  'build/derivation-trampoline-goal.cc',
   'build/drv-output-substitution-goal.cc',
   'build/entry-points.cc',
   'build/goal.cc',

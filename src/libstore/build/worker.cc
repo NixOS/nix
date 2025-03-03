@@ -5,6 +5,7 @@
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
+#include "nix/store/build/derivation-trampoline-goal.hh"
 #ifndef _WIN32 // TODO Enable building on Windows
 #  include "nix/store/build/hook-instance.hh"
 #endif
@@ -53,52 +54,40 @@ std::shared_ptr<G> Worker::initGoalIfNeeded(std::weak_ptr<G> & goal_weak, Args &
     return goal;
 }
 
-std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
+std::shared_ptr<DerivationTrampolineGoal> Worker::makeDerivationTrampolineGoal(
     ref<const SingleDerivedPath> drvReq,
     const OutputsSpec & wantedOutputs,
-    std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal)
+    BuildMode buildMode)
 {
-    std::weak_ptr<DerivationGoal> & goal_weak = derivationGoals.ensureSlot(*drvReq).value;
-    std::shared_ptr<DerivationGoal> goal = goal_weak.lock();
-    if (!goal) {
-        goal = mkDrvGoal();
-        goal_weak = goal;
-        wakeUp(goal);
-    } else {
-        goal->addWantedOutputs(wantedOutputs);
-    }
-    return goal;
+    return initGoalIfNeeded(
+        derivationTrampolineGoals.ensureSlot(*drvReq).value[wantedOutputs],
+        drvReq, wantedOutputs, *this, buildMode);
 }
 
 
-std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(ref<const SingleDerivedPath> drvReq,
-    const OutputsSpec & wantedOutputs, BuildMode buildMode)
+std::shared_ptr<DerivationTrampolineGoal> Worker::makeDerivationTrampolineGoal(
+    const StorePath & drvPath,
+    const OutputsSpec & wantedOutputs,
+    const Derivation & drv,
+    BuildMode buildMode)
 {
-    return makeDerivationGoalCommon(drvReq, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
-        return std::make_shared<DerivationGoal>(drvReq, wantedOutputs, *this, buildMode);
-    });
+    return initGoalIfNeeded(
+        derivationTrampolineGoals.ensureSlot(DerivedPath::Opaque{drvPath}).value[wantedOutputs],
+        drvPath, wantedOutputs, drv, *this, buildMode);
 }
 
-std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
-    const BasicDerivation & drv, const OutputsSpec & wantedOutputs, BuildMode buildMode)
+
+std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drvPath,
+    const Derivation & drv, const OutputName & wantedOutput, BuildMode buildMode)
 {
-    return makeDerivationGoalCommon(makeConstantStorePathRef(drvPath), wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
-        return std::make_shared<DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
-    });
+    return initGoalIfNeeded(derivationGoals[drvPath][wantedOutput], drvPath, drv, wantedOutput, *this, buildMode);
 }
 
 
 std::shared_ptr<DerivationBuildingGoal> Worker::makeDerivationBuildingGoal(const StorePath & drvPath,
     const Derivation & drv, BuildMode buildMode)
 {
-    std::weak_ptr<DerivationBuildingGoal> & goal_weak = derivationBuildingGoals[drvPath];
-    auto goal = goal_weak.lock(); // FIXME
-    if (!goal) {
-        goal = std::make_shared<DerivationBuildingGoal>(drvPath, drv, *this, buildMode);
-        goal_weak = goal;
-        wakeUp(goal);
-    }
-    return goal;
+    return initGoalIfNeeded(derivationBuildingGoals[drvPath], drvPath, drv, *this, buildMode);
 }
 
 
@@ -118,7 +107,7 @@ GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
 {
     return std::visit(overloaded {
         [&](const DerivedPath::Built & bfd) -> GoalPtr {
-            return makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode);
+            return makeDerivationTrampolineGoal(bfd.drvPath, bfd.outputs, buildMode);
         },
         [&](const DerivedPath::Opaque & bo) -> GoalPtr {
             return makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair);
@@ -126,46 +115,52 @@ GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
     }, req.raw());
 }
 
-
-template<typename K, typename V, typename F>
-static void cullMap(std::map<K, V> & goalMap, F f)
+/**
+ * This function is polymorphic (both via type parameters and
+ * overloading) and recursive in order to work on a various types of
+ * trees
+ *
+ * @return Whether the tree node we are processing is not empty / should
+ * be kept alive. In the case of this overloading the node in question
+ * is the leaf, the weak reference itself. If the weak reference points
+ * to the goal we are looking for, our caller can delete it. In the
+ * inductive case where the node is an interior node, we'll likewise
+ * return whether the interior node is non-empty. If it is empty
+ * (because we just deleted its last child), then our caller can
+ * likewise delete it.
+ */
+template<typename G>
+static bool removeGoal(std::shared_ptr<G> goal, std::weak_ptr<G> & gp)
 {
-    for (auto i = goalMap.begin(); i != goalMap.end();)
-        if (!f(i->second))
+    return gp.lock() != goal;
+}
+
+template<typename K, typename G, typename Inner>
+static bool removeGoal(std::shared_ptr<G> goal, std::map<K, Inner> & goalMap)
+{
+    /* !!! inefficient */
+    for (auto i = goalMap.begin(); i != goalMap.end();) {
+        if (!removeGoal(goal, i->second))
             i = goalMap.erase(i);
-        else ++i;
+        else
+            ++i;
+    }
+    return !goalMap.empty();
 }
 
-
-template<typename K, typename G>
-static void removeGoal(std::shared_ptr<G> goal, std::map<K, std::weak_ptr<G>> & goalMap)
+template<typename G>
+static bool removeGoal(std::shared_ptr<G> goal, typename DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<G>>>::ChildNode & node)
 {
-    /* !!! inefficient */
-    cullMap(goalMap, [&](const std::weak_ptr<G> & gp) -> bool {
-        return gp.lock() != goal;
-    });
-}
-
-template<typename K>
-static void removeGoal(std::shared_ptr<DerivationGoal> goal, std::map<K, DerivedPathMap<std::weak_ptr<DerivationGoal>>::ChildNode> & goalMap);
-
-template<typename K>
-static void removeGoal(std::shared_ptr<DerivationGoal> goal, std::map<K, DerivedPathMap<std::weak_ptr<DerivationGoal>>::ChildNode> & goalMap)
-{
-    /* !!! inefficient */
-    cullMap(goalMap, [&](DerivedPathMap<std::weak_ptr<DerivationGoal>>::ChildNode & node) -> bool {
-        if (node.value.lock() == goal)
-            node.value.reset();
-        removeGoal(goal, node.childMap);
-        return !node.value.expired() || !node.childMap.empty();
-    });
+    return removeGoal(goal, node.value) || removeGoal(goal, node.childMap);
 }
 
 
 void Worker::removeGoal(GoalPtr goal)
 {
-    if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
-        nix::removeGoal(drvGoal, derivationGoals.map);
+    if (auto drvGoal = std::dynamic_pointer_cast<DerivationTrampolineGoal>(goal))
+        nix::removeGoal(drvGoal, derivationTrampolineGoals.map);
+    else if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
+        nix::removeGoal(drvGoal, derivationGoals);
     else if (auto drvBuildingGoal = std::dynamic_pointer_cast<DerivationBuildingGoal>(goal))
         nix::removeGoal(drvBuildingGoal, derivationBuildingGoals);
     else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
@@ -312,13 +307,12 @@ void Worker::run(const Goals & _topGoals)
 
     for (auto & i : _topGoals) {
         topGoals.insert(i);
-        if (auto goal = dynamic_cast<DerivationGoal *>(i.get())) {
+        if (auto goal = dynamic_cast<DerivationTrampolineGoal *>(i.get())) {
             topPaths.push_back(DerivedPath::Built {
                 .drvPath = goal->drvReq,
                 .outputs = goal->wantedOutputs,
             });
-        } else
-        if (auto goal = dynamic_cast<PathSubstitutionGoal *>(i.get())) {
+        } else if (auto goal = dynamic_cast<PathSubstitutionGoal *>(i.get())) {
             topPaths.push_back(DerivedPath::Opaque{goal->storePath});
         }
     }
