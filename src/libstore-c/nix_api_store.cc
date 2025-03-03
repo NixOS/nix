@@ -53,7 +53,7 @@ Store * nix_store_open(nix_c_context * context, const char * uri, const char ***
 
 void nix_store_free(Store * store)
 {
-    delete store;
+    delete &(*store->ptr);
 }
 
 nix_err nix_store_get_uri(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data)
