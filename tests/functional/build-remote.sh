@@ -23,6 +23,7 @@ builders=(
   "ssh://localhost?remote-store=$TEST_ROOT/machine1?system-features=$(join_by "%20" foo "${EXTRA_SYSTEM_FEATURES[@]}") - - 1 1 $(join_by "," foo "${EXTRA_SYSTEM_FEATURES[@]}")"
   "$TEST_ROOT/machine2 - - 1 1 $(join_by "," bar "${EXTRA_SYSTEM_FEATURES[@]}")"
   "ssh-ng://localhost?remote-store=$TEST_ROOT/machine3?system-features=$(join_by "%20" baz "${EXTRA_SYSTEM_FEATURES[@]}") - - 1 1 $(join_by "," baz "${EXTRA_SYSTEM_FEATURES[@]}")"
+  "$TEST_ROOT/machine4 - - 1 1 $(join_by "," bar foo "${EXTRA_SYSTEM_FEATURES[@]}")"
 )
 
 chmod -R +w "$TEST_ROOT/machine"* || true
@@ -70,6 +71,12 @@ echo "$output" | grepQuietInverse builder-build-remote-input-2.sh
 echo "$output" | grepQuiet builder-build-remote-input-3.sh
 unset output
 
+# Ensure that input4 was built on store4 due to the required feature.
+output=$(nix path-info --store "$TEST_ROOT/machine4" --all)
+echo "$output" | grepQuietInverse builder-build-remote-input-1.sh
+echo "$output" | grepQuietInverse builder-build-remote-input-2.sh
+echo "$output" | grepQuietInverse builder-build-remote-input-3.sh
+unset output
 
 for i in input1 input3; do
 nix log --store "$TEST_ROOT/machine0" --file "$file" --arg busybox "$busybox" "passthru.$i" | grep hi-$i

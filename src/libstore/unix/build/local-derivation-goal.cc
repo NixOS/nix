@@ -531,9 +531,10 @@ void LocalDerivationGoal::startBuilder()
         if (drv->platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin") {
             throw Error("run `/usr/sbin/softwareupdate --install-rosetta` to enable your %s to run programs for %s", settings.thisSystem, drv->platform);
         } else {
-            throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
+            throw Error("a '%s' with features {%s} & not {%s} is required to build '%s', but I am a '%s' with features {%s}",
                 drv->platform,
                 concatStringsSep(", ", drvOptions->getRequiredSystemFeatures(*drv)),
+                concatStringsSep(", ", drvOptions->getRejectSystemFeatures(*drv)),
                 worker.store.printStorePath(drvPath),
                 settings.thisSystem,
                 concatStringsSep<StringSet>(", ", worker.store.systemFeatures));

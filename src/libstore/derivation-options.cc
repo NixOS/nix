@@ -134,6 +134,7 @@ DerivationOptions DerivationOptions::fromParsedDerivation(const ParsedDerivation
         .allowLocalNetworking = parsed.getBoolAttr("__darwinAllowLocalNetworking", defaults.allowLocalNetworking),
         .requiredSystemFeatures =
             parsed.getStringSetAttr("requiredSystemFeatures").value_or(defaults.requiredSystemFeatures),
+        .rejectSystemFeatures = parsed.getStringSetAttr("rejectSystemFeatures").value_or(defaults.rejectSystemFeatures),
         .preferLocalBuild = parsed.getBoolAttr("preferLocalBuild", defaults.preferLocalBuild),
         .allowSubstitutes = parsed.getBoolAttr("allowSubstitutes", defaults.allowSubstitutes),
     };
@@ -147,6 +148,15 @@ StringSet DerivationOptions::getRequiredSystemFeatures(const BasicDerivation & d
         res.insert(i);
     if (!drv.type().hasKnownOutputPaths())
         res.insert("ca-derivations");
+    return res;
+}
+
+StringSet DerivationOptions::getRejectSystemFeatures(const BasicDerivation & drv) const
+{
+    // FIXME: cache this?
+    StringSet res;
+    for (auto & i : rejectSystemFeatures)
+        res.insert(i);
     return res;
 }
 
@@ -215,6 +225,7 @@ DerivationOptions adl_serializer<DerivationOptions>::from_json(const json & json
         .allowLocalNetworking = getBoolean(valueAt(json, "allowLocalNetworking")),
 
         .requiredSystemFeatures = getStringSet(valueAt(json, "requiredSystemFeatures")),
+        .rejectSystemFeatures = getStringSet(valueAt(json, "rejectSystemFeatures")),
         .preferLocalBuild = getBoolean(valueAt(json, "preferLocalBuild")),
         .allowSubstitutes = getBoolean(valueAt(json, "allowSubstitutes")),
     };
@@ -247,6 +258,7 @@ void adl_serializer<DerivationOptions>::to_json(json & json, DerivationOptions o
     json["allowLocalNetworking"] = o.allowLocalNetworking;
 
     json["requiredSystemFeatures"] = o.requiredSystemFeatures;
+    json["rejectSystemFeatures"] = o.rejectSystemFeatures;
     json["preferLocalBuild"] = o.preferLocalBuild;
     json["allowSubstitutes"] = o.allowSubstitutes;
 }

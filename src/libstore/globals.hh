@@ -304,7 +304,7 @@ public:
 
           6. A comma-separated list of supported [system features](#conf-system-features).
 
-             A machine will only be used to build a derivation if all the features in the derivation's [`requiredSystemFeatures`](@docroot@/language/advanced-attributes.html#adv-attr-requiredSystemFeatures) attribute are supported by that machine.
+             A machine will only be used to build a derivation if all the features in the derivation's [`requiredSystemFeatures`](@docroot@/language/advanced-attributes.html#adv-attr-requiredSystemFeatures) attribute are supported by that machine and does not have any features in [`rejectSystemFeatures`](@docroot@/language/advanced-attributes.html#adv-attr-rejectSystemFeatures).
 
           7. A comma-separated list of required [system features](#conf-system-features).
 

@@ -69,12 +69,31 @@ let
     requiredSystemFeatures = [ "baz" ];
   };
 
+  input4 = mkDerivation {
+    shell = busybox;
+    name = "build-remote-input-4";
+    buildCommand = ''
+      echo hi-input3
+      read x < ${input3}
+      echo $x BAZ > $out
+    '';
+    rejectSystemFeatures = [ "bar" ];
+    requiredSystemFeatures = [ "foo" ];
+  };
+
 in
 
 mkDerivation {
   shell = busybox;
   name = "build-remote";
-  passthru = { inherit input1 input2 input3; };
+  passthru = {
+    inherit
+      input1
+      input2
+      input3
+      input4
+      ;
+  };
   buildCommand = ''
     read x < ${input1}
     read y < ${input3}

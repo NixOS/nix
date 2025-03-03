@@ -135,6 +135,11 @@ struct DerivationOptions
     StringSet requiredSystemFeatures = {};
 
     /**
+     * env: rejectSystemFeatures
+     */
+    StringSet rejectSystemFeatures = {};
+
+    /**
      * env: preferLocalBuild
      */
     bool preferLocalBuild = false;
@@ -160,6 +165,11 @@ struct DerivationOptions
      * `DerivationOptions` instead.
      */
     StringSet getRequiredSystemFeatures(const BasicDerivation & drv) const;
+
+    /**
+     * @param drv See note on `getRequiredSystemFeatures`
+     */
+    StringSet getRejectSystemFeatures(const BasicDerivation & drv) const;
 
     /**
      * @param drv See note on `getRequiredSystemFeatures`
