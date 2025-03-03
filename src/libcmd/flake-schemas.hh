@@ -34,6 +34,7 @@ struct OutputInfo
 {
     ref<AttrCursor> schemaInfo;
     ref<AttrCursor> nodeInfo;
+    ref<AttrCursor> rawValue;
     eval_cache::AttrPath leafAttrPath;
 };
 

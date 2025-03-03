@@ -10,6 +10,21 @@ let
 
   mapAttrsToList = f: attrs: map (name: f name attrs.${name}) (builtins.attrNames attrs);
 
+  decorateOutput =
+    inventory: output:
+    inventory
+    // (
+      if inventory ? children then
+        {
+          children = builtins.mapAttrs (name: value: decorateOutput value output.${name}) inventory.children;
+        }
+      else
+        { }
+    )
+    // {
+      raw = output;
+    };
+
 in
 
 rec {
@@ -46,9 +61,14 @@ rec {
       in
       schema
       // {
-        output = schema.inventory output;
+        node = decorateOutput (schemas.${outputName}.inventory output) output;
       }
     else
-      { unknown = true; }
+      {
+        unknown = true;
+        node = {
+          raw = output;
+        };
+      }
   ) outputs;
 }

@@ -134,7 +134,7 @@ void forEachOutput(
             auto isUnknown = (bool) output->maybeGetAttr("unknown");
             Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", output->getAttrPathStr()));
             f(outputName,
-              isUnknown ? std::shared_ptr<AttrCursor>() : output->getAttr("output"),
+              isUnknown ? std::shared_ptr<AttrCursor>() : output->getAttr("node"),
               isUnknown ? "" : output->getAttr("doc")->getString(),
               i + 1 == outputNames.size());
         } catch (Error & e) {
@@ -211,18 +211,15 @@ std::shared_ptr<AttrCursor> derivation(ref<AttrCursor> leaf)
 
 std::optional<OutputInfo> getOutput(ref<AttrCursor> inventory, eval_cache::AttrPath attrPath)
 {
-    if (attrPath.empty())
-        return std::nullopt;
+    assert(!attrPath.empty());
 
     auto outputName = attrPath.front();
 
     auto schemaInfo = inventory->maybeGetAttr(outputName);
-    if (!schemaInfo) // FIXME: shouldn't be needed
+    if (!schemaInfo)
         return std::nullopt;
 
-    auto node = schemaInfo->maybeGetAttr("output");
-    if (!node)
-        return std::nullopt;
+    auto node = schemaInfo->getAttr("node");
 
     auto pathLeft = std::span(attrPath).subspan(1);
 
@@ -231,15 +228,17 @@ std::optional<OutputInfo> getOutput(ref<AttrCursor> inventory, eval_cache::AttrP
         if (!children)
             break;
         auto attr = pathLeft.front();
-        node = children->maybeGetAttr(attr); // FIXME: add suggestions
-        if (!node)
-            return std::nullopt;
+        auto childNode = children->maybeGetAttr(attr); // FIXME: add suggestions
+        if (!childNode)
+            break;
+        node = ref(childNode);
         pathLeft = pathLeft.subspan(1);
     }
 
     return OutputInfo{
         .schemaInfo = ref(schemaInfo),
-        .nodeInfo = ref(node),
+        .nodeInfo = node,
+        .rawValue = node->getAttr("raw"),
         .leafAttrPath = std::vector(pathLeft.begin(), pathLeft.end()),
     };
 }
