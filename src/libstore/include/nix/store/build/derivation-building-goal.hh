@@ -29,7 +29,9 @@ void runPostBuildHook(
     const StorePathSet & outputPaths);
 
 /**
- * A goal for building some or all of the outputs of a derivation.
+ * A goal for building a derivation. Substitution, (or any other method of
+ * obtaining the outputs) will not be attempted, so it is the calling goal's
+ * responsibility to try to substitute first.
  */
 struct DerivationBuildingGoal : public Goal
 {
