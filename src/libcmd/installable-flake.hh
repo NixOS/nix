@@ -61,7 +61,7 @@ struct InstallableFlake : InstallableValue
      * exists. However if none exists, throw an exception.
      */
     std::vector<ref<eval_cache::AttrCursor>>
-    getCursors(EvalState & state) override;
+    getCursors(EvalState & state, bool returnAll) override;
 
     std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
 

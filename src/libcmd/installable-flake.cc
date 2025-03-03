@@ -144,7 +144,7 @@ std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state)
 }
 
 std::vector<ref<eval_cache::AttrCursor>>
-InstallableFlake::getCursors(EvalState & state)
+InstallableFlake::getCursors(EvalState & state, bool returnAll)
 {
     auto cache = flake_schemas::call(
         state,
@@ -237,9 +237,10 @@ InstallableFlake::getCursors(EvalState & state)
         }
 
         auto attr = outputs->findAlongAttrPath(attrPath);
-        if (attr)
+        if (attr) {
             res.push_back(ref(*attr));
-        else
+            if (!returnAll) break;
+        } else
             suggestions += attr.getSuggestions();
     }
 

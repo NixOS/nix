@@ -83,9 +83,11 @@ struct InstallableValue : Installable
      * Get a cursor to each value this Installable could refer to.
      * However if none exists, throw exception instead of returning
      * empty vector.
+     *
+     * @param returnAll If false, return only one cursor.
      */
     virtual std::vector<ref<eval_cache::AttrCursor>>
-    getCursors(EvalState & state);
+    getCursors(EvalState & state, bool returnAll);
 
     /**
      * Get the first and most preferred cursor this Installable could
