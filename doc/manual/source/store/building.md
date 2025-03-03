@@ -54,7 +54,7 @@ The [`builder`](./derivation/index.md#builder) is executed as follows:
     it’s `out`.)
 
 - If an output path already exists, it is removed. Also, locks are
-  acquired to prevent multiple Nix instances from performing the same
+  acquired to prevent multiple [Nix instances][Nix instance] from performing the same
   build at the same time.
 
 - A log of the combined standard output and error is written to
@@ -95,3 +95,6 @@ If the builder exited successfully, the following steps happen in order to turn 
 
   Nix also scans for references to other outputs' paths in the same way, because outputs are allowed to refer to each other.
   If the outputs' references to each other form a cycle, this is an error, because the references of store objects much be acyclic.
+
+
+[Nix instance]: @docroot@/glossary.md#gloss-nix-instance

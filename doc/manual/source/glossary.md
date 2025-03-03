@@ -1,5 +1,13 @@
 # Glossary
 
+- [build system]{#gloss-build-system}
+
+  Generic term for software that facilitates the building of software by automating the invocation of compilers, linkers, and other tools.
+
+  Nix can be used as a generic build system.
+  It has no knowledge of any particular programming language or toolchain.
+  These details are specified in [derivation expressions](#gloss-derivation-expression).
+
 - [content address]{#gloss-content-address}
 
   A
@@ -18,6 +26,10 @@
   Software Heritage's writing on [*Intrinsic and Extrinsic identifiers*](https://www.softwareheritage.org/2020/07/09/intrinsic-vs-extrinsic-identifiers) is also a good introduction to the value of content-addressing over other referencing schemes.
 
   Besides content addressing, the Nix store also uses [input addressing](#gloss-input-addressed-store-object).
+
+- [content-addressed storage]{#gloss-content-addressed-store}
+
+  The industry term for storage and retrieval systems using [content addressing](#gloss-content-address). A Nix store also has [input addressing](#gloss-input-addressed-store-object), and metadata.
 
 - [store derivation]{#gloss-store-derivation}
 
@@ -87,6 +99,12 @@
   There are many types of stores, see [Store Types](./store/types/index.md) for details.
 
   [store]: #gloss-store
+
+- [Nix instance]{#gloss-nix-instance}
+  <!-- ambiguous -->
+  1. An installation of Nix, which includes the presence of a [store], and the Nix package manager which operates on that store.
+     A local Nix installation and a [remote builder](@docroot@/advanced-topics/distributed-builds.md) are two examples of Nix instances.
+  2. A running Nix process, such as the `nix` command.
 
 - [binary cache]{#gloss-binary-cache}
 
@@ -220,7 +238,7 @@
   directly or indirectly “reachable” from that store path; that is,
   it’s the closure of the path under the *references* relation. For
   a package, the closure of its derivation is equivalent to the
-  build-time dependencies, while the closure of its output path is
+  build-time dependencies, while the closure of its [output path] is
   equivalent to its runtime dependencies. For correct deployment it
   is necessary to deploy whole closures, since otherwise at runtime
   files could be missing. The command `nix-store --query --requisites ` prints out

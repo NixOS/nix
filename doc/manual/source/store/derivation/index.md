@@ -1,7 +1,7 @@
 # Store Derivation and Deriving Path
 
-Besides functioning as a [content addressed store] the Nix store layer works as a [build system].
-Other system (like Git or IPFS) also store and transfer immutable data, but they don't concern themselves with *how* that data was created.
+Besides functioning as a [content-addressed store], the Nix store layer works as a [build system].
+Other systems (like Git or IPFS) also store and transfer immutable data, but they don't concern themselves with *how* that data was created.
 
 This is where Nix distinguishes itself.
 *Derivations* represent individual build steps, and *deriving paths* are needed to refer to the *outputs* of those build steps before they are built.
@@ -42,6 +42,8 @@ A derivation consists of:
 [args]: #args
 [env]: #env
 [system]: #system
+[content-addressed store]: @docroot@/glossary.md#gloss-content-addressed-store
+[build system]: @docroot@/glossary.md#gloss-build-system
 
 ### Referencing derivations {#derivation-path}
 
@@ -78,7 +80,7 @@ type DerivingPath = ConstantPath | OutputPath;
 ```
 
 Deriving paths are necessary because, in general and particularly for [content-addressing derivations][content-addressing derivation], the [store path] of an [output] is not known in advance.
-We can use an output deriving path to refer to such an out, instead of the store path which we do not yet know.
+We can use an output deriving path to refer to such an output, instead of the store path which we do not yet know.
 
 [deriving path]: #deriving-path
 [validity]: @docroot@/glossary.md#gloss-validity
@@ -89,25 +91,26 @@ A derivation is constructed from the parts documented in the following subsectio
 
 ### Inputs {#inputs}
 
-The inputs are a set of [deriving paths][deriving path], refering to all store objects needed in order to perform this build step.
+The inputs are a set of [deriving paths][deriving path], referring to all store objects needed in order to perform this build step.
 
 The [process creation fields] will presumably include many [store paths][store path]:
 
  - The path to the executable normally starts with a store path
  - The arguments and environment variables likely contain many other store paths.
 
-But rather than somehow scanning all the other fields for inputs, Nix requires that all inputs be explicitly collected in the inputs field. It is instead the responsibility of the creator of a derivation (e.g. the evaluator) to  ensure that every store object referenced in another field (e.g. referenced by store path) is included in this inputs field.
+But rather than somehow scanning all the other fields for inputs, Nix requires that all inputs be explicitly collected in the inputs field. It is instead the responsibility of the creator of a derivation (e.g. the evaluator) to ensure that every store object referenced in another field (e.g. referenced by store path) is included in this inputs field.
 
 ### System {#system}
 
 The system type on which the [`builder`](#attr-builder) executable is meant to be run.
 
-A necessary condition for Nix to schedule a given derivation on some Nix instance is for the "system" of that derivation to match that instance's [`system` configuration option].
+A necessary condition for Nix to schedule a given derivation on some [Nix instance] is for the "system" of that derivation to match that instance's [`system` configuration option] or [`extra-platforms` configuration option].
 
 By putting the `system` in each derivation, Nix allows *heterogenous* build plans, where not all steps can be run on the same machine or same sort of machine.
 Nix can schedule builds such that it automatically builds on other platforms by [forwarding build requests](@docroot@/advanced-topics/distributed-builds.md) to other Nix instances.
 
 [`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
+[`extra-platforms` configuration option]: @docroot@/command-ref/conf-file.md#conf-extra-platforms
 
 [content-addressing derivation]: @docroot@/glossary.md#gloss-content-addressing-derivation
 [realise]: @docroot@/glossary.md#gloss-realise
@@ -240,14 +243,14 @@ That works because we've implicitly assumed that all derivations are created *st
 But what if derivations could also be created dynamically within Nix?
 In other words, what if derivations could be the outputs of other derivations?
 
-:::{.note}
-In the parlance of "Build Systems à la carte", we are generalizing the Nix store layer to be a "Monadic" instead of "Applicative" build system.
-:::
+> **Note**
+>
+> In the parlance of "Build Systems à la carte", we are generalizing the Nix store layer to be a "Monadic" instead of "Applicative" build system.
 
 How should we refer to such derivations?
 A deriving path works, the same as how we refer to other derivation outputs.
 But what about a dynamic derivations output?
-(i.e. how do we refer to the output of an output of a derivation?)
+(i.e. how do we refer to the output of a derivation, which is itself an output of a derivation?)
 For that we need to generalize the definition of deriving path, replacing the store path used to refer to the derivation with a nested deriving path:
 
 ```diff
@@ -295,3 +298,5 @@ The result of this is that it is possible to have a chain of `^<output-name>` at
 > |------------------------------------------------------------| |-----|
 > innermost constant store path (usual encoding)                 output name
 > ```
+
+[Nix instance]: @docroot@/glossary.md#gloss-nix-instance
