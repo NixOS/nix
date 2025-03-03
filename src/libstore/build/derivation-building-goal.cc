@@ -1,5 +1,5 @@
 #include "nix/store/build/derivation-building-goal.hh"
-#include "nix/store/build/derivation-goal.hh"
+#include "nix/store/build/derivation-creation-and-realisation-goal.hh"
 #ifndef _WIN32 // TODO enable build hook on Windows
 #  include "nix/store/build/hook-instance.hh"
 #  include "nix/store/build/derivation-builder.hh"
@@ -264,7 +264,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                     auto mEntry = get(inputGoals, drvPath);
                     if (!mEntry) return std::nullopt;
 
-                    auto buildResult = (*mEntry)->getBuildResult(DerivedPath::Built{drvPath, OutputsSpec::Names{outputName}});
+                    auto & buildResult = (*mEntry)->buildResult;
                     if (!buildResult.success()) return std::nullopt;
 
                     auto i = get(buildResult.builtOutputs, outputName);
@@ -295,8 +295,8 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                    });
 
             // FIXME wanted outputs
-            auto resolvedDrvGoal = worker.makeDerivationGoal(
-                makeConstantStorePathRef(pathResolved), OutputsSpec::All{}, buildMode);
+            auto resolvedDrvGoal = worker.makeDerivationCreationAndRealisationGoal(
+                pathResolved, OutputsSpec::All{}, drvResolved, buildMode);
             {
                 Goals waitees{resolvedDrvGoal};
                 co_await await(std::move(waitees));
@@ -304,20 +304,16 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
             trace("resolved derivation finished");
 
-            auto resolvedDrv = *resolvedDrvGoal->drv;
-            auto resolvedResult = resolvedDrvGoal->getBuildResult(DerivedPath::Built{
-                .drvPath = makeConstantStorePathRef(pathResolved),
-                .outputs = OutputsSpec::All{},
-            });
+            auto resolvedResult = resolvedDrvGoal->buildResult;
 
             SingleDrvOutputs builtOutputs;
 
             if (resolvedResult.success()) {
-                auto resolvedHashes = staticOutputHashes(worker.store, resolvedDrv);
+                auto resolvedHashes = staticOutputHashes(worker.store, drvResolved);
 
                 StorePathSet outputPaths;
 
-                for (auto & outputName : resolvedDrv.outputNames()) {
+                for (auto & outputName : drvResolved.outputNames()) {
                     auto initialOutput = get(initialOutputs, outputName);
                     auto resolvedHash = get(resolvedHashes, outputName);
                     if ((!initialOutput) || (!resolvedHash))
@@ -338,7 +334,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
                       throw Error(
                           "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/realisation)",
-                          resolvedDrvGoal->drvReq->to_string(worker.store), outputName);
+                          worker.store.printStorePath(pathResolved), outputName);
                     }();
 
                     if (!drv->type().isImpure()) {
