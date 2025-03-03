@@ -12,7 +12,7 @@ Given the method, the output's name (computed from the derivation name and outpu
 
 ## Fixed-output content-addressing {#fixed}
 
-In this case the content-address of the *fixed* in advanced by the derivation itself.
+In this case the content address of the *fixed* in advanced by the derivation itself.
 In other words, when the derivation has finished [building](@docroot@/store/building.md), and the provisional output' content-address is computed as part of the process to turn it into a *bona fide* store object, the calculated content address must much that given in the derivation, or the build of that derivation will be deemed a failure.
 
 The output spec for an output with a fixed content addresses additionally contains:
@@ -159,7 +159,7 @@ A *determinstic* content-addressing derivation should produce outputs with the s
 
 ### Floating versus Fixed
 
-While the destinction between content- and input-addressing is one of *mechanism*, the distinction between fixed and floating content addression is more one of *policy*.
+While the distinction between content- and input-addressing is one of *mechanism*, the distinction between fixed and floating content addressing is more one of *policy*.
 A fixed output that passes its content address check is just like a floating output.
 It is only in the potential for that check to fail that they are different.
 
