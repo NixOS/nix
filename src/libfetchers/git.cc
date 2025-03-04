@@ -351,8 +351,7 @@ struct GitInputScheme : InputScheme
 
             if (commitMsg) {
                 // Pause the logger to allow for user input (such as a gpg passphrase) in `git commit`
-                logger->pause();
-                Finally restoreLogger([]() { logger->resume(); });
+                auto suspension = logger->suspend();
                 runProgram("git", true,
                     { "-C", repoPath->string(), "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-F", "-" },
                     *commitMsg);
