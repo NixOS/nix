@@ -306,15 +306,7 @@ void runProgram2(const RunOptions & options)
     // case), so we can't use it if we alter the environment
     processOptions.allowVfork = !options.environment;
 
-    std::optional<Finally<std::function<void()>>> resumeLoggerDefer;
-    if (options.isInteractive) {
-        logger->pause();
-        resumeLoggerDefer.emplace(
-            []() {
-                logger->resume();
-            }
-        );
-    }
+    auto suspension = logger->suspendIf(options.isInteractive);
 
     /* Fork. */
     Pid pid = startProcess([&] {
