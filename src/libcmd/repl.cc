@@ -587,6 +587,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
     else if (command == ":p" || command == ":print") {
         Value v;
         evalString(arg, v);
+        auto suspension = logger->suspend();
         if (v.type() == nString) {
             std::cout << v.string_view();
         } else {
