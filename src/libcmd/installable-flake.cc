@@ -235,7 +235,7 @@ InstallableFlake::getCursors(EvalState & state, bool returnAll)
             auto outputInfo = flake_schemas::getOutput(inventory, attrPath);
 
             if (!outputInfo) {
-                // FIXME: add suggestions
+                suggestions += outputInfo.getSuggestions();
                 continue;
             }
 

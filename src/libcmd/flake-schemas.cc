@@ -209,7 +209,7 @@ std::shared_ptr<AttrCursor> derivation(ref<AttrCursor> leaf)
     return leaf->maybeGetAttr("derivation");
 }
 
-std::optional<OutputInfo> getOutput(ref<AttrCursor> inventory, eval_cache::AttrPath attrPath)
+OrSuggestions<OutputInfo> getOutput(ref<AttrCursor> inventory, eval_cache::AttrPath attrPath)
 {
     assert(!attrPath.empty());
 
@@ -217,7 +217,7 @@ std::optional<OutputInfo> getOutput(ref<AttrCursor> inventory, eval_cache::AttrP
 
     auto schemaInfo = inventory->maybeGetAttr(outputName);
     if (!schemaInfo)
-        return std::nullopt;
+        return OrSuggestions<OutputInfo>::failed(inventory->getSuggestionsForAttr(outputName));
 
     auto node = schemaInfo->getAttr("node");
 
@@ -228,9 +228,9 @@ std::optional<OutputInfo> getOutput(ref<AttrCursor> inventory, eval_cache::AttrP
         if (!children)
             break;
         auto attr = pathLeft.front();
-        auto childNode = children->maybeGetAttr(attr); // FIXME: add suggestions
+        auto childNode = children->maybeGetAttr(attr);
         if (!childNode)
-            break;
+            return OrSuggestions<OutputInfo>::failed(children->getSuggestionsForAttr(attr));
         node = ref(childNode);
         pathLeft = pathLeft.subspan(1);
     }
