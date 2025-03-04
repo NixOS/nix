@@ -79,6 +79,8 @@ Derivations can declare some infrequently used optional attributes.
 
 ## Output checks
 
+See the [corresponding section in the derivation output page](@docroot@/store/derivation/outputs/index.md).
+
   - [`allowedReferences`]{#adv-attr-allowedReferences}\
     The optional attribute `allowedReferences` specifies a list of legal
     references (dependencies) of the output of the builder. For example,
