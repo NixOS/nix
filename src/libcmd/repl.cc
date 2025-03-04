@@ -694,8 +694,10 @@ ProcessLineResult NixRepl::processLine(std::string line)
         } else {
             Value v;
             evalString(line, v);
+            logger->pause();
             printValue(std::cout, v, 1);
             std::cout << std::endl;
+            logger->resume();
         }
     }
 
