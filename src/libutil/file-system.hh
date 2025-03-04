@@ -366,4 +366,20 @@ typedef std::function<bool(const Path & path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
 
+/**
+ * Change permissions of a file only if necessary.
+ *
+ * @details
+ * Skip chmod call if the directory already has the requested permissions.
+ * This is to avoid failing when the executing user lacks permissions to change the
+ * directory's permissions even if it would be no-op.
+ *
+ * @param path Path to the file to change the permissions for.
+ * @param mode New file mode.
+ * @param mask Used for checking if the file already has requested permissions.
+ *
+ * @return true if permissions changed, false otherwise.
+ */
+bool chmodIfNeeded(const std::filesystem::path & path, mode_t mode, mode_t mask = S_IRWXU | S_IRWXG | S_IRWXO);
+
 }
