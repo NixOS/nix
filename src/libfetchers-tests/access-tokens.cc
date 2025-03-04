@@ -81,6 +81,8 @@ TEST_F(AccessKeysTest, multipleGitLab)
 
     token = i.scheme->getAccessToken(fetchSettings, "gitlab.com", "gitlab.com/a/c");
     ASSERT_EQ(token, "token");
+
+    // TODO: How do you test CI_JOB_TOKEN? None of the methods are exported
 }
 
 TEST_F(AccessKeysTest, multipleSourceHut)

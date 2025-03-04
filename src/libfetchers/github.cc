@@ -465,6 +465,10 @@ struct GitLabInputScheme : GitArchiveInputScheme
             return std::make_pair("Authorization", fmt("Bearer %s", token.substr(fldsplit+1)));
         if ("PAT" == token.substr(0, fldsplit))
             return std::make_pair("Private-token", token.substr(fldsplit+1));
+        if ("CI_JOB_TOKEN" == token.substr(0, fldsplit)) {
+            auto hdrVal = "Basic " + base64Encode("gitlab-ci-token:" + token.substr(fldsplit+1));
+            return std::make_pair("Authorization", hdrVal);
+        }
         warn("Unrecognized GitLab token type %s",  token.substr(0, fldsplit));
         return std::make_pair(token.substr(0,fldsplit), token.substr(fldsplit+1));
     }
