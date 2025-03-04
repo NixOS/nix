@@ -86,7 +86,8 @@ nix build -o "$TEST_ROOT/result" flake3#sth
 (! nix build -o "$TEST_ROOT/result" flake3#fnord)
 mv "$flake2Dir.tmp" "$flake2Dir"
 mv "$nonFlakeDir.tmp" "$nonFlakeDir"
-nix build -o "$TEST_ROOT/result" flake3#xyzzy flake3#fnord
+nix build -o "$TEST_ROOT/result" flake3#xyzzy # FIXME
+nix build -o "$TEST_ROOT/result" flake3#fnord
 
 # Make branch "removeXyzzy" where flake3 doesn't have xyzzy anymore
 git -C "$flake3Dir" checkout -b removeXyzzy

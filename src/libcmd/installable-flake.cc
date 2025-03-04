@@ -50,6 +50,8 @@ InstallableFlake::InstallableFlake(
     : InstallableValue(state)
     , flakeRef(flakeRef)
     , fragment(fragment)
+    , isAbsolute(fragment.starts_with("."))
+    , relativeFragment(isAbsolute ? fragment.substr(1) : fragment)
     , roles(roles)
     , extendedOutputsSpec(std::move(extendedOutputsSpec))
     , lockFlags(lockFlags)
@@ -146,10 +148,7 @@ std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state)
 std::vector<ref<eval_cache::AttrCursor>>
 InstallableFlake::getCursors(EvalState & state, bool returnAll)
 {
-    auto cache = flake_schemas::call(
-        state,
-        getLockedFlake(),
-        defaultFlakeSchemas);
+    auto cache = openEvalCache();
 
     auto inventory = cache->getRoot()->getAttr("inventory");
 
@@ -157,68 +156,7 @@ InstallableFlake::getCursors(EvalState & state, bool returnAll)
 
     Suggestions suggestions;
 
-    std::vector<eval_cache::AttrPath> attrPaths;
-
-    if (fragment.starts_with("."))
-        attrPaths.push_back(parseAttrPath(state, fragment.substr(1)));
-    else {
-        auto schemas = flake_schemas::getSchema(inventory);
-
-        // FIXME: Ugly hack to preserve the historical precedence
-        // between outputs. We should add a way for schemas to declare
-        // priorities.
-        std::vector<std::string> schemasSorted;
-        std::set<std::string> schemasSeen;
-        auto doSchema = [&](const std::string & schema)
-        {
-            if (schemas.contains(schema)) {
-                schemasSorted.push_back(schema);
-                schemasSeen.insert(schema);
-            }
-        };
-        doSchema("apps");
-        doSchema("devShells");
-        doSchema("packages");
-        doSchema("legacyPackages");
-        for (auto & schema : schemas)
-            if (!schemasSeen.contains(schema.first))
-                schemasSorted.push_back(schema.first);
-
-        auto parsedFragment = parseAttrPath(state, fragment);
-
-        for (auto & role : roles) {
-            for (auto & schemaName : schemasSorted) {
-                auto & schema = schemas.find(schemaName)->second;
-                if (schema.roles.contains(role)) {
-                    eval_cache::AttrPath attrPath{state.symbols.create(schemaName)};
-                    if (schema.appendSystem)
-                        attrPath.push_back(state.symbols.create(settings.thisSystem.get()));
-
-                    if (parsedFragment.empty()) {
-                        if (schema.defaultAttrPath) {
-                            auto attrPath2{attrPath};
-                            for (auto & x : *schema.defaultAttrPath)
-                                attrPath2.push_back(x);
-                            attrPaths.push_back(attrPath2);
-                        }
-                    } else {
-                        auto attrPath2{attrPath};
-                        for (auto & x : parsedFragment)
-                            attrPath2.push_back(x);
-                        attrPaths.push_back(attrPath2);
-                    }
-                }
-            }
-        }
-
-        if (!parsedFragment.empty())
-            attrPaths.push_back(parsedFragment);
-
-        // FIXME: compatibility hack to get `nix repl` to return all
-        // outputs by default.
-        if (parsedFragment.empty() && roles.contains("nix-repl"))
-            attrPaths.push_back({});
-    }
+    auto attrPaths = getAttrPaths(state, relativeFragment);
 
     if (attrPaths.empty())
         throw Error("flake '%s' does not provide a default output", flakeRef);
@@ -263,6 +201,114 @@ InstallableFlake::getCursors(EvalState & state, bool returnAll)
             showAttrPaths(state, attrPaths));
 
     return res;
+}
+
+void InstallableFlake::getCompletions(AddCompletions & completions, std::string_view prefix) const
+{
+    auto cache = openEvalCache();
+
+    auto inventory = cache->getRoot()->getAttr("inventory");
+    auto outputs = cache->getRoot()->getAttr("outputs");
+
+    auto attrPaths = getAttrPaths(*state, relativeFragment, true);
+
+    if (fragment.empty())
+        attrPaths.push_back({});
+
+    for (auto & attrPath : attrPaths) {
+        std::string lastAttr;
+        if (!attrPath.empty() && !hasSuffix(relativeFragment, ".")) {
+            lastAttr = state->symbols[attrPath.back()];
+            attrPath.pop_back();
+        }
+
+        auto search = [&](ref<eval_cache::AttrCursor> cursor)
+        {
+            for (auto & attr : cursor->getAttrs())
+                if (hasPrefix(state->symbols[attr], lastAttr))
+                    completions.add(std::string(prefix) + state->symbols[attr]);
+        };
+
+        if (attrPath.empty())
+            search(outputs);
+        else if (auto outputInfo = flake_schemas::getOutput(inventory, attrPath))
+            search(outputInfo->rawValue);
+    }
+}
+
+std::vector<eval_cache::AttrPath> InstallableFlake::getAttrPaths(EvalState & state, std::string_view attrPathS, bool forCompletion) const
+{
+    std::vector<eval_cache::AttrPath> attrPaths;
+
+    auto parsedFragment = parseAttrPath(state, attrPathS);
+
+    if (isAbsolute)
+        attrPaths.push_back(parsedFragment);
+    else {
+        auto schemas = flake_schemas::getSchema(openEvalCache()->getRoot()->getAttr("inventory"));
+
+        // FIXME: Ugly hack to preserve the historical precedence
+        // between outputs. We should add a way for schemas to declare
+        // priorities.
+        std::vector<std::string> schemasSorted;
+        std::set<std::string> schemasSeen;
+        auto doSchema = [&](const std::string & schema)
+        {
+            if (schemas.contains(schema)) {
+                schemasSorted.push_back(schema);
+                schemasSeen.insert(schema);
+            }
+        };
+        doSchema("apps");
+        doSchema("devShells");
+        doSchema("packages");
+        doSchema("legacyPackages");
+        for (auto & schema : schemas)
+            if (!schemasSeen.contains(schema.first))
+                schemasSorted.push_back(schema.first);
+
+        for (auto & role : roles) {
+            for (auto & schemaName : schemasSorted) {
+                auto & schema = schemas.find(schemaName)->second;
+                if (schema.roles.contains(role)) {
+                    eval_cache::AttrPath attrPath{state.symbols.create(schemaName)};
+                    if (schema.appendSystem)
+                        attrPath.push_back(state.symbols.create(settings.thisSystem.get()));
+
+                    if (parsedFragment.empty()) {
+                        if (schema.defaultAttrPath) {
+                            auto attrPath2{attrPath};
+                            for (auto & x : *schema.defaultAttrPath)
+                                attrPath2.push_back(x);
+                            attrPaths.push_back(attrPath2);
+                        }
+                    }
+
+                    if (!parsedFragment.empty() || forCompletion) {
+                        auto attrPath2{attrPath};
+                        if (parsedFragment.empty())
+                            // Add dummy symbol that will be dropped
+                            // by getCompletions().
+                            attrPath2.push_back(state.symbols.create(""));
+                        else
+                            for (auto & x : parsedFragment)
+                                attrPath2.push_back(x);
+                        attrPaths.push_back(attrPath2);
+                    }
+                }
+            }
+        }
+
+        if (!parsedFragment.empty())
+            attrPaths.push_back(parsedFragment);
+
+        // FIXME: compatibility hack to get `nix repl` to return all
+        // outputs by default.
+        if (parsedFragment.empty() && roles.contains("nix-repl"))
+            attrPaths.push_back({});
+    }
+
+    return attrPaths;
 }
 
 std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const

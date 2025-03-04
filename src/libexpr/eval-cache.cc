@@ -74,6 +74,8 @@ struct AttrDb
 
         Path dbPath = cacheDir + "/" + fingerprint.to_string(HashFormat::Base16, false) + ".sqlite";
 
+        debug("opening eval cache '%s'", dbPath);
+
         state->db = SQLite(dbPath);
         state->db.isCache();
         state->db.exec(schema);

@@ -59,7 +59,8 @@ call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::op
                 fingerprint->to_string(HashFormat::Base16, false),
                 lockedDefaultSchemasFlakeFingerprint->to_string(HashFormat::Base16, false)));
 
-    // FIXME: merge with openEvalCache().
+    // FIXME: memoize eval cache on fingerprint to avoid opening the
+    // same database twice.
     auto cache = make_ref<EvalCache>(
         evalSettings.useEvalCache && evalSettings.pureEval ? fingerprint2 : std::nullopt,
         state,

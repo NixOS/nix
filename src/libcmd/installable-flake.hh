@@ -3,6 +3,7 @@
 
 #include "common-eval-args.hh"
 #include "installable-value.hh"
+#include "eval-cache.hh"
 
 namespace nix {
 
@@ -34,6 +35,13 @@ struct InstallableFlake : InstallableValue
 {
     FlakeRef flakeRef;
     std::string fragment;
+
+    // Whether `fragment` starts with a dot.
+    bool isAbsolute;
+
+    // `fragment` with the dot prefix stripped.
+    std::string relativeFragment;
+
     StringSet roles;
     ExtendedOutputsSpec extendedOutputsSpec;
     const flake::LockFlags & lockFlags;
@@ -63,6 +71,10 @@ struct InstallableFlake : InstallableValue
     std::vector<ref<eval_cache::AttrCursor>>
     getCursors(EvalState & state, bool returnAll) override;
 
+    void getCompletions(AddCompletions & completions, std::string_view prefix) const;
+
+    std::vector<eval_cache::AttrPath> getAttrPaths(EvalState & state, std::string_view attrPathS, bool forCompletion = false) const;
+
     std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
 
     FlakeRef nixpkgsFlakeRef() const;
@@ -86,9 +98,5 @@ static inline FlakeRef defaultNixpkgsFlakeRef()
 {
     return FlakeRef::fromAttrs(fetchSettings, {{"type","indirect"}, {"id", "nixpkgs"}});
 }
-
-ref<eval_cache::EvalCache> openEvalCache(
-    EvalState & state,
-    std::shared_ptr<flake::LockedFlake> lockedFlake);
 
 }
