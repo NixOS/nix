@@ -117,10 +117,10 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(
     ProcessOptions options;
     options.dieWithParent = false;
 
+    std::unique_ptr<Logger::Suspension> loggerSuspension;
     if (!fakeSSH && !useMaster) {
-        logger->pause();
+        loggerSuspension = std::make_unique<Logger::Suspension>(logger->suspend());
     }
-    Finally cleanup = [&]() { logger->resume(); };
 
     conn->sshPid = startProcess([&]() {
         restoreProcessContext();
@@ -199,8 +199,7 @@ Path SSHMaster::startMaster()
     ProcessOptions options;
     options.dieWithParent = false;
 
-    logger->pause();
-    Finally cleanup = [&]() { logger->resume(); };
+    auto suspension = logger->suspend();
 
     if (isMasterRunning())
         return state->socketPath;
