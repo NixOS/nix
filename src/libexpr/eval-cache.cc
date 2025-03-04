@@ -351,7 +351,24 @@ static std::shared_ptr<AttrDb> makeAttrDb(
     SymbolTable & symbols)
 {
     try {
-        return std::make_shared<AttrDb>(cfg, fingerprint, symbols);
+        /* Ensure that we never open a eval cache more than once,
+           since that will cause SQLite deadlocks. */
+        static Sync<std::map<Hash, std::weak_ptr<AttrDb>>> _dbs;
+
+        auto dbs(_dbs.lock());
+
+        auto i = dbs->find(fingerprint);
+        if (i != dbs->end()) {
+            if (auto ptr = i->second.lock())
+                return ptr;
+        }
+
+        auto ptr = std::make_shared<AttrDb>(cfg, fingerprint, symbols);
+
+        dbs->insert_or_assign(fingerprint, ptr);
+
+        return ptr;
+
     } catch (SQLiteError &) {
         ignoreExceptionExceptInterrupt();
         return nullptr;
