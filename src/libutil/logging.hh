@@ -4,6 +4,7 @@
 #include "error.hh"
 #include "config.hh"
 #include "file-descriptor.hh"
+#include "finally.hh"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -74,6 +75,17 @@ public:
     virtual ~Logger() { }
 
     virtual void stop() { };
+
+    /**
+     * Guard object to resume the logger when done.
+     */
+    struct Suspension {
+        Finally<std::function<void()>> _finalize;
+    };
+
+    Suspension suspend();
+
+    std::optional<Suspension> suspendIf(bool cond);
 
     virtual void pause() { };
     virtual void resume() { };

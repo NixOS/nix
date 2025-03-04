@@ -43,6 +43,19 @@ void Logger::writeToStdout(std::string_view s)
     writeFull(standard_out, "\n");
 }
 
+Logger::Suspension Logger::suspend()
+{
+    pause();
+    return Suspension { ._finalize = {[this](){this->resume();}} };
+}
+
+std::optional<Logger::Suspension> Logger::suspendIf(bool cond)
+{
+    if (cond)
+        return suspend();
+    return {};
+}
+
 class SimpleLogger : public Logger
 {
 public:
