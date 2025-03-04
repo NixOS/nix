@@ -1425,7 +1425,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
         auto cache = openEvalCache(*state, flake);
 
-        auto j = visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
+        auto lockedRef = flake->flake.lockedRef.to_string();
+        auto j = nlohmann::json::object({ {lockedRef, visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, lockedRef), "")} });
         if (json)
             logger->cout("%s", j.dump());
     }
