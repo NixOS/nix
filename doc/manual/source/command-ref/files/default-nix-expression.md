@@ -31,12 +31,12 @@ Then, the resulting expression is interpreted like this:
 
 The file [`manifest.nix`](@docroot@/command-ref/files/manifest.nix.md) is always ignored.
 
-The command [`nix-channel`] places a symlink to the current user's [channels] in this directory, the [user channel link](#user-channel-link).
+The command [`nix-channel`] places a symlink to the current user's channels in this directory, the [user channel link](#user-channel-link).
 This makes all subscribed channels available as attributes in the default expression.
 
 ## User channel link
 
-A symlink that ensures that [`nix-env`] can find the current user's [channels]:
+A symlink that ensures that [`nix-env`] can find the current user's channels:
 
 - `~/.nix-defexpr/channels`
 - `$XDG_STATE_HOME/defexpr/channels` if [`use-xdg-base-directories`] is set to `true`.
@@ -51,4 +51,3 @@ In a multi-user installation, you may also have `~/.nix-defexpr/channels_root`, 
 [`nix-channel`]: @docroot@/command-ref/nix-channel.md
 [`nix-env`]: @docroot@/command-ref/nix-env.md
 [`use-xdg-base-directories`]: @docroot@/command-ref/conf-file.md#conf-use-xdg-base-directories
-[channels]: @docroot@/command-ref/files/channels.md
