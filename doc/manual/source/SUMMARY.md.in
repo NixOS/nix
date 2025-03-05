@@ -101,7 +101,6 @@
     - [Profiles](command-ref/files/profiles.md)
       - [manifest.nix](command-ref/files/manifest.nix.md)
       - [manifest.json](command-ref/files/manifest.json.md)
-    - [Default Nix expression](command-ref/files/default-nix-expression.md)
 - [Architecture and Design](architecture/architecture.md)
 - [Formats and Protocols](protocols/index.md)
   - [JSON Formats](protocols/json/index.md)
