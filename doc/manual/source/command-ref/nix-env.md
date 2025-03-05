@@ -52,7 +52,7 @@ These pages can be viewed offline:
 `nix-env` can obtain packages from multiple sources:
 
 - An attribute set of derivations from:
-  - The [default Nix expression](@docroot@/command-ref/files/default-nix-expression.md) (by default)
+  - The default Nix expression (by default)
   - A Nix file, specified via `--file`
   - A [profile](@docroot@/command-ref/files/profiles.md), specified via `--from-profile`
   - A Nix expression that is a function which takes default expression as argument, specified via `--from-expression`
