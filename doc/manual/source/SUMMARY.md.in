@@ -54,6 +54,7 @@
 {{#include ./command-ref/new-cli/SUMMARY.md}}
   - [Deprecated Commands](command-ref/main-commands.md)
     - [nix-build](command-ref/nix-build.md)
+    - [nix-channel](command-ref/nix-channel.md)
     - [nix-shell](command-ref/nix-shell.md)
     - [nix-store](command-ref/nix-store.md)
       - [nix-store --add-fixed](command-ref/nix-store/add-fixed.md)
@@ -89,7 +90,6 @@
       - [nix-env --uninstall](command-ref/nix-env/uninstall.md)
       - [nix-env --upgrade](command-ref/nix-env/upgrade.md)
   - [Utilities](command-ref/utilities.md)
-    - [nix-channel](command-ref/nix-channel.md)
     - [nix-collect-garbage](command-ref/nix-collect-garbage.md)
     - [nix-copy-closure](command-ref/nix-copy-closure.md)
     - [nix-daemon](command-ref/nix-daemon.md)
