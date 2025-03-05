@@ -67,7 +67,7 @@ By default, this symlink points to:
 - `$NIX_STATE_DIR/profiles/per-user/root/profile` for `root`
 
 The `PATH` environment variable should include `/bin` subdirectory of the profile link (e.g. `~/.nix-profile/bin`) for the user environment to be visible to the user.
-The [installer](@docroot@/installation/installing-binary.md) sets this up by default, unless you enable [`use-xdg-base-directories`].
+The installer sets this up by default, unless you enable [`use-xdg-base-directories`].
 
 [`nix-env`]: @docroot@/command-ref/nix-env.md
 [`nix profile`]: @docroot@/command-ref/new-cli/nix3-profile.md

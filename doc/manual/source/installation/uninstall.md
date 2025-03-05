@@ -2,7 +2,7 @@
 
 ## Multi User
 
-Removing a [multi-user installation](./installing-binary.md#multi-user-installation) depends on the operating system.
+Removing a multi-user installation depends on the operating system.
 
 ### Linux
 
@@ -42,14 +42,6 @@ There may also be references to Nix in
 which you may remove.
 
 ### macOS
-
-> **Updating to macOS 15 Sequoia**
->
-> If you recently updated to macOS 15 Sequoia and are getting
-> ```console
-> error: the user '_nixbld1' in the group 'nixbld' does not exist
-> ```
-> when running Nix commands, refer to GitHub issue [NixOS/nix#10892](https://github.com/NixOS/nix/issues/10892) for instructions to fix your installation without reinstalling.
 
 1. If system-wide shell initialisation files haven't been altered since installing Nix, use the backups made by the installer:
 
