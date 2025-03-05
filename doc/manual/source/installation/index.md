@@ -1,11 +1,11 @@
 # Installation
 
-This section describes how to install and configure Nix for first-time use.
-Nix follows a [multi-user](./nix-security.md#multi-user-model) model on both Linux
-and macOS.
+We recommend that macOS users install Determinate Nix using [Determinate.pkg][pkg].
+For Linux and Windows Subsystem for Linux (WSL) users:
 
 ```console
-$ curl -L https://nixos.org/nix/install | sh -s -- --daemon
+$ curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | \
+  sh -s -- install --determinate
 ```
 
 ## Distributions
@@ -13,3 +13,5 @@ $ curl -L https://nixos.org/nix/install | sh -s -- --daemon
 The Nix community maintains installers for several distributions.
 
 They can be found in the [`nix-community/nix-installers`](https://github.com/nix-community/nix-installers) repository.
+
+[pkg]: https://install.determinate.systems/determinate-pkg/stable/Universal

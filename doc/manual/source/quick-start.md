@@ -4,7 +4,7 @@ This chapter is for impatient people who don't like reading documentation.
 For more in-depth information you are kindly referred to subsequent chapters.
 
 1. Install Nix.
-   We recommend that macOS users use [Determinate.pkg][pkg].
+   We recommend that macOS users install Determinate Nix using [Determinate.pkg][pkg].
    For Linux and Windows Subsystem for Linux (WSL) users:
 
    ```console
