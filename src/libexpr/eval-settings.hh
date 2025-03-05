@@ -96,7 +96,7 @@ struct EvalSettings : Config
 
             The current state of all channels for the `root` user.
 
-          These files are set up by the [Nix installer](@docroot@/installation/installing-binary.md).
+          These files are set up by the Nix installer.
           See [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR) for details on the environment variable.
 
           > **Note**
