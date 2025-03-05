@@ -11,7 +11,6 @@
     - [Building Nix from Source](installation/building-source.md)
   - [Using Nix within Docker](installation/installing-docker.md)
   - [Security](installation/nix-security.md)
-  - [Environment Variables](installation/env-variables.md)
   - [Upgrading Nix](installation/upgrading.md)
   - [Uninstalling Nix](installation/uninstall.md)
 - [Nix Store](store/index.md)
