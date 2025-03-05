@@ -2,7 +2,7 @@
 
 ## Multi User
 
-Removing a [multi-user installation](./installing-binary.md#multi-user-installation) depends on the operating system.
+Removing a multi-user installation depends on the operating system.
 
 ### Linux
 
