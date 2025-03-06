@@ -22,12 +22,11 @@ It is based on the current generation of the active [profile](@docroot@/command-
 
 The arguments *args* map to store paths in a number of possible ways:
 
-- By default, *args* is a set of [derivation] names denoting derivations in the [default Nix expression].
+- By default, *args* is a set of [derivation] names denoting derivations in the default Nix expression.
   These are [realised], and the resulting output paths are installed.
   Currently installed derivations with a name equal to the name of a derivation being added are removed unless the option `--preserve-installed` is specified.
 
   [derivation]: @docroot@/glossary.md#gloss-derivation
-  [default Nix expression]: @docroot@/command-ref/files/default-nix-expression.md
   [realised]: @docroot@/glossary.md#gloss-realise
 
   If there are multiple derivations matching a name in *args* that
@@ -45,7 +44,7 @@ The arguments *args* map to store paths in a number of possible ways:
   gcc-3.3.6 gcc-4.1.1` will install both version of GCC (and will
   probably cause a user environment conflict\!).
 
-- If [`--attr`](#opt-attr) / `-A` is specified, the arguments are *attribute paths* that select attributes from the [default Nix expression].
+- If [`--attr`](#opt-attr) / `-A` is specified, the arguments are *attribute paths* that select attributes from the default Nix expression.
   This is faster than using derivation names and unambiguous.
   Show the attribute paths of available packages with [`nix-env --query`](./query.md):
 
@@ -58,7 +57,7 @@ The arguments *args* map to store paths in a number of possible ways:
   easy way to copy user environment elements from one profile to
   another.
 
-- If `--from-expression` is given, *args* are [Nix language functions](@docroot@/language/syntax.md#functions) that are called with the [default Nix expression] as their single argument.
+- If `--from-expression` is given, *args* are [Nix language functions](@docroot@/language/syntax.md#functions) that are called with the default Nix expression as their single argument.
   The derivations returned by those function calls are installed.
   This allows derivations to be specified in an unambiguous way, which is necessary if there are multiple derivations with the same name.
 

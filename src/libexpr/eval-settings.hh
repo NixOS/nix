@@ -86,7 +86,7 @@ struct EvalSettings : Config
 
           - `$HOME/.nix-defexpr/channels`
 
-            The [user channel link](@docroot@/command-ref/files/default-nix-expression.md#user-channel-link), pointing to the current state of [channels](@docroot@/command-ref/files/channels.md) for the current user.
+            The user channel link pointing to the current state of channels for the current user.
 
           - `nixpkgs=$NIX_STATE_DIR/profiles/per-user/root/channels/nixpkgs`
 
