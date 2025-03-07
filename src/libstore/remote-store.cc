@@ -28,7 +28,7 @@ RemoteStore::RemoteStore(const Params & params)
     : RemoteStoreConfig(params)
     , Store(params)
     , connections(make_ref<Pool<Connection>>(
-            std::max(1, (int) maxConnections),
+            std::max(1, maxConnections.get()),
             [this]() {
                 auto conn = openConnectionWrapper();
                 try {
