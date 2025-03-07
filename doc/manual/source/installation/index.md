@@ -1,10 +1,10 @@
 # Installation
 
-We recommend that macOS users install Determinate Nix using [Determinate.pkg][pkg].
+We recommend that macOS users install Determinate Nix using our graphical installer, [Determinate.pkg][pkg].
 For Linux and Windows Subsystem for Linux (WSL) users:
 
 ```console
-$ curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | \
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | \
   sh -s -- install --determinate
 ```
 

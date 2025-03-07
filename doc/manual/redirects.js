@@ -275,7 +275,6 @@ const redirects = {
     "ssec-multi-user": "installation/multi-user.html",
     "sec-obtaining-source": "installation/obtaining-source.html",
     "sec-prerequisites-source": "installation/prerequisites-source.html",
-    "ch-supported-platforms": "installation/supported-platforms.html",
     "ch-upgrading-nix": "installation/upgrading.html",
     "ch-about-nix": "introduction.html",
     "chap-introduction": "introduction.html",
