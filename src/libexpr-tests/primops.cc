@@ -503,6 +503,30 @@ namespace nix {
         ASSERT_THROW(eval("builtins.div 5.0 0.0"), EvalError);
     }
 
+    TEST_F(PrimOpTest, modPosPos) {
+        auto v = eval("builtins.mod 5 2");
+        ASSERT_THAT(v, IsIntEq(1));
+    }
+
+    TEST_F(PrimOpTest, modPosNeg) {
+        auto v = eval("builtins.mod 5 (-2)");
+        ASSERT_THAT(v, IsIntEq(1));
+    }
+
+    TEST_F(PrimOpTest, modNegPos) {
+        auto v = eval("builtins.mod (-5) 2");
+        ASSERT_THAT(v, IsIntEq(-1));
+    }
+
+    TEST_F(PrimOpTest, modNegNeg) {
+        auto v = eval("builtins.mod (-5) (-2)");
+        ASSERT_THAT(v, IsIntEq(-1));
+    }
+
+    TEST_F(PrimOpTest, modZero) {
+        ASSERT_THROW(eval("builtins.mod 5 0"), EvalError);
+    }
+
     TEST_F(PrimOpTest, bitOr) {
         auto v = eval("builtins.bitOr 1 2");
         ASSERT_THAT(v, IsIntEq(3));

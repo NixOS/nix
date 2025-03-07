@@ -80,7 +80,7 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 struct Expr
 {
     struct AstSymbols {
-        Symbol sub, lessThan, mul, div, or_, findFile, nixPath, body;
+        Symbol sub, lessThan, mul, div, mod, or_, findFile, nixPath, body;
     };
 
 

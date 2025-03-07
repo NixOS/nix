@@ -173,6 +173,7 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
 %left NOT
 %left '+' '-'
 %left '*' '/'
+%left '%'
 %right CONCAT
 %nonassoc '?'
 %nonassoc NEGATE
@@ -259,6 +260,7 @@ expr_op
   | expr_op '-' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.sub), {$1, $3}); }
   | expr_op '*' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.mul), {$1, $3}); }
   | expr_op '/' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.div), {$1, $3}); }
+  | expr_op '%' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.mod), {$1, $3}); }
   | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(state->at(@2), $1, $3); }
   | expr_app
   ;
