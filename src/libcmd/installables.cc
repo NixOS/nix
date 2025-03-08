@@ -230,24 +230,9 @@ MixReadOnlyOption::MixReadOnlyOption()
     });
 }
 
-Strings SourceExprCommand::getDefaultFlakeAttrPaths()
+StringSet SourceExprCommand::getRoles()
 {
-    return {
-        "packages." + settings.thisSystem.get() + ".default",
-        "defaultPackage." + settings.thisSystem.get()
-    };
-}
-
-Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
-{
-    return {
-        // As a convenience, look for the attribute in
-        // 'outputs.packages'.
-        "packages." + settings.thisSystem.get() + ".",
-        // As a temporary hack until Nixpkgs is properly converted
-        // to provide a clean 'packages' set, look in 'legacyPackages'.
-        "legacyPackages." + settings.thisSystem.get() + "."
-    };
+    return {"nix-build"};
 }
 
 Args::CompleterClosure SourceExprCommand::getCompleteInstallable()
@@ -308,8 +293,7 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
                 completions,
                 getEvalState(),
                 lockFlags,
-                getDefaultFlakeAttrPathPrefixes(),
-                getDefaultFlakeAttrPaths(),
+                getRoles(),
                 prefix);
         }
     } catch (EvalError&) {
@@ -321,8 +305,7 @@ void completeFlakeRefWithFragment(
     AddCompletions & completions,
     ref<EvalState> evalState,
     flake::LockFlags lockFlags,
-    Strings attrPathPrefixes,
-    const Strings & defaultFlakeAttrPaths,
+    const StringSet & roles,
     std::string_view prefix)
 {
     /* Look for flake output attributes that match the
@@ -335,64 +318,25 @@ void completeFlakeRefWithFragment(
             completions.setType(AddCompletions::Type::Attrs);
 
             auto fragment = prefix.substr(hash + 1);
-            std::string prefixRoot = "";
-            if (fragment.starts_with(".")){
-                fragment = fragment.substr(1);
-                prefixRoot = ".";
-            }
             auto flakeRefS = std::string(prefix.substr(0, hash));
 
             // TODO: ideally this would use the command base directory instead of assuming ".".
             auto flakeRef = parseFlakeRef(fetchSettings, expandTilde(flakeRefS), fs::current_path().string());
 
-            auto evalCache = openEvalCache(*evalState,
-                std::make_shared<flake::LockedFlake>(lockFlake(
-                    flakeSettings, *evalState, flakeRef, lockFlags)));
+            auto dot = fragment.rfind('.');
 
-            auto root = evalCache->getRoot();
-
-            if (prefixRoot == "."){
-                attrPathPrefixes.clear();
-            }
-            /* Complete 'fragment' relative to all the
-               attrpath prefixes as well as the root of the
-               flake. */
-            attrPathPrefixes.push_back("");
-
-            for (auto & attrPathPrefixS : attrPathPrefixes) {
-                auto attrPathPrefix = parseAttrPath(*evalState, attrPathPrefixS);
-                auto attrPathS = attrPathPrefixS + std::string(fragment);
-                auto attrPath = parseAttrPath(*evalState, attrPathS);
-
-                std::string lastAttr;
-                if (!attrPath.empty() && !hasSuffix(attrPathS, ".")) {
-                    lastAttr = evalState->symbols[attrPath.back()];
-                    attrPath.pop_back();
-                }
-
-                auto attr = root->findAlongAttrPath(attrPath);
-                if (!attr) continue;
-
-                for (auto & attr2 : (*attr)->getAttrs()) {
-                    if (hasPrefix(evalState->symbols[attr2], lastAttr)) {
-                        auto attrPath2 = (*attr)->getAttrPath(attr2);
-                        /* Strip the attrpath prefix. */
-                        attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
-                        // FIXME: handle names with dots
-                        completions.add(flakeRefS + "#" + prefixRoot + concatStringsSep(".", evalState->symbols.resolve(attrPath2)));
-                    }
-                }
-            }
-
-            /* And add an empty completion for the default
-               attrpaths. */
-            if (fragment.empty()) {
-                for (auto & attrPath : defaultFlakeAttrPaths) {
-                    auto attr = root->findAlongAttrPath(parseAttrPath(*evalState, attrPath));
-                    if (!attr) continue;
-                    completions.add(flakeRefS + "#" + prefixRoot);
-                }
-            }
+            make_ref<InstallableFlake>(
+                nullptr, // FIXME
+                evalState,
+                std::move(flakeRef),
+                fragment,
+                ExtendedOutputsSpec::Default(),
+                roles,
+                lockFlags,
+                std::nullopt)
+                ->getCompletions(
+                    completions,
+                    flakeRefS + "#" + (dot != std::string::npos ? fragment.substr(0, dot + 1) : ""));
         }
     } catch (Error & e) {
         warn(e.msg());
@@ -443,42 +387,6 @@ static StorePath getDeriver(
         throw Error("'%s' does not have a known deriver", i.what());
     // FIXME: use all derivers?
     return *derivers.begin();
-}
-
-ref<eval_cache::EvalCache> openEvalCache(
-    EvalState & state,
-    std::shared_ptr<flake::LockedFlake> lockedFlake)
-{
-    auto fingerprint = evalSettings.useEvalCache && evalSettings.pureEval
-        ? lockedFlake->getFingerprint(state.store, state.fetchSettings)
-        : std::nullopt;
-    auto rootLoader = [&state, lockedFlake]()
-        {
-            /* For testing whether the evaluation cache is
-               complete. */
-            if (getEnv("NIX_ALLOW_EVAL").value_or("1") == "0")
-                throw Error("not everything is cached, but evaluation is not allowed");
-
-            auto vFlake = state.allocValue();
-            flake::callFlake(state, *lockedFlake, *vFlake);
-
-            state.forceAttrs(*vFlake, noPos, "while parsing cached flake data");
-
-            auto aOutputs = vFlake->attrs()->get(state.symbols.create("outputs"));
-            assert(aOutputs);
-
-            return aOutputs->value;
-        };
-
-    if (fingerprint) {
-        auto search = state.evalCaches.find(fingerprint.value());
-        if (search == state.evalCaches.end()) {
-            search = state.evalCaches.emplace(fingerprint.value(), make_ref<nix::eval_cache::EvalCache>(fingerprint, state, rootLoader)).first;
-        }
-        return search->second;
-    } else {
-        return make_ref<nix::eval_cache::EvalCache>(std::nullopt, state, rootLoader);
-    }
 }
 
 Installables SourceExprCommand::parseInstallables(
@@ -549,9 +457,9 @@ Installables SourceExprCommand::parseInstallables(
                         std::move(flakeRef),
                         fragment,
                         std::move(extendedOutputsSpec),
-                        getDefaultFlakeAttrPaths(),
-                        getDefaultFlakeAttrPathPrefixes(),
-                        lockFlags));
+                        getRoles(),
+                        lockFlags,
+                        getDefaultFlakeSchemas()));
                 continue;
             } catch (...) {
                 ex = std::current_exception();

@@ -270,7 +270,7 @@ static std::pair<std::map<FlakeId, FlakeInput>, fetchers::Attrs> parseFlakeInput
     return {inputs, selfAttrs};
 }
 
-static Flake readFlake(
+Flake readFlake(
     EvalState & state,
     const FlakeRef & originalRef,
     const FlakeRef & resolvedRef,
@@ -441,21 +441,17 @@ static LockFile readLockFile(
         : LockFile();
 }
 
-/* Compute an in-memory lock file for the specified top-level flake,
-   and optionally write it to file, if the flake is writable. */
 LockedFlake lockFlake(
     const Settings & settings,
     EvalState & state,
     const FlakeRef & topRef,
-    const LockFlags & lockFlags)
+    const LockFlags & lockFlags,
+    Flake flake,
+    FlakeCache & flakeCache)
 {
     experimentalFeatureSettings.require(Xp::Flakes);
 
-    FlakeCache flakeCache;
-
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
-
-    auto flake = getFlake(state, topRef, useRegistries, flakeCache, {});
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
@@ -919,6 +915,30 @@ LockedFlake lockFlake(
         e.addTrace({}, "while updating the lock file of flake '%s'", flake.lockedRef.to_string());
         throw;
     }
+}
+
+LockedFlake lockFlake(
+    const Settings & settings,
+    EvalState & state,
+    const FlakeRef & topRef,
+    const LockFlags & lockFlags)
+{
+    FlakeCache flakeCache;
+
+    auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
+
+    return lockFlake(settings, state, topRef, lockFlags, getFlake(state, topRef, useRegistries, flakeCache, {}), flakeCache);
+}
+
+LockedFlake lockFlake(
+    const Settings & settings,
+    EvalState & state,
+    const FlakeRef & topRef,
+    const LockFlags & lockFlags,
+    Flake flake)
+{
+    FlakeCache flakeCache;
+    return lockFlake(settings, state, topRef, lockFlags, std::move(flake), flakeCache);
 }
 
 void callFlake(EvalState & state,
