@@ -46,7 +46,7 @@ be many different serialisations.
 For these reasons, Nix has its very own archive format—the Nix Archive (NAR) format,
 which is carefully designed to avoid the problems described above.
 
-The exact specification of the Nix Archive format is in `protocols/nix-archive.md`
+The exact specification of the Nix Archive format is in [specified here](../../protocols/nix-archive.md).
 
 ## Content addressing File System Objects beyond a single serialisation pass
 
@@ -79,6 +79,7 @@ To avoid an address collision, attempts to hash a bare executable file or symlin
 Thus, Git can encode some, but not all of Nix's "File System Objects", and this sort of content-addressing is likewise partial.
 
 In the future, we may support a Git-like hash for such file system objects, or we may adopt another Merkle DAG format which is capable of representing all Nix file system objects.
+
 
 [file system object]: ../file-system-object.md
 [store object]: ../store-object.md
