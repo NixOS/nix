@@ -17,8 +17,10 @@ struct view_stringbuf : public std::stringbuf
     }
 };
 
-std::string_view toView(const std::ostringstream & os)
+__attribute__((no_sanitize("undefined"))) std::string_view toView(const std::ostringstream & os)
 {
+    /* Downcasting like this is very much undefined behavior, so we disable
+       UBSAN for this function. */
     auto buf = static_cast<view_stringbuf *>(os.rdbuf());
     return buf->toView();
 }
