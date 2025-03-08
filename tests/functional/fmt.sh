@@ -35,4 +35,6 @@ EOF
 # Argument forwarding check
 nix fmt ./file ./folder | grep 'Formatting(2): ./file ./folder'
 nix flake check
-nix flake show | grep -P "package 'formatter'"
+
+clearStore
+nix flake show | grep -P "package.*\[formatter\]"

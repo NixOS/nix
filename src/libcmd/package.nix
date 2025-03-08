@@ -48,6 +48,8 @@ mkMesonLibrary (finalAttrs: {
     ./meson.options
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
+    ./call-flake-schemas.nix
+    ./builtin-flake-schemas.nix
   ];
 
   buildInputs = [
