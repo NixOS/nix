@@ -44,11 +44,11 @@ RC_GTEST_FIXTURE_PROP(
      * to worry about race conditions if the tests run concurrently.
      */
     ExperimentalFeatureSettings mockXpSettings;
-    mockXpSettings.set("experimental-features", "ca-derivations");
+    mockXpSettings.set("experimental-features", "ca-derivations dynamic-derivations");
 
     auto * v = state.allocValue();
     state.mkOutputString(*v, b, std::nullopt, mockXpSettings);
-    auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "");
+    auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "", mockXpSettings);
     RC_ASSERT(SingleDerivedPath { b } == d);
 }
 
@@ -57,9 +57,12 @@ RC_GTEST_FIXTURE_PROP(
     prop_derived_path_built_out_path_round_trip,
     (const SingleDerivedPath::Built & b, const StorePath & outPath))
 {
+    ExperimentalFeatureSettings mockXpSettings;
+    mockXpSettings.set("experimental-features", "dynamic-derivations");
+
     auto * v = state.allocValue();
-    state.mkOutputString(*v, b, outPath);
-    auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "");
+    state.mkOutputString(*v, b, outPath, mockXpSettings);
+    auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "", mockXpSettings);
     RC_ASSERT(SingleDerivedPath { b } == d);
 }
 
