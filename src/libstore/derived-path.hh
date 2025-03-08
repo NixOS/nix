@@ -45,7 +45,7 @@ struct SingleDerivedPath;
  * path of the given output name.
  */
 struct SingleDerivedPathBuilt {
-    ref<SingleDerivedPath> drvPath;
+    ref<const SingleDerivedPath> drvPath;
     OutputName output;
 
     /**
@@ -74,7 +74,7 @@ struct SingleDerivedPathBuilt {
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     static SingleDerivedPathBuilt parse(
-        const StoreDirConfig & store, ref<SingleDerivedPath> drvPath,
+        const StoreDirConfig & store, ref<const SingleDerivedPath> drvPath,
         OutputNameView outputs,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     nlohmann::json toJSON(Store & store) const;
@@ -172,7 +172,7 @@ static inline ref<SingleDerivedPath> makeConstantStorePathRef(StorePath drvPath)
  * output name.
  */
 struct DerivedPathBuilt {
-    ref<SingleDerivedPath> drvPath;
+    ref<const SingleDerivedPath> drvPath;
     OutputsSpec outputs;
 
     /**
@@ -201,7 +201,7 @@ struct DerivedPathBuilt {
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     static DerivedPathBuilt parse(
-        const StoreDirConfig & store, ref<SingleDerivedPath>,
+        const StoreDirConfig & store, ref<const SingleDerivedPath>,
         std::string_view,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     nlohmann::json toJSON(Store & store) const;
