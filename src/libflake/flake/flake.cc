@@ -92,6 +92,8 @@ static StorePath copyInputToStore(
 
     state.allowPath(storePath);
 
+    state.storePathAccessors->insert_or_assign(CanonPath(state.store->printStorePath(storePath)), accessor);
+
     auto narHash = state.store->queryPathInfo(storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
