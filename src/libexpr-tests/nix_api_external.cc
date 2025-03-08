@@ -63,6 +63,9 @@ TEST_F(nix_api_expr_test, nix_expr_eval_external)
     std::string string_value;
     nix_get_string(nullptr, valueResult, OBSERVE_STRING(string_value));
     ASSERT_STREQ("nix-external<MyExternalValueDesc( 42 )>", string_value.c_str());
+
+    nix_state_free(stateResult);
+    nix_state_free(stateFn);
 }
 
 }

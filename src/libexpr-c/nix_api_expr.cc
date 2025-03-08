@@ -199,7 +199,9 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c
             != NIX_OK)
         return nullptr;
 
-    return nix_eval_state_build(context, builder);
+    auto *state = nix_eval_state_build(context, builder);
+    nix_eval_state_builder_free(builder);
+    return state;
 }
 
 void nix_state_free(EvalState * state)
