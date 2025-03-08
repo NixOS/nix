@@ -1044,6 +1044,24 @@ namespace nix {
     }
 
 
+    TEST_F(ErrorTraceTest, mod) {
+        ASSERT_TRACE2("mod \"foo\" 1",
+                      TypeError,
+                      HintFmt("expected an integer but found %s: %s", "a string", Uncolored(ANSI_MAGENTA "\"foo\"" ANSI_NORMAL)),
+                      HintFmt("while evaluating the first operand of the modulo"));
+
+        ASSERT_TRACE2("mod 1 \"foo\"",
+                      TypeError,
+                      HintFmt("expected an integer but found %s: %s", "a string", Uncolored(ANSI_MAGENTA "\"foo\"" ANSI_NORMAL)),
+                      HintFmt("while evaluating the second operand of the modulo"));
+
+        ASSERT_TRACE1("mod \"foo\" 0",
+                      EvalError,
+                      HintFmt("modulo by zero"));
+
+    }
+
+
     TEST_F(ErrorTraceTest, bitAnd) {
         ASSERT_TRACE2("bitAnd 1.1 2",
                       TypeError,

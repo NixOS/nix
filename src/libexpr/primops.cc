@@ -3951,6 +3951,27 @@ static RegisterPrimOp primop_div({
     .fun = prim_div,
 });
 
+static void prim_mod(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    auto i2 = state.forceInt(*args[1], pos, "while evaluating the second operand of the modulo");
+
+    if (i2.value == 0)
+        state.error<EvalError>("modulo by zero").atPos(pos).debugThrow();
+
+    auto i1 = state.forceInt(*args[0], pos, "while evaluating the first operand of the modulo");
+
+    v.mkInt(i1.value % i2.value);
+}
+
+static RegisterPrimOp primop_mod({
+    .name = "__mod",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Return the remainder of the division of the numbers *e1* and *e2*.
+    )",
+    .fun = prim_mod,
+});
+
 static void prim_bitAnd(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitAnd");

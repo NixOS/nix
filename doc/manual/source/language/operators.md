@@ -9,6 +9,7 @@
 | List concatenation                     | *list* `++` *list*                         | right         | 5          |
 | [Multiplication][arithmetic]           | *number* `*` *number*                      | left          | 6          |
 | [Division][arithmetic]                 | *number* `/` *number*                      | left          | 6          |
+| [Modulo][arithmetic]                   | *number* `%` *number*                      | left          | 6          |
 | [Subtraction][arithmetic]              | *number* `-` *number*                      | left          | 7          |
 | [Addition][arithmetic]                 | *number* `+` *number*                      | left          | 7          |
 | [String concatenation]                 | *string* `+` *string*                      | left          | 7          |
@@ -88,6 +89,7 @@ Pure integer operations will always return integers, whereas any operation invol
 
 Evaluation of the following numeric operations throws an evaluation error:
 - Division by zero
+- Modulo by zero
 - Integer overflow, that is, any operation yielding a result outside of the representable range of [Nix language integers](./syntax.md#number-literal)
 
 See also [Comparison] and [Equality].
