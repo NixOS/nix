@@ -21,10 +21,8 @@
 
 #include <curl/curl.h>
 
-#include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <iostream>
 #include <queue>
 #include <random>
 #include <thread>
@@ -536,6 +534,8 @@ struct curlFileTransfer : public FileTransfer
                         warn("%s; retrying from offset %d in %d ms", exc.what(), writtenToSink, ms);
                     else
                         warn("%s; retrying in %d ms", exc.what(), ms);
+                    decompressionSink.reset();
+                    errorSink.reset();
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
                     fileTransfer.enqueueItem(shared_from_this());
                 }
