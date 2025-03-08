@@ -776,4 +776,18 @@ std::filesystem::path makeParentCanonical(const std::filesystem::path & rawPath)
     }
 }
 
+bool chmodIfNeeded(const fs::path & path, mode_t mode, mode_t mask)
+{
+    auto pathString = path.string();
+    auto prevMode = lstat(pathString).st_mode;
+
+    if (((prevMode ^ mode) & mask) == 0)
+        return false;
+
+    if (chmod(pathString.c_str(), mode) != 0)
+        throw SysError("could not set permissions on '%s' to %o", pathString, mode);
+
+    return true;
+}
+
 } // namespace nix
