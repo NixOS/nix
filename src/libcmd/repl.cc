@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "error.hh"
+#include "eval-error.hh"
 #include "repl-interacter.hh"
 #include "repl.hh"
 
@@ -344,6 +345,58 @@ void NixRepl::loadDebugTraceEnv(DebugTrace & dt)
     }
 }
 
+static Value * lazyProbe(Expr * e, EvalState &state, Env &env)
+{
+    if (auto select = dynamic_cast<ExprSelect *>(e)) {
+        if (select->attrPath.size() != 1) {
+            throw Unsupported(":probe: Nested attribute selection not supported yet. Workaround: use parentheses?");
+        }
+
+        if (select->def) {
+            // This seems like nonsensical input, and we only really support simple attribute paths
+            throw Unsupported(":probe: %1% keyword is not supported.", "or");
+        }
+
+        auto attr = select->attrPath[0];
+
+        if (!attr.symbol) {
+            throw Unsupported(":probe: Computed attribute selection not supported yet.");
+        }
+
+        auto name = state.symbols[attr.symbol];
+        auto v = lazyProbe(select->e, state, env);
+
+        if (v->type() != nAttrs) {
+            state.error<TypeError>("can't look up '%1%', expecting the left hand side to be an attribute set, but it is %2%", name, v->type()).atPos(select->e->getPos()).debugThrow();
+        }
+
+        auto it = v->attrs()->find(attr.symbol);
+        if (it == v->attrs()->end()) {
+            state.error<EvalError>("attribute '%1%' missing", state.symbols[attr.symbol]).atPos(select->e->getPos()).debugThrow();
+        }
+        return it->value;
+    }
+    if (auto ref = dynamic_cast<ExprVar *>(e)) {
+        auto name = state.symbols[ref->name];
+        // TODO: subtly different intent, so factor out common logic from maybeThunk instead
+        Value * v = ref->maybeThunk(state, env);
+        if (!v) {
+            state.error<EvalError>("Variable '%1%' not found in scope", name).atPos(ref->getPos()).debugThrow();
+        }
+        return v;
+    }
+    state.error<EvalError>("'%s' is not an expression I can probe. Use variables and attribute selection").atPos(e->getPos()).debugThrow();
+}
+
+static void printLazyProbe(Expr * e, EvalState &state, Env &env)
+{
+    Value * v = lazyProbe(e, state, env);
+    auto suspension = logger->suspend();
+    std::cout << (v->type() == nThunk ? ANSI_GREEN : ANSI_BLUE);
+    std::cout << v->type() << std::endl;
+    std::cout << ANSI_NORMAL;
+}
+
 ProcessLineResult NixRepl::processLine(std::string line)
 {
     line = trim(line);
@@ -380,6 +433,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
              << "  :lf, :load-flake <ref>       Load Nix flake and add it to scope\n"
              << "  :p, :print <expr>            Evaluate and print expression recursively\n"
              << "                               Strings are printed directly, without escaping.\n"
+             << "  :probe <select>              Do not evaluate, but report type or thunk.\n"
              << "  :q, :quit                    Exit nix-repl\n"
              << "  :r, :reload                  Reload all files\n"
              << "  :sh <expr>                   Build dependencies of derivation, then start\n"
@@ -594,6 +648,11 @@ ProcessLineResult NixRepl::processLine(std::string line)
             printValue(std::cout, v);
         }
         std::cout << std::endl;
+    }
+
+    else if (command == ":probe") {
+        auto expr = parseString(arg);
+        printLazyProbe(expr, *state, *env);
     }
 
     else if (command == ":q" || command == ":quit") {
