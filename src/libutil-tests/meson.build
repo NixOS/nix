@@ -43,6 +43,7 @@ add_project_arguments(
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'sort.cc',
   'args.cc',
   'canon-path.cc',
   'checked-arithmetic.cc',
