@@ -2,6 +2,83 @@
 
 Derivations can declare some infrequently used optional attributes.
 
+## Inputs
+
+  - [`exportReferencesGraph`]{#adv-attr-exportReferencesGraph}\
+    This attribute allows builders access to the references graph of
+    their inputs. The attribute is a list of inputs in the Nix store
+    whose references graph the builder needs to know. The value of
+    this attribute should be a list of pairs `[ name1 path1 name2
+    path2 ...  ]`. The references graph of each *pathN* will be stored
+    in a text file *nameN* in the temporary build directory. The text
+    files have the format used by `nix-store --register-validity`
+    (with the deriver fields left empty). For example, when the
+    following derivation is built:
+
+    ```nix
+    derivation {
+      ...
+      exportReferencesGraph = [ "libfoo-graph" libfoo ];
+    };
+    ```
+
+    the references graph of `libfoo` is placed in the file
+    `libfoo-graph` in the temporary build directory.
+
+    `exportReferencesGraph` is useful for builders that want to do
+    something with the closure of a store path. Examples include the
+    builders in NixOS that generate the initial ramdisk for booting
+    Linux (a `cpio` archive containing the closure of the boot script)
+    and the ISO-9660 image for the installation CD (which is populated
+    with a Nix store containing the closure of a bootable NixOS
+    configuration).
+
+  - [`passAsFile`]{#adv-attr-passAsFile}\
+    A list of names of attributes that should be passed via files rather
+    than environment variables. For example, if you have
+
+    ```nix
+    passAsFile = ["big"];
+    big = "a very long string";
+    ```
+
+    then when the builder runs, the environment variable `bigPath`
+    will contain the absolute path to a temporary file containing `a
+    very long string`. That is, for any attribute *x* listed in
+    `passAsFile`, Nix will pass an environment variable `xPath`
+    holding the path of the file containing the value of attribute
+    *x*. This is useful when you need to pass large strings to a
+    builder, since most operating systems impose a limit on the size
+    of the environment (typically, a few hundred kilobyte).
+
+  - [`__structuredAttrs`]{#adv-attr-structuredAttrs}\
+    If the special attribute `__structuredAttrs` is set to `true`, the other derivation
+    attributes are serialised into a file in JSON format. The environment variable
+    `NIX_ATTRS_JSON_FILE` points to the exact location of that file both in a build
+    and a [`nix-shell`](../command-ref/nix-shell.md). This obviates the need for
+    [`passAsFile`](#adv-attr-passAsFile) since JSON files have no size restrictions,
+    unlike process environments.
+
+    It also makes it possible to tweak derivation settings in a structured way; see
+    [`outputChecks`](#adv-attr-outputChecks) for example.
+
+    As a convenience to Bash builders,
+    Nix writes a script that initialises shell variables
+    corresponding to all attributes that are representable in Bash. The
+    environment variable `NIX_ATTRS_SH_FILE` points to the exact
+    location of the script, both in a build and a
+    [`nix-shell`](../command-ref/nix-shell.md). This includes non-nested
+    (associative) arrays. For example, the attribute `hardening.format = true`
+    ends up as the Bash associative array element `${hardening[format]}`.
+
+    > **Warning**
+    >
+    > If set to `true`, other advanced attributes such as [`allowedReferences`](#adv-attr-allowedReferences), [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
+    [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites), maxSize, and maxClosureSize.
+    will have no effect.
+
+## Output checks
+
   - [`allowedReferences`]{#adv-attr-allowedReferences}\
     The optional attribute `allowedReferences` specifies a list of legal
     references (dependencies) of the output of the builder. For example,
@@ -55,34 +132,89 @@ Derivations can declare some infrequently used optional attributes.
     dependency on `foobar` or any other derivation depending recursively
     on `foobar`.
 
-  - [`exportReferencesGraph`]{#adv-attr-exportReferencesGraph}\
-    This attribute allows builders access to the references graph of
-    their inputs. The attribute is a list of inputs in the Nix store
-    whose references graph the builder needs to know. The value of
-    this attribute should be a list of pairs `[ name1 path1 name2
-    path2 ...  ]`. The references graph of each *pathN* will be stored
-    in a text file *nameN* in the temporary build directory. The text
-    files have the format used by `nix-store --register-validity`
-    (with the deriver fields left empty). For example, when the
-    following derivation is built:
+  - [`outputChecks`]{#adv-attr-outputChecks}\
+    When using [structured attributes](#adv-attr-structuredAttrs), the `outputChecks`
+    attribute allows defining checks per-output.
+
+    In addition to
+    [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
+    [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites),
+    the following attributes are available:
+
+    - `maxSize` defines the maximum size of the resulting [store object](@docroot@/store/store-object.md).
+    - `maxClosureSize` defines the maximum size of the output's closure.
+    - `ignoreSelfRefs` controls whether self-references should be considered when
+      checking for allowed references/requisites.
+
+    Example:
 
     ```nix
-    derivation {
-      ...
-      exportReferencesGraph = [ "libfoo-graph" libfoo ];
+    __structuredAttrs = true;
+
+    outputChecks.out = {
+      # The closure of 'out' must not be larger than 256 MiB.
+      maxClosureSize = 256 * 1024 * 1024;
+
+      # It must not refer to the C compiler or to the 'dev' output.
+      disallowedRequisites = [ stdenv.cc "dev" ];
+    };
+
+    outputChecks.dev = {
+      # The 'dev' output must not be larger than 128 KiB.
+      maxSize = 128 * 1024;
     };
     ```
 
-    the references graph of `libfoo` is placed in the file
-    `libfoo-graph` in the temporary build directory.
+## Other output modifications
 
-    `exportReferencesGraph` is useful for builders that want to do
-    something with the closure of a store path. Examples include the
-    builders in NixOS that generate the initial ramdisk for booting
-    Linux (a `cpio` archive containing the closure of the boot script)
-    and the ISO-9660 image for the installation CD (which is populated
-    with a Nix store containing the closure of a bootable NixOS
-    configuration).
+  - [`unsafeDiscardReferences`]{#adv-attr-unsafeDiscardReferences}\
+
+    When using [structured attributes](#adv-attr-structuredAttrs), the
+    attribute `unsafeDiscardReferences` is an attribute set with a boolean value for each output name.
+    If set to `true`, it disables scanning the output for runtime dependencies.
+
+    Example:
+
+    ```nix
+    __structuredAttrs = true;
+    unsafeDiscardReferences.out = true;
+    ```
+
+    This is useful, for example, when generating self-contained filesystem images with
+    their own embedded Nix store: hashes found inside such an image refer
+    to the embedded store and not to the host's Nix store.
+
+## Build scheduling
+
+  - [`preferLocalBuild`]{#adv-attr-preferLocalBuild}\
+    If this attribute is set to `true` and [distributed building is enabled](@docroot@/command-ref/conf-file.md#conf-builders), then, if possible, the derivation will be built locally instead of being forwarded to a remote machine.
+    This is useful for derivations that are cheapest to build locally.
+
+  - [`allowSubstitutes`]{#adv-attr-allowSubstitutes}\
+    If this attribute is set to `false`, then Nix will always build this derivation (locally or remotely); it will not try to substitute its outputs.
+    This is useful for derivations that are cheaper to build than to substitute.
+
+    This attribute can be ignored by setting [`always-allow-substitutes`](@docroot@/command-ref/conf-file.md#conf-always-allow-substitutes) to `true`.
+
+    > **Note**
+    >
+    > If set to `false`, the [`builder`] should be able to run on the system type specified in the [`system` attribute](./derivations.md#attr-system), since the derivation cannot be substituted.
+
+    [`builder`]: ./derivations.md#attr-builder
+
+- [`requiredSystemFeatures`]{#adv-attr-requiredSystemFeatures}\
+
+  If a derivation has the `requiredSystemFeatures` attribute, then Nix will only build it on a machine that has the corresponding features set in its [`system-features` configuration](@docroot@/command-ref/conf-file.md#conf-system-features).
+
+  For example, setting
+
+  ```nix
+  requiredSystemFeatures = [ "kvm" ];
+  ```
+
+  ensures that the derivation can only be built on a machine with the `kvm` feature.
+
+# Build Impurities
 
   - [`impureEnvVars`]{#adv-attr-impureEnvVars}\
     This attribute allows you to specify a list of environment variables
@@ -118,128 +250,6 @@ Derivations can declare some infrequently used optional attributes.
     through the
     [`impure-env`](@docroot@/command-ref/conf-file.md#conf-impure-env)
     configuration setting.
-
-  - [`passAsFile`]{#adv-attr-passAsFile}\
-    A list of names of attributes that should be passed via files rather
-    than environment variables. For example, if you have
-
-    ```nix
-    passAsFile = ["big"];
-    big = "a very long string";
-    ```
-
-    then when the builder runs, the environment variable `bigPath`
-    will contain the absolute path to a temporary file containing `a
-    very long string`. That is, for any attribute *x* listed in
-    `passAsFile`, Nix will pass an environment variable `xPath`
-    holding the path of the file containing the value of attribute
-    *x*. This is useful when you need to pass large strings to a
-    builder, since most operating systems impose a limit on the size
-    of the environment (typically, a few hundred kilobyte).
-
-  - [`preferLocalBuild`]{#adv-attr-preferLocalBuild}\
-    If this attribute is set to `true` and [distributed building is enabled](@docroot@/command-ref/conf-file.md#conf-builders), then, if possible, the derivation will be built locally instead of being forwarded to a remote machine.
-    This is useful for derivations that are cheapest to build locally.
-
-  - [`allowSubstitutes`]{#adv-attr-allowSubstitutes}\
-    If this attribute is set to `false`, then Nix will always build this derivation (locally or remotely); it will not try to substitute its outputs.
-    This is useful for derivations that are cheaper to build than to substitute.
-
-    This attribute can be ignored by setting [`always-allow-substitutes`](@docroot@/command-ref/conf-file.md#conf-always-allow-substitutes) to `true`.
-
-    > **Note**
-    >
-    > If set to `false`, the [`builder`] should be able to run on the system type specified in the [`system` attribute](./derivations.md#attr-system), since the derivation cannot be substituted.
-
-    [`builder`]: ./derivations.md#attr-builder
-
-  - [`__structuredAttrs`]{#adv-attr-structuredAttrs}\
-    If the special attribute `__structuredAttrs` is set to `true`, the other derivation
-    attributes are serialised into a file in JSON format. The environment variable
-    `NIX_ATTRS_JSON_FILE` points to the exact location of that file both in a build
-    and a [`nix-shell`](../command-ref/nix-shell.md). This obviates the need for
-    [`passAsFile`](#adv-attr-passAsFile) since JSON files have no size restrictions,
-    unlike process environments.
-
-    It also makes it possible to tweak derivation settings in a structured way; see
-    [`outputChecks`](#adv-attr-outputChecks) for example.
-
-    As a convenience to Bash builders,
-    Nix writes a script that initialises shell variables
-    corresponding to all attributes that are representable in Bash. The
-    environment variable `NIX_ATTRS_SH_FILE` points to the exact
-    location of the script, both in a build and a
-    [`nix-shell`](../command-ref/nix-shell.md). This includes non-nested
-    (associative) arrays. For example, the attribute `hardening.format = true`
-    ends up as the Bash associative array element `${hardening[format]}`.
-
-    > **Warning**
-    >
-    > If set to `true`, other advanced attributes such as [`allowedReferences`](#adv-attr-allowedReferences), [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
-    [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites), maxSize, and maxClosureSize.
-    will have no effect.
-
-  - [`outputChecks`]{#adv-attr-outputChecks}\
-    When using [structured attributes](#adv-attr-structuredAttrs), the `outputChecks`
-    attribute allows defining checks per-output.
-
-    In addition to
-    [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
-    [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites),
-    the following attributes are available:
-
-    - `maxSize` defines the maximum size of the resulting [store object](@docroot@/store/store-object.md).
-    - `maxClosureSize` defines the maximum size of the output's closure.
-    - `ignoreSelfRefs` controls whether self-references should be considered when
-      checking for allowed references/requisites.
-
-    Example:
-
-    ```nix
-    __structuredAttrs = true;
-
-    outputChecks.out = {
-      # The closure of 'out' must not be larger than 256 MiB.
-      maxClosureSize = 256 * 1024 * 1024;
-
-      # It must not refer to the C compiler or to the 'dev' output.
-      disallowedRequisites = [ stdenv.cc "dev" ];
-    };
-
-    outputChecks.dev = {
-      # The 'dev' output must not be larger than 128 KiB.
-      maxSize = 128 * 1024;
-    };
-    ```
-
-  - [`unsafeDiscardReferences`]{#adv-attr-unsafeDiscardReferences}\
-
-    When using [structured attributes](#adv-attr-structuredAttrs), the
-    attribute `unsafeDiscardReferences` is an attribute set with a boolean value for each output name.
-    If set to `true`, it disables scanning the output for runtime dependencies.
-
-    Example:
-
-    ```nix
-    __structuredAttrs = true;
-    unsafeDiscardReferences.out = true;
-    ```
-
-    This is useful, for example, when generating self-contained filesystem images with
-    their own embedded Nix store: hashes found inside such an image refer
-    to the embedded store and not to the host's Nix store.
-
-- [`requiredSystemFeatures`]{#adv-attr-requiredSystemFeatures}\
-
-  If a derivation has the `requiredSystemFeatures` attribute, then Nix will only build it on a machine that has the corresponding features set in its [`system-features` configuration](@docroot@/command-ref/conf-file.md#conf-system-features).
-
-  For example, setting
-
-  ```nix
-  requiredSystemFeatures = [ "kvm" ];
-  ```
-
-  ensures that the derivation can only be built on a machine with the `kvm` feature.
 
 ## Setting the derivation type
 
