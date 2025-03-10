@@ -263,8 +263,114 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     started();
     co_await Suspend{};
-    // after EOF on child
-    co_return buildDone();
+
+    trace("build done");
+
+    Finally releaseBuildUser([&](){ this->cleanupHookFinally(); });
+
+    cleanupPreChildKill();
+
+    /* Since we got an EOF on the logger pipe, the builder is presumed
+       to have terminated.  In fact, the builder could also have
+       simply have closed its end of the pipe, so just to be sure,
+       kill it. */
+    int status = getChildStatus();
+
+    debug("builder process for '%s' finished", worker.store.printStorePath(drvPath));
+
+    buildResult.timesBuilt++;
+    buildResult.stopTime = time(0);
+
+    /* So the child is gone now. */
+    worker.childTerminated(this);
+
+    /* Close the read side of the logger pipe. */
+    closeReadPipes();
+
+    /* Close the log file. */
+    closeLogFile();
+
+    cleanupPostChildKill();
+
+    if (buildResult.cpuUser && buildResult.cpuSystem) {
+        debug("builder for '%s' terminated with status %d, user CPU %.3fs, system CPU %.3fs",
+            worker.store.printStorePath(drvPath),
+            status,
+            ((double) buildResult.cpuUser->count()) / 1000000,
+            ((double) buildResult.cpuSystem->count()) / 1000000);
+    }
+
+    bool diskFull = false;
+
+    try {
+
+        /* Check the exit status. */
+        if (!statusOk(status)) {
+
+            diskFull |= cleanupDecideWhetherDiskFull();
+
+            auto msg = fmt("builder for '%s' %s",
+                Magenta(worker.store.printStorePath(drvPath)),
+                statusToString(status));
+
+            appendLogTailErrorMsg(worker, drvPath, logTail, msg);
+
+            if (diskFull)
+                msg += "\nnote: build failure may have been caused by lack of free disk space";
+
+            throw BuildError(msg);
+        }
+
+        /* Compute the FS closure of the outputs and register them as
+           being valid. */
+        auto builtOutputs = registerOutputs();
+
+        StorePathSet outputPaths;
+        for (auto & [_, output] : builtOutputs)
+            outputPaths.insert(output.outPath);
+        runPostBuildHook(
+            worker.store,
+            *logger,
+            drvPath,
+            outputPaths
+        );
+
+        cleanupPostOutputsRegisteredModeNonCheck();
+
+        /* It is now safe to delete the lock files, since all future
+           lockers will see that the output paths are valid; they will
+           not create new lock files with the same names as the old
+           (unlinked) lock files. */
+        outputLocks.setDeletion(true);
+        outputLocks.unlock();
+
+        co_return done(BuildResult::Built, std::move(builtOutputs));
+
+    } catch (BuildError & e) {
+        outputLocks.unlock();
+
+        BuildResult::Status st = BuildResult::MiscFailure;
+
+#ifndef _WIN32 // TODO abstract over proc exit status
+        if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101)
+            st = BuildResult::TimedOut;
+
+        else if (hook && (!WIFEXITED(status) || WEXITSTATUS(status) != 100)) {
+        }
+
+        else
+#endif
+        {
+            assert(derivationType);
+            st =
+                dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
+                statusOk(status) ? BuildResult::OutputRejected :
+                !derivationType->isSandboxed() || diskFull ? BuildResult::TransientFailure :
+                BuildResult::PermanentFailure;
+        }
+
+        co_return done(st, {}, std::move(e));
+    }
 }
 
 static void chmod_(const Path & path, mode_t mode)

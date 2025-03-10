@@ -640,7 +640,7 @@ Goal::Co DerivationGoal::tryToBuild()
                 buildResult.startTime = time(0); // inexact
                 started();
                 co_await Suspend{};
-                co_return buildDone();
+                co_return hookDone();
             case rpPostpone:
                 /* Not now; wait until at least one child finishes or
                    the wake-up timeout expires. */
@@ -935,7 +935,7 @@ void appendLogTailErrorMsg(
 }
 
 
-Goal::Co DerivationGoal::buildDone()
+Goal::Co DerivationGoal::hookDone()
 {
     trace("build done");
 

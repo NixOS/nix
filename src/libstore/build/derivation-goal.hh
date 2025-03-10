@@ -56,6 +56,13 @@ struct InitialOutput {
 };
 
 /** Used internally */
+void runPostBuildHook(
+    Store & store,
+    Logger & logger,
+    const StorePath & drvPath,
+    const StorePathSet & outputPaths);
+
+/** Used internally */
 void appendLogTailErrorMsg(
     Worker & worker,
     const StorePath & drvPath,
@@ -246,7 +253,7 @@ struct DerivationGoal : public Goal
     Co gaveUpOnSubstitution();
     Co tryToBuild();
     virtual Co tryLocalBuild();
-    Co buildDone();
+    Co hookDone();
 
     Co resolvedFinished();
 
