@@ -241,8 +241,6 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     SingleDrvOutputs registerOutputs();
 
-    void signRealisation(Realisation &) override;
-
     /**
      * Check that an output meets the requirements specified by the
      * 'outputChecks' attribute (or the legacy

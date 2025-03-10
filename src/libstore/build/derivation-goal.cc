@@ -1047,7 +1047,7 @@ Goal::Co DerivationGoal::resolvedFinished()
                         : worker.store;
                     newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation.outPath, &drvStore);
                 }
-                signRealisation(newRealisation);
+                worker.store.signRealisation(newRealisation);
                 worker.store.registerDrvOutput(newRealisation);
             }
             outputPaths.insert(realisation.outPath);

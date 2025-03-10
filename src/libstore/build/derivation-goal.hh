@@ -268,11 +268,6 @@ struct DerivationGoal : public Goal
     Path openLogFile();
 
     /**
-     * Sign the newly built realisation if the store allows it
-     */
-    virtual void signRealisation(Realisation&) {}
-
-    /**
      * Close the log file.
      */
     void closeLogFile();
