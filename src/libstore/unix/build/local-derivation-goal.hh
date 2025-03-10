@@ -89,11 +89,6 @@ struct LocalDerivationGoal : public DerivationGoal
     std::shared_ptr<AutoDelete> autoDelChroot;
 
     /**
-     * Whether to run the build in a private network namespace.
-     */
-    bool privateNetwork = false;
-
-    /**
      * Stuff we need to pass to initChild().
      */
     struct ChrootPath {
