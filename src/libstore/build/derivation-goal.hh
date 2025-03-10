@@ -262,8 +262,6 @@ struct DerivationGoal : public Goal
      */
     HookReply tryBuildHook();
 
-    virtual int getChildStatus();
-
     /**
      * Check that the derivation outputs all exist and register them
      * as valid.

@@ -801,16 +801,6 @@ void replaceValidPath(const Path & storePath, const Path & tmpPath)
 }
 
 
-int DerivationGoal::getChildStatus()
-{
-#ifndef _WIN32 // TODO enable build hook on Windows
-    return hook->pid.kill();
-#else
-    return 0;
-#endif
-}
-
-
 void runPostBuildHook(
     Store & store,
     Logger & logger,
@@ -908,7 +898,12 @@ Goal::Co DerivationGoal::hookDone()
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe, so just to be sure,
        kill it. */
-    int status = getChildStatus();
+    int status =
+#ifndef _WIN32 // TODO enable build hook on Windows
+        hook->pid.kill();
+#else
+        0;
+#endif
 
     debug("builder process for '%s' finished", worker.store.printStorePath(drvPath));
 

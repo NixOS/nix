@@ -282,7 +282,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe, so just to be sure,
        kill it. */
-    int status = getChildStatus();
+    int status = pid.kill();
 
     debug("builder process for '%s' finished", worker.store.printStorePath(drvPath));
 
@@ -410,12 +410,6 @@ static void movePath(const Path & src, const Path & dst)
 
 
 extern void replaceValidPath(const Path & storePath, const Path & tmpPath);
-
-
-int LocalDerivationGoal::getChildStatus()
-{
-    return hook ? DerivationGoal::getChildStatus() : pid.kill();
-}
 
 
 bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
@@ -787,7 +781,7 @@ void LocalDerivationGoal::startBuilder()
            environment using bind-mounts.  We put it in the Nix store
            so that the build outputs can be moved efficiently from the
            chroot to their final location. */
-        chrootParentDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
+        auto chrootParentDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
         deletePath(chrootParentDir);
 
         /* Clean up the chroot directory automatically. */
