@@ -945,7 +945,15 @@ Goal::Co DerivationGoal::hookDone()
 
         /* Compute the FS closure of the outputs and register them as
            being valid. */
-        auto builtOutputs = registerOutputs();
+        auto builtOutputs =
+            /* When using a build hook, the build hook can register the output
+               as valid (by doing `nix-store --import').  If so we don't have
+               to do anything here.
+
+               We can only early return when the outputs are known a priori. For
+               floating content-addressing derivations this isn't the case.
+             */
+            assertPathValidity();
 
         StorePathSet outputPaths;
         for (auto & [_, output] : builtOutputs)
@@ -1173,18 +1181,6 @@ HookReply DerivationGoal::tryBuildHook()
 #endif
 }
 
-
-SingleDrvOutputs DerivationGoal::registerOutputs()
-{
-    /* When using a build hook, the build hook can register the output
-       as valid (by doing `nix-store --import').  If so we don't have
-       to do anything here.
-
-       We can only early return when the outputs are known a priori. For
-       floating content-addressing derivations this isn't the case.
-     */
-    return assertPathValidity();
-}
 
 Path DerivationGoal::openLogFile()
 {

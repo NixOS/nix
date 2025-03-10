@@ -2330,15 +2330,7 @@ void LocalDerivationGoal::runChild()
 
 SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 {
-    /* When using a build hook, the build hook can register the output
-       as valid (by doing `nix-store --import').  If so we don't have
-       to do anything here.
-
-       We can only early return when the outputs are known a priori. For
-       floating content-addressing derivations this isn't the case.
-     */
-    if (hook)
-        return DerivationGoal::registerOutputs();
+    assert(!hook);
 
     std::map<std::string, ValidPathInfo> infos;
 

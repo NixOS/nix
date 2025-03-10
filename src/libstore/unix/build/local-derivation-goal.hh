@@ -239,7 +239,7 @@ struct LocalDerivationGoal : public DerivationGoal
      * Check that the derivation outputs all exist and register them
      * as valid.
      */
-    SingleDrvOutputs registerOutputs() override;
+    SingleDrvOutputs registerOutputs();
 
     void signRealisation(Realisation &) override;
 
