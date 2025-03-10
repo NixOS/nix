@@ -264,21 +264,6 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     void checkOutputs(const std::map<std::string, ValidPathInfo> & outputs);
 
-    /**
-     * Close the read side of the logger pipe.
-     */
-    void closeReadPipes() override;
-
-    /**
-     * Cleanup hooks for buildDone()
-     */
-    void cleanupHookFinally() override;
-    void cleanupPreChildKill() override;
-    void cleanupPostChildKill() override;
-    bool cleanupDecideWhetherDiskFull() override;
-    void cleanupPostOutputsRegisteredModeCheck() override;
-    void cleanupPostOutputsRegisteredModeNonCheck() override;
-
     bool isReadDesc(int fd) override;
 
     /**
@@ -298,6 +283,8 @@ struct LocalDerivationGoal : public DerivationGoal
      * cgroup of the build.
      */
     void killSandbox(bool getStats);
+
+    bool cleanupDecideWhetherDiskFull();
 
     /**
      * Create alternative path calculated from but distinct from the

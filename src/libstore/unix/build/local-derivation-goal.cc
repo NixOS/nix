@@ -184,6 +184,8 @@ void LocalDerivationGoal::killSandbox(bool getStats)
 
 Goal::Co LocalDerivationGoal::tryLocalBuild()
 {
+    assert(!hook);
+
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
         worker.waitForBuildSlot(shared_from_this());
@@ -266,9 +268,15 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     trace("build done");
 
-    Finally releaseBuildUser([&](){ this->cleanupHookFinally(); });
+    Finally releaseBuildUser([&](){
+        /* Release the build user at the end of this function. We don't do
+           it right away because we don't want another build grabbing this
+           uid and then messing around with our output. */
+        buildUser.reset();
+    });
 
-    cleanupPreChildKill();
+    sandboxMountNamespace = -1;
+    sandboxUserNamespace = -1;
 
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
@@ -285,12 +293,20 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
     worker.childTerminated(this);
 
     /* Close the read side of the logger pipe. */
-    closeReadPipes();
+    builderOut.close();
 
     /* Close the log file. */
     closeLogFile();
 
-    cleanupPostChildKill();
+    /* When running under a build user, make sure that all processes
+       running under that uid are gone.  This is to prevent a
+       malicious user from leaving behind a process that keeps files
+       open and modifies them after they have been chown'ed to
+       root. */
+    killSandbox(true);
+
+    /* Terminate the recursive Nix daemon. */
+    stopDaemon();
 
     if (buildResult.cpuUser && buildResult.cpuSystem) {
         debug("builder for '%s' terminated with status %d, user CPU %.3fs, system CPU %.3fs",
@@ -335,7 +351,14 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
             outputPaths
         );
 
-        cleanupPostOutputsRegisteredModeNonCheck();
+        /* Delete unused redirected outputs (when doing hash rewriting). */
+        for (auto & i : redirectedOutputs)
+            deletePath(worker.store.Store::toRealPath(i.second));
+
+        /* Delete the chroot (if we were using one). */
+        autoDelChroot.reset(); /* this runs the destructor */
+
+        deleteTmpDir(true);
 
         /* It is now safe to delete the lock files, since all future
            lockers will see that the output paths are valid; they will
@@ -407,44 +430,6 @@ int LocalDerivationGoal::getChildStatus()
     return hook ? DerivationGoal::getChildStatus() : pid.kill();
 }
 
-void LocalDerivationGoal::closeReadPipes()
-{
-    if (hook) {
-        DerivationGoal::closeReadPipes();
-    } else
-        builderOut.close();
-}
-
-
-void LocalDerivationGoal::cleanupHookFinally()
-{
-    /* Release the build user at the end of this function. We don't do
-       it right away because we don't want another build grabbing this
-       uid and then messing around with our output. */
-    buildUser.reset();
-}
-
-
-void LocalDerivationGoal::cleanupPreChildKill()
-{
-    sandboxMountNamespace = -1;
-    sandboxUserNamespace = -1;
-}
-
-
-void LocalDerivationGoal::cleanupPostChildKill()
-{
-    /* When running under a build user, make sure that all processes
-       running under that uid are gone.  This is to prevent a
-       malicious user from leaving behind a process that keeps files
-       open and modifies them after they have been chown'ed to
-       root. */
-    killSandbox(true);
-
-    /* Terminate the recursive Nix daemon. */
-    stopDaemon();
-}
-
 
 bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
 {
@@ -485,24 +470,6 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
     return diskFull;
 }
 
-
-void LocalDerivationGoal::cleanupPostOutputsRegisteredModeCheck()
-{
-    deleteTmpDir(true);
-}
-
-
-void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
-{
-    /* Delete unused redirected outputs (when doing hash rewriting). */
-    for (auto & i : redirectedOutputs)
-        deletePath(worker.store.Store::toRealPath(i.second));
-
-    /* Delete the chroot (if we were using one). */
-    autoDelChroot.reset(); /* this runs the destructor */
-
-    cleanupPostOutputsRegisteredModeCheck();
-}
 
 #if __linux__
 static void doBind(const Path & source, const Path & target, bool optional = false) {

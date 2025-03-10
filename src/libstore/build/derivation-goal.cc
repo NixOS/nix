@@ -811,45 +811,6 @@ int DerivationGoal::getChildStatus()
 }
 
 
-void DerivationGoal::closeReadPipes()
-{
-#ifndef _WIN32 // TODO enable build hook on Windows
-    hook->builderOut.readSide.close();
-    hook->fromHook.readSide.close();
-#endif
-}
-
-
-void DerivationGoal::cleanupHookFinally()
-{
-}
-
-
-void DerivationGoal::cleanupPreChildKill()
-{
-}
-
-
-void DerivationGoal::cleanupPostChildKill()
-{
-}
-
-
-bool DerivationGoal::cleanupDecideWhetherDiskFull()
-{
-    return false;
-}
-
-
-void DerivationGoal::cleanupPostOutputsRegisteredModeCheck()
-{
-}
-
-
-void DerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
-{
-}
-
 void runPostBuildHook(
     Store & store,
     Logger & logger,
@@ -937,11 +898,11 @@ void appendLogTailErrorMsg(
 
 Goal::Co DerivationGoal::hookDone()
 {
-    trace("build done");
+#ifndef _WIN32
+    assert(hook);
+#endif
 
-    Finally releaseBuildUser([&](){ this->cleanupHookFinally(); });
-
-    cleanupPreChildKill();
+    trace("hook build done");
 
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
@@ -958,12 +919,13 @@ Goal::Co DerivationGoal::hookDone()
     worker.childTerminated(this);
 
     /* Close the read side of the logger pipe. */
-    closeReadPipes();
+#ifndef _WIN32 // TODO enable build hook on Windows
+    hook->builderOut.readSide.close();
+    hook->fromHook.readSide.close();
+#endif
 
     /* Close the log file. */
     closeLogFile();
-
-    cleanupPostChildKill();
 
     if (buildResult.cpuUser && buildResult.cpuSystem) {
         debug("builder for '%s' terminated with status %d, user CPU %.3fs, system CPU %.3fs",
@@ -973,23 +935,15 @@ Goal::Co DerivationGoal::hookDone()
             ((double) buildResult.cpuSystem->count()) / 1000000);
     }
 
-    bool diskFull = false;
-
     try {
 
         /* Check the exit status. */
         if (!statusOk(status)) {
-
-            diskFull |= cleanupDecideWhetherDiskFull();
-
             auto msg = fmt("builder for '%s' %s",
                 Magenta(worker.store.printStorePath(drvPath)),
                 statusToString(status));
 
             appendLogTailErrorMsg(worker, drvPath, logTail, msg);
-
-            if (diskFull)
-                msg += "\nnote: build failure may have been caused by lack of free disk space";
 
             throw BuildError(msg);
         }
@@ -1008,8 +962,6 @@ Goal::Co DerivationGoal::hookDone()
             outputPaths
         );
 
-        cleanupPostOutputsRegisteredModeNonCheck();
-
         /* It is now safe to delete the lock files, since all future
            lockers will see that the output paths are valid; they will
            not create new lock files with the same names as the old
@@ -1024,23 +976,20 @@ Goal::Co DerivationGoal::hookDone()
 
         BuildResult::Status st = BuildResult::MiscFailure;
 
-#ifndef _WIN32 // TODO abstract over proc exit status
-        if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101)
+#ifndef _WIN32
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 101)
             st = BuildResult::TimedOut;
 
-        else if (hook && (!WIFEXITED(status) || WEXITSTATUS(status) != 100)) {
-        }
-
-        else
-#endif
+        else if (WIFEXITED(status) && WEXITSTATUS(status) == 100)
         {
             assert(derivationType);
             st =
                 dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
                 statusOk(status) ? BuildResult::OutputRejected :
-                !derivationType->isSandboxed() || diskFull ? BuildResult::TransientFailure :
+                !derivationType->isSandboxed() ? BuildResult::TransientFailure :
                 BuildResult::PermanentFailure;
         }
+#endif
 
         co_return done(st, {}, std::move(e));
     }

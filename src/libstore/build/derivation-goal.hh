@@ -285,21 +285,6 @@ struct DerivationGoal : public Goal
      */
     void closeLogFile();
 
-    /**
-     * Close the read side of the logger pipe.
-     */
-    virtual void closeReadPipes();
-
-    /**
-     * Cleanup hooks for buildDone()
-     */
-    virtual void cleanupHookFinally();
-    virtual void cleanupPreChildKill();
-    virtual void cleanupPostChildKill();
-    virtual bool cleanupDecideWhetherDiskFull();
-    virtual void cleanupPostOutputsRegisteredModeCheck();
-    virtual void cleanupPostOutputsRegisteredModeNonCheck();
-
     virtual bool isReadDesc(Descriptor fd);
 
     /**
