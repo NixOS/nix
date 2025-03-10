@@ -15,6 +15,7 @@
   # Configuration Options
 
   version,
+  resolvePath,
 }:
 
 let
@@ -61,7 +62,7 @@ mkMesonExecutable (finalAttrs: {
               mkdir -p "$HOME"
             ''
             + ''
-              export _NIX_TEST_UNIT_DATA=${./data}
+              export _NIX_TEST_UNIT_DATA=${resolvePath ./data}
               ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
               touch $out
             ''
