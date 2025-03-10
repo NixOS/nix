@@ -13,7 +13,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v30
+    - uses: cachix/install-nix-action@v31
     - run: nix --experimental-features 'nix-command flakes' flake show --all-systems --json
 
   tests:
@@ -34,7 +34,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v30
+    - uses: cachix/install-nix-action@v31
       with:
         # The sandbox would otherwise be disabled by default on Darwin
         extra_nix_config: |
@@ -77,7 +77,7 @@ jobs:
     - name: Serving installer
       id: serving_installer
       run: ./scripts/serve-installer-for-github-actions
-    - uses: cachix/install-nix-action@v30
+    - uses: cachix/install-nix-action@v31
       with:
         install_url: 'http://localhost:8126/install'
         install_options: "--tarball-url-prefix http://localhost:8126/"
@@ -131,7 +131,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v30
+    - uses: cachix/install-nix-action@v31
       with:
         install_url: https://releases.nixos.org/nix/nix-2.20.3/install
     - uses: DeterminateSystems/magic-nix-cache-action@main
