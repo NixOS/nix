@@ -132,11 +132,18 @@ void addToWeakGoals(WeakGoals & goals, GoalPtr p)
     goals.insert(p);
 }
 
-
-void Goal::addWaitee(GoalPtr waitee)
+Co Goal::await(Goals new_waitees)
 {
-    waitees.insert(waitee);
-    addToWeakGoals(waitee->waiters, shared_from_this());
+    assert(waitees.empty());
+    if (!new_waitees.empty()) {
+        waitees = std::move(new_waitees);
+        for (auto waitee : waitees) {
+            addToWeakGoals(waitee->waiters, shared_from_this());
+        }
+        co_await Suspend{};
+        assert(waitees.empty());
+    }
+    co_return Return{};
 }
 
 
@@ -147,7 +154,7 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
 
     trace(fmt("waitee '%s' done; %d left", waitee->name, waitees.size()));
 
-    if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure) ++nrFailed;
+    if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure)     ++nrFailed;
 
     if (result == ecNoSubstituters) ++nrNoSubstituters;
 

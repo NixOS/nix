@@ -128,13 +128,17 @@ Goal::Co PathSubstitutionGoal::init()
             continue;
         }
 
+        {
+        Goals waitees;
+
         /* To maintain the closure invariant, we first have to realise the
            paths referenced by this one. */
         for (auto & i : info->references)
             if (i != storePath) /* ignore self-references */
-                addWaitee(worker.makePathSubstitutionGoal(i));
+                waitees.insert(worker.makePathSubstitutionGoal(i));
 
-        if (!waitees.empty()) co_await Suspend{};
+        co_await await(std::move(waitees));
+        }
 
         // FIXME: consider returning boolean instead of passing in reference
         bool out = false; // is mutated by tryToRun
