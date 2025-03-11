@@ -194,7 +194,7 @@ StoreWrapper::computeFSClosure(int flipDirection, int includeOutputs, ...)
     PPCODE:
         try {
             StorePathSet paths;
-            for (int n = 2; n < items; ++n)
+            for (int n = 3; n < items; ++n)
                 THIS->store->computeFSClosure(THIS->store->parseStorePath(SvPV_nolen(ST(n))), paths, flipDirection, includeOutputs);
             for (auto & i : paths)
                 XPUSHs(sv_2mortal(newSVpv(THIS->store->printStorePath(i).c_str(), 0)));
@@ -208,7 +208,7 @@ StoreWrapper::topoSortPaths(...)
     PPCODE:
         try {
             StorePathSet paths;
-            for (int n = 0; n < items; ++n) paths.insert(THIS->store->parseStorePath(SvPV_nolen(ST(n))));
+            for (int n = 1; n < items; ++n) paths.insert(THIS->store->parseStorePath(SvPV_nolen(ST(n))));
             auto sorted = THIS->store->topoSortPaths(paths);
             for (auto & i : sorted)
                 XPUSHs(sv_2mortal(newSVpv(THIS->store->printStorePath(i).c_str(), 0)));
@@ -234,7 +234,7 @@ StoreWrapper::exportPaths(int fd, ...)
     PPCODE:
         try {
             StorePathSet paths;
-            for (int n = 1; n < items; ++n) paths.insert(THIS->store->parseStorePath(SvPV_nolen(ST(n))));
+            for (int n = 2; n < items; ++n) paths.insert(THIS->store->parseStorePath(SvPV_nolen(ST(n))));
             FdSink sink(fd);
             THIS->store->exportPaths(paths, sink);
         } catch (Error & e) {

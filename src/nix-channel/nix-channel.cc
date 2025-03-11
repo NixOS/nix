@@ -8,6 +8,7 @@
 #include "users.hh"
 #include "tarball.hh"
 #include "self-exe.hh"
+#include "man-pages.hh"
 
 #include <fcntl.h>
 #include <regex>

@@ -85,11 +85,6 @@ public:
     std::vector<Path> nixUserConfFiles;
 
     /**
-     * The directory where the man pages are stored.
-     */
-    Path nixManDir;
-
-    /**
      * File name of the socket the daemon listens to.
      */
     Path nixDaemonSocketFile;
@@ -189,7 +184,7 @@ public:
         this, SYSTEM, "system",
         R"(
           The system type of the current Nix installation.
-          Nix will only build a given [derivation](@docroot@/language/derivations.md) locally when its `system` attribute equals any of the values specified here or in [`extra-platforms`](#conf-extra-platforms).
+          Nix will only build a given [store derivation](@docroot@/glossary.md#gloss-store-derivation) locally when its `system` attribute equals any of the values specified here or in [`extra-platforms`](#conf-extra-platforms).
 
           The default value is set when Nix itself is compiled for the system it will run on.
           The following system types are widely used, as Nix is actively supported on these platforms:
@@ -399,10 +394,18 @@ public:
           default is `true`.
         )"};
 
+    Setting<bool> fsyncStorePaths{this, false, "fsync-store-paths",
+        R"(
+          Whether to call `fsync()` on store paths before registering them, to
+          flush them to disk. This improves robustness in case of system crashes,
+          but reduces performance. The default is `false`.
+        )"};
+
     Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal",
         "Whether SQLite should use WAL mode."};
 
 #ifndef _WIN32
+    // FIXME: remove this option, `fsync-store-paths` is faster.
     Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
         "Whether to call `sync()` before registering a path as valid."};
 #endif
@@ -817,7 +820,7 @@ public:
         R"(
           System types of executables that can be run on this machine.
 
-          Nix will only build a given [derivation](@docroot@/language/derivations.md) locally when its `system` attribute equals any of the values specified here or in the [`system` option](#conf-system).
+          Nix will only build a given [store derivation](@docroot@/glossary.md#gloss-store-derivation) locally when its `system` attribute equals any of the values specified here or in the [`system` option](#conf-system).
 
           Setting this can be useful to build derivations locally on compatible machines:
           - `i686-linux` executables can be run on `x86_64-linux` machines (set by default)
@@ -1056,7 +1059,10 @@ public:
 
           1. `NIX_SSL_CERT_FILE`
           2. `SSL_CERT_FILE`
-        )"};
+        )",
+        {},
+        // Don't document the machine-specific default value
+        false};
 
 #if __linux__
     Setting<bool> filterSyscalls{
@@ -1196,7 +1202,7 @@ public:
 
           If the user is trusted (see `trusted-users` option), when building
           a fixed-output derivation, environment variables set in this option
-          will be passed to the builder if they are listed in [`impureEnvVars`](@docroot@/language/advanced-attributes.md##adv-attr-impureEnvVars).
+          will be passed to the builder if they are listed in [`impureEnvVars`](@docroot@/language/advanced-attributes.md#adv-attr-impureEnvVars).
 
           This option is useful for, e.g., setting `https_proxy` for
           fixed-output derivations and in a multi-user Nix installation, or
@@ -1219,14 +1225,13 @@ public:
 
     Setting<uint64_t> warnLargePathThreshold{
         this,
-        // n.b. this is deliberately int64 max rather than uint64 max because
-        // this goes through the Nix language JSON parser and thus needs to be
-        // representable in Nix language integers.
-        std::numeric_limits<int64_t>::max(),
+        0,
         "warn-large-path-threshold",
         R"(
           Warn when copying a path larger than this number of bytes to the Nix store
           (as determined by its NAR serialisation).
+          Default is 0, which disables the warning.
+          Set it to 1 to warn on all paths.
         )"
     };
 };
@@ -1246,7 +1251,15 @@ void loadConfFile(AbstractConfig & config);
 // Used by the Settings constructor
 std::vector<Path> getUserConfigFiles();
 
-extern const std::string nixVersion;
+/**
+ * The version of Nix itself.
+ *
+ * This is not `const`, so that the Nix CLI can provide a more detailed version
+ * number including the git revision, without having to "re-compile" the entire
+ * set of Nix libraries to include that version, even when those libraries are
+ * not affected by the change.
+ */
+extern std::string nixVersion;
 
 /**
  * @param loadConfig Whether to load configuration from `nix.conf`, `NIX_CONFIG`, etc. May be disabled for unit tests.

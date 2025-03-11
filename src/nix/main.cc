@@ -2,7 +2,6 @@
 #include "current-process.hh"
 #include "command.hh"
 #include "common-args.hh"
-#include "eval-gc.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "globals.hh"
@@ -20,6 +19,7 @@
 #include "eval-cache.hh"
 #include "flake/flake.hh"
 #include "self-exe.hh"
+#include "json-utils.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -390,8 +390,6 @@ void mainWrapped(int argc, char * * argv)
     }
     #endif
 
-    Finally f([] { logger->stop(); });
-
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
     auto extensionPos = programName.find_last_of(".");
@@ -437,7 +435,8 @@ void mainWrapped(int argc, char * * argv)
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"), fetchSettings, evalSettings);
         auto builtinsJson = nlohmann::json::object();
-        for (auto & builtin : *state.baseEnv.values[0]->attrs()) {
+        for (auto & builtinPtr : state.getBuiltins().attrs()->lexicographicOrder(state.symbols)) {
+            auto & builtin = *builtinPtr;
             auto b = nlohmann::json::object();
             if (!builtin.value->isPrimOp()) continue;
             auto primOp = builtin.value->primOp();
@@ -558,9 +557,13 @@ void mainWrapped(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
+    // The CLI has a more detailed version than the libraries; see nixVersion.
+    nix::nixVersion = NIX_CLI_VERSION;
+#ifndef _WIN32
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
     nix::setStackSize(64 * 1024 * 1024);
+#endif
 
     return nix::handleExceptions(argv[0], [&]() {
         nix::mainWrapped(argc, argv);

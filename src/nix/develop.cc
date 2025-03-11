@@ -7,7 +7,6 @@
 #include "store-api.hh"
 #include "outputs-spec.hh"
 #include "derivations.hh"
-#include "progress-bar.hh"
 
 #ifndef _WIN32 // TODO re-enable on Windows
 # include "run.hh"
@@ -20,6 +19,8 @@
 #include <algorithm>
 
 #include "strings.hh"
+
+namespace nix::fs { using namespace std::filesystem; }
 
 using namespace nix;
 
@@ -341,7 +342,7 @@ struct Common : InstallableCommand, MixProfile
         ref<Store> store,
         const BuildEnvironment & buildEnvironment,
         const std::filesystem::path & tmpDir,
-        const std::filesystem::path & outputsDir = std::filesystem::path { absPath(".") } / "outputs")
+        const std::filesystem::path & outputsDir = fs::path { fs::current_path() } / "outputs")
     {
         // A list of colon-separated environment variables that should be
         // prepended to, rather than overwritten, in order to keep the shell usable.
@@ -450,7 +451,7 @@ struct Common : InstallableCommand, MixProfile
         auto targetFilePath = tmpDir / OS_STR(".attrs.");
         targetFilePath += ext;
 
-        writeFile(targetFilePath.string(), content);
+        writeFile(targetFilePath, content);
 
         auto fileInBuilderEnv = buildEnvironment.vars.find(envVar);
         assert(fileInBuilderEnv != buildEnvironment.vars.end());
@@ -608,7 +609,8 @@ struct CmdDevelop : Common, MixEnvironment
 
         else if (!command.empty()) {
             std::vector<std::string> args;
-            for (auto s : command)
+            args.reserve(command.size());
+            for (const auto & s : command)
                 args.push_back(shellEscape(s));
             script += fmt("exec %s\n", concatStringsSep(" ", args));
         }
@@ -670,7 +672,7 @@ struct CmdDevelop : Common, MixEnvironment
                 throw Error("package 'nixpkgs#bashInteractive' does not provide a 'bin/bash'");
 
         } catch (Error &) {
-            ignoreException();
+            ignoreExceptionExceptInterrupt();
         }
 
         // Override SHELL with the one chosen for this environment.
@@ -693,7 +695,7 @@ struct CmdDevelop : Common, MixEnvironment
                 auto sourcePath = installableFlake->getLockedFlake()->flake.resolvedRef.input.getSourcePath();
                 if (sourcePath) {
                     if (chdir(sourcePath->c_str()) == -1) {
-                        throw SysError("chdir to '%s' failed", *sourcePath);
+                        throw SysError("chdir to %s failed", *sourcePath);
                     }
                 }
             }
@@ -728,7 +730,7 @@ struct CmdPrintDevEnv : Common, MixJSON
     {
         auto buildEnvironment = getBuildEnvironment(store, installable).first;
 
-        stopProgressBar();
+        logger->stop();
 
         if (json) {
             logger->writeToStdout(buildEnvironment.toJSON());

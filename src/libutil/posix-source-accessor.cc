@@ -7,8 +7,8 @@
 
 namespace nix {
 
-PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && root)
-    : root(std::move(root))
+PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && argRoot)
+    : root(std::move(argRoot))
 {
     assert(root.empty() || root.is_absolute());
     displayPrefix = root.string();
@@ -20,7 +20,7 @@ PosixSourceAccessor::PosixSourceAccessor()
 
 SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
 {
-    std::filesystem::path path2 = absPath(path.string());
+    std::filesystem::path path2 = absPath(path);
     return {
         make_ref<PosixSourceAccessor>(path2.root_path()),
         CanonPath { path2.relative_path().string() },
@@ -124,7 +124,13 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
             S_ISREG(st->st_mode) ? tRegular :
             S_ISDIR(st->st_mode) ? tDirectory :
             S_ISLNK(st->st_mode) ? tSymlink :
-            tMisc,
+            S_ISCHR(st->st_mode) ? tChar :
+            S_ISBLK(st->st_mode) ? tBlock :
+#ifdef S_ISSOCK
+            S_ISSOCK(st->st_mode) ? tSocket :
+#endif
+            S_ISFIFO(st->st_mode) ? tFifo :
+            tUnknown,
         .fileSize = S_ISREG(st->st_mode) ? std::optional<uint64_t>(st->st_size) : std::nullopt,
         .isExecutable = S_ISREG(st->st_mode) && st->st_mode & S_IXUSR,
     };
@@ -134,34 +140,42 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
 {
     assertNoSymlinks(path);
     DirEntries res;
-    for (auto & entry : std::filesystem::directory_iterator{makeAbsPath(path)}) {
-        checkInterrupt();
-        auto type = [&]() -> std::optional<Type> {
-            std::filesystem::file_type nativeType;
-            try {
-                nativeType = entry.symlink_status().type();
-            } catch (std::filesystem::filesystem_error & e) {
-                // We cannot always stat the child. (Ideally there is no
-                // stat because the native directory entry has the type
-                // already, but this isn't always the case.)
-                if (e.code() == std::errc::permission_denied || e.code() == std::errc::operation_not_permitted)
-                    return std::nullopt;
-                else throw;
-            }
+    try {
+        for (auto & entry : std::filesystem::directory_iterator{makeAbsPath(path)}) {
+            checkInterrupt();
+            auto type = [&]() -> std::optional<Type> {
+                std::filesystem::file_type nativeType;
+                try {
+                    nativeType = entry.symlink_status().type();
+                } catch (std::filesystem::filesystem_error & e) {
+                    // We cannot always stat the child. (Ideally there is no
+                    // stat because the native directory entry has the type
+                    // already, but this isn't always the case.)
+                    if (e.code() == std::errc::permission_denied || e.code() == std::errc::operation_not_permitted)
+                        return std::nullopt;
+                    else throw;
+                }
 
-            // cannot exhaustively enumerate because implementation-specific
-            // additional file types are allowed.
+                // cannot exhaustively enumerate because implementation-specific
+                // additional file types are allowed.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch-enum"
             switch (nativeType) {
             case std::filesystem::file_type::regular: return Type::tRegular; break;
             case std::filesystem::file_type::symlink: return Type::tSymlink; break;
             case std::filesystem::file_type::directory: return Type::tDirectory; break;
-            default: return tMisc;
+            case std::filesystem::file_type::character: return Type::tChar; break;
+            case std::filesystem::file_type::block: return Type::tBlock; break;
+            case std::filesystem::file_type::fifo: return Type::tFifo; break;
+            case std::filesystem::file_type::socket: return Type::tSocket; break;
+            default: return tUnknown;
             }
 #pragma GCC diagnostic pop
-        }();
-        res.emplace(entry.path().filename().string(), type);
+            }();
+            res.emplace(entry.path().filename().string(), type);
+        }
+    } catch (std::filesystem::filesystem_error & e) {
+        throw SysError("reading directory %1%", showPath(path));
     }
     return res;
 }

@@ -16,7 +16,7 @@ suites += {
     'duplicate-realisation-in-closure.sh',
     'eval-store.sh',
     'gc.sh',
-    'import-derivation.sh',
+    'import-from-derivation.sh',
     'new-build-cmd.sh',
     'nix-copy.sh',
     'nix-run.sh',
@@ -29,5 +29,5 @@ suites += {
     'substitute.sh',
     'why-depends.sh',
   ],
-  'workdir': meson.current_build_dir(),
+  'workdir': meson.current_source_dir(),
 }

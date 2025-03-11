@@ -12,7 +12,7 @@ class StorePath;
 
 namespace nix::flake {
 
-typedef std::vector<FlakeId> InputPath;
+typedef std::vector<FlakeId> InputAttrPath;
 
 struct LockedNode;
 
@@ -23,7 +23,7 @@ struct LockedNode;
  */
 struct Node : std::enable_shared_from_this<Node>
 {
-    typedef std::variant<ref<LockedNode>, InputPath> Edge;
+    typedef std::variant<ref<LockedNode>, InputAttrPath> Edge;
 
     std::map<FlakeId, Edge> inputs;
 
@@ -38,11 +38,19 @@ struct LockedNode : Node
     FlakeRef lockedRef, originalRef;
     bool isFlake = true;
 
+    /* The node relative to which relative source paths
+       (e.g. 'path:../foo') are interpreted. */
+    std::optional<InputAttrPath> parentInputAttrPath;
+
     LockedNode(
         const FlakeRef & lockedRef,
         const FlakeRef & originalRef,
-        bool isFlake = true)
-        : lockedRef(lockedRef), originalRef(originalRef), isFlake(isFlake)
+        bool isFlake = true,
+        std::optional<InputAttrPath> parentInputAttrPath = {})
+        : lockedRef(std::move(lockedRef))
+        , originalRef(std::move(originalRef))
+        , isFlake(isFlake)
+        , parentInputAttrPath(std::move(parentInputAttrPath))
     { }
 
     LockedNode(
@@ -68,16 +76,16 @@ struct LockFile
     std::pair<std::string, KeyMap> to_string() const;
 
     /**
-     * Check whether this lock file has any unlocked inputs. If so,
-     * return one.
+     * Check whether this lock file has any unlocked or non-final
+     * inputs. If so, return one.
      */
-    std::optional<FlakeRef> isUnlocked() const;
+    std::optional<FlakeRef> isUnlocked(const fetchers::Settings & fetchSettings) const;
 
     bool operator ==(const LockFile & other) const;
 
-    std::shared_ptr<Node> findInput(const InputPath & path);
+    std::shared_ptr<Node> findInput(const InputAttrPath & path);
 
-    std::map<InputPath, Node::Edge> getAllInputs() const;
+    std::map<InputAttrPath, Node::Edge> getAllInputs() const;
 
     static std::string diff(const LockFile & oldLocks, const LockFile & newLocks);
 
@@ -89,8 +97,8 @@ struct LockFile
 
 std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile);
 
-InputPath parseInputPath(std::string_view s);
+InputAttrPath parseInputAttrPath(std::string_view s);
 
-std::string printInputPath(const InputPath & path);
+std::string printInputAttrPath(const InputAttrPath & path);
 
 }

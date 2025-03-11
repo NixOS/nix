@@ -23,10 +23,10 @@ readonly RED='\033[31m'
 # installer allows overriding build user count to speed up installation
 # as creating each user takes non-trivial amount of time on macos
 readonly NIX_USER_COUNT=${NIX_USER_COUNT:-32}
-readonly NIX_BUILD_GROUP_ID="${NIX_BUILD_GROUP_ID:-30000}"
 readonly NIX_BUILD_GROUP_NAME="nixbld"
 # each system specific installer must set these:
 #   NIX_FIRST_BUILD_UID
+#   NIX_BUILD_GROUP_ID
 #   NIX_BUILD_USER_NAME_TEMPLATE
 # Please don't change this. We don't support it, because the
 # default shell profile that comes with Nix doesn't support it.
@@ -55,6 +55,9 @@ readonly NIX_INSTALLED_CACERT="@cacert@"
 #readonly NIX_INSTALLED_NIX="/nix/store/j8dbv5w6jl34caywh2ygdy88knx1mdf7-nix-2.3.6"
 #readonly NIX_INSTALLED_CACERT="/nix/store/7dxhzymvy330i28ii676fl1pqwcahv2f-nss-cacert-3.49.2"
 readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
+
+# allow to override identity change command
+readonly NIX_BECOME=${NIX_BECOME:-sudo}
 
 readonly ROOT_HOME=~root
 
@@ -123,7 +126,7 @@ uninstall_directions() {
             cat <<EOF
 $step. Restore $profile_target$PROFILE_BACKUP_SUFFIX back to $profile_target
 
-  sudo mv $profile_target$PROFILE_BACKUP_SUFFIX $profile_target
+  $NIX_BECOME mv $profile_target$PROFILE_BACKUP_SUFFIX $profile_target
 
 (after this one, you may need to re-open any terminals that were
 opened while it existed.)
@@ -136,7 +139,7 @@ EOF
     cat <<EOF
 $step. Delete the files Nix added to your system:
 
-  sudo rm -rf "/etc/nix" "$NIX_ROOT" "$ROOT_HOME/.nix-profile" "$ROOT_HOME/.nix-defexpr" "$ROOT_HOME/.nix-channels" "$ROOT_HOME/.local/state/nix" "$ROOT_HOME/.cache/nix" "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels" "$HOME/.local/state/nix" "$HOME/.cache/nix"
+  $NIX_BECOME rm -rf "/etc/nix" "$NIX_ROOT" "$ROOT_HOME/.nix-profile" "$ROOT_HOME/.nix-defexpr" "$ROOT_HOME/.nix-channels" "$ROOT_HOME/.local/state/nix" "$ROOT_HOME/.cache/nix" "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels" "$HOME/.local/state/nix" "$HOME/.cache/nix"
 
 and that is it.
 
@@ -343,7 +346,7 @@ __sudo() {
 
     echo "I am executing:"
     echo ""
-    printf "    $ sudo %s\\n" "$cmd"
+    printf "    $ $NIX_BECOME %s\\n" "$cmd"
     echo ""
     echo "$expl"
     echo ""
@@ -361,7 +364,9 @@ _sudo() {
     if is_root; then
         env "$@"
     else
-        sudo "$@"
+        # env sets environment variables for sudo alternatives
+        # that don't support "VAR=value command" syntax
+        $NIX_BECOME env "$@"
     fi
 }
 
@@ -530,9 +535,7 @@ It seems the build group $NIX_BUILD_GROUP_NAME already exists, but
 with the UID $primary_group_id. This script can't really handle
 that right now, so I'm going to give up.
 
-You can fix this by editing this script and changing the
-NIX_BUILD_GROUP_ID variable near the top to from $NIX_BUILD_GROUP_ID
-to $primary_group_id and re-run.
+You can export NIX_BUILD_GROUP_ID=$primary_group_id and re-run.
 EOF
         else
             row "            Exists" "Yes"
@@ -559,7 +562,7 @@ create_build_user_for_core() {
         if [ "$actual_uid" != "$uid" ]; then
             failure <<EOF
 It seems the build user $username already exists, but with the UID
-with the UID '$actual_uid'. This script can't really handle that right
+'$actual_uid'. This script can't really handle that right
 now, so I'm going to give up.
 
 If you already created the users and you know they start from
@@ -692,7 +695,7 @@ place_channel_configuration() {
     if [ -z "${NIX_INSTALLER_NO_CHANNEL_ADD:-}" ]; then
         echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$SCRATCH/.nix-channels"
         _sudo "to set up the default system channel (part 1)" \
-            install -m 0664 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
+            install -m 0644 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
     fi
 }
 
@@ -966,7 +969,7 @@ $NIX_EXTRA_CONF
 build-users-group = $NIX_BUILD_GROUP_NAME
 EOF
     _sudo "to place the default nix daemon configuration (part 2)" \
-          install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
+          install -m 0644 "$SCRATCH/nix.conf" /etc/nix/nix.conf
 }
 
 

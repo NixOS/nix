@@ -1,11 +1,9 @@
-project('nix-functional-tests', 'cpp',
+project('nix-functional-tests',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
-    'debug=true',
-    'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
   ],
   meson_version : '>= 1.3',
@@ -14,31 +12,13 @@ project('nix-functional-tests', 'cpp',
 
 fs = import('fs')
 
-# Need to combine source and build trees
-run_command(
-  'rsync',
-  '-a',
-  '--copy-unsafe-links',
-  meson.current_source_dir() / '',
-  meson.current_build_dir() / '',
-)
-# This current-source-escaping relative is no good because we don't know
-# where the build directory will be, therefore we fix it up. Once the
-# Make build system is gone, we should think about doing this better.
-scripts_dir = fs.relative_to(
-  meson.current_source_dir() / '..' / '..' / 'scripts',
-  meson.current_build_dir(),
-)
-run_command(
-  'sed',
-  '-i', meson.current_build_dir() / 'bash-profile.sh',
-  '-e', 's^../../scripts^@0@^'.format(scripts_dir),
-)
-
 nix = find_program('nix')
 bash = find_program('bash', native : true)
 busybox = find_program('busybox', native : true, required : false)
-coreutils = find_program('coreutils', native : true)
+# Look up `coreutils` package by searching for `ls` binary.
+# Previously we looked up `coreutils` on `linux`, but that is not
+# guaranteed to exist either.
+coreutils = find_program('ls', native : true)
 dot = find_program('dot', native : true, required : false)
 
 nix_bin_dir = fs.parent(nix.full_path())
@@ -57,7 +37,7 @@ test_confdata = {
 # Done as a subdir() so Meson places it under `common` in the build directory as well.
 subdir('common')
 
-config_nix_in = configure_file(
+configure_file(
   input : 'config.nix.in',
   output : 'config.nix',
   configuration : test_confdata,
@@ -157,9 +137,9 @@ suites = [
       'why-depends.sh',
       'derivation-json.sh',
       'derivation-advanced-attributes.sh',
-      'import-derivation.sh',
+      'import-from-derivation.sh',
       'nix_path.sh',
-      'case-hack.sh',
+      'nars.sh',
       'placeholders.sh',
       'ssh-relay.sh',
       'build.sh',
@@ -184,13 +164,15 @@ suites = [
       'debugger.sh',
       'extra-sandbox-profile.sh',
       'help.sh',
+      'symlinks.sh',
     ],
-    'workdir': meson.current_build_dir(),
+    'workdir': meson.current_source_dir(),
   },
 ]
 
 nix_store = dependency('nix-store', required : false)
 if nix_store.found()
+  add_languages('cpp')
   subdir('test-libstoreconsumer')
   suites += {
     'name': 'libstoreconsumer',
@@ -200,7 +182,7 @@ if nix_store.found()
     'tests': [
       'test-libstoreconsumer.sh',
     ],
-    'workdir': meson.current_build_dir(),
+    'workdir': meson.current_source_dir(),
   }
 
 endif
@@ -208,6 +190,7 @@ endif
 # Plugin tests require shared libraries support.
 nix_expr = dependency('nix-expr', required : false)
 if nix_expr.found() and get_option('default_library') != 'static'
+  add_languages('cpp')
   subdir('plugins')
   suites += {
     'name': 'plugins',
@@ -217,7 +200,7 @@ if nix_expr.found() and get_option('default_library') != 'static'
     'tests': [
       'plugins.sh',
     ],
-    'workdir': meson.current_build_dir(),
+    'workdir': meson.current_source_dir(),
   }
 endif
 
@@ -228,14 +211,12 @@ subdir('git-hashing')
 subdir('local-overlay-store')
 
 foreach suite : suites
+  workdir = suite['workdir']
+  suite_name = suite['name']
   foreach script : suite['tests']
-    workdir = suite['workdir']
-    prefix = fs.relative_to(workdir, meson.project_build_root())
-
-    script = script
     # Turns, e.g., `tests/functional/flakes/show.sh` into a Meson test target called
     # `functional-flakes-show`.
-    name = fs.replace_suffix(prefix / script, '')
+    name = fs.replace_suffix(script, '')
 
     test(
       name,
@@ -247,20 +228,21 @@ foreach suite : suites
         '-o', 'pipefail',
         script,
       ],
-      suite : suite['name'],
+      suite : suite_name,
       env : {
-        'TEST_NAME': name,
+        '_NIX_TEST_SOURCE_DIR': meson.current_source_dir(),
+        '_NIX_TEST_BUILD_DIR': meson.current_build_dir(),
+        'TEST_NAME': suite_name / name,
         'NIX_REMOTE': '',
         'PS4': '+(${BASH_SOURCE[0]-$0}:$LINENO) ',
       },
-      # some tests take 15+ seconds even on an otherwise idle machine, on a loaded machine
-      # this can easily drive them to failure. give them more time than default of 30sec
+      # Some tests take 15+ seconds even on an otherwise idle machine;
+      # on a loaded machine this can easily drive them to failure. Give
+      # them more time than the default of 30 seconds.
       timeout : 300,
       # Used for target dependency/ordering tracking, not adding compiler flags or anything.
       depends : suite['deps'],
       workdir : workdir,
-      # Won't pass until man pages are generated
-      should_fail : suite['name'] == 'main' and script == 'help.sh'
     )
   endforeach
 endforeach

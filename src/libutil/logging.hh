@@ -3,6 +3,8 @@
 
 #include "error.hh"
 #include "config.hh"
+#include "file-descriptor.hh"
+#include "finally.hh"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -73,6 +75,17 @@ public:
     virtual ~Logger() { }
 
     virtual void stop() { };
+
+    /**
+     * Guard object to resume the logger when done.
+     */
+    struct Suspension {
+        Finally<std::function<void()>> _finalize;
+    };
+
+    Suspension suspend();
+
+    std::optional<Suspension> suspendIf(bool cond);
 
     virtual void pause() { };
     virtual void resume() { };
@@ -179,20 +192,31 @@ struct PushActivity
     ~PushActivity() { setCurActivity(prevAct); }
 };
 
-extern Logger * logger;
+extern std::unique_ptr<Logger> logger;
 
-Logger * makeSimpleLogger(bool printBuildLogs = true);
+std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
 
-Logger * makeJSONLogger(Logger & prevLogger);
+std::unique_ptr<Logger> makeJSONLogger(Descriptor fd);
 
-std::optional<nlohmann::json> parseJSONMessage(const std::string & msg);
+/**
+ * @param source A noun phrase describing the source of the message, e.g. "the builder".
+ */
+std::optional<nlohmann::json> parseJSONMessage(const std::string & msg, std::string_view source);
 
+/**
+ * @param source A noun phrase describing the source of the message, e.g. "the builder".
+ */
 bool handleJSONLogMessage(nlohmann::json & json,
     const Activity & act, std::map<ActivityId, Activity> & activities,
+    std::string_view source,
     bool trusted);
 
+/**
+ * @param source A noun phrase describing the source of the message, e.g. "the builder".
+ */
 bool handleJSONLogMessage(const std::string & msg,
     const Activity & act, std::map<ActivityId, Activity> & activities,
+    std::string_view source,
     bool trusted);
 
 /**

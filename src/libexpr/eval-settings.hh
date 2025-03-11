@@ -2,11 +2,11 @@
 ///@file
 
 #include "config.hh"
-#include "ref.hh"
+#include "source-path.hh"
 
 namespace nix {
 
-class Store;
+class EvalState;
 
 struct EvalSettings : Config
 {
@@ -18,11 +18,8 @@ struct EvalSettings : Config
      *
      * The return value is (a) whether the entry was valid, and, if so,
      * what does it map to.
-     *
-     * @todo Return (`std::optional` of) `SourceAccssor` or something
-     * more structured instead of mere `std::string`?
      */
-    using LookupPathHook = std::optional<std::string>(ref<Store> store, std::string_view);
+    using LookupPathHook = std::optional<SourcePath>(EvalState & state, std::string_view);
 
     /**
      * Map from "scheme" to a `LookupPathHook`.
@@ -87,10 +84,19 @@ struct EvalSettings : Config
           If the respective paths are accessible, the default values are:
 
           - `$HOME/.nix-defexpr/channels`
+
+            The [user channel link](@docroot@/command-ref/files/default-nix-expression.md#user-channel-link), pointing to the current state of [channels](@docroot@/command-ref/files/channels.md) for the current user.
+
           - `nixpkgs=$NIX_STATE_DIR/profiles/per-user/root/channels/nixpkgs`
+
+            The current state of the `nixpkgs` channel for the `root` user.
+
           - `$NIX_STATE_DIR/profiles/per-user/root/channels`
 
-          See [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR) for details.
+            The current state of all channels for the `root` user.
+
+          These files are set up by the [Nix installer](@docroot@/installation/installing-binary.md).
+          See [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR) for details on the environment variable.
 
           > **Note**
           >

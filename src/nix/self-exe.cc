@@ -5,17 +5,20 @@
 
 namespace nix {
 
-namespace fs = std::filesystem;
+namespace fs {
+using namespace std::filesystem;
+}
 
 fs::path getNixBin(std::optional<std::string_view> binaryNameOpt)
 {
     auto getBinaryName = [&] { return binaryNameOpt ? *binaryNameOpt : "nix"; };
 
-    // If the environment variable is set, use it unconditionally
+    // If the environment variable is set, use it unconditionally.
     if (auto envOpt = getEnvNonEmpty("NIX_BIN_DIR"))
         return fs::path{*envOpt} / std::string{getBinaryName()};
 
-    // Use some-times avaiable OS tricks to get to the path of this Nix, and try that
+    // Try OS tricks, if available, to get to the path of this Nix, and
+    // see if we can find the right executable next to that.
     if (auto selfOpt = getSelfExe()) {
         fs::path path{*selfOpt};
         if (binaryNameOpt)

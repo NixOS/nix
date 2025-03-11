@@ -7,119 +7,84 @@ on:
 permissions: read-all
 
 jobs:
+  eval:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: cachix/install-nix-action@v31
+    - run: nix --experimental-features 'nix-command flakes' flake show --all-systems --json
 
   tests:
-    needs: [check_secrets]
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - scenario: on ubuntu
+            runs-on: ubuntu-24.04
+            os: linux
+          - scenario: on macos
+            runs-on: macos-14
+            os: darwin
+    name: tests ${{ matrix.scenario }}
+    runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 60
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@V27
+    - uses: cachix/install-nix-action@v31
       with:
         # The sandbox would otherwise be disabled by default on Darwin
-        extra_nix_config: "sandbox = true"
-    - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/cachix-action@v15
-      if: needs.check_secrets.outputs.cachix == 'true'
+        extra_nix_config: |
+          sandbox = true
+          max-jobs = 1
+    - uses: DeterminateSystems/magic-nix-cache-action@main
+    # Since ubuntu 22.30, unprivileged usernamespaces are no longer allowed to map to the root user:
+    # https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
+    - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      if: matrix.os == 'linux'
+    - run: scripts/build-checks
+    - run: scripts/prepare-installer-for-github-actions
+    - name: Upload installer tarball
+      uses: actions/upload-artifact@v4
       with:
-        name: '${{ env.CACHIX_NAME }}'
-        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
-        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    - if: matrix.os == 'ubuntu-latest'
-      run: |
-        free -h
-        swapon --show
-        swap=$(swapon --show --noheadings | head -n 1 | awk '{print $1}')
-        echo "Found swap: $swap"
-        sudo swapoff $swap
-        # resize it (fallocate)
-        sudo fallocate -l 10G $swap
-        sudo mkswap $swap
-        sudo swapon $swap
-        free -h
-        (
-          while sleep 60; do
-            free -h
-          done
-        ) &
-    - run: nix --experimental-features 'nix-command flakes' flake check -L
-    - run: nix --experimental-features 'nix-command flakes' flake show --all-systems --json
-
-  # Steps to test CI automation in your own fork.
-  # Cachix:
-  # 1. Sign-up for https://www.cachix.org/
-  # 2. Create a cache for $githubuser-nix-install-tests
-  # 3. Create a cachix auth token and save it in https://github.com/$githubuser/nix/settings/secrets/actions in "Repository secrets" as CACHIX_AUTH_TOKEN
-  # Dockerhub:
-  # 1. Sign-up for https://hub.docker.com/
-  # 2. Store your dockerhub username as DOCKERHUB_USERNAME in "Repository secrets" of your fork repository settings (https://github.com/$githubuser/nix/settings/secrets/actions)
-  # 3. Create an access token in https://hub.docker.com/settings/security and store it as DOCKERHUB_TOKEN in "Repository secrets" of your fork
-  check_secrets:
-    permissions:
-      contents: none
-    name: Check Cachix and Docker secrets present for installer tests
-    runs-on: ubuntu-latest
-    outputs:
-      cachix: ${{ steps.secret.outputs.cachix }}
-      docker: ${{ steps.secret.outputs.docker }}
-    steps:
-      - name: Check for secrets
-        id: secret
-        env:
-          _CACHIX_SECRETS: ${{ secrets.CACHIX_SIGNING_KEY }}${{ secrets.CACHIX_AUTH_TOKEN }}
-          _DOCKER_SECRETS: ${{ secrets.DOCKERHUB_USERNAME }}${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          echo "::set-output name=cachix::${{ env._CACHIX_SECRETS != '' }}"
-          echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
-
-  installer:
-    needs: [tests, check_secrets]
-    if: github.event_name == 'push' && needs.check_secrets.outputs.cachix == 'true'
-    runs-on: ubuntu-latest
-    outputs:
-      installerURL: ${{ steps.prepare-installer.outputs.installerURL }}
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/install-nix-action@V27
-      with:
-        install_url: https://releases.nixos.org/nix/nix-2.20.3/install
-    - uses: cachix/cachix-action@v15
-      with:
-        name: '${{ env.CACHIX_NAME }}'
-        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
-        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-        cachixArgs: '-v'
-    - id: prepare-installer
-      run: scripts/prepare-installer-for-github-actions
+        name: installer-${{matrix.os}}
+        path: out/*
 
   installer_test:
-    needs: [installer, check_secrets]
-    if: github.event_name == 'push' && needs.check_secrets.outputs.cachix == 'true'
+    needs: [tests]
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - scenario: on ubuntu
+            runs-on: ubuntu-24.04
+            os: linux
+          - scenario: on macos
+            runs-on: macos-14
+            os: darwin
+    name: installer test ${{ matrix.scenario }}
+    runs-on: ${{ matrix.runs-on }}
     steps:
     - uses: actions/checkout@v4
-    - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/install-nix-action@V27
+    - name: Download installer tarball
+      uses: actions/download-artifact@v4
       with:
-        install_url: '${{needs.installer.outputs.installerURL}}'
-        install_options: "--tarball-url-prefix https://${{ env.CACHIX_NAME }}.cachix.org/serve"
+        name: installer-${{matrix.os}}
+        path: out
+    - name: Serving installer
+      id: serving_installer
+      run: ./scripts/serve-installer-for-github-actions
+    - uses: cachix/install-nix-action@v31
+      with:
+        install_url: 'http://localhost:8126/install'
+        install_options: "--tarball-url-prefix http://localhost:8126/"
     - run: sudo apt install fish zsh
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.os == 'linux'
     - run: brew install fish
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'darwin'
     - run: exec bash -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec sh -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec zsh -c "nix-instantiate -E 'builtins.currentTime' --eval"
@@ -127,32 +92,50 @@ jobs:
     - run: exec bash -c "nix-channel --add https://releases.nixos.org/nixos/unstable/nixos-23.05pre466020.60c1d71f2ba nixpkgs"
     - run: exec bash -c "nix-channel --update && nix-env -iA nixpkgs.hello && hello"
 
+  # Steps to test CI automation in your own fork.
+  # 1. Sign-up for https://hub.docker.com/
+  # 2. Store your dockerhub username as DOCKERHUB_USERNAME in "Repository secrets" of your fork repository settings (https://github.com/$githubuser/nix/settings/secrets/actions)
+  # 3. Create an access token in https://hub.docker.com/settings/security and store it as DOCKERHUB_TOKEN in "Repository secrets" of your fork
+  check_secrets:
+    permissions:
+      contents: none
+    name: Check Docker secrets present for installer tests
+    runs-on: ubuntu-24.04
+    outputs:
+      docker: ${{ steps.secret.outputs.docker }}
+    steps:
+      - name: Check for secrets
+        id: secret
+        env:
+          _DOCKER_SECRETS: ${{ secrets.DOCKERHUB_USERNAME }}${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
+
   docker_push_image:
-    needs: [check_secrets, tests]
+    needs: [tests, vm_tests, check_secrets]
     permissions:
       contents: read
       packages: write
     if: >-
+      needs.check_secrets.outputs.docker == 'true' &&
       github.event_name == 'push' &&
-      github.ref_name == 'master' &&
-      needs.check_secrets.outputs.cachix == 'true' &&
-      needs.check_secrets.outputs.docker == 'true'
-    runs-on: ubuntu-latest
+      github.ref_name == 'master'
+    runs-on: ubuntu-24.04
     steps:
+    - name: Check for secrets
+      id: secret
+      env:
+        _DOCKER_SECRETS: ${{ secrets.DOCKERHUB_USERNAME }}${{ secrets.DOCKERHUB_TOKEN }}
+      run: |
+        echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@V27
+    - uses: cachix/install-nix-action@v31
       with:
         install_url: https://releases.nixos.org/nix/nix-2.20.3/install
-    - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
+    - uses: DeterminateSystems/magic-nix-cache-action@main
     - run: echo NIX_VERSION="$(nix --experimental-features 'nix-command flakes' eval .\#nix.version | tr -d \")" >> $GITHUB_ENV
-    - uses: cachix/cachix-action@v15
-      if: needs.check_secrets.outputs.cachix == 'true'
-      with:
-        name: '${{ env.CACHIX_NAME }}'
-        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
-        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: nix --experimental-features 'nix-command flakes' build .#dockerImage -L
     - run: docker load -i ./result/image.tar.gz
     - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:$NIX_VERSION
@@ -189,16 +172,22 @@ jobs:
         docker push $IMAGE_ID:master
 
   vm_tests:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix build -L .#hydraJobs.tests.githubFlakes .#hydraJobs.tests.tarballFlakes .#hydraJobs.tests.functional_user
+      - run: |
+          nix build -L \
+            .#hydraJobs.tests.functional_user \
+            .#hydraJobs.tests.githubFlakes \
+            .#hydraJobs.tests.nix-docker \
+            .#hydraJobs.tests.tarballFlakes \
+            ;
 
   flake_regressions:
     needs: vm_tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout nix
         uses: actions/checkout@v4
@@ -214,4 +203,4 @@ jobs:
           path: flake-regressions/tests
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix build --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH scripts/flake-regressions.sh
+      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=25 flake-regressions/eval-all.sh

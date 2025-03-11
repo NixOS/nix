@@ -10,6 +10,8 @@
 #include "worker-protocol.hh"
 #include "executable-path.hh"
 
+namespace nix::fs { using namespace std::filesystem; }
+
 using namespace nix;
 
 namespace {
@@ -24,23 +26,21 @@ std::string formatProtocol(unsigned int proto)
     return "unknown";
 }
 
-bool checkPass(const std::string & msg) {
+bool checkPass(std::string_view msg) {
     notice(ANSI_GREEN "[PASS] " ANSI_NORMAL + msg);
     return true;
 }
 
-bool checkFail(const std::string & msg) {
+bool checkFail(std::string_view msg) {
     notice(ANSI_RED "[FAIL] " ANSI_NORMAL + msg);
     return false;
 }
 
-void checkInfo(const std::string & msg) {
+void checkInfo(std::string_view msg) {
     notice(ANSI_BLUE "[INFO] " ANSI_NORMAL + msg);
 }
 
 }
-
-namespace fs = std::filesystem;
 
 struct CmdConfigCheck : StoreCommand
 {
@@ -87,11 +87,11 @@ struct CmdConfigCheck : StoreCommand
         }
 
         if (dirs.size() != 1) {
-            std::stringstream ss;
+            std::ostringstream ss;
             ss << "Multiple versions of nix found in PATH:\n";
             for (auto & dir : dirs)
                 ss << "  " << dir << "\n";
-            return checkFail(ss.str());
+            return checkFail(toView(ss));
         }
 
         return checkPass("PATH contains only one nix version.");
@@ -125,14 +125,14 @@ struct CmdConfigCheck : StoreCommand
         }
 
         if (!dirs.empty()) {
-            std::stringstream ss;
+            std::ostringstream ss;
             ss << "Found profiles outside of " << settings.nixStateDir << "/profiles.\n"
                << "The generation this profile points to might not have a gcroot and could be\n"
                << "garbage collected, resulting in broken symlinks.\n\n";
             for (auto & dir : dirs)
                 ss << "  " << dir << "\n";
             ss << "\n";
-            return checkFail(ss.str());
+            return checkFail(toView(ss));
         }
 
         return checkPass("All profiles are gcroots.");
@@ -145,13 +145,13 @@ struct CmdConfigCheck : StoreCommand
             : PROTOCOL_VERSION;
 
         if (clientProto != storeProto) {
-            std::stringstream ss;
+            std::ostringstream ss;
             ss << "Warning: protocol version of this client does not match the store.\n"
                << "While this is not necessarily a problem it's recommended to keep the client in\n"
                << "sync with the daemon.\n\n"
                << "Client protocol: " << formatProtocol(clientProto) << "\n"
                << "Store protocol: " << formatProtocol(storeProto) << "\n\n";
-            return checkFail(ss.str());
+            return checkFail(toView(ss));
         }
 
         return checkPass("Client protocol matches store protocol.");

@@ -96,6 +96,10 @@ struct Expr
     virtual void setName(Symbol name);
     virtual void setDocComment(DocComment docComment) { };
     virtual PosIdx getPos() const { return noPos; }
+
+    // These are temporary methods to be used only in parser.y
+    virtual void resetCursedOr() { };
+    virtual void warnIfCursedOr(const SymbolTable & symbols, const PosTable & positions) { };
 };
 
 #define COMMON_METHODS \
@@ -164,7 +168,7 @@ struct ExprVar : Expr
        the set stored in the environment that is `level` levels up
        from the current one.*/
     Level level;
-    Displacement displ;
+    Displacement displ = 0;
 
     ExprVar(Symbol name) : name(name) { };
     ExprVar(const PosIdx & pos, Symbol name) : pos(pos), name(name) { };
@@ -202,7 +206,7 @@ struct ExprSelect : Expr
     /**
      * Evaluate the `a.b.c` part of `a.b.c.d`. This exists mostly for the purpose of :doc in the repl.
      *
-     * @param[out] v The attribute set that should contain the last attribute name (if it exists).
+     * @param[out] attrs The attribute set that should contain the last attribute name (if it exists).
      * @return The last attribute name in `attrPath`
      *
      * @note This does *not* evaluate the final attribute, and does not fail if that's the only attribute that does not exist.
@@ -238,7 +242,7 @@ struct ExprAttrs : Expr
         Kind kind;
         Expr * e;
         PosIdx pos;
-        Displacement displ; // displacement
+        Displacement displ = 0; // displacement
         AttrDef(Expr * e, const PosIdx & pos, Kind kind = Kind::Plain)
             : kind(kind), e(e), pos(pos) { };
         AttrDef() { };
@@ -354,10 +358,16 @@ struct ExprCall : Expr
     Expr * fun;
     std::vector<Expr *> args;
     PosIdx pos;
+    std::optional<PosIdx> cursedOrEndPos; // used during parsing to warn about https://github.com/NixOS/nix/issues/11118
     ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args)
-        : fun(fun), args(args), pos(pos)
+        : fun(fun), args(args), pos(pos), cursedOrEndPos({})
+    { }
+    ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args, PosIdx && cursedOrEndPos)
+        : fun(fun), args(args), pos(pos), cursedOrEndPos(cursedOrEndPos)
     { }
     PosIdx getPos() const override { return pos; }
+    virtual void resetCursedOr() override;
+    virtual void warnIfCursedOr(const SymbolTable & symbols, const PosTable & positions) override;
     COMMON_METHODS
 };
 
@@ -458,6 +468,7 @@ struct ExprBlackHole : Expr
     void show(const SymbolTable & symbols, std::ostream & str) const override {}
     void eval(EvalState & state, Env & env, Value & v) override;
     void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override {}
+    [[noreturn]] static void throwInfiniteRecursionError(EvalState & state, Value & v);
 };
 
 extern ExprBlackHole eBlackHole;
@@ -469,13 +480,16 @@ extern ExprBlackHole eBlackHole;
 struct StaticEnv
 {
     ExprWith * isWith;
-    const StaticEnv * up;
+    std::shared_ptr<const StaticEnv> up;
 
     // Note: these must be in sorted order.
     typedef std::vector<std::pair<Symbol, Displacement>> Vars;
     Vars vars;
 
-    StaticEnv(ExprWith * isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
+    StaticEnv(ExprWith * isWith, std::shared_ptr<const StaticEnv> up, size_t expectedSize = 0)
+        : isWith(isWith)
+        , up(std::move(up))
+    {
         vars.reserve(expectedSize);
     };
 

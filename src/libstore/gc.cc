@@ -4,6 +4,7 @@
 #include "finally.hh"
 #include "unix-domain-socket.hh"
 #include "signals.hh"
+#include "posix-fs-canonicalise.hh"
 
 #if !defined(__linux__)
 // For shelling out to lsof
@@ -333,7 +334,7 @@ static std::string quoteRegexChars(const std::string & raw)
 }
 
 #if __linux__
-static void readFileRoots(const char * path, UncheckedRoots & roots)
+static void readFileRoots(const std::filesystem::path & path, UncheckedRoots & roots)
 {
     try {
         roots[readFile(path)].emplace(path);
@@ -454,7 +455,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     bool gcKeepOutputs = settings.gcKeepOutputs;
     bool gcKeepDerivations = settings.gcKeepDerivations;
 
-    StorePathSet roots, dead, alive;
+    std::unordered_set<StorePath> roots, dead, alive;
 
     struct Shared
     {
@@ -660,7 +661,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     };
 
-    std::map<StorePath, StorePathSet> referrersCache;
+    std::unordered_map<StorePath, StorePathSet> referrersCache;
 
     /* Helper function that visits all paths reachable from `start`
        via the referrers edges and optionally derivers and derivation
@@ -763,13 +764,18 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 }
             }
         }
-
         for (auto & path : topoSortPaths(visited)) {
             if (!dead.insert(path).second) continue;
             if (shouldDelete) {
-                invalidatePathChecked(path);
-                deleteFromStore(path.to_string());
-                referrersCache.erase(path);
+                try {
+                    invalidatePathChecked(path);
+                    deleteFromStore(path.to_string());
+                    referrersCache.erase(path);
+                } catch (PathInUse &e) {
+                    // If we end up here, it's likely a new occurence
+                    // of https://github.com/NixOS/nix/issues/11923
+                    printError("BUG: %s", e.what());
+                }
             }
         }
     };
@@ -958,8 +964,8 @@ void LocalStore::autoGC(bool sync)
 
             } catch (...) {
                 // FIXME: we could propagate the exception to the
-                // future, but we don't really care.
-                ignoreException();
+                // future, but we don't really care. (what??)
+                ignoreExceptionInDestructor();
             }
 
         }).detach();

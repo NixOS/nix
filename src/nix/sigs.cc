@@ -3,7 +3,6 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "thread-pool.hh"
-#include "progress-bar.hh"
 
 #include <atomic>
 
@@ -41,7 +40,6 @@ struct CmdCopySigs : StorePathsCommand
 
         ThreadPool pool;
 
-        std::string doneLabel = "done";
         std::atomic<size_t> added{0};
 
         //logger->setExpected(doneLabel, storePaths.size());
@@ -176,8 +174,8 @@ struct CmdKeyGenerateSecret : Command
         if (!keyName)
             throw UsageError("required argument '--key-name' is missing");
 
-        stopProgressBar();
-        writeFull(getStandardOut(), SecretKey::generate(*keyName).to_string());
+        logger->stop();
+        writeFull(getStandardOutput(), SecretKey::generate(*keyName).to_string());
     }
 };
 
@@ -198,8 +196,8 @@ struct CmdKeyConvertSecretToPublic : Command
     void run() override
     {
         SecretKey secretKey(drainFD(STDIN_FILENO));
-        stopProgressBar();
-        writeFull(getStandardOut(), secretKey.toPublicKey().to_string());
+        logger->stop();
+        writeFull(getStandardOutput(), secretKey.toPublicKey().to_string());
     }
 };
 

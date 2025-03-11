@@ -50,7 +50,7 @@ struct GitArchiveInputScheme : InputScheme
             else if (std::regex_match(path[2], refRegex))
                 ref = path[2];
             else
-                throw BadURL("in URL '%s', '%s' is not a commit hash or branch/tag name", url.url, path[2]);
+                throw BadURL("in URL '%s', '%s' is not a commit hash or branch/tag name", url, path[2]);
         } else if (size > 3) {
             std::string rs;
             for (auto i = std::next(path.begin(), 2); i != path.end(); i++) {
@@ -63,34 +63,34 @@ struct GitArchiveInputScheme : InputScheme
             if (std::regex_match(rs, refRegex)) {
                 ref = rs;
             } else {
-                throw BadURL("in URL '%s', '%s' is not a branch/tag name", url.url, rs);
+                throw BadURL("in URL '%s', '%s' is not a branch/tag name", url, rs);
             }
         } else if (size < 2)
-            throw BadURL("URL '%s' is invalid", url.url);
+            throw BadURL("URL '%s' is invalid", url);
 
         for (auto &[name, value] : url.query) {
             if (name == "rev") {
                 if (rev)
-                    throw BadURL("URL '%s' contains multiple commit hashes", url.url);
+                    throw BadURL("URL '%s' contains multiple commit hashes", url);
                 rev = Hash::parseAny(value, HashAlgorithm::SHA1);
             }
             else if (name == "ref") {
                 if (!std::regex_match(value, refRegex))
-                    throw BadURL("URL '%s' contains an invalid branch/tag name", url.url);
+                    throw BadURL("URL '%s' contains an invalid branch/tag name", url);
                 if (ref)
-                    throw BadURL("URL '%s' contains multiple branch/tag names", url.url);
+                    throw BadURL("URL '%s' contains multiple branch/tag names", url);
                 ref = value;
             }
             else if (name == "host") {
                 if (!std::regex_match(value, hostRegex))
-                    throw BadURL("URL '%s' contains an invalid instance host", url.url);
+                    throw BadURL("URL '%s' contains an invalid instance host", url);
                 host_url = value;
             }
             // FIXME: barf on unsupported attributes
         }
 
         if (ref && rev)
-            throw BadURL("URL '%s' contains both a commit hash and a branch/tag name %s %s", url.url, *ref, rev->gitRev());
+            throw BadURL("URL '%s' contains both a commit hash and a branch/tag name %s %s", url, *ref, rev->gitRev());
 
         Input input{settings};
         input.attrs.insert_or_assign("type", std::string { schemeName() });
@@ -149,6 +149,9 @@ struct GitArchiveInputScheme : InputScheme
         };
         if (auto narHash = input.getNarHash())
             url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
+        auto host = maybeGetStrAttr(input.attrs, "host");
+        if (host)
+            url.query.insert_or_assign("host", *host);
         return url;
     }
 
@@ -172,9 +175,30 @@ struct GitArchiveInputScheme : InputScheme
         return input;
     }
 
-    std::optional<std::string> getAccessToken(const fetchers::Settings & settings, const std::string & host) const
+    // Search for the longest possible match starting from the begining and ending at either the end or a path segment.
+    std::optional<std::string> getAccessToken(const fetchers::Settings & settings, const std::string & host, const std::string & url) const override
     {
         auto tokens = settings.accessTokens.get();
+        std::string answer;
+        size_t answer_match_len = 0;
+        if(! url.empty()) {
+            for (auto & token : tokens) {
+                auto first = url.find(token.first);
+                if (
+                    first != std::string::npos
+                    && token.first.length() > answer_match_len
+                    && first == 0
+                    && url.substr(0,token.first.length()) == token.first
+                    && (url.length() == token.first.length() || url[token.first.length()] == '/')
+                    )
+                {
+                    answer = token.second;
+                    answer_match_len = token.first.length();
+                }
+            }
+            if (!answer.empty())
+                return answer;
+        }
         if (auto token = get(tokens, host))
             return *token;
         return {};
@@ -182,10 +206,22 @@ struct GitArchiveInputScheme : InputScheme
 
     Headers makeHeadersWithAuthTokens(
         const fetchers::Settings & settings,
-        const std::string & host) const
+        const std::string & host,
+        const Input & input) const
+    {
+        auto owner = getStrAttr(input.attrs, "owner");
+        auto repo = getStrAttr(input.attrs, "repo");
+        auto hostAndPath = fmt( "%s/%s/%s", host, owner, repo);
+        return makeHeadersWithAuthTokens(settings, host, hostAndPath);
+    }
+
+    Headers makeHeadersWithAuthTokens(
+        const fetchers::Settings & settings,
+        const std::string & host,
+        const std::string & hostAndPath) const
     {
         Headers headers;
-        auto accessToken = getAccessToken(settings, host);
+        auto accessToken = getAccessToken(settings, host, hostAndPath);
         if (accessToken) {
             auto hdr = accessHeaderFromToken(*accessToken);
             if (hdr)
@@ -261,11 +297,12 @@ struct GitArchiveInputScheme : InputScheme
         auto tarballCache = getTarballCache();
         auto parseSink = tarballCache->getFileSystemObjectSink();
         auto lastModified = unpackTarfileToSink(archive, *parseSink);
+        auto tree = parseSink->flush();
 
         act.reset();
 
         TarballInfo tarballInfo {
-            .treeHash = tarballCache->dereferenceSingletonDirectory(parseSink->sync()),
+            .treeHash = tarballCache->dereferenceSingletonDirectory(tree),
             .lastModified = lastModified
         };
 
@@ -293,9 +330,10 @@ struct GitArchiveInputScheme : InputScheme
         #endif
         input.attrs.insert_or_assign("lastModified", uint64_t(tarballInfo.lastModified));
 
-        auto accessor = getTarballCache()->getAccessor(tarballInfo.treeHash, false);
-
-        accessor->setPathDisplay("«" + input.to_string() + "»");
+        auto accessor = getTarballCache()->getAccessor(
+            tarballInfo.treeHash,
+            false,
+            "«" + input.to_string() + "»");
 
         return {accessor, input};
     }
@@ -364,7 +402,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
             : "https://%s/api/v3/repos/%s/%s/commits/%s",
             host, getOwner(input), getRepo(input), *input.getRef());
 
-        Headers headers = makeHeadersWithAuthTokens(*input.settings, host);
+        Headers headers = makeHeadersWithAuthTokens(*input.settings, host, input);
 
         auto json = nlohmann::json::parse(
             readFile(
@@ -381,7 +419,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
     {
         auto host = getHost(input);
 
-        Headers headers = makeHeadersWithAuthTokens(*input.settings, host);
+        Headers headers = makeHeadersWithAuthTokens(*input.settings, host, input);
 
         // If we have no auth headers then we default to the public archive
         // urls so we do not run into rate limits.
@@ -438,7 +476,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/commits?ref_name=%s",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
 
-        Headers headers = makeHeadersWithAuthTokens(*input.settings, host);
+        Headers headers = makeHeadersWithAuthTokens(*input.settings, host, input);
 
         auto json = nlohmann::json::parse(
             readFile(
@@ -468,7 +506,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(HashFormat::Base16, false));
 
-        Headers headers = makeHeadersWithAuthTokens(*input.settings, host);
+        Headers headers = makeHeadersWithAuthTokens(*input.settings, host, input);
         return DownloadUrl { url, headers };
     }
 
@@ -508,7 +546,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         auto base_url = fmt("https://%s/%s/%s",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"));
 
-        Headers headers = makeHeadersWithAuthTokens(*input.settings, host);
+        Headers headers = makeHeadersWithAuthTokens(*input.settings, host, input);
 
         std::string refUri;
         if (ref == "HEAD") {
@@ -555,7 +593,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(HashFormat::Base16, false));
 
-        Headers headers = makeHeadersWithAuthTokens(*input.settings, host);
+        Headers headers = makeHeadersWithAuthTokens(*input.settings, host, input);
         return DownloadUrl { url, headers };
     }
 

@@ -1,7 +1,5 @@
-#include "file-system.hh"
-#include "signals.hh"
-#include "finally.hh"
 #include "serialise.hh"
+#include "util.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -44,8 +42,9 @@ AutoCloseFD::AutoCloseFD() : fd{INVALID_DESCRIPTOR} {}
 
 AutoCloseFD::AutoCloseFD(Descriptor fd) : fd{fd} {}
 
-
-AutoCloseFD::AutoCloseFD(AutoCloseFD && that) : fd{that.fd}
+// NOTE: This can be noexcept since we are just copying a value and resetting
+// the file descriptor in the rhs.
+AutoCloseFD::AutoCloseFD(AutoCloseFD && that) noexcept : fd{that.fd}
 {
     that.fd = INVALID_DESCRIPTOR;
 }
@@ -65,7 +64,7 @@ AutoCloseFD::~AutoCloseFD()
     try {
         close();
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 
@@ -92,7 +91,7 @@ void AutoCloseFD::close()
     }
 }
 
-void AutoCloseFD::fsync()
+void AutoCloseFD::fsync() const
 {
     if (fd != INVALID_DESCRIPTOR) {
         int result;
@@ -108,6 +107,18 @@ void AutoCloseFD::fsync()
         if (result == -1)
             throw NativeSysError("fsync file descriptor %1%", fd);
     }
+}
+
+
+
+void AutoCloseFD::startFsync() const
+{
+#if __linux__
+        if (fd != -1) {
+            /* Ignore failure, since fsync must be run later anyway. This is just a performance optimization. */
+            ::sync_file_range(fd, 0, 0, SYNC_FILE_RANGE_WRITE);
+        }
+#endif
 }
 
 

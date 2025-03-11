@@ -1,5 +1,4 @@
 #include "eval.hh"
-#include "eval-gc.hh"
 #include "eval-settings.hh"
 #include "primops.hh"
 #include "print-options.hh"
@@ -39,16 +38,6 @@
 #  include <sys/resource.h>
 #endif
 
-#if HAVE_BOEHMGC
-
-#  define GC_INCLUDE_NEW
-
-#  include <gc/gc.h>
-#  include <gc/gc_cpp.h>
-#  include <gc/gc_allocator.h>
-
-#endif
-
 #include "strings-inline.hh"
 
 using json = nlohmann::json;
@@ -58,24 +47,7 @@ namespace nix {
 static char * allocString(size_t size)
 {
     char * t;
-#if HAVE_BOEHMGC
     t = (char *) GC_MALLOC_ATOMIC(size);
-#else
-    t = (char *) malloc(size);
-#endif
-    if (!t) throw std::bad_alloc();
-    return t;
-}
-
-
-static char * dupString(const char * s)
-{
-    char * t;
-#if HAVE_BOEHMGC
-    t = GC_STRDUP(s);
-#else
-    t = strdup(s);
-#endif
     if (!t) throw std::bad_alloc();
     return t;
 }
@@ -99,11 +71,7 @@ static const char * makeImmutableString(std::string_view s)
 
 RootValue allocRootValue(Value * v)
 {
-#if HAVE_BOEHMGC
     return std::allocate_shared<Value *>(traceable_allocator<Value *>(), v);
-#else
-    return std::make_shared<Value *>(v);
-#endif
 }
 
 // Pretty print types for assertion errors
@@ -278,15 +246,42 @@ EvalState::EvalState(
     , repair(NoRepair)
     , emptyBindings(0)
     , rootFS(
-        settings.restrictEval || settings.pureEval
-        ? ref<SourceAccessor>(AllowListSourceAccessor::create(getFSSourceAccessor(), {},
-            [&settings](const CanonPath & path) -> RestrictedPathError {
-                auto modeInformation = settings.pureEval
-                    ? "in pure evaluation mode (use '--impure' to override)"
-                    : "in restricted mode";
-                throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
-            }))
-        : getFSSourceAccessor())
+        ({
+            /* In pure eval mode, we provide a filesystem that only
+               contains the Nix store.
+
+               If we have a chroot store and pure eval is not enabled,
+               use a union accessor to make the chroot store available
+               at its logical location while still having the
+               underlying directory available. This is necessary for
+               instance if we're evaluating a file from the physical
+               /nix/store while using a chroot store. */
+            auto accessor = getFSSourceAccessor();
+
+            auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
+            if (settings.pureEval || store->storeDir != realStoreDir) {
+                auto storeFS = makeMountedSourceAccessor(
+                    {
+                        {CanonPath::root, makeEmptySourceAccessor()},
+                        {CanonPath(store->storeDir), makeFSSourceAccessor(realStoreDir)}
+                    });
+                accessor = settings.pureEval
+                    ? storeFS
+                    : makeUnionSourceAccessor({accessor, storeFS});
+            }
+
+            /* Apply access control if needed. */
+            if (settings.restrictEval || settings.pureEval)
+                accessor = AllowListSourceAccessor::create(accessor, {},
+                    [&settings](const CanonPath & path) -> RestrictedPathError {
+                        auto modeInformation = settings.pureEval
+                            ? "in pure evaluation mode (use '--impure' to override)"
+                            : "in restricted mode";
+                        throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
+                    });
+
+            accessor;
+        }))
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{corepkgsFS->addFile(
@@ -374,7 +369,17 @@ void EvalState::allowPath(const Path & path)
 void EvalState::allowPath(const StorePath & storePath)
 {
     if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-        rootFS2->allowPrefix(CanonPath(store->toRealPath(storePath)));
+        rootFS2->allowPrefix(CanonPath(store->printStorePath(storePath)));
+}
+
+void EvalState::allowClosure(const StorePath & storePath)
+{
+    if (!rootFS.dynamic_pointer_cast<AllowListSourceAccessor>()) return;
+
+    StorePathSet closure;
+    store->computeFSClosure(storePath, closure);
+    for (auto & p : closure)
+        allowPath(p);
 }
 
 void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)
@@ -426,7 +431,7 @@ void EvalState::checkURI(const std::string & uri)
 
     /* If the URI is a path, then check it against allowedPaths as
        well. */
-    if (hasPrefix(uri, "/")) {
+    if (isAbsolute(uri)) {
         if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
             rootFS2->checkAccess(CanonPath(uri));
         return;
@@ -439,16 +444,6 @@ void EvalState::checkURI(const std::string & uri)
     }
 
     throw RestrictedPathError("access to URI '%s' is forbidden in restricted mode", uri);
-}
-
-
-Path EvalState::toRealPath(const Path & path, const NixStringContext & context)
-{
-    // FIXME: check whether 'path' is in 'context'.
-    return
-        !context.empty() && store->isInStore(path)
-        ? store->toRealPath(path)
-        : path;
 }
 
 
@@ -480,7 +475,7 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
         /* Install value the base environment. */
         staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
-        baseEnv.values[0]->payload.attrs->push_back(Attr(symbols.create(name2), v));
+        getBuiltins().payload.attrs->push_back(Attr(symbols.create(name2), v));
     }
 }
 
@@ -542,16 +537,32 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
 
     Value * v = allocValue();
     v->mkPrimOp(new PrimOp(primOp));
-    staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
-    baseEnv.values[baseEnvDispl++] = v;
-    baseEnv.values[0]->payload.attrs->push_back(Attr(symbols.create(primOp.name), v));
+
+    if (primOp.internal)
+        internalPrimOps.emplace(primOp.name, v);
+    else {
+        staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
+        baseEnv.values[baseEnvDispl++] = v;
+        getBuiltins().payload.attrs->push_back(Attr(symbols.create(primOp.name), v));
+    }
+
     return v;
+}
+
+
+Value & EvalState::getBuiltins()
+{
+    return *baseEnv.values[0];
 }
 
 
 Value & EvalState::getBuiltin(const std::string & name)
 {
-    return *baseEnv.values[0]->attrs()->find(symbols.create(name))->value;
+    auto it = getBuiltins().attrs()->get(symbols.create(name));
+    if (it)
+        return *it->value;
+    else
+        error<EvalError>("builtin '%1%' not found", name).debugThrow();
 }
 
 
@@ -571,7 +582,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     if (v.isLambda()) {
         auto exprLambda = v.payload.lambda.fun;
 
-        std::stringstream s(std::ios_base::out);
+        std::ostringstream s;
         std::string name;
         auto pos = positions[exprLambda->getPos()];
         std::string docStr;
@@ -603,18 +614,32 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 
         s << docStr;
 
-        s << '\0'; // for making a c string below
-        std::string ss = s.str();
-
         return Doc {
             .pos = pos,
             .name = name,
             .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
             .args = {},
-            .doc =
-                // FIXME: this leaks; make the field std::string?
-                strdup(ss.data()),
+            .doc = makeImmutableString(toView(s)), // NOTE: memory leak when compiled without GC
         };
+    }
+    if (isFunctor(v)) {
+        try {
+            Value & functor = *v.attrs()->find(sFunctor)->value;
+            Value * vp[] = {&v};
+            Value partiallyApplied;
+            // The first paramater is not user-provided, and may be
+            // handled by code that is opaque to the user, like lib.const = x: y: y;
+            // So preferably we show docs that are relevant to the
+            // "partially applied" function returned by e.g. `const`.
+            // We apply the first argument:
+            callFunction(functor, vp, partiallyApplied, noPos);
+            auto _level = addCallDepth(noPos);
+            return getDoc(partiallyApplied);
+        }
+        catch (Error & e) {
+            e.addTrace(nullptr, "while partially calling '%1%' to retrieve documentation", "__functor");
+            throw;
+        }
     }
     return {};
 }
@@ -836,9 +861,10 @@ static const char * * encodeContext(const NixStringContext & context)
         size_t n = 0;
         auto ctx = (const char * *)
             allocBytes((context.size() + 1) * sizeof(char *));
-        for (auto & i : context)
-            ctx[n++] = dupString(i.to_string().c_str());
-        ctx[n] = 0;
+        for (auto & i : context) {
+            ctx[n++] = makeImmutableString({i.to_string()});
+        }
+        ctx[n] = nullptr;
         return ctx;
     } else
         return nullptr;
@@ -1514,11 +1540,9 @@ public:
 };
 };
 
-void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos)
+void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes, const PosIdx pos)
 {
-    if (callDepth > settings.maxCallDepth)
-        error<EvalError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
-    CallDepth _level(callDepth);
+    auto _level = addCallDepth(pos);
 
     auto trace = settings.traceFunctionCalls
         ? std::make_unique<FunctionCallTrace>(positions[pos])
@@ -1530,18 +1554,18 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
     auto makeAppChain = [&]()
     {
-        for (size_t i = 0; i < nrArgs; ++i) {
+        for (auto arg : args) {
             auto fun2 = allocValue();
             *fun2 = vCur;
             vCur.reset();
-            vCur.mkPrimOpApp(fun2, args[i]);
+            vCur.mkPrimOpApp(fun2, arg);
         }
         vRes = vCur;
     };
 
     const Attr * functor;
 
-    while (nrArgs > 0) {
+    while (args.size() > 0) {
 
         if (vCur.isLambda()) {
 
@@ -1645,15 +1669,14 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 throw;
             }
 
-            nrArgs--;
-            args += 1;
+            args = args.subspan(1);
         }
 
         else if (vCur.isPrimOp()) {
 
             size_t argsLeft = vCur.primOp()->arity;
 
-            if (nrArgs < argsLeft) {
+            if (args.size() < argsLeft) {
                 /* We don't have enough arguments, so create a tPrimOpApp chain. */
                 makeAppChain();
                 return;
@@ -1667,15 +1690,14 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 try {
                     auto pos = vCur.determinePos(noPos);
                     vCur.reset();
-                    fn->fun(*this, pos, args, vCur);
+                    fn->fun(*this, pos, args.data(), vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
-                nrArgs -= argsLeft;
-                args += argsLeft;
+                args = args.subspan(argsLeft);
             }
         }
 
@@ -1692,7 +1714,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             auto argsLeft = arity - argsDone;
             assert(argsLeft);
 
-            if (nrArgs < argsLeft) {
+            if (args.size() < argsLeft) {
                 /* We still don't have enough arguments, so extend the tPrimOpApp chain. */
                 makeAppChain();
                 return;
@@ -1726,8 +1748,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     throw;
                 }
 
-                nrArgs -= argsLeft;
-                args += argsLeft;
+                args = args.subspan(argsLeft);
             }
         }
 
@@ -1739,13 +1760,12 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             *args2[0] = vCur;
             vCur.reset();
             try {
-                callFunction(*functor->value, 2, args2, vCur, functor->pos);
+                callFunction(*functor->value, args2, vCur, functor->pos);
             } catch (Error & e) {
                 e.addTrace(positions[pos], "while calling a functor (an attribute set with a '__functor' attribute)");
                 throw;
             }
-            nrArgs--;
-            args++;
+            args = args.subspan(1);
         }
 
         else
@@ -1789,7 +1809,7 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
     for (size_t i = 0; i < args.size(); ++i)
         vArgs[i] = args[i]->maybeThunk(state, env);
 
-    state.callFunction(vFun, args.size(), vArgs.data(), v, pos);
+    state.callFunction(vFun, vArgs, v, pos);
 }
 
 
@@ -1801,7 +1821,7 @@ void EvalState::incrFunctionCall(ExprLambda * fun)
 }
 
 
-void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
+void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res)
 {
     auto pos = fun.determinePos(noPos);
 
@@ -1871,11 +1891,9 @@ void ExprIf::eval(EvalState & state, Env & env, Value & v)
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
     if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
-        auto exprStr = ({
-            std::ostringstream out;
-            cond->show(state.symbols, out);
-            out.str();
-        });
+        std::ostringstream out;
+        cond->show(state.symbols, out);
+        auto exprStr = toView(out);
 
         if (auto eq = dynamic_cast<ExprOpEq *>(cond)) {
             try {
@@ -2102,7 +2120,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == nPath) {
         if (!context.empty())
             state.error<EvalError>("a string that refers to a store path cannot be appended to a path").atPos(pos).withFrame(env, *this).debugThrow();
-        v.mkPath(state.rootPath(CanonPath(canonPath(str()))));
+        v.mkPath(state.rootPath(CanonPath(str())));
     } else
         v.mkStringMove(c_str(), context);
 }
@@ -2113,9 +2131,12 @@ void ExprPos::eval(EvalState & state, Env & env, Value & v)
     state.mkPos(v, pos);
 }
 
-
-void ExprBlackHole::eval(EvalState & state, Env & env, Value & v)
+void ExprBlackHole::eval(EvalState & state, [[maybe_unused]] Env & env, Value & v)
 {
+    throwInfiniteRecursionError(state, v);
+}
+
+[[gnu::noinline]] [[noreturn]] void ExprBlackHole::throwInfiniteRecursionError(EvalState & state, Value &v) {
     state.error<InfiniteRecursionError>("infinite recursion encountered")
         .atPos(v.determinePos(noPos))
         .debugThrow();
@@ -2276,18 +2297,18 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
 }
 
 
-void copyContext(const Value & v, NixStringContext & context)
+void copyContext(const Value & v, NixStringContext & context, const ExperimentalFeatureSettings & xpSettings)
 {
     if (v.payload.string.context)
         for (const char * * p = v.payload.string.context; *p; ++p)
-            context.insert(NixStringContextElem::parse(*p));
+            context.insert(NixStringContextElem::parse(*p, xpSettings));
 }
 
 
-std::string_view EvalState::forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx)
+std::string_view EvalState::forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx, const ExperimentalFeatureSettings & xpSettings)
 {
     auto s = forceString(v, pos, errorCtx);
-    copyContext(v, context);
+    copyContext(v, context, xpSettings);
     return s;
 }
 
@@ -2432,7 +2453,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
         : [&]() {
             auto dstPath = fetchToStore(
                 *store,
-                path.resolveSymlinks(),
+                path.resolveSymlinks(SymlinkResolution::Ancestors),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
                 path.baseName(),
                 ContentAddressMethod::Raw::NixArchive,
@@ -2480,7 +2501,7 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
     auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
     if (path == "" || path[0] != '/')
         error<EvalError>("string '%1%' doesn't represent an absolute path", path).withTrace(pos, errorCtx).debugThrow();
-    return rootPath(CanonPath(path));
+    return rootPath(path);
 }
 
 
@@ -2493,10 +2514,10 @@ StorePath EvalState::coerceToStorePath(const PosIdx pos, Value & v, NixStringCon
 }
 
 
-std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx)
+std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx, const ExperimentalFeatureSettings & xpSettings)
 {
     NixStringContext context;
-    auto s = forceString(v, context, pos, errorCtx);
+    auto s = forceString(v, context, pos, errorCtx, xpSettings);
     auto csize = context.size();
     if (csize != 1)
         error<EvalError>(
@@ -2921,7 +2942,9 @@ void EvalState::printStatistics()
 #endif
 #if HAVE_BOEHMGC
         {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
+#ifndef _WIN32 // TODO implement
         {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
+#endif
 #endif
     };
     topObj["envs"] = {
@@ -3108,8 +3131,8 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
         if (!rOpt) continue;
         auto r = *rOpt;
 
-        Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
-        if (pathExists(res)) return rootPath(CanonPath(canonPath(res)));
+        auto res = (r / CanonPath(suffix)).resolveSymlinks();
+        if (res.pathExists()) return res;
     }
 
     if (hasPrefix(path, "nix/"))
@@ -3124,14 +3147,17 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
 }
 
 
-std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Path & value0, bool initAccessControl)
+std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Path & value0, bool initAccessControl)
 {
     auto & value = value0.s;
     auto i = lookupPathResolved.find(value);
     if (i != lookupPathResolved.end()) return i->second;
 
-    auto finish = [&](std::string res) {
-        debug("resolved search path element '%s' to '%s'", value, res);
+    auto finish = [&](std::optional<SourcePath> res) {
+        if (res)
+            debug("resolved search path element '%s' to '%s'", value, *res);
+        else
+            debug("failed to resolve search path element '%s'", value);
         lookupPathResolved.emplace(value, res);
         return res;
     };
@@ -3143,7 +3169,7 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
                 fetchSettings,
                 EvalSettings::resolvePseudoUrl(value));
             auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
-            return finish(store->toRealPath(storePath));
+            return finish(this->storePath(storePath));
         } catch (Error & e) {
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
@@ -3155,29 +3181,26 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
         auto scheme = value.substr(0, colPos);
         auto rest = value.substr(colPos + 1);
         if (auto * hook = get(settings.lookupPathHooks, scheme)) {
-            auto res = (*hook)(store, rest);
+            auto res = (*hook)(*this, rest);
             if (res)
                 return finish(std::move(*res));
         }
     }
 
     {
-        auto path = absPath(value);
+        auto path = rootPath(value);
 
         /* Allow access to paths in the search path. */
         if (initAccessControl) {
-            allowPath(path);
-            if (store->isInStore(path)) {
+            allowPath(path.path.abs());
+            if (store->isInStore(path.path.abs())) {
                 try {
-                    StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(path).first, closure);
-                    for (auto & p : closure)
-                        allowPath(p);
+                    allowClosure(store->toStorePath(path.path.abs()).first);
                 } catch (InvalidPath &) { }
             }
         }
 
-        if (pathExists(path))
+        if (path.resolveSymlinks().pathExists())
             return finish(std::move(path));
         else {
             logWarning({
@@ -3186,9 +3209,7 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
         }
     }
 
-    debug("failed to resolve search path element '%s'", value);
-    return std::nullopt;
-
+    return finish(std::nullopt);
 }
 
 
@@ -3249,6 +3270,19 @@ bool ExternalValueBase::operator==(const ExternalValueBase & b) const noexcept
 
 std::ostream & operator << (std::ostream & str, const ExternalValueBase & v) {
     return v.print(str);
+}
+
+void forceNoNullByte(std::string_view s, std::function<Pos()> pos)
+{
+    if (s.find('\0') != s.npos) {
+        using namespace std::string_view_literals;
+        auto str = replaceStrings(std::string(s), "\0"sv, "␀"sv);
+        Error error("input string '%s' cannot be represented as Nix string because it contains null bytes", str);
+        if (pos) {
+            error.atPos(pos());
+        }
+        throw error;
+    }
 }
 
 

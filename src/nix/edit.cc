@@ -3,7 +3,6 @@
 #include "shared.hh"
 #include "eval.hh"
 #include "attr-path.hh"
-#include "progress-bar.hh"
 #include "editor-for.hh"
 
 #include <unistd.h>
@@ -40,7 +39,7 @@ struct CmdEdit : InstallableValueCommand
             }
         }();
 
-        stopProgressBar();
+        logger->stop();
 
         auto args = editorFor(file, line);
 

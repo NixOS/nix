@@ -81,7 +81,7 @@ typedef std::set<StorePath> StorePathSet;
 typedef std::vector<StorePath> StorePaths;
 
 /**
- * The file extension of \ref Derivation derivations when serialized
+ * The file extension of \ref nix::Derivation derivations when serialized
  * into store objects.
  */
 constexpr std::string_view drvExtension = ".drv";

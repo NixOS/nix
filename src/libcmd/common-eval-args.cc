@@ -18,6 +18,8 @@
 
 namespace nix {
 
+namespace fs { using namespace std::filesystem; }
+
 fetchers::Settings fetchSettings;
 
 static GlobalConfig::Register rFetchSettings(&fetchSettings);
@@ -27,13 +29,15 @@ EvalSettings evalSettings {
     {
         {
             "flake",
-            [](ref<Store> store, std::string_view rest) {
+            [](EvalState & state, std::string_view rest) {
                 experimentalFeatureSettings.require(Xp::Flakes);
                 // FIXME `parseFlakeRef` should take a `std::string_view`.
                 auto flakeRef = parseFlakeRef(fetchSettings, std::string { rest }, {}, true, false);
                 debug("fetching flake search path element '%s''", rest);
-                auto storePath = flakeRef.resolve(store).fetchTree(store).first;
-                return store->toRealPath(storePath);
+                auto [accessor, lockedRef] = flakeRef.resolve(state.store).lazyFetch(state.store);
+                auto storePath = nix::fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
+                state.allowPath(storePath);
+                return state.storePath(storePath);
             },
         },
     },
@@ -119,8 +123,8 @@ MixEvalArgs::MixEvalArgs()
         .category = category,
         .labels = {"original-ref", "resolved-ref"},
         .handler = {[&](std::string _from, std::string _to) {
-            auto from = parseFlakeRef(fetchSettings, _from, absPath("."));
-            auto to = parseFlakeRef(fetchSettings, _to, absPath("."));
+            auto from = parseFlakeRef(fetchSettings, _from, fs::current_path().string());
+            auto to = parseFlakeRef(fetchSettings, _to, fs::current_path().string());
             fetchers::Attrs extraAttrs;
             if (to.subdir != "") extraAttrs["dir"] = to.subdir;
             fetchers::overrideRegistry(from.input, to.input, extraAttrs);
@@ -175,14 +179,16 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * bas
             state.fetchSettings,
             EvalSettings::resolvePseudoUrl(s));
         auto storePath = fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy);
-        return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
+        return state.storePath(storePath);
     }
 
     else if (hasPrefix(s, "flake:")) {
         experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(fetchSettings, std::string(s.substr(6)), {}, true, false);
-        auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first;
-        return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
+        auto [accessor, lockedRef] = flakeRef.resolve(state.store).lazyFetch(state.store);
+        auto storePath = nix::fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
+        state.allowPath(storePath);
+        return state.storePath(storePath);
     }
 
     else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {

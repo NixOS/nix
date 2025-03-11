@@ -3,11 +3,12 @@
 
 #include <nlohmann/json.hpp>
 #include <list>
-#include <nlohmann/json_fwd.hpp>
 
 #include "types.hh"
 
 namespace nix {
+
+enum struct ExperimentalFeature;
 
 const nlohmann::json * get(const nlohmann::json & map, const std::string & key);
 
@@ -24,6 +25,7 @@ const nlohmann::json & valueAt(
     const std::string & key);
 
 std::optional<nlohmann::json> optionalValueAt(const nlohmann::json::object_t & value, const std::string & key);
+std::optional<nlohmann::json> nullableValueAt(const nlohmann::json::object_t & value, const std::string & key);
 
 /**
  * Downcast the json object, failing with a nice error if the conversion fails.
@@ -68,8 +70,17 @@ struct json_avoids_null<std::vector<T>> : std::true_type {};
 template<typename T>
 struct json_avoids_null<std::list<T>> : std::true_type {};
 
+template<typename T>
+struct json_avoids_null<std::set<T>> : std::true_type {};
+
 template<typename K, typename V>
 struct json_avoids_null<std::map<K, V>> : std::true_type {};
+
+/**
+ * `ExperimentalFeature` is always rendered as a string.
+ */
+template<>
+struct json_avoids_null<ExperimentalFeature> : std::true_type {};
 
 }
 
@@ -84,12 +95,14 @@ namespace nlohmann {
  * round trip. We do that with a static assert.
  */
 template<typename T>
-struct adl_serializer<std::optional<T>> {
+struct adl_serializer<std::optional<T>>
+{
     /**
      * @brief Convert a JSON type to an `optional<T>` treating
      *        `null` as `std::nullopt`.
      */
-    static void from_json(const json & json, std::optional<T> & t) {
+    static void from_json(const json & json, std::optional<T> & t)
+    {
         static_assert(
             nix::json_avoids_null<T>::value,
             "null is already in use for underlying type's JSON");
@@ -102,7 +115,8 @@ struct adl_serializer<std::optional<T>> {
      *  @brief Convert an optional type to a JSON type  treating `std::nullopt`
      *         as `null`.
      */
-    static void to_json(json & json, const std::optional<T> & t) {
+    static void to_json(json & json, const std::optional<T> & t)
+    {
         static_assert(
             nix::json_avoids_null<T>::value,
             "null is already in use for underlying type's JSON");

@@ -1,6 +1,7 @@
 #include "current-process.hh"
 #include "environment-variables.hh"
 #include "error.hh"
+#include "executable-path.hh"
 #include "file-descriptor.hh"
 #include "file-path.hh"
 #include "signals.hh"
@@ -21,6 +22,8 @@
 
 #include <sys/types.h>
 #include <unistd.h>
+
+#ifdef _WIN32
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -309,11 +312,7 @@ void runProgram2(const RunOptions & options)
     // TODO: Implement shebang / program interpreter lookup on Windows
     auto interpreter = getProgramInterpreter(realProgram);
 
-    std::optional<Finally<std::function<void()>>> resumeLoggerDefer;
-    if (options.isInteractive) {
-        logger->pause();
-        resumeLoggerDefer.emplace([]() { logger->resume(); });
-    }
+    auto suspension = logger->suspendIf(options.isInteractive);
 
     Pid pid = spawnProcess(interpreter.has_value() ? *interpreter : realProgram, options, out, in);
 
@@ -377,4 +376,13 @@ bool statusOk(int status)
 {
     return status == 0;
 }
+
+int execvpe(const wchar_t * file0, const wchar_t * const argv[], const wchar_t * const envp[])
+{
+    auto file = ExecutablePath::load().findPath(file0);
+    return _wexecve(file.c_str(), argv, envp);
 }
+
+}
+
+#endif

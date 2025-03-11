@@ -7,12 +7,16 @@ namespace nix {
 
 namespace fetchers { struct PublicKey; }
 
+/**
+ * A sink that writes into a Git repository. Note that nothing may be written
+ * until `flush()` is called.
+ */
 struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
 {
     /**
      * Flush builder and return a final Git hash.
      */
-    virtual Hash sync() = 0;
+    virtual Hash flush() = 0;
 };
 
 struct GitRepo
@@ -55,11 +59,19 @@ struct GitRepo
            modified or added, but excluding deleted files. */
         std::set<CanonPath> files;
 
+        /* All modified or added files. */
+        std::set<CanonPath> dirtyFiles;
+
+        /* The deleted files. */
+        std::set<CanonPath> deletedFiles;
+
         /* The submodules listed in .gitmodules of this workdir. */
         std::vector<Submodule> submodules;
     };
 
     virtual WorkdirInfo getWorkdirInfo() = 0;
+
+    static WorkdirInfo getCachedWorkdirInfo(const std::filesystem::path & path);
 
     /* Get the ref that HEAD points to. */
     virtual std::optional<std::string> getWorkdirRef() = 0;
@@ -74,11 +86,17 @@ struct GitRepo
 
     virtual bool hasObject(const Hash & oid) = 0;
 
-    virtual ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
+    virtual ref<SourceAccessor> getAccessor(
+        const Hash & rev,
+        bool exportIgnore,
+        std::string displayPrefix,
+        bool smudgeLfs = false) = 0;
 
     virtual ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
 
     virtual ref<GitFileSystemObjectSink> getFileSystemObjectSink() = 0;
+
+    virtual void flush() = 0;
 
     virtual void fetch(
         const std::string & url,
@@ -108,5 +126,27 @@ struct GitRepo
 };
 
 ref<GitRepo> getTarballCache();
+
+// A helper to ensure that the `git_*_free` functions get called.
+template<auto del>
+struct Deleter
+{
+    template <typename T>
+    void operator()(T * p) const { del(p); };
+};
+
+// A helper to ensure that we don't leak objects returned by libgit2.
+template<typename T>
+struct Setter
+{
+    T & t;
+    typename T::pointer p = nullptr;
+
+    Setter(T & t) : t(t) { }
+
+    ~Setter() { if (p) t = T(p); }
+
+    operator typename T::pointer * () { return &p; }
+};
 
 }

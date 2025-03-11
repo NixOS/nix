@@ -4,6 +4,9 @@
 project('nix-dev-shell', 'cpp',
   version : files('.version'),
   subproject_dir : 'src',
+  default_options : [
+    'localstatedir=/nix/var',
+  ]
 )
 
 # Internal Libraries
@@ -19,27 +22,35 @@ subproject('libcmd')
 subproject('nix')
 
 # Docs
-subproject('internal-api-docs')
-subproject('external-api-docs')
+if get_option('doc-gen')
+  subproject('internal-api-docs')
+  subproject('external-api-docs')
+  if not meson.is_cross_build()
+    subproject('nix-manual')
+  endif
+endif
 
 # External C wrapper libraries
 subproject('libutil-c')
 subproject('libstore-c')
 subproject('libexpr-c')
+subproject('libflake-c')
 subproject('libmain-c')
 
 # Language Bindings
-if not meson.is_cross_build()
+if get_option('bindings') and not meson.is_cross_build()
   subproject('perl')
 endif
 
 # Testing
-subproject('nix-util-test-support')
-subproject('nix-util-tests')
-subproject('nix-store-test-support')
-subproject('nix-store-tests')
-subproject('nix-fetchers-tests')
-subproject('nix-expr-test-support')
-subproject('nix-expr-tests')
-subproject('nix-flake-tests')
+if get_option('unit-tests')
+  subproject('libutil-test-support')
+  subproject('libutil-tests')
+  subproject('libstore-test-support')
+  subproject('libstore-tests')
+  subproject('libfetchers-tests')
+  subproject('libexpr-test-support')
+  subproject('libexpr-tests')
+  subproject('libflake-tests')
+endif
 subproject('nix-functional-tests')

@@ -57,7 +57,7 @@ Goal::Co PathSubstitutionGoal::init()
 
     bool substituterFailed = false;
 
-    for (auto sub : subs) {
+    for (const auto & sub : subs) {
         trace("trying next substituter");
 
         cleanup();
@@ -183,7 +183,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
     /* Make sure that we are allowed to start a substitution.  Note that even
        if maxSubstitutionJobs == 0, we still allow a substituter to run. This
        prevents infinite waiting. */
-    if (worker.getNrSubstitutions() >= std::max(1U, (unsigned int) settings.maxSubstitutionJobs)) {
+    while (worker.getNrSubstitutions() >= std::max(1U, (unsigned int) settings.maxSubstitutionJobs)) {
         worker.waitForBuildSlot(shared_from_this());
         co_await Suspend{};
     }
@@ -294,7 +294,7 @@ void PathSubstitutionGoal::cleanup()
 
         outPipe.close();
     } catch (...) {
-        ignoreException();
+        ignoreExceptionInDestructor();
     }
 }
 

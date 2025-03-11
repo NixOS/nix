@@ -1,5 +1,6 @@
 #include "current-process.hh"
 #include "environment-variables.hh"
+#include "executable-path.hh"
 #include "signals.hh"
 #include "processes.hh"
 #include "finally.hh"
@@ -199,8 +200,15 @@ static int childEntry(void * arg)
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
     ChildWrapperFunction wrapper = [&] {
-        if (!options.allowVfork)
+        if (!options.allowVfork) {
+            /* Set a simple logger, while releasing (not destroying)
+               the parent logger. We don't want to run the parent
+               logger's destructor since that will crash (e.g. when
+               ~ProgressBar() tries to join a thread that doesn't
+               exist. */
+            logger.release();
             logger = makeSimpleLogger();
+        }
         try {
 #if __linux__
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
@@ -298,15 +306,7 @@ void runProgram2(const RunOptions & options)
     // case), so we can't use it if we alter the environment
     processOptions.allowVfork = !options.environment;
 
-    std::optional<Finally<std::function<void()>>> resumeLoggerDefer;
-    if (options.isInteractive) {
-        logger->pause();
-        resumeLoggerDefer.emplace(
-            []() {
-                logger->resume();
-            }
-        );
-    }
+    auto suspension = logger->suspendIf(options.isInteractive);
 
     /* Fork. */
     Pid pid = startProcess([&] {
@@ -417,6 +417,14 @@ std::string statusToString(int status)
 bool statusOk(int status)
 {
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+int execvpe(const char * file0, const char * const argv[], const char * const envp[])
+{
+    auto file = ExecutablePath::load().findPath(file0);
+    // `const_cast` is safe. See the note in
+    // https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html
+    return execve(file.c_str(), const_cast<char *const *>(argv), const_cast<char *const *>(envp));
 }
 
 }

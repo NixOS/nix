@@ -10,6 +10,9 @@ lockFileStr:
 # unlocked trees.
 overrides:
 
+# This is `prim_fetchFinalTree`.
+fetchTreeFinal:
+
 let
 
   lockFile = builtins.fromJSON lockFileStr;
@@ -17,69 +20,77 @@ let
   # Resolve a input spec into a node name. An input spec is
   # either a node name, or a 'follows' path from the root
   # node.
-  resolveInput = inputSpec:
-    if builtins.isList inputSpec
-    then getInputByPath lockFile.root inputSpec
-    else inputSpec;
+  resolveInput =
+    inputSpec: if builtins.isList inputSpec then getInputByPath lockFile.root inputSpec else inputSpec;
 
-  # Follow an input path (e.g. ["dwarffs" "nixpkgs"]) from the
+  # Follow an input attrpath (e.g. ["dwarffs" "nixpkgs"]) from the
   # root node, returning the final node.
-  getInputByPath = nodeName: path:
-    if path == []
-    then nodeName
+  getInputByPath =
+    nodeName: path:
+    if path == [ ] then
+      nodeName
     else
       getInputByPath
         # Since this could be a 'follows' input, call resolveInput.
         (resolveInput lockFile.nodes.${nodeName}.inputs.${builtins.head path})
         (builtins.tail path);
 
-  allNodes =
-    builtins.mapAttrs
-      (key: node:
-        let
+  allNodes = builtins.mapAttrs (
+    key: node:
+    let
 
-          sourceInfo =
-            if overrides ? ${key}
-            then
-              overrides.${key}.sourceInfo
-            else
-              # FIXME: remove obsolete node.info.
-              fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
+      parentNode = allNodes.${getInputByPath lockFile.root node.parent};
 
-          subdir = overrides.${key}.dir or node.locked.dir or "";
+      sourceInfo =
+        if overrides ? ${key} then
+          overrides.${key}.sourceInfo
+        else if node.locked.type == "path" && builtins.substring 0 1 node.locked.path != "/" then
+          parentNode.sourceInfo
+          // {
+            outPath = parentNode.outPath + ("/" + node.locked.path);
+          }
+        else
+          # FIXME: remove obsolete node.info.
+          # Note: lock file entries are always final.
+          fetchTreeFinal (node.info or { } // removeAttrs node.locked [ "dir" ]);
 
-          outPath = sourceInfo + ((if subdir == "" then "" else "/") + subdir);
+      subdir = overrides.${key}.dir or node.locked.dir or "";
 
-          flake = import (outPath + "/flake.nix");
+      outPath = sourceInfo + ((if subdir == "" then "" else "/") + subdir);
 
-          inputs = builtins.mapAttrs
-            (inputName: inputSpec: allNodes.${resolveInput inputSpec})
-            (node.inputs or {});
+      flake = import (outPath + "/flake.nix");
 
-          outputs = flake.outputs (inputs // { self = result; });
+      inputs = builtins.mapAttrs (inputName: inputSpec: allNodes.${resolveInput inputSpec}) (
+        node.inputs or { }
+      );
 
-          result =
-            outputs
-            # We add the sourceInfo attribute for its metadata, as they are
-            # relevant metadata for the flake. However, the outPath of the
-            # sourceInfo does not necessarily match the outPath of the flake,
-            # as the flake may be in a subdirectory of a source.
-            # This is shadowed in the next //
-            // sourceInfo
-            // {
-              # This shadows the sourceInfo.outPath
-              inherit outPath;
+      outputs = flake.outputs (inputs // { self = result; });
 
-              inherit inputs; inherit outputs; inherit sourceInfo; _type = "flake";
-            };
+      result =
+        outputs
+        # We add the sourceInfo attribute for its metadata, as they are
+        # relevant metadata for the flake. However, the outPath of the
+        # sourceInfo does not necessarily match the outPath of the flake,
+        # as the flake may be in a subdirectory of a source.
+        # This is shadowed in the next //
+        // sourceInfo
+        // {
+          # This shadows the sourceInfo.outPath
+          inherit outPath;
 
-        in
-          if node.flake or true then
-            assert builtins.isFunction flake.outputs;
-            result
-          else
-            sourceInfo
-      )
-      lockFile.nodes;
+          inherit inputs;
+          inherit outputs;
+          inherit sourceInfo;
+          _type = "flake";
+        };
 
-in allNodes.${lockFile.root}
+    in
+    if node.flake or true then
+      assert builtins.isFunction flake.outputs;
+      result
+    else
+      sourceInfo
+  ) lockFile.nodes;
+
+in
+allNodes.${lockFile.root}

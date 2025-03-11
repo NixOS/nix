@@ -1,7 +1,7 @@
 // redirect rules for URL fragments (client-side) to prevent link rot.
 // this must be done on the client side, as web servers do not see the fragment part of the URL.
 // it will only work with JavaScript enabled in the browser, but this is the best we can do here.
-// see src/_redirects for path redirects (server-side)
+// see source/_redirects for path redirects (server-side)
 
 // redirects are declared as follows:
 // each entry has as its key a path matching the requested URL path, relative to the mdBook document root.
@@ -346,6 +346,9 @@ const redirects = {
     "scoping-rules": "scoping.html",
     "string-literal": "string-literals.html",
   },
+  "language/derivations.md": {
+    "builder-execution": "store/drv/building.md#builder-execution",
+  },
   "installation/installing-binary.html": {
     "linux": "uninstall.html#linux",
     "macos": "uninstall.html#macos",
@@ -372,6 +375,7 @@ const redirects = {
   "glossary.html": {
     "gloss-local-store": "store/types/local-store.html",
     "gloss-chroot-store": "store/types/local-store.html",
+    "gloss-content-addressed-derivation": "#gloss-content-addressing-derivation",
   },
 };
 

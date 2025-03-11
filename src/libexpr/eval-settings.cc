@@ -57,7 +57,7 @@ Strings EvalSettings::getDefaultNixPath()
 {
     Strings res;
     auto add = [&](const Path & p, const std::string & s = std::string()) {
-        if (pathAccessible(p)) {
+        if (std::filesystem::exists(p)) {
             if (s.empty()) {
                 res.push_back(p);
             } else {
@@ -99,7 +99,7 @@ const std::string & EvalSettings::getCurrentSystem() const
 Path getNixDefExpr()
 {
     return settings.useXDGBaseDirectories
-        ? getStateDir() + "/nix/defexpr"
+        ? getStateDir() + "/defexpr"
         : getHome() + "/.nix-defexpr";
 }
 

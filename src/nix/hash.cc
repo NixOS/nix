@@ -8,6 +8,7 @@
 #include "git.hh"
 #include "posix-source-accessor.hh"
 #include "misc-store-flags.hh"
+#include "man-pages.hh"
 
 using namespace nix;
 
@@ -79,7 +80,7 @@ struct CmdHashBase : Command
 
     void run() override
     {
-        for (auto path : paths) {
+        for (const auto & path : paths) {
             auto makeSink = [&]() -> std::unique_ptr<AbstractHashSink> {
                 if (modulus)
                     return std::make_unique<HashModuloSink>(hashAlgo, *modulus);
@@ -87,18 +88,35 @@ struct CmdHashBase : Command
                     return std::make_unique<HashSink>(hashAlgo);
             };
 
-            auto path2 = PosixSourceAccessor::createAtRoot(path);
+            auto makeSourcePath = [&]() -> SourcePath {
+                return PosixSourceAccessor::createAtRoot(makeParentCanonical(path));
+            };
+
             Hash h { HashAlgorithm::SHA256 }; // throwaway def to appease C++
             switch (mode) {
             case FileIngestionMethod::Flat:
+            {
+                // While usually we could use the some code as for NixArchive,
+                // the Flat method needs to support FIFOs, such as those
+                // produced by bash process substitution, e.g.:
+                //     nix hash --mode flat <(echo hi)
+                // Also symlinks semantics are unambiguous in the flat case,
+                // so we don't need to go low-level, or reject symlink `path`s.
+                auto hashSink = makeSink();
+                readFile(path, *hashSink);
+                h = hashSink->finish().first;
+                break;
+            }
             case FileIngestionMethod::NixArchive:
             {
+                auto sourcePath = makeSourcePath();
                 auto hashSink = makeSink();
-                dumpPath(path2, *hashSink, (FileSerialisationMethod) mode);
+                dumpPath(sourcePath, *hashSink, (FileSerialisationMethod) mode);
                 h = hashSink->finish().first;
                 break;
             }
             case FileIngestionMethod::Git: {
+                auto sourcePath = makeSourcePath();
                 std::function<git::DumpHook> hook;
                 hook = [&](const SourcePath & path) -> git::TreeEntry {
                     auto hashSink = makeSink();
@@ -109,7 +127,7 @@ struct CmdHashBase : Command
                         .hash = hash,
                     };
                 };
-                h = hook(path2).hash;
+                h = hook(sourcePath).hash;
                 break;
             }
             }
@@ -163,8 +181,11 @@ struct CmdToBase : Command
     HashFormat hashFormat;
     std::optional<HashAlgorithm> hashAlgo;
     std::vector<std::string> args;
+    bool legacyCli;
 
-    CmdToBase(HashFormat hashFormat) : hashFormat(hashFormat)
+    CmdToBase(HashFormat hashFormat, bool legacyCli = false)
+        : hashFormat(hashFormat)
+        , legacyCli(legacyCli)
     {
         addFlag(flag::hashAlgoOpt("type", &hashAlgo));
         expectArgs("strings", &args);
@@ -181,8 +202,9 @@ struct CmdToBase : Command
 
     void run() override
     {
-        warn("The old format conversion sub commands of `nix hash` were deprecated in favor of `nix hash convert`.");
-        for (auto s : args)
+        if (!legacyCli)
+            warn("The old format conversion subcommands of `nix hash` were deprecated in favor of `nix hash convert`.");
+        for (const auto & s : args)
             logger->cout(Hash::parseAny(s, hashAlgo).to_string(hashFormat, hashFormat == HashFormat::SRI));
     }
 };
@@ -222,11 +244,18 @@ struct CmdHashConvert : Command
     Category category() override { return catUtility; }
 
     void run() override {
-        for (const auto& s: hashStrings) {
-            Hash h = Hash::parseAny(s, algo);
-            if (from && h.to_string(*from, from == HashFormat::SRI) != s) {
+        for (const auto & s : hashStrings) {
+            Hash h =
+                from == HashFormat::SRI
+                ? Hash::parseSRI(s)
+                : Hash::parseAny(s, algo);
+            if (from
+                && from != HashFormat::SRI
+                && h.to_string(*from, false) !=
+                    (from == HashFormat::Base16 ? toLower(s) : s))
+            {
                 auto from_as_string = printHashFormat(*from);
-                throw BadHash("input hash '%s' does not have the expected format '--from %s'", s, from_as_string);
+                throw BadHash("input hash '%s' does not have the expected format for '--from %s'", s, from_as_string);
             }
             logger->cout(h.to_string(to, to == HashFormat::SRI));
         }
@@ -321,7 +350,7 @@ static int compatNixHash(int argc, char * * argv)
     }
 
     else {
-        CmdToBase cmd(hashFormat);
+        CmdToBase cmd(hashFormat, true);
         cmd.args = ss;
         if (hashAlgo.has_value()) cmd.hashAlgo = hashAlgo;
         cmd.run();

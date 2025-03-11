@@ -3,8 +3,19 @@
 #include "current-process.hh"
 #include "environment-variables.hh"
 #include "util.hh"
+#include "exec.hh"
 
 namespace nix {
+
+static std::string parsePublicHostKey(std::string_view host, std::string_view sshPublicHostKey)
+{
+    try {
+        return base64Decode(sshPublicHostKey);
+    } catch (Error & e) {
+        e.addTrace({}, "while decoding ssh public host key for host '%s'", host);
+        throw;
+    }
+}
 
 SSHMaster::SSHMaster(
     std::string_view host,
@@ -14,7 +25,7 @@ SSHMaster::SSHMaster(
     : host(host)
     , fakeSSH(host == "localhost")
     , keyFile(keyFile)
-    , sshPublicHostKey(sshPublicHostKey)
+    , sshPublicHostKey(parsePublicHostKey(host, sshPublicHostKey))
     , useMaster(useMaster && !fakeSSH)
     , compress(compress)
     , logFD(logFD)
@@ -30,20 +41,33 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
 {
     auto state(state_.lock());
 
-    for (auto & i : tokenizeString<Strings>(getEnv("NIX_SSHOPTS").value_or("")))
-        args.push_back(i);
+    std::string sshOpts = getEnv("NIX_SSHOPTS").value_or("");
+
+    try {
+        std::list<std::string> opts = shellSplitString(sshOpts);
+        for (auto & i : opts)
+            args.push_back(i);
+    } catch (Error & e) {
+        e.addTrace({}, "while splitting NIX_SSHOPTS '%s'", sshOpts);
+        throw;
+    }
+
     if (!keyFile.empty())
         args.insert(args.end(), {"-i", keyFile});
     if (!sshPublicHostKey.empty()) {
         std::filesystem::path fileName = state->tmpDir->path() / "host-key";
         auto p = host.rfind("@");
         std::string thost = p != std::string::npos ? std::string(host, p + 1) : host;
-        writeFile(fileName.string(), thost + " " + base64Decode(sshPublicHostKey) + "\n");
+        writeFile(fileName.string(), thost + " " + sshPublicHostKey + "\n");
         args.insert(args.end(), {"-oUserKnownHostsFile=" + fileName.string()});
     }
     if (compress)
         args.push_back("-C");
 
+    // We use this to make ssh signal back to us that the connection is established.
+    // It really does run locally; see createSSHEnv which sets up SHELL to make
+    // it launch more reliably. The local command runs synchronously, so presumably
+    // the remote session won't be garbled if the local command is slow.
     args.push_back("-oPermitLocalCommand=yes");
     args.push_back("-oLocalCommand=echo started");
 }
@@ -54,6 +78,27 @@ bool SSHMaster::isMasterRunning() {
 
     auto res = runProgram(RunOptions {.program = "ssh", .args = args, .mergeStderrToStdout = true});
     return res.first == 0;
+}
+
+Strings createSSHEnv()
+{
+    // Copy the environment and set SHELL=/bin/sh
+    std::map<std::string, std::string> env = getEnv();
+
+    // SSH will invoke the "user" shell for -oLocalCommand, but that means
+    // $SHELL. To keep things simple and avoid potential issues with other
+    // shells, we set it to /bin/sh.
+    // Technically, we don't need that, and we could reinvoke ourselves to print
+    // "started". Self-reinvocation is tricky with library consumers, but mostly
+    // solved; refer to the development history of nixExePath in libstore/globals.cc.
+    env.insert_or_assign("SHELL", "/bin/sh");
+
+    Strings r;
+    for (auto & [k, v] : env) {
+        r.push_back(k + "=" + v);
+    }
+
+    return r;
 }
 
 std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(
@@ -72,10 +117,10 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(
     ProcessOptions options;
     options.dieWithParent = false;
 
+    std::unique_ptr<Logger::Suspension> loggerSuspension;
     if (!fakeSSH && !useMaster) {
-        logger->pause();
+        loggerSuspension = std::make_unique<Logger::Suspension>(logger->suspend());
     }
-    Finally cleanup = [&]() { logger->resume(); };
 
     conn->sshPid = startProcess([&]() {
         restoreProcessContext();
@@ -104,8 +149,8 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(
         }
 
         args.splice(args.end(), std::move(command));
-
-        execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
+        auto env = createSSHEnv();
+        nix::execvpe(args.begin()->c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(env).data());
 
         // could not exec ssh/bash
         throw SysError("unable to execute '%s'", args.front());
@@ -154,8 +199,7 @@ Path SSHMaster::startMaster()
     ProcessOptions options;
     options.dieWithParent = false;
 
-    logger->pause();
-    Finally cleanup = [&]() { logger->resume(); };
+    auto suspension = logger->suspend();
 
     if (isMasterRunning())
         return state->socketPath;
@@ -172,7 +216,8 @@ Path SSHMaster::startMaster()
         if (verbosity >= lvlChatty)
             args.push_back("-v");
         addCommonSSHOpts(args);
-        execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
+        auto env = createSSHEnv();
+        nix::execvpe(args.begin()->c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(env).data());
 
         throw SysError("unable to execute '%s'", args.front());
     }, options);
@@ -193,5 +238,20 @@ Path SSHMaster::startMaster()
 }
 
 #endif
+
+void SSHMaster::Connection::trySetBufferSize(size_t size)
+{
+#ifdef F_SETPIPE_SZ
+    /* This `fcntl` method of doing this takes a positive `int`. Check
+       and convert accordingly.
+
+       The function overall still takes `size_t` because this is more
+       portable for a platform-agnostic interface. */
+    assert(size <= INT_MAX);
+    int pipesize = size;
+    fcntl(in.get(), F_SETPIPE_SZ, pipesize);
+    fcntl(out.get(), F_SETPIPE_SZ, pipesize);
+#endif
+}
 
 }

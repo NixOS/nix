@@ -4,9 +4,8 @@ project('nix', 'cpp',
     'cpp_std=c++2a',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
-    'debug=true',
-    'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
+    'localstatedir=/nix/var',
   ],
   meson_version : '>= 1.1',
   license : 'LGPL-2.1-or-later',
@@ -14,11 +13,13 @@ project('nix', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
+
+nix_store = dependency('nix-store')
 
 deps_private_maybe_subproject = [
   dependency('nix-util'),
-  dependency('nix-store'),
+  nix_store,
   dependency('nix-expr'),
   dependency('nix-flake'),
   dependency('nix-fetchers'),
@@ -27,13 +28,15 @@ deps_private_maybe_subproject = [
 ]
 deps_public_maybe_subproject = [
 ]
-subdir('build-utils-meson/subprojects')
+subdir('nix-meson-build-support/subprojects')
 
-subdir('build-utils-meson/threads')
-
-subdir('build-utils-meson/export-all-symbols')
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 configdata = configuration_data()
+
+# The CLI has a more detailed version string than the libraries; see `nixVersion`
+configdata.set_quoted('NIX_CLI_VERSION', meson.project_version())
 
 fs = import('fs')
 
@@ -61,8 +64,8 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
-subdir('build-utils-meson/generate-header')
+subdir('nix-meson-build-support/common')
+subdir('nix-meson-build-support/generate-header')
 
 nix_sources = [config_h] + files(
   'add-to-store.cc',
@@ -90,6 +93,7 @@ nix_sources = [config_h] + files(
   'ls.cc',
   'main.cc',
   'make-content-addressed.cc',
+  'man-pages.cc',
   'nar.cc',
   'optimise-store.cc',
   'path-from-hash-part.cc',
@@ -182,6 +186,16 @@ if host_machine.system() != 'windows'
   ]
 endif
 
+fs = import('fs')
+prefix = get_option('prefix')
+
+mandir = get_option('mandir')
+mandir = fs.is_absolute(mandir) ? mandir : prefix / mandir
+
+cpp_args= [
+  '-DNIX_MAN_DIR="@0@"'.format(mandir)
+]
+
 include_dirs = [include_directories('.')]
 
 this_exe = executable(
@@ -189,6 +203,7 @@ this_exe = executable(
   sources,
   dependencies : deps_private_subproject + deps_private + deps_other,
   include_directories : include_dirs,
+  cpp_args : cpp_args,
   link_args: linker_export_flags,
   install : true,
 )
@@ -209,18 +224,25 @@ nix_symlinks = [
   'nix-store',
 ]
 
+executable_suffix = ''
+if host_machine.system() == 'windows'
+  executable_suffix = '.exe'
+endif
+
 foreach linkname : nix_symlinks
   install_symlink(
-    linkname,
+    linkname + executable_suffix,
     # TODO(Qyriad): should these continue to be relative symlinks?
-    pointing_to : 'nix',
+    pointing_to : fs.name(this_exe),
     install_dir : get_option('bindir'),
     # The 'runtime' tag is what executables default to, which we want to emulate here.
     install_tag : 'runtime'
   )
-  t = custom_target(
+  custom_target(
     command: ['ln', '-sf', fs.name(this_exe), '@OUTPUT@'],
-    output: linkname,
+    output: linkname + executable_suffix,
+    # native doesn't allow dangling symlinks, but the target executable often doesn't exist at this time
+    env : { 'MSYS' : 'winsymlinks:lnk' },
     # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
     build_by_default: true
   )
@@ -230,17 +252,28 @@ endforeach
 
 install_symlink(
   'build-remote',
-  pointing_to : '..' / '..'/ get_option('bindir') / 'nix',
-  install_dir : get_option('libexecdir') / 'nix',
+  pointing_to : '..' / '..'/ get_option('bindir') / fs.name(this_exe),
+  install_dir : get_option('libexecdir') / fs.name(this_exe),
   # The 'runtime' tag is what executables default to, which we want to emulate here.
   install_tag : 'runtime'
 )
 
 custom_target(
   command: ['ln', '-sf', fs.name(this_exe), '@OUTPUT@'],
-  output: 'build-remote',
+  output: 'build-remote' + executable_suffix,
+  # native doesn't allow dangling symlinks, but the target executable often doesn't exist at this time
+  env : { 'MSYS' : 'winsymlinks:lnk' },
   # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
   build_by_default: true
 )
 # TODO(Ericson3214): Dosen't yet work
 #meson.override_find_program(linkname, t)
+
+localstatedir = nix_store.get_variable(
+  'localstatedir',
+  default_value : get_option('localstatedir'),
+)
+assert(localstatedir == get_option('localstatedir'))
+store_dir = nix_store.get_variable('storedir')
+subdir('scripts')
+subdir('misc')

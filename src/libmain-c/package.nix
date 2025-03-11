@@ -1,34 +1,29 @@
-{ lib
-, stdenv
-, mkMesonDerivation
-, releaseTools
+{
+  lib,
+  mkMesonLibrary,
 
-, meson
-, ninja
-, pkg-config
+  nix-util-c,
+  nix-store,
+  nix-store-c,
+  nix-main,
 
-, nix-util-c
-, nix-store
-, nix-store-c
-, nix-main
+  # Configuration Options
 
-# Configuration Options
-
-, version
+  version,
 }:
 
 let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonLibrary (finalAttrs: {
   pname = "nix-main-c";
   inherit version;
 
   workDir = ./.;
   fileset = fileset.unions [
-    ../../build-utils-meson
-    ./build-utils-meson
+    ../../nix-meson-build-support
+    ./nix-meson-build-support
     ../../.version
     ./.version
     ./meson.build
@@ -38,14 +33,6 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "h") ./.)
   ];
 
-  outputs = [ "out" "dev" ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-  ];
-
   propagatedBuildInputs = [
     nix-util-c
     nix-store
@@ -53,24 +40,8 @@ mkMesonDerivation (finalAttrs: {
     nix-main
   ];
 
-  preConfigure =
-    # "Inline" .version so it's not a symlink, and includes the suffix.
-    # Do the meson utils, without modification.
-    ''
-      chmod u+w ./.version
-      echo ${version} > ../../.version
-    '';
-
   mesonFlags = [
   ];
-
-  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
-  };
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

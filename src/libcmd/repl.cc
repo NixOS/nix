@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "error.hh"
 #include "repl-interacter.hh"
 #include "repl.hh"
 
@@ -27,11 +28,6 @@
 #include "print.hh"
 #include "ref.hh"
 #include "value.hh"
-
-#if HAVE_BOEHMGC
-#define GC_INCLUDE_NEW
-#include <gc/gc_cpp.h>
-#endif
 
 #include "strings.hh"
 
@@ -61,9 +57,7 @@ enum class ProcessLineResult {
 struct NixRepl
     : AbstractNixRepl
     , detail::ReplCompleterMixin
-    #if HAVE_BOEHMGC
     , gc
-    #endif
 {
     size_t debugTraceIndex;
 
@@ -107,6 +101,8 @@ struct NixRepl
                               Value & v,
                               unsigned int maxDepth = std::numeric_limits<unsigned int>::max())
     {
+        // Hide the progress bar during printing because it might interfere
+        auto suspension = logger->suspend();
         ::nix::printValue(*state, str, v, PrintOptions {
             .ansiColors = true,
             .force = true,
@@ -132,9 +128,9 @@ NixRepl::NixRepl(const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalS
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
     , getValues(getValues)
-    , staticEnv(new StaticEnv(nullptr, state->staticBaseEnv.get()))
+    , staticEnv(new StaticEnv(nullptr, state->staticBaseEnv))
     , runNixPtr{runNix}
-    , interacter(make_unique<ReadlineLikeInteracter>(getDataDir() + "/nix/repl-history"))
+    , interacter(make_unique<ReadlineLikeInteracter>(getDataDir() + "/repl-history"))
 {
 }
 
@@ -183,18 +179,20 @@ ReplExitStatus NixRepl::mainLoop()
 
     while (true) {
         // Hide the progress bar while waiting for user input, so that it won't interfere.
-        logger->pause();
-        // When continuing input from previous lines, don't print a prompt, just align to the same
-        // number of chars as the prompt.
-        if (!interacter->getLine(input, input.empty() ? ReplPromptType::ReplPrompt : ReplPromptType::ContinuationPrompt)) {
-            // Ctrl-D should exit the debugger.
-            state->debugStop = false;
-            logger->cout("");
-            // TODO: Should Ctrl-D exit just the current debugger session or
-            // the entire program?
-            return ReplExitStatus::QuitAll;
+        {
+            auto suspension = logger->suspend();
+            // When continuing input from previous lines, don't print a prompt, just align to the same
+            // number of chars as the prompt.
+            if (!interacter->getLine(input, input.empty() ? ReplPromptType::ReplPrompt : ReplPromptType::ContinuationPrompt)) {
+                // Ctrl-D should exit the debugger.
+                state->debugStop = false;
+                logger->cout("");
+                // TODO: Should Ctrl-D exit just the current debugger session or
+                // the entire program?
+                return ReplExitStatus::QuitAll;
+            }
+            // `suspension` resumes the logger
         }
-        logger->resume();
         try {
             switch (processLine(input)) {
                 case ProcessLineResult::Quit:
@@ -589,6 +587,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
     else if (command == ":p" || command == ":print") {
         Value v;
         evalString(arg, v);
+        auto suspension = logger->suspend();
         if (v.type() == nString) {
             std::cout << v.string_view();
         } else {
@@ -622,7 +621,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 // When missing, trigger the normal exception
                 // e.g. :doc builtins.foo
                 // behaves like
-                // nix-repl> builtins.foo      
+                // nix-repl> builtins.foo<tab>
                 // error: attribute 'foo' missing
                 evalString(arg, v);
                 assert(false);
@@ -651,7 +650,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
         } else if (fallbackPos) {
-            std::stringstream ss;
+            std::ostringstream ss;
             ss << "Attribute `" << fallbackName << "`\n\n";
             ss << "  … defined at " << state->positions[fallbackPos] << "\n\n";
             if (fallbackDoc) {
@@ -660,7 +659,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 ss << "No documentation found.\n\n";
             }
 
-            auto markdown = ss.str();
+            auto markdown = toView(ss);
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
 
         } else
@@ -697,6 +696,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         } else {
             Value v;
             evalString(line, v);
+            auto suspension = logger->suspend();
             printValue(std::cout, v, 1);
             std::cout << std::endl;
         }
@@ -720,7 +720,14 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
     if (flakeRefS.empty())
         throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
 
-    auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, absPath("."), true);
+    std::filesystem::path cwd;
+    try {
+        cwd = std::filesystem::current_path();
+    } catch (std::filesystem::filesystem_error & e) {
+        throw SysError("cannot determine current working directory");
+    }
+
+    auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, cwd.string(), true);
     if (evalSettings.pureEval && !flakeRef.input.isLocked())
         throw Error("cannot use ':load-flake' on locked flake reference '%s' (use --impure to override)", flakeRefS);
 
@@ -825,7 +832,7 @@ void NixRepl::runNix(Path program, const Strings & args, const std::optional<std
     if (runNixPtr)
         (*runNixPtr)(program, args, input);
     else
-        throw Error("Cannot run '%s', no method of calling the Nix CLI provided", program);
+        throw Error("Cannot run '%s' because no method of calling the Nix CLI was provided. This is a configuration problem pertaining to how this program was built. See Nix 2.25 release notes", program);
 }
 
 

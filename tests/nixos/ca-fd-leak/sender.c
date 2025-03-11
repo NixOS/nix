@@ -49,8 +49,8 @@ int main(int argc, char **argv) {
     msg.msg_controllen = CMSG_SPACE(sizeof(int));
 
     // Write a single null byte too.
-    msg.msg_iov = malloc(sizeof(struct iovec));
-    msg.msg_iov[0].iov_base = "";
+    msg.msg_iov = (struct iovec*) malloc(sizeof(struct iovec));
+    msg.msg_iov[0].iov_base = (void*) "";
     msg.msg_iov[0].iov_len = 1;
     msg.msg_iovlen = 1;
 

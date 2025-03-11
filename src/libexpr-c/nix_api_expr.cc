@@ -6,6 +6,7 @@
 #include "eval-gc.hh"
 #include "globals.hh"
 #include "eval-settings.hh"
+#include "ref.hh"
 
 #include "nix_api_expr.h"
 #include "nix_api_expr_internal.h"
@@ -16,9 +17,30 @@
 
 #if HAVE_BOEHMGC
 #  include <mutex>
-#  define GC_INCLUDE_NEW 1
-#  include "gc_cpp.h"
 #endif
+
+/**
+ * @brief Allocate and initialize using self-reference
+ *
+ * This allows a brace initializer to reference the object being constructed.
+ *
+ * @warning Use with care, as the pointer points to an object that is not fully constructed yet.
+ *
+ * @tparam T Type to allocate
+ * @tparam F A function type for `init`, taking a T* and returning the initializer for T
+ * @param init Function that takes a T* and returns the initializer for T
+ * @return Pointer to allocated and initialized object
+ */
+template <typename T, typename F>
+static T * unsafe_new_with_self(F && init)
+{
+    // Allocate
+    void * p = ::operator new(
+        sizeof(T),
+        static_cast<std::align_val_t>(alignof(T)));
+    // Initialize with placement new
+    return new (p) T(init(static_cast<T *>(p)));
+}
 
 nix_err nix_libexpr_init(nix_c_context * context)
 {
@@ -69,7 +91,7 @@ nix_err nix_value_call_multi(nix_c_context * context, EvalState * state, nix_val
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        state->state.callFunction(fn->value, nargs, (nix::Value * *)args, value->value, nix::noPos);
+        state->state.callFunction(fn->value, {(nix::Value * *) args, nargs}, value->value, nix::noPos);
         state->state.forceValue(value->value, nix::noPos);
     }
     NIXC_CATCH_ERRS
@@ -95,7 +117,42 @@ nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, nix_val
     NIXC_CATCH_ERRS
 }
 
-EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c, Store * store)
+nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Store * store)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        return unsafe_new_with_self<nix_eval_state_builder>([&](auto * self) {
+            return nix_eval_state_builder{
+                .store = nix::ref<nix::Store>(store->ptr),
+                .settings = nix::EvalSettings{/* &bool */ self->readOnlyMode},
+                .fetchSettings = nix::fetchers::Settings{},
+                .readOnlyMode = true,
+            };
+        });
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+void nix_eval_state_builder_free(nix_eval_state_builder * builder)
+{
+    delete builder;
+}
+
+nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_builder * builder)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        // TODO: load in one go?
+        builder->settings.readOnlyMode = nix::settings.readOnlyMode;
+        loadConfFile(builder->settings);
+        loadConfFile(builder->fetchSettings);
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_eval_state_builder_set_lookup_path(nix_c_context * context, nix_eval_state_builder * builder, const char ** lookupPath_c)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -104,26 +161,47 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c
         if (lookupPath_c != nullptr)
             for (size_t i = 0; lookupPath_c[i] != nullptr; i++)
                 lookupPath.push_back(lookupPath_c[i]);
+        builder->lookupPath = nix::LookupPath::parse(lookupPath);
+    }
+    NIXC_CATCH_ERRS
+}
 
-        void * p = ::operator new(
-            sizeof(EvalState),
-            static_cast<std::align_val_t>(alignof(EvalState)));
-        auto * p2 = static_cast<EvalState *>(p);
-        new (p) EvalState {
-            .fetchSettings = nix::fetchers::Settings{},
-            .settings = nix::EvalSettings{
-                nix::settings.readOnlyMode,
-            },
-            .state = nix::EvalState(
-                nix::LookupPath::parse(lookupPath),
-                store->ptr,
-                p2->fetchSettings,
-                p2->settings),
-        };
-        loadConfFile(p2->settings);
-        return p2;
+EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder * builder)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        return unsafe_new_with_self<EvalState>([&](auto * self) {
+            return EvalState{
+                .fetchSettings = std::move(builder->fetchSettings),
+                .settings = std::move(builder->settings),
+                .state = nix::EvalState(
+                    builder->lookupPath,
+                    builder->store,
+                    self->fetchSettings,
+                    self->settings),
+            };
+        });
     }
     NIXC_CATCH_ERRS_NULL
+}
+
+EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c, Store * store)
+{
+    auto builder = nix_eval_state_builder_new(context, store);
+    if (builder == nullptr)
+        return nullptr;
+
+    if (nix_eval_state_builder_load(context, builder) != NIX_OK)
+        return nullptr;
+
+    if (nix_eval_state_builder_set_lookup_path(context, builder, lookupPath_c)
+            != NIX_OK)
+        return nullptr;
+
+    auto *state = nix_eval_state_build(context, builder);
+    nix_eval_state_builder_free(builder);
+    return state;
 }
 
 void nix_state_free(EvalState * state)

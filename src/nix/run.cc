@@ -9,7 +9,6 @@
 #include "local-fs-store.hh"
 #include "finally.hh"
 #include "source-accessor.hh"
-#include "progress-bar.hh"
 #include "eval.hh"
 #include <filesystem>
 
@@ -19,6 +18,8 @@
 #endif
 
 #include <queue>
+
+namespace nix::fs { using namespace std::filesystem; }
 
 using namespace nix;
 
@@ -32,7 +33,7 @@ void execProgramInStore(ref<Store> store,
     const Strings & args,
     std::optional<std::string_view> system)
 {
-    stopProgressBar();
+    logger->stop();
 
     restoreProcessContext();
 
@@ -73,7 +74,7 @@ void execProgramInStore(ref<Store> store,
 
 }
 
-struct CmdRun : InstallableValueCommand
+struct CmdRun : InstallableValueCommand, MixEnvironment
 {
     using InstallableCommand::run;
 
@@ -133,6 +134,8 @@ struct CmdRun : InstallableValueCommand
         // we are about to exec out of this process without running C++ destructors.
         state->evalCaches.clear();
 
+        setEnviron();
+
         execProgramInStore(store, UseLookupPath::DontUse, app.program, allArgs);
     }
 };
@@ -163,32 +166,31 @@ void chrootHelper(int argc, char * * argv)
     /* Bind-mount realStoreDir on /nix/store. If the latter mount
        point doesn't already exists, we have to create a chroot
        environment containing the mount point and bind mounts for the
-       children of /. Would be nice if we could use overlayfs here,
-       but that doesn't work in a user namespace yet (Ubuntu has a
-       patch for this:
-       https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1478578). */
+       children of /.
+       Overlayfs for user namespaces is fixed in Linux since ac519625ed
+       (v5.11, 14 February 2021) */
     if (!pathExists(storeDir)) {
         // FIXME: Use overlayfs?
 
-        std::filesystem::path tmpDir = createTempDir();
+        fs::path tmpDir = createTempDir();
 
         createDirs(tmpDir + storeDir);
 
         if (mount(realStoreDir.c_str(), (tmpDir + storeDir).c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-        for (auto entry : std::filesystem::directory_iterator{"/"}) {
+        for (const auto & entry : fs::directory_iterator{"/"}) {
             checkInterrupt();
-            auto src = entry.path();
-            Path dst = tmpDir / entry.path().filename();
+            const auto & src = entry.path();
+            fs::path dst = tmpDir / entry.path().filename();
             if (pathExists(dst)) continue;
             auto st = entry.symlink_status();
-            if (std::filesystem::is_directory(st)) {
+            if (fs::is_directory(st)) {
                 if (mkdir(dst.c_str(), 0700) == -1)
                     throw SysError("creating directory '%s'", dst);
                 if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
                     throw SysError("mounting '%s' on '%s'", src, dst);
-            } else if (std::filesystem::is_symlink(st))
+            } else if (fs::is_symlink(st))
                 createSymlink(readLink(src), dst);
         }
 
@@ -202,12 +204,13 @@ void chrootHelper(int argc, char * * argv)
         if (chdir(cwd) == -1)
             throw SysError("chdir to '%s' in chroot", cwd);
     } else
-        if (mount(realStoreDir.c_str(), storeDir.c_str(), "", MS_BIND, 0) == -1)
-            throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
+        if (mount("overlay", storeDir.c_str(), "overlay", MS_MGC_VAL, fmt("lowerdir=%s:%s", storeDir, realStoreDir).c_str()) == -1)
+            if (mount(realStoreDir.c_str(), storeDir.c_str(), "", MS_BIND, 0) == -1)
+                throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-    writeFile("/proc/self/setgroups", "deny");
-    writeFile("/proc/self/uid_map", fmt("%d %d %d", uid, uid, 1));
-    writeFile("/proc/self/gid_map", fmt("%d %d %d", gid, gid, 1));
+    writeFile(fs::path{"/proc/self/setgroups"}, "deny");
+    writeFile(fs::path{"/proc/self/uid_map"}, fmt("%d %d %d", uid, uid, 1));
+    writeFile(fs::path{"/proc/self/gid_map"}, fmt("%d %d %d", gid, gid, 1));
 
 #if __linux__
     if (system != "")

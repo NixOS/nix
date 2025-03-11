@@ -156,9 +156,26 @@ std::string toLower(std::string s);
 std::string shellEscape(const std::string_view s);
 
 
-/* Exception handling in destructors: print an error message, then
-   ignore the exception. */
-void ignoreException(Verbosity lvl = lvlError);
+/**
+ * Exception handling in destructors: print an error message, then
+ * ignore the exception.
+ *
+ * If you're not in a destructor, you usually want to use `ignoreExceptionExceptInterrupt()`.
+ *
+ * This function might also be used in callbacks whose caller may not handle exceptions,
+ * but ideally we propagate the exception using an exception_ptr in such cases.
+ * See e.g. `PackBuilderContext`
+ */
+void ignoreExceptionInDestructor(Verbosity lvl = lvlError);
+
+/**
+ * Not destructor-safe.
+ * Print an error message, then ignore the exception.
+ * If the exception is an `Interrupted` exception, rethrow it.
+ *
+ * This may be used in a few places where Interrupt can't happen, but that's ok.
+ */
+void ignoreExceptionExceptInterrupt(Verbosity lvl = lvlError);
 
 
 
@@ -172,9 +189,13 @@ constexpr char treeNull[] = "    ";
 
 
 /**
- * Base64 encoding/decoding.
+ * Encode arbitrary bytes as Base64.
  */
 std::string base64Encode(std::string_view s);
+
+/**
+ * Decode arbitrary bytes to Base64.
+ */
 std::string base64Decode(std::string_view s);
 
 
@@ -261,6 +282,17 @@ std::optional<typename T::value_type> pop(T & c)
 }
 
 
+/**
+ * Append items to a container. TODO: remove this once we can use
+ * C++23's `append_range()`.
+ */
+template<class C, typename T>
+void append(C & c, std::initializer_list<T> l)
+{
+    c.insert(c.end(), l.begin(), l.end());
+}
+
+
 template<typename T>
 class Callback;
 
@@ -325,7 +357,9 @@ std::string showBytes(uint64_t bytes);
  */
 inline std::string operator + (const std::string & s1, std::string_view s2)
 {
-    auto s = s1;
+    std::string s;
+    s.reserve(s1.size() + s2.size());
+    s.append(s1);
     s.append(s2);
     return s;
 }
@@ -338,10 +372,11 @@ inline std::string operator + (std::string && s, std::string_view s2)
 
 inline std::string operator + (std::string_view s1, const char * s2)
 {
+    auto s2Size = strlen(s2);
     std::string s;
-    s.reserve(s1.size() + strlen(s2));
+    s.reserve(s1.size() + s2Size);
     s.append(s1);
-    s.append(s2);
+    s.append(s2, s2Size);
     return s;
 }
 

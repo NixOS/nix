@@ -57,15 +57,21 @@ libdir = join_paths(prefix, get_option('libdir'))
 
 # Required Programs
 #-------------------------------------------------
-xz = find_program('xz')
+find_program('xz')
 xsubpp = find_program('xsubpp')
 perl = find_program('perl')
-curl = find_program('curl')
+find_program('curl')
 yath = find_program('yath', required : false)
 
 # Required Libraries
 #-------------------------------------------------
-bzip2_dep = dependency('bzip2')
+bzip2_dep = dependency('bzip2', required: false)
+if not bzip2_dep.found()
+  bzip2_dep = cpp.find_library('bz2')
+  if not bzip2_dep.found()
+    error('No "bzip2" pkg-config or "bz2" library found')
+  endif
+endif
 curl_dep = dependency('libcurl')
 libsodium_dep = dependency('libsodium')
 
@@ -76,6 +82,9 @@ nix_store_dep = dependency('nix-store')
 # pkgconfig available, are not in a standard location,
 # and are installed into a version folder. Use the
 # Perl binary to give hints about perl include dir.
+#
+# Note that until we have a better solution for this, cross-compiling
+# the perl bindings does not appear to be possible.
 #-------------------------------------------------
 perl_archname = run_command(
   perl, '-e', 'use Config; print $Config{archname};', check: true).stdout()
@@ -148,7 +157,7 @@ subdir(lib_dir)
 if get_option('tests').enabled()
   yath_rc_conf = configuration_data()
   yath_rc_conf.set('lib_dir', lib_dir)
-  yath_rc = configure_file(
+  configure_file(
     output : '.yath.rc',
     input : '.yath.rc.in',
     configuration : yath_rc_conf,

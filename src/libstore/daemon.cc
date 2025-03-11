@@ -90,11 +90,11 @@ struct TunnelLogger : public Logger
     {
         if (ei.level > verbosity) return;
 
-        std::stringstream oss;
+        std::ostringstream oss;
         showErrorInfo(oss, ei, false);
 
         StringSink buf;
-        buf << STDERR_NEXT << oss.str();
+        buf << STDERR_NEXT << toView(oss);
         enqueueMsg(buf.s);
     }
 
@@ -593,7 +593,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         auto drvType = drv.type();
 
-        /* Content-addressed derivations are trustless because their output paths
+        /* Content-addressing derivations are trustless because their output paths
            are verified by their content alone, so any derivation is free to
            try to produce such a path.
 
@@ -1041,11 +1041,15 @@ void processConnection(
     conn.protoVersion = protoVersion;
     conn.features = features;
 
-    auto tunnelLogger = new TunnelLogger(conn.to, protoVersion);
-    auto prevLogger = nix::logger;
+    auto tunnelLogger_ = std::make_unique<TunnelLogger>(conn.to, protoVersion);
+    auto tunnelLogger = tunnelLogger_.get();
+    std::unique_ptr<Logger> prevLogger_;
+    auto prevLogger = logger.get();
     // FIXME
-    if (!recursive)
-        logger = tunnelLogger;
+    if (!recursive) {
+        prevLogger_ = std::move(logger);
+        logger = std::move(tunnelLogger_);
+    }
 
     unsigned int opCount = 0;
 

@@ -31,7 +31,7 @@ LocalOverlayStore::LocalOverlayStore(std::string_view scheme, PathView path, con
     if (checkMount.get()) {
         std::smatch match;
         std::string mountInfo;
-        auto mounts = readFile("/proc/self/mounts");
+        auto mounts = readFile(std::filesystem::path{"/proc/self/mounts"});
         auto regex = std::regex(R"((^|\n)overlay )" + realStoreDir.get() + R"( .*(\n|$))");
 
         // Mount points can be stacked, so there might be multiple matching entries.
@@ -156,7 +156,7 @@ void LocalOverlayStore::queryGCReferrers(const StorePath & path, StorePathSet & 
 StorePathSet LocalOverlayStore::queryValidDerivers(const StorePath & path)
 {
     auto res = LocalStore::queryValidDerivers(path);
-    for (auto p : lowerStore->queryValidDerivers(path))
+    for (const auto & p : lowerStore->queryValidDerivers(path))
         res.insert(p);
     return res;
 }

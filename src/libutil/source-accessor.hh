@@ -88,12 +88,13 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
 
         Unlike `DT_UNKNOWN`, this must not be used for deferring the lookup of types.
       */
-      tMisc
+      tChar, tBlock, tSocket, tFifo,
+      tUnknown
     };
 
     struct Stat
     {
-        Type type = tMisc;
+        Type type = tUnknown;
 
         /**
          * For regular files only: the size of the file. Not all
@@ -112,6 +113,9 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
          * file in the NAR. Only returned by NAR accessors.
          */
         std::optional<uint64_t> narOffset;
+
+        bool isNotNARSerialisable();
+        std::string typeString();
     };
 
     Stat lstat(const CanonPath & path);
@@ -209,5 +213,13 @@ ref<SourceAccessor> getFSSourceAccessor();
  * `root`.
  */
 ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root);
+
+ref<SourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts);
+
+/**
+ * Construct an accessor that presents a "union" view of a vector of
+ * underlying accessors. Earlier accessors take precedence over later.
+ */
+ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors);
 
 }

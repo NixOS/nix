@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 
-set -x
+set -eo pipefail
 
-((NEW_NIX_FIRST_BUILD_UID=350))
+# stock path to avoid unexpected command versions
+PATH="$(/usr/bin/getconf PATH)"
+
+((NEW_NIX_FIRST_BUILD_UID=351))
 ((TEMP_NIX_FIRST_BUILD_UID=31000))
 
 nix_user_n() {
@@ -17,18 +20,23 @@ any_nixbld(){
 	dscl . list /Users UniqueID | grep -E '\b_nixbld' >/dev/null
 }
 
+dsclattr() {
+	dscl . -read "$1" | awk "/$2/ { print \$2 }"
+}
+
 re_create_nixbld_user(){
 	local name uid
 
 	name="$1"
 	uid="$2"
+	gid="$3"
 
 	sudo /usr/bin/dscl . -create "/Users/$name" "UniqueID" "$uid"
 	sudo /usr/bin/dscl . -create "/Users/$name" "IsHidden" "1"
 	sudo /usr/bin/dscl . -create "/Users/$name" "NFSHomeDirectory" "/var/empty"
 	sudo /usr/bin/dscl . -create "/Users/$name" "RealName" "Nix build user $name"
 	sudo /usr/bin/dscl . -create "/Users/$name" "UserShell" "/sbin/nologin"
-	sudo /usr/bin/dscl . -create "/Users/$name" "PrimaryGroupID" "30001"
+	sudo /usr/bin/dscl . -create "/Users/$name" "PrimaryGroupID" "$gid"
 }
 
 hit_id_cap(){
@@ -68,11 +76,12 @@ temporarily_move_existing_nixbld_uids(){
 }
 
 change_nixbld_uids(){
-	local name next_id user_n
+	local existing_gid name next_id user_n
 
 	((next_id=NEW_NIX_FIRST_BUILD_UID))
 	((user_n=1))
 	name="$(nix_user_n "$user_n")"
+	existing_gid="$(dsclattr "/Groups/nixbld" "PrimaryGroupID")"
 
 	# we know that we have *some* nixbld users, but macOS may have
 	# already clobbered the first few users if this system has been
@@ -91,7 +100,7 @@ change_nixbld_uids(){
 			fi
 		done
 
-		re_create_nixbld_user "$name" "$next_id"
+		re_create_nixbld_user "$name" "$next_id" "$existing_gid"
 		echo "      $name was missing; created with uid: $next_id"
 
 		((user_n++))

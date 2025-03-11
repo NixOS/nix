@@ -1,39 +1,37 @@
-{ lib
-, stdenv
-, mkMesonDerivation
-, releaseTools
+{
+  lib,
+  stdenv,
+  mkMesonLibrary,
 
-, meson
-, ninja
-, pkg-config
+  boost,
+  brotli,
+  libarchive,
+  libblake3,
+  libcpuid,
+  libsodium,
+  nlohmann_json,
+  openssl,
 
-, boost
-, brotli
-, libarchive
-, libcpuid
-, libsodium
-, nlohmann_json
-, openssl
+  # Configuration Options
 
-# Configuration Options
-
-, version
+  version,
 }:
 
 let
   inherit (lib) fileset;
 in
 
-mkMesonDerivation (finalAttrs: {
+mkMesonLibrary (finalAttrs: {
   pname = "nix-util";
   inherit version;
 
   workDir = ./.;
   fileset = fileset.unions [
-    ../../build-utils-meson
-    ./build-utils-meson
+    ../../nix-meson-build-support
+    ./nix-meson-build-support
     ../../.version
     ./.version
+    ./widecharwidth
     ./meson.build
     ./meson.options
     ./linux/meson.build
@@ -43,37 +41,18 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];
 
-  outputs = [ "out" "dev" ];
-
-  nativeBuildInputs = [
-    meson
-    ninja
-    pkg-config
-  ];
-
   buildInputs = [
     brotli
+    libblake3
     libsodium
     openssl
-  ] ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
-  ;
+  ] ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
   propagatedBuildInputs = [
     boost
     libarchive
     nlohmann_json
   ];
-
-  preConfigure =
-    # "Inline" .version so it's not a symlink, and includes the suffix.
-    # Do the meson utils, without modification.
-    #
-    # TODO: change release process to add `pre` in `.version`, remove it
-    # before tagging, and restore after.
-    ''
-      chmod u+w ./.version
-      echo ${version} > ../../.version
-    '';
 
   mesonFlags = [
     (lib.mesonEnable "cpuid" stdenv.hostPlatform.isx86_64)
@@ -84,13 +63,7 @@ mkMesonDerivation (finalAttrs: {
     # https://github.com/NixOS/nixpkgs/issues/86131.
     BOOST_INCLUDEDIR = "${lib.getDev boost}/include";
     BOOST_LIBRARYDIR = "${lib.getLib boost}/lib";
-  } // lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
-    LDFLAGS = "-fuse-ld=gold";
   };
-
-  separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

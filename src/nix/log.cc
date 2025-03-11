@@ -3,7 +3,6 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "log-store.hh"
-#include "progress-bar.hh"
 
 using namespace nix;
 
@@ -55,9 +54,9 @@ struct CmdLog : InstallableCommand
 
             auto log = logSub.getBuildLog(path);
             if (!log) continue;
-            stopProgressBar();
+            logger->stop();
             printInfo("got build log for '%s' from '%s'", installable->what(), logSub.getUri());
-            writeFull(getStandardOut(), *log);
+            writeFull(getStandardOutput(), *log);
             return;
         }
 

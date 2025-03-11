@@ -40,7 +40,7 @@ static size_t getFreeMem()
 #  if __linux__
     {
         std::unordered_map<std::string, std::string> fields;
-        for (auto & line : tokenizeString<std::vector<std::string>>(readFile("/proc/meminfo"), "\n")) {
+        for (auto & line : tokenizeString<std::vector<std::string>>(readFile(std::filesystem::path("/proc/meminfo")), "\n")) {
             auto colon = line.find(':');
             if (colon == line.npos)
                 continue;

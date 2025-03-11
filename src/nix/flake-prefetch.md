@@ -5,10 +5,14 @@ R""(
 * Download a tarball and unpack it:
 
   ```console
-  # nix flake prefetch https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.5.tar.xz
+  # nix flake prefetch https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.5.tar.xz --out-link ./result
   Downloaded 'https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.5.tar.xz?narHash=sha256-3XYHZANT6AFBV0BqegkAZHbba6oeDkIUCDwbATLMhAY='
   to '/nix/store/sl5vvk8mb4ma1sjyy03kwpvkz50hd22d-source' (hash
   'sha256-3XYHZANT6AFBV0BqegkAZHbba6oeDkIUCDwbATLMhAY=').
+
+  # cat ./result/README
+  Linux kernel
+  …
   ```
 
 * Download the `dwarffs` flake (looked up in the flake registry):

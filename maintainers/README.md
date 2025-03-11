@@ -29,11 +29,7 @@ We aim to achieve this by improving the contributor experience and attracting mo
 
 ## Members
 
-- Eelco Dolstra (@edolstra) – Team lead
-- Valentin Gagarin (@fricklerhandwerk)
-- Thomas Bereknyei (@tomberek)
-- Robert Hensing (@roberth)
-- John Ericson (@Ericson2314)
+See https://nixos.org/community/teams/nix/ for the current team membership.
 
 The team is on Github as [@NixOS/nix-team](https://github.com/orgs/NixOS/teams/nix-team).
 
@@ -41,7 +37,7 @@ The team is on Github as [@NixOS/nix-team](https://github.com/orgs/NixOS/teams/n
 
 The team meets twice a week (times are denoted in the [Europe/Amsterdam](https://en.m.wikipedia.org/wiki/Time_in_the_Netherlands) time zone):
 
-- Discussion meeting: [Wednesday 21:00-22:00 Europe/Amsterdam](https://www.google.com/calendar/event?eid=ZG5rZzNyajRjajducGV2NGY5aGkzYWIwdnJfMjAyNDA1MDhUMTkwMDAwWiBiOW81MmZvYnFqYWs4b3E4bGZraGczdDBxZ0Bn)
+- Discussion meeting: Wednesday 21:00-22:00 Europe/Amsterdam see [calendar](https://calendar.google.com/calendar/u/0/embed?src=b9o52fobqjak8oq8lfkhg3t0qg@group.calendar.google.com).
 
   1. Triage issues and pull requests from the [No Status](#no-status) column (30 min)
   2. Discuss issues and pull requests from the [To discuss](#to-discuss) column (30 min).
@@ -50,7 +46,7 @@ The team meets twice a week (times are denoted in the [Europe/Amsterdam](https:/
        - mark it as draft if it is blocked on the contributor
        - escalate it back to the team by moving it to To discuss, and leaving a comment as to why the issue needs to be discussed again.
 
-- Work meeting: [Mondays 14:00-16:00 Europe/Amsterdam](https://www.google.com/calendar/event?eid=Ym52NDdzYnRic2NzcDcybjZiNDhpNzhpa3NfMjAyNDA1MTNUMTIwMDAwWiBiOW81MmZvYnFqYWs4b3E4bGZraGczdDBxZ0Bn)
+- Work meeting: Mondays 14:00-16:00 Europe/Amsterdam see [calendar](https://calendar.google.com/calendar/u/0/embed?src=b9o52fobqjak8oq8lfkhg3t0qg@group.calendar.google.com).
 
   1. Code review on pull requests from [In review](#in-review).
   2. Other chores and tasks.
@@ -62,6 +58,9 @@ Notes on issues and pull requests are posted as comments and linked from the mee
 Team meetings are generally open to anyone interested.
 We can make exceptions to discuss sensitive issues, such as security incidents or people matters.
 Contact any team member to get a calendar invite for reminders and updates.
+
+> [!IMPORTANT]
+> [Handling security reports](./security-reports.md) always takes priority.
 
 ## Project board protocol
 

@@ -14,6 +14,9 @@ private:
     const std::string host;
     bool fakeSSH;
     const std::string keyFile;
+    /**
+     * Raw bytes, not Base64 encoding.
+     */
     const std::string sshPublicHostKey;
     const bool useMaster;
     const bool compress;
@@ -51,12 +54,24 @@ public:
         Pid sshPid;
 #endif
         AutoCloseFD out, in;
+
+        /**
+         * Try to set the buffer size in both directions to the
+         * designated amount, if possible. If not possible, does
+         * nothing.
+         *
+         * Current implementation is to use `fcntl` with `F_SETPIPE_SZ`,
+         * which is Linux-only. For this implementation, `size` must
+         * convertable to an `int`. In other words, it must be within
+         * `[0, INT_MAX]`.
+         */
+        void trySetBufferSize(size_t size);
     };
 
     /**
      * @param command The command (arg vector) to execute.
      *
-     * @param extraSShArgs Extra args to pass to SSH (not the command to
+     * @param extraSshArgs Extra arguments to pass to SSH (not the command to
      * execute). Will not be used when "fake SSHing" to the local
      * machine.
      */

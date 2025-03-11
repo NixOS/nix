@@ -264,19 +264,28 @@ expr_op
   ;
 
 expr_app
-  : expr_app expr_select { $$ = makeCall(CUR_POS, $1, $2); }
-  | expr_select
+  : expr_app expr_select { $$ = makeCall(CUR_POS, $1, $2); $2->warnIfCursedOr(state->symbols, state->positions); }
+  | /* Once a ‘cursed or’ reaches this nonterminal, it is no longer cursed,
+       because the uncursed parse would also produce an expr_app. But we need
+       to remove the cursed status in order to prevent valid things like
+       `f (g or)` from triggering the warning. */
+    expr_select { $$ = $1; $$->resetCursedOr(); }
   ;
 
 expr_select
   : expr_simple '.' attrpath
     { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), nullptr); delete $3; }
   | expr_simple '.' attrpath OR_KW expr_select
-    { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), $5); delete $3; }
-  | /* Backwards compatibility: because Nixpkgs has a rarely used
-       function named ‘or’, allow stuff like ‘map or [...]’. */
+    { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), $5); delete $3; $5->warnIfCursedOr(state->symbols, state->positions); }
+  | /* Backwards compatibility: because Nixpkgs has a function named ‘or’,
+       allow stuff like ‘map or [...]’. This production is problematic (see
+       https://github.com/NixOS/nix/issues/11118) and will be refactored in the
+       future by treating `or` as a regular identifier. The refactor will (in
+       very rare cases, we think) change the meaning of expressions, so we mark
+       the ExprCall with data (establishing that it is a ‘cursed or’) that can
+       be used to emit a warning when an affected expression is parsed. */
     expr_simple OR_KW
-    { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, state->s.or_)}); }
+    { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, state->s.or_)}, state->positions.add(state->origin, @$.endOffset)); }
   | expr_simple
   ;
 
@@ -350,11 +359,18 @@ string_parts_interpolated
 
 path_start
   : PATH {
-    Path path(absPath({$1.p, $1.l}, state->basePath.path.abs()));
+    std::string_view literal({$1.p, $1.l});
+    Path path(absPath(literal, state->basePath.path.abs()));
     /* add back in the trailing '/' to the first segment */
-    if ($1.p[$1.l-1] == '/' && $1.l > 1)
-      path += "/";
-    $$ = new ExprPath(ref<SourceAccessor>(state->rootFS), std::move(path));
+    if (literal.size() > 1 && literal.back() == '/')
+      path += '/';
+    $$ =
+        /* Absolute paths are always interpreted relative to the
+           root filesystem accessor, rather than the accessor of the
+           current Nix expression. */
+        literal.front() == '/'
+        ? new ExprPath(state->rootFS, std::move(path))
+        : new ExprPath(state->basePath.accessor, std::move(path));
   }
   | HPATH {
     if (state->settings.pureEval) {
@@ -472,7 +488,7 @@ string_attr
   ;
 
 expr_list
-  : expr_list expr_select { $$ = $1; $1->elems.push_back($2); /* !!! dangerous */ }
+  : expr_list expr_select { $$ = $1; $1->elems.push_back($2); /* !!! dangerous */; $2->warnIfCursedOr(state->symbols, state->positions); }
   | { $$ = new ExprList; }
   ;
 

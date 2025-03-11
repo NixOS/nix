@@ -66,6 +66,7 @@ std::vector<KeyedBuildResult> Store::buildPathsWithResults(
     worker.run(goals);
 
     std::vector<KeyedBuildResult> results;
+    results.reserve(state.size());
 
     for (auto & [req, goalPtr] : state)
         results.emplace_back(KeyedBuildResult {

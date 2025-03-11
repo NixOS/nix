@@ -4,15 +4,13 @@
 #include <cassert>
 #include <span>
 
+#include "eval-gc.hh"
 #include "symbol-table.hh"
 #include "value/context.hh"
 #include "source-path.hh"
 #include "print-options.hh"
 #include "checked-arithmetic.hh"
 
-#if HAVE_BOEHMGC
-#include <gc/gc_allocator.h>
-#endif
 #include <nlohmann/json_fwd.hpp>
 
 namespace nix {
@@ -162,7 +160,9 @@ public:
     Value * * elems;
     ListBuilder(EvalState & state, size_t size);
 
-    ListBuilder(ListBuilder && x)
+    // NOTE: Can be noexcept because we are just copying integral values and
+    // raw pointers.
+    ListBuilder(ListBuilder && x) noexcept
         : size(x.size)
         , inlineElems{x.inlineElems[0], x.inlineElems[1]}
         , elems(size <= 2 ? inlineElems : x.elems)
@@ -598,15 +598,9 @@ void Value::mkBlackhole()
 }
 
 
-#if HAVE_BOEHMGC
 typedef std::vector<Value *, traceable_allocator<Value *>> ValueVector;
 typedef std::unordered_map<Symbol, Value *, std::hash<Symbol>, std::equal_to<Symbol>, traceable_allocator<std::pair<const Symbol, Value *>>> ValueMap;
 typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueVector>>> ValueVectorMap;
-#else
-typedef std::vector<Value *> ValueVector;
-typedef std::unordered_map<Symbol, Value *> ValueMap;
-typedef std::map<Symbol, ValueVector> ValueVectorMap;
-#endif
 
 
 /**
@@ -615,5 +609,7 @@ typedef std::map<Symbol, ValueVector> ValueVectorMap;
 typedef std::shared_ptr<Value *> RootValue;
 
 RootValue allocRootValue(Value * v);
+
+void forceNoNullByte(std::string_view s, std::function<Pos()> = nullptr);
 
 }

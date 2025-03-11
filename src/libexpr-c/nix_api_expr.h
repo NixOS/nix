@@ -31,6 +31,11 @@ extern "C" {
 
 // Type definitions
 /**
+ * @brief Builder for EvalState
+ */
+typedef struct nix_eval_state_builder nix_eval_state_builder;
+
+/**
  * @brief Represents a state of the Nix language evaluator.
  *
  * Multiple states can be created for multi-threaded
@@ -129,7 +134,7 @@ nix_err nix_value_call_multi(
  * @param[in] state The state of the evaluation.
  * @param[out] value The result of the function call.
  * @param[in] fn The Nix function to call.
- * @param[in] args The arguments to pass to the function.
+ * @param[in] ... The arguments to pass to the function.
  *
  * @see nix_value_call_multi
  */
@@ -174,12 +179,70 @@ nix_err nix_value_force(nix_c_context * context, EvalState * state, nix_value * 
 nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, nix_value * value);
 
 /**
- * @brief Create a new Nix language evaluator state.
+ * @brief Create a new nix_eval_state_builder
+ *
+ * The settings are initialized to their default value.
+ * Values can be sourced elsewhere with nix_eval_state_builder_load.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store The Nix store to use.
+ * @return A new nix_eval_state_builder or NULL on failure.
+ */
+nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Store * store);
+
+/**
+ * @brief Read settings from the ambient environment
+ *
+ * Settings are sourced from environment variables and configuration files,
+ * as documented in the Nix manual.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[out] builder The builder to modify.
+ * @return NIX_OK if successful, an error code otherwise.
+ */
+nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_builder * builder);
+
+/**
+ * @brief Set the lookup path for `<...>` expressions
+ *
+ * @param[in] context Optional, stores error information
+ * @param[in] builder The builder to modify.
+ * @param[in] lookupPath Null-terminated array of strings corresponding to entries in NIX_PATH.
+ */
+nix_err nix_eval_state_builder_set_lookup_path(
+    nix_c_context * context, nix_eval_state_builder * builder, const char ** lookupPath);
+
+/**
+ * @brief Create a new Nix language evaluator state
+ *
+ * Remember to nix_eval_state_builder_free after building the state.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] builder The builder to use and free
+ * @return A new Nix state or NULL on failure.
+ * @see nix_eval_state_builder_new, nix_eval_state_builder_free
+ */
+EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder * builder);
+
+/**
+ * @brief Free a nix_eval_state_builder
+ *
+ * Does not fail.
+ *
+ * @param[in] builder The builder to free.
+ */
+void nix_eval_state_builder_free(nix_eval_state_builder * builder);
+
+/**
+ * @brief Create a new Nix language evaluator state
+ *
+ * For more control, use nix_eval_state_builder
  *
  * @param[out] context Optional, stores error information
  * @param[in] lookupPath Null-terminated array of strings corresponding to entries in NIX_PATH.
  * @param[in] store The Nix store to use.
  * @return A new Nix state or NULL on failure.
+ * @see nix_state_builder_new
  */
 EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath, Store * store);
 

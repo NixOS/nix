@@ -161,7 +161,7 @@ struct FutureVector
                 } catch (...) {
                     if (ex) {
                         if (!getInterrupted())
-                            ignoreException();
+                            ignoreExceptionExceptInterrupt();
                     } else
                         ex = std::current_exception();
                 }

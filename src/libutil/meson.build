@@ -4,8 +4,6 @@ project('nix-util', 'cpp',
     'cpp_std=c++2a',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
-    'debug=true',
-    'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
   ],
   meson_version : '>= 1.1',
@@ -14,7 +12,7 @@ project('nix-util', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('build-utils-meson/deps-lists')
+subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
@@ -22,12 +20,13 @@ deps_private_maybe_subproject = [
 ]
 deps_public_maybe_subproject = [
 ]
-subdir('build-utils-meson/subprojects')
+subdir('nix-meson-build-support/subprojects')
 
 # Check for each of these functions, and create a define like `#define
 # HAVE_LUTIMES 1`. The `#define` is unconditional, 0 for not found and 1
 # for found. One therefore uses it with `#if` not `#ifdef`.
 check_funcs = [
+  'close_range',
   # Optionally used for changing the mtime of symlinks.
   'lutimes',
   # Optionally used for creating pipes on Unix
@@ -41,6 +40,8 @@ check_funcs = [
   # Optionally used to try to close more file descriptors (e.g. before
   # forking) on Unix.
   'sysconf',
+  # Optionally used for changing the mtime of files and symlinks.
+  'utimensat',
 ]
 foreach funcspec : check_funcs
   define_name = 'HAVE_' + funcspec.underscorify().to_upper()
@@ -48,7 +49,9 @@ foreach funcspec : check_funcs
   configdata.set(define_name, define_value)
 endforeach
 
-subdir('build-utils-meson/threads')
+configdata.set('HAVE_DECL_AT_SYMLINK_NOFOLLOW', cxx.has_header_symbol('fcntl.h', 'AT_SYMLINK_NOFOLLOW').to_int())
+
+subdir('nix-meson-build-support/libatomic')
 
 if host_machine.system() == 'windows'
   socket = cxx.find_library('ws2_32')
@@ -58,6 +61,12 @@ elif host_machine.system() == 'sunos'
   network_service_library = cxx.find_library('nsl')
   deps_other += [socket, network_service_library]
 endif
+
+blake3 = dependency(
+  'libblake3',
+  version: '>= 1.5.5',
+)
+deps_private += blake3
 
 boost = dependency(
   'boost',
@@ -103,6 +112,8 @@ deps_private += cpuid
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
+cxx = meson.get_compiler('cpp')
+
 config_h = configure_file(
   configuration : configdata,
   output : 'config-util.hh',
@@ -115,7 +126,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('build-utils-meson/diagnostics')
+subdir('nix-meson-build-support/common')
 
 sources = files(
   'archive.cc',
@@ -142,6 +153,7 @@ sources = files(
   'json-utils.cc',
   'logging.cc',
   'memory-source-accessor.cc',
+  'mounted-source-accessor.cc',
   'position.cc',
   'posix-source-accessor.cc',
   'references.cc',
@@ -155,6 +167,7 @@ sources = files(
   'tarfile.cc',
   'terminal.cc',
   'thread-pool.cc',
+  'union-source-accessor.cc',
   'unix-domain-socket.cc',
   'url.cc',
   'users.cc',
@@ -163,6 +176,10 @@ sources = files(
 )
 
 include_dirs = [include_directories('.')]
+if not cxx.has_header('widechar_width.h', required : false)
+  # use vendored widechar_width.h
+  include_dirs += include_directories('./widecharwidth')
+endif
 
 headers = [config_h] + files(
   'abstract-setting-to-json.hh',
@@ -185,6 +202,7 @@ headers = [config_h] + files(
   'english.hh',
   'environment-variables.hh',
   'error.hh',
+  'exec.hh',
   'executable-path.hh',
   'exit.hh',
   'experimental-features.hh',
@@ -250,7 +268,8 @@ else
   subdir('unix')
 endif
 
-subdir('build-utils-meson/export-all-symbols')
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 this_library = library(
   'nixutil',
@@ -271,4 +290,4 @@ if host_machine.system() == 'windows'
   libraries_private += ['-lws2_32']
 endif
 
-subdir('build-utils-meson/export')
+subdir('nix-meson-build-support/export')

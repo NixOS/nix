@@ -23,9 +23,11 @@ struct Settings : public Config
           Access tokens are specified as a string made up of
           space-separated `host=token` values.  The specific token
           used is selected by matching the `host` portion against the
-          "host" specification of the input. The actual use of the
-          `token` value is determined by the type of resource being
-          accessed:
+          "host" specification of the input. The `host` portion may
+          contain a path element which will match against the prefix
+          URL for the input. (eg: `github.com/org=token`). The actual use
+          of the `token` value is determined by the type of resource
+          being accessed:
 
           * Github: the token value is the OAUTH-TOKEN string obtained
             as the Personal Access Token from the Github server (see
@@ -69,6 +71,22 @@ struct Settings : public Config
 
     Setting<bool> warnDirty{this, true, "warn-dirty",
         "Whether to warn about dirty Git/Mercurial trees."};
+
+    Setting<bool> allowDirtyLocks{
+        this,
+        false,
+        "allow-dirty-locks",
+        R"(
+          Whether to allow dirty inputs (such as dirty Git workdirs)
+          to be locked via their NAR hash. This is generally bad
+          practice since Nix has no way to obtain such inputs if they
+          are subsequently modified. Therefore lock files with dirty
+          locks should generally only be used for local testing, and
+          should not be pushed to other users.
+        )",
+        {},
+        true,
+        Xp::Flakes};
 
     Setting<bool> trustTarballsFromGitForges{
         this, true, "trust-tarballs-from-git-forges",
