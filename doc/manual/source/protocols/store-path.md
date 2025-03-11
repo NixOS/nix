@@ -73,8 +73,8 @@ the end, while base-16 processes in from the beginning.
     `id` is the name of the output (usually, "out").
     For content-addressed store objects, `id`, is always "out".
 
-- `inner-digest` = base-16 representation of a SHA-256 hash of `inner-fingerprint`. The
-  base-16 encoding uses lower-cased hex digits.
+- `inner-digest` = base-16 representation of a SHA-256 hash of `inner-fingerprint`.
+  The base-16 encoding uses lower-cased hex digits.
 
 ## Inner fingerprint
 
