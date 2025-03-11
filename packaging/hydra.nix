@@ -29,32 +29,86 @@ let
   # Technically we could just return `pkgs.nixComponents`, but for Hydra it's
   # convention to transpose it, and to transpose it efficiently, we need to
   # enumerate them manually, so that we don't evaluate unnecessary package sets.
-  forAllPackages = lib.genAttrs [
-    "nix-everything"
-    "nix-util"
-    "nix-util-c"
-    "nix-util-test-support"
-    "nix-util-tests"
-    "nix-store"
-    "nix-store-c"
-    "nix-store-test-support"
-    "nix-store-tests"
-    "nix-fetchers"
-    "nix-fetchers-tests"
-    "nix-expr"
-    "nix-expr-c"
-    "nix-expr-test-support"
-    "nix-expr-tests"
-    "nix-flake"
-    "nix-flake-tests"
-    "nix-main"
-    "nix-main-c"
-    "nix-cmd"
-    "nix-cli"
-    "nix-functional-tests"
-  ];
+  # See listingIsComplete below.
+  forAllPackages = forAllPackages' { };
+  forAllPackages' =
+    {
+      enableBindings ? false,
+      enableDocs ? false, # already have separate attrs for these
+    }:
+    lib.genAttrs (
+      [
+        "nix-everything"
+        "nix-util"
+        "nix-util-c"
+        "nix-util-test-support"
+        "nix-util-tests"
+        "nix-store"
+        "nix-store-c"
+        "nix-store-test-support"
+        "nix-store-tests"
+        "nix-fetchers"
+        "nix-fetchers-tests"
+        "nix-expr"
+        "nix-expr-c"
+        "nix-expr-test-support"
+        "nix-expr-tests"
+        "nix-flake"
+        "nix-flake-c"
+        "nix-flake-tests"
+        "nix-main"
+        "nix-main-c"
+        "nix-cmd"
+        "nix-cli"
+        "nix-functional-tests"
+      ]
+      ++ lib.optionals enableBindings [
+        "nix-perl-bindings"
+      ]
+      ++ lib.optionals enableDocs [
+        "nix-manual"
+        "nix-internal-api-docs"
+        "nix-external-api-docs"
+      ]
+    );
 in
 {
+  /**
+    An internal check to make sure our package listing is complete.
+  */
+  listingIsComplete =
+    let
+      arbitrarySystem = "x86_64-linux";
+      listedPkgs = forAllPackages' {
+        enableBindings = true;
+        enableDocs = true;
+      } (_: null);
+      actualPkgs = lib.concatMapAttrs (
+        k: v: if lib.strings.hasPrefix "nix-" k then { ${k} = null; } else { }
+      ) nixpkgsFor.${arbitrarySystem}.native.nixComponents;
+      diff = lib.concatStringsSep "\n" (
+        lib.concatLists (
+          lib.mapAttrsToList (
+            k: _:
+            if (listedPkgs ? ${k}) && !(actualPkgs ? ${k}) then
+              [ "- ${k}: redundant?" ]
+            else if !(listedPkgs ? ${k}) && (actualPkgs ? ${k}) then
+              [ "- ${k}: missing?" ]
+            else
+              [ ]
+          ) (listedPkgs // actualPkgs)
+        )
+      );
+    in
+    if listedPkgs == actualPkgs then
+      { }
+    else
+      throw ''
+        Please update the components list in hydra.nix (or fix this check)
+        Differences:
+        ${diff}
+      '';
+
   # Binary package for various platforms.
   build = forAllPackages (
     pkgName: forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.${pkgName})
