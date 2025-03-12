@@ -922,14 +922,6 @@ Goal::Co DerivationGoal::hookDone()
     /* Close the log file. */
     closeLogFile();
 
-    if (buildResult.cpuUser && buildResult.cpuSystem) {
-        debug("builder for '%s' terminated with status %d, user CPU %.3fs, system CPU %.3fs",
-            worker.store.printStorePath(drvPath),
-            status,
-            ((double) buildResult.cpuUser->count()) / 1000000,
-            ((double) buildResult.cpuSystem->count()) / 1000000);
-    }
-
     try {
 
         /* Check the exit status. */
