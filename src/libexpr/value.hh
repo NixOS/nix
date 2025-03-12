@@ -81,7 +81,6 @@ class Bindings;
 struct Env;
 struct Expr;
 struct ExprLambda;
-struct ExprBlackHole;
 struct PrimOp;
 class Symbol;
 class PosIdx;
@@ -222,7 +221,11 @@ public:
         return nix::isFinished(internalType.load(std::memory_order_acquire));
     }
 
-    inline bool isBlackhole() const;
+    bool isBlackhole() const
+    {
+        auto type = internalType.load(std::memory_order_acquire);
+        return type == tPending || type == tAwaited;
+    }
 
     // type() == nFunction
     inline bool isLambda() const { return internalType == tLambda; };
@@ -473,8 +476,6 @@ public:
         finishValue(tLambda, { .lambda = { .env = e, .fun = f } });
     }
 
-    inline void mkBlackhole();
-
     void mkPrimOp(PrimOp * p);
 
     inline void mkPrimOpApp(Value * l, Value * r)
@@ -583,19 +584,6 @@ public:
     NixFloat fpoint() const
     { return payload.fpoint; }
 };
-
-
-extern ExprBlackHole eBlackHole;
-
-bool Value::isBlackhole() const
-{
-    return internalType == tThunk && payload.thunk.expr == (Expr*) &eBlackHole;
-}
-
-void Value::mkBlackhole()
-{
-    mkThunk(nullptr, (Expr *) &eBlackHole);
-}
 
 
 typedef std::vector<Value *, traceable_allocator<Value *>> ValueVector;

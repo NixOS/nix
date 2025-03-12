@@ -1173,7 +1173,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
         std::function<void(eval_cache::AttrCursor & visitor, nlohmann::json & result)> visit;
 
-        Executor executor;
+        Executor executor(state->settings);
         FutureVector futures(executor);
 
         visit = [&](eval_cache::AttrCursor & visitor, nlohmann::json & j)

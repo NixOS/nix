@@ -185,12 +185,14 @@ TEST_F(ValuePrintingTests, vFloat)
     test(vFloat, "2");
 }
 
+#if 0
 TEST_F(ValuePrintingTests, vBlackhole)
 {
     Value vBlackhole;
     vBlackhole.mkBlackhole();
     test(vBlackhole, "«potential infinite recursion»");
 }
+#endif
 
 TEST_F(ValuePrintingTests, depthAttrs)
 {
@@ -630,6 +632,7 @@ TEST_F(ValuePrintingTests, ansiColorsThunk)
          });
 }
 
+#if 0
 TEST_F(ValuePrintingTests, ansiColorsBlackhole)
 {
     Value v;
@@ -641,6 +644,7 @@ TEST_F(ValuePrintingTests, ansiColorsBlackhole)
              .ansiColors = true
          });
 }
+#endif
 
 TEST_F(ValuePrintingTests, ansiColorsAttrsRepeated)
 {

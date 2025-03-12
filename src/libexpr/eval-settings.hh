@@ -244,6 +244,14 @@ struct EvalSettings : Config
 
           This option can be enabled by setting `NIX_ABORT_ON_WARN=1` in the environment.
         )"};
+
+    Setting<unsigned int> evalCores{
+        this,
+        1,
+        "eval-cores",
+        R"(
+          Set the number of threads used to evaluate Nix expressions.
+        )"};
 };
 
 /**

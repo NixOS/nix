@@ -2131,17 +2131,6 @@ void ExprPos::eval(EvalState & state, Env & env, Value & v)
     state.mkPos(v, pos);
 }
 
-void ExprBlackHole::eval(EvalState & state, [[maybe_unused]] Env & env, Value & v)
-{
-    throwInfiniteRecursionError(state, v);
-}
-
-[[gnu::noinline]] [[noreturn]] void ExprBlackHole::throwInfiniteRecursionError(EvalState & state, Value &v) {
-    state.error<InfiniteRecursionError>("infinite recursion encountered")
-        .atPos(v.determinePos(noPos))
-        .debugThrow();
-}
-
 // always force this to be separate, otherwise forceValue may inline it and take
 // a massive perf hit
 [[gnu::noinline]]

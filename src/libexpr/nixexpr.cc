@@ -13,8 +13,6 @@ namespace nix {
 
 unsigned long Expr::nrExprs = 0;
 
-ExprBlackHole eBlackHole;
-
 // FIXME: remove, because *symbols* are abstract and do not have a single
 //        textual representation; see printIdentifier()
 std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)

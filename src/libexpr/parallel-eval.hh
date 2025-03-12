@@ -38,12 +38,11 @@ struct Executor
 
     std::condition_variable wakeup;
 
-    Executor()
+    Executor(const EvalSettings & evalSettings)
     {
-        auto nrCores = string2Int<size_t>(getEnv("NR_CORES").value_or("1")).value_or(1);
-        debug("executor using %d threads", nrCores);
+        debug("executor using %d threads", evalSettings.evalCores);
         auto state(state_.lock());
-        for (size_t n = 0; n < nrCores; ++n)
+        for (size_t n = 0; n < evalSettings.evalCores; ++n)
             state->threads.push_back(std::thread([&]() {
 #if HAVE_BOEHMGC
                 GC_stack_base sb;

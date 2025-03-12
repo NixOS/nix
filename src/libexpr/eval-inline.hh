@@ -110,6 +110,7 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
             Expr * expr = v.payload.thunk.expr;
             expr->eval(*this, *env, v);
         } catch (...) {
+            tryFixupBlackHolePos(v, pos);
             v.mkFailed();
             throw;
         }
@@ -128,6 +129,7 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
             }
             callFunction(*v.payload.app.left, *v.payload.app.right, v, pos);
         } catch (...) {
+            tryFixupBlackHolePos(v, pos);
             v.mkFailed();
             throw;
         }

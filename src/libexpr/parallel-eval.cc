@@ -56,6 +56,9 @@ InternalType EvalState::waitOnThunk(Value & v, bool awaited)
     /* Wait for another thread to finish this value. */
     debug("AWAIT %x", &v);
 
+    if (settings.evalCores <= 1)
+        error<InfiniteRecursionError>("infinite recursion encountered").atPos(v.determinePos(noPos)).debugThrow();
+
     nrThunksAwaitedSlow++;
     currentlyWaiting++;
     maxWaiting = std::max(maxWaiting.load(std::memory_order_acquire), currentlyWaiting.load(std::memory_order_acquire));
