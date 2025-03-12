@@ -552,4 +552,9 @@ GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal)
     return subGoal;
 }
 
+GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal)
+{
+    return subGoal;
+}
+
 }

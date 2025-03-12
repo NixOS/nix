@@ -322,6 +322,18 @@ Goal::Co DerivationGoal::haveDerivation()
 }
 
 
+/**
+ * Used for `inputGoals` local variable below
+ */
+struct value_comparison
+{
+    template <typename T>
+    bool operator()(const ref<T> & lhs, const ref<T> & rhs) const {
+        return *lhs < *rhs;
+    }
+};
+
+
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
 Goal::Co DerivationGoal::gaveUpOnSubstitution()
@@ -330,19 +342,22 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
        is no need to restart. */
     needRestart = NeedRestartForMoreOutputs::BuildInProgressWillNotNeed;
 
-    /* The inputs must be built before we can build this goal. */
-    inputDrvOutputs.clear();
-    if (useDerivation) {
-        std::function<void(ref<SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)> addWaiteeDerivedPath;
+    std::map<ref<const SingleDerivedPath>, GoalPtr, value_comparison> inputGoals;
 
-        addWaiteeDerivedPath = [&](ref<SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
-            if (!inputNode.value.empty())
-                addWaitee(worker.makeGoal(
+    if (useDerivation) {
+        std::function<void(ref<const SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)> addWaiteeDerivedPath;
+
+        addWaiteeDerivedPath = [&](ref<const SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+            if (!inputNode.value.empty()) {
+                auto g = worker.makeGoal(
                     DerivedPath::Built {
                         .drvPath = inputDrv,
                         .outputs = inputNode.value,
                     },
-                    buildMode == bmRepair ? bmRepair : bmNormal));
+                    buildMode == bmRepair ? bmRepair : bmNormal);
+                inputGoals.insert_or_assign(inputDrv, g);
+                addWaitee(std::move(g));
+            }
             for (const auto & [outputName, childNode] : inputNode.childMap)
                 addWaiteeDerivedPath(
                     make_ref<SingleDerivedPath>(SingleDerivedPath::Built { inputDrv, outputName }),
@@ -430,7 +445,12 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
             [&](const DerivationType::Impure &) {
                 return true;
             }
-        }, drvType.raw);
+        }, drvType.raw)
+            /* no inputs are outputs of dynamic derivations */
+            || std::ranges::any_of(
+                fullDrv.inputDrvs.map.begin(),
+                fullDrv.inputDrvs.map.end(),
+                [](auto & pair) { return !pair.second.childMap.empty(); });
 
         if (resolveDrv && !fullDrv.inputDrvs.map.empty()) {
             experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -438,7 +458,19 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
             /* We are be able to resolve this derivation based on the
                now-known results of dependencies. If so, we become a
                stub goal aliasing that resolved derivation goal. */
-            std::optional attempt = fullDrv.tryResolve(worker.store, inputDrvOutputs);
+            std::optional attempt = fullDrv.tryResolve(worker.store,
+                [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
+                    auto mEntry = get(inputGoals, drvPath);
+                    if (!mEntry) return std::nullopt;
+
+                    auto buildResult = (*mEntry)->getBuildResult(DerivedPath::Built{drvPath, OutputsSpec::Names{outputName}});
+                    if (!buildResult.success()) return std::nullopt;
+
+                    auto i = get(buildResult.builtOutputs, outputName);
+                    if (!i) return std::nullopt;
+
+                    return i->outPath;
+                });
             if (!attempt) {
               /* TODO (impure derivations-induced tech debt) (see below):
                  The above attempt should have found it, but because we manage
@@ -469,54 +501,31 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
             co_return resolvedFinished();
         }
 
-        std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputPaths;
+        /* If we get this far, we know no dynamic drvs inputs */
 
-        accumInputPaths = [&](const StorePath & depDrvPath, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
-            /* Add the relevant output closures of the input derivation
-               `i' as input paths.  Only add the closures of output paths
-               that are specified as inputs. */
-            auto getOutput = [&](const std::string & outputName) {
-                /* TODO (impure derivations-induced tech debt):
-                   Tracking input derivation outputs statefully through the
-                   goals is error prone and has led to bugs.
-                   For a robust nix, we need to move towards the `else` branch,
-                   which does not rely on goal state to match up with the
-                   reality of the store, which is our real source of truth.
-                   However, the impure derivations feature still relies on this
-                   fragile way of doing things, because its builds do not have
-                   a representation in the store, which is a usability problem
-                   in itself. When implementing this logic entirely with lookups
-                   make sure that they're cached. */
-                if (auto outPath = get(inputDrvOutputs, { depDrvPath, outputName })) {
-                    return *outPath;
+        for (auto & [depDrvPath, depNode] : fullDrv.inputDrvs.map) {
+            for (auto & outputName : depNode.value) {
+                /* Don't need to worry about `inputGoals`, because
+                   impure derivations are always resolved above. Can
+                   just use DB. This case only happens in the (older)
+                   input addressed and fixed output derivation cases. */
+                auto outMap = [&]{
+                    for (auto * drvStore : { &worker.evalStore, &worker.store })
+                        if (drvStore->isValidPath(depDrvPath))
+                            return worker.store.queryDerivationOutputMap(depDrvPath, drvStore);
+                    assert(false);
+                }();
+
+                auto outMapPath = outMap.find(outputName);
+                if (outMapPath == outMap.end()) {
+                    throw Error(
+                        "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
+                        worker.store.printStorePath(drvPath), outputName, worker.store.printStorePath(depDrvPath));
                 }
-                else {
-                    auto outMap = [&]{
-                        for (auto * drvStore : { &worker.evalStore, &worker.store })
-                            if (drvStore->isValidPath(depDrvPath))
-                                return worker.store.queryDerivationOutputMap(depDrvPath, drvStore);
-                        assert(false);
-                    }();
 
-                    auto outMapPath = outMap.find(outputName);
-                    if (outMapPath == outMap.end()) {
-                        throw Error(
-                            "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
-                            worker.store.printStorePath(drvPath), outputName, worker.store.printStorePath(depDrvPath));
-                    }
-                    return outMapPath->second;
-                }
-            };
-
-            for (auto & outputName : inputNode.value)
-                worker.store.computeFSClosure(getOutput(outputName), inputPaths);
-
-            for (auto & [outputName, childNode] : inputNode.childMap)
-                accumInputPaths(getOutput(outputName), childNode);
-        };
-
-        for (auto & [depDrvPath, depNode] : fullDrv.inputDrvs.map)
-            accumInputPaths(depDrvPath, depNode);
+                worker.store.computeFSClosure(outMapPath->second, inputPaths);
+            }
+        }
     }
 
     /* Second, the input sources. */
@@ -1543,36 +1552,6 @@ Goal::Done DerivationGoal::done(
     }
 
     return amDone(buildResult.success() ? ecSuccess : ecFailed, std::move(ex));
-}
-
-
-void DerivationGoal::waiteeDone(GoalPtr waitee, ExitCode result)
-{
-    Goal::waiteeDone(waitee, result);
-
-    if (!useDerivation || !drv) return;
-    auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
-
-    auto * dg = dynamic_cast<DerivationGoal *>(&*waitee);
-    if (!dg) return;
-
-    auto * nodeP = fullDrv.inputDrvs.findSlot(DerivedPath::Opaque { .path = dg->drvPath });
-    if (!nodeP) return;
-    auto & outputs = nodeP->value;
-
-    for (auto & outputName : outputs) {
-        auto buildResult = dg->getBuildResult(DerivedPath::Built {
-            .drvPath = makeConstantStorePathRef(dg->drvPath),
-            .outputs = OutputsSpec::Names { outputName },
-        });
-        if (buildResult.success()) {
-            auto i = buildResult.builtOutputs.find(outputName);
-            if (i != buildResult.builtOutputs.end())
-                inputDrvOutputs.insert_or_assign(
-                    { dg->drvPath, outputName },
-                    i->second.outPath);
-        }
-    }
 }
 
 }
