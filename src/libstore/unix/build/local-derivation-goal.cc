@@ -512,76 +512,55 @@ static void handleChildException(bool sendException)
     }
 }
 
-static std::function<bool(Descriptor, std::optional<std::string_view>)> build_handler(
+static std::function<bool(Descriptor, std::string_view)> build_handler(
     BufferedSink * logSink,
     Activity & act,
     std::map<ActivityId, Activity> & builderActivities,
     bool & failed,
-    Descriptor builderOut)
-{
-    unsigned long logSize;
-    size_t currentLogLinePos;
-    std::string currentLogLine;
-    std::string currentHookLine;
-    std::list<std::string> logTail;
+    Descriptor builderOut,
+    unsigned long & logSize,
+    std::string & currentLogLine,
+    size_t & currentLogLinePos,
+    std::list<std::string> & logTail
 
-    return [&](Descriptor fd, std::optional<std::string_view> data_) {
-        if (data_) {
-            auto data = *data_;
+) {
+    return [&](Descriptor fd, std::string_view data) {
+        // local & `ssh://`-builds are dealt with here.
+        bool isWrittenToLog =
+            fd == builderOut;
 
-            // local & `ssh://`-builds are dealt with here.
-            bool isWrittenToLog =
-                fd == builderOut;
+        if (isWrittenToLog) {
+            logSize += data.size();
+            if (settings.maxLogSize && logSize > settings.maxLogSize) {
+                failed = true;
+                return true; // break out and stop listening to children
+            }
 
-            if (isWrittenToLog) {
-                logSize += data.size();
-                if (settings.maxLogSize && logSize > settings.maxLogSize) {
-                    failed = true;
-                    return true; // break out and stop listening to children
-                }
-
-                for (auto c : data)
-                    if (c == '\r')
-                        currentLogLinePos = 0;
-                    else if (c == '\n') {
-                        if (!handleJSONLogMessage(
-                                currentLogLine, act, builderActivities, "the derivation builder", false)) {
-                            logTail.push_back(currentLogLine);
-                            if (logTail.size() > settings.logLines)
-                                logTail.pop_front();
-
-                            act.result(resBuildLogLine, currentLogLine);
-                        }
-
-                        currentLogLine = "";
-                        currentLogLinePos = 0;
-                    } else {
-                        if (currentLogLinePos >= currentLogLine.size())
-                            currentLogLine.resize(currentLogLinePos + 1);
-                        currentLogLine[currentLogLinePos++] = c;
+            for (auto c : data)
+                if (c == '\r')
+                    currentLogLinePos = 0;
+                else if (c == '\n') {
+                    if (!handleJSONLogMessage(
+                            currentLogLine, act, builderActivities, "the derivation builder", false)) {
+                        act.result(resBuildLogLine, currentLogLine);
+                        logTail.push_back(std::move(currentLogLine));
+                        if (logTail.size() > settings.logLines)
+                            logTail.pop_front();
                     }
 
-                if (logSink)
-                    (*logSink)(data);
-            }
-            failed = false;
-            return false;
-        } else {
-            if (!currentLogLine.empty()) {
-                if (!handleJSONLogMessage(currentLogLine, act, builderActivities, "the derivation builder", false)) {
-                    logTail.push_back(currentLogLine);
-                    if (logTail.size() > settings.logLines)
-                        logTail.pop_front();
-
-                    act.result(resBuildLogLine, currentLogLine);
+                    currentLogLine = "";
+                    currentLogLinePos = 0;
+                } else {
+                    if (currentLogLinePos >= currentLogLine.size())
+                        currentLogLine.resize(currentLogLinePos + 1);
+                    currentLogLine[currentLogLinePos++] = c;
                 }
 
-                currentLogLine = "";
-                currentLogLinePos = 0;
-            }
-            failed = false;
-            return true;
+            if (logSink)
+                (*logSink)(data);
         }
+        failed = false;
+        return false;
     };
 }
 
@@ -1212,13 +1191,44 @@ Goal::Co LocalDerivationGoal::startBuilder()
         });
     }
 
+    trace("process started");
+
     /* parent */
     pid.setSeparatePG(true);
     started();
     processSandboxSetupMessages();
 
     bool failed = false;
-    co_await childStarted({builderOut.get()}, true, true, build_handler(logSink.get(), *act, builderActivities, failed, builderOut.get()));
+    trace("calling childStarted build");
+
+    unsigned long logSize;
+    std::string currentLogLine;
+    size_t currentLogLinePos;
+    std::list<std::string> logTail;
+
+    auto handler = build_handler(
+        logSink.get(),
+        *act,
+        builderActivities,
+        failed,
+        builderOut.get(),
+        logSize,
+        currentLogLine,
+        currentLogLinePos,
+        logTail
+    );
+
+    co_await childStarted({builderOut.get()}, true, true, handler);
+
+    trace("calling childStarted build end");
+
+    if (
+        !currentLogLine.empty() &&
+        !handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false)
+    ) {
+        act->result(resBuildLogLine, currentLogLine);
+    }
+
     if (failed) {
         killChild();
         co_return done(

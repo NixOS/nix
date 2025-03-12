@@ -227,10 +227,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
 #else
         &outPipe
 #endif
-    }, true, false, [](Descriptor fd, std::optional<std::string_view> data) {
-        if (!data) return true;
-        else return false;
-    });
+    }, true, false, [](Descriptor, std::string_view) {return false;});
 
     trace("substitute finished");
 

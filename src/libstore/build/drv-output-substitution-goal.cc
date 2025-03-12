@@ -64,10 +64,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
     #else
             &*outPipe
     #endif
-        }, true, false, [](Descriptor fd, std::optional<std::string_view> data) {
-            if (!data) return true;
-            else return false;
-        });
+        }, true, false, [](Descriptor, std::string_view) {return false;});
 
         /*
          * The realisation corresponding to the given output id.

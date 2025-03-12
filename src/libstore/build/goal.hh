@@ -432,7 +432,7 @@ protected:
         const std::set<MuxablePipePollState::CommChannel> & channels,
         bool inBuildSlot,
         bool respectTimeouts,
-        std::function<bool(Descriptor, std::optional<std::string_view>)> handler
+        std::function<bool(Descriptor, std::string_view)> handler
     );
 
     Co waitForAWhile();

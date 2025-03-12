@@ -148,7 +148,7 @@ Co Goal::await(Goals new_waitees)
 
 Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
 {
-    trace("amDone");
+    trace("done");
     assert(top_co);
     assert(exitCode == ecBusy);
     assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure);
@@ -222,14 +222,7 @@ void Goal::handleChildOutput(Descriptor fd, std::string_view data) {
     assert(child_handler);
     bool stop_listening = child_handler(fd, data);
     if (stop_listening) {
-        work(); // goes back into childStarted
-    }
-}
-void Goal::handleEOF(Descriptor fd) {
-    assert(child_handler);
-    bool stop_listening = child_handler(fd, {});
-    if (stop_listening) {
-        work(); // goes back into childStarted
+        worker.wakeUp(shared_from_this()); 
     }
 }
 
@@ -237,11 +230,12 @@ Co Goal::childStarted(
     const std::set<MuxablePipePollState::CommChannel> & channels,
     bool inBuildSlot,
     bool respectTimeouts,
-    std::function<bool(Descriptor fd, std::optional<std::string_view> data)> handler
+    std::function<bool(Descriptor fd, std::string_view data)> handler
 ) {
     worker.childStarted(shared_from_this(), channels, inBuildSlot, respectTimeouts);
     child_handler = handler;
     co_await Suspend{};
+    trace("done listening to children");
     child_handler = {};
     worker.childTerminated(this);
     co_return Return{};

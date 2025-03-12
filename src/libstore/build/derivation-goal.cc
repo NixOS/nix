@@ -573,120 +573,100 @@ void DerivationGoal::started()
     worker.updateProgress();
 }
 
-static std::function<bool(Descriptor, std::optional<std::string_view>)> hook_handler(
+static std::function<bool(Descriptor, std::string_view)> hook_handler(
     BufferedSink * logSink,
     Activity & act,
     const Activity & workerAct,
     std::map<ActivityId, Activity> & builderActivities,
     bool & failed,
-    HookInstance & hook)
+    HookInstance & hook,
+    unsigned long& logSize,
+    std::string& currentLogLine,
+    size_t& currentLogLinePos,
+    std::string& currentHookLine,
+    std::list<std::string>& logTail
+)
 {
-    unsigned long logSize;
-    size_t currentLogLinePos;
-    std::string currentLogLine;
-    std::string currentHookLine;
-    std::list<std::string> logTail;
-
-    return [&](Descriptor fd, std::optional<std::string_view> data_) {
-        if (data_) {
-            auto data = *data_;
-
-            // local & `ssh://`-builds are dealt with here.
-            bool isWrittenToLog =
+    return [&](Descriptor fd, std::string_view data) {
+        // local & `ssh://`-builds are dealt with here.
+        bool isWrittenToLog =
 #ifdef _WIN32 // TODO enable build hook on Windows
-                false;
+            false;
 #else
-                fd == hook.builderOut.readSide.get();
+            fd == hook.builderOut.readSide.get();
 #endif
 
-            if (isWrittenToLog) {
-                logSize += data.size();
-                if (settings.maxLogSize && logSize > settings.maxLogSize) {
-                    failed = true;
-                    return true; // break out and stop listening to children
-                }
-
-                for (auto c : data)
-                    if (c == '\r')
-                        currentLogLinePos = 0;
-                    else if (c == '\n') {
-                        if (!handleJSONLogMessage(
-                                currentLogLine, act, builderActivities, "the derivation builder", false)) {
-                            logTail.push_back(currentLogLine);
-                            if (logTail.size() > settings.logLines)
-                                logTail.pop_front();
-
-                            act.result(resBuildLogLine, currentLogLine);
-                        }
-
-                        currentLogLine = "";
-                        currentLogLinePos = 0;
-                    } else {
-                        if (currentLogLinePos >= currentLogLine.size())
-                            currentLogLine.resize(currentLogLinePos + 1);
-                        currentLogLine[currentLogLinePos++] = c;
-                    }
-
-                if (logSink)
-                    (*logSink)(data);
+        if (isWrittenToLog) {
+            logSize += data.size();
+            if (settings.maxLogSize && logSize > settings.maxLogSize) {
+                failed = true;
+                return true; // break out and stop listening to children
             }
 
+            for (auto c : data)
+                if (c == '\r')
+                    currentLogLinePos = 0;
+                else if (c == '\n') {
+                    if (!handleJSONLogMessage(
+                            currentLogLine, act, builderActivities, "the derivation builder", false)) {
+                        act.result(resBuildLogLine, currentLogLine);
+                        logTail.push_back(std::move(currentLogLine));
+                        if (logTail.size() > settings.logLines)
+                            logTail.pop_front();
+                    }
+
+                    currentLogLine = "";
+                    currentLogLinePos = 0;
+                } else {
+                    if (currentLogLinePos >= currentLogLine.size())
+                        currentLogLine.resize(currentLogLinePos + 1);
+                    currentLogLine[currentLogLinePos++] = c;
+                }
+
+            if (logSink)
+                (*logSink)(data);
+        }
+
 #ifndef _WIN32 // TODO enable build hook on Windows
-            if (fd == hook.fromHook.readSide.get()) {
-                for (auto c : data)
-                    if (c == '\n') {
-                        auto json = parseJSONMessage(currentHookLine, "the derivation builder");
-                        if (json) {
-                            auto s =
-                                handleJSONLogMessage(*json, workerAct, hook.activities, "the derivation builder", true);
-                            // ensure that logs from a builder using `ssh-ng://` as protocol
-                            // are also available to `nix log`.
-                            if (s && !isWrittenToLog && logSink) {
-                                const auto type = (*json)["type"];
-                                const auto fields = (*json)["fields"];
-                                if (type == resBuildLogLine) {
-                                    (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
-                                } else if (type == resSetPhase && !fields.is_null()) {
-                                    const auto phase = fields[0];
-                                    if (!phase.is_null()) {
-                                        // nixpkgs' stdenv produces lines in the log to signal
-                                        // phase changes.
-                                        // We want to get the same lines in case of remote builds.
-                                        // The format is:
-                                        //   @nix { "action": "setPhase", "phase": "$curPhase" }
-                                        const auto logLine =
-                                            nlohmann::json::object({{"action", "setPhase"}, {"phase", phase}});
-                                        (*logSink)(
-                                            "@nix "
-                                            + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace)
-                                            + "\n");
-                                    }
+        if (fd == hook.fromHook.readSide.get()) {
+            for (auto c : data)
+                if (c == '\n') {
+                    auto json = parseJSONMessage(currentHookLine, "the derivation builder");
+                    if (json) {
+                        auto s =
+                            handleJSONLogMessage(*json, workerAct, hook.activities, "the derivation builder", true);
+                        // ensure that logs from a builder using `ssh-ng://` as protocol
+                        // are also available to `nix log`.
+                        if (s && !isWrittenToLog && logSink) {
+                            const auto type = (*json)["type"];
+                            const auto fields = (*json)["fields"];
+                            if (type == resBuildLogLine) {
+                                (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
+                            } else if (type == resSetPhase && !fields.is_null()) {
+                                const auto phase = fields[0];
+                                if (!phase.is_null()) {
+                                    // nixpkgs' stdenv produces lines in the log to signal
+                                    // phase changes.
+                                    // We want to get the same lines in case of remote builds.
+                                    // The format is:
+                                    //   @nix { "action": "setPhase", "phase": "$curPhase" }
+                                    const auto logLine =
+                                        nlohmann::json::object({{"action", "setPhase"}, {"phase", phase}});
+                                    (*logSink)(
+                                        "@nix "
+                                        + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace)
+                                        + "\n");
                                 }
                             }
                         }
-                        currentHookLine.clear();
-                    } else
-                        currentHookLine += c;
-            }
-#endif
-            failed = false;
-            return false;
-        } else {
-            if (!currentLogLine.empty()) {
-                if (!handleJSONLogMessage(currentLogLine, act, builderActivities, "the derivation builder", false)) {
-                    logTail.push_back(currentLogLine);
-                    if (logTail.size() > settings.logLines)
-                        logTail.pop_front();
-
-                    act.result(resBuildLogLine, currentLogLine);
-                }
-
-                currentLogLine = "";
-                currentLogLinePos = 0;
-            }
-            failed = false;
-            return true;
+                    }
+                    currentHookLine.clear();
+                } else
+                    currentHookLine += c;
         }
+#endif
+        failed = false;
+        return false;
     };
 }
 
@@ -775,8 +755,38 @@ Goal::Co DerivationGoal::tryToBuild()
             {
                 bool failed = false;
                 assert(act);
+                trace("calling childStarted hook");
+                unsigned long logSize;
+                std::string currentLogLine;
+                size_t currentLogLinePos;
+                std::string currentHookLine;
+                std::list<std::string> logTail;
+                auto handler = hook_handler(
+                    logSink.get(),
+                    *act,
+                    worker.act,
+                    builderActivities,
+                    failed,
+                    *hook,
+                    logSize,
+                    currentLogLine,
+                    currentLogLinePos,
+                    currentHookLine,
+                    logTail
+                );
                 co_await childStarted(
-                    {}, false, false, hook_handler(logSink.get(), *act, worker.act, builderActivities, failed, *hook));
+                    { hook->fromHook.readSide.get()
+                    , hook->builderOut.readSide.get()
+                    }, false, false, handler);
+                trace("calling childStarted hook end");
+
+                if (
+                    !currentLogLine.empty() &&
+                    !handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false)
+                ) {
+                    act->result(resBuildLogLine, currentLogLine);
+                }
+
                 if (failed) {
                     co_return done(
                         BuildResult::LogLimitExceeded,
@@ -1294,7 +1304,6 @@ HookReply DerivationGoal::tryBuildHook()
     std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());
     fds.insert(hook->builderOut.readSide.get());
-    worker.childStarted(shared_from_this(), fds, false, false);
 
     return rpAccept;
 #endif
