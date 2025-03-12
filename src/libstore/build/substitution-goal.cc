@@ -35,6 +35,7 @@ Goal::Done PathSubstitutionGoal::done(
         debug(*errorMsg);
         buildResult.errorMsg = *errorMsg;
     }
+    cleanup();
     return amDone(result);
 }
 
