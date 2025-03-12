@@ -1131,7 +1131,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 {
     bool showLegacy = false;
     bool showAllSystems = false;
-    bool allowImportFromDerivation = false;
+    bool evaluateImportFromDerivation = false;
 
     CmdFlakeShow()
     {
@@ -1146,9 +1146,9 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             .handler = {&showAllSystems, true}
         });
         addFlag({
-            .longName = "allow-import-from-derivation",
+            .longName = "evaluate-import-from-derivation",
             .description = "Show the contents of outputs which require builds to evaluate.",
-            .handler = {&allowImportFromDerivation, true}
+            .handler = {&evaluateImportFromDerivation, true}
         });
     }
 
@@ -1166,7 +1166,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
     void run(nix::ref<nix::Store> store) override
     {
-        evalSettings.enableImportFromDerivation.setDefault(allowImportFromDerivation);
+        evalSettings.enableImportFromDerivation.setDefault(evaluateImportFromDerivation);
 
         auto state = getEvalState();
         auto flake = std::make_shared<LockedFlake>(lockFlake());
@@ -1342,9 +1342,9 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                 throw Error("expected a derivation");
                         } catch (IFDError & e) {
                             if (!json) {
-                                logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--allow-import-from-derivation' to show)", headerPrefix));
+                                logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--evaluate-import-from-derivation' to show)", headerPrefix));
                             } else {
-                                logger->warn(fmt("%s omitted (use '--allow-import-from-derivation' to show)", concatStringsSep(".", attrPathS))); 
+                                logger->warn(fmt("%s omitted (use '--evaluate-import-from-derivation' to show)", concatStringsSep(".", attrPathS))); 
                             }
                         }
                     }
@@ -1358,9 +1358,9 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             recurse();
                     } catch (IFDError & e) {
                         if (!json) {
-                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--allow-import-from-derivation' to show)", headerPrefix));
+                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--evaluate-import-from-derivation' to show)", headerPrefix));
                         } else {
-                            logger->warn(fmt("%s omitted (use '--allow-import-from-derivation' to show)", concatStringsSep(".", attrPathS))); 
+                            logger->warn(fmt("%s omitted (use '--evaluate-import-from-derivation' to show)", concatStringsSep(".", attrPathS))); 
                         }
                     }
                 }
@@ -1389,9 +1389,9 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                 recurse();
                         } catch (IFDError & e) {
                             if (!json) {
-                                logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--allow-import-from-derivation' to show)", headerPrefix));
+                                logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--evaluate-import-from-derivation' to show)", headerPrefix));
                             } else {
-                                logger->warn(fmt("%s omitted (use '--allow-import-from-derivation' to show)", concatStringsSep(".", attrPathS))); 
+                                logger->warn(fmt("%s omitted (use '--evaluate-import-from-derivation' to show)", concatStringsSep(".", attrPathS))); 
                             }
                         }
                     }
