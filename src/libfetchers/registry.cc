@@ -82,13 +82,15 @@ void Registry::write(const Path & path)
 void Registry::add(
     const Input & from,
     const Input & to,
-    const Attrs & extraAttrs)
+    const Attrs & extraAttrs,
+    bool exact)
 {
     entries.emplace_back(
         Entry {
             .from = from,
             .to = to,
-            .extraAttrs = extraAttrs
+            .extraAttrs = extraAttrs,
+            .exact = exact
         });
 }
 
@@ -142,7 +144,7 @@ void overrideRegistry(
     const Input & to,
     const Attrs & extraAttrs)
 {
-    getFlagRegistry(*from.settings)->add(from, to, extraAttrs);
+    getFlagRegistry(*from.settings)->add(from, to, extraAttrs, false);
 }
 
 static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, ref<Store> store)
