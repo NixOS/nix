@@ -372,10 +372,8 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
     } catch (BuildError & e) {
         outputLocks.unlock();
 
-        BuildResult::Status st = BuildResult::MiscFailure;
-
         assert(derivationType);
-        st =
+        BuildResult::Status st =
             dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
             statusOk(status) ? BuildResult::OutputRejected :
             !derivationType->isSandboxed() || diskFull ? BuildResult::TransientFailure :
