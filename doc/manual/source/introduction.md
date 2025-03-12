@@ -1,7 +1,21 @@
-# Introduction
+# Determinate Nix
 
-Nix is a _purely functional package manager_.  This means that it
-treats packages like values in purely functional programming languages
+**Determinate Nix** is a downstream distribution of [Nix], a purely functional language, CLI tool, and package management system.
+It's available on Linux, macOS, and Windows Subsystem for Linux (WSL).
+
+## Installing
+
+We recommend that macOS users install Determinate Nix using our graphical installer, [Determinate.pkg][pkg].
+For Linux and Windows Subsystem for Linux (WSL) users:
+
+```console
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | \
+  sh -s -- install --determinate
+```
+
+## How Nix works
+
+Nix treats packages like values in purely functional programming languages
 such as Haskell — they are built by functions that don’t have
 side-effects, and they never change after they have been built.  Nix
 stores packages in the _Nix store_, usually the directory
@@ -184,10 +198,14 @@ to build configuration files in `/etc`).  This means, among other
 things, that it is easy to roll back the entire configuration of the
 system to an earlier state.  Also, users can install software without
 root privileges.  For more information and downloads, see the [NixOS
-homepage](https://nixos.org/).
+homepage][nix].
 
 ## License
 
 Nix is released under the terms of the [GNU LGPLv2.1 or (at your
 option) any later
-version](http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html).
+version][license].
+
+[license]: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+[pkg]: https://install.determinate.systems/determinate-pkg/stable/Universal
+[site]: https://nixos.org
