@@ -55,6 +55,13 @@ struct InitialOutput {
     std::optional<InitialOutputStatus> known;
 };
 
+/** Used internally */
+void appendLogTailErrorMsg(
+    Worker & worker,
+    const StorePath & drvPath,
+    const std::list<std::string> & logTail,
+    std::string & msg);
+
 /**
  * A goal for building some or all of the outputs of a derivation.
  */

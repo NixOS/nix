@@ -908,6 +908,33 @@ void runPostBuildHook(
     });
 }
 
+
+void appendLogTailErrorMsg(
+    Worker & worker,
+    const StorePath & drvPath,
+    const std::list<std::string> & logTail,
+    std::string & msg)
+{
+    if (!logger->isVerbose() && !logTail.empty()) {
+        msg += fmt(";\nlast %d log lines:\n", logTail.size());
+        for (auto & line : logTail) {
+            msg += "> ";
+            msg += line;
+            msg += "\n";
+        }
+        auto nixLogCommand = experimentalFeatureSettings.isEnabled(Xp::NixCommand)
+            ? "nix log"
+            : "nix-store -l";
+        // The command is on a separate line for easy copying, such as with triple click.
+        // This message will be indented elsewhere, so removing the indentation before the
+        // command will not put it at the start of the line unfortunately.
+        msg += fmt("For full logs, run:\n  " ANSI_BOLD "%s %s" ANSI_NORMAL,
+            nixLogCommand,
+            worker.store.printStorePath(drvPath));
+    }
+}
+
+
 Goal::Co DerivationGoal::buildDone()
 {
     trace("build done");
@@ -959,23 +986,7 @@ Goal::Co DerivationGoal::buildDone()
                 Magenta(worker.store.printStorePath(drvPath)),
                 statusToString(status));
 
-            if (!logger->isVerbose() && !logTail.empty()) {
-                msg += fmt(";\nlast %d log lines:\n", logTail.size());
-                for (auto & line : logTail) {
-                    msg += "> ";
-                    msg += line;
-                    msg += "\n";
-                }
-                auto nixLogCommand = experimentalFeatureSettings.isEnabled(Xp::NixCommand)
-                    ? "nix log"
-                    : "nix-store -l";
-                // The command is on a separate line for easy copying, such as with triple click.
-                // This message will be indented elsewhere, so removing the indentation before the
-                // command will not put it at the start of the line unfortunately.
-                msg += fmt("For full logs, run:\n  " ANSI_BOLD "%s %s" ANSI_NORMAL,
-                    nixLogCommand,
-                    worker.store.printStorePath(drvPath));
-            }
+            appendLogTailErrorMsg(worker, drvPath, logTail, msg);
 
             if (diskFull)
                 msg += "\nnote: build failure may have been caused by lack of free disk space";
