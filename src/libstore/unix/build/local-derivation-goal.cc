@@ -374,23 +374,12 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
         BuildResult::Status st = BuildResult::MiscFailure;
 
-#ifndef _WIN32 // TODO abstract over proc exit status
-        if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101)
-            st = BuildResult::TimedOut;
-
-        else if (hook && (!WIFEXITED(status) || WEXITSTATUS(status) != 100)) {
-        }
-
-        else
-#endif
-        {
-            assert(derivationType);
-            st =
-                dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
-                statusOk(status) ? BuildResult::OutputRejected :
-                !derivationType->isSandboxed() || diskFull ? BuildResult::TransientFailure :
-                BuildResult::PermanentFailure;
-        }
+        assert(derivationType);
+        st =
+            dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
+            statusOk(status) ? BuildResult::OutputRejected :
+            !derivationType->isSandboxed() || diskFull ? BuildResult::TransientFailure :
+            BuildResult::PermanentFailure;
 
         co_return done(st, {}, std::move(e));
     }
