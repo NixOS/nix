@@ -186,7 +186,7 @@ struct LocalDerivationGoal : public DerivationGoal
     /**
      * Start building a derivation.
      */
-    void startBuilder();
+    Co startBuilder();
 
     /**
      * Fill in the environment for the builder.
@@ -247,8 +247,6 @@ struct LocalDerivationGoal : public DerivationGoal
      * '{allowed,disallowed}{References,Requisites}' attributes).
      */
     void checkOutputs(const std::map<std::string, ValidPathInfo> & outputs);
-
-    bool isReadDesc(int fd) override;
 
     /**
      * Delete the temporary directory, if we have one.

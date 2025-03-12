@@ -3,6 +3,7 @@
 
 #include "store-api.hh"
 #include "build-result.hh"
+#include "muxable-pipe.hh"
 
 #include <coroutine>
 
@@ -60,6 +61,12 @@ private:
      */
     Goals waitees;
 
+    /**
+     * Suspend our goal and wait until we get `work`-ed again.
+     * `co_await`-able by @ref Co.
+     */
+    struct Suspend {};
+
 public:
     typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure} ExitCode;
 
@@ -108,12 +115,6 @@ protected:
     BuildResult buildResult;
 
 public:
-    /**
-     * Suspend our goal and wait until we get `work`-ed again.
-     * `co_await`-able by @ref Co.
-     */
-    struct Suspend {};
-
     /**
      * Return from the current coroutine and suspend our goal
      * if we're not busy anymore, or jump to the next coroutine
@@ -398,15 +399,8 @@ public:
 
     void work();
 
-    virtual void handleChildOutput(Descriptor fd, std::string_view data)
-    {
-        unreachable();
-    }
-
-    virtual void handleEOF(Descriptor fd)
-    {
-        unreachable();
-    }
+    void handleChildOutput(Descriptor fd, std::string_view data);
+    void handleEOF(Descriptor fd);
 
     void trace(std::string_view s);
 
@@ -430,8 +424,22 @@ public:
      */
     virtual JobCategory jobCategory() const = 0;
 
+private:
+    std::function<bool(Descriptor, std::string_view)> child_handler;
+
 protected:
     Co await(Goals waitees);
+
+    Co childStarted(
+        const std::set<MuxablePipePollState::CommChannel> & channels,
+        bool inBuildSlot,
+        bool respectTimeouts,
+        std::function<bool(Descriptor, std::optional<std::string_view>)> handler
+    );
+
+    Co waitForAWhile();
+    Co waitForBuildSlot();
+    Co yield();
 };
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);

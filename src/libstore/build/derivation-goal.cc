@@ -547,8 +547,7 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
        build hook. */
-    worker.wakeUp(shared_from_this());
-    co_await Suspend{};
+    co_await yield();
     co_return tryToBuild();
 }
 
@@ -572,6 +571,123 @@ void DerivationGoal::started()
         1});
     mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
     worker.updateProgress();
+}
+
+static std::function<bool(Descriptor, std::optional<std::string_view>)> hook_handler(
+    BufferedSink * logSink,
+    Activity & act,
+    const Activity & workerAct,
+    std::map<ActivityId, Activity> & builderActivities,
+    bool & failed,
+    HookInstance & hook)
+{
+    unsigned long logSize;
+    size_t currentLogLinePos;
+    std::string currentLogLine;
+    std::string currentHookLine;
+    std::list<std::string> logTail;
+
+    return [&](Descriptor fd, std::optional<std::string_view> data_) {
+        if (data_) {
+            auto data = *data_;
+
+            // local & `ssh://`-builds are dealt with here.
+            bool isWrittenToLog =
+#ifdef _WIN32 // TODO enable build hook on Windows
+                false;
+#else
+                fd == hook.builderOut.readSide.get();
+#endif
+
+            if (isWrittenToLog) {
+                logSize += data.size();
+                if (settings.maxLogSize && logSize > settings.maxLogSize) {
+                    failed = true;
+                    return true; // break out and stop listening to children
+                }
+
+                for (auto c : data)
+                    if (c == '\r')
+                        currentLogLinePos = 0;
+                    else if (c == '\n') {
+                        if (!handleJSONLogMessage(
+                                currentLogLine, act, builderActivities, "the derivation builder", false)) {
+                            logTail.push_back(currentLogLine);
+                            if (logTail.size() > settings.logLines)
+                                logTail.pop_front();
+
+                            act.result(resBuildLogLine, currentLogLine);
+                        }
+
+                        currentLogLine = "";
+                        currentLogLinePos = 0;
+                    } else {
+                        if (currentLogLinePos >= currentLogLine.size())
+                            currentLogLine.resize(currentLogLinePos + 1);
+                        currentLogLine[currentLogLinePos++] = c;
+                    }
+
+                if (logSink)
+                    (*logSink)(data);
+            }
+
+#ifndef _WIN32 // TODO enable build hook on Windows
+            if (fd == hook.fromHook.readSide.get()) {
+                for (auto c : data)
+                    if (c == '\n') {
+                        auto json = parseJSONMessage(currentHookLine, "the derivation builder");
+                        if (json) {
+                            auto s =
+                                handleJSONLogMessage(*json, workerAct, hook.activities, "the derivation builder", true);
+                            // ensure that logs from a builder using `ssh-ng://` as protocol
+                            // are also available to `nix log`.
+                            if (s && !isWrittenToLog && logSink) {
+                                const auto type = (*json)["type"];
+                                const auto fields = (*json)["fields"];
+                                if (type == resBuildLogLine) {
+                                    (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
+                                } else if (type == resSetPhase && !fields.is_null()) {
+                                    const auto phase = fields[0];
+                                    if (!phase.is_null()) {
+                                        // nixpkgs' stdenv produces lines in the log to signal
+                                        // phase changes.
+                                        // We want to get the same lines in case of remote builds.
+                                        // The format is:
+                                        //   @nix { "action": "setPhase", "phase": "$curPhase" }
+                                        const auto logLine =
+                                            nlohmann::json::object({{"action", "setPhase"}, {"phase", phase}});
+                                        (*logSink)(
+                                            "@nix "
+                                            + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace)
+                                            + "\n");
+                                    }
+                                }
+                            }
+                        }
+                        currentHookLine.clear();
+                    } else
+                        currentHookLine += c;
+            }
+#endif
+            failed = false;
+            return false;
+        } else {
+            if (!currentLogLine.empty()) {
+                if (!handleJSONLogMessage(currentLogLine, act, builderActivities, "the derivation builder", false)) {
+                    logTail.push_back(currentLogLine);
+                    if (logTail.size() > settings.logLines)
+                        logTail.pop_front();
+
+                    act.result(resBuildLogLine, currentLogLine);
+                }
+
+                currentLogLine = "";
+                currentLogLinePos = 0;
+            }
+            failed = false;
+            return true;
+        }
+    };
 }
 
 Goal::Co DerivationGoal::tryToBuild()
@@ -609,8 +725,7 @@ Goal::Co DerivationGoal::tryToBuild()
         if (!actLock)
             actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                 fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
-        worker.waitForAWhile(shared_from_this());
-        co_await Suspend{};
+        co_await waitForAWhile();
         co_return tryToBuild();
     }
 
@@ -650,34 +765,52 @@ Goal::Co DerivationGoal::tryToBuild()
 
     if (!buildLocally) {
         switch (tryBuildHook()) {
-            case rpAccept:
-                /* Yes, it has started doing so.  Wait until we get
-                   EOF from the hook. */
-                actLock.reset();
-                buildResult.startTime = time(0); // inexact
-                started();
-                co_await Suspend{};
-                co_return hookDone();
-            case rpPostpone:
-                /* Not now; wait until at least one child finishes or
-                   the wake-up timeout expires. */
-                if (!actLock)
-                    actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                        fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
-                worker.waitForAWhile(shared_from_this());
-                outputLocks.unlock();
-                co_await Suspend{};
-                co_return tryToBuild();
-            case rpDecline:
-                /* We should do it ourselves. */
-                break;
+        case rpAccept:
+            /* Yes, it has started doing so.  Wait until we get
+               EOF from the hook. */
+            actLock.reset();
+            buildResult.startTime = time(0); // inexact
+            started();
+            assert(hook);
+            {
+                bool failed = false;
+                assert(act);
+                co_await childStarted(
+                    {}, false, false, hook_handler(logSink.get(), *act, worker.act, builderActivities, failed, *hook));
+                if (failed) {
+                    co_return done(
+                        BuildResult::LogLimitExceeded,
+                        {},
+                        Error(
+                            "%s killed after writing more than %d bytes of log output",
+                            getName(),
+                            settings.maxLogSize));
+                } else {
+                    co_return hookDone();
+                }
+            }
+        case rpPostpone:
+            /* Not now; wait until at least one child finishes or
+               the wake-up timeout expires. */
+            if (!actLock)
+                actLock = std::make_unique<Activity>(
+                    *logger,
+                    lvlWarn,
+                    actBuildWaiting,
+                    fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
+            co_await waitForAWhile();
+            outputLocks.unlock();
+            co_await waitForAWhile();
+            co_return tryToBuild();
+        case rpDecline:
+            /* We should do it ourselves. */
+            break;
         }
     }
 
     actLock.reset();
 
-    worker.wakeUp(shared_from_this());
-    co_await Suspend{};
+    co_await yield();
     co_return tryLocalBuild();
 }
 
@@ -927,9 +1060,6 @@ Goal::Co DerivationGoal::hookDone()
 
     buildResult.timesBuilt++;
     buildResult.stopTime = time(0);
-
-    /* So the child is gone now. */
-    worker.childTerminated(this);
 
     /* Close the read side of the logger pipe. */
 #ifndef _WIN32 // TODO enable build hook on Windows
@@ -1217,111 +1347,6 @@ void DerivationGoal::closeLogFile()
     logSink = logFileSink = 0;
     fdLogFile.close();
 }
-
-
-bool DerivationGoal::isReadDesc(Descriptor fd)
-{
-#ifdef _WIN32 // TODO enable build hook on Windows
-    return false;
-#else
-    return fd == hook->builderOut.readSide.get();
-#endif
-}
-
-void DerivationGoal::handleChildOutput(Descriptor fd, std::string_view data)
-{
-    // local & `ssh://`-builds are dealt with here.
-    auto isWrittenToLog = isReadDesc(fd);
-    if (isWrittenToLog)
-    {
-        logSize += data.size();
-        if (settings.maxLogSize && logSize > settings.maxLogSize) {
-            killChild();
-            // We're not inside a coroutine, hence we can't use co_return here.
-            // Thus we ignore the return value.
-            [[maybe_unused]] Done _ = done(
-                BuildResult::LogLimitExceeded, {},
-                Error("%s killed after writing more than %d bytes of log output",
-                    getName(), settings.maxLogSize));
-            return;
-        }
-
-        for (auto c : data)
-            if (c == '\r')
-                currentLogLinePos = 0;
-            else if (c == '\n')
-                flushLine();
-            else {
-                if (currentLogLinePos >= currentLogLine.size())
-                    currentLogLine.resize(currentLogLinePos + 1);
-                currentLogLine[currentLogLinePos++] = c;
-            }
-
-        if (logSink) (*logSink)(data);
-    }
-
-#ifndef _WIN32 // TODO enable build hook on Windows
-    if (hook && fd == hook->fromHook.readSide.get()) {
-        for (auto c : data)
-            if (c == '\n') {
-                auto json = parseJSONMessage(currentHookLine, "the derivation builder");
-                if (json) {
-                    auto s = handleJSONLogMessage(*json, worker.act, hook->activities, "the derivation builder", true);
-                    // ensure that logs from a builder using `ssh-ng://` as protocol
-                    // are also available to `nix log`.
-                    if (s && !isWrittenToLog && logSink) {
-                        const auto type = (*json)["type"];
-                        const auto fields = (*json)["fields"];
-                        if (type == resBuildLogLine) {
-                            (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
-                        } else if (type == resSetPhase && ! fields.is_null()) {
-                            const auto phase = fields[0];
-                            if (! phase.is_null()) {
-                                // nixpkgs' stdenv produces lines in the log to signal
-                                // phase changes.
-                                // We want to get the same lines in case of remote builds.
-                                // The format is:
-                                //   @nix { "action": "setPhase", "phase": "$curPhase" }
-                                const auto logLine = nlohmann::json::object({
-                                    {"action", "setPhase"},
-                                    {"phase", phase}
-                                });
-                                (*logSink)("@nix " + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n");
-                            }
-                        }
-                    }
-                }
-                currentHookLine.clear();
-            } else
-                currentHookLine += c;
-    }
-#endif
-}
-
-
-void DerivationGoal::handleEOF(Descriptor fd)
-{
-    if (!currentLogLine.empty()) flushLine();
-    worker.wakeUp(shared_from_this());
-}
-
-
-void DerivationGoal::flushLine()
-{
-    if (handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false))
-        ;
-
-    else {
-        logTail.push_back(currentLogLine);
-        if (logTail.size() > settings.logLines) logTail.pop_front();
-
-        act->result(resBuildLogLine, currentLogLine);
-    }
-
-    currentLogLine = "";
-    currentLogLinePos = 0;
-}
-
 
 std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDerivationOutputMap()
 {

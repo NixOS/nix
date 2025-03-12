@@ -179,8 +179,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
         if (i != storePath) /* ignore self-references */
             assert(worker.store.isValidPath(i));
 
-    worker.wakeUp(shared_from_this());
-    co_await Suspend{};
+    co_await yield();
 
     trace("trying to run");
 
@@ -188,8 +187,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
        if maxSubstitutionJobs == 0, we still allow a substituter to run. This
        prevents infinite waiting. */
     while (worker.getNrSubstitutions() >= std::max(1U, (unsigned int) settings.maxSubstitutionJobs)) {
-        worker.waitForBuildSlot(shared_from_this());
-        co_await Suspend{};
+        co_await waitForBuildSlot();
     }
 
     auto maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
@@ -222,20 +220,20 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
         }
     });
 
-    worker.childStarted(shared_from_this(), {
+    co_await childStarted({
 #ifndef _WIN32
         outPipe.readSide.get()
 #else
         &outPipe
 #endif
-    }, true, false);
-
-    co_await Suspend{};
+    }, true, false, [](Descriptor fd, std::optional<std::string_view> data) {
+        if (!data) return true;
+        else return false;
+    });
 
     trace("substitute finished");
 
     thr.join();
-    worker.childTerminated(this);
 
     try {
         promise.get_future().get();
@@ -279,13 +277,6 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
 
     co_return done(ecSuccess, BuildResult::Substituted);
 }
-
-
-void PathSubstitutionGoal::handleEOF(Descriptor fd)
-{
-    worker.wakeUp(shared_from_this());
-}
-
 
 void PathSubstitutionGoal::cleanup()
 {

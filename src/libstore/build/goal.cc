@@ -1,12 +1,12 @@
 #include "goal.hh"
 #include "worker.hh"
+#include <optional>
 
 namespace nix {
 
 using Co = nix::Goal::Co;
 using promise_type = nix::Goal::promise_type;
 using handle_type = nix::Goal::handle_type;
-using Suspend = nix::Goal::Suspend;
 
 Co::Co(Co&& rhs) {
     this->handle = rhs.handle;
@@ -148,7 +148,7 @@ Co Goal::await(Goals new_waitees)
 
 Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
 {
-    trace("done");
+    trace("amDone");
     assert(top_co);
     assert(exitCode == ecBusy);
     assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure);
@@ -220,5 +220,51 @@ void Goal::work()
     assert(top_co || exitCode != ecBusy);
 }
 
+void Goal::handleChildOutput(Descriptor fd, std::string_view data) {
+    assert(child_handler);
+    bool stop_listening = child_handler(fd, data);
+    if (stop_listening) {
+        work(); // goes back into childStarted
+    }
+}
+void Goal::handleEOF(Descriptor fd) {
+    assert(child_handler);
+    bool stop_listening = child_handler(fd, {});
+    if (stop_listening) {
+        work(); // goes back into childStarted
+    }
+}
+
+Co Goal::childStarted(
+    const std::set<MuxablePipePollState::CommChannel> & channels,
+    bool inBuildSlot,
+    bool respectTimeouts,
+    std::function<bool(Descriptor fd, std::optional<std::string_view> data)> handler
+) {
+    worker.childStarted(shared_from_this(), channels, inBuildSlot, respectTimeouts);
+    child_handler = handler;
+    co_await Suspend{};
+    child_handler = {};
+    worker.childTerminated(this);
+    co_return Return{};
+}
+
+Co Goal::yield() {
+    worker.wakeUp(shared_from_this()); 
+    co_await Suspend{};
+    co_return Return{};
+}
+
+Co Goal::waitForAWhile() {
+    worker.waitForAWhile(shared_from_this());
+    co_await Suspend{};
+    co_return Return{};
+}
+
+Co Goal::waitForBuildSlot() {
+    worker.waitForBuildSlot(shared_from_this());
+    co_await Suspend{};
+    co_return Return{};
+}
 
 }
