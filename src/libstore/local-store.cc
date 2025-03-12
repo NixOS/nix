@@ -110,7 +110,6 @@ LocalStore::LocalStore(
     , schemaPath(dbDir + "/schema")
     , tempRootsDir(stateDir + "/temproots")
     , fnTempRoots(fmt("%s/%d", tempRootsDir, getpid()))
-    , locksHeld(tokenizeString<PathSet>(getEnv("NIX_HELD_LOCKS").value_or("")))
 {
     auto state(_state.lock());
     state->stmts = std::make_unique<State::Stmts>();
