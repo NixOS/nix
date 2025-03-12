@@ -905,7 +905,7 @@ Goal::Co DerivationGoal::hookDone()
         0;
 #endif
 
-    debug("builder process for '%s' finished", worker.store.printStorePath(drvPath));
+    debug("build hook for '%s' finished", worker.store.printStorePath(drvPath));
 
     buildResult.timesBuilt++;
     buildResult.stopTime = time(0);
