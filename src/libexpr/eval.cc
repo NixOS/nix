@@ -1140,7 +1140,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
         auto cache(fileEvalCache.lock());
         auto [i, inserted] = cache->try_emplace(*resolvedPath);
         if (inserted)
-            i->second.mkThunk(nullptr, &expr);
+            i->second.mkThunk(&baseEnv, &expr);
         vExpr = &i->second;
     }
 

@@ -108,6 +108,7 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
             }
             Env * env = v.payload.thunk.env;
             Expr * expr = v.payload.thunk.expr;
+            assert(env);
             expr->eval(*this, *env, v);
         } catch (...) {
             tryFixupBlackHolePos(v, pos);
