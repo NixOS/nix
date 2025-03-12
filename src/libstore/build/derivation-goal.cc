@@ -922,51 +922,16 @@ Goal::Co DerivationGoal::hookDone()
     /* Close the log file. */
     closeLogFile();
 
-    try {
+    /* Check the exit status. */
+    if (!statusOk(status)) {
+        auto msg = fmt("builder for '%s' %s",
+            Magenta(worker.store.printStorePath(drvPath)),
+            statusToString(status));
 
-        /* Check the exit status. */
-        if (!statusOk(status)) {
-            auto msg = fmt("builder for '%s' %s",
-                Magenta(worker.store.printStorePath(drvPath)),
-                statusToString(status));
+        appendLogTailErrorMsg(worker, drvPath, logTail, msg);
 
-            appendLogTailErrorMsg(worker, drvPath, logTail, msg);
+        auto e = BuildError(msg);
 
-            throw BuildError(msg);
-        }
-
-        /* Compute the FS closure of the outputs and register them as
-           being valid. */
-        auto builtOutputs =
-            /* When using a build hook, the build hook can register the output
-               as valid (by doing `nix-store --import').  If so we don't have
-               to do anything here.
-
-               We can only early return when the outputs are known a priori. For
-               floating content-addressing derivations this isn't the case.
-             */
-            assertPathValidity();
-
-        StorePathSet outputPaths;
-        for (auto & [_, output] : builtOutputs)
-            outputPaths.insert(output.outPath);
-        runPostBuildHook(
-            worker.store,
-            *logger,
-            drvPath,
-            outputPaths
-        );
-
-        /* It is now safe to delete the lock files, since all future
-           lockers will see that the output paths are valid; they will
-           not create new lock files with the same names as the old
-           (unlinked) lock files. */
-        outputLocks.setDeletion(true);
-        outputLocks.unlock();
-
-        co_return done(BuildResult::Built, std::move(builtOutputs));
-
-    } catch (BuildError & e) {
         outputLocks.unlock();
 
         BuildResult::Status st = BuildResult::MiscFailure;
@@ -988,6 +953,37 @@ Goal::Co DerivationGoal::hookDone()
 
         co_return done(st, {}, std::move(e));
     }
+
+    /* Compute the FS closure of the outputs and register them as
+       being valid. */
+    auto builtOutputs =
+        /* When using a build hook, the build hook can register the output
+           as valid (by doing `nix-store --import').  If so we don't have
+           to do anything here.
+
+           We can only early return when the outputs are known a priori. For
+           floating content-addressing derivations this isn't the case.
+         */
+        assertPathValidity();
+
+    StorePathSet outputPaths;
+    for (auto & [_, output] : builtOutputs)
+        outputPaths.insert(output.outPath);
+    runPostBuildHook(
+        worker.store,
+        *logger,
+        drvPath,
+        outputPaths
+    );
+
+    /* It is now safe to delete the lock files, since all future
+       lockers will see that the output paths are valid; they will
+       not create new lock files with the same names as the old
+       (unlinked) lock files. */
+    outputLocks.setDeletion(true);
+    outputLocks.unlock();
+
+    co_return done(BuildResult::Built, std::move(builtOutputs));
 }
 
 Goal::Co DerivationGoal::resolvedFinished()
