@@ -192,8 +192,6 @@ Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
     waiters.clear();
     worker.removeGoal(shared_from_this());
 
-    cleanup();
-
     // We drop the continuation.
     // In `final_awaiter` this will signal that there is no more work to be done.
     top_co->handle.promise().continuation = {};

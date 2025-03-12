@@ -69,8 +69,7 @@ public:
     Co tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool & substituterFailed);
     Co finished();
 
-    /* Called by destructor, can't be overridden */
-    void cleanup() override final;
+    void cleanup();
 
     JobCategory jobCategory() const override {
         return JobCategory::Substitution;
