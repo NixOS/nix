@@ -83,10 +83,9 @@ std::optional<std::string> readHead(const Path & path)
 }
 
 // Persist the HEAD ref from the remote repo in the local cached repo.
-bool storeCachedHead(const std::string & actualUrl, const std::string & headRef)
+bool storeCachedHead(const std::string & actualUrl, bool shallow, const std::string & headRef)
 {
-    // set shallow=false as HEAD will never be queried for a shallow repo
-    Path cacheDir = getCachePath(actualUrl, false);
+    Path cacheDir = getCachePath(actualUrl, shallow);
     try {
         runProgram("git", true, { "-C", cacheDir, "--git-dir", ".", "symbolic-ref", "--", "HEAD", headRef });
     } catch (ExecError &e) {
@@ -105,12 +104,11 @@ bool storeCachedHead(const std::string & actualUrl, const std::string & headRef)
     return true;
 }
 
-std::optional<std::string> readHeadCached(const std::string & actualUrl)
+std::optional<std::string> readHeadCached(const std::string & actualUrl, bool shallow)
 {
     // Create a cache path to store the branch of the HEAD ref. Append something
     // in front of the URL to prevent collision with the repository itself.
-    // set shallow=false as HEAD will never be queried for a shallow repo
-    Path cacheDir = getCachePath(actualUrl, false);
+    Path cacheDir = getCachePath(actualUrl, shallow);
     Path headRefFile = cacheDir + "/HEAD";
 
     time_t now = time(0);
@@ -516,14 +514,14 @@ struct GitInputScheme : InputScheme
         return revCount;
     }
 
-    std::string getDefaultRef(const RepoInfo & repoInfo) const
+    std::string getDefaultRef(const RepoInfo & repoInfo, bool shallow) const
     {
         auto head = std::visit(
             overloaded {
                 [&](const std::filesystem::path & path)
                 { return GitRepo::openRepo(path)->getWorkdirRef(); },
                 [&](const ParsedURL & url)
-                { return readHeadCached(url.to_string()); }
+                { return readHeadCached(url.to_string(), shallow); }
             }, repoInfo.location);
         if (!head) {
             warn("could not read HEAD ref from repo at '%s', using 'master'", repoInfo.locationToArg());
@@ -566,7 +564,8 @@ struct GitInputScheme : InputScheme
         auto origRev = input.getRev();
 
         auto originalRef = input.getRef();
-        auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo);
+        bool shallow = getShallowAttr(input);
+        auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo, shallow);
         input.attrs.insert_or_assign("ref", ref);
 
         std::filesystem::path repoDir;
@@ -577,7 +576,7 @@ struct GitInputScheme : InputScheme
                 input.attrs.insert_or_assign("rev", GitRepo::openRepo(repoDir)->resolveRef(ref).gitRev());
         } else {
             auto repoUrl = std::get<ParsedURL>(repoInfo.location);
-            std::filesystem::path cacheDir = getCachePath(repoUrl.to_string(), getShallowAttr(input));
+            std::filesystem::path cacheDir = getCachePath(repoUrl.to_string(), shallow);
             repoDir = cacheDir;
             repoInfo.gitDir = ".";
 
@@ -614,6 +613,7 @@ struct GitInputScheme : InputScheme
             }
 
             if (doFetch) {
+                bool shallow = getShallowAttr(input);
                 try {
                     auto fetchRef =
                         getAllRefsAttr(input)
@@ -626,7 +626,7 @@ struct GitInputScheme : InputScheme
                         ? ref
                         : fmt("%1%:%1%", "refs/heads/" + ref);
 
-                    repo->fetch(repoUrl.to_string(), fetchRef, getShallowAttr(input));
+                    repo->fetch(repoUrl.to_string(), fetchRef, shallow);
                 } catch (Error & e) {
                     if (!std::filesystem::exists(localRefFile)) throw;
                     logError(e.info());
@@ -639,7 +639,7 @@ struct GitInputScheme : InputScheme
                 } catch (Error & e) {
                     warn("could not update mtime for file %s: %s", localRefFile, e.info().msg);
                 }
-                if (!originalRef && !storeCachedHead(repoUrl.to_string(), ref))
+                if (!originalRef && !storeCachedHead(repoUrl.to_string(), shallow, ref))
                     warn("could not update cached head '%s' for '%s'", ref, repoInfo.locationToArg());
             }
 
