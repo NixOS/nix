@@ -930,28 +930,11 @@ Goal::Co DerivationGoal::hookDone()
 
         appendLogTailErrorMsg(worker, drvPath, logTail, msg);
 
-        auto e = BuildError(msg);
-
         outputLocks.unlock();
 
-        BuildResult::Status st = BuildResult::MiscFailure;
+        /* TODO (once again) support fine-grained error codes, see issue #12641. */
 
-#ifndef _WIN32
-        if (WIFEXITED(status) && WEXITSTATUS(status) == 101)
-            st = BuildResult::TimedOut;
-
-        else if (WIFEXITED(status) && WEXITSTATUS(status) == 100)
-        {
-            assert(derivationType);
-            st =
-                dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
-                statusOk(status) ? BuildResult::OutputRejected :
-                !derivationType->isSandboxed() ? BuildResult::TransientFailure :
-                BuildResult::PermanentFailure;
-        }
-#endif
-
-        co_return done(st, {}, std::move(e));
+        co_return done(BuildResult::MiscFailure, {}, BuildError(msg));
     }
 
     /* Compute the FS closure of the outputs and register them as
