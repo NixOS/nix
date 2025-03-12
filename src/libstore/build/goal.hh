@@ -398,7 +398,6 @@ public:
     void work();
 
     void handleChildOutput(Descriptor fd, std::string_view data);
-    void handleEOF(Descriptor fd);
 
     void trace(std::string_view s);
 
