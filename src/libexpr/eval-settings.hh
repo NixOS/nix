@@ -250,7 +250,7 @@ struct EvalSettings : Config
         1,
         "eval-cores",
         R"(
-          Set the number of threads used to evaluate Nix expressions.
+          The number of threads used to evaluate Nix expressions.
         )"};
 };
 
