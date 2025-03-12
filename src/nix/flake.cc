@@ -905,7 +905,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         std::function<void(const SourcePath & from, const fs::path & to)> copyDir;
         copyDir = [&](const SourcePath & from, const fs::path & to)
         {
-            fs::create_directories(to);
+            createDirs(to);
 
             for (auto & [name, entry] : from.readDirectory()) {
                 checkInterrupt();
