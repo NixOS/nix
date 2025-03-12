@@ -364,8 +364,6 @@ protected:
     Done amDone(ExitCode result, std::optional<Error> ex = {});
 
 public:
-    virtual void cleanup() { }
-
     /**
      * Project a `BuildResult` with just the information that pertains
      * to the given request.
