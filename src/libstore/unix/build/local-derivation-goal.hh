@@ -72,13 +72,6 @@ struct LocalDerivationGoal : public DerivationGoal
     bool useChroot = false;
 
     /**
-     * The parent directory of `chrootRootDir`. It has permission 700
-     * and is owned by root to ensure other users cannot mess with
-     * `chrootRootDir`.
-     */
-    Path chrootParentDir;
-
-    /**
      * The root of the chroot environment.
      */
     Path chrootRootDir;
@@ -87,11 +80,6 @@ struct LocalDerivationGoal : public DerivationGoal
      * RAII object to delete the chroot directory.
      */
     std::shared_ptr<AutoDelete> autoDelChroot;
-
-    /**
-     * Whether to run the build in a private network namespace.
-     */
-    bool privateNetwork = false;
 
     /**
      * Stuff we need to pass to initChild().
@@ -242,8 +230,6 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     void chownToBuilder(const Path & path);
 
-    int getChildStatus() override;
-
     /**
      * Run the builder's process.
      */
@@ -253,9 +239,7 @@ struct LocalDerivationGoal : public DerivationGoal
      * Check that the derivation outputs all exist and register them
      * as valid.
      */
-    SingleDrvOutputs registerOutputs() override;
-
-    void signRealisation(Realisation &) override;
+    SingleDrvOutputs registerOutputs();
 
     /**
      * Check that an output meets the requirements specified by the
@@ -263,21 +247,6 @@ struct LocalDerivationGoal : public DerivationGoal
      * '{allowed,disallowed}{References,Requisites}' attributes).
      */
     void checkOutputs(const std::map<std::string, ValidPathInfo> & outputs);
-
-    /**
-     * Close the read side of the logger pipe.
-     */
-    void closeReadPipes() override;
-
-    /**
-     * Cleanup hooks for buildDone()
-     */
-    void cleanupHookFinally() override;
-    void cleanupPreChildKill() override;
-    void cleanupPostChildKill() override;
-    bool cleanupDecideWhetherDiskFull() override;
-    void cleanupPostOutputsRegisteredModeCheck() override;
-    void cleanupPostOutputsRegisteredModeNonCheck() override;
 
     bool isReadDesc(int fd) override;
 
@@ -298,6 +267,8 @@ struct LocalDerivationGoal : public DerivationGoal
      * cgroup of the build.
      */
     void killSandbox(bool getStats);
+
+    bool cleanupDecideWhetherDiskFull();
 
     /**
      * Create alternative path calculated from but distinct from the

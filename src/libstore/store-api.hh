@@ -622,6 +622,8 @@ public:
     virtual void addSignatures(const StorePath & storePath, const StringSet & sigs)
     { unsupported("addSignatures"); }
 
+    void signRealisation(Realisation &);
+
     /* Utility functions. */
 
     /**

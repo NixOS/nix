@@ -184,6 +184,8 @@ void LocalDerivationGoal::killSandbox(bool getStats)
 
 Goal::Co LocalDerivationGoal::tryLocalBuild()
 {
+    assert(!hook);
+
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
         worker.waitForBuildSlot(shared_from_this());
@@ -263,8 +265,122 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     started();
     co_await Suspend{};
-    // after EOF on child
-    co_return buildDone();
+
+    trace("build done");
+
+    Finally releaseBuildUser([&](){
+        /* Release the build user at the end of this function. We don't do
+           it right away because we don't want another build grabbing this
+           uid and then messing around with our output. */
+        buildUser.reset();
+    });
+
+    sandboxMountNamespace = -1;
+    sandboxUserNamespace = -1;
+
+    /* Since we got an EOF on the logger pipe, the builder is presumed
+       to have terminated.  In fact, the builder could also have
+       simply have closed its end of the pipe, so just to be sure,
+       kill it. */
+    int status = pid.kill();
+
+    debug("builder process for '%s' finished", worker.store.printStorePath(drvPath));
+
+    buildResult.timesBuilt++;
+    buildResult.stopTime = time(0);
+
+    /* So the child is gone now. */
+    worker.childTerminated(this);
+
+    /* Close the read side of the logger pipe. */
+    builderOut.close();
+
+    /* Close the log file. */
+    closeLogFile();
+
+    /* When running under a build user, make sure that all processes
+       running under that uid are gone.  This is to prevent a
+       malicious user from leaving behind a process that keeps files
+       open and modifies them after they have been chown'ed to
+       root. */
+    killSandbox(true);
+
+    /* Terminate the recursive Nix daemon. */
+    stopDaemon();
+
+    if (buildResult.cpuUser && buildResult.cpuSystem) {
+        debug("builder for '%s' terminated with status %d, user CPU %.3fs, system CPU %.3fs",
+            worker.store.printStorePath(drvPath),
+            status,
+            ((double) buildResult.cpuUser->count()) / 1000000,
+            ((double) buildResult.cpuSystem->count()) / 1000000);
+    }
+
+    bool diskFull = false;
+
+    try {
+
+        /* Check the exit status. */
+        if (!statusOk(status)) {
+
+            diskFull |= cleanupDecideWhetherDiskFull();
+
+            auto msg = fmt("builder for '%s' %s",
+                Magenta(worker.store.printStorePath(drvPath)),
+                statusToString(status));
+
+            appendLogTailErrorMsg(worker, drvPath, logTail, msg);
+
+            if (diskFull)
+                msg += "\nnote: build failure may have been caused by lack of free disk space";
+
+            throw BuildError(msg);
+        }
+
+        /* Compute the FS closure of the outputs and register them as
+           being valid. */
+        auto builtOutputs = registerOutputs();
+
+        StorePathSet outputPaths;
+        for (auto & [_, output] : builtOutputs)
+            outputPaths.insert(output.outPath);
+        runPostBuildHook(
+            worker.store,
+            *logger,
+            drvPath,
+            outputPaths
+        );
+
+        /* Delete unused redirected outputs (when doing hash rewriting). */
+        for (auto & i : redirectedOutputs)
+            deletePath(worker.store.Store::toRealPath(i.second));
+
+        /* Delete the chroot (if we were using one). */
+        autoDelChroot.reset(); /* this runs the destructor */
+
+        deleteTmpDir(true);
+
+        /* It is now safe to delete the lock files, since all future
+           lockers will see that the output paths are valid; they will
+           not create new lock files with the same names as the old
+           (unlinked) lock files. */
+        outputLocks.setDeletion(true);
+        outputLocks.unlock();
+
+        co_return done(BuildResult::Built, std::move(builtOutputs));
+
+    } catch (BuildError & e) {
+        outputLocks.unlock();
+
+        assert(derivationType);
+        BuildResult::Status st =
+            dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
+            statusOk(status) ? BuildResult::OutputRejected :
+            !derivationType->isSandboxed() || diskFull ? BuildResult::TransientFailure :
+            BuildResult::PermanentFailure;
+
+        co_return done(st, {}, std::move(e));
+    }
 }
 
 static void chmod_(const Path & path, mode_t mode)
@@ -294,50 +410,6 @@ static void movePath(const Path & src, const Path & dst)
 
 
 extern void replaceValidPath(const Path & storePath, const Path & tmpPath);
-
-
-int LocalDerivationGoal::getChildStatus()
-{
-    return hook ? DerivationGoal::getChildStatus() : pid.kill();
-}
-
-void LocalDerivationGoal::closeReadPipes()
-{
-    if (hook) {
-        DerivationGoal::closeReadPipes();
-    } else
-        builderOut.close();
-}
-
-
-void LocalDerivationGoal::cleanupHookFinally()
-{
-    /* Release the build user at the end of this function. We don't do
-       it right away because we don't want another build grabbing this
-       uid and then messing around with our output. */
-    buildUser.reset();
-}
-
-
-void LocalDerivationGoal::cleanupPreChildKill()
-{
-    sandboxMountNamespace = -1;
-    sandboxUserNamespace = -1;
-}
-
-
-void LocalDerivationGoal::cleanupPostChildKill()
-{
-    /* When running under a build user, make sure that all processes
-       running under that uid are gone.  This is to prevent a
-       malicious user from leaving behind a process that keeps files
-       open and modifies them after they have been chown'ed to
-       root. */
-    killSandbox(true);
-
-    /* Terminate the recursive Nix daemon. */
-    stopDaemon();
-}
 
 
 bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
@@ -379,24 +451,6 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
     return diskFull;
 }
 
-
-void LocalDerivationGoal::cleanupPostOutputsRegisteredModeCheck()
-{
-    deleteTmpDir(true);
-}
-
-
-void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
-{
-    /* Delete unused redirected outputs (when doing hash rewriting). */
-    for (auto & i : redirectedOutputs)
-        deletePath(worker.store.Store::toRealPath(i.second));
-
-    /* Delete the chroot (if we were using one). */
-    autoDelChroot.reset(); /* this runs the destructor */
-
-    cleanupPostOutputsRegisteredModeCheck();
-}
 
 #if __linux__
 static void doBind(const Path & source, const Path & target, bool optional = false) {
@@ -727,7 +781,7 @@ void LocalDerivationGoal::startBuilder()
            environment using bind-mounts.  We put it in the Nix store
            so that the build outputs can be moved efficiently from the
            chroot to their final location. */
-        chrootParentDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
+        auto chrootParentDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
         deletePath(chrootParentDir);
 
         /* Clean up the chroot directory automatically. */
@@ -972,9 +1026,6 @@ void LocalDerivationGoal::startBuilder()
            us.
         */
 
-        if (derivationType->isSandboxed())
-            privateNetwork = true;
-
         userNamespaceSync.create();
 
         usingUserNamespace = userNamespacesSupported();
@@ -1002,7 +1053,7 @@ void LocalDerivationGoal::startBuilder()
 
                 ProcessOptions options;
                 options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
-                if (privateNetwork)
+                if (derivationType->isSandboxed())
                     options.cloneFlags |= CLONE_NEWNET;
                 if (usingUserNamespace)
                     options.cloneFlags |= CLONE_NEWUSER;
@@ -1819,7 +1870,7 @@ void LocalDerivationGoal::runChild()
 
             userNamespaceSync.readSide = -1;
 
-            if (privateNetwork) {
+            if (derivationType->isSandboxed()) {
 
                 /* Initialise the loopback interface. */
                 AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
@@ -2279,15 +2330,7 @@ void LocalDerivationGoal::runChild()
 
 SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 {
-    /* When using a build hook, the build hook can register the output
-       as valid (by doing `nix-store --import').  If so we don't have
-       to do anything here.
-
-       We can only early return when the outputs are known a priori. For
-       floating content-addressing derivations this isn't the case.
-     */
-    if (hook)
-        return DerivationGoal::registerOutputs();
+    assert(!hook);
 
     std::map<std::string, ValidPathInfo> infos;
 
@@ -2829,18 +2872,13 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
             && !drv->type().isImpure())
         {
-            signRealisation(thisRealisation);
+            worker.store.signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
         builtOutputs.emplace(outputName, thisRealisation);
     }
 
     return builtOutputs;
-}
-
-void LocalDerivationGoal::signRealisation(Realisation & realisation)
-{
-    getLocalStore().signRealisation(realisation);
 }
 
 

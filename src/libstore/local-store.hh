@@ -401,7 +401,6 @@ private:
      * specified by the ‘secret-key-files’ option.
      */
     void signPathInfo(ValidPathInfo & info);
-    void signRealisation(Realisation &);
 
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 

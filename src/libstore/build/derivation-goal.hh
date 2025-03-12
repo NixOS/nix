@@ -55,6 +55,20 @@ struct InitialOutput {
     std::optional<InitialOutputStatus> known;
 };
 
+/** Used internally */
+void runPostBuildHook(
+    Store & store,
+    Logger & logger,
+    const StorePath & drvPath,
+    const StorePathSet & outputPaths);
+
+/** Used internally */
+void appendLogTailErrorMsg(
+    Worker & worker,
+    const StorePath & drvPath,
+    const std::list<std::string> & logTail,
+    std::string & msg);
+
 /**
  * A goal for building some or all of the outputs of a derivation.
  */
@@ -232,7 +246,7 @@ struct DerivationGoal : public Goal
     Co gaveUpOnSubstitution();
     Co tryToBuild();
     virtual Co tryLocalBuild();
-    Co buildDone();
+    Co hookDone();
 
     Co resolvedFinished();
 
@@ -241,43 +255,15 @@ struct DerivationGoal : public Goal
      */
     HookReply tryBuildHook();
 
-    virtual int getChildStatus();
-
-    /**
-     * Check that the derivation outputs all exist and register them
-     * as valid.
-     */
-    virtual SingleDrvOutputs registerOutputs();
-
     /**
      * Open a log file and a pipe to it.
      */
     Path openLogFile();
 
     /**
-     * Sign the newly built realisation if the store allows it
-     */
-    virtual void signRealisation(Realisation&) {}
-
-    /**
      * Close the log file.
      */
     void closeLogFile();
-
-    /**
-     * Close the read side of the logger pipe.
-     */
-    virtual void closeReadPipes();
-
-    /**
-     * Cleanup hooks for buildDone()
-     */
-    virtual void cleanupHookFinally();
-    virtual void cleanupPreChildKill();
-    virtual void cleanupPostChildKill();
-    virtual bool cleanupDecideWhetherDiskFull();
-    virtual void cleanupPostOutputsRegisteredModeCheck();
-    virtual void cleanupPostOutputsRegisteredModeNonCheck();
 
     virtual bool isReadDesc(Descriptor fd);
 

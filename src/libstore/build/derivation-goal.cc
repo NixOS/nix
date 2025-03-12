@@ -649,7 +649,7 @@ Goal::Co DerivationGoal::tryToBuild()
                 buildResult.startTime = time(0); // inexact
                 started();
                 co_await Suspend{};
-                co_return buildDone();
+                co_return hookDone();
             case rpPostpone:
                 /* Not now; wait until at least one child finishes or
                    the wake-up timeout expires. */
@@ -810,55 +810,6 @@ void replaceValidPath(const Path & storePath, const Path & tmpPath)
 }
 
 
-int DerivationGoal::getChildStatus()
-{
-#ifndef _WIN32 // TODO enable build hook on Windows
-    return hook->pid.kill();
-#else
-    return 0;
-#endif
-}
-
-
-void DerivationGoal::closeReadPipes()
-{
-#ifndef _WIN32 // TODO enable build hook on Windows
-    hook->builderOut.readSide.close();
-    hook->fromHook.readSide.close();
-#endif
-}
-
-
-void DerivationGoal::cleanupHookFinally()
-{
-}
-
-
-void DerivationGoal::cleanupPreChildKill()
-{
-}
-
-
-void DerivationGoal::cleanupPostChildKill()
-{
-}
-
-
-bool DerivationGoal::cleanupDecideWhetherDiskFull()
-{
-    return false;
-}
-
-
-void DerivationGoal::cleanupPostOutputsRegisteredModeCheck()
-{
-}
-
-
-void DerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
-{
-}
-
 void runPostBuildHook(
     Store & store,
     Logger & logger,
@@ -917,21 +868,53 @@ void runPostBuildHook(
     });
 }
 
-Goal::Co DerivationGoal::buildDone()
+
+void appendLogTailErrorMsg(
+    Worker & worker,
+    const StorePath & drvPath,
+    const std::list<std::string> & logTail,
+    std::string & msg)
 {
-    trace("build done");
+    if (!logger->isVerbose() && !logTail.empty()) {
+        msg += fmt(";\nlast %d log lines:\n", logTail.size());
+        for (auto & line : logTail) {
+            msg += "> ";
+            msg += line;
+            msg += "\n";
+        }
+        auto nixLogCommand = experimentalFeatureSettings.isEnabled(Xp::NixCommand)
+            ? "nix log"
+            : "nix-store -l";
+        // The command is on a separate line for easy copying, such as with triple click.
+        // This message will be indented elsewhere, so removing the indentation before the
+        // command will not put it at the start of the line unfortunately.
+        msg += fmt("For full logs, run:\n  " ANSI_BOLD "%s %s" ANSI_NORMAL,
+            nixLogCommand,
+            worker.store.printStorePath(drvPath));
+    }
+}
 
-    Finally releaseBuildUser([&](){ this->cleanupHookFinally(); });
 
-    cleanupPreChildKill();
+Goal::Co DerivationGoal::hookDone()
+{
+#ifndef _WIN32
+    assert(hook);
+#endif
+
+    trace("hook build done");
 
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe, so just to be sure,
        kill it. */
-    int status = getChildStatus();
+    int status =
+#ifndef _WIN32 // TODO enable build hook on Windows
+        hook->pid.kill();
+#else
+        0;
+#endif
 
-    debug("builder process for '%s' finished", worker.store.printStorePath(drvPath));
+    debug("build hook for '%s' finished", worker.store.printStorePath(drvPath));
 
     buildResult.timesBuilt++;
     buildResult.stopTime = time(0);
@@ -940,108 +923,59 @@ Goal::Co DerivationGoal::buildDone()
     worker.childTerminated(this);
 
     /* Close the read side of the logger pipe. */
-    closeReadPipes();
+#ifndef _WIN32 // TODO enable build hook on Windows
+    hook->builderOut.readSide.close();
+    hook->fromHook.readSide.close();
+#endif
 
     /* Close the log file. */
     closeLogFile();
 
-    cleanupPostChildKill();
+    /* Check the exit status. */
+    if (!statusOk(status)) {
+        auto msg = fmt("builder for '%s' %s",
+            Magenta(worker.store.printStorePath(drvPath)),
+            statusToString(status));
 
-    if (buildResult.cpuUser && buildResult.cpuSystem) {
-        debug("builder for '%s' terminated with status %d, user CPU %.3fs, system CPU %.3fs",
-            worker.store.printStorePath(drvPath),
-            status,
-            ((double) buildResult.cpuUser->count()) / 1000000,
-            ((double) buildResult.cpuSystem->count()) / 1000000);
-    }
+        appendLogTailErrorMsg(worker, drvPath, logTail, msg);
 
-    bool diskFull = false;
-
-    try {
-
-        /* Check the exit status. */
-        if (!statusOk(status)) {
-
-            diskFull |= cleanupDecideWhetherDiskFull();
-
-            auto msg = fmt("builder for '%s' %s",
-                Magenta(worker.store.printStorePath(drvPath)),
-                statusToString(status));
-
-            if (!logger->isVerbose() && !logTail.empty()) {
-                msg += fmt(";\nlast %d log lines:\n", logTail.size());
-                for (auto & line : logTail) {
-                    msg += "> ";
-                    msg += line;
-                    msg += "\n";
-                }
-                auto nixLogCommand = experimentalFeatureSettings.isEnabled(Xp::NixCommand)
-                    ? "nix log"
-                    : "nix-store -l";
-                // The command is on a separate line for easy copying, such as with triple click.
-                // This message will be indented elsewhere, so removing the indentation before the
-                // command will not put it at the start of the line unfortunately.
-                msg += fmt("For full logs, run:\n  " ANSI_BOLD "%s %s" ANSI_NORMAL,
-                    nixLogCommand,
-                    worker.store.printStorePath(drvPath));
-            }
-
-            if (diskFull)
-                msg += "\nnote: build failure may have been caused by lack of free disk space";
-
-            throw BuildError(msg);
-        }
-
-        /* Compute the FS closure of the outputs and register them as
-           being valid. */
-        auto builtOutputs = registerOutputs();
-
-        StorePathSet outputPaths;
-        for (auto & [_, output] : builtOutputs)
-            outputPaths.insert(output.outPath);
-        runPostBuildHook(
-            worker.store,
-            *logger,
-            drvPath,
-            outputPaths
-        );
-
-        cleanupPostOutputsRegisteredModeNonCheck();
-
-        /* It is now safe to delete the lock files, since all future
-           lockers will see that the output paths are valid; they will
-           not create new lock files with the same names as the old
-           (unlinked) lock files. */
-        outputLocks.setDeletion(true);
         outputLocks.unlock();
 
-        co_return done(BuildResult::Built, std::move(builtOutputs));
+        /* TODO (once again) support fine-grained error codes, see issue #12641. */
 
-    } catch (BuildError & e) {
-        outputLocks.unlock();
-
-        BuildResult::Status st = BuildResult::MiscFailure;
-
-#ifndef _WIN32 // TODO abstract over proc exit status
-        if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101)
-            st = BuildResult::TimedOut;
-
-        else if (hook && (!WIFEXITED(status) || WEXITSTATUS(status) != 100)) {
-        }
-
-        else
-#endif
-        {
-            assert(derivationType);
-            st =
-                dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
-                statusOk(status) ? BuildResult::OutputRejected :
-                !derivationType->isSandboxed() || diskFull ? BuildResult::TransientFailure :
-                BuildResult::PermanentFailure;
-        }
-
-        co_return done(st, {}, std::move(e));
+        co_return done(BuildResult::MiscFailure, {}, BuildError(msg));
     }
+
+    /* Compute the FS closure of the outputs and register them as
+       being valid. */
+    auto builtOutputs =
+        /* When using a build hook, the build hook can register the output
+           as valid (by doing `nix-store --import').  If so we don't have
+           to do anything here.
+
+           We can only early return when the outputs are known a priori. For
+           floating content-addressing derivations this isn't the case.
+         */
+        assertPathValidity();
+
+    StorePathSet outputPaths;
+    for (auto & [_, output] : builtOutputs)
+        outputPaths.insert(output.outPath);
+    runPostBuildHook(
+        worker.store,
+        *logger,
+        drvPath,
+        outputPaths
+    );
+
+    /* It is now safe to delete the lock files, since all future
+       lockers will see that the output paths are valid; they will
+       not create new lock files with the same names as the old
+       (unlinked) lock files. */
+    outputLocks.setDeletion(true);
+    outputLocks.unlock();
+
+    co_return done(BuildResult::Built, std::move(builtOutputs));
 }
 
 Goal::Co DerivationGoal::resolvedFinished()
@@ -1093,7 +1027,7 @@ Goal::Co DerivationGoal::resolvedFinished()
                         : worker.store;
                     newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation.outPath, &drvStore);
                 }
-                signRealisation(newRealisation);
+                worker.store.signRealisation(newRealisation);
                 worker.store.registerDrvOutput(newRealisation);
             }
             outputPaths.insert(realisation.outPath);
@@ -1227,18 +1161,6 @@ HookReply DerivationGoal::tryBuildHook()
 #endif
 }
 
-
-SingleDrvOutputs DerivationGoal::registerOutputs()
-{
-    /* When using a build hook, the build hook can register the output
-       as valid (by doing `nix-store --import').  If so we don't have
-       to do anything here.
-
-       We can only early return when the outputs are known a priori. For
-       floating content-addressing derivations this isn't the case.
-     */
-    return assertPathValidity();
-}
 
 Path DerivationGoal::openLogFile()
 {
