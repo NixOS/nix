@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <cinttypes>
 #include <functional>
