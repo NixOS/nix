@@ -66,6 +66,13 @@ std::optional<std::string> Pos::getSource() const
     }, origin);
 }
 
+std::optional<SourcePath> Pos::getSourcePath() const
+{
+    if (auto * path = std::get_if<SourcePath>(&origin))
+        return *path;
+    return std::nullopt;
+}
+
 void Pos::print(std::ostream & out, bool showOrigin) const
 {
     if (showOrigin) {
