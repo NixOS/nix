@@ -5,6 +5,8 @@
 #include "serialise.hh"
 #include "file-system.hh"
 
+#include <nlohmann/json_fwd.hpp>
+
 namespace nix {
 
 
@@ -209,6 +211,10 @@ std::optional<HashAlgorithm> parseHashAlgoOpt(std::string_view s);
  */
 std::string_view printHashAlgo(HashAlgorithm ha);
 
+/**
+ * Write a JSON serialisation of the format `{"algo":"<sha1|...>","base16":"<hex>"}`.
+ */
+void to_json(nlohmann::json & json, const Hash & hash);
 
 union Ctx;
 

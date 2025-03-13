@@ -2659,8 +2659,8 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                     act->result(resHashMismatch,
                         {
                             {"storePath", worker.store.printStorePath(drvPath)},
-                            {"wanted", wanted.to_string(HashFormat::SRI, true)},
-                            {"got", got.to_string(HashFormat::SRI, true)},
+                            {"wanted", wanted},
+                            {"got", got},
                         });
                 }
                 if (!newInfo0.references.empty()) {
