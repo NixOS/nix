@@ -5,6 +5,7 @@
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "globals.hh"
+#include "config-global.hh"
 #include "legacy.hh"
 #include "shared.hh"
 #include "store-api.hh"
@@ -347,6 +348,20 @@ struct CmdHelpStores : Command
 
 static auto rCmdHelpStores = registerCommand<CmdHelpStores>("help-stores");
 
+struct ExtLoggerSettings : Config
+{
+    Setting<Path> jsonLogPath{
+        this, "", "json-log-path",
+        R"(
+          A path to which JSON records of Nix's log output will be
+          written, in the same format as `--log-format internal-json`.
+        )"};
+};
+
+static ExtLoggerSettings extLoggerSettings;
+
+static GlobalConfig::Register rExtLoggerSettings(&extLoggerSettings);
+
 void mainWrapped(int argc, char * * argv)
 {
     savedArgv = argv;
@@ -485,8 +500,8 @@ void mainWrapped(int argc, char * * argv)
         if (!args.helpRequested && !args.completions) throw;
     }
 
-    if (auto logFile = getEnv("NIX_LOG_FILE")) {
-        logger = makeTeeLogger({logger, makeJSONLogger(*logFile)});
+    if (!extLoggerSettings.jsonLogPath.get().empty()) {
+        logger = makeTeeLogger({logger, makeJSONLogger(std::filesystem::path(extLoggerSettings.jsonLogPath.get()))});
     }
 
     if (args.helpRequested) {
