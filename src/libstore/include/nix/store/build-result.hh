@@ -8,6 +8,8 @@
 #include "nix/store/derived-path.hh"
 #include "nix/store/realisation.hh"
 
+#include <nlohmann/json_fwd.hpp>
+
 namespace nix {
 
 struct BuildResult
@@ -122,6 +124,63 @@ struct BuildResult
         return std::get_if<Failure>(&self.inner);
     }
 
+    static std::string_view statusToString(uint8_t status)
+    {
+        switch (status) {
+        case Success::Status::Built:
+            return "Built";
+        case Success::Status::Substituted:
+            return "Substituted";
+        case Success::Status::AlreadyValid:
+            return "AlreadyValid";
+        case Failure::Status::PermanentFailure:
+            return "PermanentFailure";
+        case Failure::Status::InputRejected:
+            return "InputRejected";
+        case Failure::Status::OutputRejected:
+            return "OutputRejected";
+        case Failure::Status::TransientFailure:
+            return "TransientFailure";
+        case Failure::Status::CachedFailure:
+            return "CachedFailure";
+        case Failure::Status::TimedOut:
+            return "TimedOut";
+        case Failure::Status::MiscFailure:
+            return "MiscFailure";
+        case Failure::Status::DependencyFailed:
+            return "DependencyFailed";
+        case Failure::Status::LogLimitExceeded:
+            return "LogLimitExceeded";
+        case Failure::Status::NotDeterministic:
+            return "NotDeterministic";
+        case Success::Status::ResolvesToAlreadyValid:
+            return "ResolvesToAlreadyValid";
+        case Failure::Status::NoSubstituters:
+            return "NoSubstituters";
+        default:
+            return "Unknown";
+        };
+    }
+
+    uint8_t status(this auto & self)
+    {
+        auto fail = self.tryGetFailure();
+        auto success = self.tryGetSuccess();
+        return fail != nullptr ? fail->status : success->status;
+    }
+
+    std::string errorMsg(this auto & self)
+    {
+        auto fail = self.tryGetFailure();
+        return fail != nullptr ? fail->errorMsg : "";
+    }
+
+    std::string toString(this auto & self)
+    {
+        auto msg = self.errorMsg();
+        return std::string(statusToString(self.status())) + ((msg == "") ? "" : " : " + msg);
+    }
+
     /**
      * How many times this build was performed.
      */
@@ -172,6 +231,10 @@ struct KeyedBuildResult : BuildResult
         , path(std::move(path))
     {
     }
+
+    nlohmann::json toJSON(Store & store) const;
 };
+
+void to_json(nlohmann::json & json, const BuildResult & buildResult);
 
 } // namespace nix
