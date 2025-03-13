@@ -2656,11 +2656,11 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                             worker.store.printStorePath(drvPath),
                             wanted.to_string(HashFormat::SRI, true),
                             got.to_string(HashFormat::SRI, true)));
-                    // FIXME: put this in BuildResult and log that as JSON.
                     act->result(resHashMismatch,
-                        {worker.store.printStorePath(drvPath),
-                         wanted.to_string(HashFormat::SRI, true),
-                         got.to_string(HashFormat::SRI, true)
+                        {
+                            {"storePath", worker.store.printStorePath(drvPath)},
+                            {"wanted", wanted.to_string(HashFormat::SRI, true)},
+                            {"got", got.to_string(HashFormat::SRI, true)},
                         });
                 }
                 if (!newInfo0.references.empty()) {

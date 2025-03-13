@@ -108,6 +108,8 @@ public:
 
     virtual void result(ActivityId act, ResultType type, const Fields & fields) { };
 
+    virtual void result(ActivityId act, ResultType type, const nlohmann::json & json) { };
+
     virtual void writeToStdout(std::string_view s);
 
     template<typename... Args>
@@ -159,6 +161,11 @@ struct Activity
 
     void setExpected(ActivityType type2, uint64_t expected) const
     { result(resSetExpected, type2, expected); }
+
+    void result(ResultType type, const nlohmann::json & json) const
+    {
+        logger.result(id, type, json);
+    }
 
     template<typename... Args>
     void result(ResultType type, const Args & ... args) const

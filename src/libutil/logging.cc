@@ -279,6 +279,16 @@ struct JSONLogger : Logger {
         addFields(json, fields);
         write(json);
     }
+
+    void result(ActivityId act, ResultType type, const nlohmann::json & j) override
+    {
+        nlohmann::json json;
+        json["action"] = "result";
+        json["id"] = act;
+        json["type"] = type;
+        json["payload"] = j;
+        write(json);
+    }
 };
 
 Logger * makeJSONLogger(Descriptor fd, bool includeNixPrefix)

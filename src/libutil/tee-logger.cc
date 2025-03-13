@@ -65,6 +65,12 @@ struct TeeLogger : Logger
             logger->result(act, type, fields);
     }
 
+    void result(ActivityId act, ResultType type, const nlohmann::json & json) override
+    {
+        for (auto & logger : loggers)
+            logger->result(act, type, json);
+    }
+
     void writeToStdout(std::string_view s) override
     {
         for (auto & logger : loggers) {
