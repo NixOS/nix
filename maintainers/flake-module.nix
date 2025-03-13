@@ -99,7 +99,6 @@
               ''^src/libexpr/nixexpr\.cc$''
               ''^src/libexpr/nixexpr\.hh$''
               ''^src/libexpr/parser-state\.hh$''
-              ''^src/libexpr/pos-table\.hh$''
               ''^src/libexpr/primops\.cc$''
               ''^src/libexpr/primops\.hh$''
               ''^src/libexpr/primops/context\.cc$''
