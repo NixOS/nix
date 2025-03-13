@@ -70,9 +70,7 @@ struct Pos
     /**
      * Get the SourcePath, if the source was loaded from a file.
      */
-    std::optional<SourcePath> getSourcePath() const {
-        return *std::get_if<SourcePath>(&origin);
-    }
+    std::optional<SourcePath> getSourcePath() const;
 
     struct LinesIterator {
         using difference_type = size_t;
