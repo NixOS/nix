@@ -39,6 +39,7 @@ typedef enum {
     resPostBuildLogLine = 107,
     resFetchStatus = 108,
     resHashMismatch = 109,
+    resBuildResult = 110,
 } ResultType;
 
 typedef uint64_t ActivityId;

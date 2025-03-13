@@ -8,6 +8,8 @@
 #include <chrono>
 #include <optional>
 
+#include <nlohmann/json_fwd.hpp>
+
 namespace nix {
 
 struct BuildResult
@@ -46,28 +48,32 @@ struct BuildResult
      */
     std::string errorMsg;
 
+    static std::string_view statusToString(Status status)
+    {
+        switch (status) {
+        case Built: return "Built";
+        case Substituted: return "Substituted";
+        case AlreadyValid: return "AlreadyValid";
+        case PermanentFailure: return "PermanentFailure";
+        case InputRejected: return "InputRejected";
+        case OutputRejected: return "OutputRejected";
+        case TransientFailure: return "TransientFailure";
+        case CachedFailure: return "CachedFailure";
+        case TimedOut: return "TimedOut";
+        case MiscFailure: return "MiscFailure";
+        case DependencyFailed: return "DependencyFailed";
+        case LogLimitExceeded: return "LogLimitExceeded";
+        case NotDeterministic: return "NotDeterministic";
+        case ResolvesToAlreadyValid: return "ResolvesToAlreadyValid";
+        case NoSubstituters: return "NoSubstituters";
+        default: return "Unknown";
+        };
+    }
+
     std::string toString() const {
-        auto strStatus = [&]() {
-            switch (status) {
-                case Built: return "Built";
-                case Substituted: return "Substituted";
-                case AlreadyValid: return "AlreadyValid";
-                case PermanentFailure: return "PermanentFailure";
-                case InputRejected: return "InputRejected";
-                case OutputRejected: return "OutputRejected";
-                case TransientFailure: return "TransientFailure";
-                case CachedFailure: return "CachedFailure";
-                case TimedOut: return "TimedOut";
-                case MiscFailure: return "MiscFailure";
-                case DependencyFailed: return "DependencyFailed";
-                case LogLimitExceeded: return "LogLimitExceeded";
-                case NotDeterministic: return "NotDeterministic";
-                case ResolvesToAlreadyValid: return "ResolvesToAlreadyValid";
-                case NoSubstituters: return "NoSubstituters";
-                default: return "Unknown";
-            };
-        }();
-        return strStatus + ((errorMsg == "") ? "" : " : " + errorMsg);
+        return
+            std::string(statusToString(status))
+            + ((errorMsg == "") ? "" : " : " + errorMsg);
     }
 
     /**
@@ -128,6 +134,10 @@ struct KeyedBuildResult : BuildResult
     KeyedBuildResult(BuildResult res, DerivedPath path)
         : BuildResult(std::move(res)), path(std::move(path))
     { }
+
+    nlohmann::json toJSON(Store & store) const;
 };
+
+void to_json(nlohmann::json & json, const BuildResult & buildResult);
 
 }
