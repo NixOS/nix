@@ -296,7 +296,7 @@ Logger * makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefi
         { }
     };
 
-    auto fd{toDescriptor(open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0644))};
+    AutoCloseFD fd{toDescriptor(open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0644))};
     if (!fd)
         throw SysError("opening log file '%1%'", path);
 
