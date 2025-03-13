@@ -50,6 +50,7 @@ struct Pos
 
     explicit operator bool() const { return line > 0; }
 
+    /* TODO: Why std::shared_ptr<Pos> and not std::shared_ptr<const Pos>? */
     operator std::shared_ptr<Pos>() const;
 
     /**
