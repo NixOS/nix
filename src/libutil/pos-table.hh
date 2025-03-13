@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <cstdint>
 #include <vector>
@@ -18,9 +19,12 @@ public:
     private:
         uint32_t offset;
 
-        Origin(Pos::Origin origin, uint32_t offset, size_t size):
-            offset(offset), origin(origin), size(size)
-        {}
+        Origin(Pos::Origin origin, uint32_t offset, size_t size)
+            : offset(offset)
+            , origin(origin)
+            , size(size)
+        {
+        }
 
     public:
         const Pos::Origin origin;
