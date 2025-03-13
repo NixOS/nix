@@ -21,6 +21,7 @@
 #include <aws/core/utils/logging/FormattedLogSystem.h>
 #include <aws/core/utils/logging/LogMacros.h>
 #include <aws/core/utils/threading/Executor.h>
+#include <aws/identity-management/auth/STSProfileCredentialsProvider.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/model/GetObjectRequest.h>
 #include <aws/s3/model/HeadObjectRequest.h>
@@ -71,6 +72,29 @@ class AwsLogger : public Aws::Utils::Logging::FormattedLogSystem
 #endif
 };
 
+/* Retrieve the credentials from the list of AWS default providers, with the addition of the STS creds provider. This
+   last can be used to acquire further permissions with a specific IAM role.
+   Roughly based on https://github.com/aws/aws-sdk-cpp/issues/150#issuecomment-538548438
+*/
+struct CustomAwsCredentialsProviderChain : public Aws::Auth::AWSCredentialsProviderChain
+{
+    CustomAwsCredentialsProviderChain(const std::string & profile)
+    {
+        if (profile.empty()) {
+            // Use all the default AWS providers, plus the possibility to acquire a IAM role directly via a profile.
+            Aws::Auth::DefaultAWSCredentialsProviderChain default_aws_chain;
+            for (auto provider : default_aws_chain.GetProviders())
+                AddProvider(provider);
+            AddProvider(std::make_shared<Aws::Auth::STSProfileCredentialsProvider>());
+        } else {
+            // Override the profile name to retrieve from the AWS config and credentials. I believe this option
+            // comes from the ?profile querystring in nix.conf.
+            AddProvider(std::make_shared<Aws::Auth::ProfileConfigFileAWSCredentialsProvider>(profile.c_str()));
+            AddProvider(std::make_shared<Aws::Auth::STSProfileCredentialsProvider>(profile));
+        }
+    }
+};
+
 static void initAWS()
 {
     static std::once_flag flag;
@@ -102,13 +126,8 @@ S3Helper::S3Helper(
     const std::string & endpoint)
     : config(makeConfig(region, scheme, endpoint))
     , client(make_ref<Aws::S3::S3Client>(
-            profile == ""
-            ? std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
-                std::make_shared<Aws::Auth::DefaultAWSCredentialsProviderChain>())
-            : std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
-                std::make_shared<Aws::Auth::ProfileConfigFileAWSCredentialsProvider>(profile.c_str())),
+            std::make_shared<CustomAwsCredentialsProviderChain>(profile),
             *config,
-            // FIXME: https://github.com/aws/aws-sdk-cpp/issues/759
 #if AWS_SDK_VERSION_MAJOR == 1 && AWS_SDK_VERSION_MINOR < 3
             false,
 #else
