@@ -35,7 +35,66 @@ struct MixDryRun : virtual Args
     }
 };
 
-struct MixJSON : virtual Args
+/**
+ * Commands that can print JSON according to the
+ * `--pretty`/`--no-pretty` flag.
+ *
+ * This is distinct from MixJSON, because for some commands,
+ * JSON outputs is not optional.
+ */
+struct MixPrintJSON : virtual Args
+{
+    bool outputPretty = isatty(STDOUT_FILENO);
+
+    MixPrintJSON()
+    {
+        addFlag({
+            .longName = "pretty",
+            .description =
+                R"(
+                    Print multi-line, indented JSON output for readability.
+
+                    Default: indent if output is to a terminal.
+
+                    This option is only effective when `--json` is also specified.
+                )",
+            //.category = commonArgsCategory,
+            .handler = {&outputPretty, true},
+        });
+        addFlag({
+            .longName = "no-pretty",
+            .description =
+                R"(
+                    Print compact JSON output on a single line, even when the output is a terminal.
+                    Some commands may print multiple JSON objects on separate lines.
+
+                    See `--pretty`.
+                )",
+            //.category = commonArgsCategory,
+            .handler = {&outputPretty, false},
+        });
+    };
+
+    /**
+     * Print an `nlohmann::json` to stdout
+     *
+     * - respecting `--pretty` / `--no-pretty`.
+     * - suspending the progress bar
+     *
+     * This is a template to avoid accidental coercions from `string` to `json` in the caller,
+     * to avoid mistakenly passing an already serialized JSON to this function.
+     *
+     * It is not recommended to print a JSON string - see the JSON guidelines
+     * about extensibility, https://nix.dev/manual/nix/development/development/json-guideline.html -
+     * but you _can_ print a sole JSON string by explicitly coercing it to
+     * `nlohmann::json` first.
+     */
+    template <typename T, typename = std::enable_if_t<std::is_same_v<T, nlohmann::json>>>
+    void printJSON(const T & json);
+};
+
+/** Optional JSON support via `--json` flag */
+struct MixJSON : virtual Args, virtual MixPrintJSON
 {
     bool json = false;
 
