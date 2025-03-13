@@ -168,8 +168,12 @@ void to_json(nlohmann::json & json, std::shared_ptr<Pos> pos)
 
 struct JSONLogger : Logger {
     Descriptor fd;
+    bool includeNixPrefix;
 
-    JSONLogger(Descriptor fd) : fd(fd) { }
+    JSONLogger(Descriptor fd, bool includeNixPrefix)
+        : fd(fd)
+        , includeNixPrefix(includeNixPrefix)
+    { }
 
     bool isVerbose() override {
         return true;
@@ -190,7 +194,9 @@ struct JSONLogger : Logger {
 
     void write(const nlohmann::json & json)
     {
-        writeLine(fd, "@nix " + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
+        writeLine(fd,
+            (includeNixPrefix ? "@nix " : "") +
+            json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
     }
 
     void log(Verbosity lvl, std::string_view s) override
@@ -262,18 +268,18 @@ struct JSONLogger : Logger {
     }
 };
 
-Logger * makeJSONLogger(Descriptor fd)
+Logger * makeJSONLogger(Descriptor fd, bool includeNixPrefix)
 {
-    return new JSONLogger(fd);
+    return new JSONLogger(fd, includeNixPrefix);
 }
 
-Logger * makeJSONLogger(const std::filesystem::path & path)
+Logger * makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix)
 {
     struct JSONFileLogger : JSONLogger {
         AutoCloseFD fd;
 
-        JSONFileLogger(AutoCloseFD && fd)
-            : JSONLogger(fd.get())
+        JSONFileLogger(AutoCloseFD && fd, bool includeNixPrefix)
+            : JSONLogger(fd.get(), includeNixPrefix)
             , fd(std::move(fd))
         { }
     };
@@ -282,7 +288,7 @@ Logger * makeJSONLogger(const std::filesystem::path & path)
     if (!fd)
         throw SysError("opening log file '%1%'", path);
 
-    return new JSONFileLogger(std::move(fd));
+    return new JSONFileLogger(std::move(fd), includeNixPrefix);
 }
 
 static Logger::Fields getFields(nlohmann::json & json)

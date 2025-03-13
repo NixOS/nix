@@ -189,9 +189,9 @@ Logger * makeSimpleLogger(bool printBuildLogs = true);
 
 Logger * makeTeeLogger(std::vector<Logger *> loggers);
 
-Logger * makeJSONLogger(Descriptor fd);
+Logger * makeJSONLogger(Descriptor fd, bool includeNixPrefix = true);
 
-Logger * makeJSONLogger(const std::filesystem::path & path);
+Logger * makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix = true);
 
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".

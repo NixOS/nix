@@ -354,7 +354,8 @@ struct ExtLoggerSettings : Config
         this, "", "json-log-path",
         R"(
           A path to which JSON records of Nix's log output will be
-          written, in the same format as `--log-format internal-json`.
+          written, in the same format as `--log-format internal-json`
+          (without the `@nix ` prefixes on each line).
         )"};
 };
 
@@ -501,7 +502,7 @@ void mainWrapped(int argc, char * * argv)
     }
 
     if (!extLoggerSettings.jsonLogPath.get().empty()) {
-        logger = makeTeeLogger({logger, makeJSONLogger(std::filesystem::path(extLoggerSettings.jsonLogPath.get()))});
+        logger = makeTeeLogger({logger, makeJSONLogger(std::filesystem::path(extLoggerSettings.jsonLogPath.get()), false)});
     }
 
     if (args.helpRequested) {
