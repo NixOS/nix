@@ -579,7 +579,9 @@ static std::function<bool(Descriptor, std::string_view)> hook_handler(
     const Activity & workerAct,
     std::map<ActivityId, Activity> & builderActivities,
     bool & failed,
+#ifndef _WIN32 // TODO enable build hook on Windows
     HookInstance & hook,
+#endif
     unsigned long& logSize,
     std::string& currentLogLine,
     size_t& currentLogLinePos,
@@ -751,7 +753,9 @@ Goal::Co DerivationGoal::tryToBuild()
             actLock.reset();
             buildResult.startTime = time(0); // inexact
             started();
+#ifndef _WIN32 // TODO enable build hook on Windows
             assert(hook);
+#endif
             {
                 bool failed = false;
                 assert(act);
@@ -767,7 +771,9 @@ Goal::Co DerivationGoal::tryToBuild()
                     worker.act,
                     builderActivities,
                     failed,
+#ifndef _WIN32 // TODO enable build hook on Windows
                     *hook,
+#endif
                     logSize,
                     currentLogLine,
                     currentLogLinePos,
@@ -775,9 +781,15 @@ Goal::Co DerivationGoal::tryToBuild()
                     logTail
                 );
                 co_await childStarted(
-                    { hook->fromHook.readSide.get()
-                    , hook->builderOut.readSide.get()
-                    }, false, false, handler);
+                    {
+#ifndef _WIN32 // TODO enable build hook on Windows
+                        hook->fromHook.readSide.get(),
+                        hook->builderOut.readSide.get(),
+#endif
+                    },
+                    false,
+                    false,
+                    handler);
                 trace("calling childStarted hook end");
 
                 if (
