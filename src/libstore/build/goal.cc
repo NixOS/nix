@@ -146,33 +146,6 @@ Co Goal::await(Goals new_waitees)
     co_return Return{};
 }
 
-
-void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
-{
-    assert(waitees.count(waitee));
-    waitees.erase(waitee);
-
-    trace(fmt("waitee '%s' done; %d left", waitee->name, waitees.size()));
-
-    if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure)     ++nrFailed;
-
-    if (result == ecNoSubstituters) ++nrNoSubstituters;
-
-    if (result == ecIncompleteClosure) ++nrIncompleteClosure;
-
-    if (waitees.empty() || (result == ecFailed && !settings.keepGoing)) {
-
-        /* If we failed and keepGoing is not set, we remove all
-           remaining waitees. */
-        for (auto & goal : waitees) {
-            goal->waiters.extract(shared_from_this());
-        }
-        waitees.clear();
-
-        worker.wakeUp(shared_from_this());
-    }
-}
-
 Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
 {
     trace("done");
@@ -190,7 +163,32 @@ Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
 
     for (auto & i : waiters) {
         GoalPtr goal = i.lock();
-        if (goal) goal->waiteeDone(shared_from_this(), result);
+        if (goal) {
+            auto me = shared_from_this();
+            assert(goal->waitees.count(me));
+            goal->waitees.erase(me);
+
+            goal->trace(fmt("waitee '%s' done; %d left", name, goal->waitees.size()));
+
+            if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure) ++goal->nrFailed;
+
+            if (result == ecNoSubstituters) ++goal->nrNoSubstituters;
+
+            if (result == ecIncompleteClosure) ++goal->nrIncompleteClosure;
+
+            if (goal->waitees.empty()) {
+                worker.wakeUp(goal);
+            } else if (result == ecFailed && !settings.keepGoing) {
+                /* If we failed and keepGoing is not set, we remove all
+                   remaining waitees. */
+                for (auto & g : goal->waitees) {
+                    g->waiters.extract(goal);
+                }
+                goal->waitees.clear();
+
+                worker.wakeUp(goal);
+            }
+        }
     }
     waiters.clear();
     worker.removeGoal(shared_from_this());

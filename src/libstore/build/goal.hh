@@ -398,8 +398,6 @@ public:
 
     void work();
 
-    void waiteeDone(GoalPtr waitee, ExitCode result);
-
     virtual void handleChildOutput(Descriptor fd, std::string_view data)
     {
         unreachable();
