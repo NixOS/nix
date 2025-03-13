@@ -80,4 +80,9 @@ void bind(Socket fd, const std::string & path);
  */
 void connect(Socket fd, const std::string & path);
 
+/**
+ * Connect to a Unix domain socket.
+ */
+AutoCloseFD connect(const std::filesystem::path & path);
+
 }

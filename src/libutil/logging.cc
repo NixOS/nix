@@ -7,6 +7,7 @@
 #include "source-path.hh"
 #include "position.hh"
 #include "sync.hh"
+#include "unix-domain-socket.hh"
 
 #include <atomic>
 #include <sstream>
@@ -296,7 +297,10 @@ Logger * makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefi
         { }
     };
 
-    AutoCloseFD fd{toDescriptor(open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0644))};
+    AutoCloseFD fd =
+        std::filesystem::is_socket(path)
+        ? connect(path)
+        : toDescriptor(open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0644));
     if (!fd)
         throw SysError("opening log file '%1%'", path);
 
