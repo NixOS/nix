@@ -50,6 +50,14 @@ struct LinesOfCode {
     std::optional<std::string> nextLineOfCode;
 };
 
+/* NOTE: position.hh recursively depends on source-path.hh -> source-accessor.hh
+   -> hash.hh -> config.hh -> experimental-features.hh -> error.hh -> Pos.
+   There are other such cycles.
+   Thus, Pos has to be an incomplete type in this header. But since ErrorInfo/Trace
+   have to refer to Pos, they have to use pointer indirection via std::shared_ptr
+   to break the recursive header dependency.
+   FIXME: Untangle this mess. Should there be AbstractPos as there used to be before
+   4feb7d9f71? */
 struct Pos;
 
 void printCodeLines(std::ostream & out,

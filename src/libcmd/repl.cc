@@ -140,16 +140,13 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
         out << ANSI_RED "error: " << ANSI_NORMAL;
     out << dt.hint.str() << "\n";
 
-    // prefer direct pos, but if noPos then try the expr.
-    auto pos = dt.pos
-        ? dt.pos
-        : positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
+    auto pos = dt.getPos(positions);
 
     if (pos) {
-        out << *pos;
-        if (auto loc = pos->getCodeLines()) {
+        out << pos;
+        if (auto loc = pos.getCodeLines()) {
             out << "\n";
-            printCodeLines(out, "", *pos, *loc);
+            printCodeLines(out, "", pos, *loc);
             out << "\n";
         }
     }
