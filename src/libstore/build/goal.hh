@@ -3,6 +3,7 @@
 
 #include "store-api.hh"
 #include "build-result.hh"
+#include "muxable-pipe.hh"
 
 #include <coroutine>
 
@@ -54,17 +55,25 @@ enum struct JobCategory {
 
 struct Goal : public std::enable_shared_from_this<Goal>
 {
+private:
+    /**
+     * Goals that this goal is waiting for.
+     */
+    Goals waitees;
+
+    /**
+     * Suspend our goal and wait until we get `work`-ed again.
+     * `co_await`-able by @ref Co.
+     */
+    struct Suspend {};
+
+public:
     typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure} ExitCode;
 
     /**
      * Backlink to the worker.
      */
     Worker & worker;
-
-    /**
-     * Goals that this goal is waiting for.
-     */
-    Goals waitees;
 
     /**
      * Goals waiting for this one to finish.  Must use weak pointers
@@ -104,14 +113,8 @@ protected:
      * Build result.
      */
     BuildResult buildResult;
+
 public:
-
-    /**
-     * Suspend our goal and wait until we get `work`-ed again.
-     * `co_await`-able by @ref Co.
-     */
-    struct Suspend {};
-
     /**
      * Return from the current coroutine and suspend our goal
      * if we're not busy anymore, or jump to the next coroutine
@@ -332,6 +335,7 @@ public:
         std::suspend_always await_transform(Suspend) { return {}; };
     };
 
+protected:
     /**
      * The coroutine being currently executed.
      * MUST be updated when switching the coroutine being executed.
@@ -359,8 +363,7 @@ public:
      */
     Done amDone(ExitCode result, std::optional<Error> ex = {});
 
-    virtual void cleanup() { }
-
+public:
     /**
      * Project a `BuildResult` with just the information that pertains
      * to the given request.
@@ -394,19 +397,7 @@ public:
 
     void work();
 
-    void addWaitee(GoalPtr waitee);
-
-    void waiteeDone(GoalPtr waitee, ExitCode result);
-
-    virtual void handleChildOutput(Descriptor fd, std::string_view data)
-    {
-        unreachable();
-    }
-
-    virtual void handleEOF(Descriptor fd)
-    {
-        unreachable();
-    }
+    void handleChildOutput(Descriptor fd, std::string_view data);
 
     void trace(std::string_view s);
 
@@ -429,6 +420,23 @@ public:
      * @see JobCategory
      */
     virtual JobCategory jobCategory() const = 0;
+
+private:
+    std::function<bool(Descriptor, std::string_view)> child_handler;
+
+protected:
+    Co await(Goals waitees);
+
+    Co childStarted(
+        const std::set<MuxablePipePollState::CommChannel> & channels,
+        bool inBuildSlot,
+        bool respectTimeouts,
+        std::function<bool(Descriptor, std::string_view)> handler
+    );
+
+    Co waitForAWhile();
+    Co waitForBuildSlot();
+    Co yield();
 };
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);

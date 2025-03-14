@@ -1,12 +1,12 @@
 #include "goal.hh"
 #include "worker.hh"
+#include <optional>
 
 namespace nix {
 
 using Co = nix::Goal::Co;
 using promise_type = nix::Goal::promise_type;
 using handle_type = nix::Goal::handle_type;
-using Suspend = nix::Goal::Suspend;
 
 Co::Co(Co&& rhs) {
     this->handle = rhs.handle;
@@ -132,38 +132,18 @@ void addToWeakGoals(WeakGoals & goals, GoalPtr p)
     goals.insert(p);
 }
 
-
-void Goal::addWaitee(GoalPtr waitee)
+Co Goal::await(Goals new_waitees)
 {
-    waitees.insert(waitee);
-    addToWeakGoals(waitee->waiters, shared_from_this());
-}
-
-
-void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
-{
-    assert(waitees.count(waitee));
-    waitees.erase(waitee);
-
-    trace(fmt("waitee '%s' done; %d left", waitee->name, waitees.size()));
-
-    if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure) ++nrFailed;
-
-    if (result == ecNoSubstituters) ++nrNoSubstituters;
-
-    if (result == ecIncompleteClosure) ++nrIncompleteClosure;
-
-    if (waitees.empty() || (result == ecFailed && !settings.keepGoing)) {
-
-        /* If we failed and keepGoing is not set, we remove all
-           remaining waitees. */
-        for (auto & goal : waitees) {
-            goal->waiters.extract(shared_from_this());
+    assert(waitees.empty());
+    if (!new_waitees.empty()) {
+        waitees = std::move(new_waitees);
+        for (auto waitee : waitees) {
+            addToWeakGoals(waitee->waiters, shared_from_this());
         }
-        waitees.clear();
-
-        worker.wakeUp(shared_from_this());
+        co_await Suspend{};
+        assert(waitees.empty());
     }
+    co_return Return{};
 }
 
 Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
@@ -183,12 +163,35 @@ Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
 
     for (auto & i : waiters) {
         GoalPtr goal = i.lock();
-        if (goal) goal->waiteeDone(shared_from_this(), result);
+        if (goal) {
+            auto me = shared_from_this();
+            assert(goal->waitees.count(me));
+            goal->waitees.erase(me);
+
+            goal->trace(fmt("waitee '%s' done; %d left", name, goal->waitees.size()));
+
+            if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure) ++goal->nrFailed;
+
+            if (result == ecNoSubstituters) ++goal->nrNoSubstituters;
+
+            if (result == ecIncompleteClosure) ++goal->nrIncompleteClosure;
+
+            if (goal->waitees.empty()) {
+                worker.wakeUp(goal);
+            } else if (result == ecFailed && !settings.keepGoing) {
+                /* If we failed and keepGoing is not set, we remove all
+                   remaining waitees. */
+                for (auto & g : goal->waitees) {
+                    g->waiters.extract(goal);
+                }
+                goal->waitees.clear();
+
+                worker.wakeUp(goal);
+            }
+        }
     }
     waiters.clear();
     worker.removeGoal(shared_from_this());
-
-    cleanup();
 
     // We drop the continuation.
     // In `final_awaiter` this will signal that there is no more work to be done.
@@ -215,5 +218,45 @@ void Goal::work()
     assert(top_co || exitCode != ecBusy);
 }
 
+void Goal::handleChildOutput(Descriptor fd, std::string_view data) {
+    assert(child_handler);
+    bool stop_listening = child_handler(fd, data);
+    if (stop_listening) {
+        worker.wakeUp(shared_from_this()); 
+    }
+}
+
+Co Goal::childStarted(
+    const std::set<MuxablePipePollState::CommChannel> & channels,
+    bool inBuildSlot,
+    bool respectTimeouts,
+    std::function<bool(Descriptor fd, std::string_view data)> handler
+) {
+    worker.childStarted(shared_from_this(), channels, inBuildSlot, respectTimeouts);
+    child_handler = handler;
+    co_await Suspend{};
+    trace("done listening to children");
+    child_handler = {};
+    worker.childTerminated(this);
+    co_return Return{};
+}
+
+Co Goal::yield() {
+    worker.wakeUp(shared_from_this()); 
+    co_await Suspend{};
+    co_return Return{};
+}
+
+Co Goal::waitForAWhile() {
+    worker.waitForAWhile(shared_from_this());
+    co_await Suspend{};
+    co_return Return{};
+}
+
+Co Goal::waitForBuildSlot() {
+    worker.waitForBuildSlot(shared_from_this());
+    co_await Suspend{};
+    co_return Return{};
+}
 
 }

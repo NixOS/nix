@@ -58,17 +58,13 @@ Goal::Co DrvOutputSubstitutionGoal::init()
                 }
             } });
 
-        worker.childStarted(shared_from_this(), {
+        co_await childStarted({
     #ifndef _WIN32
             outPipe->readSide.get()
     #else
             &*outPipe
     #endif
-        }, true, false);
-
-        co_await Suspend{};
-
-        worker.childTerminated(this);
+        }, true, false, [](Descriptor, std::string_view) {return false;});
 
         /*
          * The realisation corresponding to the given output id.
@@ -87,6 +83,8 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 
         bool failed = false;
 
+        Goals waitees;
+
         for (const auto & [depId, depPath] : outputInfo->dependentRealisations) {
             if (depId != id) {
                 if (auto localOutputInfo = worker.store.queryRealisation(depId);
@@ -103,13 +101,13 @@ Goal::Co DrvOutputSubstitutionGoal::init()
                     failed = true;
                     break;
                 }
-                addWaitee(worker.makeDrvOutputSubstitutionGoal(depId));
+                waitees.insert(worker.makeDrvOutputSubstitutionGoal(depId));
             }
         }
 
         if (failed) continue;
 
-        co_return realisationFetched(outputInfo, sub);
+        co_return realisationFetched(std::move(waitees), outputInfo, sub);
     }
 
     /* None left.  Terminate this goal and let someone else deal
@@ -127,10 +125,10 @@ Goal::Co DrvOutputSubstitutionGoal::init()
     co_return amDone(substituterFailed ? ecFailed : ecNoSubstituters);
 }
 
-Goal::Co DrvOutputSubstitutionGoal::realisationFetched(std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub) {
-    addWaitee(worker.makePathSubstitutionGoal(outputInfo->outPath));
+Goal::Co DrvOutputSubstitutionGoal::realisationFetched(Goals waitees, std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub) {
+    waitees.insert(worker.makePathSubstitutionGoal(outputInfo->outPath));
 
-    if (!waitees.empty()) co_await Suspend{};
+    co_await await(std::move(waitees));
 
     trace("output path substituted");
 
@@ -151,11 +149,5 @@ std::string DrvOutputSubstitutionGoal::key()
        goals. */
     return "a$" + std::string(id.to_string());
 }
-
-void DrvOutputSubstitutionGoal::handleEOF(Descriptor fd)
-{
-    worker.wakeUp(shared_from_this());
-}
-
 
 }

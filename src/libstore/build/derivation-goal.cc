@@ -142,8 +142,8 @@ Goal::Co DerivationGoal::init() {
            substitute. */
 
         if (buildMode != bmNormal || !worker.evalStore.isValidPath(drvPath)) {
-            addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
-            co_await Suspend{};
+            Goals waitees{upcast_goal(worker.makePathSubstitutionGoal(drvPath))};
+            co_await await(std::move(waitees));
         }
 
         trace("loading derivation");
@@ -235,6 +235,9 @@ Goal::Co DerivationGoal::haveDerivation()
         }
     }
 
+    {
+    Goals waitees;
+
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
@@ -242,7 +245,7 @@ Goal::Co DerivationGoal::haveDerivation()
         for (auto & [outputName, status] : initialOutputs) {
             if (!status.wanted) continue;
             if (!status.known)
-                addWaitee(
+                waitees.insert(
                     upcast_goal(
                         worker.makeDrvOutputSubstitutionGoal(
                             DrvOutput{status.outputHash, outputName},
@@ -252,14 +255,15 @@ Goal::Co DerivationGoal::haveDerivation()
                 );
             else {
                 auto * cap = getDerivationCA(*drv);
-                addWaitee(upcast_goal(worker.makePathSubstitutionGoal(
+                waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
                     status.known->path,
                     buildMode == bmRepair ? Repair : NoRepair,
                     cap ? std::optional { *cap } : std::nullopt)));
             }
         }
 
-    if (!waitees.empty()) co_await Suspend{}; /* to prevent hang (no wake-up event) */
+    co_await await(std::move(waitees));
+    }
 
     trace("all outputs substituted (maybe)");
 
@@ -344,6 +348,9 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
 
     std::map<ref<const SingleDerivedPath>, GoalPtr, value_comparison> inputGoals;
 
+    {
+    Goals waitees;
+
     if (useDerivation) {
         std::function<void(ref<const SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)> addWaiteeDerivedPath;
 
@@ -356,7 +363,7 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
                     },
                     buildMode == bmRepair ? bmRepair : bmNormal);
                 inputGoals.insert_or_assign(inputDrv, g);
-                addWaitee(std::move(g));
+                waitees.insert(std::move(g));
             }
             for (const auto & [outputName, childNode] : inputNode.childMap)
                 addWaiteeDerivedPath(
@@ -397,10 +404,12 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
         if (!settings.useSubstitutes)
             throw Error("dependency '%s' of '%s' does not exist, and substitution is disabled",
                 worker.store.printStorePath(i), worker.store.printStorePath(drvPath));
-        addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i)));
+        waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(i)));
     }
 
-    if (!waitees.empty()) co_await Suspend{}; /* to prevent hang (no wake-up event) */
+    co_await await(std::move(waitees));
+    }
+
 
     trace("all inputs realised");
 
@@ -495,9 +504,8 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
 
             resolvedDrvGoal = worker.makeDerivationGoal(
                 pathResolved, wantedOutputs, buildMode);
-            addWaitee(resolvedDrvGoal);
-
-            co_await Suspend{};
+            Goals goals{resolvedDrvGoal};
+            co_await await(std::move(goals));
             co_return resolvedFinished();
         }
 
@@ -539,8 +547,7 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
        build hook. */
-    worker.wakeUp(shared_from_this());
-    co_await Suspend{};
+    co_await yield();
     co_return tryToBuild();
 }
 
@@ -564,6 +571,105 @@ void DerivationGoal::started()
         1});
     mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
     worker.updateProgress();
+}
+
+static std::function<bool(Descriptor, std::string_view)> hook_handler(
+    BufferedSink * logSink,
+    Activity & act,
+    const Activity & workerAct,
+    std::map<ActivityId, Activity> & builderActivities,
+    bool & failed,
+#ifndef _WIN32 // TODO enable build hook on Windows
+    HookInstance & hook,
+#endif
+    unsigned long& logSize,
+    std::string& currentLogLine,
+    size_t& currentLogLinePos,
+    std::string& currentHookLine,
+    std::list<std::string>& logTail
+)
+{
+    return [&](Descriptor fd, std::string_view data) {
+        // local & `ssh://`-builds are dealt with here.
+        bool isWrittenToLog =
+#ifdef _WIN32 // TODO enable build hook on Windows
+            false;
+#else
+            fd == hook.builderOut.readSide.get();
+#endif
+
+        if (isWrittenToLog) {
+            logSize += data.size();
+            if (settings.maxLogSize && logSize > settings.maxLogSize) {
+                failed = true;
+                return true; // break out and stop listening to children
+            }
+
+            for (auto c : data)
+                if (c == '\r')
+                    currentLogLinePos = 0;
+                else if (c == '\n') {
+                    if (!handleJSONLogMessage(
+                            currentLogLine, act, builderActivities, "the derivation builder", false)) {
+                        act.result(resBuildLogLine, currentLogLine);
+                        logTail.push_back(std::move(currentLogLine));
+                        if (logTail.size() > settings.logLines)
+                            logTail.pop_front();
+                    }
+
+                    currentLogLine = "";
+                    currentLogLinePos = 0;
+                } else {
+                    if (currentLogLinePos >= currentLogLine.size())
+                        currentLogLine.resize(currentLogLinePos + 1);
+                    currentLogLine[currentLogLinePos++] = c;
+                }
+
+            if (logSink)
+                (*logSink)(data);
+        }
+
+#ifndef _WIN32 // TODO enable build hook on Windows
+        if (fd == hook.fromHook.readSide.get()) {
+            for (auto c : data)
+                if (c == '\n') {
+                    auto json = parseJSONMessage(currentHookLine, "the derivation builder");
+                    if (json) {
+                        auto s =
+                            handleJSONLogMessage(*json, workerAct, hook.activities, "the derivation builder", true);
+                        // ensure that logs from a builder using `ssh-ng://` as protocol
+                        // are also available to `nix log`.
+                        if (s && !isWrittenToLog && logSink) {
+                            const auto type = (*json)["type"];
+                            const auto fields = (*json)["fields"];
+                            if (type == resBuildLogLine) {
+                                (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
+                            } else if (type == resSetPhase && !fields.is_null()) {
+                                const auto phase = fields[0];
+                                if (!phase.is_null()) {
+                                    // nixpkgs' stdenv produces lines in the log to signal
+                                    // phase changes.
+                                    // We want to get the same lines in case of remote builds.
+                                    // The format is:
+                                    //   @nix { "action": "setPhase", "phase": "$curPhase" }
+                                    const auto logLine =
+                                        nlohmann::json::object({{"action", "setPhase"}, {"phase", phase}});
+                                    (*logSink)(
+                                        "@nix "
+                                        + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace)
+                                        + "\n");
+                                }
+                            }
+                        }
+                    }
+                    currentHookLine.clear();
+                } else
+                    currentHookLine += c;
+        }
+#endif
+        failed = false;
+        return false;
+    };
 }
 
 Goal::Co DerivationGoal::tryToBuild()
@@ -601,8 +707,7 @@ Goal::Co DerivationGoal::tryToBuild()
         if (!actLock)
             actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                 fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
-        worker.waitForAWhile(shared_from_this());
-        co_await Suspend{};
+        co_await waitForAWhile();
         co_return tryToBuild();
     }
 
@@ -642,34 +747,92 @@ Goal::Co DerivationGoal::tryToBuild()
 
     if (!buildLocally) {
         switch (tryBuildHook()) {
-            case rpAccept:
-                /* Yes, it has started doing so.  Wait until we get
-                   EOF from the hook. */
-                actLock.reset();
-                buildResult.startTime = time(0); // inexact
-                started();
-                co_await Suspend{};
-                co_return hookDone();
-            case rpPostpone:
-                /* Not now; wait until at least one child finishes or
-                   the wake-up timeout expires. */
-                if (!actLock)
-                    actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                        fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
-                worker.waitForAWhile(shared_from_this());
-                outputLocks.unlock();
-                co_await Suspend{};
-                co_return tryToBuild();
-            case rpDecline:
-                /* We should do it ourselves. */
-                break;
+        case rpAccept:
+            /* Yes, it has started doing so.  Wait until we get
+               EOF from the hook. */
+            actLock.reset();
+            buildResult.startTime = time(0); // inexact
+            started();
+#ifndef _WIN32 // TODO enable build hook on Windows
+            assert(hook);
+#endif
+            {
+                bool failed = false;
+                assert(act);
+                trace("calling childStarted hook");
+                unsigned long logSize;
+                std::string currentLogLine;
+                size_t currentLogLinePos;
+                std::string currentHookLine;
+                std::list<std::string> logTail;
+                auto handler = hook_handler(
+                    logSink.get(),
+                    *act,
+                    worker.act,
+                    builderActivities,
+                    failed,
+#ifndef _WIN32 // TODO enable build hook on Windows
+                    *hook,
+#endif
+                    logSize,
+                    currentLogLine,
+                    currentLogLinePos,
+                    currentHookLine,
+                    logTail
+                );
+                co_await childStarted(
+                    {
+#ifndef _WIN32 // TODO enable build hook on Windows
+                        hook->fromHook.readSide.get(),
+                        hook->builderOut.readSide.get(),
+#endif
+                    },
+                    false,
+                    false,
+                    handler);
+                trace("calling childStarted hook end");
+
+                if (
+                    !currentLogLine.empty() &&
+                    !handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false)
+                ) {
+                    act->result(resBuildLogLine, currentLogLine);
+                }
+
+                if (failed) {
+                    co_return done(
+                        BuildResult::LogLimitExceeded,
+                        {},
+                        Error(
+                            "%s killed after writing more than %d bytes of log output",
+                            getName(),
+                            settings.maxLogSize));
+                } else {
+                    co_return hookDone();
+                }
+            }
+        case rpPostpone:
+            /* Not now; wait until at least one child finishes or
+               the wake-up timeout expires. */
+            if (!actLock)
+                actLock = std::make_unique<Activity>(
+                    *logger,
+                    lvlWarn,
+                    actBuildWaiting,
+                    fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
+            co_await waitForAWhile();
+            outputLocks.unlock();
+            co_await waitForAWhile();
+            co_return tryToBuild();
+        case rpDecline:
+            /* We should do it ourselves. */
+            break;
         }
     }
 
     actLock.reset();
 
-    worker.wakeUp(shared_from_this());
-    co_await Suspend{};
+    co_await yield();
     co_return tryLocalBuild();
 }
 
@@ -720,6 +883,9 @@ Goal::Co DerivationGoal::repairClosure()
                     outputsToDrv.insert_or_assign(*j.second, i);
         }
 
+    {
+    Goals waitees;
+
     /* Check each path (slow!). */
     for (auto & i : outputClosure) {
         if (worker.pathContentsGood(i)) continue;
@@ -728,9 +894,9 @@ Goal::Co DerivationGoal::repairClosure()
             worker.store.printStorePath(i), worker.store.printStorePath(drvPath));
         auto drvPath2 = outputsToDrv.find(i);
         if (drvPath2 == outputsToDrv.end())
-            addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i, Repair)));
+            waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(i, Repair)));
         else
-            addWaitee(worker.makeGoal(
+            waitees.insert(worker.makeGoal(
                 DerivedPath::Built {
                     .drvPath = makeConstantStorePathRef(drvPath2->second),
                     .outputs = OutputsSpec::All { },
@@ -738,17 +904,15 @@ Goal::Co DerivationGoal::repairClosure()
                 bmRepair));
     }
 
-    if (waitees.empty()) {
-        co_return done(BuildResult::AlreadyValid, assertPathValidity());
-    } else {
-        co_await Suspend{};
-
-        trace("closure repaired");
-        if (nrFailed > 0)
-            throw Error("some paths in the output closure of derivation '%s' could not be repaired",
-                worker.store.printStorePath(drvPath));
-        co_return done(BuildResult::AlreadyValid, assertPathValidity());
+    co_await await(std::move(waitees));
     }
+
+    trace("closure repaired");
+    if (nrFailed > 0)
+        throw Error("some paths in the output closure of derivation '%s' could not be repaired",
+            worker.store.printStorePath(drvPath));
+
+    co_return done(BuildResult::AlreadyValid, assertPathValidity());
 }
 
 
@@ -918,9 +1082,6 @@ Goal::Co DerivationGoal::hookDone()
 
     buildResult.timesBuilt++;
     buildResult.stopTime = time(0);
-
-    /* So the child is gone now. */
-    worker.childTerminated(this);
 
     /* Close the read side of the logger pipe. */
 #ifndef _WIN32 // TODO enable build hook on Windows
@@ -1155,7 +1316,6 @@ HookReply DerivationGoal::tryBuildHook()
     std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());
     fds.insert(hook->builderOut.readSide.get());
-    worker.childStarted(shared_from_this(), fds, false, false);
 
     return rpAccept;
 #endif
@@ -1208,111 +1368,6 @@ void DerivationGoal::closeLogFile()
     logSink = logFileSink = 0;
     fdLogFile.close();
 }
-
-
-bool DerivationGoal::isReadDesc(Descriptor fd)
-{
-#ifdef _WIN32 // TODO enable build hook on Windows
-    return false;
-#else
-    return fd == hook->builderOut.readSide.get();
-#endif
-}
-
-void DerivationGoal::handleChildOutput(Descriptor fd, std::string_view data)
-{
-    // local & `ssh://`-builds are dealt with here.
-    auto isWrittenToLog = isReadDesc(fd);
-    if (isWrittenToLog)
-    {
-        logSize += data.size();
-        if (settings.maxLogSize && logSize > settings.maxLogSize) {
-            killChild();
-            // We're not inside a coroutine, hence we can't use co_return here.
-            // Thus we ignore the return value.
-            [[maybe_unused]] Done _ = done(
-                BuildResult::LogLimitExceeded, {},
-                Error("%s killed after writing more than %d bytes of log output",
-                    getName(), settings.maxLogSize));
-            return;
-        }
-
-        for (auto c : data)
-            if (c == '\r')
-                currentLogLinePos = 0;
-            else if (c == '\n')
-                flushLine();
-            else {
-                if (currentLogLinePos >= currentLogLine.size())
-                    currentLogLine.resize(currentLogLinePos + 1);
-                currentLogLine[currentLogLinePos++] = c;
-            }
-
-        if (logSink) (*logSink)(data);
-    }
-
-#ifndef _WIN32 // TODO enable build hook on Windows
-    if (hook && fd == hook->fromHook.readSide.get()) {
-        for (auto c : data)
-            if (c == '\n') {
-                auto json = parseJSONMessage(currentHookLine, "the derivation builder");
-                if (json) {
-                    auto s = handleJSONLogMessage(*json, worker.act, hook->activities, "the derivation builder", true);
-                    // ensure that logs from a builder using `ssh-ng://` as protocol
-                    // are also available to `nix log`.
-                    if (s && !isWrittenToLog && logSink) {
-                        const auto type = (*json)["type"];
-                        const auto fields = (*json)["fields"];
-                        if (type == resBuildLogLine) {
-                            (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
-                        } else if (type == resSetPhase && ! fields.is_null()) {
-                            const auto phase = fields[0];
-                            if (! phase.is_null()) {
-                                // nixpkgs' stdenv produces lines in the log to signal
-                                // phase changes.
-                                // We want to get the same lines in case of remote builds.
-                                // The format is:
-                                //   @nix { "action": "setPhase", "phase": "$curPhase" }
-                                const auto logLine = nlohmann::json::object({
-                                    {"action", "setPhase"},
-                                    {"phase", phase}
-                                });
-                                (*logSink)("@nix " + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n");
-                            }
-                        }
-                    }
-                }
-                currentHookLine.clear();
-            } else
-                currentHookLine += c;
-    }
-#endif
-}
-
-
-void DerivationGoal::handleEOF(Descriptor fd)
-{
-    if (!currentLogLine.empty()) flushLine();
-    worker.wakeUp(shared_from_this());
-}
-
-
-void DerivationGoal::flushLine()
-{
-    if (handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false))
-        ;
-
-    else {
-        logTail.push_back(currentLogLine);
-        if (logTail.size() > settings.logLines) logTail.pop_front();
-
-        act->result(resBuildLogLine, currentLogLine);
-    }
-
-    currentLogLine = "";
-    currentLogLinePos = 0;
-}
-
 
 std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDerivationOutputMap()
 {

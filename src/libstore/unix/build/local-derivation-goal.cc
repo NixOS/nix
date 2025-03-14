@@ -142,8 +142,6 @@ LocalStore & LocalDerivationGoal::getLocalStore()
 void LocalDerivationGoal::killChild()
 {
     if (pid != -1) {
-        worker.childTerminated(this);
-
         /* If we're using a build user, then there is a tricky race
            condition: if we kill the build user before the child has
            done its setuid() to the build user uid, then it won't be
@@ -188,9 +186,8 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
-        worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
-        co_await Suspend{};
+        co_await waitForBuildSlot();
         co_return tryToBuild();
     }
 
@@ -243,8 +240,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
             if (!actLock)
                 actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                     fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
-            worker.waitForAWhile(shared_from_this());
-            co_await Suspend{};
+            co_await waitForAWhile();
             co_return tryLocalBuild();
         }
     }
@@ -254,7 +250,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
     try {
 
         /* Okay, we have to build. */
-        startBuilder();
+        co_await startBuilder();
 
     } catch (BuildError & e) {
         outputLocks.unlock();
@@ -262,9 +258,6 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
         worker.permanentFailure = true;
         co_return done(BuildResult::InputRejected, {}, std::move(e));
     }
-
-    started();
-    co_await Suspend{};
 
     trace("build done");
 
@@ -288,9 +281,6 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     buildResult.timesBuilt++;
     buildResult.stopTime = time(0);
-
-    /* So the child is gone now. */
-    worker.childTerminated(this);
 
     /* Close the read side of the logger pipe. */
     builderOut.close();
@@ -522,7 +512,60 @@ static void handleChildException(bool sendException)
     }
 }
 
-void LocalDerivationGoal::startBuilder()
+static std::function<bool(Descriptor, std::string_view)> build_handler(
+    BufferedSink * logSink,
+    Activity & act,
+    std::map<ActivityId, Activity> & builderActivities,
+    bool & failed,
+    Descriptor builderOut,
+    unsigned long & logSize,
+    std::string & currentLogLine,
+    size_t & currentLogLinePos,
+    std::list<std::string> & logTail
+
+) {
+    return [&](Descriptor fd, std::string_view data) {
+        // local & `ssh://`-builds are dealt with here.
+        bool isWrittenToLog =
+            fd == builderOut;
+
+        if (isWrittenToLog) {
+            logSize += data.size();
+            if (settings.maxLogSize && logSize > settings.maxLogSize) {
+                failed = true;
+                return true; // break out and stop listening to children
+            }
+
+            for (auto c : data)
+                if (c == '\r')
+                    currentLogLinePos = 0;
+                else if (c == '\n') {
+                    if (!handleJSONLogMessage(
+                            currentLogLine, act, builderActivities, "the derivation builder", false)) {
+                        act.result(resBuildLogLine, currentLogLine);
+                        logTail.push_back(std::move(currentLogLine));
+                        if (logTail.size() > settings.logLines)
+                            logTail.pop_front();
+                    }
+
+                    currentLogLine = "";
+                    currentLogLinePos = 0;
+                } else {
+                    if (currentLogLinePos >= currentLogLine.size())
+                        currentLogLine.resize(currentLogLinePos + 1);
+                    currentLogLine[currentLogLinePos++] = c;
+                }
+
+            if (logSink)
+                (*logSink)(data);
+        }
+        failed = false;
+        return false;
+    };
+}
+
+
+Goal::Co LocalDerivationGoal::startBuilder()
 {
     if ((buildUser && buildUser->getUIDCount() != 1)
         #if __linux__
@@ -597,11 +640,13 @@ void LocalDerivationGoal::startBuilder()
     /* Create a temporary directory where the build will take
        place. */
     topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+    if (
 #if __APPLE__
-    if (false) {
+    false
 #else
-    if (useChroot) {
+    useChroot
 #endif
+    ) {
         /* If sandboxing is enabled, put the actual TMPDIR underneath
            an inaccessible root-owned directory, to prevent outside
            access.
@@ -1146,11 +1191,56 @@ void LocalDerivationGoal::startBuilder()
         });
     }
 
+    trace("process started");
+
     /* parent */
     pid.setSeparatePG(true);
-    worker.childStarted(shared_from_this(), {builderOut.get()}, true, true);
-
+    started();
     processSandboxSetupMessages();
+
+    bool failed = false;
+    trace("calling childStarted build");
+
+    unsigned long logSize;
+    std::string currentLogLine;
+    size_t currentLogLinePos;
+    std::list<std::string> logTail;
+
+    auto handler = build_handler(
+        logSink.get(),
+        *act,
+        builderActivities,
+        failed,
+        builderOut.get(),
+        logSize,
+        currentLogLine,
+        currentLogLinePos,
+        logTail
+    );
+
+    co_await childStarted({builderOut.get()}, true, true, handler);
+
+    trace("calling childStarted build end");
+
+    if (
+        !currentLogLine.empty() &&
+        !handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false)
+    ) {
+        act->result(resBuildLogLine, currentLogLine);
+    }
+
+    if (failed) {
+        killChild();
+        co_return done(
+            BuildResult::LogLimitExceeded,
+            {},
+            Error(
+                "%s killed after writing more than %d bytes of log output",
+                getName(),
+                settings.maxLogSize));
+    } else {
+        co_return Return{};
+    }
 }
 
 
@@ -3028,13 +3118,6 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
         topTmpDir = "";
         tmpDir = "";
     }
-}
-
-
-bool LocalDerivationGoal::isReadDesc(int fd)
-{
-    return (hook && DerivationGoal::isReadDesc(fd)) ||
-        (!hook && fd == builderOut.get());
 }
 
 
