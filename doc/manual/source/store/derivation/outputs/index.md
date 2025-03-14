@@ -45,6 +45,118 @@ In particular, the specification decides:
 
 - if the content is content-addressed, [what is its content address](./content-address.md#fixed-content-addressing) (and thus what is its [store path])
 
+## Output Checks
+
+Additional checks for each output can also be mandated by the derivation,
+supplementing the core required output specification above additional properties that must hold on the produced outputs for the derivation build to be considered successful.
+
+**TODO No nix lang**
+
+### Reference checks
+
+The main checks assert properties about the [references][reference] of an output.
+These checks vary on two different axes, yielding 4 possible checks.
+The first axis is *direct* (references proper) vs *transitive* ([requisites]).
+The first axis is *allowal* vs *disallowal*.
+
+[reference]: @docroot@/glossary.md#gloss-reference
+
+[requisites]: @docroot@/store/store-object.md#requisites
+
+- [*allowed references*]{#allowed-references}: Set (store path or output name)
+
+  The outputs references must be a subset of this set.
+  Not every store path in the set must be a reference of the output,
+  but every reference of the output must be in this set.
+
+  For example, the empty set enforces that the output of a derivation cannot have any runtime dependencies on its inputs.
+
+  > **Usage note**
+  >
+  > This is used in NixOS to check that generated files such as initial ramdisks for booting Linux don’t have accidental dependencies on other paths in the Nix store.
+
+- [`allowedRequisites`]{#adv-attr-allowedRequisites}: Set (store paths or outputs name)
+
+  like
+  This attribute is similar to `allowedReferences`, but it specifies
+  the legal requisites of the whole closure, so all the dependencies
+  recursively. For example,
+
+  ```nix
+  allowedRequisites = [ foobar ];
+  ```
+
+  enforces that the output of a derivation cannot have any other
+  runtime dependency than `foobar`, and in addition it enforces that
+  `foobar` itself doesn't introduce any other dependency itself.
+
+- [`disallowedReferences`]{#adv-attr-disallowedReferences}\
+  The optional attribute `disallowedReferences` specifies a list of
+  illegal references (dependencies) of the output of the builder. For
+  example,
+
+  ```nix
+  disallowedReferences = [ foo ];
+  ```
+
+  enforces that the output of a derivation cannot have a direct
+  runtime dependencies on the derivation `foo`.
+
+  https://en.wikipedia.org/wiki/Blacklist_(computing)
+
+- [`disallowedRequisites`]{#adv-attr-disallowedRequisites}\
+  This attribute is similar to `disallowedReferences`, but it
+  specifies illegal requisites for the whole closure, so all the
+  dependencies recursively. For example,
+
+  ```nix
+  disallowedRequisites = [ foobar ];
+  ```
+
+  enforces that the output of a derivation cannot have any runtime
+  dependency on `foobar` or any other derivation depending recursively
+  on `foobar`.
+
+The final references of the store object are always store paths.
+However, if all elements of the sets above had to be store paths, it would be hard-to-impossible to write down the reference from outputs *to other outputs*, because in general we don't know outputs' store paths until they are built.
+
+For this reason, it is also acceptable to use an output specification name (of the current derivation) instead of a store path.
+  To allow an output to have a runtime
+  dependency on itself, use `"out"` as a list item.
+
+- [`outputChecks`]{#adv-attr-outputChecks}\
+  When using [structured attributes](#adv-attr-structuredAttrs), the `outputChecks`
+  attribute allows defining checks per-output.
+
+  In addition to
+  [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
+  [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites),
+  the following attributes are available:
+
+  - `maxSize` defines the maximum size of the resulting [store object](@docroot@/store/store-object.md).
+  - `maxClosureSize` defines the maximum size of the output's closure.
+  - `ignoreSelfRefs` controls whether self-references should be considered when
+    checking for allowed references/requisites.
+
+  Example:
+
+  ```nix
+  __structuredAttrs = true;
+
+  outputChecks.out = {
+    # The closure of 'out' must not be larger than 256 MiB.
+    maxClosureSize = 256 * 1024 * 1024;
+
+    # It must not refer to the C compiler or to the 'dev' output.
+    disallowedRequisites = [ stdenv.cc "dev" ];
+  };
+
+  outputChecks.dev = {
+    # The 'dev' output must not be larger than 128 KiB.
+    maxSize = 128 * 1024;
+  };
+  ```
+
 ## Types of derivations
 
 The sections on each type of derivation output addressing ended up discussing other attributes of the derivation besides its outputs, such as purity, scheduling, determinism, etc.
