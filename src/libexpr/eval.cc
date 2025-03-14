@@ -771,18 +771,26 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
     if (!debugRepl || inDebugger)
         return;
 
-    auto dts =
-        error && expr.getPos()
-        ? std::make_unique<DebugTraceStacker>(
-            *this,
-            DebugTrace {
-                .pos = error->info().pos ? error->info().pos : positions[expr.getPos()],
+    auto dts = [&]() -> std::unique_ptr<DebugTraceStacker> {
+        if (error && expr.getPos()) {
+            auto trace = DebugTrace{
+                .pos = [&]() -> std::variant<Pos, PosIdx> {
+                    if (error->info().pos) {
+                        if (auto * pos = error->info().pos.get())
+                            return *pos;
+                        return noPos;
+                    }
+                    return expr.getPos();
+                }(),
                 .expr = expr,
                 .env = env,
                 .hint = error->info().msg,
-                .isError = true
-            })
-        : nullptr;
+                .isError = true};
+
+            return std::make_unique<DebugTraceStacker>(*this, std::move(trace));
+        }
+        return nullptr;
+    }();
 
     if (error)
     {
@@ -827,7 +835,7 @@ static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
     EvalState & state,
     Expr & expr,
     Env & env,
-    std::shared_ptr<Pos> && pos,
+    std::variant<Pos, PosIdx> pos,
     const Args & ... formatArgs)
 {
     return std::make_unique<DebugTraceStacker>(state,
@@ -1104,7 +1112,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
                 *this,
                 *e,
                 this->baseEnv,
-                e->getPos() ? std::make_shared<Pos>(positions[e->getPos()]) : nullptr,
+                e->getPos(),
                 "while evaluating the file '%1%':", resolvedPath.to_string())
             : nullptr;
 
@@ -1330,9 +1338,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
             state,
             *this,
             env2,
-            getPos()
-                ? std::make_shared<Pos>(state.positions[getPos()])
-                : nullptr,
+            getPos(),
             "while evaluating a '%1%' expression",
             "let"
         )
@@ -1401,7 +1407,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 state,
                 *this,
                 env,
-                state.positions[getPos()],
+                getPos(),
                 "while evaluating the attribute '%1%'",
                 showAttrPath(state, env, attrPath))
             : nullptr;
@@ -1602,7 +1608,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             try {
                 auto dts = debugRepl
                     ? makeDebugTraceStacker(
-                        *this, *lambda.body, env2, positions[lambda.pos],
+                        *this, *lambda.body, env2, lambda.pos,
                         "while calling %s",
                         lambda.name
                         ? concatStrings("'", symbols[lambda.name], "'")
@@ -1737,9 +1743,7 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
             state,
             *this,
             env,
-            getPos()
-                ? std::make_shared<Pos>(state.positions[getPos()])
-                : nullptr,
+            getPos(),
             "while calling a function"
         )
         : nullptr;
@@ -2123,7 +2127,7 @@ void EvalState::forceValueDeep(Value & v)
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
                     auto dts = debugRepl && i.value->isThunk()
-                        ? makeDebugTraceStacker(*this, *i.value->payload.thunk.expr, *i.value->payload.thunk.env, positions[i.pos],
+                        ? makeDebugTraceStacker(*this, *i.value->payload.thunk.expr, *i.value->payload.thunk.env, i.pos,
                             "while evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;
 
