@@ -33,11 +33,20 @@ void to_json(nlohmann::json & json, const BuildResult & buildResult)
     }
 }
 
-nlohmann::json KeyedBuildResult::toJSON(Store & store) const
+void to_json(nlohmann::json & json, const KeyedBuildResult & buildResult)
 {
-    auto json = nlohmann::json((const BuildResult &) *this);
-    json["path"] = path;
-    return json;
+    json = nlohmann::json((const BuildResult &) buildResult);
+    auto path = nlohmann::json::object();
+    std::visit(
+        overloaded{
+            [&](const DerivedPathOpaque & opaque) { path["opaque"] = opaque.path.to_string(); },
+            [&](const DerivedPathBuilt & drv) {
+                path["drvPath"] = drv.drvPath->getBaseStorePath().to_string();
+                path["outputs"] = drv.outputs.to_string();
+            },
+        },
+        buildResult.path.raw());
+    json["path"] = std::move(path);
 }
 
 } // namespace nix

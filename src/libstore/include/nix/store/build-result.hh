@@ -236,5 +236,6 @@ struct KeyedBuildResult : BuildResult
 };
 
 void to_json(nlohmann::json & json, const BuildResult & buildResult);
+void to_json(nlohmann::json & json, const KeyedBuildResult & buildResult);
 
 } // namespace nix
