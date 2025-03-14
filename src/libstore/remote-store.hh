@@ -122,6 +122,16 @@ public:
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
 
+    /**
+     * Note, the returned function must only be called once, or we'll
+     * try to read from the connection twice.
+     *
+     * @todo Use C++23 `std::move_only_function`.
+     */
+    std::function<BuildResult()> buildDerivationAsync(
+        const StorePath & drvPath, const BasicDerivation & drv,
+        BuildMode buildMode);
+
     void ensurePath(const StorePath & path) override;
 
     void addTempRoot(const StorePath & path) override;
