@@ -253,9 +253,30 @@ struct LocalDerivationGoal : DerivationGoal, RestrictionContext
     Goal::Co tryLocalBuild() override;
 
     /**
+     * Set up build environment / sandbox, acquiring resources (e.g.
+     * locks as needed). After this is run, the builder should be
+     * started.
+     *
+     * @returns true if successful, false if we could not acquire a build
+     * user. In that case, the caller must wait and then try again.
+     */
+    bool prepareBuild();
+
+    /**
      * Start building a derivation.
      */
     void startBuilder();
+
+    /**
+     * Tear down build environment after the builder exits (either on
+     * its own or if it is killed).
+     *
+     * @returns The first case indicates failure during output
+     * processing. A status code and exception are returned, providing
+     * more information. The second case indicates success, and
+     * realisations for each output of the derivation are returned.
+     */
+    std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> unprepareBuild();
 
     /**
      * Fill in the environment for the builder.
@@ -488,6 +509,53 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
         co_return tryToBuild();
     }
 
+    if (!prepareBuild()) {
+        if (!actLock)
+            actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
+                fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
+        co_await waitForAWhile();
+        co_return tryLocalBuild();
+    }
+
+    actLock.reset();
+
+    try {
+
+        /* Okay, we have to build. */
+        startBuilder();
+
+    } catch (BuildError & e) {
+        outputLocks.unlock();
+        buildUser.reset();
+        worker.permanentFailure = true;
+        co_return done(BuildResult::InputRejected, {}, std::move(e));
+    }
+
+    started();
+    co_await Suspend{};
+
+    trace("build done");
+
+    auto res = unprepareBuild();
+    // N.B. cannot use `std::visit` with co-routine return
+    if (auto * ste = std::get_if<0>(&res)) {
+        outputLocks.unlock();
+        co_return done(std::move(ste->first), {}, std::move(ste->second));
+    } else if (auto * builtOutputs = std::get_if<1>(&res)) {
+        /* It is now safe to delete the lock files, since all future
+           lockers will see that the output paths are valid; they will
+           not create new lock files with the same names as the old
+           (unlinked) lock files. */
+        outputLocks.setDeletion(true);
+        outputLocks.unlock();
+        co_return done(BuildResult::Built, std::move(*builtOutputs));
+    } else {
+        unreachable();
+    }
+}
+
+bool LocalDerivationGoal::prepareBuild()
+{
     /* Cache this */
     derivationType = drv->type();
 
@@ -535,33 +603,16 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
             buildUser = acquireUserLock(drvOptions->useUidRange(*drv) ? 65536 : 1, useChroot);
 
         if (!buildUser) {
-            if (!actLock)
-                actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                    fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
-            co_await waitForAWhile();
-            co_return tryLocalBuild();
+            return false;
         }
     }
 
-    actLock.reset();
+    return true;
+}
 
-    try {
 
-        /* Okay, we have to build. */
-        startBuilder();
-
-    } catch (BuildError & e) {
-        outputLocks.unlock();
-        buildUser.reset();
-        worker.permanentFailure = true;
-        co_return done(BuildResult::InputRejected, {}, std::move(e));
-    }
-
-    started();
-    co_await Suspend{};
-
-    trace("build done");
-
+std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> LocalDerivationGoal::unprepareBuild()
+{
     Finally releaseBuildUser([&](){
         /* Release the build user at the end of this function. We don't do
            it right away because we don't want another build grabbing this
@@ -654,18 +705,9 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
         deleteTmpDir(true);
 
-        /* It is now safe to delete the lock files, since all future
-           lockers will see that the output paths are valid; they will
-           not create new lock files with the same names as the old
-           (unlinked) lock files. */
-        outputLocks.setDeletion(true);
-        outputLocks.unlock();
-
-        co_return done(BuildResult::Built, std::move(builtOutputs));
+        return std::move(builtOutputs);
 
     } catch (BuildError & e) {
-        outputLocks.unlock();
-
         assert(derivationType);
         BuildResult::Status st =
             dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
@@ -673,9 +715,10 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
             !derivationType->isSandboxed() || diskFull ? BuildResult::TransientFailure :
             BuildResult::PermanentFailure;
 
-        co_return done(st, {}, std::move(e));
+        return std::pair{std::move(st), std::move(e)};
     }
 }
+
 
 static void chmod_(const Path & path, mode_t mode)
 {
