@@ -134,10 +134,9 @@ struct KeyedBuildResult : BuildResult
     KeyedBuildResult(BuildResult res, DerivedPath path)
         : BuildResult(std::move(res)), path(std::move(path))
     { }
-
-    nlohmann::json toJSON(Store & store) const;
 };
 
 void to_json(nlohmann::json & json, const BuildResult & buildResult);
+void to_json(nlohmann::json & json, const KeyedBuildResult & buildResult);
 
 }

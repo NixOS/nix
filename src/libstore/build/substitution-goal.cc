@@ -42,9 +42,10 @@ Goal::Done PathSubstitutionGoal::done(
     logger->result(
         getCurActivity(),
         resBuildResult,
-        KeyedBuildResult(
-            buildResult,
-            DerivedPath::Opaque{storePath}).toJSON(worker.store));
+        nlohmann::json(
+            KeyedBuildResult(
+                buildResult,
+                DerivedPath::Opaque{storePath})));
 
     return amDone(result);
 }

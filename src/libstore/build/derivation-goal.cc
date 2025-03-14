@@ -1566,9 +1566,10 @@ Goal::Done DerivationGoal::done(
     logger->result(
         act ? act->id : getCurActivity(),
         resBuildResult,
-        KeyedBuildResult(
-            buildResult,
-            DerivedPath::Built{.drvPath = makeConstantStorePathRef(drvPath), .outputs = wantedOutputs}).toJSON(worker.store));
+        nlohmann::json(
+            KeyedBuildResult(
+                buildResult,
+                DerivedPath::Built{.drvPath = makeConstantStorePathRef(drvPath), .outputs = wantedOutputs})));
 
     return amDone(buildResult.success() ? ecSuccess : ecFailed, std::move(ex));
 }
