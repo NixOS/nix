@@ -204,6 +204,7 @@ struct JSONLogger : Logger {
 
     struct State
     {
+        bool enabled = true;
     };
 
     Sync<State> _state;
@@ -216,8 +217,18 @@ struct JSONLogger : Logger {
 
         /* Acquire a lock to prevent log messages from clobbering each
            other. */
-        auto state(_state.lock());
-        writeLine(fd, line);
+        try {
+            auto state(_state.lock());
+            if (state->enabled)
+                writeLine(fd, line);
+        } catch (...) {
+            bool enabled = false;
+            std::swap(_state.lock()->enabled, enabled);
+            if (enabled) {
+                ignoreExceptionExceptInterrupt();
+                logger->warn("disabling JSON logger due to write errors");
+            }
+        }
     }
 
     void log(Verbosity lvl, std::string_view s) override
