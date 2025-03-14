@@ -502,7 +502,11 @@ void mainWrapped(int argc, char * * argv)
     }
 
     if (!extLoggerSettings.jsonLogPath.get().empty()) {
-        logger = makeTeeLogger({logger, makeJSONLogger(std::filesystem::path(extLoggerSettings.jsonLogPath.get()), false)});
+        try {
+            logger = makeTeeLogger({logger, makeJSONLogger(std::filesystem::path(extLoggerSettings.jsonLogPath.get()), false)});
+        } catch (...) {
+            ignoreExceptionExceptInterrupt();
+        }
     }
 
     if (args.helpRequested) {
