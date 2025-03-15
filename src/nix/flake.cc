@@ -1,4 +1,5 @@
 #include "command.hh"
+#include "error.hh"
 #include "installable-flake.hh"
 #include "common-args.hh"
 #include "shared.hh"
@@ -31,6 +32,23 @@ namespace nix::fs { using namespace std::filesystem; }
 using namespace nix;
 using namespace nix::flake;
 using json = nlohmann::json;
+
+class TypeMismatch : public Error
+{
+public:
+    TypeMismatch(std::string expected_type, eval_cache::AttrCursor & cursor)
+        : TypeMismatch(expected_type, cursor.showType())
+    {}
+
+    TypeMismatch(std::string expected_type, Value & value)
+        : TypeMismatch(expected_type, showType(value))
+    {}
+
+    TypeMismatch(std::string expected_type, std::string actual_type)
+        : Error("expected %s, but got %s", expected_type, actual_type)
+    {}
+
+};
 
 struct CmdFlakeUpdate;
 class FlakeCommand : virtual Args, public MixFlakeOptions
@@ -423,7 +441,7 @@ struct CmdFlakeCheck : FlakeCommand
                     fmt("checking derivation %s", attrPath));
                 auto packageInfo = getDerivation(*state, v, false);
                 if (!packageInfo)
-                    throw Error("flake attribute '%s' is not a derivation", attrPath);
+                    throw TypeMismatch("a derivation", v);
                 else {
                     // FIXME: check meta attributes
                     auto storePath = packageInfo->queryDrvPath();
@@ -490,7 +508,7 @@ struct CmdFlakeCheck : FlakeCommand
                     fmt("checking overlay '%s'", attrPath));
                 state->forceValue(v, pos);
                 if (!v.isLambda()) {
-                    throw Error("overlay is not a function, but %s instead", showType(v));
+                    throw TypeMismatch("a function", v);
                 }
                 if (v.payload.lambda.fun->hasFormals()
                     || !argHasName(v.payload.lambda.fun->arg, "final"))
@@ -547,10 +565,13 @@ struct CmdFlakeCheck : FlakeCommand
                 Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking NixOS configuration '%s'", attrPath));
                 Bindings & bindings(*state->allocBindings(0));
-                auto vToplevel = findAlongAttrPath(*state, "config.system.build.toplevel", bindings, v).first;
+                auto [vToplevel, pToplevel] = findAlongAttrPath(*state, "config.system.build.toplevel", bindings, v);
                 state->forceValue(*vToplevel, pos);
-                if (!state->isDerivation(*vToplevel))
-                    throw Error("attribute 'config.system.build.toplevel' is not a derivation");
+                if (!state->isDerivation(*vToplevel)) {
+                    auto err = TypeMismatch("a derivation", *vToplevel);
+                    err.addTrace(resolve(pToplevel), "while checking the 'config.system.build.toplevel' attribute");
+                    throw err;
+                }
             } catch (Error & e) {
                 e.addTrace(resolve(pos), HintFmt("while checking the NixOS configuration '%s'", attrPath));
                 reportError(e);
@@ -596,11 +617,12 @@ struct CmdFlakeCheck : FlakeCommand
                 Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking bundler '%s'", attrPath));
                 state->forceValue(v, pos);
-                if (!v.isLambda())
-                    throw Error("bundler must be a function");
+                if (!v.isLambda()) {
+                    throw TypeMismatch("a function", v);
+                }
                 // TODO: check types of inputs/outputs?
             } catch (Error & e) {
-                e.addTrace(resolve(pos), HintFmt("while checking the template '%s'", attrPath));
+                e.addTrace(resolve(pos), HintFmt("while checking the bundler '%s'", attrPath));
                 reportError(e);
             }
         };
@@ -1332,7 +1354,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         if (visitor.isDerivation())
                             showDerivation();
                         else
-                            throw Error("expected a derivation");
+                            throw TypeMismatch("a derivation", visitor);
                     }
                 }
 
