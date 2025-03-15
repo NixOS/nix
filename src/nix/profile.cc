@@ -802,7 +802,7 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
         ProfileManifest manifest(*getEvalState(), *profile);
 
         if (json) {
-            std::cout << manifest.toJSON(*store).dump() << "\n";
+            printJSON(manifest.toJSON(*store));
         } else {
             for (const auto & [i, e] : enumerate(manifest.elements)) {
                 auto & [name, element] = e;

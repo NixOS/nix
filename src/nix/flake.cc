@@ -242,7 +242,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             j["locks"] = lockedFlake.lockFile.toJSON().first;
             if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
-            logger->cout("%s", j.dump());
+            printJSON(j);
         } else {
             logger->cout(
                 ANSI_BOLD "Resolved URL:" ANSI_NORMAL "  %s",
@@ -1115,7 +1115,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
                 {"path", store->printStorePath(storePath)},
                 {"inputs", traverse(*flake.lockFile.root)},
             };
-            logger->cout("%s", jsonRoot);
+            printJSON(jsonRoot);
         } else {
             traverse(*flake.lockFile.root);
         }
@@ -1427,7 +1427,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
         auto j = visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
         if (json)
-            logger->cout("%s", j.dump());
+            printJSON(j);
     }
 };
 
@@ -1473,7 +1473,7 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
             res["hash"] = hash.to_string(HashFormat::SRI, true);
             res["original"] = fetchers::attrsToJSON(resolvedRef.toAttrs());
             res["locked"] = fetchers::attrsToJSON(lockedRef.toAttrs());
-            logger->cout(res.dump());
+            printJSON(res);
         } else {
             notice("Downloaded '%s' to '%s' (hash '%s').",
                 lockedRef.to_string(),

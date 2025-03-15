@@ -57,7 +57,7 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
 
                 res.push_back(currentPath);
             }
-            logger->cout("%s", res);
+            printJSON(res);
         }
         else {
             for (auto & path : realisations) {

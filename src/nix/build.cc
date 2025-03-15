@@ -101,7 +101,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
             printMissing(store, pathsToBuild, lvlError);
 
             if (json)
-                logger->cout("%s", derivedPathsToJSON(pathsToBuild, *store).dump());
+                printJSON(derivedPathsToJSON(pathsToBuild, *store));
 
             return;
         }
