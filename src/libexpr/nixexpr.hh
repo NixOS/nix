@@ -381,12 +381,21 @@ struct ExprLet : Expr
 
 struct ExprWith : Expr
 {
+    enum class Binding {
+        /** Classic `with` behaviour */
+        Outermost,
+        /** `with` behaviour mimicking OCaml's `foo.( <expr> )` */
+        Innermost,
+    };
+
     PosIdx pos;
     Expr * attrs, * body;
     size_t prevWith;
     ExprWith * parentWith;
-    ExprWith(const PosIdx & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
+    ExprWith(const PosIdx & pos, Expr * attrs, Expr * body, Binding binding)
+          : pos(pos), attrs(attrs), body(body), binding(binding) { };
     PosIdx getPos() const override { return pos; }
+    const Binding binding;
     COMMON_METHODS
 };
 
