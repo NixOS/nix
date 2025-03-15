@@ -39,6 +39,7 @@ basicSplitString(std::basic_string_view<OsChar> s, std::basic_string_view<OsChar
 template std::string concatStringsSep(std::string_view, const std::list<std::string> &);
 template std::string concatStringsSep(std::string_view, const std::set<std::string> &);
 template std::string concatStringsSep(std::string_view, const std::vector<std::string> &);
+template std::string concatStringsSep(std::string_view, const boost::container::small_vector<std::string, 64> &);
 
 typedef std::string_view strings_2[2];
 template std::string concatStringsSep(std::string_view, const strings_2 &);
