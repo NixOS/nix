@@ -6,6 +6,7 @@
 #include "pathlocks.hh"
 #include "store-api.hh"
 #include "indirect-root-store.hh"
+#include "local-log-store.hh"
 #include "sync.hh"
 
 #include <chrono>
@@ -76,6 +77,7 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 class LocalStore : public virtual LocalStoreConfig
     , public virtual IndirectRootStore
     , public virtual GcStore
+    , public virtual MixLocalStore
 {
 private:
 
@@ -214,16 +216,6 @@ private:
      */
     Sync<AutoCloseFD> _fdRootsSocket;
 
-public:
-
-    /**
-     * Implementation of IndirectRootStore::addIndirectRoot().
-     *
-     * The weak reference merely is a symlink to `path' from
-     * /nix/var/nix/gcroots/auto/<hash of `path'>.
-     */
-    void addIndirectRoot(const Path & path) override;
-
 private:
 
     void findTempRoots(Roots & roots, bool censor);
@@ -309,8 +301,6 @@ public:
     virtual void registerValidPaths(const ValidPathInfos & infos);
 
     unsigned int getProtocol() override;
-
-    std::optional<TrustedFlag> isTrustedClient() override;
 
     void vacuumDB();
 
@@ -401,8 +391,6 @@ private:
      * specified by the ‘secret-key-files’ option.
      */
     void signPathInfo(ValidPathInfo & info);
-
-    void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
     friend struct LocalDerivationGoal;
     friend struct PathSubstitutionGoal;
