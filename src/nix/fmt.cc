@@ -22,11 +22,10 @@ struct CmdFmt : SourceExprCommand {
 
     Category category() override { return catSecondary; }
 
-    Strings getDefaultFlakeAttrPaths() override {
-        return Strings{"formatter." + settings.thisSystem.get()};
+    StringSet getRoles() override
+    {
+        return {"nix-fmt"};
     }
-
-    Strings getDefaultFlakeAttrPathPrefixes() override { return Strings{}; }
 
     void run(ref<Store> store) override
     {
@@ -40,7 +39,7 @@ struct CmdFmt : SourceExprCommand {
         Strings programArgs{app.program};
 
         // Propagate arguments from the CLI
-        for (auto &i : args) {
+        for (auto & i : args) {
             programArgs.push_back(i);
         }
 
