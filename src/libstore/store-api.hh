@@ -622,6 +622,12 @@ public:
     virtual void addSignatures(const StorePath & storePath, const StringSet & sigs)
     { unsupported("addSignatures"); }
 
+    /**
+     * Add signatures to a ValidPathInfo or Realisation using the secret keys
+     * specified by the ‘secret-key-files’ option.
+     */
+    void signPathInfo(ValidPathInfo & info);
+
     void signRealisation(Realisation &);
 
     /* Utility functions. */

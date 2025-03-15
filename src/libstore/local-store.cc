@@ -1582,20 +1582,6 @@ void LocalStore::addSignatures(const StorePath & storePath, const StringSet & si
 }
 
 
-void LocalStore::signPathInfo(ValidPathInfo & info)
-{
-    // FIXME: keep secret keys in memory.
-
-    auto secretKeyFiles = settings.secretKeyFiles;
-
-    for (auto & secretKeyFile : secretKeyFiles.get()) {
-        SecretKey secretKey(readFile(secretKeyFile));
-        LocalSigner signer(std::move(secretKey));
-        info.sign(*this, signer);
-    }
-}
-
-
 std::optional<std::pair<int64_t, Realisation>> LocalStore::queryRealisationCore_(
         LocalStore::State & state,
         const DrvOutput & id)

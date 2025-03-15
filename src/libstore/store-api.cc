@@ -1274,6 +1274,21 @@ Derivation Store::readDerivation(const StorePath & drvPath)
 Derivation Store::readInvalidDerivation(const StorePath & drvPath)
 { return readDerivationCommon(*this, drvPath, false); }
 
+
+void Store::signPathInfo(ValidPathInfo & info)
+{
+    // FIXME: keep secret keys in memory.
+
+    auto secretKeyFiles = settings.secretKeyFiles;
+
+    for (auto & secretKeyFile : secretKeyFiles.get()) {
+        SecretKey secretKey(readFile(secretKeyFile));
+        LocalSigner signer(std::move(secretKey));
+        info.sign(*this, signer);
+    }
+}
+
+
 void Store::signRealisation(Realisation & realisation)
 {
     // FIXME: keep secret keys in memory.
