@@ -15,6 +15,8 @@ R""(
 This command deletes non-current versions of a profile, making it
 impossible to roll back to these versions. By default, all non-current
 versions are deleted. With `--older-than` *N*`d`, all non-current
-versions older than *N* days are deleted.
+versions older than *N* days are deleted. With `--older-than` `+`*N*,
+*N* older versions than the current version will be kept, the rest
+removed.
 
 )""
