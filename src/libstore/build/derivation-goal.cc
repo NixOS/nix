@@ -879,11 +879,7 @@ void runPostBuildHook(
 }
 
 
-void appendLogTailErrorMsg(
-    const Store & store,
-    const StorePath & drvPath,
-    const std::list<std::string> & logTail,
-    std::string & msg)
+void DerivationGoal::appendLogTailErrorMsg(std::string & msg)
 {
     if (!logger->isVerbose() && !logTail.empty()) {
         msg += fmt(";\nlast %d log lines:\n", logTail.size());
@@ -900,7 +896,7 @@ void appendLogTailErrorMsg(
         // command will not put it at the start of the line unfortunately.
         msg += fmt("For full logs, run:\n  " ANSI_BOLD "%s %s" ANSI_NORMAL,
             nixLogCommand,
-            store.printStorePath(drvPath));
+            worker.store.printStorePath(drvPath));
     }
 }
 
@@ -947,7 +943,7 @@ Goal::Co DerivationGoal::hookDone()
             Magenta(worker.store.printStorePath(drvPath)),
             statusToString(status));
 
-        appendLogTailErrorMsg(worker.store, drvPath, logTail, msg);
+        appendLogTailErrorMsg(msg);
 
         outputLocks.unlock();
 
