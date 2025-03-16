@@ -594,16 +594,18 @@ Goal::Co DerivationGoal::tryToBuild()
         }
     }
 
-    if (!outputLocks.lockPaths(lockFiles, "", false)) {
-        if (!actLock)
-            actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
+    if (!outputLocks.lockPaths(lockFiles, "", false))
+    {
+        Activity act(*logger, lvlWarn, actBuildWaiting,
                 fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
-        worker.waitForAWhile(shared_from_this());
-        co_await Suspend{};
-        co_return tryToBuild();
-    }
 
-    actLock.reset();
+        /* Wait then try locking again, repeat until success (returned
+           boolean is true). */
+        do {
+            worker.waitForAWhile(shared_from_this());
+            co_await Suspend{};
+        } while (!outputLocks.lockPaths(lockFiles, "", false));
+    }
 
     /* Now check again whether the outputs are valid.  This is because
        another process may have started building in parallel.  After
