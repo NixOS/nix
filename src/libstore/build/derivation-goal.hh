@@ -198,11 +198,6 @@ struct DerivationGoal : public Goal
     std::unique_ptr<HookInstance> hook;
 #endif
 
-    /**
-     * The sort of derivation we are building.
-     */
-    std::optional<DerivationType> derivationType;
-
     BuildMode buildMode;
 
     std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds, mcRunningBuilds;

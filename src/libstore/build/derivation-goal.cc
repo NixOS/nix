@@ -533,9 +533,6 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
 
     debug("added input paths %s", worker.store.showPaths(inputPaths));
 
-    /* What type of derivation are we building? */
-    derivationType = drv->type();
-
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
        build hook. */
