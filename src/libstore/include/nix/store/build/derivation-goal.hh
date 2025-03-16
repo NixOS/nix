@@ -62,13 +62,6 @@ void runPostBuildHook(
     const StorePath & drvPath,
     const StorePathSet & outputPaths);
 
-/** Used internally */
-void appendLogTailErrorMsg(
-    const Store & store,
-    const StorePath & drvPath,
-    const std::list<std::string> & logTail,
-    std::string & msg);
-
 /**
  * A goal for building some or all of the outputs of a derivation.
  */
@@ -304,6 +297,8 @@ struct DerivationGoal : public Goal
         BuildResult::Status status,
         SingleDrvOutputs builtOutputs = {},
         std::optional<Error> ex = {});
+
+    void appendLogTailErrorMsg(std::string & msg);
 
     StorePathSet exportReferences(const StorePathSet & storePaths);
 
