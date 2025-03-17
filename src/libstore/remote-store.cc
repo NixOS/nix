@@ -18,18 +18,58 @@
 #include "nix/util/callback.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/signals.hh"
+#include "nix/store/config-parse-impl.hh"
 
 #include <nlohmann/json.hpp>
 
 namespace nix {
 
+constexpr static const RemoteStoreConfigT<config::SettingInfoWithDefault> remoteStoreConfigDescriptions = {
+    .maxConnections{
+        {
+            .name = "max-connections",
+            .description = "Maximum number of concurrent connections to the Nix daemon.",
+        },
+        {
+            .makeDefault = [] { return 1; },
+        },
+    },
+    .maxConnectionAge{
+        {
+            .name = "max-connection-age",
+            .description = "Maximum age of a connection before it is closed.",
+        },
+        {
+            .makeDefault = [] { return std::numeric_limits<unsigned int>::max(); },
+        },
+    },
+};
+
+#define REMOTE_STORE_CONFIG_FIELDS(X) X(maxConnections), X(maxConnectionAge),
+
+MAKE_PARSE(RemoteStoreConfig, remoteStoreConfig, REMOTE_STORE_CONFIG_FIELDS)
+
+MAKE_APPLY_PARSE(RemoteStoreConfig, remoteStoreConfig, REMOTE_STORE_CONFIG_FIELDS)
+
+config::SettingDescriptionMap RemoteStoreConfig::descriptions()
+{
+    constexpr auto & descriptions = remoteStoreConfigDescriptions;
+    return {REMOTE_STORE_CONFIG_FIELDS(DESCRIBE_ROW)};
+}
+
+RemoteStore::Config::RemoteStoreConfig(const Store::Config & storeConfig, const StoreConfig::Params & params)
+    : RemoteStoreConfigT<config::PlainValue>{remoteStoreConfigApplyParse(params)}
+    , storeConfig{storeConfig}
+{
+}
+
 /* TODO: Separate these store types into different files, give them better names */
 RemoteStore::RemoteStore(const Config & config)
-    : Store{config}
+    : Store{config.storeConfig}
     , config{config}
     , connections(
           make_ref<Pool<Connection>>(
-              std::max(1, config.maxConnections.get()),
+              std::max(1, config.maxConnections),
               [this]() {
                   auto conn = openConnectionWrapper();
                   try {
@@ -53,7 +93,8 @@ RemoteStore::RemoteStore(const Config & config)
 ref<RemoteStore::Connection> RemoteStore::openConnectionWrapper()
 {
     if (failed)
-        throw Error("opening a connection to remote store '%s' previously failed", config.getHumanReadableURI());
+        throw Error(
+            "opening a connection to remote store '%s' previously failed", config.storeConfig.getHumanReadableURI());
     try {
         return openConnection();
     } catch (...) {
@@ -97,7 +138,8 @@ void RemoteStore::initConnection(Connection & conn)
         if (ex)
             std::rethrow_exception(ex);
     } catch (Error & e) {
-        throw Error("cannot open connection to remote store '%s': %s", config.getHumanReadableURI(), e.what());
+        throw Error(
+            "cannot open connection to remote store '%s': %s", config.storeConfig.getHumanReadableURI(), e.what());
     }
 
     setOptions(conn);

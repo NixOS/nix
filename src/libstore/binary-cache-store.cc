@@ -13,6 +13,7 @@
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/archive.hh"
+#include "nix/store/config-parse-impl.hh"
 
 #include <chrono>
 #include <future>
@@ -24,23 +25,130 @@
 
 namespace nix {
 
-BinaryCacheStore::BinaryCacheStore(Config & config)
-    : config{config}
+constexpr static const BinaryCacheStoreConfigT<config::SettingInfoWithDefault> binaryCacheStoreConfigDescriptions = {
+    .compression{
+        {
+            .name = "compression",
+            .description = "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`).",
+        },
+        {
+            .makeDefault = []() -> std::string { return "xz"; },
+        },
+    },
+    .writeNARListing{
+        {
+            .name = "write-nar-listing",
+            .description = "Whether to write a JSON file that lists the files in each NAR.",
+        },
+        {
+            .makeDefault = [] { return false; },
+        },
+    },
+    .writeDebugInfo{
+        {
+            .name = "index-debug-info",
+            .description = R"(
+              Whether to index DWARF debug info files by build ID. This allows [`dwarffs`](https://github.com/edolstra/dwarffs) to
+              fetch debug info on demand
+            )",
+        },
+        {
+            .makeDefault = [] { return false; },
+        },
+    },
+    .secretKeyFile{
+        {
+            .name = "secret-key",
+            .description = "Path to the secret key used to sign the binary cache.",
+        },
+        {
+            .makeDefault = []() -> Path { return ""; },
+        },
+    },
+    .secretKeyFiles{
+        {
+            .name = "secret-keys",
+            .description = "List of paths to the secret keys used to sign the binary cache.",
+        },
+        {
+            .makeDefault = []() -> std::vector<Path> { return {}; },
+        },
+    },
+    .localNarCache{
+        {
+            .name = "local-nar-cache",
+            .description =
+                "Path to a local cache of NARs fetched from this binary cache, used by commands such as `nix store cat`.",
+        },
+        {
+            .makeDefault = []() -> Path { return ""; },
+        },
+    },
+    .parallelCompression{
+        {
+            .name = "parallel-compression",
+            .description =
+                "Enable multi-threaded compression of NARs. This is currently only available for `xz` and `zstd`.",
+        },
+        {
+            .makeDefault = [] { return false; },
+        },
+    },
+    .compressionLevel{
+        {
+            .name = "compression-level",
+            .description = R"(
+              The *preset level* to be used when compressing NARs.
+              The meaning and accepted values depend on the compression method selected.
+              `-1` specifies that the default compression level should be used.
+            )",
+        },
+        {
+            .makeDefault = [] { return -1; },
+        },
+    },
+};
+
+#define BINARY_CACHE_STORE_CONFIG_FIELDS(X)                                                                       \
+    X(compression), X(writeNARListing), X(writeDebugInfo), X(secretKeyFile), X(secretKeyFiles), X(localNarCache), \
+        X(parallelCompression), X(compressionLevel),
+
+MAKE_PARSE(BinaryCacheStoreConfig, binaryCacheStoreConfig, BINARY_CACHE_STORE_CONFIG_FIELDS)
+
+MAKE_APPLY_PARSE(BinaryCacheStoreConfig, binaryCacheStoreConfig, BINARY_CACHE_STORE_CONFIG_FIELDS)
+
+BinaryCacheStore::Config::BinaryCacheStoreConfig(const Store::Config & storeConfig, const StoreConfig::Params & params)
+    : BinaryCacheStoreConfigT<config::PlainValue>{binaryCacheStoreConfigApplyParse(params)}
+    , storeConfig{storeConfig}
+{
+}
+
+config::SettingDescriptionMap BinaryCacheStoreConfig::descriptions()
+{
+    constexpr auto & descriptions = binaryCacheStoreConfigDescriptions;
+    return {BINARY_CACHE_STORE_CONFIG_FIELDS(DESCRIBE_ROW)};
+}
+
+BinaryCacheStore::BinaryCacheStore(const Config & config)
+    : Store{config.storeConfig}
+    , config{config}
 {
     if (config.secretKeyFile != "")
         signers.push_back(std::make_unique<LocalSigner>(SecretKey{readFile(config.secretKeyFile)}));
 
-    if (config.secretKeyFiles != "") {
-        std::stringstream ss(config.secretKeyFiles);
-        Path keyPath;
-        while (std::getline(ss, keyPath, ',')) {
-            signers.push_back(std::make_unique<LocalSigner>(SecretKey{readFile(keyPath)}));
-        }
+    for (auto & keyPath : config.secretKeyFiles) {
+        signers.push_back(std::make_unique<LocalSigner>(SecretKey{readFile(keyPath)}));
     }
 
     StringSink sink;
     sink << narVersionMagic1;
     narMagic = sink.s;
+
+    // Want to call this but cannot, because virtual function lookup is
+    // disabled in a constructor. It is thus left to instances to call
+    // it instead.
+
+    // init();
 }
 
 void BinaryCacheStore::init()
@@ -59,13 +167,13 @@ void BinaryCacheStore::init()
                 if (value != storeDir)
                     throw Error(
                         "binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
-                        config.getHumanReadableURI(),
+                        config.storeConfig.getHumanReadableURI(),
                         value,
                         storeDir);
             } else if (name == "WantMassQuery") {
-                config.wantMassQuery.setDefault(value == "1");
+                resolvedSubstConfig.wantMassQuery = config.storeConfig.wantMassQuery.value_or(value == "1");
             } else if (name == "Priority") {
-                config.priority.setDefault(std::stoi(value));
+                resolvedSubstConfig.priority = config.storeConfig.priority.value_or(std::stoi(value));
             }
         }
     }
@@ -132,7 +240,7 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 
     if (diskCache)
         diskCache->upsertNarInfo(
-            config.getReference().render(/*FIXME withParams=*/false),
+            config.storeConfig.getReference().render(/*FIXME withParams=*/false),
             std::string(narInfo->path.hashPart()),
             std::shared_ptr<NarInfo>(narInfo));
 }
@@ -439,7 +547,7 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
 void BinaryCacheStore::queryPathInfoUncached(
     const StorePath & storePath, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
-    auto uri = config.getReference().render(/*FIXME withParams=*/false);
+    auto uri = config.storeConfig.getReference().render(/*FIXME withParams=*/false);
     auto storePathS = printStorePath(storePath);
     auto act = std::make_shared<Activity>(
         *logger,
@@ -550,7 +658,7 @@ void BinaryCacheStore::queryRealisationUncached(
 void BinaryCacheStore::registerDrvOutput(const Realisation & info)
 {
     if (diskCache)
-        diskCache->upsertRealisation(config.getReference().render(/*FIXME withParams=*/false), info);
+        diskCache->upsertRealisation(config.storeConfig.getReference().render(/*FIXME withParams=*/false), info);
     upsertFile(makeRealisationPath(info.id), static_cast<nlohmann::json>(info).dump(), "application/json");
 }
 
@@ -587,7 +695,7 @@ std::optional<std::string> BinaryCacheStore::getBuildLogExact(const StorePath & 
 {
     auto logPath = "log/" + std::string(baseNameOf(printStorePath(path)));
 
-    debug("fetching build log from binary cache '%s/%s'", config.getHumanReadableURI(), logPath);
+    debug("fetching build log from binary cache '%s/%s'", config.storeConfig.getHumanReadableURI(), logPath);
 
     return getFile(logPath);
 }

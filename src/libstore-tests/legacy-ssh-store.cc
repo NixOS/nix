@@ -12,13 +12,15 @@ TEST(LegacySSHStore, constructConfig)
         StoreConfig::Params{
             {
                 "remote-program",
-                // TODO #11106, no more split on space
-                "foo bar",
+                {
+                    "foo",
+                    "bar",
+                },
             },
         });
 
     EXPECT_EQ(
-        config.remoteProgram.get(),
+        config.remoteProgram,
         (Strings{
             "foo",
             "bar",

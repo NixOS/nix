@@ -2,72 +2,23 @@
 
 namespace nix {
 
+template<template<typename> class F>
+struct LocalOverlayStoreConfigT
+{
+    F<ref<const StoreConfig>>::type lowerStoreConfig;
+    F<Path>::type upperLayer;
+    F<bool>::type checkMount;
+    F<Path>::type remountHook;
+};
+
 /**
  * Configuration for `LocalOverlayStore`.
  */
-struct LocalOverlayStoreConfig : virtual LocalStoreConfig
+struct LocalOverlayStoreConfig : LocalStoreConfig, LocalOverlayStoreConfigT<config::PlainValue>
 {
-    LocalOverlayStoreConfig(const StringMap & params)
-        : LocalOverlayStoreConfig("local-overlay", "", params)
-    {
-    }
+    static config::SettingDescriptionMap descriptions();
 
-    LocalOverlayStoreConfig(std::string_view scheme, PathView path, const Params & params)
-        : StoreConfig(params)
-        , LocalFSStoreConfig(path, params)
-        , LocalStoreConfig(scheme, path, params)
-    {
-    }
-
-    const Setting<std::string> lowerStoreUri{
-        (StoreConfig *) this,
-        "",
-        "lower-store",
-        R"(
-          [Store URL](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
-          for the lower store. The default is `auto` (i.e. use the Nix daemon or `/nix/store` directly).
-
-          Must be a store with a store dir on the file system.
-          Must be used as OverlayFS lower layer for this store's store dir.
-        )"};
-
-    const PathSetting upperLayer{
-        (StoreConfig *) this,
-        "",
-        "upper-layer",
-        R"(
-          Directory containing the OverlayFS upper layer for this store's store dir.
-        )"};
-
-    Setting<bool> checkMount{
-        (StoreConfig *) this,
-        true,
-        "check-mount",
-        R"(
-          Check that the overlay filesystem is correctly mounted.
-
-          Nix does not manage the overlayfs mount point itself, but the correct
-          functioning of the overlay store does depend on this mount point being set up
-          correctly. Rather than just assume this is the case, check that the lowerdir
-          and upperdir options are what we expect them to be. This check is on by
-          default, but can be disabled if needed.
-        )"};
-
-    const PathSetting remountHook{
-        (StoreConfig *) this,
-        "",
-        "remount-hook",
-        R"(
-          Script or other executable to run when overlay filesystem needs remounting.
-
-          This is occasionally necessary when deleting a store path that exists in both upper and lower layers.
-          In such a situation, bypassing OverlayFS and deleting the path in the upper layer directly
-          is the only way to perform the deletion without creating a "whiteout".
-          However this causes the OverlayFS kernel data structures to get out-of-sync,
-          and can lead to 'stale file handle' errors; remounting solves the problem.
-
-          The store directory is passed as an argument to the invoked executable.
-        )"};
+    LocalOverlayStoreConfig(std::string_view scheme, PathView path, const StoreConfig::Params & params);
 
     static const std::string name()
     {

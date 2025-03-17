@@ -26,8 +26,8 @@ subproject('nix')
 
 # Docs
 if get_option('doc-gen')
-  subproject('internal-api-docs')
-  subproject('external-api-docs')
+  #subproject('internal-api-docs')
+  #subproject('external-api-docs')
   if meson.can_run_host_binaries()
     subproject('nix-manual')
   endif

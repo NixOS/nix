@@ -3,6 +3,7 @@
 #include "nix/store/local-store.hh"
 #include "nix/store/uds-remote-store.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/json-utils.hh"
 
 namespace nix {
 
@@ -18,9 +19,7 @@ ref<Store> openStore(const std::string & uri, const Store::Config::Params & extr
 
 ref<Store> openStore(StoreReference && storeURI)
 {
-    auto store = resolveStoreConfig(std::move(storeURI))->openStore();
-    store->init();
-    return store;
+    return resolveStoreConfig(std::move(storeURI))->openStore();
 }
 
 ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
@@ -30,7 +29,7 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
     auto storeConfig = std::visit(
         overloaded{
             [&](const StoreReference::Auto &) -> ref<StoreConfig> {
-                auto stateDir = getOr(params, "state", settings.nixStateDir);
+                auto stateDir = getString(getOr(params, "state", settings.nixStateDir));
                 if (access(stateDir.c_str(), R_OK | W_OK) == 0)
                     return make_ref<LocalStore::Config>(params);
                 else if (pathExists(settings.nixDaemonSocketFile))
@@ -59,7 +58,7 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
                     return make_ref<LocalStore::Config>(params);
             },
             [&](const StoreReference::Specified & g) {
-                for (const auto & [storeName, implem] : Implementations::registered())
+                for (auto & [name, implem] : Implementations::registered())
                     if (implem.uriSchemes.count(g.scheme))
                         return implem.parseConfig(g.scheme, g.authority, params);
 
@@ -69,7 +68,6 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
         storeURI.variant);
 
     experimentalFeatureSettings.require(storeConfig->experimentalFeature());
-    storeConfig->warnUnknownSettings();
 
     return storeConfig;
 }
@@ -91,10 +89,12 @@ std::list<ref<Store>> getDefaultSubstituters()
             }
         };
 
-        for (const auto & uri : settings.substituters.get())
+        for (auto & uri : settings.substituters.get())
             addStore(uri);
 
-        stores.sort([](ref<Store> & a, ref<Store> & b) { return a->config.priority < b->config.priority; });
+        stores.sort([](ref<Store> & a, ref<Store> & b) {
+            return a->resolvedSubstConfig.priority < b->resolvedSubstConfig.priority;
+        });
 
         return stores;
     }());
@@ -109,3 +109,20 @@ Implementations::Map & Implementations::registered()
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix::config;
+
+ref<const StoreConfig> adl_serializer<ref<const StoreConfig>>::from_json(const json & json)
+{
+    return resolveStoreConfig(adl_serializer<StoreReference>::from_json(json));
+}
+
+void adl_serializer<ref<const StoreConfig>>::to_json(json & obj, const ref<const StoreConfig> & s)
+{
+    // TODO, for tests maybe
+    assert(false);
+}
+
+} // namespace nlohmann

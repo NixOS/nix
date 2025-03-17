@@ -1,4 +1,5 @@
 #include "nix/util/source-path.hh"
+#include "nix/store/config-parse-impl.hh"
 #include "nix/util/util.hh"
 #include "nix/store/store-dir-config.hh"
 #include "nix/store/derivations.hh"

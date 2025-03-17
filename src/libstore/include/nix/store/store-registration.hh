@@ -30,6 +30,19 @@ struct StoreFactory
     StringSet uriSchemes;
 
     /**
+     * @note This is a functional pointer for now because this situation:
+     *
+     *   - We register store types with global initializers
+     *
+     *   - The default values for some settings maybe depend on the settings globals.
+     *
+     *   And because the ordering of global initialization is arbitrary,
+     *   this is not allowed. For now, we can simply defer actually
+     *   creating these maps until we need to later.
+     */
+    config::SettingDescriptionMap (*configDescriptions)();
+
+    /**
      * An experimental feature this type store is gated, if it is to be
      * experimental.
      */
@@ -40,20 +53,20 @@ struct StoreFactory
      * whatever comes after `<scheme>://` and before `?<query-params>`.
      */
     std::function<ref<StoreConfig>(
-        std::string_view scheme, std::string_view authorityPath, const Store::Config::Params & params)>
+        std::string_view scheme, std::string_view authorityPath, const StoreConfig::Params & params)>
         parseConfig;
-
-    /**
-     * Just for dumping the defaults. Kind of awkward this exists,
-     * because it means we cannot require fields to be manually
-     * specified so easily.
-     */
-    std::function<ref<StoreConfig>()> getConfig;
 };
 
 struct Implementations
 {
+private:
+
+    /**
+     * The name of this type of store, and a factory for it.
+     */
     using Map = std::map<std::string, StoreFactory>;
+
+public:
 
     static Map & registered();
 
@@ -63,11 +76,11 @@ struct Implementations
         StoreFactory factory{
             .doc = TConfig::doc(),
             .uriSchemes = TConfig::uriSchemes(),
+            .configDescriptions = TConfig::descriptions,
             .experimentalFeature = TConfig::experimentalFeature(),
             .parseConfig = ([](auto scheme, auto uri, auto & params) -> ref<StoreConfig> {
                 return make_ref<TConfig>(scheme, uri, params);
             }),
-            .getConfig = ([]() -> ref<StoreConfig> { return make_ref<TConfig>(Store::Config::Params{}); }),
         };
         auto [it, didInsert] = registered().insert({TConfig::name(), std::move(factory)});
         if (!didInsert) {

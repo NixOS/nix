@@ -226,7 +226,7 @@ void LocalStore::optimisePath_(
        the store itself (we don't want or need to mess with its
        permissions). */
     const Path dirOfPath(dirOf(path));
-    bool mustToggle = dirOfPath != config->realStoreDir.get();
+    bool mustToggle = dirOfPath != config->realStoreDir;
     if (mustToggle)
         makeWritable(dirOfPath);
 
