@@ -45,7 +45,7 @@ static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
 static bool allSupportedLocally(Store & store, const StringSet & requiredFeatures)
 {
     for (auto & feature : requiredFeatures)
-        if (!store.config.systemFeatures.get().count(feature))
+        if (!store.config.systemFeatures.count(feature))
             return false;
     return true;
 }
