@@ -34,6 +34,16 @@ mkdir -p err
 cat <<EOF > err/flake.nix
 throw "error"
 EOF
+mkdir -p hasdots
+cat <<EOF > hasdots/flake.nix
+{
+    outputs = i: {
+        "sample.dotted.output" = {
+            subAttr = 1;
+        };
+    };
+}
+EOF
 
 # Test the completion of a subcommand
 [[ "$(NIX_GET_COMPLETIONS=1 nix buil)" == $'normal\nbuild\t' ]]
@@ -73,3 +83,5 @@ NIX_GET_COMPLETIONS=3 nix build --option allow-import-from | grep -- "allow-impo
 [[ "$(NIX_GET_COMPLETIONS=4 nix eval --file ./foo/flake.nix outp)" == $'attrs\noutputs\t' ]]
 [[ "$(NIX_GET_COMPLETIONS=4 nix eval --file ./err/flake.nix outp 2>&1)" == $'attrs' ]]
 [[ "$(NIX_GET_COMPLETIONS=2 nix eval ./err\# 2>&1)" == $'attrs' ]]
+[[ "$(NIX_GET_COMPLETIONS=2 nix eval './hasdots#s')" == $'attrs\n./hasdots#\\"sample.dotted.output\\"\t' ]]
+[[ "$(NIX_GET_COMPLETIONS=2 nix eval './hasdots#\"sample.dotted.output\".s')" == $'attrs\n./hasdots#\\"sample.dotted.output\\".subAttr\t' ]]
