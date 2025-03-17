@@ -255,7 +255,7 @@ struct LocalDerivationGoal : DerivationGoal, RestrictionContext
     /**
      * Start building a derivation.
      */
-    void startBuilder();
+    Co startBuilder(std::list<std::string> & logTail);
 
     /**
      * Fill in the environment for the builder.
@@ -435,8 +435,6 @@ LocalStore & LocalDerivationGoal::getLocalStore()
 void LocalDerivationGoal::killChild()
 {
     if (pid != -1) {
-        worker.childTerminated(this);
-
         /* If we're using a build user, then there is a tricky race
            condition: if we kill the build user before the child has
            done its setuid() to the build user uid, then it won't be
@@ -543,34 +541,18 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     actLock.reset();
 
-    started();
+    std::list<std::string> logTail{};
+
     try {
 
         /* Okay, we have to build. */
-        startBuilder();
+        co_await startBuilder(logTail);
 
     } catch (BuildError & e) {
         outputLocks.unlock();
         buildUser.reset();
         worker.permanentFailure = true;
         co_return done(BuildResult::InputRejected, {}, std::move(e));
-    }
-
-    co_await Suspend{};
-
-    if (!currentLogLine.empty()) {
-        if (handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false))
-            ;
-
-        else {
-            logTail.push_back(currentLogLine);
-            if (logTail.size() > settings.logLines) logTail.pop_front();
-
-            act->result(resBuildLogLine, currentLogLine);
-        }
-
-        currentLogLine = "";
-        currentLogLinePos = 0;
     }
 
     trace("build done");
@@ -595,9 +577,6 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     buildResult.timesBuilt++;
     buildResult.stopTime = time(0);
-
-    /* So the child is gone now. */
-    worker.childTerminated(this);
 
     /* Close the read side of the logger pipe. */
     builderOut.close();
@@ -833,7 +812,7 @@ static std::function<bool(Descriptor, std::string_view)> makeBuildLogHandler(
     std::shared_ptr<BufferedSink> & logSink,
     Activity & act,
     std::map<ActivityId, Activity> & builderActivities,
-    std::function<void()> killChild,
+    bool & failed,
     Descriptor & builderOut,
     unsigned long & logSize,
     std::string & currentLogLine,
@@ -849,7 +828,7 @@ static std::function<bool(Descriptor, std::string_view)> makeBuildLogHandler(
         if (isWrittenToLog) {
             logSize += data.size();
             if (settings.maxLogSize && logSize > settings.maxLogSize) {
-                killChild();
+                failed = true;
                 return true; // break out and stop listening to children
             }
 
@@ -876,12 +855,13 @@ static std::function<bool(Descriptor, std::string_view)> makeBuildLogHandler(
             if (logSink)
                 (*logSink)(data);
         }
+        failed = false;
         return false;
     };
 }
 
 
-void LocalDerivationGoal::startBuilder()
+Goal::Co LocalDerivationGoal::startBuilder(std::list<std::string> & logTail)
 {
     if ((buildUser && buildUser->getUIDCount() != 1)
         #ifdef __linux__
@@ -956,11 +936,13 @@ void LocalDerivationGoal::startBuilder()
     /* Create a temporary directory where the build will take
        place. */
     topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+    if (
 #ifdef __APPLE__
-    if (false) {
+    false
 #else
-    if (useChroot) {
+    useChroot
 #endif
+    ) {
         /* If sandboxing is enabled, put the actual TMPDIR underneath
            an inaccessible root-owned directory, to prevent outside
            access.
@@ -1490,16 +1472,27 @@ void LocalDerivationGoal::startBuilder()
         });
     }
 
+    trace("process started");
+
     /* parent */
     pid.setSeparatePG(true);
+    started();
+    processSandboxSetupMessages();
+
+    bool failed = false;
+    trace("calling childStarted build");
+
+    unsigned long logSize = 0;
+    std::string currentLogLine{};
+    size_t currentLogLinePos = 0;
 
     auto builderOut_ = builderOut.get();
 
-    childHandler = makeBuildLogHandler(
+    auto handler = makeBuildLogHandler(
         logSink,
         *act,
         builderActivities,
-        [&]{ killChild(); },
+        failed,
         builderOut_,
         logSize,
         currentLogLine,
@@ -1507,9 +1500,29 @@ void LocalDerivationGoal::startBuilder()
         logTail
     );
 
-    worker.childStarted(shared_from_this(), {builderOut.get()}, true, true);
+    co_await childStarted({builderOut.get()}, true, true, std::move(handler));
 
-    processSandboxSetupMessages();
+    trace("calling childStarted build end");
+
+    if (
+        !currentLogLine.empty() &&
+        !handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false)
+    ) {
+        act->result(resBuildLogLine, currentLogLine);
+    }
+
+    if (failed) {
+        killChild();
+        co_return done(
+            BuildResult::LogLimitExceeded,
+            {},
+            Error(
+                "%s killed after writing more than %d bytes of log output",
+                getName(),
+                settings.maxLogSize));
+    } else {
+        co_return Return{};
+    }
 }
 
 

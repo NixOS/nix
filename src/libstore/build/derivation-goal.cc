@@ -582,7 +582,7 @@ static std::function<bool(Descriptor, std::string_view)> makeHookLogHandler(
     Activity & act,
     const Activity & workerAct,
     std::map<ActivityId, Activity> & builderActivities,
-    std::function<void()> killChild,
+    bool & failed,
 #ifndef _WIN32 // TODO enable build hook on Windows
     HookInstance & hook,
 #endif
@@ -605,7 +605,7 @@ static std::function<bool(Descriptor, std::string_view)> makeHookLogHandler(
         if (isWrittenToLog) {
             logSize += data.size();
             if (settings.maxLogSize && logSize > settings.maxLogSize) {
-                killChild();
+                failed = true;
                 return true; // break out and stop listening to children
             }
 
@@ -671,6 +671,7 @@ static std::function<bool(Descriptor, std::string_view)> makeHookLogHandler(
                     currentHookLine += c;
         }
 #endif
+        failed = false;
         return false;
     };
 }
@@ -752,24 +753,30 @@ Goal::Co DerivationGoal::tryToBuild()
 
     if (!buildLocally) {
         switch (tryBuildHook()) {
-            case rpAccept:
+        case rpAccept:
+            /* Yes, it has started doing so.  Wait until we get
+               EOF from the hook. */
+            actLock.reset();
+            buildResult.startTime = time(0); // inexact
+            started();
+#ifndef _WIN32 // TODO enable build hook on Windows
+            assert(hook);
+#endif
             {
-                /* Yes, it has started doing so.  Wait until we get
-                   EOF from the hook. */
-                actLock.reset();
-                buildResult.startTime = time(0); // inexact
-                started();
-
-                std::set<MuxablePipePollState::CommChannel> fds;
-                fds.insert(hook->fromHook.readSide.get());
-                fds.insert(hook->builderOut.readSide.get());
-
-                childHandler = makeHookLogHandler(
+                bool failed = false;
+                assert(act);
+                trace("calling childStarted hook");
+                unsigned long logSize = 0;
+                std::string currentLogLine{};
+                size_t currentLogLinePos = 0;
+                std::string currentHookLine{};
+                std::list<std::string> logTail{};
+                auto handler = makeHookLogHandler(
                     logSink,
                     *act,
                     worker.act,
                     builderActivities,
-                    [&]{ killChild(); },
+                    failed,
 #ifndef _WIN32 // TODO enable build hook on Windows
                     *hook,
 #endif
@@ -779,39 +786,49 @@ Goal::Co DerivationGoal::tryToBuild()
                     currentHookLine,
                     logTail
                 );
+#ifndef _WIN32 // TODO enable build hook on Windows
+                co_await childStarted(
+                    { hook->fromHook.readSide.get()
+                    , hook->builderOut.readSide.get()
+                    }, false, false, std::move(handler));
+                trace("calling childStarted hook end");
+#endif
 
-                worker.childStarted(shared_from_this(), fds, false, false);
-                co_await Suspend{};
-
-                if (!currentLogLine.empty()) {
-                    if (handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false))
-                        ;
-
-                    else {
-                        logTail.push_back(currentLogLine);
-                        if (logTail.size() > settings.logLines) logTail.pop_front();
-
-                        act->result(resBuildLogLine, currentLogLine);
-                    }
-
-                    currentLogLine = "";
-                    currentLogLinePos = 0;
+                if (
+                    !currentLogLine.empty() &&
+                    !handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false)
+                ) {
+                    act->result(resBuildLogLine, currentLogLine);
                 }
 
-                co_return hookDone();
+                if (failed) {
+                    co_return done(
+                        BuildResult::LogLimitExceeded,
+                        {},
+                        Error(
+                            "%s killed after writing more than %d bytes of log output",
+                            getName(),
+                            settings.maxLogSize));
+                } else {
+                    co_return hookDone(std::move(logTail));
+                }
             }
-            case rpPostpone:
-                /* Not now; wait until at least one child finishes or
-                   the wake-up timeout expires. */
-                if (!actLock)
-                    actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                        fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
-                outputLocks.unlock();
-                co_await waitForAWhile();
-                co_return tryToBuild();
-            case rpDecline:
-                /* We should do it ourselves. */
-                break;
+        case rpPostpone:
+            /* Not now; wait until at least one child finishes or
+               the wake-up timeout expires. */
+            if (!actLock)
+                actLock = std::make_unique<Activity>(
+                    *logger,
+                    lvlWarn,
+                    actBuildWaiting,
+                    fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
+            co_await waitForAWhile();
+            outputLocks.unlock();
+            co_await waitForAWhile();
+            co_return tryToBuild();
+        case rpDecline:
+            /* We should do it ourselves. */
+            break;
         }
     }
 
@@ -1043,7 +1060,7 @@ void appendLogTailErrorMsg(
 }
 
 
-Goal::Co DerivationGoal::hookDone()
+Goal::Co DerivationGoal::hookDone(std::list<std::string> logTail)
 {
 #ifndef _WIN32
     assert(hook);
@@ -1066,9 +1083,6 @@ Goal::Co DerivationGoal::hookDone()
 
     buildResult.timesBuilt++;
     buildResult.stopTime = time(0);
-
-    /* So the child is gone now. */
-    worker.childTerminated(this);
 
     /* Close the read side of the logger pipe. */
 #ifndef _WIN32 // TODO enable build hook on Windows
@@ -1300,6 +1314,10 @@ HookReply DerivationGoal::tryBuildHook()
     /* Create the log file and pipe. */
     [[maybe_unused]] Path logFile = openLogFile();
 
+    std::set<MuxablePipePollState::CommChannel> fds;
+    fds.insert(hook->fromHook.readSide.get());
+    fds.insert(hook->builderOut.readSide.get());
+
     return rpAccept;
 #endif
 }
@@ -1307,8 +1325,6 @@ HookReply DerivationGoal::tryBuildHook()
 
 Path DerivationGoal::openLogFile()
 {
-    logSize = 0;
-
     if (!settings.keepLog) return "";
 
     auto baseName = std::string(baseNameOf(worker.store.printStorePath(drvPath)));

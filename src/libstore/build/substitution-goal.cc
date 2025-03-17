@@ -223,22 +223,17 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
         }
     });
 
-    childHandler = [](Descriptor, std::string_view) { return false; };
-
-    worker.childStarted(shared_from_this(), {
+    co_await childStarted({
 #ifndef _WIN32
         outPipe.readSide.get()
 #else
         &outPipe
 #endif
-    }, true, false);
-
-    co_await Suspend{};
+    }, true, false, [](Descriptor, std::string_view) {return false;});
 
     trace("substitute finished");
 
     thr.join();
-    worker.childTerminated(this);
 
     try {
         promise.get_future().get();
