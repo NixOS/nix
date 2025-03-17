@@ -96,22 +96,6 @@ std::string DerivationGoal::key()
 }
 
 
-void DerivationGoal::killChild()
-{
-#ifndef _WIN32 // TODO enable build hook on Windows
-    hook.reset();
-#endif
-}
-
-
-void DerivationGoal::timedOut(Error && ex)
-{
-    killChild();
-    // We're not inside a coroutine, hence we can't use co_return here.
-    // Thus we ignore the return value.
-    [[maybe_unused]] Done _ = done(BuildResult::TimedOut, {}, std::move(ex));
-}
-
 void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
 {
     auto newWanted = wantedOutputs.union_(outputs);
@@ -786,11 +770,12 @@ Goal::Co DerivationGoal::tryToBuild()
                     currentHookLine,
                     logTail
                 );
+                bool timedOut = false;
 #ifndef _WIN32 // TODO enable build hook on Windows
                 co_await childStarted(
                     { hook->fromHook.readSide.get()
                     , hook->builderOut.readSide.get()
-                    }, false, false, std::move(handler));
+                    }, false, false, std::move(handler), timedOut);
                 trace("calling childStarted hook end");
 #endif
 
@@ -801,7 +786,12 @@ Goal::Co DerivationGoal::tryToBuild()
                     act->result(resBuildLogLine, currentLogLine);
                 }
 
-                if (failed) {
+                if (timedOut) {
+#ifndef _WIN32 // TODO enable build hook on Windows
+                    hook.reset();
+#endif
+                    co_return done(BuildResult::TimedOut, {}, std::move(ex));
+                } else if (failed) {
                     co_return done(
                         BuildResult::LogLimitExceeded,
                         {},

@@ -58,13 +58,15 @@ Goal::Co DrvOutputSubstitutionGoal::init()
                 }
             } });
 
+        bool timedOut = false;
         co_await childStarted({
     #ifndef _WIN32
             outPipe->readSide.get()
     #else
             &*outPipe
     #endif
-        }, true, false, [](Descriptor, std::string_view) {return false;});
+        }, true, false, [](Descriptor, std::string_view) {return false;}, timedOut);
+        assert(!timedOut);
 
         /*
          * The realisation corresponding to the given output id.

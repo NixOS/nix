@@ -243,18 +243,26 @@ void Goal::handleChildOutput(Descriptor fd, std::string_view data) {
     }
 }
 
+void Goal::timedOut(Error && ex) {
+    didTimeOut = true;
+    worker.wakeUp(shared_from_this());
+}
+
 Co Goal::childStarted(
     const std::set<MuxablePipePollState::CommChannel> & channels,
     bool inBuildSlot,
     bool respectTimeouts,
-    std::function<bool(Descriptor fd, std::string_view data)> handler
+    std::function<bool(Descriptor fd, std::string_view data)> handler,
+    bool& timedOut
 ) {
     worker.childStarted(shared_from_this(), channels, inBuildSlot, respectTimeouts);
+    didTimeOut = false;
     assert(handler);
     childHandler = std::move(handler);
     co_await Suspend{};
     trace("done listening to children");
     childHandler = {};
+    timedOut = didTimeOut;
     worker.childTerminated(this);
     co_return Return{};
 }

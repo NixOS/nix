@@ -323,7 +323,7 @@ struct LocalDerivationGoal : DerivationGoal, RestrictionContext
      *
      * Called by destructor, can't be overridden
      */
-    void killChild() override final;
+    void killChild();
 
     /**
      * Kill any processes running under the build user UID or in the
@@ -446,8 +446,6 @@ void LocalDerivationGoal::killChild()
 
         pid.wait();
     }
-
-    DerivationGoal::killChild();
 }
 
 
@@ -818,7 +816,6 @@ static std::function<bool(Descriptor, std::string_view)> makeBuildLogHandler(
     std::string & currentLogLine,
     size_t & currentLogLinePos,
     std::list<std::string> & logTail
-
 ) {
     return [&](Descriptor fd, std::string_view data) {
         // local & `ssh://`-builds are dealt with here.
@@ -1500,7 +1497,8 @@ Goal::Co LocalDerivationGoal::startBuilder(std::list<std::string> & logTail)
         logTail
     );
 
-    co_await childStarted({builderOut.get()}, true, true, std::move(handler));
+    bool timedOut = false;
+    co_await childStarted({builderOut.get()}, true, true, std::move(handler), timedOut);
 
     trace("calling childStarted build end");
 
@@ -1511,7 +1509,10 @@ Goal::Co LocalDerivationGoal::startBuilder(std::list<std::string> & logTail)
         act->result(resBuildLogLine, currentLogLine);
     }
 
-    if (failed) {
+    if (timedOut) {
+        killChild();
+        co_return done(BuildResult::TimedOut, {}, std::move(ex));
+    } if (failed) {
         killChild();
         co_return done(
             BuildResult::LogLimitExceeded,
