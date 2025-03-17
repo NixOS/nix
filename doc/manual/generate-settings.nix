@@ -19,7 +19,6 @@ in
   prefix,
   inlineHTML ? true,
 }:
-settingsInfo:
 
 let
 
@@ -27,11 +26,25 @@ let
     prefix: setting:
     {
       description,
-      documentDefault,
-      defaultValue,
-      aliases,
-      value,
+
       experimentalFeature,
+
+      # Whether we document the default, because it is machine agostic,
+      # or don't because because it is machine-specific.
+      documentDefault ? true,
+
+      # The default value is JSON for new-style config, rather than then
+      # a string or boolean, for old-style config.
+      isJson ? false,
+
+      defaultValue ? null,
+
+      subSettings ? null,
+
+      aliases ? [ ],
+
+      # The current value for this setting. Purposefully unused.
+      value ? null,
     }:
     let
       result = squash ''
@@ -50,7 +63,7 @@ let
 
         ${description}
 
-        **Default:** ${showDefault documentDefault defaultValue}
+        ${showDefaultOrSubSettings}
 
         ${showAliases aliases}
       '';
@@ -72,9 +85,24 @@ let
         > ```
       '';
 
+      showDefaultOrSubSettings =
+        if !isAttrs subSettings then
+          # No subsettings, instead single setting. Show the default value.
+          ''
+            **Default:** ${showDefault}
+          ''
+        else
+          # Indent the nested sub-settings, and append the outer setting name onto the prefix
+          indent "  " ''
+            **Nullable sub-settings**: ${if subSettings.nullable then "true" else "false"}
+            ${builtins.trace prefix (showSettings "${prefix}-${setting}" subSettings.map)}
+          '';
+
       showDefault =
-        documentDefault: defaultValue:
         if documentDefault then
+          if isJson then
+            "`${builtins.toJSON defaultValue}`"
+          else
           # a StringMap value type is specified as a string, but
           # this shows the value type. The empty stringmap is `null` in
           # JSON, but that converts to `{ }` here.
@@ -95,5 +123,7 @@ let
     in
     result;
 
+  showSettings =
+    prefix: settingsInfo: concatStrings (attrValues (mapAttrs (showSetting prefix) settingsInfo));
 in
-concatStrings (attrValues (mapAttrs (showSetting prefix) settingsInfo))
+showSettings prefix

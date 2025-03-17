@@ -17,6 +17,7 @@
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/keys.hh"
 #include "nix/util/users.hh"
+#include "nix/store/config-parse-impl.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/store-registration.hh"
 
@@ -61,14 +62,71 @@
 
 namespace nix {
 
-LocalStoreConfig::LocalStoreConfig(
+constexpr static const LocalStoreConfigT<config::SettingInfo> localStoreConfigDescriptions = {
+    .requireSigs = {
+        .name = "require-sigs",
+        .description = "Whether store paths copied into this store should have a trusted signature.",
+    },
+    .readOnly = {
+        .name = "read-only",
+        .description = R"(
+          Allow this store to be opened when its [database](@docroot@/glossary.md#gloss-nix-database) is on a read-only filesystem.
+
+          Normally Nix will attempt to open the store database in read-write mode, even for querying (when write access is not needed), causing it to fail if the database is on a read-only filesystem.
+
+          Enable read-only mode to disable locking and open the SQLite database with the [`immutable` parameter](https://www.sqlite.org/c3ref/open.html) set.
+
+          > **Warning**
+          > Do not use this unless the filesystem is read-only.
+          >
+          > Using it when the filesystem is writable can cause incorrect query results or corruption errors if the database is changed by another process.
+          > While the filesystem the database resides on might appear to be read-only, consider whether another user or system might have write access to it.
+        )",
+    },
+};
+
+#define LOCAL_STORE_CONFIG_FIELDS(X) \
+    X(requireSigs), \
+    X(readOnly),
+
+MAKE_PARSE(LocalStoreConfig, localStoreConfig, LOCAL_STORE_CONFIG_FIELDS)
+
+static LocalStoreConfigT<config::PlainValue> localStoreConfigDefaults()
+{
+    return {
+        .requireSigs = {settings.requireSigs},
+        .readOnly = {false},
+    };
+}
+
+MAKE_APPLY_PARSE(LocalStoreConfig, localStoreConfig, LOCAL_STORE_CONFIG_FIELDS)
+
+config::SettingDescriptionMap LocalStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(LocalFSStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = localStoreConfigDescriptions;
+        auto defaults = localStoreConfigDefaults();
+        ret.merge(decltype(ret){
+            LOCAL_STORE_CONFIG_FIELDS(DESCRIBE_ROW)
+        });
+    }
+    return ret;
+}
+
+LocalStore::Config::LocalStoreConfig(
     std::string_view scheme,
     std::string_view authority,
-    const Params & params)
-    : StoreConfig(params)
-    , LocalFSStoreConfig(authority, params)
+    const StoreReference::Params & params)
+    : Store::Config(params)
+    , LocalFSStore::Config(*this, authority, params)
+    , LocalStoreConfigT<config::PlainValue>{localStoreConfigApplyParse(params)}
 {
 }
+
+LocalStoreConfig::LocalStoreConfig(const LocalStoreConfig &) = default;
 
 std::string LocalStoreConfig::doc()
 {
@@ -916,7 +974,7 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
     for (auto & sub : getDefaultSubstituters()) {
         if (remaining.empty()) break;
         if (sub->storeDir != storeDir) continue;
-        if (!sub->config.wantMassQuery) continue;
+        if (!sub->resolvedSubstConfig.wantMassQuery) continue;
 
         auto valid = sub->queryValidPaths(remaining);
 
