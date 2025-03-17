@@ -9,7 +9,6 @@
 #include "nix/util/lru-cache.hh"
 #include "nix/util/sync.hh"
 #include "nix/store/globals.hh"
-#include "nix/util/configuration.hh"
 #include "nix/store/path-info.hh"
 #include "nix/util/repair-flag.hh"
 #include "nix/store/store-dir-config.hh"
@@ -25,6 +24,32 @@
 
 
 namespace nix {
+
+/**
+ * About the class hierarchy of the store types:
+ *
+ * Each store type `Foo` consists of two classes:
+ *
+ * 1. A class `FooConfig : virtual StoreConfig` that contains the configuration
+ *   for the store
+ *
+ *   It should only contain members of type `const Setting<T>` (or subclasses
+ *   of it) and inherit the constructors of `StoreConfig`
+ *   (`using StoreConfig::StoreConfig`).
+ *
+ * 2. A class `Foo : virtual Store, virtual FooConfig` that contains the
+ *   implementation of the store.
+ *
+ *   This class is expected to have a constructor `Foo(const StoreReference::Params & params)`
+ *   that calls `StoreConfig(params)` (otherwise you're gonna encounter an
+ *   `assertion failure` when trying to instantiate it).
+ *
+ * You can then register the new store using:
+ *
+ * ```
+ * cpp static RegisterStoreImplementation<Foo, FooConfig> regStore;
+ * ```
+ */
 
 MakeError(SubstError, Error);
 /**
@@ -71,39 +96,43 @@ struct KeyedBuildResult;
 
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
+template<template<typename> class F>
+struct StoreConfigT
+{
+    F<int> pathInfoCacheSize;
+    F<bool> isTrusted;
+    F<StringSet> systemFeatures;
+};
+
+template<template<typename> class F>
+struct SubstituterConfigT
+{
+    F<int> priority;
+    F<bool> wantMassQuery;
+};
 
 /**
- * About the class hierarchy of the store types:
- *
- * Each store type `Foo` consists of two classes:
- *
- * 1. A class `FooConfig : virtual StoreConfig` that contains the configuration
- *   for the store
- *
- *   It should only contain members of type `Setting<T>` (or subclasses
- *   of it) and inherit the constructors of `StoreConfig`
- *   (`using StoreConfig::StoreConfig`).
- *
- * 2. A class `Foo : virtual Store` that contains the
- *   implementation of the store.
- *
- *   This class is expected to have:
- *
- *   1. an alias `using Config = FooConfig;`
- *
- *   2. a constructor `Foo(ref<const Config> params)`.
- *
- * You can then register the new store using:
- *
- * ```
- * cpp static RegisterStoreImplementation<FooConfig> regStore;
- * ```
+ * @note In other cases we don't expose this function directly, but in
+ * this case we must because of `Store::resolvedSubstConfig` below. As
+ * the docs of that field describe, this is a case where the
+ * configuration is intentionally stateful.
  */
-struct StoreConfig : public StoreDirConfig
-{
-    using StoreDirConfig::StoreDirConfig;
+SubstituterConfigT<config::PlainValue> substituterConfigDefaults();
 
-    StoreConfig() = delete;
+/**
+ * @note `config::OptValue` rather than `config::PlainValue` is applied to
+ * `SubstitutorConfigT` because these are overrides. Caches themselves (not our
+ * config) can update default settings, but aren't allowed to update settings
+ * specified by the client (i.e. us).
+ */
+struct StoreConfig :
+    StoreDirConfig,
+    StoreConfigT<config::PlainValue>,
+    SubstituterConfigT<config::OptValue>
+{
+    static config::SettingDescriptionMap descriptions();
+
+    StoreConfig(const StoreReference::Params &);
 
     virtual ~StoreConfig() { }
 
@@ -125,39 +154,6 @@ struct StoreConfig : public StoreDirConfig
     {
         return std::nullopt;
     }
-
-    Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size",
-        "Size of the in-memory store path metadata cache."};
-
-    Setting<bool> isTrusted{this, false, "trusted",
-        R"(
-          Whether paths from this store can be used as substitutes
-          even if they are not signed by a key listed in the
-          [`trusted-public-keys`](@docroot@/command-ref/conf-file.md#conf-trusted-public-keys)
-          setting.
-        )"};
-
-    Setting<int> priority{this, 0, "priority",
-        R"(
-          Priority of this store when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
-          A lower value means a higher priority.
-        )"};
-
-    Setting<bool> wantMassQuery{this, false, "want-mass-query",
-        R"(
-          Whether this store can be queried efficiently for path validity when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
-        )"};
-
-    Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
-        "system-features",
-        R"(
-          Optional [system features](@docroot@/command-ref/conf-file.md#conf-system-features) available on the system this store uses to build derivations.
-
-          Example: `"kvm"`
-        )",
-        {},
-        // Don't document the machine-specific default value
-        false};
 
     /**
      * Open a store of the type corresponding to this configuration
@@ -189,6 +185,14 @@ public:
      * @note Avoid churn, since we used to inherit from `Config`.
      */
     operator const Config &() const { return config; }
+
+    /**
+     * Resolved substituter configuration. This is intentionally mutable
+     * as store clients may do IO to ask the underlying store for their
+     * default setting values if the client config did not statically
+     * override them.
+     */
+    SubstituterConfigT<config::PlainValue> resolvedSubstConfig = substituterConfigDefaults();
 
 protected:
 
@@ -231,11 +235,6 @@ protected:
     Store(const Store::Config & config);
 
 public:
-    /**
-     * Perform any necessary effectful operation to make the store up and
-     * running
-     */
-    virtual void init() {};
 
     virtual ~Store() { }
 
@@ -909,3 +908,6 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
     Store * evalStore = nullptr);
 
 }
+
+// Parses a Store URL, uses global state not pure so think about this
+JSON_IMPL(ref<const StoreConfig>)

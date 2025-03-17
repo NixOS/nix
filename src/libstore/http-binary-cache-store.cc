@@ -7,6 +7,15 @@
 
 namespace nix {
 
+config::SettingDescriptionMap HttpBinaryCacheStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(BinaryCacheStoreConfig::descriptions());
+    return ret;
+}
+
+
 MakeError(UploadToHTTP, Error);
 
 
@@ -22,9 +31,9 @@ StringSet HttpBinaryCacheStoreConfig::uriSchemes()
 HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
     std::string_view scheme,
     std::string_view _cacheUri,
-    const Params & params)
-    : StoreConfig(params)
-    , BinaryCacheStoreConfig(params)
+    const StoreReference::Params & params)
+    : Store::Config{params}
+    , BinaryCacheStoreConfig{*this, params}
     , cacheUri(
         std::string { scheme }
         + "://"
@@ -60,15 +69,16 @@ public:
 
     using Config = HttpBinaryCacheStoreConfig;
 
-    ref<Config> config;
+    ref<const Config> config;
 
-    HttpBinaryCacheStore(ref<Config> config)
+    HttpBinaryCacheStore(ref<const Config> config)
         : Store{*config}
-        // TODO it will actually mutate the configuration
         , BinaryCacheStore{*config}
         , config{config}
     {
         diskCache = getNarInfoDiskCache();
+
+        init();
     }
 
     std::string getUri() override
@@ -80,15 +90,18 @@ public:
     {
         // FIXME: do this lazily?
         if (auto cacheInfo = diskCache->upToDateCacheExists(config->cacheUri)) {
-            config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
-            config->priority.setDefault(cacheInfo->priority);
+            resolvedSubstConfig.wantMassQuery.value =
+                config->storeConfig.wantMassQuery.optValue.value_or(cacheInfo->wantMassQuery);
+            resolvedSubstConfig.priority.value =
+                config->storeConfig.priority.optValue.value_or(cacheInfo->priority);
         } else {
             try {
                 BinaryCacheStore::init();
             } catch (UploadToHTTP &) {
                 throw Error("'%s' does not appear to be a binary cache", config->cacheUri);
             }
-            diskCache->createCache(config->cacheUri, config->storeDir, config->wantMassQuery, config->priority);
+            diskCache->createCache(
+                config->cacheUri, storeDir, resolvedSubstConfig.wantMassQuery, resolvedSubstConfig.priority);
         }
     }
 
@@ -232,10 +245,7 @@ protected:
 
 ref<Store> HttpBinaryCacheStore::Config::openStore() const
 {
-    return make_ref<HttpBinaryCacheStore>(ref{
-        // FIXME we shouldn't actually need a mutable config
-        std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())
-    });
+    return make_ref<HttpBinaryCacheStore>(ref{shared_from_this()});
 }
 
 static RegisterStoreImplementation<HttpBinaryCacheStore::Config> regHttpBinaryCacheStore;
