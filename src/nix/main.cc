@@ -7,7 +7,8 @@
 #include "nix/store/globals.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/main/shared.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/store-registration.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/finally.hh"
 #include "nix/main/loggers.hh"
@@ -197,7 +198,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
             auto & j = stores[storeName];
             j["doc"] = implem.doc;
             j["uri-schemes"] = implem.uriSchemes;
-            j["settings"] = implem.getConfig()->toJSON();
+            j["settings"] = implem.configDescriptions();
             j["experimentalFeature"] = implem.experimentalFeature;
         }
         res["stores"] = std::move(stores);
