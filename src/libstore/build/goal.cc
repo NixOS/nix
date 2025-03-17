@@ -1,12 +1,12 @@
 #include "goal.hh"
 #include "worker.hh"
+#include <optional>
 
 namespace nix {
 
 using Co = nix::Goal::Co;
 using promise_type = nix::Goal::promise_type;
 using handle_type = nix::Goal::handle_type;
-using Suspend = nix::Goal::Suspend;
 
 Co::Co(Co&& rhs) {
     this->handle = rhs.handle;
@@ -235,6 +235,30 @@ Goal::Co Goal::waitForAWhile() {
 Goal::Co Goal::waitForBuildSlot() {
     worker.waitForBuildSlot(shared_from_this());
     co_await Suspend{};
+    co_return Return{};
+}
+
+void Goal::handleChildOutput(Descriptor fd, std::string_view data) {
+    assert(childHandler);
+    bool stop_listening = childHandler(fd, data);
+    if (stop_listening) {
+        worker.wakeUp(shared_from_this());
+    }
+}
+
+Co Goal::childStarted(
+    const std::set<MuxablePipePollState::CommChannel> & channels,
+    bool inBuildSlot,
+    bool respectTimeouts,
+    std::function<bool(Descriptor fd, std::string_view data)> handler
+) {
+    worker.childStarted(shared_from_this(), channels, inBuildSlot, respectTimeouts);
+    assert(handler);
+    childHandler = std::move(handler);
+    co_await Suspend{};
+    trace("done listening to children");
+    childHandler = {};
+    worker.childTerminated(this);
     co_return Return{};
 }
 

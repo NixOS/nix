@@ -58,17 +58,13 @@ Goal::Co DrvOutputSubstitutionGoal::init()
                 }
             } });
 
-        worker.childStarted(shared_from_this(), {
+        co_await childStarted({
     #ifndef _WIN32
             outPipe->readSide.get()
     #else
             &*outPipe
     #endif
-        }, true, false);
-
-        co_await Suspend{};
-
-        worker.childTerminated(this);
+        }, true, false, [](Descriptor, std::string_view) {return false;});
 
         /*
          * The realisation corresponding to the given output id.
@@ -153,11 +149,5 @@ std::string DrvOutputSubstitutionGoal::key()
        goals. */
     return "a$" + std::string(id.to_string());
 }
-
-void DrvOutputSubstitutionGoal::handleEOF(Descriptor fd)
-{
-    worker.wakeUp(shared_from_this());
-}
-
 
 }
