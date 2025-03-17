@@ -71,6 +71,7 @@ add_project_arguments(
 )
 
 subdir('nix-meson-build-support/common')
+subdir('nix-meson-build-support/generate-header')
 
 sources = files(
   'built-path.cc',
@@ -78,6 +79,7 @@ sources = files(
   'command.cc',
   'common-eval-args.cc',
   'editor-for.cc',
+  'flake-schemas.cc',
   'installable-attr-path.cc',
   'installable-derived-path.cc',
   'installable-flake.cc',
@@ -91,6 +93,11 @@ sources = files(
   'repl.cc',
 )
 
+sources += [
+  gen_header.process('call-flake-schemas.nix'),
+  gen_header.process('builtin-flake-schemas.nix'),
+]
+
 include_dirs = [include_directories('.')]
 
 headers = [config_h] + files(
@@ -100,6 +107,7 @@ headers = [config_h] + files(
   'common-eval-args.hh',
   'compatibility-settings.hh',
   'editor-for.hh',
+  'flake-schemas.hh',
   'installable-attr-path.hh',
   'installable-derived-path.hh',
   'installable-flake.hh',

@@ -57,14 +57,6 @@ struct CmdSearch : InstallableValueCommand, MixJSON
           ;
     }
 
-    Strings getDefaultFlakeAttrPaths() override
-    {
-        return {
-            "packages." + settings.thisSystem.get(),
-            "legacyPackages." + settings.thisSystem.get()
-        };
-    }
-
     void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         settings.readOnlyMode = true;
@@ -92,9 +84,9 @@ struct CmdSearch : InstallableValueCommand, MixJSON
 
         uint64_t results = 0;
 
-        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
+        std::function<void(eval_cache::AttrCursor & cursor, const eval_cache::AttrPath & attrPath, bool initialRecurse)> visit;
 
-        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)
+        visit = [&](eval_cache::AttrCursor & cursor, const eval_cache::AttrPath & attrPath, bool initialRecurse)
         {
             auto attrPathS = state->symbols.resolve(attrPath);
 
@@ -194,7 +186,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             }
         };
 
-        for (auto & cursor : installable->getCursors(*state))
+        for (auto & cursor : installable->getCursors(*state, true))
             visit(*cursor, cursor->getAttrPath(), true);
 
         if (json)

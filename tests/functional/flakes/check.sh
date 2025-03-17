@@ -18,17 +18,6 @@ nix flake check $flakeDir
 
 cat > $flakeDir/flake.nix <<EOF
 {
-  outputs = { self }: {
-    overlay = finalll: prev: {
-    };
-  };
-}
-EOF
-
-(! nix flake check $flakeDir)
-
-cat > $flakeDir/flake.nix <<EOF
-{
   outputs = { self, ... }: {
     overlays.x86_64-linux.foo = final: prev: {
     };
@@ -123,7 +112,7 @@ cat > $flakeDir/flake.nix <<EOF
 EOF
 
 checkRes=$(nix flake check --all-systems $flakeDir 2>&1 && fail "nix flake check --all-systems should have failed" || true)
-echo "$checkRes" | grepQuiet "unknown-attr"
+echo "$checkRes" | grepQuiet "Evaluation check.*apps.system-1.default.isValidApp.*failed"
 
 cat > $flakeDir/flake.nix <<EOF
 {

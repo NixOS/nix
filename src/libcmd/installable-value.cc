@@ -5,7 +5,7 @@
 namespace nix {
 
 std::vector<ref<eval_cache::AttrCursor>>
-InstallableValue::getCursors(EvalState & state)
+InstallableValue::getCursors(EvalState & state, bool returnAll)
 {
     auto evalCache =
         std::make_shared<nix::eval_cache::EvalCache>(std::nullopt, state,
@@ -17,8 +17,8 @@ ref<eval_cache::AttrCursor>
 InstallableValue::getCursor(EvalState & state)
 {
     /* Although getCursors should return at least one element, in case it doesn't,
-       bound check to avoid an undefined behavior for vector[0] */
-    return getCursors(state).at(0);
+       bound check to avoid an undefined behavior for vector[0]. */
+    return getCursors(state, false).at(0);
 }
 
 static UsageError nonValueInstallable(Installable & installable)
