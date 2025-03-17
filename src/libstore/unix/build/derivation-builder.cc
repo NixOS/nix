@@ -1,4 +1,4 @@
-#include "local-derivation-goal.hh"
+#include "derivation-builder.hh"
 #include "local-store.hh"
 #include "processes.hh"
 #include "indirect-root-store.hh"
@@ -76,108 +76,7 @@ extern "C" int sandbox_init_with_parameters(const char *profile, uint64_t flags,
 
 namespace nix {
 
-/**
- * Parameters by (mostly) `const` reference for `DerivationBuilder`.
- */
-struct DerivationBuilderParams
-{
-    /** The path of the derivation. */
-    const StorePath & drvPath;
-
-    BuildResult & buildResult;
-
-    /**
-     * The derivation stored at drvPath.
-     *
-     * @todo Remove double indirection by delaying when this is
-     * initialized.
-     */
-    const std::unique_ptr<Derivation> & drv;
-
-    const std::unique_ptr<ParsedDerivation> & parsedDrv;
-    const std::unique_ptr<DerivationOptions> & drvOptions;
-
-    /**
-     * The remainder is state held during the build.
-     */
-
-    /**
-     * All input paths (that is, the union of FS closures of the
-     * immediate input paths).
-     */
-    const StorePathSet & inputPaths;
-
-    /**
-     * @note we do in fact mutate this
-     */
-    std::map<std::string, InitialOutput> & initialOutputs;
-
-    const BuildMode & buildMode;
-
-    DerivationBuilderParams(
-        const StorePath & drvPath,
-        const BuildMode & buildMode,
-        BuildResult & buildResult,
-        const std::unique_ptr<Derivation> & drv,
-        const std::unique_ptr<ParsedDerivation> & parsedDrv,
-        const std::unique_ptr<DerivationOptions> & drvOptions,
-        const StorePathSet & inputPaths,
-        std::map<std::string, InitialOutput> & initialOutputs)
-        : drvPath{drvPath}
-        , buildResult{buildResult}
-        , drv{drv}
-        , parsedDrv{parsedDrv}
-        , drvOptions{drvOptions}
-        , inputPaths{inputPaths}
-        , initialOutputs{initialOutputs}
-        , buildMode{buildMode}
-    { }
-
-    DerivationBuilderParams(DerivationBuilderParams &&) = default;
-};
-
-/**
- * Callbacks that `DerivationBuilder` needs.
- */
-struct DerivationBuilderCallbacks
-{
-    /**
-     * Open a log file and a pipe to it.
-     */
-    virtual Path openLogFile() = 0;
-
-    /**
-     * Close the log file.
-     */
-    virtual void closeLogFile() = 0;
-
-    /**
-     * Aborts if any output is not valid or corrupt, and otherwise
-     * returns a 'SingleDrvOutputs' structure containing all outputs.
-     *
-     * @todo Probably should just be in `DerivationGoal`.
-     */
-    virtual SingleDrvOutputs assertPathValidity() = 0;
-
-    virtual void appendLogTailErrorMsg(std::string & msg) = 0;
-
-    /**
-     * Hook up `builderOut` to some mechanism to ingest the log
-     *
-     * @todo this should be reworked
-     */
-    virtual void childStarted() = 0;
-
-    /**
-     * @todo this should be reworked
-     */
-    virtual void childTerminated() = 0;
-
-    virtual void noteHashMismatch(void) = 0;
-    virtual void noteCheckMismatch(void) = 0;
-
-    virtual void markContentsGood(const StorePath & path) = 0;
-};
+MakeError(NotDeterministic, BuildError);
 
 /**
  * This class represents the state for building locally.
@@ -190,7 +89,7 @@ struct DerivationBuilderCallbacks
  * rather than incoming call edges that either should be removed, or
  * become (higher order) function parameters.
  */
-class DerivationBuilder : public RestrictionContext, DerivationBuilderParams
+class DerivationBuilderImpl : public DerivationBuilder, DerivationBuilderParams
 {
     Store & store;
 
@@ -198,7 +97,7 @@ class DerivationBuilder : public RestrictionContext, DerivationBuilderParams
 
 public:
 
-    DerivationBuilder(
+    DerivationBuilderImpl(
         Store & store,
         DerivationBuilderCallbacks & miscMethods,
         DerivationBuilderParams params)
@@ -208,16 +107,6 @@ public:
       { }
 
       LocalStore & getLocalStore();
-
-    /**
-     * User selected for running the builder.
-     */
-    std::unique_ptr<UserLock> buildUser;
-
-    /**
-     * The process ID of the builder.
-     */
-    Pid pid;
 
 private:
 
@@ -241,16 +130,6 @@ private:
      * The path of the temporary directory in the sandbox.
      */
     Path tmpDirInSandbox;
-
-public:
-
-    /**
-     * Master side of the pseudoterminal used for the builder's
-     * standard output/error.
-     */
-    AutoCloseFD builderOut;
-
-private:
 
     /**
      * Pipe for synchronising updates to the builder namespaces.
@@ -302,17 +181,17 @@ private:
             : source(source), optional(optional)
         { }
     };
-    typedef map<Path, ChrootPath> PathsInChroot; // maps target path to source path
+    typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
     PathsInChroot pathsInChroot;
 
-    typedef map<std::string, std::string> Environment;
+    typedef std::map<std::string, std::string> Environment;
     Environment env;
 
     /**
      * Hash rewriting.
      */
     StringMap inputRewrites, outputRewrites;
-    typedef map<StorePath, StorePath> RedirectedOutputs;
+    typedef std::map<StorePath, StorePath> RedirectedOutputs;
     RedirectedOutputs redirectedOutputs;
 
     /**
@@ -384,12 +263,12 @@ public:
      * @returns true if successful, false if we could not acquire a build
      * user. In that case, the caller must wait and then try again.
      */
-    bool prepareBuild();
+    bool prepareBuild() override;
 
     /**
      * Start building a derivation.
      */
-    void startBuilder();
+    void startBuilder() override;;
 
     /**
      * Tear down build environment after the builder exits (either on
@@ -400,7 +279,7 @@ public:
      * more information. The second case indicates success, and
      * realisations for each output of the derivation are returned.
      */
-    std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> unprepareBuild();
+    std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> unprepareBuild() override;
 
 private:
 
@@ -435,7 +314,7 @@ public:
      * Stop the in-process nix daemon thread.
      * @see startDaemon
      */
-    void stopDaemon();
+    void stopDaemon() override;
 
 private:
 
@@ -469,13 +348,13 @@ public:
     /**
      * Delete the temporary directory, if we have one.
      */
-    void deleteTmpDir(bool force);
+    void deleteTmpDir(bool force) override;
 
     /**
      * Kill any processes running under the build user UID or in the
      * cgroup of the build.
      */
-    void killSandbox(bool getStats);
+    void killSandbox(bool getStats) override;
 
 private:
 
@@ -498,112 +377,15 @@ private:
     StorePath makeFallbackPath(OutputNameView outputName);
 };
 
-/**
- * This hooks up `DerivationBuilder` to the scheduler / goal machinary.
- *
- * @todo Eventually, this shouldn't exist, because `DerivationGoal` can
- * just choose to use `DerivationBuilder` or its remote-building
- * equalivalent directly, at the "value level" rather than "class
- * inheritance hierarchy" level.
- */
-struct LocalDerivationGoal : DerivationGoal, DerivationBuilderCallbacks
+std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
+    Store & store,
+    DerivationBuilderCallbacks & miscMethods,
+    DerivationBuilderParams params)
 {
-    DerivationBuilder builder;
-
-    LocalDerivationGoal(const StorePath & drvPath,
-        const OutputsSpec & wantedOutputs, Worker & worker,
-        BuildMode buildMode)
-        : DerivationGoal{drvPath, wantedOutputs, worker, buildMode}
-        , builder{
-            worker.store,
-            static_cast<DerivationBuilderCallbacks &>(*this),
-            DerivationBuilderParams {
-                DerivationGoal::drvPath,
-                DerivationGoal::buildMode,
-                DerivationGoal::buildResult,
-                DerivationGoal::drv,
-                DerivationGoal::parsedDrv,
-                DerivationGoal::drvOptions,
-                DerivationGoal::inputPaths,
-                DerivationGoal::initialOutputs,
-            },
-        }
-    {}
-
-    LocalDerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-        const OutputsSpec & wantedOutputs, Worker & worker,
-        BuildMode buildMode = bmNormal)
-        : DerivationGoal{drvPath, drv, wantedOutputs, worker, buildMode}
-        , builder{
-            worker.store,
-            static_cast<DerivationBuilderCallbacks &>(*this),
-            DerivationBuilderParams {
-                DerivationGoal::drvPath,
-                DerivationGoal::buildMode,
-                DerivationGoal::buildResult,
-                DerivationGoal::drv,
-                DerivationGoal::parsedDrv,
-                DerivationGoal::drvOptions,
-                DerivationGoal::inputPaths,
-                DerivationGoal::initialOutputs,
-            },
-        }
-    {}
-
-    virtual ~LocalDerivationGoal() override;
-
-    /**
-     * The additional states.
-     */
-    Goal::Co tryLocalBuild() override;
-
-    bool isReadDesc(int fd) override;
-
-    /**
-     * Forcibly kill the child process, if any.
-     *
-     * Called by destructor, can't be overridden
-     */
-    void killChild() override final;
-
-    void childStarted() override;
-    void childTerminated() override;
-
-    void noteHashMismatch(void) override;
-    void noteCheckMismatch(void) override;
-
-    void markContentsGood(const StorePath &) override;
-
-    // Fake overrides to isntantiate identically-named virtual methods
-
-    Path openLogFile() override {
-        return DerivationGoal::openLogFile();
-    }
-    void closeLogFile() override {
-        DerivationGoal::closeLogFile();
-    }
-    SingleDrvOutputs assertPathValidity() override {
-        return DerivationGoal::assertPathValidity();
-    }
-    void appendLogTailErrorMsg(std::string & msg) override {
-        DerivationGoal::appendLogTailErrorMsg(msg);
-    }
-};
-
-std::shared_ptr<DerivationGoal> makeLocalDerivationGoal(
-    const StorePath & drvPath,
-    const OutputsSpec & wantedOutputs, Worker & worker,
-    BuildMode buildMode)
-{
-    return std::make_shared<LocalDerivationGoal>(drvPath, wantedOutputs, worker, buildMode);
-}
-
-std::shared_ptr<DerivationGoal> makeLocalDerivationGoal(
-    const StorePath & drvPath, const BasicDerivation & drv,
-    const OutputsSpec & wantedOutputs, Worker & worker,
-    BuildMode buildMode)
-{
-    return std::make_shared<LocalDerivationGoal>(drvPath, drv, wantedOutputs, worker, buildMode);
+    return std::make_unique<DerivationBuilderImpl>(
+        store,
+        miscMethods,
+        std::move(params));
 }
 
 void handleDiffHook(
@@ -640,20 +422,10 @@ void handleDiffHook(
     }
 }
 
-const Path DerivationBuilder::homeDir = "/homeless-shelter";
+const Path DerivationBuilderImpl::homeDir = "/homeless-shelter";
 
 
-LocalDerivationGoal::~LocalDerivationGoal()
-{
-    /* Careful: we should never ever throw an exception from a
-       destructor. */
-    try { builder.deleteTmpDir(false); } catch (...) { ignoreExceptionInDestructor(); }
-    try { killChild(); } catch (...) { ignoreExceptionInDestructor(); }
-    try { builder.stopDaemon(); } catch (...) { ignoreExceptionInDestructor(); }
-}
-
-
-inline bool DerivationBuilder::needsHashRewrite()
+inline bool DerivationBuilderImpl::needsHashRewrite()
 {
 #if __linux__
     return !useChroot;
@@ -664,7 +436,7 @@ inline bool DerivationBuilder::needsHashRewrite()
 }
 
 
-LocalStore & DerivationBuilder::getLocalStore()
+LocalStore & DerivationBuilderImpl::getLocalStore()
 {
     auto p = dynamic_cast<LocalStore *>(&store);
     assert(p);
@@ -672,28 +444,7 @@ LocalStore & DerivationBuilder::getLocalStore()
 }
 
 
-void LocalDerivationGoal::killChild()
-{
-    if (builder.pid != -1) {
-        worker.childTerminated(this);
-
-        /* If we're using a build user, then there is a tricky race
-           condition: if we kill the build user before the child has
-           done its setuid() to the build user uid, then it won't be
-           killed, and we'll potentially lock up in pid.wait().  So
-           also send a conventional kill to the child. */
-        ::kill(-builder.pid, SIGKILL); /* ignore the result */
-
-        builder.killSandbox(true);
-
-        builder.pid.wait();
-    }
-
-    DerivationGoal::killChild();
-}
-
-
-void DerivationBuilder::killSandbox(bool getStats)
+void DerivationBuilderImpl::killSandbox(bool getStats)
 {
     if (cgroup) {
         #if __linux__
@@ -715,91 +466,7 @@ void DerivationBuilder::killSandbox(bool getStats)
 }
 
 
-void LocalDerivationGoal::childStarted()
-{
-    worker.childStarted(shared_from_this(), {builder.builderOut.get()}, true, true);
-}
-
-void LocalDerivationGoal::childTerminated()
-{
-    worker.childTerminated(this);
-}
-
-void LocalDerivationGoal::noteHashMismatch()
-{
-    worker.hashMismatch = true;
-}
-
-
-void LocalDerivationGoal::noteCheckMismatch()
-{
-    worker.checkMismatch = true;
-}
-
-
-void LocalDerivationGoal::markContentsGood(const StorePath & path)
-{
-    worker.markContentsGood(path);
-}
-
-
-Goal::Co LocalDerivationGoal::tryLocalBuild()
-{
-    assert(!hook);
-
-    unsigned int curBuilds = worker.getNrLocalBuilds();
-    if (curBuilds >= settings.maxBuildJobs) {
-        outputLocks.unlock();
-        co_await waitForBuildSlot();
-        co_return tryToBuild();
-    }
-
-    if (!builder.prepareBuild()) {
-        if (!actLock)
-            actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
-        co_await waitForAWhile();
-        co_return tryLocalBuild();
-    }
-
-    actLock.reset();
-
-    try {
-
-        /* Okay, we have to build. */
-        builder.startBuilder();
-
-    } catch (BuildError & e) {
-        outputLocks.unlock();
-        builder.buildUser.reset();
-        worker.permanentFailure = true;
-        co_return done(BuildResult::InputRejected, {}, std::move(e));
-    }
-
-    started();
-    co_await Suspend{};
-
-    trace("build done");
-
-    auto res = builder.unprepareBuild();
-    // N.B. cannot use `std::visit` with co-routine return
-    if (auto * ste = std::get_if<0>(&res)) {
-        outputLocks.unlock();
-        co_return done(std::move(ste->first), {}, std::move(ste->second));
-    } else if (auto * builtOutputs = std::get_if<1>(&res)) {
-        /* It is now safe to delete the lock files, since all future
-           lockers will see that the output paths are valid; they will
-           not create new lock files with the same names as the old
-           (unlinked) lock files. */
-        outputLocks.setDeletion(true);
-        outputLocks.unlock();
-        co_return done(BuildResult::Built, std::move(*builtOutputs));
-    } else {
-        unreachable();
-    }
-}
-
-bool DerivationBuilder::prepareBuild()
+bool DerivationBuilderImpl::prepareBuild()
 {
     /* Cache this */
     derivationType = drv->type();
@@ -813,7 +480,7 @@ bool DerivationBuilder::prepareBuild()
 #if __APPLE__
             if (drvOptions->additionalSandboxProfile != "")
                 throw Error("derivation '%s' specifies a sandbox profile, "
-                    "but this is only allowed when 'sandbox' is 'relaxed'", worker.store.printStorePath(drvPath));
+                    "but this is only allowed when 'sandbox' is 'relaxed'", store.printStorePath(drvPath));
 #endif
             useChroot = true;
         }
@@ -856,7 +523,7 @@ bool DerivationBuilder::prepareBuild()
 }
 
 
-std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> DerivationBuilder::unprepareBuild()
+std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> DerivationBuilderImpl::unprepareBuild()
 {
     Finally releaseBuildUser([&](){
         /* Release the build user at the end of this function. We don't do
@@ -994,7 +661,7 @@ static void movePath(const Path & src, const Path & dst)
 extern void replaceValidPath(const Path & storePath, const Path & tmpPath);
 
 
-bool DerivationBuilder::cleanupDecideWhetherDiskFull()
+bool DerivationBuilderImpl::cleanupDecideWhetherDiskFull()
 {
     bool diskFull = false;
 
@@ -1087,7 +754,7 @@ static void rethrowExceptionAsError()
 
 /**
  * Send the current exception to the parent in the format expected by
- * `DerivationBuilder::processSandboxSetupMessages()`.
+ * `DerivationBuilderImpl::processSandboxSetupMessages()`.
  */
 static void handleChildException(bool sendException)
 {
@@ -1104,7 +771,7 @@ static void handleChildException(bool sendException)
     }
 }
 
-void DerivationBuilder::startBuilder()
+void DerivationBuilderImpl::startBuilder()
 {
     if ((buildUser && buildUser->getUIDCount() != 1)
         #if __linux__
@@ -1736,7 +1403,7 @@ void DerivationBuilder::startBuilder()
 }
 
 
-void DerivationBuilder::processSandboxSetupMessages()
+void DerivationBuilderImpl::processSandboxSetupMessages()
 {
     std::vector<std::string> msgs;
     while (true) {
@@ -1765,7 +1432,7 @@ void DerivationBuilder::processSandboxSetupMessages()
 }
 
 
-void DerivationBuilder::initTmpDir()
+void DerivationBuilderImpl::initTmpDir()
 {
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
@@ -1809,7 +1476,7 @@ void DerivationBuilder::initTmpDir()
 }
 
 
-void DerivationBuilder::initEnv()
+void DerivationBuilderImpl::initEnv()
 {
     env.clear();
 
@@ -1877,7 +1544,7 @@ void DerivationBuilder::initEnv()
 }
 
 
-void DerivationBuilder::writeStructuredAttrs()
+void DerivationBuilderImpl::writeStructuredAttrs()
 {
     if (auto structAttrsJson = parsedDrv->prepareStructuredAttrs(store, inputPaths)) {
         auto json = structAttrsJson.value();
@@ -1902,7 +1569,7 @@ void DerivationBuilder::writeStructuredAttrs()
 }
 
 
-void DerivationBuilder::startDaemon()
+void DerivationBuilderImpl::startDaemon()
 {
     experimentalFeatureSettings.require(Xp::RecursiveNix);
 
@@ -1970,7 +1637,7 @@ void DerivationBuilder::startDaemon()
 }
 
 
-void DerivationBuilder::stopDaemon()
+void DerivationBuilderImpl::stopDaemon()
 {
     if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
         // According to the POSIX standard, the 'shutdown' function should
@@ -2003,7 +1670,7 @@ void DerivationBuilder::stopDaemon()
 }
 
 
-void DerivationBuilder::addDependency(const StorePath & path)
+void DerivationBuilderImpl::addDependency(const StorePath & path)
 {
     if (isAllowed(path)) return;
 
@@ -2049,13 +1716,13 @@ void DerivationBuilder::addDependency(const StorePath & path)
 
         #else
             throw Error("don't know how to make path '%s' (produced by a recursive Nix call) appear in the sandbox",
-                worker.store.printStorePath(path));
+                store.printStorePath(path));
         #endif
 
     }
 }
 
-void DerivationBuilder::chownToBuilder(const Path & path)
+void DerivationBuilderImpl::chownToBuilder(const Path & path)
 {
     if (!buildUser) return;
     if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
@@ -2151,7 +1818,7 @@ void setupSeccomp()
 }
 
 
-void DerivationBuilder::runChild()
+void DerivationBuilderImpl::runChild()
 {
     /* Warning: in the child we should absolutely not make any SQLite
        calls! */
@@ -2664,7 +2331,7 @@ void DerivationBuilder::runChild()
 }
 
 
-SingleDrvOutputs DerivationBuilder::registerOutputs()
+SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 {
     std::map<std::string, ValidPathInfo> infos;
 
@@ -3216,7 +2883,7 @@ SingleDrvOutputs DerivationBuilder::registerOutputs()
 }
 
 
-void DerivationBuilder::checkOutputs(const std::map<std::string, ValidPathInfo> & outputs)
+void DerivationBuilderImpl::checkOutputs(const std::map<std::string, ValidPathInfo> & outputs)
 {
     std::map<Path, const ValidPathInfo &> outputsByPath;
     for (auto & output : outputs)
@@ -3351,7 +3018,7 @@ void DerivationBuilder::checkOutputs(const std::map<std::string, ValidPathInfo> 
 }
 
 
-void DerivationBuilder::deleteTmpDir(bool force)
+void DerivationBuilderImpl::deleteTmpDir(bool force)
 {
     if (topTmpDir != "") {
         /* Don't keep temporary directories for builtins because they
@@ -3369,14 +3036,7 @@ void DerivationBuilder::deleteTmpDir(bool force)
 }
 
 
-bool LocalDerivationGoal::isReadDesc(int fd)
-{
-    return (hook && DerivationGoal::isReadDesc(fd)) ||
-        (!hook && fd == builder.builderOut.get());
-}
-
-
-StorePath DerivationBuilder::makeFallbackPath(OutputNameView outputName)
+StorePath DerivationBuilderImpl::makeFallbackPath(OutputNameView outputName)
 {
     // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
     // See doc/manual/source/protocols/store-path.md for details
@@ -3389,7 +3049,7 @@ StorePath DerivationBuilder::makeFallbackPath(OutputNameView outputName)
 }
 
 
-StorePath DerivationBuilder::makeFallbackPath(const StorePath & path)
+StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
 {
     // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
     // See doc/manual/source/protocols/store-path.md for details
