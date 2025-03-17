@@ -1,22 +1,21 @@
-// FIXME: Odd failures for templates that are causing the PR to break
-// for now with discussion with @Ericson2314 to comment out.
-#if 0
-#  include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
-#  include "ssh-store.hh"
+#include "ssh-store.hh"
 
 namespace nix {
 
 TEST(SSHStore, constructConfig)
 {
     SSHStoreConfig config{
-        "ssh",
+        "ssh-ng",
         "localhost",
-        StoreConfig::Params{
+        StoreReference::Params{
             {
                 "remote-program",
-                // TODO #11106, no more split on space
-                "foo bar",
+                {
+                    "foo",
+                    "bar",
+                },
             },
         },
     };
@@ -31,16 +30,26 @@ TEST(SSHStore, constructConfig)
 
 TEST(MountedSSHStore, constructConfig)
 {
-    MountedSSHStoreConfig config{
-        "mounted-ssh",
+    ExperimentalFeatureSettings mockXpSettings;
+    mockXpSettings.set("experimental-features", "mounted-ssh-store");
+
+    SSHStoreConfig config{
+        "ssh-ng",
         "localhost",
-        StoreConfig::Params{
+        StoreReference::Params{
             {
                 "remote-program",
-                // TODO #11106, no more split on space
-                "foo bar",
+                {
+                    "foo",
+                    "bar",
+                },
+            },
+            {
+                "mounted",
+                nlohmann::json::object_t{},
             },
         },
+        mockXpSettings,
     };
 
     EXPECT_EQ(
@@ -49,7 +58,48 @@ TEST(MountedSSHStore, constructConfig)
             "foo",
             "bar",
         }));
+
+    ASSERT_TRUE(config.mounted);
+
+    EXPECT_EQ(config.mounted->realStoreDir, "/nix/store");
+}
+
+TEST(MountedSSHStore, constructConfigWithFunnyRealStoreDir)
+{
+    ExperimentalFeatureSettings mockXpSettings;
+    mockXpSettings.set("experimental-features", "mounted-ssh-store");
+
+    SSHStoreConfig config{
+        "ssh-ng",
+        "localhost",
+        StoreReference::Params{
+            {
+                "remote-program",
+                {
+                    "foo",
+                    "bar",
+                },
+            },
+            {
+                "mounted",
+                nlohmann::json::object_t{
+                    {"real", "/foo/bar"},
+                },
+            },
+        },
+        mockXpSettings,
+    };
+
+    EXPECT_EQ(
+        config.remoteProgram.get(),
+        (Strings{
+            "foo",
+            "bar",
+        }));
+
+    ASSERT_TRUE(config.mounted);
+
+    EXPECT_EQ(config.mounted->realStoreDir, "/foo/bar");
 }
 
 }
-#endif

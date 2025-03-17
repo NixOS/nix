@@ -1,5 +1,5 @@
 #include "globals.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "build-result.hh"
 #include <iostream>
 

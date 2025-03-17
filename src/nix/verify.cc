@@ -1,6 +1,6 @@
 #include "command.hh"
 #include "shared.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "thread-pool.hh"
 #include "signals.hh"
 #include "keys.hh"
