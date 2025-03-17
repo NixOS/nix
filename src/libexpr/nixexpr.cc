@@ -13,8 +13,6 @@ namespace nix {
 
 unsigned long Expr::nrExprs = 0;
 
-ExprBlackHole eBlackHole;
-
 // FIXME: remove, because *symbols* are abstract and do not have a single
 //        textual representation; see printIdentifier()
 std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)
@@ -585,7 +583,8 @@ std::string ExprLambda::showNamePos(const EvalState & state) const
     return fmt("%1% at %2%", id, state.positions[pos]);
 }
 
-void ExprLambda::setDocComment(DocComment docComment) {
+void ExprLambda::setDocComment(DocComment docComment)
+{
     // RFC 145 specifies that the innermost doc comment wins.
     // See https://github.com/NixOS/rfcs/blob/master/rfcs/0145-doc-strings.md#ambiguous-placement
     if (!this->docComment) {
@@ -599,18 +598,11 @@ void ExprLambda::setDocComment(DocComment docComment) {
         // belongs in the same conditional.
         body->setDocComment(docComment);
     }
-};
-
-/* Symbol table. */
-
-size_t SymbolTable::totalSize() const
-{
-    size_t n = 0;
-    dump([&] (const std::string & s) { n += s.size(); });
-    return n;
 }
 
-std::string DocComment::getInnerText(const PosTable & positions) const {
+
+std::string DocComment::getInnerText(const PosTable & positions) const
+{
     auto beginPos = positions[begin];
     auto endPos = positions[end];
     auto docCommentStr = beginPos.getSnippetUpTo(endPos).value_or("");

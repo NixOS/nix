@@ -497,7 +497,7 @@ private:
             output << "«potential infinite recursion»";
             if (options.ansiColors)
                 output << ANSI_NORMAL;
-        } else if (v.isThunk() || v.isApp()) {
+        } else if (!v.isFinished()) {
             if (options.ansiColors)
                     output << ANSI_MAGENTA;
             output << "«thunk»";
@@ -506,6 +506,11 @@ private:
         } else {
             unreachable();
         }
+    }
+
+    void printFailed(Value & v)
+    {
+        output << "«failed»";
     }
 
     void printExternal(Value & v)
@@ -581,6 +586,10 @@ private:
 
             case nThunk:
                 printThunk(v);
+                break;
+
+            case nFailed:
+                printFailed(v);
                 break;
 
             case nExternal:
