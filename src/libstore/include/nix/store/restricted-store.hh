@@ -55,6 +55,6 @@ struct RestrictionContext
 /**
  * Create a shared pointer to a restricted store.
  */
-ref<Store> makeRestrictedStore(const Store::Params & params, ref<LocalStore> next, RestrictionContext & context);
+ref<Store> makeRestrictedStore(ref<LocalStore::Config> config, ref<LocalStore> next, RestrictionContext & context);
 
 }

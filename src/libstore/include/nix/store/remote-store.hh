@@ -18,31 +18,36 @@ struct FdSink;
 struct FdSource;
 template<typename T> class Pool;
 
-struct RemoteStoreConfig : virtual StoreConfig
+template<template<typename> class F>
+struct RemoteStoreConfigT
 {
-    using StoreConfig::StoreConfig;
+    F<int> maxConnections;
+    F<unsigned int> maxConnectionAge;
+};
 
-    const Setting<int> maxConnections{this, 1, "max-connections",
-        "Maximum number of concurrent connections to the Nix daemon."};
+struct RemoteStoreConfig : RemoteStoreConfigT<config::PlainValue>
+{
+    static config::SettingDescriptionMap descriptions();
 
-    const Setting<unsigned int> maxConnectionAge{this,
-        std::numeric_limits<unsigned int>::max(),
-        "max-connection-age",
-        "Maximum age of a connection before it is closed."};
+    const Store::Config & storeConfig;
+
+    RemoteStoreConfig(const Store::Config &, const StoreReference::Params &);
 };
 
 /**
  * \todo RemoteStore is a misnomer - should be something like
  * DaemonStore.
  */
-class RemoteStore : public virtual RemoteStoreConfig,
+struct RemoteStore :
     public virtual Store,
     public virtual GcStore,
     public virtual LogStore
 {
-public:
+    using Config = RemoteStoreConfig;
 
-    RemoteStore(const Params & params);
+    const Config & config;
+
+    RemoteStore(const Config & config);
 
     /* Implementations of abstract store API methods. */
 

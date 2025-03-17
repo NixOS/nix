@@ -1,47 +1,39 @@
-#include "nix/store/store-api.hh"
+#include "nix/store/dummy-store.hh"
+#include "nix/store/store-registration.hh"
 #include "nix/util/callback.hh"
 
 namespace nix {
 
-struct DummyStoreConfig : virtual StoreConfig {
-    using StoreConfig::StoreConfig;
-
-    DummyStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-        : StoreConfig(params)
-    {
-        if (!authority.empty())
-            throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
-    }
-
-    const std::string name() override { return "Dummy Store"; }
-
-    std::string doc() override
-    {
-        return
-          #include "dummy-store.md"
-          ;
-    }
-
-    static std::set<std::string> uriSchemes() {
-        return {"dummy"};
-    }
-};
-
-struct DummyStore : public virtual DummyStoreConfig, public virtual Store
+DummyStoreConfig::DummyStoreConfig(
+    std::string_view scheme, std::string_view authority, const StoreReference::Params & params)
+    : StoreConfig{params}
 {
-    DummyStore(std::string_view scheme, std::string_view authority, const Params & params)
-        : StoreConfig(params)
-        , DummyStoreConfig(scheme, authority, params)
-        , Store(params)
-    { }
+    if (!authority.empty())
+        throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
+}
 
-    DummyStore(const Params & params)
-        : DummyStore("dummy", "", params)
+std::string DummyStoreConfig::doc()
+{
+    return
+      #include "dummy-store.md"
+      ;
+}
+
+
+struct DummyStore : virtual Store
+{
+    using Config = DummyStoreConfig;
+
+    ref<const Config> config;
+
+    DummyStore(ref<const Config> config)
+        : Store{*config}
+        , config(config)
     { }
 
     std::string getUri() override
     {
-        return *uriSchemes().begin();
+        return *Config::uriSchemes().begin() + "://";
     }
 
     void queryPathInfoUncached(const StorePath & path,
@@ -88,6 +80,11 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
     }
 };
 
-static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regDummyStore;
+ref<Store> DummyStore::Config::openStore() const
+{
+    return make_ref<DummyStore>(ref{shared_from_this()});
+}
+
+static RegisterStoreImplementation<DummyStore::Config> regDummyStore;
 
 }
