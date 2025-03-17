@@ -3,7 +3,8 @@
 #include "nix/store/path.hh"
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
-#include "nix/util/configuration.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/store/config-parse.hh"
 
 #include <map>
 #include <string>
@@ -30,8 +31,6 @@ MakeError(BadStorePathName, BadStorePath);
 struct StoreDirConfig
 {
     const Path & storeDir;
-
-    // pure methods
 
     StorePath parseStorePath(std::string_view path) const;
 
