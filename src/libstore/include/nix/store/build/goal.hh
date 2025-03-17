@@ -3,6 +3,7 @@
 
 #include "nix/store/store-api.hh"
 #include "nix/store/build-result.hh"
+#include "nix/util/muxable-pipe.hh"
 
 #include <coroutine>
 
@@ -398,15 +399,7 @@ public:
 
     void work();
 
-    virtual void handleChildOutput(Descriptor fd, std::string_view data)
-    {
-        unreachable();
-    }
-
-    virtual void handleEOF(Descriptor fd)
-    {
-        unreachable();
-    }
+    void handleChildOutput(Descriptor fd, std::string_view data);
 
     void trace(std::string_view s);
 
@@ -431,6 +424,8 @@ public:
     virtual JobCategory jobCategory() const = 0;
 
 protected:
+    std::function<bool(Descriptor, std::string_view)> childHandler;
+
     Co await(Goals waitees);
 
     Co waitForAWhile();

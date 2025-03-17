@@ -238,4 +238,12 @@ Goal::Co Goal::waitForBuildSlot() {
     co_return Return{};
 }
 
+void Goal::handleChildOutput(Descriptor fd, std::string_view data) {
+    assert(childHandler);
+    bool stop_listening = childHandler(fd, data);
+    if (stop_listening) {
+        worker.wakeUp(shared_from_this());
+    }
+}
+
 }

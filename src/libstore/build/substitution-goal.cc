@@ -223,6 +223,8 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
         }
     });
 
+    childHandler = [](Descriptor, std::string_view) { return false; };
+
     worker.childStarted(shared_from_this(), {
 #ifndef _WIN32
         outPipe.readSide.get()
@@ -280,13 +282,6 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
 
     co_return done(ecSuccess, BuildResult::Substituted);
 }
-
-
-void PathSubstitutionGoal::handleEOF(Descriptor fd)
-{
-    worker.wakeUp(shared_from_this());
-}
-
 
 void PathSubstitutionGoal::cleanup()
 {

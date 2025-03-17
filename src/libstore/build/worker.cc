@@ -457,7 +457,7 @@ void Worker::waitForInput()
             },
             [&](Descriptor k) {
                 debug("%1%: got EOF", goal->getName());
-                goal->handleEOF(k);
+                wakeUp(goal);
             });
 
         if (goal->exitCode == Goal::ecBusy &&

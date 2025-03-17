@@ -261,15 +261,6 @@ struct DerivationGoal : public Goal
      */
     void closeLogFile();
 
-    virtual bool isReadDesc(Descriptor fd);
-
-    /**
-     * Callback used by the worker to write to the log.
-     */
-    void handleChildOutput(Descriptor fd, std::string_view data) override;
-    void handleEOF(Descriptor fd) override;
-    void flushLine();
-
     /**
      * Wrappers around the corresponding Store methods that first consult the
      * derivation.  This is currently needed because when there is no drv file
