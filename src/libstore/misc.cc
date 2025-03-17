@@ -4,7 +4,7 @@
 #include "parsed-derivations.hh"
 #include "derivation-options.hh"
 #include "globals.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "thread-pool.hh"
 #include "realisation.hh"
 #include "topo-sort.hh"

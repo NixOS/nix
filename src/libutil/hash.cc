@@ -6,7 +6,6 @@
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
-#include "args.hh"
 #include "hash.hh"
 #include "archive.hh"
 #include "config.hh"

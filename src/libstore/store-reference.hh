@@ -2,8 +2,10 @@
 ///@file
 
 #include <variant>
+#include <nlohmann/json_fwd.hpp>
 
 #include "types.hh"
+#include "json-impls.hh"
 
 namespace nix {
 
@@ -41,7 +43,17 @@ namespace nix {
  */
 struct StoreReference
 {
-    using Params = std::map<std::string, std::string>;
+    /**
+     * Would do
+     *
+     * ```
+     * using Params = nlohmann::json::object_t;
+     * ```
+     *
+     * but cannot because `<nlohmann/json_fwd.hpp>` doesn't have that.
+     *
+     */
+    using Params = std::map<std::string, nlohmann::json, std::less<>>;
 
     /**
      * Special store reference `""` or `"auto"`
@@ -70,7 +82,7 @@ struct StoreReference
 
     Params params;
 
-    bool operator==(const StoreReference & rhs) const = default;
+    bool operator==(const StoreReference & rhs) const;
 
     /**
      * Render the whole store reference as a URI, including parameters.
@@ -89,3 +101,5 @@ struct StoreReference
 std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::string & uri);
 
 }
+
+JSON_IMPL(StoreReference)
