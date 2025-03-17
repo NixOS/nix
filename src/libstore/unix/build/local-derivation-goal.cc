@@ -1060,7 +1060,7 @@ void LocalDerivationGoal::startBuilder()
             /* If only we had a trie to do this more efficiently :) luckily, these are generally going to be pretty small */
             for (auto & a : allowedPaths) {
                 Path canonA = canonPath(a);
-                if (canonI == canonA || isInDir(canonI, canonA)) {
+                if (isDirOrInDir(canonI, canonA)) {
                     found = true;
                     break;
                 }
