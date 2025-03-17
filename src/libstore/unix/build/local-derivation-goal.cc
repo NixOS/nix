@@ -309,8 +309,6 @@ struct LocalDerivationGoal : DerivationGoal, RestrictionContext
      */
     void checkOutputs(const std::map<std::string, ValidPathInfo> & outputs);
 
-    bool isReadDesc(int fd) override;
-
     /**
      * Delete the temporary directory, if we have one.
      */
@@ -541,6 +539,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     actLock.reset();
 
+    started();
     try {
 
         /* Okay, we have to build. */
@@ -553,8 +552,22 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
         co_return done(BuildResult::InputRejected, {}, std::move(e));
     }
 
-    started();
     co_await Suspend{};
+
+    if (!currentLogLine.empty()) {
+        if (handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false))
+            ;
+
+        else {
+            logTail.push_back(currentLogLine);
+            if (logTail.size() > settings.logLines) logTail.pop_front();
+
+            act->result(resBuildLogLine, currentLogLine);
+        }
+
+        currentLogLine = "";
+        currentLogLinePos = 0;
+    }
 
     trace("build done");
 
@@ -811,6 +824,58 @@ static void handleChildException(bool sendException)
             std::cerr << e.msg();
     }
 }
+
+static std::function<bool(Descriptor, std::string_view)> makeBuildLogHandler(
+    std::shared_ptr<BufferedSink> & logSink,
+    Activity & act,
+    std::map<ActivityId, Activity> & builderActivities,
+    std::function<void()> killChild,
+    Descriptor & builderOut,
+    unsigned long & logSize,
+    std::string & currentLogLine,
+    size_t & currentLogLinePos,
+    std::list<std::string> & logTail
+
+) {
+    return [&](Descriptor fd, std::string_view data) {
+        // local & `ssh://`-builds are dealt with here.
+        bool isWrittenToLog =
+            fd == builderOut;
+
+        if (isWrittenToLog) {
+            logSize += data.size();
+            if (settings.maxLogSize && logSize > settings.maxLogSize) {
+                killChild();
+                return true; // break out and stop listening to children
+            }
+
+            for (auto c : data)
+                if (c == '\r')
+                    currentLogLinePos = 0;
+                else if (c == '\n') {
+                    if (!handleJSONLogMessage(
+                            currentLogLine, act, builderActivities, "the derivation builder", false)) {
+                        act.result(resBuildLogLine, currentLogLine);
+                        logTail.push_back(std::move(currentLogLine));
+                        if (logTail.size() > settings.logLines)
+                            logTail.pop_front();
+                    }
+
+                    currentLogLine = "";
+                    currentLogLinePos = 0;
+                } else {
+                    if (currentLogLinePos >= currentLogLine.size())
+                        currentLogLine.resize(currentLogLinePos + 1);
+                    currentLogLine[currentLogLinePos++] = c;
+                }
+
+            if (logSink)
+                (*logSink)(data);
+        }
+        return false;
+    };
+}
+
 
 void LocalDerivationGoal::startBuilder()
 {
@@ -1438,6 +1503,21 @@ void LocalDerivationGoal::startBuilder()
 
     /* parent */
     pid.setSeparatePG(true);
+
+    auto builderOut_ = builderOut.get();
+
+    childHandler = makeBuildLogHandler(
+        logSink,
+        *act,
+        builderActivities,
+        [&]{ killChild(); },
+        builderOut_,
+        logSize,
+        currentLogLine,
+        currentLogLinePos,
+        logTail
+    );
+
     worker.childStarted(shared_from_this(), {builderOut.get()}, true, true);
 
     processSandboxSetupMessages();
@@ -3076,13 +3156,6 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
         topTmpDir = "";
         tmpDir = "";
     }
-}
-
-
-bool LocalDerivationGoal::isReadDesc(int fd)
-{
-    return (hook && DerivationGoal::isReadDesc(fd)) ||
-        (!hook && fd == builderOut.get());
 }
 
 
