@@ -110,7 +110,6 @@ LocalStore::LocalStore(
     , schemaPath(dbDir + "/schema")
     , tempRootsDir(stateDir + "/temproots")
     , fnTempRoots(fmt("%s/%d", tempRootsDir, getpid()))
-    , locksHeld(tokenizeString<PathSet>(getEnv("NIX_HELD_LOCKS").value_or("")))
 {
     auto state(_state.lock());
     state->stmts = std::make_unique<State::Stmts>();
@@ -136,13 +135,10 @@ LocalStore::LocalStore(
     for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
         createDirs(perUserDir);
         if (!readOnly) {
-            auto st = lstat(perUserDir);
-
             // Skip chmod call if the directory already has the correct permissions (0755).
             // This is to avoid failing when the executing user lacks permissions to change the directory's permissions
             // even if it would be no-op.
-            if ((st.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) != 0755 && chmod(perUserDir.c_str(), 0755) == -1)
-                throw SysError("could not set permissions on '%s' to 755", perUserDir);
+            chmodIfNeeded(perUserDir, 0755, S_IRWXU | S_IRWXG | S_IRWXO);
         }
     }
 
@@ -1583,33 +1579,6 @@ void LocalStore::addSignatures(const StorePath & storePath, const StringSet & si
 
         txn.commit();
     });
-}
-
-
-void LocalStore::signRealisation(Realisation & realisation)
-{
-    // FIXME: keep secret keys in memory.
-
-    auto secretKeyFiles = settings.secretKeyFiles;
-
-    for (auto & secretKeyFile : secretKeyFiles.get()) {
-        SecretKey secretKey(readFile(secretKeyFile));
-        LocalSigner signer(std::move(secretKey));
-        realisation.sign(signer);
-    }
-}
-
-void LocalStore::signPathInfo(ValidPathInfo & info)
-{
-    // FIXME: keep secret keys in memory.
-
-    auto secretKeyFiles = settings.secretKeyFiles;
-
-    for (auto & secretKeyFile : secretKeyFiles.get()) {
-        SecretKey secretKey(readFile(secretKeyFile));
-        LocalSigner signer(std::move(secretKey));
-        info.sign(*this, signer);
-    }
 }
 
 

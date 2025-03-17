@@ -369,7 +369,7 @@ struct Derivation : BasicDerivation
      */
     std::optional<BasicDerivation> tryResolve(
         Store & store,
-        const std::map<std::pair<StorePath, std::string>, StorePath> & inputDrvOutputs) const;
+        std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)> queryResolutionChain) const;
 
     /**
      * Check that the derivation is valid and does not present any

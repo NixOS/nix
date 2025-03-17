@@ -175,8 +175,6 @@ headers = [config_h] + files(
   'nixexpr.hh',
   'parallel-eval.hh',
   'parser-state.hh',
-  'pos-idx.hh',
-  'pos-table.hh',
   'primops.hh',
   'print-ambiguous.hh',
   'print-options.hh',

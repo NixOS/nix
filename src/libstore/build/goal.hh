@@ -378,7 +378,7 @@ public:
      */
     std::optional<Error> ex;
 
-    Goal(Worker & worker, DerivedPath path)
+    Goal(Worker & worker)
         : worker(worker), top_co(init_wrapper())
     {
         // top_co shouldn't have a goal already, should be nullptr.
@@ -396,7 +396,7 @@ public:
 
     void addWaitee(GoalPtr waitee);
 
-    virtual void waiteeDone(GoalPtr waitee, ExitCode result);
+    void waiteeDone(GoalPtr waitee, ExitCode result);
 
     virtual void handleChildOutput(Descriptor fd, std::string_view data)
     {

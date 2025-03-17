@@ -45,7 +45,7 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::withFrame(const Env & env, const Expr
     // TODO: check compatibility with nested debugger calls.
     // TODO: What side-effects??
     error.state.debugTraces.push_front(DebugTrace{
-        .pos = error.state.positions[expr.getPos()],
+        .pos = expr.getPos(),
         .expr = expr,
         .env = env,
         .hint = HintFmt("Fake frame for debugging purposes"),

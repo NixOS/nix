@@ -68,7 +68,7 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drv
         return
 #ifndef _WIN32 // TODO Enable building on Windows
             dynamic_cast<LocalStore *>(&store)
-            ? std::make_shared<LocalDerivationGoal>(drvPath, wantedOutputs, *this, buildMode)
+            ? makeLocalDerivationGoal(drvPath, wantedOutputs, *this, buildMode)
             :
 #endif
             std::make_shared</* */DerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
@@ -82,7 +82,7 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
         return
 #ifndef _WIN32 // TODO Enable building on Windows
             dynamic_cast<LocalStore *>(&store)
-            ? std::make_shared<LocalDerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode)
+            ? makeLocalDerivationGoal(drvPath, drv, wantedOutputs, *this, buildMode)
             :
 #endif
             std::make_shared</* */DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
@@ -548,6 +548,11 @@ GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal)
 }
 
 GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal)
+{
+    return subGoal;
+}
+
+GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal)
 {
     return subGoal;
 }

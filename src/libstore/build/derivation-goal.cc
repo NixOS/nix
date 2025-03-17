@@ -38,7 +38,7 @@ namespace nix {
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath,
     const OutputsSpec & wantedOutputs, Worker & worker, BuildMode buildMode)
-    : Goal(worker, DerivedPath::Built { .drvPath = makeConstantStorePathRef(drvPath), .outputs = wantedOutputs })
+    : Goal(worker)
     , useDerivation(true)
     , drvPath(drvPath)
     , wantedOutputs(wantedOutputs)
@@ -56,7 +56,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath,
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
     const OutputsSpec & wantedOutputs, Worker & worker, BuildMode buildMode)
-    : Goal(worker, DerivedPath::Built { .drvPath = makeConstantStorePathRef(drvPath), .outputs = wantedOutputs })
+    : Goal(worker)
     , useDerivation(false)
     , drvPath(drvPath)
     , wantedOutputs(wantedOutputs)
@@ -322,6 +322,18 @@ Goal::Co DerivationGoal::haveDerivation()
 }
 
 
+/**
+ * Used for `inputGoals` local variable below
+ */
+struct value_comparison
+{
+    template <typename T>
+    bool operator()(const ref<T> & lhs, const ref<T> & rhs) const {
+        return *lhs < *rhs;
+    }
+};
+
+
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
 Goal::Co DerivationGoal::gaveUpOnSubstitution()
@@ -330,19 +342,22 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
        is no need to restart. */
     needRestart = NeedRestartForMoreOutputs::BuildInProgressWillNotNeed;
 
-    /* The inputs must be built before we can build this goal. */
-    inputDrvOutputs.clear();
-    if (useDerivation) {
-        std::function<void(ref<SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)> addWaiteeDerivedPath;
+    std::map<ref<const SingleDerivedPath>, GoalPtr, value_comparison> inputGoals;
 
-        addWaiteeDerivedPath = [&](ref<SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
-            if (!inputNode.value.empty())
-                addWaitee(worker.makeGoal(
+    if (useDerivation) {
+        std::function<void(ref<const SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)> addWaiteeDerivedPath;
+
+        addWaiteeDerivedPath = [&](ref<const SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+            if (!inputNode.value.empty()) {
+                auto g = worker.makeGoal(
                     DerivedPath::Built {
                         .drvPath = inputDrv,
                         .outputs = inputNode.value,
                     },
-                    buildMode == bmRepair ? bmRepair : bmNormal));
+                    buildMode == bmRepair ? bmRepair : bmNormal);
+                inputGoals.insert_or_assign(inputDrv, g);
+                addWaitee(std::move(g));
+            }
             for (const auto & [outputName, childNode] : inputNode.childMap)
                 addWaiteeDerivedPath(
                     make_ref<SingleDerivedPath>(SingleDerivedPath::Built { inputDrv, outputName }),
@@ -430,7 +445,12 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
             [&](const DerivationType::Impure &) {
                 return true;
             }
-        }, drvType.raw);
+        }, drvType.raw)
+            /* no inputs are outputs of dynamic derivations */
+            || std::ranges::any_of(
+                fullDrv.inputDrvs.map.begin(),
+                fullDrv.inputDrvs.map.end(),
+                [](auto & pair) { return !pair.second.childMap.empty(); });
 
         if (resolveDrv && !fullDrv.inputDrvs.map.empty()) {
             experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -438,7 +458,19 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
             /* We are be able to resolve this derivation based on the
                now-known results of dependencies. If so, we become a
                stub goal aliasing that resolved derivation goal. */
-            std::optional attempt = fullDrv.tryResolve(worker.store, inputDrvOutputs);
+            std::optional attempt = fullDrv.tryResolve(worker.store,
+                [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
+                    auto mEntry = get(inputGoals, drvPath);
+                    if (!mEntry) return std::nullopt;
+
+                    auto buildResult = (*mEntry)->getBuildResult(DerivedPath::Built{drvPath, OutputsSpec::Names{outputName}});
+                    if (!buildResult.success()) return std::nullopt;
+
+                    auto i = get(buildResult.builtOutputs, outputName);
+                    if (!i) return std::nullopt;
+
+                    return i->outPath;
+                });
             if (!attempt) {
               /* TODO (impure derivations-induced tech debt) (see below):
                  The above attempt should have found it, but because we manage
@@ -469,54 +501,31 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
             co_return resolvedFinished();
         }
 
-        std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputPaths;
+        /* If we get this far, we know no dynamic drvs inputs */
 
-        accumInputPaths = [&](const StorePath & depDrvPath, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
-            /* Add the relevant output closures of the input derivation
-               `i' as input paths.  Only add the closures of output paths
-               that are specified as inputs. */
-            auto getOutput = [&](const std::string & outputName) {
-                /* TODO (impure derivations-induced tech debt):
-                   Tracking input derivation outputs statefully through the
-                   goals is error prone and has led to bugs.
-                   For a robust nix, we need to move towards the `else` branch,
-                   which does not rely on goal state to match up with the
-                   reality of the store, which is our real source of truth.
-                   However, the impure derivations feature still relies on this
-                   fragile way of doing things, because its builds do not have
-                   a representation in the store, which is a usability problem
-                   in itself. When implementing this logic entirely with lookups
-                   make sure that they're cached. */
-                if (auto outPath = get(inputDrvOutputs, { depDrvPath, outputName })) {
-                    return *outPath;
+        for (auto & [depDrvPath, depNode] : fullDrv.inputDrvs.map) {
+            for (auto & outputName : depNode.value) {
+                /* Don't need to worry about `inputGoals`, because
+                   impure derivations are always resolved above. Can
+                   just use DB. This case only happens in the (older)
+                   input addressed and fixed output derivation cases. */
+                auto outMap = [&]{
+                    for (auto * drvStore : { &worker.evalStore, &worker.store })
+                        if (drvStore->isValidPath(depDrvPath))
+                            return worker.store.queryDerivationOutputMap(depDrvPath, drvStore);
+                    assert(false);
+                }();
+
+                auto outMapPath = outMap.find(outputName);
+                if (outMapPath == outMap.end()) {
+                    throw Error(
+                        "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
+                        worker.store.printStorePath(drvPath), outputName, worker.store.printStorePath(depDrvPath));
                 }
-                else {
-                    auto outMap = [&]{
-                        for (auto * drvStore : { &worker.evalStore, &worker.store })
-                            if (drvStore->isValidPath(depDrvPath))
-                                return worker.store.queryDerivationOutputMap(depDrvPath, drvStore);
-                        assert(false);
-                    }();
 
-                    auto outMapPath = outMap.find(outputName);
-                    if (outMapPath == outMap.end()) {
-                        throw Error(
-                            "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
-                            worker.store.printStorePath(drvPath), outputName, worker.store.printStorePath(depDrvPath));
-                    }
-                    return outMapPath->second;
-                }
-            };
-
-            for (auto & outputName : inputNode.value)
-                worker.store.computeFSClosure(getOutput(outputName), inputPaths);
-
-            for (auto & [outputName, childNode] : inputNode.childMap)
-                accumInputPaths(getOutput(outputName), childNode);
-        };
-
-        for (auto & [depDrvPath, depNode] : fullDrv.inputDrvs.map)
-            accumInputPaths(depDrvPath, depNode);
+                worker.store.computeFSClosure(outMapPath->second, inputPaths);
+            }
+        }
     }
 
     /* Second, the input sources. */
@@ -640,7 +649,7 @@ Goal::Co DerivationGoal::tryToBuild()
                 buildResult.startTime = time(0); // inexact
                 started();
                 co_await Suspend{};
-                co_return buildDone();
+                co_return hookDone();
             case rpPostpone:
                 /* Not now; wait until at least one child finishes or
                    the wake-up timeout expires. */
@@ -801,55 +810,6 @@ void replaceValidPath(const Path & storePath, const Path & tmpPath)
 }
 
 
-int DerivationGoal::getChildStatus()
-{
-#ifndef _WIN32 // TODO enable build hook on Windows
-    return hook->pid.kill();
-#else
-    return 0;
-#endif
-}
-
-
-void DerivationGoal::closeReadPipes()
-{
-#ifndef _WIN32 // TODO enable build hook on Windows
-    hook->builderOut.readSide.close();
-    hook->fromHook.readSide.close();
-#endif
-}
-
-
-void DerivationGoal::cleanupHookFinally()
-{
-}
-
-
-void DerivationGoal::cleanupPreChildKill()
-{
-}
-
-
-void DerivationGoal::cleanupPostChildKill()
-{
-}
-
-
-bool DerivationGoal::cleanupDecideWhetherDiskFull()
-{
-    return false;
-}
-
-
-void DerivationGoal::cleanupPostOutputsRegisteredModeCheck()
-{
-}
-
-
-void DerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
-{
-}
-
 void runPostBuildHook(
     Store & store,
     Logger & logger,
@@ -908,21 +868,53 @@ void runPostBuildHook(
     });
 }
 
-Goal::Co DerivationGoal::buildDone()
+
+void appendLogTailErrorMsg(
+    Worker & worker,
+    const StorePath & drvPath,
+    const std::list<std::string> & logTail,
+    std::string & msg)
 {
-    trace("build done");
+    if (!logger->isVerbose() && !logTail.empty()) {
+        msg += fmt(";\nlast %d log lines:\n", logTail.size());
+        for (auto & line : logTail) {
+            msg += "> ";
+            msg += line;
+            msg += "\n";
+        }
+        auto nixLogCommand = experimentalFeatureSettings.isEnabled(Xp::NixCommand)
+            ? "nix log"
+            : "nix-store -l";
+        // The command is on a separate line for easy copying, such as with triple click.
+        // This message will be indented elsewhere, so removing the indentation before the
+        // command will not put it at the start of the line unfortunately.
+        msg += fmt("For full logs, run:\n  " ANSI_BOLD "%s %s" ANSI_NORMAL,
+            nixLogCommand,
+            worker.store.printStorePath(drvPath));
+    }
+}
 
-    Finally releaseBuildUser([&](){ this->cleanupHookFinally(); });
 
-    cleanupPreChildKill();
+Goal::Co DerivationGoal::hookDone()
+{
+#ifndef _WIN32
+    assert(hook);
+#endif
+
+    trace("hook build done");
 
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe, so just to be sure,
        kill it. */
-    int status = getChildStatus();
+    int status =
+#ifndef _WIN32 // TODO enable build hook on Windows
+        hook->pid.kill();
+#else
+        0;
+#endif
 
-    debug("builder process for '%s' finished", worker.store.printStorePath(drvPath));
+    debug("build hook for '%s' finished", worker.store.printStorePath(drvPath));
 
     buildResult.timesBuilt++;
     buildResult.stopTime = time(0);
@@ -931,108 +923,59 @@ Goal::Co DerivationGoal::buildDone()
     worker.childTerminated(this);
 
     /* Close the read side of the logger pipe. */
-    closeReadPipes();
+#ifndef _WIN32 // TODO enable build hook on Windows
+    hook->builderOut.readSide.close();
+    hook->fromHook.readSide.close();
+#endif
 
     /* Close the log file. */
     closeLogFile();
 
-    cleanupPostChildKill();
+    /* Check the exit status. */
+    if (!statusOk(status)) {
+        auto msg = fmt("builder for '%s' %s",
+            Magenta(worker.store.printStorePath(drvPath)),
+            statusToString(status));
 
-    if (buildResult.cpuUser && buildResult.cpuSystem) {
-        debug("builder for '%s' terminated with status %d, user CPU %.3fs, system CPU %.3fs",
-            worker.store.printStorePath(drvPath),
-            status,
-            ((double) buildResult.cpuUser->count()) / 1000000,
-            ((double) buildResult.cpuSystem->count()) / 1000000);
-    }
+        appendLogTailErrorMsg(worker, drvPath, logTail, msg);
 
-    bool diskFull = false;
-
-    try {
-
-        /* Check the exit status. */
-        if (!statusOk(status)) {
-
-            diskFull |= cleanupDecideWhetherDiskFull();
-
-            auto msg = fmt("builder for '%s' %s",
-                Magenta(worker.store.printStorePath(drvPath)),
-                statusToString(status));
-
-            if (!logger->isVerbose() && !logTail.empty()) {
-                msg += fmt(";\nlast %d log lines:\n", logTail.size());
-                for (auto & line : logTail) {
-                    msg += "> ";
-                    msg += line;
-                    msg += "\n";
-                }
-                auto nixLogCommand = experimentalFeatureSettings.isEnabled(Xp::NixCommand)
-                    ? "nix log"
-                    : "nix-store -l";
-                // The command is on a separate line for easy copying, such as with triple click.
-                // This message will be indented elsewhere, so removing the indentation before the
-                // command will not put it at the start of the line unfortunately.
-                msg += fmt("For full logs, run:\n  " ANSI_BOLD "%s %s" ANSI_NORMAL,
-                    nixLogCommand,
-                    worker.store.printStorePath(drvPath));
-            }
-
-            if (diskFull)
-                msg += "\nnote: build failure may have been caused by lack of free disk space";
-
-            throw BuildError(msg);
-        }
-
-        /* Compute the FS closure of the outputs and register them as
-           being valid. */
-        auto builtOutputs = registerOutputs();
-
-        StorePathSet outputPaths;
-        for (auto & [_, output] : builtOutputs)
-            outputPaths.insert(output.outPath);
-        runPostBuildHook(
-            worker.store,
-            *logger,
-            drvPath,
-            outputPaths
-        );
-
-        cleanupPostOutputsRegisteredModeNonCheck();
-
-        /* It is now safe to delete the lock files, since all future
-           lockers will see that the output paths are valid; they will
-           not create new lock files with the same names as the old
-           (unlinked) lock files. */
-        outputLocks.setDeletion(true);
         outputLocks.unlock();
 
-        co_return done(BuildResult::Built, std::move(builtOutputs));
+        /* TODO (once again) support fine-grained error codes, see issue #12641. */
 
-    } catch (BuildError & e) {
-        outputLocks.unlock();
-
-        BuildResult::Status st = BuildResult::MiscFailure;
-
-#ifndef _WIN32 // TODO abstract over proc exit status
-        if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101)
-            st = BuildResult::TimedOut;
-
-        else if (hook && (!WIFEXITED(status) || WEXITSTATUS(status) != 100)) {
-        }
-
-        else
-#endif
-        {
-            assert(derivationType);
-            st =
-                dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
-                statusOk(status) ? BuildResult::OutputRejected :
-                !derivationType->isSandboxed() || diskFull ? BuildResult::TransientFailure :
-                BuildResult::PermanentFailure;
-        }
-
-        co_return done(st, {}, std::move(e));
+        co_return done(BuildResult::MiscFailure, {}, BuildError(msg));
     }
+
+    /* Compute the FS closure of the outputs and register them as
+       being valid. */
+    auto builtOutputs =
+        /* When using a build hook, the build hook can register the output
+           as valid (by doing `nix-store --import').  If so we don't have
+           to do anything here.
+
+           We can only early return when the outputs are known a priori. For
+           floating content-addressing derivations this isn't the case.
+         */
+        assertPathValidity();
+
+    StorePathSet outputPaths;
+    for (auto & [_, output] : builtOutputs)
+        outputPaths.insert(output.outPath);
+    runPostBuildHook(
+        worker.store,
+        *logger,
+        drvPath,
+        outputPaths
+    );
+
+    /* It is now safe to delete the lock files, since all future
+       lockers will see that the output paths are valid; they will
+       not create new lock files with the same names as the old
+       (unlinked) lock files. */
+    outputLocks.setDeletion(true);
+    outputLocks.unlock();
+
+    co_return done(BuildResult::Built, std::move(builtOutputs));
 }
 
 Goal::Co DerivationGoal::resolvedFinished()
@@ -1084,7 +1027,7 @@ Goal::Co DerivationGoal::resolvedFinished()
                         : worker.store;
                     newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation.outPath, &drvStore);
                 }
-                signRealisation(newRealisation);
+                worker.store.signRealisation(newRealisation);
                 worker.store.registerDrvOutput(newRealisation);
             }
             outputPaths.insert(realisation.outPath);
@@ -1218,18 +1161,6 @@ HookReply DerivationGoal::tryBuildHook()
 #endif
 }
 
-
-SingleDrvOutputs DerivationGoal::registerOutputs()
-{
-    /* When using a build hook, the build hook can register the output
-       as valid (by doing `nix-store --import').  If so we don't have
-       to do anything here.
-
-       We can only early return when the outputs are known a priori. For
-       floating content-addressing derivations this isn't the case.
-     */
-    return assertPathValidity();
-}
 
 Path DerivationGoal::openLogFile()
 {
@@ -1543,36 +1474,6 @@ Goal::Done DerivationGoal::done(
     }
 
     return amDone(buildResult.success() ? ecSuccess : ecFailed, std::move(ex));
-}
-
-
-void DerivationGoal::waiteeDone(GoalPtr waitee, ExitCode result)
-{
-    Goal::waiteeDone(waitee, result);
-
-    if (!useDerivation || !drv) return;
-    auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
-
-    auto * dg = dynamic_cast<DerivationGoal *>(&*waitee);
-    if (!dg) return;
-
-    auto * nodeP = fullDrv.inputDrvs.findSlot(DerivedPath::Opaque { .path = dg->drvPath });
-    if (!nodeP) return;
-    auto & outputs = nodeP->value;
-
-    for (auto & outputName : outputs) {
-        auto buildResult = dg->getBuildResult(DerivedPath::Built {
-            .drvPath = makeConstantStorePathRef(dg->drvPath),
-            .outputs = OutputsSpec::Names { outputName },
-        });
-        if (buildResult.success()) {
-            auto i = buildResult.builtOutputs.find(outputName);
-            if (i != buildResult.builtOutputs.end())
-                inputDrvOutputs.insert_or_assign(
-                    { dg->drvPath, outputName },
-                    i->second.outPath);
-        }
-    }
 }
 
 }
