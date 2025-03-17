@@ -209,8 +209,6 @@ struct DerivationGoal : public Goal
         BuildMode buildMode = bmNormal);
     virtual ~DerivationGoal();
 
-    void timedOut(Error && ex) override;
-
     std::string key() override;
 
     /**
@@ -266,11 +264,6 @@ struct DerivationGoal : public Goal
      * returns a 'SingleDrvOutputs' structure containing all outputs.
      */
     SingleDrvOutputs assertPathValidity();
-
-    /**
-     * Forcibly kill the child process, if any.
-     */
-    virtual void killChild();
 
     Co repairClosure();
 
