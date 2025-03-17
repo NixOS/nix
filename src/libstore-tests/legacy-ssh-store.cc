@@ -12,8 +12,10 @@ TEST(LegacySSHStore, constructConfig)
         StoreConfig::Params{
             {
                 "remote-program",
-                // TODO #11106, no more split on space
-                "foo bar",
+                {
+                    "foo",
+                    "bar",
+                },
             },
         });
 

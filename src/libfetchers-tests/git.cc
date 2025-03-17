@@ -182,7 +182,7 @@ TEST_F(GitTest, submodulePeriodSupport)
 
     auto store = [] {
         auto cfg = make_ref<DummyStoreConfig>(StoreReference::Params{});
-        cfg->readOnly = false;
+        cfg->readOnly.value = false;
         return cfg->openStore();
     }();
 
