@@ -411,7 +411,7 @@ public:
      * get rid of any running child processes that are being monitored
      * by the worker (important!), etc.
      */
-    virtual void timedOut(Error && ex) = 0;
+    void timedOut(Error && ex);
 
     virtual std::string key() = 0;
 
@@ -424,6 +424,8 @@ public:
 private:
     std::function<bool(Descriptor, std::string_view)> childHandler;
 
+    bool didTimeOut;
+
 protected:
     Co await(Goals waitees);
 
@@ -435,7 +437,8 @@ protected:
         const std::set<MuxablePipePollState::CommChannel> & channels,
         bool inBuildSlot,
         bool respectTimeouts,
-        std::function<bool(Descriptor, std::string_view)> handler
+        std::function<bool(Descriptor, std::string_view)> handler,
+        bool& timedOut
     );
 };
 
