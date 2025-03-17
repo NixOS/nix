@@ -1,11 +1,109 @@
+#include <regex>
+
 #include "nix/store/local-overlay-store.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/url.hh"
-#include <regex>
+#include "nix/store/store-api.hh"
+#include "nix/store/store-registration.hh"
+#include "nix/store/config-parse-impl.hh"
 
 namespace nix {
+
+static LocalOverlayStoreConfigT<config::SettingInfo> localOverlayStoreConfigDescriptions = {
+    .lowerStoreConfig{
+        .name = "lower-store",
+        .description = R"(
+          [Store URL](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+          for the lower store. The default is `auto` (i.e. use the Nix daemon or `/nix/store` directly).
+
+          Must be a store with a store dir on the file system.
+          Must be used as OverlayFS lower layer for this store's store dir.
+        )",
+        // It's not actually machine-specific, but we don't yet have a
+        // `to_json` for `StoreConfig`.
+        .documentDefault = false,
+    },
+    .upperLayer{
+        .name = "upper-layer",
+        .description = R"(
+          Directory containing the OverlayFS upper layer for this store's store dir.
+        )",
+    },
+    .checkMount{
+        .name = "check-mount",
+        .description = R"(
+          Check that the overlay filesystem is correctly mounted.
+
+          Nix does not manage the overlayfs mount point itself, but the correct
+          functioning of the overlay store does depend on this mount point being set up
+          correctly. Rather than just assume this is the case, check that the lowerdir
+          and upperdir options are what we expect them to be. This check is on by
+          default, but can be disabled if needed.
+        )",
+    },
+    .remountHook{
+        .name = "remount-hook",
+        .description = R"(
+          Script or other executable to run when overlay filesystem needs remounting.
+
+          This is occasionally necessary when deleting a store path that exists in both upper and lower layers.
+          In such a situation, bypassing OverlayFS and deleting the path in the upper layer directly
+          is the only way to perform the deletion without creating a "whiteout".
+          However this causes the OverlayFS kernel data structures to get out-of-sync,
+          and can lead to 'stale file handle' errors; remounting solves the problem.
+
+          The store directory is passed as an argument to the invoked executable.
+        )",
+    },
+};
+
+#define LOCAL_OVERLAY_STORE_CONFIG_FIELDS(X) \
+    X(lowerStoreConfig), \
+    X(upperLayer), \
+    X(checkMount), \
+    X(remountHook),
+
+MAKE_PARSE(LocalOverlayStoreConfig, localOverlayStoreConfig, LOCAL_OVERLAY_STORE_CONFIG_FIELDS)
+
+static LocalOverlayStoreConfigT<config::PlainValue> localOverlayStoreConfigDefaults()
+{
+    return {
+        .lowerStoreConfig = {make_ref<LocalStore::Config>(StoreReference::Params{})},
+        .upperLayer = {""},
+        .checkMount = {true},
+        .remountHook = {""},
+    };
+}
+
+MAKE_APPLY_PARSE(LocalOverlayStoreConfig, localOverlayStoreConfig, LOCAL_OVERLAY_STORE_CONFIG_FIELDS)
+
+config::SettingDescriptionMap LocalOverlayStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(LocalFSStoreConfig::descriptions());
+    ret.merge(LocalStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = localOverlayStoreConfigDescriptions;
+        auto defaults = localOverlayStoreConfigDefaults();
+        ret.merge(decltype(ret){
+            LOCAL_OVERLAY_STORE_CONFIG_FIELDS(DESCRIBE_ROW)
+        });
+    }
+    return ret;
+}
+
+LocalOverlayStore::Config::LocalOverlayStoreConfig(
+    std::string_view scheme,
+    std::string_view authority,
+    const StoreReference::Params & params)
+    : LocalStore::Config(scheme, authority, params)
+    , LocalOverlayStoreConfigT<config::PlainValue>{localOverlayStoreConfigApplyParse(params)}
+{
+}
+
 
 std::string LocalOverlayStoreConfig::doc()
 {
@@ -33,7 +131,7 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
     , LocalFSStore{*config}
     , LocalStore{static_cast<ref<const LocalStore::Config>>(config)}
     , config{config}
-    , lowerStore(openStore(percentDecode(config->lowerStoreUri.get())).dynamic_pointer_cast<LocalFSStore>())
+    , lowerStore(config->lowerStoreConfig.value->openStore().dynamic_pointer_cast<LocalFSStore>())
 {
     if (config->checkMount.get()) {
         std::smatch match;

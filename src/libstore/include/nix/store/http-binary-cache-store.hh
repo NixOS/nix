@@ -3,13 +3,13 @@
 namespace nix {
 
 struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCacheStoreConfig>,
-                                    virtual Store::Config,
+                                    Store::Config,
                                     BinaryCacheStoreConfig
 {
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+    static config::SettingDescriptionMap descriptions();
 
     HttpBinaryCacheStoreConfig(
-        std::string_view scheme, std::string_view cacheUri, const Store::Config::Params & params);
+        std::string_view scheme, std::string_view cacheUri, const StoreReference::Params & params);
 
     Path cacheUri;
 

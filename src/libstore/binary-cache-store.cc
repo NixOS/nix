@@ -13,6 +13,7 @@
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/archive.hh"
+#include "nix/store/config-parse-impl.hh"
 
 #include <chrono>
 #include <future>
@@ -24,25 +25,111 @@
 
 namespace nix {
 
-BinaryCacheStore::BinaryCacheStore(Config & config)
-    : config{config}
+constexpr static const BinaryCacheStoreConfigT<config::SettingInfo> binaryCacheStoreConfigDescriptions = {
+    .compression = {
+        .name = "compression",
+        .description = "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`).",
+    },
+    .writeNARListing = {
+        .name = "write-nar-listing",
+        .description = "Whether to write a JSON file that lists the files in each NAR.",
+    },
+    .writeDebugInfo = {
+        .name = "index-debug-info",
+        .description = R"(
+          Whether to index DWARF debug info files by build ID. This allows [`dwarffs`](https://github.com/edolstra/dwarffs) to
+          fetch debug info on demand
+        )",
+    },
+    .secretKeyFile{
+        .name = "secret-key",
+        .description = "Path to the secret key used to sign the binary cache.",
+    },
+    .localNarCache{
+        .name = "local-nar-cache",
+        .description = "Path to a local cache of NARs fetched from this binary cache, used by commands such as `nix store cat`.",
+    },
+    .parallelCompression{
+        .name = "parallel-compression",
+        .description = "Enable multi-threaded compression of NARs. This is currently only available for `xz` and `zstd`.",
+    },
+    .compressionLevel{
+        .name = "compression-level",
+        .description = R"(
+          The *preset level* to be used when compressing NARs.
+          The meaning and accepted values depend on the compression method selected.
+          `-1` specifies that the default compression level should be used.
+        )",
+    },
+};
+
+#define BINARY_CACHE_STORE_CONFIG_FIELDS(X) \
+    X(compression), \
+    X(writeNARListing), \
+    X(writeDebugInfo), \
+    X(secretKeyFile), \
+    X(secretKeyFiles), \
+    X(localNarCache), \
+    X(parallelCompression), \
+    X(compressionLevel),
+
+MAKE_PARSE(BinaryCacheStoreConfig, binaryCacheStoreConfig, BINARY_CACHE_STORE_CONFIG_FIELDS)
+
+static BinaryCacheStoreConfigT<config::PlainValue> binaryCacheStoreConfigDefaults()
+{
+    return {
+        .compression = {"xz"},
+        .writeNARListing = {false},
+        .writeDebugInfo = {false},
+        .secretKeyFile = {""},
+        .secretKeyFiles = {{}},
+        .localNarCache = {""},
+        .parallelCompression = {false},
+        .compressionLevel = {-1},
+    };
+}
+
+MAKE_APPLY_PARSE(BinaryCacheStoreConfig, binaryCacheStoreConfig, BINARY_CACHE_STORE_CONFIG_FIELDS)
+
+BinaryCacheStore::Config::BinaryCacheStoreConfig(
+    const Store::Config & storeConfig,
+    const StoreReference::Params & params)
+    : BinaryCacheStoreConfigT<config::PlainValue>{binaryCacheStoreConfigApplyParse(params)}
+    , storeConfig{storeConfig}
+{
+}
+
+config::SettingDescriptionMap BinaryCacheStoreConfig::descriptions()
+{
+    constexpr auto & descriptions = binaryCacheStoreConfigDescriptions;
+    auto defaults = binaryCacheStoreConfigDefaults();
+    return {
+        BINARY_CACHE_STORE_CONFIG_FIELDS(DESCRIBE_ROW)
+    };
+}
+
+BinaryCacheStore::BinaryCacheStore(const Config & config)
+    : Store{config.storeConfig}
+    , config{config}
 {
     if (config.secretKeyFile != "")
         signers.push_back(std::make_unique<LocalSigner>(
             SecretKey { readFile(config.secretKeyFile) }));
 
-    if (config.secretKeyFiles != "") {
-        std::stringstream ss(config.secretKeyFiles);
-        Path keyPath;
-        while (std::getline(ss, keyPath, ',')) {
-            signers.push_back(std::make_unique<LocalSigner>(
-                SecretKey { readFile(keyPath) }));
-        }
+    for (auto & keyPath : config.secretKeyFiles.value) {
+        signers.push_back(std::make_unique<LocalSigner>(
+            SecretKey { readFile(keyPath) }));
     }
 
     StringSink sink;
     sink << narVersionMagic1;
     narMagic = sink.s;
+
+    // Want to call this but cannot, because virtual function lookup is
+    // disabled in a constructor. It is thus left to instances to call
+    // it instead.
+
+    //init();
 }
 
 void BinaryCacheStore::init()
@@ -61,9 +148,11 @@ void BinaryCacheStore::init()
                     throw Error("binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
                         getUri(), value, storeDir);
             } else if (name == "WantMassQuery") {
-                config.wantMassQuery.setDefault(value == "1");
+                resolvedSubstConfig.wantMassQuery.value =
+                    config.storeConfig.wantMassQuery.optValue.value_or(value == "1");
             } else if (name == "Priority") {
-                config.priority.setDefault(std::stoi(value));
+                resolvedSubstConfig.priority.value =
+                    config.storeConfig.priority.optValue.value_or(std::stoi(value));
             }
         }
     }

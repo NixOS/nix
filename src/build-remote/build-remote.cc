@@ -16,7 +16,7 @@
 #include "nix/store/globals.hh"
 #include "nix/util/serialise.hh"
 #include "nix/store/build-result.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/util/strings.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/local-store.hh"

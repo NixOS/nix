@@ -9,13 +9,15 @@ namespace nix {
 
 struct UDSRemoteStoreConfig :
     std::enable_shared_from_this<UDSRemoteStoreConfig>,
-    virtual LocalFSStoreConfig,
-    virtual RemoteStoreConfig
+    Store::Config,
+    LocalFSStore::Config,
+    RemoteStore::Config
 {
-    // TODO(fzakaria): Delete this constructor once moved over to the factory pattern
-    // outlined in https://github.com/NixOS/nix/issues/10766
-    using LocalFSStoreConfig::LocalFSStoreConfig;
-    using RemoteStoreConfig::RemoteStoreConfig;
+    static config::SettingDescriptionMap descriptions();
+
+    UDSRemoteStoreConfig(const StoreReference::Params & params)
+        : UDSRemoteStoreConfig{"unix", "", params}
+    {}
 
     /**
      * @param authority is the socket path.
@@ -23,7 +25,7 @@ struct UDSRemoteStoreConfig :
     UDSRemoteStoreConfig(
         std::string_view scheme,
         std::string_view authority,
-        const Params & params);
+        const StoreReference::Params & params);
 
     static const std::string name() { return "Local Daemon Store"; }
 

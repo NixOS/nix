@@ -18,14 +18,64 @@
 #include "nix/util/callback.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/signals.hh"
+#include "nix/store/config-parse-impl.hh"
 
 #include <nlohmann/json.hpp>
 
 namespace nix {
 
+constexpr static const RemoteStoreConfigT<config::SettingInfo> remoteStoreConfigDescriptions = {
+    .maxConnections{
+        .name = "max-connections",
+        .description = "Maximum number of concurrent connections to the Nix daemon.",
+    },
+    .maxConnectionAge{
+        .name = "max-connection-age",
+        .description = "Maximum age of a connection before it is closed.",
+    },
+};
+
+
+#define REMOTE_STORE_CONFIG_FIELDS(X) \
+    X(maxConnections), \
+    X(maxConnectionAge),
+
+
+MAKE_PARSE(RemoteStoreConfig, remoteStoreConfig, REMOTE_STORE_CONFIG_FIELDS)
+
+
+static RemoteStoreConfigT<config::PlainValue> remoteStoreConfigDefaults()
+{
+    return {
+        .maxConnections = {1},
+        .maxConnectionAge = {std::numeric_limits<unsigned int>::max()},
+    };
+}
+
+
+MAKE_APPLY_PARSE(RemoteStoreConfig, remoteStoreConfig, REMOTE_STORE_CONFIG_FIELDS)
+
+
+config::SettingDescriptionMap RemoteStoreConfig::descriptions()
+{
+    constexpr auto & descriptions = remoteStoreConfigDescriptions;
+    auto defaults = remoteStoreConfigDefaults();
+    return {
+        REMOTE_STORE_CONFIG_FIELDS(DESCRIBE_ROW)
+    };
+}
+
+
+RemoteStore::Config::RemoteStoreConfig(const Store::Config & storeConfig, const StoreReference::Params & params)
+    : RemoteStoreConfigT<config::PlainValue>{remoteStoreConfigApplyParse(params)}
+    , storeConfig{storeConfig}
+{
+}
+
+
 /* TODO: Separate these store types into different files, give them better names */
 RemoteStore::RemoteStore(const Config & config)
-    : Store{config}
+    : Store{config.storeConfig}
     , config{config}
     , connections(make_ref<Pool<Connection>>(
             std::max(1, config.maxConnections.get()),

@@ -4,7 +4,7 @@
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/globals.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/topo-sort.hh"
