@@ -1166,9 +1166,9 @@ void DerivationBuilderImpl::startDaemon()
     auto store = makeRestrictedStore(
         [&] {
             auto config = make_ref<LocalStore::Config>(*this->store.config);
-            config->pathInfoCacheSize = 0;
-            config->stateDir = "/no-such-path";
-            config->logDir = "/no-such-path";
+            config->pathInfoCacheSize.value = 0;
+            config->stateDir.value = "/no-such-path";
+            config->logDir.value = "/no-such-path";
             return config;
         }(),
         ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
