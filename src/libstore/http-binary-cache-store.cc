@@ -3,18 +3,37 @@
 #include "nix/store/globals.hh"
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/callback.hh"
+#include "nix/store/store-registration.hh"
 
 namespace nix {
+
+config::SettingDescriptionMap HttpBinaryCacheStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(BinaryCacheStoreConfig::descriptions());
+    return ret;
+}
+
 
 MakeError(UploadToHTTP, Error);
 
 
+std::set<std::string> HttpBinaryCacheStoreConfig::uriSchemes()
+{
+    static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
+    auto ret = std::set<std::string>({"http", "https"});
+    if (forceHttp)
+        ret.insert("file");
+    return ret;
+}
+
 HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
     std::string_view scheme,
     std::string_view _cacheUri,
-    const Params & params)
-    : StoreConfig(params)
-    , BinaryCacheStoreConfig(params)
+    const StoreReference::Params & params)
+    : Store::Config{params}
+    , BinaryCacheStoreConfig{*this, params}
     , cacheUri(
         std::string { scheme }
         + "://"
@@ -35,10 +54,9 @@ std::string HttpBinaryCacheStoreConfig::doc()
 }
 
 
-class HttpBinaryCacheStore : public virtual HttpBinaryCacheStoreConfig, public virtual BinaryCacheStore
+class HttpBinaryCacheStore :
+    public virtual BinaryCacheStore
 {
-private:
-
     struct State
     {
         bool enabled = true;
@@ -49,37 +67,41 @@ private:
 
 public:
 
-    HttpBinaryCacheStore(
-        std::string_view scheme,
-        PathView cacheUri,
-        const Params & params)
-        : StoreConfig(params)
-        , BinaryCacheStoreConfig(params)
-        , HttpBinaryCacheStoreConfig(scheme, cacheUri, params)
-        , Store(params)
-        , BinaryCacheStore(params)
+    using Config = HttpBinaryCacheStoreConfig;
+
+    ref<const Config> config;
+
+    HttpBinaryCacheStore(ref<const Config> config)
+        : Store{*config}
+        , BinaryCacheStore{*config}
+        , config{config}
     {
         diskCache = getNarInfoDiskCache();
+
+        init();
     }
 
     std::string getUri() override
     {
-        return cacheUri;
+        return config->cacheUri;
     }
 
     void init() override
     {
         // FIXME: do this lazily?
-        if (auto cacheInfo = diskCache->upToDateCacheExists(cacheUri)) {
-            wantMassQuery.setDefault(cacheInfo->wantMassQuery);
-            priority.setDefault(cacheInfo->priority);
+        if (auto cacheInfo = diskCache->upToDateCacheExists(config->cacheUri)) {
+            resolvedSubstConfig.wantMassQuery.value =
+                config->storeConfig.wantMassQuery.optValue.value_or(cacheInfo->wantMassQuery);
+            resolvedSubstConfig.priority.value =
+                config->storeConfig.priority.optValue.value_or(cacheInfo->priority);
         } else {
             try {
                 BinaryCacheStore::init();
             } catch (UploadToHTTP &) {
-                throw Error("'%s' does not appear to be a binary cache", cacheUri);
+                throw Error("'%s' does not appear to be a binary cache", config->cacheUri);
             }
-            diskCache->createCache(cacheUri, storeDir, wantMassQuery, priority);
+            diskCache->createCache(
+                config->cacheUri, storeDir, resolvedSubstConfig.wantMassQuery, resolvedSubstConfig.priority);
         }
     }
 
@@ -137,7 +159,7 @@ protected:
         try {
             getFileTransfer()->upload(req);
         } catch (FileTransferError & e) {
-            throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", cacheUri, e.msg());
+            throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", config->cacheUri, e.msg());
         }
     }
 
@@ -146,7 +168,7 @@ protected:
         return FileTransferRequest(
             hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
             ? path
-            : cacheUri + "/" + path);
+            : config->cacheUri + "/" + path);
 
     }
 
@@ -221,6 +243,11 @@ protected:
     }
 };
 
-static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regHttpBinaryCacheStore;
+ref<Store> HttpBinaryCacheStore::Config::openStore() const
+{
+    return make_ref<HttpBinaryCacheStore>(ref{shared_from_this()});
+}
+
+static RegisterStoreImplementation<HttpBinaryCacheStore::Config> regHttpBinaryCacheStore;
 
 }

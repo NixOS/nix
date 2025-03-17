@@ -9,7 +9,6 @@
 #include "nix/util/lru-cache.hh"
 #include "nix/util/sync.hh"
 #include "nix/store/globals.hh"
-#include "nix/util/configuration.hh"
 #include "nix/store/path-info.hh"
 #include "nix/util/repair-flag.hh"
 #include "nix/store/store-dir-config.hh"
@@ -41,7 +40,7 @@ namespace nix {
  * 2. A class `Foo : virtual Store, virtual FooConfig` that contains the
  *   implementation of the store.
  *
- *   This class is expected to have a constructor `Foo(const Params & params)`
+ *   This class is expected to have a constructor `Foo(const StoreReference::Params & params)`
  *   that calls `StoreConfig(params)` (otherwise you're gonna encounter an
  *   `assertion failure` when trying to instantiate it).
  *
@@ -97,27 +96,52 @@ struct KeyedBuildResult;
 
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
-struct StoreConfig : public StoreDirConfig
+template<template<typename> class F>
+struct StoreConfigT
 {
-    using Params = StoreReference::Params;
+    F<int> pathInfoCacheSize;
+    F<bool> isTrusted;
+    F<StringSet> systemFeatures;
+};
 
-    using StoreDirConfig::StoreDirConfig;
+template<template<typename> class F>
+struct SubstituterConfigT
+{
+    F<int> priority;
+    F<bool> wantMassQuery;
+};
 
-    StoreConfig() = delete;
+/**
+ * @note In other cases we don't expose this function directly, but in
+ * this case we must because of `Store::resolvedSubstConfig` below. As
+ * the docs of that field describe, this is a case where the
+ * configuration is intentionally stateful.
+ */
+SubstituterConfigT<config::PlainValue> substituterConfigDefaults();
 
-    static StringSet getDefaultSystemFeatures();
+/**
+ * @note `config::OptValue` rather than `config::PlainValue` is applied to
+ * `SubstitutorConfigT` because these are overrides. Caches themselves (not our
+ * config) can update default settings, but aren't allowed to update settings
+ * specified by the client (i.e. us).
+ */
+struct StoreConfig :
+    StoreDirConfig,
+    StoreConfigT<config::PlainValue>,
+    SubstituterConfigT<config::OptValue>
+{
+    static config::SettingDescriptionMap descriptions();
+
+    StoreConfig(const StoreReference::Params &);
 
     virtual ~StoreConfig() { }
 
-    /**
-     * The name of this type of store.
-     */
-    virtual const std::string name() = 0;
+    static StringSet getDefaultSystemFeatures();
 
     /**
      * Documentation for this type of store.
      */
-    virtual std::string doc()
+    static std::string doc()
     {
         return "";
     }
@@ -126,47 +150,50 @@ struct StoreConfig : public StoreDirConfig
      * An experimental feature this type store is gated, if it is to be
      * experimental.
      */
-    virtual std::optional<ExperimentalFeature> experimentalFeature() const
+    static std::optional<ExperimentalFeature> experimentalFeature()
     {
         return std::nullopt;
     }
 
-    const Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size",
-        "Size of the in-memory store path metadata cache."};
-
-    const Setting<bool> isTrusted{this, false, "trusted",
-        R"(
-          Whether paths from this store can be used as substitutes
-          even if they are not signed by a key listed in the
-          [`trusted-public-keys`](@docroot@/command-ref/conf-file.md#conf-trusted-public-keys)
-          setting.
-        )"};
-
-    Setting<int> priority{this, 0, "priority",
-        R"(
-          Priority of this store when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
-          A lower value means a higher priority.
-        )"};
-
-    Setting<bool> wantMassQuery{this, false, "want-mass-query",
-        R"(
-          Whether this store can be queried efficiently for path validity when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
-        )"};
-
-    Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
-        "system-features",
-        R"(
-          Optional [system features](@docroot@/command-ref/conf-file.md#conf-system-features) available on the system this store uses to build derivations.
-
-          Example: `"kvm"`
-        )",
-        {},
-        // Don't document the machine-specific default value
-        false};
+    /**
+     * Open a store of the type corresponding to this configuration
+     * type.
+     */
+    virtual ref<Store> openStore() const = 0;
 };
 
-class Store : public std::enable_shared_from_this<Store>, public virtual StoreConfig
+/**
+ * A Store (client)
+ *
+ * This is an interface type allowing for create and read operations on
+ * a collection of store objects, and also building new store objects
+ * from `Derivation`s. See the manual for further details.
+ *
+ * "client" used is because this is just one view/actor onto an
+ * underlying resource, which could be an external process (daemon
+ * server), file system state, etc.
+ */
+class Store : public std::enable_shared_from_this<Store>, public MixStoreDirMethods
 {
+public:
+
+    using Config = StoreConfig;
+
+    const Config & config;
+
+    /**
+     * @note Avoid churn, since we used to inherit from `Config`.
+     */
+    operator const Config &() const { return config; }
+
+    /**
+     * Resolved substituter configuration. This is intentionally mutable
+     * as store clients may do IO to ask the underlying store for their
+     * default setting values if the client config did not statically
+     * override them.
+     */
+    SubstituterConfigT<config::PlainValue> resolvedSubstConfig = substituterConfigDefaults();
+
 protected:
 
     struct PathInfoCacheValue {
@@ -205,14 +232,9 @@ protected:
 
     std::shared_ptr<NarInfoDiskCache> diskCache;
 
-    Store(const Params & params);
+    Store(const Store::Config & config);
 
 public:
-    /**
-     * Perform any necessary effectful operation to make the store up and
-     * running
-     */
-    virtual void init() {};
 
     virtual ~Store() { }
 
@@ -866,74 +888,6 @@ OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * ev
 
 
 /**
- * @return a Store object to access the Nix store denoted by
- * ‘uri’ (slight misnomer...).
- */
-ref<Store> openStore(StoreReference && storeURI);
-
-
-/**
- * Opens the store at `uri`, where `uri` is in the format expected by `StoreReference::parse`
-
- */
-ref<Store> openStore(const std::string & uri = settings.storeUri.get(),
-    const Store::Params & extraParams = Store::Params());
-
-
-/**
- * @return the default substituter stores, defined by the
- * ‘substituters’ option and various legacy options.
- */
-std::list<ref<Store>> getDefaultSubstituters();
-
-struct StoreFactory
-{
-    std::set<std::string> uriSchemes;
-    /**
-     * The `authorityPath` parameter is `<authority>/<path>`, or really
-     * whatever comes after `<scheme>://` and before `?<query-params>`.
-     */
-    std::function<std::shared_ptr<Store> (
-        std::string_view scheme,
-        std::string_view authorityPath,
-        const Store::Params & params)> create;
-    std::function<std::shared_ptr<StoreConfig> ()> getConfig;
-};
-
-struct Implementations
-{
-    static std::vector<StoreFactory> * registered;
-
-    template<typename T, typename TConfig>
-    static void add()
-    {
-        if (!registered) registered = new std::vector<StoreFactory>();
-        StoreFactory factory{
-            .uriSchemes = TConfig::uriSchemes(),
-            .create =
-                ([](auto scheme, auto uri, auto & params)
-                 -> std::shared_ptr<Store>
-                 { return std::make_shared<T>(scheme, uri, params); }),
-            .getConfig =
-                ([]()
-                 -> std::shared_ptr<StoreConfig>
-                 { return std::make_shared<TConfig>(StringMap({})); })
-        };
-        registered->push_back(factory);
-    }
-};
-
-template<typename T, typename TConfig>
-struct RegisterStoreImplementation
-{
-    RegisterStoreImplementation()
-    {
-        Implementations::add<T, TConfig>();
-    }
-};
-
-
-/**
  * Display a set of paths in human-readable form (i.e., between quotes
  * and separated by commas).
  */
@@ -954,3 +908,6 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
     Store * evalStore = nullptr);
 
 }
+
+// Parses a Store URL, uses global state not pure so think about this
+JSON_IMPL(ref<const StoreConfig>)

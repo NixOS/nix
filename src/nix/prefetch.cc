@@ -1,7 +1,7 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/finally.hh"
 #include "nix/main/loggers.hh"

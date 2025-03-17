@@ -8,7 +8,7 @@
 #include "nix/util/signals.hh"
 #include "nix/expr/value-to-xml.hh"
 #include "nix/expr/value-to-json.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/cmd/legacy.hh"

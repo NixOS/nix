@@ -1,4 +1,5 @@
 #include "nix/store/build/worker.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/nar-info.hh"
 #include "nix/util/finally.hh"
@@ -121,7 +122,7 @@ Goal::Co PathSubstitutionGoal::init()
         /* Bail out early if this substituter lacks a valid
            signature. LocalStore::addToStore() also checks for this, but
            only after we've downloaded the path. */
-        if (!sub->isTrusted && worker.store.pathInfoIsUntrusted(*info))
+        if (!sub->config.isTrusted && worker.store.pathInfoIsUntrusted(*info))
         {
             warn("ignoring substitute for '%s' from '%s', as it's not signed by any of the keys in 'trusted-public-keys'",
                 worker.store.printStorePath(storePath), sub->getUri());
@@ -215,7 +216,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
             PushActivity pact(act.id);
 
             copyStorePath(*sub, worker.store,
-                subPath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
+                subPath, repair, sub->config.isTrusted ? NoCheckSigs : CheckSigs);
 
             promise.set_value();
         } catch (...) {

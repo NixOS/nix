@@ -2,29 +2,27 @@
 
 namespace nix {
 
-struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
+struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCacheStoreConfig>,
+                                    Store::Config,
+                                    BinaryCacheStoreConfig
 {
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+    static config::SettingDescriptionMap descriptions();
 
-    HttpBinaryCacheStoreConfig(std::string_view scheme, std::string_view _cacheUri, const Params & params);
+    HttpBinaryCacheStoreConfig(
+        std::string_view scheme, std::string_view cacheUri, const StoreReference::Params & params);
 
     Path cacheUri;
 
-    const std::string name() override
+    static const std::string name()
     {
         return "HTTP Binary Cache Store";
     }
 
-    static std::set<std::string> uriSchemes()
-    {
-        static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
-        auto ret = std::set<std::string>({"http", "https"});
-        if (forceHttp)
-            ret.insert("file");
-        return ret;
-    }
+    static std::set<std::string> uriSchemes();
 
-    std::string doc() override;
+    static std::string doc();
+
+    ref<Store> openStore() const override;
 };
 
 }

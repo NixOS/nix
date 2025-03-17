@@ -2,8 +2,55 @@
 
 #include "nix/store/common-ssh-store-config.hh"
 #include "nix/store/ssh.hh"
+#include "nix/store/config-parse-impl.hh"
 
 namespace nix {
+
+constexpr static const CommonSSHStoreConfigT<config::SettingInfo> commonSSHStoreConfigDescriptions = {
+    .sshKey{
+        .name = "ssh-key",
+        .description = "Path to the SSH private key used to authenticate to the remote machine.",
+    },
+    .sshPublicHostKey{
+        .name = "base64-ssh-public-host-key",
+        .description = "The public host key of the remote machine.",
+    },
+    .compress{
+        .name = "compress",
+        .description = "Whether to enable SSH compression.",
+    },
+    .remoteStore{
+        .name = "remote-store",
+        .description = R"(
+            [Store URL](@docroot@/store/types/index.md#store-url-format)
+            to be used on the remote machine. The default is `auto`
+            (i.e. use the Nix daemon or `/nix/store` directly).
+        )",
+    },
+};
+
+#define COMMON_SSH_STORE_CONFIG_FIELDS(X) X(sshKey), X(sshPublicHostKey), X(compress), X(remoteStore),
+
+MAKE_PARSE(CommonSSHStoreConfig, commonSSHStoreConfig, COMMON_SSH_STORE_CONFIG_FIELDS)
+
+static CommonSSHStoreConfigT<config::PlainValue> commonSSHStoreConfigDefaults()
+{
+    return {
+        .sshKey = {""},
+        .sshPublicHostKey = {""},
+        .compress = {false},
+        .remoteStore = {""},
+    };
+}
+
+MAKE_APPLY_PARSE(CommonSSHStoreConfig, commonSSHStoreConfig, COMMON_SSH_STORE_CONFIG_FIELDS)
+
+config::SettingDescriptionMap CommonSSHStoreConfig::descriptions()
+{
+    constexpr auto & descriptions = commonSSHStoreConfigDescriptions;
+    auto defaults = commonSSHStoreConfigDefaults();
+    return {COMMON_SSH_STORE_CONFIG_FIELDS(DESCRIBE_ROW)};
+}
 
 static std::string extractConnStr(std::string_view scheme, std::string_view _connStr)
 {
@@ -22,13 +69,14 @@ static std::string extractConnStr(std::string_view scheme, std::string_view _con
     return connStr;
 }
 
-CommonSSHStoreConfig::CommonSSHStoreConfig(std::string_view scheme, std::string_view host, const Params & params)
-    : StoreConfig(params)
-    , host(extractConnStr(scheme, host))
+CommonSSHStoreConfig::CommonSSHStoreConfig(
+    std::string_view scheme, std::string_view host, const StoreReference::Params & params)
+    : CommonSSHStoreConfigT<config::PlainValue>{commonSSHStoreConfigApplyParse(params)}
+    , host{extractConnStr(scheme, host)}
 {
 }
 
-SSHMaster CommonSSHStoreConfig::createSSHMaster(bool useMaster, Descriptor logFD)
+SSHMaster CommonSSHStoreConfig::createSSHMaster(bool useMaster, Descriptor logFD) const
 {
     return {
         host,
