@@ -218,16 +218,16 @@ std::pair<std::string_view, std::string_view> getLine(std::string_view s);
 /**
  * Get a value for the specified key from an associate container.
  */
-template <class T>
-const typename T::mapped_type * get(const T & map, const typename T::key_type & key)
+template <class T, typename K = const T::key_type &>
+const typename T::mapped_type * get(const T & map, K key)
 {
     auto i = map.find(key);
     if (i == map.end()) return nullptr;
     return &i->second;
 }
 
-template <class T>
-typename T::mapped_type * get(T & map, const typename T::key_type & key)
+template <class T, typename K = const T::key_type &>
+typename T::mapped_type * get(T & map, K key)
 {
     auto i = map.find(key);
     if (i == map.end()) return nullptr;
@@ -237,9 +237,9 @@ typename T::mapped_type * get(T & map, const typename T::key_type & key)
 /**
  * Get a value for the specified key from an associate container, or a default value if the key isn't present.
  */
-template <class T>
+template <class T, typename K = const T::key_type &>
 const typename T::mapped_type & getOr(T & map,
-    const typename T::key_type & key,
+    K key,
     const typename T::mapped_type & defaultValue)
 {
     auto i = map.find(key);

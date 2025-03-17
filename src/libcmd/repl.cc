@@ -12,7 +12,7 @@
 #include "eval-settings.hh"
 #include "attr-path.hh"
 #include "signals.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "log-store.hh"
 #include "common-eval-args.hh"
 #include "get-drvs.hh"

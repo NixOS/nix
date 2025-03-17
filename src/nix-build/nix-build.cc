@@ -12,7 +12,7 @@
 #include "current-process.hh"
 #include "parsed-derivations.hh"
 #include "derivation-options.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
 #include "realisation.hh"

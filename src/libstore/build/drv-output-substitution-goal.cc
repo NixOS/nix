@@ -3,6 +3,7 @@
 #include "worker.hh"
 #include "substitution-goal.hh"
 #include "callback.hh"
+#include "store-open.hh"
 
 namespace nix {
 
