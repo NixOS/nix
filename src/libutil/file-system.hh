@@ -105,13 +105,13 @@ std::string_view baseNameOf(std::string_view path);
  * Check whether 'path' is a descendant of 'dir'. Both paths must be
  * canonicalized.
  */
-bool isInDir(std::string_view path, std::string_view dir);
+bool isInDir(const std::filesystem::path & path, const std::filesystem::path & dir);
 
 /**
  * Check whether 'path' is equal to 'dir' or a descendant of
  * 'dir'. Both paths must be canonicalized.
  */
-bool isDirOrInDir(std::string_view path, std::string_view dir);
+bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::path & dir);
 
 /**
  * Get status of `path`.
