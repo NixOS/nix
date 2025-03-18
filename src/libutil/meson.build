@@ -66,9 +66,17 @@ endif
 
 blake3 = dependency(
   'libblake3',
-  version: '>= 1.5.5',
+  version: '>= 1.7.0',
+  method : 'pkg-config',
 )
 deps_private += blake3
+tbb = dependency(
+  'tbb',
+  version: '>= 2021_11',
+  method : 'pkg-config',
+)
+deps_private += tbb
+add_project_arguments(['-DBLAKE3_USE_TBB=1'], language: 'cpp')
 
 boost = dependency(
   'boost',

@@ -11,6 +11,7 @@
   libsodium,
   nlohmann_json,
   openssl,
+  tbb_2021_11,
 
   # Configuration Options
 
@@ -46,6 +47,7 @@ mkMesonLibrary (finalAttrs: {
     libblake3
     libsodium
     openssl
+    tbb_2021_11
   ] ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
   propagatedBuildInputs = [
