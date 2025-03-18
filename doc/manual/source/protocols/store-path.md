@@ -20,9 +20,12 @@ where
 
 - `store-dir` = the [store directory](@docroot@/store/store-path.md#store-directory)
 
-- `digest` = base-32 representation of the first 160 bits of a [SHA-256] hash of `fingerprint`
+- `digest` = base-32 representation of the compressed to 160 bits [SHA-256] hash of `fingerprint`
 
-  This the hash part of the store name
+For the definition of the hash compression algorithm, please refer to the section 5.1 of
+the [Nix thesis](https://edolstra.github.io/pubs/phd-thesis.pdf), which also defines the
+specifics of base-32 encoding. Note that base-32 encoding processes the hash bytestring from
+the end, while base-16 processes in from the beginning.
 
 ## Fingerprint
 
@@ -70,7 +73,8 @@ where
     `id` is the name of the output (usually, "out").
     For content-addressed store objects, `id`, is always "out".
 
-- `inner-digest` = base-16 representation of a SHA-256 hash of `inner-fingerprint`
+- `inner-digest` = base-16 representation of a SHA-256 hash of `inner-fingerprint`.
+  The base-16 encoding uses lower-cased hex digits.
 
 ## Inner fingerprint
 
@@ -82,7 +86,7 @@ where
 
   - if `type` = `"source:" ...`:
 
-    the hash of the [Nix Archive (NAR)] serialization of the [file system object](@docroot@/store/file-system-object.md) of the store object.
+    the [Nix Archive (NAR)] serialization of the [file system object](@docroot@/store/file-system-object.md) of the store object.
 
   - if `type` = `"output:" id`:
 
