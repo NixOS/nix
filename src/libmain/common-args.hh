@@ -29,7 +29,6 @@ struct MixDryRun : virtual Args
         addFlag({
             .longName = "dry-run",
             .description = "Show what this command would do without doing it.",
-            //.category = commonArgsCategory,
             .handler = {&dryRun, true},
         });
     }
@@ -58,7 +57,6 @@ struct MixPrintJSON : virtual Args
 
                     This option is only effective when `--json` is also specified.
                 )",
-            //.category = commonArgsCategory,
             .handler = {&outputPretty, true},
         });
         addFlag({
@@ -70,7 +68,6 @@ struct MixPrintJSON : virtual Args
 
                     See `--pretty`.
                 )",
-            //.category = commonArgsCategory,
             .handler = {&outputPretty, false},
         });
     };
@@ -103,7 +100,6 @@ struct MixJSON : virtual Args, virtual MixPrintJSON
         addFlag({
             .longName = "json",
             .description = "Produce output in JSON format, suitable for consumption by another program.",
-            //.category = commonArgsCategory,
             .handler = {&json, true},
         });
     }
