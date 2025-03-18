@@ -20,6 +20,9 @@ const int sha1HashSize = 20;
 const int sha256HashSize = 32;
 const int sha512HashSize = 64;
 
+// BLAKE3 data size threshold beyond which parallel hashing with TBB is likely faster.
+const size_t blake3TbbThreshold = 128000;
+
 extern const std::set<std::string> hashAlgorithms;
 
 extern const std::string nix32Chars;
