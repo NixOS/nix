@@ -21,6 +21,8 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#include <boost/iostreams/device/mapped_file.hpp>
+
 #ifdef _WIN32
 # include <io.h>
 #endif
@@ -273,9 +275,22 @@ std::string readFile(const std::filesystem::path & path)
     return readFile(os_string_to_string(PathViewNG { path }));
 }
 
-
-void readFile(const Path & path, Sink & sink)
+void readFile(const Path & path, Sink & sink, bool memory_map)
 {
+    // Memory-map the file for faster processing where possible.
+    if (memory_map) {
+        try {
+            boost::iostreams::mapped_file_source mmap(path);
+            if (mmap.is_open()) {
+                sink({mmap.data(), mmap.size()});
+                return;
+            }
+        } catch (const boost::exception & e) {
+        }
+        debug("memory-mapping failed for path: %s", path);
+    }
+
+    // Stream the file instead if memory-mapping fails or is disabled.
     AutoCloseFD fd = toDescriptor(open(path.c_str(), O_RDONLY
 // TODO
 #ifndef _WIN32
