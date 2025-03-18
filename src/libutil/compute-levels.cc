@@ -23,9 +23,9 @@ StringSet computeLevels() {
     if (cpu_identify(NULL, &data) < 0)
         return levels;
 
-    for (cpu_feature_level_t level = FEATURE_LEVEL_X86_64_V1; level <= FEATURE_LEVEL_X86_64_V4; level++)
+    for (auto & [level, levelString] : feature_strings)
         if (data.feature_level >= level)
-            levels.insert(feature_strings.at(level));
+            levels.insert(levelString);
 
     return levels;
 }
