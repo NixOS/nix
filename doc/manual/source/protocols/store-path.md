@@ -7,7 +7,7 @@ The format of this specification is close to [Extended Backus–Naur form](https
 Regular users do *not* need to know this information --- store paths can be treated as black boxes computed from the properties of the store objects they refer to.
 But for those interested in exactly how Nix works, e.g. if they are reimplementing it, this information can be useful.
 
-[store path](@docroot@/store/store-path.md)
+[store path]: @docroot@/store/store-path.md
 
 ## Store path proper
 
@@ -30,7 +30,7 @@ the end, while base-16 processes in from the beginning.
 ## Fingerprint
 
 - ```ebnf
-  fingerprint = type ":" sha256 ":" inner-digest ":" store ":" name
+  fingerprint = type ":sha256:" inner-digest ":" store ":" name
   ```
 
   Note that it includes the location of the store as well as the name to make sure that changes to either of those are reflected in the hash
