@@ -198,7 +198,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             visit(*cursor, cursor->getAttrPath(), true);
 
         if (json)
-            logger->cout("%s", *jsonOut);
+            printJSON(*jsonOut);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");
