@@ -127,6 +127,7 @@ struct PathInputScheme : InputScheme
             if (!input.parent)
                 throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
 
+<<<<<<< HEAD
             auto parent = canonPath(*input.parent);
 
             // the path isn't relative, prefix it
@@ -142,6 +143,9 @@ struct PathInputScheme : InputScheme
             absPath = path;
 
         Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s'", absPath));
+=======
+        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying %s to the store", absPath));
+>>>>>>> 314e9fbed (libfetchers: fix double quote in path printed in logger)
 
         // FIXME: check whether access to 'path' is allowed.
         auto storePath = store->maybeParseStorePath(absPath);
