@@ -151,6 +151,13 @@ struct LocalDerivationGoal : DerivationGoal, RestrictionContext
     std::shared_ptr<AutoDelete> autoDelChroot;
 
     /**
+     * The sort of derivation we are building.
+     *
+     * Just a cached value, can be recomputed from `drv`.
+     */
+    std::optional<DerivationType> derivationType;
+
+    /**
      * Stuff we need to pass to initChild().
      */
     struct ChrootPath {
@@ -478,7 +485,8 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
         co_return tryToBuild();
     }
 
-    assert(derivationType);
+    /* Cache this */
+    derivationType = drv->type();
 
     /* Are we doing a chroot build? */
     {
