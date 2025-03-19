@@ -37,6 +37,8 @@ struct LocalStoreAccessor : PosixSourceAccessor
         , store(store)
         , requireValidPath(requireValidPath)
     {
+        // Not `realStoreDir`, because this is where the store objects "morally" reside.
+        ownLocationForSymlinkResolution = store->storeDir;
     }
 
 

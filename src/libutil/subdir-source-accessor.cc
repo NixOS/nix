@@ -13,6 +13,8 @@ struct SubdirSourceAccessor : SourceAccessor
         , subdirectory(std::move(subdirectory))
     {
         displayPrefix.clear();
+
+        ownLocationForSymlinkResolution = this->parent->ownLocationForSymlinkResolution + subdirectory.abs();
     }
 
     std::string readFile(const CanonPath & path) override

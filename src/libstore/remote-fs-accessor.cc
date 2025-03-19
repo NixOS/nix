@@ -15,6 +15,9 @@ RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, bool requireValidPath, cons
 {
     if (cacheDir != "")
         createDirs(cacheDir);
+
+    // Not `realStoreDir`, because this is where the store objects "morally" reside.
+    ownLocationForSymlinkResolution = store->storeDir;
 }
 
 Path RemoteFSAccessor::makeCacheFile(std::string_view hashPart, const std::string & ext)
