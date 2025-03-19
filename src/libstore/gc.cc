@@ -245,7 +245,7 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
             else {
                 target = absPath(target, dirOf(path));
                 if (!pathExists(target)) {
-                    if (isInDir(path, stateDir + "/" + gcRootsDir + "/auto")) {
+                    if (isInDir(path, std::filesystem::path{stateDir.get()} / gcRootsDir / "auto")) {
                         printInfo("removing stale link from '%1%' to '%2%'", path, target);
                         unlink(path.c_str());
                     }
