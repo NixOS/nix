@@ -125,7 +125,7 @@ struct PathInputScheme : InputScheme
 
         auto absPath = getAbsPath(input);
 
-        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to the store", absPath));
+        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying %s to the store", absPath));
 
         // FIXME: check whether access to 'path' is allowed.
         auto storePath = store->maybeParseStorePath(absPath.string());
