@@ -146,7 +146,7 @@ inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view e
 [[gnu::always_inline]]
 inline CallDepth EvalState::addCallDepth(const PosIdx pos) {
     if (callDepth > settings.maxCallDepth)
-        error<EvalError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
+        error<EvalBaseError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
 
     return CallDepth(callDepth);
 };
