@@ -105,7 +105,7 @@ cpuid_required = get_option('cpuid')
 if host_machine.cpu_family() != 'x86_64' and cpuid_required.enabled()
   warning('Force-enabling seccomp on non-x86_64 does not make sense')
 endif
-cpuid = dependency('libcpuid', 'cpuid', required : cpuid_required)
+cpuid = dependency('libcpuid', 'cpuid', version : '>= 0.7.0', required : cpuid_required)
 configdata.set('HAVE_LIBCPUID', cpuid.found().to_int())
 deps_private += cpuid
 
