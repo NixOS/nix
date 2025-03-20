@@ -323,7 +323,7 @@ Logger * makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefi
         ? connect(path)
         : toDescriptor(open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0644));
     if (!fd)
-        throw SysError("opening log file '%1%'", path);
+        throw SysError("opening log file %1%", path);
 
     return new JSONFileLogger(std::move(fd), includeNixPrefix);
 }
