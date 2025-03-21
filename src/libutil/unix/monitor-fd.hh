@@ -52,8 +52,10 @@ public:
                     ;
 
                 auto count = poll(fds, 2, -1);
-                if (count == -1)
-                    unreachable(); // can't happen
+                if (count == -1) {
+                    if (errno == EINTR || errno == EAGAIN) continue;
+                    throw SysError("failed to poll() in MonitorFdHup");
+                }
                 /* This shouldn't happen, but can on macOS due to a bug.
                    See rdar://37550628.
 
