@@ -36,6 +36,7 @@ nix shell -f shell-hello.nix hello -c env > "$TEST_ROOT/actual-env"
 # - __CF_USER_TEXT_ENCODING is set by macOS and is beyond our control
 sed -i \
   -e 's/PATH=.*/PATH=.../' \
+  -e '/^IN_NIX_SHELL=.*/d' \
   -e 's/_=.*/_=.../' \
   -e '/^TMPDIR=\/var\/folders\/.*/d' \
   -e '/^__CF_USER_TEXT_ENCODING=.*$/d' \
