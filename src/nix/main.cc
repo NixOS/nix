@@ -20,6 +20,7 @@
 #include "flake/flake.hh"
 #include "self-exe.hh"
 #include "json-utils.hh"
+#include "crash-handler.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -353,6 +354,8 @@ static auto rCmdHelpStores = registerCommand<CmdHelpStores>("help-stores");
 void mainWrapped(int argc, char * * argv)
 {
     savedArgv = argv;
+
+    registerCrashHandler();
 
     /* The chroot helper needs to be run before any threads have been
        started. */
