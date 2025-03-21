@@ -33,7 +33,7 @@ std::optional<Mode> decodeMode(RawMode m) {
 static std::string getStringUntil(Source & source, char byte)
 {
     std::string s;
-    char n[1];
+    char n[1] = { 0 };
     source(std::string_view { n, 1 });
     while (*n != byte) {
         s += *n;
