@@ -22,6 +22,11 @@ cat >"$flake1Dir/flake.nix" <<EOF
         echo true > \$out
       '';
     };
+    stack-depth =
+      let
+        f = x: if x == 0 then true else f (x - 1);
+      in
+        assert (f 100); self.drv;
     ifd = assert (import self.drv); self.drv;
   };
 }
@@ -32,6 +37,12 @@ git -C "$flake1Dir" commit -m "Init"
 
 expect 1 nix build "$flake1Dir#foo.bar" 2>&1 | grepQuiet 'error: breaks'
 expect 1 nix build "$flake1Dir#foo.bar" 2>&1 | grepQuiet 'error: breaks'
+
+# Stack overflow error must not be cached
+expect 1 nix build --max-call-depth 50 "$flake1Dir#stack-depth" 2>&1 \
+  | grepQuiet 'error: stack overflow; max-call-depth exceeded'
+# If the SO is cached, the following invocation will produce a cached failure; we expect it to succeed
+nix build --no-link "$flake1Dir#stack-depth"
 
 # Conditional error should not be cached
 expect 1 nix build "$flake1Dir#ifd" --option allow-import-from-derivation false 2>&1 \
