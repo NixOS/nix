@@ -1649,7 +1649,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                 if (countCalls) primOpCalls[fn->name]++;
 
                 try {
-                    fn->fun(*this, vCur.determinePos(noPos), args.data(), vCur);
+                    fn->fun(*this, vCur.determinePos(pos), args.data(), vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
@@ -1697,7 +1697,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                     // 1. Unify this and above code. Heavily redundant.
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2 etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
-                    fn->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
+                    fn->fun(*this, vCur.determinePos(pos), vArgs, vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
@@ -1760,7 +1760,6 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
     SmallValueVector<4> vArgs(args.size());
     for (size_t i = 0; i < args.size(); ++i)
         vArgs[i] = args[i]->maybeThunk(state, env);
-
     state.callFunction(vFun, vArgs, v, pos);
 }
 

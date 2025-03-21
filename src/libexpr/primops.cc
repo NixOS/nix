@@ -14,6 +14,8 @@
 #include "value-to-xml.hh"
 #include "primops.hh"
 #include "fetch-to-store.hh"
+#include "terminal.hh"
+#include <span>
 
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
@@ -512,6 +514,97 @@ static RegisterPrimOp primop_isFunction({
     )",
     .fun = prim_isFunction,
 });
+
+void prim_isThunk(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    auto &arg = *args[0];
+    v.mkBool(arg.isThunk());
+}
+
+static RegisterPrimOp primop_isThunk({
+    .name = "isThunk",
+    .args = {"v"},
+    .doc = R"(
+      Returns `true` if the argument is a thunk, `false` otherwise.
+
+      This is internal, because the thunk-ness of a value is not a stable property, while the Nix language is meant to be referentially transparent.
+    )",
+    .fun = prim_isThunk,
+    .internal = true
+});
+
+void prim_printValue(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    auto &arg = *args[0];
+    std::stringstream ss;
+    printValue(state, ss, arg);
+    v.mkString(ss.str());
+}
+
+static RegisterPrimOp primop_printValue({
+    .name = "printValue",
+    .args = {"v"},
+    .doc = R"(
+      Print any value to an informative string.
+
+      This is internal, because the format is not a stable behavior, while the Nix language is meant to be stable over time.
+    )",
+    .fun = prim_printValue,
+    .internal = true
+});
+
+
+/* Determine whether the argument is an integer. */
+static void prim_seqWithCallPos(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    auto p = args[0];
+    auto f = args[1];
+    auto a = args[2];
+    state.forceValue(*args[0], pos);
+    state.forceValue(*args[1], pos);
+    auto intro_args = state.buildBindings(4);
+    auto pos_attrs = state.allocValue();
+    intro_args.insert(state.symbols.create("pos"), pos_attrs, noPos);
+
+    auto vIsThunk = get(state.internalPrimOps, "isThunk");
+    assert(vIsThunk);
+    intro_args.insert(state.symbols.create("isThunk"), *vIsThunk, noPos);
+
+    auto vPrintValue = get(state.internalPrimOps, "printValue");
+    assert(vPrintValue);
+    intro_args.insert(state.symbols.create("printValue"), *vPrintValue, noPos);
+
+    auto [rows,cols] = getWindowSize();
+    auto vCols = state.allocValue();
+    vCols->mkInt(cols);
+    intro_args.insert(state.symbols.create("terminalWidth"), vCols , noPos);
+
+    Value intro_args_value;
+    intro_args_value.mkAttrs(intro_args);
+    state.mkPos(*pos_attrs, pos);
+
+    Value * pargs[2] = {&intro_args_value, a};
+
+    Value * _pRes = state.allocValue();
+    try {
+        state.callFunction(*p, std::span<Value *>(pargs, 2), *_pRes, pos);
+    } catch (Error & e) {
+        e.addTrace(state.positions[pos], "while calling the first function passed to builtins.seqWithCallPos");
+        ignoreExceptionExceptInterrupt(lvlDebug);
+    }
+
+    state.callFunction(*f, *a, v, pos);
+}
+
+static RegisterPrimOp primop_seqWithCallPos({
+    .name = "__seqWithCallPos",
+    .args = {"p", "f", "a"},
+    .doc = R"(
+      Stuff
+    )",
+    .fun = prim_seqWithCallPos,
+});
+
 
 /* Determine whether the argument is an integer. */
 static void prim_isInt(EvalState & state, const PosIdx pos, Value * * args, Value & v)
