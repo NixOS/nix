@@ -54,17 +54,19 @@ enum struct JobCategory {
 
 struct Goal : public std::enable_shared_from_this<Goal>
 {
+private:
+    /**
+     * Goals that this goal is waiting for.
+     */
+    Goals waitees;
+
+public:
     typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure} ExitCode;
 
     /**
      * Backlink to the worker.
      */
     Worker & worker;
-
-    /**
-     * Goals that this goal is waiting for.
-     */
-    Goals waitees;
 
     /**
      * Goals waiting for this one to finish.  Must use weak pointers
@@ -104,8 +106,8 @@ protected:
      * Build result.
      */
     BuildResult buildResult;
-public:
 
+public:
     /**
      * Suspend our goal and wait until we get `work`-ed again.
      * `co_await`-able by @ref Co.
@@ -332,6 +334,7 @@ public:
         std::suspend_always await_transform(Suspend) { return {}; };
     };
 
+protected:
     /**
      * The coroutine being currently executed.
      * MUST be updated when switching the coroutine being executed.
@@ -359,6 +362,7 @@ public:
      */
     Done amDone(ExitCode result, std::optional<Error> ex = {});
 
+public:
     virtual void cleanup() { }
 
     /**
@@ -394,10 +398,6 @@ public:
 
     void work();
 
-    void addWaitee(GoalPtr waitee);
-
-    void waiteeDone(GoalPtr waitee, ExitCode result);
-
     virtual void handleChildOutput(Descriptor fd, std::string_view data)
     {
         unreachable();
@@ -429,6 +429,13 @@ public:
      * @see JobCategory
      */
     virtual JobCategory jobCategory() const = 0;
+
+protected:
+    Co await(Goals waitees);
+
+    Co waitForAWhile();
+    Co waitForBuildSlot();
+    Co yield();
 };
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);
