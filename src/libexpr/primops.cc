@@ -981,6 +981,58 @@ static RegisterPrimOp primop_tryEval({
     .fun = prim_tryEval,
 });
 
+/* Similar to `builtins.tryEval` but catches more, `value` attribute provided only on success. */
+static void prim_catchEvalError(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    auto attrs = state.buildBindings(2);
+
+    /* increment state.trylevel, and decrement it when this function returns. */
+    MaintainCount trylevel(state.trylevel);
+
+    ReplExitStatus (* savedDebugRepl)(ref<EvalState> es, const ValMap & extraEnv) = nullptr;
+    if (state.debugRepl && state.settings.ignoreExceptionsDuringTry)
+    {
+        /* to prevent starting the repl from exceptions withing a tryEval, null it. */
+        savedDebugRepl = state.debugRepl;
+        state.debugRepl = nullptr;
+    }
+
+    try {
+        state.forceValue(*args[0], pos);
+        attrs.insert(state.sValue, args[0]);
+        attrs.insert(state.symbols.create("success"), &state.vTrue);
+    } catch (EvalError & e) {
+        attrs.insert(state.symbols.create("success"), &state.vFalse);
+    } catch (FileNotFound & e) {
+        attrs.insert(state.symbols.create("success"), &state.vFalse);
+    }
+
+    // restore the debugRepl pointer if we saved it earlier.
+    if (savedDebugRepl)
+        state.debugRepl = savedDebugRepl;
+
+    v.mkAttrs(attrs);
+}
+
+static RegisterPrimOp primop_catchEvalError({
+    .name = "__catchEvalError",
+    .args = {"e"},
+    .doc = R"(
+        Similar to `builtins.tryEval` except that it catches
+        - `throw`
+        - `assert`
+        - `abort`
+        - missing attribute
+        - out of bounds indexing
+        - file not found such as `import` and `builtins.readFile`
+        - deserialization such as `builtins.fromJSON`
+        - detectable infinite recursion
+
+        And that `value` attribute exists only on success.
+    )",
+    .fun = prim_catchEvalError,
+});
+
 /* Return an environment variable.  Use with care. */
 static void prim_getEnv(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {

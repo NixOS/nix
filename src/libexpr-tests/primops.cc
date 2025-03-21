@@ -63,6 +63,91 @@ namespace nix {
         ASSERT_THAT(v, IsIntEq(1));
     }
 
+    TEST_F(PrimOpTest, catchEvalErrorFailureThrow) {
+        auto v = eval("builtins.catchEvalError (throw \"\")");
+        ASSERT_THAT(v, IsAttrsOfSize(1));
+        auto s = createSymbol("success");
+        auto p = v.attrs()->get(s);
+        ASSERT_NE(p, nullptr);
+        ASSERT_THAT(*p->value, IsFalse());
+    }
+
+    TEST_F(PrimOpTest, catchEvalErrorFailureAbort) {
+        auto v = eval("builtins.catchEvalError (abort \"\")");
+        ASSERT_THAT(v, IsAttrsOfSize(1));
+        auto s = createSymbol("success");
+        auto p = v.attrs()->get(s);
+        ASSERT_NE(p, nullptr);
+        ASSERT_THAT(*p->value, IsFalse());
+    }
+
+    TEST_F(PrimOpTest, catchEvalErrorFailureMissingAttr) {
+        auto v = eval("builtins.catchEvalError {}.a");
+        ASSERT_THAT(v, IsAttrsOfSize(1));
+        auto s = createSymbol("success");
+        auto p = v.attrs()->get(s);
+        ASSERT_NE(p, nullptr);
+        ASSERT_THAT(*p->value, IsFalse());
+    }
+
+    TEST_F(PrimOpTest, catchEvalErrorFailureImportFileNotFound) {
+        auto v = eval("builtins.catchEvalError (import /does-not-exist)");
+        ASSERT_THAT(v, IsAttrsOfSize(1));
+        auto s = createSymbol("success");
+        auto p = v.attrs()->get(s);
+        ASSERT_NE(p, nullptr);
+        ASSERT_THAT(*p->value, IsFalse());
+    }
+
+    TEST_F(PrimOpTest, catchEvalErrorFailureReadFileFileNotFound) {
+        auto v = eval("builtins.catchEvalError (builtins.readFile /does-not-exist)");
+        ASSERT_THAT(v, IsAttrsOfSize(1));
+        auto s = createSymbol("success");
+        auto p = v.attrs()->get(s);
+        ASSERT_NE(p, nullptr);
+        ASSERT_THAT(*p->value, IsFalse());
+    }
+
+    TEST_F(PrimOpTest, catchEvalErrorFailureFromJSON) {
+        auto v = eval("builtins.catchEvalError (builtins.fromJSON \"{\")");
+        ASSERT_THAT(v, IsAttrsOfSize(1));
+        auto s = createSymbol("success");
+        auto p = v.attrs()->get(s);
+        ASSERT_NE(p, nullptr);
+        ASSERT_THAT(*p->value, IsFalse());
+    }
+
+    TEST_F(PrimOpTest, catchEvalErrorFailureInfRec) {
+        auto v = eval("builtins.catchEvalError (let a = b; b = a; in a)");
+        ASSERT_THAT(v, IsAttrsOfSize(1));
+        auto s = createSymbol("success");
+        auto p = v.attrs()->get(s);
+        ASSERT_NE(p, nullptr);
+        ASSERT_THAT(*p->value, IsFalse());
+    }
+
+    TEST_F(PrimOpTest, catchEvalErrorFailureOutOfBounds) {
+        auto v = eval("builtins.catchEvalError (builtins.head [])");
+        ASSERT_THAT(v, IsAttrsOfSize(1));
+        auto s = createSymbol("success");
+        auto p = v.attrs()->get(s);
+        ASSERT_NE(p, nullptr);
+        ASSERT_THAT(*p->value, IsFalse());
+    }
+
+    TEST_F(PrimOpTest, catchEvalErrorSuccess) {
+        auto v = eval("builtins.catchEvalError 123");
+        ASSERT_THAT(v, IsAttrs());
+        auto s = createSymbol("success");
+        auto p = v.attrs()->get(s);
+        ASSERT_NE(p, nullptr);
+        ASSERT_THAT(*p->value, IsTrue());
+        s = createSymbol("value");
+        p = v.attrs()->get(s);
+        ASSERT_NE(p, nullptr);
+        ASSERT_THAT(*p->value, IsIntEq(123));
+    }
+
     TEST_F(PrimOpTest, tryEvalFailure) {
         auto v = eval("builtins.tryEval (throw \"\")");
         ASSERT_THAT(v, IsAttrsOfSize(2));
