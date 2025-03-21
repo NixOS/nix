@@ -248,7 +248,7 @@ LocalStore::LocalStore(
     else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
         openDB(*state, true);
-        writeFile(schemaPath, fmt("%1%", nixSchemaVersion), 0666, true);
+        writeFile(schemaPath, fmt("%1%", curSchema), 0666, true);
     }
 
     else if (curSchema < nixSchemaVersion) {
