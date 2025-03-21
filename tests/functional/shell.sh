@@ -21,7 +21,7 @@ nix shell -f shell-hello.nix 'hello^*' -c hello2 | grep 'Hello2'
 nix shell -f shell-hello.nix hello-symlink -c hello | grep 'Hello World'
 
 # Test that symlinks outside of the store don't work.
-expect 1 nix shell -f shell-hello.nix forbidden-symlink -c hello 2>&1 | grepQuiet "is not in the Nix store"
+expect 1 nix shell -f shell-hello.nix forbidden-symlink -c hello 2>&1 | grepQuiet "points outside source tree"
 
 # Test that we're not setting any more environment variables than necessary.
 # For instance, we might set an environment variable temporarily to affect some

@@ -114,9 +114,30 @@ CanonPath SourceAccessor::resolveSymlinks(
                     if (!linksAllowed--)
                         throw Error("infinite symlink recursion in path '%s'", showPath(path));
                     auto target = readLink(res);
-                    res.pop();
-                    if (isAbsolute(target))
+                    if (isAbsolute(target)) {
+                        /* TODO need to support windows paths without making
+                           Unix incorrect. The problem is we don't know
+                           whether the target (which is *not* a
+                           `CanonPath`) is a Windows or Unix path.
+                           Because of remote FSes on other OSes, and
+                           abstract FS (which should have
+                           host-OS-agnostic designs), we cannot simply
+                           use whether we are running on Unix or Windows
+                           for this. */
+                        std::filesystem::path target2{target};
+                        if (!isDirOrInDir(target2, ownLocationForSymlinkResolution)) {
+                            throw Error(
+                                "cannot resolve '%s': "
+                                "symlink target '%s' points outside source tree that is considered to reside at '%s'",
+                                showPath(path),
+                                target,
+                                ownLocationForSymlinkResolution.string());
+                        }
+                        target = "/" + target2.lexically_relative(ownLocationForSymlinkResolution).string();
                         res = CanonPath::root;
+                    } else {
+                        res.pop();
+                    }
                     todo.splice(todo.begin(), tokenizeString<std::list<std::string>>(target, "/"));
                 }
             }
