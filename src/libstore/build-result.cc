@@ -32,7 +32,14 @@ void to_json(nlohmann::json & json, const KeyedBuildResult & buildResult)
             [&](const DerivedPathOpaque & opaque) { path["opaque"] = opaque.path.to_string(); },
             [&](const DerivedPathBuilt & drv) {
                 path["drvPath"] = drv.drvPath->getBaseStorePath().to_string();
-                path["outputs"] = drv.outputs.to_string();
+                path["outputs"] = drv.outputs;
+                auto outputs = nlohmann::json::object();
+                for (auto & [name, output] : buildResult.builtOutputs)
+                    outputs[name] = {
+                        {"path", output.outPath.to_string()},
+                        {"signatures", output.signatures},
+                    };
+                json["builtOutputs"] = std::move(outputs);
             },
         },
         buildResult.path.raw());
