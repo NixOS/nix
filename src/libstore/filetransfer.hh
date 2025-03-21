@@ -77,7 +77,7 @@ struct FileTransferRequest
     FileTransferRequest(std::string_view uri)
         : uri(uri), parentAct(getCurActivity()) { }
 
-    std::string verb()
+    std::string verb() const
     {
         return data ? "upload" : "download";
     }
