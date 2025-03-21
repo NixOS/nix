@@ -36,11 +36,7 @@ public:
     Co init() override;
     Co realisationFetched(Goals waitees, std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub);
 
-    void timedOut(Error && ex) override { unreachable(); };
-
     std::string key() override;
-
-    void handleEOF(Descriptor fd) override;
 
     JobCategory jobCategory() const override {
         return JobCategory::Substitution;
