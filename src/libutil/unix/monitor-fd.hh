@@ -19,14 +19,17 @@ class MonitorFdHup
 {
 private:
     std::thread thread;
+    Pipe notifyPipe;
 
 public:
     MonitorFdHup(int fd)
     {
-        thread = std::thread([fd]() {
+        notifyPipe.create();
+        thread = std::thread([this, fd]() {
             while (true) {
                 /* Wait indefinitely until a POLLHUP occurs. */
-                struct pollfd fds[1];
+                struct pollfd fds[2];
+
                 fds[0].fd = fd;
                 /* Polling for no specific events (i.e. just waiting
                    for an error/hangup) doesn't work on macOS
@@ -39,10 +42,20 @@ public:
                     0
                     #endif
                     ;
-                auto count = poll(fds, 1, -1);
-                if (count == -1)
-                    unreachable();
+                fds[1].fd = notifyPipe.readSide.get();
+                fds[1].events =
+                    #ifdef __APPLE__
+                    POLLRDNORM
+                    #else
+                    0
+                    #endif
+                    ;
 
+                auto count = poll(fds, 2, -1);
+                if (count == -1) {
+                    if (errno == EINTR || errno == EAGAIN) continue;
+                    throw SysError("failed to poll() in MonitorFdHup");
+                }
                 /* This shouldn't happen, but can on macOS due to a bug.
                    See rdar://37550628.
 
@@ -55,6 +68,9 @@ public:
                     unix::triggerInterrupt();
                     break;
                 }
+                if (fds[1].revents & POLLHUP) {
+                    break;
+                }
                 /* This will only happen on macOS. We sleep a bit to
                    avoid waking up too often if the client is sending
                    input. */
@@ -65,7 +81,7 @@ public:
 
     ~MonitorFdHup()
     {
-        pthread_cancel(thread.native_handle());
+        close(notifyPipe.writeSide.get());
         thread.join();
     }
 };
