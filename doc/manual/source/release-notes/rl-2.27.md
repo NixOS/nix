@@ -30,9 +30,9 @@
 
   The evaluator now presents a "union" filesystem view of the `/nix/store` in the host and the chroot.
 
-  This change also removes some hacks that broke `builtins.{path,filterSource}` in chroot stores [#11503](https://github.com/NixOS/nix/issue/11503).
+  This change also removes some hacks that broke `builtins.{path,filterSource}` in chroot stores [#11503](https://github.com/NixOS/nix/issues/11503).
 
-- `nix flake prefetch` now has a `--out-link` option [#12443](https://github.com/NixOS/nix/issue/12443)
+- `nix flake prefetch` now has a `--out-link` option [#12443](https://github.com/NixOS/nix/pull/12443)
 
 - Set `FD_CLOEXEC` on sockets created by curl [#12439](https://github.com/NixOS/nix/pull/12439)
 
