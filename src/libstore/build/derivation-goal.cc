@@ -5,30 +5,16 @@
 #include "processes.hh"
 #include "config-global.hh"
 #include "worker.hh"
-#include "builtins.hh"
-#include "builtins/buildenv.hh"
-#include "references.hh"
-#include "finally.hh"
 #include "util.hh"
-#include "archive.hh"
 #include "compression.hh"
 #include "common-protocol.hh"
 #include "common-protocol-impl.hh"
-#include "topo-sort.hh"
-#include "callback.hh"
 #include "local-store.hh" // TODO remove, along with remaining downcasts
-
-#include <regex>
-#include <queue>
 
 #include <fstream>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
-
-#ifndef _WIN32 // TODO abstract over proc exit status
-#  include <sys/wait.h>
-#endif
 
 #include <nlohmann/json.hpp>
 
@@ -872,11 +858,7 @@ void runPostBuildHook(
 }
 
 
-void appendLogTailErrorMsg(
-    Worker & worker,
-    const StorePath & drvPath,
-    const std::list<std::string> & logTail,
-    std::string & msg)
+void DerivationGoal::appendLogTailErrorMsg(std::string & msg)
 {
     if (!logger->isVerbose() && !logTail.empty()) {
         msg += fmt(";\nlast %d log lines:\n", logTail.size());
@@ -940,7 +922,7 @@ Goal::Co DerivationGoal::hookDone()
             Magenta(worker.store.printStorePath(drvPath)),
             statusToString(status));
 
-        appendLogTailErrorMsg(worker, drvPath, logTail, msg);
+        appendLogTailErrorMsg(msg);
 
         outputLocks.unlock();
 

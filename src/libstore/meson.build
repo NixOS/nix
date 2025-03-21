@@ -256,6 +256,7 @@ include_dirs = [
 headers = [config_h] + files(
   'binary-cache-store.hh',
   'build-result.hh',
+  'build/derivation-building-misc.hh',
   'build/derivation-goal.hh',
   'build/drv-output-substitution-goal.hh',
   'build/goal.hh',
