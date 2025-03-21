@@ -28,6 +28,7 @@ suites += {
     'commit-lock-file-summary.sh',
     'non-flake-inputs.sh',
     'relative-paths.sh',
+    'relative-paths-lockfile.sh',
     'symlink-paths.sh',
     'debugger.sh'
   ],
