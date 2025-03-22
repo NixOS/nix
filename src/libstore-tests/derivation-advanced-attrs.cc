@@ -81,10 +81,11 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_defaults)
 
         auto drvPath = writeDerivation(*store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options =
+            DerivationOptions::fromStructuredAttrs(*store, got.env, parsedDrv ? &*parsedDrv : nullptr);
 
-        EXPECT_TRUE(!parsedDrv.hasStructuredAttrs());
+        EXPECT_TRUE(!parsedDrv);
 
         EXPECT_EQ(options.additionalSandboxProfile, "");
         EXPECT_EQ(options.noChroot, false);
@@ -116,12 +117,13 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes)
 
         auto drvPath = writeDerivation(*store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options =
+            DerivationOptions::fromStructuredAttrs(*store, got.env, parsedDrv ? &*parsedDrv : nullptr);
 
         StringSet systemFeatures{"rainbow", "uid-range"};
 
-        EXPECT_TRUE(!parsedDrv.hasStructuredAttrs());
+        EXPECT_TRUE(!parsedDrv);
 
         EXPECT_EQ(options.additionalSandboxProfile, "sandcastle");
         EXPECT_EQ(options.noChroot, true);
@@ -157,10 +159,11 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_structuredAttr
 
         auto drvPath = writeDerivation(*store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options =
+            DerivationOptions::fromStructuredAttrs(*store, got.env, parsedDrv ? &*parsedDrv : nullptr);
 
-        EXPECT_TRUE(parsedDrv.hasStructuredAttrs());
+        EXPECT_TRUE(parsedDrv);
 
         EXPECT_EQ(options.additionalSandboxProfile, "");
         EXPECT_EQ(options.noChroot, false);
@@ -191,12 +194,13 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_structuredAttr
 
         auto drvPath = writeDerivation(*store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options =
+            DerivationOptions::fromStructuredAttrs(*store, got.env, parsedDrv ? &*parsedDrv : nullptr);
 
         StringSet systemFeatures{"rainbow", "uid-range"};
 
-        EXPECT_TRUE(parsedDrv.hasStructuredAttrs());
+        EXPECT_TRUE(parsedDrv);
 
         EXPECT_EQ(options.additionalSandboxProfile, "sandcastle");
         EXPECT_EQ(options.noChroot, true);
