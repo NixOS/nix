@@ -767,7 +767,22 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     auto conn(getConnection());
     conn->putBuildDerivationRequest(*this, &conn.daemonException, drvPath, drv, buildMode);
     conn.processStderr();
-    return WorkerProto::Serialise<BuildResult>::read(*this, *conn);
+    return conn->getBuildDerivationResponse(*this, &conn.daemonException);
+}
+
+
+std::function<BuildResult()> RemoteStore::buildDerivationAsync(
+    const StorePath & drvPath, const BasicDerivation & drv,
+    BuildMode buildMode)
+{
+    // Until we have C++23 std::move_only_function
+    auto conn = std::make_shared<ConnectionHandle>(getConnection());
+    (*conn)->putBuildDerivationRequest(*this, &conn->daemonException, drvPath, drv, buildMode);
+    conn->processStderr();
+
+    return [this,conn]() -> BuildResult {
+        return (*conn)->getBuildDerivationResponse(*this, &conn->daemonException);
+    };
 }
 
 
