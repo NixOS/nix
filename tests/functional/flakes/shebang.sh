@@ -69,7 +69,7 @@ EOF
 cat >> "$scriptDir/shebang-inline-expr.sh" <<"EOF"
 #! nix --offline shell
 #! nix --impure --expr ``
-#! nix let flake = (builtins.getFlake (toString ../flake1)).packages;
+#! nix let flake = (builtins.getFlake ../flake1).packages;
 #! nix     fooScript = flake.${builtins.currentSystem}.fooScript;
 #! nix     /* just a comment !@#$%^&*()__+ # */
 #! nix  in fooScript
