@@ -1131,6 +1131,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 {
     bool showLegacy = false;
     bool showAllSystems = false;
+    bool evaluateImportFromDerivation = false;
 
     CmdFlakeShow()
     {
@@ -1143,6 +1144,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             .longName = "all-systems",
             .description = "Show the contents of outputs for all systems.",
             .handler = {&showAllSystems, true}
+        });
+        addFlag({
+            .longName = "evaluate-import-from-derivation",
+            .description = "Show the contents of outputs which require builds to evaluate.",
+            .handler = {&evaluateImportFromDerivation, true}
         });
     }
 
@@ -1160,7 +1166,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
     void run(nix::ref<nix::Store> store) override
     {
-        evalSettings.enableImportFromDerivation.setDefault(false);
+        evalSettings.enableImportFromDerivation.setDefault(evaluateImportFromDerivation);
 
         auto state = getEvalState();
         auto flake = std::make_shared<LockedFlake>(lockFlake());
@@ -1329,18 +1335,34 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
                         }
                     } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else
-                            throw Error("expected a derivation");
+                        try {
+                            if (visitor.isDerivation())
+                                showDerivation();
+                            else
+                                throw Error("expected a derivation");
+                        } catch (IFDError & e) {
+                            if (!json) {
+                                logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--evaluate-import-from-derivation' to show)", headerPrefix));
+                            } else {
+                                logger->warn(fmt("%s omitted (use '--evaluate-import-from-derivation' to show)", concatStringsSep(".", attrPathS))); 
+                            }
+                        }
                     }
                 }
 
                 else if (attrPath.size() > 0 && attrPathS[0] == "hydraJobs") {
-                    if (visitor.isDerivation())
-                        showDerivation();
-                    else
-                        recurse();
+                    try {
+                        if (visitor.isDerivation())
+                            showDerivation();
+                        else
+                            recurse();
+                    } catch (IFDError & e) {
+                        if (!json) {
+                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--evaluate-import-from-derivation' to show)", headerPrefix));
+                        } else {
+                            logger->warn(fmt("%s omitted (use '--evaluate-import-from-derivation' to show)", concatStringsSep(".", attrPathS))); 
+                        }
+                    }
                 }
 
                 else if (attrPath.size() > 0 && attrPathS[0] == "legacyPackages") {
@@ -1359,11 +1381,19 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
                         }
                     } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else if (attrPath.size() <= 2)
-                            // FIXME: handle recurseIntoAttrs
-                            recurse();
+                        try {
+                            if (visitor.isDerivation())
+                                showDerivation();
+                            else if (attrPath.size() <= 2)
+                                // FIXME: handle recurseIntoAttrs
+                                recurse();
+                        } catch (IFDError & e) {
+                            if (!json) {
+                                logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--evaluate-import-from-derivation' to show)", headerPrefix));
+                            } else {
+                                logger->warn(fmt("%s omitted (use '--evaluate-import-from-derivation' to show)", concatStringsSep(".", attrPathS))); 
+                            }
+                        }
                     }
                 }
 

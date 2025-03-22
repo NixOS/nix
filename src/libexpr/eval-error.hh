@@ -54,6 +54,7 @@ MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, EvalError);
 MakeError(MissingArgumentError, EvalError);
 MakeError(InfiniteRecursionError, EvalError);
+MakeError(IFDError, EvalBaseError);
 
 struct InvalidPathError : public EvalError
 {
