@@ -25,19 +25,22 @@ public:
         thread = std::thread([fd]() {
             while (true) {
                 /* Wait indefinitely until a POLLHUP occurs. */
-                struct pollfd fds[1];
-                fds[0].fd = fd;
+                struct pollfd fds[1] = {
+                    {
+                        .fd = fd,
+                        .events =
                 /* Polling for no specific events (i.e. just waiting
                    for an error/hangup) doesn't work on macOS
                    anymore. So wait for read events and ignore
                    them. */
-                fds[0].events =
 #ifdef __APPLE__
-                    POLLRDNORM
+                            POLLRDNORM,
 #else
-                    0
+                            0,
 #endif
-                    ;
+                    },
+                };
+
                 auto count = poll(fds, 1, -1);
                 if (count == -1) {
                     if (errno == EINTR || errno == EAGAIN)
