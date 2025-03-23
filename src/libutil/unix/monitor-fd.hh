@@ -98,11 +98,24 @@ public:
                 if (fds[1].revents & POLLHUP) {
                     break;
                 }
-                // On macOS, it is possible (although not observed on macOS
-                // 14.5) that in some limited cases on buggy kernel versions,
-                // all the non-POLLHUP events for the socket get delivered.
-                // Sleeping avoids pointlessly spinning a thread on those.
-                sleep(1);
+                // On macOS, (jade thinks that) it is possible (although not
+                // observed on macOS 14.5) that in some limited cases on buggy
+                // kernel versions, all the non-POLLHUP events for the socket
+                // get delivered.
+                //
+                // We could sleep to avoid pointlessly spinning a thread on
+                // those, but this opens up a different problem, which is that
+                // if do sleep, it will be longer before the daemon fork for a
+                // client exits. Imagine a sequential shell script, running Nix
+                // commands, each of which talk to the daemon. If the previous
+                // command registered a temp root, exits, and then the next
+                // command issues a delete request before the temp root is
+                // cleaned up, that delete request might fail.
+                //
+                // Not sleeping doesn't actually fix the race condition --- we
+                // would need to block on the old connections' tempt roots being
+                // cleaned up in in the new connection --- but it does make it
+                // much less likely.
             }
         });
     };
