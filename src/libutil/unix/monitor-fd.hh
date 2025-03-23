@@ -14,7 +14,6 @@
 
 namespace nix {
 
-
 class MonitorFdHup
 {
 private:
@@ -33,11 +32,11 @@ public:
                    anymore. So wait for read events and ignore
                    them. */
                 fds[0].events =
-                    #ifdef __APPLE__
+#ifdef __APPLE__
                     POLLRDNORM
-                    #else
+#else
                     0
-                    #endif
+#endif
                     ;
                 auto count = poll(fds, 1, -1);
                 if (count == -1)
@@ -50,7 +49,8 @@ public:
                    coordination with the main thread if spinning proves
                    too harmful.
                 */
-                if (count == 0) continue;
+                if (count == 0)
+                    continue;
                 if (fds[0].revents & POLLHUP) {
                     unix::triggerInterrupt();
                     break;
@@ -69,6 +69,5 @@ public:
         thread.join();
     }
 };
-
 
 }
