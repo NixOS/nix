@@ -16,8 +16,13 @@ import fileinput
 stack = []
 timestack = []
 
+#Reads the input file line by line
 for line in fileinput.input():
+    
+    #Split the line read from the file, by ' ' character into two
     components = line.strip().split(" ", 2)
+
+    #Read next line if first word on splitting is 'function-trace'
     if components[0] != "function-trace":
         continue
 
@@ -28,6 +33,7 @@ for line in fileinput.input():
     _at = components[1]
     time = int(components[2])
 
+    #Verify if direction is 'entered' Or 'exited'
     if direction == "entered":
         stack.append(loc)
         timestack.append(time)
