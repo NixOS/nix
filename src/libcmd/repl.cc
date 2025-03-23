@@ -839,7 +839,7 @@ std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
 {
     return std::make_unique<NixRepl>(
         lookupPath,
-        openStore(),
+        std::move(store),
         state,
         getValues
     );
