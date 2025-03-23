@@ -25,7 +25,8 @@ public:
         thread = std::thread([fd]() {
             while (true) {
                 /* Wait indefinitely until a POLLHUP occurs. */
-                struct pollfd fds[1] = {
+                constexpr size_t num_fds = 1;
+                struct pollfd fds[num_fds] = {
                     {
                         .fd = fd,
                         .events =
@@ -41,7 +42,7 @@ public:
                     },
                 };
 
-                auto count = poll(fds, 1, -1);
+                auto count = poll(fds, num_fds, -1);
                 if (count == -1) {
                     if (errno == EINTR || errno == EAGAIN)
                         continue;
