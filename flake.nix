@@ -310,27 +310,31 @@
 
               closures = forAllSystems (system: self.packages.${system}.default.outPath);
 
-              closures_json = pkgs.runCommand "versions.json"
-                {
-                  buildInputs = [ pkgs.jq ];
-                  passAsFile = [ "json" ];
-                  json = builtins.toJSON closures;
-                } ''
-                cat "$jsonPath" | jq . > $out
-              '';
-
-              closures_nix = pkgs.runCommand "versions.nix"
-                {
-                  buildInputs = [ pkgs.jq ];
-                  passAsFile = [ "template" ];
-                  jsonPath = closures_json;
-                  template = ''
-                    builtins.fromJSON('''@closures@''')
+              closures_json =
+                pkgs.runCommand "versions.json"
+                  {
+                    buildInputs = [ pkgs.jq ];
+                    passAsFile = [ "json" ];
+                    json = builtins.toJSON closures;
+                  }
+                  ''
+                    cat "$jsonPath" | jq . > $out
                   '';
-                } ''
-                export closures=$(cat "$jsonPath");
-                substituteAll "$templatePath" "$out"
-              '';
+
+              closures_nix =
+                pkgs.runCommand "versions.nix"
+                  {
+                    buildInputs = [ pkgs.jq ];
+                    passAsFile = [ "template" ];
+                    jsonPath = closures_json;
+                    template = ''
+                      builtins.fromJSON('''@closures@''')
+                    '';
+                  }
+                  ''
+                    export closures=$(cat "$jsonPath");
+                    substituteAll "$templatePath" "$out"
+                  '';
             in
             closures_nix;
         }

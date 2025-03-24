@@ -50,17 +50,6 @@ let
     exts: userFn: stdenv.mkDerivation (lib.extends (lib.composeManyExtensions exts) userFn);
 
   setVersionLayer = finalAttrs: prevAttrs: {
-    /*
-    preConfigure =
-      prevAttrs.preConfigure or ""
-      +
-        # Update the repo-global .version file.
-        # Symlink ./.version points there, but by default only workDir is writable.
-        ''
-          chmod u+w ./.version
-          echo ${finalAttrs.version} > ./.version
-        '';
-    */
   };
 
   localSourceLayer =
