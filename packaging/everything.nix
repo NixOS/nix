@@ -201,8 +201,8 @@ stdenv.mkDerivation (finalAttrs: {
       done
 
       # Forwarded outputs
-      ln -s ${nix-manual} $doc
-      ln -s ${nix-manual.man} $man
+      ln -sT ${nix-manual} $doc
+      ln -sT ${nix-manual.man} $man
     '';
 
   passthru = {
