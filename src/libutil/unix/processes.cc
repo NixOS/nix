@@ -200,8 +200,15 @@ static int childEntry(void * arg)
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
     ChildWrapperFunction wrapper = [&] {
-        if (!options.allowVfork)
+        if (!options.allowVfork) {
+            /* Set a simple logger, while releasing (not destroying)
+               the parent logger. We don't want to run the parent
+               logger's destructor since that will crash (e.g. when
+               ~ProgressBar() tries to join a thread that doesn't
+               exist. */
+            logger.release();
             logger = makeSimpleLogger();
+        }
         try {
 #if __linux__
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
@@ -299,15 +306,7 @@ void runProgram2(const RunOptions & options)
     // case), so we can't use it if we alter the environment
     processOptions.allowVfork = !options.environment;
 
-    std::optional<Finally<std::function<void()>>> resumeLoggerDefer;
-    if (options.isInteractive) {
-        logger->pause();
-        resumeLoggerDefer.emplace(
-            []() {
-                logger->resume();
-            }
-        );
-    }
+    auto suspension = logger->suspendIf(options.isInteractive);
 
     /* Fork. */
     Pid pid = startProcess([&] {

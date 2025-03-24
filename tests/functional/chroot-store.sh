@@ -2,6 +2,28 @@
 
 source common.sh
 
+# Regression test for #11503.
+mkdir -p "$TEST_ROOT/directory"
+cat > "$TEST_ROOT/directory/default.nix" <<EOF
+  let
+    root = ./.;
+    filter = path: type:
+      let
+        rootStr = builtins.toString ./.;
+      in
+        if builtins.substring 0 (builtins.stringLength rootStr) (builtins.toString path) == rootStr then true
+        else builtins.throw "root path\n\${rootStr}\nnot prefix of path\n\${builtins.toString path}";
+  in
+    builtins.filterSource filter root
+EOF
+
+result="$(nix-store --add-fixed --recursive sha256 "$TEST_ROOT/directory")"
+nix-instantiate --eval "$result"
+nix-instantiate --eval "$result" --store "$TEST_ROOT/2nd-store"
+nix-store --add-fixed --recursive sha256 "$TEST_ROOT/directory" --store "$TEST_ROOT/2nd-store"
+nix-instantiate --eval "$result" --store "$TEST_ROOT/2nd-store"
+
+# Misc tests.
 echo example > "$TEST_ROOT"/example.txt
 mkdir -p "$TEST_ROOT/x"
 

@@ -5,8 +5,26 @@
 
 #include <fcntl.h>
 #include <unistd.h>
+#include <poll.h>
 
 namespace nix {
+
+namespace {
+
+// This function is needed to handle non-blocking reads/writes. This is needed in the buildhook, because
+// somehow the json logger file descriptor ends up beeing non-blocking and breaks remote-building.
+// TODO: get rid of buildhook and remove this function again (https://github.com/NixOS/nix/issues/12688)
+void pollFD(int fd, int events)
+{
+    struct pollfd pfd;
+    pfd.fd = fd;
+    pfd.events = events;
+    int ret = poll(&pfd, 1, -1);
+    if (ret == -1) {
+        throw SysError("poll on file descriptor failed");
+    }
+}
+}
 
 std::string readFile(int fd)
 {
@@ -17,14 +35,18 @@ std::string readFile(int fd)
     return drainFD(fd, true, st.st_size);
 }
 
-
 void readFull(int fd, char * buf, size_t count)
 {
     while (count) {
         checkInterrupt();
         ssize_t res = read(fd, buf, count);
         if (res == -1) {
-            if (errno == EINTR) continue;
+            switch (errno) {
+            case EINTR: continue;
+            case EAGAIN:
+                pollFD(fd, POLLIN);
+                continue;
+            }
             throw SysError("reading from file");
         }
         if (res == 0) throw EndOfFile("unexpected end-of-file");
@@ -39,8 +61,15 @@ void writeFull(int fd, std::string_view s, bool allowInterrupts)
     while (!s.empty()) {
         if (allowInterrupts) checkInterrupt();
         ssize_t res = write(fd, s.data(), s.size());
-        if (res == -1 && errno != EINTR)
+        if (res == -1) {
+            switch (errno) {
+            case EINTR: continue;
+            case EAGAIN:
+                pollFD(fd, POLLOUT);
+                continue;
+            }
             throw SysError("writing to file");
+        }
         if (res > 0)
             s.remove_prefix(res);
     }
@@ -56,8 +85,15 @@ std::string readLine(int fd, bool eofOk)
         // FIXME: inefficient
         ssize_t rd = read(fd, &ch, 1);
         if (rd == -1) {
-            if (errno != EINTR)
+            switch (errno) {
+            case EINTR: continue;
+            case EAGAIN: {
+                pollFD(fd, POLLIN);
+                continue;
+            }
+            default:
                 throw SysError("reading a line");
+            }
         } else if (rd == 0) {
             if (eofOk)
                 return s;

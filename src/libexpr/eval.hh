@@ -171,11 +171,28 @@ struct RegexCache;
 std::shared_ptr<RegexCache> makeRegexCache();
 
 struct DebugTrace {
-    std::shared_ptr<Pos> pos;
+    /* WARNING: Converting PosIdx -> Pos should be done with extra care. This is
+       due to the fact that operator[] of PosTable is incredibly expensive. */
+    std::variant<Pos, PosIdx> pos;
     const Expr & expr;
     const Env & env;
     HintFmt hint;
     bool isError;
+
+    Pos getPos(const PosTable & table) const
+    {
+        return std::visit(
+            overloaded{
+                [&](PosIdx idx) {
+                    // Prefer direct pos, but if noPos then try the expr.
+                    if (!idx)
+                        idx = expr.getPos();
+                    return table[idx];
+                },
+                [&](Pos pos) { return pos; },
+            },
+            pos);
+    }
 };
 
 class EvalState : public std::enable_shared_from_this<EvalState>
@@ -390,6 +407,15 @@ public:
     SourcePath rootPath(PathView path);
 
     /**
+     * Return a `SourcePath` that refers to `path` in the store.
+     *
+     * For now, this has to also be within the root filesystem for
+     * backwards compat, but for Windows and maybe also pure eval, we'll
+     * probably want to do something different.
+     */
+    SourcePath storePath(const StorePath & path);
+
+    /**
      * Allow access to a path.
      */
     void allowPath(const Path & path);
@@ -411,17 +437,6 @@ public:
     void allowAndSetStorePathString(const StorePath & storePath, Value & v);
 
     void checkURI(const std::string & uri);
-
-    /**
-     * When using a diverted store and 'path' is in the Nix store, map
-     * 'path' to the diverted location (e.g. /nix/store/foo is mapped
-     * to /home/alice/my-nix/nix/store/foo). However, this is only
-     * done if the context is not empty, since otherwise we're
-     * probably trying to read from the actual /nix/store. This is
-     * intended to distinguish between import-from-derivation and
-     * sources stored in the actual /nix/store.
-     */
-    Path toRealPath(const Path & path, const NixStringContext & context);
 
     /**
      * Parse a Nix expression from the specified file.

@@ -53,7 +53,7 @@ where
     method of content addressing store objects,
     if the hash algorithm is [SHA-256].
     Just like in the "Text" case, we can have the store objects referenced by their paths.
-    Additionally, we can have an optional `:self` label to denote self reference.
+    Additionally, we can have an optional `:self` label to denote self-reference.
 
   - ```ebnf
     | "output:" id

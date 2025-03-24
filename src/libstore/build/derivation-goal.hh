@@ -2,6 +2,7 @@
 ///@file
 
 #include "parsed-derivations.hh"
+#include "derivation-options.hh"
 #ifndef _WIN32
 #  include "user-lock.hh"
 #endif
@@ -80,7 +81,7 @@ struct DerivationGoal : public Goal
     /**
      * Mapping from input derivations + output names to actual store
      * paths. This is filled in by waiteeDone() as each dependency
-     * finishes, before inputsRealised() is reached.
+     * finishes, before `trace("all inputs realised")` is reached.
      */
     std::map<std::pair<StorePath, std::string>, StorePath> inputDrvOutputs;
 
@@ -143,6 +144,7 @@ struct DerivationGoal : public Goal
     std::unique_ptr<Derivation> drv;
 
     std::unique_ptr<ParsedDerivation> parsedDrv;
+    std::unique_ptr<DerivationOptions> drvOptions;
 
     /**
      * The remainder is state held during the build.
@@ -233,13 +235,8 @@ struct DerivationGoal : public Goal
      * The states.
      */
     Co init() override;
-    Co getDerivation();
-    Co loadDerivation();
     Co haveDerivation();
-    Co outputsSubstitutionTried();
     Co gaveUpOnSubstitution();
-    Co closureRepaired();
-    Co inputsRealised();
     Co tryToBuild();
     virtual Co tryLocalBuild();
     Co buildDone();

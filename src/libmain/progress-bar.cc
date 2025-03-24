@@ -73,8 +73,13 @@ private:
         uint64_t corruptedPaths = 0, untrustedPaths = 0;
 
         bool active = true;
-        bool paused = false;
+        size_t suspensions = 0;
         bool haveUpdate = true;
+
+        bool isPaused() const
+        {
+            return suspensions > 0;
+        }
     };
 
     /** Helps avoid unnecessary redraws, see `redraw()` */
@@ -117,29 +122,43 @@ public:
     {
         {
             auto state(state_.lock());
-            if (!state->active) return;
-            state->active = false;
-            writeToStderr("\r\e[K");
-            updateCV.notify_one();
-            quitCV.notify_one();
+            if (state->active) {
+                state->active = false;
+                writeToStderr("\r\e[K");
+                updateCV.notify_one();
+                quitCV.notify_one();
+            }
         }
-        updateThread.join();
+        if (updateThread.joinable())
+            updateThread.join();
     }
 
     void pause() override {
         auto state (state_.lock());
-        state->paused = true;
+        state->suspensions++;
+        if (state->suspensions > 1) {
+            // already paused
+            return;
+        }
+
         if (state->active)
             writeToStderr("\r\e[K");
     }
 
     void resume() override {
         auto state (state_.lock());
-        state->paused = false;
-        if (state->active)
-            writeToStderr("\r\e[K");
-        state->haveUpdate = true;
-        updateCV.notify_one();
+        if (state->suspensions == 0) {
+            log(lvlError, "nix::ProgressBar: resume() called without a matching preceding pause(). This is a bug.");
+            return;
+        } else {
+            state->suspensions--;
+        }
+        if (state->suspensions == 0) {
+            if (state->active)
+                writeToStderr("\r\e[K");
+            state->haveUpdate = true;
+            updateCV.notify_one();
+        }
     }
 
     bool isVerbose() override
@@ -381,7 +400,7 @@ public:
         auto nextWakeup = std::chrono::milliseconds::max();
 
         state.haveUpdate = false;
-        if (state.paused || !state.active) return nextWakeup;
+        if (state.isPaused() || !state.active) return nextWakeup;
 
         std::string line;
 
@@ -553,21 +572,9 @@ public:
     }
 };
 
-Logger * makeProgressBar()
+std::unique_ptr<Logger> makeProgressBar()
 {
-    return new ProgressBar(isTTY());
-}
-
-void startProgressBar()
-{
-    logger = makeProgressBar();
-}
-
-void stopProgressBar()
-{
-    auto progressBar = dynamic_cast<ProgressBar *>(logger);
-    if (progressBar) progressBar->stop();
-
+    return std::make_unique<ProgressBar>(isTTY());
 }
 
 }

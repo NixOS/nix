@@ -1,5 +1,5 @@
-// FIXME: integrate this with nix path-info?
-// FIXME: rename to 'nix store derivation show' or 'nix debug derivation show'?
+// FIXME: integrate this with `nix path-info`?
+// FIXME: rename to 'nix store derivation show'?
 
 #include "command.hh"
 #include "common-args.hh"

@@ -33,8 +33,10 @@ EvalSettings evalSettings {
                 // FIXME `parseFlakeRef` should take a `std::string_view`.
                 auto flakeRef = parseFlakeRef(fetchSettings, std::string { rest }, {}, true, false);
                 debug("fetching flake search path element '%s''", rest);
-                auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first;
-                return state.rootPath(state.store->toRealPath(storePath));
+                auto [accessor, lockedRef] = flakeRef.resolve(state.store).lazyFetch(state.store);
+                auto storePath = nix::fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
+                state.allowPath(storePath);
+                return state.storePath(storePath);
             },
         },
     },
@@ -176,13 +178,15 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * bas
             state.fetchSettings,
             EvalSettings::resolvePseudoUrl(s));
         auto storePath = fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy);
-        return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
+        return state.storePath(storePath);
     }
 
     else if (hasPrefix(s, "flake:")) {
         auto flakeRef = parseFlakeRef(fetchSettings, std::string(s.substr(6)), {}, true, false);
-        auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first;
-        return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
+        auto [accessor, lockedRef] = flakeRef.resolve(state.store).lazyFetch(state.store);
+        auto storePath = nix::fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
+        state.allowPath(storePath);
+        return state.storePath(storePath);
     }
 
     else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
