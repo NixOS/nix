@@ -368,7 +368,6 @@
               ''^src/libutil/types\.hh$''
               ''^src/libutil/unix/file-descriptor\.cc$''
               ''^src/libutil/unix/file-path\.cc$''
-              ''^src/libutil/unix/monitor-fd\.hh$''
               ''^src/libutil/unix/processes\.cc$''
               ''^src/libutil/unix/signals-impl\.hh$''
               ''^src/libutil/unix/signals\.cc$''
