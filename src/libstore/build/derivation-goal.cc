@@ -660,9 +660,8 @@ Goal::Co DerivationGoal::tryToBuild()
                 if (!actLock)
                     actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                         fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
-                worker.waitForAWhile(shared_from_this());
                 outputLocks.unlock();
-                co_await Suspend{};
+                co_await waitForAWhile();
                 co_return tryToBuild();
             case rpDecline:
                 /* We should do it ourselves. */
