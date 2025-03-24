@@ -12,7 +12,8 @@
   nlohmann_json,
   openssl,
   tbb_2021_11,
-
+  # TODO: Remove this once we have https://github.com/NixOS/nixpkgs/pull/390458 backported
+  tbb_2022_0 ? tbb_2021_11,
   # Configuration Options
 
   version,
@@ -47,7 +48,7 @@ mkMesonLibrary (finalAttrs: {
     libblake3
     libsodium
     openssl
-    tbb_2021_11
+    tbb_2022_0
   ] ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
   propagatedBuildInputs = [
