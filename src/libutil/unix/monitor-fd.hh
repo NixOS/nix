@@ -123,7 +123,7 @@ public:
 
     ~MonitorFdHup()
     {
-        close(notifyPipe.writeSide.get());
+        notifyPipe.writeSide.close();
         thread.join();
     }
 };
