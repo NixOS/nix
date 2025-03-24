@@ -873,7 +873,7 @@ void runPostBuildHook(
 
 
 void appendLogTailErrorMsg(
-    Worker & worker,
+    const Store & store,
     const StorePath & drvPath,
     const std::list<std::string> & logTail,
     std::string & msg)
@@ -893,7 +893,7 @@ void appendLogTailErrorMsg(
         // command will not put it at the start of the line unfortunately.
         msg += fmt("For full logs, run:\n  " ANSI_BOLD "%s %s" ANSI_NORMAL,
             nixLogCommand,
-            worker.store.printStorePath(drvPath));
+            store.printStorePath(drvPath));
     }
 }
 
@@ -940,7 +940,7 @@ Goal::Co DerivationGoal::hookDone()
             Magenta(worker.store.printStorePath(drvPath)),
             statusToString(status));
 
-        appendLogTailErrorMsg(worker, drvPath, logTail, msg);
+        appendLogTailErrorMsg(worker.store, drvPath, logTail, msg);
 
         outputLocks.unlock();
 
