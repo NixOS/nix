@@ -65,7 +65,7 @@ public:
 
     ~MonitorFdHup()
     {
-        pthread_cancel(thread.native_handle());
+        notifyPipe.writeSide.close();
         thread.join();
     }
 };
