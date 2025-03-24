@@ -66,17 +66,21 @@ scope: {
         installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
       });
 
-  libblake3 = pkgs.libblake3.overrideAttrs (attrs: rec {
-    version = "1.7.0";
-    src = pkgs.fetchFromGitHub {
-      owner = "BLAKE3-team";
-      repo = "BLAKE3";
-      tag = version;
-      hash = "sha256-08D5hnU3I0VJ+RM/TNk2LxsEAvOLuO52+08zlKssXbc=";
-    };
-    buildInputs = [ pkgs.tbb_2021_11 ];
-    cmakeFlags = attrs.cmakeFlags or [ ] ++ [ "-DBLAKE3_USE_TBB:BOOL=TRUE" ];
-  });
+  libblake3 =
+    if lib.versionAtLeast pkgs.libblake3.version "1.7.0" then
+      pkgs.libblake3
+    else
+      pkgs.libblake3.overrideAttrs (attrs: rec {
+        version = "1.7.0";
+        src = pkgs.fetchFromGitHub {
+          owner = "BLAKE3-team";
+          repo = "BLAKE3";
+          tag = version;
+          hash = "sha256-08D5hnU3I0VJ+RM/TNk2LxsEAvOLuO52+08zlKssXbc=";
+        };
+        buildInputs = [ pkgs.tbb_2021_11 ];
+        cmakeFlags = attrs.cmakeFlags or [ ] ++ [ "-DBLAKE3_USE_TBB:BOOL=TRUE" ];
+      });
 
   libgit2 = pkgs.libgit2.overrideAttrs (
     attrs:
