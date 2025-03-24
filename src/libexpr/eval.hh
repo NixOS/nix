@@ -171,11 +171,28 @@ struct RegexCache;
 std::shared_ptr<RegexCache> makeRegexCache();
 
 struct DebugTrace {
-    std::shared_ptr<Pos> pos;
+    /* WARNING: Converting PosIdx -> Pos should be done with extra care. This is
+       due to the fact that operator[] of PosTable is incredibly expensive. */
+    std::variant<Pos, PosIdx> pos;
     const Expr & expr;
     const Env & env;
     HintFmt hint;
     bool isError;
+
+    Pos getPos(const PosTable & table) const
+    {
+        return std::visit(
+            overloaded{
+                [&](PosIdx idx) {
+                    // Prefer direct pos, but if noPos then try the expr.
+                    if (!idx)
+                        idx = expr.getPos();
+                    return table[idx];
+                },
+                [&](Pos pos) { return pos; },
+            },
+            pos);
+    }
 };
 
 class EvalState : public std::enable_shared_from_this<EvalState>
