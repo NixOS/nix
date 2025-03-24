@@ -621,7 +621,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
                 Magenta(worker.store.printStorePath(drvPath)),
                 statusToString(status));
 
-            appendLogTailErrorMsg(worker, drvPath, logTail, msg);
+            appendLogTailErrorMsg(worker.store, drvPath, logTail, msg);
 
             if (diskFull)
                 msg += "\nnote: build failure may have been caused by lack of free disk space";
