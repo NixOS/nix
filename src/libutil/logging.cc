@@ -29,7 +29,7 @@ void setCurActivity(const ActivityId activityId)
     curActivity = activityId;
 }
 
-Logger * logger = makeSimpleLogger(true);
+std::unique_ptr<Logger> logger = makeSimpleLogger(true);
 
 void Logger::warn(const std::string & msg)
 {
@@ -41,6 +41,19 @@ void Logger::writeToStdout(std::string_view s)
     Descriptor standard_out = getStandardOutput();
     writeFull(standard_out, s);
     writeFull(standard_out, "\n");
+}
+
+Logger::Suspension Logger::suspend()
+{
+    pause();
+    return Suspension { ._finalize = {[this](){this->resume();}} };
+}
+
+std::optional<Logger::Suspension> Logger::suspendIf(bool cond)
+{
+    if (cond)
+        return suspend();
+    return {};
 }
 
 class SimpleLogger : public Logger
@@ -128,9 +141,9 @@ void writeToStderr(std::string_view s)
     }
 }
 
-Logger * makeSimpleLogger(bool printBuildLogs)
+std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs)
 {
-    return new SimpleLogger(printBuildLogs);
+    return std::make_unique<SimpleLogger>(printBuildLogs);
 }
 
 std::atomic<uint64_t> nextId{0};
@@ -167,9 +180,9 @@ void to_json(nlohmann::json & json, std::shared_ptr<Pos> pos)
 }
 
 struct JSONLogger : Logger {
-    Logger & prevLogger;
+    Descriptor fd;
 
-    JSONLogger(Logger & prevLogger) : prevLogger(prevLogger) { }
+    JSONLogger(Descriptor fd) : fd(fd) { }
 
     bool isVerbose() override {
         return true;
@@ -190,7 +203,7 @@ struct JSONLogger : Logger {
 
     void write(const nlohmann::json & json)
     {
-        prevLogger.log(lvlError, "@nix " + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
+        writeLine(fd, "@nix " + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
     }
 
     void log(Verbosity lvl, std::string_view s) override
@@ -262,9 +275,9 @@ struct JSONLogger : Logger {
     }
 };
 
-Logger * makeJSONLogger(Logger & prevLogger)
+std::unique_ptr<Logger> makeJSONLogger(Descriptor fd)
 {
-    return new JSONLogger(prevLogger);
+    return std::make_unique<JSONLogger>(fd);
 }
 
 static Logger::Fields getFields(nlohmann::json & json)

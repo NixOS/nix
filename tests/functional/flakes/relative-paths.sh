@@ -84,10 +84,10 @@ json=$(nix flake archive --json "$rootFlake" --to "$TEST_ROOT/store2")
 [[ $(echo "$json" | jq .inputs.sub0.inputs) = {} ]]
 [[ -n $(echo "$json" | jq .path) ]]
 
-#nix flake prefetch --out-link "$TEST_ROOT/result" "$rootFlake"
-#outPath=$(readlink "$TEST_ROOT/result")
+nix flake prefetch --out-link "$TEST_ROOT/result" "$rootFlake"
+outPath=$(readlink "$TEST_ROOT/result")
 
-#[ -e "$TEST_ROOT/store2/nix/store/$(basename "$outPath")" ]
+[ -e "$TEST_ROOT/store2/nix/store/$(basename "$outPath")" ]
 
 # Test circular relative path flakes. FIXME: doesn't work at the moment.
 if false; then

@@ -7,7 +7,6 @@
 #include "store-api.hh"
 #include "outputs-spec.hh"
 #include "derivations.hh"
-#include "progress-bar.hh"
 
 #ifndef _WIN32 // TODO re-enable on Windows
 # include "run.hh"
@@ -731,7 +730,7 @@ struct CmdPrintDevEnv : Common, MixJSON
     {
         auto buildEnvironment = getBuildEnvironment(store, installable).first;
 
-        stopProgressBar();
+        logger->stop();
 
         if (json) {
             logger->writeToStdout(buildEnvironment.toJSON());

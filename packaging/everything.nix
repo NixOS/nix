@@ -192,7 +192,7 @@ stdenv.mkDerivation (finalAttrs: {
       devPaths = lib.mapAttrsToList (_k: lib.getDev) finalAttrs.finalPackage.libs;
     in
     ''
-      mkdir -p $out $dev $doc $man
+      mkdir -p $out $dev
 
       # Merged outputs
       lndir ${nix-cli} $out
@@ -201,8 +201,8 @@ stdenv.mkDerivation (finalAttrs: {
       done
 
       # Forwarded outputs
-      ln -s ${nix-manual} $doc
-      ln -s ${nix-manual.man} $man
+      ln -sT ${nix-manual} $doc
+      ln -sT ${nix-manual.man} $man
     '';
 
   passthru = {

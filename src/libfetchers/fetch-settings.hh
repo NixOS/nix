@@ -23,9 +23,11 @@ struct Settings : public Config
           Access tokens are specified as a string made up of
           space-separated `host=token` values.  The specific token
           used is selected by matching the `host` portion against the
-          "host" specification of the input. The actual use of the
-          `token` value is determined by the type of resource being
-          accessed:
+          "host" specification of the input. The `host` portion may
+          contain a path element which will match against the prefix
+          URL for the input. (eg: `github.com/org=token`). The actual use
+          of the `token` value is determined by the type of resource
+          being accessed:
 
           * Github: the token value is the OAUTH-TOKEN string obtained
             as the Personal Access Token from the Github server (see

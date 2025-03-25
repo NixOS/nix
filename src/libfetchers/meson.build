@@ -14,7 +14,7 @@ cxx = meson.get_compiler('cpp')
 
 subdir('nix-meson-build-support/deps-lists')
 
-configdata = configuration_data()
+configuration_data()
 
 deps_private_maybe_subproject = [
 ]
@@ -48,12 +48,12 @@ sources = files(
   'fetch-to-store.cc',
   'fetchers.cc',
   'filtering-source-accessor.cc',
+  'git-lfs-fetch.cc',
   'git-utils.cc',
   'git.cc',
   'github.cc',
   'indirect.cc',
   'mercurial.cc',
-  'mounted-source-accessor.cc',
   'path.cc',
   'registry.cc',
   'store-path-accessor.cc',
@@ -69,8 +69,8 @@ headers = files(
   'fetch-to-store.hh',
   'fetchers.hh',
   'filtering-source-accessor.hh',
+  'git-lfs-fetch.hh',
   'git-utils.hh',
-  'mounted-source-accessor.hh',
   'registry.hh',
   'store-path-accessor.hh',
   'tarball.hh',

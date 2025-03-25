@@ -24,7 +24,7 @@ struct ExperimentalFeatureDetails
  * feature, we either have no issue at all if few features are not added
  * at the end of the list, or a proper merge conflict if they are.
  */
-constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::PipeOperators);
+constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::BLAKE3Hashes);
 
 constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
     {
@@ -109,6 +109,8 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
 
             runCommand "foo"
               {
+                 # Optional: let Nix know "foo" requires the experimental feature
+                 requiredSystemFeatures = [ "recursive-nix" ];
                  buildInputs = [ nix jq ];
                  NIX_PATH = "nixpkgs=${<nixpkgs>}";
               }
@@ -285,6 +287,14 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
             Add `|>` and `<|` operators to the Nix language.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/55",
+    },
+    {
+        .tag = Xp::BLAKE3Hashes,
+        .name = "blake3-hashes",
+        .description = R"(
+            Enables support for BLAKE3 hashes.
+        )",
+        .trackingUrl = "",
     },
 }};
 

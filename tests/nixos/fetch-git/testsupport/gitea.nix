@@ -29,9 +29,16 @@ in
       { pkgs, ... }:
       {
         services.gitea.enable = true;
-        services.gitea.settings.service.DISABLE_REGISTRATION = true;
-        services.gitea.settings.log.LEVEL = "Info";
-        services.gitea.settings.database.LOG_SQL = false;
+        services.gitea.lfs.enable = true;
+        services.gitea.settings = {
+          service.DISABLE_REGISTRATION = true;
+          server = {
+            DOMAIN = "gitea";
+            HTTP_PORT = 3000;
+          };
+          log.LEVEL = "Info";
+          database.LOG_SQL = false;
+        };
         services.openssh.enable = true;
         networking.firewall.allowedTCPPorts = [ 3000 ];
         environment.systemPackages = [
@@ -54,7 +61,10 @@ in
     client =
       { pkgs, ... }:
       {
-        environment.systemPackages = [ pkgs.git ];
+        environment.systemPackages = [
+          pkgs.git
+          pkgs.git-lfs
+        ];
       };
   };
   defaults =

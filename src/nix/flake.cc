@@ -17,6 +17,8 @@
 #include "eval-cache.hh"
 #include "markdown.hh"
 #include "users.hh"
+#include "fetch-to-store.hh"
+#include "local-fs-store.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -95,20 +97,20 @@ public:
             .optional=true,
             .handler={[&](std::vector<std::string> inputsToUpdate){
                 for (const auto & inputToUpdate : inputsToUpdate) {
-                    InputPath inputPath;
+                    InputAttrPath inputAttrPath;
                     try {
-                        inputPath = flake::parseInputPath(inputToUpdate);
+                        inputAttrPath = flake::parseInputAttrPath(inputToUpdate);
                     } catch (Error & e) {
                         warn("Invalid flake input '%s'. To update a specific flake, use 'nix flake update --flake %s' instead.", inputToUpdate, inputToUpdate);
                         throw e;
                     }
-                    if (lockFlags.inputUpdates.contains(inputPath))
-                        warn("Input '%s' was specified multiple times. You may have done this by accident.");
-                    lockFlags.inputUpdates.insert(inputPath);
+                    if (lockFlags.inputUpdates.contains(inputAttrPath))
+                        warn("Input '%s' was specified multiple times. You may have done this by accident.", printInputAttrPath(inputAttrPath));
+                    lockFlags.inputUpdates.insert(inputAttrPath);
                 }
             }},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
-                completeFlakeInputPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
+                completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
             }}
         });
 
@@ -214,7 +216,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
         auto & flake = lockedFlake.flake;
 
         // Currently, all flakes are in the Nix store via the rootFS accessor.
-        auto storePath = store->printStorePath(sourcePathToStorePath(store, flake.path).first);
+        auto storePath = store->printStorePath(store->toStorePath(flake.path.path.abs()).first);
 
         if (json) {
             nlohmann::json j;
@@ -304,7 +306,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                     } else if (auto follows = std::get_if<1>(&input.second)) {
                         logger->cout("%s" ANSI_BOLD "%s" ANSI_NORMAL " follows input '%s'",
                             prefix + (last ? treeLast : treeConn), input.first,
-                            printInputPath(*follows));
+                            printInputAttrPath(*follows));
                     }
                 }
             };
@@ -1077,7 +1079,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         StorePathSet sources;
 
-        auto storePath = sourcePathToStorePath(store, flake.flake.path).first;
+        auto storePath = store->toStorePath(flake.flake.path.path.abs()).first;
 
         sources.insert(storePath);
 
@@ -1431,8 +1433,18 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
 struct CmdFlakePrefetch : FlakeCommand, MixJSON
 {
+    std::optional<std::filesystem::path> outLink;
+
     CmdFlakePrefetch()
     {
+        addFlag({
+            .longName = "out-link",
+            .shortName = 'o',
+            .description = "Create symlink named *path* to the resulting store path.",
+            .labels = {"path"},
+            .handler = {&outLink},
+            .completer = completePath
+        });
     }
 
     std::string description() override
@@ -1451,7 +1463,8 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
     {
         auto originalRef = getFlakeRef();
         auto resolvedRef = originalRef.resolve(store);
-        auto [storePath, lockedRef] = resolvedRef.fetchTree(store);
+        auto [accessor, lockedRef] = resolvedRef.lazyFetch(store);
+        auto storePath = fetchToStore(*store, accessor, FetchMode::Copy, lockedRef.input.getName());
         auto hash = store->queryPathInfo(storePath)->narHash;
 
         if (json) {
@@ -1466,6 +1479,13 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
                 lockedRef.to_string(),
                 store->printStorePath(storePath),
                 hash.to_string(HashFormat::SRI, true));
+        }
+
+        if (outLink) {
+            if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
+                createOutLinks(*outLink, {BuiltPath::Opaque{storePath}}, *store2);
+            else
+                throw Error("'--out-link' is not supported for this Nix store");
         }
     }
 };

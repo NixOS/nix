@@ -7,13 +7,18 @@
 #include <gtest/gtest.h>
 #include "fs-sink.hh"
 #include "serialise.hh"
+#include "git-lfs-fetch.hh"
 
 namespace nix {
+
+namespace fs {
+using namespace std::filesystem;
+}
 
 class GitUtilsTest : public ::testing::Test
 {
     // We use a single repository for all tests.
-    Path tmpDir;
+    fs::path tmpDir;
     std::unique_ptr<AutoDelete> delTmpDir;
 
 public:
@@ -25,7 +30,7 @@ public:
         // Create the repo with libgit2
         git_libgit2_init();
         git_repository * repo = nullptr;
-        auto r = git_repository_init(&repo, tmpDir.c_str(), 0);
+        auto r = git_repository_init(&repo, tmpDir.string().c_str(), 0);
         ASSERT_EQ(r, 0);
         git_repository_free(repo);
     }
@@ -40,6 +45,11 @@ public:
     ref<GitRepo> openRepo()
     {
         return GitRepo::openRepo(tmpDir, true, false);
+    }
+
+    std::string getRepoName() const
+    {
+        return tmpDir.filename().string();
     }
 };
 
@@ -78,7 +88,7 @@ TEST_F(GitUtilsTest, sink_basic)
     // sink->createHardlink("foo-1.1/links/foo-2", CanonPath("foo-1.1/hello"));
 
     auto result = repo->dereferenceSingletonDirectory(sink->flush());
-    auto accessor = repo->getAccessor(result, false);
+    auto accessor = repo->getAccessor(result, false, getRepoName());
     auto entries = accessor->readDirectory(CanonPath::root);
     ASSERT_EQ(entries.size(), 5);
     ASSERT_EQ(accessor->readFile(CanonPath("hello")), "hello world");

@@ -20,7 +20,7 @@ For a local machine to forward a build to a remote machine, the remote machine m
 
 ## Testing
 
-To test connecting to a remote Nix instance (in this case `mac`), run:
+To test connecting to a remote [Nix instance] (in this case `mac`), run:
 
 ```console
 nix store info --store ssh://username@mac
@@ -106,3 +106,5 @@ file included in `builders` via the syntax `@/path/to/file`. For example,
 
 causes the list of machines in `/etc/nix/machines` to be included.
 (This is the default.)
+
+[Nix instance]: @docroot@/glossary.md#gloss-nix-instance

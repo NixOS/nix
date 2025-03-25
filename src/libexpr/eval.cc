@@ -246,15 +246,42 @@ EvalState::EvalState(
     , repair(NoRepair)
     , emptyBindings(0)
     , rootFS(
-        settings.restrictEval || settings.pureEval
-        ? ref<SourceAccessor>(AllowListSourceAccessor::create(getFSSourceAccessor(), {},
-            [&settings](const CanonPath & path) -> RestrictedPathError {
-                auto modeInformation = settings.pureEval
-                    ? "in pure evaluation mode (use '--impure' to override)"
-                    : "in restricted mode";
-                throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
-            }))
-        : getFSSourceAccessor())
+        ({
+            /* In pure eval mode, we provide a filesystem that only
+               contains the Nix store.
+
+               If we have a chroot store and pure eval is not enabled,
+               use a union accessor to make the chroot store available
+               at its logical location while still having the
+               underlying directory available. This is necessary for
+               instance if we're evaluating a file from the physical
+               /nix/store while using a chroot store. */
+            auto accessor = getFSSourceAccessor();
+
+            auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
+            if (settings.pureEval || store->storeDir != realStoreDir) {
+                auto storeFS = makeMountedSourceAccessor(
+                    {
+                        {CanonPath::root, makeEmptySourceAccessor()},
+                        {CanonPath(store->storeDir), makeFSSourceAccessor(realStoreDir)}
+                    });
+                accessor = settings.pureEval
+                    ? storeFS
+                    : makeUnionSourceAccessor({accessor, storeFS});
+            }
+
+            /* Apply access control if needed. */
+            if (settings.restrictEval || settings.pureEval)
+                accessor = AllowListSourceAccessor::create(accessor, {},
+                    [&settings](const CanonPath & path) -> RestrictedPathError {
+                        auto modeInformation = settings.pureEval
+                            ? "in pure evaluation mode (use '--impure' to override)"
+                            : "in restricted mode";
+                        throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
+                    });
+
+            accessor;
+        }))
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{corepkgsFS->addFile(
@@ -344,7 +371,7 @@ void EvalState::allowPath(const Path & path)
 void EvalState::allowPath(const StorePath & storePath)
 {
     if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-        rootFS2->allowPrefix(CanonPath(store->toRealPath(storePath)));
+        rootFS2->allowPrefix(CanonPath(store->printStorePath(storePath)));
 }
 
 void EvalState::allowClosure(const StorePath & storePath)
@@ -419,16 +446,6 @@ void EvalState::checkURI(const std::string & uri)
     }
 
     throw RestrictedPathError("access to URI '%s' is forbidden in restricted mode", uri);
-}
-
-
-Path EvalState::toRealPath(const Path & path, const NixStringContext & context)
-{
-    // FIXME: check whether 'path' is in 'context'.
-    return
-        !context.empty() && store->isInStore(path)
-        ? store->toRealPath(path)
-        : path;
 }
 
 
@@ -754,18 +771,26 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
     if (!debugRepl || inDebugger)
         return;
 
-    auto dts =
-        error && expr.getPos()
-        ? std::make_unique<DebugTraceStacker>(
-            *this,
-            DebugTrace {
-                .pos = error->info().pos ? error->info().pos : positions[expr.getPos()],
+    auto dts = [&]() -> std::unique_ptr<DebugTraceStacker> {
+        if (error && expr.getPos()) {
+            auto trace = DebugTrace{
+                .pos = [&]() -> std::variant<Pos, PosIdx> {
+                    if (error->info().pos) {
+                        if (auto * pos = error->info().pos.get())
+                            return *pos;
+                        return noPos;
+                    }
+                    return expr.getPos();
+                }(),
                 .expr = expr,
                 .env = env,
                 .hint = error->info().msg,
-                .isError = true
-            })
-        : nullptr;
+                .isError = true};
+
+            return std::make_unique<DebugTraceStacker>(*this, std::move(trace));
+        }
+        return nullptr;
+    }();
 
     if (error)
     {
@@ -810,7 +835,7 @@ static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
     EvalState & state,
     Expr & expr,
     Env & env,
-    std::shared_ptr<Pos> && pos,
+    std::variant<Pos, PosIdx> pos,
     const Args & ... formatArgs)
 {
     return std::make_unique<DebugTraceStacker>(state,
@@ -1087,7 +1112,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
                 *this,
                 *e,
                 this->baseEnv,
-                e->getPos() ? std::make_shared<Pos>(positions[e->getPos()]) : nullptr,
+                e->getPos(),
                 "while evaluating the file '%1%':", resolvedPath.to_string())
             : nullptr;
 
@@ -1313,9 +1338,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
             state,
             *this,
             env2,
-            getPos()
-                ? std::make_shared<Pos>(state.positions[getPos()])
-                : nullptr,
+            getPos(),
             "while evaluating a '%1%' expression",
             "let"
         )
@@ -1384,7 +1407,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 state,
                 *this,
                 env,
-                state.positions[getPos()],
+                getPos(),
                 "while evaluating the attribute '%1%'",
                 showAttrPath(state, env, attrPath))
             : nullptr;
@@ -1585,7 +1608,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             try {
                 auto dts = debugRepl
                     ? makeDebugTraceStacker(
-                        *this, *lambda.body, env2, positions[lambda.pos],
+                        *this, *lambda.body, env2, lambda.pos,
                         "while calling %s",
                         lambda.name
                         ? concatStrings("'", symbols[lambda.name], "'")
@@ -1720,9 +1743,7 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
             state,
             *this,
             env,
-            getPos()
-                ? std::make_shared<Pos>(state.positions[getPos()])
-                : nullptr,
+            getPos(),
             "while calling a function"
         )
         : nullptr;
@@ -2051,7 +2072,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == nPath) {
         if (!context.empty())
             state.error<EvalError>("a string that refers to a store path cannot be appended to a path").atPos(pos).withFrame(env, *this).debugThrow();
-        v.mkPath(state.rootPath(CanonPath(canonPath(str()))));
+        v.mkPath(state.rootPath(CanonPath(str())));
     } else
         v.mkStringMove(c_str(), context);
 }
@@ -2106,7 +2127,7 @@ void EvalState::forceValueDeep(Value & v)
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
                     auto dts = debugRepl && i.value->isThunk()
-                        ? makeDebugTraceStacker(*this, *i.value->payload.thunk.expr, *i.value->payload.thunk.env, positions[i.pos],
+                        ? makeDebugTraceStacker(*this, *i.value->payload.thunk.expr, *i.value->payload.thunk.env, i.pos,
                             "while evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;
 
@@ -2432,7 +2453,7 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
     auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
     if (path == "" || path[0] != '/')
         error<EvalError>("string '%1%' doesn't represent an absolute path", path).withTrace(pos, errorCtx).debugThrow();
-    return rootPath(CanonPath(path));
+    return rootPath(path);
 }
 
 
@@ -3086,7 +3107,7 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
                 fetchSettings,
                 EvalSettings::resolvePseudoUrl(value));
             auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
-            return finish(rootPath(store->toRealPath(storePath)));
+            return finish(this->storePath(storePath));
         } catch (Error & e) {
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
