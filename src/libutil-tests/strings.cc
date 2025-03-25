@@ -81,6 +81,42 @@ TEST(concatStringsSep, buildSingleString)
     ASSERT_EQ(concatStringsSep(",", strings), "this");
 }
 
+TEST(concatMapStringsSep, empty)
+{
+    Strings strings;
+
+    ASSERT_EQ(concatMapStringsSep(",", strings, [](const std::string & s) { return s; }), "");
+}
+
+TEST(concatMapStringsSep, justOne)
+{
+    Strings strings;
+    strings.push_back("this");
+
+    ASSERT_EQ(concatMapStringsSep(",", strings, [](const std::string & s) { return s; }), "this");
+}
+
+TEST(concatMapStringsSep, two)
+{
+    Strings strings;
+    strings.push_back("this");
+    strings.push_back("that");
+
+    ASSERT_EQ(concatMapStringsSep(",", strings, [](const std::string & s) { return s; }), "this,that");
+}
+
+TEST(concatMapStringsSep, map)
+{
+    std::map<std::string, std::string> strings;
+    strings["this"] = "that";
+    strings["1"] = "one";
+
+    ASSERT_EQ(
+        concatMapStringsSep(
+            ", ", strings, [](const std::pair<std::string, std::string> & s) { return s.first + " -> " + s.second; }),
+        "1 -> one, this -> that");
+}
+
 /* ----------------------------------------------------------------------------
  * dropEmptyInitThenConcatStringsSep
  * --------------------------------------------------------------------------*/
