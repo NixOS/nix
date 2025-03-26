@@ -16,6 +16,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "memory-source-accessor.hh"
+
 namespace nix {
 
 using namespace flake;
@@ -921,6 +923,25 @@ LockedFlake lockFlake(
     }
 }
 
+static ref<SourceAccessor> makeInternalFS() {
+    auto internalFS = make_ref<MemorySourceAccessor>(MemorySourceAccessor {});
+    internalFS->setPathDisplay("«flakes-internal»", "");
+    internalFS->addFile(
+        CanonPath("call-flake.nix"),
+        #include "call-flake.nix.gen.hh"
+    );
+    return internalFS;
+}
+
+static auto internalFS = makeInternalFS();
+
+static Value * requireInternalFile(EvalState & state, CanonPath path) {
+    SourcePath p {internalFS, path};
+    auto v = state.allocValue();
+    state.evalFile(p, *v); // has caching
+    return v;
+}
+
 void callFlake(EvalState & state,
     const LockedFlake & lockedFlake,
     Value & vRes)
@@ -960,8 +981,7 @@ void callFlake(EvalState & state,
 
     auto & vOverrides = state.allocValue()->mkAttrs(overrides);
 
-    auto vCallFlake = state.allocValue();
-    state.evalFile(state.callFlakeInternal, *vCallFlake);
+    Value * vCallFlake = requireInternalFile(state, CanonPath("call-flake.nix"));
 
     auto vLocks = state.allocValue();
     vLocks->mkString(lockFileStr);
