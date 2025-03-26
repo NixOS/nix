@@ -53,15 +53,6 @@ struct EvalSettings : Config
 
     std::vector<PrimOp> extraPrimOps;
 
-    /**
-     * Register a primop to be added when an EvalState is created from these settings.
-     */
-    void addPrimOp(PrimOp && primOp);
-    /**
-     * Register a primop to be added when an EvalState is created from these settings.
-     */
-    void addPrimOp(const PrimOp & primOp);
-
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation", R"(
         Enable built-in functions that allow executing native code.
 

@@ -17,7 +17,7 @@ struct Settings : public Config
 {
     Settings();
 
-    void configureEvalSettings(nix::EvalSettings & evalSettings);
+    void configureEvalSettings(nix::EvalSettings & evalSettings) const;
 
     Setting<bool> useRegistries{
         this,

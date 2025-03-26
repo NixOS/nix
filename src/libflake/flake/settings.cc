@@ -5,11 +5,11 @@ namespace nix::flake {
 
 Settings::Settings() {}
 
-void Settings::configureEvalSettings(nix::EvalSettings & evalSettings)
+void Settings::configureEvalSettings(nix::EvalSettings & evalSettings) const
 {
-    evalSettings.addPrimOp(primops::getFlake(*this));
-    evalSettings.addPrimOp(primops::parseFlakeRef);
-    evalSettings.addPrimOp(primops::flakeRefToString);
+    evalSettings.extraPrimOps.emplace_back(primops::getFlake(*this));
+    evalSettings.extraPrimOps.emplace_back(primops::parseFlakeRef);
+    evalSettings.extraPrimOps.emplace_back(primops::flakeRefToString);
 }
 
 } // namespace nix
