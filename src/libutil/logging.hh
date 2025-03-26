@@ -4,6 +4,7 @@
 #include "error.hh"
 #include "config.hh"
 #include "file-descriptor.hh"
+#include "finally.hh"
 
 #include <filesystem>
 
@@ -86,6 +87,17 @@ public:
     virtual ~Logger() { }
 
     virtual void stop() { };
+
+    /**
+     * Guard object to resume the logger when done.
+     */
+    struct Suspension {
+        Finally<std::function<void()>> _finalize;
+    };
+
+    Suspension suspend();
+
+    std::optional<Suspension> suspendIf(bool cond);
 
     virtual void pause() { };
     virtual void resume() { };
@@ -199,15 +211,15 @@ struct PushActivity
     ~PushActivity() { setCurActivity(prevAct); }
 };
 
-extern Logger * logger;
+extern std::unique_ptr<Logger> logger;
 
-Logger * makeSimpleLogger(bool printBuildLogs = true);
+std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
 
-Logger * makeTeeLogger(std::vector<Logger *> loggers);
+std::unique_ptr<Logger> makeTeeLogger(std::vector<std::unique_ptr<Logger>> && loggers);
 
-Logger * makeJSONLogger(Descriptor fd, bool includeNixPrefix = true);
+std::unique_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix = true);
 
-Logger * makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix = true);
+std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix = true);
 
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".

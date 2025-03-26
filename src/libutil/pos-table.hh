@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <cstdint>
 #include <vector>
@@ -18,9 +19,12 @@ public:
     private:
         uint32_t offset;
 
-        Origin(Pos::Origin origin, uint32_t offset, size_t size):
-            offset(offset), origin(origin), size(size)
-        {}
+        Origin(Pos::Origin origin, uint32_t offset, size_t size)
+            : offset(offset)
+            , origin(origin)
+            , size(size)
+        {
+        }
 
     public:
         const Pos::Origin origin;
@@ -72,6 +76,17 @@ public:
         return PosIdx(1 + origin.offset + offset);
     }
 
+    /**
+     * Convert a byte-offset PosIdx into a Pos with line/column information.
+     *
+     * @param p Byte offset into the virtual concatenation of all parsed contents
+     * @return Position
+     *
+     * @warning Very expensive to call, as this has to read the entire source
+     * into memory each time. Call this only if absolutely necessary. Prefer
+     * to keep PosIdx around instead of needlessly converting it into Pos by
+     * using this lookup method.
+     */
     Pos operator[](PosIdx p) const;
 
     Pos::Origin originOf(PosIdx p) const

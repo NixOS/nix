@@ -4,9 +4,9 @@ namespace nix {
 
 struct TeeLogger : Logger
 {
-    std::vector<Logger *> loggers;
+    std::vector<std::unique_ptr<Logger>> loggers;
 
-    TeeLogger(std::vector<Logger *> loggers)
+    TeeLogger(std::vector<std::unique_ptr<Logger>> && loggers)
         : loggers(std::move(loggers))
     {
     }
@@ -100,9 +100,9 @@ struct TeeLogger : Logger
     }
 };
 
-Logger * makeTeeLogger(std::vector<Logger *> loggers)
+std::unique_ptr<Logger> makeTeeLogger(std::vector<std::unique_ptr<Logger>> && loggers)
 {
-    return new TeeLogger(std::move(loggers));
+    return std::make_unique<TeeLogger>(std::move(loggers));
 }
 
 }

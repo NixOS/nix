@@ -594,7 +594,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         auto drvType = drv.type();
 
-        /* Content-addressed derivations are trustless because their output paths
+        /* Content-addressing derivations are trustless because their output paths
            are verified by their content alone, so any derivation is free to
            try to produce such a path.
 
@@ -1042,15 +1042,21 @@ void processConnection(
     conn.protoVersion = protoVersion;
     conn.features = features;
 
-    auto tunnelLogger = new TunnelLogger(conn.to, protoVersion);
-    auto prevLogger = nix::logger;
+    auto tunnelLogger_ = std::make_unique<TunnelLogger>(conn.to, protoVersion);
+    auto tunnelLogger = tunnelLogger_.get();
+    std::unique_ptr<Logger> prevLogger_;
+    auto prevLogger = logger.get();
     // FIXME
     if (!recursive) {
-        logger = tunnelLogger;
+        prevLogger_ = std::move(logger);
+        logger = std::move(tunnelLogger_);
 
         if (!loggerSettings.jsonLogPath.get().empty()) {
             try {
-                logger = makeTeeLogger({logger, makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false)});
+                std::vector<std::unique_ptr<Logger>> loggers;
+                loggers.push_back(std::move(logger));
+                loggers.push_back(makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false));
+                logger = makeTeeLogger(std::move(loggers));
             } catch (...) {
                 ignoreExceptionExceptInterrupt();
             }

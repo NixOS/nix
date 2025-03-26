@@ -21,6 +21,7 @@
 #include "flake/flake.hh"
 #include "self-exe.hh"
 #include "json-utils.hh"
+#include "crash-handler.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -352,6 +353,8 @@ void mainWrapped(int argc, char * * argv)
 {
     savedArgv = argv;
 
+    registerCrashHandler();
+
     /* The chroot helper needs to be run before any threads have been
        started. */
 #ifndef _WIN32
@@ -385,8 +388,6 @@ void mainWrapped(int argc, char * * argv)
         } catch (Error & e) { }
     }
     #endif
-
-    Finally f([] { logger->stop(); });
 
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
@@ -488,7 +489,10 @@ void mainWrapped(int argc, char * * argv)
 
     if (!loggerSettings.jsonLogPath.get().empty()) {
         try {
-            logger = makeTeeLogger({logger, makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false)});
+            std::vector<std::unique_ptr<Logger>> loggers;
+            loggers.push_back(std::move(logger));
+            loggers.push_back(makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false));
+            logger = makeTeeLogger(std::move(loggers));
         } catch (...) {
             ignoreExceptionExceptInterrupt();
         }
@@ -564,10 +568,11 @@ int main(int argc, char * * argv)
 {
     // The CLI has a more detailed version than the libraries; see nixVersion.
     nix::nixVersion = NIX_CLI_VERSION;
-
+#ifndef _WIN32
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
     nix::setStackSize(64 * 1024 * 1024);
+#endif
 
     return nix::handleExceptions(argv[0], [&]() {
         nix::mainWrapped(argc, argv);

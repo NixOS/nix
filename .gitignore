@@ -14,7 +14,7 @@
 /tests/functional/lang/*.err
 /tests/functional/lang/*.ast
 
-outputs/
+/outputs
 
 *~
 

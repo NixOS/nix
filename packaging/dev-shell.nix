@@ -1,4 +1,7 @@
-{ lib, devFlake }:
+{
+  lib,
+  devFlake,
+}:
 
 { pkgs }:
 
@@ -113,6 +116,7 @@ pkgs.nixComponents.nix-util.overrideAttrs (
         pkgs.buildPackages.changelog-d
         modular.pre-commit.settings.package
         (pkgs.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
+        pkgs.buildPackages.nixfmt-rfc-style
       ]
       # TODO: Remove the darwin check once
       # https://github.com/NixOS/nixpkgs/pull/291814 is available

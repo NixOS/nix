@@ -5,10 +5,6 @@
 
 namespace nix {
 
-Logger * makeProgressBar();
-
-void startProgressBar();
-
-void stopProgressBar();
+std::unique_ptr<Logger> makeProgressBar();
 
 }

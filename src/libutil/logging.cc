@@ -31,7 +31,7 @@ void setCurActivity(const ActivityId activityId)
     curActivity = activityId;
 }
 
-Logger * logger = makeSimpleLogger(true);
+std::unique_ptr<Logger> logger = makeSimpleLogger(true);
 
 void Logger::warn(const std::string & msg)
 {
@@ -43,6 +43,19 @@ void Logger::writeToStdout(std::string_view s)
     Descriptor standard_out = getStandardOutput();
     writeFull(standard_out, s);
     writeFull(standard_out, "\n");
+}
+
+Logger::Suspension Logger::suspend()
+{
+    pause();
+    return Suspension { ._finalize = {[this](){this->resume();}} };
+}
+
+std::optional<Logger::Suspension> Logger::suspendIf(bool cond)
+{
+    if (cond)
+        return suspend();
+    return {};
 }
 
 class SimpleLogger : public Logger
@@ -130,9 +143,9 @@ void writeToStderr(std::string_view s)
     }
 }
 
-Logger * makeSimpleLogger(bool printBuildLogs)
+std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs)
 {
-    return new SimpleLogger(printBuildLogs);
+    return std::make_unique<SimpleLogger>(printBuildLogs);
 }
 
 std::atomic<uint64_t> nextId{0};
@@ -302,12 +315,12 @@ struct JSONLogger : Logger {
     }
 };
 
-Logger * makeJSONLogger(Descriptor fd, bool includeNixPrefix)
+std::unique_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix)
 {
-    return new JSONLogger(fd, includeNixPrefix);
+    return std::make_unique<JSONLogger>(fd, includeNixPrefix);
 }
 
-Logger * makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix)
+std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix)
 {
     struct JSONFileLogger : JSONLogger {
         AutoCloseFD fd;
@@ -325,7 +338,7 @@ Logger * makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefi
     if (!fd)
         throw SysError("opening log file %1%", path);
 
-    return new JSONFileLogger(std::move(fd), includeNixPrefix);
+    return std::make_unique<JSONFileLogger>(std::move(fd), includeNixPrefix);
 }
 
 static Logger::Fields getFields(nlohmann::json & json)

@@ -24,6 +24,7 @@ deps_public_maybe_subproject = [
   dependency('nix-fetchers'),
 ]
 subdir('nix-meson-build-support/subprojects')
+subdir('nix-meson-build-support/big-objs')
 
 boost = dependency(
   'boost',
@@ -171,8 +172,6 @@ headers = [config_h] + files(
   # internal: 'lexer-helpers.hh',
   'nixexpr.hh',
   'parser-state.hh',
-  'pos-idx.hh',
-  'pos-table.hh',
   'primops.hh',
   'print-ambiguous.hh',
   'print-options.hh',

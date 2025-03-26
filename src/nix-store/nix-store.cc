@@ -253,7 +253,7 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
             return store->queryDerivationOutputs(storePath);
         for (auto & i : drv.outputsAndOptPaths(*store)) {
             if (!i.second.second)
-                throw UsageError("Cannot use output path of floating content-addressed derivation until we know what it is (e.g. by building it)");
+                throw UsageError("Cannot use output path of floating content-addressing derivation until we know what it is (e.g. by building it)");
             outputs.insert(*i.second.second);
         }
         return outputs;

@@ -3,7 +3,6 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
-#include "progress-bar.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -120,7 +119,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
                 createOutLinks(outLink, toBuiltPaths(buildables), *store2);
 
         if (printOutputPaths) {
-            stopProgressBar();
+            logger->stop();
             for (auto & buildable : buildables) {
                 std::visit(overloaded {
                     [&](const BuiltPath::Opaque & bo) {

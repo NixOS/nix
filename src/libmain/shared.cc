@@ -361,7 +361,7 @@ RunPager::RunPager()
     if (!pager) pager = getenv("PAGER");
     if (pager && ((std::string) pager == "" || (std::string) pager == "cat")) return;
 
-    stopProgressBar();
+    logger->stop();
 
     Pipe toPager;
     toPager.create();

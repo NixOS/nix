@@ -22,11 +22,11 @@ It is based on the current generation of the active [profile](@docroot@/command-
 
 The arguments *args* map to store paths in a number of possible ways:
 
-- By default, *args* is a set of [derivation] names denoting derivations in the default Nix expression.
+- By default, *args* is a set of names denoting derivations in the default Nix expression.
   These are [realised], and the resulting output paths are installed.
   Currently installed derivations with a name equal to the name of a derivation being added are removed unless the option `--preserve-installed` is specified.
 
-  [derivation]: @docroot@/glossary.md#gloss-derivation
+  [derivation expression]: @docroot@/glossary.md#gloss-derivation-expression
   [realised]: @docroot@/glossary.md#gloss-realise
 
   If there are multiple derivations matching a name in *args* that
@@ -65,11 +65,11 @@ The arguments *args* map to store paths in a number of possible ways:
   This can be used to override the priority of the derivations being installed.
   This is useful if *args* are [store paths], which don't have any priority information.
 
-- If *args* are [store derivations](@docroot@/glossary.md#gloss-store-derivation), then these are [realised], and the resulting output paths are installed.
+- If *args* are [store paths] that point to [store derivations][store derivation], then those store derivations are [realised], and the resulting output paths are installed.
 
-- If *args* are [store paths] that are not store derivations, then these are [realised] and installed.
+- If *args* are [store paths] that do not point to store derivations, then these are [realised] and installed.
 
-- By default all [outputs](@docroot@/language/derivations.md#attr-outputs) are installed for each [derivation].
+- By default all [outputs](@docroot@/language/derivations.md#attr-outputs) are installed for each [store derivation].
   This can be overridden by adding a `meta.outputsToInstall` attribute on the derivation listing a subset of the output names.
 
   Example:
@@ -120,6 +120,8 @@ The arguments *args* map to store paths in a number of possible ways:
   bar-file
   manifest.nix
   ```
+
+[store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 # Options
 

@@ -91,15 +91,6 @@ public:
     bool isLocked() const;
 
     /**
-     * Return whether the input is either locked, or, if
-     * `allow-dirty-locks` is enabled, it has a NAR hash. In the
-     * latter case, we can verify the input but we may not be able to
-     * fetch it from anywhere.
-     */
-    bool isConsideredLocked(
-        const Settings & settings) const;
-
-    /**
      * Only for relative path flakes, i.e. 'path:./foo', returns the
      * relative path, i.e. './foo'.
      */
@@ -273,6 +264,9 @@ struct InputScheme
 
     virtual std::optional<std::string> isRelative(const Input & input) const
     { return std::nullopt; }
+
+    virtual std::optional<std::string> getAccessToken(const fetchers::Settings & settings, const std::string & host, const std::string & url) const
+    { return {};}
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);

@@ -37,7 +37,7 @@ test_confdata = {
 # Done as a subdir() so Meson places it under `common` in the build directory as well.
 subdir('common')
 
-config_nix_in = configure_file(
+configure_file(
   input : 'config.nix.in',
   output : 'config.nix',
   configuration : test_confdata,
@@ -243,8 +243,6 @@ foreach suite : suites
       # Used for target dependency/ordering tracking, not adding compiler flags or anything.
       depends : suite['deps'],
       workdir : workdir,
-      # Won't pass until man pages are generated
-      should_fail : suite['name'] == 'main' and script == 'help.sh'
     )
   endforeach
 endforeach
