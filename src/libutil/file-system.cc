@@ -613,7 +613,11 @@ void setWriteTime(
         if (utimes(path.c_str(), times) == -1)
             throw SysError("changing modification time of '%s' (not a symlink)", path);
     } else {
+<<<<<<< HEAD
         throw Error("Cannot modification time of symlink '%s'", path);
+=======
+        throw Error("Cannot change modification time of symlink %s", path);
+>>>>>>> 1cffcd91a (libutil: Fix error message)
     }
 #endif
 #endif
