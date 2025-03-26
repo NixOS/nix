@@ -1070,8 +1070,11 @@ void DerivationBuilderImpl::initEnv()
                 auto hash = hashString(HashAlgorithm::SHA256, i.first);
                 std::string fn = ".attr-" + hash.to_string(HashFormat::Nix32, false);
                 Path p = tmpDir + "/" + fn;
-                writeFile(p, rewriteStrings(i.second, inputRewrites));
-                chownToBuilder(p);
+                AutoCloseFD passAsFileFd{openat(tmpDirFd.get(), fn.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666)};
+                if (!passAsFileFd)
+                    throw SysError("opening `passAsFile` file in the sandbox '%1%'", p);
+                writeFile(passAsFileFd, rewriteStrings(i.second, inputRewrites));
+                chownToBuilder(passAsFileFd);
                 env[i.first + "Path"] = tmpDirInSandbox() + "/" + fn;
             }
         }
