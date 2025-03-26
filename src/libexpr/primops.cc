@@ -2775,7 +2775,13 @@ static void prim_unsafeGetAttrPos(EvalState & state, const PosIdx pos, Value * *
 
 static RegisterPrimOp primop_unsafeGetAttrPos(PrimOp {
     .name = "__unsafeGetAttrPos",
+    .args = {"s", "set"},
     .arity = 2,
+    .doc = R"(
+      `unsafeGetAttrPos` returns the position of the attribute named *s*
+      from *set*. This is used by Nixpkgs to provide location information
+      in error messages.
+    )",
     .fun = prim_unsafeGetAttrPos,
 });
 
