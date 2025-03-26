@@ -348,21 +348,6 @@ struct CmdHelpStores : Command
 
 static auto rCmdHelpStores = registerCommand<CmdHelpStores>("help-stores");
 
-struct ExtLoggerSettings : Config
-{
-    Setting<Path> jsonLogPath{
-        this, "", "json-log-path",
-        R"(
-          A path to which JSON records of Nix's log output will be
-          written, in the same format as `--log-format internal-json`
-          (without the `@nix ` prefixes on each line).
-        )"};
-};
-
-static ExtLoggerSettings extLoggerSettings;
-
-static GlobalConfig::Register rExtLoggerSettings(&extLoggerSettings);
-
 void mainWrapped(int argc, char * * argv)
 {
     savedArgv = argv;
@@ -501,9 +486,9 @@ void mainWrapped(int argc, char * * argv)
         if (!args.helpRequested && !args.completions) throw;
     }
 
-    if (!extLoggerSettings.jsonLogPath.get().empty()) {
+    if (!loggerSettings.jsonLogPath.get().empty()) {
         try {
-            logger = makeTeeLogger({logger, makeJSONLogger(std::filesystem::path(extLoggerSettings.jsonLogPath.get()), false)});
+            logger = makeTeeLogger({logger, makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false)});
         } catch (...) {
             ignoreExceptionExceptInterrupt();
         }

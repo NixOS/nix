@@ -15,6 +15,7 @@
 #include "derivations.hh"
 #include "args.hh"
 #include "git.hh"
+#include "logging.hh"
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
 # include "monitor-fd.hh"
@@ -1044,8 +1045,17 @@ void processConnection(
     auto tunnelLogger = new TunnelLogger(conn.to, protoVersion);
     auto prevLogger = nix::logger;
     // FIXME
-    if (!recursive)
+    if (!recursive) {
         logger = tunnelLogger;
+
+        if (!loggerSettings.jsonLogPath.get().empty()) {
+            try {
+                logger = makeTeeLogger({logger, makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false)});
+            } catch (...) {
+                ignoreExceptionExceptInterrupt();
+            }
+        }
+    }
 
     unsigned int opCount = 0;
 

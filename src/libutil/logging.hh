@@ -52,6 +52,14 @@ struct LoggerSettings : Config
           Whether Nix should print out a stack trace in case of Nix
           expression evaluation errors.
         )"};
+
+    Setting<Path> jsonLogPath{
+        this, "", "json-log-path",
+        R"(
+          A path to which JSON records of Nix's log output will be
+          written, in the same format as `--log-format internal-json`
+          (without the `@nix ` prefixes on each line).
+        )"};
 };
 
 extern LoggerSettings loggerSettings;
