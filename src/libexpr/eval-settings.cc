@@ -103,4 +103,13 @@ Path getNixDefExpr()
         : getHome() + "/.nix-defexpr";
 }
 
+void EvalSettings::addPrimOp(PrimOp && primOp)
+{
+    extraPrimOps.emplace_back(std::move(primOp));
 }
+void EvalSettings::addPrimOp(const PrimOp & primOp)
+{
+    extraPrimOps.emplace_back(PrimOp(primOp));
+}
+
+} // namespace nix
