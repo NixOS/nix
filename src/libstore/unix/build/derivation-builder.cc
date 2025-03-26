@@ -96,6 +96,11 @@ protected:
     Path topTmpDir;
 
     /**
+     * The file descriptor of the temporary directory.
+     */
+    AutoCloseFD tmpDirFd;
+
+    /**
      * The sort of derivation we are building.
      *
      * Just a cached value, computed from `drv`.
@@ -710,6 +715,13 @@ void DerivationBuilderImpl::startBuilder()
     topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), 0700);
     setBuildTmpDir();
     assert(!tmpDir.empty());
+
+    /* The TOCTOU between the previous mkdir call and this open call is unavoidable due to
+       POSIX semantics.*/
+    tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
+    if (!tmpDirFd)
+        throw SysError("failed to open the build temporary directory descriptor '%1%'", tmpDir);
+
     chownToBuilder(tmpDir);
 
     for (auto & [outputName, status] : initialOutputs) {
