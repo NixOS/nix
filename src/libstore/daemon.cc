@@ -1050,17 +1050,7 @@ void processConnection(
     if (!recursive) {
         prevLogger_ = std::move(logger);
         logger = std::move(tunnelLogger_);
-
-        if (!loggerSettings.jsonLogPath.get().empty()) {
-            try {
-                std::vector<std::unique_ptr<Logger>> loggers;
-                loggers.push_back(std::move(logger));
-                loggers.push_back(makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false));
-                logger = makeTeeLogger(std::move(loggers));
-            } catch (...) {
-                ignoreExceptionExceptInterrupt();
-            }
-        }
+        applyJSONLogger();
     }
 
     unsigned int opCount = 0;

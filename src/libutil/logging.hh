@@ -221,6 +221,8 @@ std::unique_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix = tr
 
 std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix = true);
 
+void applyJSONLogger();
+
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".
  */

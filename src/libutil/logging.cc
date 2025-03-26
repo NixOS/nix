@@ -341,6 +341,20 @@ std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool 
     return std::make_unique<JSONFileLogger>(std::move(fd), includeNixPrefix);
 }
 
+void applyJSONLogger()
+{
+    if (!loggerSettings.jsonLogPath.get().empty()) {
+        try {
+            std::vector<std::unique_ptr<Logger>> loggers;
+            loggers.push_back(std::move(logger));
+            loggers.push_back(makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false));
+            logger = makeTeeLogger(std::move(loggers));
+        } catch (...) {
+            ignoreExceptionExceptInterrupt();
+        }
+    }
+}
+
 static Logger::Fields getFields(nlohmann::json & json)
 {
     Logger::Fields fields;

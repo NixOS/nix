@@ -487,16 +487,7 @@ void mainWrapped(int argc, char * * argv)
         if (!args.helpRequested && !args.completions) throw;
     }
 
-    if (!loggerSettings.jsonLogPath.get().empty()) {
-        try {
-            std::vector<std::unique_ptr<Logger>> loggers;
-            loggers.push_back(std::move(logger));
-            loggers.push_back(makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false));
-            logger = makeTeeLogger(std::move(loggers));
-        } catch (...) {
-            ignoreExceptionExceptInterrupt();
-        }
-    }
+    applyJSONLogger();
 
     if (args.helpRequested) {
         std::vector<std::string> subcommand;
