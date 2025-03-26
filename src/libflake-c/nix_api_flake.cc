@@ -1,6 +1,7 @@
 #include "nix_api_flake.h"
 #include "nix_api_flake_internal.hh"
 #include "nix_api_util_internal.h"
+#include "nix_api_expr_internal.h"
 
 #include "flake/flake.hh"
 
@@ -18,15 +19,11 @@ void nix_flake_settings_free(nix_flake_settings * settings)
     delete settings;
 }
 
-nix_err nix_flake_init_global(nix_c_context * context, nix_flake_settings * settings)
+nix_err nix_flake_settings_add_to_eval_state_builder(
+    nix_c_context * context, nix_flake_settings * settings, nix_eval_state_builder * builder)
 {
-    static std::shared_ptr<nix::flake::Settings> registeredSettings;
     try {
-        if (registeredSettings)
-            throw nix::Error("nix_flake_init_global already initialized");
-
-        registeredSettings = settings->settings;
-        nix::flake::initLib(*registeredSettings);
+        settings->settings->configureEvalSettings(builder->settings);
     }
     NIXC_CATCH_ERRS
 }

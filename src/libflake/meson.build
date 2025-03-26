@@ -44,6 +44,7 @@ sources = files(
   'flake/flake.cc',
   'flake/flakeref.cc',
   'flake/lockfile.cc',
+  'flake/flake-primops.cc',
   'flake/settings.cc',
   'flake/url-name.cc',
 )
