@@ -1,5 +1,8 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
+#include "nix/util/file-system.hh"
+
+#include "util-config-private.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -73,6 +76,29 @@ Descriptor AutoCloseFD::get() const
 {
     return fd;
 }
+
+std::string guessOrInventPathFromFD(Descriptor fd)
+ {
+     assert(fd >= 0);
+     /* On Linux, there's no F_GETPATH available.
+      * But we can read /proc/ */
+ #if defined(__linux__)
+     try {
+         return readLink(fmt("/proc/self/fd/%1%", fd));
+     } catch (...) {
+     }
+ #elif defined (HAVE_F_GETPATH) && HAVE_F_GETPATH
+     std::string fdName(PATH_MAX, '\0');
+     if (fcntl(fd, F_GETPATH, fdName.data()) != -1) {
+         fdName.resize(strlen(fdName.c_str()));
+         return fdName;
+     }
+ #else
+ #error "No implementation for retrieving file descriptors path."
+ #endif
+
+     return fmt("<fd %i>", fd);
+ }
 
 
 void AutoCloseFD::close()

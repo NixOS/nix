@@ -106,6 +106,14 @@ void drainFD(
 #endif
     );
 
+ /*
+  * Will attempt to guess *A* path associated that might lead to the same file as used by this
+  * file descriptor.
+  *
+  * The returned string should NEVER be used as a valid path.
+  */
+ std::string guessOrInventPathFromFD(Descriptor fd);
+
 /**
  * Get [Standard Input](https://en.wikipedia.org/wiki/Standard_streams#Standard_input_(stdin))
  */
@@ -160,6 +168,15 @@ public:
     AutoCloseFD& operator =(const AutoCloseFD & fd) = delete;
     AutoCloseFD& operator =(AutoCloseFD&& fd);
     Descriptor get() const;
+
+    /**
+     * Will attempt to guess *A* path associated that might lead to the same file as used by this
+     * file descriptor.
+     *
+     * The returned string should NEVER be used as a valid path.
+     */
+    std::string guessOrInventPath() const { return guessOrInventPathFromFD(fd); }
+
     explicit operator bool() const;
     Descriptor release();
     void close();
