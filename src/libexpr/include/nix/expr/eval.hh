@@ -266,6 +266,11 @@ public:
     Value vStringUnknown;
 
     /**
+     * The accessor corresponding to `store`.
+     */
+    const ref<SourceAccessor> storeFS;
+
+    /**
      * The accessor for the root filesystem.
      */
     const ref<SourceAccessor> rootFS;
