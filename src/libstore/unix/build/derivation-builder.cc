@@ -305,8 +305,16 @@ protected:
 
     /**
      * Make a file owned by the builder.
+     *
+     * SAFETY: this function is prone to TOCTOU as it receives a path and not a descriptor.
+     * It's only safe to call in a child of a directory only visible to the owner.
      */
     void chownToBuilder(const Path & path);
+
+    /**
+     * Make a file owned by the builder addressed by its file descriptor.
+     */
+    void chownToBuilder(const AutoCloseFD & fd);
 
     /**
      * Run the builder's process.
@@ -722,7 +730,7 @@ void DerivationBuilderImpl::startBuilder()
     if (!tmpDirFd)
         throw SysError("failed to open the build temporary directory descriptor '%1%'", tmpDir);
 
-    chownToBuilder(tmpDir);
+    chownToBuilder(tmpDirFd);
 
     for (auto & [outputName, status] : initialOutputs) {
         /* Set scratch path we'll actually use during the build.
@@ -1265,6 +1273,13 @@ void DerivationBuilderImpl::chownToBuilder(const Path & path)
     if (!buildUser) return;
     if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
         throw SysError("cannot change ownership of '%1%'", path);
+}
+
+void DerivationBuilderImpl::chownToBuilder(const AutoCloseFD & fd)
+{
+    if (!buildUser) return;
+    if (fchown(fd.get(), buildUser->getUID(), buildUser->getGID()) == -1)
+        throw SysError("cannot change ownership of file '%1%'", fd.guessOrInventPath());
 }
 
 void DerivationBuilderImpl::runChild()
