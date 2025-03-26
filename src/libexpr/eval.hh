@@ -633,7 +633,7 @@ private:
 
     unsigned int baseEnvDispl = 0;
 
-    void createBaseEnv();
+    void createBaseEnv(const EvalSettings & settings);
 
     Value * addConstant(const std::string & name, Value & v, Constant info);
 

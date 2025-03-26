@@ -353,7 +353,7 @@ EvalState::EvalState(
         #include "fetchurl.nix.gen.hh"
     );
 
-    createBaseEnv();
+    createBaseEnv(settings);
 }
 
 
