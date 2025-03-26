@@ -172,10 +172,10 @@ void readFile(const Path & path, Sink & sink, bool memory_map = true);
 /**
  * Write a string to a file.
  */
-void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, bool sync = false);
-static inline void writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode = 0666, bool sync = false)
+void writeFile(const Path & path, std::string_view s, mode_t mode = 0666);
+static inline void writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode = 0666)
 {
-    return writeFile(path.string(), s, mode, sync);
+    return writeFile(path.string(), s, mode);
 }
 
 void writeFile(const Path & path, Source & source, mode_t mode = 0666, bool sync = false);
@@ -183,6 +183,13 @@ static inline void writeFile(const std::filesystem::path & path, Source & source
 {
     return writeFile(path.string(), source, mode, sync);
 }
+
+void writeFile(AutoCloseFD & fd, std::string_view s, mode_t mode = 0666 );
+
+/**
+ * Write a string to a file and flush the file and its parents direcotry to disk.
+ */
+void writeFileAndSync(const Path & path, std::string_view s, mode_t mode = 0666);
 
 /**
  * Flush a path's parent directory to disk.
