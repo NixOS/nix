@@ -347,9 +347,12 @@ void applyJSONLogger()
         try {
             std::vector<std::unique_ptr<Logger>> loggers;
             loggers.push_back(makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false));
-            // Note: this had better not throw, otherwise `logger` is
-            // left unset.
-            logger = makeTeeLogger(std::move(logger), std::move(loggers));
+            try {
+                logger = makeTeeLogger(std::move(logger), std::move(loggers));
+            } catch (...) {
+                // `logger` is now gone so give up.
+                abort();
+            }
         } catch (...) {
             ignoreExceptionExceptInterrupt();
         }
