@@ -977,7 +977,11 @@ void initLib(const Settings & settings)
 {
     auto prim_getFlake = [&settings](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
-        std::string flakeRefS(state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.getFlake"));
+        NixStringContext context; // no context
+        auto flakeRefS = state.coerceToString(pos, *args[0], context,
+                                        "while evaluating the argument passed to builtins.getFlake",
+                                        false, false, true).toOwned();
+
         auto flakeRef = parseFlakeRef(state.fetchSettings, flakeRefS, {}, true);
         if (state.settings.pureEval && !flakeRef.input.isLocked())
             throw Error("cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)", flakeRefS, state.positions[pos]);
@@ -1001,6 +1005,12 @@ void initLib(const Settings & settings)
 
           ```nix
           (builtins.getFlake "nix/55bc52401966fbffa525c574c14f67b00bc4fb3a").packages.x86_64-linux.nix
+          ```
+
+          The function can also be used to load flakes from the file system. For example:
+
+          ```nix
+          (builtins.getFlake ./.).packages.x86_64-linux.nix
           ```
 
           Unless impure evaluation is allowed (`--impure`), the flake reference

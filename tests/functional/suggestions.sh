@@ -37,8 +37,8 @@ NIX_BUILD_STDERR_WITH_NO_CLOSE_SUGGESTION=$(! nix build .\#bar 2>&1 1>/dev/null)
 [[ ! "$NIX_BUILD_STDERR_WITH_NO_CLOSE_SUGGESTION" =~ "Did you mean" ]] || \
     fail "The nix build stderr shouldn’t suggest anything if there’s nothing relevant to suggest"
 
-NIX_EVAL_STDERR_WITH_SUGGESTIONS=$(! nix build --impure --expr '(builtins.getFlake (builtins.toPath ./.)).packages.'"$system"'.fob' 2>&1 1>/dev/null)
-[[ "$NIX_EVAL_STDERR_WITH_SUGGESTIONS" =~ "Did you mean one of fo1, fo2, foo or fooo?" ]] || \
+NIX_EVAL_STDERR_WITH_SUGGESTIONS=$(! nix build --impure --expr '(builtins.getFlake ./.).packages.'"$system"'.fob' 2>&1 1>/dev/null)
+[[ "$NIX_EVAL_STDERR_WITH_SUGGESTIONS" =~ "Did you mean one of fo1, fo2, foo or fooo?" ]] ||
     fail "The evaluator should suggest the three closest possiblities"
 
 NIX_EVAL_STDERR_WITH_SUGGESTIONS=$(! nix build --impure --expr '({ foo }: foo) { foo = 1; fob = 2; }' 2>&1 1>/dev/null)
