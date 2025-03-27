@@ -344,12 +344,13 @@ std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool 
 void applyJSONLogger()
 {
     if (!loggerSettings.jsonLogPath.get().empty()) {
+        std::vector<std::unique_ptr<Logger>> loggers;
         try {
-            std::vector<std::unique_ptr<Logger>> loggers;
             loggers.push_back(std::move(logger));
             loggers.push_back(makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false));
             logger = makeTeeLogger(std::move(loggers));
         } catch (...) {
+            logger = std::move(loggers[0]);
             ignoreExceptionExceptInterrupt();
         }
     }
