@@ -16,6 +16,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "memory-source-accessor.hh"
+
 namespace nix {
 
 using namespace flake;
@@ -921,6 +923,25 @@ LockedFlake lockFlake(
     }
 }
 
+static ref<SourceAccessor> makeInternalFS() {
+    auto internalFS = make_ref<MemorySourceAccessor>(MemorySourceAccessor {});
+    internalFS->setPathDisplay("«flakes-internal»", "");
+    internalFS->addFile(
+        CanonPath("call-flake.nix"),
+        #include "call-flake.nix.gen.hh"
+    );
+    return internalFS;
+}
+
+static auto internalFS = makeInternalFS();
+
+static Value * requireInternalFile(EvalState & state, CanonPath path) {
+    SourcePath p {internalFS, path};
+    auto v = state.allocValue();
+    state.evalFile(p, *v); // has caching
+    return v;
+}
+
 void callFlake(EvalState & state,
     const LockedFlake & lockedFlake,
     Value & vRes)
@@ -960,8 +981,7 @@ void callFlake(EvalState & state,
 
     auto & vOverrides = state.allocValue()->mkAttrs(overrides);
 
-    auto vCallFlake = state.allocValue();
-    state.evalFile(state.callFlakeInternal, *vCallFlake);
+    Value * vCallFlake = requireInternalFile(state, CanonPath("call-flake.nix"));
 
     auto vLocks = state.allocValue();
     vLocks->mkString(lockFileStr);
@@ -972,155 +992,6 @@ void callFlake(EvalState & state,
     Value * args[] = {vLocks, &vOverrides, *vFetchFinalTree};
     state.callFunction(*vCallFlake, args, vRes, noPos);
 }
-
-void initLib(const Settings & settings)
-{
-    auto prim_getFlake = [&settings](EvalState & state, const PosIdx pos, Value * * args, Value & v)
-    {
-        std::string flakeRefS(state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.getFlake"));
-        auto flakeRef = parseFlakeRef(state.fetchSettings, flakeRefS, {}, true);
-        if (state.settings.pureEval && !flakeRef.input.isLocked())
-            throw Error("cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)", flakeRefS, state.positions[pos]);
-
-        callFlake(state,
-            lockFlake(settings, state, flakeRef,
-                LockFlags {
-                    .updateLockFile = false,
-                    .writeLockFile = false,
-                    .useRegistries = !state.settings.pureEval && settings.useRegistries,
-                    .allowUnlocked = !state.settings.pureEval,
-                }),
-            v);
-    };
-
-    RegisterPrimOp::primOps->push_back({
-        .name =  "__getFlake",
-        .args = {"args"},
-        .doc = R"(
-          Fetch a flake from a flake reference, and return its output attributes and some metadata. For example:
-
-          ```nix
-          (builtins.getFlake "nix/55bc52401966fbffa525c574c14f67b00bc4fb3a").packages.x86_64-linux.nix
-          ```
-
-          Unless impure evaluation is allowed (`--impure`), the flake reference
-          must be "locked", e.g. contain a Git revision or content hash. An
-          example of an unlocked usage is:
-
-          ```nix
-          (builtins.getFlake "github:edolstra/dwarffs").rev
-          ```
-        )",
-        .fun = prim_getFlake,
-        .experimentalFeature = Xp::Flakes,
-    });
-}
-
-static void prim_parseFlakeRef(
-    EvalState & state,
-    const PosIdx pos,
-    Value * * args,
-    Value & v)
-{
-    std::string flakeRefS(state.forceStringNoCtx(*args[0], pos,
-        "while evaluating the argument passed to builtins.parseFlakeRef"));
-    auto attrs = parseFlakeRef(state.fetchSettings, flakeRefS, {}, true).toAttrs();
-    auto binds = state.buildBindings(attrs.size());
-    for (const auto & [key, value] : attrs) {
-        auto s = state.symbols.create(key);
-        auto & vv = binds.alloc(s);
-        std::visit(overloaded {
-            [&vv](const std::string    & value) { vv.mkString(value); },
-            [&vv](const uint64_t       & value) { vv.mkInt(value);    },
-            [&vv](const Explicit<bool> & value) { vv.mkBool(value.t); }
-        }, value);
-    }
-    v.mkAttrs(binds);
-}
-
-static RegisterPrimOp r3({
-    .name =  "__parseFlakeRef",
-    .args = {"flake-ref"},
-    .doc = R"(
-      Parse a flake reference, and return its exploded form.
-
-      For example:
-
-      ```nix
-      builtins.parseFlakeRef "github:NixOS/nixpkgs/23.05?dir=lib"
-      ```
-
-      evaluates to:
-
-      ```nix
-      { dir = "lib"; owner = "NixOS"; ref = "23.05"; repo = "nixpkgs"; type = "github"; }
-      ```
-    )",
-    .fun = prim_parseFlakeRef,
-    .experimentalFeature = Xp::Flakes,
-});
-
-
-static void prim_flakeRefToString(
-    EvalState & state,
-    const PosIdx pos,
-    Value * * args,
-    Value & v)
-{
-    state.forceAttrs(*args[0], noPos,
-        "while evaluating the argument passed to builtins.flakeRefToString");
-    fetchers::Attrs attrs;
-    for (const auto & attr : *args[0]->attrs()) {
-        auto t = attr.value->type();
-        if (t == nInt) {
-            auto intValue = attr.value->integer().value;
-
-            if (intValue < 0) {
-                state.error<EvalError>("negative value given for flake ref attr %1%: %2%", state.symbols[attr.name], intValue).atPos(pos).debugThrow();
-            }
-
-            attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
-        } else if (t == nBool) {
-            attrs.emplace(state.symbols[attr.name],
-                Explicit<bool> { attr.value->boolean() });
-        } else if (t == nString) {
-            attrs.emplace(state.symbols[attr.name],
-                std::string(attr.value->string_view()));
-        } else {
-            state.error<EvalError>(
-                "flake reference attribute sets may only contain integers, Booleans, "
-                "and strings, but attribute '%s' is %s",
-                state.symbols[attr.name],
-                showType(*attr.value)).debugThrow();
-        }
-    }
-    auto flakeRef = FlakeRef::fromAttrs(state.fetchSettings, attrs);
-    v.mkString(flakeRef.to_string());
-}
-
-static RegisterPrimOp r4({
-    .name =  "__flakeRefToString",
-    .args = {"attrs"},
-    .doc = R"(
-      Convert a flake reference from attribute set format to URL format.
-
-      For example:
-
-      ```nix
-      builtins.flakeRefToString {
-        dir = "lib"; owner = "NixOS"; ref = "23.05"; repo = "nixpkgs"; type = "github";
-      }
-      ```
-
-      evaluates to
-
-      ```nix
-      "github:NixOS/nixpkgs/23.05?dir=lib"
-      ```
-    )",
-    .fun = prim_flakeRefToString,
-    .experimentalFeature = Xp::Flakes,
-});
 
 }
 

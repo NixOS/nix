@@ -274,13 +274,11 @@ public:
 
     /**
      * In-memory filesystem for internal, non-user-callable Nix
-     * expressions like call-flake.nix.
+     * expressions like `derivation.nix`.
      */
     const ref<MemorySourceAccessor> internalFS;
 
     const SourcePath derivationInternal;
-
-    const SourcePath callFlakeInternal;
 
     /**
      * Store used to materialise .drv files.
@@ -633,7 +631,7 @@ private:
 
     unsigned int baseEnvDispl = 0;
 
-    void createBaseEnv();
+    void createBaseEnv(const EvalSettings & settings);
 
     Value * addConstant(const std::string & name, Value & v, Constant info);
 

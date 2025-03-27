@@ -4675,7 +4675,7 @@ RegisterPrimOp::RegisterPrimOp(PrimOp && primOp)
 }
 
 
-void EvalState::createBaseEnv()
+void EvalState::createBaseEnv(const EvalSettings & evalSettings)
 {
     baseEnv.up = 0;
 
@@ -4933,6 +4933,12 @@ void EvalState::createBaseEnv()
                 primOpAdjusted.arity = std::max(primOp.args.size(), primOp.arity);
                 addPrimOp(std::move(primOpAdjusted));
             }
+
+    for (auto & primOp : evalSettings.extraPrimOps) {
+        auto primOpAdjusted = primOp;
+        primOpAdjusted.arity = std::max(primOp.args.size(), primOp.arity);
+        addPrimOp(std::move(primOpAdjusted));
+    }
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily.

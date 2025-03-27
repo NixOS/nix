@@ -14,14 +14,6 @@ namespace flake {
 
 struct Settings;
 
-/**
- * Initialize `libnixflake`
- *
- * So far, this registers the `builtins.getFlake` primop, which depends
- * on the choice of `flake:Settings`.
- */
-void initLib(const Settings & settings);
-
 struct FlakeInput;
 
 typedef std::map<FlakeId, FlakeInput> FlakeInputs;

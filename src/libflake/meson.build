@@ -39,11 +39,21 @@ add_project_arguments(
 
 subdir('nix-meson-build-support/common')
 
+subdir('nix-meson-build-support/generate-header')
+
+generated_headers = []
+foreach header : [
+  'call-flake.nix',
+]
+  generated_headers += gen_header.process(header)
+endforeach
+
 sources = files(
   'flake/config.cc',
   'flake/flake.cc',
   'flake/flakeref.cc',
   'flake/lockfile.cc',
+  'flake/flake-primops.cc',
   'flake/settings.cc',
   'flake/url-name.cc',
 )
@@ -61,6 +71,7 @@ headers = files(
 this_library = library(
   'nixflake',
   sources,
+  generated_headers,
   dependencies : deps_public + deps_private + deps_other,
   prelink : true, # For C++ static initializers
   install : true,
