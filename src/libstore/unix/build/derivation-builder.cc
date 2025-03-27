@@ -2093,6 +2093,15 @@ void DerivationBuilderImpl::checkOutputs(const std::map<std::string, ValidPathIn
 void DerivationBuilderImpl::deleteTmpDir(bool force)
 {
     if (topTmpDir != "") {
+        /* As an extra caution, even in the event of `deletePath` failing to
+         * cleaning up behind. The `tmpDir` will be chown as if we were to move
+         * it inside the Nix store.
+         *
+         * This hardens against an attack which smuggles a file descriptor
+         * to make use of the temporary directory.
+         */
+        chmod(topTmpDir.c_str(), 0000);
+
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv.isBuiltin()) {
