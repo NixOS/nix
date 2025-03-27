@@ -1329,18 +1329,34 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
                         }
                     } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else
-                            throw Error("expected a derivation");
+                        try {
+                            if (visitor.isDerivation())
+                                showDerivation();
+                            else
+                                throw Error("expected a derivation");
+                        } catch (IFDError & e) {
+                            if (!json) {
+                                logger->cout(fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL, headerPrefix));
+                            } else {
+                                logger->warn(fmt("%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                            }
+                        }
                     }
                 }
 
                 else if (attrPath.size() > 0 && attrPathS[0] == "hydraJobs") {
-                    if (visitor.isDerivation())
-                        showDerivation();
-                    else
-                        recurse();
+                    try {
+                        if (visitor.isDerivation())
+                            showDerivation();
+                        else
+                            recurse();
+                    } catch (IFDError & e) {
+                        if (!json) {
+                            logger->cout(fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL, headerPrefix));
+                        } else {
+                            logger->warn(fmt("%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                        }
+                    }
                 }
 
                 else if (attrPath.size() > 0 && attrPathS[0] == "legacyPackages") {
@@ -1359,11 +1375,19 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
                         }
                     } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else if (attrPath.size() <= 2)
-                            // FIXME: handle recurseIntoAttrs
-                            recurse();
+                        try {
+                            if (visitor.isDerivation())
+                                showDerivation();
+                            else if (attrPath.size() <= 2)
+                                // FIXME: handle recurseIntoAttrs
+                                recurse();
+                        } catch (IFDError & e) {
+                            if (!json) {
+                                logger->cout(fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL, headerPrefix));
+                            } else {
+                                logger->warn(fmt("%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                            }
+                        }
                     }
                 }
 
