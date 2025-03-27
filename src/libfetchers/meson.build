@@ -76,10 +76,15 @@ headers = files(
   'tarball.hh',
 )
 
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
+
 this_library = library(
   'nixfetchers',
   sources,
   dependencies : deps_public + deps_private + deps_other,
+  include_directories : include_dirs,
+  link_args: linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
 )
