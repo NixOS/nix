@@ -5,6 +5,7 @@
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "globals.hh"
+#include "config-global.hh"
 #include "legacy.hh"
 #include "shared.hh"
 #include "store-api.hh"
@@ -485,6 +486,8 @@ void mainWrapped(int argc, char * * argv)
     } catch (UsageError &) {
         if (!args.helpRequested && !args.completions) throw;
     }
+
+    applyJSONLogger();
 
     if (args.helpRequested) {
         std::vector<std::string> subcommand;

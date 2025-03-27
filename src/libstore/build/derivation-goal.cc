@@ -1540,6 +1540,14 @@ Goal::Done DerivationGoal::done(
         fs << worker.store.printStorePath(drvPath) << "\t" << buildResult.toString() << std::endl;
     }
 
+    logger->result(
+        act ? act->id : getCurActivity(),
+        resBuildResult,
+        nlohmann::json(
+            KeyedBuildResult(
+                buildResult,
+                DerivedPath::Built{.drvPath = makeConstantStorePathRef(drvPath), .outputs = wantedOutputs})));
+
     return amDone(buildResult.success() ? ecSuccess : ecFailed, std::move(ex));
 }
 

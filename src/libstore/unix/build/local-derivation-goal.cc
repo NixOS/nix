@@ -2654,6 +2654,12 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                             worker.store.printStorePath(drvPath),
                             wanted.to_string(HashFormat::SRI, true),
                             got.to_string(HashFormat::SRI, true)));
+                    act->result(resHashMismatch,
+                        {
+                            {"storePath", worker.store.printStorePath(drvPath)},
+                            {"wanted", wanted},
+                            {"got", got},
+                        });
                 }
                 if (!newInfo0.references.empty()) {
                     auto numViolations = newInfo.references.size();

@@ -6,6 +6,8 @@
 #include "file-descriptor.hh"
 #include "finally.hh"
 
+#include <filesystem>
+
 #include <nlohmann/json_fwd.hpp>
 
 namespace nix {
@@ -37,6 +39,8 @@ typedef enum {
     resSetExpected = 106,
     resPostBuildLogLine = 107,
     resFetchStatus = 108,
+    resHashMismatch = 109,
+    resBuildResult = 110,
 } ResultType;
 
 typedef uint64_t ActivityId;
@@ -48,6 +52,14 @@ struct LoggerSettings : Config
         R"(
           Whether Nix should print out a stack trace in case of Nix
           expression evaluation errors.
+        )"};
+
+    Setting<Path> jsonLogPath{
+        this, "", "json-log-path",
+        R"(
+          A path to which JSON records of Nix's log output will be
+          written, in the same format as `--log-format internal-json`
+          (without the `@nix ` prefixes on each line).
         )"};
 };
 
@@ -117,6 +129,8 @@ public:
 
     virtual void result(ActivityId act, ResultType type, const Fields & fields) { };
 
+    virtual void result(ActivityId act, ResultType type, const nlohmann::json & json) { };
+
     virtual void writeToStdout(std::string_view s);
 
     template<typename... Args>
@@ -169,6 +183,11 @@ struct Activity
     void setExpected(ActivityType type2, uint64_t expected) const
     { result(resSetExpected, type2, expected); }
 
+    void result(ResultType type, const nlohmann::json & json) const
+    {
+        logger.result(id, type, json);
+    }
+
     template<typename... Args>
     void result(ResultType type, const Args & ... args) const
     {
@@ -196,7 +215,20 @@ extern std::unique_ptr<Logger> logger;
 
 std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
 
-std::unique_ptr<Logger> makeJSONLogger(Descriptor fd);
+/**
+ * Create a logger that sends log messages to `mainLogger` and the
+ * list of loggers in `extraLoggers`. Only `mainLogger` is used for
+ * writing to stdout and getting user input.
+ */
+std::unique_ptr<Logger> makeTeeLogger(
+    std::unique_ptr<Logger> mainLogger,
+    std::vector<std::unique_ptr<Logger>> && extraLoggers);
+
+std::unique_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix = true);
+
+std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix = true);
+
+void applyJSONLogger();
 
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".

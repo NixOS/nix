@@ -16,6 +16,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <nlohmann/json.hpp>
+
 #include <sodium.h>
 
 namespace nix {
@@ -465,6 +467,15 @@ std::string_view printHashAlgo(HashAlgorithm ha)
         // which should be validated with nice error message.
         assert(false);
     }
+}
+
+void to_json(nlohmann::json & json, const Hash & hash)
+{
+    json = nlohmann::json::object(
+        {
+            {"algo", printHashAlgo(hash.algo)},
+            {"base16", hash.to_string(HashFormat::Base16, false)},
+        });
 }
 
 }

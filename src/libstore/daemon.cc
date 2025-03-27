@@ -15,6 +15,7 @@
 #include "derivations.hh"
 #include "args.hh"
 #include "git.hh"
+#include "logging.hh"
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
 # include "monitor-fd.hh"
@@ -1049,6 +1050,7 @@ void processConnection(
     if (!recursive) {
         prevLogger_ = std::move(logger);
         logger = std::move(tunnelLogger_);
+        applyJSONLogger();
     }
 
     unsigned int opCount = 0;

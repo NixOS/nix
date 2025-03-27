@@ -3,7 +3,10 @@
 #include "nar-info.hh"
 #include "finally.hh"
 #include "signals.hh"
+
 #include <coroutine>
+
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -35,6 +38,15 @@ Goal::Done PathSubstitutionGoal::done(
         debug(*errorMsg);
         buildResult.errorMsg = *errorMsg;
     }
+
+    logger->result(
+        getCurActivity(),
+        resBuildResult,
+        nlohmann::json(
+            KeyedBuildResult(
+                buildResult,
+                DerivedPath::Opaque{storePath})));
+
     return amDone(result);
 }
 

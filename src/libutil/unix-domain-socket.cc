@@ -114,4 +114,11 @@ void connect(Socket fd, const std::string & path)
     bindConnectProcHelper("connect", ::connect, fd, path);
 }
 
+AutoCloseFD connect(const std::filesystem::path & path)
+{
+    auto fd = createUnixDomainSocket();
+    nix::connect(toSocket(fd.get()), path);
+    return fd;
+}
+
 }
