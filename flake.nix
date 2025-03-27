@@ -369,6 +369,7 @@
               "nix-expr-tests" = { };
 
               "nix-flake" = { };
+              "nix-flake-c" = { };
               "nix-flake-tests" = { };
 
               "nix-main" = { };

@@ -37,6 +37,7 @@ include_dirs = [include_directories('.')]
 
 headers = files(
   'nix_api_flake.h',
+  'nix_api_flake_internal.hh',
 )
 
 # TODO move this header to libexpr, maybe don't use it in tests?
