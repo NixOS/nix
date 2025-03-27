@@ -4,8 +4,8 @@
 
   nix-store-c,
   nix-expr-c,
-  nix-fetchers-c,
-  nix-flake,
+  nix-util-c,
+  nix-fetchers,
 
   # Configuration Options
 
@@ -17,7 +17,7 @@ let
 in
 
 mkMesonLibrary (finalAttrs: {
-  pname = "nix-flake-c";
+  pname = "nix-fetchers-c";
   inherit version;
 
   workDir = ./.;
@@ -34,10 +34,10 @@ mkMesonLibrary (finalAttrs: {
   ];
 
   propagatedBuildInputs = [
+    nix-util-c
     nix-expr-c
     nix-store-c
-    nix-fetchers-c
-    nix-flake
+    nix-fetchers
   ];
 
   mesonFlags = [
