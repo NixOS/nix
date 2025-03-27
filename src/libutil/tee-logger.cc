@@ -100,9 +100,14 @@ struct TeeLogger : Logger
     }
 };
 
-std::unique_ptr<Logger> makeTeeLogger(std::vector<std::unique_ptr<Logger>> && loggers)
+std::unique_ptr<Logger>
+makeTeeLogger(std::unique_ptr<Logger> mainLogger, std::vector<std::unique_ptr<Logger>> && extraLoggers)
 {
-    return std::make_unique<TeeLogger>(std::move(loggers));
+    std::vector<std::unique_ptr<Logger>> allLoggers;
+    allLoggers.push_back(std::move(mainLogger));
+    for (auto & l : extraLoggers)
+        allLoggers.push_back(std::move(l));
+    return std::make_unique<TeeLogger>(std::move(allLoggers));
 }
 
 }

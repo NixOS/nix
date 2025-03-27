@@ -215,7 +215,14 @@ extern std::unique_ptr<Logger> logger;
 
 std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
 
-std::unique_ptr<Logger> makeTeeLogger(std::vector<std::unique_ptr<Logger>> && loggers);
+/**
+ * Create a logger that sends log messages to `mainLogger` and the
+ * list of loggers in `extraLoggers`. Only `mainLogger` is used for
+ * writing to stdout and getting user input.
+ */
+std::unique_ptr<Logger> makeTeeLogger(
+    std::unique_ptr<Logger> mainLogger,
+    std::vector<std::unique_ptr<Logger>> && extraLoggers);
 
 std::unique_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix = true);
 
