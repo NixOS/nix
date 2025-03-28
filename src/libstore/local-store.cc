@@ -115,7 +115,7 @@ LocalStore::LocalStore(
     state->stmts = std::make_unique<State::Stmts>();
 
     /* Create missing state directories if they don't already exist. */
-    createDirs(realStoreDir);
+    createDirs(realStoreDir.get());
     if (readOnly) {
         experimentalFeatureSettings.require(Xp::ReadOnlyLocalStore);
     } else {
