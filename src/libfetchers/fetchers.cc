@@ -187,34 +187,30 @@ bool Input::contains(const Input & other) const
 }
 
 // FIXME: remove
-std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
+std::tuple<StorePath, ref<SourceAccessor>, Input> Input::fetchToStore(ref<Store> store) const
 {
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
-    auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
-        try {
-            auto [accessor, result] = getAccessorUnchecked(store);
+    try {
+        auto [accessor, result] = getAccessorUnchecked(store);
 
-            auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, result.getName());
+        auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, result.getName());
 
-            auto narHash = store->queryPathInfo(storePath)->narHash;
-            result.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
+        auto narHash = store->queryPathInfo(storePath)->narHash;
+        result.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
-            result.attrs.insert_or_assign("__final", Explicit<bool>(true));
+        result.attrs.insert_or_assign("__final", Explicit<bool>(true));
 
-            assert(result.isFinal());
+        assert(result.isFinal());
 
-            checkLocks(*this, result);
+        checkLocks(*this, result);
 
-            return {storePath, result};
-        } catch (Error & e) {
-            e.addTrace({}, "while fetching the input '%s'", to_string());
-            throw;
-        }
-    }();
-
-    return {std::move(storePath), input};
+        return {std::move(storePath), accessor, result};
+    } catch (Error & e) {
+        e.addTrace({}, "while fetching the input '%s'", to_string());
+        throw;
+    }
 }
 
 void Input::checkLocks(Input specified, Input & result)
@@ -322,6 +318,8 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
             auto accessor = makeStorePathAccessor(store, storePath);
 
             accessor->fingerprint = getFingerprint(store);
+
+            accessor->setPathDisplay("«" + to_string() + "»");
 
             return {accessor, *this};
         } catch (Error & e) {
