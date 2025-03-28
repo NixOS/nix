@@ -18,6 +18,11 @@ struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
     const Setting<Strings> remoteProgram{
         this, {"nix-daemon"}, "remote-program", "Path to the `nix-daemon` executable on the remote machine."};
 
+    /**
+     * Hack for hydra
+     */
+    Strings extraSshArgs = {};
+
     const std::string name() override
     {
         return "Experimental SSH Store";
