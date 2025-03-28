@@ -4,9 +4,11 @@ on:
       os:
         required: true
         type: string
+      system:
+        required: true
+        type: string
 
 jobs:
-
   build:
     strategy:
       fail-fast: false
@@ -16,13 +18,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
         with:
-          flakehub: true
+          determinate: true
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: echo "system=$(nix eval --impure --raw --expr 'builtins.currentSystem')" >> "$GITHUB_OUTPUT"
-        id: system
-      - run: nix build .# .#binaryTarball --no-link -L
-      - run: nix build .#binaryTarball --out-link tarball
+      - run: nix build .#packages.${{ inputs.system }}.default .#packages.${{ inputs.system }}.binaryTarball --no-link -L
+      - run: nix build .#packages.${{ inputs.system }}.binaryTarball --out-link tarball
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.system.outputs.system }}
+          name: ${{ inputs.system }}
           path: ./tarball/*.xz
