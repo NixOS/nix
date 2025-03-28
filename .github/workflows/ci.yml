@@ -40,12 +40,12 @@ jobs:
     if: github.event_name == 'merge_group'
     uses: ./.github/workflows/build.yml
     with:
-      os: macos-13
+      os: macos-latest-large
 
   build_aarch64-darwin:
     uses: ./.github/workflows/build.yml
     with:
-      os: macos-latest
+      os: macos-latest-xlarge
 
   test_x86_64-linux:
     uses: ./.github/workflows/test.yml
@@ -65,14 +65,14 @@ jobs:
     uses: ./.github/workflows/test.yml
     needs: build_aarch64-darwin
     with:
-      os: macos-13
+      os: macos-latest-large
 
   test_aarch64-darwin:
     if: github.event_name == 'merge_group'
     uses: ./.github/workflows/test.yml
     needs: build_aarch64-darwin
     with:
-      os: macos-latest
+      os: macos-latest-xlarge
 
   vm_tests_smoke:
     if: github.event_name != 'merge_group'
