@@ -112,7 +112,8 @@ deps_public += nlohmann_json
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
-# AWS C++ SDK has bad pkg-config
+# AWS C++ SDK has bad pkg-config. See
+# https://github.com/aws/aws-sdk-cpp/issues/2673 for details.
 aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
 configdata.set('ENABLE_S3', aws_s3.found().to_int())
 if aws_s3.found()
