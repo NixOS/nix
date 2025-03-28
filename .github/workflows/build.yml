@@ -4,10 +4,21 @@ on:
       os:
         required: true
         type: string
+      system:
+        required: true
+        type: string
+      if:
+        required: false
+        default: true
+        type: boolean
+      run_tests:
+        required: false
+        default: true
+        type: boolean
 
 jobs:
-
   build:
+    if: ${{ inputs.if }}
     strategy:
       fail-fast: false
     runs-on: ${{ inputs.os }}
@@ -18,11 +29,22 @@ jobs:
         with:
           determinate: true
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: echo "system=$(nix eval --impure --raw --expr 'builtins.currentSystem')" >> "$GITHUB_OUTPUT"
-        id: system
-      - run: nix build .# .#binaryTarball --no-link -L
-      - run: nix build .#binaryTarball --out-link tarball
+      - run: nix build .#packages.${{ inputs.system }}.default .#packages.${{ inputs.system }}.binaryTarball --no-link -L
+      - run: nix build .#packages.${{ inputs.system }}.binaryTarball --out-link tarball
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.system.outputs.system }}
+          name: ${{ inputs.system }}
           path: ./tarball/*.xz
+  test:
+    if: ${{ inputs.if && inputs.run_tests}}
+    strategy:
+      fail-fast: false
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          determinate: true
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - run: nix flake check -L --system ${{ inputs.system }}
