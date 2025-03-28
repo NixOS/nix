@@ -419,12 +419,12 @@ void createDir(const Path & path, mode_t mode)
         throw SysError("creating directory '%1%'", path);
 }
 
-void createDirs(const Path & path)
+void createDirs(const fs::path & path)
 {
     try {
         fs::create_directories(path);
     } catch (fs::filesystem_error & e) {
-        throw SysError("creating directory '%1%'", path);
+        throw SysError("creating directory '%1%'", path.string());
     }
 }
 
