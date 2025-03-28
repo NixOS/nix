@@ -56,6 +56,7 @@ jobs:
     needs: build_x86_64-linux
     with:
       os: blacksmith-32vcpu-ubuntu-2204
+      system: x86_64-linux
 
   test_aarch64-linux:
     if: github.event_name == 'merge_group'
@@ -63,13 +64,15 @@ jobs:
     needs: build_aarch64-linux
     with:
       os: blacksmith-32vcpu-ubuntu-2204-arm
+      system: aarch64-linux
 
   test_x86_64-darwin:
     if: github.event_name == 'merge_group'
     uses: ./.github/workflows/test.yml
-    needs: build_aarch64-darwin
+    needs: build_x86_64-darwin
     with:
       os: macos-latest-large
+      system: x86_64-darwin
 
   test_aarch64-darwin:
     if: github.event_name == 'merge_group'
@@ -77,6 +80,7 @@ jobs:
     needs: build_aarch64-darwin
     with:
       os: macos-latest-xlarge
+      system: aarch64-darwin
 
   vm_tests_smoke:
     if: github.event_name != 'merge_group'
