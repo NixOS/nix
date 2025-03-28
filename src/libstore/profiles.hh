@@ -102,19 +102,19 @@ class LocalFSStore;
 Path createGeneration(LocalFSStore & store, Path profile, StorePath outPath);
 
 /**
- * Unconditionally delete a generation
+ * Delete a specific generation.
  *
  * @param profile A profile specified by its name and location combined into a path.
  *
  * @param gen The generation number specifying exactly which generation
  * to delete.
  *
- * Because there is no check of whether the generation to delete is
- * active, this is somewhat unsafe.
+ * @param dryRun Log what would be deleted instead of actually doing
+ * so.
  *
- * @todo Should we expose this at all?
+ * Trying to delete the currently active generation will fail.
  */
-void deleteGeneration(const Path & profile, GenerationNumber gen);
+void deleteGeneration(const Path & profile, GenerationNumber gen, bool dryRun);
 
 /**
  * Delete the given set of generations.
@@ -130,48 +130,23 @@ void deleteGeneration(const Path & profile, GenerationNumber gen);
  * Trying to delete the currently active generation will fail, and cause
  * no generations to be deleted.
  */
-void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & gensToDelete, bool dryRun);
+void deleteNumberedGenerations(const Path & profile, const std::set<GenerationNumber> & gensToDelete, bool dryRun);
 
 /**
- * Delete generations older than `max` passed the current generation.
+ * Delete unused generations.
  *
  * @param profile The profile, specified by its name and location combined into a path, whose generations we want to delete.
  *
- * @param max How many generations to keep up to the current one. Must
- * be at least 1 so we don't delete the current one.
+ * @param period Specifies which generations to keep.
+ * "old" removes all unused generations.
+ * "+*N*" will keep up to *N* generations older than the current generation.
+ * "*N*d" will keep up to *N* days older than the current generation
  *
  * @param dryRun Log what would be deleted instead of actually doing
  * so.
  */
-void deleteGenerationsGreaterThan(const Path & profile, GenerationNumber max, bool dryRun);
+void deleteUnusedGenerations(const Path & profile, std::string_view period, bool dryRun);
 
-/**
- * Delete all generations other than the current one
- *
- * @param profile The profile, specified by its name and location combined into a path, whose generations we want to delete.
- *
- * @param dryRun Log what would be deleted instead of actually doing
- * so.
- */
-void deleteOldGenerations(const Path & profile, bool dryRun);
-
-/**
- * Delete generations older than `t`, except for the most recent one
- * older than `t`.
- *
- * @param profile The profile, specified by its name and location combined into a path, whose generations we want to delete.
- *
- * @param dryRun Log what would be deleted instead of actually doing
- * so.
- */
-void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun);
-
-/**
- * Parse a temp spec intended for `deleteGenerationsOlderThan()`.
- *
- * Throws an exception if `timeSpec` fails to parse.
- */
-time_t parseOlderThanTimeSpec(std::string_view timeSpec);
 
 /**
  * Smaller wrapper around `replaceSymlink` for replacing the current

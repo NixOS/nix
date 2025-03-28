@@ -16,7 +16,7 @@ namespace nix::fs { using namespace std::filesystem; }
 
 using namespace nix;
 
-std::string deleteOlderThan;
+std::string deletePeriod = "old";
 bool dryRun = false;
 
 
@@ -46,11 +46,7 @@ void removeOldGenerations(fs::path dir)
             }
             if (link.find("link") != std::string::npos) {
                 printInfo("removing old generations of profile %s", path);
-                if (deleteOlderThan != "") {
-                    auto t = parseOlderThanTimeSpec(deleteOlderThan);
-                    deleteGenerationsOlderThan(path, t, dryRun);
-                } else
-                    deleteOldGenerations(path, dryRun);
+                deleteUnusedGenerations(path, deletePeriod, dryRun);
             }
         } else if (type == fs::file_type::directory) {
             removeOldGenerations(path);
@@ -73,7 +69,7 @@ static int main_nix_collect_garbage(int argc, char * * argv)
             else if (*arg == "--delete-old" || *arg == "-d") removeOld = true;
             else if (*arg == "--delete-older-than") {
                 removeOld = true;
-                deleteOlderThan = getArg(*arg, arg, end);
+                deletePeriod = getArg(*arg, arg, end);
             }
             else if (*arg == "--dry-run") dryRun = true;
             else if (*arg == "--max-freed")
