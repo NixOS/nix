@@ -51,39 +51,6 @@ jobs:
       os: namespace-profile-mac-m2-12c28g
       system: aarch64-darwin
 
-  test_x86_64-linux:
-    uses: ./.github/workflows/test.yml
-    needs: build_x86_64-linux
-    with:
-      os: blacksmith-32vcpu-ubuntu-2204
-      system: x86_64-linux
-
-  test_aarch64-linux:
-    if: success() || failure()
-    uses: ./.github/workflows/test.yml
-    needs: build_aarch64-linux
-    with:
-      if: ${{ github.event_name == 'merge_group' }}
-      os: blacksmith-32vcpu-ubuntu-2204-arm
-      system: aarch64-linux
-
-  test_x86_64-darwin:
-    if: success() || failure()
-    uses: ./.github/workflows/test.yml
-    needs: build_x86_64-darwin
-    with:
-      if: ${{ github.event_name == 'merge_group' }}
-      os: namespace-profile-mac-m2-12c28g
-      system: x86_64-darwin
-
-  test_aarch64-darwin:
-    uses: ./.github/workflows/test.yml
-    needs: build_aarch64-darwin
-    with:
-      if: ${{ github.event_name == 'merge_group' }}
-      os: namespace-profile-mac-m2-12c28g
-      system: aarch64-darwin
-
   vm_tests_smoke:
     if: github.event_name != 'merge_group'
     needs: build_x86_64-linux
@@ -165,7 +132,7 @@ jobs:
         run: nix build .#hydraJobs.manual
       - uses: nwtgck/actions-netlify@v3.0
         with:
-          publish-dir: './result/share/doc/nix/manual'
+          publish-dir: "./result/share/doc/nix/manual"
           production-branch: detsys-main
           github-token: ${{ secrets.GITHUB_TOKEN }}
           deploy-message: "Deploy from GitHub Actions"

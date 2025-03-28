@@ -30,24 +30,28 @@ jobs:
     with:
       os: blacksmith-32vcpu-ubuntu-2204
       system: x86_64-linux
+      run_tests: false
 
   build-aarch64-linux:
     uses: ./.github/workflows/build.yml
     with:
       os: blacksmith-32vcpu-ubuntu-2204-arm
       system: aarch64-linux
+      run_tests: false
 
   build-x86_64-darwin:
     uses: ./.github/workflows/build.yml
     with:
       os: macos-13
       system: x86_64-darwin
+      run_tests: false
 
   build-aarch64-darwin:
     uses: ./.github/workflows/build.yml
     with:
       os: macos-latest
       system: aarch64-darwin
+      run_tests: false
 
   release:
     runs-on: ubuntu-latest
