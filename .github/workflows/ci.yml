@@ -17,35 +17,39 @@ jobs:
   eval:
     runs-on: blacksmith-32vcpu-ubuntu-2204
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    - uses: DeterminateSystems/nix-installer-action@main
-      with:
-        flakehub: true
-    - run: nix flake show --all-systems --json
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          flakehub: true
+      - run: nix flake show --all-systems --json
 
   build_x86_64-linux:
     uses: ./.github/workflows/build.yml
     with:
       os: blacksmith-32vcpu-ubuntu-2204
+      system: x86_64-linux
 
   build_aarch64-linux:
     if: github.event_name == 'merge_group'
     uses: ./.github/workflows/build.yml
     with:
       os: blacksmith-32vcpu-ubuntu-2204-arm
+      system: aarch64-linux
 
   build_x86_64-darwin:
     if: github.event_name == 'merge_group'
     uses: ./.github/workflows/build.yml
     with:
       os: macos-latest-large
+      system: x86_64-darwin
 
   build_aarch64-darwin:
     uses: ./.github/workflows/build.yml
     with:
       os: macos-latest-xlarge
+      system: aarch64-darwin
 
   test_x86_64-linux:
     uses: ./.github/workflows/test.yml
