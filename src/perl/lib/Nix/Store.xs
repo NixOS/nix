@@ -1,6 +1,3 @@
-#include "nix/config-util.hh"
-#include "nix/config-store.hh"
-
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"

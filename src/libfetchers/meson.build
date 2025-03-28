@@ -30,15 +30,6 @@ deps_public += nlohmann_json
 libgit2 = dependency('libgit2')
 deps_private += libgit2
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'nix/config-util.hh',
-  '-include', 'nix/config-store.hh',
-  # '-include', 'nix_api_fetchers_config.h',
-  language : 'cpp',
-)
-
 subdir('nix-meson-build-support/common')
 
 sources = files(

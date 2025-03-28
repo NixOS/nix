@@ -1,3 +1,5 @@
+#include "main-config-private.hh"
+
 #include "nix/globals.hh"
 #include "nix/current-process.hh"
 #include "nix/shared.hh"
@@ -297,7 +299,7 @@ void printVersion(const std::string & programName)
     std::cout << fmt("%1% (Nix) %2%", programName, nixVersion) << std::endl;
     if (verbosity > lvlInfo) {
         Strings cfg;
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
         cfg.push_back("gc");
 #endif
         cfg.push_back("signed-caches");

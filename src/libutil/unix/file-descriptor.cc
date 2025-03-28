@@ -1,3 +1,6 @@
+#include "util-config-private.hh"
+#include "util-unix-config-private.hh"
+
 #include "nix/file-system.hh"
 #include "nix/signals.hh"
 #include "nix/finally.hh"

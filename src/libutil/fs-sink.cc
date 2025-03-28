@@ -1,3 +1,5 @@
+#include "util-config-private.hh"
+
 #include <fcntl.h>
 
 #include "nix/error.hh"

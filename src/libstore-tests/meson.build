@@ -37,16 +37,16 @@ deps_private += rapidcheck
 gtest = dependency('gtest', main : true)
 deps_private += gtest
 
+configdata = configuration_data()
+configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
+
+config_priv_h = configure_file(
+  configuration : configdata,
+  output : 'store-tests-config.hh',
+)
+
 gtest = dependency('gmock')
 deps_private += gtest
-
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'nix/config-util.hh',
-  '-include', 'nix/config-store.hh',
-  language : 'cpp',
-)
 
 subdir('nix-meson-build-support/common')
 
@@ -84,6 +84,7 @@ include_dirs = [include_directories('.')]
 this_exe = executable(
   meson.project_name(),
   sources,
+  config_priv_h,
   dependencies : deps_private_subproject + deps_private + deps_other,
   include_directories : include_dirs,
   # TODO: -lrapidcheck, see ../libutil-support/build.meson

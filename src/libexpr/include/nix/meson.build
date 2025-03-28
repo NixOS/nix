@@ -2,12 +2,12 @@
 
 include_dirs = [include_directories('..')]
 
-config_h = configure_file(
-  configuration : configdata,
-  output : 'config-expr.hh',
+config_pub_h = configure_file(
+  configuration : configdata_pub,
+  output : 'expr-config.hh',
 )
 
-headers = [config_h] + files(
+headers = [config_pub_h] + files(
   'attr-path.hh',
   'attr-set.hh',
   'eval-cache.hh',

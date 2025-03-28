@@ -15,7 +15,7 @@ void setPersonality(std::string_view system)
         struct utsname utsbuf;
         uname(&utsbuf);
         if ((system == "i686-linux"
-                && (std::string_view(SYSTEM) == "x86_64-linux"
+                && (std::string_view(NIX_LOCAL_SYSTEM) == "x86_64-linux"
                     || (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64"))))
             || system == "armv7l-linux"
             || system == "armv6l-linux"

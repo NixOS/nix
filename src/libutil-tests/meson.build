@@ -35,14 +35,9 @@ deps_private += gtest
 configdata = configuration_data()
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
-config_h = configure_file(
+config_priv_h = configure_file(
   configuration : configdata,
-  output : 'config-util-tests.hh',
-)
-
-add_project_arguments(
-  '-include', 'config-util-tests.hh',
-  language : 'cpp',
+  output : 'util-tests-config.hh',
 )
 
 subdir('nix-meson-build-support/common')
@@ -84,7 +79,7 @@ include_dirs = [include_directories('.')]
 this_exe = executable(
   meson.project_name(),
   sources,
-  config_h,
+  config_priv_h,
   dependencies : deps_private_subproject + deps_private + deps_other,
   include_directories : include_dirs,
   # TODO: -lrapidcheck, see ../libutil-support/build.meson

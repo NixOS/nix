@@ -27,16 +27,6 @@ subdir('nix-meson-build-support/subprojects')
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'nix/config-util.hh',
-  '-include', 'nix/config-store.hh',
-  # '-include', 'nix_api_fetchers_config.h',
-  '-include', 'nix/config-expr.hh',
-  language : 'cpp',
-)
-
 subdir('nix-meson-build-support/common')
 
 subdir('nix-meson-build-support/generate-header')

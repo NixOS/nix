@@ -168,7 +168,7 @@ ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalV
         context->last_err_code = NIX_OK;
     try {
         auto ret = new
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
             (GC)
 #endif
                 NixCExternalValue(*desc, v);

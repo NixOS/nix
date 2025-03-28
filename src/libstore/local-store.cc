@@ -1,3 +1,5 @@
+#include "store-config-private.hh"
+
 #include "nix/local-store.hh"
 #include "nix/globals.hh"
 #include "nix/git.hh"

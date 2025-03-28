@@ -1,3 +1,6 @@
+#include "util-config-private.hh"
+#include "util-unix-config-private.hh"
+
 #include "nix/current-process.hh"
 #include "nix/environment-variables.hh"
 #include "nix/executable-path.hh"

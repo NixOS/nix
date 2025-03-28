@@ -25,13 +25,6 @@ subdir('nix-meson-build-support/subprojects')
 rapidcheck = dependency('rapidcheck')
 deps_public += rapidcheck
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'nix/config-util.hh',
-  language : 'cpp',
-)
-
 subdir('nix-meson-build-support/common')
 
 sources = files(

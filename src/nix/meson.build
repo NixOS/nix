@@ -46,25 +46,15 @@ if not fs.is_absolute(bindir)
 endif
 configdata.set_quoted('NIX_BIN_DIR', bindir)
 
-config_h = configure_file(
+config_priv_h = configure_file(
   configuration : configdata,
-  output : 'config-nix-cli.hh',
-)
-
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'nix/config-util.hh',
-  '-include', 'nix/config-store.hh',
-  '-include', 'nix/config-expr.hh',
-  '-include', 'config-nix-cli.hh',
-  language : 'cpp',
+  output : 'cli-config-private.hh',
 )
 
 subdir('nix-meson-build-support/common')
 subdir('nix-meson-build-support/generate-header')
 
-nix_sources = [config_h] + files(
+nix_sources = [config_priv_h] + files(
   'add-to-store.cc',
   'app.cc',
   'self-exe.cc',

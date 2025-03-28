@@ -23,6 +23,9 @@
 #include "nix/posix-source-accessor.hh"
 #include "nix/restricted-store.hh"
 
+#include "nix/store-config.hh"
+#include "store-config-private.hh"
+
 #include <regex>
 #include <queue>
 
@@ -1785,7 +1788,7 @@ void setupSeccomp()
         seccomp_release(ctx);
     });
 
-    constexpr std::string_view nativeSystem = SYSTEM;
+    constexpr std::string_view nativeSystem = NIX_LOCAL_SYSTEM;
 
     if (nativeSystem == "x86_64-linux" &&
         seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)

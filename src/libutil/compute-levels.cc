@@ -1,3 +1,5 @@
+#include "util-config-private.hh"
+
 #include "nix/types.hh"
 
 #if HAVE_LIBCPUID
