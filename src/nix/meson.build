@@ -57,9 +57,6 @@ add_project_arguments(
   '-include', 'config-util.hh',
   '-include', 'config-store.hh',
   '-include', 'config-expr.hh',
-  #'-include', 'config-fetchers.hh',
-  '-include', 'config-main.hh',
-  '-include', 'config-cmd.hh',
   '-include', 'config-nix-cli.hh',
   language : 'cpp',
 )
