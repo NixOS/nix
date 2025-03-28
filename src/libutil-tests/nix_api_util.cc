@@ -9,6 +9,8 @@
 
 #include <memory>
 
+#include "util-tests-config.hh"
+
 namespace nixC {
 
 TEST_F(nix_api_util_context, nix_context_error)

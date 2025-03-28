@@ -23,35 +23,19 @@ deps_public_maybe_subproject = [
 subdir('nix-meson-build-support/subprojects')
 
 # Check for each of these functions, and create a define like `#define
-# HAVE_LUTIMES 1`. The `#define` is unconditional, 0 for not found and 1
-# for found. One therefore uses it with `#if` not `#ifdef`.
+# HAVE_POSIX_FALLOCATE 1`. The `#define` is unconditional, 0 for not
+# found and 1 for found. One therefore uses it with `#if` not `#ifdef`.
 check_funcs = [
-  'close_range',
-  # Optionally used for changing the mtime of symlinks.
-  'lutimes',
-  # Optionally used for creating pipes on Unix
-  'pipe2',
-  # Optionally used to preallocate files to be large enough before
-  # writing to them.
-  # WARNING: define also used in libstore
-  'posix_fallocate',
-  # Optionally used to get more information about processes failing due
-  # to a signal on Unix.
-  'strsignal',
-  # Optionally used to try to close more file descriptors (e.g. before
-  # forking) on Unix.
-  # WARNING: also used in libexpr
-  'sysconf',
-  # Optionally used for changing the mtime of files and symlinks.
-  'utimensat',
+  [
+    'posix_fallocate',
+    'Optionally used to preallocate files to be large enough before writing to them.',
+  ],
 ]
 foreach funcspec : check_funcs
-  define_name = 'HAVE_' + funcspec.underscorify().to_upper()
-  define_value = cxx.has_function(funcspec).to_int()
-  configdata.set(define_name, define_value)
+  define_name = 'HAVE_' + funcspec[0].underscorify().to_upper()
+  define_value = cxx.has_function(funcspec[0]).to_int()
+  configdata.set(define_name, define_value, description: funcspec[1])
 endforeach
-
-configdata.set('HAVE_DECL_AT_SYMLINK_NOFOLLOW', cxx.has_header_symbol('fcntl.h', 'AT_SYMLINK_NOFOLLOW').to_int())
 
 subdir('nix-meson-build-support/libatomic')
 
@@ -116,16 +100,14 @@ deps_public += nlohmann_json
 
 cxx = meson.get_compiler('cpp')
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'nix/config-util.hh',
-  language : 'cpp',
+config_priv_h = configure_file(
+  configuration : configdata,
+  output : 'util-config-private.hh',
 )
 
 subdir('nix-meson-build-support/common')
 
-sources = files(
+sources = [config_priv_h] + files(
   'archive.cc',
   'args.cc',
   'canon-path.cc',

@@ -6,6 +6,7 @@
 #include "nix/abstract-setting-to-json.hh"
 #include "nix/compute-levels.hh"
 #include "nix/signals.hh"
+#include "nix/strings.hh"
 
 #include <algorithm>
 #include <map>
@@ -35,7 +36,8 @@
 #include <sys/sysctl.h>
 #endif
 
-#include "nix/strings.hh"
+#include "store-config-private.hh"
+
 
 namespace nix {
 
@@ -202,7 +204,7 @@ StringSet Settings::getDefaultExtraPlatforms()
 {
     StringSet extraPlatforms;
 
-    if (std::string{SYSTEM} == "x86_64-linux" && !isWSL1())
+    if (std::string{NIX_LOCAL_SYSTEM} == "x86_64-linux" && !isWSL1())
         extraPlatforms.insert("i686-linux");
 
 #if __linux__
@@ -214,7 +216,7 @@ StringSet Settings::getDefaultExtraPlatforms()
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
     // always exec with their own binary preferences.
-    if (std::string{SYSTEM} == "aarch64-darwin" &&
+    if (std::string{NIX_LOCAL_SYSTEM} == "aarch64-darwin" &&
         runProgram(RunOptions {.program = "arch", .args = {"-arch", "x86_64", "/usr/bin/true"}, .mergeStderrToStdout = true}).first == 0)
         extraPlatforms.insert("x86_64-darwin");
 #endif
