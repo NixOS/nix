@@ -74,7 +74,7 @@ endif
 
 include_dirs = [include_directories('.')]
 
-headers = [config_h] + files(
+headers = files(
   'common-args.hh',
   'loggers.hh',
   'plugin.hh',
@@ -85,6 +85,7 @@ headers = [config_h] + files(
 this_library = library(
   'nixmain',
   sources,
+  config_h,
   dependencies : deps_public + deps_private + deps_other,
   prelink : true, # For C++ static initializers
   install : true,

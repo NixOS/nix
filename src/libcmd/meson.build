@@ -63,9 +63,7 @@ add_project_arguments(
   # It would be nice for our headers to be idempotent instead.
   '-include', 'config-util.hh',
   '-include', 'config-store.hh',
-  # '-include', 'config-fetchers.h',
   '-include', 'config-expr.hh',
-  '-include', 'config-main.hh',
   '-include', 'config-cmd.hh',
   language : 'cpp',
 )
@@ -93,7 +91,7 @@ sources = files(
 
 include_dirs = [include_directories('.')]
 
-headers = [config_h] + files(
+headers = files(
   'built-path.hh',
   'command-installable-value.hh',
   'command.hh',
@@ -116,6 +114,7 @@ headers = [config_h] + files(
 this_library = library(
   'nixcmd',
   sources,
+  config_h,
   dependencies : deps_public + deps_private + deps_other,
   prelink : true, # For C++ static initializers
   install : true,
