@@ -72,10 +72,6 @@ pkgs.nixComponents.nix-util.overrideAttrs (
     src = null;
 
     env = {
-      # Needed for Meson to find Boost.
-      # https://github.com/NixOS/nixpkgs/issues/86131.
-      BOOST_INCLUDEDIR = "${lib.getDev pkgs.nixDependencies.boost}/include";
-      BOOST_LIBRARYDIR = "${lib.getLib pkgs.nixDependencies.boost}/lib";
       # For `make format`, to work without installing pre-commit
       _NIX_PRE_COMMIT_HOOKS_CONFIG = "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml"
         modular.pre-commit.settings.rawConfig
