@@ -546,7 +546,7 @@ static int main_nix_daemon(int argc, char * * argv)
 
 static RegisterLegacyCommand r_nix_daemon("nix-daemon", main_nix_daemon);
 
-struct CmdDaemon : StoreCommand
+struct CmdDaemon : Command
 {
     bool stdio = false;
     std::optional<TrustedFlag> isTrustedOpt = std::nullopt;
@@ -615,7 +615,7 @@ struct CmdDaemon : StoreCommand
           ;
     }
 
-    void run(ref<Store> store) override
+    void run() override
     {
         runDaemon(stdio, isTrustedOpt, processOps);
     }
