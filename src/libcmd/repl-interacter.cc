@@ -1,3 +1,5 @@
+#include "cmd-config-private.hh"
+
 #include <cstdio>
 
 #ifdef USE_READLINE
