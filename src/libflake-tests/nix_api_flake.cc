@@ -14,7 +14,7 @@
 
 namespace nixC {
 
-TEST_F(nix_api_store_test, nix_api_init_global_getFlake_exists)
+TEST_F(nix_api_store_test, nix_api_init_getFlake_exists)
 {
     nix_libstore_init(ctx);
     assert_ctx_ok();
