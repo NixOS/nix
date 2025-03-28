@@ -62,7 +62,7 @@ jobs:
     uses: ./.github/workflows/test.yml
     needs: build_aarch64-linux
     with:
-      if: github.event_name == 'merge_group'
+      if: ${{ github.event_name == 'merge_group' }}
       os: blacksmith-32vcpu-ubuntu-2204-arm
       system: aarch64-linux
 
@@ -70,7 +70,7 @@ jobs:
     uses: ./.github/workflows/test.yml
     needs: build_x86_64-darwin
     with:
-      if: github.event_name == 'merge_group'
+      if: ${{ github.event_name == 'merge_group' }}
       os: namespace-profile-mac-m2-12c28g
       system: x86_64-darwin
 
@@ -78,7 +78,7 @@ jobs:
     uses: ./.github/workflows/test.yml
     needs: build_aarch64-darwin
     with:
-      if: github.event_name == 'merge_group'
+      if: ${{ github.event_name == 'merge_group' }}
       os: namespace-profile-mac-m2-12c28g
       system: aarch64-darwin
 
