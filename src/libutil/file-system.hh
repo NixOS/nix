@@ -231,14 +231,9 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed);
 /**
  * Create a directory and all its parents, if necessary.
  *
- * In the process of being deprecated for
- * `std::filesystem::create_directories`.
+ * Wrapper around `std::filesystem::create_directories` to handle exceptions.
  */
-void createDirs(const Path & path);
-inline void createDirs(PathView path)
-{
-    return createDirs(Path(path));
-}
+void createDirs(const std::filesystem::path & path);
 
 /**
  * Create a single directory.
