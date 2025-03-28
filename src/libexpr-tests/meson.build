@@ -41,9 +41,6 @@ add_project_arguments(
   '-include', 'config-util.hh',
   '-include', 'config-store.hh',
   '-include', 'config-expr.hh',
-  '-include', 'config-util.h',
-  '-include', 'config-store.h',
-  '-include', 'config-expr.h',
   language : 'cpp',
 )
 
