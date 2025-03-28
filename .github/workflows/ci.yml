@@ -59,6 +59,7 @@ jobs:
       system: x86_64-linux
 
   test_aarch64-linux:
+    if: success() || failure()
     uses: ./.github/workflows/test.yml
     needs: build_aarch64-linux
     with:
@@ -67,6 +68,7 @@ jobs:
       system: aarch64-linux
 
   test_x86_64-darwin:
+    if: success() || failure()
     uses: ./.github/workflows/test.yml
     needs: build_x86_64-darwin
     with:
