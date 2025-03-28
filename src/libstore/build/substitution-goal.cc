@@ -174,8 +174,13 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
     }
 
     for (auto & i : info->references)
-        if (i != storePath) /* ignore self-references */
-            assert(worker.store.isValidPath(i));
+         /* ignore self-references */
+        if (i != storePath) {
+            if (!worker.store.isValidPath(i)) {
+                throw Error("reference '%s' of path '%s' is not a valid path",
+                            worker.store.printStorePath(i), worker.store.printStorePath(storePath));
+            }
+        }
 
     co_await yield();
 
