@@ -4,6 +4,8 @@
 #include "finally.hh"
 #include "terminal.hh"
 
+#include "cmd-config-private.hh"
+
 #if HAVE_LOWDOWN
 #  include <sys/queue.h>
 #  include <lowdown.h>

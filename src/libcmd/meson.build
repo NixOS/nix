@@ -55,7 +55,7 @@ endif
 
 config_h = configure_file(
   configuration : configdata,
-  output : 'config-cmd.hh',
+  output : 'cmd-config-private.hh',
 )
 
 add_project_arguments(
@@ -64,7 +64,6 @@ add_project_arguments(
   '-include', 'config-util.hh',
   '-include', 'config-store.hh',
   '-include', 'config-expr.hh',
-  '-include', 'config-cmd.hh',
   language : 'cpp',
 )
 
