@@ -5,7 +5,9 @@
 #include "nix/serialise.hh"
 #include "nix/eval-gc.hh"
 
-#if HAVE_BOEHMGC
+#include "expr-config-private.hh"
+
+#if NIX_USE_BOEHMGC
 
 #  include <pthread.h>
 #  if __FreeBSD__
@@ -24,7 +26,7 @@
 
 namespace nix {
 
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
 /* Called when the Boehm GC runs out of memory. */
 static void * oomHandler(size_t requested)
 {
@@ -94,7 +96,7 @@ void initGC()
     if (gcInitialised)
         return;
 
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     initGCReal();
 
     gcCyclesAfterInit = GC_get_gc_no();

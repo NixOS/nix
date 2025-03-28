@@ -295,7 +295,7 @@ EvalState::EvalState(
     , debugStop(false)
     , trylevel(0)
     , regexCache(makeRegexCache())
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
@@ -2812,7 +2812,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
 }
 
 bool EvalState::fullGC() {
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     GC_gcollect();
     // Check that it ran. We might replace this with a version that uses more
     // of the boehm API to get this reliably, at a maintenance cost.
@@ -2831,7 +2831,7 @@ void EvalState::maybePrintStats()
 
     if (showStats) {
         // Make the final heap size more deterministic.
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
         if (!fullGC()) {
             warn("failed to perform a full GC before reporting stats");
         }
@@ -2853,7 +2853,7 @@ void EvalState::printStatistics()
     uint64_t bValues = nrValues * sizeof(Value);
     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
 
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     GC_word heapSize, totalBytes;
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
     double gcFullOnlyTime = ({
@@ -2875,7 +2875,7 @@ void EvalState::printStatistics()
 #ifndef _WIN32 // TODO implement
         {"cpu", cpuTime},
 #endif
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
         {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
 #ifndef _WIN32 // TODO implement
         {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
@@ -2919,7 +2919,7 @@ void EvalState::printStatistics()
     topObj["nrLookups"] = nrLookups;
     topObj["nrPrimOpCalls"] = nrPrimOpCalls;
     topObj["nrFunctionCalls"] = nrFunctionCalls;
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     topObj["gc"] = {
         {"heapSize", heapSize},
         {"totalBytes", totalBytes},

@@ -6,6 +6,8 @@
 #include "nix/tests/nix_api_store.hh"
 #include "nix/tests/string_callback.hh"
 
+#include "store-tests-config.hh"
+
 namespace nixC {
 
 std::string PATH_SUFFIX = "/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-name";

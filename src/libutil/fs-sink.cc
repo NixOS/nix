@@ -10,6 +10,8 @@
 # include "nix/windows-error.hh"
 #endif
 
+#include "util-config-private.hh"
+
 namespace nix {
 
 void copyRecursive(

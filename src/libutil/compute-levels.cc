@@ -1,5 +1,7 @@
 #include "nix/types.hh"
 
+#include "util-config-private.hh"
+
 #if HAVE_LIBCPUID
 #include <libcpuid/libcpuid.h>
 #endif

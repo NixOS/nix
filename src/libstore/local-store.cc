@@ -54,6 +54,8 @@
 
 #include "nix/strings.hh"
 
+#include "store-config-private.hh"
+
 
 namespace nix {
 

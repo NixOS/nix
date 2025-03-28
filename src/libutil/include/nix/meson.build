@@ -2,12 +2,7 @@
 
 include_dirs = [include_directories('..')]
 
-config_h = configure_file(
-  configuration : configdata,
-  output : 'config-util.hh',
-)
-
-headers = [config_h] + files(
+headers = files(
   'abstract-setting-to-json.hh',
   'ansicolor.hh',
   'archive.hh',
