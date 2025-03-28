@@ -42,13 +42,13 @@ jobs:
     if: github.event_name == 'merge_group'
     uses: ./.github/workflows/build.yml
     with:
-      os: macos-latest-large
+      os: namespace-profile-mac-m2-12c28g
       system: x86_64-darwin
 
   build_aarch64-darwin:
     uses: ./.github/workflows/build.yml
     with:
-      os: macos-latest-xlarge
+      os: namespace-profile-mac-m2-12c28g
       system: aarch64-darwin
 
   test_x86_64-linux:
@@ -71,7 +71,7 @@ jobs:
     needs: build_x86_64-darwin
     with:
       if: github.event_name == 'merge_group'
-      os: macos-latest-large
+      os: namespace-profile-mac-m2-12c28g
       system: x86_64-darwin
 
   test_aarch64-darwin:
@@ -79,7 +79,7 @@ jobs:
     needs: build_aarch64-darwin
     with:
       if: github.event_name == 'merge_group'
-      os: macos-latest-xlarge
+      os: namespace-profile-mac-m2-12c28g
       system: aarch64-darwin
 
   vm_tests_smoke:
