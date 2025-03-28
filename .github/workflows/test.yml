@@ -4,9 +4,10 @@ on:
       os:
         required: true
         type: string
-
+      system:
+        required: true
+        type: string
 jobs:
-
   tests:
     strategy:
       fail-fast: false
@@ -18,4 +19,4 @@ jobs:
         with:
           flakehub: true
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix flake check -L
+      - run: nix flake check -L --system ${{ inputs.system }}
