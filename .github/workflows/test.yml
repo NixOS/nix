@@ -7,8 +7,13 @@ on:
       system:
         required: true
         type: string
+      if:
+        required: false
+        default: true
+        type: boolean
 jobs:
   tests:
+    if: ${{ inputs.if }}
     strategy:
       fail-fast: false
     runs-on: ${{ inputs.os }}

@@ -59,26 +59,26 @@ jobs:
       system: x86_64-linux
 
   test_aarch64-linux:
-    if: github.event_name == 'merge_group'
     uses: ./.github/workflows/test.yml
     needs: build_aarch64-linux
     with:
+      if: github.event_name == 'merge_group'
       os: blacksmith-32vcpu-ubuntu-2204-arm
       system: aarch64-linux
 
   test_x86_64-darwin:
-    if: github.event_name == 'merge_group'
     uses: ./.github/workflows/test.yml
     needs: build_x86_64-darwin
     with:
+      if: github.event_name == 'merge_group'
       os: macos-latest-large
       system: x86_64-darwin
 
   test_aarch64-darwin:
-    if: github.event_name == 'merge_group'
     uses: ./.github/workflows/test.yml
     needs: build_aarch64-darwin
     with:
+      if: github.event_name == 'merge_group'
       os: macos-latest-xlarge
       system: aarch64-darwin
 
