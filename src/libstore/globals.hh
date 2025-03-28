@@ -608,11 +608,20 @@ public:
           `/dev`, `/dev/shm` and `/dev/pts` (on Linux), and the paths
           configured with the `sandbox-paths` option. This is useful to
           prevent undeclared dependencies on files in directories such as
-          `/usr/bin`. In addition, on Linux, builds run in private PID,
-          mount, network, IPC and UTS namespaces to isolate them from other
-          processes in the system (except that fixed-output derivations do
-          not run in private network namespace to ensure they can access the
-          network).
+          `/usr/bin`.
+
+          In addition, on Linux, builds run in private PID, mount, network,
+          IPC and UTS namespaces to isolate them from other processes in the
+          system (except that fixed-output derivations do not run in private
+          network namespace to ensure they can access the network).
+
+          On macOS, local port binding is disabled by default when the
+          sandbox is enabled. Derivations that have the
+          `__darwinAllowLocalNetworking` attribute set to `true` will have a
+          sandbox exception added to allow it.
+
+          The macOS sandbox has known limitations, and should not be
+          considered a strong security boundary.
 
           Currently, sandboxing only work on Linux and macOS. The use of a
           sandbox requires that Nix is run as root (so you should use the
