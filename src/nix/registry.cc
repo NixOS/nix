@@ -1,11 +1,11 @@
-#include "command.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "eval.hh"
-#include "flake/flake.hh"
-#include "store-api.hh"
-#include "fetchers.hh"
-#include "registry.hh"
+#include "nix/command.hh"
+#include "nix/common-args.hh"
+#include "nix/shared.hh"
+#include "nix/eval.hh"
+#include "nix/flake/flake.hh"
+#include "nix/store-api.hh"
+#include "nix/fetchers.hh"
+#include "nix/registry.hh"
 
 using namespace nix;
 using namespace nix::flake;

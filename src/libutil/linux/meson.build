@@ -3,9 +3,4 @@ sources += files(
   'namespaces.cc',
 )
 
-include_dirs += include_directories('.')
-
-headers += files(
-  'cgroup.hh',
-  'namespaces.hh',
-)
+subdir('include/nix')

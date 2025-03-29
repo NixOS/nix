@@ -1,7 +1,7 @@
-#include "pathlocks.hh"
-#include "util.hh"
-#include "sync.hh"
-#include "signals.hh"
+#include "nix/pathlocks.hh"
+#include "nix/util.hh"
+#include "nix/sync.hh"
+#include "nix/signals.hh"
 
 #include <cerrno>
 #include <cstdlib>

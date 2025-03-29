@@ -1,6 +1,6 @@
-#include "machines.hh"
-#include "globals.hh"
-#include "store-api.hh"
+#include "nix/machines.hh"
+#include "nix/globals.hh"
+#include "nix/store-api.hh"
 
 #include <algorithm>
 

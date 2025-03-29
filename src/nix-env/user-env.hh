@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "get-drvs.hh"
+#include "nix/get-drvs.hh"
 
 namespace nix {
 

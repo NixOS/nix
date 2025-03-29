@@ -1,22 +1,22 @@
-#include "local-store.hh"
-#include "globals.hh"
-#include "git.hh"
-#include "archive.hh"
-#include "pathlocks.hh"
-#include "worker-protocol.hh"
-#include "derivations.hh"
-#include "realisation.hh"
-#include "nar-info.hh"
-#include "references.hh"
-#include "callback.hh"
-#include "topo-sort.hh"
-#include "finally.hh"
-#include "compression.hh"
-#include "signals.hh"
-#include "posix-fs-canonicalise.hh"
-#include "posix-source-accessor.hh"
-#include "keys.hh"
-#include "users.hh"
+#include "nix/local-store.hh"
+#include "nix/globals.hh"
+#include "nix/git.hh"
+#include "nix/archive.hh"
+#include "nix/pathlocks.hh"
+#include "nix/worker-protocol.hh"
+#include "nix/derivations.hh"
+#include "nix/realisation.hh"
+#include "nix/nar-info.hh"
+#include "nix/references.hh"
+#include "nix/callback.hh"
+#include "nix/topo-sort.hh"
+#include "nix/finally.hh"
+#include "nix/compression.hh"
+#include "nix/signals.hh"
+#include "nix/posix-fs-canonicalise.hh"
+#include "nix/posix-source-accessor.hh"
+#include "nix/keys.hh"
+#include "nix/users.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -52,7 +52,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "strings.hh"
+#include "nix/strings.hh"
 
 
 namespace nix {

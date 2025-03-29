@@ -2,13 +2,13 @@
 #include <unordered_set>
 #include <sstream>
 
-#include "print.hh"
-#include "ansicolor.hh"
-#include "signals.hh"
-#include "store-api.hh"
-#include "terminal.hh"
-#include "english.hh"
-#include "eval.hh"
+#include "nix/print.hh"
+#include "nix/ansicolor.hh"
+#include "nix/signals.hh"
+#include "nix/store-api.hh"
+#include "nix/terminal.hh"
+#include "nix/english.hh"
+#include "nix/eval.hh"
 
 namespace nix {
 

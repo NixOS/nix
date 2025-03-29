@@ -116,15 +116,10 @@ deps_public += nlohmann_json
 
 cxx = meson.get_compiler('cpp')
 
-config_h = configure_file(
-  configuration : configdata,
-  output : 'config-util.hh',
-)
-
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
+  '-include', 'nix/config-util.hh',
   language : 'cpp',
 )
 
@@ -178,90 +173,12 @@ sources = files(
   'xml-writer.cc',
 )
 
-include_dirs = [include_directories('.')]
+subdir('include/nix')
+
 if not cxx.has_header('widechar_width.h', required : false)
   # use vendored widechar_width.h
   include_dirs += include_directories('./widecharwidth')
 endif
-
-headers = [config_h] + files(
-  'abstract-setting-to-json.hh',
-  'ansicolor.hh',
-  'archive.hh',
-  'args.hh',
-  'args/root.hh',
-  'callback.hh',
-  'canon-path.hh',
-  'checked-arithmetic.hh',
-  'chunked-vector.hh',
-  'closure.hh',
-  'comparator.hh',
-  'compression.hh',
-  'compute-levels.hh',
-  'config-global.hh',
-  'config-impl.hh',
-  'config.hh',
-  'current-process.hh',
-  'english.hh',
-  'environment-variables.hh',
-  'error.hh',
-  'exec.hh',
-  'executable-path.hh',
-  'exit.hh',
-  'experimental-features.hh',
-  'file-content-address.hh',
-  'file-descriptor.hh',
-  'file-path-impl.hh',
-  'file-path.hh',
-  'file-system.hh',
-  'finally.hh',
-  'fmt.hh',
-  'fs-sink.hh',
-  'git.hh',
-  'hash.hh',
-  'hilite.hh',
-  'json-impls.hh',
-  'json-utils.hh',
-  'logging.hh',
-  'lru-cache.hh',
-  'memory-source-accessor.hh',
-  'muxable-pipe.hh',
-  'os-string.hh',
-  'pool.hh',
-  'pos-idx.hh',
-  'pos-table.hh',
-  'position.hh',
-  'posix-source-accessor.hh',
-  'processes.hh',
-  'ref.hh',
-  'references.hh',
-  'regex-combinators.hh',
-  'repair-flag.hh',
-  'serialise.hh',
-  'signals.hh',
-  'signature/local-keys.hh',
-  'signature/signer.hh',
-  'source-accessor.hh',
-  'source-path.hh',
-  'split.hh',
-  'std-hash.hh',
-  'strings.hh',
-  'strings-inline.hh',
-  'suggestions.hh',
-  'sync.hh',
-  'tarfile.hh',
-  'terminal.hh',
-  'thread-pool.hh',
-  'topo-sort.hh',
-  'types.hh',
-  'unix-domain-socket.hh',
-  'url-parts.hh',
-  'url.hh',
-  'users.hh',
-  'util.hh',
-  'variant-wrapper.hh',
-  'xml-writer.hh',
-)
 
 if host_machine.system() == 'linux'
   subdir('linux')

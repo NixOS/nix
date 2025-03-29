@@ -1,14 +1,14 @@
-#include "derivations.hh"
-#include "globals.hh"
-#include "local-store.hh"
-#include "finally.hh"
-#include "unix-domain-socket.hh"
-#include "signals.hh"
-#include "posix-fs-canonicalise.hh"
+#include "nix/derivations.hh"
+#include "nix/globals.hh"
+#include "nix/local-store.hh"
+#include "nix/finally.hh"
+#include "nix/unix-domain-socket.hh"
+#include "nix/signals.hh"
+#include "nix/posix-fs-canonicalise.hh"
 
 #if !defined(__linux__)
 // For shelling out to lsof
-#  include "processes.hh"
+#  include "nix/processes.hh"
 #endif
 
 #include <functional>

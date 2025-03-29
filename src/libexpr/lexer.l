@@ -16,7 +16,7 @@
 
 %top {
 #include "parser-tab.hh" // YYSTYPE
-#include "parser-state.hh"
+#include "nix/parser-state.hh"
 }
 
 %{
@@ -24,9 +24,9 @@
 #pragma clang diagnostic ignored "-Wunneeded-internal-declaration"
 #endif
 
-#include "nixexpr.hh"
+#include "nix/nixexpr.hh"
 #include "parser-tab.hh"
-#include "lexer-helpers.hh"
+#include "nix/lexer-helpers.hh"
 
 namespace nix {
   struct LexerState;

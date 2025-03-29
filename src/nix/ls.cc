@@ -1,7 +1,7 @@
-#include "command.hh"
-#include "store-api.hh"
-#include "nar-accessor.hh"
-#include "common-args.hh"
+#include "nix/command.hh"
+#include "nix/store-api.hh"
+#include "nix/nar-accessor.hh"
+#include "nix/common-args.hh"
 #include <nlohmann/json.hpp>
 
 using namespace nix;

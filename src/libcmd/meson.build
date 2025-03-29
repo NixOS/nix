@@ -55,16 +55,15 @@ endif
 
 config_h = configure_file(
   configuration : configdata,
-  output : 'config-cmd.hh',
+  output : 'cmd-config-private.hh',
 )
 
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  '-include', 'config-expr.hh',
-  '-include', 'config-cmd.hh',
+  '-include', 'nix/config-util.hh',
+  '-include', 'nix/config-store.hh',
+  '-include', 'nix/config-expr.hh',
   language : 'cpp',
 )
 
@@ -89,27 +88,7 @@ sources = files(
   'repl.cc',
 )
 
-include_dirs = [include_directories('.')]
-
-headers = files(
-  'built-path.hh',
-  'command-installable-value.hh',
-  'command.hh',
-  'common-eval-args.hh',
-  'compatibility-settings.hh',
-  'editor-for.hh',
-  'installable-attr-path.hh',
-  'installable-derived-path.hh',
-  'installable-flake.hh',
-  'installable-value.hh',
-  'installables.hh',
-  'legacy.hh',
-  'markdown.hh',
-  'misc-store-flags.hh',
-  'network-proxy.hh',
-  'repl-interacter.hh',
-  'repl.hh',
-)
+subdir('include/nix')
 
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')

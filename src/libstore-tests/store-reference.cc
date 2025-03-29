@@ -1,11 +1,11 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
-#include "file-system.hh"
-#include "store-reference.hh"
+#include "nix/file-system.hh"
+#include "nix/store-reference.hh"
 
-#include "tests/characterization.hh"
-#include "tests/libstore.hh"
+#include "nix/tests/characterization.hh"
+#include "nix/tests/libstore.hh"
 
 namespace nix {
 

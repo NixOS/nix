@@ -1,12 +1,12 @@
 #ifndef NIX_API_EXPR_INTERNAL_H
 #define NIX_API_EXPR_INTERNAL_H
 
-#include "fetch-settings.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "attr-set.hh"
+#include "nix/fetch-settings.hh"
+#include "nix/eval.hh"
+#include "nix/eval-settings.hh"
+#include "nix/attr-set.hh"
 #include "nix_api_value.h"
-#include "search-path.hh"
+#include "nix/search-path.hh"
 
 struct nix_eval_state_builder
 {

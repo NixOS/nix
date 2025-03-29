@@ -28,26 +28,18 @@ deps_public += rapidcheck
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
+  '-include', 'nix/config-util.hh',
   language : 'cpp',
 )
 
 subdir('nix-meson-build-support/common')
 
 sources = files(
-  'tests/hash.cc',
-  'tests/string_callback.cc',
+  'hash.cc',
+  'string_callback.cc',
 )
 
-include_dirs = [include_directories('.')]
-
-headers = files(
-  'tests/characterization.hh',
-  'tests/gtest-with-params.hh',
-  'tests/hash.hh',
-  'tests/nix_api_util.hh',
-  'tests/string_callback.hh',
-)
+subdir('include/nix')
 
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')

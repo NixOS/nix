@@ -4,7 +4,7 @@
 #include <string>
 #include <optional>
 
-#include "error.hh"
+#include "nix/error.hh"
 #include "nix_api_util.h"
 
 struct nix_c_context

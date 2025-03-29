@@ -1,10 +1,10 @@
-#include "git-lfs-fetch.hh"
-#include "git-utils.hh"
-#include "filetransfer.hh"
-#include "processes.hh"
-#include "url.hh"
-#include "users.hh"
-#include "hash.hh"
+#include "nix/git-lfs-fetch.hh"
+#include "nix/git-utils.hh"
+#include "nix/filetransfer.hh"
+#include "nix/processes.hh"
+#include "nix/url.hh"
+#include "nix/users.hh"
+#include "nix/hash.hh"
 
 #include <git2/attr.h>
 #include <git2/config.h>

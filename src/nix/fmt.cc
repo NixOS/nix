@@ -1,6 +1,6 @@
-#include "command.hh"
-#include "installable-value.hh"
-#include "eval.hh"
+#include "nix/command.hh"
+#include "nix/installable-value.hh"
+#include "nix/eval.hh"
 #include "run.hh"
 
 using namespace nix;

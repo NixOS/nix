@@ -1,8 +1,8 @@
-#include "globals.hh"
-#include "nar-info.hh"
-#include "store-api.hh"
-#include "strings.hh"
-#include "json-utils.hh"
+#include "nix/globals.hh"
+#include "nix/nar-info.hh"
+#include "nix/store-api.hh"
+#include "nix/strings.hh"
+#include "nix/json-utils.hh"
 
 namespace nix {
 

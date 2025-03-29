@@ -1,12 +1,12 @@
-#include "git-utils.hh"
-#include "git-lfs-fetch.hh"
-#include "cache.hh"
-#include "finally.hh"
-#include "processes.hh"
-#include "signals.hh"
-#include "users.hh"
-#include "fs-sink.hh"
-#include "sync.hh"
+#include "nix/git-utils.hh"
+#include "nix/git-lfs-fetch.hh"
+#include "nix/cache.hh"
+#include "nix/finally.hh"
+#include "nix/processes.hh"
+#include "nix/signals.hh"
+#include "nix/users.hh"
+#include "nix/fs-sink.hh"
+#include "nix/sync.hh"
 
 #include <git2/attr.h>
 #include <git2/blob.h>

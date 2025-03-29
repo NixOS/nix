@@ -1,9 +1,9 @@
-#include "error.hh"
-#include "environment-variables.hh"
-#include "eval-settings.hh"
-#include "config-global.hh"
-#include "serialise.hh"
-#include "eval-gc.hh"
+#include "nix/error.hh"
+#include "nix/environment-variables.hh"
+#include "nix/eval-settings.hh"
+#include "nix/config-global.hh"
+#include "nix/serialise.hh"
+#include "nix/eval-gc.hh"
 
 #if HAVE_BOEHMGC
 

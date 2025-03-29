@@ -1,5 +1,5 @@
-#include "goal.hh"
-#include "worker.hh"
+#include "nix/build/goal.hh"
+#include "nix/build/worker.hh"
 
 namespace nix {
 

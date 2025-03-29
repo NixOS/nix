@@ -1,8 +1,8 @@
-#include "experimental-features.hh"
-#include "fmt.hh"
-#include "util.hh"
+#include "nix/experimental-features.hh"
+#include "nix/fmt.hh"
+#include "nix/util.hh"
 
-#include "nlohmann/json.hpp"
+#include <nlohmann/json.hpp>
 
 namespace nix {
 

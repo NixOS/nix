@@ -1,7 +1,7 @@
 #include <rapidcheck.h>
 
-#include "tests/path.hh"
-#include "tests/value/context.hh"
+#include "nix/tests/path.hh"
+#include "nix/tests/value/context.hh"
 
 namespace rc {
 using namespace nix;

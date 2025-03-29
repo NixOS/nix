@@ -1,6 +1,6 @@
-#include "file-system.hh"
-#include "unix-domain-socket.hh"
-#include "util.hh"
+#include "nix/file-system.hh"
+#include "nix/unix-domain-socket.hh"
+#include "nix/util.hh"
 
 #ifdef _WIN32
 # include <winsock2.h>
@@ -8,7 +8,7 @@
 #else
 # include <sys/socket.h>
 # include <sys/un.h>
-# include "processes.hh"
+# include "nix/processes.hh"
 #endif
 #include <unistd.h>
 

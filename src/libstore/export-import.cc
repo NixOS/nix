@@ -1,8 +1,8 @@
-#include "serialise.hh"
-#include "store-api.hh"
-#include "archive.hh"
-#include "common-protocol.hh"
-#include "common-protocol-impl.hh"
+#include "nix/serialise.hh"
+#include "nix/store-api.hh"
+#include "nix/archive.hh"
+#include "nix/common-protocol.hh"
+#include "nix/common-protocol-impl.hh"
 
 #include <algorithm>
 

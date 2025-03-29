@@ -1,4 +1,4 @@
-#include "memory-source-accessor.hh"
+#include "nix/memory-source-accessor.hh"
 
 namespace nix {
 

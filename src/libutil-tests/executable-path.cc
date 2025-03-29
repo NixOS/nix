@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "executable-path.hh"
+#include "nix/executable-path.hh"
 
 namespace nix {
 

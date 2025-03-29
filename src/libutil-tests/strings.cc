@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
-#include "strings.hh"
-#include "error.hh"
+#include "nix/strings.hh"
+#include "nix/error.hh"
 
 namespace nix {
 

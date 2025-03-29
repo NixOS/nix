@@ -3,9 +3,9 @@
 #include <iostream>
 #include <locale>
 
-#include "file-path.hh"
-#include "file-path-impl.hh"
-#include "util.hh"
+#include "nix/file-path.hh"
+#include "nix/file-path-impl.hh"
+#include "nix/util.hh"
 
 namespace nix {
 

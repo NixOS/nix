@@ -3,13 +3,13 @@
 #if 0
 #  include <gtest/gtest.h>
 
-#  include "local-store.hh"
+#  include "nix/local-store.hh"
 
 // Needed for template specialisations. This is not good! When we
 // overhaul how store configs work, this should be fixed.
-#  include "args.hh"
-#  include "config-impl.hh"
-#  include "abstract-setting-to-json.hh"
+#  include "nix/args.hh"
+#  include "nix/config-impl.hh"
+#  include "nix/abstract-setting-to-json.hh"
 
 namespace nix {
 

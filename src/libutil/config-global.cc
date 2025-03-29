@@ -1,4 +1,4 @@
-#include "config-global.hh"
+#include "nix/config-global.hh"
 
 #include <nlohmann/json.hpp>
 

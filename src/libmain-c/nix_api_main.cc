@@ -3,7 +3,7 @@
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
 
-#include "plugin.hh"
+#include "nix/plugin.hh"
 
 nix_err nix_init_plugins(nix_c_context * context)
 {
