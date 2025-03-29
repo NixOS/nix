@@ -33,12 +33,14 @@ check_funcs = [
   'pipe2',
   # Optionally used to preallocate files to be large enough before
   # writing to them.
+  # WARNING: define also used in libstore
   'posix_fallocate',
   # Optionally used to get more information about processes failing due
   # to a signal on Unix.
   'strsignal',
   # Optionally used to try to close more file descriptors (e.g. before
   # forking) on Unix.
+  # WARNING: also used in libexpr
   'sysconf',
   # Optionally used for changing the mtime of files and symlinks.
   'utimensat',

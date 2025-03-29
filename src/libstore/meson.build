@@ -67,6 +67,7 @@ endforeach
 has_acl_support = cxx.has_header('sys/xattr.h') \
   and cxx.has_function('llistxattr') \
   and cxx.has_function('lremovexattr')
+# TODO: used in header - make proper public header and make sure it's included. Affects ABI!
 configdata.set('HAVE_ACL_SUPPORT', has_acl_support.to_int())
 
 if host_machine.system() == 'darwin'
