@@ -21,4 +21,27 @@ namespace nix {
         ASSERT_EQ(parsed, expected);
     }
 
+    /* ----------------------------------------------------------------------------
+     * parseFlakeRef
+     * --------------------------------------------------------------------------*/
+
+    TEST(parseFlakeRef, removesDirFromInputURL) {
+        fetchers::Settings fetchSettings;
+        auto s = "git+https://localhost:8181/test/test.git?dir=subdir";
+        auto flakeref = parseFlakeRef(fetchSettings, s);
+        auto expected = "git+https://localhost:8181/test/test.git";
+        auto inputURL = flakeref.input.toURLString();
+
+        ASSERT_EQ(inputURL, expected);
+    }
+
+    TEST(parseFlakeRef, setsSubdir) {
+        fetchers::Settings fetchSettings;
+        auto s = "git+https://localhost:8181/test/test.git?dir=subdir";
+        auto flakeref = parseFlakeRef(fetchSettings, s);
+        auto expected = "subdir";
+        auto flakerefSubdir = flakeref.subdir;
+
+        ASSERT_EQ(flakerefSubdir, expected);
+    }
 }
