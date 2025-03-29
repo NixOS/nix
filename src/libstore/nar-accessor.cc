@@ -1,5 +1,5 @@
-#include "nar-accessor.hh"
-#include "archive.hh"
+#include "nix/nar-accessor.hh"
+#include "nix/archive.hh"
 
 #include <map>
 #include <stack>

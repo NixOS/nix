@@ -3,8 +3,10 @@
 #include "nix_api_store.h"
 #include "nix_api_store_internal.h"
 
-#include "tests/nix_api_store.hh"
-#include "tests/string_callback.hh"
+#include "nix/tests/nix_api_store.hh"
+#include "nix/tests/string_callback.hh"
+
+#include "store-tests-config.hh"
 
 namespace nixC {
 

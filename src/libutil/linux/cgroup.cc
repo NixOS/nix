@@ -1,8 +1,8 @@
-#include "cgroup.hh"
-#include "signals.hh"
-#include "util.hh"
-#include "file-system.hh"
-#include "finally.hh"
+#include "nix/cgroup.hh"
+#include "nix/signals.hh"
+#include "nix/util.hh"
+#include "nix/file-system.hh"
+#include "nix/finally.hh"
 
 #include <chrono>
 #include <cmath>

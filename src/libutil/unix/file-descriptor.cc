@@ -1,7 +1,10 @@
-#include "file-system.hh"
-#include "signals.hh"
-#include "finally.hh"
-#include "serialise.hh"
+#include "util-config-private.hh"
+#include "util-unix-config-private.hh"
+
+#include "nix/file-system.hh"
+#include "nix/signals.hh"
+#include "nix/finally.hh"
+#include "nix/serialise.hh"
 
 #include <fcntl.h>
 #include <unistd.h>

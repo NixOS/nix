@@ -1,4 +1,4 @@
-#include "filtering-source-accessor.hh"
+#include "nix/filtering-source-accessor.hh"
 
 namespace nix {
 

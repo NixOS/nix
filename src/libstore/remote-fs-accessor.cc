@@ -1,6 +1,6 @@
 #include <nlohmann/json.hpp>
-#include "remote-fs-accessor.hh"
-#include "nar-accessor.hh"
+#include "nix/remote-fs-accessor.hh"
+#include "nix/nar-accessor.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

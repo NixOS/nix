@@ -1,5 +1,5 @@
-#include "primops.hh"
-#include "eval-inline.hh"
+#include "nix/primops.hh"
+#include "nix/eval-inline.hh"
 
 #include <sstream>
 

@@ -1,13 +1,13 @@
-#include "nar-info-disk-cache.hh"
-#include "users.hh"
-#include "sync.hh"
-#include "sqlite.hh"
-#include "globals.hh"
+#include "nix/nar-info-disk-cache.hh"
+#include "nix/users.hh"
+#include "nix/sync.hh"
+#include "nix/sqlite.hh"
+#include "nix/globals.hh"
 
 #include <sqlite3.h>
 #include <nlohmann/json.hpp>
 
-#include "strings.hh"
+#include "nix/strings.hh"
 
 namespace nix {
 

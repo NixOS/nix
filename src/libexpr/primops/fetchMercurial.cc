@@ -1,10 +1,10 @@
-#include "primops.hh"
-#include "eval-inline.hh"
-#include "eval-settings.hh"
-#include "store-api.hh"
-#include "fetchers.hh"
-#include "url.hh"
-#include "url-parts.hh"
+#include "nix/primops.hh"
+#include "nix/eval-inline.hh"
+#include "nix/eval-settings.hh"
+#include "nix/store-api.hh"
+#include "nix/fetchers.hh"
+#include "nix/url.hh"
+#include "nix/url-parts.hh"
 
 namespace nix {
 

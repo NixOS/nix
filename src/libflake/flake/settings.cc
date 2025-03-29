@@ -1,5 +1,5 @@
-#include "flake/settings.hh"
-#include "flake/flake-primops.hh"
+#include "nix/flake/settings.hh"
+#include "nix/flake/flake-primops.hh"
 
 namespace nix::flake {
 

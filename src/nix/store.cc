@@ -1,4 +1,4 @@
-#include "command.hh"
+#include "nix/command.hh"
 
 using namespace nix;
 

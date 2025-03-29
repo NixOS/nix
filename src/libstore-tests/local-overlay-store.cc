@@ -3,7 +3,7 @@
 #if 0
 #  include <gtest/gtest.h>
 
-#  include "local-overlay-store.hh"
+#  include "nix/local-overlay-store.hh"
 
 namespace nix {
 

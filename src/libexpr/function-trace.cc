@@ -1,5 +1,5 @@
-#include "function-trace.hh"
-#include "logging.hh"
+#include "nix/function-trace.hh"
+#include "nix/logging.hh"
 
 namespace nix {
 

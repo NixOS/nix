@@ -42,18 +42,9 @@ configdata.set(
   description: 'Optionally used for buffering on standard error'
 )
 
-config_h = configure_file(
+config_priv_h = configure_file(
   configuration : configdata,
-  output : 'config-main.hh',
-)
-
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  '-include', 'config-main.hh',
-  language : 'cpp',
+  output : 'main-config-private.hh',
 )
 
 subdir('nix-meson-build-support/common')
@@ -72,15 +63,7 @@ if host_machine.system() != 'windows'
   )
 endif
 
-include_dirs = [include_directories('.')]
-
-headers = files(
-  'common-args.hh',
-  'loggers.hh',
-  'plugin.hh',
-  'progress-bar.hh',
-  'shared.hh',
-)
+subdir('include/nix')
 
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
@@ -88,7 +71,7 @@ subdir('nix-meson-build-support/windows-version')
 this_library = library(
   'nixmain',
   sources,
-  config_h,
+  config_priv_h,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args: linker_export_flags,

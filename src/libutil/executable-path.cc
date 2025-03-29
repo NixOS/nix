@@ -1,8 +1,8 @@
-#include "environment-variables.hh"
-#include "executable-path.hh"
-#include "strings-inline.hh"
-#include "util.hh"
-#include "file-path-impl.hh"
+#include "nix/environment-variables.hh"
+#include "nix/executable-path.hh"
+#include "nix/strings-inline.hh"
+#include "nix/util.hh"
+#include "nix/file-path-impl.hh"
 
 namespace nix {
 

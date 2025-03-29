@@ -1,8 +1,8 @@
-#include "command.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "log-store.hh"
+#include "nix/command.hh"
+#include "nix/common-args.hh"
+#include "nix/shared.hh"
+#include "nix/store-api.hh"
+#include "nix/log-store.hh"
 
 using namespace nix;
 

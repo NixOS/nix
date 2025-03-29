@@ -1,5 +1,5 @@
-#include "source-accessor.hh"
-#include "archive.hh"
+#include "nix/source-accessor.hh"
+#include "nix/archive.hh"
 
 namespace nix {
 

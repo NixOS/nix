@@ -23,17 +23,6 @@ deps_public_maybe_subproject = [
 ]
 subdir('nix-meson-build-support/subprojects')
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-
-  # From C++ libraries, only for internals
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-
-  language : 'cpp',
-)
-
 subdir('nix-meson-build-support/common')
 
 sources = files(
@@ -62,7 +51,7 @@ this_library = library(
   install : true,
 )
 
-install_headers(headers, subdir : 'nix', preserve_path : true)
+install_headers(headers, preserve_path : true)
 
 libraries_private = []
 

@@ -1,7 +1,7 @@
-#include "file-content-address.hh"
-#include "archive.hh"
-#include "git.hh"
-#include "source-path.hh"
+#include "nix/file-content-address.hh"
+#include "nix/archive.hh"
+#include "nix/git.hh"
+#include "nix/source-path.hh"
 
 namespace nix {
 
