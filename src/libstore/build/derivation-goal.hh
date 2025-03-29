@@ -176,21 +176,6 @@ struct DerivationGoal : public Goal
     AutoCloseFD fdLogFile;
     std::shared_ptr<BufferedSink> logFileSink, logSink;
 
-    /**
-     * Number of bytes received from the builder's stdout/stderr.
-     */
-    unsigned long logSize;
-
-    /**
-     * The most recent log lines.
-     */
-    std::list<std::string> logTail;
-
-    std::string currentLogLine;
-    size_t currentLogLinePos = 0; // to handle carriage return
-
-    std::string currentHookLine;
-
 #ifndef _WIN32 // TODO enable build hook on Windows
     /**
      * The build hook.
@@ -224,8 +209,6 @@ struct DerivationGoal : public Goal
         BuildMode buildMode = bmNormal);
     virtual ~DerivationGoal();
 
-    void timedOut(Error && ex) override;
-
     std::string key() override;
 
     /**
@@ -241,7 +224,7 @@ struct DerivationGoal : public Goal
     Co gaveUpOnSubstitution();
     Co tryToBuild();
     virtual Co tryLocalBuild();
-    Co hookDone();
+    Co hookDone(std::list<std::string> logTail);
 
     Co resolvedFinished();
 
@@ -259,15 +242,6 @@ struct DerivationGoal : public Goal
      * Close the log file.
      */
     void closeLogFile();
-
-    virtual bool isReadDesc(Descriptor fd);
-
-    /**
-     * Callback used by the worker to write to the log.
-     */
-    void handleChildOutput(Descriptor fd, std::string_view data) override;
-    void handleEOF(Descriptor fd) override;
-    void flushLine();
 
     /**
      * Wrappers around the corresponding Store methods that first consult the
@@ -290,11 +264,6 @@ struct DerivationGoal : public Goal
      * returns a 'SingleDrvOutputs' structure containing all outputs.
      */
     SingleDrvOutputs assertPathValidity();
-
-    /**
-     * Forcibly kill the child process, if any.
-     */
-    virtual void killChild();
 
     Co repairClosure();
 
