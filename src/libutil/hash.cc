@@ -307,11 +307,22 @@ static void start(HashAlgorithm ha, Ctx & ctx)
     else if (ha == HashAlgorithm::SHA512) SHA512_Init(&ctx.sha512);
 }
 
+// Decide which BLAKE3 update strategy to use based on some heuristics. Currently this just checks the data size but in
+// the future it might also take into consideration available system resources or the presence of a shared-memory
+// capable GPU for a heterogenous compute implementation.
+void blake3_hasher_update_with_heuristics(blake3_hasher * blake3, std::string_view data)
+{
+    if (data.size() >= blake3TbbThreshold) {
+        blake3_hasher_update_tbb(blake3, data.data(), data.size());
+    } else {
+        blake3_hasher_update(blake3, data.data(), data.size());
+    }
+}
 
 static void update(HashAlgorithm ha, Ctx & ctx,
                    std::string_view data)
 {
-    if (ha == HashAlgorithm::BLAKE3) blake3_hasher_update(&ctx.blake3, data.data(), data.size());
+    if (ha == HashAlgorithm::BLAKE3) blake3_hasher_update_with_heuristics(&ctx.blake3, data);
     else if (ha == HashAlgorithm::MD5) MD5_Update(&ctx.md5, data.data(), data.size());
     else if (ha == HashAlgorithm::SHA1) SHA1_Update(&ctx.sha1, data.data(), data.size());
     else if (ha == HashAlgorithm::SHA256) SHA256_Update(&ctx.sha256, data.data(), data.size());
