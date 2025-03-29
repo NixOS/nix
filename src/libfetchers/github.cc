@@ -452,19 +452,25 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
-        // Gitlab supports 4 kinds of authorization, two of which are
-        // relevant here: OAuth2 and PAT (Private Access Token).  The
-        // user can indicate which token is used by specifying the
-        // token as <TYPE>:<VALUE>, where type is "OAuth2" or "PAT".
+        // Gitlab supports 4 kinds of authorization, three of which are
+        // relevant here: OAuth2, PAT (Private Access Token) and CI_JOB_TOKEN.
+        // The user can indicate which token is used by specifying the
+        // token as <TYPE>:<VALUE>, where type is "OAuth2" "PAT" or
+        // "CI_JOB_TOKEN".
         // If the <TYPE> is unrecognized, this will fall back to
         // treating this simply has <HDRNAME>:<HDRVAL>.  See
-        // https://docs.gitlab.com/12.10/ee/api/README.html#authentication
+        // https://docs.gitlab.com/12.10/ee/api/README.html#authentication and
+        // https://archives.docs.gitlab.com/16.11/ee/ci/jobs/ci_job_token.html
         auto fldsplit = token.find_first_of(':');
         // n.b. C++20 would allow: if (token.starts_with("OAuth2:")) ...
         if ("OAuth2" == token.substr(0, fldsplit))
             return std::make_pair("Authorization", fmt("Bearer %s", token.substr(fldsplit+1)));
         if ("PAT" == token.substr(0, fldsplit))
             return std::make_pair("Private-token", token.substr(fldsplit+1));
+        if ("CI_JOB_TOKEN" == token.substr(0, fldsplit)) {
+            auto hdrVal = "Basic " + base64Encode("gitlab-ci-token:" + token.substr(fldsplit+1));
+            return std::make_pair("Authorization", hdrVal);
+        }
         warn("Unrecognized GitLab token type %s",  token.substr(0, fldsplit));
         return std::make_pair(token.substr(0,fldsplit), token.substr(fldsplit+1));
     }
