@@ -1,1 +1,2 @@
-d @localstatedir@/nix/daemon-socket 0755 root root - -
+d @localstatedir@/nix/daemon-socket 0755 root root -  -
+d @localstatedir@/nix/builds        0755 root root 7d -

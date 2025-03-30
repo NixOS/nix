@@ -77,6 +77,18 @@ std::string LocalStoreConfig::doc()
         ;
 }
 
+Path LocalBuildStoreConfig::getBuildDir() const
+{
+    if (settings.buildDir.get().has_value()) {
+        return *settings.buildDir.get();
+    }
+    if (buildDir.get().has_value()) {
+        return *buildDir.get();
+    }
+
+    return stateDir.get() + "/builds";
+}
+
 ref<Store> LocalStore::Config::openStore() const
 {
     return make_ref<LocalStore>(ref{shared_from_this()});

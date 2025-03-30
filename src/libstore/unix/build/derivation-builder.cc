@@ -725,9 +725,13 @@ void DerivationBuilderImpl::startBuilder()
         throw BuildError(msg);
     }
 
+    auto buildDir = getLocalStore(store).config->getBuildDir();
+
+    createDirs(buildDir);
+
     /* Create a temporary directory where the build will take
        place. */
-    topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), 0700);
+    topTmpDir = createTempDir(buildDir, "nix-build-" + std::string(drvPath.name()), 0700);
     setBuildTmpDir();
     assert(!tmpDir.empty());
 
