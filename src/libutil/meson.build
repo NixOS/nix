@@ -33,12 +33,14 @@ check_funcs = [
   'pipe2',
   # Optionally used to preallocate files to be large enough before
   # writing to them.
+  # WARNING: define also used in libstore
   'posix_fallocate',
   # Optionally used to get more information about processes failing due
   # to a signal on Unix.
   'strsignal',
   # Optionally used to try to close more file descriptors (e.g. before
   # forking) on Unix.
+  # WARNING: also used in libexpr
   'sysconf',
   # Optionally used for changing the mtime of files and symlinks.
   'utimensat',
@@ -105,7 +107,7 @@ cpuid_required = get_option('cpuid')
 if host_machine.cpu_family() != 'x86_64' and cpuid_required.enabled()
   warning('Force-enabling seccomp on non-x86_64 does not make sense')
 endif
-cpuid = dependency('libcpuid', 'cpuid', required : cpuid_required)
+cpuid = dependency('libcpuid', 'cpuid', version : '>= 0.7.0', required : cpuid_required)
 configdata.set('HAVE_LIBCPUID', cpuid.found().to_int())
 deps_private += cpuid
 

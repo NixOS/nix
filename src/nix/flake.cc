@@ -243,7 +243,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             j["locks"] = lockedFlake.lockFile.toJSON().first;
             if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
-            logger->cout("%s", j.dump());
+            printJSON(j);
         } else {
             logger->cout(
                 ANSI_BOLD "Resolved URL:" ANSI_NORMAL "  %s",
@@ -906,7 +906,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         std::function<void(const SourcePath & from, const fs::path & to)> copyDir;
         copyDir = [&](const SourcePath & from, const fs::path & to)
         {
-            fs::create_directories(to);
+            createDirs(to);
 
             for (auto & [name, entry] : from.readDirectory()) {
                 checkInterrupt();
@@ -1116,7 +1116,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
                 {"path", store->printStorePath(storePath)},
                 {"inputs", traverse(*flake.lockFile.root)},
             };
-            logger->cout("%s", jsonRoot);
+            printJSON(jsonRoot);
         } else {
             traverse(*flake.lockFile.root);
         }
@@ -1254,18 +1254,26 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     if (!showAllSystems && std::string(attrPathS[1]) != localSystem) {
                         omit("--all-systems");
                     } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else
-                            throw Error("expected a derivation");
+                        try {
+                            if (visitor.isDerivation())
+                                showDerivation();
+                            else
+                                throw Error("expected a derivation");
+                        } catch (IFDError & e) {
+                            logger->warn(fmt("%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                        }
                     }
                 }
 
                 else if (attrPath.size() > 0 && attrPathS[0] == "hydraJobs") {
-                    if (visitor.isDerivation())
-                        showDerivation();
-                    else
-                        recurse();
+                    try {
+                        if (visitor.isDerivation())
+                            showDerivation();
+                        else
+                            recurse();
+                    } catch (IFDError & e) {
+                        logger->warn(fmt("%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                    }
                 }
 
                 else if (attrPath.size() > 0 && attrPathS[0] == "legacyPackages") {
@@ -1276,11 +1284,15 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     } else if (!showAllSystems && std::string(attrPathS[1]) != localSystem) {
                         omit("--all-systems");
                     } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else if (attrPath.size() <= 2)
-                            // FIXME: handle recurseIntoAttrs
-                            recurse();
+                        try {
+                            if (visitor.isDerivation())
+                                showDerivation();
+                            else if (attrPath.size() <= 2)
+                                // FIXME: handle recurseIntoAttrs
+                                recurse();
+                        } catch (IFDError & e) {
+                            logger->warn(fmt("%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                        }
                     }
                 }
 
@@ -1331,7 +1343,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         futures.finishAll();
 
         if (json)
-            logger->cout("%s", j.dump());
+            printJSON(j);
         else {
 
             // For frameworks it's important that structures are as
@@ -1439,7 +1451,7 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
             res["hash"] = hash.to_string(HashFormat::SRI, true);
             res["original"] = fetchers::attrsToJSON(resolvedRef.toAttrs());
             res["locked"] = fetchers::attrsToJSON(lockedRef.toAttrs());
-            logger->cout(res.dump());
+            printJSON(res);
         } else {
             notice("Downloaded '%s' to '%s' (hash '%s').",
                 lockedRef.to_string(),

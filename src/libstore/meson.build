@@ -67,6 +67,7 @@ endforeach
 has_acl_support = cxx.has_header('sys/xattr.h') \
   and cxx.has_function('llistxattr') \
   and cxx.has_function('lremovexattr')
+# TODO: used in header - make proper public header and make sure it's included. Affects ABI!
 configdata.set('HAVE_ACL_SUPPORT', has_acl_support.to_int())
 
 if host_machine.system() == 'darwin'
@@ -112,7 +113,8 @@ deps_public += nlohmann_json
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
-# AWS C++ SDK has bad pkg-config
+# AWS C++ SDK has bad pkg-config. See
+# https://github.com/aws/aws-sdk-cpp/issues/2673 for details.
 aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
 configdata.set('ENABLE_S3', aws_s3.found().to_int())
 if aws_s3.found()
@@ -234,6 +236,7 @@ sources = files(
   'realisation.cc',
   'remote-fs-accessor.cc',
   'remote-store.cc',
+  'restricted-store.cc',
   's3-binary-cache-store.cc',
   'serve-protocol-connection.cc',
   'serve-protocol.cc',
@@ -305,6 +308,7 @@ headers = [config_h] + files(
   'remote-fs-accessor.hh',
   'remote-store-connection.hh',
   'remote-store.hh',
+  'restricted-store.hh',
   's3-binary-cache-store.hh',
   's3.hh',
   'ssh-store.hh',

@@ -105,13 +105,13 @@ std::string_view baseNameOf(std::string_view path);
  * Check whether 'path' is a descendant of 'dir'. Both paths must be
  * canonicalized.
  */
-bool isInDir(std::string_view path, std::string_view dir);
+bool isInDir(const std::filesystem::path & path, const std::filesystem::path & dir);
 
 /**
  * Check whether 'path' is equal to 'dir' or a descendant of
  * 'dir'. Both paths must be canonicalized.
  */
-bool isDirOrInDir(std::string_view path, std::string_view dir);
+bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::path & dir);
 
 /**
  * Get status of `path`.
@@ -231,14 +231,9 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed);
 /**
  * Create a directory and all its parents, if necessary.
  *
- * In the process of being deprecated for
- * `std::filesystem::create_directories`.
+ * Wrapper around `std::filesystem::create_directories` to handle exceptions.
  */
-void createDirs(const Path & path);
-inline void createDirs(PathView path)
-{
-    return createDirs(Path(path));
-}
+void createDirs(const std::filesystem::path & path);
 
 /**
  * Create a single directory.

@@ -118,7 +118,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
         }
 
         else if (json) {
-            logger->cout("%s", printValueAsJSON(*state, true, *v, pos, context, false));
+            printJSON(printValueAsJSON(*state, true, *v, pos, context, false));
         }
 
         else {

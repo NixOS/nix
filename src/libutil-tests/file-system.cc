@@ -203,12 +203,10 @@ TEST(isInDir, notInDir)
     ASSERT_EQ(p1, false);
 }
 
-// XXX: hm, bug or feature? :) Looking at the implementation
-// this might be problematic.
 TEST(isInDir, emptyDir)
 {
     auto p1 = isInDir("/zes/foo/bar", "");
-    ASSERT_EQ(p1, true);
+    ASSERT_EQ(p1, false);
 }
 
 /* ----------------------------------------------------------------------------
@@ -233,14 +231,12 @@ TEST(isDirOrInDir, falseForDisjunctPaths)
 
 TEST(isDirOrInDir, relativePaths)
 {
-    ASSERT_EQ(isDirOrInDir("/foo/..", "/foo"), true);
+    ASSERT_EQ(isDirOrInDir("/foo/..", "/foo"), false);
 }
 
-// XXX: while it is possible to use "." or ".." in the
-// first argument this doesn't seem to work in the second.
-TEST(isDirOrInDir, DISABLED_shouldWork)
+TEST(isDirOrInDir, relativePathsTwice)
 {
-    ASSERT_EQ(isDirOrInDir("/foo/..", "/foo/."), true);
+    ASSERT_EQ(isDirOrInDir("/foo/..", "/foo/."), false);
 }
 
 /* ----------------------------------------------------------------------------

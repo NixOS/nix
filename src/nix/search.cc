@@ -222,7 +222,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
         futures.finishAll();
 
         if (json)
-            logger->cout("%s", *(jsonOut->lock()));
+            printJSON(*(jsonOut->lock()));
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");

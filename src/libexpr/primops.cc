@@ -91,7 +91,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     if (drvs.empty()) return {};
 
     if (isIFD && !settings.enableImportFromDerivation)
-        error<EvalBaseError>(
+        error<IFDError>(
             "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
             drvs.begin()->to_string(*store)
         ).debugThrow();
@@ -2777,7 +2777,13 @@ static void prim_unsafeGetAttrPos(EvalState & state, const PosIdx pos, Value * *
 
 static RegisterPrimOp primop_unsafeGetAttrPos(PrimOp {
     .name = "__unsafeGetAttrPos",
+    .args = {"s", "set"},
     .arity = 2,
+    .doc = R"(
+      `unsafeGetAttrPos` returns the position of the attribute named *s*
+      from *set*. This is used by Nixpkgs to provide location information
+      in error messages.
+    )",
     .fun = prim_unsafeGetAttrPos,
 });
 
@@ -4673,7 +4679,7 @@ RegisterPrimOp::RegisterPrimOp(PrimOp && primOp)
 }
 
 
-void EvalState::createBaseEnv()
+void EvalState::createBaseEnv(const EvalSettings & evalSettings)
 {
     baseEnv.up = 0;
 
@@ -4960,6 +4966,12 @@ void EvalState::createBaseEnv()
                 primOpAdjusted.arity = std::max(primOp.args.size(), primOp.arity);
                 addPrimOp(std::move(primOpAdjusted));
             }
+
+    for (auto & primOp : evalSettings.extraPrimOps) {
+        auto primOpAdjusted = primOp;
+        primOpAdjusted.arity = std::max(primOp.args.size(), primOp.arity);
+        addPrimOp(std::move(primOpAdjusted));
+    }
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily.

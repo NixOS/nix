@@ -18,6 +18,7 @@
 #include "network-proxy.hh"
 #include "eval-cache.hh"
 #include "flake/flake.hh"
+#include "flake/settings.hh"
 #include "self-exe.hh"
 #include "json-utils.hh"
 #include "crash-handler.hh"
@@ -370,7 +371,7 @@ void mainWrapped(int argc, char * * argv)
 
     initNix();
     initGC();
-    flake::initLib(flakeSettings);
+    flakeSettings.configureEvalSettings(evalSettings);
 
     /* Set the build hook location
 

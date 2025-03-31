@@ -21,6 +21,7 @@
 #include "unix-domain-socket.hh"
 #include "posix-fs-canonicalise.hh"
 #include "posix-source-accessor.hh"
+#include "restricted-store.hh"
 
 #include <regex>
 #include <queue>
@@ -75,7 +76,7 @@ extern "C" int sandbox_init_with_parameters(const char *profile, uint64_t flags,
 
 namespace nix {
 
-struct LocalDerivationGoal : public DerivationGoal
+struct LocalDerivationGoal : DerivationGoal, RestrictionContext
 {
     LocalStore & getLocalStore();
 
@@ -150,6 +151,13 @@ struct LocalDerivationGoal : public DerivationGoal
     std::shared_ptr<AutoDelete> autoDelChroot;
 
     /**
+     * The sort of derivation we are building.
+     *
+     * Just a cached value, can be recomputed from `drv`.
+     */
+    std::optional<DerivationType> derivationType;
+
+    /**
      * Stuff we need to pass to initChild().
      */
     struct ChrootPath {
@@ -208,27 +216,16 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     std::vector<std::thread> daemonWorkerThreads;
 
-    /**
-     * Paths that were added via recursive Nix calls.
-     */
-    StorePathSet addedPaths;
+    const StorePathSet & originalPaths() override
+    {
+        return inputPaths;
+    }
 
-    /**
-     * Realisations that were added via recursive Nix calls.
-     */
-    std::set<DrvOutput> addedDrvOutputs;
-
-    /**
-     * Recursive Nix calls are only allowed to build or realize paths
-     * in the original input closure or added via a recursive Nix call
-     * (so e.g. you can't do 'nix-store -r /nix/store/<bla>' where
-     * /nix/store/<bla> is some arbitrary path in a binary cache).
-     */
-    bool isAllowed(const StorePath & path)
+    bool isAllowed(const StorePath & path) override
     {
         return inputPaths.count(path) || addedPaths.count(path);
     }
-    bool isAllowed(const DrvOutput & id)
+    bool isAllowed(const DrvOutput & id) override
     {
         return addedDrvOutputs.count(id);
     }
@@ -287,11 +284,7 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     void stopDaemon();
 
-    /**
-     * Add 'path' to the set of paths that may be referenced by the
-     * outputs, and make it appear in the sandbox.
-     */
-    void addDependency(const StorePath & path);
+    void addDependency(const StorePath & path) override;
 
     /**
      * Make a file owned by the builder.
@@ -486,13 +479,13 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
-        worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
-        co_await Suspend{};
+        co_await waitForBuildSlot();
         co_return tryToBuild();
     }
 
-    assert(derivationType);
+    /* Cache this */
+    derivationType = drv->type();
 
     /* Are we doing a chroot build? */
     {
@@ -541,8 +534,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
             if (!actLock)
                 actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                     fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
-            worker.waitForAWhile(shared_from_this());
-            co_await Suspend{};
+            co_await waitForAWhile();
             co_return tryLocalBuild();
         }
     }
@@ -627,7 +619,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
                 Magenta(worker.store.printStorePath(drvPath)),
                 statusToString(status));
 
-            appendLogTailErrorMsg(worker, drvPath, logTail, msg);
+            appendLogTailErrorMsg(worker.store, drvPath, logTail, msg);
 
             if (diskFull)
                 msg += "\nnote: build failure may have been caused by lack of free disk space";
@@ -1060,7 +1052,7 @@ void LocalDerivationGoal::startBuilder()
             /* If only we had a trie to do this more efficiently :) luckily, these are generally going to be pretty small */
             for (auto & a : allowedPaths) {
                 Path canonA = canonPath(a);
-                if (canonI == canonA || isInDir(canonI, canonA)) {
+                if (isDirOrInDir(canonI, canonA)) {
                     found = true;
                     break;
                 }
@@ -1618,263 +1610,6 @@ void LocalDerivationGoal::writeStructuredAttrs()
 }
 
 
-static StorePath pathPartOfReq(const SingleDerivedPath & req)
-{
-    return std::visit(overloaded {
-        [&](const SingleDerivedPath::Opaque & bo) {
-            return bo.path;
-        },
-        [&](const SingleDerivedPath::Built & bfd)  {
-            return pathPartOfReq(*bfd.drvPath);
-        },
-    }, req.raw());
-}
-
-
-static StorePath pathPartOfReq(const DerivedPath & req)
-{
-    return std::visit(overloaded {
-        [&](const DerivedPath::Opaque & bo) {
-            return bo.path;
-        },
-        [&](const DerivedPath::Built & bfd)  {
-            return pathPartOfReq(*bfd.drvPath);
-        },
-    }, req.raw());
-}
-
-
-bool LocalDerivationGoal::isAllowed(const DerivedPath & req)
-{
-    return this->isAllowed(pathPartOfReq(req));
-}
-
-
-struct RestrictedStoreConfig : virtual LocalFSStoreConfig
-{
-    using LocalFSStoreConfig::LocalFSStoreConfig;
-    const std::string name() override { return "Restricted Store"; }
-};
-
-/* A wrapper around LocalStore that only allows building/querying of
-   paths that are in the input closures of the build or were added via
-   recursive Nix calls. */
-struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual IndirectRootStore, public virtual GcStore
-{
-    ref<LocalStore> next;
-
-    LocalDerivationGoal & goal;
-
-    RestrictedStore(const Params & params, ref<LocalStore> next, LocalDerivationGoal & goal)
-        : StoreConfig(params)
-        , LocalFSStoreConfig(params)
-        , RestrictedStoreConfig(params)
-        , Store(params)
-        , LocalFSStore(params)
-        , next(next), goal(goal)
-    { }
-
-    Path getRealStoreDir() override
-    { return next->realStoreDir; }
-
-    std::string getUri() override
-    { return next->getUri(); }
-
-    StorePathSet queryAllValidPaths() override
-    {
-        StorePathSet paths;
-        for (auto & p : goal.inputPaths) paths.insert(p);
-        for (auto & p : goal.addedPaths) paths.insert(p);
-        return paths;
-    }
-
-    void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
-    {
-        if (goal.isAllowed(path)) {
-            try {
-                /* Censor impure information. */
-                auto info = std::make_shared<ValidPathInfo>(*next->queryPathInfo(path));
-                info->deriver.reset();
-                info->registrationTime = 0;
-                info->ultimate = false;
-                info->sigs.clear();
-                callback(info);
-            } catch (InvalidPath &) {
-                callback(nullptr);
-            }
-        } else
-            callback(nullptr);
-    };
-
-    void queryReferrers(const StorePath & path, StorePathSet & referrers) override
-    { }
-
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(
-        const StorePath & path,
-        Store * evalStore = nullptr) override
-    {
-        if (!goal.isAllowed(path))
-            throw InvalidPath("cannot query output map for unknown path '%s' in recursive Nix", printStorePath(path));
-        return next->queryPartialDerivationOutputMap(path, evalStore);
-    }
-
-    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
-    { throw Error("queryPathFromHashPart"); }
-
-    StorePath addToStore(
-        std::string_view name,
-        const SourcePath & srcPath,
-        ContentAddressMethod method,
-        HashAlgorithm hashAlgo,
-        const StorePathSet & references,
-        PathFilter & filter,
-        RepairFlag repair) override
-    { throw Error("addToStore"); }
-
-    void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) override
-    {
-        next->addToStore(info, narSource, repair, checkSigs);
-        goal.addDependency(info.path);
-    }
-
-    StorePath addToStoreFromDump(
-        Source & dump,
-        std::string_view name,
-        FileSerialisationMethod dumpMethod,
-        ContentAddressMethod hashMethod,
-        HashAlgorithm hashAlgo,
-        const StorePathSet & references,
-        RepairFlag repair) override
-    {
-        auto path = next->addToStoreFromDump(dump, name, dumpMethod, hashMethod, hashAlgo, references, repair);
-        goal.addDependency(path);
-        return path;
-    }
-
-    void narFromPath(const StorePath & path, Sink & sink) override
-    {
-        if (!goal.isAllowed(path))
-            throw InvalidPath("cannot dump unknown path '%s' in recursive Nix", printStorePath(path));
-        LocalFSStore::narFromPath(path, sink);
-    }
-
-    void ensurePath(const StorePath & path) override
-    {
-        if (!goal.isAllowed(path))
-            throw InvalidPath("cannot substitute unknown path '%s' in recursive Nix", printStorePath(path));
-        /* Nothing to be done; 'path' must already be valid. */
-    }
-
-    void registerDrvOutput(const Realisation & info) override
-    // XXX: This should probably be allowed as a no-op if the realisation
-    // corresponds to an allowed derivation
-    { throw Error("registerDrvOutput"); }
-
-    void queryRealisationUncached(const DrvOutput & id,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
-    // XXX: This should probably be allowed if the realisation corresponds to
-    // an allowed derivation
-    {
-        if (!goal.isAllowed(id))
-            callback(nullptr);
-        next->queryRealisation(id, std::move(callback));
-    }
-
-    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override
-    {
-        for (auto & result : buildPathsWithResults(paths, buildMode, evalStore))
-            if (!result.success())
-                result.rethrow();
-    }
-
-    std::vector<KeyedBuildResult> buildPathsWithResults(
-        const std::vector<DerivedPath> & paths,
-        BuildMode buildMode = bmNormal,
-        std::shared_ptr<Store> evalStore = nullptr) override
-    {
-        assert(!evalStore);
-
-        if (buildMode != bmNormal) throw Error("unsupported build mode");
-
-        StorePathSet newPaths;
-        std::set<Realisation> newRealisations;
-
-        for (auto & req : paths) {
-            if (!goal.isAllowed(req))
-                throw InvalidPath("cannot build '%s' in recursive Nix because path is unknown", req.to_string(*next));
-        }
-
-        auto results = next->buildPathsWithResults(paths, buildMode);
-
-        for (auto & result : results) {
-            for (auto & [outputName, output] : result.builtOutputs) {
-                newPaths.insert(output.outPath);
-                newRealisations.insert(output);
-            }
-        }
-
-        StorePathSet closure;
-        next->computeFSClosure(newPaths, closure);
-        for (auto & path : closure)
-            goal.addDependency(path);
-        for (auto & real : Realisation::closure(*next, newRealisations))
-            goal.addedDrvOutputs.insert(real.id);
-
-        return results;
-    }
-
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode = bmNormal) override
-    { unsupported("buildDerivation"); }
-
-    void addTempRoot(const StorePath & path) override
-    { }
-
-    void addIndirectRoot(const Path & path) override
-    { }
-
-    Roots findRoots(bool censor) override
-    { return Roots(); }
-
-    void collectGarbage(const GCOptions & options, GCResults & results) override
-    { }
-
-    void addSignatures(const StorePath & storePath, const StringSet & sigs) override
-    { unsupported("addSignatures"); }
-
-    void queryMissing(const std::vector<DerivedPath> & targets,
-        StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-        uint64_t & downloadSize, uint64_t & narSize) override
-    {
-        /* This is slightly impure since it leaks information to the
-           client about what paths will be built/substituted or are
-           already present. Probably not a big deal. */
-
-        std::vector<DerivedPath> allowed;
-        for (auto & req : targets) {
-            if (goal.isAllowed(req))
-                allowed.emplace_back(req);
-            else
-                unknown.insert(pathPartOfReq(req));
-        }
-
-        next->queryMissing(allowed, willBuild, willSubstitute,
-            unknown, downloadSize, narSize);
-    }
-
-    virtual std::optional<std::string> getBuildLogExact(const StorePath & path) override
-    { return std::nullopt; }
-
-    virtual void addBuildLog(const StorePath & path, std::string_view log) override
-    { unsupported("addBuildLog"); }
-
-    std::optional<TrustedFlag> isTrustedClient() override
-    { return NotTrusted; }
-};
-
-
 void LocalDerivationGoal::startDaemon()
 {
     experimentalFeatureSettings.require(Xp::RecursiveNix);
@@ -1886,7 +1621,7 @@ void LocalDerivationGoal::startDaemon()
         params["root"] = *optRoot;
     params["state"] = "/no-such-path";
     params["log"] = "/no-such-path";
-    auto store = make_ref<RestrictedStore>(params,
+    auto store = makeRestrictedStore(params,
         ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(worker.store.shared_from_this())),
         *this);
 
@@ -2493,7 +2228,18 @@ void LocalDerivationGoal::runChild()
                without file-write* allowed, access() incorrectly returns EPERM
              */
             sandboxProfile += "(allow file-read* file-write* process-exec\n";
+
+            // We create multiple allow lists, to avoid exceeding a limit in the darwin sandbox interpreter.
+            // See https://github.com/NixOS/nix/issues/4119
+            // We split our allow groups approximately at half the actual limit, 1 << 16
+            const int breakpoint = sandboxProfile.length() + (1 << 14);
             for (auto & i : pathsInChroot) {
+
+                if (sandboxProfile.length() >= breakpoint) {
+                    debug("Sandbox break: %d %d", sandboxProfile.length(), breakpoint);
+                    sandboxProfile += ")\n(allow file-read* file-write* process-exec\n";
+                }
+
                 if (i.first != i.second.source)
                     throw Error(
                         "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin",
@@ -3245,8 +2991,12 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
                         spec.insert(worker.store.parseStorePath(i));
                     else if (auto output = get(outputs, i))
                         spec.insert(output->path);
-                    else
-                        throw BuildError("derivation contains an illegal reference specifier '%s'", i);
+                    else {
+                        std::string outputsListing = concatMapStringsSep(", ", outputs, [](auto & o) { return o.first; });
+                        throw BuildError("derivation '%s' output check for '%s' contains an illegal reference specifier '%s',"
+                            " expected store path or output name (one of [%s])",
+                            worker.store.printStorePath(drvPath), outputName, i, outputsListing);
+                    }
                 }
 
                 auto used = recursive

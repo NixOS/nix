@@ -149,16 +149,18 @@ std::string_view baseNameOf(std::string_view path)
 }
 
 
-bool isInDir(std::string_view path, std::string_view dir)
+bool isInDir(const fs::path & path, const fs::path & dir)
 {
-    return path.substr(0, 1) == "/"
-        && path.substr(0, dir.size()) == dir
-        && path.size() >= dir.size() + 2
-        && path[dir.size()] == '/';
+    /* Note that while the standard doesn't guarantee this, the
+      `lexically_*` functions should do no IO and not throw. */
+    auto rel = path.lexically_relative(dir);
+    /* Method from
+       https://stackoverflow.com/questions/62503197/check-if-path-contains-another-in-c++ */
+    return !rel.empty() && rel.native()[0] != OS_STR('.');
 }
 
 
-bool isDirOrInDir(std::string_view path, std::string_view dir)
+bool isDirOrInDir(const fs::path & path, const fs::path & dir)
 {
     return path == dir || isInDir(path, dir);
 }
@@ -475,12 +477,12 @@ void createDir(const Path & path, mode_t mode)
         throw SysError("creating directory '%1%'", path);
 }
 
-void createDirs(const Path & path)
+void createDirs(const fs::path & path)
 {
     try {
         fs::create_directories(path);
     } catch (fs::filesystem_error & e) {
-        throw SysError("creating directory '%1%'", path);
+        throw SysError("creating directory '%1%'", path.string());
     }
 }
 
@@ -680,7 +682,7 @@ void setWriteTime(
         if (utimes(path.c_str(), times) == -1)
             throw SysError("changing modification time of %s (not a symlink)", path);
     } else {
-        throw Error("Cannot modification time of symlink %s", path);
+        throw Error("Cannot change modification time of symlink %s", path);
     }
 #endif
 #endif

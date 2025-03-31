@@ -326,7 +326,7 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             auto res = nlohmann::json::object();
             res["storePath"] = store->printStorePath(storePath);
             res["hash"] = hash.to_string(HashFormat::SRI, true);
-            logger->cout(res.dump());
+            printJSON(res);
         } else {
             notice("Downloaded '%s' to '%s' (hash '%s').",
                 url,

@@ -166,7 +166,7 @@ void unpackTarfile(Source & source, const fs::path & destDir)
 {
     auto archive = TarArchive(source);
 
-    fs::create_directories(destDir);
+    createDirs(destDir);
     extract_archive(archive, destDir);
 }
 
@@ -174,7 +174,7 @@ void unpackTarfile(const fs::path & tarFile, const fs::path & destDir)
 {
     auto archive = TarArchive(tarFile);
 
-    fs::create_directories(destDir);
+    createDirs(destDir);
     extract_archive(archive, destDir);
 }
 

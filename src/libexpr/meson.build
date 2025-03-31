@@ -126,7 +126,6 @@ generated_headers = []
 foreach header : [
   'imported-drv-to-derivation.nix',
   'fetchurl.nix',
-  'call-flake.nix',
 ]
   generated_headers += gen_header.process(header)
 endforeach
@@ -190,6 +189,9 @@ headers = [config_h] + files(
 
 subdir('primops')
 
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
+
 this_library = library(
   'nixexpr',
   sources,
@@ -197,6 +199,8 @@ this_library = library(
   lexer_tab,
   generated_headers,
   dependencies : deps_public + deps_private + deps_other,
+  include_directories : include_dirs,
+  link_args: linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
 )

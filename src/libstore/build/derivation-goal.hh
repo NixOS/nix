@@ -64,7 +64,7 @@ void runPostBuildHook(
 
 /** Used internally */
 void appendLogTailErrorMsg(
-    Worker & worker,
+    const Store & store,
     const StorePath & drvPath,
     const std::list<std::string> & logTail,
     std::string & msg);
@@ -197,11 +197,6 @@ struct DerivationGoal : public Goal
      */
     std::unique_ptr<HookInstance> hook;
 #endif
-
-    /**
-     * The sort of derivation we are building.
-     */
-    std::optional<DerivationType> derivationType;
 
     BuildMode buildMode;
 

@@ -7,6 +7,7 @@
 namespace nix {
 
 class EvalState;
+struct PrimOp;
 
 struct EvalSettings : Config
 {
@@ -49,6 +50,8 @@ struct EvalSettings : Config
     static std::string resolvePseudoUrl(std::string_view url);
 
     LookupPathHooks lookupPathHooks;
+
+    std::vector<PrimOp> extraPrimOps;
 
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation", R"(
         Enable built-in functions that allow executing native code.

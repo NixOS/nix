@@ -142,8 +142,8 @@ Goal::Co DerivationGoal::init() {
            substitute. */
 
         if (buildMode != bmNormal || !worker.evalStore.isValidPath(drvPath)) {
-            addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
-            co_await Suspend{};
+            Goals waitees{upcast_goal(worker.makePathSubstitutionGoal(drvPath))};
+            co_await await(std::move(waitees));
         }
 
         trace("loading derivation");
@@ -235,6 +235,8 @@ Goal::Co DerivationGoal::haveDerivation()
         }
     }
 
+    Goals waitees;
+
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
@@ -242,7 +244,7 @@ Goal::Co DerivationGoal::haveDerivation()
         for (auto & [outputName, status] : initialOutputs) {
             if (!status.wanted) continue;
             if (!status.known)
-                addWaitee(
+                waitees.insert(
                     upcast_goal(
                         worker.makeDrvOutputSubstitutionGoal(
                             DrvOutput{status.outputHash, outputName},
@@ -252,14 +254,14 @@ Goal::Co DerivationGoal::haveDerivation()
                 );
             else {
                 auto * cap = getDerivationCA(*drv);
-                addWaitee(upcast_goal(worker.makePathSubstitutionGoal(
+                waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
                     status.known->path,
                     buildMode == bmRepair ? Repair : NoRepair,
                     cap ? std::optional { *cap } : std::nullopt)));
             }
         }
 
-    if (!waitees.empty()) co_await Suspend{}; /* to prevent hang (no wake-up event) */
+    co_await await(std::move(waitees));
 
     trace("all outputs substituted (maybe)");
 
@@ -342,6 +344,8 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
        is no need to restart. */
     needRestart = NeedRestartForMoreOutputs::BuildInProgressWillNotNeed;
 
+    Goals waitees;
+
     std::map<ref<const SingleDerivedPath>, GoalPtr, value_comparison> inputGoals;
 
     if (useDerivation) {
@@ -356,7 +360,7 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
                     },
                     buildMode == bmRepair ? bmRepair : bmNormal);
                 inputGoals.insert_or_assign(inputDrv, g);
-                addWaitee(std::move(g));
+                waitees.insert(std::move(g));
             }
             for (const auto & [outputName, childNode] : inputNode.childMap)
                 addWaiteeDerivedPath(
@@ -397,10 +401,11 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
         if (!settings.useSubstitutes)
             throw Error("dependency '%s' of '%s' does not exist, and substitution is disabled",
                 worker.store.printStorePath(i), worker.store.printStorePath(drvPath));
-        addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i)));
+        waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(i)));
     }
 
-    if (!waitees.empty()) co_await Suspend{}; /* to prevent hang (no wake-up event) */
+    co_await await(std::move(waitees));
+
 
     trace("all inputs realised");
 
@@ -495,9 +500,11 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
 
             resolvedDrvGoal = worker.makeDerivationGoal(
                 pathResolved, wantedOutputs, buildMode);
-            addWaitee(resolvedDrvGoal);
+            {
+                Goals waitees{resolvedDrvGoal};
+                co_await await(std::move(waitees));
+            }
 
-            co_await Suspend{};
             co_return resolvedFinished();
         }
 
@@ -533,14 +540,10 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
 
     debug("added input paths %s", worker.store.showPaths(inputPaths));
 
-    /* What type of derivation are we building? */
-    derivationType = drv->type();
-
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
        build hook. */
-    worker.wakeUp(shared_from_this());
-    co_await Suspend{};
+    co_await yield();
     co_return tryToBuild();
 }
 
@@ -597,16 +600,17 @@ Goal::Co DerivationGoal::tryToBuild()
         }
     }
 
-    if (!outputLocks.lockPaths(lockFiles, "", false)) {
-        if (!actLock)
-            actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
+    if (!outputLocks.lockPaths(lockFiles, "", false))
+    {
+        Activity act(*logger, lvlWarn, actBuildWaiting,
                 fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
-        worker.waitForAWhile(shared_from_this());
-        co_await Suspend{};
-        co_return tryToBuild();
-    }
 
-    actLock.reset();
+        /* Wait then try locking again, repeat until success (returned
+           boolean is true). */
+        do {
+            co_await waitForAWhile();
+        } while (!outputLocks.lockPaths(lockFiles, "", false));
+    }
 
     /* Now check again whether the outputs are valid.  This is because
        another process may have started building in parallel.  After
@@ -656,9 +660,8 @@ Goal::Co DerivationGoal::tryToBuild()
                 if (!actLock)
                     actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                         fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
-                worker.waitForAWhile(shared_from_this());
                 outputLocks.unlock();
-                co_await Suspend{};
+                co_await waitForAWhile();
                 co_return tryToBuild();
             case rpDecline:
                 /* We should do it ourselves. */
@@ -668,8 +671,7 @@ Goal::Co DerivationGoal::tryToBuild()
 
     actLock.reset();
 
-    worker.wakeUp(shared_from_this());
-    co_await Suspend{};
+    co_await yield();
     co_return tryLocalBuild();
 }
 
@@ -720,6 +722,8 @@ Goal::Co DerivationGoal::repairClosure()
                     outputsToDrv.insert_or_assign(*j.second, i);
         }
 
+    Goals waitees;
+
     /* Check each path (slow!). */
     for (auto & i : outputClosure) {
         if (worker.pathContentsGood(i)) continue;
@@ -728,9 +732,9 @@ Goal::Co DerivationGoal::repairClosure()
             worker.store.printStorePath(i), worker.store.printStorePath(drvPath));
         auto drvPath2 = outputsToDrv.find(i);
         if (drvPath2 == outputsToDrv.end())
-            addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i, Repair)));
+            waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(i, Repair)));
         else
-            addWaitee(worker.makeGoal(
+            waitees.insert(worker.makeGoal(
                 DerivedPath::Built {
                     .drvPath = makeConstantStorePathRef(drvPath2->second),
                     .outputs = OutputsSpec::All { },
@@ -738,17 +742,15 @@ Goal::Co DerivationGoal::repairClosure()
                 bmRepair));
     }
 
-    if (waitees.empty()) {
-        co_return done(BuildResult::AlreadyValid, assertPathValidity());
-    } else {
-        co_await Suspend{};
+    co_await await(std::move(waitees));
 
+    if (!waitees.empty()) {
         trace("closure repaired");
         if (nrFailed > 0)
             throw Error("some paths in the output closure of derivation '%s' could not be repaired",
                 worker.store.printStorePath(drvPath));
-        co_return done(BuildResult::AlreadyValid, assertPathValidity());
     }
+    co_return done(BuildResult::AlreadyValid, assertPathValidity());
 }
 
 
@@ -870,7 +872,7 @@ void runPostBuildHook(
 
 
 void appendLogTailErrorMsg(
-    Worker & worker,
+    const Store & store,
     const StorePath & drvPath,
     const std::list<std::string> & logTail,
     std::string & msg)
@@ -890,7 +892,7 @@ void appendLogTailErrorMsg(
         // command will not put it at the start of the line unfortunately.
         msg += fmt("For full logs, run:\n  " ANSI_BOLD "%s %s" ANSI_NORMAL,
             nixLogCommand,
-            worker.store.printStorePath(drvPath));
+            store.printStorePath(drvPath));
     }
 }
 
@@ -937,7 +939,7 @@ Goal::Co DerivationGoal::hookDone()
             Magenta(worker.store.printStorePath(drvPath)),
             statusToString(status));
 
-        appendLogTailErrorMsg(worker, drvPath, logTail, msg);
+        appendLogTailErrorMsg(worker.store, drvPath, logTail, msg);
 
         outputLocks.unlock();
 

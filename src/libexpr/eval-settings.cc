@@ -103,4 +103,4 @@ Path getNixDefExpr()
         : getHome() + "/.nix-defexpr";
 }
 
-}
+} // namespace nix
