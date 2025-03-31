@@ -1,11 +1,11 @@
-#include "logging.hh"
-#include "file-descriptor.hh"
-#include "environment-variables.hh"
-#include "terminal.hh"
-#include "util.hh"
-#include "config-global.hh"
-#include "source-path.hh"
-#include "position.hh"
+#include "nix/logging.hh"
+#include "nix/file-descriptor.hh"
+#include "nix/environment-variables.hh"
+#include "nix/terminal.hh"
+#include "nix/util.hh"
+#include "nix/config-global.hh"
+#include "nix/source-path.hh"
+#include "nix/position.hh"
 
 #include <atomic>
 #include <sstream>

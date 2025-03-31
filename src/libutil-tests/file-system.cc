@@ -1,9 +1,9 @@
-#include "util.hh"
-#include "types.hh"
-#include "file-system.hh"
-#include "processes.hh"
-#include "terminal.hh"
-#include "strings.hh"
+#include "nix/util.hh"
+#include "nix/types.hh"
+#include "nix/file-system.hh"
+#include "nix/processes.hh"
+#include "nix/terminal.hh"
+#include "nix/strings.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>

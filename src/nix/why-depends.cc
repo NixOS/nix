@@ -1,7 +1,7 @@
-#include "command.hh"
-#include "store-api.hh"
-#include "source-accessor.hh"
-#include "shared.hh"
+#include "nix/command.hh"
+#include "nix/store-api.hh"
+#include "nix/source-accessor.hh"
+#include "nix/shared.hh"
 
 #include <queue>
 

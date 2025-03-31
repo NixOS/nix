@@ -1,8 +1,8 @@
-#include "get-drvs.hh"
-#include "eval-inline.hh"
-#include "derivations.hh"
-#include "store-api.hh"
-#include "path-with-outputs.hh"
+#include "nix/get-drvs.hh"
+#include "nix/eval-inline.hh"
+#include "nix/derivations.hh"
+#include "nix/store-api.hh"
+#include "nix/path-with-outputs.hh"
 
 #include <cstring>
 #include <regex>

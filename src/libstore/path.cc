@@ -1,4 +1,4 @@
-#include "store-dir-config.hh"
+#include "nix/store-dir-config.hh"
 
 namespace nix {
 

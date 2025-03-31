@@ -1,24 +1,24 @@
-#include "local-derivation-goal.hh"
-#include "indirect-root-store.hh"
-#include "hook-instance.hh"
-#include "worker.hh"
-#include "builtins.hh"
-#include "builtins/buildenv.hh"
-#include "path-references.hh"
-#include "finally.hh"
-#include "util.hh"
-#include "archive.hh"
-#include "git.hh"
-#include "compression.hh"
-#include "daemon.hh"
-#include "topo-sort.hh"
-#include "callback.hh"
-#include "json-utils.hh"
-#include "current-process.hh"
-#include "child.hh"
-#include "unix-domain-socket.hh"
-#include "posix-fs-canonicalise.hh"
-#include "posix-source-accessor.hh"
+#include "nix/build/local-derivation-goal.hh"
+#include "nix/indirect-root-store.hh"
+#include "nix/build/hook-instance.hh"
+#include "nix/build/worker.hh"
+#include "nix/builtins.hh"
+#include "nix/builtins/buildenv.hh"
+#include "nix/path-references.hh"
+#include "nix/finally.hh"
+#include "nix/util.hh"
+#include "nix/archive.hh"
+#include "nix/git.hh"
+#include "nix/compression.hh"
+#include "nix/daemon.hh"
+#include "nix/topo-sort.hh"
+#include "nix/callback.hh"
+#include "nix/json-utils.hh"
+#include "nix/current-process.hh"
+#include "nix/build/child.hh"
+#include "nix/unix-domain-socket.hh"
+#include "nix/posix-fs-canonicalise.hh"
+#include "nix/posix-source-accessor.hh"
 
 #include <regex>
 #include <queue>
@@ -37,7 +37,7 @@
 
 /* Includes required for chroot support. */
 #if __linux__
-# include "fchmodat2-compat.hh"
+# include "nix/fchmodat2-compat.hh"
 # include <sys/ioctl.h>
 # include <net/if.h>
 # include <netinet/ip.h>
@@ -46,13 +46,13 @@
 # include <sys/param.h>
 # include <sys/mount.h>
 # include <sys/syscall.h>
-# include "namespaces.hh"
+# include "nix/namespaces.hh"
 # if HAVE_SECCOMP
 #   include <seccomp.h>
 # endif
 # define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
-# include "cgroup.hh"
-# include "personality.hh"
+# include "nix/cgroup.hh"
+# include "nix/personality.hh"
 #endif
 
 #if __APPLE__
@@ -68,8 +68,8 @@ extern "C" int sandbox_init_with_parameters(const char *profile, uint64_t flags,
 #include <grp.h>
 #include <iostream>
 
-#include "strings.hh"
-#include "signals.hh"
+#include "nix/strings.hh"
+#include "nix/signals.hh"
 
 namespace nix {
 

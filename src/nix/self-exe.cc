@@ -1,6 +1,6 @@
-#include "current-process.hh"
-#include "file-system.hh"
-#include "globals.hh"
+#include "nix/current-process.hh"
+#include "nix/file-system.hh"
+#include "nix/globals.hh"
 #include "self-exe.hh"
 
 namespace nix {

@@ -1,5 +1,5 @@
-#include "store-api.hh"
-#include "eval.hh"
+#include "nix/store-api.hh"
+#include "nix/eval.hh"
 
 namespace nix {
 

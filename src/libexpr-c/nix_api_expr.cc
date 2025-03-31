@@ -2,11 +2,11 @@
 #include <stdexcept>
 #include <string>
 
-#include "eval.hh"
-#include "eval-gc.hh"
-#include "globals.hh"
-#include "eval-settings.hh"
-#include "ref.hh"
+#include "nix/eval.hh"
+#include "nix/eval-gc.hh"
+#include "nix/globals.hh"
+#include "nix/eval-settings.hh"
+#include "nix/ref.hh"
 
 #include "nix_api_expr.h"
 #include "nix_api_expr_internal.h"

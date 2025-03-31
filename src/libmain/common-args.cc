@@ -1,11 +1,11 @@
-#include "common-args.hh"
-#include "args/root.hh"
-#include "config-global.hh"
-#include "globals.hh"
-#include "logging.hh"
-#include "loggers.hh"
-#include "util.hh"
-#include "plugin.hh"
+#include "nix/common-args.hh"
+#include "nix/args/root.hh"
+#include "nix/config-global.hh"
+#include "nix/globals.hh"
+#include "nix/logging.hh"
+#include "nix/loggers.hh"
+#include "nix/util.hh"
+#include "nix/plugin.hh"
 
 namespace nix {
 

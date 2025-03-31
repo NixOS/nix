@@ -1,10 +1,10 @@
-#include "command-installable-value.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "eval.hh"
-#include "eval-inline.hh"
-#include "value-to-json.hh"
+#include "nix/command-installable-value.hh"
+#include "nix/common-args.hh"
+#include "nix/shared.hh"
+#include "nix/store-api.hh"
+#include "nix/eval.hh"
+#include "nix/eval-inline.hh"
+#include "nix/value-to-json.hh"
 
 #include <nlohmann/json.hpp>
 

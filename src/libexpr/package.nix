@@ -48,6 +48,7 @@ mkMesonLibrary (finalAttrs: {
     ./meson.build
     ./meson.options
     ./primops/meson.build
+    ./include/nix/meson.build
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
     ./lexer.l

@@ -1,8 +1,8 @@
-#include "url.hh"
-#include "url-parts.hh"
-#include "util.hh"
-#include "split.hh"
-#include "canon-path.hh"
+#include "nix/url.hh"
+#include "nix/url-parts.hh"
+#include "nix/util.hh"
+#include "nix/split.hh"
+#include "nix/canon-path.hh"
 
 namespace nix {
 

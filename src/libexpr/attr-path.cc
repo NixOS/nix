@@ -1,5 +1,5 @@
-#include "attr-path.hh"
-#include "eval-inline.hh"
+#include "nix/attr-path.hh"
+#include "nix/eval-inline.hh"
 
 
 namespace nix {

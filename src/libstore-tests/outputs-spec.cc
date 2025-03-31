@@ -1,4 +1,4 @@
-#include "tests/outputs-spec.hh"
+#include "nix/tests/outputs-spec.hh"
 
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>

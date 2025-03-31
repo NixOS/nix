@@ -30,10 +30,10 @@ deps_public += nlohmann_json
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  # '-include', 'config-fetchers.h',
-  '-include', 'config-expr.hh',
+  '-include', 'nix/config-util.hh',
+  '-include', 'nix/config-store.hh',
+  # '-include', 'nix_api_fetchers_config.h',
+  '-include', 'nix/config-expr.hh',
   language : 'cpp',
 )
 
@@ -58,15 +58,7 @@ sources = files(
   'flake/url-name.cc',
 )
 
-include_dirs = [include_directories('.')]
-
-headers = files(
-  'flake/flake.hh',
-  'flake/flakeref.hh',
-  'flake/lockfile.hh',
-  'flake/settings.hh',
-  'flake/url-name.hh',
-)
+subdir('include/nix')
 
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')

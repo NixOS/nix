@@ -1,7 +1,7 @@
 #include <regex>
 
-#include "common-ssh-store-config.hh"
-#include "ssh.hh"
+#include "nix/common-ssh-store-config.hh"
+#include "nix/ssh.hh"
 
 namespace nix {
 

@@ -1,6 +1,7 @@
 #include "crash-handler.hh"
-#include "fmt.hh"
-#include "logging.hh"
+
+#include "nix/fmt.hh"
+#include "nix/logging.hh"
 
 #include <boost/core/demangle.hpp>
 #include <exception>
