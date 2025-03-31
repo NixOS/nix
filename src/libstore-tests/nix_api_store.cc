@@ -3,8 +3,8 @@
 #include "nix_api_store.h"
 #include "nix_api_store_internal.h"
 
-#include "nix/tests/nix_api_store.hh"
-#include "nix/tests/string_callback.hh"
+#include "nix/store/tests/nix_api_store.hh"
+#include "nix/util/tests/string_callback.hh"
 
 #include "store-tests-config.hh"
 

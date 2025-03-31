@@ -1,13 +1,13 @@
-#include "nix/logging.hh"
-#include "nix/pathlocks.hh"
-#include "nix/signals.hh"
-#include "nix/util.hh"
+#include "nix/util/logging.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/util.hh"
 
 #ifdef _WIN32
 #  include <errhandlingapi.h>
 #  include <fileapi.h>
 #  include <windows.h>
-#  include "nix/windows-error.hh"
+#  include "nix/util/windows-error.hh"
 
 namespace nix {
 

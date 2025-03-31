@@ -1,6 +1,6 @@
-#include "nix/references.hh"
-#include "nix/hash.hh"
-#include "nix/archive.hh"
+#include "nix/util/references.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/archive.hh"
 
 #include <map>
 #include <cstdlib>

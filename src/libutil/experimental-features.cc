@@ -1,6 +1,6 @@
-#include "nix/experimental-features.hh"
-#include "nix/fmt.hh"
-#include "nix/util.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/util.hh"
 
 #include <nlohmann/json.hpp>
 

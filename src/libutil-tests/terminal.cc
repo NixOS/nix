@@ -1,7 +1,7 @@
-#include "nix/util.hh"
-#include "nix/types.hh"
-#include "nix/terminal.hh"
-#include "nix/strings.hh"
+#include "nix/util/util.hh"
+#include "nix/util/types.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/strings.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>

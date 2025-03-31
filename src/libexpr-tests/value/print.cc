@@ -1,7 +1,7 @@
-#include "nix/tests/libexpr.hh"
+#include "nix/expr/tests/libexpr.hh"
 
-#include "nix/value.hh"
-#include "nix/print.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/print.hh"
 
 namespace nix {
 

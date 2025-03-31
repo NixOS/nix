@@ -1,5 +1,5 @@
-#include "nix/make-content-addressed.hh"
-#include "nix/references.hh"
+#include "nix/store/make-content-addressed.hh"
+#include "nix/util/references.hh"
 
 namespace nix {
 

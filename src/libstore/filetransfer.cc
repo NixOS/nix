@@ -1,19 +1,19 @@
-#include "nix/filetransfer.hh"
-#include "nix/globals.hh"
-#include "nix/config-global.hh"
-#include "nix/store-api.hh"
-#include "nix/s3.hh"
-#include "nix/compression.hh"
-#include "nix/finally.hh"
-#include "nix/callback.hh"
-#include "nix/signals.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/config-global.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/s3.hh"
+#include "nix/util/compression.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/callback.hh"
+#include "nix/util/signals.hh"
 
 #if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
 #endif
 
 #if __linux__
-# include "nix/namespaces.hh"
+# include "nix/util/namespaces.hh"
 #endif
 
 #include <unistd.h>

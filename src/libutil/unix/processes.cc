@@ -1,10 +1,10 @@
-#include "nix/current-process.hh"
-#include "nix/environment-variables.hh"
-#include "nix/executable-path.hh"
-#include "nix/signals.hh"
-#include "nix/processes.hh"
-#include "nix/finally.hh"
-#include "nix/serialise.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/executable-path.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/serialise.hh"
 
 #include <cerrno>
 #include <cstdlib>

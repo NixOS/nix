@@ -48,7 +48,7 @@ sources = files(
   'flake/url-name.cc',
 )
 
-subdir('include/nix')
+subdir('include/nix/flake')
 
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
@@ -64,7 +64,7 @@ this_library = library(
   install : true,
 )
 
-install_headers(headers, subdir : 'nix', preserve_path : true)
+install_headers(headers, subdir : 'nix/flake', preserve_path : true)
 
 libraries_private = []
 

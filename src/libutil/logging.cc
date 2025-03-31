@@ -1,12 +1,12 @@
-#include "nix/logging.hh"
-#include "nix/file-descriptor.hh"
-#include "nix/environment-variables.hh"
-#include "nix/terminal.hh"
-#include "nix/util.hh"
-#include "nix/config-global.hh"
-#include "nix/source-path.hh"
-#include "nix/position.hh"
-#include "nix/sync.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/util.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/position.hh"
+#include "nix/util/sync.hh"
 
 #include <atomic>
 #include <sstream>

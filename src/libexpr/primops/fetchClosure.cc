@@ -1,8 +1,8 @@
-#include "nix/primops.hh"
-#include "nix/store-api.hh"
-#include "nix/realisation.hh"
-#include "nix/make-content-addressed.hh"
-#include "nix/url.hh"
+#include "nix/expr/primops.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/make-content-addressed.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 

@@ -3,8 +3,8 @@
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
-#include "nix/tests/derived-path.hh"
-#include "nix/tests/libstore.hh"
+#include "nix/store/tests/derived-path.hh"
+#include "nix/store/tests/libstore.hh"
 
 namespace nix {
 

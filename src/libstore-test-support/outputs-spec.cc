@@ -1,4 +1,4 @@
-#include "nix/tests/outputs-spec.hh"
+#include "nix/store/tests/outputs-spec.hh"
 
 #include <rapidcheck.h>
 

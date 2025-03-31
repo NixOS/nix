@@ -1,4 +1,4 @@
-#include "nix/xml-writer.hh"
+#include "nix/util/xml-writer.hh"
 #include <gtest/gtest.h>
 #include <sstream>
 

@@ -1,5 +1,5 @@
-#include "nix/args.hh"
-#include "nix/fs-sink.hh"
+#include "nix/util/args.hh"
+#include "nix/util/fs-sink.hh"
 #include <list>
 
 #include <gtest/gtest.h>

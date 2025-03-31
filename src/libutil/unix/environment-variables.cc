@@ -1,6 +1,6 @@
 #include <cstdlib>
 
-#include "nix/environment-variables.hh"
+#include "nix/util/environment-variables.hh"
 
 namespace nix {
 

@@ -1,22 +1,22 @@
-#include "nix/local-store.hh"
-#include "nix/globals.hh"
-#include "nix/git.hh"
-#include "nix/archive.hh"
-#include "nix/pathlocks.hh"
-#include "nix/worker-protocol.hh"
-#include "nix/derivations.hh"
-#include "nix/realisation.hh"
-#include "nix/nar-info.hh"
-#include "nix/references.hh"
-#include "nix/callback.hh"
-#include "nix/topo-sort.hh"
-#include "nix/finally.hh"
-#include "nix/compression.hh"
-#include "nix/signals.hh"
-#include "nix/posix-fs-canonicalise.hh"
-#include "nix/posix-source-accessor.hh"
-#include "nix/keys.hh"
-#include "nix/users.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/git.hh"
+#include "nix/util/archive.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/store/worker-protocol.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/nar-info.hh"
+#include "nix/util/references.hh"
+#include "nix/util/callback.hh"
+#include "nix/util/topo-sort.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/compression.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/util/posix-source-accessor.hh"
+#include "nix/store/keys.hh"
+#include "nix/util/users.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -52,7 +52,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "nix/strings.hh"
+#include "nix/util/strings.hh"
 
 #include "store-config-private.hh"
 

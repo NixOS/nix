@@ -1,13 +1,13 @@
 #include <fcntl.h>
 
-#include "nix/error.hh"
-#include "nix/config-global.hh"
-#include "nix/fs-sink.hh"
+#include "nix/util/error.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/fs-sink.hh"
 
 #if _WIN32
 # include <fileapi.h>
-# include "nix/file-path.hh"
-# include "nix/windows-error.hh"
+# include "nix/util/file-path.hh"
+# include "nix/util/windows-error.hh"
 #endif
 
 #include "util-config-private.hh"

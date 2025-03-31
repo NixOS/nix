@@ -1,14 +1,14 @@
 #include <sstream>
 
-#include "nix/command.hh"
-#include "nix/exit.hh"
-#include "nix/logging.hh"
-#include "nix/serve-protocol.hh"
-#include "nix/shared.hh"
-#include "nix/store-api.hh"
-#include "nix/local-fs-store.hh"
-#include "nix/worker-protocol.hh"
-#include "nix/executable-path.hh"
+#include "nix/cmd/command.hh"
+#include "nix/util/exit.hh"
+#include "nix/util/logging.hh"
+#include "nix/store/serve-protocol.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/worker-protocol.hh"
+#include "nix/util/executable-path.hh"
 
 namespace nix::fs { using namespace std::filesystem; }
 

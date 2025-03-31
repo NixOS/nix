@@ -1,25 +1,25 @@
-#include "nix/args/root.hh"
-#include "nix/current-process.hh"
-#include "nix/command.hh"
-#include "nix/common-args.hh"
-#include "nix/eval.hh"
-#include "nix/eval-settings.hh"
-#include "nix/globals.hh"
-#include "nix/legacy.hh"
-#include "nix/shared.hh"
-#include "nix/store-api.hh"
-#include "nix/filetransfer.hh"
-#include "nix/finally.hh"
-#include "nix/loggers.hh"
-#include "nix/markdown.hh"
-#include "nix/memory-source-accessor.hh"
-#include "nix/terminal.hh"
-#include "nix/users.hh"
-#include "nix/network-proxy.hh"
-#include "nix/eval-cache.hh"
+#include "nix/util/args/root.hh"
+#include "nix/util/current-process.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/common-args.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/store/globals.hh"
+#include "nix/cmd/legacy.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/util/finally.hh"
+#include "nix/main/loggers.hh"
+#include "nix/cmd/markdown.hh"
+#include "nix/util/memory-source-accessor.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/users.hh"
+#include "nix/cmd/network-proxy.hh"
+#include "nix/expr/eval-cache.hh"
 #include "nix/flake/flake.hh"
 #include "nix/flake/settings.hh"
-#include "nix/json-utils.hh"
+#include "nix/util/json-utils.hh"
 
 #include "self-exe.hh"
 #include "crash-handler.hh"
@@ -37,7 +37,7 @@
 #endif
 
 #if __linux__
-# include "nix/namespaces.hh"
+# include "nix/util/namespaces.hh"
 #endif
 
 #ifndef _WIN32
@@ -46,7 +46,7 @@ extern std::string chrootHelperName;
 void chrootHelper(int argc, char * * argv);
 #endif
 
-#include "nix/strings.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
 

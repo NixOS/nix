@@ -1,6 +1,6 @@
-#include "nix/fetch-to-store.hh"
-#include "nix/fetchers.hh"
-#include "nix/cache.hh"
+#include "nix/fetchers/fetch-to-store.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/cache.hh"
 
 namespace nix {
 

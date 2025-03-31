@@ -1,5 +1,5 @@
 #include "nix/flake/flake-primops.hh"
-#include "nix/eval.hh"
+#include "nix/expr/eval.hh"
 #include "nix/flake/flake.hh"
 #include "nix/flake/flakeref.hh"
 #include "nix/flake/settings.hh"

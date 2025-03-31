@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nix/eval.hh"
+#include "nix/expr/eval.hh"
 #include "nix/flake/settings.hh"
 
 namespace nix::flake::primops {

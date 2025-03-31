@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/store-api.hh"
+#include "nix/store/store-api.hh"
 
 namespace nix {
 

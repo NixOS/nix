@@ -1,13 +1,13 @@
 #include <nlohmann/json.hpp>
 
-#include "nix/common-args.hh"
-#include "nix/args/root.hh"
-#include "nix/config-global.hh"
-#include "nix/globals.hh"
-#include "nix/logging.hh"
-#include "nix/loggers.hh"
-#include "nix/util.hh"
-#include "nix/plugin.hh"
+#include "nix/main/common-args.hh"
+#include "nix/util/args/root.hh"
+#include "nix/util/config-global.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/logging.hh"
+#include "nix/main/loggers.hh"
+#include "nix/util/util.hh"
+#include "nix/main/plugin.hh"
 
 namespace nix {
 

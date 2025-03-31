@@ -2,7 +2,7 @@
 
 #include <rapidcheck.h>
 
-#include "nix/tests/derived-path.hh"
+#include "nix/store/tests/derived-path.hh"
 
 namespace rc {
 using namespace nix;

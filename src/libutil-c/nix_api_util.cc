@@ -1,8 +1,8 @@
 #include "nix_api_util.h"
-#include "nix/config-global.hh"
-#include "nix/error.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/error.hh"
 #include "nix_api_util_internal.h"
-#include "nix/util.hh"
+#include "nix/util/util.hh"
 
 #include <cxxabi.h>
 #include <typeinfo>

@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "nix/file-system.hh"
+#include "nix/util/file-system.hh"
 
 #include "util-unix-config-private.hh"
 

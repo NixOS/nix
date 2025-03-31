@@ -1,8 +1,8 @@
-#include "nix/local-store.hh"
-#include "nix/globals.hh"
-#include "nix/signals.hh"
-#include "nix/posix-fs-canonicalise.hh"
-#include "nix/posix-source-accessor.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/util/posix-source-accessor.hh"
 
 #include <cstdlib>
 #include <cstring>

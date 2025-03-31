@@ -1,10 +1,10 @@
 #include <unordered_set>
 
-#include "nix/fetch-settings.hh"
+#include "nix/fetchers/fetch-settings.hh"
 #include "nix/flake/settings.hh"
 #include "nix/flake/lockfile.hh"
-#include "nix/store-api.hh"
-#include "nix/strings.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/strings.hh"
 
 #include <algorithm>
 #include <iomanip>
