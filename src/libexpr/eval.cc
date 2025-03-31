@@ -2245,18 +2245,18 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
 }
 
 
-void copyContext(const Value & v, NixStringContext & context)
+void copyContext(const Value & v, NixStringContext & context, const ExperimentalFeatureSettings & xpSettings)
 {
     if (v.payload.string.context)
         for (const char * * p = v.payload.string.context; *p; ++p)
-            context.insert(NixStringContextElem::parse(*p));
+            context.insert(NixStringContextElem::parse(*p, xpSettings));
 }
 
 
-std::string_view EvalState::forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx)
+std::string_view EvalState::forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx, const ExperimentalFeatureSettings & xpSettings)
 {
     auto s = forceString(v, pos, errorCtx);
-    copyContext(v, context);
+    copyContext(v, context, xpSettings);
     return s;
 }
 
@@ -2462,10 +2462,10 @@ StorePath EvalState::coerceToStorePath(const PosIdx pos, Value & v, NixStringCon
 }
 
 
-std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx)
+std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx, const ExperimentalFeatureSettings & xpSettings)
 {
     NixStringContext context;
-    auto s = forceString(v, context, pos, errorCtx);
+    auto s = forceString(v, context, pos, errorCtx, xpSettings);
     auto csize = context.size();
     if (csize != 1)
         error<EvalError>(
