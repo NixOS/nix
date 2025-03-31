@@ -16,7 +16,6 @@ import('pkgconfig').generate(
   filebase : meson.project_name(),
   name : 'Nix',
   description : 'Nix Package Manager',
-  subdirs : ['nix'],
   extra_cflags : ['-std=c++2a'],
   requires : requires_public,
   requires_private : requires_private,

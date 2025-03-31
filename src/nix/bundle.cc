@@ -1,10 +1,10 @@
-#include "installable-flake.hh"
-#include "command-installable-value.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
-#include "eval-inline.hh"
+#include "nix/installable-flake.hh"
+#include "nix/command-installable-value.hh"
+#include "nix/common-args.hh"
+#include "nix/shared.hh"
+#include "nix/store-api.hh"
+#include "nix/local-fs-store.hh"
+#include "nix/eval-inline.hh"
 
 namespace nix::fs { using namespace std::filesystem; }
 

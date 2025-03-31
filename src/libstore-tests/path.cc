@@ -4,12 +4,12 @@
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
-#include "path-regex.hh"
-#include "store-api.hh"
+#include "nix/path-regex.hh"
+#include "nix/store-api.hh"
 
-#include "tests/hash.hh"
-#include "tests/libstore.hh"
-#include "tests/path.hh"
+#include "nix/tests/hash.hh"
+#include "nix/tests/libstore.hh"
+#include "nix/tests/path.hh"
 
 namespace nix {
 

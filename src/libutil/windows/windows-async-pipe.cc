@@ -1,5 +1,5 @@
-#include "windows-async-pipe.hh"
-#include "windows-error.hh"
+#include "nix/windows-async-pipe.hh"
+#include "nix/windows-error.hh"
 
 #ifdef _WIN32
 

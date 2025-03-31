@@ -1,20 +1,20 @@
 ///@file
 
-#include "signals.hh"
-#include "unix-domain-socket.hh"
-#include "command.hh"
-#include "shared.hh"
-#include "local-store.hh"
-#include "remote-store.hh"
-#include "remote-store-connection.hh"
-#include "serialise.hh"
-#include "archive.hh"
-#include "globals.hh"
-#include "config-global.hh"
-#include "derivations.hh"
-#include "finally.hh"
-#include "legacy.hh"
-#include "daemon.hh"
+#include "nix/signals.hh"
+#include "nix/unix-domain-socket.hh"
+#include "nix/command.hh"
+#include "nix/shared.hh"
+#include "nix/local-store.hh"
+#include "nix/remote-store.hh"
+#include "nix/remote-store-connection.hh"
+#include "nix/serialise.hh"
+#include "nix/archive.hh"
+#include "nix/globals.hh"
+#include "nix/config-global.hh"
+#include "nix/derivations.hh"
+#include "nix/finally.hh"
+#include "nix/legacy.hh"
+#include "nix/daemon.hh"
 #include "man-pages.hh"
 
 #include <algorithm>
@@ -35,7 +35,7 @@
 #include <fcntl.h>
 
 #if __linux__
-#include "cgroup.hh"
+#include "nix/cgroup.hh"
 #endif
 
 #if __APPLE__ || __FreeBSD__

@@ -1,11 +1,11 @@
-#include "serialise.hh"
-#include "path-with-outputs.hh"
-#include "store-api.hh"
-#include "build-result.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
-#include "archive.hh"
-#include "path-info.hh"
+#include "nix/serialise.hh"
+#include "nix/path-with-outputs.hh"
+#include "nix/store-api.hh"
+#include "nix/build-result.hh"
+#include "nix/worker-protocol.hh"
+#include "nix/worker-protocol-impl.hh"
+#include "nix/archive.hh"
+#include "nix/path-info.hh"
 
 #include <chrono>
 #include <nlohmann/json.hpp>

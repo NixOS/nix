@@ -6,11 +6,11 @@
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
-#include "args.hh"
-#include "hash.hh"
-#include "archive.hh"
-#include "config.hh"
-#include "split.hh"
+#include "nix/args.hh"
+#include "nix/hash.hh"
+#include "nix/archive.hh"
+#include "nix/config.hh"
+#include "nix/split.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

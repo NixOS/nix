@@ -1,11 +1,11 @@
-#include "globals.hh"
-#include "current-process.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "gc-store.hh"
-#include "loggers.hh"
-#include "progress-bar.hh"
-#include "signals.hh"
+#include "nix/globals.hh"
+#include "nix/current-process.hh"
+#include "nix/shared.hh"
+#include "nix/store-api.hh"
+#include "nix/gc-store.hh"
+#include "nix/loggers.hh"
+#include "nix/progress-bar.hh"
+#include "nix/signals.hh"
 
 #include <algorithm>
 #include <exception>
@@ -22,8 +22,8 @@
 
 #include <openssl/crypto.h>
 
-#include "exit.hh"
-#include "strings.hh"
+#include "nix/exit.hh"
+#include "nix/strings.hh"
 
 namespace nix {
 

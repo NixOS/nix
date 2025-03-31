@@ -1,6 +1,6 @@
-#include "command.hh"
-#include "store-api.hh"
-#include "nar-accessor.hh"
+#include "nix/command.hh"
+#include "nix/store-api.hh"
+#include "nix/nar-accessor.hh"
 
 using namespace nix;
 

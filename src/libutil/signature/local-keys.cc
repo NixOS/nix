@@ -1,7 +1,7 @@
-#include "signature/local-keys.hh"
+#include "nix/signature/local-keys.hh"
 
-#include "file-system.hh"
-#include "util.hh"
+#include "nix/file-system.hh"
+#include "nix/util.hh"
 #include <sodium.h>
 
 namespace nix {

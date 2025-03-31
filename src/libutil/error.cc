@@ -1,14 +1,14 @@
 #include <algorithm>
 
-#include "error.hh"
-#include "environment-variables.hh"
-#include "signals.hh"
-#include "terminal.hh"
-#include "position.hh"
+#include "nix/error.hh"
+#include "nix/environment-variables.hh"
+#include "nix/signals.hh"
+#include "nix/terminal.hh"
+#include "nix/position.hh"
 
 #include <iostream>
 #include <optional>
-#include "serialise.hh"
+#include "nix/serialise.hh"
 #include <sstream>
 
 namespace nix {

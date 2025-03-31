@@ -1,4 +1,4 @@
-#include "lru-cache.hh"
+#include "nix/lru-cache.hh"
 #include <gtest/gtest.h>
 
 namespace nix {
