@@ -7,6 +7,7 @@ queue_rules:
       - check-success=installer test on macos
       - check-success=installer test on ubuntu
       - check-success=vm_tests
+      - check-success=dpulls
     batch_size: 5
 
 pull_request_rules:
