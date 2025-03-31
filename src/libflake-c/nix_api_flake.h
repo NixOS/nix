@@ -35,9 +35,15 @@ nix_flake_settings * nix_flake_settings_new(nix_c_context * context);
 void nix_flake_settings_free(nix_flake_settings * settings);
 
 /**
- * @brief Register Flakes support process-wide.
+ * @brief Initialize a `nix_flake_settings` to contain `builtins.getFlake` and
+ * potentially more.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] settings The settings to use for e.g. `builtins.getFlake`
+ * @param[in] builder The builder to modify
  */
-nix_err nix_flake_init_global(nix_c_context * context, nix_flake_settings * settings);
+nix_err nix_flake_settings_add_to_eval_state_builder(
+    nix_c_context * context, nix_flake_settings * settings, nix_eval_state_builder * builder);
 
 #ifdef __cplusplus
 } // extern "C"

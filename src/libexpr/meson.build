@@ -126,7 +126,6 @@ generated_headers = []
 foreach header : [
   'imported-drv-to-derivation.nix',
   'fetchurl.nix',
-  'call-flake.nix',
 ]
   generated_headers += gen_header.process(header)
 endforeach

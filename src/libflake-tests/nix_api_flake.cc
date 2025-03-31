@@ -25,11 +25,11 @@ TEST_F(nix_api_store_test, nix_api_init_global_getFlake_exists)
     assert_ctx_ok();
     ASSERT_NE(nullptr, settings);
 
-    nix_flake_init_global(ctx, settings);
-    assert_ctx_ok();
-
     nix_eval_state_builder * builder = nix_eval_state_builder_new(ctx, store);
     ASSERT_NE(nullptr, builder);
+    assert_ctx_ok();
+
+    nix_flake_settings_add_to_eval_state_builder(ctx, settings, builder);
     assert_ctx_ok();
 
     auto state = nix_eval_state_build(ctx, builder);
