@@ -27,3 +27,4 @@ struct CmdOptimiseStore : StoreCommand
 };
 
 static auto rCmdOptimiseStore = registerCommand2<CmdOptimiseStore>({"store", "optimise"});
+static auto rCmdOptimizeStore = registerCommand2<CmdOptimiseStore>({"store", "optimize"});
