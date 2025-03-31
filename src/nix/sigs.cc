@@ -1,8 +1,8 @@
-#include "signals.hh"
-#include "command.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "thread-pool.hh"
+#include "nix/signals.hh"
+#include "nix/command.hh"
+#include "nix/shared.hh"
+#include "nix/store-api.hh"
+#include "nix/thread-pool.hh"
 
 #include <atomic>
 

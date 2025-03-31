@@ -1,7 +1,7 @@
-#include "command.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
+#include "nix/command.hh"
+#include "nix/shared.hh"
+#include "nix/store-api.hh"
+#include "nix/local-fs-store.hh"
 
 using namespace nix;
 

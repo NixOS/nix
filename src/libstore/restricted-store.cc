@@ -1,7 +1,7 @@
-#include "restricted-store.hh"
-#include "build-result.hh"
-#include "callback.hh"
-#include "realisation.hh"
+#include "nix/restricted-store.hh"
+#include "nix/build-result.hh"
+#include "nix/callback.hh"
+#include "nix/realisation.hh"
 
 namespace nix {
 

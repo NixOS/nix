@@ -4,13 +4,13 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
-#include "serve-protocol.hh"
-#include "serve-protocol-impl.hh"
-#include "serve-protocol-connection.hh"
-#include "build-result.hh"
-#include "file-descriptor.hh"
-#include "tests/protocol.hh"
-#include "tests/characterization.hh"
+#include "nix/serve-protocol.hh"
+#include "nix/serve-protocol-impl.hh"
+#include "nix/serve-protocol-connection.hh"
+#include "nix/build-result.hh"
+#include "nix/file-descriptor.hh"
+#include "nix/tests/protocol.hh"
+#include "nix/tests/characterization.hh"
 
 namespace nix {
 

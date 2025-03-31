@@ -1,13 +1,13 @@
-#include "git-utils.hh"
-#include "file-system.hh"
-#include "gmock/gmock.h"
+#include "nix/git-utils.hh"
+#include "nix/file-system.hh"
+#include <gmock/gmock.h>
 #include <git2/global.h>
 #include <git2/repository.h>
 #include <git2/types.h>
 #include <gtest/gtest.h>
-#include "fs-sink.hh"
-#include "serialise.hh"
-#include "git-lfs-fetch.hh"
+#include "nix/fs-sink.hh"
+#include "nix/serialise.hh"
+#include "nix/git-lfs-fetch.hh"
 
 namespace nix {
 

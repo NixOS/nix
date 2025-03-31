@@ -1,11 +1,11 @@
-#include "users.hh"
-#include "eval-cache.hh"
-#include "sqlite.hh"
-#include "eval.hh"
-#include "eval-inline.hh"
-#include "store-api.hh"
+#include "nix/users.hh"
+#include "nix/eval-cache.hh"
+#include "nix/sqlite.hh"
+#include "nix/eval.hh"
+#include "nix/eval-inline.hh"
+#include "nix/store-api.hh"
 // Need specialization involving `SymbolStr` just in this one module.
-#include "strings-inline.hh"
+#include "nix/strings-inline.hh"
 
 namespace nix::eval_cache {
 

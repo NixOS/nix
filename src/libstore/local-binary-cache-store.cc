@@ -1,7 +1,7 @@
-#include "local-binary-cache-store.hh"
-#include "globals.hh"
-#include "nar-info-disk-cache.hh"
-#include "signals.hh"
+#include "nix/local-binary-cache-store.hh"
+#include "nix/globals.hh"
+#include "nix/nar-info-disk-cache.hh"
+#include "nix/signals.hh"
 
 #include <atomic>
 

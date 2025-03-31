@@ -1,24 +1,25 @@
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "primops.hh"
-#include "print-options.hh"
-#include "exit.hh"
-#include "types.hh"
-#include "util.hh"
-#include "store-api.hh"
-#include "derivations.hh"
-#include "downstream-placeholder.hh"
-#include "eval-inline.hh"
-#include "filetransfer.hh"
-#include "function-trace.hh"
-#include "profiles.hh"
-#include "print.hh"
-#include "filtering-source-accessor.hh"
-#include "memory-source-accessor.hh"
-#include "gc-small-vector.hh"
-#include "url.hh"
-#include "fetch-to-store.hh"
-#include "tarball.hh"
+#include "nix/eval.hh"
+#include "nix/eval-settings.hh"
+#include "nix/primops.hh"
+#include "nix/print-options.hh"
+#include "nix/exit.hh"
+#include "nix/types.hh"
+#include "nix/util.hh"
+#include "nix/store-api.hh"
+#include "nix/derivations.hh"
+#include "nix/downstream-placeholder.hh"
+#include "nix/eval-inline.hh"
+#include "nix/filetransfer.hh"
+#include "nix/function-trace.hh"
+#include "nix/profiles.hh"
+#include "nix/print.hh"
+#include "nix/filtering-source-accessor.hh"
+#include "nix/memory-source-accessor.hh"
+#include "nix/gc-small-vector.hh"
+#include "nix/url.hh"
+#include "nix/fetch-to-store.hh"
+#include "nix/tarball.hh"
+
 #include "parser-tab.hh"
 
 #include <algorithm>
@@ -38,7 +39,7 @@
 #  include <sys/resource.h>
 #endif
 
-#include "strings-inline.hh"
+#include "nix/strings-inline.hh"
 
 using json = nlohmann::json;
 

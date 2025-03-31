@@ -1,4 +1,4 @@
-#include "hilite.hh"
+#include "nix/hilite.hh"
 
 #include <gtest/gtest.h>
 

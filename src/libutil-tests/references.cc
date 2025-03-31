@@ -1,4 +1,4 @@
-#include "references.hh"
+#include "nix/references.hh"
 #include <gtest/gtest.h>
 
 namespace nix {
