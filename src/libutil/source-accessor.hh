@@ -177,6 +177,67 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
         SymlinkResolution mode = SymlinkResolution::Full);
 
     /**
+     * When `resolveSymlinks` encounters an absolute target, that path
+     * may or may not denote a location inside the current source tree
+     * --- exactly when this happens depends on the specific source
+     *  accessor in question, and what tree it "represents".
+     *
+     * For now, we use this variable to decide: if the symlink has this
+     * path as a prefix, then the suffix points inside this source
+     * accessor. If the path does not have path as prefix, than the
+     * symlink escapes the source acccessor.
+     *
+     * Here are three examples:
+     *
+     * - ```
+     *   sourceAccessor.ownLocationForSymlinkResolution = "C:\Foo";
+     *   symlinkTarget = "C:\Foo\baz";
+     *   ```
+     *   Answer: resides inside source `sourceAccessor`
+     *
+     * - ```
+     *   sourceAccessor.ownLocationForSymlinkResolution = "C:\Foo";
+     *   symlinkTarget = "C:\bar\baz";
+     *   ```
+     *   Answer: does not reside inside source `sourceAccessor`
+     *
+     * - ```
+     *   sourceAccessor.ownLocationForSymlinkResolution = "C:\Foo";
+     *   symlinkTarget = "..\..\..";
+     *   ```
+     *   Answer: depends on whether the symlink is deep enough inside
+     *   the source tree
+     *
+     * (I made these examples use Windows/DOS paths to remind the reader
+     * that neither the symlink target nor
+     * `ownLocationForSymlinkResolution` should be a `CanonPath`.)
+     *
+     * @note We do *not* want this to become a general "location of this
+     * source accessor" variable: That would further violate the "don't
+     * know your own name principle. Indeed, the same source accessor
+     * may be used in multiple different contexts, at different
+     * locations, and so its "location" is a property of the caller
+     * rather than the thing itself.
+     *
+     * @todo Based on the above observations,  we should instead get rid
+     * of this field, and separate out symlink resolving (other than the
+     * low-level, interpretation-*agnostic* `readLink`) from the source
+     * accessor itself.
+     *
+     * Until we do the above proper fix, the best we can do is *only*
+     * use this for `resolveSymlinks`.
+     *
+     * @todo `std::filesystem::path` isn't really right either, as in
+     * the remote FS case we ought to be able to put a Windows/DOS path
+     * here for a remote Windows FS in a Unix client, and
+     * `std::filesystem::path` always has native OS path semantics.
+     * `std::filesystem::path::lexically_relative` is enough of a pain
+     * to implement correctly that I (@Ericson2314) am not doing this at
+     * this time, however.
+     */
+    std::filesystem::path ownLocationForSymlinkResolution = "/";
+
+    /**
      * A string that uniquely represents the contents of this
      * accessor. This is used for caching lookups (see `fetchToStore()`).
      */
@@ -221,5 +282,11 @@ ref<SourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAcce
  * underlying accessors. Earlier accessors take precedence over later.
  */
 ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors);
+
+/**
+ * Creates a new source accessor which is confined to the subdirectory
+ * of the given source accessor.
+ */
+ref<SourceAccessor> projectSubdirSourceAccessor(ref<SourceAccessor>, CanonPath subdirectory);
 
 }
