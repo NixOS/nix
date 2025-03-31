@@ -1,28 +1,28 @@
-#include "nix/signature/local-keys.hh"
-#include "nix/source-accessor.hh"
-#include "nix/globals.hh"
-#include "nix/derived-path.hh"
-#include "nix/realisation.hh"
-#include "nix/derivations.hh"
-#include "nix/store-api.hh"
-#include "nix/util.hh"
-#include "nix/nar-info-disk-cache.hh"
-#include "nix/thread-pool.hh"
-#include "nix/references.hh"
-#include "nix/archive.hh"
-#include "nix/callback.hh"
-#include "nix/git.hh"
-#include "nix/posix-source-accessor.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/util.hh"
+#include "nix/store/nar-info-disk-cache.hh"
+#include "nix/util/thread-pool.hh"
+#include "nix/util/references.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/callback.hh"
+#include "nix/util/git.hh"
+#include "nix/util/posix-source-accessor.hh"
 // FIXME this should not be here, see TODO below on
 // `addMultipleToStore`.
-#include "nix/worker-protocol.hh"
-#include "nix/signals.hh"
-#include "nix/users.hh"
+#include "nix/store/worker-protocol.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/users.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
-#include "nix/strings.hh"
+#include "nix/util/strings.hh"
 
 using json = nlohmann::json;
 
@@ -1277,8 +1277,8 @@ Derivation Store::readInvalidDerivation(const StorePath & drvPath)
 }
 
 
-#include "nix/local-store.hh"
-#include "nix/uds-remote-store.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/uds-remote-store.hh"
 
 
 namespace nix {

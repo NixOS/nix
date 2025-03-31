@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "nix/processes.hh"
+#include "nix/util/processes.hh"
 
 namespace nix {
 

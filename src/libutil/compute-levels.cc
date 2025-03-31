@@ -1,4 +1,4 @@
-#include "nix/types.hh"
+#include "nix/util/types.hh"
 
 #include "util-config-private.hh"
 

@@ -113,7 +113,7 @@ sources = [config_priv_h] + files(
   'canon-path.cc',
   'compression.cc',
   'compute-levels.cc',
-  'config.cc',
+  'configuration.cc',
   'config-global.cc',
   'current-process.cc',
   'english.cc',
@@ -155,7 +155,7 @@ sources = [config_priv_h] + files(
   'xml-writer.cc',
 )
 
-subdir('include/nix')
+subdir('include/nix/util')
 
 if not cxx.has_header('widechar_width.h', required : false)
   # use vendored widechar_width.h
@@ -185,7 +185,7 @@ this_library = library(
   install : true,
 )
 
-install_headers(headers, subdir : 'nix', preserve_path : true)
+install_headers(headers, subdir : 'nix/util', preserve_path : true)
 
 libraries_private = []
 if host_machine.system() == 'windows'

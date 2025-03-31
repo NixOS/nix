@@ -1,4 +1,4 @@
-#include "nix/tests/string_callback.hh"
+#include "nix/util/tests/string_callback.hh"
 
 namespace nix::testing {
 

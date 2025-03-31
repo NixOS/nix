@@ -1,5 +1,5 @@
-#include "nix/users.hh"
-#include "nix/config-global.hh"
+#include "nix/util/users.hh"
+#include "nix/util/config-global.hh"
 #include "nix/flake/settings.hh"
 #include "nix/flake/flake.hh"
 

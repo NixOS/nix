@@ -1,7 +1,7 @@
 #include "lexer-tab.hh"
 #include "parser-tab.hh"
 
-#include "nix/lexer-helpers.hh"
+#include "nix/expr/lexer-helpers.hh"
 
 void nix::lexer::internal::initLoc(YYLTYPE * loc)
 {

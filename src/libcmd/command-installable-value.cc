@@ -1,4 +1,4 @@
-#include "nix/command-installable-value.hh"
+#include "nix/cmd/command-installable-value.hh"
 
 namespace nix {
 

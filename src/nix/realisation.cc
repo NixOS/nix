@@ -1,5 +1,5 @@
-#include "nix/command.hh"
-#include "nix/common-args.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/common-args.hh"
 
 #include <nlohmann/json.hpp>
 

@@ -1,15 +1,15 @@
-#include "nix/command.hh"
-#include "nix/shared.hh"
-#include "nix/store-api.hh"
-#include "nix/common-args.hh"
-#include "nix/nar-info.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/main/common-args.hh"
+#include "nix/store/nar-info.hh"
 
 #include <algorithm>
 #include <array>
 
 #include <nlohmann/json.hpp>
 
-#include "nix/strings.hh"
+#include "nix/util/strings.hh"
 
 using namespace nix;
 using nlohmann::json;

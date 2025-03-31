@@ -9,19 +9,19 @@
 #include <sys/time.h>
 #endif
 
-#include "nix/machines.hh"
-#include "nix/shared.hh"
-#include "nix/plugin.hh"
-#include "nix/pathlocks.hh"
-#include "nix/globals.hh"
-#include "nix/serialise.hh"
-#include "nix/build-result.hh"
-#include "nix/store-api.hh"
-#include "nix/strings.hh"
-#include "nix/derivations.hh"
-#include "nix/local-store.hh"
-#include "nix/legacy.hh"
-#include "nix/experimental-features.hh"
+#include "nix/store/machines.hh"
+#include "nix/main/shared.hh"
+#include "nix/main/plugin.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/serialise.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/strings.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/local-store.hh"
+#include "nix/cmd/legacy.hh"
+#include "nix/util/experimental-features.hh"
 
 using namespace nix;
 using std::cin;

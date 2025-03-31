@@ -1,10 +1,10 @@
 #include <archive.h>
 #include <archive_entry.h>
 
-#include "nix/finally.hh"
-#include "nix/serialise.hh"
-#include "nix/tarfile.hh"
-#include "nix/file-system.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/tarfile.hh"
+#include "nix/util/file-system.hh"
 
 namespace nix {
 

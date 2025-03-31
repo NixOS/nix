@@ -1,7 +1,7 @@
-#include "nix/util.hh"
-#include "nix/fmt.hh"
-#include "nix/file-path.hh"
-#include "nix/signals.hh"
+#include "nix/util/util.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/file-path.hh"
+#include "nix/util/signals.hh"
 
 #include <array>
 #include <cctype>

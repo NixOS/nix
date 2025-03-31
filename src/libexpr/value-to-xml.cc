@@ -1,7 +1,7 @@
-#include "nix/value-to-xml.hh"
-#include "nix/xml-writer.hh"
-#include "nix/eval-inline.hh"
-#include "nix/signals.hh"
+#include "nix/expr/value-to-xml.hh"
+#include "nix/util/xml-writer.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/util/signals.hh"
 
 #include <cstdlib>
 

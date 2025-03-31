@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/config.hh"
+#include "nix/util/configuration.hh"
 
 #include <sys/types.h>
 

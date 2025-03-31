@@ -1,8 +1,8 @@
-#include "nix/local-overlay-store.hh"
-#include "nix/callback.hh"
-#include "nix/realisation.hh"
-#include "nix/processes.hh"
-#include "nix/url.hh"
+#include "nix/store/local-overlay-store.hh"
+#include "nix/util/callback.hh"
+#include "nix/store/realisation.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/url.hh"
 #include <regex>
 
 namespace nix {

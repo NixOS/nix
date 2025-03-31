@@ -1,7 +1,7 @@
-#include "nix/posix-source-accessor.hh"
-#include "nix/source-path.hh"
-#include "nix/signals.hh"
-#include "nix/sync.hh"
+#include "nix/util/posix-source-accessor.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/sync.hh"
 
 #include <unordered_map>
 

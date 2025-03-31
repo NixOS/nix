@@ -2,7 +2,7 @@
 
 #  include <gtest/gtest.h>
 
-#  include "nix/s3-binary-cache-store.hh"
+#  include "nix/store/s3-binary-cache-store.hh"
 
 namespace nix {
 

@@ -1,4 +1,4 @@
-#include "nix/misc-store-flags.hh"
+#include "nix/cmd/misc-store-flags.hh"
 
 namespace nix::flag
 {

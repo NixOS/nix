@@ -1,22 +1,22 @@
-#include "nix/command-installable-value.hh"
-#include "nix/globals.hh"
-#include "nix/eval.hh"
-#include "nix/eval-inline.hh"
-#include "nix/eval-settings.hh"
-#include "nix/names.hh"
-#include "nix/get-drvs.hh"
-#include "nix/common-args.hh"
-#include "nix/shared.hh"
-#include "nix/eval-cache.hh"
-#include "nix/attr-path.hh"
-#include "nix/hilite.hh"
-#include "nix/strings-inline.hh"
+#include "nix/cmd/command-installable-value.hh"
+#include "nix/store/globals.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/store/names.hh"
+#include "nix/expr/get-drvs.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/expr/eval-cache.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/util/hilite.hh"
+#include "nix/util/strings-inline.hh"
 
 #include <regex>
 #include <fstream>
 #include <nlohmann/json.hpp>
 
-#include "nix/strings.hh"
+#include "nix/util/strings.hh"
 
 using namespace nix;
 using json = nlohmann::json;

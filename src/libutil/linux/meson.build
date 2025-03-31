@@ -3,4 +3,4 @@ sources += files(
   'namespaces.cc',
 )
 
-subdir('include/nix')
+subdir('include/nix/util')

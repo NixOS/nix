@@ -1,6 +1,6 @@
-#include "nix/suggestions.hh"
-#include "nix/ansicolor.hh"
-#include "nix/terminal.hh"
+#include "nix/util/suggestions.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/terminal.hh"
 
 #include <algorithm>
 #include <sstream>
