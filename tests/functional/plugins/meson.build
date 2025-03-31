@@ -6,6 +6,7 @@ libplugintest = shared_module(
     # It would be nice for our headers to be idempotent instead.
     '-include', 'config-util.hh',
     '-include', 'config-store.hh',
+    # '-include', 'config-fetchers.hh',
     '-include', 'config-expr.hh',
   ],
   dependencies : [
