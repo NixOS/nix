@@ -124,7 +124,7 @@ std::string removeWhitespace(std::string s)
 
 
 NixRepl::NixRepl(const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalState> state,
-            std::function<NixRepl::AnnotatedValues()> getValues, RunNix * runNix = nullptr)
+            std::function<NixRepl::AnnotatedValues()> getValues, RunNix * runNix)
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
     , getValues(getValues)
@@ -839,9 +839,10 @@ std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
 {
     return std::make_unique<NixRepl>(
         lookupPath,
-        openStore(),
+        std::move(store),
         state,
-        getValues
+        getValues,
+        runNix
     );
 }
 
@@ -859,7 +860,8 @@ ReplExitStatus AbstractNixRepl::runSimple(
             lookupPath,
             openStore(),
             evalState,
-            getValues
+            getValues,
+            /*runNix=*/nullptr
         );
 
     repl->initEnv();
