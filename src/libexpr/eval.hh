@@ -343,22 +343,22 @@ private:
     Sync<std::unordered_map<SourcePath, StorePath>> srcToStore;
 
     /**
-     * A cache from path names to parse trees.
+     * A cache that maps paths to "resolved" paths for importing Nix
+     * expressions, i.e. `/foo` to `/foo/default.nix`.
      */
-    typedef std::unordered_map<SourcePath, Expr *, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
-    FileParseCache fileParseCache;
+    SharedSync<std::unordered_map<SourcePath, SourcePath>> importResolutionCache;
 
     /**
-     * A cache from path names to values.
+     * A cache from resolved paths to values.
      */
     typedef std::unordered_map<SourcePath, Value, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
-    FileEvalCache fileEvalCache;
+    SharedSync<FileEvalCache> fileEvalCache;
 
     /**
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
      * Grouped by file.
      */
-    std::unordered_map<SourcePath, DocCommentMap> positionToDocComment;
+    SharedSync<std::unordered_map<SourcePath, DocCommentMap>> positionToDocComment;
 
     LookupPath lookupPath;
 
@@ -368,18 +368,6 @@ private:
      * Cache used by prim_match().
      */
     std::shared_ptr<RegexCache> regexCache;
-
-#if HAVE_BOEHMGC
-    /**
-     * Allocation cache for GC'd Value objects.
-     */
-    std::shared_ptr<void *> valueAllocCache;
-
-    /**
-     * Allocation cache for size-1 Env objects.
-     */
-    std::shared_ptr<void *> env1AllocCache;
-#endif
 
 public:
 
@@ -498,6 +486,13 @@ public:
      * result.  Otherwise, this is a no-op.
      */
     inline void forceValue(Value & v, const PosIdx pos);
+
+    /**
+     * Given a thunk that was observed to be in the pending or awaited
+     * state, wait for it to finish. Returns the new type of the
+     * value.
+     */
+    InternalType waitOnThunk(Value & v, bool awaited);
 
     void tryFixupBlackHolePos(Value & v, PosIdx pos);
 
@@ -691,9 +686,11 @@ private:
         std::shared_ptr<StaticEnv> & staticEnv);
 
     /**
-     * Current Nix call stack depth, used with `max-call-depth` setting to throw stack overflow hopefully before we run out of system stack.
+     * Current Nix call stack depth, used with `max-call-depth`
+     * setting to throw stack overflow hopefully before we run out of
+     * system stack.
      */
-    size_t callDepth = 0;
+    thread_local static size_t callDepth;
 
 public:
 
@@ -881,6 +878,13 @@ private:
     unsigned long nrListConcats = 0;
     unsigned long nrPrimOpCalls = 0;
     unsigned long nrFunctionCalls = 0;
+
+    std::atomic<uint64_t> nrThunksAwaited{0};
+    std::atomic<uint64_t> nrThunksAwaitedSlow{0};
+    std::atomic<uint64_t> usWaiting{0};
+    std::atomic<uint64_t> currentlyWaiting{0};
+    std::atomic<uint64_t> maxWaiting{0};
+    std::atomic<uint64_t> nrSpuriousWakeups{0};
 
     bool countCalls;
 
