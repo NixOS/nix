@@ -90,7 +90,7 @@ class AttrCursor : public std::enable_shared_from_this<AttrCursor>
     friend struct CachedEvalError;
 
     ref<EvalCache> root;
-    typedef std::optional<std::pair<std::shared_ptr<AttrCursor>, Symbol>> Parent;
+    using Parent = std::optional<std::pair<ref<AttrCursor>, Symbol>>;
     Parent parent;
     RootValue _value;
     std::optional<std::pair<AttrId, AttrValue>> cachedValue;

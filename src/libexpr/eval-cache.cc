@@ -423,7 +423,7 @@ void AttrCursor::fetchCachedValue()
     if (!cachedValue)
         cachedValue = root->db->getAttr(getKey());
     if (cachedValue && std::get_if<failed_t>(&cachedValue->second) && parent)
-        throw CachedEvalError(ref(parent->first), parent->second);
+        throw CachedEvalError(parent->first, parent->second);
 }
 
 std::vector<Symbol> AttrCursor::getAttrPath() const
@@ -508,7 +508,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
             if (auto attrs = std::get_if<std::vector<Symbol>>(&cachedValue->second)) {
                 for (auto & attr : *attrs)
                     if (attr == name)
-                        return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), attr));
+                        return std::make_shared<AttrCursor>(root, std::make_pair(ref(shared_from_this()), attr));
                 return nullptr;
             } else if (std::get_if<placeholder_t>(&cachedValue->second)) {
                 auto attr = root->db->getAttr({cachedValue->first, name});
@@ -519,7 +519,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
                         throw CachedEvalError(ref(shared_from_this()), name);
                     else
                         return std::make_shared<AttrCursor>(root,
-                            std::make_pair(shared_from_this(), name), nullptr, std::move(attr));
+                            std::make_pair(ref(shared_from_this()), name), nullptr, std::move(attr));
                 }
                 // Incomplete attrset, so need to fall thru and
                 // evaluate to see whether 'name' exists
@@ -554,7 +554,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
     }
 
     return make_ref<AttrCursor>(
-        root, std::make_pair(shared_from_this(), name), attr->value, std::move(cachedValue2));
+        root, std::make_pair(ref(shared_from_this()), name), attr->value, std::move(cachedValue2));
 }
 
 std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(std::string_view name)
