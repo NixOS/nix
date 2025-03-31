@@ -7,8 +7,6 @@
 #include <cxxabi.h>
 #include <typeinfo>
 
-#include "config-util.h"
-
 nix_c_context * nix_c_context_create()
 {
     return new nix_c_context();
