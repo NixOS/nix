@@ -208,6 +208,7 @@ const redirects = {
     "builtin-listToAttrs": "language/builtins.html#builtins-listToAttrs",
     "builtin-map": "language/builtins.html#builtins-map",
     "builtin-match": "language/builtins.html#builtins-match",
+    "builtin-mod": "language/builtins.html#builtins-mod",
     "builtin-mul": "language/builtins.html#builtins-mul",
     "builtin-parseDrvName": "language/builtins.html#builtins-parseDrvName",
     "builtin-path": "language/builtins.html#builtins-path",

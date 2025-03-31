@@ -238,6 +238,7 @@ EvalState::EvalState(
         .lessThan = symbols.create("__lessThan"),
         .mul = symbols.create("__mul"),
         .div = symbols.create("__div"),
+        .mod = symbols.create("__mod"),
         .or_ = symbols.create("or"),
         .findFile = symbols.create("__findFile"),
         .nixPath = symbols.create("__nixPath"),
