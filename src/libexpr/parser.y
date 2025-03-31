@@ -216,7 +216,7 @@ expr_function
   | ASSERT expr ';' expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
   | WITH expr ';' expr_function
-    { $$ = new ExprWith(CUR_POS, $2, $4); }
+    { $$ = new ExprWith(CUR_POS, $2, $4, ExprWith::Binding::Outermost); }
   | LET binds IN_KW expr_function
     { if (!$2->dynamicAttrs.empty())
         throw ParseError({
@@ -291,6 +291,9 @@ expr_select
        be used to emit a warning when an affected expression is parsed. */
     expr_simple OR_KW
     { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, state->s.or_)}, state->positions.add(state->origin, @$.endOffset)); }
+  | expr_simple '.' '(' expr ')'      { $$ = new ExprWith(CUR_POS, $1, $4, ExprWith::Binding::Innermost); }
+  | expr_simple '.' '[' expr_list ']' { $$ = new ExprWith(CUR_POS, $1, $4, ExprWith::Binding::Innermost); }
+  | expr_simple '.' '{' binds '}'     { $$ = new ExprWith(CUR_POS, $1, $4, ExprWith::Binding::Innermost); }
   | expr_simple
   ;
 
