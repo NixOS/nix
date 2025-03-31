@@ -124,7 +124,9 @@ RC_GTEST_PROP(
     prop_round_rip,
     (const NixStringContextElem & o))
 {
-    RC_ASSERT(o == NixStringContextElem::parse(o.to_string()));
+    ExperimentalFeatureSettings xpSettings;
+    xpSettings.set("experimental-features", "dynamic-derivations");
+    RC_ASSERT(o == NixStringContextElem::parse(o.to_string(), xpSettings));
 }
 
 #endif
