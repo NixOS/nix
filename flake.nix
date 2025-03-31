@@ -167,6 +167,13 @@
                   inherit officialRelease;
                   pkgs = final;
                   src = self;
+                  maintainers = with lib.maintainers; [
+                    edolstra
+                    Ericson2314
+                    Mic92
+                    roberth
+                    tomberek
+                  ];
                 };
               };
 
