@@ -99,6 +99,14 @@ class AttrCursor : public std::enable_shared_from_this<AttrCursor>
 
     Value & getValue();
 
+    /**
+     * If `cachedValue` is unset, try to initialize it from the
+     * database. It is not an error if it does not exist. Throw a
+     * `CachedEvalError` exception if it does exist but has type
+     * `AttrType::Failed`.
+     */
+    void fetchCachedValue();
+
 public:
 
     AttrCursor(
