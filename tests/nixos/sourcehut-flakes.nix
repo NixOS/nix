@@ -139,8 +139,8 @@ in
       start_all()
 
       sourcehut.wait_for_unit("httpd.service")
-      sourcehut.wait_for_unit("network-online.target")
-      client.wait_for_unit("network-online.target")
+      sourcehut.wait_for_unit("network-addresses-eth1.service")
+      client.wait_for_unit("network-addresses-eth1.service")
 
       client.succeed("curl -v https://git.sr.ht/ >&2")
       client.succeed("nix registry list | grep nixpkgs")
