@@ -246,6 +246,7 @@ EvalState::EvalState(
     , repair(NoRepair)
     , emptyBindings(0)
     , rootFS(
+<<<<<<< HEAD
         settings.restrictEval || settings.pureEval
         ? ref<SourceAccessor>(AllowListSourceAccessor::create(getFSSourceAccessor(), {},
             [&settings](const CanonPath & path) -> RestrictedPathError {
@@ -255,6 +256,44 @@ EvalState::EvalState(
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))
         : getFSSourceAccessor())
+=======
+        ({
+            /* In pure eval mode, we provide a filesystem that only
+               contains the Nix store.
+
+               If we have a chroot store and pure eval is not enabled,
+               use a union accessor to make the chroot store available
+               at its logical location while still having the
+               underlying directory available. This is necessary for
+               instance if we're evaluating a file from the physical
+               /nix/store while using a chroot store. */
+            auto accessor = getFSSourceAccessor();
+
+            auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
+            if (settings.pureEval || store->storeDir != realStoreDir) {
+                auto storeFS = makeMountedSourceAccessor(
+                    {
+                        {CanonPath::root, makeEmptySourceAccessor()},
+                        {CanonPath(store->storeDir), makeFSSourceAccessor(realStoreDir)}
+                    });
+                accessor = settings.pureEval
+                    ? storeFS
+                    : makeUnionSourceAccessor({accessor, storeFS});
+            }
+
+            /* Apply access control if needed. */
+            if (settings.restrictEval || settings.pureEval)
+                accessor = AllowListSourceAccessor::create(accessor, {}, {},
+                    [&settings](const CanonPath & path) -> RestrictedPathError {
+                        auto modeInformation = settings.pureEval
+                            ? "in pure evaluation mode (use '--impure' to override)"
+                            : "in restricted mode";
+                        throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
+                    });
+
+            accessor;
+        }))
+>>>>>>> 67e957b63 (Apply makeNotAllowedError to empty repos)
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{corepkgsFS->addFile(

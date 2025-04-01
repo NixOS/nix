@@ -1214,16 +1214,12 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(
 ref<SourceAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
-    /* In case of an empty workdir, return an empty in-memory tree. We
-       cannot use AllowListSourceAccessor because it would return an
-       error for the root (and we can't add the root to the allow-list
-       since that would allow access to all its children). */
     ref<SourceAccessor> fileAccessor =
-        wd.files.empty()
-        ? makeEmptySourceAccessor()
-        : AllowListSourceAccessor::create(
+        AllowListSourceAccessor::create(
             makeFSSourceAccessor(path),
-            std::set<CanonPath> { wd.files },
+            std::set<CanonPath>{ wd.files },
+            // Always allow access to the root, but not its children.
+            std::unordered_set<CanonPath>{CanonPath::root},
             std::move(makeNotAllowedError)).cast<SourceAccessor>();
     if (exportIgnore)
         return make_ref<GitExportIgnoreSourceAccessor>(self, fileAccessor, std::nullopt);

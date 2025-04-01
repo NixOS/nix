@@ -28,6 +28,12 @@ suites += {
     'commit-lock-file-summary.sh',
     'non-flake-inputs.sh',
     'relative-paths.sh',
+<<<<<<< HEAD
+=======
+    'symlink-paths.sh',
+    'debugger.sh',
+    'source-paths.sh',
+>>>>>>> 67e957b63 (Apply makeNotAllowedError to empty repos)
   ],
   'workdir': meson.current_source_dir(),
 }
