@@ -135,7 +135,7 @@ static constexpr const char * promptForType(ReplPromptType promptType)
     case ReplPromptType::ReplPrompt:
         return "nix-repl> ";
     case ReplPromptType::ContinuationPrompt:
-        return "          ";
+        return "        > "; // 9 spaces + >
     }
     assert(false);
 }
