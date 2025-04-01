@@ -92,7 +92,7 @@ static StorePath copyInputToStore(
 {
     auto storePath = fetchToStore(*state.store, accessor, FetchMode::Copy, input.getName());
 
-    state.allowPath(storePath);
+    state.allowPath(storePath); // FIXME: should just whitelist the entire virtual store
 
     state.storeFS->mount(CanonPath(state.store->printStorePath(storePath)), accessor);
 
