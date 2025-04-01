@@ -6,6 +6,9 @@
 #include "nix/eval-error.hh"
 #include "nix/eval-settings.hh"
 
+// For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
+#include "nix/expr-config.hh"
+
 namespace nix {
 
 /**
@@ -15,7 +18,7 @@ namespace nix {
 inline void * allocBytes(size_t n)
 {
     void * p;
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     p = GC_MALLOC(n);
 #else
     p = calloc(n, 1);
@@ -28,7 +31,7 @@ inline void * allocBytes(size_t n)
 [[gnu::always_inline]]
 Value * EvalState::allocValue()
 {
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
        GC_malloc_many returns a linked list of objects of the given size, where the first word
        of each object is also the pointer to the next object in the list. This also means that we
@@ -60,7 +63,7 @@ Env & EvalState::allocEnv(size_t size)
 
     Env * env;
 
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     if (size == 1) {
         /* see allocValue for explanations. */
         if (!*env1AllocCache) {

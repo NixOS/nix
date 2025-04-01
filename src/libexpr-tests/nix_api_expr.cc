@@ -12,6 +12,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "expr-tests-config.hh"
+
 namespace nixC {
 
 TEST_F(nix_api_store_test, nix_eval_state_lookup_path)

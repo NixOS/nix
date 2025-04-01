@@ -6,6 +6,8 @@
 #include "nix/signals.hh"
 #include "nix/posix-fs-canonicalise.hh"
 
+#include "store-config-private.hh"
+
 #if !defined(__linux__)
 // For shelling out to lsof
 #  include "nix/processes.hh"
