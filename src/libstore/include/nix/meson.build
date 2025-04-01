@@ -4,12 +4,12 @@ include_dirs = [
   include_directories('..'),
 ]
 
-config_h = configure_file(
-  configuration : configdata,
-  output : 'config-store.hh',
+config_pub_h = configure_file(
+  configuration : configdata_pub,
+  output : 'store-config.hh',
 )
 
-headers = [config_h] + files(
+headers = [config_pub_h] + files(
   'binary-cache-store.hh',
   'build-result.hh',
   'build/derivation-goal.hh',

@@ -23,6 +23,7 @@
 
 #include "self-exe.hh"
 #include "crash-handler.hh"
+#include "cli-config-private.hh"
 
 #include <sys/types.h>
 #include <regex>
