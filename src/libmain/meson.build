@@ -42,13 +42,9 @@ configdata.set(
   description: 'Optionally used for buffering on standard error'
 )
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'nix/config-util.hh',
-  '-include', 'nix/config-store.hh',
-  '-include', 'nix/config-main.hh',
-  language : 'cpp',
+config_priv_h = configure_file(
+  configuration : configdata,
+  output : 'main-config-private.hh',
 )
 
 subdir('nix-meson-build-support/common')
@@ -75,7 +71,7 @@ subdir('nix-meson-build-support/windows-version')
 this_library = library(
   'nixmain',
   sources,
-  config_h,
+  config_priv_h,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args: linker_export_flags,

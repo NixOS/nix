@@ -7,6 +7,9 @@
 #include <unistd.h>
 #include <poll.h>
 
+#include "util-config-private.hh"
+#include "util-unix-config-private.hh"
+
 namespace nix {
 
 namespace {

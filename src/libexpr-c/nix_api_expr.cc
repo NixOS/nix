@@ -15,7 +15,7 @@
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
 
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
 #  include <mutex>
 #endif
 
@@ -209,7 +209,7 @@ void nix_state_free(EvalState * state)
     delete state;
 }
 
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
 std::unordered_map<
     const void *,
     unsigned int,
@@ -285,7 +285,7 @@ nix_err nix_value_decref(nix_c_context * context, nix_value *x)
 
 void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * obj, void * cd))
 {
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     GC_REGISTER_FINALIZER(obj, finalizer, cd, 0, 0);
 #endif
 }

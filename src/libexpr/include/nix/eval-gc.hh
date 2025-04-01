@@ -3,7 +3,10 @@
 
 #include <cstddef>
 
-#if HAVE_BOEHMGC
+// For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
+#include "nix/expr-config.hh"
+
+#if NIX_USE_BOEHMGC
 
 #  define GC_INCLUDE_NEW
 
@@ -43,7 +46,7 @@ void initGC();
  */
 void assertGCInitialized();
 
-#ifdef HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
 /**
  * The number of GC cycles since initGC().
  */
