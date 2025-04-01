@@ -1,16 +1,18 @@
 #pragma once
 ///@file
 
+#include <map>
+#include <limits>
+
+#include <sys/types.h>
+
 #include "nix/types.hh"
 #include "nix/config.hh"
 #include "nix/environment-variables.hh"
 #include "nix/experimental-features.hh"
 #include "nix/users.hh"
 
-#include <map>
-#include <limits>
-
-#include <sys/types.h>
+#include "nix/store-config.hh"
 
 namespace nix {
 
@@ -181,7 +183,7 @@ public:
     bool readOnlyMode = false;
 
     Setting<std::string> thisSystem{
-        this, SYSTEM, "system",
+        this, NIX_LOCAL_SYSTEM, "system",
         R"(
           The system type of the current Nix installation.
           Nix will only build a given [store derivation](@docroot@/glossary.md#gloss-store-derivation) locally when its `system` attribute equals any of the values specified here or in [`extra-platforms`](#conf-extra-platforms).
@@ -1089,7 +1091,7 @@ public:
         )"};
 #endif
 
-#if HAVE_ACL_SUPPORT
+#if NIX_SUPPORT_ACL
     Setting<StringSet> ignoredAcls{
         this, {"security.selinux", "system.nfs4_acl", "security.csm"}, "ignored-acls",
         R"(
