@@ -304,7 +304,7 @@ EvalState::EvalState(
 
             /* Apply access control if needed. */
             if (settings.restrictEval || settings.pureEval)
-                accessor = AllowListSourceAccessor::create(accessor, {},
+                accessor = AllowListSourceAccessor::create(accessor, {}, {},
                     [&settings](const CanonPath & path) -> RestrictedPathError {
                         auto modeInformation = settings.pureEval
                             ? "in pure evaluation mode (use '--impure' to override)"

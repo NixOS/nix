@@ -17,7 +17,7 @@ cat > "$repo/flake.nix" <<EOF
 }
 EOF
 
-expectStderr 1 nix eval "$repo#x" | grepQuiet "error: path '$repo/flake.nix' does not exist"
+expectStderr 1 nix eval "$repo#x" | grepQuiet "error: File 'flake.nix' in the repository \"$repo\" is not tracked by Git."
 
 git -C "$repo" add flake.nix
 
