@@ -121,7 +121,7 @@ public:
      * Fetch the entire input into the Nix store, returning the
      * location in the Nix store and the locked input.
      */
-    std::pair<StorePath, Input> fetchToStore(ref<Store> store) const;
+    std::tuple<StorePath, ref<SourceAccessor>, Input> fetchToStore(ref<Store> store) const;
 
     /**
      * Check the locking attributes in `result` against

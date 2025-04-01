@@ -10,6 +10,7 @@
 #include "url.hh"
 #include "value-to-json.hh"
 #include "fetch-to-store.hh"
+#include "mounted-source-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -200,9 +201,11 @@ static void fetchTree(
             throw Error("input '%s' is not allowed to use the '__final' attribute", input.to_string());
     }
 
-    auto [storePath, input2] = input.fetchToStore(state.store);
+    auto [storePath, accessor, input2] = input.fetchToStore(state.store);
 
     state.allowPath(storePath);
+
+    state.storeFS->mount(CanonPath(state.store->printStorePath(storePath)), accessor);
 
     emitTreeAttrs(state, storePath, input2, v, params.emptyRevFallback, false);
 }

@@ -2,6 +2,8 @@
 
 #include "source-path.hh"
 
+#include <unordered_set>
+
 namespace nix {
 
 /**
@@ -35,6 +37,8 @@ struct FilteringSourceAccessor : SourceAccessor
     std::string readFile(const CanonPath & path) override;
 
     bool pathExists(const CanonPath & path) override;
+
+    Stat lstat(const CanonPath & path) override;
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override;
 
@@ -70,6 +74,7 @@ struct AllowListSourceAccessor : public FilteringSourceAccessor
     static ref<AllowListSourceAccessor> create(
         ref<SourceAccessor> next,
         std::set<CanonPath> && allowedPrefixes,
+        std::unordered_set<CanonPath> && allowedPaths,
         MakeNotAllowedError && makeNotAllowedError);
 
     using FilteringSourceAccessor::FilteringSourceAccessor;
