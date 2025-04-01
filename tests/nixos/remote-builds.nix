@@ -123,12 +123,12 @@ in
         client.succeed("chmod 600 /root/.ssh/id_ed25519")
 
         # Install the SSH key on the builders.
-        client.wait_for_unit("network-online.target")
+        client.wait_for_unit("network-addresses-eth1.service")
         for builder in [builder1, builder2]:
           builder.succeed("mkdir -p -m 700 /root/.ssh")
           builder.copy_from_host("key.pub", "/root/.ssh/authorized_keys")
           builder.wait_for_unit("sshd")
-          builder.wait_for_unit("network-online.target")
+          builder.wait_for_unit("network-addresses-eth1.service")
           # Make sure the builder can handle our login correctly
           builder.wait_for_unit("multi-user.target")
           # Make sure there's no funny business on the client either
