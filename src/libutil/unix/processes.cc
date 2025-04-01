@@ -28,6 +28,9 @@
 # include <sys/mman.h>
 #endif
 
+#include "util-config-private.hh"
+#include "util-unix-config-private.hh"
+
 
 namespace nix {
 

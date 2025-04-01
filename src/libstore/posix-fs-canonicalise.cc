@@ -1,13 +1,16 @@
-#if HAVE_ACL_SUPPORT
-# include <sys/xattr.h>
-#endif
-
 #include "nix/posix-fs-canonicalise.hh"
 #include "nix/file-system.hh"
 #include "nix/signals.hh"
 #include "nix/util.hh"
 #include "nix/globals.hh"
 #include "nix/store-api.hh"
+#include "nix/store-config.hh"
+
+#include "store-config-private.hh"
+
+#if NIX_SUPPORT_ACL
+# include <sys/xattr.h>
+#endif
 
 namespace nix {
 
@@ -72,7 +75,7 @@ static void canonicalisePathMetaData_(
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
         throw Error("file '%1%' has an unsupported type", path);
 
-#if HAVE_ACL_SUPPORT
+#if NIX_SUPPORT_ACL
     /* Remove extended attributes / ACLs. */
     ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
 
