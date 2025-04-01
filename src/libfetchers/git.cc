@@ -532,11 +532,21 @@ struct GitInputScheme : InputScheme
 
     static MakeNotAllowedError makeNotAllowedError(std::string url)
     {
-        return [url{std::move(url)}](const CanonPath & path) -> RestrictedPathError
-        {
-            if (nix::pathExists(path.abs()))
-                return RestrictedPathError("access to path '%s' is forbidden because it is not under Git control; maybe you should 'git add' it to the repository '%s'?", path, url);
-            else
+        return [url{std::move(url)}](const CanonPath & path) -> RestrictedPathError {
+            if (nix::pathExists(url + "/" + path.abs())) {
+                auto relativePath = path.rel(); // .makeRelative(CanonPath("/"));
+
+                return RestrictedPathError(
+                    "'%s' is not tracked by Git.\n"
+                    "\n"
+                    "To use '%s', stage it in the Git repository at '%s':\n"
+                    "\n"
+                    "git add %s",
+                    relativePath,
+                    relativePath,
+                    url,
+                    relativePath);
+            } else
                 return RestrictedPathError("path '%s' does not exist in Git repository '%s'", path, url);
         };
     }
