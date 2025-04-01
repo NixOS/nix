@@ -23,7 +23,7 @@ nix-instantiate --restrict-eval ./simple.nix -I src1=./simple.nix -I src2=./conf
 (! nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix')
 nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix' -I src=../..
 
-expectStderr 1 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' #| grepQuiet "forbidden in restricted mode"
+expectStderr 1 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' | grepQuiet "forbidden in restricted mode"
 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' -I src=.
 
 p=$(nix eval --raw --expr "builtins.fetchurl file://${_NIX_TEST_SOURCE_DIR}/restricted.sh" --impure --restrict-eval --allowed-uris "file://${_NIX_TEST_SOURCE_DIR}")
@@ -53,9 +53,9 @@ mkdir -p $TEST_ROOT/tunnel.d $TEST_ROOT/foo2
 ln -sfn .. $TEST_ROOT/tunnel.d/tunnel
 echo foo > $TEST_ROOT/bar
 
-expectStderr 1 nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readFile <foo/tunnel/bar>" -I $TEST_ROOT/tunnel.d #| grepQuiet "forbidden in restricted mode"
+expectStderr 1 nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readFile <foo/tunnel/bar>" -I $TEST_ROOT/tunnel.d | grepQuiet "forbidden in restricted mode"
 
-expectStderr 1 nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readDir <foo/tunnel/foo2>" -I $TEST_ROOT/tunnel.d #| grepQuiet "forbidden in restricted mode"
+expectStderr 1 nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readDir <foo/tunnel/foo2>" -I $TEST_ROOT/tunnel.d | grepQuiet "forbidden in restricted mode"
 
 # Reading the parents of allowed paths should show only the ancestors of the allowed paths.
 [[ $(nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readDir <foo/tunnel>" -I $TEST_ROOT/tunnel.d) == '{ "tunnel.d" = "directory"; }' ]]
