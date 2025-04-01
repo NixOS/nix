@@ -47,8 +47,8 @@ git -C "$repo" add "$repo/foo"
 
 expectStderr 1 nix eval "$repo#b" | grepQuiet "error: path '/dir' does not exist in Git repository \"$repo\""
 
-mkdir -p $repo/dir
-echo 456 > $repo/dir/default.nix
+mkdir -p "$repo/dir"
+echo 456 > "$repo/dir/default.nix"
 
 expectStderr 1 nix eval "$repo#b" | grepQuiet "error: File 'dir' in the repository \"$repo\" is not tracked by Git."
 
