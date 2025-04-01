@@ -13,6 +13,7 @@
 #include "value-to-json.hh"
 #include "local-fs-store.hh"
 #include "fetch-to-store.hh"
+#include "mounted-source-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -92,7 +93,7 @@ static StorePath copyInputToStore(
 
     state.allowPath(storePath);
 
-    state.storePathAccessors->insert_or_assign(CanonPath(state.store->printStorePath(storePath)), accessor);
+    state.storeFS->mount(CanonPath(state.store->printStorePath(storePath)), accessor);
 
     auto narHash = state.store->queryPathInfo(storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));

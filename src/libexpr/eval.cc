@@ -14,8 +14,8 @@
 #include "profiles.hh"
 #include "print.hh"
 #include "filtering-source-accessor.hh"
-#include "forwarding-source-accessor.hh"
 #include "memory-source-accessor.hh"
+#include "mounted-source-accessor.hh"
 #include "gc-small-vector.hh"
 #include "url.hh"
 #include "fetch-to-store.hh"
@@ -181,34 +181,6 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     }
 }
 
-struct PathDisplaySourceAccessor : ForwardingSourceAccessor
-{
-    ref<EvalState::StorePathAccessors> storePathAccessors;
-
-    PathDisplaySourceAccessor(
-        ref<SourceAccessor> next,
-        ref<EvalState::StorePathAccessors> storePathAccessors)
-        : ForwardingSourceAccessor(next)
-        , storePathAccessors(storePathAccessors)
-    {
-    }
-
-    std::string showPath(const CanonPath & path) override
-    {
-        /* Find the accessor that produced `path`, if any, and use it
-           to render a more informative path
-           (e.g. `«github:foo/bar»/flake.nix` rather than
-           `/nix/store/hash.../flake.nix`). */
-        auto ub = storePathAccessors->upper_bound(path);
-        if (ub != storePathAccessors->begin())
-            ub--;
-        if (ub != storePathAccessors->end() && path.isWithin(ub->first))
-            return ub->second->showPath(path.removePrefix(ub->first));
-        else
-            return next->showPath(path);
-    }
-};
-
 static constexpr size_t BASE_ENV_SIZE = 128;
 
 EvalState::EvalState(
@@ -274,7 +246,12 @@ EvalState::EvalState(
     }
     , repair(NoRepair)
     , emptyBindings(0)
-    , storePathAccessors(make_ref<StorePathAccessors>())
+    , storeFS(
+        makeMountedSourceAccessor(
+            {
+                {CanonPath::root, makeEmptySourceAccessor()},
+                {CanonPath(store->storeDir), makeFSSourceAccessor(dirOf(store->toRealPath(StorePath::dummy)))}
+            }))
     , rootFS(
         ({
             /* In pure eval mode, we provide a filesystem that only
@@ -290,17 +267,10 @@ EvalState::EvalState(
 
             auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
             if (settings.pureEval || store->storeDir != realStoreDir) {
-                auto storeFS = makeMountedSourceAccessor(
-                    {
-                        {CanonPath::root, makeEmptySourceAccessor()},
-                        {CanonPath(store->storeDir), makeFSSourceAccessor(realStoreDir)}
-                    });
                 accessor = settings.pureEval
-                    ? storeFS
+                    ? storeFS.cast<SourceAccessor>()
                     : makeUnionSourceAccessor({accessor, storeFS});
             }
-
-            accessor = make_ref<PathDisplaySourceAccessor>(accessor, storePathAccessors);
 
             /* Apply access control if needed. */
             if (settings.restrictEval || settings.pureEval)

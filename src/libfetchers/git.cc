@@ -15,6 +15,7 @@
 #include "fetch-settings.hh"
 #include "json-utils.hh"
 #include "archive.hh"
+#include "mounted-source-accessor.hh"
 
 #include <regex>
 #include <string.h>

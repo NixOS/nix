@@ -37,6 +37,7 @@ class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct MemorySourceAccessor;
+struct MountedSourceAccessor;
 namespace eval_cache {
     class EvalCache;
 }
@@ -262,15 +263,10 @@ public:
     /** `"unknown"` */
     Value vStringUnknown;
 
-    using StorePathAccessors = std::map<CanonPath, ref<SourceAccessor>>;
-
     /**
-     * A map back to the original `SourceAccessor`s used to produce
-     * store paths. We keep track of this to produce error messages
-     * that refer to the original flakerefs.
-     * FIXME: use Sync.
+     * The accessor corresponding to `store`.
      */
-    ref<StorePathAccessors> storePathAccessors;
+    const ref<MountedSourceAccessor> storeFS;
 
     /**
      * The accessor for the root filesystem.

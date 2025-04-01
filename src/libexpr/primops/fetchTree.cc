@@ -10,6 +10,7 @@
 #include "url.hh"
 #include "value-to-json.hh"
 #include "fetch-to-store.hh"
+#include "mounted-source-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -204,7 +205,7 @@ static void fetchTree(
 
     state.allowPath(storePath);
 
-    state.storePathAccessors->insert_or_assign(CanonPath(state.store->printStorePath(storePath)), accessor);
+    state.storeFS->mount(CanonPath(state.store->printStorePath(storePath)), accessor);
 
     emitTreeAttrs(state, storePath, input2, v, params.emptyRevFallback, false);
 }
