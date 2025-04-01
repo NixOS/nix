@@ -70,9 +70,9 @@ in
       server.copy_from_host("key.pub", "/root/.ssh/authorized_keys")
       server.wait_for_unit("sshd")
       server.wait_for_unit("multi-user.target")
-      server.wait_for_unit("network-online.target")
+      server.wait_for_unit("network-addresses-eth1.service")
 
-      client.wait_for_unit("network-online.target")
+      client.wait_for_unit("network-addresses-eth1.service")
       client.succeed(f"ssh -o StrictHostKeyChecking=no {server.name} 'echo hello world'")
 
       # Copy the closure of package A from the client to the server.
