@@ -530,24 +530,20 @@ struct GitInputScheme : InputScheme
         return *head;
     }
 
-    static MakeNotAllowedError makeNotAllowedError(std::string url)
+    static MakeNotAllowedError makeNotAllowedError(std::filesystem::path repoPath)
     {
-        return [url{std::move(url)}](const CanonPath & path) -> RestrictedPathError {
-            if (nix::pathExists(url + "/" + path.abs())) {
-                auto relativePath = path.rel(); // .makeRelative(CanonPath("/"));
-
+        return [repoPath{std::move(repoPath)}](const CanonPath & path) -> RestrictedPathError {
+            if (nix::pathExists(repoPath / path.rel()))
                 return RestrictedPathError(
-                    "'%s' is not tracked by Git.\n"
+                    "File '%1%' in the repository %2% is not tracked by Git.\n"
                     "\n"
-                    "To use '%s', stage it in the Git repository at '%s':\n"
+                    "To make it visible to Nix, run:\n"
                     "\n"
-                    "git add %s",
-                    relativePath,
-                    relativePath,
-                    url,
-                    relativePath);
-            } else
-                return RestrictedPathError("path '%s' does not exist in Git repository '%s'", path, url);
+                    "git -C %2% add \"%1%\"",
+                    path.rel(),
+                    repoPath);
+            else
+                return RestrictedPathError("path '%s' does not exist in Git repository %s", path, repoPath);
         };
     }
 
@@ -757,7 +753,7 @@ struct GitInputScheme : InputScheme
         ref<SourceAccessor> accessor =
             repo->getAccessor(repoInfo.workdirInfo,
                 exportIgnore,
-                makeNotAllowedError(repoInfo.locationToArg()));
+                makeNotAllowedError(repoPath));
 
         /* If the repo has submodules, return a mounted input accessor
            consisting of the accessor for the top-level repo and the
