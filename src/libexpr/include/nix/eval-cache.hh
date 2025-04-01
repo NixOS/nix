@@ -90,7 +90,7 @@ class AttrCursor : public std::enable_shared_from_this<AttrCursor>
     friend struct CachedEvalError;
 
     ref<EvalCache> root;
-    typedef std::optional<std::pair<std::shared_ptr<AttrCursor>, Symbol>> Parent;
+    using Parent = std::optional<std::pair<ref<AttrCursor>, Symbol>>;
     Parent parent;
     RootValue _value;
     std::optional<std::pair<AttrId, AttrValue>> cachedValue;
@@ -98,6 +98,14 @@ class AttrCursor : public std::enable_shared_from_this<AttrCursor>
     AttrKey getKey();
 
     Value & getValue();
+
+    /**
+     * If `cachedValue` is unset, try to initialize it from the
+     * database. It is not an error if it does not exist. Throw a
+     * `CachedEvalError` exception if it does exist but has type
+     * `AttrType::Failed`.
+     */
+    void fetchCachedValue();
 
 public:
 
