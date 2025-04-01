@@ -1221,15 +1221,18 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool export
        since that would allow access to all its children). */
     ref<SourceAccessor> fileAccessor =
         wd.files.empty()
-        ? makeEmptySourceAccessor()
+        ? ({
+            auto empty = makeEmptySourceAccessor();
+            empty->setPathDisplay(path.string());
+            empty;
+          })
         : AllowListSourceAccessor::create(
             makeFSSourceAccessor(path),
             std::set<CanonPath> { wd.files },
             std::move(makeNotAllowedError)).cast<SourceAccessor>();
     if (exportIgnore)
-        return make_ref<GitExportIgnoreSourceAccessor>(self, fileAccessor, std::nullopt);
-    else
-        return fileAccessor;
+        fileAccessor = make_ref<GitExportIgnoreSourceAccessor>(self, fileAccessor, std::nullopt);
+    return fileAccessor;
 }
 
 ref<GitFileSystemObjectSink> GitRepoImpl::getFileSystemObjectSink()
