@@ -535,7 +535,7 @@ struct GitInputScheme : InputScheme
         return [repoPath{std::move(repoPath)}](const CanonPath & path) -> RestrictedPathError {
             if (nix::pathExists(repoPath / path.rel()))
                 return RestrictedPathError(
-                    "File '%1%' in the repository %2% is not tracked by Git.\n"
+                    "Path '%1%' in the repository %2% is not tracked by Git.\n"
                     "\n"
                     "To make it visible to Nix, run:\n"
                     "\n"
@@ -543,7 +543,7 @@ struct GitInputScheme : InputScheme
                     path.rel(),
                     repoPath);
             else
-                return RestrictedPathError("path '%s' does not exist in Git repository %s", path, repoPath);
+                return RestrictedPathError("Path '%s' does not exist in Git repository %s.", path.rel(), repoPath);
         };
     }
 
