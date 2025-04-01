@@ -1,10 +1,10 @@
-#include "attr-set.hh"
-#include "config.hh"
-#include "eval.hh"
-#include "globals.hh"
-#include "path.hh"
-#include "primops.hh"
-#include "value.hh"
+#include "nix/attr-set.hh"
+#include "nix/config.hh"
+#include "nix/eval.hh"
+#include "nix/globals.hh"
+#include "nix/path.hh"
+#include "nix/primops.hh"
+#include "nix/value.hh"
 
 #include "nix_api_expr.h"
 #include "nix_api_expr_internal.h"
@@ -12,7 +12,7 @@
 #include "nix_api_util_internal.h"
 #include "nix_api_store_internal.h"
 #include "nix_api_value.h"
-#include "value/context.hh"
+#include "nix/value/context.hh"
 
 // Internal helper functions to check [in] and [out] `Value *` parameters
 static const nix::Value & check_value_not_null(const nix_value * value)
@@ -125,7 +125,7 @@ PrimOp * nix_alloc_primop(
     try {
         using namespace std::placeholders;
         auto p = new
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
             (GC)
 #endif
                 nix::PrimOp{
@@ -497,7 +497,7 @@ ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, 
     try {
         auto builder = state->state.buildList(capacity);
         return new
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
             (NoGC)
 #endif
                 ListBuilder{std::move(builder)};
@@ -519,7 +519,7 @@ nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, uns
 
 void nix_list_builder_free(ListBuilder * list_builder)
 {
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     GC_FREE(list_builder);
 #else
     delete list_builder;
@@ -578,7 +578,7 @@ BindingsBuilder * nix_make_bindings_builder(nix_c_context * context, EvalState *
     try {
         auto bb = state->state.buildBindings(capacity);
         return new
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
             (NoGC)
 #endif
                 BindingsBuilder{std::move(bb)};
@@ -600,7 +600,7 @@ nix_err nix_bindings_builder_insert(nix_c_context * context, BindingsBuilder * b
 
 void nix_bindings_builder_free(BindingsBuilder * bb)
 {
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     GC_FREE((nix::BindingsBuilder *) bb);
 #else
     delete (nix::BindingsBuilder *) bb;

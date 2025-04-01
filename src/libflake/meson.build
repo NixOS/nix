@@ -27,16 +27,6 @@ subdir('nix-meson-build-support/subprojects')
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  # '-include', 'config-fetchers.h',
-  '-include', 'config-expr.hh',
-  language : 'cpp',
-)
-
 subdir('nix-meson-build-support/common')
 
 subdir('nix-meson-build-support/generate-header')
@@ -58,15 +48,7 @@ sources = files(
   'flake/url-name.cc',
 )
 
-include_dirs = [include_directories('.')]
-
-headers = files(
-  'flake/flake.hh',
-  'flake/flakeref.hh',
-  'flake/lockfile.hh',
-  'flake/settings.hh',
-  'flake/url-name.hh',
-)
+subdir('include/nix')
 
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')

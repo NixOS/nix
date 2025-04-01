@@ -1,7 +1,7 @@
 #include "man-pages.hh"
-#include "file-system.hh"
-#include "current-process.hh"
-#include "environment-variables.hh"
+#include "nix/file-system.hh"
+#include "nix/current-process.hh"
+#include "nix/environment-variables.hh"
 
 namespace nix {
 

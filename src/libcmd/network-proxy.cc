@@ -1,8 +1,8 @@
-#include "network-proxy.hh"
+#include "nix/network-proxy.hh"
 
 #include <algorithm>
 
-#include "environment-variables.hh"
+#include "nix/environment-variables.hh"
 
 namespace nix {
 

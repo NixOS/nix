@@ -1,8 +1,8 @@
-#include "users.hh"
-#include "globals.hh"
-#include "profiles.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
+#include "nix/users.hh"
+#include "nix/globals.hh"
+#include "nix/profiles.hh"
+#include "nix/eval.hh"
+#include "nix/eval-settings.hh"
 
 namespace nix {
 

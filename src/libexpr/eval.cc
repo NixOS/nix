@@ -1,24 +1,25 @@
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "primops.hh"
-#include "print-options.hh"
-#include "exit.hh"
-#include "types.hh"
-#include "util.hh"
-#include "store-api.hh"
-#include "derivations.hh"
-#include "downstream-placeholder.hh"
-#include "eval-inline.hh"
-#include "filetransfer.hh"
-#include "function-trace.hh"
-#include "profiles.hh"
-#include "print.hh"
-#include "filtering-source-accessor.hh"
-#include "memory-source-accessor.hh"
-#include "gc-small-vector.hh"
-#include "url.hh"
-#include "fetch-to-store.hh"
-#include "tarball.hh"
+#include "nix/eval.hh"
+#include "nix/eval-settings.hh"
+#include "nix/primops.hh"
+#include "nix/print-options.hh"
+#include "nix/exit.hh"
+#include "nix/types.hh"
+#include "nix/util.hh"
+#include "nix/store-api.hh"
+#include "nix/derivations.hh"
+#include "nix/downstream-placeholder.hh"
+#include "nix/eval-inline.hh"
+#include "nix/filetransfer.hh"
+#include "nix/function-trace.hh"
+#include "nix/profiles.hh"
+#include "nix/print.hh"
+#include "nix/filtering-source-accessor.hh"
+#include "nix/memory-source-accessor.hh"
+#include "nix/gc-small-vector.hh"
+#include "nix/url.hh"
+#include "nix/fetch-to-store.hh"
+#include "nix/tarball.hh"
+
 #include "parser-tab.hh"
 
 #include <algorithm>
@@ -38,7 +39,7 @@
 #  include <sys/resource.h>
 #endif
 
-#include "strings-inline.hh"
+#include "nix/strings-inline.hh"
 
 using json = nlohmann::json;
 
@@ -294,7 +295,7 @@ EvalState::EvalState(
     , debugStop(false)
     , trylevel(0)
     , regexCache(makeRegexCache())
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
@@ -2811,7 +2812,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
 }
 
 bool EvalState::fullGC() {
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     GC_gcollect();
     // Check that it ran. We might replace this with a version that uses more
     // of the boehm API to get this reliably, at a maintenance cost.
@@ -2830,7 +2831,7 @@ void EvalState::maybePrintStats()
 
     if (showStats) {
         // Make the final heap size more deterministic.
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
         if (!fullGC()) {
             warn("failed to perform a full GC before reporting stats");
         }
@@ -2852,7 +2853,7 @@ void EvalState::printStatistics()
     uint64_t bValues = nrValues * sizeof(Value);
     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
 
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     GC_word heapSize, totalBytes;
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
     double gcFullOnlyTime = ({
@@ -2874,7 +2875,7 @@ void EvalState::printStatistics()
 #ifndef _WIN32 // TODO implement
         {"cpu", cpuTime},
 #endif
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
         {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
 #ifndef _WIN32 // TODO implement
         {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
@@ -2918,7 +2919,7 @@ void EvalState::printStatistics()
     topObj["nrLookups"] = nrLookups;
     topObj["nrPrimOpCalls"] = nrPrimOpCalls;
     topObj["nrFunctionCalls"] = nrFunctionCalls;
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     topObj["gc"] = {
         {"heapSize", heapSize},
         {"totalBytes", totalBytes},

@@ -1,7 +1,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "tests/libexpr.hh"
+#include "nix/tests/libexpr.hh"
 
 namespace nix {
 

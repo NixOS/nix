@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "downstream-placeholder.hh"
+#include "nix/downstream-placeholder.hh"
 
 namespace nix {
 

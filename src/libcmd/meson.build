@@ -44,28 +44,18 @@ if readline_flavor == 'editline'
 elif readline_flavor == 'readline'
   readline = dependency('readline')
   deps_private += readline
-  configdata.set(
-    'USE_READLINE',
-    1,
-    description: 'Use readline instead of editline',
-  )
 else
   error('illegal editline flavor', readline_flavor)
 endif
-
-config_h = configure_file(
-  configuration : configdata,
-  output : 'config-cmd.hh',
+configdata.set(
+  'USE_READLINE',
+  (readline_flavor == 'readline').to_int(),
+  description: 'Use readline instead of editline',
 )
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  '-include', 'config-expr.hh',
-  '-include', 'config-cmd.hh',
-  language : 'cpp',
+config_priv_h = configure_file(
+  configuration : configdata,
+  output : 'cmd-config-private.hh',
 )
 
 subdir('nix-meson-build-support/common')
@@ -89,27 +79,7 @@ sources = files(
   'repl.cc',
 )
 
-include_dirs = [include_directories('.')]
-
-headers = files(
-  'built-path.hh',
-  'command-installable-value.hh',
-  'command.hh',
-  'common-eval-args.hh',
-  'compatibility-settings.hh',
-  'editor-for.hh',
-  'installable-attr-path.hh',
-  'installable-derived-path.hh',
-  'installable-flake.hh',
-  'installable-value.hh',
-  'installables.hh',
-  'legacy.hh',
-  'markdown.hh',
-  'misc-store-flags.hh',
-  'network-proxy.hh',
-  'repl-interacter.hh',
-  'repl.hh',
-)
+subdir('include/nix')
 
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
@@ -117,7 +87,7 @@ subdir('nix-meson-build-support/windows-version')
 this_library = library(
   'nixcmd',
   sources,
-  config_h,
+  config_priv_h,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args: linker_export_flags,

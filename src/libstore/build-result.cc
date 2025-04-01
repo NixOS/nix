@@ -1,4 +1,4 @@
-#include "build-result.hh"
+#include "nix/build-result.hh"
 
 namespace nix {
 

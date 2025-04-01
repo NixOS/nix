@@ -1,7 +1,7 @@
-#include "users.hh"
-#include "config-global.hh"
-#include "flake/settings.hh"
-#include "flake.hh"
+#include "nix/users.hh"
+#include "nix/config-global.hh"
+#include "nix/flake/settings.hh"
+#include "nix/flake/flake.hh"
 
 #include <nlohmann/json.hpp>
 

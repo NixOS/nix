@@ -1,8 +1,8 @@
-#include "cache.hh"
-#include "users.hh"
-#include "sqlite.hh"
-#include "sync.hh"
-#include "store-api.hh"
+#include "nix/cache.hh"
+#include "nix/users.hh"
+#include "nix/sqlite.hh"
+#include "nix/sync.hh"
+#include "nix/store-api.hh"
 
 #include <nlohmann/json.hpp>
 

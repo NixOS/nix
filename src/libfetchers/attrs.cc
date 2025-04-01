@@ -1,5 +1,5 @@
-#include "attrs.hh"
-#include "fetchers.hh"
+#include "nix/attrs.hh"
+#include "nix/fetchers.hh"
 
 #include <nlohmann/json.hpp>
 

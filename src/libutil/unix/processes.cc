@@ -1,10 +1,10 @@
-#include "current-process.hh"
-#include "environment-variables.hh"
-#include "executable-path.hh"
-#include "signals.hh"
-#include "processes.hh"
-#include "finally.hh"
-#include "serialise.hh"
+#include "nix/current-process.hh"
+#include "nix/environment-variables.hh"
+#include "nix/executable-path.hh"
+#include "nix/signals.hh"
+#include "nix/processes.hh"
+#include "nix/finally.hh"
+#include "nix/serialise.hh"
 
 #include <cerrno>
 #include <cstdlib>
@@ -27,6 +27,9 @@
 # include <sys/prctl.h>
 # include <sys/mman.h>
 #endif
+
+#include "util-config-private.hh"
+#include "util-unix-config-private.hh"
 
 
 namespace nix {
