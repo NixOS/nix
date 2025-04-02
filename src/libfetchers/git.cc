@@ -530,14 +530,20 @@ struct GitInputScheme : InputScheme
         return *head;
     }
 
-    static MakeNotAllowedError makeNotAllowedError(std::string url)
+    static MakeNotAllowedError makeNotAllowedError(std::filesystem::path repoPath)
     {
-        return [url{std::move(url)}](const CanonPath & path) -> RestrictedPathError
-        {
-            if (nix::pathExists(path.abs()))
-                return RestrictedPathError("access to path '%s' is forbidden because it is not under Git control; maybe you should 'git add' it to the repository '%s'?", path, url);
+        return [repoPath{std::move(repoPath)}](const CanonPath & path) -> RestrictedPathError {
+            if (nix::pathExists(repoPath / path.rel()))
+                return RestrictedPathError(
+                    "Path '%1%' in the repository %2% is not tracked by Git.\n"
+                    "\n"
+                    "To make it visible to Nix, run:\n"
+                    "\n"
+                    "git -C %2% add \"%1%\"",
+                    path.rel(),
+                    repoPath);
             else
-                return RestrictedPathError("path '%s' does not exist in Git repository '%s'", path, url);
+                return RestrictedPathError("Path '%s' does not exist in Git repository %s.", path.rel(), repoPath);
         };
     }
 
@@ -747,7 +753,7 @@ struct GitInputScheme : InputScheme
         ref<SourceAccessor> accessor =
             repo->getAccessor(repoInfo.workdirInfo,
                 exportIgnore,
-                makeNotAllowedError(repoInfo.locationToArg()));
+                makeNotAllowedError(repoPath));
 
         /* If the repo has submodules, return a mounted input accessor
            consisting of the accessor for the top-level repo and the
