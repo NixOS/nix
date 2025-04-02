@@ -1,15 +1,10 @@
 # Release 2.28.0 (2025-04-02)
 
-This is an atypical release -- instead of being branched off from `master`, it is branched off from the 2.27.x maintenance branch.
-The purpose of this is to satisfy both these goals:
+This is an atypical release, and for almost all intents and purposes, it is just a continuation of 2.27; not a feature release.
 
-- Release with number of API-breaking changes that are not suitable to backport to 2.27
+We had originally set the goal of making 2.27 the Nixpkgs default for NixOS 25.05, but dependents that link to Nix need certain _interface breaking_ changes in the C++ headers. This is not something we should do in a patch release, so this is why we branched 2.28 right off 2.27 instead of `master`.
 
-- Do not Release with arbitrary new commits from master
-
-The reason for the combinations of these goals is that we would like this version of Nix to the default in Nixpkgs 25.05, yet, we are getting close to the Nixpkgs 25.05 version freeze.
-These API changes complete the big infrastructure rework that accompanies the switch to Meson --- we want to batch all these changes together so there is one round of breakage.
-But we don't want to to release with arbitrary new changes form master, so close to a major release, before those changes have had time to "incubate".
+This completes the infrastructure overhaul for the [RFC 132](https://github.com/NixOS/rfcs/blob/master/rfcs/0132-meson-builds-nix.md) switchover to meson as our build system.
 
 ## Major changes
 
@@ -29,8 +24,8 @@ But we don't want to to release with arbitrary new changes form master, so close
     There is no more need to pass `-include` to force additional files to be included.
 
   - The public, installed configuration headers no longer contain implementation-specific details that are not relevant to the API.
-    The vast majority of definitions that were previously in there are now moved to new private, non-installed configuration headers.
-    The renaming definitions now all start with `NIX_`.
+    The vast majority of definitions that were previously in there are now moved to new headers that are not installed, but used during Nix's own compilation only.
+    The remaining macro definitions are renamed to have `NIX_` as a prefix.
 
   - The name of the Nix component the header comes from
     (e.g. `util`, `store`, `expr`, `flake`, etc.)
@@ -84,7 +79,8 @@ But we don't want to to release with arbitrary new changes form master, so close
   +    HANDLE_ERROR(ctx);
   ```
 
-  We figured it would be good to do this API change at the same time, also.
+  Although this change is not as critical, we figured it would be good to do this API change at the same time, also.
+  Also note that we try to keep the C API compatible, but we decided to break this function because it was young and likely not in widespread use yet. This frees up time to make important progress on the rest of the C API.
 
 # Contributors
 
