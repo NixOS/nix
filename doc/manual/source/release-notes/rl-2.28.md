@@ -1,0 +1,91 @@
+# Release 2.28.0 (2025-04-02)
+
+This is an atypical release -- instead of being branched off from `master`, it is branched off from the 2.27.x maintenance branch.
+The purpose of this is to satisfy both these goals:
+
+- Release with number of API-breaking changes that are not suitable to backport to 2.27
+
+- Do not Release with arbitrary new commits from master
+
+The reason for the combinations of these goals is that we would like this version of Nix to the default in Nixpkgs 25.05, yet, we are getting close to the Nixpkgs 25.05 version freeze.
+These API changes complete the big infrastructure rework that accompanies the switch to Meson --- we want to batch all these changes together so there is one round of breakage.
+But we don't want to to release with arbitrary new changes form master, so close to a major release, before those changes have had time to "incubate".
+
+## Major changes
+
+- Unstable C++ API reworked
+  [#12836](https://github.com/NixOS/nix/pull/12836)
+  [#12798](https://github.com/NixOS/nix/pull/12798)
+  [#12773](https://github.com/NixOS/nix/pull/12773)
+
+  Now the C++ interface confirms to common conventions much better than before:
+
+  - All headers are expected to be included with the initial `nix/`, e.g. as `#include "nix/....hh"` (what Nix's headers now do) or `#include <nix/....hh>` (what downstream projects may choose to do).
+    Likewise, the pkg-config files have `-I${includedir}` not `-I${includedir}/nix` or similar.
+
+    Including without the `nix/` like before sometimes worked because of how for `#include` C pre-process checks the directory containing the current file, not just the lookup path, but this was not reliable.
+
+  - All configuration headers are included explicitly by the (regular) headers that need them.
+    There is no more need to pass `-include` to force additional files to be included.
+
+  - The public, installed configuration headers no longer contain implementation-specific details that are not relevant to the API.
+    The vast majority of definitions that were previously in there are now moved to new private, non-installed configuration headers.
+    The renaming definitions now all start with `NIX_`.
+
+  - The name of the Nix component the header comes from
+    (e.g. `util`, `store`, `expr`, `flake`, etc.)
+    is now part of the path to the header, coming after `nix` and before the header name
+    (or rest of the header path, if it is already in a directory).
+
+  Here is a contrived diff showing a few of these changes at once:
+
+  ```diff
+  @@ @@
+  -#include "derived-path.hh"
+  +#include "nix/store/derived-path.hh"
+  @@ @@
+  +// Would include for the variables used before. But when other headers
+  +// need these variables. those will include these config themselves.
+  +#include "nix/store/config.hh"
+  +#include "nix/expr/config.hh"
+  @@ @@
+  -#include "config.hh"
+  +// Additionally renamed to distinguish from components' config headers.
+  +#include "nix/util/configuration.hh"
+  @@ @@
+  -#if HAVE_ACL_SUPPORT
+  +#if NIX_SUPPORT_ACL
+  @@ @@
+  -#if HAVE_BOEHMGC
+  +#if NIX_USE_BOEHMGC
+  @@ @@
+   #endif
+   #endif
+  @@ @@
+  -const char *s = "hi from " SYSTEM;
+  +const char *s = "hi from " NIX_LOCAL_SYSTEM;
+  ```
+
+- C API `nix_flake_init_global` removed [#5638](https://github.com/NixOS/nix/issues/5638) [#12759](https://github.com/NixOS/nix/pull/12759)
+
+  In order to improve the modularity of the code base, we are removing a use of global state, and therefore the `nix_flake_init_global` function.
+
+  Instead, use `nix_flake_settings_add_to_eval_state_builder`.
+  For example:
+
+  ```diff
+  -    nix_flake_init_global(ctx, settings);
+  -    HANDLE_ERROR(ctx);
+  -
+       nix_eval_state_builder * builder = nix_eval_state_builder_new(ctx, store);
+       HANDLE_ERROR(ctx);
+
+  +    nix_flake_settings_add_to_eval_state_builder(ctx, settings, builder);
+  +    HANDLE_ERROR(ctx);
+  ```
+
+  We figured it would be good to do this API change at the same time, also.
+
+# Contributors
+
+Querying GitHub API for ce8b1eb2c4735b0bb6e65760c935daf0b8605a8b, to get handle for oldshensheep@gmail.com
