@@ -1228,13 +1228,13 @@ DerivationOutput DerivationOutput::fromJSON(
         keys.insert(key);
 
     auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashAlgorithm> {
-        auto & method_ = getString(valueAt(json, "method"));
-        ContentAddressMethod method = ContentAddressMethod::parse(method_);
+        ContentAddressMethod method = ContentAddressMethod::parse(
+            getString(valueAt(json, "method")));
         if (method == ContentAddressMethod::Raw::Text)
             xpSettings.require(Xp::DynamicDerivations);
 
-        auto & hashAlgo_ = getString(valueAt(json, "hashAlgo"));
-        auto hashAlgo = parseHashAlgo(hashAlgo_);
+        auto hashAlgo = parseHashAlgo(
+            getString(valueAt(json, "hashAlgo")));
         return { std::move(method), std::move(hashAlgo) };
     };
 

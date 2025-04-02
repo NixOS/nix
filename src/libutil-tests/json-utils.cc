@@ -63,9 +63,7 @@ TEST(valueAt, simpleObject) {
 
     auto nested = R"({ "hello": { "world": "" } })"_json;
 
-    auto & nestedObject = valueAt(getObject(nested), "hello");
-
-    ASSERT_EQ(valueAt(nestedObject, "world"), "");
+    ASSERT_EQ(valueAt(valueAt(getObject(nested), "hello"), "world"), "");
 }
 
 TEST(valueAt, missingKey) {

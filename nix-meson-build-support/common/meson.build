@@ -14,5 +14,6 @@ add_project_arguments(
   '-Wignored-qualifiers',
   '-Wimplicit-fallthrough',
   '-Wno-deprecated-declarations',
+  '-Wno-dangling-reference',
   language : 'cpp',
 )
