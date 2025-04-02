@@ -3,11 +3,11 @@
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
 
-#include "nix/path.hh"
-#include "nix/store-api.hh"
-#include "nix/build-result.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/build-result.hh"
 
-#include "nix/globals.hh"
+#include "nix/store/globals.hh"
 
 nix_err nix_libstore_init(nix_c_context * context)
 {

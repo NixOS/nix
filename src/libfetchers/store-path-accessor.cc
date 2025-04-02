@@ -1,5 +1,5 @@
-#include "nix/store-path-accessor.hh"
-#include "nix/store-api.hh"
+#include "nix/fetchers/store-path-accessor.hh"
+#include "nix/store/store-api.hh"
 
 namespace nix {
 

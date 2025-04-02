@@ -5,12 +5,12 @@
 #include <regex>
 #include <strings.h> // for strcasecmp
 
-#include "nix/signals.hh"
-#include "nix/config.hh"
-#include "nix/hash.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/hash.hh"
 
-#include "nix/git.hh"
-#include "nix/serialise.hh"
+#include "nix/util/git.hh"
+#include "nix/util/serialise.hh"
 
 namespace nix::git {
 

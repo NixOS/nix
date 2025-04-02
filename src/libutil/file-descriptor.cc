@@ -1,12 +1,12 @@
-#include "nix/serialise.hh"
-#include "nix/util.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/util.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
 #ifdef _WIN32
 # include <winnt.h>
 # include <fileapi.h>
-# include "nix/windows-error.hh"
+# include "nix/util/windows-error.hh"
 #endif
 
 namespace nix {

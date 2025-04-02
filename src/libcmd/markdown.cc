@@ -1,8 +1,8 @@
-#include "nix/markdown.hh"
-#include "nix/environment-variables.hh"
-#include "nix/error.hh"
-#include "nix/finally.hh"
-#include "nix/terminal.hh"
+#include "nix/cmd/markdown.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/terminal.hh"
 
 #include "cmd-config-private.hh"
 

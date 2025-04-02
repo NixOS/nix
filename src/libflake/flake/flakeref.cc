@@ -1,8 +1,8 @@
 #include "nix/flake/flakeref.hh"
-#include "nix/store-api.hh"
-#include "nix/url.hh"
-#include "nix/url-parts.hh"
-#include "nix/fetchers.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/url.hh"
+#include "nix/util/url-parts.hh"
+#include "nix/fetchers/fetchers.hh"
 
 namespace nix {
 

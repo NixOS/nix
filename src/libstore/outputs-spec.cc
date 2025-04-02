@@ -1,11 +1,11 @@
 #include <regex>
 #include <nlohmann/json.hpp>
 
-#include "nix/util.hh"
-#include "nix/regex-combinators.hh"
-#include "nix/outputs-spec.hh"
-#include "nix/path-regex.hh"
-#include "nix/strings-inline.hh"
+#include "nix/util/util.hh"
+#include "nix/util/regex-combinators.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path-regex.hh"
+#include "nix/util/strings-inline.hh"
 
 namespace nix {
 

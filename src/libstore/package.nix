@@ -43,11 +43,11 @@ mkMesonLibrary (finalAttrs: {
     ./.version
     ./meson.build
     ./meson.options
-    ./include/nix/meson.build
+    ./include/nix/store/meson.build
     ./linux/meson.build
-    ./linux/include/nix/meson.build
+    ./linux/include/nix/store/meson.build
     ./unix/meson.build
-    ./unix/include/nix/meson.build
+    ./unix/include/nix/store/meson.build
     ./windows/meson.build
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)

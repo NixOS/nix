@@ -1,10 +1,10 @@
 #pragma once
 ///@file
 
-#include "nix/types.hh"
+#include "nix/util/types.hh"
 #include "nix/flake/flakeref.hh"
 #include "nix/flake/lockfile.hh"
-#include "nix/value.hh"
+#include "nix/expr/value.hh"
 
 namespace nix {
 

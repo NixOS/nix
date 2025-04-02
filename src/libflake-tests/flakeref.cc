@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "nix/fetch-settings.hh"
+#include "nix/fetchers/fetch-settings.hh"
 #include "nix/flake/flakeref.hh"
 
 namespace nix {

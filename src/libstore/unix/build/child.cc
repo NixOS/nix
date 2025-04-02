@@ -1,6 +1,6 @@
-#include "nix/build/child.hh"
-#include "nix/current-process.hh"
-#include "nix/logging.hh"
+#include "nix/store/build/child.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/logging.hh"
 
 #include <fcntl.h>
 #include <unistd.h>

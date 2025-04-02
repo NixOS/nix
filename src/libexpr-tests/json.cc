@@ -1,5 +1,5 @@
-#include "nix/tests/libexpr.hh"
-#include "nix/value-to-json.hh"
+#include "nix/expr/tests/libexpr.hh"
+#include "nix/expr/value-to-json.hh"
 
 namespace nix {
 // Testing the conversion to JSON

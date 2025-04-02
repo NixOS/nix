@@ -1,4 +1,4 @@
-#include "nix/compression.hh"
+#include "nix/util/compression.hh"
 #include <gtest/gtest.h>
 
 namespace nix {

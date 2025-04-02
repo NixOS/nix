@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "nix/file-content-address.hh"
+#include "nix/util/file-content-address.hh"
 
 namespace nix {
 

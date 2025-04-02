@@ -1,7 +1,7 @@
-#include "nix/fetchers.hh"
-#include "nix/store-api.hh"
-#include "nix/archive.hh"
-#include "nix/store-path-accessor.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/archive.hh"
+#include "nix/fetchers/store-path-accessor.hh"
 
 namespace nix::fetchers {
 

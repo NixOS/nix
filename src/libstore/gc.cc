@@ -1,16 +1,16 @@
-#include "nix/derivations.hh"
-#include "nix/globals.hh"
-#include "nix/local-store.hh"
-#include "nix/finally.hh"
-#include "nix/unix-domain-socket.hh"
-#include "nix/signals.hh"
-#include "nix/posix-fs-canonicalise.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/local-store.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/unix-domain-socket.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
 
 #include "store-config-private.hh"
 
 #if !defined(__linux__)
 // For shelling out to lsof
-#  include "nix/processes.hh"
+#  include "nix/util/processes.hh"
 #endif
 
 #include <functional>

@@ -2,9 +2,9 @@
 #include <string>
 #include <sstream>
 
-#include "nix/strings-inline.hh"
-#include "nix/os-string.hh"
-#include "nix/error.hh"
+#include "nix/util/strings-inline.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 

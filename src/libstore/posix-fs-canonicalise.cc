@@ -1,10 +1,9 @@
-#include "nix/posix-fs-canonicalise.hh"
-#include "nix/file-system.hh"
-#include "nix/signals.hh"
-#include "nix/util.hh"
-#include "nix/globals.hh"
-#include "nix/store-api.hh"
-#include "nix/store-config.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/util.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/store-api.hh"
 
 #include "store-config-private.hh"
 

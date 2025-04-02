@@ -1,10 +1,10 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
-#include "nix/path-info.hh"
+#include "nix/store/path-info.hh"
 
-#include "nix/tests/characterization.hh"
-#include "nix/tests/libstore.hh"
+#include "nix/util/tests/characterization.hh"
+#include "nix/store/tests/libstore.hh"
 
 namespace nix {
 

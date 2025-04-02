@@ -5,9 +5,9 @@
 #include "nix_api_expr.h"
 #include "nix_api_value.h"
 
-#include "nix/tests/nix_api_expr.hh"
-#include "nix/tests/string_callback.hh"
-#include "nix/file-system.hh"
+#include "nix/expr/tests/nix_api_expr.hh"
+#include "nix/util/tests/string_callback.hh"
+#include "nix/util/file-system.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

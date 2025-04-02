@@ -30,8 +30,8 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > src
 > ├── libexpr
 > │   ├── meson.build
-> │   ├── value/context.hh
-> │   ├── include/nix/value/context.cc
+> │   ├── include/nix/expr/value/context.hh
+> │   ├── value/context.cc
 > │   …
 > │
 > ├── tests
@@ -46,7 +46,7 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > │   │
 > │   ├── libexpr-test-support
 > │   │   ├── meson.build
-> │   │   ├── include/nix
+> │   │   ├── include/nix/expr
 > │   │   │   ├── meson.build
 > │   │   │   └── tests
 > │   │   │       ├── value/context.hh
@@ -63,7 +63,7 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > ```
 
 The tests for each Nix library (`libnixexpr`, `libnixstore`, etc..) live inside a directory `src/${library_name_without-nix}-test`.
-Given an interface (header) and implementation pair in the original library, say, `src/libexpr/include/nix/value/context.hh` and `src/libexpr/value/context.cc`, we write tests for it in `src/libexpr-tests/value/context.cc`, and (possibly) declare/define additional interfaces for testing purposes in `src/libexpr-test-support/include/nix/tests/value/context.hh` and `src/libexpr-test-support/tests/value/context.cc`.
+Given an interface (header) and implementation pair in the original library, say, `src/libexpr/include/nix/expr/value/context.hh` and `src/libexpr/value/context.cc`, we write tests for it in `src/libexpr-tests/value/context.cc`, and (possibly) declare/define additional interfaces for testing purposes in `src/libexpr-test-support/include/nix/expr/tests/value/context.hh` and `src/libexpr-test-support/tests/value/context.cc`.
 
 Data for unit tests is stored in a `data` subdir of the directory for each unit test executable.
 For example, `libnixstore` code is in `src/libstore`, and its test data is in `src/libstore-tests/data`.

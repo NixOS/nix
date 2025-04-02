@@ -60,4 +60,4 @@ sources += files(
   'users.cc',
 )
 
-subdir('include/nix')
+subdir('include/nix/util')

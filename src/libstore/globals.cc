@@ -1,12 +1,11 @@
-#include "nix/globals.hh"
-#include "nix/config-global.hh"
-#include "nix/current-process.hh"
-#include "nix/archive.hh"
-#include "nix/args.hh"
-#include "nix/abstract-setting-to-json.hh"
-#include "nix/compute-levels.hh"
-#include "nix/signals.hh"
-#include "nix/strings.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/args.hh"
+#include "nix/util/abstract-setting-to-json.hh"
+#include "nix/util/compute-levels.hh"
+#include "nix/util/signals.hh"
 
 #include <algorithm>
 #include <map>
@@ -27,17 +26,16 @@
 #endif
 
 #if __APPLE__
-# include "nix/processes.hh"
+# include "nix/util/processes.hh"
 #endif
 
-#include "nix/config-impl.hh"
+#include "nix/util/config-impl.hh"
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>
 #endif
 
 #include "store-config-private.hh"
-
 
 namespace nix {
 

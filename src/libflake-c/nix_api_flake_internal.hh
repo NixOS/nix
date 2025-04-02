@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nix/ref.hh"
+#include "nix/util/ref.hh"
 #include "nix/flake/settings.hh"
 
 struct nix_flake_settings

@@ -1,9 +1,9 @@
-#include "nix/error.hh"
-#include "nix/environment-variables.hh"
-#include "nix/eval-settings.hh"
-#include "nix/config-global.hh"
-#include "nix/serialise.hh"
-#include "nix/eval-gc.hh"
+#include "nix/util/error.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/serialise.hh"
+#include "nix/expr/eval-gc.hh"
 
 #include "expr-config-private.hh"
 

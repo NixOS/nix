@@ -1,6 +1,6 @@
 #include "graphml.hh"
-#include "nix/store-api.hh"
-#include "nix/derivations.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/derivations.hh"
 
 #include <iostream>
 

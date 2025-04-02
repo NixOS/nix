@@ -1,5 +1,5 @@
-#include "nix/personality.hh"
-#include "nix/globals.hh"
+#include "nix/store/personality.hh"
+#include "nix/store/globals.hh"
 
 #include <sys/utsname.h>
 #include <sys/personality.h>

@@ -1,4 +1,4 @@
-#include "nix/search-path.hh"
+#include "nix/expr/search-path.hh"
 
 namespace nix {
 

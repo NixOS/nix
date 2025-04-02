@@ -1,11 +1,11 @@
-#include "nix/serialise.hh"
-#include "nix/path-with-outputs.hh"
-#include "nix/store-api.hh"
-#include "nix/build-result.hh"
-#include "nix/common-protocol.hh"
-#include "nix/common-protocol-impl.hh"
-#include "nix/archive.hh"
-#include "nix/derivations.hh"
+#include "nix/util/serialise.hh"
+#include "nix/store/path-with-outputs.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/common-protocol.hh"
+#include "nix/store/common-protocol-impl.hh"
+#include "nix/util/archive.hh"
+#include "nix/store/derivations.hh"
 
 #include <nlohmann/json.hpp>
 

@@ -1,11 +1,11 @@
 #include <unordered_set>
 #include <queue>
 
-#include "nix/command.hh"
-#include "nix/eval.hh"
+#include "nix/cmd/command.hh"
+#include "nix/expr/eval.hh"
 #include "run.hh"
-#include "nix/strings.hh"
-#include "nix/executable-path.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/executable-path.hh"
 
 using namespace nix;
 

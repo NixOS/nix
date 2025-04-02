@@ -1,25 +1,27 @@
-#include "nix/build/local-derivation-goal.hh"
-#include "nix/indirect-root-store.hh"
-#include "nix/build/hook-instance.hh"
-#include "nix/build/worker.hh"
-#include "nix/builtins.hh"
-#include "nix/builtins/buildenv.hh"
-#include "nix/path-references.hh"
-#include "nix/finally.hh"
-#include "nix/util.hh"
-#include "nix/archive.hh"
-#include "nix/git.hh"
-#include "nix/compression.hh"
-#include "nix/daemon.hh"
-#include "nix/topo-sort.hh"
-#include "nix/callback.hh"
-#include "nix/json-utils.hh"
-#include "nix/current-process.hh"
-#include "nix/build/child.hh"
-#include "nix/unix-domain-socket.hh"
-#include "nix/posix-fs-canonicalise.hh"
-#include "nix/posix-source-accessor.hh"
-#include "nix/store-config.hh"
+#include "nix/store/build/local-derivation-goal.hh"
+#include "nix/store/local-store.hh"
+#include "nix/util/processes.hh"
+#include "nix/store/indirect-root-store.hh"
+#include "nix/store/build/hook-instance.hh"
+#include "nix/store/build/worker.hh"
+#include "nix/store/builtins.hh"
+#include "nix/store/builtins/buildenv.hh"
+#include "nix/store/path-references.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/util.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/git.hh"
+#include "nix/util/compression.hh"
+#include "nix/store/daemon.hh"
+#include "nix/util/topo-sort.hh"
+#include "nix/util/callback.hh"
+#include "nix/util/json-utils.hh"
+#include "nix/util/current-process.hh"
+#include "nix/store/build/child.hh"
+#include "nix/util/unix-domain-socket.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/util/posix-source-accessor.hh"
+#include "nix/store/config.hh"
 
 #include <regex>
 #include <queue>
@@ -40,7 +42,7 @@
 
 /* Includes required for chroot support. */
 #if __linux__
-# include "nix/fchmodat2-compat.hh"
+# include "nix/store/fchmodat2-compat.hh"
 # include <sys/ioctl.h>
 # include <net/if.h>
 # include <netinet/ip.h>
@@ -49,13 +51,13 @@
 # include <sys/param.h>
 # include <sys/mount.h>
 # include <sys/syscall.h>
-# include "nix/namespaces.hh"
+# include "nix/util/namespaces.hh"
 # if HAVE_SECCOMP
 #   include <seccomp.h>
 # endif
 # define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
-# include "nix/cgroup.hh"
-# include "nix/personality.hh"
+# include "nix/util/cgroup.hh"
+# include "nix/store/personality.hh"
 #endif
 
 #if __APPLE__
@@ -71,8 +73,8 @@ extern "C" int sandbox_init_with_parameters(const char *profile, uint64_t flags,
 #include <grp.h>
 #include <iostream>
 
-#include "nix/strings.hh"
-#include "nix/signals.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/signals.hh"
 
 namespace nix {
 

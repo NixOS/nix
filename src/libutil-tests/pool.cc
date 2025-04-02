@@ -1,4 +1,4 @@
-#include "nix/pool.hh"
+#include "nix/util/pool.hh"
 #include <gtest/gtest.h>
 
 namespace nix {

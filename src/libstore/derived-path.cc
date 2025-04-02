@@ -1,7 +1,7 @@
-#include "nix/derived-path.hh"
-#include "nix/derivations.hh"
-#include "nix/store-api.hh"
-#include "nix/comparator.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/comparator.hh"
 
 #include <nlohmann/json.hpp>
 

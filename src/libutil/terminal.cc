@@ -1,6 +1,6 @@
-#include "nix/terminal.hh"
-#include "nix/environment-variables.hh"
-#include "nix/sync.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/sync.hh"
 
 #if _WIN32
 # include <io.h>

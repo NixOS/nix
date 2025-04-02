@@ -1,11 +1,11 @@
-#include "nix/globals.hh"
-#include "nix/current-process.hh"
-#include "nix/shared.hh"
-#include "nix/store-api.hh"
-#include "nix/gc-store.hh"
-#include "nix/loggers.hh"
-#include "nix/progress-bar.hh"
-#include "nix/signals.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/current-process.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/gc-store.hh"
+#include "nix/main/loggers.hh"
+#include "nix/main/progress-bar.hh"
+#include "nix/util/signals.hh"
 
 #include <algorithm>
 #include <exception>
@@ -22,10 +22,11 @@
 
 #include <openssl/crypto.h>
 
-#include "nix/exit.hh"
-#include "nix/strings.hh"
+#include "nix/util/exit.hh"
+#include "nix/util/strings.hh"
 
 #include "main-config-private.hh"
+
 
 namespace nix {
 

@@ -1,7 +1,7 @@
-#include "nix/primops.hh"
-#include "nix/eval-inline.hh"
-#include "nix/derivations.hh"
-#include "nix/store-api.hh"
+#include "nix/expr/primops.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/store-api.hh"
 
 namespace nix {
 

@@ -3,8 +3,8 @@
 
 #include <gtest/gtest.h>
 
-#include "nix/error.hh"
-#include "nix/json-utils.hh"
+#include "nix/util/error.hh"
+#include "nix/util/json-utils.hh"
 
 namespace nix {
 
