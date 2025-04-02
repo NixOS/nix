@@ -97,7 +97,16 @@ nix_flake_lock_flags * nix_flake_lock_flags_new(nix_c_context * context, nix_fla
 {
     nix_clear_err(context);
     try {
-        auto lockSettings = nix::make_ref<nix::flake::LockFlags>();
+        auto lockSettings = nix::make_ref<nix::flake::LockFlags>(nix::flake::LockFlags{
+            .recreateLockFile = false,
+            .updateLockFile = true,  // == `nix_flake_lock_flags_set_mode_write_as_needed`
+            .writeLockFile = true,   // == `nix_flake_lock_flags_set_mode_write_as_needed`
+            .failOnUnlocked = false, // == `nix_flake_lock_flags_set_mode_write_as_needed`
+            .useRegistries = false,
+            .allowUnlocked = false, // == `nix_flake_lock_flags_set_mode_write_as_needed`
+            .commitLockFile = false,
+
+        });
         return new nix_flake_lock_flags{lockSettings};
     }
     NIXC_CATCH_ERRS_NULL
@@ -108,16 +117,68 @@ void nix_flake_lock_flags_free(nix_flake_lock_flags * flags)
     delete flags;
 }
 
+nix_err nix_flake_lock_flags_set_mode_virtual(nix_c_context * context, nix_flake_lock_flags * flags)
+{
+    nix_clear_err(context);
+    try {
+        flags->lockFlags->updateLockFile = true;
+        flags->lockFlags->writeLockFile = false;
+        flags->lockFlags->failOnUnlocked = false;
+        flags->lockFlags->allowUnlocked = true;
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_flake_lock_flags_set_mode_write_as_needed(nix_c_context * context, nix_flake_lock_flags * flags)
+{
+    nix_clear_err(context);
+    try {
+        flags->lockFlags->updateLockFile = true;
+        flags->lockFlags->writeLockFile = true;
+        flags->lockFlags->failOnUnlocked = false;
+        flags->lockFlags->allowUnlocked = true;
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_flake_lock_flags_set_mode_check(nix_c_context * context, nix_flake_lock_flags * flags)
+{
+    nix_clear_err(context);
+    try {
+        flags->lockFlags->updateLockFile = false;
+        flags->lockFlags->writeLockFile = false;
+        flags->lockFlags->failOnUnlocked = true;
+        flags->lockFlags->allowUnlocked = false;
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_flake_lock_flags_add_input_override(
+    nix_c_context * context, nix_flake_lock_flags * flags, const char * inputPath, nix_flake_reference * flakeRef)
+{
+    nix_clear_err(context);
+    try {
+        auto path = nix::flake::parseInputAttrPath(inputPath);
+        flags->lockFlags->inputOverrides.emplace(path, *flakeRef->flakeRef);
+        if (flags->lockFlags->writeLockFile) {
+            return nix_flake_lock_flags_set_mode_virtual(context, flags);
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
 nix_locked_flake * nix_flake_lock(
     nix_c_context * context,
-    nix_flake_settings * settings,
+    nix_fetchers_settings * fetchSettings,
+    nix_flake_settings * flakeSettings,
     EvalState * eval_state,
     nix_flake_lock_flags * flags,
     nix_flake_reference * flakeReference)
 {
+    nix_clear_err(context);
     try {
         auto lockedFlake = nix::make_ref<nix::flake::LockedFlake>(nix::flake::lockFlake(
-            *settings->settings, eval_state->state, *flakeReference->flakeRef, *flags->lockFlags));
+            *flakeSettings->settings, eval_state->state, *flakeReference->flakeRef, *flags->lockFlags));
         return new nix_locked_flake{lockedFlake};
     }
     NIXC_CATCH_ERRS_NULL

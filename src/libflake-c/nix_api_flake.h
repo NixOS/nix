@@ -127,6 +127,49 @@ nix_flake_lock_flags * nix_flake_lock_flags_new(nix_c_context * context, nix_fla
 void nix_flake_lock_flags_free(nix_flake_lock_flags * settings);
 
 /**
+ * @brief Put the lock flags in a mode that checks whether the lock is up to date.
+ * @param[out] context Optional, stores error information
+ * @param[in] flags The flags to modify
+ * @return NIX_OK on success, NIX_ERR on failure
+ *
+ * This causes `nix_flake_lock` to fail if the lock needs to be updated.
+ */
+nix_err nix_flake_lock_flags_set_mode_check(nix_c_context * context, nix_flake_lock_flags * flags);
+
+/**
+ * @brief Put the lock flags in a mode that updates the lock file in memory, if needed.
+ * @param[out] context Optional, stores error information
+ * @param[in] flags The flags to modify
+ * @param[in] update Whether to allow updates
+ *
+ * This will cause `nix_flake_lock` to update the lock file in memory, if needed.
+ */
+nix_err nix_flake_lock_flags_set_mode_virtual(nix_c_context * context, nix_flake_lock_flags * flags);
+
+/**
+ * @brief Put the lock flags in a mode that updates the lock file on disk, if needed.
+ * @param[out] context Optional, stores error information
+ * @param[in] flags The flags to modify
+ * @param[in] update Whether to allow updates
+ *
+ * This will cause `nix_flake_lock` to update the lock file on disk, if needed.
+ */
+nix_err nix_flake_lock_flags_set_mode_write_as_needed(nix_c_context * context, nix_flake_lock_flags * flags);
+
+/**
+ * @brief Add input overrides to the lock flags
+ * @param[out] context Optional, stores error information
+ * @param[in] flags The flags to modify
+ * @param[in] inputPath The input path to override
+ * @param[in] flakeRef The flake reference to use as the override
+ *
+ * This switches the `flags` to `nix_flake_lock_flags_set_mode_virtual` if not in mode
+ * `nix_flake_lock_flags_set_mode_check`.
+ */
+nix_err nix_flake_lock_flags_add_input_override(
+    nix_c_context * context, nix_flake_lock_flags * flags, const char * inputPath, nix_flake_reference * flakeRef);
+
+/**
  * @brief Lock a flake, if not already locked.
  * @param[out] context Optional, stores error information
  * @param[in] settings The flake (and fetch) settings to use
@@ -135,6 +178,7 @@ void nix_flake_lock_flags_free(nix_flake_lock_flags * settings);
  */
 nix_locked_flake * nix_flake_lock(
     nix_c_context * context,
+    nix_fetchers_settings * fetchSettings,
     nix_flake_settings * settings,
     EvalState * eval_state,
     nix_flake_lock_flags * flags,
