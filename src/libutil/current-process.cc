@@ -1,12 +1,12 @@
 #include <algorithm>
 #include <cstring>
 
-#include "nix/current-process.hh"
-#include "nix/util.hh"
-#include "nix/finally.hh"
-#include "nix/file-system.hh"
-#include "nix/processes.hh"
-#include "nix/signals.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/util.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/signals.hh"
 #include <math.h>
 
 #ifdef __APPLE__
@@ -15,8 +15,8 @@
 
 #if __linux__
 # include <mutex>
-# include "nix/cgroup.hh"
-# include "nix/namespaces.hh"
+# include "nix/util/cgroup.hh"
+# include "nix/util/namespaces.hh"
 #endif
 
 namespace nix {

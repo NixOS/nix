@@ -1,5 +1,5 @@
-#include "nix/store-api.hh"
-#include "nix/callback.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/callback.hh"
 
 namespace nix {
 

@@ -11,4 +11,4 @@ sources += files(
   'windows-error.cc',
 )
 
-subdir('include/nix')
+subdir('include/nix/util')

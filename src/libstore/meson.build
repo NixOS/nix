@@ -252,7 +252,7 @@ sources = files(
   'worker-protocol.cc',
 )
 
-subdir('include/nix')
+subdir('include/nix/store')
 
 if host_machine.system() == 'linux'
   subdir('linux')
@@ -363,7 +363,7 @@ this_library = library(
   install : true,
 )
 
-install_headers(headers, subdir : 'nix', preserve_path : true)
+install_headers(headers, subdir : 'nix/store', preserve_path : true)
 
 libraries_private = []
 

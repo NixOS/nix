@@ -1,6 +1,6 @@
-#include "nix/thread-pool.hh"
-#include "nix/signals.hh"
-#include "nix/util.hh"
+#include "nix/util/thread-pool.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

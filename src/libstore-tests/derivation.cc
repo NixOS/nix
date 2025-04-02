@@ -1,11 +1,11 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
-#include "nix/experimental-features.hh"
-#include "nix/derivations.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/store/derivations.hh"
 
-#include "nix/tests/libstore.hh"
-#include "nix/tests/characterization.hh"
+#include "nix/store/tests/libstore.hh"
+#include "nix/util/tests/characterization.hh"
 
 namespace nix {
 

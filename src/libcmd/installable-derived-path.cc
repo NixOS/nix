@@ -1,5 +1,5 @@
-#include "nix/installable-derived-path.hh"
-#include "nix/derivations.hh"
+#include "nix/cmd/installable-derived-path.hh"
+#include "nix/store/derivations.hh"
 
 namespace nix {
 

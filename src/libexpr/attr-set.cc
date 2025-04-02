@@ -1,5 +1,5 @@
-#include "nix/attr-set.hh"
-#include "nix/eval-inline.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/eval-inline.hh"
 
 #include <algorithm>
 

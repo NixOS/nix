@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
-#include "nix/fetchers.hh"
-#include "nix/json-utils.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/util/json-utils.hh"
 #include <nlohmann/json.hpp>
-#include "nix/tests/characterization.hh"
+#include "nix/util/tests/characterization.hh"
 
 namespace nix {
 

@@ -3,10 +3,10 @@
 
 #include <regex>
 
-#include "nix/types.hh"
-#include "nix/fetchers.hh"
-#include "nix/outputs-spec.hh"
-#include "nix/registry.hh"
+#include "nix/util/types.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/fetchers/registry.hh"
 
 namespace nix {
 

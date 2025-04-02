@@ -1,16 +1,16 @@
 #include <gtest/gtest.h>
 #include <optional>
 
-#include "nix/experimental-features.hh"
-#include "nix/derivations.hh"
-#include "nix/derivations.hh"
-#include "nix/derivation-options.hh"
-#include "nix/parsed-derivations.hh"
-#include "nix/types.hh"
-#include "nix/json-utils.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/derivation-options.hh"
+#include "nix/store/parsed-derivations.hh"
+#include "nix/util/types.hh"
+#include "nix/util/json-utils.hh"
 
-#include "nix/tests/libstore.hh"
-#include "nix/tests/characterization.hh"
+#include "nix/store/tests/libstore.hh"
+#include "nix/util/tests/characterization.hh"
 
 namespace nix {
 

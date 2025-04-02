@@ -1,5 +1,5 @@
-#include "nix/names.hh"
-#include "nix/util.hh"
+#include "nix/store/names.hh"
+#include "nix/util/util.hh"
 
 #include <regex>
 

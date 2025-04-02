@@ -1,6 +1,6 @@
-#include "nix/json-to-value.hh"
-#include "nix/value.hh"
-#include "nix/eval.hh"
+#include "nix/expr/json-to-value.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/eval.hh"
 
 #include <limits>
 #include <variant>

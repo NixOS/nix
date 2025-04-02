@@ -1,8 +1,8 @@
-#include "nix/compression.hh"
-#include "nix/signals.hh"
-#include "nix/tarfile.hh"
-#include "nix/finally.hh"
-#include "nix/logging.hh"
+#include "nix/util/compression.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/tarfile.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/logging.hh"
 
 #include <archive.h>
 #include <archive_entry.h>

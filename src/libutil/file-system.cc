@@ -1,11 +1,11 @@
-#include "nix/environment-variables.hh"
-#include "nix/file-system.hh"
-#include "nix/file-path.hh"
-#include "nix/file-path-impl.hh"
-#include "nix/signals.hh"
-#include "nix/finally.hh"
-#include "nix/serialise.hh"
-#include "nix/util.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/file-path.hh"
+#include "nix/util/file-path-impl.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/util.hh"
 
 #include <atomic>
 #include <cerrno>
@@ -25,7 +25,7 @@
 # include <io.h>
 #endif
 
-#include "nix/strings-inline.hh"
+#include "nix/util/strings-inline.hh"
 
 #include "util-config-private.hh"
 

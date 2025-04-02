@@ -1,6 +1,6 @@
-#include "nix/json-utils.hh"
-#include "nix/error.hh"
-#include "nix/types.hh"
+#include "nix/util/json-utils.hh"
+#include "nix/util/error.hh"
+#include "nix/util/types.hh"
 #include <nlohmann/json_fwd.hpp>
 #include <iostream>
 #include <optional>

@@ -1,8 +1,8 @@
-#include "nix/build/worker.hh"
-#include "nix/build/substitution-goal.hh"
-#include "nix/nar-info.hh"
-#include "nix/finally.hh"
-#include "nix/signals.hh"
+#include "nix/store/build/worker.hh"
+#include "nix/store/build/substitution-goal.hh"
+#include "nix/store/nar-info.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/signals.hh"
 #include <coroutine>
 
 namespace nix {

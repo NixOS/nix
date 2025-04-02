@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <cstdlib>
-#include "nix/globals.hh"
-#include "nix/logging.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/logging.hh"
 
 using namespace nix;
 

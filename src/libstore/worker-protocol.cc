@@ -1,11 +1,11 @@
-#include "nix/serialise.hh"
-#include "nix/path-with-outputs.hh"
-#include "nix/store-api.hh"
-#include "nix/build-result.hh"
-#include "nix/worker-protocol.hh"
-#include "nix/worker-protocol-impl.hh"
-#include "nix/archive.hh"
-#include "nix/path-info.hh"
+#include "nix/util/serialise.hh"
+#include "nix/store/path-with-outputs.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/worker-protocol.hh"
+#include "nix/store/worker-protocol-impl.hh"
+#include "nix/util/archive.hh"
+#include "nix/store/path-info.hh"
 
 #include <chrono>
 #include <nlohmann/json.hpp>

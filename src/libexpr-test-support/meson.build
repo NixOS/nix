@@ -35,7 +35,7 @@ sources = files(
   'tests/value/context.cc',
 )
 
-subdir('include/nix')
+subdir('include/nix/expr/tests')
 
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
@@ -52,7 +52,7 @@ this_library = library(
   install : true,
 )
 
-install_headers(headers, subdir : 'nix', preserve_path : true)
+install_headers(headers, subdir : 'nix/expr/tests', preserve_path : true)
 
 libraries_private = []
 

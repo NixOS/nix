@@ -156,7 +156,7 @@ sources = files(
   'value/context.cc',
 )
 
-subdir('include/nix')
+subdir('include/nix/expr')
 
 subdir('primops')
 
@@ -177,7 +177,7 @@ this_library = library(
   install : true,
 )
 
-install_headers(headers, subdir : 'nix', preserve_path : true)
+install_headers(headers, subdir : 'nix/expr', preserve_path : true)
 
 libraries_private = []
 

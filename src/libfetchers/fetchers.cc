@@ -1,10 +1,10 @@
-#include "nix/fetchers.hh"
-#include "nix/store-api.hh"
-#include "nix/source-path.hh"
-#include "nix/fetch-to-store.hh"
-#include "nix/json-utils.hh"
-#include "nix/store-path-accessor.hh"
-#include "nix/fetch-settings.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/source-path.hh"
+#include "nix/fetchers/fetch-to-store.hh"
+#include "nix/util/json-utils.hh"
+#include "nix/fetchers/store-path-accessor.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 #include <nlohmann/json.hpp>
 

@@ -4,13 +4,13 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
-#include "nix/worker-protocol.hh"
-#include "nix/worker-protocol-connection.hh"
-#include "nix/worker-protocol-impl.hh"
-#include "nix/derived-path.hh"
-#include "nix/build-result.hh"
-#include "nix/tests/protocol.hh"
-#include "nix/tests/characterization.hh"
+#include "nix/store/worker-protocol.hh"
+#include "nix/store/worker-protocol-connection.hh"
+#include "nix/store/worker-protocol-impl.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/tests/protocol.hh"
+#include "nix/util/tests/characterization.hh"
 
 namespace nix {
 

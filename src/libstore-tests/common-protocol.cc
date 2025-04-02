@@ -3,11 +3,11 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
-#include "nix/common-protocol.hh"
-#include "nix/common-protocol-impl.hh"
-#include "nix/build-result.hh"
-#include "nix/tests/protocol.hh"
-#include "nix/tests/characterization.hh"
+#include "nix/store/common-protocol.hh"
+#include "nix/store/common-protocol-impl.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/tests/protocol.hh"
+#include "nix/util/tests/characterization.hh"
 
 namespace nix {
 

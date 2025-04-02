@@ -1,20 +1,20 @@
-#include "nix/current-process.hh"
+#include "nix/util/current-process.hh"
 #include "run.hh"
-#include "nix/command-installable-value.hh"
-#include "nix/common-args.hh"
-#include "nix/shared.hh"
-#include "nix/signals.hh"
-#include "nix/store-api.hh"
-#include "nix/derivations.hh"
-#include "nix/local-fs-store.hh"
-#include "nix/finally.hh"
-#include "nix/source-accessor.hh"
-#include "nix/eval.hh"
+#include "nix/cmd/command-installable-value.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/expr/eval.hh"
 #include <filesystem>
 
 #if __linux__
 # include <sys/mount.h>
-# include "nix/personality.hh"
+# include "nix/store/personality.hh"
 #endif
 
 #include <queue>

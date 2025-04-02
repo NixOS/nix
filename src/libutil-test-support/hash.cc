@@ -2,9 +2,9 @@
 
 #include <rapidcheck.h>
 
-#include "nix/hash.hh"
+#include "nix/util/hash.hh"
 
-#include "nix/tests/hash.hh"
+#include "nix/util/tests/hash.hh"
 
 namespace rc {
 using namespace nix;

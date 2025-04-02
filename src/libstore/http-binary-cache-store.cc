@@ -1,8 +1,8 @@
-#include "nix/http-binary-cache-store.hh"
-#include "nix/filetransfer.hh"
-#include "nix/globals.hh"
-#include "nix/nar-info-disk-cache.hh"
-#include "nix/callback.hh"
+#include "nix/store/http-binary-cache-store.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/nar-info-disk-cache.hh"
+#include "nix/util/callback.hh"
 
 namespace nix {
 

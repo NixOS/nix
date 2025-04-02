@@ -6,4 +6,4 @@ sources += files(
   'user-lock.cc',
 )
 
-subdir('include/nix')
+subdir('include/nix/store')
