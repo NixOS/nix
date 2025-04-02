@@ -156,13 +156,7 @@
                   inherit officialRelease;
                   pkgs = final;
                   src = self;
-                  maintainers = with lib.maintainers; [
-                    eelco
-                    ericson2314
-                    mic92
-                    roberth
-                    tomberek
-                  ];
+                  maintainers = [ ];
                 };
               };
 
