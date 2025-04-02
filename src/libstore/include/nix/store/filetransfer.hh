@@ -30,7 +30,7 @@ struct FileTransferSettings : Config
         {"binary-caches-parallel-connections"}};
 
     Setting<unsigned long> connectTimeout{
-        this, 0, "connect-timeout",
+        this, 5, "connect-timeout",
         R"(
           The timeout (in seconds) for establishing connections in the
           binary cache substituter. It corresponds to `curl`’s
