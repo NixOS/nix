@@ -88,4 +88,22 @@ But we don't want to to release with arbitrary new changes form master, so close
 
 # Contributors
 
-Querying GitHub API for ce8b1eb2c4735b0bb6e65760c935daf0b8605a8b, to get handle for oldshensheep@gmail.com
+This earlier-than-usual release was made possible by the following 16 contributors:
+
+- Farid Zakaria [**(@fzakaria)**](https://github.com/fzakaria)
+- Jörg Thalheim [**(@Mic92)**](https://github.com/Mic92)
+- Eelco Dolstra [**(@edolstra)**](https://github.com/edolstra)
+- Graham Christensen [**(@grahamc)**](https://github.com/grahamc)
+- Thomas Miedema [**(@thomie)**](https://github.com/thomie)
+- Brian McKenna [**(@puffnfresh)**](https://github.com/puffnfresh)
+- Sergei Trofimovich [**(@trofi)**](https://github.com/trofi)
+- Dmitry Bogatov [**(@KAction)**](https://github.com/KAction)
+- Erik Nygren [**(@Kirens)**](https://github.com/Kirens)
+- John Ericson [**(@Ericson2314)**](https://github.com/Ericson2314)
+- Sergei Zimmerman [**(@xokdvium)**](https://github.com/xokdvium)
+- Ruby Rose [**(@oldshensheep)**](https://github.com/oldshensheep)
+- Robert Hensing [**(@roberth)**](https://github.com/roberth)
+- jade [**(@lf-)**](https://github.com/lf-)
+- Félix [**(@picnoir)**](https://github.com/picnoir)
+- Valentin Gagarin [**(@fricklerhandwerk)**](https://github.com/fricklerhandwerk)
+- Dmitry Bogatov
