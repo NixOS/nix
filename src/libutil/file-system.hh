@@ -134,6 +134,7 @@ bool pathExists(const Path & path);
 namespace fs {
 
 /**
+ * TODO: we may actually want to use pathExists instead of this function
  *  ```
  *  symlink_exists(p) = std::filesystem::exists(std::filesystem::symlink_status(p))
  *  ```
@@ -142,9 +143,7 @@ namespace fs {
  *  std::filesystem::exists(p) = std::filesystem::exists(std::filesystem::status(p))
  *  ```
  */
-inline bool symlink_exists(const std::filesystem::path & path) {
-    return std::filesystem::exists(std::filesystem::symlink_status(path));
-}
+bool symlink_exists(const std::filesystem::path & path);
 
 } // namespace fs
 
