@@ -157,9 +157,9 @@
                   pkgs = final;
                   src = self;
                   maintainers = with lib.maintainers; [
-                    edolstra
-                    Ericson2314
-                    Mic92
+                    eelco
+                    ericson2314
+                    mic92
                     roberth
                     tomberek
                   ];
