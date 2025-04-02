@@ -34,10 +34,10 @@ namespace nix {
     TEST(Suggestions, Trim) {
         auto suggestions = Suggestions::bestMatches({"foooo", "bar", "fo", "gao"}, "foo");
         auto onlyOne = suggestions.trim(1);
-        ASSERT_EQ(onlyOne.suggestions.size(), 1);
+        ASSERT_EQ(onlyOne.suggestions.size(), 1u);
         ASSERT_TRUE(onlyOne.suggestions.begin()->suggestion == "fo");
 
         auto closest = suggestions.trim(999, 2);
-        ASSERT_EQ(closest.suggestions.size(), 3);
+        ASSERT_EQ(closest.suggestions.size(), 3u);
     }
 }

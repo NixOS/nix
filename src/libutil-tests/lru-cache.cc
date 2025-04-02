@@ -9,13 +9,13 @@ namespace nix {
 
     TEST(LRUCache, sizeOfEmptyCacheIsZero) {
         LRUCache<std::string, std::string> c(10);
-        ASSERT_EQ(c.size(), 0);
+        ASSERT_EQ(c.size(), 0u);
     }
 
     TEST(LRUCache, sizeOfSingleElementCacheIsOne) {
         LRUCache<std::string, std::string> c(10);
         c.upsert("foo", "bar");
-        ASSERT_EQ(c.size(), 1);
+        ASSERT_EQ(c.size(), 1u);
     }
 
     /* ----------------------------------------------------------------------------
@@ -55,12 +55,12 @@ namespace nix {
 
         auto val = c.get("foo");
         ASSERT_EQ(val.value_or("error"), "bar");
-        ASSERT_EQ(c.size(), 1);
+        ASSERT_EQ(c.size(), 1u);
 
         c.upsert("foo", "changed");
         val = c.get("foo");
         ASSERT_EQ(val.value_or("error"), "changed");
-        ASSERT_EQ(c.size(), 1);
+        ASSERT_EQ(c.size(), 1u);
     }
 
     TEST(LRUCache, overwriteOldestWhenCapacityIsReached) {
@@ -69,13 +69,13 @@ namespace nix {
         c.upsert("two", "zwei");
         c.upsert("three", "drei");
 
-        ASSERT_EQ(c.size(), 3);
+        ASSERT_EQ(c.size(), 3u);
         ASSERT_EQ(c.get("one").value_or("error"), "eins");
 
         // exceed capacity
         c.upsert("another", "whatever");
 
-        ASSERT_EQ(c.size(), 3);
+        ASSERT_EQ(c.size(), 3u);
         // Retrieving "one" makes it the most recent element thus
         // two will be the oldest one and thus replaced.
         ASSERT_EQ(c.get("two").has_value(), false);
@@ -89,7 +89,7 @@ namespace nix {
     TEST(LRUCache, clearEmptyCache) {
         LRUCache<std::string, std::string> c(10);
         c.clear();
-        ASSERT_EQ(c.size(), 0);
+        ASSERT_EQ(c.size(), 0u);
     }
 
     TEST(LRUCache, clearNonEmptyCache) {
@@ -97,9 +97,9 @@ namespace nix {
         c.upsert("one", "eins");
         c.upsert("two", "zwei");
         c.upsert("three", "drei");
-        ASSERT_EQ(c.size(), 3);
+        ASSERT_EQ(c.size(), 3u);
         c.clear();
-        ASSERT_EQ(c.size(), 0);
+        ASSERT_EQ(c.size(), 0u);
     }
 
     /* ----------------------------------------------------------------------------
@@ -109,14 +109,14 @@ namespace nix {
     TEST(LRUCache, eraseFromEmptyCache) {
         LRUCache<std::string, std::string> c(10);
         ASSERT_EQ(c.erase("foo"), false);
-        ASSERT_EQ(c.size(), 0);
+        ASSERT_EQ(c.size(), 0u);
     }
 
     TEST(LRUCache, eraseMissingFromNonEmptyCache) {
         LRUCache<std::string, std::string> c(10);
         c.upsert("one", "eins");
         ASSERT_EQ(c.erase("foo"), false);
-        ASSERT_EQ(c.size(), 1);
+        ASSERT_EQ(c.size(), 1u);
         ASSERT_EQ(c.get("one").value_or("error"), "eins");
     }
 
@@ -124,7 +124,7 @@ namespace nix {
         LRUCache<std::string, std::string> c(10);
         c.upsert("one", "eins");
         ASSERT_EQ(c.erase("one"), true);
-        ASSERT_EQ(c.size(), 0);
+        ASSERT_EQ(c.size(), 0u);
         ASSERT_EQ(c.get("one").value_or("empty"), "empty");
     }
 }

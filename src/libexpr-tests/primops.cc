@@ -204,7 +204,7 @@ namespace nix {
         auto v = eval("builtins.listToAttrs []");
         ASSERT_THAT(v, IsAttrsOfSize(0));
         ASSERT_EQ(v.type(), nAttrs);
-        ASSERT_EQ(v.attrs()->size(), 0);
+        ASSERT_EQ(v.attrs()->size(), 0u);
     }
 
     TEST_F(PrimOpTest, listToAttrsNotFieldName) {
@@ -383,7 +383,7 @@ namespace nix {
     TEST_F(PrimOpTest, genList) {
         auto v = eval("builtins.genList (x: x + 1) 3");
         ASSERT_EQ(v.type(), nList);
-        ASSERT_EQ(v.listSize(), 3);
+        ASSERT_EQ(v.listSize(), 3u);
         for (const auto [i, elem] : enumerate(v.listItems())) {
             ASSERT_THAT(*elem, IsThunk());
             state.forceValue(*elem, noPos);
@@ -394,7 +394,7 @@ namespace nix {
     TEST_F(PrimOpTest, sortLessThan) {
         auto v = eval("builtins.sort builtins.lessThan [ 483 249 526 147 42 77 ]");
         ASSERT_EQ(v.type(), nList);
-        ASSERT_EQ(v.listSize(), 6);
+        ASSERT_EQ(v.listSize(), 6u);
 
         const std::vector<int> numbers = { 42, 77, 147, 249, 483, 526 };
         for (const auto [n, elem] : enumerate(v.listItems()))
@@ -414,7 +414,7 @@ namespace nix {
         auto wrong = v.attrs()->get(createSymbol("wrong"));
         ASSERT_NE(wrong, nullptr);
         ASSERT_EQ(wrong->value->type(), nList);
-        ASSERT_EQ(wrong->value->listSize(), 3);
+        ASSERT_EQ(wrong->value->listSize(), 3u);
         ASSERT_THAT(*wrong->value, IsListOfSize(3));
         ASSERT_THAT(*wrong->value->listElems()[0], IsIntEq(1));
         ASSERT_THAT(*wrong->value->listElems()[1], IsIntEq(9));
@@ -424,7 +424,7 @@ namespace nix {
     TEST_F(PrimOpTest, concatMap) {
         auto v = eval("builtins.concatMap (x: x ++ [0]) [ [1 2] [3 4] ]");
         ASSERT_EQ(v.type(), nList);
-        ASSERT_EQ(v.listSize(), 6);
+        ASSERT_EQ(v.listSize(), 6u);
 
         const std::vector<int> numbers = { 1, 2, 0, 3, 4, 0 };
         for (const auto [n, elem] : enumerate(v.listItems()))

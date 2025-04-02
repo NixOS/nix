@@ -5,12 +5,12 @@
 namespace nix {
     TEST(ChunkedVector, InitEmpty) {
         auto v = ChunkedVector<int, 2>(100);
-        ASSERT_EQ(v.size(), 0);
+        ASSERT_EQ(v.size(), 0u);
     }
 
     TEST(ChunkedVector, GrowsCorrectly) {
         auto v = ChunkedVector<int, 2>(100);
-        for (auto i = 1; i < 20; i++) {
+        for (uint32_t i = 1; i < 20; i++) {
             v.add(i);
             ASSERT_EQ(v.size(), i);
         }
@@ -31,7 +31,7 @@ namespace nix {
         for (auto i = 1; i < 20; i++) {
             v.add(i);
         }
-        int count = 0;
+        uint32_t count = 0;
         v.forEach([&count](int elt) {
             count++;
         });
