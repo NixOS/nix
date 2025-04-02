@@ -63,9 +63,7 @@ TEST(valueAt, simpleObject) {
 
     auto nested = R"({ "hello": { "world": "" } })"_json;
 
-    auto & nestedObject = valueAt(getObject(nested), "hello");
-
-    ASSERT_EQ(valueAt(nestedObject, "world"), "");
+    ASSERT_EQ(valueAt(valueAt(getObject(nested), "hello"), "world"), "");
 }
 
 TEST(valueAt, missingKey) {
@@ -83,7 +81,7 @@ TEST(getObject, rightAssertions) {
 
     auto nested = R"({ "object": { "object": {} } })"_json;
 
-    auto & nestedObject = getObject(valueAt(getObject(nested), "object"));
+    auto nestedObject = getObject(valueAt(getObject(nested), "object"));
 
     ASSERT_EQ(nestedObject, getObject(nlohmann::json::parse(R"({ "object": {} })")));
     ASSERT_EQ(getObject(valueAt(getObject(nestedObject), "object")), (nlohmann::json::object_t {}));

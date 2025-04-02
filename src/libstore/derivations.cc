@@ -1228,13 +1228,13 @@ DerivationOutput DerivationOutput::fromJSON(
         keys.insert(key);
 
     auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashAlgorithm> {
-        auto & method_ = getString(valueAt(json, "method"));
-        ContentAddressMethod method = ContentAddressMethod::parse(method_);
+        ContentAddressMethod method = ContentAddressMethod::parse(
+            getString(valueAt(json, "method")));
         if (method == ContentAddressMethod::Raw::Text)
             xpSettings.require(Xp::DynamicDerivations);
 
-        auto & hashAlgo_ = getString(valueAt(json, "hashAlgo"));
-        auto hashAlgo = parseHashAlgo(hashAlgo_);
+        auto hashAlgo = parseHashAlgo(
+            getString(valueAt(json, "hashAlgo")));
         return { std::move(method), std::move(hashAlgo) };
     };
 
@@ -1351,7 +1351,8 @@ Derivation Derivation::fromJSON(
     res.name = getString(valueAt(json, "name"));
 
     try {
-        for (auto & [outputName, output] : getObject(valueAt(json, "outputs"))) {
+        auto outputs = getObject(valueAt(json, "outputs"));
+        for (auto & [outputName, output] : outputs) {
             res.outputs.insert_or_assign(
                 outputName,
                 DerivationOutput::fromJSON(store, res.name, outputName, output));
@@ -1362,7 +1363,8 @@ Derivation Derivation::fromJSON(
     }
 
     try {
-        for (auto & input : getArray(valueAt(json, "inputSrcs")))
+        auto inputSrcs = getArray(valueAt(json, "inputSrcs"));
+        for (auto & input : inputSrcs)
             res.inputSrcs.insert(store.parseStorePath(static_cast<const std::string &>(input)));
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'inputSrcs'");
@@ -1375,13 +1377,15 @@ Derivation Derivation::fromJSON(
             auto & json = getObject(_json);
             DerivedPathMap<StringSet>::ChildNode node;
             node.value = getStringSet(valueAt(json, "outputs"));
-            for (auto & [outputId, childNode] : getObject(valueAt(json, "dynamicOutputs"))) {
+            auto drvs = getObject(valueAt(json, "dynamicOutputs"));
+            for (auto & [outputId, childNode] : drvs) {
                 xpSettings.require(Xp::DynamicDerivations);
                 node.childMap[outputId] = doInput(childNode);
             }
             return node;
         };
-        for (auto & [inputDrvPath, inputOutputs] : getObject(valueAt(json, "inputDrvs")))
+        auto drvs = getObject(valueAt(json, "inputDrvs"));
+        for (auto & [inputDrvPath, inputOutputs] : drvs)
             res.inputDrvs.map[store.parseStorePath(inputDrvPath)] =
                 doInput(inputOutputs);
     } catch (Error & e) {
