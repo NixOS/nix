@@ -10,6 +10,7 @@
 
 nix_flake_settings * nix_flake_settings_new(nix_c_context * context)
 {
+    nix_clear_err(context);
     try {
         auto settings = nix::make_ref<nix::flake::Settings>();
         return new nix_flake_settings{settings};
@@ -25,6 +26,7 @@ void nix_flake_settings_free(nix_flake_settings * settings)
 nix_err nix_flake_settings_add_to_eval_state_builder(
     nix_c_context * context, nix_flake_settings * settings, nix_eval_state_builder * builder)
 {
+    nix_clear_err(context);
     try {
         settings->settings->configureEvalSettings(builder->settings);
     }
