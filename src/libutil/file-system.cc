@@ -31,7 +31,17 @@
 
 namespace nix {
 
-namespace fs { using namespace std::filesystem; }
+namespace fs {
+  using namespace std::filesystem;
+
+  bool symlink_exists(const std::filesystem::path & path) {
+      try {
+          return std::filesystem::exists(std::filesystem::symlink_status(path));
+      } catch (const std::filesystem::filesystem_error & e) {
+          throw SysError("cannot check existence of %1%", path);
+      }
+  }
+}
 
 bool isAbsolute(PathView path)
 {
