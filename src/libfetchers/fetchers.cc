@@ -323,6 +323,8 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
             accessor->fingerprint = getFingerprint(store);
 
+            accessor->setPathDisplay("«" + to_string() + "»");
+
             return {accessor, *this};
         } catch (Error & e) {
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
