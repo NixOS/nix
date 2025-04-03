@@ -156,13 +156,7 @@
                   inherit officialRelease;
                   pkgs = final;
                   src = self;
-                  maintainers = with lib.maintainers; [
-                    edolstra
-                    Ericson2314
-                    Mic92
-                    roberth
-                    tomberek
-                  ];
+                  maintainers = [ ];
                 };
               };
 
@@ -177,7 +171,7 @@
               {
                 otherSplices = final.generateSplicesForMkScope "nixDependencies";
                 f = import ./packaging/dependencies.nix {
-                  inherit inputs stdenv;
+                  inherit stdenv;
                   pkgs = final;
                 };
               };
