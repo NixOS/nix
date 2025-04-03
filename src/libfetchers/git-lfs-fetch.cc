@@ -44,11 +44,10 @@ static void downloadToSink(
 
 static std::string getLfsApiToken(const ParsedURL & url)
 {
-    auto [status, output] = runProgram(
-        RunOptions{
-            .program = "ssh",
-            .args = {*url.authority, "git-lfs-authenticate", url.path, "download"},
-        });
+    auto [status, output] = runProgram(RunOptions{
+        .program = "ssh",
+        .args = {*url.authority, "git-lfs-authenticate", url.path, "download"},
+    });
 
     if (output.empty())
         throw Error(
