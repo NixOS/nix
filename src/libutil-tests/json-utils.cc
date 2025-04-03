@@ -50,7 +50,7 @@ TEST(from_json, optionalInt) {
 TEST(from_json, vectorOfOptionalInts) {
     nlohmann::json json = { 420, nullptr };
     std::vector<std::optional<int>> vals = json;
-    ASSERT_EQ(vals.size(), 2);
+    ASSERT_EQ(vals.size(), 2u);
     ASSERT_TRUE(vals.at(0).has_value());
     ASSERT_EQ(*vals.at(0), 420);
     ASSERT_FALSE(vals.at(1).has_value());

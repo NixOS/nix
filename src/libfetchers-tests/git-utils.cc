@@ -90,11 +90,11 @@ TEST_F(GitUtilsTest, sink_basic)
     auto result = repo->dereferenceSingletonDirectory(sink->flush());
     auto accessor = repo->getAccessor(result, false, getRepoName());
     auto entries = accessor->readDirectory(CanonPath::root);
-    ASSERT_EQ(entries.size(), 5);
+    ASSERT_EQ(entries.size(), 5u);
     ASSERT_EQ(accessor->readFile(CanonPath("hello")), "hello world");
     ASSERT_EQ(accessor->readFile(CanonPath("bye")), "thanks for all the fish");
     ASSERT_EQ(accessor->readLink(CanonPath("bye-link")), "bye");
-    ASSERT_EQ(accessor->readDirectory(CanonPath("empty")).size(), 0);
+    ASSERT_EQ(accessor->readDirectory(CanonPath("empty")).size(), 0u);
     ASSERT_EQ(accessor->readFile(CanonPath("links/foo")), "hello world");
 };
 

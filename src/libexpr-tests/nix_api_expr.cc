@@ -222,7 +222,7 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context)
         names.push_back(name);
     }
     std::sort(names.begin(), names.end());
-    ASSERT_EQ(3, names.size());
+    ASSERT_EQ(3u, names.size());
     EXPECT_THAT(names[0], testing::StrEq("just-a-file"));
     EXPECT_THAT(names[1], testing::StrEq("letsbuild"));
     EXPECT_THAT(names[2], testing::StrEq("not-actually-built-yet.drv"));

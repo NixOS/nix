@@ -11,6 +11,7 @@ add_project_arguments(
   '-Werror=switch',
   '-Werror=switch-enum',
   '-Werror=unused-result',
+  '-Werror=sign-compare',
   '-Wignored-qualifiers',
   '-Wimplicit-fallthrough',
   '-Wno-deprecated-declarations',

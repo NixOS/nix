@@ -702,7 +702,7 @@ TEST_F(WorkerProtoTest, handshake_features)
     clientThread.join();
 
     EXPECT_EQ(clientResult, daemonResult);
-    EXPECT_EQ(std::get<0>(clientResult), 123);
+    EXPECT_EQ(std::get<0>(clientResult), 123u);
     EXPECT_EQ(std::get<1>(clientResult), std::set<WorkerProto::Feature>({"bar", "xyzzy"}));
 }
 

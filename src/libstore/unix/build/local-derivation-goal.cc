@@ -2235,7 +2235,7 @@ void LocalDerivationGoal::runChild()
             // We create multiple allow lists, to avoid exceeding a limit in the darwin sandbox interpreter.
             // See https://github.com/NixOS/nix/issues/4119
             // We split our allow groups approximately at half the actual limit, 1 << 16
-            const int breakpoint = sandboxProfile.length() + (1 << 14);
+            const size_t breakpoint = sandboxProfile.length() + (1 << 14);
             for (auto & i : pathsInChroot) {
 
                 if (sandboxProfile.length() >= breakpoint) {

@@ -173,7 +173,7 @@ TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_structuredAttr
             ASSERT_TRUE(checksPerOutput_ != nullptr);
             auto & checksPerOutput = *checksPerOutput_;
 
-            EXPECT_EQ(checksPerOutput.size(), 0);
+            EXPECT_EQ(checksPerOutput.size(), 0u);
         }
 
         EXPECT_EQ(options.getRequiredSystemFeatures(got), StringSet());
