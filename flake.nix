@@ -177,7 +177,7 @@
               {
                 otherSplices = final.generateSplicesForMkScope "nixDependencies";
                 f = import ./packaging/dependencies.nix {
-                  inherit stdenv;
+                  inherit inputs stdenv;
                   pkgs = final;
                 };
               };
