@@ -5,6 +5,7 @@
 #include "file-system.hh"
 #include "repair-flag.hh"
 #include "file-content-address.hh"
+#include "cache.hh"
 
 namespace nix {
 
@@ -21,5 +22,8 @@ StorePath fetchToStore(
     ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive,
     PathFilter * filter = nullptr,
     RepairFlag repair = NoRepair);
+
+fetchers::Cache::Key makeFetchToStoreCacheKey(
+    const std::string & name, const std::string & fingerprint, ContentAddressMethod method, const std::string & path);
 
 }
