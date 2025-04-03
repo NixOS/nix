@@ -203,7 +203,7 @@ protected:
 
     SharedSync<State> state;
 
-    std::shared_ptr<NarInfoDiskCache> diskCache;
+    std::shared_ptr<NarInfoDiskCache> diskCache = nullptr;
 
     Store(const Params & params);
 
