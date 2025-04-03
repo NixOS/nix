@@ -38,6 +38,13 @@
 
   [store derivation]: #gloss-store-derivation
 
+- [directed acyclic graph]{#gloss-directed-acyclic-graph}
+
+  A [directed acyclic graph](https://en.wikipedia.org/wiki/Directed_acyclic_graph) (DAG) is graph whose edges are given a direction ("a to b" is not the same edge as "b to a"), and for which no possible path (created by joining together edges) forms a cycle.
+
+  DAGs are very important to Nix.
+  In particular, the non-self-[references][reference] of [store object][store object] form a cycle.
+
 - [derivation path]{#gloss-derivation-path}
 
   A [store path] which uniquely identifies a [store derivation].
@@ -156,6 +163,8 @@
   non-[fixed-output](#gloss-fixed-output-derivation)
   derivation.
 
+  See [input-addressing derivation outputs](store/derivation/outputs/input-address.md) for details.
+
 - [content-addressed store object]{#gloss-content-addressed-store-object}
 
   A [store object] which is [content-addressed](#gloss-content-address),
@@ -219,11 +228,9 @@
 
 - [reference]{#gloss-reference}
 
-  A [store object] `O` is said to have a *reference* to a store object `P` if a [store path] to `P` appears in the contents of `O`.
+  An edge from one [store object] to another.
 
-  Store objects can refer to both other store objects and themselves.
-  References from a store object to itself are called *self-references*.
-  References other than a self-reference must not form a cycle.
+  See [References](@docroot@/store/store-object.md#references) for details.
 
   [reference]: #gloss-reference
 
@@ -231,6 +238,8 @@
 
   A store path `Q` is reachable from another store path `P` if `Q`
   is in the *closure* of the *references* relation.
+
+  See [References](@docroot@/store/store-object.md#references) for details.
 
 - [closure]{#gloss-closure}
 
@@ -247,6 +256,8 @@
   As an example, if the [store object] at path `P` contains a [reference]
   to a store object at path `Q`, then `Q` is in the closure of `P`. Further, if `Q`
   references `R` then `R` is also in the closure of `P`.
+
+  See [References](@docroot@/store/store-object.md#references) for details.
 
   [closure]: #gloss-closure
 
