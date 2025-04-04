@@ -25,7 +25,7 @@
 # include <dlfcn.h>
 #endif
 
-#if __APPLE__
+#ifdef __APPLE__
 # include "nix/util/processes.hh"
 #endif
 
@@ -90,7 +90,7 @@ Settings::Settings()
 #endif
 
     /* chroot-like behavior from Apple's sandbox */
-#if __APPLE__
+#ifdef __APPLE__
     sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
@@ -151,7 +151,7 @@ unsigned int Settings::getDefaultCores()
       return concurrency;
 }
 
-#if __APPLE__
+#ifdef __APPLE__
 static bool hasVirt() {
 
     int hasVMM;
@@ -190,7 +190,7 @@ StringSet Settings::getDefaultSystemFeatures()
         features.insert("kvm");
     #endif
 
-    #if __APPLE__
+    #ifdef __APPLE__
     if (hasVirt())
         features.insert("apple-virt");
     #endif
@@ -374,7 +374,7 @@ void initLibStore(bool loadConfig) {
        [1] https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-initialize.mm#L614-L636
     */
     curl_global_init(CURL_GLOBAL_ALL);
-#if __APPLE__
+#ifdef __APPLE__
     /* On macOS, don't use the per-session TMPDIR (as set e.g. by
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */

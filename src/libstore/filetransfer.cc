@@ -8,6 +8,7 @@
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
 
+#include "store-config-private.hh"
 #if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
 #endif

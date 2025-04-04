@@ -10,7 +10,7 @@
 #if NIX_USE_BOEHMGC
 
 #  include <pthread.h>
-#  if __FreeBSD__
+#  ifdef __FreeBSD__
 #    include <pthread_np.h>
 #  endif
 

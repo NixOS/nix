@@ -27,7 +27,7 @@ int main (int argc, char **argv) {
     settings.sandboxBuildDir = "/test-build-dir-instead-of-usual-build-dir";
     #endif
 
-    #if __APPLE__
+    #ifdef __APPLE__
     // Avoid this error, when already running in a sandbox:
     // sandbox-exec: sandbox_apply: Operation not permitted
     settings.sandboxMode = smDisabled;

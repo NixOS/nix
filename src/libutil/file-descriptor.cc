@@ -98,7 +98,7 @@ void AutoCloseFD::fsync() const
         result =
 #ifdef _WIN32
             ::FlushFileBuffers(fd)
-#elif __APPLE__
+#elif defined(__APPLE__)
             ::fcntl(fd, F_FULLFSYNC)
 #else
             ::fsync(fd)

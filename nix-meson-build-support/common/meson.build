@@ -10,6 +10,7 @@ add_project_arguments(
   '-Werror=suggest-override',
   '-Werror=switch',
   '-Werror=switch-enum',
+  '-Werror=undef',
   '-Werror=unused-result',
   '-Wignored-qualifiers',
   '-Wimplicit-fallthrough',

@@ -1,3 +1,4 @@
+#include "store-tests-config.hh"
 #if ENABLE_S3
 
 #  include <gtest/gtest.h>
