@@ -127,7 +127,39 @@ scope: {
   libgit2 = pkgs.libgit2.overrideAttrs (attrs: {
     src = inputs.libgit2;
     version = inputs.libgit2.lastModifiedDate;
+<<<<<<< HEAD
     cmakeFlags = attrs.cmakeFlags or [ ] ++ [ "-DUSE_SSH=exec" ];
+=======
+    cmakeFlags = attrs.cmakeFlags or []
+      ++ [ "-DUSE_SSH=exec" ];
+    nativeBuildInputs = attrs.nativeBuildInputs or []
+      # gitMinimal does not build on Windows. See packbuilder patch.
+      ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
+        # Needed for `git apply`; see `prePatch`
+        pkgs.buildPackages.gitMinimal
+      ];
+    # Only `git apply` can handle git binary patches
+    prePatch = attrs.prePatch or ""
+      + lib.optionalString (!stdenv.hostPlatform.isWindows) ''
+        patch() {
+          git apply
+        }
+      '';
+    patches = attrs.patches or []
+<<<<<<< HEAD
+      ++ [ ./patches/libgit2-mempack-thin-packfile.patch ];
+>>>>>>> 5dd6c4f06 (libgit2, GitRepo: Write thin packfiles)
+=======
+      ++ [
+        ./patches/libgit2-mempack-thin-packfile.patch
+      ]
+      # gitMinimal does not build on Windows, but fortunately this patch only
+      # impacts interruptibility
+      ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
+        # binary patch; see `prePatch`
+        ./patches/libgit2-packbuilder-callback-interruptible.patch
+      ];
+>>>>>>> c1fe3546e (libgit2: Add libgit2-packbuilder-callback-interruptible.patch)
   });
 
   busybox-sandbox-shell =
