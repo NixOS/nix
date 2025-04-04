@@ -1,8 +1,22 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/fetchers.hh"
-#include "nix/fetchers/cache.hh"
 
 namespace nix {
+
+fetchers::Cache::Key makeFetchToStoreCacheKey(
+    const std::string &name,
+    const std::string &fingerprint,
+    ContentAddressMethod method,
+    const std::string &path)
+{
+    return fetchers::Cache::Key{"fetchToStore", {
+        {"name", name},
+        {"fingerprint", fingerprint},
+        {"method", std::string{method.render()}},
+        {"path", path}
+    }};
+
+}
 
 StorePath fetchToStore(
     Store & store,
@@ -19,12 +33,7 @@ StorePath fetchToStore(
     std::optional<fetchers::Cache::Key> cacheKey;
 
     if (!filter && path.accessor->fingerprint) {
-        cacheKey = fetchers::Cache::Key{"fetchToStore", {
-            {"name", std::string{name}},
-            {"fingerprint", *path.accessor->fingerprint},
-            {"method", std::string{method.render()}},
-            {"path", path.path.abs()}
-        }};
+        cacheKey = makeFetchToStoreCacheKey(std::string{name}, *path.accessor->fingerprint, method, path.path.abs());
         if (auto res = fetchers::getCache()->lookupStorePath(*cacheKey, store)) {
             debug("store path cache hit for '%s'", path);
             return res->storePath;
