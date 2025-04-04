@@ -390,6 +390,33 @@ Currently the `type` attribute can be one of the following:
   * `sourcehut:~misterio/nix-colors/182b4b8709b8ffe4e9774a4c5d6877bf6bb9a21c`
   * `sourcehut:~misterio/nix-colors/21c1a380a6915d890d408e9f22203436a35bb2de?host=hg.sr.ht`
 
+* `gitea`: Similar to `github`, is a more efficient way to fetch
+  Gitea/Forgejo repositories. The default host is `codeberg.org`.
+  The following attributes are required:
+
+  * `owner`: The owner of the repository.
+
+  * `repo`: The name of the repository.
+
+  Like `github`, these are downloaded as tarball archives.
+
+  The URL syntax for `gitea` flakes is:
+
+  `gitea:<owner>/<repo>(/<rev-or-ref>)?(\?<params>)?`
+
+  `<rev-or-ref>` works the same as `github`. Either a branch or tag name
+  (`ref`), or a commit hash (`rev`) can be specified.
+
+  Since Gitea/Forgejo allows for self-hosting, you can specify `host` as
+  a parameter, to point to any instances other than `codeberg.org`.
+
+  Some examples:
+
+  * `gitea:redict/redict`
+  * `gitea:redict/redict/main`
+  * `gitea:redict/redict/a4c81102327bc2c74d229784a1d1dd680c708918`
+  * `gitea:lix-project/lix?host=git.lix.systems`
+
 # Flake format
 
 As an example, here is a simple `flake.nix` that depends on the
