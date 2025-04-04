@@ -56,6 +56,10 @@ testRepl () {
     nix repl "${nixArgs[@]}" 2>&1 <<< "builtins.currentSystem" \
       | grep "$(nix-instantiate --eval -E 'builtins.currentSystem')"
 
+    # regression test for #12163
+    replOutput=$(nix repl "${nixArgs[@]}" 2>&1 <<< ":sh import $testDir/simple.nix")
+    echo "$replOutput" | grepInverse "error: Cannot run 'nix-shell'"
+
     expectStderr 1 nix repl "${testDir}/simple.nix" \
       | grepQuiet -s "error: path '$testDir/simple.nix' is not a flake"
 }

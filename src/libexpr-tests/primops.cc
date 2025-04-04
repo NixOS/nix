@@ -1,10 +1,10 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "eval-settings.hh"
-#include "memory-source-accessor.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/util/memory-source-accessor.hh"
 
-#include "tests/libexpr.hh"
+#include "nix/expr/tests/libexpr.hh"
 
 namespace nix {
     class CaptureLogger : public Logger

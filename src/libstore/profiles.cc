@@ -1,8 +1,8 @@
-#include "profiles.hh"
-#include "signals.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
-#include "users.hh"
+#include "nix/store/profiles.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/util/users.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

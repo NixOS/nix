@@ -1,11 +1,13 @@
 #include "nix_api_util.h"
-#include "config-global.hh"
-#include "error.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/error.hh"
 #include "nix_api_util_internal.h"
-#include "util.hh"
+#include "nix/util/util.hh"
 
 #include <cxxabi.h>
 #include <typeinfo>
+
+#include "nix_api_util_config.h"
 
 nix_c_context * nix_c_context_create()
 {

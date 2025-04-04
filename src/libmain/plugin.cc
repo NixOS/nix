@@ -4,8 +4,8 @@
 
 #include <filesystem>
 
-#include "config-global.hh"
-#include "signals.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/signals.hh"
 
 namespace nix {
 

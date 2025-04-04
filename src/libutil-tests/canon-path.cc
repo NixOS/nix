@@ -1,4 +1,4 @@
-#include "canon-path.hh"
+#include "nix/util/canon-path.hh"
 
 #include <gtest/gtest.h>
 

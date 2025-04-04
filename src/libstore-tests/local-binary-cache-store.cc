@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "local-binary-cache-store.hh"
+#include "nix/store/local-binary-cache-store.hh"
 
 namespace nix {
 

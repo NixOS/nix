@@ -1,8 +1,8 @@
 #include <regex>
 
-#include "path-with-outputs.hh"
-#include "store-api.hh"
-#include "strings.hh"
+#include "nix/store/path-with-outputs.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/strings.hh"
 
 
 namespace nix {

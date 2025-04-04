@@ -1,7 +1,7 @@
 #if 0
 
-#include "logging.hh"
-#include "nixexpr.hh"
+#include "nix/util/logging.hh"
+#include "nix/expr/nixexpr.hh"
 #include <fstream>
 
 #include <gtest/gtest.h>

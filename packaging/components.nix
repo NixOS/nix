@@ -3,6 +3,7 @@
   pkgs,
   src,
   officialRelease,
+  maintainers,
 }:
 
 scope:
@@ -101,7 +102,7 @@ let
         let
           n = lib.length finalScope.patches;
         in
-        if n == 0 then finalAttrs.version else finalAttrs.version + "+${toString n}";
+        if n == 0 then prevAttrs.version else prevAttrs.version + "+${toString n}";
 
       # Clear what `derivation` can't/shouldn't serialize; see prevAttrs.workDir.
       fileset = null;
@@ -171,9 +172,24 @@ let
       mesonFlags = [ (lib.mesonBool "b_asneeded" false) ] ++ prevAttrs.mesonFlags or [ ];
     };
 
-  miscGoodPractice = finalAttrs: prevAttrs: {
+  nixDefaultsLayer = finalAttrs: prevAttrs: {
     strictDeps = prevAttrs.strictDeps or true;
     enableParallelBuilding = true;
+    pos = builtins.unsafeGetAttrPos "pname" prevAttrs;
+    meta = prevAttrs.meta or { } // {
+      homepage = prevAttrs.meta.homepage or "https://nixos.org/nix";
+      longDescription =
+        prevAttrs.longDescription or ''
+          Nix is a powerful package manager for mainly Linux and other Unix systems that
+          makes package management reliable and reproducible. It provides atomic
+          upgrades and rollbacks, side-by-side installation of multiple versions of
+          a package, multi-user package management and easy setup of build
+          environments.
+        '';
+      license = prevAttrs.meta.license or lib.licenses.lgpl21Plus;
+      maintainers = prevAttrs.meta.maintainers or [ ] ++ scope.maintainers;
+      platforms = prevAttrs.meta.platforms or (lib.platforms.unix ++ lib.platforms.windows);
+    };
   };
 
   /**
@@ -193,6 +209,7 @@ in
 {
   version = baseVersion + versionSuffix;
   inherit versionSuffix;
+  inherit maintainers;
 
   inherit filesetToSource;
 
@@ -228,6 +245,10 @@ in
     but it does make the build non-granular; all components will use a complete source.
 
     Packaging expressions will be ignored.
+
+    Single argument: the source to use.
+
+    See also `appendPatches`
   */
   overrideSource =
     src:
@@ -256,6 +277,7 @@ in
               }
             );
         resolvePath = p: finalScope.patchedSrc + "/${resolveRelPath p}";
+        filesetToSource = { root, fileset }: finalScope.resolvePath root;
         appendPatches = appendPatches finalScope;
       }
     );
@@ -272,14 +294,14 @@ in
     (scope.overrideSource "${./..}").appendPatches patches;
 
   mkMesonDerivation = mkPackageBuilder [
-    miscGoodPractice
+    nixDefaultsLayer
     scope.sourceLayer
     setVersionLayer
     mesonLayer
     scope.mesonComponentOverrides
   ];
   mkMesonExecutable = mkPackageBuilder [
-    miscGoodPractice
+    nixDefaultsLayer
     bsdNoLinkAsNeeded
     scope.sourceLayer
     setVersionLayer
@@ -288,7 +310,7 @@ in
     scope.mesonComponentOverrides
   ];
   mkMesonLibrary = mkPackageBuilder [
-    miscGoodPractice
+    nixDefaultsLayer
     bsdNoLinkAsNeeded
     scope.sourceLayer
     mesonLayer
@@ -338,7 +360,7 @@ in
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
 
   nix-everything = callPackage ../packaging/everything.nix { } // {
-    # Note: no `passthru.overrideAllMesonComponents`
+    # Note: no `passthru.overrideAllMesonComponents` etc
     #       This would propagate into `nix.overrideAttrs f`, but then discard
     #       `f` when `.overrideAllMesonComponents` is used.
     #       Both "methods" should be views on the same fixpoint overriding mechanism
@@ -346,6 +368,8 @@ in
     #       two-fixpoint solution.
     /**
       Apply an extension function (i.e. overlay-shaped) to all component derivations, and return the nix package.
+
+      Single argument: the extension function to apply (finalAttrs: prevAttrs: { ... })
     */
     overrideAllMesonComponents = f: (scope.overrideAllMesonComponents f).nix-everything;
 
@@ -354,6 +378,10 @@ in
       This affects all components.
 
       Changes to the packaging expressions will be ignored.
+
+      Single argument: list of patches to apply
+
+      See also `overrideSource`
     */
     appendPatches = ps: (scope.appendPatches ps).nix-everything;
 
@@ -362,8 +390,26 @@ in
       but it does make the build non-granular; all components will use a complete source.
 
       Packaging expressions will be ignored.
+
+      Filesets in the packaging expressions will be ignored.
+
+      Single argument: the source to use.
+
+      See also `appendPatches`
     */
     overrideSource = src: (scope.overrideSource src).nix-everything;
+
+    /**
+      Override any internals of the Nix package set.
+
+      Single argument: the extension function to apply to the package set (finalScope: prevScope: { ... })
+
+      Example:
+      ```
+      overrideScope (finalScope: prevScope: { aws-sdk-cpp = null; })
+      ```
+    */
+    overrideScope = f: (scope.overrideScope f).nix-everything;
 
   };
 }

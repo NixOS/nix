@@ -1,7 +1,7 @@
-#include "command.hh"
-#include "store-api.hh"
-#include "make-content-addressed.hh"
-#include "common-args.hh"
+#include "nix/cmd/command.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/make-content-addressed.hh"
+#include "nix/main/common-args.hh"
 
 #include <nlohmann/json.hpp>
 

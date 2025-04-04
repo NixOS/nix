@@ -1,4 +1,4 @@
-#include "references.hh"
+#include "nix/util/references.hh"
 
 #include <gtest/gtest.h>
 

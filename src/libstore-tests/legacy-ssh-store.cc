@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "legacy-ssh-store.hh"
+#include "nix/store/legacy-ssh-store.hh"
 
 namespace nix {
 

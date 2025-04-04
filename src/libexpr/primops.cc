@@ -1,19 +1,19 @@
-#include "derivations.hh"
-#include "downstream-placeholder.hh"
-#include "eval-inline.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "gc-small-vector.hh"
-#include "json-to-value.hh"
-#include "names.hh"
-#include "path-references.hh"
-#include "store-api.hh"
-#include "util.hh"
-#include "processes.hh"
-#include "value-to-json.hh"
-#include "value-to-xml.hh"
-#include "primops.hh"
-#include "fetch-to-store.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/downstream-placeholder.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/expr/gc-small-vector.hh"
+#include "nix/expr/json-to-value.hh"
+#include "nix/store/names.hh"
+#include "nix/store/path-references.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/util.hh"
+#include "nix/util/processes.hh"
+#include "nix/expr/value-to-json.hh"
+#include "nix/expr/value-to-xml.hh"
+#include "nix/expr/primops.hh"
+#include "nix/fetchers/fetch-to-store.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
@@ -4669,7 +4669,7 @@ RegisterPrimOp::RegisterPrimOp(PrimOp && primOp)
 }
 
 
-void EvalState::createBaseEnv()
+void EvalState::createBaseEnv(const EvalSettings & evalSettings)
 {
     baseEnv.up = 0;
 
@@ -4927,6 +4927,12 @@ void EvalState::createBaseEnv()
                 primOpAdjusted.arity = std::max(primOp.args.size(), primOp.arity);
                 addPrimOp(std::move(primOpAdjusted));
             }
+
+    for (auto & primOp : evalSettings.extraPrimOps) {
+        auto primOpAdjusted = primOp;
+        primOpAdjusted.arity = std::max(primOp.args.size(), primOp.arity);
+        addPrimOp(std::move(primOpAdjusted));
+    }
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily.

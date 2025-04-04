@@ -1,8 +1,8 @@
-#include "worker.hh"
-#include "substitution-goal.hh"
-#include "nar-info.hh"
-#include "finally.hh"
-#include "signals.hh"
+#include "nix/store/build/worker.hh"
+#include "nix/store/build/substitution-goal.hh"
+#include "nix/store/nar-info.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/signals.hh"
 
 #include <coroutine>
 

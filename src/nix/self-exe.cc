@@ -1,7 +1,9 @@
-#include "current-process.hh"
-#include "file-system.hh"
-#include "globals.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/file-system.hh"
+#include "nix/store/globals.hh"
+
 #include "self-exe.hh"
+#include "cli-config-private.hh"
 
 namespace nix {
 

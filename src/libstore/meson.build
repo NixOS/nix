@@ -17,14 +17,22 @@ cxx = meson.get_compiler('cpp')
 
 subdir('nix-meson-build-support/deps-lists')
 
-configdata = configuration_data()
+configdata_pub = configuration_data()
+configdata_priv = configuration_data()
 
 # TODO rename, because it will conflict with downstream projects
-configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
+configdata_priv.set_quoted('PACKAGE_VERSION', meson.project_version())
 
-configdata.set_quoted('DETERMINATE_NIX_VERSION', fs.read('../../.version-determinate').strip())
+configdata_priv.set_quoted('DETERMINATE_NIX_VERSION', fs.read('../../.version-determinate').strip())
 
-configdata.set_quoted('SYSTEM', host_machine.cpu_family() + '-' + host_machine.system())
+# Used in public header.
+configdata_pub.set_quoted(
+  'NIX_LOCAL_SYSTEM',
+  host_machine.cpu_family() + '-' + host_machine.system(),
+  description :
+    'This is the system name Nix expects for local running instance of Nix.\n\n'
+    + 'See the "system" setting for additional details',
+)
 
 deps_private_maybe_subproject = [
 ]
@@ -51,27 +59,30 @@ run_command('rm', '-f',
   check : true,
 )
 summary('can hardlink to symlink', can_link_symlink, bool_yn : true)
-configdata.set('CAN_LINK_SYMLINK', can_link_symlink.to_int())
+configdata_priv.set('CAN_LINK_SYMLINK', can_link_symlink.to_int())
 
 # Check for each of these functions, and create a define like `#define HAVE_LCHOWN 1`.
-#
-# Only need to do functions that deps (like `libnixutil`) didn't already
-# check for.
 check_funcs = [
   # Optionally used for canonicalising files from the build
   'lchown',
+  'posix_fallocate',
   'statvfs',
 ]
 foreach funcspec : check_funcs
   define_name = 'HAVE_' + funcspec.underscorify().to_upper()
   define_value = cxx.has_function(funcspec).to_int()
-  configdata.set(define_name, define_value)
+  configdata_priv.set(define_name, define_value)
 endforeach
 
 has_acl_support = cxx.has_header('sys/xattr.h') \
   and cxx.has_function('llistxattr') \
   and cxx.has_function('lremovexattr')
-configdata.set('HAVE_ACL_SUPPORT', has_acl_support.to_int())
+# Used in public header. Affects ABI!
+configdata_pub.set(
+  'NIX_SUPPORT_ACL',
+  has_acl_support.to_int(),
+  description : 'FIXME: It\'s a bit peculiar that this needs to be exposed. The reason is that that it effects whether the settings struct in a header has a particular field. This is also odd, because it means when there is no ACL support one will just get an "unknown setting" warning from their configuration.',
+)
 
 if host_machine.system() == 'darwin'
   sandbox = cxx.find_library('sandbox')
@@ -107,7 +118,7 @@ seccomp = dependency('libseccomp', 'seccomp', required : seccomp_required, versi
 if is_linux and not seccomp.found()
   warning('Sandbox security is reduced because libseccomp has not been found! Please provide libseccomp if it supports your CPU architecture.')
 endif
-configdata.set('HAVE_SECCOMP', seccomp.found().to_int())
+configdata_priv.set('HAVE_SECCOMP', seccomp.found().to_int())
 deps_private += seccomp
 
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
@@ -116,9 +127,10 @@ deps_public += nlohmann_json
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
-# AWS C++ SDK has bad pkg-config
+# AWS C++ SDK has bad pkg-config. See
+# https://github.com/aws/aws-sdk-cpp/issues/2673 for details.
 aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
-configdata.set('ENABLE_S3', aws_s3.found().to_int())
+configdata_priv.set('ENABLE_S3', aws_s3.found().to_int())
 if aws_s3.found()
   aws_s3 = declare_dependency(
     include_directories: include_directories(aws_s3.get_variable('includedir')),
@@ -150,7 +162,7 @@ if get_option('embedded-sandbox-shell')
   # The path to busybox is passed as a -D flag when compiling this_library.
   # This solution is inherited from the old make buildsystem
   # TODO: do this differently?
-  configdata.set('HAVE_EMBEDDED_SANDBOX_SHELL', 1)
+  configdata_priv.set('HAVE_EMBEDDED_SANDBOX_SHELL', 1)
   hexdump = find_program('hexdump', native : true)
   embedded_sandbox_shell_gen = custom_target(
     'embedded-sandbox-shell.gen.hh',
@@ -168,17 +180,9 @@ if get_option('embedded-sandbox-shell')
   generated_headers += embedded_sandbox_shell_gen
 endif
 
-config_h = configure_file(
-  configuration : configdata,
-  output : 'config-store.hh',
-)
-
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  language : 'cpp',
+config_priv_h = configure_file(
+  configuration : configdata_priv,
+  output : 'store-config-private.hh',
 )
 
 subdir('nix-meson-build-support/common')
@@ -251,81 +255,7 @@ sources = files(
   'worker-protocol.cc',
 )
 
-include_dirs = [
-  include_directories('.'),
-  include_directories('build'),
-]
-
-headers = [config_h] + files(
-  'binary-cache-store.hh',
-  'build-result.hh',
-  'build/derivation-goal.hh',
-  'build/drv-output-substitution-goal.hh',
-  'build/goal.hh',
-  'build/substitution-goal.hh',
-  'build/worker.hh',
-  'builtins.hh',
-  'builtins/buildenv.hh',
-  'common-protocol-impl.hh',
-  'common-protocol.hh',
-  'common-ssh-store-config.hh',
-  'content-address.hh',
-  'daemon.hh',
-  'derivations.hh',
-  'derivation-options.hh',
-  'derived-path-map.hh',
-  'derived-path.hh',
-  'downstream-placeholder.hh',
-  'filetransfer.hh',
-  'gc-store.hh',
-  'globals.hh',
-  'http-binary-cache-store.hh',
-  'indirect-root-store.hh',
-  'keys.hh',
-  'legacy-ssh-store.hh',
-  'length-prefixed-protocol-helper.hh',
-  'local-binary-cache-store.hh',
-  'local-fs-store.hh',
-  'local-overlay-store.hh',
-  'local-store.hh',
-  'log-store.hh',
-  'machines.hh',
-  'make-content-addressed.hh',
-  'names.hh',
-  'nar-accessor.hh',
-  'nar-info-disk-cache.hh',
-  'nar-info.hh',
-  'outputs-spec.hh',
-  'parsed-derivations.hh',
-  'path-info.hh',
-  'path-references.hh',
-  'path-regex.hh',
-  'path-with-outputs.hh',
-  'path.hh',
-  'pathlocks.hh',
-  'posix-fs-canonicalise.hh',
-  'profiles.hh',
-  'realisation.hh',
-  'remote-fs-accessor.hh',
-  'remote-store-connection.hh',
-  'remote-store.hh',
-  's3-binary-cache-store.hh',
-  's3.hh',
-  'ssh-store.hh',
-  'serve-protocol-connection.hh',
-  'serve-protocol-impl.hh',
-  'serve-protocol.hh',
-  'sqlite.hh',
-  'ssh.hh',
-  'store-api.hh',
-  'store-cast.hh',
-  'store-dir-config.hh',
-  'store-reference.hh',
-  'uds-remote-store.hh',
-  'worker-protocol-connection.hh',
-  'worker-protocol-impl.hh',
-  'worker-protocol.hh',
-)
+subdir('include/nix/store')
 
 if host_machine.system() == 'linux'
   subdir('linux')
@@ -425,6 +355,7 @@ this_library = library(
   'nixstore',
   generated_headers,
   sources,
+  config_priv_h,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   cpp_args : cpp_args,
@@ -433,7 +364,7 @@ this_library = library(
   install : true,
 )
 
-install_headers(headers, subdir : 'nix', preserve_path : true)
+install_headers(headers, subdir : 'nix/store', preserve_path : true)
 
 libraries_private = []
 

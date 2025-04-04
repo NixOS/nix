@@ -1,25 +1,26 @@
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "primops.hh"
-#include "print-options.hh"
-#include "exit.hh"
-#include "types.hh"
-#include "util.hh"
-#include "store-api.hh"
-#include "derivations.hh"
-#include "downstream-placeholder.hh"
-#include "eval-inline.hh"
-#include "filetransfer.hh"
-#include "function-trace.hh"
-#include "profiles.hh"
-#include "print.hh"
-#include "filtering-source-accessor.hh"
-#include "memory-source-accessor.hh"
-#include "mounted-source-accessor.hh"
-#include "gc-small-vector.hh"
-#include "url.hh"
-#include "fetch-to-store.hh"
-#include "tarball.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/expr/primops.hh"
+#include "nix/expr/print-options.hh"
+#include "nix/util/exit.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/downstream-placeholder.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/expr/function-trace.hh"
+#include "nix/store/profiles.hh"
+#include "nix/expr/print.hh"
+#include "nix/fetchers/filtering-source-accessor.hh"
+#include "nix/util/memory-source-accessor.hh"
+#include "nix/util/mounted-source-accessor.hh"
+#include "nix/expr/gc-small-vector.hh"
+#include "nix/util/url.hh"
+#include "nix/fetchers/fetch-to-store.hh"
+#include "nix/fetchers/tarball.hh"
+
 #include "parser-tab.hh"
 
 #include <algorithm>
@@ -39,7 +40,7 @@
 #  include <sys/resource.h>
 #endif
 
-#include "strings-inline.hh"
+#include "nix/util/strings-inline.hh"
 
 using json = nlohmann::json;
 
@@ -290,17 +291,13 @@ EvalState::EvalState(
         CanonPath("derivation-internal.nix"),
         #include "primops/derivation.nix.gen.hh"
     )}
-    , callFlakeInternal{internalFS->addFile(
-        CanonPath("call-flake.nix"),
-        #include "call-flake.nix.gen.hh"
-    )}
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , debugRepl(nullptr)
     , debugStop(false)
     , trylevel(0)
     , regexCache(makeRegexCache())
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
@@ -355,7 +352,7 @@ EvalState::EvalState(
         #include "fetchurl.nix.gen.hh"
     );
 
-    createBaseEnv();
+    createBaseEnv(settings);
 }
 
 
@@ -2251,18 +2248,18 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
 }
 
 
-void copyContext(const Value & v, NixStringContext & context)
+void copyContext(const Value & v, NixStringContext & context, const ExperimentalFeatureSettings & xpSettings)
 {
     if (v.payload.string.context)
         for (const char * * p = v.payload.string.context; *p; ++p)
-            context.insert(NixStringContextElem::parse(*p));
+            context.insert(NixStringContextElem::parse(*p, xpSettings));
 }
 
 
-std::string_view EvalState::forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx)
+std::string_view EvalState::forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx, const ExperimentalFeatureSettings & xpSettings)
 {
     auto s = forceString(v, pos, errorCtx);
-    copyContext(v, context);
+    copyContext(v, context, xpSettings);
     return s;
 }
 
@@ -2468,10 +2465,10 @@ StorePath EvalState::coerceToStorePath(const PosIdx pos, Value & v, NixStringCon
 }
 
 
-std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx)
+std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx, const ExperimentalFeatureSettings & xpSettings)
 {
     NixStringContext context;
-    auto s = forceString(v, context, pos, errorCtx);
+    auto s = forceString(v, context, pos, errorCtx, xpSettings);
     auto csize = context.size();
     if (csize != 1)
         error<EvalError>(
@@ -2817,7 +2814,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
 }
 
 bool EvalState::fullGC() {
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     GC_gcollect();
     // Check that it ran. We might replace this with a version that uses more
     // of the boehm API to get this reliably, at a maintenance cost.
@@ -2836,7 +2833,7 @@ void EvalState::maybePrintStats()
 
     if (showStats) {
         // Make the final heap size more deterministic.
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
         if (!fullGC()) {
             warn("failed to perform a full GC before reporting stats");
         }
@@ -2858,7 +2855,7 @@ void EvalState::printStatistics()
     uint64_t bValues = nrValues * sizeof(Value);
     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
 
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     GC_word heapSize, totalBytes;
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
     double gcFullOnlyTime = ({
@@ -2880,7 +2877,7 @@ void EvalState::printStatistics()
 #ifndef _WIN32 // TODO implement
         {"cpu", cpuTime},
 #endif
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
         {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
 #ifndef _WIN32 // TODO implement
         {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
@@ -2924,7 +2921,7 @@ void EvalState::printStatistics()
     topObj["nrLookups"] = nrLookups;
     topObj["nrPrimOpCalls"] = nrPrimOpCalls;
     topObj["nrFunctionCalls"] = nrFunctionCalls;
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     topObj["gc"] = {
         {"heapSize", heapSize},
         {"totalBytes", totalBytes},

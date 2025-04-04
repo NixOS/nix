@@ -1,12 +1,12 @@
-#include "command.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "common-args.hh"
-#include "names.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/main/common-args.hh"
+#include "nix/store/names.hh"
 
 #include <regex>
 
-#include "strings.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
 

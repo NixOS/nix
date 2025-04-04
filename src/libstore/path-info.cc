@@ -1,10 +1,10 @@
 #include <nlohmann/json.hpp>
 
-#include "path-info.hh"
-#include "store-api.hh"
-#include "json-utils.hh"
-#include "comparator.hh"
-#include "strings.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/json-utils.hh"
+#include "nix/util/comparator.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
 

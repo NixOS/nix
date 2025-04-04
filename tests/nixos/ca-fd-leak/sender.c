@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
     struct sockaddr_un data;
     data.sun_family = AF_UNIX;
     data.sun_path[0] = 0;
-    strcpy(data.sun_path + 1, argv[1]);
+    strncpy(data.sun_path + 1, argv[1], sizeof(data.sun_path) - 2);
 
     // Now try to connect, To ensure we work no matter what order we are
     // executed in, just busyloop here.

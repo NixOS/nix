@@ -2,14 +2,14 @@
 
 #include <assert.h>
 
-#include "s3.hh"
-#include "s3-binary-cache-store.hh"
-#include "nar-info.hh"
-#include "nar-info-disk-cache.hh"
-#include "globals.hh"
-#include "compression.hh"
-#include "filetransfer.hh"
-#include "signals.hh"
+#include "nix/store/s3.hh"
+#include "nix/store/s3-binary-cache-store.hh"
+#include "nix/store/nar-info.hh"
+#include "nix/store/nar-info-disk-cache.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/compression.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/util/signals.hh"
 
 #include <aws/core/Aws.h>
 #include <aws/core/VersionConfig.h>

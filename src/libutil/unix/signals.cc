@@ -1,8 +1,8 @@
-#include "signals.hh"
-#include "util.hh"
-#include "error.hh"
-#include "sync.hh"
-#include "terminal.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/util.hh"
+#include "nix/util/error.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/terminal.hh"
 
 #include <thread>
 

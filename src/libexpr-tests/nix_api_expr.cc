@@ -5,12 +5,14 @@
 #include "nix_api_expr.h"
 #include "nix_api_value.h"
 
-#include "tests/nix_api_expr.hh"
-#include "tests/string_callback.hh"
-#include "file-system.hh"
+#include "nix/expr/tests/nix_api_expr.hh"
+#include "nix/util/tests/string_callback.hh"
+#include "nix/util/file-system.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+
+#include "expr-tests-config.hh"
 
 namespace nixC {
 

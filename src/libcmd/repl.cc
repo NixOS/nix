@@ -2,34 +2,34 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "error.hh"
-#include "repl-interacter.hh"
-#include "repl.hh"
+#include "nix/util/error.hh"
+#include "nix/cmd/repl-interacter.hh"
+#include "nix/cmd/repl.hh"
 
-#include "ansicolor.hh"
-#include "shared.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "attr-path.hh"
-#include "signals.hh"
-#include "store-api.hh"
-#include "log-store.hh"
-#include "common-eval-args.hh"
-#include "get-drvs.hh"
-#include "derivations.hh"
-#include "globals.hh"
-#include "flake/flake.hh"
-#include "flake/lockfile.hh"
-#include "users.hh"
-#include "editor-for.hh"
-#include "finally.hh"
-#include "markdown.hh"
-#include "local-fs-store.hh"
-#include "print.hh"
-#include "ref.hh"
-#include "value.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/main/shared.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/log-store.hh"
+#include "nix/cmd/common-eval-args.hh"
+#include "nix/expr/get-drvs.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/globals.hh"
+#include "nix/flake/flake.hh"
+#include "nix/flake/lockfile.hh"
+#include "nix/util/users.hh"
+#include "nix/cmd/editor-for.hh"
+#include "nix/util/finally.hh"
+#include "nix/cmd/markdown.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/expr/print.hh"
+#include "nix/util/ref.hh"
+#include "nix/expr/value.hh"
 
-#include "strings.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
 
@@ -124,7 +124,7 @@ std::string removeWhitespace(std::string s)
 
 
 NixRepl::NixRepl(const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalState> state,
-            std::function<NixRepl::AnnotatedValues()> getValues, RunNix * runNix = nullptr)
+            std::function<NixRepl::AnnotatedValues()> getValues, RunNix * runNix)
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
     , getValues(getValues)
@@ -839,9 +839,10 @@ std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
 {
     return std::make_unique<NixRepl>(
         lookupPath,
-        openStore(),
+        std::move(store),
         state,
-        getValues
+        getValues,
+        runNix
     );
 }
 
@@ -859,7 +860,8 @@ ReplExitStatus AbstractNixRepl::runSimple(
             lookupPath,
             openStore(),
             evalState,
-            getValues
+            getValues,
+            /*runNix=*/nullptr
         );
 
     repl->initEnv();

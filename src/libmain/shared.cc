@@ -1,11 +1,11 @@
-#include "globals.hh"
-#include "current-process.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "gc-store.hh"
-#include "loggers.hh"
-#include "progress-bar.hh"
-#include "signals.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/current-process.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/gc-store.hh"
+#include "nix/main/loggers.hh"
+#include "nix/main/progress-bar.hh"
+#include "nix/util/signals.hh"
 
 #include <algorithm>
 #include <exception>
@@ -22,8 +22,11 @@
 
 #include <openssl/crypto.h>
 
-#include "exit.hh"
-#include "strings.hh"
+#include "nix/util/exit.hh"
+#include "nix/util/strings.hh"
+
+#include "main-config-private.hh"
+
 
 namespace nix {
 
@@ -297,7 +300,7 @@ void printVersion(const std::string & programName)
     std::cout << fmt("%s (Determinate Nix %s) %s", programName, determinateNixVersion, nixVersion) << std::endl;
     if (verbosity > lvlInfo) {
         Strings cfg;
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
         cfg.push_back("gc");
 #endif
         cfg.push_back("signed-caches");

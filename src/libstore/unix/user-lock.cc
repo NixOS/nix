@@ -2,11 +2,11 @@
 #include <pwd.h>
 #include <grp.h>
 
-#include "user-lock.hh"
-#include "file-system.hh"
-#include "globals.hh"
-#include "pathlocks.hh"
-#include "users.hh"
+#include "nix/store/user-lock.hh"
+#include "nix/util/file-system.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/util/users.hh"
 
 namespace nix {
 

@@ -1,8 +1,10 @@
-#include "markdown.hh"
-#include "environment-variables.hh"
-#include "error.hh"
-#include "finally.hh"
-#include "terminal.hh"
+#include "nix/cmd/markdown.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/terminal.hh"
+
+#include "cmd-config-private.hh"
 
 #if HAVE_LOWDOWN
 #  include <sys/queue.h>

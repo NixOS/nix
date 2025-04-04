@@ -1,7 +1,7 @@
-#include "realisation.hh"
-#include "store-api.hh"
-#include "closure.hh"
-#include "signature/local-keys.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/closure.hh"
+#include "nix/util/signature/local-keys.hh"
 #include <nlohmann/json.hpp>
 
 namespace nix {

@@ -1,22 +1,22 @@
-#include "derivation-goal.hh"
+#include "nix/store/build/derivation-goal.hh"
 #ifndef _WIN32 // TODO enable build hook on Windows
-#  include "hook-instance.hh"
+#  include "nix/store/build/hook-instance.hh"
 #endif
-#include "processes.hh"
-#include "config-global.hh"
-#include "worker.hh"
-#include "builtins.hh"
-#include "builtins/buildenv.hh"
-#include "references.hh"
-#include "finally.hh"
-#include "util.hh"
-#include "archive.hh"
-#include "compression.hh"
-#include "common-protocol.hh"
-#include "common-protocol-impl.hh"
-#include "topo-sort.hh"
-#include "callback.hh"
-#include "local-store.hh" // TODO remove, along with remaining downcasts
+#include "nix/util/processes.hh"
+#include "nix/util/config-global.hh"
+#include "nix/store/build/worker.hh"
+#include "nix/store/builtins.hh"
+#include "nix/store/builtins/buildenv.hh"
+#include "nix/util/references.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/util.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/compression.hh"
+#include "nix/store/common-protocol.hh"
+#include "nix/store/common-protocol-impl.hh"
+#include "nix/util/topo-sort.hh"
+#include "nix/util/callback.hh"
+#include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
 
 #include <regex>
 #include <queue>
@@ -32,7 +32,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "strings.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
 

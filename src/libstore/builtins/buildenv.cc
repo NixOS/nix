@@ -1,6 +1,6 @@
-#include "buildenv.hh"
-#include "derivations.hh"
-#include "signals.hh"
+#include "nix/store/builtins/buildenv.hh"
+#include "nix/store/derivations.hh"
+#include "nix/util/signals.hh"
 
 #include <sys/stat.h>
 #include <sys/types.h>

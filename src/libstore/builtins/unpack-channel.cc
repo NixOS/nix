@@ -1,5 +1,5 @@
-#include "builtins.hh"
-#include "tarfile.hh"
+#include "nix/store/builtins.hh"
+#include "nix/util/tarfile.hh"
 
 namespace nix {
 
@@ -23,11 +23,7 @@ void builtinUnpackChannel(
         throw Error("channelName is not allowed to contain filesystem separators, got %1%", channelName);
     }
 
-    try {
-        fs::create_directories(out);
-    } catch (fs::filesystem_error &) {
-        throw SysError("creating directory '%1%'", out.string());
-    }
+    createDirs(out);
 
     unpackTarfile(src, out);
 
