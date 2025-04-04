@@ -2,6 +2,9 @@
 #include "store-api.hh"
 #include "archive.hh"
 #include "store-path-accessor.hh"
+#include "store-path-accessor.hh"
+#include "cache.hh"
+#include "fetch-to-store.hh"
 
 namespace nix::fetchers {
 
@@ -140,6 +143,14 @@ struct PathInputScheme : InputScheme
                 mtime = dumpPathAndGetMtime(absPath.string(), sink, defaultPathFilter);
             });
             storePath = store->addToStoreFromDump(*src, "source");
+        }
+
+        // To avoid copying the path again to the /nix/store, we need to add a cache entry.
+        ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive;
+        auto fp = getFingerprint(store, input);
+        if (fp) {
+            auto cacheKey = makeFetchToStoreCacheKey(input.getName(), *fp, method, "/");
+            fetchers::getCache()->upsert(cacheKey, *store, {}, *storePath);
         }
 
         /* Trust the lastModified value supplied by the user, if
