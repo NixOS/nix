@@ -13,7 +13,7 @@
 # include <mach-o/dyld.h>
 #endif
 
-#if __linux__
+#ifdef __linux__
 # include <mutex>
 # include "nix/util/cgroup.hh"
 # include "nix/util/namespaces.hh"
@@ -23,7 +23,7 @@ namespace nix {
 
 unsigned int getMaxCPU()
 {
-    #if __linux__
+    #ifdef __linux__
     try {
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS) return 0;
@@ -82,7 +82,7 @@ void restoreProcessContext(bool restoreMounts)
     unix::restoreSignals();
     #endif
     if (restoreMounts) {
-        #if __linux__
+        #ifdef __linux__
         restoreMountNamespace();
         #endif
     }
@@ -106,7 +106,7 @@ std::optional<Path> getSelfExe()
 {
     static auto cached = []() -> std::optional<Path>
     {
-        #if __linux__ || __GNU__
+        #if defined(__linux__) || defined(__GNU__)
         return readLink("/proc/self/exe");
         #elif __APPLE__
         char buf[1024];

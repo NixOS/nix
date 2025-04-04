@@ -36,7 +36,7 @@
 # include <netinet/in.h>
 #endif
 
-#if __linux__
+#ifdef __linux__
 # include "nix/util/namespaces.hh"
 #endif
 
@@ -384,7 +384,7 @@ void mainWrapped(int argc, char * * argv)
         "__build-remote",
     });
 
-    #if __linux__
+    #ifdef __linux__
     if (isRootUser()) {
         try {
             saveMountNamespace();

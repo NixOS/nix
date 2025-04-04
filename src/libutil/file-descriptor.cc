@@ -113,7 +113,7 @@ void AutoCloseFD::fsync() const
 
 void AutoCloseFD::startFsync() const
 {
-#if __linux__
+#ifdef __linux__
         if (fd != -1) {
             /* Ignore failure, since fsync must be run later anyway. This is just a performance optimization. */
             ::sync_file_range(fd, 0, 0, SYNC_FILE_RANGE_WRITE);
