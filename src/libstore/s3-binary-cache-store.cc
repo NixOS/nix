@@ -1,3 +1,5 @@
+#include "nix/store/config.hh"
+
 #if ENABLE_S3
 
 #include <assert.h>

@@ -126,7 +126,7 @@ deps_private += sqlite
 # AWS C++ SDK has bad pkg-config. See
 # https://github.com/aws/aws-sdk-cpp/issues/2673 for details.
 aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
-configdata_priv.set('ENABLE_S3', aws_s3.found().to_int())
+configdata_pub.set('ENABLE_S3', aws_s3.found().to_int())
 if aws_s3.found()
   aws_s3 = declare_dependency(
     include_directories: include_directories(aws_s3.get_variable('includedir')),
