@@ -38,7 +38,7 @@
 # include <grp.h>
 #endif
 
-#if __linux__
+#ifdef __linux__
 # include <sched.h>
 # include <sys/statvfs.h>
 # include <sys/mount.h>
@@ -571,7 +571,7 @@ void LocalStore::upgradeDBSchema(State & state)
    bind mount.  So make the Nix store writable for this process. */
 void LocalStore::makeStoreWritable()
 {
-#if __linux__
+#ifdef __linux__
     if (!isRootUser()) return;
     /* Check if /nix/store is on a read-only mount. */
     struct statvfs stat;

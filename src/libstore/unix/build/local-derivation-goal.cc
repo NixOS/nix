@@ -42,7 +42,7 @@
 #endif
 
 /* Includes required for chroot support. */
-#if __linux__
+#ifdef __linux__
 # include "nix/store/fchmodat2-compat.hh"
 # include <sys/ioctl.h>
 # include <net/if.h>
@@ -418,7 +418,7 @@ LocalDerivationGoal::~LocalDerivationGoal()
 
 inline bool LocalDerivationGoal::needsHashRewrite()
 {
-#if __linux__
+#ifdef __linux__
     return !useChroot;
 #else
     /* Darwin requires hash rewriting even when sandboxing is enabled. */
@@ -459,7 +459,7 @@ void LocalDerivationGoal::killChild()
 void LocalDerivationGoal::killSandbox(bool getStats)
 {
     if (cgroup) {
-        #if __linux__
+        #ifdef __linux__
         auto stats = destroyCgroup(*cgroup);
         if (getStats) {
             buildResult.cpuUser = stats.cpuUser;
@@ -513,14 +513,14 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     auto & localStore = getLocalStore();
     if (localStore.storeDir != localStore.realStoreDir.get()) {
-        #if __linux__
+        #ifdef __linux__
             useChroot = true;
         #else
             throw Error("building using a diverted store is not supported on this platform");
         #endif
     }
 
-    #if __linux__
+    #ifdef __linux__
     if (useChroot) {
         if (!mountAndPidNamespacesSupported()) {
             if (!settings.sandboxFallback)
@@ -747,7 +747,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
 }
 
 
-#if __linux__
+#ifdef __linux__
 static void doBind(const Path & source, const Path & target, bool optional = false) {
     debug("bind mounting '%1%' to '%2%'", source, target);
 
@@ -820,12 +820,12 @@ static void handleChildException(bool sendException)
 void LocalDerivationGoal::startBuilder()
 {
     if ((buildUser && buildUser->getUIDCount() != 1)
-        #if __linux__
+        #ifdef __linux__
         || settings.useCgroups
         #endif
         )
     {
-        #if __linux__
+        #ifdef __linux__
         experimentalFeatureSettings.require(Xp::Cgroups);
 
         /* If we're running from the daemon, then this will return the
@@ -1071,7 +1071,7 @@ void LocalDerivationGoal::startBuilder()
             pathsInChroot[i] = {i, true};
         }
 
-#if __linux__
+#ifdef __linux__
         /* Create a temporary directory in which we set up the chroot
            environment using bind-mounts.  We put it in the Nix store
            so that the build outputs can be moved efficiently from the
@@ -1285,7 +1285,7 @@ void LocalDerivationGoal::startBuilder()
 
     /* Fork a child to build the package. */
 
-#if __linux__
+#ifdef __linux__
     if (useChroot) {
         /* Set up private namespaces for the build:
 
@@ -1482,7 +1482,7 @@ void LocalDerivationGoal::initTmpDir()
 {
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
-#if __linux__
+#ifdef __linux__
     tmpDirInSandbox = useChroot ? settings.sandboxBuildDir : tmpDir;
 #else
     tmpDirInSandbox = tmpDir;
@@ -1728,7 +1728,7 @@ void LocalDerivationGoal::addDependency(const StorePath & path)
 
         debug("materialising '%s' in the sandbox", worker.store.printStorePath(path));
 
-        #if __linux__
+        #ifdef __linux__
 
             Path source = worker.store.Store::toRealPath(path);
             Path target = chrootRootDir + worker.store.printStorePath(path);
@@ -1778,7 +1778,7 @@ void LocalDerivationGoal::chownToBuilder(const Path & path)
 
 void setupSeccomp()
 {
-#if __linux__
+#ifdef __linux__
     if (!settings.filterSyscalls) return;
 #if HAVE_SECCOMP
     scmp_filter_ctx ctx;
@@ -1898,7 +1898,7 @@ void LocalDerivationGoal::runChild()
            } catch (SystemError &) { }
         }
 
-#if __linux__
+#ifdef __linux__
         if (useChroot) {
 
             userNamespaceSync.writeSide = -1;
@@ -2132,7 +2132,7 @@ void LocalDerivationGoal::runChild()
         /* Close all other file descriptors. */
         unix::closeExtraFDs();
 
-#if __linux__
+#ifdef __linux__
         linux::setPersonality(drv->platform);
 #endif
 

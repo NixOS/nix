@@ -181,11 +181,11 @@ StringSet Settings::getDefaultSystemFeatures()
        actually require anything special on the machines. */
     StringSet features{"nixos-test", "benchmark", "big-parallel"};
 
-    #if __linux__
+    #ifdef __linux__
     features.insert("uid-range");
     #endif
 
-    #if __linux__
+    #ifdef __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
         features.insert("kvm");
     #endif
@@ -205,7 +205,7 @@ StringSet Settings::getDefaultExtraPlatforms()
     if (std::string{NIX_LOCAL_SYSTEM} == "x86_64-linux" && !isWSL1())
         extraPlatforms.insert("i686-linux");
 
-#if __linux__
+#ifdef __linux__
     StringSet levels = computeLevels();
     for (auto iter = levels.begin(); iter != levels.end(); ++iter)
         extraPlatforms.insert(*iter + "-linux");
@@ -224,7 +224,7 @@ StringSet Settings::getDefaultExtraPlatforms()
 
 bool Settings::isWSL1()
 {
-#if __linux__
+#ifdef __linux__
     struct utsname utsbuf;
     uname(&utsbuf);
     // WSL1 uses -Microsoft suffix

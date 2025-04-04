@@ -190,7 +190,7 @@ static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun)
 }
 
 
-#if __linux__
+#ifdef __linux__
 static int childEntry(void * arg)
 {
     auto & fun = *reinterpret_cast<ChildWrapperFunction*>(arg);
@@ -213,7 +213,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
             logger = makeSimpleLogger();
         }
         try {
-#if __linux__
+#ifdef __linux__
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
                 throw SysError("setting death signal");
 #endif

@@ -34,7 +34,7 @@
 #include <grp.h>
 #include <fcntl.h>
 
-#if __linux__
+#ifdef __linux__
 #include "nix/util/cgroup.hh"
 #endif
 
@@ -317,7 +317,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
     //  Get rid of children automatically; don't let them become zombies.
     setSigChldAction(true);
 
-    #if __linux__
+    #ifdef __linux__
     if (settings.useCgroups) {
         experimentalFeatureSettings.require(Xp::Cgroups);
 

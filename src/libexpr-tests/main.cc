@@ -14,7 +14,7 @@ int main (int argc, char **argv) {
     // Disable build hook. We won't be testing remote builds in these unit tests. If we do, fix the above build hook.
     settings.buildHook = {};
 
-    #if __linux__ // should match the conditional around sandboxBuildDir declaration.
+    #ifdef __linux__ // should match the conditional around sandboxBuildDir declaration.
 
     // When building and testing nix within the host's Nix sandbox, our store dir will be located in the host's sandboxBuildDir, e.g.:
     // Host
