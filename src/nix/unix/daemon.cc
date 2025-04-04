@@ -38,7 +38,7 @@
 #include "nix/util/cgroup.hh"
 #endif
 
-#if __APPLE__ || __FreeBSD__
+#if defined(__APPLE__) || defined(__FreeBSD__)
 #include <sys/ucred.h>
 #endif
 

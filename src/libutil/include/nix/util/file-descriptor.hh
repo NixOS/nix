@@ -18,7 +18,7 @@ struct Source;
  * Operating System capability
  */
 using Descriptor =
-#if _WIN32
+#ifdef _WIN32
     HANDLE
 #else
     int
@@ -26,7 +26,7 @@ using Descriptor =
     ;
 
 const Descriptor INVALID_DESCRIPTOR =
-#if _WIN32
+#ifdef _WIN32
     INVALID_HANDLE_VALUE
 #else
     -1

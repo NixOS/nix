@@ -61,7 +61,7 @@
 # include "nix/store/personality.hh"
 #endif
 
-#if __APPLE__
+#ifdef __APPLE__
 #include <spawn.h>
 #include <sys/sysctl.h>
 #include <sandbox.h>
@@ -76,6 +76,8 @@ extern "C" int sandbox_init_with_parameters(const char *profile, uint64_t flags,
 
 #include "nix/util/strings.hh"
 #include "nix/util/signals.hh"
+
+#include "store-config-private.hh"
 
 namespace nix {
 
@@ -496,7 +498,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
             if (drvOptions->noChroot)
                 throw Error("derivation '%s' has '__noChroot' set, "
                     "but that's not allowed when 'sandbox' is 'true'", worker.store.printStorePath(drvPath));
-#if __APPLE__
+#ifdef __APPLE__
             if (drvOptions->additionalSandboxProfile != "")
                 throw Error("derivation '%s' specifies a sandbox profile, "
                     "but this is only allowed when 'sandbox' is 'relaxed'", worker.store.printStorePath(drvPath));
@@ -890,7 +892,7 @@ void LocalDerivationGoal::startBuilder()
     /* Create a temporary directory where the build will take
        place. */
     topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
-#if __APPLE__
+#ifdef __APPLE__
     if (false) {
 #else
     if (useChroot) {
@@ -1168,7 +1170,7 @@ void LocalDerivationGoal::startBuilder()
 #else
         if (drvOptions->useUidRange(*drv))
             throw Error("feature 'uid-range' is not supported on this platform");
-        #if __APPLE__
+        #ifdef __APPLE__
             /* We don't really have any parent prep work to do (yet?)
                All work happens in the child, instead. */
         #else
@@ -1248,7 +1250,7 @@ void LocalDerivationGoal::startBuilder()
         if (chown(slaveName.c_str(), buildUser->getUID(), 0))
             throw SysError("changing owner of pseudoterminal slave");
     }
-#if __APPLE__
+#ifdef __APPLE__
     else {
         if (grantpt(builderOut.get()))
             throw SysError("granting access to pseudoterminal slave");
@@ -2015,7 +2017,7 @@ void LocalDerivationGoal::runChild()
             for (auto & i : pathsInChroot) {
                 if (i.second.source == "/proc") continue; // backwards compatibility
 
-                #if HAVE_EMBEDDED_SANDBOX_SHELL
+                #ifdef HAVE_EMBEDDED_SANDBOX_SHELL
                 if (i.second.source == "__embedded_sandbox_shell__") {
                     static unsigned char sh[] = {
                         #include "embedded-sandbox-shell.gen.hh"
@@ -2169,7 +2171,7 @@ void LocalDerivationGoal::runChild()
                 throw SysError("setuid failed");
         }
 
-#if __APPLE__
+#ifdef __APPLE__
         /* This has to appear before import statements. */
         std::string sandboxProfile = "(version 1)\n";
 
@@ -2340,7 +2342,7 @@ void LocalDerivationGoal::runChild()
         for (auto & i : drv->args)
             args.push_back(rewriteStrings(i, inputRewrites));
 
-#if __APPLE__
+#ifdef __APPLE__
         posix_spawnattr_t attrp;
 
         if (posix_spawnattr_init(&attrp))

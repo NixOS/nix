@@ -1,3 +1,4 @@
+#include "store-config-private.hh"
 #if ENABLE_S3
 
 #include <assert.h>

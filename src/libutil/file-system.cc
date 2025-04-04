@@ -576,7 +576,7 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
                     , mode
 #endif
                     ) == 0) {
-#if __FreeBSD__
+#ifdef __FreeBSD__
             /* Explicitly set the group of the directory.  This is to
                work around around problems caused by BSD's group
                ownership semantics (directories inherit the group of
