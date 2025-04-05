@@ -15,11 +15,11 @@
 #include "nix/expr/print.hh"
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/util/mounted-source-accessor.hh"
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/util/url.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/tarball.hh"
-
 #include "parser-tab.hh"
 
 #include <algorithm>
@@ -246,6 +246,12 @@ EvalState::EvalState(
     }
     , repair(NoRepair)
     , emptyBindings(0)
+    , storeFS(
+        makeMountedSourceAccessor(
+            {
+                {CanonPath::root, makeEmptySourceAccessor()},
+                {CanonPath(store->storeDir), makeFSSourceAccessor(dirOf(store->toRealPath(StorePath::dummy)))}
+            }))
     , rootFS(
         ({
             /* In pure eval mode, we provide a filesystem that only
@@ -261,13 +267,8 @@ EvalState::EvalState(
 
             auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
             if (settings.pureEval || store->storeDir != realStoreDir) {
-                auto storeFS = makeMountedSourceAccessor(
-                    {
-                        {CanonPath::root, makeEmptySourceAccessor()},
-                        {CanonPath(store->storeDir), makeFSSourceAccessor(realStoreDir)}
-                    });
                 accessor = settings.pureEval
-                    ? storeFS
+                    ? storeFS.cast<SourceAccessor>()
                     : makeUnionSourceAccessor({accessor, storeFS});
             }
 
@@ -3068,6 +3069,11 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
 
         auto res = (r / CanonPath(suffix)).resolveSymlinks();
         if (res.pathExists()) return res;
+
+        // Backward compatibility hack: throw an exception if access
+        // to this path is not allowed.
+        if (auto accessor = res.accessor.dynamic_pointer_cast<FilteringSourceAccessor>())
+            accessor->checkAccess(res.path);
     }
 
     if (hasPrefix(path, "nix/"))
@@ -3138,6 +3144,11 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
         if (path.resolveSymlinks().pathExists())
             return finish(std::move(path));
         else {
+            // Backward compatibility hack: throw an exception if access
+            // to this path is not allowed.
+            if (auto accessor = path.accessor.dynamic_pointer_cast<FilteringSourceAccessor>())
+                accessor->checkAccess(path.path);
+
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' does not exist, ignoring", value)
             });
