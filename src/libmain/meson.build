@@ -17,6 +17,8 @@ subdir('nix-meson-build-support/deps-lists')
 configdata = configuration_data()
 
 deps_private_maybe_subproject = [
+  # This dependency may be very limited; was introduced for NIX_USE_BOEHMGC macro dependency
+  dependency('nix-expr'),
 ]
 deps_public_maybe_subproject = [
   dependency('nix-util'),

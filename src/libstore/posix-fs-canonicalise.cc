@@ -58,7 +58,7 @@ static void canonicalisePathMetaData_(
 {
     checkInterrupt();
 
-#if __APPLE__
+#ifdef __APPLE__
     /* Remove flags, in particular UF_IMMUTABLE which would prevent
        the file from being garbage-collected. FIXME: Use
        setattrlist() to remove other attributes as well. */

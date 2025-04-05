@@ -158,6 +158,7 @@ if get_option('embedded-sandbox-shell')
   # The path to busybox is passed as a -D flag when compiling this_library.
   # This solution is inherited from the old make buildsystem
   # TODO: do this differently?
+  # TODO: at least define it unconditionally, so we get checking from -Wundef
   configdata_priv.set('HAVE_EMBEDDED_SANDBOX_SHELL', 1)
   hexdump = find_program('hexdump', native : true)
   embedded_sandbox_shell_gen = custom_target(
@@ -179,6 +180,11 @@ endif
 config_priv_h = configure_file(
   configuration : configdata_priv,
   output : 'store-config-private.hh',
+)
+
+config_pub_h = configure_file(
+  configuration : configdata_pub,
+  output : 'store-config.hh',
 )
 
 subdir('nix-meson-build-support/common')
@@ -362,7 +368,7 @@ this_library = library(
   install : true,
 )
 
-install_headers(headers, subdir : 'nix/store', preserve_path : true)
+install_headers(headers + [ config_pub_h ], subdir : 'nix/store', preserve_path : true)
 
 libraries_private = []
 

@@ -4,7 +4,7 @@
 #include "nix/util/config-global.hh"
 #include "nix/util/fs-sink.hh"
 
-#if _WIN32
+#ifdef _WIN32
 # include <fileapi.h>
 # include "nix/util/file-path.hh"
 # include "nix/util/windows-error.hh"

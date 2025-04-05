@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <regex>
 
+#include "store-config-private.hh"
 
 namespace nix {
 
@@ -96,7 +97,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     auto st = lstat(path);
 
-#if __APPLE__
+#ifdef __APPLE__
     /* HFS/macOS has some undocumented security feature disabling hardlinking for
        special files within .app dirs. Known affected paths include
        *.app/Contents/{PkgInfo,Resources/\*.lproj,_CodeSignature} and .DS_Store.

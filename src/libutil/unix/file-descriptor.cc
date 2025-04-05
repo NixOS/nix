@@ -163,7 +163,7 @@ void Pipe::create()
 
 //////////////////////////////////////////////////////////////////////
 
-#if __linux__ || __FreeBSD__
+#if defined(__linux__) || defined(__FreeBSD__)
 static int unix_close_range(unsigned int first, unsigned int last, int flags)
 {
 #if !HAVE_CLOSE_RANGE
@@ -179,7 +179,7 @@ void unix::closeExtraFDs()
     constexpr int MAX_KEPT_FD = 2;
     static_assert(std::max({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO}) == MAX_KEPT_FD);
 
-#if __linux__ || __FreeBSD__
+#if defined(__linux__) || defined(__FreeBSD__)
     // first try to close_range everything we don't care about. if this
     // returns an error with these parameters we're running on a kernel
     // that does not implement close_range (i.e. pre 5.9) and fall back
@@ -189,7 +189,7 @@ void unix::closeExtraFDs()
     }
 #endif
 
-#if __linux__
+#ifdef __linux__
     try {
         for (auto & s : std::filesystem::directory_iterator{"/proc/self/fd"}) {
             checkInterrupt();
