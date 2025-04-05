@@ -48,6 +48,7 @@ let
         "nix-store-test-support"
         "nix-store-tests"
         "nix-fetchers"
+        "nix-fetchers-c"
         "nix-fetchers-tests"
         "nix-expr"
         "nix-expr-c"

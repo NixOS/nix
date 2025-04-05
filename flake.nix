@@ -355,6 +355,7 @@
               "nix-store-tests" = { };
 
               "nix-fetchers" = { };
+              "nix-fetchers-c" = { };
               "nix-fetchers-tests" = { };
 
               "nix-expr" = { };
@@ -363,6 +364,7 @@
               "nix-expr-tests" = { };
 
               "nix-flake" = { };
+              "nix-flake-c" = { };
               "nix-flake-tests" = { };
 
               "nix-main" = { };

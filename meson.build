@@ -33,6 +33,7 @@ endif
 # External C wrapper libraries
 subproject('libutil-c')
 subproject('libstore-c')
+subproject('libfetchers-c')
 subproject('libexpr-c')
 subproject('libflake-c')
 subproject('libmain-c')
