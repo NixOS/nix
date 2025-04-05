@@ -2,7 +2,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/sync.hh"
 
-#if _WIN32
+#ifdef _WIN32
 # include <io.h>
 # define WIN32_LEAN_AND_MEAN
 # include <windows.h>

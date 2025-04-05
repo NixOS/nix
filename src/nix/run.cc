@@ -12,7 +12,7 @@
 #include "nix/expr/eval.hh"
 #include <filesystem>
 
-#if __linux__
+#ifdef __linux__
 # include <sys/mount.h>
 # include "nix/store/personality.hh"
 #endif
@@ -59,7 +59,7 @@ void execProgramInStore(ref<Store> store,
         throw SysError("could not execute chroot helper");
     }
 
-#if __linux__
+#ifdef __linux__
     if (system)
         linux::setPersonality(*system);
 #endif
@@ -153,7 +153,7 @@ void chrootHelper(int argc, char * * argv)
     while (p < argc)
         args.push_back(argv[p++]);
 
-#if __linux__
+#ifdef __linux__
     uid_t uid = getuid();
     uid_t gid = getgid();
 
@@ -212,7 +212,7 @@ void chrootHelper(int argc, char * * argv)
     writeFile(fs::path{"/proc/self/uid_map"}, fmt("%d %d %d", uid, uid, 1));
     writeFile(fs::path{"/proc/self/gid_map"}, fmt("%d %d %d", gid, gid, 1));
 
-#if __linux__
+#ifdef __linux__
     if (system != "")
         linux::setPersonality(system);
 #endif
