@@ -126,7 +126,8 @@ deps_private += sqlite
 # AWS C++ SDK has bad pkg-config. See
 # https://github.com/aws/aws-sdk-cpp/issues/2673 for details.
 aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
-configdata_priv.set('ENABLE_S3', aws_s3.found().to_int())
+# The S3 store definitions in the header will be hidden based on this variables.
+configdata_pub.set('NIX_WITH_S3_SUPPORT', aws_s3.found().to_int())
 if aws_s3.found()
   aws_s3 = declare_dependency(
     include_directories: include_directories(aws_s3.get_variable('includedir')),
@@ -153,13 +154,13 @@ endforeach
 
 busybox = find_program(get_option('sandbox-shell'), required : false)
 
+# This one goes in config.h
+# The path to busybox is passed as a -D flag when compiling this_library.
+# This solution is inherited from the old make buildsystem
+# TODO: do this differently?
+configdata_priv.set('HAVE_EMBEDDED_SANDBOX_SHELL', get_option('embedded-sandbox-shell').to_int())
+
 if get_option('embedded-sandbox-shell')
-  # This one goes in config.h
-  # The path to busybox is passed as a -D flag when compiling this_library.
-  # This solution is inherited from the old make buildsystem
-  # TODO: do this differently?
-  # TODO: at least define it unconditionally, so we get checking from -Wundef
-  configdata_priv.set('HAVE_EMBEDDED_SANDBOX_SHELL', 1)
   hexdump = find_program('hexdump', native : true)
   embedded_sandbox_shell_gen = custom_target(
     'embedded-sandbox-shell.gen.hh',
@@ -180,11 +181,6 @@ endif
 config_priv_h = configure_file(
   configuration : configdata_priv,
   output : 'store-config-private.hh',
-)
-
-config_pub_h = configure_file(
-  configuration : configdata_pub,
-  output : 'store-config.hh',
 )
 
 subdir('nix-meson-build-support/common')
@@ -369,7 +365,7 @@ this_library = library(
   install : true,
 )
 
-install_headers(headers + [ config_pub_h ], subdir : 'nix/store', preserve_path : true)
+install_headers(headers, subdir : 'nix/store', preserve_path : true)
 
 libraries_private = []
 
