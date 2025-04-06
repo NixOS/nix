@@ -196,7 +196,7 @@ bool useBuildUsers()
     #ifdef __linux__
     static bool b = (settings.buildUsersGroup != "" || settings.autoAllocateUids) && isRootUser();
     return b;
-    #elif __APPLE__
+    #elif defined(__APPLE__)
     static bool b = settings.buildUsersGroup != "" && isRootUser();
     return b;
     #else
