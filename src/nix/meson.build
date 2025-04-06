@@ -39,12 +39,15 @@ configdata = configuration_data()
 configdata.set_quoted('NIX_CLI_VERSION', meson.project_version())
 
 fs = import('fs')
+prefix = get_option('prefix')
 
 bindir = get_option('bindir')
-if not fs.is_absolute(bindir)
-  bindir = get_option('prefix') / bindir
-endif
+bindir = fs.is_absolute(bindir) ? bindir : prefix / bindir
 configdata.set_quoted('NIX_BIN_DIR', bindir)
+
+mandir = get_option('mandir')
+mandir = fs.is_absolute(mandir) ? mandir : prefix / mandir
+configdata.set_quoted('NIX_MAN_DIR', mandir)
 
 config_priv_h = configure_file(
   configuration : configdata,
@@ -174,16 +177,6 @@ if host_machine.system() != 'windows'
   ]
 endif
 
-fs = import('fs')
-prefix = get_option('prefix')
-
-mandir = get_option('mandir')
-mandir = fs.is_absolute(mandir) ? mandir : prefix / mandir
-
-cpp_args= [
-  '-DNIX_MAN_DIR="@0@"'.format(mandir)
-]
-
 include_dirs = [include_directories('.')]
 
 this_exe = executable(
@@ -191,7 +184,6 @@ this_exe = executable(
   sources,
   dependencies : deps_private_subproject + deps_private + deps_other,
   include_directories : include_dirs,
-  cpp_args : cpp_args,
   link_args: linker_export_flags,
   install : true,
 )

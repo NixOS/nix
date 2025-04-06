@@ -10,7 +10,6 @@ config_pub_h = configure_file(
 headers = [config_pub_h] + files(
   'attr-path.hh',
   'attr-set.hh',
-  'config.hh',
   'eval-cache.hh',
   'eval-error.hh',
   'eval-gc.hh',

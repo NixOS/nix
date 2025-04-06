@@ -40,8 +40,7 @@ deps_private += gtest
 configdata = configuration_data()
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
-aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
-configdata.set('ENABLE_S3', aws_s3.found().to_int())
+configdata.set_quoted('NIX_STORE_DIR', nix_store.get_variable('storedir'))
 
 config_priv_h = configure_file(
   configuration : configdata,
@@ -92,7 +91,6 @@ this_exe = executable(
   include_directories : include_dirs,
   # TODO: -lrapidcheck, see ../libutil-support/build.meson
   link_args: linker_export_flags + ['-lrapidcheck'],
-  cpp_args : [ '-DNIX_STORE_DIR="' + nix_store.get_variable('storedir') + '"' ],
   # get main from gtest
   install : true,
 )
