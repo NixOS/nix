@@ -108,7 +108,7 @@ std::optional<Path> getSelfExe()
     {
         #if defined(__linux__) || defined(__GNU__)
         return readLink("/proc/self/exe");
-        #elif __APPLE__
+        #elif defined(__APPLE__)
         char buf[1024];
         uint32_t size = sizeof(buf);
         if (_NSGetExecutablePath(buf, &size) == 0)

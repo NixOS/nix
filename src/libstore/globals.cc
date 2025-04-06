@@ -209,7 +209,7 @@ StringSet Settings::getDefaultExtraPlatforms()
     StringSet levels = computeLevels();
     for (auto iter = levels.begin(); iter != levels.end(); ++iter)
         extraPlatforms.insert(*iter + "-linux");
-#elif __APPLE__
+#elif defined(__APPLE__)
     // Rosetta 2 emulation layer can run x86_64 binaries on aarch64
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
