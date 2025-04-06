@@ -40,9 +40,6 @@ deps_private += gtest
 configdata = configuration_data()
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
-aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
-configdata.set('ENABLE_S3', aws_s3.found().to_int())
-
 config_priv_h = configure_file(
   configuration : configdata,
   output : 'store-tests-config.hh',

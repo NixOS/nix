@@ -9,7 +9,7 @@
 #include "nix/util/signals.hh"
 
 #include "store-config-private.hh"
-#if ENABLE_S3
+#if NIX_WITH_S3_SUPPORT
 #include <aws/core/client/ClientConfiguration.h>
 #endif
 
@@ -756,7 +756,7 @@ struct curlFileTransfer : public FileTransfer
         #endif
     }
 
-#if ENABLE_S3
+#if NIX_WITH_S3_SUPPORT
     std::tuple<std::string, std::string, Store::Params> parseS3Uri(std::string uri)
     {
         auto [path, params] = splitUriAndParams(uri);
@@ -779,7 +779,7 @@ struct curlFileTransfer : public FileTransfer
         if (hasPrefix(request.uri, "s3://")) {
             // FIXME: do this on a worker thread
             try {
-#if ENABLE_S3
+#if NIX_WITH_S3_SUPPORT
                 auto [bucketName, key, params] = parseS3Uri(request.uri);
 
                 std::string profile = getOr(params, "profile", "");
