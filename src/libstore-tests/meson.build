@@ -40,6 +40,8 @@ deps_private += gtest
 configdata = configuration_data()
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
+configdata.set_quoted('NIX_STORE_DIR', nix_store.get_variable('storedir'))
+
 config_priv_h = configure_file(
   configuration : configdata,
   output : 'store-tests-config.hh',
@@ -89,7 +91,6 @@ this_exe = executable(
   include_directories : include_dirs,
   # TODO: -lrapidcheck, see ../libutil-support/build.meson
   link_args: linker_export_flags + ['-lrapidcheck'],
-  cpp_args : [ '-DNIX_STORE_DIR="' + nix_store.get_variable('storedir') + '"' ],
   # get main from gtest
   install : true,
 )
