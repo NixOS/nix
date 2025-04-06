@@ -109,15 +109,15 @@ for sample in samples:
     s = samples[sample]
     email = s["email"]
     if not email in email_to_handle_cache.values:
-        print(f"Querying GitHub API for {s['hash']}, to get handle for {s['email']}")
+        print(f"Querying GitHub API for {s['hash']}, to get handle for {s['email']}", file=sys.stderr)
         ghc = get_github_commit(samples[sample])
         gha = ghc["author"]
         if gha and gha["login"]:
             handle = gha["login"]
-            print(f"Handle: {handle}")
+            print(f"Handle: {handle}", file=sys.stderr)
             email_to_handle_cache.values[email] = handle
         else:
-            print(f"Found no handle for {s['email']}")
+            print(f"Found no handle for {s['email']}", file=sys.stderr)
             email_to_handle_cache.values[email] = None
     handle = email_to_handle_cache.values[email]
     if handle is not None:
