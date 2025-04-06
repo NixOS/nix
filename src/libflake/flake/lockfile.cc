@@ -108,8 +108,13 @@ LockFile::LockFile(
     const fetchers::Settings & fetchSettings,
     std::string_view contents, std::string_view path)
 {
-    auto json = nlohmann::json::parse(contents);
-
+    auto json = [=] {
+        try {
+            return nlohmann::json::parse(contents);
+        } catch (const nlohmann::json::parse_error & e) {
+            throw Error("Could not parse '%s': %s", path, e.what());
+        }
+    }();
     auto version = json.value("version", 0);
     if (version < 5 || version > 7)
         throw Error("lock file '%s' has unsupported version %d", path, version);
