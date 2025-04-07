@@ -1,11 +1,11 @@
-#include "environment-variables.hh"
-#include "file-system.hh"
-#include "file-path.hh"
-#include "file-path-impl.hh"
-#include "signals.hh"
-#include "finally.hh"
-#include "serialise.hh"
-#include "util.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/file-path.hh"
+#include "nix/util/file-path-impl.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/util.hh"
 
 #include <atomic>
 #include <cerrno>
@@ -25,11 +25,23 @@
 # include <io.h>
 #endif
 
-#include "strings-inline.hh"
+#include "nix/util/strings-inline.hh"
+
+#include "util-config-private.hh"
 
 namespace nix {
 
-namespace fs { using namespace std::filesystem; }
+namespace fs {
+  using namespace std::filesystem;
+
+  bool symlink_exists(const std::filesystem::path & path) {
+      try {
+          return std::filesystem::exists(std::filesystem::symlink_status(path));
+      } catch (const std::filesystem::filesystem_error & e) {
+          throw SysError("cannot check existence of %1%", path);
+      }
+  }
+}
 
 bool isAbsolute(PathView path)
 {
@@ -475,12 +487,12 @@ void createDir(const Path & path, mode_t mode)
         throw SysError("creating directory '%1%'", path);
 }
 
-void createDirs(const Path & path)
+void createDirs(const fs::path & path)
 {
     try {
         fs::create_directories(path);
     } catch (fs::filesystem_error & e) {
-        throw SysError("creating directory '%1%'", path);
+        throw SysError("creating directory '%1%'", path.string());
     }
 }
 
@@ -562,7 +574,7 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
                     , mode
 #endif
                     ) == 0) {
-#if __FreeBSD__
+#ifdef __FreeBSD__
             /* Explicitly set the group of the directory.  This is to
                work around around problems caused by BSD's group
                ownership semantics (directories inherit the group of
@@ -628,62 +640,6 @@ void replaceSymlink(const fs::path & target, const fs::path & link)
 
         break;
     }
-}
-
-void setWriteTime(
-    const fs::path & path,
-    time_t accessedTime,
-    time_t modificationTime,
-    std::optional<bool> optIsSymlink)
-{
-#ifdef _WIN32
-    // FIXME use `fs::last_write_time`.
-    //
-    // Would be nice to use std::filesystem unconditionally, but
-    // doesn't support access time just modification time.
-    //
-    // System clock vs File clock issues also make that annoying.
-    warn("Changing file times is not yet implemented on Windows, path is %s", path);
-#elif HAVE_UTIMENSAT && HAVE_DECL_AT_SYMLINK_NOFOLLOW
-    struct timespec times[2] = {
-        {
-            .tv_sec = accessedTime,
-            .tv_nsec = 0,
-        },
-        {
-            .tv_sec = modificationTime,
-            .tv_nsec = 0,
-        },
-    };
-    if (utimensat(AT_FDCWD, path.c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
-        throw SysError("changing modification time of %s (using `utimensat`)", path);
-#else
-    struct timeval times[2] = {
-        {
-            .tv_sec = accessedTime,
-            .tv_usec = 0,
-        },
-        {
-            .tv_sec = modificationTime,
-            .tv_usec = 0,
-        },
-    };
-#if HAVE_LUTIMES
-    if (lutimes(path.c_str(), times) == -1)
-        throw SysError("changing modification time of %s", path);
-#else
-    bool isSymlink = optIsSymlink
-        ? *optIsSymlink
-        : fs::is_symlink(path);
-
-    if (!isSymlink) {
-        if (utimes(path.c_str(), times) == -1)
-            throw SysError("changing modification time of %s (not a symlink)", path);
-    } else {
-        throw Error("Cannot modification time of symlink %s", path);
-    }
-#endif
-#endif
 }
 
 void setWriteTime(const fs::path & path, const struct stat & st)

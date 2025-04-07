@@ -1,4 +1,4 @@
-#include "source-path.hh"
+#include "nix/util/source-path.hh"
 
 namespace nix {
 

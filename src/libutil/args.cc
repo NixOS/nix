@@ -1,10 +1,10 @@
-#include "args.hh"
-#include "args/root.hh"
-#include "hash.hh"
-#include "environment-variables.hh"
-#include "signals.hh"
-#include "users.hh"
-#include "json-utils.hh"
+#include "nix/util/args.hh"
+#include "nix/util/args/root.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/users.hh"
+#include "nix/util/json-utils.hh"
 
 #include <fstream>
 #include <string>

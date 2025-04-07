@@ -50,7 +50,7 @@ The hashes of these modified input streams are used instead.
 
 When validating the content address of a store object after the fact, the above process works as written.
 However, when first creating the store object we don't know the store object's store path, as explained just above.
-We therefore, strictly speaking, do not know what value we will be replacing with the sentinental value in the inputs to hash functions.
+We therefore, strictly speaking, do not know what value we will be replacing with the sentinel value in the inputs to hash functions.
 What instead happens is that the provisional store object --- the data from which we wish to create a store object --- is paired with a provisional "scratch" store path (that presumably was chosen when the data was created).
 That provisional store path is instead what is replaced with the sentinel value, rather than the final store object which we do not yet know.
 

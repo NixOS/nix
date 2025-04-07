@@ -1,23 +1,23 @@
-#include "command.hh"
-#include "installable-flake.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "derivations.hh"
-#include "archive.hh"
-#include "builtins/buildenv.hh"
-#include "flake/flakeref.hh"
+#include "nix/cmd/command.hh"
+#include "nix/cmd/installable-flake.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/derivations.hh"
+#include "nix/util/archive.hh"
+#include "nix/store/builtins/buildenv.hh"
+#include "nix/flake/flakeref.hh"
 #include "../nix-env/user-env.hh"
-#include "profiles.hh"
-#include "names.hh"
-#include "url.hh"
-#include "flake/url-name.hh"
+#include "nix/store/profiles.hh"
+#include "nix/store/names.hh"
+#include "nix/util/url.hh"
+#include "nix/flake/url-name.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
 #include <iomanip>
 
-#include "strings.hh"
+#include "nix/util/strings.hh"
 
 using namespace nix;
 

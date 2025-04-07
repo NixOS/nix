@@ -1,4 +1,4 @@
-#include "indirect-root-store.hh"
+#include "nix/store/indirect-root-store.hh"
 
 namespace nix {
 

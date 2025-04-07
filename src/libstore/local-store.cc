@@ -1,22 +1,22 @@
-#include "local-store.hh"
-#include "globals.hh"
-#include "git.hh"
-#include "archive.hh"
-#include "pathlocks.hh"
-#include "worker-protocol.hh"
-#include "derivations.hh"
-#include "realisation.hh"
-#include "nar-info.hh"
-#include "references.hh"
-#include "callback.hh"
-#include "topo-sort.hh"
-#include "finally.hh"
-#include "compression.hh"
-#include "signals.hh"
-#include "posix-fs-canonicalise.hh"
-#include "posix-source-accessor.hh"
-#include "keys.hh"
-#include "users.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/git.hh"
+#include "nix/util/archive.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/store/worker-protocol.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/nar-info.hh"
+#include "nix/util/references.hh"
+#include "nix/util/callback.hh"
+#include "nix/util/topo-sort.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/compression.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/util/posix-source-accessor.hh"
+#include "nix/store/keys.hh"
+#include "nix/util/users.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -38,7 +38,7 @@
 # include <grp.h>
 #endif
 
-#if __linux__
+#ifdef __linux__
 # include <sched.h>
 # include <sys/statvfs.h>
 # include <sys/mount.h>
@@ -52,7 +52,9 @@
 
 #include <nlohmann/json.hpp>
 
-#include "strings.hh"
+#include "nix/util/strings.hh"
+
+#include "store-config-private.hh"
 
 
 namespace nix {
@@ -116,7 +118,7 @@ LocalStore::LocalStore(
     state->stmts = std::make_unique<State::Stmts>();
 
     /* Create missing state directories if they don't already exist. */
-    createDirs(realStoreDir);
+    createDirs(realStoreDir.get());
     if (readOnly) {
         experimentalFeatureSettings.require(Xp::ReadOnlyLocalStore);
     } else {
@@ -247,7 +249,7 @@ LocalStore::LocalStore(
     else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
         openDB(*state, true);
-        writeFile(schemaPath, fmt("%1%", nixSchemaVersion), 0666, true);
+        writeFile(schemaPath, fmt("%1%", curSchema), 0666, true);
     }
 
     else if (curSchema < nixSchemaVersion) {
@@ -573,7 +575,7 @@ void LocalStore::upgradeDBSchema(State & state)
    bind mount.  So make the Nix store writable for this process. */
 void LocalStore::makeStoreWritable()
 {
-#if __linux__
+#ifdef __linux__
     if (!isRootUser()) return;
     /* Check if /nix/store is on a read-only mount. */
     struct statvfs stat;

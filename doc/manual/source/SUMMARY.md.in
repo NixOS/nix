@@ -132,5 +132,6 @@
   - [Release 3.0.0 (2025-03-04)](release-notes-determinate/rl-3.0.0.md)
 - [Nix Release Notes](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
+  - [Release 2.28 (2025-04-02)](release-notes/rl-2.28.md)
   - [Release 2.27 (2025-03-03)](release-notes/rl-2.27.md)
   - [Release 2.26 (2025-01-22)](release-notes/rl-2.26.md)

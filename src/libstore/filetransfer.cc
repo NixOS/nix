@@ -1,19 +1,20 @@
-#include "filetransfer.hh"
-#include "globals.hh"
-#include "config-global.hh"
-#include "store-api.hh"
-#include "s3.hh"
-#include "compression.hh"
-#include "finally.hh"
-#include "callback.hh"
-#include "signals.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/config-global.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/s3.hh"
+#include "nix/util/compression.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/callback.hh"
+#include "nix/util/signals.hh"
 
-#if ENABLE_S3
+#include "store-config-private.hh"
+#if NIX_WITH_S3_SUPPORT
 #include <aws/core/client/ClientConfiguration.h>
 #endif
 
-#if __linux__
-# include "namespaces.hh"
+#ifdef __linux__
+# include "nix/util/namespaces.hh"
 #endif
 
 #include <unistd.h>
@@ -623,7 +624,7 @@ struct curlFileTransfer : public FileTransfer
         });
         #endif
 
-        #if __linux__
+        #ifdef __linux__
         try {
             tryUnshareFilesystem();
         } catch (nix::Error & e) {
@@ -757,7 +758,7 @@ struct curlFileTransfer : public FileTransfer
         #endif
     }
 
-#if ENABLE_S3
+#if NIX_WITH_S3_SUPPORT
     std::tuple<std::string, std::string, Store::Params> parseS3Uri(std::string uri)
     {
         auto [path, params] = splitUriAndParams(uri);
@@ -780,7 +781,7 @@ struct curlFileTransfer : public FileTransfer
         if (hasPrefix(request.uri, "s3://")) {
             // FIXME: do this on a worker thread
             try {
-#if ENABLE_S3
+#if NIX_WITH_S3_SUPPORT
                 auto [bucketName, key, params] = parseS3Uri(request.uri);
 
                 std::string profile = getOr(params, "profile", "");

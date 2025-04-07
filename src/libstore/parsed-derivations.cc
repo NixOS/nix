@@ -1,4 +1,4 @@
-#include "parsed-derivations.hh"
+#include "nix/store/parsed-derivations.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>

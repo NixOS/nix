@@ -1,6 +1,6 @@
-#include "serialise.hh"
-#include "signals.hh"
-#include "util.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/util.hh"
 
 #include <cstring>
 #include <cerrno>
@@ -11,7 +11,7 @@
 #ifdef _WIN32
 # include <fileapi.h>
 # include <winsock2.h>
-# include "windows-error.hh"
+# include "nix/util/windows-error.hh"
 #else
 # include <poll.h>
 #endif

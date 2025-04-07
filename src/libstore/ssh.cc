@@ -1,9 +1,9 @@
-#include "ssh.hh"
-#include "finally.hh"
-#include "current-process.hh"
-#include "environment-variables.hh"
-#include "util.hh"
-#include "exec.hh"
+#include "nix/store/ssh.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/util.hh"
+#include "nix/util/exec.hh"
 
 namespace nix {
 

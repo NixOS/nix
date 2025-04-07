@@ -1,17 +1,17 @@
 #include <unordered_set>
 
-#include "derivations.hh"
-#include "parsed-derivations.hh"
-#include "derivation-options.hh"
-#include "globals.hh"
-#include "store-api.hh"
-#include "thread-pool.hh"
-#include "realisation.hh"
-#include "topo-sort.hh"
-#include "callback.hh"
-#include "closure.hh"
-#include "filetransfer.hh"
-#include "strings.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation-options.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/thread-pool.hh"
+#include "nix/store/realisation.hh"
+#include "nix/util/topo-sort.hh"
+#include "nix/util/callback.hh"
+#include "nix/util/closure.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
 

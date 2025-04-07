@@ -1,12 +1,12 @@
-#include "config-global.hh"
-#include "eval.hh"
-#include "installable-flake.hh"
-#include "command-installable-value.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "outputs-spec.hh"
-#include "derivations.hh"
+#include "nix/util/config-global.hh"
+#include "nix/expr/eval.hh"
+#include "nix/cmd/installable-flake.hh"
+#include "nix/cmd/command-installable-value.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/derivations.hh"
 
 #ifndef _WIN32 // TODO re-enable on Windows
 # include "run.hh"
@@ -18,7 +18,7 @@
 #include <nlohmann/json.hpp>
 #include <algorithm>
 
-#include "strings.hh"
+#include "nix/util/strings.hh"
 
 namespace nix::fs { using namespace std::filesystem; }
 

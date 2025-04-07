@@ -1,10 +1,10 @@
 #include <archive.h>
 #include <archive_entry.h>
 
-#include "finally.hh"
-#include "serialise.hh"
-#include "tarfile.hh"
-#include "file-system.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/tarfile.hh"
+#include "nix/util/file-system.hh"
 
 namespace nix {
 
@@ -166,7 +166,7 @@ void unpackTarfile(Source & source, const fs::path & destDir)
 {
     auto archive = TarArchive(source);
 
-    fs::create_directories(destDir);
+    createDirs(destDir);
     extract_archive(archive, destDir);
 }
 
@@ -174,7 +174,7 @@ void unpackTarfile(const fs::path & tarFile, const fs::path & destDir)
 {
     auto archive = TarArchive(tarFile);
 
-    fs::create_directories(destDir);
+    createDirs(destDir);
     extract_archive(archive, destDir);
 }
 

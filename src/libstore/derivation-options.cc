@@ -1,8 +1,8 @@
-#include "derivation-options.hh"
-#include "json-utils.hh"
-#include "parsed-derivations.hh"
-#include "types.hh"
-#include "util.hh"
+#include "nix/store/derivation-options.hh"
+#include "nix/util/json-utils.hh"
+#include "nix/store/parsed-derivations.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 #include <optional>
 #include <string>
 #include <variant>

@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 
-#include "git.hh"
-#include "memory-source-accessor.hh"
+#include "nix/util/git.hh"
+#include "nix/util/memory-source-accessor.hh"
 
-#include "tests/characterization.hh"
+#include "nix/util/tests/characterization.hh"
 
 namespace nix {
 

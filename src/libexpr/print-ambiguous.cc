@@ -1,7 +1,7 @@
-#include "print-ambiguous.hh"
-#include "print.hh"
-#include "signals.hh"
-#include "eval.hh"
+#include "nix/expr/print-ambiguous.hh"
+#include "nix/expr/print.hh"
+#include "nix/util/signals.hh"
+#include "nix/expr/eval.hh"
 
 namespace nix {
 

@@ -1,20 +1,20 @@
-#include "current-process.hh"
+#include "nix/util/current-process.hh"
 #include "run.hh"
-#include "command-installable-value.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "signals.hh"
-#include "store-api.hh"
-#include "derivations.hh"
-#include "local-fs-store.hh"
-#include "finally.hh"
-#include "source-accessor.hh"
-#include "eval.hh"
+#include "nix/cmd/command-installable-value.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/expr/eval.hh"
 #include <filesystem>
 
-#if __linux__
+#ifdef __linux__
 # include <sys/mount.h>
-# include "personality.hh"
+# include "nix/store/personality.hh"
 #endif
 
 #include <queue>
@@ -59,7 +59,7 @@ void execProgramInStore(ref<Store> store,
         throw SysError("could not execute chroot helper");
     }
 
-#if __linux__
+#ifdef __linux__
     if (system)
         linux::setPersonality(*system);
 #endif
@@ -153,7 +153,7 @@ void chrootHelper(int argc, char * * argv)
     while (p < argc)
         args.push_back(argv[p++]);
 
-#if __linux__
+#ifdef __linux__
     uid_t uid = getuid();
     uid_t gid = getgid();
 
@@ -212,7 +212,7 @@ void chrootHelper(int argc, char * * argv)
     writeFile(fs::path{"/proc/self/uid_map"}, fmt("%d %d %d", uid, uid, 1));
     writeFile(fs::path{"/proc/self/gid_map"}, fmt("%d %d %d", gid, gid, 1));
 
-#if __linux__
+#ifdef __linux__
     if (system != "")
         linux::setPersonality(system);
 #endif

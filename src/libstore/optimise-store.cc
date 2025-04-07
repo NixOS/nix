@@ -1,8 +1,8 @@
-#include "local-store.hh"
-#include "globals.hh"
-#include "signals.hh"
-#include "posix-fs-canonicalise.hh"
-#include "posix-source-accessor.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/util/posix-source-accessor.hh"
 
 #include <cstdlib>
 #include <cstring>
@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <regex>
 
+#include "store-config-private.hh"
 
 namespace nix {
 
@@ -96,7 +97,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     auto st = lstat(path);
 
-#if __APPLE__
+#ifdef __APPLE__
     /* HFS/macOS has some undocumented security feature disabling hardlinking for
        special files within .app dirs. Known affected paths include
        *.app/Contents/{PkgInfo,Resources/\*.lproj,_CodeSignature} and .DS_Store.

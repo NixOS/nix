@@ -1,21 +1,21 @@
-#include "error.hh"
-#include "fetchers.hh"
-#include "users.hh"
-#include "cache.hh"
-#include "globals.hh"
-#include "tarfile.hh"
-#include "store-api.hh"
-#include "url-parts.hh"
-#include "pathlocks.hh"
-#include "processes.hh"
-#include "git.hh"
-#include "git-utils.hh"
-#include "logging.hh"
-#include "finally.hh"
-#include "fetch-settings.hh"
-#include "json-utils.hh"
-#include "archive.hh"
-#include "mounted-source-accessor.hh"
+#include "nix/util/error.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/util/users.hh"
+#include "nix/fetchers/cache.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/tarfile.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/url-parts.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/git.hh"
+#include "nix/fetchers/git-utils.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/finally.hh"
+#include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/json-utils.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/mounted-source-accessor.hh"
 
 #include <regex>
 #include <string.h>
@@ -536,7 +536,7 @@ struct GitInputScheme : InputScheme
     static MakeNotAllowedError makeNotAllowedError(std::filesystem::path repoPath)
     {
         return [repoPath{std::move(repoPath)}](const CanonPath & path) -> RestrictedPathError {
-            if (nix::pathExists(repoPath / path.rel()))
+            if (fs::symlink_exists(repoPath / path.rel()))
                 return RestrictedPathError(
                     "Path '%1%' in the repository %2% is not tracked by Git.\n"
                     "\n"

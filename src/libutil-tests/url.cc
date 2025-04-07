@@ -1,4 +1,4 @@
-#include "url.hh"
+#include "nix/util/url.hh"
 #include <gtest/gtest.h>
 
 namespace nix {

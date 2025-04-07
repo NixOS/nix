@@ -1,8 +1,8 @@
-#include "progress-bar.hh"
-#include "terminal.hh"
-#include "sync.hh"
-#include "store-api.hh"
-#include "names.hh"
+#include "nix/main/progress-bar.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/sync.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/names.hh"
 
 #include <atomic>
 #include <map>

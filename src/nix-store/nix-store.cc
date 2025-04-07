@@ -1,23 +1,23 @@
-#include "archive.hh"
-#include "derivations.hh"
+#include "nix/util/archive.hh"
+#include "nix/store/derivations.hh"
 #include "dotgraph.hh"
-#include "globals.hh"
-#include "store-cast.hh"
-#include "local-fs-store.hh"
-#include "log-store.hh"
-#include "serve-protocol.hh"
-#include "serve-protocol-connection.hh"
-#include "shared.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/store-cast.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/log-store.hh"
+#include "nix/store/serve-protocol.hh"
+#include "nix/store/serve-protocol-connection.hh"
+#include "nix/main/shared.hh"
 #include "graphml.hh"
-#include "legacy.hh"
-#include "posix-source-accessor.hh"
-#include "path-with-outputs.hh"
+#include "nix/cmd/legacy.hh"
+#include "nix/util/posix-source-accessor.hh"
+#include "nix/store/path-with-outputs.hh"
 #include "man-pages.hh"
 
 #ifndef _WIN32 // TODO implement on Windows or provide allowed-to-noop interface
-# include "local-store.hh"
-# include "monitor-fd.hh"
-# include "posix-fs-canonicalise.hh"
+# include "nix/store/local-store.hh"
+# include "nix/util/monitor-fd.hh"
+# include "nix/store/posix-fs-canonicalise.hh"
 #endif
 
 #include <iostream>
@@ -27,9 +27,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "build-result.hh"
-#include "exit.hh"
-#include "serve-protocol-impl.hh"
+#include "nix/store/build-result.hh"
+#include "nix/util/exit.hh"
+#include "nix/store/serve-protocol-impl.hh"
 
 namespace nix_store {
 

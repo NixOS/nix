@@ -5,23 +5,23 @@
 #include <memory>
 #include <tuple>
 #include <iomanip>
-#if __APPLE__
+#ifdef __APPLE__
 #include <sys/time.h>
 #endif
 
-#include "machines.hh"
-#include "shared.hh"
-#include "plugin.hh"
-#include "pathlocks.hh"
-#include "globals.hh"
-#include "serialise.hh"
-#include "build-result.hh"
-#include "store-api.hh"
-#include "strings.hh"
-#include "derivations.hh"
-#include "local-store.hh"
-#include "legacy.hh"
-#include "experimental-features.hh"
+#include "nix/store/machines.hh"
+#include "nix/main/shared.hh"
+#include "nix/main/plugin.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/serialise.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/strings.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/local-store.hh"
+#include "nix/cmd/legacy.hh"
+#include "nix/util/experimental-features.hh"
 
 using namespace nix;
 using std::cin;
@@ -225,7 +225,7 @@ static int main_build_remote(int argc, char * * argv)
                     break;
                 }
 
-#if __APPLE__
+#ifdef __APPLE__
                 futimes(bestSlotLock.get(), NULL);
 #else
                 futimens(bestSlotLock.get(), NULL);

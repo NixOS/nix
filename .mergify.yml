@@ -117,3 +117,14 @@ pull_request_rules:
         labels:
           - automatic backport
           - merge-queue
+
+  - name: backport patches to 2.27
+    conditions:
+      - label=backport 2.27-maintenance
+    actions:
+      backport:
+        branches:
+          - "2.27-maintenance"
+        labels:
+          - automatic backport
+          - merge-queue

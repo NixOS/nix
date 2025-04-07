@@ -1,6 +1,6 @@
-#include "uds-remote-store.hh"
-#include "unix-domain-socket.hh"
-#include "worker-protocol.hh"
+#include "nix/store/uds-remote-store.hh"
+#include "nix/util/unix-domain-socket.hh"
+#include "nix/store/worker-protocol.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

@@ -1,6 +1,6 @@
-#include "eval-error.hh"
-#include "eval.hh"
-#include "value.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
 
 namespace nix {
 

@@ -1,10 +1,10 @@
-#include "archive.hh"
-#include "posix-source-accessor.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
-#include "globals.hh"
-#include "compression.hh"
-#include "derivations.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/posix-source-accessor.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/compression.hh"
+#include "nix/store/derivations.hh"
 
 namespace nix {
 

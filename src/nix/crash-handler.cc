@@ -1,13 +1,14 @@
 #include "crash-handler.hh"
-#include "fmt.hh"
-#include "logging.hh"
+
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
 
 #include <boost/core/demangle.hpp>
 #include <exception>
 #include <sstream>
 
 // Darwin and FreeBSD stdenv do not define _GNU_SOURCE but do have _Unwind_Backtrace.
-#if __APPLE__ || __FreeBSD__
+#if defined(__APPLE__) || defined(__FreeBSD__)
 #  define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
 #endif
 

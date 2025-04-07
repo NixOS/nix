@@ -1,30 +1,30 @@
-#include "command.hh"
-#include "installable-flake.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "eval.hh"
-#include "eval-inline.hh"
-#include "eval-settings.hh"
-#include "flake/flake.hh"
-#include "get-drvs.hh"
-#include "signals.hh"
-#include "store-api.hh"
-#include "derivations.hh"
-#include "outputs-spec.hh"
-#include "attr-path.hh"
-#include "fetchers.hh"
-#include "registry.hh"
-#include "eval-cache.hh"
-#include "markdown.hh"
-#include "users.hh"
-#include "fetch-to-store.hh"
-#include "local-fs-store.hh"
+#include "nix/cmd/command.hh"
+#include "nix/cmd/installable-flake.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/flake/flake.hh"
+#include "nix/expr/get-drvs.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/registry.hh"
+#include "nix/expr/eval-cache.hh"
+#include "nix/cmd/markdown.hh"
+#include "nix/util/users.hh"
+#include "nix/fetchers/fetch-to-store.hh"
+#include "nix/store/local-fs-store.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
 #include <iomanip>
 
-#include "strings-inline.hh"
+#include "nix/util/strings-inline.hh"
 
 namespace nix::fs { using namespace std::filesystem; }
 
@@ -905,7 +905,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         std::function<void(const SourcePath & from, const fs::path & to)> copyDir;
         copyDir = [&](const SourcePath & from, const fs::path & to)
         {
-            fs::create_directories(to);
+            createDirs(to);
 
             for (auto & [name, entry] : from.readDirectory()) {
                 checkInterrupt();

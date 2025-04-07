@@ -1,14 +1,16 @@
-#include "derivations.hh"
-#include "globals.hh"
-#include "local-store.hh"
-#include "finally.hh"
-#include "unix-domain-socket.hh"
-#include "signals.hh"
-#include "posix-fs-canonicalise.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/local-store.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/unix-domain-socket.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
+
+#include "store-config-private.hh"
 
 #if !defined(__linux__)
 // For shelling out to lsof
-#  include "processes.hh"
+#  include "nix/util/processes.hh"
 #endif
 
 #include <functional>
@@ -333,7 +335,7 @@ static std::string quoteRegexChars(const std::string & raw)
     return std::regex_replace(raw, specialRegex, R"(\$&)");
 }
 
-#if __linux__
+#ifdef __linux__
 static void readFileRoots(const std::filesystem::path & path, UncheckedRoots & roots)
 {
     try {
@@ -425,7 +427,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     }
 #endif
 
-#if __linux__
+#ifdef __linux__
     readFileRoots("/proc/sys/kernel/modprobe", unchecked);
     readFileRoots("/proc/sys/kernel/fbsplash", unchecked);
     readFileRoots("/proc/sys/kernel/poweroff_cmd", unchecked);

@@ -2,9 +2,9 @@
 #include <string>
 #include <sstream>
 
-#include "strings-inline.hh"
-#include "os-string.hh"
-#include "error.hh"
+#include "nix/util/strings-inline.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 
@@ -17,8 +17,10 @@ struct view_stringbuf : public std::stringbuf
     }
 };
 
-std::string_view toView(const std::ostringstream & os)
+__attribute__((no_sanitize("undefined"))) std::string_view toView(const std::ostringstream & os)
 {
+    /* Downcasting like this is very much undefined behavior, so we disable
+       UBSAN for this function. */
     auto buf = static_cast<view_stringbuf *>(os.rdbuf());
     return buf->toView();
 }
@@ -37,6 +39,7 @@ basicSplitString(std::basic_string_view<OsChar> s, std::basic_string_view<OsChar
 template std::string concatStringsSep(std::string_view, const std::list<std::string> &);
 template std::string concatStringsSep(std::string_view, const std::set<std::string> &);
 template std::string concatStringsSep(std::string_view, const std::vector<std::string> &);
+template std::string concatStringsSep(std::string_view, const boost::container::small_vector<std::string, 64> &);
 
 typedef std::string_view strings_2[2];
 template std::string concatStringsSep(std::string_view, const strings_2 &);

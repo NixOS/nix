@@ -1,14 +1,14 @@
-#include "local-store.hh"
-#include "machines.hh"
-#include "worker.hh"
-#include "substitution-goal.hh"
-#include "drv-output-substitution-goal.hh"
-#include "derivation-goal.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/machines.hh"
+#include "nix/store/build/worker.hh"
+#include "nix/store/build/substitution-goal.hh"
+#include "nix/store/build/drv-output-substitution-goal.hh"
+#include "nix/store/build/derivation-goal.hh"
 #ifndef _WIN32 // TODO Enable building on Windows
-#  include "local-derivation-goal.hh"
-#  include "hook-instance.hh"
+#  include "nix/store/build/local-derivation-goal.hh"
+#  include "nix/store/build/hook-instance.hh"
 #endif
-#include "signals.hh"
+#include "nix/util/signals.hh"
 
 namespace nix {
 

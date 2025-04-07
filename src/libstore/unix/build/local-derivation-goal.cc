@@ -1,24 +1,27 @@
-#include "local-derivation-goal.hh"
-#include "indirect-root-store.hh"
-#include "hook-instance.hh"
-#include "worker.hh"
-#include "builtins.hh"
-#include "builtins/buildenv.hh"
-#include "path-references.hh"
-#include "finally.hh"
-#include "util.hh"
-#include "archive.hh"
-#include "git.hh"
-#include "compression.hh"
-#include "daemon.hh"
-#include "topo-sort.hh"
-#include "callback.hh"
-#include "json-utils.hh"
-#include "current-process.hh"
-#include "child.hh"
-#include "unix-domain-socket.hh"
-#include "posix-fs-canonicalise.hh"
-#include "posix-source-accessor.hh"
+#include "nix/store/build/local-derivation-goal.hh"
+#include "nix/store/local-store.hh"
+#include "nix/util/processes.hh"
+#include "nix/store/indirect-root-store.hh"
+#include "nix/store/build/hook-instance.hh"
+#include "nix/store/build/worker.hh"
+#include "nix/store/builtins.hh"
+#include "nix/store/builtins/buildenv.hh"
+#include "nix/store/path-references.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/util.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/git.hh"
+#include "nix/util/compression.hh"
+#include "nix/store/daemon.hh"
+#include "nix/util/topo-sort.hh"
+#include "nix/util/callback.hh"
+#include "nix/util/json-utils.hh"
+#include "nix/util/current-process.hh"
+#include "nix/store/build/child.hh"
+#include "nix/util/unix-domain-socket.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/util/posix-source-accessor.hh"
+#include "nix/store/config.hh"
 
 #include <regex>
 #include <queue>
@@ -31,13 +34,15 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 
+#include "store-config-private.hh"
+
 #if HAVE_STATVFS
 #include <sys/statvfs.h>
 #endif
 
 /* Includes required for chroot support. */
-#if __linux__
-# include "fchmodat2-compat.hh"
+#ifdef __linux__
+# include "nix/store/fchmodat2-compat.hh"
 # include <sys/ioctl.h>
 # include <net/if.h>
 # include <netinet/ip.h>
@@ -46,16 +51,16 @@
 # include <sys/param.h>
 # include <sys/mount.h>
 # include <sys/syscall.h>
-# include "namespaces.hh"
+# include "nix/util/namespaces.hh"
 # if HAVE_SECCOMP
 #   include <seccomp.h>
 # endif
 # define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
-# include "cgroup.hh"
-# include "personality.hh"
+# include "nix/util/cgroup.hh"
+# include "nix/store/personality.hh"
 #endif
 
-#if __APPLE__
+#ifdef __APPLE__
 #include <spawn.h>
 #include <sys/sysctl.h>
 #include <sandbox.h>
@@ -68,8 +73,10 @@ extern "C" int sandbox_init_with_parameters(const char *profile, uint64_t flags,
 #include <grp.h>
 #include <iostream>
 
-#include "strings.hh"
-#include "signals.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/signals.hh"
+
+#include "store-config-private.hh"
 
 namespace nix {
 
@@ -122,7 +129,7 @@ LocalDerivationGoal::~LocalDerivationGoal()
 
 inline bool LocalDerivationGoal::needsHashRewrite()
 {
-#if __linux__
+#ifdef __linux__
     return !useChroot;
 #else
     /* Darwin requires hash rewriting even when sandboxing is enabled. */
@@ -163,7 +170,7 @@ void LocalDerivationGoal::killChild()
 void LocalDerivationGoal::killSandbox(bool getStats)
 {
     if (cgroup) {
-        #if __linux__
+        #ifdef __linux__
         auto stats = destroyCgroup(*cgroup);
         if (getStats) {
             buildResult.cpuUser = stats.cpuUser;
@@ -200,7 +207,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
             if (drvOptions->noChroot)
                 throw Error("derivation '%s' has '__noChroot' set, "
                     "but that's not allowed when 'sandbox' is 'true'", worker.store.printStorePath(drvPath));
-#if __APPLE__
+#ifdef __APPLE__
             if (drvOptions->additionalSandboxProfile != "")
                 throw Error("derivation '%s' specifies a sandbox profile, "
                     "but this is only allowed when 'sandbox' is 'relaxed'", worker.store.printStorePath(drvPath));
@@ -215,14 +222,14 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 
     auto & localStore = getLocalStore();
     if (localStore.storeDir != localStore.realStoreDir.get()) {
-        #if __linux__
+        #ifdef __linux__
             useChroot = true;
         #else
             throw Error("building using a diverted store is not supported on this platform");
         #endif
     }
 
-    #if __linux__
+    #ifdef __linux__
     if (useChroot) {
         if (!mountAndPidNamespacesSupported()) {
             if (!settings.sandboxFallback)
@@ -398,7 +405,7 @@ void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
     cleanupPostOutputsRegisteredModeCheck();
 }
 
-#if __linux__
+#ifdef __linux__
 static void doBind(const Path & source, const Path & target, bool optional = false) {
     debug("bind mounting '%1%' to '%2%'", source, target);
 
@@ -471,12 +478,12 @@ static void handleChildException(bool sendException)
 void LocalDerivationGoal::startBuilder()
 {
     if ((buildUser && buildUser->getUIDCount() != 1)
-        #if __linux__
+        #ifdef __linux__
         || settings.useCgroups
         #endif
         )
     {
-        #if __linux__
+        #ifdef __linux__
         experimentalFeatureSettings.require(Xp::Cgroups);
 
         /* If we're running from the daemon, then this will return the
@@ -543,7 +550,7 @@ void LocalDerivationGoal::startBuilder()
     /* Create a temporary directory where the build will take
        place. */
     topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
-#if __APPLE__
+#ifdef __APPLE__
     if (false) {
 #else
     if (useChroot) {
@@ -722,7 +729,7 @@ void LocalDerivationGoal::startBuilder()
             pathsInChroot[i] = {i, true};
         }
 
-#if __linux__
+#ifdef __linux__
         /* Create a temporary directory in which we set up the chroot
            environment using bind-mounts.  We put it in the Nix store
            so that the build outputs can be moved efficiently from the
@@ -821,7 +828,7 @@ void LocalDerivationGoal::startBuilder()
 #else
         if (drvOptions->useUidRange(*drv))
             throw Error("feature 'uid-range' is not supported on this platform");
-        #if __APPLE__
+        #ifdef __APPLE__
             /* We don't really have any parent prep work to do (yet?)
                All work happens in the child, instead. */
         #else
@@ -901,7 +908,7 @@ void LocalDerivationGoal::startBuilder()
         if (chown(slaveName.c_str(), buildUser->getUID(), 0))
             throw SysError("changing owner of pseudoterminal slave");
     }
-#if __APPLE__
+#ifdef __APPLE__
     else {
         if (grantpt(builderOut.get()))
             throw SysError("granting access to pseudoterminal slave");
@@ -936,7 +943,7 @@ void LocalDerivationGoal::startBuilder()
 
     /* Fork a child to build the package. */
 
-#if __linux__
+#ifdef __linux__
     if (useChroot) {
         /* Set up private namespaces for the build:
 
@@ -1136,7 +1143,7 @@ void LocalDerivationGoal::initTmpDir()
 {
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
-#if __linux__
+#ifdef __linux__
     tmpDirInSandbox = useChroot ? settings.sandboxBuildDir : tmpDir;
 #else
     tmpDirInSandbox = tmpDir;
@@ -1639,7 +1646,7 @@ void LocalDerivationGoal::addDependency(const StorePath & path)
 
         debug("materialising '%s' in the sandbox", worker.store.printStorePath(path));
 
-        #if __linux__
+        #ifdef __linux__
 
             Path source = worker.store.Store::toRealPath(path);
             Path target = chrootRootDir + worker.store.printStorePath(path);
@@ -1689,7 +1696,7 @@ void LocalDerivationGoal::chownToBuilder(const Path & path)
 
 void setupSeccomp()
 {
-#if __linux__
+#ifdef __linux__
     if (!settings.filterSyscalls) return;
 #if HAVE_SECCOMP
     scmp_filter_ctx ctx;
@@ -1701,7 +1708,7 @@ void setupSeccomp()
         seccomp_release(ctx);
     });
 
-    constexpr std::string_view nativeSystem = SYSTEM;
+    constexpr std::string_view nativeSystem = NIX_LOCAL_SYSTEM;
 
     if (nativeSystem == "x86_64-linux" &&
         seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)
@@ -1809,7 +1816,7 @@ void LocalDerivationGoal::runChild()
            } catch (SystemError &) { }
         }
 
-#if __linux__
+#ifdef __linux__
         if (useChroot) {
 
             userNamespaceSync.writeSide = -1;
@@ -2043,7 +2050,7 @@ void LocalDerivationGoal::runChild()
         /* Close all other file descriptors. */
         unix::closeExtraFDs();
 
-#if __linux__
+#ifdef __linux__
         linux::setPersonality(drv->platform);
 #endif
 
@@ -2082,7 +2089,7 @@ void LocalDerivationGoal::runChild()
                 throw SysError("setuid failed");
         }
 
-#if __APPLE__
+#ifdef __APPLE__
         /* This has to appear before import statements. */
         std::string sandboxProfile = "(version 1)\n";
 
@@ -2253,7 +2260,7 @@ void LocalDerivationGoal::runChild()
         for (auto & i : drv->args)
             args.push_back(rewriteStrings(i, inputRewrites));
 
-#if __APPLE__
+#ifdef __APPLE__
         posix_spawnattr_t attrp;
 
         if (posix_spawnattr_init(&attrp))
@@ -2926,8 +2933,12 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
                         spec.insert(worker.store.parseStorePath(i));
                     else if (auto output = get(outputs, i))
                         spec.insert(output->path);
-                    else
-                        throw BuildError("derivation contains an illegal reference specifier '%s'", i);
+                    else {
+                        std::string outputsListing = concatMapStringsSep(", ", outputs, [](auto & o) { return o.first; });
+                        throw BuildError("derivation '%s' output check for '%s' contains an illegal reference specifier '%s',"
+                            " expected store path or output name (one of [%s])",
+                            worker.store.printStorePath(drvPath), outputName, i, outputsListing);
+                    }
                 }
 
                 auto used = recursive

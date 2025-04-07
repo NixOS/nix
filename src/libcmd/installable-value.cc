@@ -1,6 +1,6 @@
-#include "installable-value.hh"
-#include "eval-cache.hh"
-#include "fetch-to-store.hh"
+#include "nix/cmd/installable-value.hh"
+#include "nix/expr/eval-cache.hh"
+#include "nix/fetchers/fetch-to-store.hh"
 
 namespace nix {
 

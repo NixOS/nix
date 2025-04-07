@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <cstdlib>
-#include "globals.hh"
-#include "logging.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/logging.hh"
 
 using namespace nix;
 
@@ -14,7 +14,7 @@ int main (int argc, char **argv) {
     // Disable build hook. We won't be testing remote builds in these unit tests. If we do, fix the above build hook.
     settings.buildHook = {};
 
-    #if __linux__ // should match the conditional around sandboxBuildDir declaration.
+    #ifdef __linux__ // should match the conditional around sandboxBuildDir declaration.
 
     // When building and testing nix within the host's Nix sandbox, our store dir will be located in the host's sandboxBuildDir, e.g.:
     // Host
@@ -27,7 +27,7 @@ int main (int argc, char **argv) {
     settings.sandboxBuildDir = "/test-build-dir-instead-of-usual-build-dir";
     #endif
 
-    #if __APPLE__
+    #ifdef __APPLE__
     // Avoid this error, when already running in a sandbox:
     // sandbox-exec: sandbox_apply: Operation not permitted
     settings.sandboxMode = smDisabled;

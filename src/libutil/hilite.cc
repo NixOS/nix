@@ -1,4 +1,4 @@
-#include "hilite.hh"
+#include "nix/util/hilite.hh"
 
 namespace nix {
 

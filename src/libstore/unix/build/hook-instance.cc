@@ -1,10 +1,10 @@
-#include "globals.hh"
-#include "config-global.hh"
-#include "hook-instance.hh"
-#include "file-system.hh"
-#include "child.hh"
-#include "strings.hh"
-#include "executable-path.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/config-global.hh"
+#include "nix/store/build/hook-instance.hh"
+#include "nix/util/file-system.hh"
+#include "nix/store/build/child.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/executable-path.hh"
 
 namespace nix {
 
