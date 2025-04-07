@@ -130,7 +130,8 @@ deps_private += sqlite
 # AWS C++ SDK has bad pkg-config. See
 # https://github.com/aws/aws-sdk-cpp/issues/2673 for details.
 aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
-configdata_priv.set('ENABLE_S3', aws_s3.found().to_int())
+# The S3 store definitions in the header will be hidden based on this variables.
+configdata_pub.set('NIX_WITH_S3_SUPPORT', aws_s3.found().to_int())
 if aws_s3.found()
   aws_s3 = declare_dependency(
     include_directories: include_directories(aws_s3.get_variable('includedir')),
@@ -157,12 +158,15 @@ endforeach
 
 busybox = find_program(get_option('sandbox-shell'), required : false)
 
+configdata_priv.set('HAVE_EMBEDDED_SANDBOX_SHELL', get_option('embedded-sandbox-shell').to_int())
+
 if get_option('embedded-sandbox-shell')
-  # This one goes in config.h
-  # The path to busybox is passed as a -D flag when compiling this_library.
-  # This solution is inherited from the old make buildsystem
-  # TODO: do this differently?
-  configdata_priv.set('HAVE_EMBEDDED_SANDBOX_SHELL', 1)
+  configdata_priv.set_quoted('SANDBOX_SHELL', '__embedded_sandbox_shell__')
+elif busybox.found()
+  configdata_priv.set_quoted('SANDBOX_SHELL', busybox.full_path())
+endif
+
+if get_option('embedded-sandbox-shell')
   hexdump = find_program('hexdump', native : true)
   embedded_sandbox_shell_gen = custom_target(
     'embedded-sandbox-shell.gen.hh',
@@ -179,6 +183,64 @@ if get_option('embedded-sandbox-shell')
   )
   generated_headers += embedded_sandbox_shell_gen
 endif
+
+prefix = get_option('prefix')
+# For each of these paths, assume that it is relative to the prefix unless
+# it is already an absolute path (which is the default for store-dir, localstatedir, and log-dir).
+path_opts = [
+  # Meson built-ins.
+  'datadir',
+  'mandir',
+  'libdir',
+  'includedir',
+  'libexecdir',
+  # Homecooked Nix directories.
+  'store-dir',
+  'localstatedir',
+  'log-dir',
+]
+# For your grepping pleasure, this loop sets the following variables that aren't mentioned
+# literally above:
+# store_dir
+# localstatedir
+# log_dir
+# profile_dir
+foreach optname : path_opts
+  varname = optname.replace('-', '_')
+  path = get_option(optname)
+  if fs.is_absolute(path)
+    set_variable(varname, path)
+  else
+    set_variable(varname, prefix / path)
+  endif
+endforeach
+
+# sysconfdir doesn't get anything installed to directly, and is only used to
+# tell Nix where to look for nix.conf, so it doesn't get appended to prefix.
+sysconfdir = get_option('sysconfdir')
+if not fs.is_absolute(sysconfdir)
+  sysconfdir = '/' / sysconfdir
+endif
+
+# Aside from prefix itself, each of these was made into an absolute path
+# by joining it with prefix, unless it was already an absolute path
+# (which is the default for store-dir, localstatedir, and log-dir).
+configdata_priv.set_quoted('NIX_PREFIX',    prefix)
+configdata_priv.set_quoted('NIX_STORE_DIR', store_dir)
+configdata_priv.set_quoted('NIX_DATA_DIR',  datadir)
+configdata_priv.set_quoted('NIX_STATE_DIR', localstatedir / 'nix')
+configdata_priv.set_quoted('NIX_LOG_DIR',   log_dir)
+configdata_priv.set_quoted('NIX_CONF_DIR',  sysconfdir / 'nix')
+configdata_priv.set_quoted('NIX_MAN_DIR',   mandir)
+
+lsof = find_program('lsof', required : false)
+configdata_priv.set_quoted(
+  'LSOF',
+  lsof.found()
+    ? lsof.full_path()
+    # Just look up on the PATH
+    : 'lsof',
+)
 
 config_priv_h = configure_file(
   configuration : configdata_priv,
@@ -267,87 +329,6 @@ else
   subdir('unix')
 endif
 
-prefix = get_option('prefix')
-# For each of these paths, assume that it is relative to the prefix unless
-# it is already an absolute path (which is the default for store-dir, localstatedir, and log-dir).
-path_opts = [
-  # Meson built-ins.
-  'datadir',
-  'mandir',
-  'libdir',
-  'includedir',
-  'libexecdir',
-  # Homecooked Nix directories.
-  'store-dir',
-  'localstatedir',
-  'log-dir',
-]
-# For your grepping pleasure, this loop sets the following variables that aren't mentioned
-# literally above:
-# store_dir
-# localstatedir
-# log_dir
-# profile_dir
-foreach optname : path_opts
-  varname = optname.replace('-', '_')
-  path = get_option(optname)
-  if fs.is_absolute(path)
-    set_variable(varname, path)
-  else
-    set_variable(varname, prefix / path)
-  endif
-endforeach
-
-# sysconfdir doesn't get anything installed to directly, and is only used to
-# tell Nix where to look for nix.conf, so it doesn't get appended to prefix.
-sysconfdir = get_option('sysconfdir')
-if not fs.is_absolute(sysconfdir)
-  sysconfdir = '/' / sysconfdir
-endif
-
-lsof = find_program('lsof', required : false)
-
-# Aside from prefix itself, each of these was made into an absolute path
-# by joining it with prefix, unless it was already an absolute path
-# (which is the default for store-dir, localstatedir, and log-dir).
-cpp_str_defines = {
-  'NIX_PREFIX':    prefix,
-  'NIX_STORE_DIR': store_dir,
-  'NIX_DATA_DIR':  datadir,
-  'NIX_STATE_DIR': localstatedir / 'nix',
-  'NIX_LOG_DIR':   log_dir,
-  'NIX_CONF_DIR':  sysconfdir / 'nix',
-  'NIX_MAN_DIR':   mandir,
-}
-
-if lsof.found()
-  lsof_path = lsof.full_path()
-else
-  # Just look up on the PATH
-  lsof_path = 'lsof'
-endif
-cpp_str_defines += {
-  'LSOF': lsof_path
-}
-
-if get_option('embedded-sandbox-shell')
-  cpp_str_defines += {
-    'SANDBOX_SHELL': '__embedded_sandbox_shell__'
-  }
-elif busybox.found()
-  cpp_str_defines += {
-    'SANDBOX_SHELL': busybox.full_path()
-  }
-endif
-
-cpp_args = []
-
-foreach name, value : cpp_str_defines
-  cpp_args += [
-    '-D' + name + '=' + '"' + value + '"'
-  ]
-endforeach
-
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
 
@@ -358,7 +339,6 @@ this_library = library(
   config_priv_h,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
-  cpp_args : cpp_args,
   link_args: linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,

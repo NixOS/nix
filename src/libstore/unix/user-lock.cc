@@ -10,7 +10,7 @@
 
 namespace nix {
 
-#if __linux__
+#ifdef __linux__
 
 static std::vector<gid_t> get_group_list(const char *username, gid_t group_id)
 {
@@ -94,7 +94,7 @@ struct SimpleUserLock : UserLock
                 if (lock->uid == getuid() || lock->uid == geteuid())
                     throw Error("the Nix user should not be a member of '%s'", settings.buildUsersGroup);
 
-                #if __linux__
+                #ifdef __linux__
                 /* Get the list of supplementary groups of this user. This is
                  * usually either empty or contains a group such as "kvm". */
 
@@ -193,10 +193,10 @@ std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useUserNamespace)
 
 bool useBuildUsers()
 {
-    #if __linux__
+    #ifdef __linux__
     static bool b = (settings.buildUsersGroup != "" || settings.autoAllocateUids) && isRootUser();
     return b;
-    #elif __APPLE__
+    #elif defined(__APPLE__)
     static bool b = settings.buildUsersGroup != "" && isRootUser();
     return b;
     #else

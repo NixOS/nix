@@ -17,7 +17,7 @@ namespace nix {
 struct ArchiveSettings : Config
 {
     Setting<bool> useCaseHack{this,
-        #if __APPLE__
+        #ifdef __APPLE__
             true,
         #else
             false,

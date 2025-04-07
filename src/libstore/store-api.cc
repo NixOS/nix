@@ -1300,7 +1300,7 @@ ref<Store> openStore(StoreReference && storeURI)
                 return std::make_shared<LocalStore>(params);
             else if (pathExists(settings.nixDaemonSocketFile))
                 return std::make_shared<UDSRemoteStore>(params);
-            #if __linux__
+            #ifdef __linux__
             else if (!pathExists(stateDir)
                 && params.empty()
                 && !isRootUser()

@@ -25,7 +25,7 @@
 # include <dlfcn.h>
 #endif
 
-#if __APPLE__
+#ifdef __APPLE__
 # include "nix/util/processes.hh"
 #endif
 
@@ -90,7 +90,7 @@ Settings::Settings()
 #endif
 
     /* chroot-like behavior from Apple's sandbox */
-#if __APPLE__
+#ifdef __APPLE__
     sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
@@ -151,7 +151,7 @@ unsigned int Settings::getDefaultCores()
       return concurrency;
 }
 
-#if __APPLE__
+#ifdef __APPLE__
 static bool hasVirt() {
 
     int hasVMM;
@@ -181,16 +181,16 @@ StringSet Settings::getDefaultSystemFeatures()
        actually require anything special on the machines. */
     StringSet features{"nixos-test", "benchmark", "big-parallel"};
 
-    #if __linux__
+    #ifdef __linux__
     features.insert("uid-range");
     #endif
 
-    #if __linux__
+    #ifdef __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
         features.insert("kvm");
     #endif
 
-    #if __APPLE__
+    #ifdef __APPLE__
     if (hasVirt())
         features.insert("apple-virt");
     #endif
@@ -205,11 +205,11 @@ StringSet Settings::getDefaultExtraPlatforms()
     if (std::string{NIX_LOCAL_SYSTEM} == "x86_64-linux" && !isWSL1())
         extraPlatforms.insert("i686-linux");
 
-#if __linux__
+#ifdef __linux__
     StringSet levels = computeLevels();
     for (auto iter = levels.begin(); iter != levels.end(); ++iter)
         extraPlatforms.insert(*iter + "-linux");
-#elif __APPLE__
+#elif defined(__APPLE__)
     // Rosetta 2 emulation layer can run x86_64 binaries on aarch64
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
@@ -224,7 +224,7 @@ StringSet Settings::getDefaultExtraPlatforms()
 
 bool Settings::isWSL1()
 {
-#if __linux__
+#ifdef __linux__
     struct utsname utsbuf;
     uname(&utsbuf);
     // WSL1 uses -Microsoft suffix
@@ -376,7 +376,7 @@ void initLibStore(bool loadConfig) {
        [1] https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-initialize.mm#L614-L636
     */
     curl_global_init(CURL_GLOBAL_ALL);
-#if __APPLE__
+#ifdef __APPLE__
     /* On macOS, don't use the per-session TMPDIR (as set e.g. by
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */

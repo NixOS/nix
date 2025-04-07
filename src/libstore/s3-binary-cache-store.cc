@@ -1,9 +1,10 @@
-#if ENABLE_S3
+#include "nix/store/s3-binary-cache-store.hh"
+
+#if NIX_WITH_S3_SUPPORT
 
 #include <assert.h>
 
 #include "nix/store/s3.hh"
-#include "nix/store/s3-binary-cache-store.hh"
 #include "nix/store/nar-info.hh"
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/store/globals.hh"
