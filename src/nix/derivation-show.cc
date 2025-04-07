@@ -21,7 +21,7 @@ struct CmdShowDerivation : InstallablesCommand, MixPrintJSON
             .longName = "recursive",
             .shortName = 'r',
             .description = "Include the dependencies of the specified derivations.",
-            .handler = {&recursive, true}
+            .handler = {&recursive, true},
         });
     }
 

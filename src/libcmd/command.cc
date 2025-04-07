@@ -237,12 +237,13 @@ void StorePathCommand::run(ref<Store> store, StorePaths && storePaths)
 
 MixProfile::MixProfile()
 {
-    addFlag(
-        {.longName = "profile",
-         .description = "The profile to operate on.",
-         .labels = {"path"},
-         .handler = {&profile},
-         .completer = completePath});
+    addFlag({
+        .longName = "profile",
+        .description = "The profile to operate on.",
+        .labels = {"path"},
+        .handler = {&profile},
+        .completer = completePath,
+    });
 }
 
 void MixProfile::updateProfile(const StorePath & storePath)
