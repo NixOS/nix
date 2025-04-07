@@ -274,7 +274,7 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             .longName = "name",
             .description = "Override the name component of the resulting store path. It defaults to the base name of *url*.",
             .labels = {"name"},
-            .handler = {&name}
+            .handler = {&name},
         });
 
         addFlag({
@@ -283,7 +283,7 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             .labels = {"hash"},
             .handler = {[&](std::string s) {
                 expectedHash = Hash::parseAny(s, hashAlgo);
-            }}
+            }},
         });
 
         addFlag(flag::hashAlgo("hash-type", &hashAlgo));

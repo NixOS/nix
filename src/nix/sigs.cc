@@ -104,7 +104,7 @@ struct CmdSign : StorePathsCommand
             .description = "File containing the secret signing key.",
             .labels = {"file"},
             .handler = {&secretKeyFile},
-            .completer = completePath
+            .completer = completePath,
         });
     }
 

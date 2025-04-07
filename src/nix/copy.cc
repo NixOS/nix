@@ -21,7 +21,7 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile
             .description = "Create symlinks prefixed with *path* to the top-level store paths fetched from the source store.",
             .labels = {"path"},
             .handler = {&outLink},
-            .completer = completePath
+            .completer = completePath,
         });
 
         addFlag({
