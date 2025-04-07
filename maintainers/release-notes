@@ -2,6 +2,8 @@
 # vim: set filetype=bash:
 #!nix shell .#changelog-d --command bash
 
+set -euo pipefail
+
 # --- CONFIGURATION ---
 
 # This does double duty for
