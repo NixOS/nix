@@ -79,11 +79,6 @@ config_priv_h = configure_file(
   output : 'expr-config-private.hh',
 )
 
-config_pub_h = configure_file(
-  configuration : configdata_pub,
-  output : 'expr-config.hh',
-)
-
 subdir('nix-meson-build-support/common')
 
 parser_tab = custom_target(
@@ -168,8 +163,6 @@ subdir('primops')
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
 
-headers += [config_pub_h]
-
 this_library = library(
   'nixexpr',
   sources,
@@ -188,8 +181,4 @@ install_headers(headers, subdir : 'nix/expr', preserve_path : true)
 
 libraries_private = []
 
-nixexpr_dep = declare_dependency(
-  include_directories : include_directories('.'),
-  link_with : this_library,
-)
 subdir('nix-meson-build-support/export')

@@ -1935,7 +1935,7 @@ void LocalDerivationGoal::runChild()
             for (auto & i : pathsInChroot) {
                 if (i.second.source == "/proc") continue; // backwards compatibility
 
-                #ifdef HAVE_EMBEDDED_SANDBOX_SHELL
+                #if HAVE_EMBEDDED_SANDBOX_SHELL
                 if (i.second.source == "__embedded_sandbox_shell__") {
                     static unsigned char sh[] = {
                         #include "embedded-sandbox-shell.gen.hh"

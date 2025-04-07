@@ -17,12 +17,14 @@ subdir('nix-meson-build-support/deps-lists')
 configdata = configuration_data()
 
 deps_private_maybe_subproject = [
-  # This dependency may be very limited; was introduced for NIX_USE_BOEHMGC macro dependency
-  dependency('nix-expr'),
 ]
 deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
+  # FIXME: This is only here for the NIX_USE_BOEHMGC macro dependency
+  #        Removing nix-expr will make the build more concurrent and is
+  #        architecturally nice, perhaps.
+  dependency('nix-expr'),
 ]
 subdir('nix-meson-build-support/subprojects')
 
