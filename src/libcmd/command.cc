@@ -240,10 +240,17 @@ MixProfile::MixProfile()
 {
     addFlag({
         .longName = "profile",
+<<<<<<< HEAD
         .description = "The profile to operate on.",
         .labels = {"path"},
         .handler = {&profile},
         .completer = completePath
+=======
+         .description = "The profile to operate on.",
+         .labels = {"path"},
+         .handler = {&profile},
+         .completer = completePath,
+>>>>>>> 06acbd37b (Add trailing commas on addFlag incantations)
     });
 }
 

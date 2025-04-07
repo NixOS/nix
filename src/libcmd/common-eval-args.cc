@@ -59,7 +59,7 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the value *expr* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "expr"},
-        .handler = {[&](std::string name, std::string expr) { autoArgs.insert_or_assign(name, AutoArg{AutoArgExpr{expr}}); }}
+        .handler = {[&](std::string name, std::string expr) { autoArgs.insert_or_assign(name, AutoArg{AutoArgExpr{expr}}); }},
     });
 
     addFlag({
@@ -76,7 +76,7 @@ MixEvalArgs::MixEvalArgs()
         .category = category,
         .labels = {"name", "path"},
         .handler = {[&](std::string name, std::string path) { autoArgs.insert_or_assign(name, AutoArg{AutoArgFile{path}}); }},
-        .completer = completePath
+        .completer = completePath,
     });
 
     addFlag({
@@ -101,7 +101,7 @@ MixEvalArgs::MixEvalArgs()
         .labels = {"path"},
         .handler = {[&](std::string s) {
             lookupPath.elements.emplace_back(LookupPath::Elem::parse(s));
-        }}
+        }},
     });
 
     addFlag({
@@ -127,7 +127,7 @@ MixEvalArgs::MixEvalArgs()
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
             completeFlakeRef(completions, openStore(), prefix);
-        }}
+        }},
     });
 
     addFlag({

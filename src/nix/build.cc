@@ -79,7 +79,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
             .description = "Use *path* as prefix for the symlinks to the build results. It defaults to `result`.",
             .labels = {"path"},
             .handler = {&outLink},
-            .completer = completePath
+            .completer = completePath,
         });
 
         addFlag({

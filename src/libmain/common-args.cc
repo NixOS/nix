@@ -57,7 +57,7 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
                     if (hasPrefix(s.first, prefix))
                         completions.add(s.first, fmt("Set the `%s` setting.", s.first));
             }
-        }
+        },
     });
 
     addFlag({
@@ -75,7 +75,7 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
         .labels = Strings{"jobs"},
         .handler = {[=](std::string s) {
             settings.set("max-jobs", s);
-        }}
+        }},
     });
 
     std::string cat = "Options to override configuration settings";
