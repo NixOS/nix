@@ -23,14 +23,14 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
             .shortName = 'p',
             .description = "The path to the Nix profile to upgrade.",
             .labels = {"profile-dir"},
-            .handler = {&profileDir}
+            .handler = {&profileDir},
         });
 
         addFlag({
             .longName = "nix-store-paths-url",
             .description = "The URL of the file that contains the store paths of the latest Nix release.",
             .labels = {"url"},
-            .handler = {&(std::string&) settings.upgradeNixStorePathUrl}
+            .handler = {&(std::string&) settings.upgradeNixStorePathUrl},
         });
     }
 
