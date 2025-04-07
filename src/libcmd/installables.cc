@@ -844,7 +844,7 @@ RawInstallablesCommand::RawInstallablesCommand()
 void RawInstallablesCommand::applyDefaultInstallables(std::vector<std::string> & rawInstallables)
 {
     if (rawInstallables.empty()) {
-        // FIXME: commands like "nix profile install" should not have a
+        // FIXME: commands like "nix profile add" should not have a
         // default, probably.
         rawInstallables.push_back(".");
     }
