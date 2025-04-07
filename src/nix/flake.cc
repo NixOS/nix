@@ -88,7 +88,7 @@ public:
             .handler={&flakeUrl},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
                 completeFlakeRef(completions, getStore(), prefix);
-            }}
+            }},
         });
         expectArgs({
             .label="inputs",
@@ -108,8 +108,13 @@ public:
                 }
             }},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+<<<<<<< HEAD
                 completeFlakeInputPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
             }}
+=======
+                completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
+            }},
+>>>>>>> 06acbd37b (Add trailing commas on addFlag incantations)
         });
 
         /* Remove flags that don't make sense. */
@@ -334,12 +339,12 @@ struct CmdFlakeCheck : FlakeCommand
         addFlag({
             .longName = "no-build",
             .description = "Do not build checks.",
-            .handler = {&build, false}
+            .handler = {&build, false},
         });
         addFlag({
             .longName = "all-systems",
             .description = "Check the outputs for all systems.",
-            .handler = {&checkAllSystems, true}
+            .handler = {&checkAllSystems, true},
         });
     }
 
@@ -872,7 +877,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     defaultTemplateAttrPathsPrefixes,
                     defaultTemplateAttrPaths,
                     prefix);
-            }}
+            }},
         });
     }
 
@@ -1032,7 +1037,7 @@ struct CmdFlakeClone : FlakeCommand
             .shortName = 'f',
             .description = "Clone the flake to path *dest*.",
             .labels = {"path"},
-            .handler = {&destDir}
+            .handler = {&destDir},
         });
     }
 
@@ -1055,7 +1060,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
             .longName = "to",
             .description = "URI of the destination Nix store",
             .labels = {"store-uri"},
-            .handler = {&dstUri}
+            .handler = {&dstUri},
         });
     }
 
@@ -1135,12 +1140,12 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         addFlag({
             .longName = "legacy",
             .description = "Show the contents of the `legacyPackages` output.",
-            .handler = {&showLegacy, true}
+            .handler = {&showLegacy, true},
         });
         addFlag({
             .longName = "all-systems",
             .description = "Show the contents of outputs for all systems.",
-            .handler = {&showAllSystems, true}
+            .handler = {&showAllSystems, true},
         });
     }
 
@@ -1433,6 +1438,17 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
 {
     CmdFlakePrefetch()
     {
+<<<<<<< HEAD
+=======
+        addFlag({
+            .longName = "out-link",
+            .shortName = 'o',
+            .description = "Create symlink named *path* to the resulting store path.",
+            .labels = {"path"},
+            .handler = {&outLink},
+            .completer = completePath,
+        });
+>>>>>>> 06acbd37b (Add trailing commas on addFlag incantations)
     }
 
     std::string description() override

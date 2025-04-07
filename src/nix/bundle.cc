@@ -24,7 +24,7 @@ struct CmdBundle : InstallableValueCommand
             .handler = {&bundler},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
                 completeFlakeRef(completions, getStore(), prefix);
-            }}
+            }},
         });
 
         addFlag({
@@ -33,7 +33,7 @@ struct CmdBundle : InstallableValueCommand
             .description = "Override the name of the symlink to the build result. It defaults to the base name of the app.",
             .labels = {"path"},
             .handler = {&outLink},
-            .completer = completePath
+            .completer = completePath,
         });
 
     }
