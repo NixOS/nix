@@ -43,7 +43,7 @@
 
 /* Includes required for chroot support. */
 #ifdef __linux__
-# include "nix/store/fchmodat2-compat.hh"
+# include "linux/fchmodat2-compat.hh"
 # include <sys/ioctl.h>
 # include <net/if.h>
 # include <netinet/ip.h>
