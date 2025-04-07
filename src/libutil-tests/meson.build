@@ -59,6 +59,7 @@ sources = files(
   'json-utils.cc',
   'logging.cc',
   'lru-cache.cc',
+  'monitorfdhup.cc',
   'nix_api_util.cc',
   'pool.cc',
   'position.cc',
