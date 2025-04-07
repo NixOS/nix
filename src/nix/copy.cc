@@ -14,6 +14,18 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand
         : BuiltPathsCommand(true)
     {
         addFlag({
+<<<<<<< HEAD
+=======
+            .longName = "out-link",
+            .shortName = 'o',
+            .description = "Create symlinks prefixed with *path* to the top-level store paths fetched from the source store.",
+            .labels = {"path"},
+            .handler = {&outLink},
+            .completer = completePath,
+        });
+
+        addFlag({
+>>>>>>> 06acbd37b (Add trailing commas on addFlag incantations)
             .longName = "no-check-sigs",
             .description = "Do not require that paths are signed by trusted keys.",
             .handler = {&checkSigs, NoCheckSigs},
