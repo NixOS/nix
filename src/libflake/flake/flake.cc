@@ -104,6 +104,19 @@ static StorePath copyInputToStore(
     return storePath;
 }
 
+static SourcePath maybeCopyInputToStore(
+    EvalState & state,
+    fetchers::Input & input,
+    const fetchers::Input & originalInput,
+    ref<SourceAccessor> accessor,
+    CopyMode copyMode)
+{
+    return copyMode == CopyMode::Lazy || (copyMode == CopyMode::RequireLockable && (input.isLocked() || input.getNarHash()))
+        ? SourcePath(accessor)
+        : state.storePath(
+            copyInputToStore(state, input, originalInput, accessor));
+}
+
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
 {
     if (value.isThunk() && value.isTrivial())
@@ -401,7 +414,8 @@ static Flake getFlake(
     const FlakeRef & originalRef,
     bool useRegistries,
     FlakeCache & flakeCache,
-    const InputAttrPath & lockRootAttrPath)
+    const InputAttrPath & lockRootAttrPath,
+    CopyMode copyMode)
 {
     // Fetch a lazy tree first.
     auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
@@ -423,17 +437,17 @@ static Flake getFlake(
         lockedRef = lockedRef2;
     }
 
-    // Copy the tree to the store.
-    auto storePath = copyInputToStore(state, lockedRef.input, originalRef.input, accessor);
-
     // Re-parse flake.nix from the store.
-    return readFlake(state, originalRef, resolvedRef, lockedRef, state.storePath(storePath), lockRootAttrPath);
+    return readFlake(
+        state, originalRef, resolvedRef, lockedRef,
+        maybeCopyInputToStore(state, lockedRef.input, originalRef.input, accessor, copyMode),
+        lockRootAttrPath);
 }
 
-Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
+Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries, CopyMode copyMode)
 {
     FlakeCache flakeCache;
-    return getFlake(state, originalRef, useRegistries, flakeCache, {});
+    return getFlake(state, originalRef, useRegistries, flakeCache, {}, copyMode);
 }
 
 static LockFile readLockFile(
@@ -457,7 +471,7 @@ LockedFlake lockFlake(
 
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
 
-    auto flake = getFlake(state, topRef, useRegistries, flakeCache, {});
+    auto flake = getFlake(state, topRef, useRegistries, flakeCache, {}, lockFlags.copyMode);
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
@@ -501,6 +515,13 @@ LockedFlake lockFlake(
                 });
             explicitCliOverrides.insert(i.first);
         }
+
+        /* For locking of inputs, we require at least a NAR
+           hash. I.e. we can't be fully lazy. */
+        auto inputCopyMode =
+            lockFlags.copyMode == CopyMode::Lazy
+            ? CopyMode::RequireLockable
+            : lockFlags.copyMode;
 
         LockFile newLockFile;
 
@@ -632,7 +653,7 @@ LockedFlake lockFlake(
                         if (auto resolvedPath = resolveRelativePath()) {
                             return readFlake(state, ref, ref, ref, *resolvedPath, inputAttrPath);
                         } else {
-                            return getFlake(state, ref, useRegistries, flakeCache, inputAttrPath);
+                            return getFlake(state, ref, useRegistries, flakeCache, inputAttrPath, inputCopyMode);
                         }
                     };
 
@@ -783,10 +804,10 @@ LockedFlake lockFlake(
                                     auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
                                         state, *input.ref, useRegistries, flakeCache);
 
-                                    // FIXME: allow input to be lazy.
-                                    auto storePath = copyInputToStore(state, lockedRef.input, input.ref->input, accessor);
-
-                                    return {state.storePath(storePath), lockedRef};
+                                    return {
+                                        maybeCopyInputToStore(state, lockedRef.input, input.ref->input, accessor, inputCopyMode),
+                                        lockedRef
+                                    };
                                 }
                             }();
 
@@ -896,7 +917,7 @@ LockedFlake lockFlake(
                            repo, so we should re-read it. FIXME: we could
                            also just clear the 'rev' field... */
                         auto prevLockedRef = flake.lockedRef;
-                        flake = getFlake(state, topRef, useRegistries);
+                        flake = getFlake(state, topRef, useRegistries, lockFlags.copyMode);
 
                         if (lockFlags.commitLockFile &&
                             flake.lockedRef.input.getRev() &&
