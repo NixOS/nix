@@ -118,23 +118,20 @@ nix flake lock $flakeFollowsA
 jq -r -c '.nodes | keys | .[]' $flakeFollowsA/flake.lock | grep "^foobar$"
 
 # Check that path: inputs cannot escape from their root.
-# FIXME: this test is wonky because with lazy trees, ../flakeB at the root is equivalent to /flakeB and not an error.
 cat > $flakeFollowsA/flake.nix <<EOF
 {
     description = "Flake A";
     inputs = {
         B.url = "path:../flakeB";
     };
-    outputs = { ... }: {
-        x = 123;
-    };
+    outputs = { ... }: {};
 }
 EOF
 
 git -C $flakeFollowsA add flake.nix
 
-expect 1 nix eval $flakeFollowsA#x 2>&1 | grep '/flakeB.*is forbidden in pure evaluation mode'
-expect 1 nix eval --impure $flakeFollowsA#x 2>&1 | grep '/flakeB.*does not exist'
+expect 1 nix flake lock $flakeFollowsA 2>&1 | grep '/flakeB.*is forbidden in pure evaluation mode'
+expect 1 nix flake lock --impure $flakeFollowsA 2>&1 | grep '/flakeB.*does not exist'
 
 # Test relative non-flake inputs.
 cat > $flakeFollowsA/flake.nix <<EOF
