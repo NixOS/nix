@@ -554,6 +554,18 @@ public:
     std::optional<std::string> tryAttrsToString(const PosIdx pos, Value & v,
         NixStringContext & context, bool coerceMore = false, bool copyToStore = true);
 
+    StorePath devirtualize(
+        const StorePath & path,
+        StringMap * rewrites = nullptr);
+
+    SingleDerivedPath devirtualize(
+        const SingleDerivedPath & path,
+        StringMap * rewrites = nullptr);
+
+    std::string devirtualize(
+        std::string_view s,
+        const NixStringContext & context);
+
     /**
      * String coercion.
      *

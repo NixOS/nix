@@ -201,13 +201,16 @@ static void fetchTree(
             throw Error("input '%s' is not allowed to use the '__final' attribute", input.to_string());
     }
 
-    auto [storePath, accessor, input2] = input.fetchToStore(state.store);
+    // FIXME: use fetchOrSubstituteTree().
+    auto [accessor, lockedInput] = input.getAccessor(state.store);
+
+    auto storePath = StorePath::random(input.getName());
 
     state.allowPath(storePath);
 
     state.storeFS->mount(CanonPath(state.store->printStorePath(storePath)), accessor);
 
-    emitTreeAttrs(state, storePath, input2, v, params.emptyRevFallback, false);
+    emitTreeAttrs(state, storePath, lockedInput, v, params.emptyRevFallback, false);
 }
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)

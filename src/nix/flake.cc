@@ -1085,7 +1085,10 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         StorePathSet sources;
 
-        auto storePath = store->toStorePath(flake.flake.path.path.abs()).first;
+        auto storePath =
+            dryRun
+            ? flake.flake.lockedRef.input.computeStorePath(*store)
+            : std::get<StorePath>(flake.flake.lockedRef.input.fetchToStore(store));
 
         sources.insert(storePath);
 
@@ -1101,7 +1104,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
                         storePath =
                             dryRun
                             ? (*inputNode)->lockedRef.input.computeStorePath(*store)
-                            : std::get<0>((*inputNode)->lockedRef.input.fetchToStore(store));
+                            : std::get<StorePath>((*inputNode)->lockedRef.input.fetchToStore(store));
                         sources.insert(*storePath);
                     }
                     if (json) {

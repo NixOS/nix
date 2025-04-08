@@ -84,37 +84,31 @@ static std::tuple<ref<SourceAccessor>, FlakeRef, FlakeRef> fetchOrSubstituteTree
     return {fetched->accessor, resolvedRef, fetched->lockedRef};
 }
 
-static StorePath copyInputToStore(
-    EvalState & state,
-    fetchers::Input & input,
-    const fetchers::Input & originalInput,
-    ref<SourceAccessor> accessor)
-{
-    auto storePath = fetchToStore(*state.store, accessor, FetchMode::Copy, input.getName());
-
-    state.allowPath(storePath); // FIXME: should just whitelist the entire virtual store
-
-    state.storeFS->mount(CanonPath(state.store->printStorePath(storePath)), accessor);
-
-    auto narHash = state.store->queryPathInfo(storePath)->narHash;
-    input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
-
-    assert(!originalInput.getNarHash() || storePath == originalInput.computeStorePath(*state.store));
-
-    return storePath;
-}
-
-static SourcePath maybeCopyInputToStore(
+static StorePath mountInput(
     EvalState & state,
     fetchers::Input & input,
     const fetchers::Input & originalInput,
     ref<SourceAccessor> accessor,
     CopyMode copyMode)
 {
-    return copyMode == CopyMode::Lazy || (copyMode == CopyMode::RequireLockable && (input.isLocked() || input.getNarHash()))
-        ? SourcePath(accessor)
-        : state.storePath(
-            copyInputToStore(state, input, originalInput, accessor));
+    auto storePath = StorePath::random(input.getName());
+
+    state.allowPath(storePath); // FIXME: should just whitelist the entire virtual store
+
+    state.storeFS->mount(CanonPath(state.store->printStorePath(storePath)), accessor);
+
+    if (copyMode == CopyMode::RequireLockable && !input.isLocked() && !input.getNarHash()) {
+        auto narHash = accessor->hashPath(CanonPath::root);
+        input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
+    }
+
+    // FIXME: check NAR hash
+
+    #if 0
+    assert(!originalInput.getNarHash() || storePath == originalInput.computeStorePath(*state.store));
+    #endif
+
+    return storePath;
 }
 
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
@@ -440,7 +434,7 @@ static Flake getFlake(
     // Re-parse flake.nix from the store.
     return readFlake(
         state, originalRef, resolvedRef, lockedRef,
-        maybeCopyInputToStore(state, lockedRef.input, originalRef.input, accessor, copyMode),
+        state.storePath(mountInput(state, lockedRef.input, originalRef.input, accessor, copyMode)),
         lockRootAttrPath);
 }
 
@@ -805,7 +799,7 @@ LockedFlake lockFlake(
                                         state, *input.ref, useRegistries, flakeCache);
 
                                     return {
-                                        maybeCopyInputToStore(state, lockedRef.input, input.ref->input, accessor, inputCopyMode),
+                                        state.storePath(mountInput(state, lockedRef.input, input.ref->input, accessor, inputCopyMode)),
                                         lockedRef
                                     };
                                 }

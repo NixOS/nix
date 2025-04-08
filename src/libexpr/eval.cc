@@ -267,11 +267,9 @@ EvalState::EvalState(
             auto accessor = getFSSourceAccessor();
 
             auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
-            if (settings.pureEval || store->storeDir != realStoreDir) {
-                accessor = settings.pureEval
-                    ? storeFS.cast<SourceAccessor>()
-                    : makeUnionSourceAccessor({accessor, storeFS});
-            }
+            accessor = settings.pureEval
+                ? storeFS.cast<SourceAccessor>()
+                : makeUnionSourceAccessor({accessor, storeFS});
 
             /* Apply access control if needed. */
             if (settings.restrictEval || settings.pureEval)

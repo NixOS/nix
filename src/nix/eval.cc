@@ -114,7 +114,11 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 
         else if (raw) {
             logger->stop();
-            writeFull(getStandardOutput(), *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
+            writeFull(
+                getStandardOutput(),
+                state->devirtualize(
+                    *state->coerceToString(noPos, *v, context, "while generating the eval command output"),
+                    context));
         }
 
         else if (json) {
