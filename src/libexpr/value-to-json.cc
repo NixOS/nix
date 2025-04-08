@@ -31,7 +31,9 @@ json printValueAsJSON(EvalState & state, bool strict,
 
         case nString:
             copyContext(v, context);
-            out = v.c_str();
+            // FIXME: only use the context from `v`.
+            // FIXME: make devirtualization configurable?
+            out = state.devirtualize(v.c_str(), context);
             break;
 
         case nPath:
