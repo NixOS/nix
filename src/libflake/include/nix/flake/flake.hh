@@ -63,7 +63,7 @@ struct ConfigFile
 };
 
 /**
- * The contents of a flake.nix file.
+ * A flake in context
  */
 struct Flake
 {

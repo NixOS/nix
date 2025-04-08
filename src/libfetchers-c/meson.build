@@ -1,4 +1,4 @@
-project('nix-flake-c', 'cpp',
+project('nix-fetchers-c', 'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -18,38 +18,38 @@ deps_private_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
   dependency('nix-fetchers'),
-  dependency('nix-expr'),
-  dependency('nix-flake'),
 ]
 deps_public_maybe_subproject = [
   dependency('nix-util-c'),
   dependency('nix-store-c'),
-  dependency('nix-fetchers-c'),
-  dependency('nix-expr-c'),
 ]
 subdir('nix-meson-build-support/subprojects')
+
+add_project_arguments(
+  language : 'cpp',
+)
 
 subdir('nix-meson-build-support/common')
 
 sources = files(
-  'nix_api_flake.cc',
+  'nix_api_fetchers.cc',
 )
 
 include_dirs = [include_directories('.')]
 
 headers = files(
-  'nix_api_flake.h',
-  'nix_api_flake_internal.hh',
+  'nix_api_fetchers.h',
+  'nix_api_fetchers_internal.hh',
 )
 
 # TODO move this header to libexpr, maybe don't use it in tests?
-headers += files('nix_api_flake.h')
+headers += files('nix_api_fetchers.h')
 
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
 
 this_library = library(
-  'nixflakec',
+  'nixfetchersc',
   sources,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
