@@ -1,5 +1,5 @@
-#include "util.hh"
-#include "monitor-fd.hh"
+#include "nix/util/util.hh"
+#include "nix/util/monitor-fd.hh"
 
 #include <sys/file.h>
 #include <gtest/gtest.h>
