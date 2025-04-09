@@ -7,6 +7,7 @@
 #include "nix_api_fetchers.h"
 
 #include "nix/flake/flake.hh"
+#include "nix/fetchers/input-cache.hh"
 
 nix_flake_settings * nix_flake_settings_new(nix_c_context * context)
 {
@@ -177,6 +178,7 @@ nix_locked_flake * nix_flake_lock(
 {
     nix_clear_err(context);
     try {
+        nix::fetchers::InputCache::getCache()->clear();
         auto lockedFlake = nix::make_ref<nix::flake::LockedFlake>(nix::flake::lockFlake(
             *flakeSettings->settings, eval_state->state, *flakeReference->flakeRef, *flags->lockFlags));
         return new nix_locked_flake{lockedFlake};

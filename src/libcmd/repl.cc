@@ -28,6 +28,7 @@
 #include "nix/expr/print.hh"
 #include "nix/util/ref.hh"
 #include "nix/expr/value.hh"
+#include "nix/fetchers/input-cache.hh"
 
 #include "nix/util/strings.hh"
 
@@ -458,6 +459,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
     else if (command == ":l" || command == ":load") {
         state->resetFileCache();
+        fetchers::InputCache::getCache()->clear();
         loadFile(arg);
     }
 
@@ -467,6 +469,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
     else if (command == ":r" || command == ":reload") {
         state->resetFileCache();
+        fetchers::InputCache::getCache()->clear();
         reloadFiles();
     }
 

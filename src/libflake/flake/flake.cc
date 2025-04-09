@@ -14,6 +14,7 @@
 #include "nix/store/local-fs-store.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/fetchers/input-cache.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -23,32 +24,14 @@ using namespace flake;
 
 namespace flake {
 
-struct CachedInput
-{
-    Input lockedInput;
-    ref<SourceAccessor> accessor;
-};
-
-typedef std::map<Input, CachedInput> InputCache;
-
-static std::optional<CachedInput> lookupInInputCache(
-    const InputCache & inputCache,
-    const Input & originalInput)
-{
-    auto i = inputCache.find(originalInput);
-    if (i == inputCache.end()) return std::nullopt;
-    debug("mapping '%s' to previously seen input '%s' -> '%s",
-        originalInput.to_string(), i->first.to_string(), i->second.lockedInput.to_string());
-    return i->second;
-}
-
 static std::tuple<ref<SourceAccessor>, Input, Input> getAccessorCached(
     EvalState & state,
     const Input & originalInput,
-    bool useRegistries,
-    InputCache & inputCache)
+    bool useRegistries)
 {
-    auto fetched = lookupInInputCache(inputCache, originalInput);
+    auto inputCache = InputCache::getCache();
+
+    auto fetched = inputCache->lookup(originalInput);
     Input resolvedInput = originalInput;
 
     if (!fetched) {
@@ -64,18 +47,18 @@ static std::tuple<ref<SourceAccessor>, Input, Input> getAccessorCached(
                         return type == fetchers::Registry::Flag || type == fetchers::Registry::Global;
                     });
                 resolvedInput = std::move(res);
-                fetched = lookupInInputCache(inputCache, originalInput);
+                fetched = inputCache->lookup(resolvedInput);
                 if (!fetched) {
                     auto [accessor, lockedInput] = resolvedInput.getAccessor(state.store);
                     fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
                 }
-                inputCache.insert_or_assign(resolvedInput, *fetched);
+                inputCache->upsert(resolvedInput, *fetched);
             }
             else {
                 throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalInput.to_string());
             }
         }
-        inputCache.insert_or_assign(originalInput, *fetched);
+        inputCache->upsert(originalInput, *fetched);
     }
 
     debug("got tree '%s' from '%s'", fetched->accessor, fetched->lockedInput.to_string());
@@ -397,12 +380,11 @@ static Flake getFlake(
     EvalState & state,
     const FlakeRef & originalRef,
     bool useRegistries,
-    InputCache & inputCache,
     const InputAttrPath & lockRootAttrPath)
 {
     // Fetch a lazy tree first.
     auto [accessor, resolvedInput, lockedInput] = getAccessorCached(
-        state, originalRef.input, useRegistries, inputCache);
+        state, originalRef.input, useRegistries);
 
     auto resolvedRef = FlakeRef(std::move(resolvedInput), originalRef.subdir);
     auto lockedRef = FlakeRef(std::move(lockedInput), originalRef.subdir);
@@ -418,7 +400,7 @@ static Flake getFlake(
         // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
         newLockedRef.input.attrs.erase("narHash");
         auto [accessor2, resolvedInput2, lockedInput2] = getAccessorCached(
-            state, newLockedRef.input, false, inputCache);
+            state, newLockedRef.input, false);
         accessor = accessor2;
         lockedRef = FlakeRef(std::move(lockedInput2), newLockedRef.subdir);
     }
@@ -432,8 +414,7 @@ static Flake getFlake(
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
 {
-    InputCache inputCache;
-    return getFlake(state, originalRef, useRegistries, inputCache, {});
+    return getFlake(state, originalRef, useRegistries, {});
 }
 
 static LockFile readLockFile(
@@ -455,11 +436,9 @@ LockedFlake lockFlake(
 {
     experimentalFeatureSettings.require(Xp::Flakes);
 
-    InputCache inputCache;
-
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
 
-    auto flake = getFlake(state, topRef, useRegistries, inputCache, {});
+    auto flake = getFlake(state, topRef, useRegistries, {});
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
@@ -634,7 +613,7 @@ LockedFlake lockFlake(
                         if (auto resolvedPath = resolveRelativePath()) {
                             return readFlake(state, ref, ref, ref, *resolvedPath, inputAttrPath);
                         } else {
-                            return getFlake(state, ref, useRegistries, inputCache, inputAttrPath);
+                            return getFlake(state, ref, useRegistries, inputAttrPath);
                         }
                     };
 
@@ -783,7 +762,7 @@ LockedFlake lockFlake(
                                     return {*resolvedPath, *input.ref};
                                 } else {
                                     auto [accessor, resolvedInput, lockedInput] = getAccessorCached(
-                                        state, input.ref->input, useRegistries, inputCache);
+                                        state, input.ref->input, useRegistries);
 
                                     auto lockedRef = FlakeRef(std::move(lockedInput), input.ref->subdir);
 
