@@ -23,64 +23,64 @@ using namespace flake;
 
 namespace flake {
 
-struct FetchedFlake
+struct CachedInput
 {
-    FlakeRef lockedRef;
+    Input lockedInput;
     ref<SourceAccessor> accessor;
 };
 
-typedef std::map<FlakeRef, FetchedFlake> FlakeCache;
+typedef std::map<Input, CachedInput> InputCache;
 
-static std::optional<FetchedFlake> lookupInFlakeCache(
-    const FlakeCache & flakeCache,
-    const FlakeRef & flakeRef)
+static std::optional<CachedInput> lookupInInputCache(
+    const InputCache & inputCache,
+    const Input & originalInput)
 {
-    auto i = flakeCache.find(flakeRef);
-    if (i == flakeCache.end()) return std::nullopt;
+    auto i = inputCache.find(originalInput);
+    if (i == inputCache.end()) return std::nullopt;
     debug("mapping '%s' to previously seen input '%s' -> '%s",
-        flakeRef, i->first, i->second.lockedRef);
+        originalInput.to_string(), i->first.to_string(), i->second.lockedInput.to_string());
     return i->second;
 }
 
-static std::tuple<ref<SourceAccessor>, FlakeRef, FlakeRef> fetchOrSubstituteTree(
+static std::tuple<ref<SourceAccessor>, Input, Input> getAccessorCached(
     EvalState & state,
-    const FlakeRef & originalRef,
+    const Input & originalInput,
     bool useRegistries,
-    FlakeCache & flakeCache)
+    InputCache & inputCache)
 {
-    auto fetched = lookupInFlakeCache(flakeCache, originalRef);
-    FlakeRef resolvedRef = originalRef;
+    auto fetched = lookupInInputCache(inputCache, originalInput);
+    Input resolvedInput = originalInput;
 
     if (!fetched) {
-        if (originalRef.input.isDirect()) {
-            auto [accessor, lockedRef] = originalRef.lazyFetch(state.store);
-            fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .accessor = accessor});
+        if (originalInput.isDirect()) {
+            auto [accessor, lockedInput] = originalInput.getAccessor(state.store);
+            fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
         } else {
             if (useRegistries) {
-                resolvedRef = originalRef.resolve(
-                    state.store,
+                auto [res, extraAttrs] = lookupInRegistries(state.store, originalInput,
                     [](fetchers::Registry::RegistryType type) {
                         /* Only use the global registry and CLI flags
                            to resolve indirect flakerefs. */
                         return type == fetchers::Registry::Flag || type == fetchers::Registry::Global;
                     });
-                fetched = lookupInFlakeCache(flakeCache, originalRef);
+                resolvedInput = std::move(res);
+                fetched = lookupInInputCache(inputCache, originalInput);
                 if (!fetched) {
-                    auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
-                    fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .accessor = accessor});
+                    auto [accessor, lockedInput] = resolvedInput.getAccessor(state.store);
+                    fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
                 }
-                flakeCache.insert_or_assign(resolvedRef, *fetched);
+                inputCache.insert_or_assign(resolvedInput, *fetched);
             }
             else {
-                throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalRef);
+                throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalInput.to_string());
             }
         }
-        flakeCache.insert_or_assign(originalRef, *fetched);
+        inputCache.insert_or_assign(originalInput, *fetched);
     }
 
-    debug("got tree '%s' from '%s'", fetched->accessor, fetched->lockedRef);
+    debug("got tree '%s' from '%s'", fetched->accessor, fetched->lockedInput.to_string());
 
-    return {fetched->accessor, resolvedRef, fetched->lockedRef};
+    return {fetched->accessor, resolvedInput, fetched->lockedInput};
 }
 
 static StorePath copyInputToStore(
@@ -397,12 +397,15 @@ static Flake getFlake(
     EvalState & state,
     const FlakeRef & originalRef,
     bool useRegistries,
-    FlakeCache & flakeCache,
+    InputCache & inputCache,
     const InputAttrPath & lockRootAttrPath)
 {
     // Fetch a lazy tree first.
-    auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-        state, originalRef, useRegistries, flakeCache);
+    auto [accessor, resolvedInput, lockedInput] = getAccessorCached(
+        state, originalRef.input, useRegistries, inputCache);
+
+    auto resolvedRef = FlakeRef(std::move(resolvedInput), originalRef.subdir);
+    auto lockedRef = FlakeRef(std::move(lockedInput), originalRef.subdir);
 
     // Parse/eval flake.nix to get at the input.self attributes.
     auto flake = readFlake(state, originalRef, resolvedRef, lockedRef, {accessor}, lockRootAttrPath);
@@ -414,10 +417,10 @@ static Flake getFlake(
         debug("refetching input '%s' due to self attribute", newLockedRef);
         // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
         newLockedRef.input.attrs.erase("narHash");
-        auto [accessor2, resolvedRef2, lockedRef2] = fetchOrSubstituteTree(
-            state, newLockedRef, false, flakeCache);
+        auto [accessor2, resolvedInput2, lockedInput2] = getAccessorCached(
+            state, newLockedRef.input, false, inputCache);
         accessor = accessor2;
-        lockedRef = lockedRef2;
+        lockedRef = FlakeRef(std::move(lockedInput2), newLockedRef.subdir);
     }
 
     // Copy the tree to the store.
@@ -429,8 +432,8 @@ static Flake getFlake(
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
 {
-    FlakeCache flakeCache;
-    return getFlake(state, originalRef, useRegistries, flakeCache, {});
+    InputCache inputCache;
+    return getFlake(state, originalRef, useRegistries, inputCache, {});
 }
 
 static LockFile readLockFile(
@@ -452,11 +455,11 @@ LockedFlake lockFlake(
 {
     experimentalFeatureSettings.require(Xp::Flakes);
 
-    FlakeCache flakeCache;
+    InputCache inputCache;
 
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
 
-    auto flake = getFlake(state, topRef, useRegistries, flakeCache, {});
+    auto flake = getFlake(state, topRef, useRegistries, inputCache, {});
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
@@ -631,7 +634,7 @@ LockedFlake lockFlake(
                         if (auto resolvedPath = resolveRelativePath()) {
                             return readFlake(state, ref, ref, ref, *resolvedPath, inputAttrPath);
                         } else {
-                            return getFlake(state, ref, useRegistries, flakeCache, inputAttrPath);
+                            return getFlake(state, ref, useRegistries, inputCache, inputAttrPath);
                         }
                     };
 
@@ -779,8 +782,10 @@ LockedFlake lockFlake(
                                 if (auto resolvedPath = resolveRelativePath()) {
                                     return {*resolvedPath, *input.ref};
                                 } else {
-                                    auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-                                        state, *input.ref, useRegistries, flakeCache);
+                                    auto [accessor, resolvedInput, lockedInput] = getAccessorCached(
+                                        state, input.ref->input, useRegistries, inputCache);
+
+                                    auto lockedRef = FlakeRef(std::move(lockedInput), input.ref->subdir);
 
                                     // FIXME: allow input to be lazy.
                                     auto storePath = copyInputToStore(state, lockedRef.input, input.ref->input, accessor);
