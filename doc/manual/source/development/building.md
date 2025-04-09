@@ -236,18 +236,18 @@ Nix can be compiled using multiple environments:
 To build with one of those environments, you can use
 
 ```console
-$ nix build .#nix-ccacheStdenv
+$ nix build .#nix-cli-ccacheStdenv
 ```
 
 for flake-enabled Nix, or
 
 ```console
-$ nix-build --attr nix-ccacheStdenv
+$ nix-build --attr nix-cli-ccacheStdenv
 ```
 
 for classic Nix.
 
-You can use any of the other supported environments in place of `nix-ccacheStdenv`.
+You can use any of the other supported environments in place of `nix-cli-ccacheStdenv`.
 
 ## Editor integration
 
