@@ -10,6 +10,7 @@
 #include "nix/util/url.hh"
 #include "nix/expr/value-to-json.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/fetchers/input-cache.hh"
 #include "nix/util/mounted-source-accessor.hh"
 
 #include <nlohmann/json.hpp>
@@ -201,16 +202,15 @@ static void fetchTree(
             throw Error("input '%s' is not allowed to use the '__final' attribute", input.to_string());
     }
 
-    // FIXME: use fetchOrSubstituteTree().
-    auto [accessor, lockedInput] = input.getAccessor(state.store);
+    auto cachedInput = fetchers::InputCache::getCache()->getAccessor(state.store, input, false);
 
     auto storePath = StorePath::random(input.getName());
 
     state.allowPath(storePath);
 
-    state.storeFS->mount(CanonPath(state.store->printStorePath(storePath)), accessor);
+    state.storeFS->mount(CanonPath(state.store->printStorePath(storePath)), cachedInput.accessor);
 
-    emitTreeAttrs(state, storePath, lockedInput, v, params.emptyRevFallback, false);
+    emitTreeAttrs(state, storePath, cachedInput.lockedInput, v, params.emptyRevFallback, false);
 }
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
