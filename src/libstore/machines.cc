@@ -106,13 +106,14 @@ static std::vector<std::string> expandBuilderLines(const std::string & builders)
 {
     std::vector<std::string> result;
     for (auto line : tokenizeString<std::vector<std::string>>(builders, "\n")) {
-        trim(line);
         line.erase(std::find(line.begin(), line.end(), '#'), line.end());
         for (auto entry : tokenizeString<std::vector<std::string>>(line, ";")) {
-            if (entry.empty()) continue;
+            entry = trim(entry);
 
-            if (entry[0] == '@') {
-                const std::string path = trim(std::string(entry, 1));
+            if (entry.empty()) {
+                // skip blank entries
+            } else if (entry[0] == '@') {
+                const std::string path = trim(std::string_view{entry}.substr(1));
                 std::string text;
                 try {
                     text = readFile(path);
