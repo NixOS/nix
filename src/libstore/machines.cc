@@ -105,28 +105,30 @@ ref<Store> Machine::openStore() const
 static std::vector<std::string> expandBuilderLines(const std::string & builders)
 {
     std::vector<std::string> result;
-    for (auto line : tokenizeString<std::vector<std::string>>(builders, "\n;")) {
+    for (auto line : tokenizeString<std::vector<std::string>>(builders, "\n")) {
         trim(line);
         line.erase(std::find(line.begin(), line.end(), '#'), line.end());
-        if (line.empty()) continue;
+        for (auto entry : tokenizeString<std::vector<std::string>>(line, ";")) {
+            if (entry.empty()) continue;
 
-        if (line[0] == '@') {
-            const std::string path = trim(std::string(line, 1));
-            std::string text;
-            try {
-                text = readFile(path);
-            } catch (const SysError & e) {
-                if (e.errNo != ENOENT)
-                    throw;
-                debug("cannot find machines file '%s'", path);
+            if (entry[0] == '@') {
+                const std::string path = trim(std::string(entry, 1));
+                std::string text;
+                try {
+                    text = readFile(path);
+                } catch (const SysError & e) {
+                    if (e.errNo != ENOENT)
+                        throw;
+                    debug("cannot find machines file '%s'", path);
+                    continue;
+                }
+
+                const auto entrys = expandBuilderLines(text);
+                result.insert(end(result), begin(entrys), end(entrys));
+            } else {
+                result.emplace_back(entry);
             }
-
-            const auto lines = expandBuilderLines(text);
-            result.insert(end(result), begin(lines), end(lines));
-            continue;
         }
-
-        result.emplace_back(line);
     }
     return result;
 }
