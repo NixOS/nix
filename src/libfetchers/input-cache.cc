@@ -1,7 +1,47 @@
 #include "nix/fetchers/input-cache.hh"
+#include "nix/fetchers/registry.hh"
 #include "nix/util/sync.hh"
+#include "nix/util/source-path.hh"
 
 namespace nix::fetchers {
+
+InputCache::CachedResult InputCache::getAccessor(ref<Store> store, const Input & originalInput, bool useRegistries)
+{
+    auto fetched = lookup(originalInput);
+    Input resolvedInput = originalInput;
+
+    if (!fetched) {
+        if (originalInput.isDirect()) {
+            auto [accessor, lockedInput] = originalInput.getAccessor(store);
+            fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
+        } else {
+            if (useRegistries) {
+                auto [res, extraAttrs] =
+                    lookupInRegistries(store, originalInput, [](fetchers::Registry::RegistryType type) {
+                        /* Only use the global registry and CLI flags
+                           to resolve indirect flakerefs. */
+                        return type == fetchers::Registry::Flag || type == fetchers::Registry::Global;
+                    });
+                resolvedInput = std::move(res);
+                fetched = lookup(resolvedInput);
+                if (!fetched) {
+                    auto [accessor, lockedInput] = resolvedInput.getAccessor(store);
+                    fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
+                }
+                upsert(resolvedInput, *fetched);
+            } else {
+                throw Error(
+                    "'%s' is an indirect flake reference, but registry lookups are not allowed",
+                    originalInput.to_string());
+            }
+        }
+        upsert(originalInput, *fetched);
+    }
+
+    debug("got tree '%s' from '%s'", fetched->accessor, fetched->lockedInput.to_string());
+
+    return {fetched->accessor, resolvedInput, fetched->lockedInput};
+}
 
 struct InputCacheImpl : InputCache
 {
