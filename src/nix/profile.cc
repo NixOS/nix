@@ -984,10 +984,12 @@ struct CmdProfile : NixMultiCommand
               {"history", []() { return make_ref<CmdProfileHistory>(); }},
               {"rollback", []() { return make_ref<CmdProfileRollback>(); }},
               {"wipe-history", []() { return make_ref<CmdProfileWipeHistory>(); }},
-              // 2025-04-05 Deprecated in favor of "add"
-              {"install", []() { return make_ref<CmdProfileAdd>(); }},
           })
-    { }
+    {
+        aliases = {
+            {"install", { AliasStatus::Deprecated, {"add"}}},
+        };
+    }
 
     std::string description() override
     {
