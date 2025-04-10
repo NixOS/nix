@@ -71,9 +71,8 @@
 
   This can be achieved by:
   - Fetching a pre-built [store object] from a [substituter]
-  - Running the [`builder`](@docroot@/language/derivations.md#attr-builder) executable as specified in the corresponding [store derivation]
+  - [Building](@docroot@/store/building.md) the corresponding [store derivation]
   - Delegating to a [remote machine](@docroot@/command-ref/conf-file.md#conf-builders) and retrieving the outputs
-  <!-- TODO: link [running] to build process page, #8888 -->
 
   See [`nix-store --realise`](@docroot@/command-ref/nix-store/realise.md) for a detailed description of the algorithm.
 
