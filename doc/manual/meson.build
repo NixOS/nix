@@ -248,7 +248,6 @@ nix3_manpages = [
   'nix3-print-dev-env',
   'nix3-profile-diff-closures',
   'nix3-profile-history',
-  'nix3-profile-install',
   'nix3-profile-list',
   'nix3-profile',
   'nix3-profile-remove',
