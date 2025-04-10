@@ -234,15 +234,16 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
         return std::nullopt;
     }
 
+    const auto subdir = getOr(parsedURL.query, "dir", "");
+    parsedURL.query.erase("dir");
+
     std::string fragment;
     std::swap(fragment, parsedURL.fragment);
 
     auto input = fetchers::Input::fromURL(fetchSettings, parsedURL, isFlake);
     input.parent = baseDir;
 
-    return std::make_pair(
-        FlakeRef(std::move(input), getOr(parsedURL.query, "dir", "")),
-        fragment);
+    return std::make_pair(FlakeRef(std::move(input), subdir), fragment);
 }
 
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
