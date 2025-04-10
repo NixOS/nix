@@ -215,7 +215,7 @@
 
   > **Example**
   >
-  > Building and deploying software using Nix entails writing Nix expressions as a high-level description of packages and compositions thereof.
+  > Building and deploying software using Nix entails writing Nix expressions to describe [packages][package] and compositions thereof.
 
 - [reference]{#gloss-reference}
 
@@ -330,18 +330,17 @@
 
 - [package]{#package}
 
-  1. A software package; a collection of files and other data.
+  A software package; files that belong together for a particular purpose, and metadata.
 
-  2. A [package attribute set].
+  Nix represents files as [file system objects][file system object], and how they belong together is encoded as [references][reference] between [store objects][store object] that contain these file system objects.
 
-- [package attribute set]{#package-attribute-set}
+  The [Nix language] allows denoting packages in terms of [attribute sets](@docroot@/language/types.md#attribute-set) containing:
+  - attributes that refer to the files of a package, typically in the form of [derivation outputs](#output),
+  - attributes with metadata, such as information about how the package is supposed to be used.
 
-  An [attribute set](@docroot@/language/types.md#attribute-set) containing the attribute `type = "derivation";` (derivation for historical reasons), as well as other attributes, such as
-  - attributes that refer to the files of a [package], typically in the form of [derivation outputs](#output),
-  - attributes that declare something about how the package is supposed to be installed or used,
-  - other metadata or arbitrary attributes.
+  The exact shape of these attribute sets is up to convention.
 
-  [package attribute set]: #package-attribute-set
+  [package]: #package
 
 - [string interpolation]{#gloss-string-interpolation}
 
