@@ -83,7 +83,9 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
     { callback(nullptr); }
 
     virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
-    { unsupported("getFSAccessor"); }
+    {
+        return makeEmptySourceAccessor();
+    }
 };
 
 static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regDummyStore;

@@ -172,7 +172,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         struct BailOut { };
 
         printNode = [&](Node & node, const std::string & firstPad, const std::string & tailPad) {
-            CanonPath pathS(store->printStorePath(node.path));
+            CanonPath pathS(node.path.to_string());
 
             assert(node.dist != inf);
             if (precise) {
