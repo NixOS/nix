@@ -266,7 +266,6 @@ EvalState::EvalState(
                /nix/store while using a chroot store. */
             auto accessor = getFSSourceAccessor();
 
-            auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
             accessor = settings.pureEval
                 ? storeFS.cast<SourceAccessor>()
                 : makeUnionSourceAccessor({accessor, storeFS});
