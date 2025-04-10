@@ -283,7 +283,6 @@ nix3_manpages = [
   'nix3-store',
   'nix3-store-optimise',
   'nix3-store-path-from-hash-part',
-  'nix3-store-ping',
   'nix3-store-prefetch-file',
   'nix3-store-repair',
   'nix3-store-sign',
