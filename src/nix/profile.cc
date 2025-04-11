@@ -186,6 +186,7 @@ struct ProfileManifest
             for (auto & packageInfo : packageInfos) {
                 ProfileElement element;
                 element.storePaths = {packageInfo.queryOutPath()};
+                element.priority = packageInfo.queryMetaInt("priority", NixInt{defaultPriority}).value;
                 addElement(std::move(element));
             }
         }
