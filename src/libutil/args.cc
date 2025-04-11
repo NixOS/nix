@@ -647,4 +647,25 @@ nlohmann::json MultiCommand::toJSON()
     return res;
 }
 
+Strings::iterator MultiCommand::rewriteArgs(Strings & args, Strings::iterator pos)
+{
+    if (command)
+        return command->second->rewriteArgs(args, pos);
+
+    if (aliasUsed || pos == args.end()) return pos;
+    auto arg = *pos;
+    auto i = aliases.find(arg);
+    if (i == aliases.end()) return pos;
+    auto & info = i->second;
+    if (info.status == AliasStatus::Deprecated) {
+        warn("'%s' is a deprecated alias for '%s'",
+            arg, concatStringsSep(" ", info.replacement));
+    }
+    pos = args.erase(pos);
+    for (auto j = info.replacement.rbegin(); j != info.replacement.rend(); ++j)
+        pos = args.insert(pos, *j);
+    aliasUsed = true;
+    return pos;
+}
+
 }

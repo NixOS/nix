@@ -5,7 +5,11 @@ using namespace nix;
 struct CmdStore : NixMultiCommand
 {
     CmdStore() : NixMultiCommand("store", RegisterCommand::getCommandsFor({"store"}))
-    { }
+    {
+        aliases = {
+            {"ping", { AliasStatus::Deprecated, {"info"}}},
+        };
+    }
 
     std::string description() override
     {

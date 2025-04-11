@@ -393,8 +393,30 @@ public:
 
     nlohmann::json toJSON() override;
 
+    enum struct AliasStatus {
+        /** Aliases that don't go away */
+        AcceptedShorthand,
+        /** Aliases that will go away */
+        Deprecated,
+    };
+
+    /** An alias, except for the original syntax, which is in the map key. */
+    struct AliasInfo {
+        AliasStatus status;
+        std::vector<std::string> replacement;
+    };
+
+    /**
+     * A list of aliases (remapping a deprecated/shorthand subcommand
+     * to something else).
+     */
+    std::map<std::string, AliasInfo> aliases;
+
+    Strings::iterator rewriteArgs(Strings & args, Strings::iterator pos) override;
+
 protected:
     std::string commandName = "";
+    bool aliasUsed = false;
 };
 
 Strings argvToStrings(int argc, char * * argv);
