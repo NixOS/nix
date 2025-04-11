@@ -12,7 +12,8 @@ struct Hash;
 /**
  * Check whether a name is a valid store path name.
  *
- * @throws BadStorePathName if the name is invalid. The message is of the format "name %s is not valid, for this specific reason".
+ * @throws BadStorePathName if the name is invalid. The message is of the format "name %s is not valid, for this
+ * specific reason".
  */
 void checkName(std::string_view name);
 
@@ -49,8 +50,8 @@ public:
         return baseName;
     }
 
-    bool operator == (const StorePath & other) const noexcept = default;
-    auto operator <=> (const StorePath & other) const noexcept = default;
+    bool operator==(const StorePath & other) const noexcept = default;
+    auto operator<=>(const StorePath & other) const noexcept = default;
 
     /**
      * Check whether a file name ends with the extension for derivations.
@@ -90,10 +91,12 @@ constexpr std::string_view drvExtension = ".drv";
 
 namespace std {
 
-template<> struct hash<nix::StorePath> {
+template<>
+struct hash<nix::StorePath>
+{
     std::size_t operator()(const nix::StorePath & path) const noexcept
     {
-        return * (std::size_t *) path.to_string().data();
+        return *(std::size_t *) path.to_string().data();
     }
 };
 

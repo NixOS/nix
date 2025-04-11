@@ -3,7 +3,6 @@
 
 #include "nix/store/store-api.hh"
 
-
 namespace nix {
 
 struct LogStore : public virtual Store

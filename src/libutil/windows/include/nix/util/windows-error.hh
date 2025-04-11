@@ -2,9 +2,9 @@
 ///@file
 
 #ifdef _WIN32
-#include <errhandlingapi.h>
+#  include <errhandlingapi.h>
 
-#include "nix/util/error.hh"
+#  include "nix/util/error.hh"
 
 namespace nix::windows {
 
@@ -25,8 +25,9 @@ public:
      * information to the message.
      */
     template<typename... Args>
-    WinError(DWORD lastError, const Args & ... args)
-        : SystemError(""), lastError(lastError)
+    WinError(DWORD lastError, const Args &... args)
+        : SystemError("")
+        , lastError(lastError)
     {
         auto hf = HintFmt(args...);
         err.msg = HintFmt("%1%: %2%", Uncolored(hf.str()), renderError(lastError));
@@ -39,8 +40,8 @@ public:
      * before calling this constructor!
      */
     template<typename... Args>
-    WinError(const Args & ... args)
-        : WinError(GetLastError(), args ...)
+    WinError(const Args &... args)
+        : WinError(GetLastError(), args...)
     {
     }
 

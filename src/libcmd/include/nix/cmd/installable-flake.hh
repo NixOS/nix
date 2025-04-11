@@ -18,7 +18,8 @@ struct ExtraPathInfoFlake : ExtraPathInfoValue
     /**
      * Extra struct to get around C++ designated initializer limitations
      */
-    struct Flake {
+    struct Flake
+    {
         FlakeRef originalRef;
         FlakeRef lockedRef;
     };
@@ -26,8 +27,10 @@ struct ExtraPathInfoFlake : ExtraPathInfoValue
     Flake flake;
 
     ExtraPathInfoFlake(Value && v, Flake && f)
-        : ExtraPathInfoValue(std::move(v)), flake(std::move(f))
-    { }
+        : ExtraPathInfoValue(std::move(v))
+        , flake(std::move(f))
+    {
+    }
 };
 
 struct InstallableFlake : InstallableValue
@@ -49,7 +52,10 @@ struct InstallableFlake : InstallableValue
         Strings prefixes,
         const flake::LockFlags & lockFlags);
 
-    std::string what() const override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
+    std::string what() const override
+    {
+        return flakeRef.to_string() + "#" + *attrPaths.begin();
+    }
 
     std::vector<std::string> getActualAttrPaths();
 
@@ -61,8 +67,7 @@ struct InstallableFlake : InstallableValue
      * Get a cursor to every attrpath in getActualAttrPaths() that
      * exists. However if none exists, throw an exception.
      */
-    std::vector<ref<eval_cache::AttrCursor>>
-    getCursors(EvalState & state) override;
+    std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState & state) override;
 
     std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
 
@@ -79,11 +84,9 @@ struct InstallableFlake : InstallableValue
  */
 static inline FlakeRef defaultNixpkgsFlakeRef()
 {
-    return FlakeRef::fromAttrs(fetchSettings, {{"type","indirect"}, {"id", "nixpkgs"}});
+    return FlakeRef::fromAttrs(fetchSettings, {{"type", "indirect"}, {"id", "nixpkgs"}});
 }
 
-ref<eval_cache::EvalCache> openEvalCache(
-    EvalState & state,
-    std::shared_ptr<flake::LockedFlake> lockedFlake);
+ref<eval_cache::EvalCache> openEvalCache(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake);
 
 }

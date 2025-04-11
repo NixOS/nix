@@ -134,9 +134,7 @@ struct LockedFlake
      */
     std::map<ref<Node>, SourcePath> nodePaths;
 
-    std::optional<Fingerprint> getFingerprint(
-        ref<Store> store,
-        const fetchers::Settings & fetchSettings) const;
+    std::optional<Fingerprint> getFingerprint(ref<Store> store, const fetchers::Settings & fetchSettings) const;
 };
 
 struct LockFlags
@@ -215,16 +213,10 @@ struct LockFlags
     std::set<InputAttrPath> inputUpdates;
 };
 
-LockedFlake lockFlake(
-    const Settings & settings,
-    EvalState & state,
-    const FlakeRef & flakeRef,
-    const LockFlags & lockFlags);
+LockedFlake
+lockFlake(const Settings & settings, EvalState & state, const FlakeRef & flakeRef, const LockFlags & lockFlags);
 
-void callFlake(
-    EvalState & state,
-    const LockedFlake & lockedFlake,
-    Value & v);
+void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & v);
 
 }
 
@@ -241,6 +233,6 @@ void emitTreeAttrs(
  * always treats the input as final (i.e. no attributes can be
  * added/removed/changed).
  */
-void prim_fetchFinalTree(EvalState & state, const PosIdx pos, Value * * args, Value & v);
+void prim_fetchFinalTree(EvalState & state, const PosIdx pos, Value ** args, Value & v);
 
 }

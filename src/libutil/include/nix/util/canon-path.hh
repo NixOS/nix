@@ -51,13 +51,16 @@ public:
 
     explicit CanonPath(const char * raw)
         : CanonPath(std::string_view(raw))
-    { }
+    {
+    }
 
-    struct unchecked_t { };
+    struct unchecked_t
+    {};
 
     CanonPath(unchecked_t _, std::string path)
         : path(std::move(path))
-    { }
+    {
+    }
 
     /**
      * Construct a canon path from a vector of elements.
@@ -74,13 +77,19 @@ public:
     CanonPath(std::string_view raw, const CanonPath & root);
 
     bool isRoot() const
-    { return path.size() <= 1; }
+    {
+        return path.size() <= 1;
+    }
 
     explicit operator std::string_view() const
-    { return path; }
+    {
+        return path;
+    }
 
     const std::string & abs() const
-    { return path; }
+    {
+        return path;
+    }
 
     /**
      * Like abs(), but return an empty string if this path is
@@ -93,10 +102,14 @@ public:
     }
 
     const char * c_str() const
-    { return path.c_str(); }
+    {
+        return path.c_str();
+    }
 
     std::string_view rel() const
-    { return ((std::string_view) path).substr(1); }
+    {
+        return ((std::string_view) path).substr(1);
+    }
 
     const char * rel_c_str() const
     {
@@ -113,18 +126,25 @@ public:
         Iterator(std::string_view remaining)
             : remaining(remaining)
             , slash(remaining.find('/'))
-        { }
+        {
+        }
 
-        bool operator != (const Iterator & x) const
-        { return remaining.data() != x.remaining.data(); }
+        bool operator!=(const Iterator & x) const
+        {
+            return remaining.data() != x.remaining.data();
+        }
 
-        bool operator == (const Iterator & x) const
-        { return !(*this != x); }
+        bool operator==(const Iterator & x) const
+        {
+            return !(*this != x);
+        }
 
-        const std::string_view operator * () const
-        { return remaining.substr(0, slash); }
+        const std::string_view operator*() const
+        {
+            return remaining.substr(0, slash);
+        }
 
-        void operator ++ ()
+        void operator++()
         {
             if (slash == remaining.npos)
                 remaining = remaining.substr(remaining.size());
@@ -135,8 +155,14 @@ public:
         }
     };
 
-    Iterator begin() const { return Iterator(rel()); }
-    Iterator end() const { return Iterator(rel().substr(path.size() - 1)); }
+    Iterator begin() const
+    {
+        return Iterator(rel());
+    }
+    Iterator end() const
+    {
+        return Iterator(rel().substr(path.size() - 1));
+    }
 
     std::optional<CanonPath> parent() const;
 
@@ -147,21 +173,27 @@ public:
 
     std::optional<std::string_view> dirOf() const
     {
-        if (isRoot()) return std::nullopt;
+        if (isRoot())
+            return std::nullopt;
         return ((std::string_view) path).substr(0, path.rfind('/'));
     }
 
     std::optional<std::string_view> baseName() const
     {
-        if (isRoot()) return std::nullopt;
+        if (isRoot())
+            return std::nullopt;
         return ((std::string_view) path).substr(path.rfind('/') + 1);
     }
 
-    bool operator == (const CanonPath & x) const
-    { return path == x.path; }
+    bool operator==(const CanonPath & x) const
+    {
+        return path == x.path;
+    }
 
-    bool operator != (const CanonPath & x) const
-    { return path != x.path; }
+    bool operator!=(const CanonPath & x) const
+    {
+        return path != x.path;
+    }
 
     /**
      * Compare paths lexicographically except that path separators
@@ -169,16 +201,19 @@ public:
      * a directory is always followed directly by its children. For
      * instance, 'foo' < 'foo/bar' < 'foo!'.
      */
-    auto operator <=> (const CanonPath & x) const
+    auto operator<=>(const CanonPath & x) const
     {
         auto i = path.begin();
         auto j = x.path.begin();
-        for ( ; i != path.end() && j != x.path.end(); ++i, ++j) {
+        for (; i != path.end() && j != x.path.end(); ++i, ++j) {
             auto c_i = *i;
-            if (c_i == '/') c_i = 0;
+            if (c_i == '/')
+                c_i = 0;
             auto c_j = *j;
-            if (c_j == '/') c_j = 0;
-            if (auto cmp = c_i <=> c_j; cmp != 0) return cmp;
+            if (c_j == '/')
+                c_j = 0;
+            if (auto cmp = c_i <=> c_j; cmp != 0)
+                return cmp;
         }
         return (i != path.end()) <=> (j != x.path.end());
     }
@@ -199,14 +234,14 @@ public:
     /**
      * Concatenate two paths.
      */
-    CanonPath operator / (const CanonPath & x) const;
+    CanonPath operator/(const CanonPath & x) const;
 
     /**
      * Add a path component to this one. It must not contain any slashes.
      */
     void push(std::string_view c);
 
-    CanonPath operator / (std::string_view c) const;
+    CanonPath operator/(std::string_view c) const;
 
     /**
      * Check whether access to this path is allowed, which is the case
@@ -225,14 +260,14 @@ public:
     friend class std::hash<CanonPath>;
 };
 
-std::ostream & operator << (std::ostream & stream, const CanonPath & path);
+std::ostream & operator<<(std::ostream & stream, const CanonPath & path);
 
 }
 
 template<>
 struct std::hash<nix::CanonPath>
 {
-    std::size_t operator ()(const nix::CanonPath & s) const noexcept
+    std::size_t operator()(const nix::CanonPath & s) const noexcept
     {
         return std::hash<std::string>{}(s.path);
     }

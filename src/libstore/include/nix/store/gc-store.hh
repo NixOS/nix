@@ -7,9 +7,7 @@
 
 namespace nix {
 
-
 typedef std::unordered_map<StorePath, std::unordered_set<std::string>> Roots;
-
 
 struct GCOptions
 {
@@ -55,7 +53,6 @@ struct GCOptions
     uint64_t maxFreed{std::numeric_limits<uint64_t>::max()};
 };
 
-
 struct GCResults
 {
     /**
@@ -70,7 +67,6 @@ struct GCResults
      */
     uint64_t bytesFreed = 0;
 };
-
 
 /**
  * Mix-in class for \ref Store "stores" which expose a notion of garbage

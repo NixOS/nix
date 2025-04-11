@@ -5,8 +5,8 @@
 #include "nix/util/error.hh"
 
 #ifdef _WIN32
-# define WIN32_LEAN_AND_MEAN
-# include <windows.h>
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
 #endif
 
 namespace nix {
@@ -93,18 +93,19 @@ void writeLine(Descriptor fd, std::string s);
 /**
  * Read a file descriptor until EOF occurs.
  */
-std::string drainFD(Descriptor fd, bool block = true, const size_t reserveSize=0);
+std::string drainFD(Descriptor fd, bool block = true, const size_t reserveSize = 0);
 
 /**
  * The Windows version is always blocking.
  */
 void drainFD(
-      Descriptor fd
-    , Sink & sink
+    Descriptor fd,
+    Sink & sink
 #ifndef _WIN32
-    , bool block = true
+    ,
+    bool block = true
 #endif
-    );
+);
 
 /**
  * Get [Standard Input](https://en.wikipedia.org/wiki/Standard_streams#Standard_input_(stdin))
@@ -155,10 +156,10 @@ public:
     AutoCloseFD();
     AutoCloseFD(Descriptor fd);
     AutoCloseFD(const AutoCloseFD & fd) = delete;
-    AutoCloseFD(AutoCloseFD&& fd) noexcept;
+    AutoCloseFD(AutoCloseFD && fd) noexcept;
     ~AutoCloseFD();
-    AutoCloseFD& operator =(const AutoCloseFD & fd) = delete;
-    AutoCloseFD& operator =(AutoCloseFD&& fd);
+    AutoCloseFD & operator=(const AutoCloseFD & fd) = delete;
+    AutoCloseFD & operator=(AutoCloseFD && fd);
     Descriptor get() const;
     explicit operator bool() const;
     Descriptor release();
