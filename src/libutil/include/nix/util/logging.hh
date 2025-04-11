@@ -6,6 +6,8 @@
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/finally.hh"
 
+#include <filesystem>
+
 #include <nlohmann/json_fwd.hpp>
 
 namespace nix {
@@ -48,6 +50,14 @@ struct LoggerSettings : Config
         R"(
           Whether Nix should print out a stack trace in case of Nix
           expression evaluation errors.
+        )"};
+
+    Setting<Path> jsonLogPath{
+        this, "", "json-log-path",
+        R"(
+          A path to which JSON records of Nix's log output will be
+          written, in the same format as `--log-format internal-json`
+          (without the `@nix ` prefixes on each line).
         )"};
 };
 
@@ -196,7 +206,20 @@ extern std::unique_ptr<Logger> logger;
 
 std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
 
-std::unique_ptr<Logger> makeJSONLogger(Descriptor fd);
+/**
+ * Create a logger that sends log messages to `mainLogger` and the
+ * list of loggers in `extraLoggers`. Only `mainLogger` is used for
+ * writing to stdout and getting user input.
+ */
+std::unique_ptr<Logger> makeTeeLogger(
+    std::unique_ptr<Logger> mainLogger,
+    std::vector<std::unique_ptr<Logger>> && extraLoggers);
+
+std::unique_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix = true);
+
+std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix = true);
+
+void applyJSONLogger();
 
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".

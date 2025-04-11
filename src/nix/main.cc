@@ -493,6 +493,8 @@ void mainWrapped(int argc, char * * argv)
         if (!args.helpRequested && !args.completions) throw;
     }
 
+    applyJSONLogger();
+
     if (args.helpRequested) {
         std::vector<std::string> subcommand;
         MultiCommand * command = &args;
