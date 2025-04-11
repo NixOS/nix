@@ -187,11 +187,7 @@ S3Helper::FileTransferResult S3Helper::getObject(
     });
 
     request.SetContinueRequestHandler([](const Aws::Http::HttpRequest*) {
-        try {
-            checkInterrupt();
-            return true;
-        } catch(...) {}
-        return false;
+        return !isInterrupted();
     });
 
     FileTransferResult res;
@@ -420,10 +416,9 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
             TransferStatus status = transferHandle->GetStatus();
             while (status == TransferStatus::IN_PROGRESS || status == TransferStatus::NOT_STARTED) {
-                try {
-                    checkInterrupt();
+                if (!isInterrupted()) {
                     context->wait();
-                } catch (...) {
+                } else {
                     transferHandle->Cancel();
                     transferHandle->WaitUntilFinished();
                 }
@@ -454,11 +449,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
             });
 
             request.SetContinueRequestHandler([](const Aws::Http::HttpRequest*) {
-                try {
-                    checkInterrupt();
-                    return true;
-                } catch(...) {}
-                return false;
+                return !isInterrupted();
             });
 
             request.SetContentType(mimeType);
