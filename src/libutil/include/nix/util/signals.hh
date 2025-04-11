@@ -29,6 +29,11 @@ void setInterruptThrown();
 /**
  * @note Does nothing on Windows
  */
+static inline bool isInterrupted();
+
+/**
+ * @note Does nothing on Windows
+ */
 inline void checkInterrupt();
 
 /**
