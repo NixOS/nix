@@ -1,5 +1,6 @@
 sources += files(
   'build/child.cc',
+  'build/derivation-builder.cc',
   'build/hook-instance.cc',
   'build/local-derivation-goal.cc',
   'pathlocks.cc',

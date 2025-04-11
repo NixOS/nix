@@ -3,9 +3,7 @@
 
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivation-options.hh"
-#ifndef _WIN32
-#  include "nix/store/user-lock.hh"
-#endif
+#include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/pathlocks.hh"
@@ -21,53 +19,12 @@ struct HookInstance;
 
 typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
 
-/**
- * Unless we are repairing, we don't both to test validity and just assume it,
- * so the choices are `Absent` or `Valid`.
- */
-enum struct PathStatus {
-    Corrupt,
-    Absent,
-    Valid,
-};
-
-struct InitialOutputStatus {
-    StorePath path;
-    PathStatus status;
-    /**
-     * Valid in the store, and additionally non-corrupt if we are repairing
-     */
-    bool isValid() const {
-        return status == PathStatus::Valid;
-    }
-    /**
-     * Merely present, allowed to be corrupt
-     */
-    bool isPresent() const {
-        return status == PathStatus::Corrupt
-            || status == PathStatus::Valid;
-    }
-};
-
-struct InitialOutput {
-    bool wanted;
-    Hash outputHash;
-    std::optional<InitialOutputStatus> known;
-};
-
 /** Used internally */
 void runPostBuildHook(
     Store & store,
     Logger & logger,
     const StorePath & drvPath,
     const StorePathSet & outputPaths);
-
-/** Used internally */
-void appendLogTailErrorMsg(
-    const Store & store,
-    const StorePath & drvPath,
-    const std::list<std::string> & logTail,
-    std::string & msg);
 
 /**
  * A goal for building some or all of the outputs of a derivation.
@@ -305,13 +262,13 @@ struct DerivationGoal : public Goal
         SingleDrvOutputs builtOutputs = {},
         std::optional<Error> ex = {});
 
+    void appendLogTailErrorMsg(std::string & msg);
+
     StorePathSet exportReferences(const StorePathSet & storePaths);
 
     JobCategory jobCategory() const override {
         return JobCategory::Build;
     };
 };
-
-MakeError(NotDeterministic, BuildError);
 
 }
