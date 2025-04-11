@@ -19,6 +19,13 @@
 
 using namespace nix;
 
+struct ETagCacheEntry {
+    std::string etag;
+    std::string hashSRI;
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ETagCacheEntry, etag, hashSRI);
+};
+using ETagCacheMap = std::map<std::string, ETagCacheEntry>;
+
 /* If ‘url’ starts with ‘mirror://’, then resolve it using the list of
    mirrors defined in Nixpkgs. */
 std::string resolveMirrorUrl(EvalState & state, const std::string & url)
@@ -52,22 +59,23 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
 
 std::tuple<StorePath, Hash> prefetchFile(
         ref<Store> store,
-        std::string_view url,
+        std::string_view resolvedUrl_sv,
         std::optional<std::string> name,
         HashAlgorithm hashAlgo,
         std::optional<Hash> expectedHash,
         bool unpack,
         bool executable)
 {
+    std::string resolvedUrl(resolvedUrl_sv);
     ContentAddressMethod method = unpack || executable
         ? ContentAddressMethod::Raw::NixArchive
         : ContentAddressMethod::Raw::Flat;
 
     /* Figure out a name in the Nix store. */
     if (!name) {
-        name = baseNameOf(url);
+        name = baseNameOf(resolvedUrl);
         if (name->empty())
-            throw Error("cannot figure out file name for '%s'", url);
+            throw Error("cannot figure out file name for '%s'", resolvedUrl);
     }
 
     std::optional<StorePath> storePath;
@@ -77,20 +85,50 @@ std::tuple<StorePath, Hash> prefetchFile(
        the store. */
     if (expectedHash) {
         hashAlgo = expectedHash->algo;
-        storePath = store->makeFixedOutputPathFromCA(*name, ContentAddressWithReferences::fromParts(
+        auto expectedStorePath = store->makeFixedOutputPathFromCA(*name, ContentAddressWithReferences::fromParts(
             method,
             *expectedHash,
             {}));
-        if (store->isValidPath(*storePath))
+        if (store->isValidPath(expectedStorePath)) {
             hash = expectedHash;
-        else
-            storePath.reset();
+            storePath = expectedStorePath;
+            return {*storePath, *hash};
+        }
     }
 
     if (!storePath) {
+        std::string receivedETag;
 
         AutoDelete tmpDir(createTempDir(), true);
         std::filesystem::path tmpFile = tmpDir.path() / "tmp";
+
+        bool hasEtag = false;
+        Path etagPath = getCacheDir() + "/prefetch-etags.json";
+        std::optional<ETagCacheMap> etagCache;
+        if (std::filesystem::exists(etagPath)) {
+            auto json = nlohmann::json::parse(readFile(etagPath));
+            etagCache = json.get<ETagCacheMap>();
+            hasEtag = true;
+        }
+
+        bool useETagCheck = false;
+        std::string cachedETag;
+        std::optional<Hash> cachedHash;
+        std::optional<StorePath> potentialStorePath;
+        if (hasEtag) {
+            auto cacheIt = etagCache->find(resolvedUrl);
+            if (cacheIt != etagCache->end()) {
+                cachedHash = Hash::parseAny(cacheIt->second.hashSRI, hashAlgo);
+                if (cachedHash && cachedHash->algo == hashAlgo) {
+                    potentialStorePath = store->makeFixedOutputPathFromCA(
+                        *name, ContentAddressWithReferences::fromParts(method, *cachedHash, {}));
+                    if (potentialStorePath && store->isValidPath(*potentialStorePath)) {
+                        useETagCheck = true;
+                        cachedETag = cacheIt->second.etag;
+                    }
+                }
+            }
+        }
 
         /* Download the file. */
         {
@@ -103,15 +141,28 @@ std::tuple<StorePath, Hash> prefetchFile(
 
             FdSink sink(fd.get());
 
-            FileTransferRequest req(url);
+            FileTransferRequest req(resolvedUrl);
             req.decompress = false;
-            getFileTransfer()->download(std::move(req), sink);
+            if (useETagCheck) {
+                req.expectedETag = cachedETag;
+            }
+            bool wasCached = false;
+            getFileTransfer()->download(
+                std::move(req),
+                sink,
+                [&](FileTransferResult result) {
+                    receivedETag = result.etag;
+                    wasCached = result.cached;
+                });
+            if (useETagCheck && wasCached && potentialStorePath && cachedHash) {
+                return {*potentialStorePath, *cachedHash};
+            }
         }
 
         /* Optionally unpack the file. */
         if (unpack) {
             Activity act(*logger, lvlChatty, actUnknown,
-                fmt("unpacking '%s'", url));
+                fmt("unpacking '%s'", resolvedUrl));
             auto unpacked = (tmpDir.path() / "unpacked").string();
             createDirs(unpacked);
             unpackTarfile(tmpFile.string(), unpacked);
@@ -128,7 +179,7 @@ std::tuple<StorePath, Hash> prefetchFile(
         }
 
         Activity act(*logger, lvlChatty, actUnknown,
-            fmt("adding '%s' to the store", url));
+            fmt("adding '%s' to the store", resolvedUrl));
 
         auto info = store->addToStoreSlow(
             *name, PosixSourceAccessor::createAtRoot(tmpFile),
@@ -136,6 +187,14 @@ std::tuple<StorePath, Hash> prefetchFile(
         storePath = info.path;
         assert(info.ca);
         hash = info.ca->hash;
+        if (hasEtag && hash.has_value()) {
+            if (!receivedETag.empty()) {
+                std::string hashSRI = hash->to_string(HashFormat::SRI, true);
+                etagCache->operator[](resolvedUrl) = ETagCacheEntry{receivedETag, hashSRI};
+                nlohmann::json json = *etagCache;
+                writeFile(etagPath, json.dump(4));
+            }
+        }
     }
 
     return {storePath.value(), hash.value()};
@@ -238,12 +297,13 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             }
         }
 
+        std::string resolvedUrl = resolveMirrorUrl(*state, url);
         std::optional<Hash> expectedHash;
         if (args.size() == 2)
             expectedHash = Hash::parseAny(args[1], ha);
 
         auto [storePath, hash] = prefetchFile(
-            store, resolveMirrorUrl(*state, url), name, ha, expectedHash, unpack, executable);
+            store, resolvedUrl, name, ha, expectedHash, unpack, executable);
 
         logger->stop();
 
