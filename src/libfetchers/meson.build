@@ -44,6 +44,7 @@ sources = files(
   'git.cc',
   'github.cc',
   'indirect.cc',
+  'input-cache.cc',
   'mercurial.cc',
   'path.cc',
   'registry.cc',
