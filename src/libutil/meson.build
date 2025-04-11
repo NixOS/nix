@@ -147,6 +147,7 @@ sources = [config_priv_h] + files(
   'strings.cc',
   'suggestions.cc',
   'tarfile.cc',
+  'tee-logger.cc',
   'terminal.cc',
   'thread-pool.cc',
   'union-source-accessor.cc',
