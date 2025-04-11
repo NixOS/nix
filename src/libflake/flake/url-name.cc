@@ -5,10 +5,11 @@
 namespace nix {
 
 static const std::string attributeNamePattern("[a-zA-Z0-9_-]+");
-static const std::regex lastAttributeRegex("^((?:" + attributeNamePattern + "\\.)*)(" + attributeNamePattern +")(\\^.*)?$");
+static const std::regex
+    lastAttributeRegex("^((?:" + attributeNamePattern + "\\.)*)(" + attributeNamePattern + ")(\\^.*)?$");
 static const std::string pathSegmentPattern("[a-zA-Z0-9_-]+");
-static const std::regex lastPathSegmentRegex(".*/(" + pathSegmentPattern +")");
-static const std::regex secondPathSegmentRegex("(?:" + pathSegmentPattern + ")/(" + pathSegmentPattern +")(?:/.*)?");
+static const std::regex lastPathSegmentRegex(".*/(" + pathSegmentPattern + ")");
+static const std::regex secondPathSegmentRegex("(?:" + pathSegmentPattern + ")/(" + pathSegmentPattern + ")(?:/.*)?");
 static const std::regex gitProviderRegex("github|gitlab|sourcehut");
 static const std::regex gitSchemeRegex("git($|\\+.*)");
 
@@ -21,8 +22,7 @@ std::optional<std::string> getNameFromURL(const ParsedURL & url)
         return url.query.at("dir");
 
     /* If the fragment isn't a "default" and contains two attribute elements, use the last one */
-    if (std::regex_match(url.fragment, match, lastAttributeRegex)
-        && match.str(1) != "defaultPackage."
+    if (std::regex_match(url.fragment, match, lastAttributeRegex) && match.str(1) != "defaultPackage."
         && match.str(2) != "default") {
         return match.str(2);
     }

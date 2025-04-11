@@ -6,7 +6,8 @@
 namespace nix {
 
 ParsedDerivation::ParsedDerivation(const StorePath & drvPath, BasicDerivation & drv)
-    : drvPath(drvPath), drv(drv)
+    : drvPath(drvPath)
+    , drv(drv)
 {
     /* Parse the __json attribute, if any. */
     auto jsonAttr = drv.env.find("__json");
@@ -19,7 +20,7 @@ ParsedDerivation::ParsedDerivation(const StorePath & drvPath, BasicDerivation & 
     }
 }
 
-ParsedDerivation::~ParsedDerivation() { }
+ParsedDerivation::~ParsedDerivation() {}
 
 std::optional<std::string> ParsedDerivation::getStringAttr(const std::string & name) const
 {
@@ -73,7 +74,8 @@ std::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name
             Strings res;
             for (auto j = i->begin(); j != i->end(); ++j) {
                 if (!j->is_string())
-                    throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath.to_string());
+                    throw Error(
+                        "attribute '%s' of derivation '%s' must be a list of strings", name, drvPath.to_string());
                 res.push_back(j->get<std::string>());
             }
             return res;
@@ -90,9 +92,7 @@ std::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name
 std::optional<StringSet> ParsedDerivation::getStringSetAttr(const std::string & name) const
 {
     auto ss = getStringsAttr(name);
-    return ss
-        ? (std::optional{StringSet{ss->begin(), ss->end()}})
-        : (std::optional<StringSet>{});
+    return ss ? (std::optional{StringSet{ss->begin(), ss->end()}}) : (std::optional<StringSet>{});
 }
 
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
@@ -107,9 +107,7 @@ static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
  * mechanism to allow this to evolve again and get back in sync, but for
  * now we must not change - not even extend - the behavior.
  */
-static nlohmann::json pathInfoToJSON(
-    Store & store,
-    const StorePathSet & storePaths)
+static nlohmann::json pathInfoToJSON(Store & store, const StorePathSet & storePaths)
 {
     using nlohmann::json;
 
@@ -153,7 +151,8 @@ static nlohmann::json pathInfoToJSON(
 
 std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths)
 {
-    if (!structuredAttrs) return std::nullopt;
+    if (!structuredAttrs)
+        return std::nullopt;
 
     auto json = *structuredAttrs;
 
@@ -170,8 +169,7 @@ std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & s
             StorePathSet storePaths;
             for (auto & p : *i)
                 storePaths.insert(store.toStorePath(p.get<std::string>()).first);
-            json[i.key()] = pathInfoToJSON(store,
-                store.exportReferences(storePaths, inputPaths));
+            json[i.key()] = pathInfoToJSON(store, store.exportReferences(storePaths, inputPaths));
         }
     }
 
@@ -209,7 +207,8 @@ std::string writeStructuredAttrsShell(const nlohmann::json & json)
 
     for (auto & [key, value] : json.items()) {
 
-        if (!std::regex_match(key, shVarName)) continue;
+        if (!std::regex_match(key, shVarName))
+            continue;
 
         auto s = handleSimpleType(value);
         if (s)
@@ -221,8 +220,12 @@ std::string writeStructuredAttrsShell(const nlohmann::json & json)
 
             for (auto & value2 : value) {
                 auto s3 = handleSimpleType(value2);
-                if (!s3) { good = false; break; }
-                s2 += *s3; s2 += ' ';
+                if (!s3) {
+                    good = false;
+                    break;
+                }
+                s2 += *s3;
+                s2 += ' ';
             }
 
             if (good)
@@ -235,7 +238,10 @@ std::string writeStructuredAttrsShell(const nlohmann::json & json)
 
             for (auto & [key2, value2] : value.items()) {
                 auto s3 = handleSimpleType(value2);
-                if (!s3) { good = false; break; }
+                if (!s3) {
+                    good = false;
+                    break;
+                }
                 s2 += fmt("[%s]=%s ", shellEscape(key2), *s3);
             }
 

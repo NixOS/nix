@@ -27,10 +27,7 @@ struct PosixSourceAccessor : virtual SourceAccessor
      */
     time_t mtime = 0;
 
-    void readFile(
-        const CanonPath & path,
-        Sink & sink,
-        std::function<void(uint64_t)> sizeCallback) override;
+    void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override;
 
     bool pathExists(const CanonPath & path) override;
 

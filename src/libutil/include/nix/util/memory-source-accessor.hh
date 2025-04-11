@@ -14,33 +14,37 @@ struct MemorySourceAccessor : virtual SourceAccessor
      * `MemorySourceAccessor`, this has a side benefit of nicely
      * defining what a "file system object" is in Nix.
      */
-    struct File {
-        bool operator == (const File &) const noexcept;
-        std::strong_ordering operator <=> (const File &) const noexcept;
+    struct File
+    {
+        bool operator==(const File &) const noexcept;
+        std::strong_ordering operator<=>(const File &) const noexcept;
 
-        struct Regular {
+        struct Regular
+        {
             bool executable = false;
             std::string contents;
 
-            bool operator == (const Regular &) const = default;
-            auto operator <=> (const Regular &) const = default;
+            bool operator==(const Regular &) const = default;
+            auto operator<=>(const Regular &) const = default;
         };
 
-        struct Directory {
+        struct Directory
+        {
             using Name = std::string;
 
             std::map<Name, File, std::less<>> contents;
 
-            bool operator == (const Directory &) const noexcept;
+            bool operator==(const Directory &) const noexcept;
             // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
-            bool operator < (const Directory &) const noexcept;
+            bool operator<(const Directory &) const noexcept;
         };
 
-        struct Symlink {
+        struct Symlink
+        {
             std::string target;
 
-            bool operator == (const Symlink &) const = default;
-            auto operator <=> (const Symlink &) const = default;
+            bool operator==(const Symlink &) const = default;
+            auto operator<=>(const Symlink &) const = default;
         };
 
         using Raw = std::variant<Regular, Directory, Symlink>;
@@ -51,10 +55,11 @@ struct MemorySourceAccessor : virtual SourceAccessor
         Stat lstat() const;
     };
 
-    File root { File::Directory {} };
+    File root{File::Directory{}};
 
-    bool operator == (const MemorySourceAccessor &) const noexcept = default;
-    bool operator < (const MemorySourceAccessor & other) const noexcept {
+    bool operator==(const MemorySourceAccessor &) const noexcept = default;
+    bool operator<(const MemorySourceAccessor & other) const noexcept
+    {
         return root < other.root;
     }
 
@@ -80,19 +85,17 @@ struct MemorySourceAccessor : virtual SourceAccessor
     SourcePath addFile(CanonPath path, std::string && contents);
 };
 
-
-inline bool MemorySourceAccessor::File::Directory::operator == (
+inline bool MemorySourceAccessor::File::Directory::operator==(
     const MemorySourceAccessor::File::Directory &) const noexcept = default;
-inline bool MemorySourceAccessor::File::Directory::operator < (
-    const MemorySourceAccessor::File::Directory & other) const noexcept
+inline bool
+MemorySourceAccessor::File::Directory::operator<(const MemorySourceAccessor::File::Directory & other) const noexcept
 {
     return contents < other.contents;
 }
 
-inline bool MemorySourceAccessor::File::operator == (
-    const MemorySourceAccessor::File &) const noexcept = default;
-inline std::strong_ordering MemorySourceAccessor::File::operator <=> (
-    const MemorySourceAccessor::File &) const noexcept = default;
+inline bool MemorySourceAccessor::File::operator==(const MemorySourceAccessor::File &) const noexcept = default;
+inline std::strong_ordering
+MemorySourceAccessor::File::operator<=>(const MemorySourceAccessor::File &) const noexcept = default;
 
 /**
  * Write to a `MemorySourceAccessor` at the given path
@@ -101,13 +104,14 @@ struct MemorySink : FileSystemObjectSink
 {
     MemorySourceAccessor & dst;
 
-    MemorySink(MemorySourceAccessor & dst) : dst(dst) { }
+    MemorySink(MemorySourceAccessor & dst)
+        : dst(dst)
+    {
+    }
 
     void createDirectory(const CanonPath & path) override;
 
-    void createRegularFile(
-        const CanonPath & path,
-        std::function<void(CreateRegularFileSink &)>) override;
+    void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)>) override;
 
     void createSymlink(const CanonPath & path, const std::string & target) override;
 };

@@ -10,7 +10,6 @@
 using namespace nix;
 using namespace nix::flake;
 
-
 class RegistryCommand : virtual Args
 {
     std::string registry_path;
@@ -31,7 +30,8 @@ public:
 
     std::shared_ptr<fetchers::Registry> getRegistry()
     {
-        if (registry) return registry;
+        if (registry)
+            return registry;
         if (registry_path.empty()) {
             registry = fetchers::getUserRegistry(fetchSettings);
         } else {
@@ -60,8 +60,8 @@ struct CmdRegistryList : StoreCommand
     std::string doc() override
     {
         return
-          #include "registry-list.md"
-          ;
+#include "registry-list.md"
+            ;
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -73,11 +73,12 @@ struct CmdRegistryList : StoreCommand
         for (auto & registry : registries) {
             for (auto & entry : registry->entries) {
                 // FIXME: format nicely
-                logger->cout("%s %s %s",
-                    registry->type == Registry::Flag   ? "flags " :
-                    registry->type == Registry::User   ? "user  " :
-                    registry->type == Registry::System ? "system" :
-                    "global",
+                logger->cout(
+                    "%s %s %s",
+                    registry->type == Registry::Flag     ? "flags "
+                    : registry->type == Registry::User   ? "user  "
+                    : registry->type == Registry::System ? "system"
+                                                         : "global",
                     entry.from.toURLString(),
                     entry.to.toURLString(attrsToQuery(entry.extraAttrs)));
             }
@@ -97,8 +98,8 @@ struct CmdRegistryAdd : MixEvalArgs, Command, RegistryCommand
     std::string doc() override
     {
         return
-          #include "registry-add.md"
-          ;
+#include "registry-add.md"
+            ;
     }
 
     CmdRegistryAdd()
@@ -113,7 +114,8 @@ struct CmdRegistryAdd : MixEvalArgs, Command, RegistryCommand
         auto toRef = parseFlakeRef(fetchSettings, toUrl);
         auto registry = getRegistry();
         fetchers::Attrs extraAttrs;
-        if (toRef.subdir != "") extraAttrs["dir"] = toRef.subdir;
+        if (toRef.subdir != "")
+            extraAttrs["dir"] = toRef.subdir;
         registry->remove(fromRef.input);
         registry->add(fromRef.input, toRef.input, extraAttrs);
         registry->write(getRegistryPath());
@@ -132,8 +134,8 @@ struct CmdRegistryRemove : RegistryCommand, Command
     std::string doc() override
     {
         return
-          #include "registry-remove.md"
-          ;
+#include "registry-remove.md"
+            ;
     }
 
     CmdRegistryRemove()
@@ -163,27 +165,27 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
     std::string doc() override
     {
         return
-          #include "registry-pin.md"
-          ;
+#include "registry-pin.md"
+            ;
     }
 
     CmdRegistryPin()
     {
         expectArg("url", &url);
 
-        expectArgs({
-            .label = "locked",
-            .optional = true,
-            .handler = {&locked},
-            .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
-                completeFlakeRef(completions, getStore(), prefix);
-            }}
-        });
+        expectArgs(
+            {.label = "locked",
+             .optional = true,
+             .handler = {&locked},
+             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+                 completeFlakeRef(completions, getStore(), prefix);
+             }}});
     }
 
     void run(nix::ref<nix::Store> store) override
     {
-        if (locked.empty()) locked = url;
+        if (locked.empty())
+            locked = url;
         auto registry = getRegistry();
         auto ref = parseFlakeRef(fetchSettings, url);
         auto lockedRef = parseFlakeRef(fetchSettings, locked);
@@ -192,7 +194,8 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
         if (!resolved.isLocked())
             warn("flake '%s' is not locked", resolved.to_string());
         fetchers::Attrs extraAttrs;
-        if (ref.subdir != "") extraAttrs["dir"] = ref.subdir;
+        if (ref.subdir != "")
+            extraAttrs["dir"] = ref.subdir;
         registry->add(ref.input, resolved, extraAttrs);
         registry->write(getRegistryPath());
     }
@@ -202,13 +205,13 @@ struct CmdRegistry : NixMultiCommand
 {
     CmdRegistry()
         : NixMultiCommand(
-            "registry",
-            {
-                {"list", []() { return make_ref<CmdRegistryList>(); }},
-                {"add", []() { return make_ref<CmdRegistryAdd>(); }},
-                {"remove", []() { return make_ref<CmdRegistryRemove>(); }},
-                {"pin", []() { return make_ref<CmdRegistryPin>(); }},
-            })
+              "registry",
+              {
+                  {"list", []() { return make_ref<CmdRegistryList>(); }},
+                  {"add", []() { return make_ref<CmdRegistryAdd>(); }},
+                  {"remove", []() { return make_ref<CmdRegistryRemove>(); }},
+                  {"pin", []() { return make_ref<CmdRegistryPin>(); }},
+              })
     {
     }
 
@@ -220,11 +223,14 @@ struct CmdRegistry : NixMultiCommand
     std::string doc() override
     {
         return
-          #include "registry.md"
-          ;
+#include "registry.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 };
 
 static auto rCmdRegistry = registerCommand<CmdRegistry>("registry");

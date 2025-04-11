@@ -48,7 +48,7 @@ class NixCExternalValue : public nix::ExternalValueBase
 public:
     NixCExternalValue(NixCExternalValueDesc & desc, void * v)
         : desc(desc)
-        , v(v){};
+        , v(v) {};
     void * get_ptr()
     {
         return v;
@@ -155,11 +155,17 @@ public:
         }
         nix_string_context ctx{context};
         desc.printValueAsXML(
-            v, (EvalState *) &state, strict, location, &doc, &ctx, &drvsSeen,
+            v,
+            (EvalState *) &state,
+            strict,
+            location,
+            &doc,
+            &ctx,
+            &drvsSeen,
             *reinterpret_cast<const uint32_t *>(&pos));
     }
 
-    virtual ~NixCExternalValue() override{};
+    virtual ~NixCExternalValue() override {};
 };
 
 ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalValueDesc * desc, void * v)

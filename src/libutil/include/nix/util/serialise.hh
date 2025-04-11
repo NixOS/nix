@@ -8,19 +8,23 @@
 #include "nix/util/util.hh"
 #include "nix/util/file-descriptor.hh"
 
-namespace boost::context { struct stack_context; }
+namespace boost::context {
+struct stack_context;
+}
 
 namespace nix {
-
 
 /**
  * Abstract destination of binary data.
  */
 struct Sink
 {
-    virtual ~Sink() { }
-    virtual void operator () (std::string_view data) = 0;
-    virtual bool good() { return true; }
+    virtual ~Sink() {}
+    virtual void operator()(std::string_view data) = 0;
+    virtual bool good()
+    {
+        return true;
+    }
 };
 
 /**
@@ -28,16 +32,13 @@ struct Sink
  */
 struct NullSink : Sink
 {
-    void operator () (std::string_view data) override
-    { }
+    void operator()(std::string_view data) override {}
 };
-
 
 struct FinishSink : virtual Sink
 {
     virtual void finish() = 0;
 };
-
 
 /**
  * A buffered abstract sink. Warning: a BufferedSink should not be
@@ -49,9 +50,13 @@ struct BufferedSink : virtual Sink
     std::unique_ptr<char[]> buffer;
 
     BufferedSink(size_t bufSize = 32 * 1024)
-        : bufSize(bufSize), bufPos(0), buffer(nullptr) { }
+        : bufSize(bufSize)
+        , bufPos(0)
+        , buffer(nullptr)
+    {
+    }
 
-    void operator () (std::string_view data) override;
+    void operator()(std::string_view data) override;
 
     void flush();
 
@@ -60,21 +65,20 @@ protected:
     virtual void writeUnbuffered(std::string_view data) = 0;
 };
 
-
 /**
  * Abstract source of binary data.
  */
 struct Source
 {
-    virtual ~Source() { }
+    virtual ~Source() {}
 
     /**
      * Store exactly ‘len’ bytes in the buffer pointed to by ‘data’.
      * It blocks until all the requested data is available, or throws
      * an error if it is not going to be available.
      */
-    void operator () (char * data, size_t len);
-    void operator () (std::string_view data);
+    void operator()(char * data, size_t len);
+    void operator()(std::string_view data);
 
     /**
      * Store up to ‘len’ in the buffer pointed to by ‘data’, and
@@ -83,13 +87,15 @@ struct Source
      */
     virtual size_t read(char * data, size_t len) = 0;
 
-    virtual bool good() { return true; }
+    virtual bool good()
+    {
+        return true;
+    }
 
     void drainInto(Sink & sink);
 
     std::string drain();
 };
-
 
 /**
  * A buffered abstract source. Warning: a BufferedSource should not be
@@ -101,7 +107,12 @@ struct BufferedSource : Source
     std::unique_ptr<char[]> buffer;
 
     BufferedSource(size_t bufSize = 32 * 1024)
-        : bufSize(bufSize), bufPosIn(0), bufPosOut(0), buffer(nullptr) { }
+        : bufSize(bufSize)
+        , bufPosIn(0)
+        , bufPosOut(0)
+        , buffer(nullptr)
+    {
+    }
 
     size_t read(char * data, size_t len) override;
 
@@ -117,7 +128,6 @@ protected:
     virtual size_t readUnbuffered(char * data, size_t len) = 0;
 };
 
-
 /**
  * A sink that writes data to a file descriptor.
  */
@@ -126,9 +136,15 @@ struct FdSink : BufferedSink
     Descriptor fd;
     size_t written = 0;
 
-    FdSink() : fd(INVALID_DESCRIPTOR) { }
-    FdSink(Descriptor fd) : fd(fd) { }
-    FdSink(FdSink&&) = default;
+    FdSink()
+        : fd(INVALID_DESCRIPTOR)
+    {
+    }
+    FdSink(Descriptor fd)
+        : fd(fd)
+    {
+    }
+    FdSink(FdSink &&) = default;
 
     FdSink & operator=(FdSink && s)
     {
@@ -149,7 +165,6 @@ private:
     bool _good = true;
 };
 
-
 /**
  * A source that reads data from a file descriptor.
  */
@@ -159,8 +174,14 @@ struct FdSource : BufferedSource
     size_t read = 0;
     BackedStringView endOfFileError{"unexpected end-of-file"};
 
-    FdSource() : fd(INVALID_DESCRIPTOR) { }
-    FdSource(Descriptor fd) : fd(fd) { }
+    FdSource()
+        : fd(INVALID_DESCRIPTOR)
+    {
+    }
+    FdSource(Descriptor fd)
+        : fd(fd)
+    {
+    }
     FdSource(FdSource &&) = default;
 
     FdSource & operator=(FdSource && s) = default;
@@ -179,22 +200,21 @@ private:
     bool _good = true;
 };
 
-
 /**
  * A sink that writes data to a string.
  */
 struct StringSink : Sink
 {
     std::string s;
-    StringSink() { }
+    StringSink() {}
     explicit StringSink(const size_t reservedSize)
     {
-      s.reserve(reservedSize);
+        s.reserve(reservedSize);
     };
-    StringSink(std::string && s) : s(std::move(s)) { };
-    void operator () (std::string_view data) override;
+    StringSink(std::string && s)
+        : s(std::move(s)) {};
+    void operator()(std::string_view data) override;
 };
-
 
 /**
  * A source that reads data from a string.
@@ -208,27 +228,36 @@ struct StringSource : Source
     // from std::string -> std::string_view occurs when the string is passed
     // by rvalue.
     StringSource(std::string &&) = delete;
-    StringSource(std::string_view s) : s(s), pos(0) { }
-    StringSource(const std::string& str): StringSource(std::string_view(str)) {}
+    StringSource(std::string_view s)
+        : s(s)
+        , pos(0)
+    {
+    }
+    StringSource(const std::string & str)
+        : StringSource(std::string_view(str))
+    {
+    }
 
     size_t read(char * data, size_t len) override;
 };
-
 
 /**
  * A sink that writes all incoming data to two other sinks.
  */
 struct TeeSink : Sink
 {
-    Sink & sink1, & sink2;
-    TeeSink(Sink & sink1, Sink & sink2) : sink1(sink1), sink2(sink2) { }
-    virtual void operator () (std::string_view data) override
+    Sink &sink1, &sink2;
+    TeeSink(Sink & sink1, Sink & sink2)
+        : sink1(sink1)
+        , sink2(sink2)
+    {
+    }
+    virtual void operator()(std::string_view data) override
     {
         sink1(data);
         sink2(data);
     }
 };
-
 
 /**
  * Adapter class of a Source that saves all data read to a sink.
@@ -238,7 +267,10 @@ struct TeeSource : Source
     Source & orig;
     Sink & sink;
     TeeSource(Source & orig, Sink & sink)
-        : orig(orig), sink(sink) { }
+        : orig(orig)
+        , sink(sink)
+    {
+    }
     size_t read(char * data, size_t len) override
     {
         size_t n = orig.read(data, len);
@@ -255,7 +287,10 @@ struct SizedSource : Source
     Source & orig;
     size_t remain;
     SizedSource(Source & orig, size_t size)
-        : orig(orig), remain(size) { }
+        : orig(orig)
+        , remain(size)
+    {
+    }
     size_t read(char * data, size_t len) override
     {
         if (this->remain <= 0) {
@@ -289,7 +324,7 @@ struct LengthSink : Sink
 {
     uint64_t length = 0;
 
-    void operator () (std::string_view data) override
+    void operator()(std::string_view data) override
     {
         length += data.size();
     }
@@ -302,8 +337,10 @@ struct LengthSource : Source
 {
     Source & next;
 
-    LengthSource(Source & next) : next(next)
-    { }
+    LengthSource(Source & next)
+        : next(next)
+    {
+    }
 
     uint64_t total = 0;
 
@@ -324,14 +361,16 @@ struct LambdaSink : Sink
 
     lambda_t lambda;
 
-    LambdaSink(const lambda_t & lambda) : lambda(lambda) { }
+    LambdaSink(const lambda_t & lambda)
+        : lambda(lambda)
+    {
+    }
 
-    void operator () (std::string_view data) override
+    void operator()(std::string_view data) override
     {
         lambda(data);
     }
 };
-
 
 /**
  * Convert a function into a source.
@@ -342,7 +381,10 @@ struct LambdaSource : Source
 
     lambda_t lambda;
 
-    LambdaSource(const lambda_t & lambda) : lambda(lambda) { }
+    LambdaSource(const lambda_t & lambda)
+        : lambda(lambda)
+    {
+    }
 
     size_t read(char * data, size_t len) override
     {
@@ -356,11 +398,13 @@ struct LambdaSource : Source
  */
 struct ChainSource : Source
 {
-    Source & source1, & source2;
+    Source &source1, &source2;
     bool useSecond = false;
     ChainSource(Source & s1, Source & s2)
-        : source1(s1), source2(s2)
-    { }
+        : source1(s1)
+        , source2(s2)
+    {
+    }
 
     size_t read(char * data, size_t len) override;
 };
@@ -372,16 +416,12 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun);
  * Source executes the function as a coroutine.
  */
 std::unique_ptr<Source> sinkToSource(
-    std::function<void(Sink &)> fun,
-    std::function<void()> eof = []() {
-        throw EndOfFile("coroutine has finished");
-    });
-
+    std::function<void(Sink &)> fun, std::function<void()> eof = []() { throw EndOfFile("coroutine has finished"); });
 
 void writePadding(size_t len, Sink & sink);
 void writeString(std::string_view s, Sink & sink);
 
-inline Sink & operator << (Sink & sink, uint64_t n)
+inline Sink & operator<<(Sink & sink, uint64_t n)
 {
     unsigned char buf[8];
     buf[0] = n & 0xff;
@@ -396,14 +436,12 @@ inline Sink & operator << (Sink & sink, uint64_t n)
     return sink;
 }
 
-Sink & operator << (Sink & in, const Error & ex);
-Sink & operator << (Sink & sink, std::string_view s);
-Sink & operator << (Sink & sink, const Strings & s);
-Sink & operator << (Sink & sink, const StringSet & s);
-
+Sink & operator<<(Sink & in, const Error & ex);
+Sink & operator<<(Sink & sink, std::string_view s);
+Sink & operator<<(Sink & sink, const Strings & s);
+Sink & operator<<(Sink & sink, const StringSet & s);
 
 MakeError(SerialisationError, Error);
-
 
 template<typename T>
 T readNum(Source & source)
@@ -419,42 +457,39 @@ T readNum(Source & source)
     return (T) n;
 }
 
-
 inline unsigned int readInt(Source & source)
 {
     return readNum<unsigned int>(source);
 }
-
 
 inline uint64_t readLongLong(Source & source)
 {
     return readNum<uint64_t>(source);
 }
 
-
 void readPadding(size_t len, Source & source);
 size_t readString(char * buf, size_t max, Source & source);
 std::string readString(Source & source, size_t max = std::numeric_limits<size_t>::max());
-template<class T> T readStrings(Source & source);
+template<class T>
+T readStrings(Source & source);
 
-Source & operator >> (Source & in, std::string & s);
+Source & operator>>(Source & in, std::string & s);
 
 template<typename T>
-Source & operator >> (Source & in, T & n)
+Source & operator>>(Source & in, T & n)
 {
     n = readNum<T>(in);
     return in;
 }
 
 template<typename T>
-Source & operator >> (Source & in, bool & b)
+Source & operator>>(Source & in, bool & b)
 {
     b = readNum<uint64_t>(in);
     return in;
 }
 
 Error readError(Source & source);
-
 
 /**
  * An adapter that converts a std::basic_istream into a source.
@@ -465,7 +500,8 @@ struct StreamToSourceAdapter : Source
 
     StreamToSourceAdapter(std::shared_ptr<std::basic_istream<char>> istream)
         : istream(istream)
-    { }
+    {
+    }
 
     size_t read(char * data, size_t len) override
     {
@@ -479,7 +515,6 @@ struct StreamToSourceAdapter : Source
         return istream->gcount();
     }
 };
-
 
 /**
  * A source that reads a distinct format of concatenated chunks back into its
@@ -496,8 +531,10 @@ struct FramedSource : Source
     std::vector<char> pending;
     size_t pos = 0;
 
-    FramedSource(Source & from) : from(from)
-    { }
+    FramedSource(Source & from)
+        : from(from)
+    {
+    }
 
     ~FramedSource()
     {
@@ -505,7 +542,8 @@ struct FramedSource : Source
             if (!eof) {
                 while (true) {
                     auto n = readInt(from);
-                    if (!n) break;
+                    if (!n)
+                        break;
                     std::vector<char> data(n);
                     from(data.data(), n);
                 }
@@ -517,7 +555,8 @@ struct FramedSource : Source
 
     size_t read(char * data, size_t len) override
     {
-        if (eof) throw EndOfFile("reached end of FramedSource");
+        if (eof)
+            throw EndOfFile("reached end of FramedSource");
 
         if (pos >= pending.size()) {
             size_t len = readInt(from);
@@ -549,8 +588,10 @@ struct FramedSink : nix::BufferedSink
     std::function<void()> checkError;
 
     FramedSink(BufferedSink & to, std::function<void()> && checkError)
-        : to(to), checkError(checkError)
-    { }
+        : to(to)
+        , checkError(checkError)
+    {
+    }
 
     ~FramedSink()
     {
