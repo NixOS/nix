@@ -115,7 +115,7 @@ It creates an [attribute set] representing the string context, which can be insp
 
 ## Clearing string contexts
 
-[`buitins.unsafeDiscardStringContext`](./builtins.md#builtins-unsafeDiscardStringContext) will make a copy of a string, but with an empty string context.
+[`builtins.unsafeDiscardStringContext`](./builtins.md#builtins-unsafeDiscardStringContext) will make a copy of a string, but with an empty string context.
 The returned string can be used in more ways, e.g. by operators that require the string context to be empty.
 The requirement to explicitly discard the string context in such use cases helps ensure that string context elements are not lost by mistake.
 The "unsafe" marker is only there to remind that Nix normally guarantees that dependencies are tracked, whereas the returned string has lost them.
