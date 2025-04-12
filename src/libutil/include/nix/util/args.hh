@@ -398,6 +398,8 @@ public:
         AcceptedShorthand,
         /** Aliases that will go away */
         Deprecated,
+        /** Aliases for linguistic variation */
+        LinguisticVariation,
     };
 
     /** An alias, except for the original syntax, which is in the map key. */
