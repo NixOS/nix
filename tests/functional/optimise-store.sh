@@ -44,6 +44,30 @@ if [ "$inode1" != "$inode3" ]; then
     exit 1
 fi
 
+# shellcheck disable=SC2016
+outPath4=$(echo 'with import '"${config_nix}"'; mkDerivation { name = "foo4"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link)
+
+NIX_REMOTE="" nix store optimise
+
+inode1="$(stat --format=%i "$outPath1"/foo)"
+inode4="$(stat --format=%i "$outPath4"/foo)"
+if [ "$inode1" != "$inode4" ]; then
+    echo "inodes do not match"
+    exit 1
+fi
+
+# shellcheck disable=SC2016
+outPath5=$(echo 'with import '"${config_nix}"'; mkDerivation { name = "foo5"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link)
+
+NIX_REMOTE="" nix store optimize # alias of optimise
+
+inode1="$(stat --format=%i "$outPath1"/foo)"
+inode5="$(stat --format=%i "$outPath5"/foo)"
+if [ "$inode1" != "$inode5" ]; then
+    echo "inodes do not match"
+    exit 1
+fi
+
 nix-store --gc
 
 if [ -n "$(ls "$NIX_STORE_DIR"/.links)" ]; then
