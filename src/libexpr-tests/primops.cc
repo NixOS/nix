@@ -56,11 +56,31 @@ namespace nix {
     TEST_F(PrimOpTest, ceil) {
         auto v = eval("builtins.ceil 1.9");
         ASSERT_THAT(v, IsIntEq(2));
+        auto intMin = eval("builtins.ceil (-4611686018427387904 - 4611686018427387904)");
+        ASSERT_THAT(intMin, IsIntEq(std::numeric_limits<NixInt::Inner>::min()));
+        ASSERT_THROW(eval("builtins.ceil 1.0e200"), EvalError);
+        ASSERT_THROW(eval("builtins.ceil -1.0e200"), EvalError);
+        ASSERT_THROW(eval("builtins.ceil (1.0e200 * 1.0e200)"), EvalError); // inf
+        ASSERT_THROW(eval("builtins.ceil (-1.0e200 * 1.0e200)"), EvalError); // -inf
+        ASSERT_THROW(eval("builtins.ceil (1.0e200 * 1.0e200 - 1.0e200 * 1.0e200)"), EvalError); // nan
+        // bugs in previous Nix versions
+        ASSERT_THROW(eval("builtins.ceil (4611686018427387904 + 4611686018427387903)"), EvalError);
+        ASSERT_THROW(eval("builtins.ceil (-4611686018427387904 - 4611686018427387903)"), EvalError);
     }
 
     TEST_F(PrimOpTest, floor) {
         auto v = eval("builtins.floor 1.9");
         ASSERT_THAT(v, IsIntEq(1));
+        auto intMin = eval("builtins.ceil (-4611686018427387904 - 4611686018427387904)");
+        ASSERT_THAT(intMin, IsIntEq(std::numeric_limits<NixInt::Inner>::min()));
+        ASSERT_THROW(eval("builtins.ceil 1.0e200"), EvalError);
+        ASSERT_THROW(eval("builtins.ceil -1.0e200"), EvalError);
+        ASSERT_THROW(eval("builtins.ceil (1.0e200 * 1.0e200)"), EvalError); // inf
+        ASSERT_THROW(eval("builtins.ceil (-1.0e200 * 1.0e200)"), EvalError); // -inf
+        ASSERT_THROW(eval("builtins.ceil (1.0e200 * 1.0e200 - 1.0e200 * 1.0e200)"), EvalError); // nan
+        // bugs in previous Nix versions
+        ASSERT_THROW(eval("builtins.ceil (4611686018427387904 + 4611686018427387903)"), EvalError);
+        ASSERT_THROW(eval("builtins.ceil (-4611686018427387904 - 4611686018427387903)"), EvalError);
     }
 
     TEST_F(PrimOpTest, tryEvalFailure) {
