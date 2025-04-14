@@ -1,6 +1,21 @@
+{ contentAddress }:
+
 let
+  caArgs =
+    if contentAddress then
+      {
+        __contentAddressed = true;
+        outputHashMode = "recursive";
+        outputHashAlgo = "sha256";
+      }
+    else
+      { };
+
+  derivation' = args: derivation (caArgs // args);
+
   system = "my-system";
-  foo = derivation {
+
+  foo = derivation' {
     inherit system;
     name = "foo";
     builder = "/bin/bash";
@@ -9,7 +24,8 @@ let
       "echo foo > $out"
     ];
   };
-  bar = derivation {
+
+  bar = derivation' {
     inherit system;
     name = "bar";
     builder = "/bin/bash";
@@ -18,8 +34,9 @@ let
       "echo bar > $out"
     ];
   };
+
 in
-derivation {
+derivation' {
   inherit system;
   name = "advanced-attributes-structured-attrs";
   builder = "/bin/bash";
