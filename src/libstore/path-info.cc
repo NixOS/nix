@@ -40,6 +40,14 @@ void ValidPathInfo::sign(const Store & store, const Signer & signer)
     sigs.insert(signer.signDetached(fingerprint(store)));
 }
 
+void ValidPathInfo::sign(const Store & store, const std::vector<std::unique_ptr<Signer>> & signers)
+{
+    auto fingerprint = this->fingerprint(store);
+    for (auto & signer: signers) {
+        sigs.insert(signer->signDetached(fingerprint));
+    }
+}
+
 std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithReferences() const
 {
     if (! ca)
