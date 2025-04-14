@@ -353,7 +353,7 @@ static Flake getFlake(
     CopyMode copyMode)
 {
     // Fetch a lazy tree first.
-    auto cachedInput = fetchers::InputCache::getCache()->getAccessor(state.store, originalRef.input, useRegistries);
+    auto cachedInput = state.inputCache->getAccessor(state.store, originalRef.input, useRegistries);
 
     auto resolvedRef = FlakeRef(std::move(cachedInput.resolvedInput), originalRef.subdir);
     auto lockedRef = FlakeRef(std::move(cachedInput.lockedInput), originalRef.subdir);
@@ -368,7 +368,7 @@ static Flake getFlake(
         debug("refetching input '%s' due to self attribute", newLockedRef);
         // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
         newLockedRef.input.attrs.erase("narHash");
-        auto cachedInput2 = fetchers::InputCache::getCache()->getAccessor(state.store, newLockedRef.input, useRegistries);
+        auto cachedInput2 = state.inputCache->getAccessor(state.store, newLockedRef.input, useRegistries);
         cachedInput.accessor = cachedInput2.accessor;
         lockedRef = FlakeRef(std::move(cachedInput2.lockedInput), newLockedRef.subdir);
     }
@@ -734,7 +734,7 @@ LockedFlake lockFlake(
                                 if (auto resolvedPath = resolveRelativePath()) {
                                     return {*resolvedPath, *input.ref};
                                 } else {
-                                    auto cachedInput = fetchers::InputCache::getCache()->getAccessor(state.store, input.ref->input, useRegistries);
+                                    auto cachedInput = state.inputCache->getAccessor(state.store, input.ref->input, useRegistries);
 
                                     auto lockedRef = FlakeRef(std::move(cachedInput.lockedInput), input.ref->subdir);
 

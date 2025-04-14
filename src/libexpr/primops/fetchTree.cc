@@ -202,7 +202,7 @@ static void fetchTree(
             throw Error("input '%s' is not allowed to use the '__final' attribute", input.to_string());
     }
 
-    auto cachedInput = fetchers::InputCache::getCache()->getAccessor(state.store, input, false);
+    auto cachedInput = state.inputCache->getAccessor(state.store, input, false);
 
     auto storePath = StorePath::random(input.getName());
 

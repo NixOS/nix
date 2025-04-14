@@ -25,7 +25,7 @@ struct InputCache
 
     virtual void clear() = 0;
 
-    static ref<InputCache> getCache();
+    static ref<InputCache> create();
 };
 
 }

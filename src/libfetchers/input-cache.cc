@@ -72,10 +72,9 @@ struct InputCacheImpl : InputCache
     }
 };
 
-ref<InputCache> InputCache::getCache()
+ref<InputCache> InputCache::create()
 {
-    static auto cache = make_ref<InputCacheImpl>();
-    return cache;
+    return make_ref<InputCacheImpl>();
 }
 
 }

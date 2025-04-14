@@ -33,7 +33,10 @@ namespace nix {
 constexpr size_t maxPrimOpArity = 8;
 
 class Store;
-namespace fetchers { struct Settings; }
+namespace fetchers {
+struct Settings;
+struct InputCache;
+}
 struct EvalSettings;
 class EvalState;
 class StorePath;
@@ -300,6 +303,8 @@ public:
     const ref<Store> buildStore;
 
     RootValue vImportedDrvToDerivation = nullptr;
+
+    ref<fetchers::InputCache> inputCache;
 
     /**
      * Debugger
