@@ -13,7 +13,7 @@ unset NIX_STATE_DIR
 function join_by { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
 
 EXTRA_SYSTEM_FEATURES=()
-if [[ -n "${CONTENT_ADDRESSED-}" ]]; then
+if [[ -n "${NIX_TESTS_CA_BY_DEFAULT-}" ]]; then
     EXTRA_SYSTEM_FEATURES=("ca-derivations")
 fi
 
