@@ -69,7 +69,7 @@ struct DerivationBuilderParams
      *
      * @todo this should be part of `Derivation`.
      */
-    const DerivationOptions & drvOptions;
+    const DerivationOptions<StorePath> & drvOptions;
 
     // The remainder is state held during the build.
 

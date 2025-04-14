@@ -554,9 +554,9 @@ static void main_nix_build(int argc, char ** argv)
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores ? settings.buildCores : settings.getDefaultCores());
 
-        DerivationOptions drvOptions;
+        DerivationOptions<StorePath> drvOptions;
         try {
-            drvOptions = DerivationOptions::fromStructuredAttrs(drv.env, drv.structuredAttrs);
+            drvOptions = derivationOptionsFromStructuredAttrs(*store, drv.env, get(drv.structuredAttrs));
         } catch (Error & e) {
             e.addTrace({}, "while parsing derivation '%s'", store->printStorePath(packageInfo.requireDrvPath()));
             throw;

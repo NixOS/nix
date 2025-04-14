@@ -225,11 +225,12 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                         return;
 
                     auto drv = make_ref<Derivation>(derivationFromPath(drvPath));
-                    DerivationOptions drvOptions;
+                    DerivationOptions<SingleDerivedPath> drvOptions;
                     try {
                         // FIXME: this is a lot of work just to get the value
                         // of `allowSubstitutes`.
-                        drvOptions = DerivationOptions::fromStructuredAttrs(drv->env, drv->structuredAttrs);
+                        drvOptions = derivationOptionsFromStructuredAttrs(
+                            *this, drv->inputDrvs, drv->env, get(drv->structuredAttrs));
                     } catch (Error & e) {
                         e.addTrace({}, "while parsing derivation '%s'", printStorePath(drvPath));
                         throw;
