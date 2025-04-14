@@ -9,6 +9,7 @@
 namespace nix {
 
 class Store;
+template<typename Input>
 struct DerivationOptions;
 struct DerivationOutput;
 
@@ -47,7 +48,7 @@ struct StructuredAttrs
 
     nlohmann::json::object_t prepareStructuredAttrs(
         Store & store,
-        const DerivationOptions & drvOptions,
+        const DerivationOptions<StorePath> & drvOptions,
         const StorePathSet & inputPaths,
         const DerivationOutputs & outputs) const;
 
