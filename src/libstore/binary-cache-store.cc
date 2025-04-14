@@ -279,9 +279,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     stats.narWriteCompressedBytes += fileSize;
     stats.narWriteCompressionTimeMs += duration;
 
-    for (auto &signer: signers) {
-        narInfo->sign(*this, *signer);
-    }
+    narInfo->sign(*this, signers);
 
     /* Atomically write the NAR info file.*/
     writeNarInfo(narInfo);
