@@ -195,7 +195,7 @@ Nix uses a string with the following format to identify the *system type* or *pl
 <cpu>-<os>[-<abi>]
 ```
 
-It is set when Nix is compiled for the given system, and based on the output of meson's [host_machine information](https://mesonbuild.com/Reference-manual_builtin_host_machine.html)>
+It is set when Nix is compiled for the given system, and based on the output of Meson's [`host_machine` information](https://mesonbuild.com/Reference-manual_builtin_host_machine.html)>
 
 ```
 <cpu>-<vendor>-<os>[<version>][-<abi>]
