@@ -1,0 +1,47 @@
+{
+  "args": [
+    "-c",
+    "echo hello > $out"
+  ],
+  "builder": "/bin/bash",
+  "env": {
+    "__darwinAllowLocalNetworking": "1",
+    "__impureHostDeps": "/usr/bin/ditto",
+    "__noChroot": "1",
+    "__sandboxProfile": "sandcastle",
+    "allowSubstitutes": "",
+    "allowedReferences": "/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo",
+    "allowedRequisites": "/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo",
+    "builder": "/bin/bash",
+    "disallowedReferences": "/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar",
+    "disallowedRequisites": "/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar",
+    "impureEnvVars": "UNICORN",
+    "name": "advanced-attributes",
+    "out": "/nix/store/33a6fdmn8q9ih9d7npbnrxn2q56a4l8q-advanced-attributes",
+    "preferLocalBuild": "1",
+    "requiredSystemFeatures": "rainbow uid-range",
+    "system": "my-system"
+  },
+  "inputDrvs": {
+    "/nix/store/4xm4wccqsvagz9gjksn24s7rip2fdy7v-foo.drv": {
+      "dynamicOutputs": {},
+      "outputs": [
+        "out"
+      ]
+    },
+    "/nix/store/plsq5jbr5nhgqwcgb2qxw7jchc09dnl8-bar.drv": {
+      "dynamicOutputs": {},
+      "outputs": [
+        "out"
+      ]
+    }
+  },
+  "inputSrcs": [],
+  "name": "advanced-attributes",
+  "outputs": {
+    "out": {
+      "path": "/nix/store/33a6fdmn8q9ih9d7npbnrxn2q56a4l8q-advanced-attributes"
+    }
+  },
+  "system": "my-system"
+}

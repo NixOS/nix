@@ -8,10 +8,11 @@ suites += {
   'name': 'ca',
   'deps': [],
   'tests': [
+    'build-cache.sh',
     'build-with-garbage-path.sh',
     'build.sh',
-    'build-cache.sh',
     'concurrent-builds.sh',
+    'derivation-advanced-attributes.sh',
     'derivation-json.sh',
     'duplicate-realisation-in-closure.sh',
     'eval-store.sh',
