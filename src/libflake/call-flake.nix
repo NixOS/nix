@@ -14,6 +14,7 @@ overrides:
 fetchTreeFinal:
 
 let
+  inherit (builtins) mapAttrs;
 
   lockFile = builtins.fromJSON lockFileStr;
 
@@ -35,7 +36,7 @@ let
         (resolveInput lockFile.nodes.${nodeName}.inputs.${builtins.head path})
         (builtins.tail path);
 
-  allNodes = builtins.mapAttrs (
+  allNodes = mapAttrs (
     key: node:
     let
 
@@ -60,9 +61,7 @@ let
 
       flake = import (outPath + "/flake.nix");
 
-      inputs = builtins.mapAttrs (inputName: inputSpec: allNodes.${resolveInput inputSpec}) (
-        node.inputs or { }
-      );
+      inputs = mapAttrs (inputName: inputSpec: allNodes.${resolveInput inputSpec}) (node.inputs or { });
 
       outputs = flake.outputs (inputs // { self = result; });
 
