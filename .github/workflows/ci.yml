@@ -7,7 +7,33 @@ on:
 permissions: read-all
 
 jobs:
+  check_merge_conflicts:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check for Merge Conflicts
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request?.number;
+            if (!prNumber) {
+              console.log("Not a pull request, skipping merge conflict check.");
+              return;
+            }            
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });  
+            if (pr.mergeable === false) {
+              core.setFailed("❌ Merge conflict detected! Please resolve before CI can run.");
+            } else if (pr.mergeable === null) {
+              console.setFailed("❌ GitHub is still checking mergeability, rerun if necessary.");
+            } else {
+              console.log("✅ No merge conflicts detected.");
+            }
   eval:
+    needs: check_merge_conflicts
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
@@ -17,6 +43,7 @@ jobs:
     - run: nix --experimental-features 'nix-command flakes' flake show --all-systems --json
 
   tests:
+    needs: check_merge_conflicts
     strategy:
       fail-fast: false
       matrix:
@@ -54,7 +81,7 @@ jobs:
         path: out/*
 
   installer_test:
-    needs: [tests]
+    needs: [tests, check_merge_conflicts]
     strategy:
       fail-fast: false
       matrix:
@@ -97,6 +124,7 @@ jobs:
   # 2. Store your dockerhub username as DOCKERHUB_USERNAME in "Repository secrets" of your fork repository settings (https://github.com/$githubuser/nix/settings/secrets/actions)
   # 3. Create an access token in https://hub.docker.com/settings/security and store it as DOCKERHUB_TOKEN in "Repository secrets" of your fork
   check_secrets:
+    needs: check_merge_conflicts
     permissions:
       contents: none
     name: Check Docker secrets present for installer tests
@@ -112,7 +140,7 @@ jobs:
           echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
 
   docker_push_image:
-    needs: [tests, vm_tests, check_secrets]
+    needs: [tests, vm_tests, check_secrets, check_merge_conflicts]
     permissions:
       contents: read
       packages: write
@@ -172,6 +200,7 @@ jobs:
         docker push $IMAGE_ID:master
 
   vm_tests:
+    needs: check_merge_conflicts
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -185,8 +214,8 @@ jobs:
             .#hydraJobs.tests.tarballFlakes \
             ;
 
-  flake_regressions:
-    needs: vm_tests
+  flake_regressions:  
+    needs: [vm_tests, check_merge_conflicts]
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout nix
