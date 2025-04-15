@@ -201,13 +201,15 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes)
             auto & checksForAllOutputs = *checksForAllOutputs_;
 
             EXPECT_EQ(
-                checksForAllOutputs.allowedReferences, StringSet{"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"});
+                checksForAllOutputs.allowedReferences, StringSet{"/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"});
             EXPECT_EQ(
-                checksForAllOutputs.allowedRequisites, StringSet{"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"});
+                checksForAllOutputs.allowedRequisites,
+                StringSet{"/nix/store/z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev"});
             EXPECT_EQ(
-                checksForAllOutputs.disallowedReferences, StringSet{"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"});
+                checksForAllOutputs.disallowedReferences, StringSet{"/nix/store/r5cff30838majxk5mp3ip2diffi8vpaj-bar"});
             EXPECT_EQ(
-                checksForAllOutputs.disallowedRequisites, StringSet{"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"});
+                checksForAllOutputs.disallowedRequisites,
+                StringSet{"/nix/store/9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev"});
         }
 
         StringSet systemFeatures{"rainbow", "uid-range"};
@@ -233,16 +235,16 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
 
             EXPECT_EQ(
                 checksForAllOutputs.allowedReferences,
-                StringSet{"/08cr1k2yfw44g21w1h850285vqhsciy7y3siqjdzz1m9yvwlqfm8"});
+                StringSet{"/164j69y6zir9z0339n8pjigg3rckinlr77bxsavzizdaaljb7nh9"});
             EXPECT_EQ(
                 checksForAllOutputs.allowedRequisites,
-                StringSet{"/08cr1k2yfw44g21w1h850285vqhsciy7y3siqjdzz1m9yvwlqfm8"});
+                StringSet{"/0nr45p69vn6izw9446wsh9bng9nndhvn19kpsm4n96a5mycw0s4z"});
             EXPECT_EQ(
                 checksForAllOutputs.disallowedReferences,
-                StringSet{"/05pdic30acaypbz73ivw4wlsi9whq08jxsimml2h0inwqya2hn99"});
+                StringSet{"/0nyw57wm2iicnm9rglvjmbci3ikmcp823czdqdzdcgsnnwqps71g"});
             EXPECT_EQ(
                 checksForAllOutputs.disallowedRequisites,
-                StringSet{"/05pdic30acaypbz73ivw4wlsi9whq08jxsimml2h0inwqya2hn99"});
+                StringSet{"/07f301yqyz8c6wf6bbbavb2q39j4n8kmcly1s09xadyhgy6x2wr8"});
         }
 
         StringSet systemFeatures{"rainbow", "uid-range"};
@@ -363,8 +365,8 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
                 ASSERT_TRUE(output_);
                 auto & output = *output_;
 
-                EXPECT_EQ(output.allowedReferences, StringSet{"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"});
-                EXPECT_EQ(output.allowedRequisites, StringSet{"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo"});
+                EXPECT_EQ(output.allowedReferences, StringSet{"/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"});
+                EXPECT_EQ(output.allowedRequisites, StringSet{"/nix/store/z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev"});
             }
 
             {
@@ -372,8 +374,9 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
                 ASSERT_TRUE(output_);
                 auto & output = *output_;
 
-                EXPECT_EQ(output.disallowedReferences, StringSet{"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"});
-                EXPECT_EQ(output.disallowedRequisites, StringSet{"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar"});
+                EXPECT_EQ(output.disallowedReferences, StringSet{"/nix/store/r5cff30838majxk5mp3ip2diffi8vpaj-bar"});
+                EXPECT_EQ(
+                    output.disallowedRequisites, StringSet{"/nix/store/9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev"});
             }
         }
 
@@ -399,8 +402,8 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
                 ASSERT_TRUE(output_);
                 auto & output = *output_;
 
-                EXPECT_EQ(output.allowedReferences, StringSet{"/08cr1k2yfw44g21w1h850285vqhsciy7y3siqjdzz1m9yvwlqfm8"});
-                EXPECT_EQ(output.allowedRequisites, StringSet{"/08cr1k2yfw44g21w1h850285vqhsciy7y3siqjdzz1m9yvwlqfm8"});
+                EXPECT_EQ(output.allowedReferences, StringSet{"/164j69y6zir9z0339n8pjigg3rckinlr77bxsavzizdaaljb7nh9"});
+                EXPECT_EQ(output.allowedRequisites, StringSet{"/0nr45p69vn6izw9446wsh9bng9nndhvn19kpsm4n96a5mycw0s4z"});
             }
 
             {
@@ -409,9 +412,9 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
                 auto & output = *output_;
 
                 EXPECT_EQ(
-                    output.disallowedReferences, StringSet{"/05pdic30acaypbz73ivw4wlsi9whq08jxsimml2h0inwqya2hn99"});
+                    output.disallowedReferences, StringSet{"/0nyw57wm2iicnm9rglvjmbci3ikmcp823czdqdzdcgsnnwqps71g"});
                 EXPECT_EQ(
-                    output.disallowedRequisites, StringSet{"/05pdic30acaypbz73ivw4wlsi9whq08jxsimml2h0inwqya2hn99"});
+                    output.disallowedRequisites, StringSet{"/07f301yqyz8c6wf6bbbavb2q39j4n8kmcly1s09xadyhgy6x2wr8"});
             }
         }
 
