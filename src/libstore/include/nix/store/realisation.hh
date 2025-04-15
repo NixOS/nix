@@ -21,7 +21,8 @@ struct OutputsSpec;
  * This is similar to a `DerivedPath::Opaque`, but the derivation is
  * identified by its "hash modulo" instead of by its store path.
  */
-struct DrvOutput {
+struct DrvOutput
+{
     /**
      * The hash modulo of the derivation.
      *
@@ -39,14 +40,17 @@ struct DrvOutput {
     std::string to_string() const;
 
     std::string strHash() const
-    { return drvHash.to_string(HashFormat::Base16, true); }
+    {
+        return drvHash.to_string(HashFormat::Base16, true);
+    }
 
     static DrvOutput parse(const std::string &);
 
     GENERATE_CMP(DrvOutput, me->drvHash, me->outputName);
 };
 
-struct Realisation {
+struct Realisation
+{
     DrvOutput id;
     StorePath outPath;
 
@@ -61,7 +65,7 @@ struct Realisation {
     std::map<DrvOutput, StorePath> dependentRealisations;
 
     nlohmann::json toJSON() const;
-    static Realisation fromJSON(const nlohmann::json& json, const std::string& whence);
+    static Realisation fromJSON(const nlohmann::json & json, const std::string & whence);
 
     std::string fingerprint() const;
     void sign(const Signer &);
@@ -73,7 +77,10 @@ struct Realisation {
 
     bool isCompatibleWith(const Realisation & other) const;
 
-    StorePath getPath() const { return outPath; }
+    StorePath getPath() const
+    {
+        return outPath;
+    }
 
     GENERATE_CMP(Realisation, me->id, me->outPath);
 };
@@ -100,22 +107,25 @@ typedef std::map<DrvOutput, Realisation> DrvOutputs;
  *
  * Moves the `outputs` input.
  */
-SingleDrvOutputs filterDrvOutputs(const OutputsSpec&, SingleDrvOutputs&&);
+SingleDrvOutputs filterDrvOutputs(const OutputsSpec &, SingleDrvOutputs &&);
 
-
-struct OpaquePath {
+struct OpaquePath
+{
     StorePath path;
 
-    StorePath getPath() const { return path; }
+    StorePath getPath() const
+    {
+        return path;
+    }
 
     GENERATE_CMP(OpaquePath, me->path);
 };
 
-
 /**
  * A store path with all the history of how it went into the store
  */
-struct RealisedPath {
+struct RealisedPath
+{
     /*
      * A path is either the result of the realisation of a derivation or
      * an opaque blob that has been directly added to the store
@@ -125,17 +135,23 @@ struct RealisedPath {
 
     using Set = std::set<RealisedPath>;
 
-    RealisedPath(StorePath path) : raw(OpaquePath{path}) {}
-    RealisedPath(Realisation r) : raw(r) {}
+    RealisedPath(StorePath path)
+        : raw(OpaquePath{path})
+    {
+    }
+    RealisedPath(Realisation r)
+        : raw(r)
+    {
+    }
 
     /**
      * Get the raw store path associated to this
      */
     StorePath path() const;
 
-    void closure(Store& store, Set& ret) const;
-    static void closure(Store& store, const Set& startPaths, Set& ret);
-    Set closure(Store& store) const;
+    void closure(Store & store, Set & ret) const;
+    static void closure(Store & store, const Set & startPaths, Set & ret);
+    Set closure(Store & store) const;
 
     GENERATE_CMP(RealisedPath, me->raw);
 };
@@ -145,13 +161,16 @@ class MissingRealisation : public Error
 public:
     MissingRealisation(DrvOutput & outputId)
         : MissingRealisation(outputId.outputName, outputId.strHash())
-    {}
+    {
+    }
     MissingRealisation(std::string_view drv, OutputName outputName)
-        : Error( "cannot operate on output '%s' of the "
-                "unbuilt derivation '%s'",
-                outputName,
-                drv)
-    {}
+        : Error(
+              "cannot operate on output '%s' of the "
+              "unbuilt derivation '%s'",
+              outputName,
+              drv)
+    {
+    }
 };
 
 }

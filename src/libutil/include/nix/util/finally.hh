@@ -16,10 +16,13 @@ private:
     bool movedFrom = false;
 
 public:
-    Finally(Fn fun) : fun(std::move(fun)) { }
+    Finally(Fn fun)
+        : fun(std::move(fun))
+    {
+    }
     // Copying Finallys is definitely not a good idea and will cause them to be
     // called twice.
-    Finally(Finally &other) = delete;
+    Finally(Finally & other) = delete;
     // NOTE: Move constructor can be nothrow if the callable type is itself nothrow
     // move-constructible.
     Finally(Finally && other) noexcept(std::is_nothrow_move_constructible_v<Fn>)

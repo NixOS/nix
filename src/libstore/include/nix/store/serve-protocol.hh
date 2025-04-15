@@ -12,14 +12,12 @@ namespace nix {
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
-
 struct StoreDirConfig;
 struct Source;
 
 // items being serialised
 struct BuildResult;
 struct UnkeyedValidPathInfo;
-
 
 /**
  * The "serve protocol", used by ssh:// stores.
@@ -45,7 +43,8 @@ struct ServeProto
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
-    struct ReadConn {
+    struct ReadConn
+    {
         Source & from;
         Version version;
     };
@@ -54,7 +53,8 @@ struct ServeProto
      * A unidirectional write connection, to be used by the write half of the
      * canonical serializers below.
      */
-    struct WriteConn {
+    struct WriteConn
+    {
         Sink & to;
         Version version;
     };
@@ -104,8 +104,7 @@ struct ServeProto
     struct BuildOptions;
 };
 
-enum struct ServeProto::Command : uint64_t
-{
+enum struct ServeProto::Command : uint64_t {
     QueryValidPaths = 1,
     QueryPathInfos = 2,
     DumpStorePath = 3,
@@ -117,8 +116,8 @@ enum struct ServeProto::Command : uint64_t
     AddToStoreNar = 9,
 };
 
-
-struct ServeProto::BuildOptions {
+struct ServeProto::BuildOptions
+{
     /**
      * Default value in this and every other field is so tests pass when
      * testing older deserialisers which do not set all the fields.
@@ -130,7 +129,7 @@ struct ServeProto::BuildOptions {
     bool enforceDeterminism = -1;
     bool keepFailed = -1;
 
-    bool operator == (const ServeProto::BuildOptions &) const = default;
+    bool operator==(const ServeProto::BuildOptions &) const = default;
 };
 
 /**
@@ -139,7 +138,7 @@ struct ServeProto::BuildOptions {
  * @todo Switch to using `ServeProto::Serialize` instead probably. But
  * this was not done at this time so there would be less churn.
  */
-inline Sink & operator << (Sink & sink, ServeProto::Command op)
+inline Sink & operator<<(Sink & sink, ServeProto::Command op)
 {
     return sink << (uint64_t) op;
 }
@@ -149,7 +148,7 @@ inline Sink & operator << (Sink & sink, ServeProto::Command op)
  *
  * @todo Perhaps render known opcodes more nicely.
  */
-inline std::ostream & operator << (std::ostream & s, ServeProto::Command op)
+inline std::ostream & operator<<(std::ostream & s, ServeProto::Command op)
 {
     return s << (uint64_t) op;
 }
@@ -164,10 +163,10 @@ inline std::ostream & operator << (std::ostream & s, ServeProto::Command op)
  * be legal specialization syntax. See below for what that looks like in
  * practice.
  */
-#define DECLARE_SERVE_SERIALISER(T) \
-    struct ServeProto::Serialise< T > \
-    { \
-        static T read(const StoreDirConfig & store, ServeProto::ReadConn conn); \
+#define DECLARE_SERVE_SERIALISER(T)                                                               \
+    struct ServeProto::Serialise<T>                                                               \
+    {                                                                                             \
+        static T read(const StoreDirConfig & store, ServeProto::ReadConn conn);                   \
         static void write(const StoreDirConfig & store, ServeProto::WriteConn conn, const T & t); \
     };
 

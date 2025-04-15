@@ -17,12 +17,12 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
     /**
      * @param authority is the socket path.
      */
-    UDSRemoteStoreConfig(
-        std::string_view scheme,
-        std::string_view authority,
-        const Params & params);
+    UDSRemoteStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
 
-    const std::string name() override { return "Local Daemon Store"; }
+    const std::string name() override
+    {
+        return "Local Daemon Store";
+    }
 
     std::string doc() override;
 
@@ -39,35 +39,36 @@ protected:
 
 public:
     static std::set<std::string> uriSchemes()
-    { return {scheme}; }
+    {
+        return {scheme};
+    }
 };
 
-class UDSRemoteStore : public virtual UDSRemoteStoreConfig
-    , public virtual IndirectRootStore
-    , public virtual RemoteStore
+class UDSRemoteStore : public virtual UDSRemoteStoreConfig, public virtual IndirectRootStore, public virtual RemoteStore
 {
 public:
 
     /**
      * @deprecated This is the old API to construct the store.
-    */
+     */
     UDSRemoteStore(const Params & params);
 
     /**
      * @param authority is the socket path.
      */
-    UDSRemoteStore(
-        std::string_view scheme,
-        std::string_view authority,
-        const Params & params);
+    UDSRemoteStore(std::string_view scheme, std::string_view authority, const Params & params);
 
     std::string getUri() override;
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override
-    { return LocalFSStore::getFSAccessor(requireValidPath); }
+    {
+        return LocalFSStore::getFSAccessor(requireValidPath);
+    }
 
     void narFromPath(const StorePath & path, Sink & sink) override
-    { LocalFSStore::narFromPath(path, sink); }
+    {
+        LocalFSStore::narFromPath(path, sink);
+    }
 
     /**
      * Implementation of `IndirectRootStore::addIndirectRoot()` which

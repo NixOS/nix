@@ -4,7 +4,7 @@
 #include "nix/util/types.hh"
 
 #ifndef _WIN32
-# include <sys/types.h>
+#  include <sys/types.h>
 #endif
 
 namespace nix {
@@ -58,7 +58,6 @@ Path createNixStateDir();
  * home directory.
  */
 std::string expandTilde(std::string_view path);
-
 
 /**
  * Is the current user UID 0 on Unix?
