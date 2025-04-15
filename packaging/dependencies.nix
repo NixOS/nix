@@ -38,6 +38,7 @@ scope: {
   aws-sdk-cpp =
     (pkgs.aws-sdk-cpp.override {
       apis = [
+        "identity-management"
         "s3"
         "transfer"
       ];

@@ -93,7 +93,7 @@ struct curlFileTransfer : public FileTransfer
             : fileTransfer(fileTransfer)
             , request(request)
             , act(*logger, lvlTalkative, actFileTransfer,
-                request.post ? "" : fmt(request.data ?  "uploading '%s'" : "downloading '%s'", request.uri),
+                fmt("%sing '%s'", request.verb(), request.uri),
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
@@ -270,19 +270,11 @@ struct curlFileTransfer : public FileTransfer
             return getInterrupted();
         }
 
-        int silentProgressCallback(curl_off_t dltotal, curl_off_t dlnow)
-        {
-            return getInterrupted();
-        }
-
         static int progressCallbackWrapper(void * userp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow)
         {
-            return ((TransferItem *) userp)->progressCallback(dltotal, dlnow);
-        }
-
-        static int silentProgressCallbackWrapper(void * userp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow)
-        {
-            return ((TransferItem *) userp)->silentProgressCallback(dltotal, dlnow);
+            auto & item = *static_cast<TransferItem *>(userp);
+            auto isUpload = bool(item.request.data);
+            return item.progressCallback(isUpload ? ultotal : dltotal, isUpload ? ulnow : dlnow);
         }
 
         static int debugCallback(CURL * handle, curl_infotype type, char * data, size_t size, void * userptr)
@@ -349,10 +341,7 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_HEADERFUNCTION, TransferItem::headerCallbackWrapper);
             curl_easy_setopt(req, CURLOPT_HEADERDATA, this);
 
-            if (request.post)
-                curl_easy_setopt(req, CURLOPT_XFERINFOFUNCTION, silentProgressCallbackWrapper);
-            else
-                curl_easy_setopt(req, CURLOPT_XFERINFOFUNCTION, progressCallbackWrapper);
+            curl_easy_setopt(req, CURLOPT_XFERINFOFUNCTION, progressCallbackWrapper);
             curl_easy_setopt(req, CURLOPT_XFERINFODATA, this);
             curl_easy_setopt(req, CURLOPT_NOPROGRESS, 0);
 
@@ -445,8 +434,7 @@ struct curlFileTransfer : public FileTransfer
                 if (httpStatus == 304 && result.etag == "")
                     result.etag = request.expectedETag;
 
-                if (!request.post)
-                    act.progress(result.bodySize, result.bodySize);
+                act.progress(result.bodySize, result.bodySize);
                 done = true;
                 callback(std::move(result));
             }
@@ -788,10 +776,6 @@ struct curlFileTransfer : public FileTransfer
                 std::string endpoint = getOr(params, "endpoint", "");
 
                 S3Helper s3Helper(profile, region, scheme, endpoint);
-
-                Activity act(*logger, lvlTalkative, actFileTransfer,
-                    fmt("downloading '%s'", request.uri),
-                    {request.uri}, request.parentAct);
 
                 // FIXME: implement ETag
                 auto s3Res = s3Helper.getObject(bucketName, key);

@@ -20,6 +20,8 @@
 #include "nix/util/url.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/tarball.hh"
+#include "nix/fetchers/input-cache.hh"
+
 #include "parser-tab.hh"
 
 #include <algorithm>
@@ -310,6 +312,7 @@ EvalState::EvalState(
     )}
     , store(store)
     , buildStore(buildStore ? buildStore : store)
+    , inputCache(fetchers::InputCache::create())
     , debugRepl(nullptr)
     , debugStop(false)
     , trylevel(0)
@@ -1152,6 +1155,7 @@ void EvalState::resetFileCache()
 {
     fileEvalCache.clear();
     fileParseCache.clear();
+    inputCache->clear();
 }
 
 

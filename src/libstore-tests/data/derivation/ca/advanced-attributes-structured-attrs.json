@@ -1,0 +1,46 @@
+{
+  "args": [
+    "-c",
+    "echo hello > $out"
+  ],
+  "builder": "/bin/bash",
+  "env": {
+    "__json": "{\"__darwinAllowLocalNetworking\":true,\"__impureHostDeps\":[\"/usr/bin/ditto\"],\"__noChroot\":true,\"__sandboxProfile\":\"sandcastle\",\"allowSubstitutes\":false,\"builder\":\"/bin/bash\",\"exportReferencesGraph\":{\"refs1\":[\"/08cr1k2yfw44g21w1h850285vqhsciy7y3siqjdzz1m9yvwlqfm8\"],\"refs2\":[\"/nix/store/x1vpzav565aqr7ccmkn0wv0svkm1qrbl-bar.drv\"]},\"impureEnvVars\":[\"UNICORN\"],\"name\":\"advanced-attributes-structured-attrs\",\"outputChecks\":{\"bin\":{\"disallowedReferences\":[\"/05pdic30acaypbz73ivw4wlsi9whq08jxsimml2h0inwqya2hn99\"],\"disallowedRequisites\":[\"/05pdic30acaypbz73ivw4wlsi9whq08jxsimml2h0inwqya2hn99\"]},\"dev\":{\"maxClosureSize\":5909,\"maxSize\":789},\"out\":{\"allowedReferences\":[\"/08cr1k2yfw44g21w1h850285vqhsciy7y3siqjdzz1m9yvwlqfm8\"],\"allowedRequisites\":[\"/08cr1k2yfw44g21w1h850285vqhsciy7y3siqjdzz1m9yvwlqfm8\"]}},\"outputHashAlgo\":\"sha256\",\"outputHashMode\":\"recursive\",\"outputs\":[\"out\",\"bin\",\"dev\"],\"preferLocalBuild\":true,\"requiredSystemFeatures\":[\"rainbow\",\"uid-range\"],\"system\":\"my-system\"}",
+    "bin": "/04f3da1kmbr67m3gzxikmsl4vjz5zf777sv6m14ahv22r65aac9m",
+    "dev": "/02qcpld1y6xhs5gz9bchpxaw0xdhmsp5dv88lh25r2ss44kh8dxz",
+    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9"
+  },
+  "inputDrvs": {
+    "/nix/store/spfzlnkwb1v8s62yvh8vj1apd1kwjr5f-foo.drv": {
+      "dynamicOutputs": {},
+      "outputs": [
+        "out"
+      ]
+    },
+    "/nix/store/x1vpzav565aqr7ccmkn0wv0svkm1qrbl-bar.drv": {
+      "dynamicOutputs": {},
+      "outputs": [
+        "out"
+      ]
+    }
+  },
+  "inputSrcs": [
+    "/nix/store/x1vpzav565aqr7ccmkn0wv0svkm1qrbl-bar.drv"
+  ],
+  "name": "advanced-attributes-structured-attrs",
+  "outputs": {
+    "bin": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    },
+    "dev": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    },
+    "out": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    }
+  },
+  "system": "my-system"
+}

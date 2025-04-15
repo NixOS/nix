@@ -85,17 +85,22 @@ static inline bool getInterrupted()
     return unix::_isInterrupted;
 }
 
+static inline bool isInterrupted()
+{
+    using namespace unix;
+    return _isInterrupted || (interruptCheck && interruptCheck());
+}
+
 /**
  * Throw `Interrupted` exception if the process has been interrupted.
  *
  * Call this in long-running loops and between slow operations to terminate
  * them as needed.
  */
-void inline checkInterrupt()
+inline void checkInterrupt()
 {
-    using namespace unix;
-    if (_isInterrupted || (interruptCheck && interruptCheck()))
-        _interrupted();
+    if (isInterrupted())
+        unix::_interrupted();
 }
 
 /**

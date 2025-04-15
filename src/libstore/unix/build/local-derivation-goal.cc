@@ -24,7 +24,6 @@
 #include "nix/store/restricted-store.hh"
 #include "nix/store/config.hh"
 
-#include <regex>
 #include <queue>
 
 #include <sys/un.h>
@@ -972,33 +971,18 @@ void LocalDerivationGoal::startBuilder()
     writeStructuredAttrs();
 
     /* Handle exportReferencesGraph(), if set. */
-    if (!parsedDrv->hasStructuredAttrs()) {
-        /* The `exportReferencesGraph' feature allows the references graph
-           to be passed to a builder.  This attribute should be a list of
-           pairs [name1 path1 name2 path2 ...].  The references graph of
-           each `pathN' will be stored in a text file `nameN' in the
-           temporary build directory.  The text files have the format used
-           by `nix-store --register-validity'.  However, the deriver
-           fields are left empty. */
-        auto s = getOr(drv->env, "exportReferencesGraph", "");
-        Strings ss = tokenizeString<Strings>(s);
-        if (ss.size() % 2 != 0)
-            throw BuildError("odd number of tokens in 'exportReferencesGraph': '%1%'", s);
-        for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
-            auto fileName = *i++;
-            static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
-            if (!std::regex_match(fileName, regex))
-                throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
-
-            auto storePathS = *i++;
-            if (!worker.store.isInStore(storePathS))
-                throw BuildError("'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
-            auto storePath = worker.store.toStorePath(storePathS).first;
-
+    if (!parsedDrv) {
+        for (auto & [fileName, ss] : drvOptions->exportReferencesGraph) {
+            StorePathSet storePathSet;
+            for (auto & storePathS : ss) {
+                if (!worker.store.isInStore(storePathS))
+                    throw BuildError("'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
+                storePathSet.insert(worker.store.toStorePath(storePathS).first);
+            }
             /* Write closure info to <fileName>. */
             writeFile(tmpDir + "/" + fileName,
                 worker.store.makeValidityRegistration(
-                    worker.store.exportReferences({storePath}, inputPaths), false, false));
+                    worker.store.exportReferences(storePathSet, inputPaths), false, false));
         }
     }
 
@@ -1491,7 +1475,7 @@ void LocalDerivationGoal::initTmpDir()
     /* In non-structured mode, set all bindings either directory in the
        environment or via a file, as specified by
        `DerivationOptions::passAsFile`. */
-    if (!parsedDrv->hasStructuredAttrs()) {
+    if (!parsedDrv) {
         for (auto & i : drv->env) {
             if (drvOptions->passAsFile.find(i.first) == drvOptions->passAsFile.end()) {
                 env[i.first] = i.second;
@@ -1592,8 +1576,12 @@ void LocalDerivationGoal::initEnv()
 
 void LocalDerivationGoal::writeStructuredAttrs()
 {
-    if (auto structAttrsJson = parsedDrv->prepareStructuredAttrs(worker.store, inputPaths)) {
-        auto json = structAttrsJson.value();
+    if (parsedDrv) {
+        auto json = parsedDrv->prepareStructuredAttrs(
+            worker.store,
+            *drvOptions,
+            inputPaths,
+            drv->outputs);
         nlohmann::json rewritten;
         for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {
             /* The placeholder must have a rewrite, so we use it to cover both the
@@ -1603,7 +1591,7 @@ void LocalDerivationGoal::writeStructuredAttrs()
 
         json["outputs"] = rewritten;
 
-        auto jsonSh = writeStructuredAttrsShell(json);
+        auto jsonSh = StructuredAttrs::writeShell(json);
 
         writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
         chownToBuilder(tmpDir + "/.attrs.sh");

@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "local-store.hh"
+#include "nix/store/local-store.hh"
 
 namespace nix {
 

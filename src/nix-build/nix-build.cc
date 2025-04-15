@@ -544,8 +544,16 @@ static void main_nix_build(int argc, char * * argv)
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
-        ParsedDerivation parsedDrv(packageInfo.requireDrvPath(), drv);
-        DerivationOptions drvOptions = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(drv.env);
+        DerivationOptions drvOptions;
+        try {
+            drvOptions = DerivationOptions::fromStructuredAttrs(
+                drv.env,
+                parsedDrv ? &*parsedDrv : nullptr);
+        } catch (Error & e) {
+            e.addTrace({}, "while parsing derivation '%s'", store->printStorePath(packageInfo.requireDrvPath()));
+            throw;
+        }
 
         int fileNr = 0;
 
@@ -560,7 +568,7 @@ static void main_nix_build(int argc, char * * argv)
 
         std::string structuredAttrsRC;
 
-        if (parsedDrv.hasStructuredAttrs()) {
+        if (parsedDrv) {
             StorePathSet inputs;
 
             std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputClosure;
@@ -578,19 +586,22 @@ static void main_nix_build(int argc, char * * argv)
             for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
                 accumInputClosure(inputDrv, inputNode);
 
-            if (auto structAttrs = parsedDrv.prepareStructuredAttrs(*store, inputs)) {
-                auto json = structAttrs.value();
-                structuredAttrsRC = writeStructuredAttrsShell(json);
+            auto json = parsedDrv->prepareStructuredAttrs(
+                *store,
+                drvOptions,
+                inputs,
+                drv.outputs);
 
-                auto attrsJSON = (tmpDir.path() / ".attrs.json").string();
-                writeFile(attrsJSON, json.dump());
+            structuredAttrsRC = StructuredAttrs::writeShell(json);
 
-                auto attrsSH = (tmpDir.path() / ".attrs.sh").string();
-                writeFile(attrsSH, structuredAttrsRC);
+            auto attrsJSON = (tmpDir.path() / ".attrs.json").string();
+            writeFile(attrsJSON, json.dump());
 
-                env["NIX_ATTRS_SH_FILE"] = attrsSH;
-                env["NIX_ATTRS_JSON_FILE"] = attrsJSON;
-            }
+            auto attrsSH = (tmpDir.path() / ".attrs.sh").string();
+            writeFile(attrsSH, structuredAttrsRC);
+
+            env["NIX_ATTRS_SH_FILE"] = attrsSH;
+            env["NIX_ATTRS_JSON_FILE"] = attrsJSON;
         }
 
         /* Run a shell using the derivation's environment.  For

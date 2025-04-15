@@ -21,6 +21,7 @@
 #include <aws/core/utils/logging/FormattedLogSystem.h>
 #include <aws/core/utils/logging/LogMacros.h>
 #include <aws/core/utils/threading/Executor.h>
+#include <aws/identity-management/auth/STSProfileCredentialsProvider.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/model/GetObjectRequest.h>
 #include <aws/s3/model/HeadObjectRequest.h>
@@ -71,6 +72,29 @@ class AwsLogger : public Aws::Utils::Logging::FormattedLogSystem
 #endif
 };
 
+/* Retrieve the credentials from the list of AWS default providers, with the addition of the STS creds provider. This
+   last can be used to acquire further permissions with a specific IAM role.
+   Roughly based on https://github.com/aws/aws-sdk-cpp/issues/150#issuecomment-538548438
+*/
+struct CustomAwsCredentialsProviderChain : public Aws::Auth::AWSCredentialsProviderChain
+{
+    CustomAwsCredentialsProviderChain(const std::string & profile)
+    {
+        if (profile.empty()) {
+            // Use all the default AWS providers, plus the possibility to acquire a IAM role directly via a profile.
+            Aws::Auth::DefaultAWSCredentialsProviderChain default_aws_chain;
+            for (auto provider : default_aws_chain.GetProviders())
+                AddProvider(provider);
+            AddProvider(std::make_shared<Aws::Auth::STSProfileCredentialsProvider>());
+        } else {
+            // Override the profile name to retrieve from the AWS config and credentials. I believe this option
+            // comes from the ?profile querystring in nix.conf.
+            AddProvider(std::make_shared<Aws::Auth::ProfileConfigFileAWSCredentialsProvider>(profile.c_str()));
+            AddProvider(std::make_shared<Aws::Auth::STSProfileCredentialsProvider>(profile));
+        }
+    }
+};
+
 static void initAWS()
 {
     static std::once_flag flag;
@@ -102,13 +126,8 @@ S3Helper::S3Helper(
     const std::string & endpoint)
     : config(makeConfig(region, scheme, endpoint))
     , client(make_ref<Aws::S3::S3Client>(
-            profile == ""
-            ? std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
-                std::make_shared<Aws::Auth::DefaultAWSCredentialsProviderChain>())
-            : std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
-                std::make_shared<Aws::Auth::ProfileConfigFileAWSCredentialsProvider>(profile.c_str())),
+            std::make_shared<CustomAwsCredentialsProviderChain>(profile),
             *config,
-            // FIXME: https://github.com/aws/aws-sdk-cpp/issues/759
 #if AWS_SDK_VERSION_MAJOR == 1 && AWS_SDK_VERSION_MINOR < 3
             false,
 #else
@@ -160,7 +179,10 @@ ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(
 S3Helper::FileTransferResult S3Helper::getObject(
     const std::string & bucketName, const std::string & key)
 {
-    debug("fetching 's3://%s/%s'...", bucketName, key);
+    std::string uri = "s3://" + bucketName + "/" + key;
+    Activity act(*logger, lvlTalkative, actFileTransfer,
+        fmt("downloading '%s'", uri),
+        Logger::Fields{uri}, getCurActivity());
 
     auto request =
         Aws::S3::Model::GetObjectRequest()
@@ -171,6 +193,22 @@ S3Helper::FileTransferResult S3Helper::getObject(
         return Aws::New<std::stringstream>("STRINGSTREAM");
     });
 
+    size_t bytesDone = 0;
+    size_t bytesExpected = 0;
+    request.SetDataReceivedEventHandler([&](const Aws::Http::HttpRequest * req, Aws::Http::HttpResponse * resp, long long l) {
+        if (!bytesExpected && resp->HasHeader("Content-Length")) {
+            if (auto length = string2Int<size_t>(resp->GetHeader("Content-Length"))) {
+                bytesExpected = *length;
+            }
+        }
+        bytesDone += l;
+        act.progress(bytesDone, bytesExpected);
+    });
+
+    request.SetContinueRequestHandler([](const Aws::Http::HttpRequest*) {
+        return !isInterrupted();
+    });
+
     FileTransferResult res;
 
     auto now1 = std::chrono::steady_clock::now();
@@ -179,6 +217,8 @@ S3Helper::FileTransferResult S3Helper::getObject(
 
         auto result = checkAws(fmt("AWS error fetching '%s'", key),
             client->GetObject(request));
+
+        act.progress(result.GetContentLength(), result.GetContentLength());
 
         res.data = decompress(result.GetContentEncoding(),
             dynamic_cast<std::stringstream &>(result.GetBody()).str());
@@ -307,11 +347,35 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     std::shared_ptr<TransferManager> transferManager;
     std::once_flag transferManagerCreated;
 
+    struct AsyncContext : public Aws::Client::AsyncCallerContext
+    {
+        mutable std::mutex mutex;
+        mutable std::condition_variable cv;
+        const Activity & act;
+
+        void notify() const
+        {
+            cv.notify_one();
+        }
+
+        void wait() const
+        {
+            std::unique_lock<std::mutex> lk(mutex);
+            cv.wait(lk);
+        }
+
+        AsyncContext(const Activity & act) : act(act) {}
+    };
+
     void uploadFile(const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType,
         const std::string & contentEncoding)
     {
+        std::string uri = "s3://" + bucketName + "/" + path;
+        Activity act(*logger, lvlTalkative, actFileTransfer,
+            fmt("uploading '%s'", uri),
+            Logger::Fields{uri}, getCurActivity());
         istream->seekg(0, istream->end);
         auto size = istream->tellg();
         istream->seekg(0, istream->beg);
@@ -330,16 +394,25 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
                 transferConfig.bufferSize = bufferSize;
 
                 transferConfig.uploadProgressCallback =
-                    [](const TransferManager *transferManager,
-                        const std::shared_ptr<const TransferHandle>
-                        &transferHandle)
+                    [](const TransferManager * transferManager,
+                        const std::shared_ptr<const TransferHandle> & transferHandle)
                     {
-                        //FIXME: find a way to properly abort the multipart upload.
-                        //checkInterrupt();
-                        debug("upload progress ('%s'): '%d' of '%d' bytes",
-                            transferHandle->GetKey(),
-                            transferHandle->GetBytesTransferred(),
-                            transferHandle->GetBytesTotalSize());
+                        auto context = std::dynamic_pointer_cast<const AsyncContext>(transferHandle->GetContext());
+                        size_t bytesDone = transferHandle->GetBytesTransferred();
+                        size_t bytesTotal = transferHandle->GetBytesTotalSize();
+                        try {
+                            checkInterrupt();
+                            context->act.progress(bytesDone, bytesTotal);
+                        } catch (...) {
+                            context->notify();
+                        }
+                    };
+                transferConfig.transferStatusUpdatedCallback =
+                    [](const TransferManager * transferManager,
+                        const std::shared_ptr<const TransferHandle> & transferHandle)
+                    {
+                        auto context = std::dynamic_pointer_cast<const AsyncContext>(transferHandle->GetContext());
+                        context->notify();
                     };
 
                 transferManager = TransferManager::Create(transferConfig);
@@ -353,28 +426,50 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
             if (contentEncoding != "")
                 throw Error("setting a content encoding is not supported with S3 multi-part uploads");
 
+            auto context = std::make_shared<AsyncContext>(act);
             std::shared_ptr<TransferHandle> transferHandle =
                 transferManager->UploadFile(
                     istream, bucketName, path, mimeType,
                     Aws::Map<Aws::String, Aws::String>(),
-                    nullptr /*, contentEncoding */);
+                    context /*, contentEncoding */);
 
-            transferHandle->WaitUntilFinished();
+            TransferStatus status = transferHandle->GetStatus();
+            while (status == TransferStatus::IN_PROGRESS || status == TransferStatus::NOT_STARTED) {
+                if (!isInterrupted()) {
+                    context->wait();
+                } else {
+                    transferHandle->Cancel();
+                    transferHandle->WaitUntilFinished();
+                }
+                status = transferHandle->GetStatus();
+            }
+            act.progress(transferHandle->GetBytesTransferred(), transferHandle->GetBytesTotalSize());
 
-            if (transferHandle->GetStatus() == TransferStatus::FAILED)
+            if (status == TransferStatus::FAILED)
                 throw Error("AWS error: failed to upload 's3://%s/%s': %s",
                     bucketName, path, transferHandle->GetLastError().GetMessage());
 
-            if (transferHandle->GetStatus() != TransferStatus::COMPLETED)
+            if (status != TransferStatus::COMPLETED)
                 throw Error("AWS error: transfer status of 's3://%s/%s' in unexpected state",
                     bucketName, path);
 
         } else {
+            act.progress(0, size);
 
             auto request =
                 Aws::S3::Model::PutObjectRequest()
                 .WithBucket(bucketName)
                 .WithKey(path);
+
+            size_t bytesSent = 0;
+            request.SetDataSentEventHandler([&](const Aws::Http::HttpRequest * req, long long l) {
+                bytesSent += l;
+                act.progress(bytesSent, size);
+            });
+
+            request.SetContinueRequestHandler([](const Aws::Http::HttpRequest*) {
+                return !isInterrupted();
+            });
 
             request.SetContentType(mimeType);
 
@@ -385,6 +480,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
             auto result = checkAws(fmt("AWS error uploading '%s'", path),
                 s3Helper.client->PutObject(request));
+
+            act.progress(size, size);
         }
 
         auto now2 = std::chrono::steady_clock::now();
