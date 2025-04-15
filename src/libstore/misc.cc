@@ -222,10 +222,12 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
             if (knownOutputPaths && invalid.empty()) return;
 
             auto drv = make_ref<Derivation>(derivationFromPath(drvPath));
-            ParsedDerivation parsedDrv(*drv);
+            auto parsedDrv = StructuredAttrs::tryParse(drv->env);
             DerivationOptions drvOptions;
             try {
-                drvOptions = DerivationOptions::fromParsedDerivation(parsedDrv);
+                drvOptions = DerivationOptions::fromStructuredAttrs(
+                    drv->env,
+                    parsedDrv ? &*parsedDrv : nullptr);
             } catch (Error & e) {
                 e.addTrace({}, "while parsing derivation '%s'", printStorePath(drvPath));
                 throw;

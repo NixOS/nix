@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivations.hh"
 #include "nix/store/derivation-options.hh"
 #ifndef _WIN32
 #  include "nix/store/user-lock.hh"
@@ -150,7 +151,7 @@ struct DerivationGoal : public Goal
      */
     std::unique_ptr<Derivation> drv;
 
-    std::unique_ptr<ParsedDerivation> parsedDrv;
+    std::unique_ptr<StructuredAttrs> parsedDrv;
     std::unique_ptr<DerivationOptions> drvOptions;
 
     /**
