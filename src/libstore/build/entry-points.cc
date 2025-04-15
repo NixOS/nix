@@ -33,7 +33,7 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
                 failed.insert(printStorePath(i2->drvPath));
             else
 #endif
-            if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
+                if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
                 failed.insert(printStorePath(i2->storePath));
         }
     }
@@ -42,15 +42,14 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
         ex->withExitStatus(worker.failingExitStatus());
         throw std::move(*ex);
     } else if (!failed.empty()) {
-        if (ex) logError(ex->info());
+        if (ex)
+            logError(ex->info());
         throw Error(worker.failingExitStatus(), "build of %s failed", concatStringsSep(", ", quoteStrings(failed)));
     }
 }
 
 std::vector<KeyedBuildResult> Store::buildPathsWithResults(
-    const std::vector<DerivedPath> & reqs,
-    BuildMode buildMode,
-    std::shared_ptr<Store> evalStore)
+    const std::vector<DerivedPath> & reqs, BuildMode buildMode, std::shared_ptr<Store> evalStore)
 {
     Worker worker(*this, evalStore ? *evalStore : *this);
 
@@ -69,20 +68,20 @@ std::vector<KeyedBuildResult> Store::buildPathsWithResults(
     results.reserve(state.size());
 
     for (auto & [req, goalPtr] : state)
-        results.emplace_back(KeyedBuildResult {
-            goalPtr->getBuildResult(req),
-            /* .path = */ req,
-        });
+        results.emplace_back(
+            KeyedBuildResult{
+                goalPtr->getBuildResult(req),
+                /* .path = */ req,
+            });
 
     return results;
 }
 
-BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-    BuildMode buildMode)
+BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode)
 {
     Worker worker(*this, *this);
 #ifndef _WIN32 // TODO Enable building on Windows
-    auto goal = worker.makeBasicDerivationGoal(drvPath, drv, OutputsSpec::All {}, buildMode);
+    auto goal = worker.makeBasicDerivationGoal(drvPath, drv, OutputsSpec::All{}, buildMode);
 #else
     std::shared_ptr<Goal> goal;
     throw UnimplementedError("Building derivations not yet implemented on windows.");
@@ -90,23 +89,24 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
 
     try {
         worker.run(Goals{goal});
-        return goal->getBuildResult(DerivedPath::Built {
-            .drvPath = makeConstantStorePathRef(drvPath),
-            .outputs = OutputsSpec::All {},
-        });
+        return goal->getBuildResult(
+            DerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(drvPath),
+                .outputs = OutputsSpec::All{},
+            });
     } catch (Error & e) {
-        return BuildResult {
+        return BuildResult{
             .status = BuildResult::MiscFailure,
             .errorMsg = e.msg(),
         };
     };
 }
 
-
 void Store::ensurePath(const StorePath & path)
 {
     /* If the path is already valid, we're done. */
-    if (isValidPath(path)) return;
+    if (isValidPath(path))
+        return;
 
     Worker worker(*this, *this);
     GoalPtr goal = worker.makePathSubstitutionGoal(path);
@@ -119,10 +119,10 @@ void Store::ensurePath(const StorePath & path)
             goal->ex->withExitStatus(worker.failingExitStatus());
             throw std::move(*goal->ex);
         } else
-            throw Error(worker.failingExitStatus(), "path '%s' does not exist and cannot be created", printStorePath(path));
+            throw Error(
+                worker.failingExitStatus(), "path '%s' does not exist and cannot be created", printStorePath(path));
     }
 }
-
 
 void Store::repairPath(const StorePath & path)
 {
@@ -138,11 +138,13 @@ void Store::repairPath(const StorePath & path)
         auto info = queryPathInfo(path);
         if (info->deriver && isValidPath(*info->deriver)) {
             goals.clear();
-            goals.insert(worker.makeGoal(DerivedPath::Built {
-                .drvPath = makeConstantStorePathRef(*info->deriver),
-                // FIXME: Should just build the specific output we need.
-                .outputs = OutputsSpec::All { },
-            }, bmRepair));
+            goals.insert(worker.makeGoal(
+                DerivedPath::Built{
+                    .drvPath = makeConstantStorePathRef(*info->deriver),
+                    // FIXME: Should just build the specific output we need.
+                    .outputs = OutputsSpec::All{},
+                },
+                bmRepair));
             worker.run(goals);
         } else
             throw Error(worker.failingExitStatus(), "cannot repair path '%s'", printStorePath(path));

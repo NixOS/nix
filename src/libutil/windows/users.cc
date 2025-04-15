@@ -5,8 +5,8 @@
 #include "nix/util/windows-error.hh"
 
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
 
 namespace nix {
 
@@ -37,8 +37,7 @@ std::string getUserName()
 
 Path getHome()
 {
-    static Path homeDir = []()
-    {
+    static Path homeDir = []() {
         Path homeDir = getEnv("USERPROFILE").value_or("C:\\Users\\Default");
         assert(!homeDir.empty());
         return canonPath(homeDir);
@@ -46,7 +45,8 @@ Path getHome()
     return homeDir;
 }
 
-bool isRootUser() {
+bool isRootUser()
+{
     return false;
 }
 

@@ -29,22 +29,13 @@
 
 namespace nix {
 
-
-typedef enum {
-    lvlError = 0,
-    lvlWarn,
-    lvlNotice,
-    lvlInfo,
-    lvlTalkative,
-    lvlChatty,
-    lvlDebug,
-    lvlVomit
-} Verbosity;
+typedef enum { lvlError = 0, lvlWarn, lvlNotice, lvlInfo, lvlTalkative, lvlChatty, lvlDebug, lvlVomit } Verbosity;
 
 /**
  * The lines of code surrounding an error.
  */
-struct LinesOfCode {
+struct LinesOfCode
+{
     std::optional<std::string> prevLineOfCode;
     std::optional<std::string> errLineOfCode;
     std::optional<std::string> nextLineOfCode;
@@ -60,10 +51,7 @@ struct LinesOfCode {
    4feb7d9f71? */
 struct Pos;
 
-void printCodeLines(std::ostream & out,
-    const std::string & prefix,
-    const Pos & errPos,
-    const LinesOfCode & loc);
+void printCodeLines(std::ostream & out, const std::string & prefix, const Pos & errPos, const LinesOfCode & loc);
 
 /**
  * When a stack frame is printed.
@@ -77,15 +65,17 @@ enum struct TracePrint {
     Always,
 };
 
-struct Trace {
+struct Trace
+{
     std::shared_ptr<Pos> pos;
     HintFmt hint;
     TracePrint print = TracePrint::Default;
 };
 
-inline std::strong_ordering operator<=>(const Trace& lhs, const Trace& rhs);
+inline std::strong_ordering operator<=>(const Trace & lhs, const Trace & rhs);
 
-struct ErrorInfo {
+struct ErrorInfo
+{
     Verbosity level;
     HintFmt msg;
     std::shared_ptr<Pos> pos;
@@ -128,51 +118,69 @@ protected:
 
 public:
     BaseError(const BaseError &) = default;
-    BaseError& operator=(const BaseError &) = default;
-    BaseError& operator=(BaseError &&) = default;
+    BaseError & operator=(const BaseError &) = default;
+    BaseError & operator=(BaseError &&) = default;
 
     template<typename... Args>
-    BaseError(unsigned int status, const Args & ... args)
-        : err { .level = lvlError, .msg = HintFmt(args...), .status = status }
-    { }
+    BaseError(unsigned int status, const Args &... args)
+        : err{.level = lvlError, .msg = HintFmt(args...), .status = status}
+    {
+    }
 
     template<typename... Args>
-    explicit BaseError(const std::string & fs, const Args & ... args)
-        : err { .level = lvlError, .msg = HintFmt(fs, args...) }
-    { }
+    explicit BaseError(const std::string & fs, const Args &... args)
+        : err{.level = lvlError, .msg = HintFmt(fs, args...)}
+    {
+    }
 
     template<typename... Args>
-    BaseError(const Suggestions & sug, const Args & ... args)
-        : err { .level = lvlError, .msg = HintFmt(args...), .suggestions = sug }
-    { }
+    BaseError(const Suggestions & sug, const Args &... args)
+        : err{.level = lvlError, .msg = HintFmt(args...), .suggestions = sug}
+    {
+    }
 
     BaseError(HintFmt hint)
-        : err { .level = lvlError, .msg = hint }
-    { }
+        : err{.level = lvlError, .msg = hint}
+    {
+    }
 
     BaseError(ErrorInfo && e)
         : err(std::move(e))
-    { }
+    {
+    }
 
     BaseError(const ErrorInfo & e)
         : err(e)
-    { }
+    {
+    }
 
     /** The error message without "error: " prefixed to it. */
-    std::string message() {
+    std::string message()
+    {
         return err.msg.str();
     }
 
-    const char * what() const noexcept override { return calcWhat().c_str(); }
-    const std::string & msg() const { return calcWhat(); }
-    const ErrorInfo & info() const { calcWhat(); return err; }
+    const char * what() const noexcept override
+    {
+        return calcWhat().c_str();
+    }
+    const std::string & msg() const
+    {
+        return calcWhat();
+    }
+    const ErrorInfo & info() const
+    {
+        calcWhat();
+        return err;
+    }
 
     void withExitStatus(unsigned int status)
     {
         err.status = status;
     }
 
-    void atPos(std::shared_ptr<Pos> pos) {
+    void atPos(std::shared_ptr<Pos> pos)
+    {
         err.pos = pos;
     }
 
@@ -182,23 +190,29 @@ public:
     }
 
     template<typename... Args>
-    void addTrace(std::shared_ptr<Pos> && e, std::string_view fs, const Args & ... args)
+    void addTrace(std::shared_ptr<Pos> && e, std::string_view fs, const Args &... args)
     {
         addTrace(std::move(e), HintFmt(std::string(fs), args...));
     }
 
     void addTrace(std::shared_ptr<Pos> && e, HintFmt hint, TracePrint print = TracePrint::Default);
 
-    bool hasTrace() const { return !err.traces.empty(); }
+    bool hasTrace() const
+    {
+        return !err.traces.empty();
+    }
 
-    const ErrorInfo & info() { return err; };
+    const ErrorInfo & info()
+    {
+        return err;
+    };
 };
 
 #define MakeError(newClass, superClass) \
-    class newClass : public superClass                  \
-    {                                                   \
-    public:                                             \
-        using superClass::superClass;                   \
+    class newClass : public superClass  \
+    {                                   \
+    public:                             \
+        using superClass::superClass;   \
     }
 
 MakeError(Error, BaseError);
@@ -236,8 +250,9 @@ public:
      * will be used to try to add additional information to the message.
      */
     template<typename... Args>
-    SysError(int errNo, const Args & ... args)
-        : SystemError(""), errNo(errNo)
+    SysError(int errNo, const Args &... args)
+        : SystemError("")
+        , errNo(errNo)
     {
         auto hf = HintFmt(args...);
         err.msg = HintFmt("%1%: %2%", Uncolored(hf.str()), strerror(errNo));
@@ -250,15 +265,15 @@ public:
      * calling this constructor!
      */
     template<typename... Args>
-    SysError(const Args & ... args)
-        : SysError(errno, args ...)
+    SysError(const Args &... args)
+        : SysError(errno, args...)
     {
     }
 };
 
 #ifdef _WIN32
 namespace windows {
-    class WinError;
+class WinError;
 }
 #endif
 

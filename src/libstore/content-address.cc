@@ -62,8 +62,7 @@ ContentAddressMethod ContentAddressMethod::parse(std::string_view m)
     if (m == "text")
         return ContentAddressMethod::Raw::Text;
     else
-        return fileIngestionMethodToContentAddressMethod(
-            parseFileIngestionMethod(m));
+        return fileIngestionMethodToContentAddressMethod(parseFileIngestionMethod(m));
 }
 
 std::string_view ContentAddressMethod::renderPrefix() const
@@ -84,12 +83,10 @@ ContentAddressMethod ContentAddressMethod::parsePrefix(std::string_view & m)
 {
     if (splitPrefix(m, "r:")) {
         return ContentAddressMethod::Raw::NixArchive;
-    }
-    else if (splitPrefix(m, "git:")) {
+    } else if (splitPrefix(m, "git:")) {
         experimentalFeatureSettings.require(Xp::GitHashing);
         return ContentAddressMethod::Raw::Git;
-    }
-    else if (splitPrefix(m, "text:")) {
+    } else if (splitPrefix(m, "text:")) {
         return ContentAddressMethod::Raw::Text;
     }
     return ContentAddressMethod::Raw::Flat;
@@ -145,7 +142,7 @@ std::string ContentAddress::render() const
  */
 static std::pair<ContentAddressMethod, HashAlgorithm> parseContentAddressMethodPrefix(std::string_view & rest)
 {
-    std::string_view wholeInput { rest };
+    std::string_view wholeInput{rest};
 
     std::string_view prefix;
     {
@@ -155,7 +152,7 @@ static std::pair<ContentAddressMethod, HashAlgorithm> parseContentAddressMethodP
         prefix = *optPrefix;
     }
 
-    auto parseHashAlgorithm_ = [&](){
+    auto parseHashAlgorithm_ = [&]() {
         auto hashAlgoRaw = splitPrefixTo(rest, ':');
         if (!hashAlgoRaw)
             throw UsageError("content address hash must be in form '<algo>:<hash>', but found: %s", wholeInput);
@@ -186,7 +183,8 @@ static std::pair<ContentAddressMethod, HashAlgorithm> parseContentAddressMethodP
             std::move(hashAlgo),
         };
     } else
-        throw UsageError("content address prefix '%s' is unrecognized. Recogonized prefixes are 'text' or 'fixed'", prefix);
+        throw UsageError(
+            "content address prefix '%s' is unrecognized. Recogonized prefixes are 'text' or 'fixed'", prefix);
 }
 
 ContentAddress ContentAddress::parse(std::string_view rawCa)
@@ -195,7 +193,7 @@ ContentAddress ContentAddress::parse(std::string_view rawCa)
 
     auto [caMethod, hashAlgo] = parseContentAddressMethodPrefix(rest);
 
-    return ContentAddress {
+    return ContentAddress{
         .method = std::move(caMethod),
         .hash = Hash::parseNonSRIUnprefixed(rest, hashAlgo),
     };
@@ -211,9 +209,7 @@ std::pair<ContentAddressMethod, HashAlgorithm> ContentAddressMethod::parseWithAl
 
 std::optional<ContentAddress> ContentAddress::parseOpt(std::string_view rawCaOpt)
 {
-    return rawCaOpt == ""
-        ? std::nullopt
-        : std::optional { ContentAddress::parse(rawCaOpt) };
+    return rawCaOpt == "" ? std::nullopt : std::optional{ContentAddress::parse(rawCaOpt)};
 };
 
 std::string renderContentAddress(std::optional<ContentAddress> ca)
@@ -223,8 +219,7 @@ std::string renderContentAddress(std::optional<ContentAddress> ca)
 
 std::string ContentAddress::printMethodAlgo() const
 {
-    return std::string { method.renderPrefix() }
-        + printHashAlgo(hash.algo);
+    return std::string{method.renderPrefix()} + printHashAlgo(hash.algo);
 }
 
 bool StoreReferences::empty() const
@@ -241,14 +236,14 @@ ContentAddressWithReferences ContentAddressWithReferences::withoutRefs(const Con
 {
     switch (ca.method.raw) {
     case ContentAddressMethod::Raw::Text:
-        return TextInfo {
+        return TextInfo{
             .hash = ca.hash,
             .references = {},
         };
     case ContentAddressMethod::Raw::Flat:
     case ContentAddressMethod::Raw::NixArchive:
     case ContentAddressMethod::Raw::Git:
-        return FixedOutputInfo {
+        return FixedOutputInfo{
             .method = ca.method.getFileIngestionMethod(),
             .hash = ca.hash,
             .references = {},
@@ -258,21 +253,21 @@ ContentAddressWithReferences ContentAddressWithReferences::withoutRefs(const Con
     }
 }
 
-ContentAddressWithReferences ContentAddressWithReferences::fromParts(
-    ContentAddressMethod method, Hash hash, StoreReferences refs)
+ContentAddressWithReferences
+ContentAddressWithReferences::fromParts(ContentAddressMethod method, Hash hash, StoreReferences refs)
 {
     switch (method.raw) {
     case ContentAddressMethod::Raw::Text:
         if (refs.self)
             throw Error("self-reference not allowed with text hashing");
-        return TextInfo {
+        return TextInfo{
             .hash = std::move(hash),
             .references = std::move(refs.others),
         };
     case ContentAddressMethod::Raw::Flat:
     case ContentAddressMethod::Raw::NixArchive:
     case ContentAddressMethod::Raw::Git:
-        return FixedOutputInfo {
+        return FixedOutputInfo{
             .method = method.getFileIngestionMethod(),
             .hash = std::move(hash),
             .references = std::move(refs),
@@ -284,27 +279,24 @@ ContentAddressWithReferences ContentAddressWithReferences::fromParts(
 
 ContentAddressMethod ContentAddressWithReferences::getMethod() const
 {
-    return std::visit(overloaded {
-        [](const TextInfo & th) -> ContentAddressMethod {
-            return ContentAddressMethod::Raw::Text;
+    return std::visit(
+        overloaded{
+            [](const TextInfo & th) -> ContentAddressMethod { return ContentAddressMethod::Raw::Text; },
+            [](const FixedOutputInfo & fsh) -> ContentAddressMethod {
+                return fileIngestionMethodToContentAddressMethod(fsh.method);
+            },
         },
-        [](const FixedOutputInfo & fsh) -> ContentAddressMethod {
-            return fileIngestionMethodToContentAddressMethod(
-                fsh.method);
-        },
-    }, raw);
+        raw);
 }
 
 Hash ContentAddressWithReferences::getHash() const
 {
-    return std::visit(overloaded {
-        [](const TextInfo & th) {
-            return th.hash;
+    return std::visit(
+        overloaded{
+            [](const TextInfo & th) { return th.hash; },
+            [](const FixedOutputInfo & fsh) { return fsh.hash; },
         },
-        [](const FixedOutputInfo & fsh) {
-            return fsh.hash;
-        },
-    }, raw);
+        raw);
 }
 
 }

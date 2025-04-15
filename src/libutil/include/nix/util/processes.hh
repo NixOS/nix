@@ -37,11 +37,11 @@ public:
     Pid();
 #ifndef _WIN32
     Pid(pid_t pid);
-    void operator =(pid_t pid);
+    void operator=(pid_t pid);
     operator pid_t();
 #else
     Pid(AutoCloseFD pid);
-    void operator =(AutoCloseFD pid);
+    void operator=(AutoCloseFD pid);
 #endif
     ~Pid();
     int kill();
@@ -55,7 +55,6 @@ public:
 #endif
 };
 
-
 #ifndef _WIN32
 /**
  * Kill all processes running under the specified uid by sending them
@@ -63,7 +62,6 @@ public:
  */
 void killUser(uid_t uid);
 #endif
-
 
 /**
  * Fork a process that runs the given function, and return the child
@@ -89,9 +87,12 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
  * Run a program and return its stdout in a string (i.e., like the
  * shell backtick operator).
  */
-std::string runProgram(Path program, bool lookupPath = false,
+std::string runProgram(
+    Path program,
+    bool lookupPath = false,
     const Strings & args = Strings(),
-    const std::optional<std::string> & input = {}, bool isInteractive = false);
+    const std::optional<std::string> & input = {},
+    bool isInteractive = false);
 
 struct RunOptions
 {
@@ -115,16 +116,17 @@ std::pair<int, std::string> runProgram(RunOptions && options);
 
 void runProgram2(const RunOptions & options);
 
-
 class ExecError : public Error
 {
 public:
     int status;
 
     template<typename... Args>
-    ExecError(int status, const Args & ... args)
-        : Error(args...), status(status)
-    { }
+    ExecError(int status, const Args &... args)
+        : Error(args...)
+        , status(status)
+    {
+    }
 };
 
 /**

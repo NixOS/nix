@@ -5,12 +5,10 @@
 
 namespace nix {
 
-enum struct UseLookupPath {
-    Use,
-    DontUse
-};
+enum struct UseLookupPath { Use, DontUse };
 
-void execProgramInStore(ref<Store> store,
+void execProgramInStore(
+    ref<Store> store,
     UseLookupPath useLookupPath,
     const std::string & program,
     const Strings & args,

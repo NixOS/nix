@@ -15,7 +15,6 @@
 
 namespace nix {
 
-
 PackageInfos queryInstalled(EvalState & state, const Path & userEnv)
 {
     PackageInfos elems;
@@ -31,10 +30,8 @@ PackageInfos queryInstalled(EvalState & state, const Path & userEnv)
     return elems;
 }
 
-
-bool createUserEnv(EvalState & state, PackageInfos & elems,
-    const Path & profile, bool keepDerivations,
-    const std::string & lockToken)
+bool createUserEnv(
+    EvalState & state, PackageInfos & elems, const Path & profile, bool keepDerivations, const std::string & lockToken)
 {
     /* Build the components in the user environment, if they don't
        exist already. */
@@ -44,9 +41,7 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
             drvsToBuild.push_back({*drvPath});
 
     debug("building user environment dependencies");
-    state.store->buildPaths(
-        toDerivedPaths(drvsToBuild),
-        state.repair ? bmRepair : bmNormal);
+    state.store->buildPaths(toDerivedPaths(drvsToBuild), state.repair ? bmRepair : bmNormal);
 
     /* Construct the whole top level derivation. */
     StorePathSet references;
@@ -91,7 +86,8 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
         auto meta = state.buildBindings(metaNames.size());
         for (auto & j : metaNames) {
             Value * v = i.queryMeta(j);
-            if (!v) continue;
+            if (!v)
+                continue;
             meta.insert(state.symbols.create(j), v);
         }
 
@@ -99,7 +95,8 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
 
         (list[n] = state.allocValue())->mkAttrs(attrs);
 
-        if (drvPath) references.insert(*drvPath);
+        if (drvPath)
+            references.insert(*drvPath);
     }
 
     Value manifest;
@@ -111,16 +108,23 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
     auto manifestFile = ({
         std::ostringstream str;
         printAmbiguous(manifest, state.symbols, str, nullptr, std::numeric_limits<int>::max());
-        StringSource source { toView(str) };
+        StringSource source{toView(str)};
         state.store->addToStoreFromDump(
-            source, "env-manifest.nix", FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, references);
+            source,
+            "env-manifest.nix",
+            FileSerialisationMethod::Flat,
+            ContentAddressMethod::Raw::Text,
+            HashAlgorithm::SHA256,
+            references);
     });
 
     /* Get the environment builder expression. */
     Value envBuilder;
-    state.eval(state.parseExprFromString(
-        #include "buildenv.nix.gen.hh"
-            , state.rootPath(CanonPath::root)), envBuilder);
+    state.eval(
+        state.parseExprFromString(
+#include "buildenv.nix.gen.hh"
+            , state.rootPath(CanonPath::root)),
+        envBuilder);
 
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */
@@ -147,9 +151,7 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
     debug("building user environment");
     std::vector<StorePathWithOutputs> topLevelDrvs;
     topLevelDrvs.push_back({topLevelDrv});
-    state.store->buildPaths(
-        toDerivedPaths(topLevelDrvs),
-        state.repair ? bmRepair : bmNormal);
+    state.store->buildPaths(toDerivedPaths(topLevelDrvs), state.repair ? bmRepair : bmNormal);
 
     /* Switch the current user environment to the output path. */
     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
@@ -171,6 +173,5 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
 
     return true;
 }
-
 
 }

@@ -3,12 +3,12 @@
 #include "nix/util/sync.hh"
 
 #ifdef _WIN32
-# include <io.h>
-# define WIN32_LEAN_AND_MEAN
-# include <windows.h>
-# define isatty _isatty
+#  include <io.h>
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#  define isatty _isatty
 #else
-# include <sys/ioctl.h>
+#  include <sys/ioctl.h>
 #endif
 #include <unistd.h>
 #include <widechar_width.h>
@@ -63,10 +63,8 @@ namespace nix {
 
 bool isTTY()
 {
-    static const bool tty =
-        isatty(STDERR_FILENO)
-        && getEnv("TERM").value_or("dumb") != "dumb"
-        && !(getEnv("NO_COLOR").has_value() || getEnv("NOCOLOR").has_value());
+    static const bool tty = isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
+                            && !(getEnv("NO_COLOR").has_value() || getEnv("NOCOLOR").has_value());
 
     return tty;
 }
@@ -87,20 +85,26 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
             if (i != s.end() && *i == '[') {
                 e += *i++;
                 // eat parameter bytes
-                while (i != s.end() && *i >= 0x30 && *i <= 0x3f) e += *i++;
+                while (i != s.end() && *i >= 0x30 && *i <= 0x3f)
+                    e += *i++;
                 // eat intermediate bytes
-                while (i != s.end() && *i >= 0x20 && *i <= 0x2f) e += *i++;
+                while (i != s.end() && *i >= 0x20 && *i <= 0x2f)
+                    e += *i++;
                 // eat final byte
-                if (i != s.end() && *i >= 0x40 && *i <= 0x7e) e += last = *i++;
+                if (i != s.end() && *i >= 0x40 && *i <= 0x7e)
+                    e += last = *i++;
             } else if (i != s.end() && *i == ']') {
                 // OSC
                 e += *i++;
                 // eat ESC
-                while (i != s.end() && *i != '\e') e += *i++;
+                while (i != s.end() && *i != '\e')
+                    e += *i++;
                 // eat backslash
-                if (i != s.end() && *i == '\\') e += last = *i++;
+                if (i != s.end() && *i == '\\')
+                    e += last = *i++;
             } else {
-                if (i != s.end() && *i >= 0x40 && *i <= 0x5f) e += *i++;
+                if (i != s.end() && *i >= 0x40 && *i <= 0x5f)
+                    e += *i++;
             }
 
             if (!filterAll && last == 'm')
@@ -137,17 +141,16 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
 
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
 
-
 void updateWindowSize()
 {
-    #ifndef _WIN32
+#ifndef _WIN32
     struct winsize ws;
     if (ioctl(2, TIOCGWINSZ, &ws) == 0) {
         auto windowSize_(windowSize.lock());
         windowSize_->first = ws.ws_row;
         windowSize_->second = ws.ws_col;
     }
-    #else
+#else
     CONSOLE_SCREEN_BUFFER_INFO info;
     // From https://stackoverflow.com/a/12642749
     if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info) != 0) {
@@ -156,9 +159,8 @@ void updateWindowSize()
         windowSize_->first = info.srWindow.Bottom - info.srWindow.Top + 1;
         windowSize_->second = info.dwSize.X;
     }
-    #endif
+#endif
 }
-
 
 std::pair<unsigned short, unsigned short> getWindowSize()
 {

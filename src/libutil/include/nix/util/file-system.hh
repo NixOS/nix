@@ -16,7 +16,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #ifdef _WIN32
-# include <windef.h>
+#  include <windef.h>
 #endif
 #include <signal.h>
 
@@ -34,7 +34,7 @@
  * @todo get rid of this, and stop using `stat` when we want `lstat` too.
  */
 #ifndef S_ISLNK
-# define S_ISLNK(m) false
+#  define S_ISLNK(m) false
 #endif
 
 namespace nix {
@@ -54,19 +54,14 @@ bool isAbsolute(PathView path);
  *
  * In the process of being deprecated for `std::filesystem::absolute`.
  */
-Path absPath(PathView path,
-    std::optional<PathView> dir = {},
-    bool resolveSymlinks = false);
+Path absPath(PathView path, std::optional<PathView> dir = {}, bool resolveSymlinks = false);
 
-inline Path absPath(const Path & path,
-    std::optional<PathView> dir = {},
-    bool resolveSymlinks = false)
+inline Path absPath(const Path & path, std::optional<PathView> dir = {}, bool resolveSymlinks = false)
 {
     return absPath(PathView{path}, dir, resolveSymlinks);
 }
 
-std::filesystem::path absPath(const std::filesystem::path & path,
-    bool resolveSymlinks = false);
+std::filesystem::path absPath(const std::filesystem::path & path, bool resolveSymlinks = false);
 
 /**
  * Canonicalise a path by removing all `.` or `..` components and
@@ -197,7 +192,8 @@ void readFile(const Path & path, Sink & sink);
  * Write a string to a file.
  */
 void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, bool sync = false);
-static inline void writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode = 0666, bool sync = false)
+static inline void
+writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode = 0666, bool sync = false)
 {
     return writeFile(path.string(), s, mode, sync);
 }
@@ -313,29 +309,44 @@ public:
 
     void reset(const std::filesystem::path & p, bool recursive = true);
 
-    const std::filesystem::path & path() const { return _path; }
-    PathViewNG view() const { return _path; }
+    const std::filesystem::path & path() const
+    {
+        return _path;
+    }
+    PathViewNG view() const
+    {
+        return _path;
+    }
 
-    operator const std::filesystem::path & () const { return _path; }
-    operator PathViewNG () const { return _path; }
+    operator const std::filesystem::path &() const
+    {
+        return _path;
+    }
+    operator PathViewNG() const
+    {
+        return _path;
+    }
 };
-
 
 struct DIRDeleter
 {
-    void operator()(DIR * dir) const {
+    void operator()(DIR * dir) const
+    {
         closedir(dir);
     }
 };
 
 typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
 
-
 /**
  * Create a temporary directory.
  */
-Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
-    bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
+Path createTempDir(
+    const Path & tmpRoot = "",
+    const Path & prefix = "nix",
+    bool includePid = true,
+    bool useGlobalCounter = true,
+    mode_t mode = 0755);
 
 /**
  * Create a temporary file, returning a file handle and its path.

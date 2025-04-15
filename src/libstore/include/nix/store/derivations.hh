@@ -31,8 +31,8 @@ struct DerivationOutput
     {
         StorePath path;
 
-        bool operator == (const InputAddressed &) const = default;
-        auto operator <=> (const InputAddressed &) const = default;
+        bool operator==(const InputAddressed &) const = default;
+        auto operator<=>(const InputAddressed &) const = default;
     };
 
     /**
@@ -56,8 +56,8 @@ struct DerivationOutput
          */
         StorePath path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const;
 
-        bool operator == (const CAFixed &) const = default;
-        auto operator <=> (const CAFixed &) const = default;
+        bool operator==(const CAFixed &) const = default;
+        auto operator<=>(const CAFixed &) const = default;
     };
 
     /**
@@ -77,17 +77,18 @@ struct DerivationOutput
          */
         HashAlgorithm hashAlgo;
 
-        bool operator == (const CAFloating &) const = default;
-        auto operator <=> (const CAFloating &) const = default;
+        bool operator==(const CAFloating &) const = default;
+        auto operator<=>(const CAFloating &) const = default;
     };
 
     /**
      * Input-addressed output which depends on a (CA) derivation whose hash
      * isn't known yet.
      */
-    struct Deferred {
-        bool operator == (const Deferred &) const = default;
-        auto operator <=> (const Deferred &) const = default;
+    struct Deferred
+    {
+        bool operator==(const Deferred &) const = default;
+        auto operator<=>(const Deferred &) const = default;
     };
 
     /**
@@ -106,22 +107,16 @@ struct DerivationOutput
          */
         HashAlgorithm hashAlgo;
 
-        bool operator == (const Impure &) const = default;
-        auto operator <=> (const Impure &) const = default;
+        bool operator==(const Impure &) const = default;
+        auto operator<=>(const Impure &) const = default;
     };
 
-    typedef std::variant<
-        InputAddressed,
-        CAFixed,
-        CAFloating,
-        Deferred,
-        Impure
-    > Raw;
+    typedef std::variant<InputAddressed, CAFixed, CAFloating, Deferred, Impure> Raw;
 
     Raw raw;
 
-    bool operator == (const DerivationOutput &) const = default;
-    auto operator <=> (const DerivationOutput &) const = default;
+    bool operator==(const DerivationOutput &) const = default;
+    auto operator<=>(const DerivationOutput &) const = default;
 
     MAKE_WRAPPER_CONSTRUCTOR(DerivationOutput);
 
@@ -136,12 +131,10 @@ struct DerivationOutput
      * the safer interface provided by
      * BasicDerivation::outputsAndOptPaths
      */
-    std::optional<StorePath> path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const;
+    std::optional<StorePath>
+    path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const;
 
-    nlohmann::json toJSON(
-        const StoreDirConfig & store,
-        std::string_view drvName,
-        OutputNameView outputName) const;
+    nlohmann::json toJSON(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const;
     /**
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
@@ -161,8 +154,7 @@ typedef std::map<std::string, DerivationOutput> DerivationOutputs;
  * path in which it would be written. To calculate values of these
  * types, see the corresponding functions in BasicDerivation.
  */
-typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePath>>>
-  DerivationOutputsAndOptPaths;
+typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePath>>> DerivationOutputsAndOptPaths;
 
 /**
  * For inputs that are sub-derivations, we specify exactly which
@@ -170,26 +162,29 @@ typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePat
  */
 typedef std::map<StorePath, StringSet> DerivationInputs;
 
-struct DerivationType {
+struct DerivationType
+{
     /**
      * Input-addressed derivation types
      */
-    struct InputAddressed {
+    struct InputAddressed
+    {
         /**
          * True iff the derivation type can't be determined statically,
          * for instance because it (transitively) depends on a content-addressed
          * derivation.
-        */
+         */
         bool deferred;
 
-        bool operator == (const InputAddressed &) const = default;
-        auto operator <=> (const InputAddressed &) const = default;
+        bool operator==(const InputAddressed &) const = default;
+        auto operator<=>(const InputAddressed &) const = default;
     };
 
     /**
      * Content-addressing derivation types
      */
-    struct ContentAddressed {
+    struct ContentAddressed
+    {
         /**
          * Whether the derivation should be built safely inside a sandbox.
          */
@@ -207,8 +202,8 @@ struct DerivationType {
          */
         bool fixed;
 
-        bool operator == (const ContentAddressed &) const = default;
-        auto operator <=> (const ContentAddressed &) const = default;
+        bool operator==(const ContentAddressed &) const = default;
+        auto operator<=>(const ContentAddressed &) const = default;
     };
 
     /**
@@ -217,21 +212,18 @@ struct DerivationType {
      * This is similar at buil-time to the content addressed, not standboxed, not fixed
      * type, but has some restrictions on its usage.
      */
-    struct Impure {
-        bool operator == (const Impure &) const = default;
-        auto operator <=> (const Impure &) const = default;
+    struct Impure
+    {
+        bool operator==(const Impure &) const = default;
+        auto operator<=>(const Impure &) const = default;
     };
 
-    typedef std::variant<
-        InputAddressed,
-        ContentAddressed,
-        Impure
-    > Raw;
+    typedef std::variant<InputAddressed, ContentAddressed, Impure> Raw;
 
     Raw raw;
 
-    bool operator == (const DerivationType &) const = default;
-    auto operator <=> (const DerivationType &) const = default;
+    bool operator==(const DerivationType &) const = default;
+    auto operator<=>(const DerivationType &) const = default;
 
     MAKE_WRAPPER_CONSTRUCTOR(DerivationType);
 
@@ -300,9 +292,9 @@ struct BasicDerivation
     BasicDerivation() = default;
     BasicDerivation(BasicDerivation &&) = default;
     BasicDerivation(const BasicDerivation &) = default;
-    BasicDerivation& operator=(BasicDerivation &&) = default;
-    BasicDerivation& operator=(const BasicDerivation &) = default;
-    virtual ~BasicDerivation() { };
+    BasicDerivation & operator=(BasicDerivation &&) = default;
+    BasicDerivation & operator=(const BasicDerivation &) = default;
+    virtual ~BasicDerivation() {};
 
     bool isBuiltin() const;
 
@@ -331,9 +323,9 @@ struct BasicDerivation
      */
     void applyRewrites(const StringMap & rewrites);
 
-    bool operator == (const BasicDerivation &) const = default;
+    bool operator==(const BasicDerivation &) const = default;
     // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
-    //auto operator <=> (const BasicDerivation &) const = default;
+    // auto operator <=> (const BasicDerivation &) const = default;
 };
 
 class Store;
@@ -348,7 +340,9 @@ struct Derivation : BasicDerivation
     /**
      * Print a derivation.
      */
-    std::string unparse(const StoreDirConfig & store, bool maskOutputs,
+    std::string unparse(
+        const StoreDirConfig & store,
+        bool maskOutputs,
         DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const;
 
     /**
@@ -369,7 +363,8 @@ struct Derivation : BasicDerivation
      */
     std::optional<BasicDerivation> tryResolve(
         Store & store,
-        std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)> queryResolutionChain) const;
+        std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
+            queryResolutionChain) const;
 
     /**
      * Check that the derivation is valid and does not present any
@@ -382,8 +377,14 @@ struct Derivation : BasicDerivation
     void checkInvariants(Store & store, const StorePath & drvPath) const;
 
     Derivation() = default;
-    Derivation(const BasicDerivation & bd) : BasicDerivation(bd) { }
-    Derivation(BasicDerivation && bd) : BasicDerivation(std::move(bd)) { }
+    Derivation(const BasicDerivation & bd)
+        : BasicDerivation(bd)
+    {
+    }
+    Derivation(BasicDerivation && bd)
+        : BasicDerivation(std::move(bd))
+    {
+    }
 
     nlohmann::json toJSON(const StoreDirConfig & store) const;
     static Derivation fromJSON(
@@ -391,21 +392,17 @@ struct Derivation : BasicDerivation
         const nlohmann::json & json,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
-    bool operator == (const Derivation &) const = default;
+    bool operator==(const Derivation &) const = default;
     // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
-    //auto operator <=> (const Derivation &) const = default;
+    // auto operator <=> (const Derivation &) const = default;
 };
-
 
 class Store;
 
 /**
  * Write a derivation to the Nix store, and return its path.
  */
-StorePath writeDerivation(Store & store,
-    const Derivation & drv,
-    RepairFlag repair = NoRepair,
-    bool readOnly = false);
+StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repair = NoRepair, bool readOnly = false);
 
 /**
  * Read a derivation from a file.
@@ -432,7 +429,6 @@ bool isDerivation(std::string_view fileName);
  */
 std::string outputPathName(std::string_view drvName, OutputNameView outputName);
 
-
 /**
  * The hashes modulo of a derivation.
  *
@@ -440,7 +436,8 @@ std::string outputPathName(std::string_view drvName, OutputNameView outputName);
  * derivations (fixed-output or not) will have a different hash for each
  * output.
  */
-struct DrvHash {
+struct DrvHash
+{
     /**
      * Map from output names to hashes
      */
@@ -466,7 +463,7 @@ struct DrvHash {
     Kind kind;
 };
 
-void operator |= (DrvHash::Kind & self, const DrvHash::Kind & other) noexcept;
+void operator|=(DrvHash::Kind & self, const DrvHash::Kind & other) noexcept;
 
 /**
  * Returns hashes with the details of fixed-output subderivations
