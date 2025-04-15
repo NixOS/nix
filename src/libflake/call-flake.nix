@@ -48,7 +48,7 @@ let
         else if node.locked.type == "path" && builtins.substring 0 1 node.locked.path != "/" then
           parentNode.sourceInfo
           // {
-            outPath = parentNode.outPath + ("/" + node.locked.path);
+            outPath = parentNode.result.outPath + ("/" + node.locked.path);
           }
         else
           # FIXME: remove obsolete node.info.
@@ -61,7 +61,9 @@ let
 
       flake = import (outPath + "/flake.nix");
 
-      inputs = mapAttrs (inputName: inputSpec: allNodes.${resolveInput inputSpec}) (node.inputs or { });
+      inputs = mapAttrs (inputName: inputSpec: allNodes.${resolveInput inputSpec}.result) (
+        node.inputs or { }
+      );
 
       outputs = flake.outputs (inputs // { self = result; });
 
@@ -84,12 +86,15 @@ let
         };
 
     in
-    if node.flake or true then
-      assert builtins.isFunction flake.outputs;
-      result
-    else
-      sourceInfo
+    {
+      result =
+        if node.flake or true then
+          assert builtins.isFunction flake.outputs;
+          result
+        else
+          sourceInfo;
+    }
   ) lockFile.nodes;
 
 in
-allNodes.${lockFile.root}
+allNodes.${lockFile.root}.result
