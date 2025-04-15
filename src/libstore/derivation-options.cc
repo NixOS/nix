@@ -3,9 +3,11 @@
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
+
 #include <optional>
 #include <string>
 #include <variant>
+#include <regex>
 
 namespace nix {
 
@@ -125,6 +127,34 @@ DerivationOptions DerivationOptions::fromParsedDerivation(const ParsedDerivation
                     }
                 }
                 return res;
+            }(),
+        .exportReferencesGraph =
+            [&] {
+                std::map<std::string, StringSet> ret;
+
+                if (auto structuredAttrs = parsed.structuredAttrs.get()) {
+                    auto e = optionalValueAt(*structuredAttrs, "exportReferencesGraph");
+                    if (!e || !e->is_object())
+                        return ret;
+                    for (auto & [key, storePathsJson] : getObject(*e)) {
+                        ret.insert_or_assign(key, storePathsJson);
+                    }
+                } else {
+                    auto s = getOr(parsed.drv.env, "exportReferencesGraph", "");
+                    Strings ss = tokenizeString<Strings>(s);
+                    if (ss.size() % 2 != 0)
+                        throw BuildError("odd number of tokens in 'exportReferencesGraph': '%1%'", s);
+                    for (Strings::iterator i = ss.begin(); i != ss.end();) {
+                        auto fileName = std::move(*i++);
+                        static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
+                        if (!std::regex_match(fileName, regex))
+                            throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
+
+                        auto & storePathS = *i++;
+                        ret.insert_or_assign(std::move(fileName), StringSet{storePathS});
+                    }
+                }
+                return ret;
             }(),
         .additionalSandboxProfile =
             parsed.getStringAttr("__sandboxProfile").value_or(defaults.additionalSandboxProfile),

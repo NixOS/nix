@@ -1,4 +1,5 @@
 #include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation-options.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -151,7 +152,10 @@ static nlohmann::json pathInfoToJSON(
     return jsonList;
 }
 
-std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths)
+std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(
+    Store & store,
+    const DerivationOptions & drvOptions,
+    const StorePathSet & inputPaths)
 {
     if (!structuredAttrs) return std::nullopt;
 
@@ -164,15 +168,12 @@ std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & s
     json["outputs"] = outputs;
 
     /* Handle exportReferencesGraph. */
-    auto e = json.find("exportReferencesGraph");
-    if (e != json.end() && e->is_object()) {
-        for (auto i = e->begin(); i != e->end(); ++i) {
-            StorePathSet storePaths;
-            for (auto & p : *i)
-                storePaths.insert(store.toStorePath(p.get<std::string>()).first);
-            json[i.key()] = pathInfoToJSON(store,
-                store.exportReferences(storePaths, inputPaths));
-        }
+    for (auto & [key, inputPaths] : drvOptions.exportReferencesGraph) {
+        StorePathSet storePaths;
+        for (auto & p : inputPaths)
+            storePaths.insert(store.toStorePath(p).first);
+        json[key] = pathInfoToJSON(store,
+            store.exportReferences(storePaths, storePaths));
     }
 
     return json;

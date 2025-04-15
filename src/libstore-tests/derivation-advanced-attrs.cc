@@ -99,6 +99,8 @@ TEST_ATERM_JSON(advancedAttributes_structuredAttrs_defaults, "advanced-attribute
 
 #undef TEST_ATERM_JSON
 
+using ExportReferencesMap = decltype(DerivationOptions::exportReferencesGraph);
+
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
 {
     this->readTest("advanced-attributes-defaults.drv", [&](auto encoded) {
@@ -116,6 +118,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
         EXPECT_EQ(options.impureHostDeps, StringSet{});
         EXPECT_EQ(options.impureEnvVars, StringSet{});
         EXPECT_EQ(options.allowLocalNetworking, false);
+        EXPECT_EQ(options.exportReferencesGraph, ExportReferencesMap{});
         {
             auto * checksForAllOutputs_ = std::get_if<0>(&options.outputChecks);
             ASSERT_TRUE(checksForAllOutputs_ != nullptr);
@@ -195,6 +198,23 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes)
         ParsedDerivation parsedDrv(got);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
+        EXPECT_EQ(
+            options.exportReferencesGraph,
+            (ExportReferencesMap{
+                {
+                    "refs1",
+                    {
+                        "/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo",
+                    },
+                },
+                {
+                    "refs2",
+                    {
+                        "/nix/store/plsq5jbr5nhgqwcgb2qxw7jchc09dnl8-bar.drv",
+                    },
+                },
+            }));
+
         {
             auto * checksForAllOutputs_ = std::get_if<0>(&options.outputChecks);
             ASSERT_TRUE(checksForAllOutputs_ != nullptr);
@@ -225,6 +245,23 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
 
         ParsedDerivation parsedDrv(got);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+
+        EXPECT_EQ(
+            options.exportReferencesGraph,
+            (ExportReferencesMap{
+                {
+                    "refs1",
+                    {
+                        "/08cr1k2yfw44g21w1h850285vqhsciy7y3siqjdzz1m9yvwlqfm8",
+                    },
+                },
+                {
+                    "refs2",
+                    {
+                        "/nix/store/x1vpzav565aqr7ccmkn0wv0svkm1qrbl-bar.drv",
+                    },
+                },
+            }));
 
         {
             auto * checksForAllOutputs_ = std::get_if<0>(&options.outputChecks);
@@ -269,6 +306,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_d
         EXPECT_EQ(options.impureHostDeps, StringSet{});
         EXPECT_EQ(options.impureEnvVars, StringSet{});
         EXPECT_EQ(options.allowLocalNetworking, false);
+        EXPECT_EQ(options.exportReferencesGraph, ExportReferencesMap{});
 
         {
             auto * checksPerOutput_ = std::get_if<1>(&options.outputChecks);
@@ -357,6 +395,23 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
         ParsedDerivation parsedDrv(got);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
 
+        EXPECT_EQ(
+            options.exportReferencesGraph,
+            (ExportReferencesMap{
+                {
+                    "refs1",
+                    {
+                        "/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo",
+                    },
+                },
+                {
+                    "refs2",
+                    {
+                        "/nix/store/plsq5jbr5nhgqwcgb2qxw7jchc09dnl8-bar.drv",
+                    },
+                },
+            }));
+
         {
             {
                 auto output_ = get(std::get<1>(options.outputChecks), "out");
@@ -392,6 +447,23 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
 
         ParsedDerivation parsedDrv(got);
         DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+
+        EXPECT_EQ(
+            options.exportReferencesGraph,
+            (ExportReferencesMap{
+                {
+                    "refs1",
+                    {
+                        "/08cr1k2yfw44g21w1h850285vqhsciy7y3siqjdzz1m9yvwlqfm8",
+                    },
+                },
+                {
+                    "refs2",
+                    {
+                        "/nix/store/x1vpzav565aqr7ccmkn0wv0svkm1qrbl-bar.drv",
+                    },
+                },
+            }));
 
         {
             {

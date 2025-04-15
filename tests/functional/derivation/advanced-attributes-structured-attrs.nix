@@ -75,4 +75,6 @@ derivation' {
   ];
   preferLocalBuild = true;
   allowSubstitutes = false;
+  exportReferencesGraph.refs1 = [ foo ];
+  exportReferencesGraph.refs2 = [ bar.drvPath ];
 }
