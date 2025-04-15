@@ -1,0 +1,25 @@
+{
+  "args": [
+    "-c",
+    "echo hello > $out"
+  ],
+  "builder": "/bin/bash",
+  "env": {
+    "builder": "/bin/bash",
+    "name": "advanced-attributes-defaults",
+    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+    "outputHashAlgo": "sha256",
+    "outputHashMode": "recursive",
+    "system": "my-system"
+  },
+  "inputDrvs": {},
+  "inputSrcs": [],
+  "name": "advanced-attributes-defaults",
+  "outputs": {
+    "out": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    }
+  },
+  "system": "my-system"
+}

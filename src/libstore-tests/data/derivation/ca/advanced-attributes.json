@@ -1,0 +1,50 @@
+{
+  "args": [
+    "-c",
+    "echo hello > $out"
+  ],
+  "builder": "/bin/bash",
+  "env": {
+    "__darwinAllowLocalNetworking": "1",
+    "__impureHostDeps": "/usr/bin/ditto",
+    "__noChroot": "1",
+    "__sandboxProfile": "sandcastle",
+    "allowSubstitutes": "",
+    "allowedReferences": "/08cr1k2yfw44g21w1h850285vqhsciy7y3siqjdzz1m9yvwlqfm8",
+    "allowedRequisites": "/08cr1k2yfw44g21w1h850285vqhsciy7y3siqjdzz1m9yvwlqfm8",
+    "builder": "/bin/bash",
+    "disallowedReferences": "/05pdic30acaypbz73ivw4wlsi9whq08jxsimml2h0inwqya2hn99",
+    "disallowedRequisites": "/05pdic30acaypbz73ivw4wlsi9whq08jxsimml2h0inwqya2hn99",
+    "impureEnvVars": "UNICORN",
+    "name": "advanced-attributes",
+    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+    "outputHashAlgo": "sha256",
+    "outputHashMode": "recursive",
+    "preferLocalBuild": "1",
+    "requiredSystemFeatures": "rainbow uid-range",
+    "system": "my-system"
+  },
+  "inputDrvs": {
+    "/nix/store/spfzlnkwb1v8s62yvh8vj1apd1kwjr5f-foo.drv": {
+      "dynamicOutputs": {},
+      "outputs": [
+        "out"
+      ]
+    },
+    "/nix/store/x1vpzav565aqr7ccmkn0wv0svkm1qrbl-bar.drv": {
+      "dynamicOutputs": {},
+      "outputs": [
+        "out"
+      ]
+    }
+  },
+  "inputSrcs": [],
+  "name": "advanced-attributes",
+  "outputs": {
+    "out": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    }
+  },
+  "system": "my-system"
+}
