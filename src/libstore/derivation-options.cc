@@ -146,7 +146,6 @@ DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAt
                                         throw Error("attribute '%s' must be a list of strings", name);
                                     res.insert(j->get<std::string>());
                                 }
-                                checks.disallowedRequisites = res;
                                 return res;
                             }
                             return {};
