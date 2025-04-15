@@ -52,4 +52,19 @@ std::string EvalState::devirtualize(std::string_view s, const NixStringContext &
     return rewriteStrings(std::string(s), rewrites);
 }
 
+std::string EvalState::computeBaseName(const SourcePath & path)
+{
+    if (path.accessor == rootFS) {
+        if (auto storePath = store->maybeParseStorePath(path.path.abs())) {
+            warn(
+                "Performing inefficient double copy of path '%s' to the store. "
+                "This can typically be avoided by rewriting an attribute like `src = ./.` "
+                "to `src = builtins.path { path = ./.; name = \"source\"; }`.",
+                path);
+            return std::string(fetchToStore(*store, path, FetchMode::DryRun).to_string());
+        }
+    }
+    return std::string(path.baseName());
+}
+
 }

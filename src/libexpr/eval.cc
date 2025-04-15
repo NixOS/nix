@@ -2317,6 +2317,9 @@ BackedStringView EvalState::coerceToString(
     }
 
     if (v.type() == nPath) {
+        // FIXME: instead of copying the path to the store, we could
+        // return a virtual store path that lazily copies the path to
+        // the store in devirtualize().
         return
             !canonicalizePath && !copyToStore
             ? // FIXME: hack to preserve path literals that end in a
@@ -2406,7 +2409,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
                 *store,
                 path.resolveSymlinks(SymlinkResolution::Ancestors),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
-                path.baseName(),
+                computeBaseName(path),
                 ContentAddressMethod::Raw::NixArchive,
                 nullptr,
                 repair);
