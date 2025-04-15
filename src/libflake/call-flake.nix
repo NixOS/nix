@@ -42,13 +42,20 @@ let
 
       parentNode = allNodes.${getInputByPath lockFile.root node.parent};
 
+      flakeDir =
+        let
+          dir = overrides.${key}.dir or node.locked.path or "";
+          parentDir = parentNode.flakeDir;
+        in
+        if node ? parent then parentDir + ("/" + dir) else dir;
+
       sourceInfo =
         if overrides ? ${key} then
           overrides.${key}.sourceInfo
         else if node.locked.type == "path" && builtins.substring 0 1 node.locked.path != "/" then
           parentNode.sourceInfo
           // {
-            outPath = parentNode.result.outPath + ("/" + node.locked.path);
+            outPath = parentNode.sourceInfo.outPath + ("/" + flakeDir);
           }
         else
           # FIXME: remove obsolete node.info.
@@ -93,6 +100,8 @@ let
           result
         else
           sourceInfo;
+
+      inherit flakeDir sourceInfo;
     }
   ) lockFile.nodes;
 
