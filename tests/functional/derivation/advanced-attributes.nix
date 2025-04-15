@@ -23,6 +23,10 @@ let
       "-c"
       "echo foo > $out"
     ];
+    outputs = [
+      "out"
+      "dev"
+    ];
   };
 
   bar = derivation' {
@@ -32,6 +36,10 @@ let
     args = [
       "-c"
       "echo bar > $out"
+    ];
+    outputs = [
+      "out"
+      "dev"
     ];
   };
 
@@ -50,9 +58,9 @@ derivation' {
   impureEnvVars = [ "UNICORN" ];
   __darwinAllowLocalNetworking = true;
   allowedReferences = [ foo ];
-  allowedRequisites = [ foo ];
+  allowedRequisites = [ foo.dev ];
   disallowedReferences = [ bar ];
-  disallowedRequisites = [ bar ];
+  disallowedRequisites = [ bar.dev ];
   requiredSystemFeatures = [
     "rainbow"
     "uid-range"

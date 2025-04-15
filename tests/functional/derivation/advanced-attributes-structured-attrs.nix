@@ -23,6 +23,10 @@ let
       "-c"
       "echo foo > $out"
     ];
+    outputs = [
+      "out"
+      "dev"
+    ];
   };
 
   bar = derivation' {
@@ -32,6 +36,10 @@ let
     args = [
       "-c"
       "echo bar > $out"
+    ];
+    outputs = [
+      "out"
+      "dev"
     ];
   };
 
@@ -58,11 +66,11 @@ derivation' {
   outputChecks = {
     out = {
       allowedReferences = [ foo ];
-      allowedRequisites = [ foo ];
+      allowedRequisites = [ foo.dev ];
     };
     bin = {
       disallowedReferences = [ bar ];
-      disallowedRequisites = [ bar ];
+      disallowedRequisites = [ bar.dev ];
     };
     dev = {
       maxSize = 789;
