@@ -5,30 +5,16 @@
 #include "nix/util/processes.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/build/worker.hh"
-#include "nix/store/builtins.hh"
-#include "nix/store/builtins/buildenv.hh"
-#include "nix/util/references.hh"
-#include "nix/util/finally.hh"
 #include "nix/util/util.hh"
-#include "nix/util/archive.hh"
 #include "nix/util/compression.hh"
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh"
-#include "nix/util/topo-sort.hh"
-#include "nix/util/callback.hh"
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
-
-#include <regex>
-#include <queue>
 
 #include <fstream>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
-
-#ifndef _WIN32 // TODO abstract over proc exit status
-#  include <sys/wait.h>
-#endif
 
 #include <nlohmann/json.hpp>
 
