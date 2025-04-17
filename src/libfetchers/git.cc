@@ -38,7 +38,7 @@ const std::string gitInitialBranch = "__nix_dummy_branch";
 
 bool isCacheFileWithinTtl(time_t now, const struct stat & st)
 {
-    return st.st_mtime + settings.tarballTtl > now;
+    return st.st_mtime + static_cast<time_t>(settings.tarballTtl) > now;
 }
 
 Path getCachePath(std::string_view key, bool shallow)
