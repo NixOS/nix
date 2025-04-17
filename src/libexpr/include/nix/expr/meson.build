@@ -20,7 +20,6 @@ headers = [config_pub_h] + files(
   'gc-small-vector.hh',
   'get-drvs.hh',
   'json-to-value.hh',
-  # internal: 'lexer-helpers.hh',
   'nixexpr.hh',
   'parser-state.hh',
   'primops.hh',

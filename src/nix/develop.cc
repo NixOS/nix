@@ -334,7 +334,7 @@ struct Common : InstallableCommand, MixProfile
             .labels = {"installable", "outputs-dir"},
             .handler = {[&](std::string installable, std::string outputsDir) {
                 redirects.push_back({installable, outputsDir});
-            }}
+            }},
         });
     }
 
@@ -524,7 +524,7 @@ struct CmdDevelop : Common, MixEnvironment
             .handler = {[&](std::vector<std::string> ss) {
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
                 command = ss;
-            }}
+            }},
         });
 
         addFlag({

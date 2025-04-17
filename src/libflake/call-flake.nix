@@ -14,6 +14,7 @@ overrides:
 fetchTreeFinal:
 
 let
+  inherit (builtins) mapAttrs;
 
   lockFile = builtins.fromJSON lockFileStr;
 
@@ -35,11 +36,18 @@ let
         (resolveInput lockFile.nodes.${nodeName}.inputs.${builtins.head path})
         (builtins.tail path);
 
-  allNodes = builtins.mapAttrs (
+  allNodes = mapAttrs (
     key: node:
     let
 
       parentNode = allNodes.${getInputByPath lockFile.root node.parent};
+
+      flakeDir =
+        let
+          dir = overrides.${key}.dir or node.locked.path or "";
+          parentDir = parentNode.flakeDir;
+        in
+        if node ? parent then parentDir + ("/" + dir) else dir;
 
       sourceInfo =
         if overrides ? ${key} then
@@ -47,7 +55,7 @@ let
         else if node.locked.type == "path" && builtins.substring 0 1 node.locked.path != "/" then
           parentNode.sourceInfo
           // {
-            outPath = parentNode.outPath + ("/" + node.locked.path);
+            outPath = parentNode.sourceInfo.outPath + ("/" + flakeDir);
           }
         else
           # FIXME: remove obsolete node.info.
@@ -60,7 +68,7 @@ let
 
       flake = import (outPath + "/flake.nix");
 
-      inputs = builtins.mapAttrs (inputName: inputSpec: allNodes.${resolveInput inputSpec}) (
+      inputs = mapAttrs (inputName: inputSpec: allNodes.${resolveInput inputSpec}.result) (
         node.inputs or { }
       );
 
@@ -85,12 +93,17 @@ let
         };
 
     in
-    if node.flake or true then
-      assert builtins.isFunction flake.outputs;
-      result
-    else
-      sourceInfo
+    {
+      result =
+        if node.flake or true then
+          assert builtins.isFunction flake.outputs;
+          result
+        else
+          sourceInfo;
+
+      inherit flakeDir sourceInfo;
+    }
   ) lockFile.nodes;
 
 in
-allNodes.${lockFile.root}
+allNodes.${lockFile.root}.result
