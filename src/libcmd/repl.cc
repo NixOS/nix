@@ -12,7 +12,7 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/attr-path.hh"
 #include "nix/util/signals.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/log-store.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/expr/get-drvs.hh"
