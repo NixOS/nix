@@ -1,5 +1,5 @@
 # Only execute this file once per shell.
-if test -z "$HOME" || test -z "$USER" || \
+if test -z "$HOME" || \
     test -n "$__ETC_PROFILE_NIX_SOURCED"
     exit
 end
