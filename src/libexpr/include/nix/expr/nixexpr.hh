@@ -65,7 +65,7 @@ struct DocComment {
 struct AttrName
 {
     Symbol symbol;
-    Expr * expr;
+    Expr * expr = nullptr;
     AttrName(Symbol s) : symbol(s) {};
     AttrName(Expr * e) : expr(e) {};
 };
@@ -159,7 +159,7 @@ struct ExprVar : Expr
 
        `nullptr`: Not from a `with`.
        Valid pointer: the nearest, innermost `with` expression to query first. */
-    ExprWith * fromWith;
+    ExprWith * fromWith = nullptr;
 
     /* In the former case, the value is obtained by going `level`
        levels up from the current environment and getting the
@@ -167,7 +167,7 @@ struct ExprVar : Expr
        value is obtained by getting the attribute named `name` from
        the set stored in the environment that is `level` levels up
        from the current one.*/
-    Level level;
+    Level level = 0;
     Displacement displ = 0;
 
     ExprVar(Symbol name) : name(name) { };

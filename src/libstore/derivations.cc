@@ -1368,7 +1368,7 @@ Derivation Derivation::fromJSON(
         for (auto & [outputName, output] : getObject(valueAt(json, "outputs"))) {
             res.outputs.insert_or_assign(
                 outputName,
-                DerivationOutput::fromJSON(store, res.name, outputName, output));
+                DerivationOutput::fromJSON(store, res.name, outputName, output, xpSettings));
         }
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'outputs'");

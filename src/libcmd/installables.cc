@@ -64,21 +64,21 @@ MixFlakeOptions::MixFlakeOptions()
         .handler = {[&]() {
             lockFlags.recreateLockFile = true;
             warn("'--recreate-lock-file' is deprecated and will be removed in a future version; use 'nix flake update' instead.");
-        }}
+        }},
     });
 
     addFlag({
         .longName = "no-update-lock-file",
         .description = "Do not allow any updates to the flake's lock file.",
         .category = category,
-        .handler = {&lockFlags.updateLockFile, false}
+        .handler = {&lockFlags.updateLockFile, false},
     });
 
     addFlag({
         .longName = "no-write-lock-file",
         .description = "Do not write the flake's newly generated lock file.",
         .category = category,
-        .handler = {&lockFlags.writeLockFile, false}
+        .handler = {&lockFlags.writeLockFile, false},
     });
 
     addFlag({
@@ -94,14 +94,14 @@ MixFlakeOptions::MixFlakeOptions()
         .handler = {[&]() {
             lockFlags.useRegistries = false;
             warn("'--no-registries' is deprecated; use '--no-use-registries'");
-        }}
+        }},
     });
 
     addFlag({
         .longName = "commit-lock-file",
         .description = "Commit changes to the flake's lock file.",
         .category = category,
-        .handler = {&lockFlags.commitLockFile, true}
+        .handler = {&lockFlags.commitLockFile, true},
     });
 
     addFlag({
@@ -121,7 +121,7 @@ MixFlakeOptions::MixFlakeOptions()
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
             completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
-        }}
+        }},
     });
 
     addFlag({
@@ -141,7 +141,7 @@ MixFlakeOptions::MixFlakeOptions()
             } else if (n == 1) {
                 completeFlakeRef(completions, getEvalState()->store, prefix);
             }
-        }}
+        }},
     });
 
     addFlag({
@@ -152,7 +152,7 @@ MixFlakeOptions::MixFlakeOptions()
         .handler = {[&](std::string lockFilePath) {
             lockFlags.referenceLockFilePath = {getFSSourceAccessor(), CanonPath(absPath(lockFilePath))};
         }},
-        .completer = completePath
+        .completer = completePath,
     });
 
     addFlag({
@@ -163,7 +163,7 @@ MixFlakeOptions::MixFlakeOptions()
         .handler = {[&](std::string lockFilePath) {
             lockFlags.outputLockFilePath = lockFilePath;
         }},
-        .completer = completePath
+        .completer = completePath,
     });
 
     addFlag({
@@ -190,7 +190,7 @@ MixFlakeOptions::MixFlakeOptions()
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
             completeFlakeRef(completions, getEvalState()->store, prefix);
-        }}
+        }},
     });
 }
 
@@ -206,7 +206,7 @@ SourceExprCommand::SourceExprCommand()
         .category = installablesCategory,
         .labels = {"file"},
         .handler = {&file},
-        .completer = completePath
+        .completer = completePath,
     });
 
     addFlag({
@@ -214,7 +214,7 @@ SourceExprCommand::SourceExprCommand()
         .description = "Interpret [*installables*](@docroot@/command-ref/new-cli/nix.md#installables) as attribute paths relative to the Nix expression *expr*.",
         .category = installablesCategory,
         .labels = {"expr"},
-        .handler = {&expr}
+        .handler = {&expr},
     });
 }
 
@@ -831,7 +831,7 @@ RawInstallablesCommand::RawInstallablesCommand()
     addFlag({
         .longName = "stdin",
         .description = "Read installables from the standard input. No default installable applied.",
-        .handler = {&readFromStdIn, true}
+        .handler = {&readFromStdIn, true},
     });
 
     expectArgs({

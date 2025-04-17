@@ -38,6 +38,15 @@
 
   Curl created sockets without setting `FD_CLOEXEC`/`SOCK_CLOEXEC`. This could previously cause connections to remain open forever when using commands like `nix shell`. This change sets the `FD_CLOEXEC` flag using a `CURLOPT_SOCKOPTFUNCTION` callback.
 
+- Add BLAKE3 hash algorithm [#12379](https://github.com/NixOS/nix/pull/12379)
+
+  Nix now supports the BLAKE3 hash algorithm as an experimental feature (`blake3-hashes`):
+
+  ```console
+  # nix hash file ./file --type blake3 --extra-experimental-features blake3-hashes
+  blake3-34P4p+iZXcbbyB1i4uoF7eWCGcZHjmaRn6Y7QdynLwU=
+  ```
+
 # Contributors
 
 This release was made possible by the following 21 contributors:

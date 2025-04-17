@@ -231,7 +231,7 @@ LegacyArgs::LegacyArgs(const std::string & programName,
             .handler = {[=](std::string s) {
                 auto n = string2IntWithUnitPrefix<uint64_t>(s);
                 settings.set(dest, std::to_string(n));
-            }}
+            }},
         });
     };
 

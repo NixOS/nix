@@ -1,0 +1,1 @@
+Derive([("out","","r:sha256","")],[],[],"my-system","/bin/bash",["-c","echo hello > $out"],[("builder","/bin/bash"),("name","advanced-attributes-defaults"),("out","/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9"),("outputHashAlgo","sha256"),("outputHashMode","recursive"),("system","my-system")])

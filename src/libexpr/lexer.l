@@ -25,8 +25,7 @@
 #endif
 
 #include "nix/expr/nixexpr.hh"
-#include "parser-tab.hh"
-#include "nix/expr/lexer-helpers.hh"
+#include "lexer-helpers.hh"
 
 namespace nix {
   struct LexerState;

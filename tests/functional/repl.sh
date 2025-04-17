@@ -162,15 +162,32 @@ foo + baz
 # - Modify the flake
 # - Re-eval it
 # - Check that the result has changed
-replResult=$( (
-echo "changingThing"
-sleep 1 # Leave the repl the time to eval 'foo'
+mkfifo repl_fifo
+nix repl ./flake < repl_fifo > repl_output 2>&1 &
+repl_pid=$!
+exec 3>repl_fifo # Open fifo for writing
+echo "changingThing" >&3
+for i in $(seq 1 1000); do
+    if grep -q "beforeChange" repl_output; then
+        break
+    fi
+    cat repl_output
+    sleep 0.1
+done
+if [[ "$i" -eq 100 ]]; then
+    echo "Timed out waiting for beforeChange"
+    exit 1
+fi
+
 sed -i 's/beforeChange/afterChange/' flake/flake.nix
-echo ":reload"
-echo "changingThing"
-) | nix repl ./flake)
-echo "$replResult" | grepQuiet -s beforeChange
-echo "$replResult" | grepQuiet -s afterChange
+
+# Send reload and second command
+echo ":reload" >&3
+echo "changingThing" >&3
+echo "exit" >&3
+exec 3>&- # Close fifo
+wait $repl_pid # Wait for process to finish
+grep -q "afterChange" repl_output
 
 # Test recursive printing and formatting
 # Normal output should print attributes in lexicographical order non-recursively

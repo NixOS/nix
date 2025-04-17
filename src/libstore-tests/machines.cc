@@ -73,6 +73,32 @@ TEST(machines, getMachinesWithSemicolonSeparator) {
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
 }
 
+TEST(machines, getMachinesWithCommentsAndSemicolonSeparator) {
+    auto actual = Machine::parseConfig({},
+        "# This is a comment ; this is still that comment\n"
+        "nix@scratchy.labs.cs.uu.nl ; nix@itchy.labs.cs.uu.nl\n"
+        "# This is also a comment ; this also is still that comment\n"
+        "nix@scabby.labs.cs.uu.nl\n");
+    EXPECT_THAT(actual, SizeIs(3));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scabby.labs.cs.uu.nl"))));
+}
+
+TEST(machines, getMachinesWithFunnyWhitespace) {
+    auto actual = Machine::parseConfig({},
+        "        # commment ; comment\n"
+        "   nix@scratchy.labs.cs.uu.nl ; nix@itchy.labs.cs.uu.nl   \n"
+        "\n    \n"
+        "\n ;;; \n"
+        "\n ; ; \n"
+        "nix@scabby.labs.cs.uu.nl\n\n");
+    EXPECT_THAT(actual, SizeIs(3));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scabby.labs.cs.uu.nl"))));
+}
+
 TEST(machines, getMachinesWithCorrectCompleteSingleBuilder) {
     auto actual = Machine::parseConfig({},
         "nix@scratchy.labs.cs.uu.nl     i686-linux      "
