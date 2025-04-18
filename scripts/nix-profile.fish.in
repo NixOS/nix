@@ -69,6 +69,7 @@ if set --query MANPATH
     set --export --prepend --path MANPATH "$NIX_LINK/share/man"
 end
 
+add_path "@localstatedir@/nix/profiles/default/bin"
 add_path "$NIX_LINK/bin"
 
 # Cleanup
