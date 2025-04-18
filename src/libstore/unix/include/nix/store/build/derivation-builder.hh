@@ -30,7 +30,20 @@ struct DerivationBuilderParams
      */
     const std::unique_ptr<Derivation> & drv;
 
+    /**
+     * The "structured attrs" of `drv`, if it has them.
+     *
+     * @todo this should be part of `Derivation`.
+     *
+     * @todo this should be renamed from `parsedDrv`.
+     */
     const std::unique_ptr<StructuredAttrs> & parsedDrv;
+
+    /**
+     * The derivation options of `drv`.
+     *
+     * @todo this should be part of `Derivation`.
+     */
     const std::unique_ptr<DerivationOptions> & drvOptions;
 
     // The remainder is state held during the build.
