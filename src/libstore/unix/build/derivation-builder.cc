@@ -472,16 +472,16 @@ void DerivationBuilderImpl::killSandbox(bool getStats)
 bool DerivationBuilderImpl::prepareBuild()
 {
     /* Cache this */
-    derivationType = drv->type();
+    derivationType = drv.type();
 
     /* Are we doing a chroot build? */
     {
         if (settings.sandboxMode == smEnabled) {
-            if (drvOptions->noChroot)
+            if (drvOptions.noChroot)
                 throw Error("derivation '%s' has '__noChroot' set, "
                     "but that's not allowed when 'sandbox' is 'true'", store.printStorePath(drvPath));
 #ifdef __APPLE__
-            if (drvOptions->additionalSandboxProfile != "")
+            if (drvOptions.additionalSandboxProfile != "")
                 throw Error("derivation '%s' specifies a sandbox profile, "
                     "but this is only allowed when 'sandbox' is 'relaxed'", store.printStorePath(drvPath));
 #endif
@@ -490,7 +490,7 @@ bool DerivationBuilderImpl::prepareBuild()
         else if (settings.sandboxMode == smDisabled)
             useChroot = false;
         else if (settings.sandboxMode == smRelaxed)
-            useChroot = derivationType->isSandboxed() && !drvOptions->noChroot;
+            useChroot = derivationType->isSandboxed() && !drvOptions.noChroot;
     }
 
     auto & localStore = getLocalStore();
@@ -515,7 +515,7 @@ bool DerivationBuilderImpl::prepareBuild()
 
     if (useBuildUsers()) {
         if (!buildUser)
-            buildUser = acquireUserLock(drvOptions->useUidRange(*drv) ? 65536 : 1, useChroot);
+            buildUser = acquireUserLock(drvOptions.useUidRange(drv) ? 65536 : 1, useChroot);
 
         if (!buildUser) {
             return false;
@@ -832,14 +832,14 @@ void DerivationBuilderImpl::startBuilder()
     killSandbox(false);
 
     /* Right platform? */
-    if (!drvOptions->canBuildLocally(store, *drv)) {
+    if (!drvOptions.canBuildLocally(store, drv)) {
         // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware - we should tell them to run the command to install Darwin 2
-        if (drv->platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin") {
-            throw Error("run `/usr/sbin/softwareupdate --install-rosetta` to enable your %s to run programs for %s", settings.thisSystem, drv->platform);
+        if (drv.platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin") {
+            throw Error("run `/usr/sbin/softwareupdate --install-rosetta` to enable your %s to run programs for %s", settings.thisSystem, drv.platform);
         } else {
             throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
-                drv->platform,
-                concatStringsSep(", ", drvOptions->getRequiredSystemFeatures(*drv)),
+                drv.platform,
+                concatStringsSep(", ", drvOptions.getRequiredSystemFeatures(drv)),
                 store.printStorePath(drvPath),
                 settings.thisSystem,
                 concatStringsSep<StringSet>(", ", store.systemFeatures));
@@ -930,7 +930,7 @@ void DerivationBuilderImpl::startBuilder()
 
     /* Handle exportReferencesGraph(), if set. */
     if (!parsedDrv) {
-        for (auto & [fileName, ss] : drvOptions->exportReferencesGraph) {
+        for (auto & [fileName, ss] : drvOptions.exportReferencesGraph) {
             StorePathSet storePathSet;
             for (auto & storePathS : ss) {
                 if (!store.isInStore(storePathS))
@@ -988,7 +988,7 @@ void DerivationBuilderImpl::startBuilder()
         PathSet allowedPaths = settings.allowedImpureHostPrefixes;
 
         /* This works like the above, except on a per-derivation level */
-        auto impurePaths = drvOptions->impureHostDeps;
+        auto impurePaths = drvOptions.impureHostDeps;
 
         for (auto & i : impurePaths) {
             bool found = false;
@@ -1008,7 +1008,7 @@ void DerivationBuilderImpl::startBuilder()
                 throw Error("derivation '%s' requested impure path '%s', but it was not in allowed-impure-host-deps",
                     store.printStorePath(drvPath), i);
 
-            /* Allow files in drvOptions->impureHostDeps to be missing; e.g.
+            /* Allow files in drvOptions.impureHostDeps to be missing; e.g.
                macOS 11+ has no /usr/lib/libSystem*.dylib */
             pathsInChroot[i] = {i, true};
         }
@@ -1048,10 +1048,10 @@ void DerivationBuilderImpl::startBuilder()
            nobody account.  The latter is kind of a hack to support
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
-        if (drvOptions->useUidRange(*drv))
+        if (drvOptions.useUidRange(drv))
             chownToBuilder(chrootRootDir + "/etc");
 
-        if (drvOptions->useUidRange(*drv) && (!buildUser || buildUser->getUIDCount() < 65536))
+        if (drvOptions.useUidRange(drv) && (!buildUser || buildUser->getUIDCount() < 65536))
             throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
 
         /* Declare the build user's group so that programs get a consistent
@@ -1090,7 +1090,7 @@ void DerivationBuilderImpl::startBuilder()
            rebuilding a path that is in settings.sandbox-paths
            (typically the dependencies of /bin/sh).  Throw them
            out. */
-        for (auto & i : drv->outputsAndOptPaths(store)) {
+        for (auto & i : drv.outputsAndOptPaths(store)) {
             /* If the name isn't known a priori (i.e. floating
                content-addressing derivation), the temporary location we use
                should be fresh.  Freshness means it is impossible that the path
@@ -1110,7 +1110,7 @@ void DerivationBuilderImpl::startBuilder()
         }
 
 #else
-        if (drvOptions->useUidRange(*drv))
+        if (drvOptions.useUidRange(drv))
             throw Error("feature 'uid-range' is not supported on this platform");
         #ifdef __APPLE__
             /* We don't really have any parent prep work to do (yet?)
@@ -1120,14 +1120,14 @@ void DerivationBuilderImpl::startBuilder()
         #endif
 #endif
     } else {
-        if (drvOptions->useUidRange(*drv))
+        if (drvOptions.useUidRange(drv))
             throw Error("feature 'uid-range' is only supported in sandboxed builds");
     }
 
     if (needsHashRewrite() && pathExists(homeDir))
         throw Error("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing", homeDir);
 
-    if (useChroot && settings.preBuildHook != "" && dynamic_cast<Derivation *>(drv.get())) {
+    if (useChroot && settings.preBuildHook != "" && dynamic_cast<const Derivation *>(&drv)) {
         printMsg(lvlChatty, "executing pre-build hook '%1%'", settings.preBuildHook);
         auto args = useChroot ? Strings({store.printStorePath(drvPath), chrootRootDir}) :
             Strings({ store.printStorePath(drvPath) });
@@ -1165,13 +1165,13 @@ void DerivationBuilderImpl::startBuilder()
 
     /* Fire up a Nix daemon to process recursive Nix calls from the
        builder. */
-    if (drvOptions->getRequiredSystemFeatures(*drv).count("recursive-nix"))
+    if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
         startDaemon();
 
     /* Run the builder. */
-    printMsg(lvlChatty, "executing builder '%1%'", drv->builder);
-    printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv->args));
-    for (auto & i : drv->env)
+    printMsg(lvlChatty, "executing builder '%1%'", drv.builder);
+    printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv.args));
+    for (auto & i : drv.env)
         printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 
     /* Create the log file. */
@@ -1434,8 +1434,8 @@ void DerivationBuilderImpl::initTmpDir()
        environment or via a file, as specified by
        `DerivationOptions::passAsFile`. */
     if (!parsedDrv) {
-        for (auto & i : drv->env) {
-            if (drvOptions->passAsFile.find(i.first) == drvOptions->passAsFile.end()) {
+        for (auto & i : drv.env) {
+            if (drvOptions.passAsFile.find(i.first) == drvOptions.passAsFile.end()) {
                 env[i.first] = i.second;
             } else {
                 auto hash = hashString(HashAlgorithm::SHA256, i.first);
@@ -1512,7 +1512,7 @@ void DerivationBuilderImpl::initEnv()
         if (!impureEnv.empty())
             experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
 
-        for (auto & i : drvOptions->impureEnvVars){
+        for (auto & i : drvOptions.impureEnvVars){
             auto envVar = impureEnv.find(i);
             if (envVar != impureEnv.end()) {
                 env[i] = envVar->second;
@@ -1537,9 +1537,9 @@ void DerivationBuilderImpl::writeStructuredAttrs()
     if (parsedDrv) {
         auto json = parsedDrv->prepareStructuredAttrs(
             store,
-            *drvOptions,
+            drvOptions,
             inputPaths,
-            drv->outputs);
+            drv.outputs);
         nlohmann::json rewritten;
         for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {
             /* The placeholder must have a rewrite, so we use it to cover both the
@@ -1834,7 +1834,7 @@ void DerivationBuilderImpl::runChild()
            different uid and/or in a sandbox). */
         std::string netrcData;
         std::string caFileData;
-        if (drv->isBuiltin() && drv->builder == "builtin:fetchurl") {
+        if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
            try {
                netrcData = readFile(settings.netrcFile);
            } catch (SystemError &) { }
@@ -2019,7 +2019,7 @@ void DerivationBuilderImpl::runChild()
             }
 
             /* Make /etc unwritable */
-            if (!drvOptions->useUidRange(*drv))
+            if (!drvOptions.useUidRange(drv))
                 chmod_(chrootRootDir + "/etc", 0555);
 
             /* Unshare this mount namespace. This is necessary because
@@ -2079,7 +2079,7 @@ void DerivationBuilderImpl::runChild()
         unix::closeExtraFDs();
 
 #ifdef __linux__
-        linux::setPersonality(drv->platform);
+        linux::setPersonality(drv.platform);
 #endif
 
         /* Disable core dumps by default. */
@@ -2217,7 +2217,7 @@ void DerivationBuilderImpl::runChild()
             }
             sandboxProfile += ")\n";
 
-            sandboxProfile += drvOptions->additionalSandboxProfile;
+            sandboxProfile += drvOptions.additionalSandboxProfile;
         } else
             sandboxProfile +=
                 #include "sandbox-minimal.sb"
@@ -2238,7 +2238,7 @@ void DerivationBuilderImpl::runChild()
             Strings sandboxArgs;
             sandboxArgs.push_back("_GLOBAL_TMP_DIR");
             sandboxArgs.push_back(globalTmpDir);
-            if (drvOptions->allowLocalNetworking) {
+            if (drvOptions.allowLocalNetworking) {
                 sandboxArgs.push_back("_ALLOW_LOCAL_NETWORKING");
                 sandboxArgs.push_back("1");
             }
@@ -2256,23 +2256,23 @@ void DerivationBuilderImpl::runChild()
         sendException = false;
 
         /* Execute the program.  This should not return. */
-        if (drv->isBuiltin()) {
+        if (drv.isBuiltin()) {
             try {
                 logger = makeJSONLogger(getStandardError());
 
                 std::map<std::string, Path> outputs;
-                for (auto & e : drv->outputs)
+                for (auto & e : drv.outputs)
                     outputs.insert_or_assign(e.first,
                         store.printStorePath(scratchOutputs.at(e.first)));
 
-                if (drv->builder == "builtin:fetchurl")
-                    builtinFetchurl(*drv, outputs, netrcData, caFileData);
-                else if (drv->builder == "builtin:buildenv")
-                    builtinBuildenv(*drv, outputs);
-                else if (drv->builder == "builtin:unpack-channel")
-                    builtinUnpackChannel(*drv, outputs);
+                if (drv.builder == "builtin:fetchurl")
+                    builtinFetchurl(drv, outputs, netrcData, caFileData);
+                else if (drv.builder == "builtin:buildenv")
+                    builtinBuildenv(drv, outputs);
+                else if (drv.builder == "builtin:unpack-channel")
+                    builtinUnpackChannel(drv, outputs);
                 else
-                    throw Error("unsupported builtin builder '%1%'", drv->builder.substr(8));
+                    throw Error("unsupported builtin builder '%1%'", drv.builder.substr(8));
                 _exit(0);
             } catch (std::exception & e) {
                 writeFull(STDERR_FILENO, e.what() + std::string("\n"));
@@ -2283,9 +2283,9 @@ void DerivationBuilderImpl::runChild()
         // Now builder is not builtin
 
         Strings args;
-        args.push_back(std::string(baseNameOf(drv->builder)));
+        args.push_back(std::string(baseNameOf(drv.builder)));
 
-        for (auto & i : drv->args)
+        for (auto & i : drv.args)
             args.push_back(rewriteStrings(i, inputRewrites));
 
 #ifdef __APPLE__
@@ -2297,24 +2297,24 @@ void DerivationBuilderImpl::runChild()
         if (posix_spawnattr_setflags(&attrp, POSIX_SPAWN_SETEXEC))
             throw SysError("failed to initialize builder");
 
-        if (drv->platform == "aarch64-darwin") {
+        if (drv.platform == "aarch64-darwin") {
             // Unset kern.curproc_arch_affinity so we can escape Rosetta
             int affinity = 0;
             sysctlbyname("kern.curproc_arch_affinity", NULL, NULL, &affinity, sizeof(affinity));
 
             cpu_type_t cpu = CPU_TYPE_ARM64;
             posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
-        } else if (drv->platform == "x86_64-darwin") {
+        } else if (drv.platform == "x86_64-darwin") {
             cpu_type_t cpu = CPU_TYPE_X86_64;
             posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
         }
 
-        posix_spawn(NULL, drv->builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+        posix_spawn(NULL, drv.builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 #else
-        execve(drv->builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+        execve(drv.builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 #endif
 
-        throw SysError("executing '%1%'", drv->builder);
+        throw SysError("executing '%1%'", drv.builder);
 
     } catch (...) {
         handleChildException(sendException);
@@ -2362,7 +2362,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     struct PerhapsNeedToRegister { StorePathSet refs; };
     std::map<std::string, std::variant<AlreadyRegistered, PerhapsNeedToRegister>> outputReferencesIfUnregistered;
     std::map<std::string, struct stat> outputStats;
-    for (auto & [outputName, _] : drv->outputs) {
+    for (auto & [outputName, _] : drv.outputs) {
         auto scratchOutput = get(scratchOutputs, outputName);
         if (!scratchOutput)
             throw BuildError(
@@ -2418,7 +2418,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             inodesSeen);
 
         bool discardReferences = false;
-        if (auto udr = get(drvOptions->unsafeDiscardReferences, outputName)) {
+        if (auto udr = get(drvOptions.unsafeDiscardReferences, outputName)) {
             discardReferences = *udr;
         }
 
@@ -2474,7 +2474,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     OutputPathMap finalOutputs;
 
     for (auto & outputName : sortedOutputNames) {
-        auto output = get(drv->outputs, outputName);
+        auto output = get(drv.outputs, outputName);
         auto scratchPath = get(scratchOutputs, outputName);
         assert(output && scratchPath);
         auto actualPath = toRealPathChroot(store.printStorePath(*scratchPath));
@@ -2596,7 +2596,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
             ValidPathInfo newInfo0 {
                 store,
-                outputPathName(drv->name, outputName),
+                outputPathName(drv.name, outputName),
                 ContentAddressWithReferences::fromParts(
                     outputHash.method,
                     std::move(got),
@@ -2725,7 +2725,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
            derivations. */
         PathLocks dynamicOutputLock;
         dynamicOutputLock.setDeletion(true);
-        auto optFixedPath = output->path(store, drv->name, outputName);
+        auto optFixedPath = output->path(store, drv.name, outputName);
         if (!optFixedPath ||
             store.printStorePath(*optFixedPath) != finalDestPath)
         {
@@ -2863,7 +2863,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             .outPath = newInfo.path
         };
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
-            && !drv->type().isImpure())
+            && !drv.type().isImpure())
         {
             store.signRealisation(thisRealisation);
             store.registerDrvOutput(thisRealisation);
@@ -3005,7 +3005,7 @@ void DerivationBuilderImpl::checkOutputs(const std::map<std::string, ValidPathIn
 
                     applyChecks(*outputChecks);
             },
-        }, drvOptions->outputChecks);
+        }, drvOptions.outputChecks);
     }
 }
 
@@ -3015,7 +3015,7 @@ void DerivationBuilderImpl::deleteTmpDir(bool force)
     if (topTmpDir != "") {
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
-        if (settings.keepFailed && !force && !drv->isBuiltin()) {
+        if (settings.keepFailed && !force && !drv.isBuiltin()) {
             printError("note: keeping build directory '%s'", tmpDir);
             chmod(topTmpDir.c_str(), 0755);
             chmod(tmpDir.c_str(), 0755);
@@ -3037,7 +3037,7 @@ StorePath DerivationBuilderImpl::makeFallbackPath(OutputNameView outputName)
     return store.makeStorePath(
         pathType,
         // pass an all-zeroes hash
-        Hash(HashAlgorithm::SHA256), outputPathName(drv->name, outputName));
+        Hash(HashAlgorithm::SHA256), outputPathName(drv.name, outputName));
 }
 
 
