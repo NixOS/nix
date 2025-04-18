@@ -102,4 +102,18 @@ scope: {
             ./patches/libgit2-packbuilder-callback-interruptible.patch
           ];
       });
+
+  # Illustrate the failure for `nlohmann_json` update:
+  #   https://github.com/NixOS/nix/issues/13046
+  # It exposes `nix` bug in getInteger() where underlying
+  # json representation is unsigned.
+  nlohmann_json = pkgs.nlohmann_json.overrideAttrs (oa: {
+    src = pkgs.fetchFromGitHub {
+      owner = "nlohmann";
+      repo = "json";
+      rev = "v3.12.0";
+      hash = "sha256-cECvDOLxgX7Q9R3IE86Hj9JJUxraDQvhoyPDF03B2CY=";
+    };
+    cmakeFlags = oa.cmakeFlags ++ [ "-DCMAKE_INSTALL_INCLUDEDIR=include" ];
+  });
 }
