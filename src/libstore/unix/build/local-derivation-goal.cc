@@ -41,38 +41,12 @@ struct LocalDerivationGoal : DerivationGoal, DerivationBuilderCallbacks
         const OutputsSpec & wantedOutputs, Worker & worker,
         BuildMode buildMode)
         : DerivationGoal{drvPath, wantedOutputs, worker, buildMode}
-        , builder{makeDerivationBuilder(
-            worker.store,
-            static_cast<DerivationBuilderCallbacks &>(*this),
-            DerivationBuilderParams {
-                DerivationGoal::drvPath,
-                DerivationGoal::buildMode,
-                DerivationGoal::buildResult,
-                DerivationGoal::drv,
-                DerivationGoal::parsedDrv,
-                DerivationGoal::drvOptions,
-                DerivationGoal::inputPaths,
-                DerivationGoal::initialOutputs,
-            })}
     {}
 
     LocalDerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
         const OutputsSpec & wantedOutputs, Worker & worker,
         BuildMode buildMode = bmNormal)
         : DerivationGoal{drvPath, drv, wantedOutputs, worker, buildMode}
-        , builder{makeDerivationBuilder(
-            worker.store,
-            static_cast<DerivationBuilderCallbacks &>(*this),
-            DerivationBuilderParams {
-                DerivationGoal::drvPath,
-                DerivationGoal::buildMode,
-                DerivationGoal::buildResult,
-                DerivationGoal::drv,
-                DerivationGoal::parsedDrv,
-                DerivationGoal::drvOptions,
-                DerivationGoal::inputPaths,
-                DerivationGoal::initialOutputs,
-            })}
     {}
 
     virtual ~LocalDerivationGoal() override;
@@ -136,15 +110,19 @@ LocalDerivationGoal::~LocalDerivationGoal()
 {
     /* Careful: we should never ever throw an exception from a
        destructor. */
-    try { builder->deleteTmpDir(false); } catch (...) { ignoreExceptionInDestructor(); }
+    if (builder) {
+        try { builder->deleteTmpDir(false); } catch (...) { ignoreExceptionInDestructor(); }
+    }
     try { killChild(); } catch (...) { ignoreExceptionInDestructor(); }
-    try { builder->stopDaemon(); } catch (...) { ignoreExceptionInDestructor(); }
+    if (builder) {
+        try { builder->stopDaemon(); } catch (...) { ignoreExceptionInDestructor(); }
+    }
 }
 
 
 void LocalDerivationGoal::killChild()
 {
-    if (builder->pid != -1) {
+    if (builder && builder->pid != -1) {
         worker.childTerminated(this);
 
         /* If we're using a build user, then there is a tricky race
@@ -165,6 +143,7 @@ void LocalDerivationGoal::killChild()
 
 void LocalDerivationGoal::childStarted()
 {
+    assert(builder);
     worker.childStarted(shared_from_this(), {builder->builderOut.get()}, true, true);
 }
 
@@ -200,6 +179,24 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
         outputLocks.unlock();
         co_await waitForBuildSlot();
         co_return tryToBuild();
+    }
+
+    if (!builder) {
+        /* If we have to wait and retry (see below), then `builder` will
+           already be created, so we don't need to create it again. */
+        builder = makeDerivationBuilder(
+            worker.store,
+            static_cast<DerivationBuilderCallbacks &>(*this),
+            DerivationBuilderParams {
+                DerivationGoal::drvPath,
+                DerivationGoal::buildMode,
+                DerivationGoal::buildResult,
+                DerivationGoal::drv,
+                DerivationGoal::parsedDrv,
+                DerivationGoal::drvOptions,
+                DerivationGoal::inputPaths,
+                DerivationGoal::initialOutputs,
+            });
     }
 
     if (!builder->prepareBuild()) {
@@ -251,7 +248,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
 bool LocalDerivationGoal::isReadDesc(int fd)
 {
     return (hook && DerivationGoal::isReadDesc(fd)) ||
-        (!hook && fd == builder->builderOut.get());
+        (!hook && builder && fd == builder->builderOut.get());
 }
 
 }
