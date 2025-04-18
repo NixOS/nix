@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/util/args.hh"
+#include "nix/main/args.hh"
 #include "nix/util/repair-flag.hh"
 
 namespace nix {

@@ -13,6 +13,7 @@
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/archive.hh"
+#include "nix/store/config-parse-impl.hh"
 
 #include <chrono>
 #include <future>
@@ -24,26 +25,111 @@
 
 namespace nix {
 
-BinaryCacheStore::BinaryCacheStore(const Params & params)
-    : BinaryCacheStoreConfig(params)
-    , Store(params)
-{
-    if (secretKeyFile != "")
-        signers.push_back(std::make_unique<LocalSigner>(
-            SecretKey { readFile(secretKeyFile) }));
+constexpr static const BinaryCacheStoreConfigT<config::SettingInfo> binaryCacheStoreConfigDescriptions = {
+    .compression = {
+        .name = "compression",
+        .description = "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`).",
+    },
+    .writeNARListing = {
+        .name = "write-nar-listing",
+        .description = "Whether to write a JSON file that lists the files in each NAR.",
+    },
+    .writeDebugInfo = {
+        .name = "index-debug-info",
+        .description = R"(
+          Whether to index DWARF debug info files by build ID. This allows [`dwarffs`](https://github.com/edolstra/dwarffs) to
+          fetch debug info on demand
+        )",
+    },
+    .secretKeyFile{
+        .name = "secret-key",
+        .description = "Path to the secret key used to sign the binary cache.",
+    },
+    .localNarCache{
+        .name = "local-nar-cache",
+        .description = "Path to a local cache of NARs fetched from this binary cache, used by commands such as `nix store cat`.",
+    },
+    .parallelCompression{
+        .name = "parallel-compression",
+        .description = "Enable multi-threaded compression of NARs. This is currently only available for `xz` and `zstd`.",
+    },
+    .compressionLevel{
+        .name = "compression-level",
+        .description = R"(
+          The *preset level* to be used when compressing NARs.
+          The meaning and accepted values depend on the compression method selected.
+          `-1` specifies that the default compression level should be used.
+        )",
+    },
+};
 
-    if (secretKeyFiles != "") {
-        std::stringstream ss(secretKeyFiles);
-        Path keyPath;
-        while (std::getline(ss, keyPath, ',')) {
-            signers.push_back(std::make_unique<LocalSigner>(
-                SecretKey { readFile(keyPath) }));
-        }
+#define BINARY_CACHE_STORE_CONFIG_FIELDS(X) \
+    X(compression), \
+    X(writeNARListing), \
+    X(writeDebugInfo), \
+    X(secretKeyFile), \
+    X(secretKeyFiles), \
+    X(localNarCache), \
+    X(parallelCompression), \
+    X(compressionLevel),
+
+MAKE_PARSE(BinaryCacheStoreConfig, binaryCacheStoreConfig, BINARY_CACHE_STORE_CONFIG_FIELDS)
+
+static BinaryCacheStoreConfigT<config::PlainValue> binaryCacheStoreConfigDefaults()
+{
+    return {
+        .compression = {"xz"},
+        .writeNARListing = {false},
+        .writeDebugInfo = {false},
+        .secretKeyFile = {""},
+        .secretKeyFiles = {{}},
+        .localNarCache = {""},
+        .parallelCompression = {false},
+        .compressionLevel = {-1},
+    };
+}
+
+MAKE_APPLY_PARSE(BinaryCacheStoreConfig, binaryCacheStoreConfig, BINARY_CACHE_STORE_CONFIG_FIELDS)
+
+BinaryCacheStore::Config::BinaryCacheStoreConfig(
+    const Store::Config & storeConfig,
+    const StoreReference::Params & params)
+    : BinaryCacheStoreConfigT<config::PlainValue>{binaryCacheStoreConfigApplyParse(params)}
+    , storeConfig{storeConfig}
+{
+}
+
+config::SettingDescriptionMap BinaryCacheStoreConfig::descriptions()
+{
+    constexpr auto & descriptions = binaryCacheStoreConfigDescriptions;
+    auto defaults = binaryCacheStoreConfigDefaults();
+    return {
+        BINARY_CACHE_STORE_CONFIG_FIELDS(DESCRIBE_ROW)
+    };
+}
+
+BinaryCacheStore::BinaryCacheStore(const Config & config)
+    : Store{config.storeConfig}
+    , config{config}
+{
+    if (config.secretKeyFile != "")
+        signers.push_back(std::make_unique<LocalSigner>(
+            SecretKey { readFile(config.secretKeyFile) }));
+
+    for (auto & keyPath : config.secretKeyFiles.value) {
+        signers.push_back(std::make_unique<LocalSigner>(
+            SecretKey { readFile(keyPath) }));
     }
 
     StringSink sink;
     sink << narVersionMagic1;
     narMagic = sink.s;
+
+    // Want to call this but cannot, because virtual function lookup is
+    // disabled in a constructor. It is thus left to instances to call
+    // it instead.
+
+    //init();
 }
 
 void BinaryCacheStore::init()
@@ -62,9 +148,11 @@ void BinaryCacheStore::init()
                     throw Error("binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
                         getUri(), value, storeDir);
             } else if (name == "WantMassQuery") {
-                wantMassQuery.setDefault(value == "1");
+                resolvedSubstConfig.wantMassQuery.value =
+                    config.storeConfig.wantMassQuery.optValue.value_or(value == "1");
             } else if (name == "Priority") {
-                priority.setDefault(std::stoi(value));
+                resolvedSubstConfig.priority.value =
+                    config.storeConfig.priority.optValue.value_or(std::stoi(value));
             }
         }
     }
@@ -156,7 +244,11 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     {
     FdSink fileSink(fdTemp.get());
     TeeSink teeSinkCompressed { fileSink, fileHashSink };
-    auto compressionSink = makeCompressionSink(compression, teeSinkCompressed, parallelCompression, compressionLevel);
+    auto compressionSink = makeCompressionSink(
+        config.compression,
+        teeSinkCompressed,
+        config.parallelCompression,
+        config.compressionLevel);
     TeeSink teeSinkUncompressed { *compressionSink, narHashSink };
     TeeSource teeSource { narSource, teeSinkUncompressed };
     narAccessor = makeNarAccessor(teeSource);
@@ -168,17 +260,17 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
     auto info = mkInfo(narHashSink.finish());
     auto narInfo = make_ref<NarInfo>(info);
-    narInfo->compression = compression;
+    narInfo->compression = config.compression;
     auto [fileHash, fileSize] = fileHashSink.finish();
     narInfo->fileHash = fileHash;
     narInfo->fileSize = fileSize;
     narInfo->url = "nar/" + narInfo->fileHash->to_string(HashFormat::Nix32, false) + ".nar"
-                   + (compression == "xz" ? ".xz" :
-           compression == "bzip2" ? ".bz2" :
-           compression == "zstd" ? ".zst" :
-           compression == "lzip" ? ".lzip" :
-           compression == "lz4" ? ".lz4" :
-           compression == "br" ? ".br" :
+                   + (config.compression == "xz" ? ".xz" :
+           config.compression == "bzip2" ? ".bz2" :
+           config.compression == "zstd" ? ".zst" :
+           config.compression == "lzip" ? ".lzip" :
+           config.compression == "lz4" ? ".lz4" :
+           config.compression == "br" ? ".br" :
            "");
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
@@ -200,7 +292,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
     /* Optionally write a JSON file containing a listing of the
        contents of the NAR. */
-    if (writeNARListing) {
+    if (config.writeNARListing) {
         nlohmann::json j = {
             {"version", 1},
             {"root", listNar(ref<SourceAccessor>(narAccessor), CanonPath::root, true)},
@@ -212,7 +304,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     /* Optionally maintain an index of DWARF debug info files
        consisting of JSON files named 'debuginfo/<build-id>' that
        specify the NAR file and member containing the debug info. */
-    if (writeDebugInfo) {
+    if (config.writeDebugInfo) {
 
         CanonPath buildIdDir("lib/debug/.build-id");
 
@@ -524,7 +616,7 @@ void BinaryCacheStore::registerDrvOutput(const Realisation& info) {
 
 ref<SourceAccessor> BinaryCacheStore::getFSAccessor(bool requireValidPath)
 {
-    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), requireValidPath, localNarCache);
+    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), requireValidPath, config.localNarCache);
 }
 
 void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSet & sigs)

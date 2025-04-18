@@ -2,6 +2,7 @@
 #include "nix/store/derivations.hh"
 #include "dotgraph.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/store-cast.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/log-store.hh"
