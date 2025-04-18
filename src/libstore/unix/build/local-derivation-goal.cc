@@ -191,9 +191,9 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
                 DerivationGoal::drvPath,
                 DerivationGoal::buildMode,
                 DerivationGoal::buildResult,
-                DerivationGoal::drv,
-                DerivationGoal::parsedDrv,
-                DerivationGoal::drvOptions,
+                *DerivationGoal::drv,
+                DerivationGoal::parsedDrv.get(),
+                *DerivationGoal::drvOptions,
                 DerivationGoal::inputPaths,
                 DerivationGoal::initialOutputs,
             });

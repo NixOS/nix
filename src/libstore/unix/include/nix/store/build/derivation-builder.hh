@@ -24,11 +24,8 @@ struct DerivationBuilderParams
 
     /**
      * The derivation stored at drvPath.
-     *
-     * @todo Remove double indirection by delaying when this is
-     * initialized.
      */
-    const std::unique_ptr<Derivation> & drv;
+    const Derivation & drv;
 
     /**
      * The "structured attrs" of `drv`, if it has them.
@@ -37,14 +34,14 @@ struct DerivationBuilderParams
      *
      * @todo this should be renamed from `parsedDrv`.
      */
-    const std::unique_ptr<StructuredAttrs> & parsedDrv;
+    const StructuredAttrs * parsedDrv;
 
     /**
      * The derivation options of `drv`.
      *
      * @todo this should be part of `Derivation`.
      */
-    const std::unique_ptr<DerivationOptions> & drvOptions;
+    const DerivationOptions & drvOptions;
 
     // The remainder is state held during the build.
 
@@ -65,9 +62,9 @@ struct DerivationBuilderParams
         const StorePath & drvPath,
         const BuildMode & buildMode,
         BuildResult & buildResult,
-        const std::unique_ptr<Derivation> & drv,
-        const std::unique_ptr<StructuredAttrs> & parsedDrv,
-        const std::unique_ptr<DerivationOptions> & drvOptions,
+        const Derivation & drv,
+        const StructuredAttrs * parsedDrv,
+        const DerivationOptions & drvOptions,
         const StorePathSet & inputPaths,
         std::map<std::string, InitialOutput> & initialOutputs)
         : drvPath{drvPath}
