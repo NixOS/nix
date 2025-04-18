@@ -278,8 +278,6 @@
               ''^src/libstore/include/nix/store/store-dir-config\.hh$''
               ''^src/libstore/build/derivation-goal\.cc$''
               ''^src/libstore/include/nix/store/build/derivation-goal\.hh$''
-              ''^src/libstore/build/drv-output-substitution-goal\.cc$''
-              ''^src/libstore/include/nix/store/build/drv-output-substitution-goal\.hh$''
               ''^src/libstore/build/entry-points\.cc$''
               ''^src/libstore/build/goal\.cc$''
               ''^src/libstore/include/nix/store/build/goal\.hh$''
