@@ -948,7 +948,16 @@ void EvalState::mkPos(Value & v, PosIdx p)
     auto origin = positions.originOf(p);
     if (auto path = std::get_if<SourcePath>(&origin)) {
         auto attrs = buildBindings(3);
-        attrs.alloc(sFile).mkString(path->path.abs());
+        if (path->accessor == rootFS && store->isInStore(path->path.abs()))
+            // FIXME: only do this for virtual store paths?
+            attrs.alloc(sFile).mkString(path->path.abs(),
+                {
+                    NixStringContextElem::Opaque{
+                        .path = store->toStorePath(path->path.abs()).first
+                    }
+                });
+        else
+            attrs.alloc(sFile).mkString(path->path.abs());
         makePositionThunks(*this, p, attrs.alloc(sLine), attrs.alloc(sColumn));
         v.mkAttrs(attrs);
     } else
