@@ -84,9 +84,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     auto conn = make_ref<Connection>();
 
     /* Connect to a daemon that does the privileged work for us. */
-    conn->fd = createUnixDomainSocket();
-
-    nix::connect(toSocket(conn->fd.get()), path);
+    conn->fd = nix::connect(path);
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();
