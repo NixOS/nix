@@ -26,6 +26,8 @@ struct InputCache
     virtual void clear() = 0;
 
     static ref<InputCache> create();
+
+    virtual ~InputCache() = default;
 };
 
 }
