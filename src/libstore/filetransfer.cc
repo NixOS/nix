@@ -33,6 +33,9 @@ using namespace std::string_literals;
 
 namespace nix {
 
+const unsigned int RETRY_TIME_MS_DEFAULT = 250;
+const unsigned int RETRY_TIME_MS_TOO_MANY_REQUESTS = 60000;
+
 FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
@@ -453,7 +456,7 @@ struct curlFileTransfer : public FileTransfer
                     err = Forbidden;
                 } else if (httpStatus == 429) {
                     // 429 means too many requests, so we retry (with a substantially longer delay)
-                    retryTimeMs = 60000;
+                    retryTimeMs = RETRY_TIME_MS_TOO_MANY_REQUESTS;
                 } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408) {
                     // Most 4xx errors are client errors and are probably not worth retrying:
                     //   * 408 means the server timed out waiting for us, so we try again
