@@ -143,6 +143,7 @@
           # without "polluting" the top level "`pkgs`" attrset.
           # This also has the benefit of providing us with a distinct set of packages
           # we can iterate over.
+          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
           nixComponents2 =
             lib.makeScopeWithSplicing'
               {
@@ -162,6 +163,7 @@
 
           # The dependencies are in their own scope, so that they don't have to be
           # in Nixpkgs top level `pkgs` or `nixComponents2`.
+          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
           nixDependencies2 =
             lib.makeScopeWithSplicing'
               {
