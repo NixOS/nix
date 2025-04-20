@@ -42,11 +42,6 @@ struct DerivationGoal : public Goal
     StorePath drvPath;
 
     /**
-     * The goal for the corresponding resolved derivation
-     */
-    std::shared_ptr<DerivationGoal> resolvedDrvGoal;
-
-    /**
      * The specific outputs that we need to build.
      */
     OutputsSpec wantedOutputs;
@@ -202,8 +197,6 @@ struct DerivationGoal : public Goal
     Co gaveUpOnSubstitution();
     Co tryToBuild();
     Co hookDone();
-
-    Co resolvedFinished();
 
     /**
      * Is the build hook willing to perform the build?

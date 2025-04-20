@@ -516,14 +516,79 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
                        worker.store.printStorePath(pathResolved),
                    });
 
-            resolvedDrvGoal = worker.makeDerivationGoal(
+            auto resolvedDrvGoal = worker.makeDerivationGoal(
                 pathResolved, wantedOutputs, buildMode);
             {
                 Goals waitees{resolvedDrvGoal};
                 co_await await(std::move(waitees));
             }
 
-            co_return resolvedFinished();
+            trace("resolved derivation finished");
+
+            auto resolvedDrv = *resolvedDrvGoal->drv;
+            auto & resolvedResult = resolvedDrvGoal->buildResult;
+
+            SingleDrvOutputs builtOutputs;
+
+            if (resolvedResult.success()) {
+                auto resolvedHashes = staticOutputHashes(worker.store, resolvedDrv);
+
+                StorePathSet outputPaths;
+
+                for (auto & outputName : resolvedDrv.outputNames()) {
+                    auto initialOutput = get(initialOutputs, outputName);
+                    auto resolvedHash = get(resolvedHashes, outputName);
+                    if ((!initialOutput) || (!resolvedHash))
+                        throw Error(
+                            "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolve)",
+                            worker.store.printStorePath(drvPath), outputName);
+
+                    auto realisation = [&]{
+                      auto take1 = get(resolvedResult.builtOutputs, outputName);
+                      if (take1) return *take1;
+
+                      /* The above `get` should work. But sateful tracking of
+                         outputs in resolvedResult, this can get out of sync with the
+                         store, which is our actual source of truth. For now we just
+                         check the store directly if it fails. */
+                      auto take2 = worker.evalStore.queryRealisation(DrvOutput { *resolvedHash, outputName });
+                      if (take2) return *take2;
+
+                      throw Error(
+                          "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/realisation)",
+                          worker.store.printStorePath(resolvedDrvGoal->drvPath), outputName);
+                    }();
+
+                    if (!drv->type().isImpure()) {
+                        auto newRealisation = realisation;
+                        newRealisation.id = DrvOutput { initialOutput->outputHash, outputName };
+                        newRealisation.signatures.clear();
+                        if (!drv->type().isFixed()) {
+                            auto & drvStore = worker.evalStore.isValidPath(drvPath)
+                                ? worker.evalStore
+                                : worker.store;
+                            newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation.outPath, &drvStore);
+                        }
+                        worker.store.signRealisation(newRealisation);
+                        worker.store.registerDrvOutput(newRealisation);
+                    }
+                    outputPaths.insert(realisation.outPath);
+                    builtOutputs.emplace(outputName, realisation);
+                }
+
+                runPostBuildHook(
+                    worker.store,
+                    *logger,
+                    drvPath,
+                    outputPaths
+                );
+            }
+
+            auto status = resolvedResult.status;
+            if (status == BuildResult::AlreadyValid)
+                status = BuildResult::ResolvesToAlreadyValid;
+
+            co_return done(status, std::move(builtOutputs));
         }
 
         /* If we get this far, we know no dynamic drvs inputs */
@@ -1126,77 +1191,6 @@ Goal::Co DerivationGoal::hookDone()
     outputLocks.unlock();
 
     co_return done(BuildResult::Built, std::move(builtOutputs));
-}
-
-Goal::Co DerivationGoal::resolvedFinished()
-{
-    trace("resolved derivation finished");
-
-    assert(resolvedDrvGoal);
-    auto resolvedDrv = *resolvedDrvGoal->drv;
-    auto & resolvedResult = resolvedDrvGoal->buildResult;
-
-    SingleDrvOutputs builtOutputs;
-
-    if (resolvedResult.success()) {
-        auto resolvedHashes = staticOutputHashes(worker.store, resolvedDrv);
-
-        StorePathSet outputPaths;
-
-        for (auto & outputName : resolvedDrv.outputNames()) {
-            auto initialOutput = get(initialOutputs, outputName);
-            auto resolvedHash = get(resolvedHashes, outputName);
-            if ((!initialOutput) || (!resolvedHash))
-                throw Error(
-                    "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,resolve)",
-                    worker.store.printStorePath(drvPath), outputName);
-
-            auto realisation = [&]{
-              auto take1 = get(resolvedResult.builtOutputs, outputName);
-              if (take1) return *take1;
-
-              /* The above `get` should work. But sateful tracking of
-                 outputs in resolvedResult, this can get out of sync with the
-                 store, which is our actual source of truth. For now we just
-                 check the store directly if it fails. */
-              auto take2 = worker.evalStore.queryRealisation(DrvOutput { *resolvedHash, outputName });
-              if (take2) return *take2;
-
-              throw Error(
-                  "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,realisation)",
-                  worker.store.printStorePath(resolvedDrvGoal->drvPath), outputName);
-            }();
-
-            if (!drv->type().isImpure()) {
-                auto newRealisation = realisation;
-                newRealisation.id = DrvOutput { initialOutput->outputHash, outputName };
-                newRealisation.signatures.clear();
-                if (!drv->type().isFixed()) {
-                    auto & drvStore = worker.evalStore.isValidPath(drvPath)
-                        ? worker.evalStore
-                        : worker.store;
-                    newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation.outPath, &drvStore);
-                }
-                worker.store.signRealisation(newRealisation);
-                worker.store.registerDrvOutput(newRealisation);
-            }
-            outputPaths.insert(realisation.outPath);
-            builtOutputs.emplace(outputName, realisation);
-        }
-
-        runPostBuildHook(
-            worker.store,
-            *logger,
-            drvPath,
-            outputPaths
-        );
-    }
-
-    auto status = resolvedResult.status;
-    if (status == BuildResult::AlreadyValid)
-        status = BuildResult::ResolvesToAlreadyValid;
-
-    co_return done(status, std::move(builtOutputs));
 }
 
 HookReply DerivationGoal::tryBuildHook()
