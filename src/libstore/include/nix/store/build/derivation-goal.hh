@@ -16,6 +16,7 @@ using std::map;
 
 #ifndef _WIN32 // TODO enable build hook on Windows
 struct HookInstance;
+struct DerivationBuilder;
 #endif
 
 typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
@@ -154,6 +155,8 @@ struct DerivationGoal : public Goal
      * The build hook.
      */
     std::unique_ptr<HookInstance> hook;
+
+    std::unique_ptr<DerivationBuilder> builder;
 #endif
 
     BuildMode buildMode;
@@ -180,7 +183,7 @@ struct DerivationGoal : public Goal
     DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
         const OutputsSpec & wantedOutputs, Worker & worker,
         BuildMode buildMode = bmNormal);
-    virtual ~DerivationGoal();
+    ~DerivationGoal();
 
     void timedOut(Error && ex) override;
 
@@ -198,7 +201,6 @@ struct DerivationGoal : public Goal
     Co haveDerivation();
     Co gaveUpOnSubstitution();
     Co tryToBuild();
-    virtual Co tryLocalBuild();
     Co hookDone();
 
     Co resolvedFinished();
@@ -218,7 +220,7 @@ struct DerivationGoal : public Goal
      */
     void closeLogFile();
 
-    virtual bool isReadDesc(Descriptor fd);
+    bool isReadDesc(Descriptor fd);
 
     /**
      * Callback used by the worker to write to the log.
@@ -252,7 +254,7 @@ struct DerivationGoal : public Goal
     /**
      * Forcibly kill the child process, if any.
      */
-    virtual void killChild();
+    void killChild();
 
     Co repairClosure();
 

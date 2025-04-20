@@ -5,7 +5,6 @@
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-goal.hh"
 #ifndef _WIN32 // TODO Enable building on Windows
-#  include "nix/store/build/local-derivation-goal.hh"
 #  include "nix/store/build/hook-instance.hh"
 #endif
 #include "nix/util/signals.hh"
@@ -65,13 +64,7 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drv
     const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
-        return
-#ifndef _WIN32 // TODO Enable building on Windows
-            dynamic_cast<LocalStore *>(&store)
-            ? makeLocalDerivationGoal(drvPath, wantedOutputs, *this, buildMode)
-            :
-#endif
-            std::make_shared</* */DerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
+        return std::make_shared<DerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
     });
 }
 
@@ -79,13 +72,7 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
     const BasicDerivation & drv, const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
-        return
-#ifndef _WIN32 // TODO Enable building on Windows
-            dynamic_cast<LocalStore *>(&store)
-            ? makeLocalDerivationGoal(drvPath, drv, wantedOutputs, *this, buildMode)
-            :
-#endif
-            std::make_shared</* */DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
+        return std::make_shared<DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
     });
 }
 

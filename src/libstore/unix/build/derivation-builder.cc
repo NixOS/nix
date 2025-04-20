@@ -96,17 +96,17 @@ class DerivationBuilderImpl : public DerivationBuilder, DerivationBuilderParams
 {
     Store & store;
 
-    DerivationBuilderCallbacks & miscMethods;
+    std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
 
 public:
 
     DerivationBuilderImpl(
         Store & store,
-        DerivationBuilderCallbacks & miscMethods,
+        std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params)
         : DerivationBuilderParams{std::move(params)}
         , store{store}
-        , miscMethods{miscMethods}
+        , miscMethods{std::move(miscMethods)}
       { }
 
       LocalStore & getLocalStore();
@@ -382,12 +382,12 @@ private:
 
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     Store & store,
-    DerivationBuilderCallbacks & miscMethods,
+    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params)
 {
     return std::make_unique<DerivationBuilderImpl>(
         store,
-        miscMethods,
+        std::move(miscMethods),
         std::move(params));
 }
 
@@ -550,13 +550,13 @@ std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> Derivation
     buildResult.stopTime = time(0);
 
     /* So the child is gone now. */
-    miscMethods.childTerminated();
+    miscMethods->childTerminated();
 
     /* Close the read side of the logger pipe. */
     builderOut.close();
 
     /* Close the log file. */
-    miscMethods.closeLogFile();
+    miscMethods->closeLogFile();
 
     /* When running under a build user, make sure that all processes
        running under that uid are gone.  This is to prevent a
@@ -589,7 +589,7 @@ std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> Derivation
                 Magenta(store.printStorePath(drvPath)),
                 statusToString(status));
 
-            miscMethods.appendLogTailErrorMsg(msg);
+            miscMethods->appendLogTailErrorMsg(msg);
 
             if (diskFull)
                 msg += "\nnote: build failure may have been caused by lack of free disk space";
@@ -1175,7 +1175,7 @@ void DerivationBuilderImpl::startBuilder()
         printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 
     /* Create the log file. */
-    [[maybe_unused]] Path logFile = miscMethods.openLogFile();
+    [[maybe_unused]] Path logFile = miscMethods->openLogFile();
 
     /* Create a pseudoterminal to get the output of the builder. */
     builderOut = posix_openpt(O_RDWR | O_NOCTTY);
@@ -1385,7 +1385,7 @@ void DerivationBuilderImpl::startBuilder()
 
     /* parent */
     pid.setSeparatePG(true);
-    miscMethods.childStarted();
+    miscMethods->childStarted(builderOut.get());
 
     processSandboxSetupMessages();
 }
@@ -2673,7 +2673,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 if (wanted != got) {
                     /* Throw an error after registering the path as
                        valid. */
-                    miscMethods.noteHashMismatch();
+                    miscMethods->noteHashMismatch();
                     delayedException = std::make_exception_ptr(
                         BuildError("hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
                             store.printStorePath(drvPath),
@@ -2761,7 +2761,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             if (!store.isValidPath(newInfo.path)) continue;
             ValidPathInfo oldInfo(*store.queryPathInfo(newInfo.path));
             if (newInfo.narHash != oldInfo.narHash) {
-                miscMethods.noteCheckMismatch();
+                miscMethods->noteCheckMismatch();
                 if (settings.runDiffHook || settings.keepFailed) {
                     auto dst = store.toRealPath(finalDestPath + checkSuffix);
                     deletePath(dst);
@@ -2798,7 +2798,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         }
 
         localStore.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
-        miscMethods.markContentsGood(newInfo.path);
+        miscMethods->markContentsGood(newInfo.path);
 
         newInfo.deriver = drvPath;
         newInfo.ultimate = true;
@@ -2821,7 +2821,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
            also a source for non-determinism. */
         if (delayedException)
             std::rethrow_exception(delayedException);
-        return miscMethods.assertPathValidity();
+        return miscMethods->assertPathValidity();
     }
 
     /* Apply output checks. */
