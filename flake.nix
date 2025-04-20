@@ -143,14 +143,15 @@
           # without "polluting" the top level "`pkgs`" attrset.
           # This also has the benefit of providing us with a distinct set of packages
           # we can iterate over.
-          nixComponents =
+          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
+          nixComponents2 =
             lib.makeScopeWithSplicing'
               {
                 inherit (final) splicePackages;
-                inherit (final.nixDependencies) newScope;
+                inherit (final.nixDependencies2) newScope;
               }
               {
-                otherSplices = final.generateSplicesForMkScope "nixComponents";
+                otherSplices = final.generateSplicesForMkScope "nixComponents2";
                 f = import ./packaging/components.nix {
                   inherit (final) lib;
                   inherit officialRelease;
@@ -161,22 +162,23 @@
               };
 
           # The dependencies are in their own scope, so that they don't have to be
-          # in Nixpkgs top level `pkgs` or `nixComponents`.
-          nixDependencies =
+          # in Nixpkgs top level `pkgs` or `nixComponents2`.
+          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
+          nixDependencies2 =
             lib.makeScopeWithSplicing'
               {
                 inherit (final) splicePackages;
-                inherit (final) newScope; # layered directly on pkgs, unlike nixComponents above
+                inherit (final) newScope; # layered directly on pkgs, unlike nixComponents2 above
               }
               {
-                otherSplices = final.generateSplicesForMkScope "nixDependencies";
+                otherSplices = final.generateSplicesForMkScope "nixDependencies2";
                 f = import ./packaging/dependencies.nix {
                   inherit inputs stdenv;
                   pkgs = final;
                 };
               };
 
-          nix = final.nixComponents.nix-cli;
+          nix = final.nixComponents2.nix-cli;
 
           # See https://github.com/NixOS/nixpkgs/pull/214409
           # Remove when fixed in this flake's nixpkgs
@@ -277,7 +279,7 @@
                 # memory leaks with detect_leaks=0.
                 "" = rec {
                   nixpkgs = nixpkgsFor.${system}.native;
-                  nixComponents = nixpkgs.nixComponents.overrideScope (
+                  nixComponents = nixpkgs.nixComponents2.overrideScope (
                     nixCompFinal: nixCompPrev: {
                       mesonComponentOverrides = _finalAttrs: prevAttrs: {
                         mesonFlags =
@@ -305,7 +307,7 @@
               nixpkgsPrefix:
               {
                 nixpkgs,
-                nixComponents ? nixpkgs.nixComponents,
+                nixComponents ? nixpkgs.nixComponents2,
               }:
               flatMapAttrs nixComponents (
                 pkgName: pkg:
@@ -335,9 +337,9 @@
           binaryTarball = self.hydraJobs.binaryTarball.${system};
           # TODO probably should be `nix-cli`
           nix = self.packages.${system}.nix-everything;
-          nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
-          nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
-          nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
+          nix-manual = nixpkgsFor.${system}.native.nixComponents2.nix-manual;
+          nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-internal-api-docs;
+          nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-external-api-docs;
         }
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         //
@@ -391,9 +393,9 @@
               }:
               {
                 # These attributes go right into `packages.<system>`.
-                "${pkgName}" = nixpkgsFor.${system}.native.nixComponents.${pkgName};
-                "${pkgName}-static" = nixpkgsFor.${system}.native.pkgsStatic.nixComponents.${pkgName};
-                "${pkgName}-llvm" = nixpkgsFor.${system}.native.pkgsLLVM.nixComponents.${pkgName};
+                "${pkgName}" = nixpkgsFor.${system}.native.nixComponents2.${pkgName};
+                "${pkgName}-static" = nixpkgsFor.${system}.native.pkgsStatic.nixComponents2.${pkgName};
+                "${pkgName}-llvm" = nixpkgsFor.${system}.native.pkgsLLVM.nixComponents2.${pkgName};
               }
               // lib.optionalAttrs supportsCross (
                 flatMapAttrs (lib.genAttrs crossSystems (_: { })) (
@@ -401,7 +403,7 @@
                   { }:
                   {
                     # These attributes go right into `packages.<system>`.
-                    "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName};
+                    "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents2.${pkgName};
                   }
                 )
               )
@@ -411,7 +413,7 @@
                 {
                   # These attributes go right into `packages.<system>`.
                   "${pkgName}-${stdenvName}" =
-                    nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.nixComponents.${pkgName};
+                    nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.nixComponents2.${pkgName};
                 }
               )
             )
