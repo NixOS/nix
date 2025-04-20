@@ -85,6 +85,8 @@ struct DerivationBuilderParams
  */
 struct DerivationBuilderCallbacks
 {
+    virtual ~DerivationBuilderCallbacks() = default;
+
     /**
      * Open a log file and a pipe to it.
      */
@@ -110,7 +112,7 @@ struct DerivationBuilderCallbacks
      *
      * @todo this should be reworked
      */
-    virtual void childStarted() = 0;
+    virtual void childStarted(Descriptor builderOut) = 0;
 
     /**
      * @todo this should be reworked
@@ -201,7 +203,7 @@ struct DerivationBuilder : RestrictionContext
 
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     Store & store,
-    DerivationBuilderCallbacks & miscMethods,
+    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params);
 
 }

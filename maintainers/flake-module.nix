@@ -286,8 +286,6 @@
               ''^src/libstore/unix/build/hook-instance\.cc$''
               ''^src/libstore/unix/build/derivation-builder\.cc$''
               ''^src/libstore/unix/include/nix/store/build/derivation-builder\.hh$''
-              ''^src/libstore/unix/build/local-derivation-goal\.cc$''
-              ''^src/libstore/unix/include/nix/store/build/local-derivation-goal\.hh$''
               ''^src/libstore/build/substitution-goal\.cc$''
               ''^src/libstore/include/nix/store/build/substitution-goal\.hh$''
               ''^src/libstore/build/worker\.cc$''

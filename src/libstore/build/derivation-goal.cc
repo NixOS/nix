@@ -1,6 +1,7 @@
 #include "nix/store/build/derivation-goal.hh"
 #ifndef _WIN32 // TODO enable build hook on Windows
 #  include "nix/store/build/hook-instance.hh"
+#  include "nix/store/build/derivation-builder.hh"
 #endif
 #include "nix/util/processes.hh"
 #include "nix/util/config-global.hh"
@@ -68,6 +69,13 @@ DerivationGoal::~DerivationGoal()
 {
     /* Careful: we should never ever throw an exception from a
        destructor. */
+    try { killChild(); } catch (...) { ignoreExceptionInDestructor(); }
+#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
+    if (builder) {
+        try { builder->stopDaemon(); } catch (...) { ignoreExceptionInDestructor(); }
+        try { builder->deleteTmpDir(false); } catch (...) { ignoreExceptionInDestructor(); }
+    }
+#endif
     try { closeLogFile(); } catch (...) { ignoreExceptionInDestructor(); }
 }
 
@@ -86,6 +94,22 @@ void DerivationGoal::killChild()
 {
 #ifndef _WIN32 // TODO enable build hook on Windows
     hook.reset();
+#endif
+#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
+    if (builder && builder->pid != -1) {
+        worker.childTerminated(this);
+
+        /* If we're using a build user, then there is a tricky race
+           condition: if we kill the build user before the child has
+           done its setuid() to the build user uid, then it won't be
+           killed, and we'll potentially lock up in pid.wait().  So
+           also send a conventional kill to the child. */
+        ::kill(-builder->pid, SIGKILL); /* ignore the result */
+
+        builder->killSandbox(true);
+
+        builder->pid.wait();
+    }
 #endif
 }
 
@@ -666,18 +690,152 @@ Goal::Co DerivationGoal::tryToBuild()
     actLock.reset();
 
     co_await yield();
-    co_return tryLocalBuild();
-}
 
-Goal::Co DerivationGoal::tryLocalBuild() {
-    throw Error(
-        R"(
-        Unable to build with a primary store that isn't a local store;
-        either pass a different '--store' or enable remote builds.
+    if (!dynamic_cast<LocalStore *>(&worker.store)) {
+        throw Error(
+            R"(
+            Unable to build with a primary store that isn't a local store;
+            either pass a different '--store' or enable remote builds.
 
-        For more information check 'man nix.conf' and search for '/machines'.
-        )"
-    );
+            For more information check 'man nix.conf' and search for '/machines'.
+            )"
+        );
+    }
+
+#ifdef _WIN32 // TODO enable `DerivationBuilder` on Windows
+    throw UnimplementedError("building derivations is not yet implemented on Windows");
+#else
+
+    // Will continue here while waiting for a build user below
+    while (true) {
+
+        assert(!hook);
+
+        unsigned int curBuilds = worker.getNrLocalBuilds();
+        if (curBuilds >= settings.maxBuildJobs) {
+            outputLocks.unlock();
+            co_await waitForBuildSlot();
+            co_return tryToBuild();
+        }
+
+        if (!builder) {
+            /**
+             * Local implementation of these virtual methods, consider
+             * this just a record of lambdas.
+             */
+            struct DerivationGoalCallbacks : DerivationBuilderCallbacks
+            {
+                DerivationGoal & goal;
+
+                DerivationGoalCallbacks(DerivationGoal & goal, std::unique_ptr<DerivationBuilder> & builder)
+                    : goal{goal}
+                {}
+
+                ~DerivationGoalCallbacks() override = default;
+
+                void childStarted(Descriptor builderOut) override
+                {
+                    goal.worker.childStarted(goal.shared_from_this(), {builderOut}, true, true);
+                }
+
+                void childTerminated() override
+                {
+                    goal.worker.childTerminated(&goal);
+                }
+
+                void noteHashMismatch() override
+                {
+                    goal.worker.hashMismatch = true;
+                }
+
+                void noteCheckMismatch() override
+                {
+                    goal.worker.checkMismatch = true;
+                }
+
+                void markContentsGood(const StorePath & path) override
+                {
+                    goal.worker.markContentsGood(path);
+                }
+
+                Path openLogFile() override {
+                    return goal.openLogFile();
+                }
+                void closeLogFile() override {
+                    goal.closeLogFile();
+                }
+                SingleDrvOutputs assertPathValidity() override {
+                    return goal.assertPathValidity();
+                }
+                void appendLogTailErrorMsg(std::string & msg) override {
+                    goal.appendLogTailErrorMsg(msg);
+                }
+            };
+
+            /* If we have to wait and retry (see below), then `builder` will
+               already be created, so we don't need to create it again. */
+            builder = makeDerivationBuilder(
+                worker.store,
+                std::make_unique<DerivationGoalCallbacks>(*this, builder),
+                DerivationBuilderParams {
+                    drvPath,
+                    buildMode,
+                    buildResult,
+                    *drv,
+                    parsedDrv.get(),
+                    *drvOptions,
+                    inputPaths,
+                    initialOutputs,
+                });
+        }
+
+        if (!builder->prepareBuild()) {
+            if (!actLock)
+                actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
+                    fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
+            co_await waitForAWhile();
+            continue;
+        }
+
+        break;
+    }
+
+    actLock.reset();
+
+    try {
+
+        /* Okay, we have to build. */
+        builder->startBuilder();
+
+    } catch (BuildError & e) {
+        outputLocks.unlock();
+        builder->buildUser.reset();
+        worker.permanentFailure = true;
+        co_return done(BuildResult::InputRejected, {}, std::move(e));
+    }
+
+    started();
+    co_await Suspend{};
+
+    trace("build done");
+
+    auto res = builder->unprepareBuild();
+    // N.B. cannot use `std::visit` with co-routine return
+    if (auto * ste = std::get_if<0>(&res)) {
+        outputLocks.unlock();
+        co_return done(std::move(ste->first), {}, std::move(ste->second));
+    } else if (auto * builtOutputs = std::get_if<1>(&res)) {
+        /* It is now safe to delete the lock files, since all future
+           lockers will see that the output paths are valid; they will
+           not create new lock files with the same names as the old
+           (unlinked) lock files. */
+        outputLocks.setDeletion(true);
+        outputLocks.unlock();
+        co_return done(BuildResult::Built, std::move(*builtOutputs));
+    } else {
+        unreachable();
+    }
+#endif
 }
 
 
@@ -1207,7 +1365,10 @@ bool DerivationGoal::isReadDesc(Descriptor fd)
 #ifdef _WIN32 // TODO enable build hook on Windows
     return false;
 #else
-    return fd == hook->builderOut.readSide.get();
+    return
+        (hook && fd == hook->builderOut.readSide.get())
+        ||
+        (builder && fd == builder->builderOut.get());
 #endif
 }
 
