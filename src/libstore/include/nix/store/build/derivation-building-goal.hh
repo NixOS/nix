@@ -31,42 +31,10 @@ void runPostBuildHook(
 /**
  * A goal for building some or all of the outputs of a derivation.
  */
-struct DerivationGoal : public Goal
+struct DerivationBuildingGoal : public Goal
 {
     /** The path of the derivation. */
     StorePath drvPath;
-
-    /**
-     * The specific outputs that we need to build.
-     */
-    OutputsSpec wantedOutputs;
-
-    /**
-     * See `needRestart`; just for that field.
-     */
-    enum struct NeedRestartForMoreOutputs {
-        /**
-         * The goal state machine is progressing based on the current value of
-         * `wantedOutputs. No actions are needed.
-         */
-        OutputsUnmodifedDontNeed,
-        /**
-         * `wantedOutputs` has been extended, but the state machine is
-         * proceeding according to its old value, so we need to restart.
-         */
-        OutputsAddedDoNeed,
-        /**
-         * The goal state machine has progressed to the point of doing a build,
-         * in which case all outputs will be produced, so extensions to
-         * `wantedOutputs` no longer require a restart.
-         */
-        BuildInProgressWillNotNeed,
-    };
-
-    /**
-     * Whether additional wanted outputs have been added.
-     */
-    NeedRestartForMoreOutputs needRestart = NeedRestartForMoreOutputs::OutputsUnmodifedDontNeed;
 
     /**
      * The derivation stored at drvPath.
@@ -125,7 +93,7 @@ struct DerivationGoal : public Goal
 
     BuildMode buildMode;
 
-    std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds, mcRunningBuilds;
+    std::unique_ptr<MaintainCount<uint64_t>> mcRunningBuilds;
 
     std::unique_ptr<Activity> act;
 
@@ -141,28 +109,18 @@ struct DerivationGoal : public Goal
      */
     std::string machineName;
 
-    DerivationGoal(const StorePath & drvPath,
-        const OutputsSpec & wantedOutputs, Worker & worker,
+    DerivationBuildingGoal(const StorePath & drvPath, const Derivation & drv,
+        Worker & worker,
         BuildMode buildMode = bmNormal);
-    DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-        const OutputsSpec & wantedOutputs, Worker & worker,
-        BuildMode buildMode = bmNormal);
-    ~DerivationGoal();
+    ~DerivationBuildingGoal();
 
     void timedOut(Error && ex) override;
 
     std::string key() override;
 
     /**
-     * Add wanted outputs to an already existing derivation goal.
-     */
-    void addWantedOutputs(const OutputsSpec & outputs);
-
-    /**
      * The states.
      */
-    Co loadDerivation();
-    Co haveDerivation();
     Co gaveUpOnSubstitution();
     Co tryToBuild();
     Co hookDone();
@@ -197,7 +155,6 @@ struct DerivationGoal : public Goal
      * there also is no DB entry.
      */
     std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap();
-    OutputPathMap queryDerivationOutputMap();
 
     /**
      * Update 'initialOutputs' to determine the current status of the
@@ -217,8 +174,6 @@ struct DerivationGoal : public Goal
      * Forcibly kill the child process, if any.
      */
     void killChild();
-
-    Co repairClosure();
 
     void started();
 

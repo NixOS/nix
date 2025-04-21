@@ -14,6 +14,7 @@ namespace nix {
 
 /* Forward definition. */
 struct DerivationGoal;
+struct DerivationBuildingGoal;
 struct PathSubstitutionGoal;
 class DrvOutputSubstitutionGoal;
 
@@ -104,6 +105,7 @@ private:
      * same derivation / path.
      */
     std::map<StorePath, std::weak_ptr<DerivationGoal>> derivationGoals;
+    std::map<StorePath, std::weak_ptr<DerivationBuildingGoal>> derivationBuildingGoals;
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
 
@@ -209,6 +211,13 @@ public:
     std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(
         const StorePath & drvPath, const BasicDerivation & drv,
         const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
+
+    /**
+     * @ref DerivationBuildingGoal "derivation goal"
+     */
+    std::shared_ptr<DerivationBuildingGoal> makeDerivationBuildingGoal(
+        const StorePath & drvPath, const Derivation & drv,
+        BuildMode buildMode = bmNormal);
 
     /**
      * @ref PathSubstitutionGoal "substitution goal"
