@@ -247,8 +247,11 @@ requires Perl and the `HTML::TokeParser::Simple`, `LWP` and
 
 ```perl
 #! /usr/bin/env nix-shell
-#! nix-shell -i perl --packages perl perlPackages.HTMLTokeParserSimple perlPackages.LWP
-#! nix-shell -i perl --packages perl perlPackages.HTMLTokeParserSimple perlPackages.LWP perlPackages.LWPProtocolHttps
+#! nix-shell -i perl 
+#! nix-shell --packages perl 
+#! nix-shell --packages perlPackages.HTMLTokeParserSimple 
+#! nix-shell --packages perlPackages.LWP
+#! nix-shell --packages perlPackages.LWPProtocolHttps
 
 use HTML::TokeParser::Simple;
 
