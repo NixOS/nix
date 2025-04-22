@@ -316,7 +316,7 @@ contains:
 ```nix
 with import <nixpkgs> {};
 
-runCommand "dummy" { buildInputs = [ python pythonPackages.prettytable ]; } ""
+runCommand "dummy" { buildInputs = [ python3 python3Packages.prettytable ]; } ""
 ```
 
 The script's file name is passed as the first argument to the interpreter specified by the `-i` flag.
