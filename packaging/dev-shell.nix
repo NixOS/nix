@@ -5,11 +5,11 @@
 
 { pkgs }:
 
-pkgs.nixComponents.nix-util.overrideAttrs (
+pkgs.nixComponents2.nix-util.overrideAttrs (
   attrs:
 
   let
-    stdenv = pkgs.nixDependencies.stdenv;
+    stdenv = pkgs.nixDependencies2.stdenv;
     buildCanExecuteHost = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
     modular = devFlake.getSystem stdenv.buildPlatform.system;
     transformFlag =
@@ -79,26 +79,26 @@ pkgs.nixComponents.nix-util.overrideAttrs (
     };
 
     mesonFlags =
-      map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents.nix-util.mesonFlags)
-      ++ map (transformFlag "libstore") (ignoreCrossFile pkgs.nixComponents.nix-store.mesonFlags)
-      ++ map (transformFlag "libfetchers") (ignoreCrossFile pkgs.nixComponents.nix-fetchers.mesonFlags)
+      map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents2.nix-util.mesonFlags)
+      ++ map (transformFlag "libstore") (ignoreCrossFile pkgs.nixComponents2.nix-store.mesonFlags)
+      ++ map (transformFlag "libfetchers") (ignoreCrossFile pkgs.nixComponents2.nix-fetchers.mesonFlags)
       ++ lib.optionals havePerl (
-        map (transformFlag "perl") (ignoreCrossFile pkgs.nixComponents.nix-perl-bindings.mesonFlags)
+        map (transformFlag "perl") (ignoreCrossFile pkgs.nixComponents2.nix-perl-bindings.mesonFlags)
       )
-      ++ map (transformFlag "libexpr") (ignoreCrossFile pkgs.nixComponents.nix-expr.mesonFlags)
-      ++ map (transformFlag "libcmd") (ignoreCrossFile pkgs.nixComponents.nix-cmd.mesonFlags);
+      ++ map (transformFlag "libexpr") (ignoreCrossFile pkgs.nixComponents2.nix-expr.mesonFlags)
+      ++ map (transformFlag "libcmd") (ignoreCrossFile pkgs.nixComponents2.nix-cmd.mesonFlags);
 
     nativeBuildInputs =
       attrs.nativeBuildInputs or [ ]
-      ++ pkgs.nixComponents.nix-util.nativeBuildInputs
-      ++ pkgs.nixComponents.nix-store.nativeBuildInputs
-      ++ pkgs.nixComponents.nix-fetchers.nativeBuildInputs
-      ++ pkgs.nixComponents.nix-expr.nativeBuildInputs
-      ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.nativeBuildInputs
-      ++ lib.optionals buildCanExecuteHost pkgs.nixComponents.nix-manual.externalNativeBuildInputs
-      ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
-      ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
-      ++ pkgs.nixComponents.nix-functional-tests.externalNativeBuildInputs
+      ++ pkgs.nixComponents2.nix-util.nativeBuildInputs
+      ++ pkgs.nixComponents2.nix-store.nativeBuildInputs
+      ++ pkgs.nixComponents2.nix-fetchers.nativeBuildInputs
+      ++ pkgs.nixComponents2.nix-expr.nativeBuildInputs
+      ++ lib.optionals havePerl pkgs.nixComponents2.nix-perl-bindings.nativeBuildInputs
+      ++ lib.optionals buildCanExecuteHost pkgs.nixComponents2.nix-manual.externalNativeBuildInputs
+      ++ pkgs.nixComponents2.nix-internal-api-docs.nativeBuildInputs
+      ++ pkgs.nixComponents2.nix-external-api-docs.nativeBuildInputs
+      ++ pkgs.nixComponents2.nix-functional-tests.externalNativeBuildInputs
       ++ lib.optional (
         !buildCanExecuteHost
         # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
@@ -123,14 +123,14 @@ pkgs.nixComponents.nix-util.overrideAttrs (
 
     buildInputs =
       attrs.buildInputs or [ ]
-      ++ pkgs.nixComponents.nix-util.buildInputs
-      ++ pkgs.nixComponents.nix-store.buildInputs
-      ++ pkgs.nixComponents.nix-store-tests.externalBuildInputs
-      ++ pkgs.nixComponents.nix-fetchers.buildInputs
-      ++ pkgs.nixComponents.nix-expr.buildInputs
-      ++ pkgs.nixComponents.nix-expr.externalPropagatedBuildInputs
-      ++ pkgs.nixComponents.nix-cmd.buildInputs
-      ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.externalBuildInputs
+      ++ pkgs.nixComponents2.nix-util.buildInputs
+      ++ pkgs.nixComponents2.nix-store.buildInputs
+      ++ pkgs.nixComponents2.nix-store-tests.externalBuildInputs
+      ++ pkgs.nixComponents2.nix-fetchers.buildInputs
+      ++ pkgs.nixComponents2.nix-expr.buildInputs
+      ++ pkgs.nixComponents2.nix-expr.externalPropagatedBuildInputs
+      ++ pkgs.nixComponents2.nix-cmd.buildInputs
+      ++ lib.optionals havePerl pkgs.nixComponents2.nix-perl-bindings.externalBuildInputs
       ++ lib.optional havePerl pkgs.perl;
   }
 )
