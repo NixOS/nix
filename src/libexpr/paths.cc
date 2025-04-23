@@ -67,4 +67,27 @@ std::string EvalState::computeBaseName(const SourcePath & path)
     return std::string(path.baseName());
 }
 
+StorePath EvalState::mountInput(
+    fetchers::Input & input, const fetchers::Input & originalInput, ref<SourceAccessor> accessor, bool requireLockable)
+{
+    auto storePath = StorePath::random(input.getName());
+
+    allowPath(storePath); // FIXME: should just whitelist the entire virtual store
+
+    storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
+
+    if (requireLockable && !input.isLocked() && !input.getNarHash()) {
+        auto narHash = accessor->hashPath(CanonPath::root);
+        input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
+    }
+
+    // FIXME: check NAR hash
+
+#if 0
+    assert(!originalInput.getNarHash() || storePath == originalInput.computeStorePath(*store));
+#endif
+
+    return storePath;
+}
+
 }

@@ -115,18 +115,11 @@ struct Flake
     }
 };
 
-enum struct CopyMode {
-    //! Ensure that the input is locked or has a NAR hash.
-    RequireLockable,
-    //! Just return a lazy source accessor.
-    Lazy,
-};
-
 Flake getFlake(
     EvalState & state,
     const FlakeRef & flakeRef,
     bool useRegistries,
-    CopyMode copyMode = CopyMode::RequireLockable);
+    bool requireLockable = true);
 
 /**
  * Fingerprint of a locked flake; used as a cache key.
@@ -228,7 +221,7 @@ struct LockFlags
     /**
      * Whether to require a locked input.
      */
-    CopyMode copyMode = CopyMode::RequireLockable;
+    bool requireLockable = true;
 };
 
 LockedFlake lockFlake(

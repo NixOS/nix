@@ -134,7 +134,7 @@ public:
         lockFlags.recreateLockFile = updateAll;
         lockFlags.writeLockFile = true;
         lockFlags.applyNixConfig = true;
-        lockFlags.copyMode = CopyMode::Lazy;
+        lockFlags.requireLockable = false;
 
         lockFlake();
     }
@@ -167,7 +167,7 @@ struct CmdFlakeLock : FlakeCommand
         lockFlags.writeLockFile = true;
         lockFlags.failOnUnlocked = true;
         lockFlags.applyNixConfig = true;
-        lockFlags.copyMode = CopyMode::Lazy;
+        lockFlags.requireLockable = false;
 
         lockFlake();
     }
@@ -214,7 +214,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
 
     void run(nix::ref<nix::Store> store) override
     {
-        lockFlags.copyMode = CopyMode::Lazy;
+        lockFlags.requireLockable = false;
         auto lockedFlake = lockFlake();
         auto & flake = lockedFlake.flake;
 

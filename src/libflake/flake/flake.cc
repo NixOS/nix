@@ -26,33 +26,6 @@ using namespace fetchers;
 
 namespace flake {
 
-static StorePath mountInput(
-    EvalState & state,
-    fetchers::Input & input,
-    const fetchers::Input & originalInput,
-    ref<SourceAccessor> accessor,
-    CopyMode copyMode)
-{
-    auto storePath = StorePath::random(input.getName());
-
-    state.allowPath(storePath); // FIXME: should just whitelist the entire virtual store
-
-    state.storeFS->mount(CanonPath(state.store->printStorePath(storePath)), accessor);
-
-    if (copyMode == CopyMode::RequireLockable && !input.isLocked() && !input.getNarHash()) {
-        auto narHash = accessor->hashPath(CanonPath::root);
-        input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
-    }
-
-    // FIXME: check NAR hash
-
-    #if 0
-    assert(!originalInput.getNarHash() || storePath == originalInput.computeStorePath(*state.store));
-    #endif
-
-    return storePath;
-}
-
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
 {
     if (value.isThunk() && value.isTrivial())
@@ -350,7 +323,7 @@ static Flake getFlake(
     const FlakeRef & originalRef,
     bool useRegistries,
     const InputAttrPath & lockRootAttrPath,
-    CopyMode copyMode)
+    bool requireLockable)
 {
     // Fetch a lazy tree first.
     auto cachedInput = state.inputCache->getAccessor(state.store, originalRef.input, useRegistries);
@@ -376,13 +349,13 @@ static Flake getFlake(
     // Re-parse flake.nix from the store.
     return readFlake(
         state, originalRef, resolvedRef, lockedRef,
-        state.storePath(mountInput(state, lockedRef.input, originalRef.input, cachedInput.accessor, copyMode)),
+        state.storePath(state.mountInput(lockedRef.input, originalRef.input, cachedInput.accessor, requireLockable)),
         lockRootAttrPath);
 }
 
-Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries, CopyMode copyMode)
+Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries, bool requireLockable)
 {
-    return getFlake(state, originalRef, useRegistries, {}, copyMode);
+    return getFlake(state, originalRef, useRegistries, {}, requireLockable);
 }
 
 static LockFile readLockFile(
@@ -404,7 +377,7 @@ LockedFlake lockFlake(
 {
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
 
-    auto flake = getFlake(state, topRef, useRegistries, {}, lockFlags.copyMode);
+    auto flake = getFlake(state, topRef, useRegistries, {}, lockFlags.requireLockable);
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
@@ -448,13 +421,6 @@ LockedFlake lockFlake(
                 });
             explicitCliOverrides.insert(i.first);
         }
-
-        /* For locking of inputs, we require at least a NAR
-           hash. I.e. we can't be fully lazy. */
-        auto inputCopyMode =
-            lockFlags.copyMode == CopyMode::Lazy
-            ? CopyMode::RequireLockable
-            : lockFlags.copyMode;
 
         LockFile newLockFile;
 
@@ -586,7 +552,7 @@ LockedFlake lockFlake(
                         if (auto resolvedPath = resolveRelativePath()) {
                             return readFlake(state, ref, ref, ref, *resolvedPath, inputAttrPath);
                         } else {
-                            return getFlake(state, ref, useRegistries, inputAttrPath, inputCopyMode);
+                            return getFlake(state, ref, useRegistries, inputAttrPath, true);
                         }
                     };
 
@@ -739,7 +705,7 @@ LockedFlake lockFlake(
                                     auto lockedRef = FlakeRef(std::move(cachedInput.lockedInput), input.ref->subdir);
 
                                     return {
-                                        state.storePath(mountInput(state, lockedRef.input, input.ref->input, cachedInput.accessor, inputCopyMode)),
+                                        state.storePath(state.mountInput(lockedRef.input, input.ref->input, cachedInput.accessor, true)),
                                         lockedRef
                                     };
                                 }
@@ -851,7 +817,7 @@ LockedFlake lockFlake(
                            repo, so we should re-read it. FIXME: we could
                            also just clear the 'rev' field... */
                         auto prevLockedRef = flake.lockedRef;
-                        flake = getFlake(state, topRef, useRegistries, lockFlags.copyMode);
+                        flake = getFlake(state, topRef, useRegistries, lockFlags.requireLockable);
 
                         if (lockFlags.commitLockFile &&
                             flake.lockedRef.input.getRev() &&

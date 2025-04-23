@@ -36,6 +36,7 @@ class Store;
 namespace fetchers {
 struct Settings;
 struct InputCache;
+struct Input;
 }
 struct EvalSettings;
 class EvalState;
@@ -449,6 +450,15 @@ public:
     void allowAndSetStorePathString(const StorePath & storePath, Value & v);
 
     void checkURI(const std::string & uri);
+
+    /**
+     * Mount an input on the Nix store.
+     */
+    StorePath mountInput(
+        fetchers::Input & input,
+        const fetchers::Input & originalInput,
+        ref<SourceAccessor> accessor,
+        bool requireLockable);
 
     /**
      * Parse a Nix expression from the specified file.

@@ -204,11 +204,7 @@ static void fetchTree(
 
     auto cachedInput = state.inputCache->getAccessor(state.store, input, false);
 
-    auto storePath = StorePath::random(input.getName());
-
-    state.allowPath(storePath);
-
-    state.storeFS->mount(CanonPath(state.store->printStorePath(storePath)), cachedInput.accessor);
+    auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor, true);
 
     emitTreeAttrs(state, storePath, cachedInput.lockedInput, v, params.emptyRevFallback, false);
 }
