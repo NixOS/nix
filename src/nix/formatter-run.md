@@ -2,7 +2,7 @@ R""(
 
 # Description
 
-`nix fmt` calls the formatter specified in the flake.
+`nix fmt` (an alias for `nix formatter run`) calls the formatter specified in the flake.
 
 Flags can be forwarded to the formatter by using `--` followed by the flags.
 
