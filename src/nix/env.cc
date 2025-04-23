@@ -38,16 +38,17 @@ struct CmdShell : InstallablesCommand, MixEnvironment
 
     CmdShell()
     {
-        addFlag(
-            {.longName = "command",
-             .shortName = 'c',
-             .description = "Command and arguments to be executed, defaulting to `$SHELL`",
-             .labels = {"command", "args"},
-             .handler = {[&](std::vector<std::string> ss) {
-                 if (ss.empty())
-                     throw UsageError("--command requires at least one argument");
-                 command = ss;
-             }}});
+        addFlag({
+            .longName = "command",
+            .shortName = 'c',
+            .description = "Command and arguments to be executed, defaulting to `$SHELL`",
+            .labels = {"command", "args"},
+            .handler = {[&](std::vector<std::string> ss) {
+                if (ss.empty())
+                    throw UsageError("--command requires at least one argument");
+                command = ss;
+            }},
+        });
     }
 
     std::string description() override

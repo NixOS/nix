@@ -136,7 +136,10 @@ jobs:
           production-branch: detsys-main
           github-token: ${{ secrets.GITHUB_TOKEN }}
           deploy-message: "Deploy from GitHub Actions"
-          enable-pull-request-comment: true
+          # NOTE(cole-h): We have a perpetual PR displaying our changes against upstream open, but
+          # its conversation is locked, so this PR comment can never be posted.
+          # https://github.com/DeterminateSystems/nix-src/pull/4
+          enable-pull-request-comment: ${{ github.event.pull_request.number != 4 }}
           enable-commit-comment: true
           enable-commit-status: true
           overwrites-pull-request-comment: true
