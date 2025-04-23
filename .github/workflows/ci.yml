@@ -89,7 +89,7 @@ jobs:
                 | ".#hydraJobs.tests." + .')
 
   flake_regressions:
-    if: github.event_name == 'merge_group'
+    #if: github.event_name == 'merge_group'
     needs: build_x86_64-linux
     runs-on: blacksmith-32vcpu-ubuntu-2204
     steps:
@@ -109,7 +109,7 @@ jobs:
         with:
           determinate: true
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=50 flake-regressions/eval-all.sh
+      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH flake-regressions/eval-all.sh
 
   manual:
     if: github.event_name != 'merge_group'
