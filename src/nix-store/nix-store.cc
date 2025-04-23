@@ -497,7 +497,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     /* Print each environment variable in the derivation in a format
      * that can be sourced by the shell. */
     for (auto & i : drv.env)
-        logger->cout("export %1%; %1%=%2%\n", i.first, shellEscape(i.second));
+        logger->cout("export %1%; %1%=%2%\n", i.first, escapeShellArgAlways(i.second));
 
     /* Also output the arguments.  This doesn't preserve whitespace in
        arguments. */
@@ -506,7 +506,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     for (auto & i : drv.args) {
         if (!first) cout << ' ';
         first = false;
-        cout << shellEscape(i);
+        cout << escapeShellArgAlways(i);
     }
     cout << "'\n";
 }

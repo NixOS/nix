@@ -152,8 +152,13 @@ std::string toLower(std::string s);
 
 /**
  * Escape a string as a shell word.
+ *
+ * This always adds single quotes, even if escaping is not strictly necessary.
+ * So both
+ * - `"hello world"` -> `"'hello world'"`, which needs escaping because of the space
+ * - `"echo"` -> `"'echo'"`, which doesn't need escaping
  */
-std::string shellEscape(const std::string_view s);
+std::string escapeShellArgAlways(const std::string_view s);
 
 
 /**
