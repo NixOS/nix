@@ -255,16 +255,16 @@ static void main_nix_build(int argc, char * * argv)
 
             std::ostringstream joined;
             for (const auto & i : savedArgs)
-                joined << shellEscape(i) << ' ';
+                joined << escapeShellArgAlways(i) << ' ';
 
             if (std::regex_search(interpreter, std::regex("ruby"))) {
                 // Hack for Ruby. Ruby also examines the shebang. It tries to
                 // read the shebang to understand which packages to read from. Since
                 // this is handled via nix-shell -p, we wrap our ruby script execution
                 // in ruby -e 'load' which ignores the shebangs.
-                envCommand = fmt("exec %1% %2% -e 'load(ARGV.shift)' -- %3% %4%", execArgs, interpreter, shellEscape(script), toView(joined));
+                envCommand = fmt("exec %1% %2% -e 'load(ARGV.shift)' -- %3% %4%", execArgs, interpreter, escapeShellArgAlways(script), toView(joined));
             } else {
-                envCommand = fmt("exec %1% %2% %3% %4%", execArgs, interpreter, shellEscape(script), toView(joined));
+                envCommand = fmt("exec %1% %2% %3% %4%", execArgs, interpreter, escapeShellArgAlways(script), toView(joined));
             }
         }
 
@@ -637,12 +637,12 @@ static void main_nix_build(int argc, char * * argv)
                 "unset TZ; %6%"
                 "shopt -s execfail;"
                 "%7%",
-                shellEscape(tmpDir.path().string()),
+                escapeShellArgAlways(tmpDir.path().string()),
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
-                shellEscape(dirOf(*shell)),
-                shellEscape(*shell),
-                (getenv("TZ") ? (std::string("export TZ=") + shellEscape(getenv("TZ")) + "; ") : ""),
+                escapeShellArgAlways(dirOf(*shell)),
+                escapeShellArgAlways(*shell),
+                (getenv("TZ") ? (std::string("export TZ=") + escapeShellArgAlways(getenv("TZ")) + "; ") : ""),
                 envCommand);
         vomit("Sourcing nix-shell with file %s and contents:\n%s", rcfile, rc);
         writeFile(rcfile, rc);

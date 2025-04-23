@@ -112,7 +112,7 @@ std::string StructuredAttrs::writeShell(const nlohmann::json & json)
 
     auto handleSimpleType = [](const nlohmann::json & value) -> std::optional<std::string> {
         if (value.is_string())
-            return shellEscape(value.get<std::string_view>());
+            return escapeShellArgAlways(value.get<std::string_view>());
 
         if (value.is_number()) {
             auto f = value.get<float>();
@@ -160,7 +160,7 @@ std::string StructuredAttrs::writeShell(const nlohmann::json & json)
             for (auto & [key2, value2] : value.items()) {
                 auto s3 = handleSimpleType(value2);
                 if (!s3) { good = false; break; }
-                s2 += fmt("[%s]=%s ", shellEscape(key2), *s3);
+                s2 += fmt("[%s]=%s ", escapeShellArgAlways(key2), *s3);
             }
 
             if (good)
