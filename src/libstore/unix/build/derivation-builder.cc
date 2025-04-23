@@ -1127,7 +1127,7 @@ void DerivationBuilderImpl::startBuilder()
     if (needsHashRewrite() && pathExists(homeDir))
         throw Error("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing", homeDir);
 
-    if (useChroot && settings.preBuildHook != "" && dynamic_cast<const Derivation *>(&drv)) {
+    if (useChroot && settings.preBuildHook != "") {
         printMsg(lvlChatty, "executing pre-build hook '%1%'", settings.preBuildHook);
         auto args = useChroot ? Strings({store.printStorePath(drvPath), chrootRootDir}) :
             Strings({ store.printStorePath(drvPath) });
