@@ -57,7 +57,7 @@ size_t savedStackSize = 0;
 void setStackSize(size_t stackSize)
 {
     struct rlimit limit;
-    if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
+    if (getrlimit(RLIMIT_STACK, &limit) == 0 && static_cast<size_t>(limit.rlim_cur) < stackSize) {
         savedStackSize = limit.rlim_cur;
         limit.rlim_cur = std::min(static_cast<rlim_t>(stackSize), limit.rlim_max);
         if (setrlimit(RLIMIT_STACK, &limit) != 0) {
