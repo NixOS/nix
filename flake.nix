@@ -131,31 +131,107 @@
         }
       );
 
-      overlayFor =
-        getStdenv: final: prev:
+      /**
+        Produce the `nixComponents` and `nixDependencies` package sets (scopes) for
+        a given `pkgs` and `getStdenv`.
+      */
+      packageSetsFor =
         let
-          stdenv = getStdenv final;
+          /**
+            Removes a prefix from the attribute names of a set of splices.
+            This is a completely uninteresting and exists for compatibility only.
+
+            Example:
+            ```nix
+            renameSplicesFrom "pkgs" { pkgsBuildBuild = ...; ... }
+            => { buildBuild = ...; ... }
+            ```
+          */
+          renameSplicesFrom = prefix: x: {
+            buildBuild = x."${prefix}BuildBuild";
+            buildHost = x."${prefix}BuildHost";
+            buildTarget = x."${prefix}BuildTarget";
+            hostHost = x."${prefix}HostHost";
+            hostTarget = x."${prefix}HostTarget";
+            targetTarget = x."${prefix}TargetTarget";
+          };
+
+          /**
+            Adds a prefix to the attribute names of a set of splices.
+            This is a completely uninteresting and exists for compatibility only.
+
+            Example:
+            ```nix
+            renameSplicesTo "self" { buildBuild = ...; ... }
+            => { selfBuildBuild = ...; ... }
+            ```
+          */
+          renameSplicesTo = prefix: x: {
+            "${prefix}BuildBuild" = x.buildBuild;
+            "${prefix}BuildHost" = x.buildHost;
+            "${prefix}BuildTarget" = x.buildTarget;
+            "${prefix}HostHost" = x.hostHost;
+            "${prefix}HostTarget" = x.hostTarget;
+            "${prefix}TargetTarget" = x.targetTarget;
+          };
+
+          /**
+            Takes a function `f` and returns a function that applies `f` pointwise to each splice.
+
+            Example:
+            ```nix
+            mapSplices (x: x * 10) { buildBuild = 1; buildHost = 2; ... }
+            => { buildBuild = 10; buildHost = 20; ... }
+            ```
+          */
+          mapSplices =
+            f:
+            {
+              buildBuild,
+              buildHost,
+              buildTarget,
+              hostHost,
+              hostTarget,
+              targetTarget,
+            }:
+            {
+              buildBuild = f buildBuild;
+              buildHost = f buildHost;
+              buildTarget = f buildTarget;
+              hostHost = f hostHost;
+              hostTarget = f hostTarget;
+              targetTarget = f targetTarget;
+            };
+
         in
-        {
-          nixStable = prev.nix;
+        args@{
+          pkgs,
+          getStdenv ? pkgs: pkgs.stdenv,
+        }:
+        let
+          nixComponentsSplices = mapSplices (
+            pkgs': (packageSetsFor (args // { pkgs = pkgs'; })).nixComponents
+          ) (renameSplicesFrom "pkgs" pkgs);
+          nixDependenciesSplices = mapSplices (
+            pkgs': (packageSetsFor (args // { pkgs = pkgs'; })).nixDependencies
+          ) (renameSplicesFrom "pkgs" pkgs);
 
           # A new scope, so that we can use `callPackage` to inject our own interdependencies
           # without "polluting" the top level "`pkgs`" attrset.
           # This also has the benefit of providing us with a distinct set of packages
           # we can iterate over.
-          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
-          nixComponents2 =
+          nixComponents =
             lib.makeScopeWithSplicing'
               {
-                inherit (final) splicePackages;
-                inherit (final.nixDependencies2) newScope;
+                inherit (pkgs) splicePackages;
+                inherit (nixDependencies) newScope;
               }
               {
-                otherSplices = final.generateSplicesForMkScope "nixComponents2";
+                otherSplices = renameSplicesTo "self" nixComponentsSplices;
                 f = import ./packaging/components.nix {
-                  inherit (final) lib;
+                  inherit (pkgs) lib;
                   inherit officialRelease;
-                  pkgs = final;
+                  inherit pkgs;
                   src = self;
                   maintainers = [ ];
                 };
@@ -163,20 +239,50 @@
 
           # The dependencies are in their own scope, so that they don't have to be
           # in Nixpkgs top level `pkgs` or `nixComponents2`.
-          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
-          nixDependencies2 =
+          nixDependencies =
             lib.makeScopeWithSplicing'
               {
-                inherit (final) splicePackages;
-                inherit (final) newScope; # layered directly on pkgs, unlike nixComponents2 above
+                inherit (pkgs) splicePackages;
+                inherit (pkgs) newScope; # layered directly on pkgs, unlike nixComponents2 above
               }
               {
-                otherSplices = final.generateSplicesForMkScope "nixDependencies2";
+                otherSplices = renameSplicesTo "self" nixDependenciesSplices;
                 f = import ./packaging/dependencies.nix {
-                  inherit inputs stdenv;
-                  pkgs = final;
+                  inherit inputs pkgs;
+                  stdenv = getStdenv pkgs;
                 };
               };
+
+          # If the package set is largely empty, we should(?) return empty sets
+          # This is what most package sets in Nixpkgs do. Otherwise, we get
+          # an error message that indicates that some stdenv attribute is missing,
+          # and indeed it will be missing, as seemingly `pkgsTargetTarget` is
+          # very incomplete.
+          fixup = lib.mapAttrs (k: v: if !(pkgs ? nix) then { } else v);
+        in
+        fixup {
+          inherit nixDependencies;
+          inherit nixComponents;
+        };
+
+      overlayFor =
+        getStdenv: final: prev:
+        let
+          packageSets = packageSetsFor {
+            inherit getStdenv;
+            pkgs = final;
+          };
+        in
+        {
+          nixStable = prev.nix;
+
+          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
+          nixComponents2 = packageSets.nixComponents;
+
+          # The dependencies are in their own scope, so that they don't have to be
+          # in Nixpkgs top level `pkgs` or `nixComponents2`.
+          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
+          nixDependencies2 = packageSets.nixDependencies;
 
           nix = final.nixComponents2.nix-cli;
         };
@@ -465,5 +571,53 @@
             default = self.devShells.${system}.native;
           }
         );
+
+      lib = {
+        /**
+          Creates a package set for a given Nixpkgs instance and stdenv.
+
+          # Inputs
+
+          - `pkgs`: The Nixpkgs instance to use.
+
+          - `getStdenv`: _Optional_ A function that takes a package set and returns the stdenv to use.
+            This needs to be a function in order to support cross compilation - the `pkgs` passed to `getStdenv` can be `pkgsBuildHost` or any other variation needed.
+
+          # Outputs
+
+          The return value is a fresh Nixpkgs scope containing all the packages that are defined in the Nix repository,
+          as well as some internals and parameters, which may be subject to change.
+
+          # Example
+
+          ```console
+          nix repl> :lf NixOS/nix
+          nix-repl> ps = lib.makeComponents { pkgs = import inputs.nixpkgs { crossSystem = "riscv64-linux"; }; }
+          nix-repl> ps
+          {
+            appendPatches = «lambda appendPatches @ ...»;
+            callPackage = «lambda callPackageWith @ ...»;
+            overrideAllMesonComponents = «lambda overrideSource @ ...»;
+            overrideSource = «lambda overrideSource @ ...»;
+            # ...
+            nix-everything
+            # ...
+            nix-store
+            nix-store-c
+            # ...
+          }
+          ```
+        */
+        makeComponents =
+          {
+            pkgs,
+            getStdenv ? pkgs: pkgs.stdenv,
+          }:
+
+          let
+            packageSets = packageSetsFor { inherit getStdenv pkgs; };
+          in
+          packageSets.nixComponents;
+      };
     };
 }
