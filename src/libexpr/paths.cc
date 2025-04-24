@@ -61,7 +61,7 @@ std::string EvalState::computeBaseName(const SourcePath & path)
                 "This can typically be avoided by rewriting an attribute like `src = ./.` "
                 "to `src = builtins.path { path = ./.; name = \"source\"; }`.",
                 path);
-            return std::string(fetchToStore(*store, path, FetchMode::DryRun).to_string());
+            return std::string(fetchToStore(*store, path, FetchMode::DryRun, storePath->name()).to_string());
         }
     }
     return std::string(path.baseName());
