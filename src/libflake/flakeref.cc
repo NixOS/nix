@@ -39,7 +39,7 @@ FlakeRef FlakeRef::resolve(
     ref<Store> store,
     const fetchers::RegistryFilter & filter) const
 {
-    auto [input2, extraAttrs] = lookupInRegistries(store, input, filter);
+    auto [input2, extraAttrs] = lookupInRegistries(store, input);
     return FlakeRef(std::move(input2), fetchers::maybeGetStrAttr(extraAttrs, "dir").value_or(subdir));
 }
 
