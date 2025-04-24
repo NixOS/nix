@@ -1,5 +1,6 @@
 #include "nix/util/config-global.hh"
 #include "nix/expr/eval.hh"
+#include "nix/fetchers/fetch-settings.hh"
 #include "nix/cmd/installable-flake.hh"
 #include "nix/cmd/command-installable-value.hh"
 #include "nix/main/common-args.hh"
@@ -581,6 +582,11 @@ struct CmdDevelop : Common, MixEnvironment
         return
           #include "develop.md"
           ;
+    }
+
+    void preRun(ref<Store> store) override
+    {
+        fetchSettings.warnDirty = false;
     }
 
     void run(ref<Store> store, ref<Installable> installable) override

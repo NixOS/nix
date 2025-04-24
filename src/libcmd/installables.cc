@@ -903,8 +903,13 @@ InstallableCommand::InstallableCommand()
     });
 }
 
+void InstallableCommand::preRun(ref<Store> store)
+{
+}
+
 void InstallableCommand::run(ref<Store> store)
 {
+    preRun(store);
     auto installable = parseInstallable(store, _installable);
     run(store, std::move(installable));
 }
