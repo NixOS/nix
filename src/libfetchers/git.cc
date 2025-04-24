@@ -393,10 +393,10 @@ struct GitInputScheme : InputScheme
         {
             if (workdirInfo.isDirty) {
                 if (!settings.allowDirty)
-                    throw Error("Git tree '%s' is dirty", locationToArg());
+                    throw Error("Git tree '%s' has uncommitted changes", locationToArg());
 
                 if (settings.warnDirty)
-                    warn("Git tree '%s' is dirty", locationToArg());
+                    warn("Git tree '%s' has uncommitted changes", locationToArg());
             }
         }
 
