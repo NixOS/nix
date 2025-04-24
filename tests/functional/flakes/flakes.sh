@@ -220,6 +220,13 @@ nix store gc
 nix registry list --flake-registry "file://$registry" --refresh | grepQuiet flake3
 mv "$registry.tmp" "$registry"
 
+# Ensure that locking ignores the user registry.
+mkdir -p "$TEST_HOME/.config/nix"
+ln -sfn "$registry" "$TEST_HOME/.config/nix/registry.json"
+nix flake metadata --flake-registry '' flake1
+expectStderr 1 nix flake update --flake-registry '' --flake "$flake3Dir" | grepQuiet "cannot find flake 'flake:flake1' in the flake registries"
+rm "$TEST_HOME/.config/nix/registry.json"
+
 # Test whether flakes are registered as GC roots for offline use.
 # FIXME: use tarballs rather than git.
 rm -rf "$TEST_HOME/.cache"

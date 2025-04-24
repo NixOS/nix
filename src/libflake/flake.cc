@@ -45,7 +45,7 @@ static std::optional<FetchedFlake> lookupInFlakeCache(
 static std::tuple<ref<SourceAccessor>, FlakeRef, FlakeRef> fetchOrSubstituteTree(
     EvalState & state,
     const FlakeRef & originalRef,
-    bool useRegistries,
+    fetchers::UseRegistries useRegistries,
     FlakeCache & flakeCache)
 {
     auto fetched = lookupInFlakeCache(flakeCache, originalRef);
@@ -56,14 +56,8 @@ static std::tuple<ref<SourceAccessor>, FlakeRef, FlakeRef> fetchOrSubstituteTree
             auto [accessor, lockedRef] = originalRef.lazyFetch(state.store);
             fetched.emplace(FetchedFlake{.lockedRef = lockedRef, .accessor = accessor});
         } else {
-            if (useRegistries) {
-                resolvedRef = originalRef.resolve(
-                    state.store,
-                    [](fetchers::Registry::RegistryType type) {
-                        /* Only use the global registry and CLI flags
-                           to resolve indirect flakerefs. */
-                        return type == fetchers::Registry::Flag || type == fetchers::Registry::Global;
-                    });
+            if (useRegistries != fetchers::UseRegistries::No) {
+                resolvedRef = originalRef.resolve(state.store, useRegistries);
                 fetched = lookupInFlakeCache(flakeCache, originalRef);
                 if (!fetched) {
                     auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
@@ -396,7 +390,7 @@ static FlakeRef applySelfAttrs(
 static Flake getFlake(
     EvalState & state,
     const FlakeRef & originalRef,
-    bool useRegistries,
+    fetchers::UseRegistries useRegistries,
     FlakeCache & flakeCache,
     const InputAttrPath & lockRootAttrPath)
 {
@@ -415,7 +409,7 @@ static Flake getFlake(
         // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
         newLockedRef.input.attrs.erase("narHash");
         auto [accessor2, resolvedRef2, lockedRef2] = fetchOrSubstituteTree(
-            state, newLockedRef, false, flakeCache);
+            state, newLockedRef, fetchers::UseRegistries::No, flakeCache);
         accessor = accessor2;
         lockedRef = lockedRef2;
     }
@@ -427,7 +421,7 @@ static Flake getFlake(
     return readFlake(state, originalRef, resolvedRef, lockedRef, state.storePath(storePath), lockRootAttrPath);
 }
 
-Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
+Flake getFlake(EvalState & state, const FlakeRef & originalRef, fetchers::UseRegistries useRegistries)
 {
     FlakeCache flakeCache;
     return getFlake(state, originalRef, useRegistries, flakeCache, {});
@@ -455,8 +449,15 @@ LockedFlake lockFlake(
     FlakeCache flakeCache;
 
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
+    auto useRegistriesTop = useRegistries ? fetchers::UseRegistries::All : fetchers::UseRegistries::No;
+    auto useRegistriesInputs = useRegistries ? fetchers::UseRegistries::Limited : fetchers::UseRegistries::No;
 
-    auto flake = getFlake(state, topRef, useRegistries, flakeCache, {});
+    auto flake = getFlake(
+        state,
+        topRef,
+        useRegistriesTop,
+        flakeCache,
+        {});
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
@@ -631,7 +632,12 @@ LockedFlake lockFlake(
                         if (auto resolvedPath = resolveRelativePath()) {
                             return readFlake(state, ref, ref, ref, *resolvedPath, inputAttrPath);
                         } else {
-                            return getFlake(state, ref, useRegistries, flakeCache, inputAttrPath);
+                            return getFlake(
+                                state,
+                                ref,
+                                useRegistriesInputs,
+                                flakeCache,
+                                inputAttrPath);
                         }
                     };
 
@@ -780,7 +786,7 @@ LockedFlake lockFlake(
                                     return {*resolvedPath, *input.ref};
                                 } else {
                                     auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-                                        state, *input.ref, useRegistries, flakeCache);
+                                        state, *input.ref, useRegistriesInputs, flakeCache);
 
                                     // FIXME: allow input to be lazy.
                                     auto storePath = copyInputToStore(state, lockedRef.input, input.ref->input, accessor);
@@ -895,7 +901,10 @@ LockedFlake lockFlake(
                            repo, so we should re-read it. FIXME: we could
                            also just clear the 'rev' field... */
                         auto prevLockedRef = flake.lockedRef;
-                        flake = getFlake(state, topRef, useRegistries);
+                        flake = getFlake(
+                            state,
+                            topRef,
+                            useRegistriesTop);
 
                         if (lockFlags.commitLockFile &&
                             flake.lockedRef.input.getRev() &&
