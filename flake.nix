@@ -289,9 +289,21 @@
 
     in
     {
-      # A Nixpkgs overlay that overrides the 'nix' and
-      # 'nix-perl-bindings' packages.
-      overlays.default = overlayFor (p: p.stdenv);
+      overlays.internal = overlayFor (p: p.stdenv);
+
+      /**
+        A Nixpkgs overlay that sets `nix` to something like `packages.<system>.nix-everything`,
+        except dependencies aren't taken from (flake) `nix.inputs.nixpkgs`, but from the Nixpkgs packages
+        where the overlay is used.
+      */
+      overlays.default =
+        final: prev:
+        let
+          packageSets = packageSetsFor { pkgs = final; };
+        in
+        {
+          nix = packageSets.nixComponents.nix-everything;
+        };
 
       hydraJobs = import ./packaging/hydra.nix {
         inherit
