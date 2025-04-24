@@ -11,8 +11,10 @@ struct InstallableDerivedPath : Installable
     DerivedPath derivedPath;
 
     InstallableDerivedPath(ref<Store> store, DerivedPath && derivedPath)
-        : store(store), derivedPath(std::move(derivedPath))
-    { }
+        : store(store)
+        , derivedPath(std::move(derivedPath))
+    {
+    }
 
     std::string what() const override;
 
@@ -20,10 +22,8 @@ struct InstallableDerivedPath : Installable
 
     std::optional<StorePath> getStorePath() override;
 
-    static InstallableDerivedPath parse(
-        ref<Store> store,
-        std::string_view prefix,
-        ExtendedOutputsSpec extendedOutputsSpec);
+    static InstallableDerivedPath
+    parse(ref<Store> store, std::string_view prefix, ExtendedOutputsSpec extendedOutputsSpec);
 };
 
 }

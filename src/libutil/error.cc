@@ -15,13 +15,14 @@ namespace nix {
 
 void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint, TracePrint print)
 {
-    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .print = print });
+    err.traces.push_front(Trace{.pos = std::move(e), .hint = hint, .print = print});
 }
 
 void throwExceptionSelfCheck()
 {
     // This is meant to be caught in initLibUtil()
-    throw Error("C++ exception handling is broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.");
+    throw Error(
+        "C++ exception handling is broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.");
 }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
@@ -40,7 +41,7 @@ const std::string & BaseError::calcWhat() const
 
 std::optional<std::string> ErrorInfo::programName = std::nullopt;
 
-std::ostream & operator <<(std::ostream & os, const HintFmt & hf)
+std::ostream & operator<<(std::ostream & os, const HintFmt & hf)
 {
     return os << hf.str();
 }
@@ -48,7 +49,7 @@ std::ostream & operator <<(std::ostream & os, const HintFmt & hf)
 /**
  * An arbitrarily defined value comparison for the purpose of using traces in the key of a sorted container.
  */
-inline std::strong_ordering operator<=>(const Trace& lhs, const Trace& rhs)
+inline std::strong_ordering operator<=>(const Trace & lhs, const Trace & rhs)
 {
     // `std::shared_ptr` does not have value semantics for its comparison
     // functions, so we need to check for nulls and compare the dereferenced
@@ -66,27 +67,16 @@ inline std::strong_ordering operator<=>(const Trace& lhs, const Trace& rhs)
 }
 
 // print lines of code to the ostream, indicating the error column.
-void printCodeLines(std::ostream & out,
-    const std::string & prefix,
-    const Pos & errPos,
-    const LinesOfCode & loc)
+void printCodeLines(std::ostream & out, const std::string & prefix, const Pos & errPos, const LinesOfCode & loc)
 {
     // previous line of code.
     if (loc.prevLineOfCode.has_value()) {
-        out << std::endl
-            << fmt("%1% %|2$5d|| %3%",
-            prefix,
-            (errPos.line - 1),
-            *loc.prevLineOfCode);
+        out << std::endl << fmt("%1% %|2$5d|| %3%", prefix, (errPos.line - 1), *loc.prevLineOfCode);
     }
 
     if (loc.errLineOfCode.has_value()) {
         // line of code containing the error.
-        out << std::endl
-            << fmt("%1% %|2$5d|| %3%",
-            prefix,
-            (errPos.line),
-            *loc.errLineOfCode);
+        out << std::endl << fmt("%1% %|2$5d|| %3%", prefix, (errPos.line), *loc.errLineOfCode);
         // error arrows for the column range.
         if (errPos.column > 0) {
             int start = errPos.column;
@@ -97,21 +87,13 @@ void printCodeLines(std::ostream & out,
 
             std::string arrows("^");
 
-            out << std::endl
-                << fmt("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL,
-                prefix,
-                spaces,
-                arrows);
+            out << std::endl << fmt("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL, prefix, spaces, arrows);
         }
     }
 
     // next line of code.
     if (loc.nextLineOfCode.has_value()) {
-        out << std::endl
-            << fmt("%1% %|2$5d|| %3%",
-            prefix,
-            (errPos.line + 1),
-            *loc.nextLineOfCode);
+        out << std::endl << fmt("%1% %|2$5d|| %3%", prefix, (errPos.line + 1), *loc.nextLineOfCode);
     }
 }
 
@@ -122,10 +104,12 @@ static std::string indent(std::string_view indentFirst, std::string_view indentR
 
     while (!s.empty()) {
         auto end = s.find('\n');
-        if (!first) res += "\n";
+        if (!first)
+            res += "\n";
         res += chomp(std::string(first ? indentFirst : indentRest) + std::string(s.substr(0, end)));
         first = false;
-        if (end == s.npos) break;
+        if (end == s.npos)
+            break;
         s = s.substr(end + 1);
     }
 
@@ -146,7 +130,8 @@ static bool printUnknownLocations = getEnv("_NIX_EVAL_SHOW_UNKNOWN_LOCATIONS").h
  *
  * @return true if a position was printed.
  */
-static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std::shared_ptr<Pos> & pos) {
+static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std::shared_ptr<Pos> & pos)
+{
     bool hasPos = pos && *pos;
     if (hasPos) {
         oss << indent << ANSI_BLUE << "at " ANSI_WARNING << *pos << ANSI_NORMAL << ":";
@@ -161,11 +146,7 @@ static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std
     return hasPos;
 }
 
-static void printTrace(
-    std::ostream & output,
-    const std::string_view & indent,
-    size_t & count,
-    const Trace & trace)
+static void printTrace(std::ostream & output, const std::string_view & indent, size_t & count, const Trace & trace)
 {
     output << "\n" << "… " << trace.hint.str() << "\n";
 
@@ -188,7 +169,8 @@ void printSkippedTracesMaybe(
                 printTrace(output, indent, count, trace);
             }
         } else {
-            output << "\n" << ANSI_WARNING "(" << skippedTraces.size() << " duplicate frames omitted)" ANSI_NORMAL << "\n";
+            output << "\n"
+                   << ANSI_WARNING "(" << skippedTraces.size() << " duplicate frames omitted)" ANSI_NORMAL << "\n";
             // Clear the set of "seen" traces after printing a chunk of
             // `duplicate frames omitted`.
             //
@@ -228,43 +210,43 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 {
     std::string prefix;
     switch (einfo.level) {
-        case Verbosity::lvlError: {
-            prefix = ANSI_RED "error";
-            break;
-        }
-        case Verbosity::lvlNotice: {
-            prefix = ANSI_RED "note";
-            break;
-        }
-        case Verbosity::lvlWarn: {
-            if (einfo.isFromExpr)
-                prefix = ANSI_WARNING "evaluation warning";
-            else
-                prefix = ANSI_WARNING "warning";
-            break;
-        }
-        case Verbosity::lvlInfo: {
-            prefix = ANSI_GREEN "info";
-            break;
-        }
-        case Verbosity::lvlTalkative: {
-            prefix = ANSI_GREEN "talk";
-            break;
-        }
-        case Verbosity::lvlChatty: {
-            prefix = ANSI_GREEN "chat";
-            break;
-        }
-        case Verbosity::lvlVomit: {
-            prefix = ANSI_GREEN "vomit";
-            break;
-        }
-        case Verbosity::lvlDebug: {
-            prefix = ANSI_WARNING "debug";
-            break;
-        }
-        default:
-            assert(false);
+    case Verbosity::lvlError: {
+        prefix = ANSI_RED "error";
+        break;
+    }
+    case Verbosity::lvlNotice: {
+        prefix = ANSI_RED "note";
+        break;
+    }
+    case Verbosity::lvlWarn: {
+        if (einfo.isFromExpr)
+            prefix = ANSI_WARNING "evaluation warning";
+        else
+            prefix = ANSI_WARNING "warning";
+        break;
+    }
+    case Verbosity::lvlInfo: {
+        prefix = ANSI_GREEN "info";
+        break;
+    }
+    case Verbosity::lvlTalkative: {
+        prefix = ANSI_GREEN "talk";
+        break;
+    }
+    case Verbosity::lvlChatty: {
+        prefix = ANSI_GREEN "chat";
+        break;
+    }
+    case Verbosity::lvlVomit: {
+        prefix = ANSI_GREEN "vomit";
+        break;
+    }
+    case Verbosity::lvlDebug: {
+        prefix = ANSI_WARNING "debug";
+        break;
+    }
+    default:
+        assert(false);
     }
 
     // FIXME: show the program name as part of the trace?
@@ -383,7 +365,8 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         bool truncate = false;
 
         for (const auto & trace : einfo.traces) {
-            if (trace.hint.str().empty()) continue;
+            if (trace.hint.str().empty())
+                continue;
 
             if (!showTrace && count > 3) {
                 truncate = true;
@@ -406,11 +389,13 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             }
         }
 
-
         printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
 
         if (truncate) {
-            oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full, detailed trace)" ANSI_NORMAL << "\n";
+            oss << "\n"
+                << ANSI_WARNING
+                "(stack trace truncated; use '--show-trace' to show the full, detailed trace)" ANSI_NORMAL
+                << "\n";
         }
 
         oss << "\n" << prefix;
@@ -422,9 +407,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     auto suggestions = einfo.suggestions.trim();
     if (!suggestions.suggestions.empty()) {
-        oss << "Did you mean " <<
-            suggestions.trim() <<
-            "?" << std::endl;
+        oss << "Did you mean " << suggestions.trim() << "?" << std::endl;
     }
 
     out << indent(prefix, std::string(filterANSIEscapes(prefix, true).size(), ' '), chomp(oss.str()));
@@ -440,7 +423,8 @@ static void writeErr(std::string_view buf)
     while (!buf.empty()) {
         auto n = write(STDERR_FILENO, buf.data(), buf.size());
         if (n < 0) {
-            if (errno == EINTR) continue;
+            if (errno == EINTR)
+                continue;
             abort();
         }
         buf = buf.substr(n);
@@ -449,7 +433,7 @@ static void writeErr(std::string_view buf)
 
 void panic(std::string_view msg)
 {
-    writeErr("\n\n" ANSI_RED "terminating due to unexpected unrecoverable internal error: " ANSI_NORMAL );
+    writeErr("\n\n" ANSI_RED "terminating due to unexpected unrecoverable internal error: " ANSI_NORMAL);
     writeErr(msg);
     writeErr("\n");
     abort();

@@ -38,7 +38,10 @@ class DownstreamPlaceholder
     /**
      * Newtype constructor
      */
-    DownstreamPlaceholder(Hash hash) : hash(hash) { }
+    DownstreamPlaceholder(Hash hash)
+        : hash(hash)
+    {
+    }
 
 public:
     /**

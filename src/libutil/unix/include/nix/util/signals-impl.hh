@@ -47,7 +47,7 @@ void _interrupted();
  * necessarily match the current thread's mask.
  * See saveSignalMask() to set the saved mask to the current mask.
  */
-void setChildSignalMask(sigset_t *sigs);
+void setChildSignalMask(sigset_t * sigs);
 
 /**
  * Start a thread that handles various signals. Also block those signals
@@ -116,8 +116,8 @@ struct ReceiveInterrupts
     ReceiveInterrupts()
         : target(pthread_self())
         , callback(createInterruptCallback([&]() { pthread_kill(target, SIGUSR1); }))
-    { }
+    {
+    }
 };
-
 
 }

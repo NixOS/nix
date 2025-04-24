@@ -9,22 +9,26 @@ namespace rc {
 using namespace nix;
 
 template<>
-struct Arbitrary<NixStringContextElem::Opaque> {
+struct Arbitrary<NixStringContextElem::Opaque>
+{
     static Gen<NixStringContextElem::Opaque> arbitrary();
 };
 
 template<>
-struct Arbitrary<NixStringContextElem::Built> {
+struct Arbitrary<NixStringContextElem::Built>
+{
     static Gen<NixStringContextElem::Built> arbitrary();
 };
 
 template<>
-struct Arbitrary<NixStringContextElem::DrvDeep> {
+struct Arbitrary<NixStringContextElem::DrvDeep>
+{
     static Gen<NixStringContextElem::DrvDeep> arbitrary();
 };
 
 template<>
-struct Arbitrary<NixStringContextElem> {
+struct Arbitrary<NixStringContextElem>
+{
     static Gen<NixStringContextElem> arbitrary();
 };
 

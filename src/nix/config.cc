@@ -10,22 +10,28 @@ using namespace nix;
 
 struct CmdConfig : NixMultiCommand
 {
-    CmdConfig() : NixMultiCommand("config", RegisterCommand::getCommandsFor({"config"}))
-    { }
+    CmdConfig()
+        : NixMultiCommand("config", RegisterCommand::getCommandsFor({"config"}))
+    {
+    }
 
     std::string description() override
     {
         return "manipulate the Nix configuration";
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 };
 
 struct CmdConfigShow : Command, MixJSON
 {
     std::optional<std::string> name;
 
-    CmdConfigShow() {
+    CmdConfigShow()
+    {
         expectArgs({
             .label = {"name"},
             .optional = true,
@@ -38,7 +44,10 @@ struct CmdConfigShow : Command, MixJSON
         return "show the Nix configuration or the value of a specific setting";
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 
     void run() override
     {

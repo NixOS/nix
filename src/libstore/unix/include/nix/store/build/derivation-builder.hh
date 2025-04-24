@@ -75,7 +75,8 @@ struct DerivationBuilderParams
         , inputPaths{inputPaths}
         , initialOutputs{initialOutputs}
         , buildMode{buildMode}
-    { }
+    {
+    }
 
     DerivationBuilderParams(DerivationBuilderParams &&) = default;
 };
@@ -202,8 +203,6 @@ struct DerivationBuilder : RestrictionContext
 };
 
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
-    Store & store,
-    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
-    DerivationBuilderParams params);
+    Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
 
 }

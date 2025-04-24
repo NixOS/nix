@@ -106,14 +106,11 @@ TEST_F(ValuePrintingTests, vApp)
 
 TEST_F(ValuePrintingTests, vLambda)
 {
-    Env env {
-        .up = nullptr,
-        .values = { }
-    };
+    Env env{.up = nullptr, .values = {}};
     PosTable::Origin origin = state.positions.addOrigin(std::monostate(), 1);
     auto posIdx = state.positions.add(origin, 0);
     auto body = ExprInt(0);
-    auto formals = Formals {};
+    auto formals = Formals{};
 
     ExprLambda eLambda(posIdx, createSymbol("a"), &formals, &body);
 
@@ -130,9 +127,7 @@ TEST_F(ValuePrintingTests, vLambda)
 TEST_F(ValuePrintingTests, vPrimOp)
 {
     Value vPrimOp;
-    PrimOp primOp{
-        .name = "puppy"
-    };
+    PrimOp primOp{.name = "puppy"};
     vPrimOp.mkPrimOp(&primOp);
 
     test(vPrimOp, "«primop puppy»");
@@ -140,9 +135,7 @@ TEST_F(ValuePrintingTests, vPrimOp)
 
 TEST_F(ValuePrintingTests, vPrimOpApp)
 {
-    PrimOp primOp{
-        .name = "puppy"
-    };
+    PrimOp primOp{.name = "puppy"};
     Value vPrimOp;
     vPrimOp.mkPrimOp(&primOp);
 
@@ -220,10 +213,13 @@ TEST_F(ValuePrintingTests, depthAttrs)
     Value vNested;
     vNested.mkAttrs(builder2.finish());
 
-    test(vNested, "{ nested = { ... }; one = 1; two = 2; }", PrintOptions { .maxDepth = 1 });
-    test(vNested, "{ nested = { nested = { ... }; one = 1; two = 2; }; one = 1; two = 2; }", PrintOptions { .maxDepth = 2 });
-    test(vNested, "{ nested = { nested = { }; one = 1; two = 2; }; one = 1; two = 2; }", PrintOptions { .maxDepth = 3 });
-    test(vNested, "{ nested = { nested = { }; one = 1; two = 2; }; one = 1; two = 2; }", PrintOptions { .maxDepth = 4 });
+    test(vNested, "{ nested = { ... }; one = 1; two = 2; }", PrintOptions{.maxDepth = 1});
+    test(
+        vNested,
+        "{ nested = { nested = { ... }; one = 1; two = 2; }; one = 1; two = 2; }",
+        PrintOptions{.maxDepth = 2});
+    test(vNested, "{ nested = { nested = { }; one = 1; two = 2; }; one = 1; two = 2; }", PrintOptions{.maxDepth = 3});
+    test(vNested, "{ nested = { nested = { }; one = 1; two = 2; }; one = 1; two = 2; }", PrintOptions{.maxDepth = 4});
 }
 
 TEST_F(ValuePrintingTests, depthList)
@@ -256,11 +252,11 @@ TEST_F(ValuePrintingTests, depthList)
     Value vList;
     vList.mkList(list);
 
-    test(vList, "[ 1 2 { ... } ]", PrintOptions { .maxDepth = 1 });
-    test(vList, "[ 1 2 { nested = { ... }; one = 1; two = 2; } ]", PrintOptions { .maxDepth = 2 });
-    test(vList, "[ 1 2 { nested = { one = 1; two = 2; }; one = 1; two = 2; } ]", PrintOptions { .maxDepth = 3 });
-    test(vList, "[ 1 2 { nested = { one = 1; two = 2; }; one = 1; two = 2; } ]", PrintOptions { .maxDepth = 4 });
-    test(vList, "[ 1 2 { nested = { one = 1; two = 2; }; one = 1; two = 2; } ]", PrintOptions { .maxDepth = 5 });
+    test(vList, "[ 1 2 { ... } ]", PrintOptions{.maxDepth = 1});
+    test(vList, "[ 1 2 { nested = { ... }; one = 1; two = 2; } ]", PrintOptions{.maxDepth = 2});
+    test(vList, "[ 1 2 { nested = { one = 1; two = 2; }; one = 1; two = 2; } ]", PrintOptions{.maxDepth = 3});
+    test(vList, "[ 1 2 { nested = { one = 1; two = 2; }; one = 1; two = 2; } ]", PrintOptions{.maxDepth = 4});
+    test(vList, "[ 1 2 { nested = { one = 1; two = 2; }; one = 1; two = 2; } ]", PrintOptions{.maxDepth = 5});
 }
 
 struct StringPrintingTests : LibExprTest
@@ -272,9 +268,7 @@ struct StringPrintingTests : LibExprTest
         v.mkString(literal);
 
         std::stringstream out;
-        printValue(state, out, v, PrintOptions {
-            .maxStringLength = maxLength
-        });
+        printValue(state, out, v, PrintOptions{.maxStringLength = maxLength});
         ASSERT_EQ(out.str(), expected);
     }
 };
@@ -305,15 +299,9 @@ TEST_F(ValuePrintingTests, attrsTypeFirst)
     Value vAttrs;
     vAttrs.mkAttrs(builder.finish());
 
-    test(vAttrs,
-         "{ type = \"puppy\"; apple = \"apple\"; }",
-         PrintOptions {
-            .maxAttrs = 100
-         });
+    test(vAttrs, "{ type = \"puppy\"; apple = \"apple\"; }", PrintOptions{.maxAttrs = 100});
 
-    test(vAttrs,
-         "{ apple = \"apple\"; type = \"puppy\"; }",
-         PrintOptions { });
+    test(vAttrs, "{ apple = \"apple\"; type = \"puppy\"; }", PrintOptions{});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsInt)
@@ -321,11 +309,7 @@ TEST_F(ValuePrintingTests, ansiColorsInt)
     Value v;
     v.mkInt(10);
 
-    test(v,
-         ANSI_CYAN "10" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true
-         });
+    test(v, ANSI_CYAN "10" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsFloat)
@@ -333,11 +317,7 @@ TEST_F(ValuePrintingTests, ansiColorsFloat)
     Value v;
     v.mkFloat(1.6);
 
-    test(v,
-         ANSI_CYAN "1.6" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true
-         });
+    test(v, ANSI_CYAN "1.6" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsBool)
@@ -345,11 +325,7 @@ TEST_F(ValuePrintingTests, ansiColorsBool)
     Value v;
     v.mkBool(true);
 
-    test(v,
-         ANSI_CYAN "true" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true
-         });
+    test(v, ANSI_CYAN "true" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsString)
@@ -357,11 +333,7 @@ TEST_F(ValuePrintingTests, ansiColorsString)
     Value v;
     v.mkString("puppy");
 
-    test(v,
-         ANSI_MAGENTA "\"puppy\"" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true
-        });
+    test(v, ANSI_MAGENTA "\"puppy\"" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsStringElided)
@@ -369,12 +341,10 @@ TEST_F(ValuePrintingTests, ansiColorsStringElided)
     Value v;
     v.mkString("puppy");
 
-    test(v,
-         ANSI_MAGENTA "\"pup\" " ANSI_FAINT "«2 bytes elided»" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true,
-             .maxStringLength = 3
-         });
+    test(
+        v,
+        ANSI_MAGENTA "\"pup\" " ANSI_FAINT "«2 bytes elided»" ANSI_NORMAL,
+        PrintOptions{.ansiColors = true, .maxStringLength = 3});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsPath)
@@ -382,11 +352,7 @@ TEST_F(ValuePrintingTests, ansiColorsPath)
     Value v;
     v.mkPath(state.rootPath(CanonPath("puppy")));
 
-    test(v,
-         ANSI_GREEN "/puppy" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true
-         });
+    test(v, ANSI_GREEN "/puppy" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsNull)
@@ -394,11 +360,7 @@ TEST_F(ValuePrintingTests, ansiColorsNull)
     Value v;
     v.mkNull();
 
-    test(v,
-         ANSI_CYAN "null" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true
-         });
+    test(v, ANSI_CYAN "null" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsAttrs)
@@ -416,11 +378,10 @@ TEST_F(ValuePrintingTests, ansiColorsAttrs)
     Value vAttrs;
     vAttrs.mkAttrs(builder.finish());
 
-    test(vAttrs,
-         "{ one = " ANSI_CYAN "1" ANSI_NORMAL "; two = " ANSI_CYAN "2" ANSI_NORMAL "; }",
-         PrintOptions {
-             .ansiColors = true
-         });
+    test(
+        vAttrs,
+        "{ one = " ANSI_CYAN "1" ANSI_NORMAL "; two = " ANSI_CYAN "2" ANSI_NORMAL "; }",
+        PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsDerivation)
@@ -434,20 +395,15 @@ TEST_F(ValuePrintingTests, ansiColorsDerivation)
     Value vAttrs;
     vAttrs.mkAttrs(builder.finish());
 
-    test(vAttrs,
-         ANSI_GREEN "«derivation»" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true,
-             .force = true,
-             .derivationPaths = true
-         });
+    test(
+        vAttrs,
+        ANSI_GREEN "«derivation»" ANSI_NORMAL,
+        PrintOptions{.ansiColors = true, .force = true, .derivationPaths = true});
 
-    test(vAttrs,
-         "{ type = " ANSI_MAGENTA "\"derivation\"" ANSI_NORMAL "; }",
-         PrintOptions {
-             .ansiColors = true,
-             .force = true
-         });
+    test(
+        vAttrs,
+        "{ type = " ANSI_MAGENTA "\"derivation\"" ANSI_NORMAL "; }",
+        PrintOptions{.ansiColors = true, .force = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsError)
@@ -458,14 +414,13 @@ TEST_F(ValuePrintingTests, ansiColorsError)
     Value vError;
     vError.mkApp(&throw_, &message);
 
-    test(vError,
-         ANSI_RED
-         "«error: uh oh!»"
-         ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true,
-             .force = true,
-         });
+    test(
+        vError,
+        ANSI_RED "«error: uh oh!»" ANSI_NORMAL,
+        PrintOptions{
+            .ansiColors = true,
+            .force = true,
+        });
 }
 
 TEST_F(ValuePrintingTests, ansiColorsDerivationError)
@@ -486,30 +441,20 @@ TEST_F(ValuePrintingTests, ansiColorsDerivationError)
     Value vAttrs;
     vAttrs.mkAttrs(builder.finish());
 
-    test(vAttrs,
-         "{ drvPath = "
-         ANSI_RED
-         "«error: uh oh!»"
-         ANSI_NORMAL
-         "; type = "
-         ANSI_MAGENTA
-         "\"derivation\""
-         ANSI_NORMAL
-         "; }",
-         PrintOptions {
-             .ansiColors = true,
-             .force = true
-         });
+    test(
+        vAttrs,
+        "{ drvPath = " ANSI_RED "«error: uh oh!»" ANSI_NORMAL "; type = " ANSI_MAGENTA "\"derivation\"" ANSI_NORMAL
+        "; }",
+        PrintOptions{.ansiColors = true, .force = true});
 
-    test(vAttrs,
-         ANSI_RED
-         "«error: uh oh!»"
-         ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true,
-             .force = true,
-             .derivationPaths = true,
-         });
+    test(
+        vAttrs,
+        ANSI_RED "«error: uh oh!»" ANSI_NORMAL,
+        PrintOptions{
+            .ansiColors = true,
+            .force = true,
+            .derivationPaths = true,
+        });
 }
 
 TEST_F(ValuePrintingTests, ansiColorsAssert)
@@ -523,12 +468,7 @@ TEST_F(ValuePrintingTests, ansiColorsAssert)
     Value v;
     state.mkThunk_(v, &expr);
 
-    test(v,
-         ANSI_RED "«error: assertion 'false' failed»" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true,
-             .force = true
-         });
+    test(v, ANSI_RED "«error: assertion 'false' failed»" ANSI_NORMAL, PrintOptions{.ansiColors = true, .force = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsList)
@@ -545,77 +485,51 @@ TEST_F(ValuePrintingTests, ansiColorsList)
     Value vList;
     vList.mkList(list);
 
-    test(vList,
-         "[ " ANSI_CYAN "1" ANSI_NORMAL " " ANSI_CYAN "2" ANSI_NORMAL " " ANSI_MAGENTA "«nullptr»" ANSI_NORMAL " ]",
-         PrintOptions {
-             .ansiColors = true
-         });
+    test(
+        vList,
+        "[ " ANSI_CYAN "1" ANSI_NORMAL " " ANSI_CYAN "2" ANSI_NORMAL " " ANSI_MAGENTA "«nullptr»" ANSI_NORMAL " ]",
+        PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsLambda)
 {
-    Env env {
-        .up = nullptr,
-        .values = { }
-    };
+    Env env{.up = nullptr, .values = {}};
     PosTable::Origin origin = state.positions.addOrigin(std::monostate(), 1);
     auto posIdx = state.positions.add(origin, 0);
     auto body = ExprInt(0);
-    auto formals = Formals {};
+    auto formals = Formals{};
 
     ExprLambda eLambda(posIdx, createSymbol("a"), &formals, &body);
 
     Value vLambda;
     vLambda.mkLambda(&env, &eLambda);
 
-    test(vLambda,
-         ANSI_BLUE "«lambda @ «none»:1:1»" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true,
-             .force = true
-         });
+    test(vLambda, ANSI_BLUE "«lambda @ «none»:1:1»" ANSI_NORMAL, PrintOptions{.ansiColors = true, .force = true});
 
     eLambda.setName(createSymbol("puppy"));
 
-    test(vLambda,
-         ANSI_BLUE "«lambda puppy @ «none»:1:1»" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true,
-             .force = true
-         });
+    test(vLambda, ANSI_BLUE "«lambda puppy @ «none»:1:1»" ANSI_NORMAL, PrintOptions{.ansiColors = true, .force = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsPrimOp)
 {
-    PrimOp primOp{
-        .name = "puppy"
-    };
+    PrimOp primOp{.name = "puppy"};
     Value v;
     v.mkPrimOp(&primOp);
 
-    test(v,
-         ANSI_BLUE "«primop puppy»" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true
-         });
+    test(v, ANSI_BLUE "«primop puppy»" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsPrimOpApp)
 {
-    PrimOp primOp{
-        .name = "puppy"
-    };
+    PrimOp primOp{.name = "puppy"};
     Value vPrimOp;
     vPrimOp.mkPrimOp(&primOp);
 
     Value v;
     v.mkPrimOpApp(&vPrimOp, nullptr);
 
-    test(v,
-         ANSI_BLUE "«partially applied primop puppy»" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true
-         });
+    test(v, ANSI_BLUE "«partially applied primop puppy»" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsThunk)
@@ -623,11 +537,7 @@ TEST_F(ValuePrintingTests, ansiColorsThunk)
     Value v;
     v.mkThunk(nullptr, nullptr);
 
-    test(v,
-         ANSI_MAGENTA "«thunk»" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true
-         });
+    test(v, ANSI_MAGENTA "«thunk»" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsBlackhole)
@@ -635,11 +545,7 @@ TEST_F(ValuePrintingTests, ansiColorsBlackhole)
     Value v;
     v.mkBlackhole();
 
-    test(v,
-         ANSI_RED "«potential infinite recursion»" ANSI_NORMAL,
-         PrintOptions {
-             .ansiColors = true
-         });
+    test(v, ANSI_RED "«potential infinite recursion»" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsAttrsRepeated)
@@ -656,11 +562,7 @@ TEST_F(ValuePrintingTests, ansiColorsAttrsRepeated)
     Value vAttrs;
     vAttrs.mkAttrs(builder.finish());
 
-    test(vAttrs,
-         "{ a = { }; b = " ANSI_MAGENTA "«repeated»" ANSI_NORMAL "; }",
-         PrintOptions {
-             .ansiColors = true
-         });
+    test(vAttrs, "{ a = { }; b = " ANSI_MAGENTA "«repeated»" ANSI_NORMAL "; }", PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsListRepeated)
@@ -676,11 +578,7 @@ TEST_F(ValuePrintingTests, ansiColorsListRepeated)
     Value vList;
     vList.mkList(list);
 
-    test(vList,
-         "[ { } " ANSI_MAGENTA "«repeated»" ANSI_NORMAL " ]",
-         PrintOptions {
-             .ansiColors = true
-         });
+    test(vList, "[ { } " ANSI_MAGENTA "«repeated»" ANSI_NORMAL " ]", PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, listRepeated)
@@ -696,12 +594,8 @@ TEST_F(ValuePrintingTests, listRepeated)
     Value vList;
     vList.mkList(list);
 
-    test(vList, "[ { } «repeated» ]", PrintOptions { });
-    test(vList,
-         "[ { } { } ]",
-         PrintOptions {
-             .trackRepeated = false
-         });
+    test(vList, "[ { } «repeated» ]", PrintOptions{});
+    test(vList, "[ { } { } ]", PrintOptions{.trackRepeated = false});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsAttrsElided)
@@ -719,12 +613,10 @@ TEST_F(ValuePrintingTests, ansiColorsAttrsElided)
     Value vAttrs;
     vAttrs.mkAttrs(builder.finish());
 
-    test(vAttrs,
-         "{ one = " ANSI_CYAN "1" ANSI_NORMAL "; " ANSI_FAINT "«1 attribute elided»" ANSI_NORMAL " }",
-         PrintOptions {
-             .ansiColors = true,
-             .maxAttrs = 1
-         });
+    test(
+        vAttrs,
+        "{ one = " ANSI_CYAN "1" ANSI_NORMAL "; " ANSI_FAINT "«1 attribute elided»" ANSI_NORMAL " }",
+        PrintOptions{.ansiColors = true, .maxAttrs = 1});
 
     Value vThree;
     vThree.mkInt(3);
@@ -732,12 +624,10 @@ TEST_F(ValuePrintingTests, ansiColorsAttrsElided)
     builder.insert(state.symbols.create("three"), &vThree);
     vAttrs.mkAttrs(builder.finish());
 
-    test(vAttrs,
-         "{ one = " ANSI_CYAN "1" ANSI_NORMAL "; " ANSI_FAINT "«2 attributes elided»" ANSI_NORMAL " }",
-         PrintOptions {
-             .ansiColors = true,
-             .maxAttrs = 1
-         });
+    test(
+        vAttrs,
+        "{ one = " ANSI_CYAN "1" ANSI_NORMAL "; " ANSI_FAINT "«2 attributes elided»" ANSI_NORMAL " }",
+        PrintOptions{.ansiColors = true, .maxAttrs = 1});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsListElided)
@@ -751,37 +641,33 @@ TEST_F(ValuePrintingTests, ansiColorsListElided)
     vTwo.mkInt(2);
 
     {
-    auto list = state.buildList(2);
-    list.elems[0] = &vOne;
-    list.elems[1] = &vTwo;
-    Value vList;
-    vList.mkList(list);
+        auto list = state.buildList(2);
+        list.elems[0] = &vOne;
+        list.elems[1] = &vTwo;
+        Value vList;
+        vList.mkList(list);
 
-    test(vList,
-         "[ " ANSI_CYAN "1" ANSI_NORMAL " " ANSI_FAINT "«1 item elided»" ANSI_NORMAL " ]",
-         PrintOptions {
-             .ansiColors = true,
-             .maxListItems = 1
-         });
+        test(
+            vList,
+            "[ " ANSI_CYAN "1" ANSI_NORMAL " " ANSI_FAINT "«1 item elided»" ANSI_NORMAL " ]",
+            PrintOptions{.ansiColors = true, .maxListItems = 1});
     }
 
     Value vThree;
     vThree.mkInt(3);
 
     {
-    auto list = state.buildList(3);
-    list.elems[0] = &vOne;
-    list.elems[1] = &vTwo;
-    list.elems[2] = &vThree;
-    Value vList;
-    vList.mkList(list);
+        auto list = state.buildList(3);
+        list.elems[0] = &vOne;
+        list.elems[1] = &vTwo;
+        list.elems[2] = &vThree;
+        Value vList;
+        vList.mkList(list);
 
-    test(vList,
-         "[ " ANSI_CYAN "1" ANSI_NORMAL " " ANSI_FAINT "«2 items elided»" ANSI_NORMAL " ]",
-         PrintOptions {
-             .ansiColors = true,
-             .maxListItems = 1
-         });
+        test(
+            vList,
+            "[ " ANSI_CYAN "1" ANSI_NORMAL " " ANSI_FAINT "«2 items elided»" ANSI_NORMAL " ]",
+            PrintOptions{.ansiColors = true, .maxListItems = 1});
     }
 }
 

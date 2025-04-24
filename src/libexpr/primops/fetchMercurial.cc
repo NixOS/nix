@@ -8,7 +8,7 @@
 
 namespace nix {
 
-static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     std::string url;
     std::optional<Hash> rev;
@@ -23,31 +23,46 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
         for (auto & attr : *args[0]->attrs()) {
             std::string_view n(state.symbols[attr.name]);
             if (n == "url")
-                url = state.coerceToString(attr.pos, *attr.value, context,
-                        "while evaluating the `url` attribute passed to builtins.fetchMercurial",
-                        false, false).toOwned();
+                url = state
+                          .coerceToString(
+                              attr.pos,
+                              *attr.value,
+                              context,
+                              "while evaluating the `url` attribute passed to builtins.fetchMercurial",
+                              false,
+                              false)
+                          .toOwned();
             else if (n == "rev") {
                 // Ugly: unlike fetchGit, here the "rev" attribute can
                 // be both a revision or a branch/tag name.
-                auto value = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `rev` attribute passed to builtins.fetchMercurial");
+                auto value = state.forceStringNoCtx(
+                    *attr.value, attr.pos, "while evaluating the `rev` attribute passed to builtins.fetchMercurial");
                 if (std::regex_match(value.begin(), value.end(), revRegex))
                     rev = Hash::parseAny(value, HashAlgorithm::SHA1);
                 else
                     ref = value;
-            }
-            else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `name` attribute passed to builtins.fetchMercurial");
+            } else if (n == "name")
+                name = state.forceStringNoCtx(
+                    *attr.value, attr.pos, "while evaluating the `name` attribute passed to builtins.fetchMercurial");
             else
-                state.error<EvalError>("unsupported argument '%s' to 'fetchMercurial'", state.symbols[attr.name]).atPos(attr.pos).debugThrow();
+                state.error<EvalError>("unsupported argument '%s' to 'fetchMercurial'", state.symbols[attr.name])
+                    .atPos(attr.pos)
+                    .debugThrow();
         }
 
         if (url.empty())
             state.error<EvalError>("'url' argument required").atPos(pos).debugThrow();
 
     } else
-        url = state.coerceToString(pos, *args[0], context,
-                "while evaluating the first argument passed to builtins.fetchMercurial",
-                false, false).toOwned();
+        url = state
+                  .coerceToString(
+                      pos,
+                      *args[0],
+                      context,
+                      "while evaluating the first argument passed to builtins.fetchMercurial",
+                      false,
+                      false)
+                  .toOwned();
 
     // FIXME: git externals probably can be used to bypass the URI
     // whitelist. Ah well.
@@ -60,8 +75,10 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     attrs.insert_or_assign("type", "hg");
     attrs.insert_or_assign("url", url.find("://") != std::string::npos ? url : "file://" + url);
     attrs.insert_or_assign("name", std::string(name));
-    if (ref) attrs.insert_or_assign("ref", *ref);
-    if (rev) attrs.insert_or_assign("rev", rev->gitRev());
+    if (ref)
+        attrs.insert_or_assign("ref", *ref);
+    if (rev)
+        attrs.insert_or_assign("rev", rev->gitRev());
     auto input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
 
     auto [storePath, input2] = input.fetchToStore(state.store);
@@ -82,10 +99,6 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     state.allowPath(storePath);
 }
 
-static RegisterPrimOp r_fetchMercurial({
-    .name = "fetchMercurial",
-    .arity = 1,
-    .fun = prim_fetchMercurial
-});
+static RegisterPrimOp r_fetchMercurial({.name = "fetchMercurial", .arity = 1, .fun = prim_fetchMercurial});
 
 }

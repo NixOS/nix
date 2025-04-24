@@ -44,12 +44,13 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::withFrame(const Env & env, const Expr
     // NOTE: This is abusing side-effects.
     // TODO: check compatibility with nested debugger calls.
     // TODO: What side-effects??
-    error.state.debugTraces.push_front(DebugTrace{
-        .pos = expr.getPos(),
-        .expr = expr,
-        .env = env,
-        .hint = HintFmt("Fake frame for debugging purposes"),
-        .isError = true});
+    error.state.debugTraces.push_front(
+        DebugTrace{
+            .pos = expr.getPos(),
+            .expr = expr,
+            .env = env,
+            .hint = HintFmt("Fake frame for debugging purposes"),
+            .isError = true});
     return *this;
 }
 
@@ -96,7 +97,8 @@ template<class T>
 void EvalErrorBuilder<T>::panic()
 {
     logError(error.info());
-    printError("This is a bug! An unexpected condition occurred, causing the Nix evaluator to have to stop. If you could share a reproducible example or a core dump, please open an issue at https://github.com/NixOS/nix/issues");
+    printError(
+        "This is a bug! An unexpected condition occurred, causing the Nix evaluator to have to stop. If you could share a reproducible example or a core dump, please open an issue at https://github.com/NixOS/nix/issues");
     abort();
 }
 

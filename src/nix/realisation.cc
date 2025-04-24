@@ -7,15 +7,20 @@ using namespace nix;
 
 struct CmdRealisation : NixMultiCommand
 {
-    CmdRealisation() : NixMultiCommand("realisation", RegisterCommand::getCommandsFor({"realisation"}))
-    { }
+    CmdRealisation()
+        : NixMultiCommand("realisation", RegisterCommand::getCommandsFor({"realisation"}))
+    {
+    }
 
     std::string description() override
     {
         return "manipulate a Nix realisation";
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 };
 
 static auto rCmdRealisation = registerCommand<CmdRealisation>("realisation");
@@ -30,11 +35,14 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
     std::string doc() override
     {
         return
-            #include "realisation/info.md"
+#include "realisation/info.md"
             ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
     void run(ref<Store> store, BuiltPaths && paths, BuiltPaths && rootPaths) override
     {
@@ -58,13 +66,10 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
                 res.push_back(currentPath);
             }
             printJSON(res);
-        }
-        else {
+        } else {
             for (auto & path : realisations) {
                 if (auto realisation = std::get_if<Realisation>(&path.raw)) {
-                    logger->cout("%s %s",
-                        realisation->id.to_string(),
-                        store->printStorePath(realisation->outPath));
+                    logger->cout("%s %s", realisation->id.to_string(), store->printStorePath(realisation->outPath));
                 } else
                     logger->cout("%s", store->printStorePath(path.path()));
             }

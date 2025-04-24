@@ -13,12 +13,13 @@
 #include <stdint.h>
 
 #ifdef NDEBUG
-#error "Nix may not be built with assertions disabled (i.e. with -DNDEBUG)."
+#  error "Nix may not be built with assertions disabled (i.e. with -DNDEBUG)."
 #endif
 
 namespace nix {
 
-void initLibUtil() {
+void initLibUtil()
+{
     // Check that exception handling works. Exception handling has been observed
     // not to work on darwin when the linker flags aren't quite right.
     // In this case we don't want to expose the user to some unrelated uncaught
@@ -27,7 +28,8 @@ void initLibUtil() {
     // When exception handling fails, the message tends to be printed by the
     // C++ runtime, followed by an abort.
     // For example on macOS we might see an error such as
-    // libc++abi: terminating with uncaught exception of type nix::SystemError: error: C++ exception handling is broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.
+    // libc++abi: terminating with uncaught exception of type nix::SystemError: error: C++ exception handling is broken.
+    // This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.
     bool caught = false;
     try {
         throwExceptionSelfCheck();
@@ -46,14 +48,13 @@ void initLibUtil() {
 std::vector<char *> stringsToCharPtrs(const Strings & ss)
 {
     std::vector<char *> res;
-    for (auto & s : ss) res.push_back((char *) s.c_str());
+    for (auto & s : ss)
+        res.push_back((char *) s.c_str());
     res.push_back(0);
     return res;
 }
 
-
 //////////////////////////////////////////////////////////////////////
-
 
 std::string chomp(std::string_view s)
 {
@@ -61,22 +62,19 @@ std::string chomp(std::string_view s)
     return i == s.npos ? "" : std::string(s, 0, i + 1);
 }
 
-
 std::string trim(std::string_view s, std::string_view whitespace)
 {
     auto i = s.find_first_not_of(whitespace);
-    if (i == s.npos) return "";
+    if (i == s.npos)
+        return "";
     auto j = s.find_last_not_of(whitespace);
     return std::string(s, i, j == s.npos ? j : j - i + 1);
 }
 
-
-std::string replaceStrings(
-    std::string res,
-    std::string_view from,
-    std::string_view to)
+std::string replaceStrings(std::string res, std::string_view from, std::string_view to)
 {
-    if (from.empty()) return res;
+    if (from.empty())
+        return res;
     size_t pos = 0;
     while ((pos = res.find(from, pos)) != res.npos) {
         res.replace(pos, from.size(), to);
@@ -85,11 +83,11 @@ std::string replaceStrings(
     return res;
 }
 
-
 std::string rewriteStrings(std::string s, const StringMap & rewrites)
 {
     for (auto & i : rewrites) {
-        if (i.first == i.second) continue;
+        if (i.first == i.second)
+            continue;
         size_t j = 0;
         while ((j = s.find(i.first, j)) != s.npos)
             s.replace(j, i.first.size(), i.second);
@@ -110,7 +108,7 @@ std::optional<N> string2Int(const std::string_view s)
 }
 
 // Explicitly instantiated in one place for faster compilation
-template std::optional<unsigned char>  string2Int<unsigned char>(const std::string_view s);
+template std::optional<unsigned char> string2Int<unsigned char>(const std::string_view s);
 template std::optional<unsigned short> string2Int<unsigned short>(const std::string_view s);
 template std::optional<unsigned int> string2Int<unsigned int>(const std::string_view s);
 template std::optional<unsigned long> string2Int<unsigned long>(const std::string_view s);
@@ -134,12 +132,9 @@ std::optional<N> string2Float(const std::string_view s)
 template std::optional<double> string2Float<double>(const std::string_view s);
 template std::optional<float> string2Float<float>(const std::string_view s);
 
-
 std::string renderSize(uint64_t value, bool align)
 {
-    static const std::array<char, 9> prefixes{{
-        'K', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'
-    }};
+    static const std::array<char, 9> prefixes{{'K', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'}};
     size_t power = 0;
     double res = value;
     while (res > 1024 && power < prefixes.size()) {
@@ -149,19 +144,15 @@ std::string renderSize(uint64_t value, bool align)
     return fmt(align ? "%6.1f %ciB" : "%.1f %ciB", power == 0 ? res / 1024 : res, prefixes.at(power));
 }
 
-
 bool hasPrefix(std::string_view s, std::string_view prefix)
 {
     return s.compare(0, prefix.size(), prefix) == 0;
 }
 
-
 bool hasSuffix(std::string_view s, std::string_view suffix)
 {
-    return s.size() >= suffix.size()
-        && s.substr(s.size() - suffix.size()) == suffix;
+    return s.size() >= suffix.size() && s.substr(s.size() - suffix.size()) == suffix;
 }
-
 
 std::string toLower(std::string s)
 {
@@ -170,18 +161,19 @@ std::string toLower(std::string s)
     return s;
 }
 
-
 std::string escapeShellArgAlways(const std::string_view s)
 {
     std::string r;
     r.reserve(s.size() + 2);
     r += '\'';
     for (auto & i : s)
-        if (i == '\'') r += "'\\''"; else r += i;
+        if (i == '\'')
+            r += "'\\''";
+        else
+            r += i;
     r += '\'';
     return r;
 }
-
 
 void ignoreExceptionInDestructor(Verbosity lvl)
 {
@@ -193,7 +185,8 @@ void ignoreExceptionInDestructor(Verbosity lvl)
         } catch (std::exception & e) {
             printMsg(lvl, "error (ignored): %1%", e.what());
         }
-    } catch (...) { }
+    } catch (...) {
+    }
 }
 
 void ignoreExceptionExceptInterrupt(Verbosity lvl)
@@ -206,7 +199,6 @@ void ignoreExceptionExceptInterrupt(Verbosity lvl)
         printMsg(lvl, "error (ignored): %1%", e.what());
     }
 }
-
 
 constexpr char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -225,19 +217,20 @@ std::string base64Encode(std::string_view s)
         }
     }
 
-    if (nbits) res.push_back(base64Chars[data << (6 - nbits) & 0x3f]);
-    while (res.size() % 4) res.push_back('=');
+    if (nbits)
+        res.push_back(base64Chars[data << (6 - nbits) & 0x3f]);
+    while (res.size() % 4)
+        res.push_back('=');
 
     return res;
 }
-
 
 std::string base64Decode(std::string_view s)
 {
     constexpr char npos = -1;
     constexpr std::array<char, 256> base64DecodeChars = [&] {
-        std::array<char, 256>  result{};
-        for (auto& c : result)
+        std::array<char, 256> result{};
+        for (auto & c : result)
             c = npos;
         for (int i = 0; i < 64; i++)
             result[base64Chars[i]] = i;
@@ -251,8 +244,10 @@ std::string base64Decode(std::string_view s)
     unsigned int d = 0, bits = 0;
 
     for (char c : s) {
-        if (c == '=') break;
-        if (c == '\n') continue;
+        if (c == '=')
+            break;
+        if (c == '\n')
+            continue;
 
         char digit = base64DecodeChars[(unsigned char) c];
         if (digit == npos)
@@ -268,7 +263,6 @@ std::string base64Decode(std::string_view s)
 
     return res;
 }
-
 
 std::string stripIndentation(std::string_view s)
 {
@@ -297,7 +291,8 @@ std::string stripIndentation(std::string_view s)
     size_t pos = 0;
     while (pos < s.size()) {
         auto eol = s.find('\n', pos);
-        if (eol == s.npos) eol = s.size();
+        if (eol == s.npos)
+            eol = s.size();
         if (eol - pos > minIndent)
             res.append(s.substr(pos + minIndent, eol - pos - minIndent));
         res.push_back('\n');
@@ -306,7 +301,6 @@ std::string stripIndentation(std::string_view s)
 
     return res;
 }
-
 
 std::pair<std::string_view, std::string_view> getLine(std::string_view s)
 {
@@ -321,7 +315,6 @@ std::pair<std::string_view, std::string_view> getLine(std::string_view s)
         return {line, s.substr(newline + 1)};
     }
 }
-
 
 std::string showBytes(uint64_t bytes)
 {

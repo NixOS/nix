@@ -34,15 +34,14 @@ void unix::_interrupted()
     }
 }
 
-
 //////////////////////////////////////////////////////////////////////
-
 
 /* We keep track of interrupt callbacks using integer tokens, so we can iterate
    safely without having to lock the data structure while executing arbitrary
    functions.
  */
-struct InterruptCallbacks {
+struct InterruptCallbacks
+{
     typedef int64_t Token;
 
     /* We use unique tokens so that we can't accidentally delete the wrong
@@ -97,7 +96,6 @@ void unix::triggerInterrupt()
     }
 }
 
-
 static sigset_t savedSignalMask;
 static bool savedSignalMaskIsSet = false;
 
@@ -105,7 +103,8 @@ void unix::setChildSignalMask(sigset_t * sigs)
 {
     assert(sigs); // C style function, but think of sigs as a reference
 
-#if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 1) || (defined(_XOPEN_SOURCE) && _XOPEN_SOURCE) || (defined(_POSIX_SOURCE) && _POSIX_SOURCE)
+#if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 1) || (defined(_XOPEN_SOURCE) && _XOPEN_SOURCE) \
+    || (defined(_POSIX_SOURCE) && _POSIX_SOURCE)
     sigemptyset(&savedSignalMask);
     // There's no "assign" or "copy" function, so we rely on (math) idempotence
     // of the or operator: a or a = a.
@@ -120,7 +119,8 @@ void unix::setChildSignalMask(sigset_t * sigs)
     savedSignalMaskIsSet = true;
 }
 
-void unix::saveSignalMask() {
+void unix::saveSignalMask()
+{
     if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
         throw SysError("querying signal mask");
 
@@ -166,7 +166,6 @@ void unix::restoreSignals()
         throw SysError("restoring signals");
 }
 
-
 /* RAII helper to automatically deregister a callback. */
 struct InterruptCallbackImpl : InterruptCallback
 {
@@ -184,7 +183,7 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
     auto token = interruptCallbacks->nextToken++;
     interruptCallbacks->callbacks.emplace(token, callback);
 
-    std::unique_ptr<InterruptCallbackImpl> res {new InterruptCallbackImpl{}};
+    std::unique_ptr<InterruptCallbackImpl> res{new InterruptCallbackImpl{}};
     res->token = token;
 
     return std::unique_ptr<InterruptCallback>(res.release());

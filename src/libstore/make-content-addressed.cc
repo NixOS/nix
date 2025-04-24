@@ -3,10 +3,7 @@
 
 namespace nix {
 
-std::map<StorePath, StorePath> makeContentAddressed(
-    Store & srcStore,
-    Store & dstStore,
-    const StorePathSet & storePaths)
+std::map<StorePath, StorePath> makeContentAddressed(Store & srcStore, Store & dstStore, const StorePathSet & storePaths)
 {
     StorePathSet closure;
     srcStore.computeFSClosure(storePaths, closure);
@@ -48,10 +45,10 @@ std::map<StorePath, StorePath> makeContentAddressed(
 
         auto narModuloHash = hashModuloSink.finish().first;
 
-        ValidPathInfo info {
+        ValidPathInfo info{
             dstStore,
             path.name(),
-            FixedOutputInfo {
+            FixedOutputInfo{
                 .method = FileIngestionMethod::NixArchive,
                 .hash = narModuloHash,
                 .references = std::move(refs),
@@ -78,12 +75,9 @@ std::map<StorePath, StorePath> makeContentAddressed(
     return remappings;
 }
 
-StorePath makeContentAddressed(
-    Store & srcStore,
-    Store & dstStore,
-    const StorePath & fromPath)
+StorePath makeContentAddressed(Store & srcStore, Store & dstStore, const StorePath & fromPath)
 {
-    auto remappings = makeContentAddressed(srcStore, dstStore, StorePathSet { fromPath });
+    auto remappings = makeContentAddressed(srcStore, dstStore, StorePathSet{fromPath});
     auto i = remappings.find(fromPath);
     assert(i != remappings.end());
     return i->second;

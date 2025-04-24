@@ -29,7 +29,7 @@ namespace nix {
  * Here, the Connection object referenced by ‘conn’ is automatically
  * returned to the pool when ‘conn’ goes out of scope.
  */
-template <class R>
+template<class R>
 class Pool
 {
 public:
@@ -63,7 +63,8 @@ private:
 
 public:
 
-    Pool(size_t max = std::numeric_limits<size_t>::max(),
+    Pool(
+        size_t max = std::numeric_limits<size_t>::max(),
         const Factory & factory = []() { return make_ref<R>(); },
         const Validator & validator = [](ref<R> r) { return true; })
         : factory(factory)
@@ -106,7 +107,11 @@ public:
 
         friend Pool;
 
-        Handle(Pool & pool, std::shared_ptr<R> r) : pool(pool), r(r) { }
+        Handle(Pool & pool, std::shared_ptr<R> r)
+            : pool(pool)
+            , r(r)
+        {
+        }
 
     public:
         // NOTE: Copying std::shared_ptr and calling a .reset() on it is always noexcept.
@@ -123,7 +128,8 @@ public:
 
         ~Handle()
         {
-            if (!r) return;
+            if (!r)
+                return;
             {
                 auto state_(pool.state.lock());
                 if (!bad)
@@ -134,10 +140,19 @@ public:
             pool.wakeup.notify_one();
         }
 
-        R * operator -> () { return &*r; }
-        R & operator * () { return *r; }
+        R * operator->()
+        {
+            return &*r;
+        }
+        R & operator*()
+        {
+            return *r;
+        }
 
-        void markBad() { bad = true; }
+        void markBad()
+        {
+            bad = true;
+        }
     };
 
     Handle get()

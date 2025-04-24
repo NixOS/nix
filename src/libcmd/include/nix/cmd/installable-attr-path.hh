@@ -39,7 +39,10 @@ class InstallableAttrPath : public InstallableValue
         const std::string & attrPath,
         ExtendedOutputsSpec extendedOutputsSpec);
 
-    std::string what() const override { return attrPath; };
+    std::string what() const override
+    {
+        return attrPath;
+    };
 
     std::pair<Value *, PosIdx> toValue(EvalState & state) override;
 

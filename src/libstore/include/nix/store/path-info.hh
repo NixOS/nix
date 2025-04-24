@@ -11,9 +11,7 @@
 
 namespace nix {
 
-
 class Store;
-
 
 struct SubstitutablePathInfo
 {
@@ -30,7 +28,6 @@ struct SubstitutablePathInfo
 };
 
 using SubstitutablePathInfos = std::map<StorePath, SubstitutablePathInfo>;
-
 
 /**
  * Information about a store object.
@@ -103,35 +100,32 @@ struct UnkeyedValidPathInfo
 
     UnkeyedValidPathInfo(const UnkeyedValidPathInfo & other) = default;
 
-    UnkeyedValidPathInfo(Hash narHash) : narHash(narHash) { };
+    UnkeyedValidPathInfo(Hash narHash)
+        : narHash(narHash) {};
 
-    bool operator == (const UnkeyedValidPathInfo &) const noexcept;
+    bool operator==(const UnkeyedValidPathInfo &) const noexcept;
 
     /**
      * @todo return `std::strong_ordering` once `id` is removed
      */
-    std::weak_ordering operator <=> (const UnkeyedValidPathInfo &) const noexcept;
+    std::weak_ordering operator<=>(const UnkeyedValidPathInfo &) const noexcept;
 
-    virtual ~UnkeyedValidPathInfo() { }
+    virtual ~UnkeyedValidPathInfo() {}
 
     /**
      * @param includeImpureInfo If true, variable elements such as the
      * registration time are included.
      */
-    virtual nlohmann::json toJSON(
-        const Store & store,
-        bool includeImpureInfo,
-        HashFormat hashFormat) const;
-    static UnkeyedValidPathInfo fromJSON(
-        const Store & store,
-        const nlohmann::json & json);
+    virtual nlohmann::json toJSON(const Store & store, bool includeImpureInfo, HashFormat hashFormat) const;
+    static UnkeyedValidPathInfo fromJSON(const Store & store, const nlohmann::json & json);
 };
 
-struct ValidPathInfo : UnkeyedValidPathInfo {
+struct ValidPathInfo : UnkeyedValidPathInfo
+{
     StorePath path;
 
-    bool operator == (const ValidPathInfo &) const = default;
-    auto operator <=> (const ValidPathInfo &) const = default;
+    bool operator==(const ValidPathInfo &) const = default;
+    auto operator<=>(const ValidPathInfo &) const = default;
 
     /**
      * Return a fingerprint of the store path to be used in binary
@@ -177,11 +171,14 @@ struct ValidPathInfo : UnkeyedValidPathInfo {
      */
     Strings shortRefs() const;
 
-    ValidPathInfo(StorePath && path, UnkeyedValidPathInfo info) : UnkeyedValidPathInfo(info), path(std::move(path)) { };
-    ValidPathInfo(const StorePath & path, UnkeyedValidPathInfo info) : UnkeyedValidPathInfo(info), path(path) { };
+    ValidPathInfo(StorePath && path, UnkeyedValidPathInfo info)
+        : UnkeyedValidPathInfo(info)
+        , path(std::move(path)) {};
+    ValidPathInfo(const StorePath & path, UnkeyedValidPathInfo info)
+        : UnkeyedValidPathInfo(info)
+        , path(path) {};
 
-    ValidPathInfo(const Store & store,
-        std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
+    ValidPathInfo(const Store & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
 };
 
 static_assert(std::is_move_assignable_v<ValidPathInfo>);

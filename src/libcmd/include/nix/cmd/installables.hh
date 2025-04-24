@@ -112,7 +112,7 @@ typedef std::vector<ref<Installable>> Installables;
  */
 struct Installable
 {
-    virtual ~Installable() { }
+    virtual ~Installable() {}
 
     /**
      * What Installable is this?
@@ -168,37 +168,19 @@ struct Installable
         BuildMode bMode = bmNormal);
 
     static std::set<StorePath> toStorePathSet(
-        ref<Store> evalStore,
-        ref<Store> store,
-        Realise mode,
-        OperateOn operateOn,
-        const Installables & installables);
+        ref<Store> evalStore, ref<Store> store, Realise mode, OperateOn operateOn, const Installables & installables);
 
     static std::vector<StorePath> toStorePaths(
-        ref<Store> evalStore,
-        ref<Store> store,
-        Realise mode,
-        OperateOn operateOn,
-        const Installables & installables);
+        ref<Store> evalStore, ref<Store> store, Realise mode, OperateOn operateOn, const Installables & installables);
 
     static StorePath toStorePath(
-        ref<Store> evalStore,
-        ref<Store> store,
-        Realise mode,
-        OperateOn operateOn,
-        ref<Installable> installable);
+        ref<Store> evalStore, ref<Store> store, Realise mode, OperateOn operateOn, ref<Installable> installable);
 
-    static std::set<StorePath> toDerivations(
-        ref<Store> store,
-        const Installables & installables,
-        bool useDeriver = false);
+    static std::set<StorePath>
+    toDerivations(ref<Store> store, const Installables & installables, bool useDeriver = false);
 
     static BuiltPaths toBuiltPaths(
-        ref<Store> evalStore,
-        ref<Store> store,
-        Realise mode,
-        OperateOn operateOn,
-        const Installables & installables);
+        ref<Store> evalStore, ref<Store> store, Realise mode, OperateOn operateOn, const Installables & installables);
 };
 
 }

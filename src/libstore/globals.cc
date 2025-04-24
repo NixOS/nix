@@ -16,29 +16,28 @@
 #include <nlohmann/json.hpp>
 
 #ifndef _WIN32
-# include <sys/utsname.h>
+#  include <sys/utsname.h>
 #endif
 
 #ifdef __GLIBC__
-# include <gnu/lib-names.h>
-# include <nss.h>
-# include <dlfcn.h>
+#  include <gnu/lib-names.h>
+#  include <nss.h>
+#  include <dlfcn.h>
 #endif
 
 #ifdef __APPLE__
-# include "nix/util/processes.hh"
+#  include "nix/util/processes.hh"
 #endif
 
 #include "nix/util/config-impl.hh"
 
 #ifdef __APPLE__
-#include <sys/sysctl.h>
+#  include <sys/sysctl.h>
 #endif
 
 #include "store-config-private.hh"
 
 namespace nix {
-
 
 /* The default location of the daemon socket, relative to nixStateDir.
    The socket is in a directory to allow you to control access to the
@@ -55,17 +54,18 @@ Settings::Settings()
     : nixPrefix(NIX_PREFIX)
     , nixStore(
 #ifndef _WIN32
-        // On Windows `/nix/store` is not a canonical path, but we dont'
-        // want to deal with that yet.
-        canonPath
+          // On Windows `/nix/store` is not a canonical path, but we dont'
+          // want to deal with that yet.
+          canonPath
 #endif
-        (getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR))))
+          (getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR))))
     , nixDataDir(canonPath(getEnvNonEmpty("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
     , nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
     , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
     , nixConfDir(canonPath(getEnvNonEmpty("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
     , nixUserConfFiles(getUserConfigFiles())
-    , nixDaemonSocketFile(canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
+    , nixDaemonSocketFile(
+          canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
 #ifndef _WIN32
     buildUsersGroup = isRootUser() ? "nixbld" : "";
@@ -91,7 +91,8 @@ Settings::Settings()
 
     /* chroot-like behavior from Apple's sandbox */
 #ifdef __APPLE__
-    sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
+    sandboxPaths = tokenizeString<StringSet>(
+        "/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
 }
@@ -102,7 +103,8 @@ void loadConfFile(AbstractConfig & config)
         try {
             std::string contents = readFile(path);
             config.applyConfig(contents, path);
-        } catch (SystemError &) { }
+        } catch (SystemError &) {
+        }
     };
 
     applyConfigFile(settings.nixConfDir + "/nix.conf");
@@ -120,7 +122,6 @@ void loadConfFile(AbstractConfig & config)
     if (nixConfEnv.has_value()) {
         config.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
     }
-
 }
 
 std::vector<Path> getUserConfigFiles()
@@ -146,13 +147,14 @@ unsigned int Settings::getDefaultCores()
     const unsigned int maxCPU = getMaxCPU();
 
     if (maxCPU > 0)
-      return maxCPU;
+        return maxCPU;
     else
-      return concurrency;
+        return concurrency;
 }
 
 #ifdef __APPLE__
-static bool hasVirt() {
+static bool hasVirt()
+{
 
     int hasVMM;
     int hvSupport;
@@ -181,19 +183,19 @@ StringSet Settings::getDefaultSystemFeatures()
        actually require anything special on the machines. */
     StringSet features{"nixos-test", "benchmark", "big-parallel"};
 
-    #ifdef __linux__
+#ifdef __linux__
     features.insert("uid-range");
-    #endif
+#endif
 
-    #ifdef __linux__
+#ifdef __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
         features.insert("kvm");
-    #endif
+#endif
 
-    #ifdef __APPLE__
+#ifdef __APPLE__
     if (hasVirt())
         features.insert("apple-virt");
-    #endif
+#endif
 
     return features;
 }
@@ -214,8 +216,11 @@ StringSet Settings::getDefaultExtraPlatforms()
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
     // always exec with their own binary preferences.
-    if (std::string{NIX_LOCAL_SYSTEM} == "aarch64-darwin" &&
-        runProgram(RunOptions {.program = "arch", .args = {"-arch", "x86_64", "/usr/bin/true"}, .mergeStderrToStdout = true}).first == 0)
+    if (std::string{NIX_LOCAL_SYSTEM} == "aarch64-darwin"
+        && runProgram(
+               RunOptions{.program = "arch", .args = {"-arch", "x86_64", "/usr/bin/true"}, .mergeStderrToStdout = true})
+                   .first
+               == 0)
         extraPlatforms.insert("x86_64-darwin");
 #endif
 
@@ -237,41 +242,57 @@ bool Settings::isWSL1()
 
 Path Settings::getDefaultSSLCertFile()
 {
-    for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
-        if (pathAccessible(fn)) return fn;
+    for (auto & fn :
+         {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
+        if (pathAccessible(fn))
+            return fn;
     return "";
 }
 
 std::string nixVersion = PACKAGE_VERSION;
 
-NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
-    {SandboxMode::smEnabled, true},
-    {SandboxMode::smRelaxed, "relaxed"},
-    {SandboxMode::smDisabled, false},
-});
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    SandboxMode,
+    {
+        {SandboxMode::smEnabled, true},
+        {SandboxMode::smRelaxed, "relaxed"},
+        {SandboxMode::smDisabled, false},
+    });
 
-template<> SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const
+template<>
+SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const
 {
-    if (str == "true") return smEnabled;
-    else if (str == "relaxed") return smRelaxed;
-    else if (str == "false") return smDisabled;
-    else throw UsageError("option '%s' has invalid value '%s'", name, str);
+    if (str == "true")
+        return smEnabled;
+    else if (str == "relaxed")
+        return smRelaxed;
+    else if (str == "false")
+        return smDisabled;
+    else
+        throw UsageError("option '%s' has invalid value '%s'", name, str);
 }
 
-template<> struct BaseSetting<SandboxMode>::trait
+template<>
+struct BaseSetting<SandboxMode>::trait
 {
     static constexpr bool appendable = false;
 };
 
-template<> std::string BaseSetting<SandboxMode>::to_string() const
+template<>
+std::string BaseSetting<SandboxMode>::to_string() const
 {
-    if (value == smEnabled) return "true";
-    else if (value == smRelaxed) return "relaxed";
-    else if (value == smDisabled) return "false";
-    else unreachable();
+    if (value == smEnabled)
+        return "true";
+    else if (value == smRelaxed)
+        return "relaxed";
+    else if (value == smDisabled)
+        return "false";
+    else
+        unreachable();
 }
 
-template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
+template<>
+void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({
         .longName = name,
@@ -298,7 +319,8 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
 
 unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
 {
-    if (str == "auto") return std::max(1U, std::thread::hardware_concurrency());
+    if (str == "auto")
+        return std::max(1U, std::thread::hardware_concurrency());
     else {
         if (auto n = string2Int<decltype(value)>(str))
             return *n;
@@ -306,7 +328,6 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
             throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
     }
 }
-
 
 static void preloadNSS()
 {
@@ -346,15 +367,18 @@ static void preloadNSS()
 
 static bool initLibStoreDone = false;
 
-void assertLibStoreInitialized() {
+void assertLibStoreInitialized()
+{
     if (!initLibStoreDone) {
         printError("The program must call nix::initNix() before calling any libstore library functions.");
         abort();
     };
 }
 
-void initLibStore(bool loadConfig) {
-    if (initLibStoreDone) return;
+void initLibStore(bool loadConfig)
+{
+    if (initLibStoreDone)
+        return;
 
     initLibUtil();
 
@@ -371,7 +395,8 @@ void initLibStore(bool loadConfig) {
        by calling curl_global_init here, which should mean curl will already
        have been initialized by the time we try to do so in a forked process.
 
-       [1] https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-initialize.mm#L614-L636
+       [1]
+       https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-initialize.mm#L614-L636
     */
     curl_global_init(CURL_GLOBAL_ALL);
 #ifdef __APPLE__
@@ -384,6 +409,5 @@ void initLibStore(bool loadConfig) {
 
     initLibStoreDone = true;
 }
-
 
 }

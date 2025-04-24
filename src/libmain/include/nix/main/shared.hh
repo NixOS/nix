@@ -21,10 +21,12 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
  */
 void initNix(bool loadConfig = true);
 
-void parseCmdLine(int argc, char * * argv,
-    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
+void parseCmdLine(
+    int argc, char ** argv, std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
 
-void parseCmdLine(const std::string & programName, const Strings & args,
+void parseCmdLine(
+    const std::string & programName,
+    const Strings & args,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
 
 void printVersion(const std::string & programName);
@@ -36,39 +38,40 @@ void printGCWarning();
 
 class Store;
 
+void printMissing(ref<Store> store, const std::vector<DerivedPath> & paths, Verbosity lvl = lvlInfo);
+
 void printMissing(
     ref<Store> store,
-    const std::vector<DerivedPath> & paths,
+    const StorePathSet & willBuild,
+    const StorePathSet & willSubstitute,
+    const StorePathSet & unknown,
+    uint64_t downloadSize,
+    uint64_t narSize,
     Verbosity lvl = lvlInfo);
 
-void printMissing(ref<Store> store, const StorePathSet & willBuild,
-    const StorePathSet & willSubstitute, const StorePathSet & unknown,
-    uint64_t downloadSize, uint64_t narSize, Verbosity lvl = lvlInfo);
+std::string getArg(const std::string & opt, Strings::iterator & i, const Strings::iterator & end);
 
-std::string getArg(const std::string & opt,
-    Strings::iterator & i, const Strings::iterator & end);
-
-template<class N> N getIntArg(const std::string & opt,
-    Strings::iterator & i, const Strings::iterator & end, bool allowUnit)
+template<class N>
+N getIntArg(const std::string & opt, Strings::iterator & i, const Strings::iterator & end, bool allowUnit)
 {
     ++i;
-    if (i == end) throw UsageError("'%1%' requires an argument", opt);
+    if (i == end)
+        throw UsageError("'%1%' requires an argument", opt);
     return string2IntWithUnitPrefix<N>(*i);
 }
-
 
 struct LegacyArgs : public MixCommonArgs, public RootArgs
 {
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg;
 
-    LegacyArgs(const std::string & programName,
+    LegacyArgs(
+        const std::string & programName,
         std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
 
     bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
 
     bool processArgs(const Strings & args, bool finish) override;
 };
-
 
 /**
  * The constructor of this class starts a pager if standard output is a
@@ -90,7 +93,6 @@ private:
 
 extern volatile ::sig_atomic_t blockInt;
 
-
 /* GC helpers. */
 
 std::string showBytes(uint64_t bytes);
@@ -102,10 +104,12 @@ struct PrintFreed
     bool show;
     const GCResults & results;
     PrintFreed(bool show, const GCResults & results)
-        : show(show), results(results) { }
+        : show(show)
+        , results(results)
+    {
+    }
     ~PrintFreed();
 };
-
 
 #ifndef _WIN32
 /**

@@ -20,14 +20,18 @@ class Callback
 
 public:
 
-    Callback(std::function<void(std::future<T>)> fun) : fun(fun) { }
+    Callback(std::function<void(std::future<T>)> fun)
+        : fun(fun)
+    {
+    }
 
     // NOTE: std::function is noexcept move-constructible since C++20.
     Callback(Callback && callback) noexcept(std::is_nothrow_move_constructible_v<decltype(fun)>)
         : fun(std::move(callback.fun))
     {
         auto prev = callback.done.test_and_set();
-        if (prev) done.test_and_set();
+        if (prev)
+            done.test_and_set();
     }
 
     void operator()(T && t) noexcept

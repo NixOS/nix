@@ -15,7 +15,8 @@ class GitTest : public CharacterizationTest
 
 public:
 
-    std::filesystem::path goldenMaster(std::string_view testStem) const override {
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
         return unitTestData / std::string(testStem);
     }
 
@@ -33,39 +34,44 @@ private:
     }
 };
 
-TEST(GitMode, gitMode_directory) {
+TEST(GitMode, gitMode_directory)
+{
     Mode m = Mode::Directory;
     RawMode r = 0040000;
     ASSERT_EQ(static_cast<RawMode>(m), r);
-    ASSERT_EQ(decodeMode(r), std::optional { m });
+    ASSERT_EQ(decodeMode(r), std::optional{m});
 };
 
-TEST(GitMode, gitMode_executable) {
+TEST(GitMode, gitMode_executable)
+{
     Mode m = Mode::Executable;
     RawMode r = 0100755;
     ASSERT_EQ(static_cast<RawMode>(m), r);
-    ASSERT_EQ(decodeMode(r), std::optional { m });
+    ASSERT_EQ(decodeMode(r), std::optional{m});
 };
 
-TEST(GitMode, gitMode_regular) {
+TEST(GitMode, gitMode_regular)
+{
     Mode m = Mode::Regular;
     RawMode r = 0100644;
     ASSERT_EQ(static_cast<RawMode>(m), r);
-    ASSERT_EQ(decodeMode(r), std::optional { m });
+    ASSERT_EQ(decodeMode(r), std::optional{m});
 };
 
-TEST(GitMode, gitMode_symlink) {
+TEST(GitMode, gitMode_symlink)
+{
     Mode m = Mode::Symlink;
     RawMode r = 0120000;
     ASSERT_EQ(static_cast<RawMode>(m), r);
-    ASSERT_EQ(decodeMode(r), std::optional { m });
+    ASSERT_EQ(decodeMode(r), std::optional{m});
 };
 
-TEST_F(GitTest, blob_read) {
+TEST_F(GitTest, blob_read)
+{
     readTest("hello-world-blob.bin", [&](const auto & encoded) {
-        StringSource in { encoded };
+        StringSource in{encoded};
         StringSink out;
-        RegularFileSink out2 { out };
+        RegularFileSink out2{out};
         ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Blob);
         parseBlob(out2, CanonPath::root, in, BlobMode::Regular, mockXpSettings);
 
@@ -75,7 +81,8 @@ TEST_F(GitTest, blob_read) {
     });
 }
 
-TEST_F(GitTest, blob_write) {
+TEST_F(GitTest, blob_write)
+{
     writeTest("hello-world-blob.bin", [&]() {
         auto decoded = readFile(goldenMaster("hello-world.bin"));
         StringSink s;
@@ -126,24 +133,31 @@ const static Tree tree = {
     },
 };
 
-TEST_F(GitTest, tree_read) {
+TEST_F(GitTest, tree_read)
+{
     readTest("tree.bin", [&](const auto & encoded) {
-        StringSource in { encoded };
+        StringSource in{encoded};
         NullFileSystemObjectSink out;
         Tree got;
         ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Tree);
-        parseTree(out, CanonPath::root, in, [&](auto & name, auto entry) {
-            auto name2 = std::string{name.rel()};
-            if (entry.mode == Mode::Directory)
-                name2 += '/';
-            got.insert_or_assign(name2, std::move(entry));
-        }, mockXpSettings);
+        parseTree(
+            out,
+            CanonPath::root,
+            in,
+            [&](auto & name, auto entry) {
+                auto name2 = std::string{name.rel()};
+                if (entry.mode == Mode::Directory)
+                    name2 += '/';
+                got.insert_or_assign(name2, std::move(entry));
+            },
+            mockXpSettings);
 
         ASSERT_EQ(got, tree);
     });
 }
 
-TEST_F(GitTest, tree_write) {
+TEST_F(GitTest, tree_write)
+{
     writeTest("tree.bin", [&]() {
         StringSink s;
         dumpTree(tree, s, mockXpSettings);
@@ -151,36 +165,38 @@ TEST_F(GitTest, tree_write) {
     });
 }
 
-TEST_F(GitTest, both_roundrip) {
+TEST_F(GitTest, both_roundrip)
+{
     using File = MemorySourceAccessor::File;
 
     auto files = make_ref<MemorySourceAccessor>();
-    files->root = File::Directory {
-        .contents {
+    files->root = File::Directory{
+        .contents{
             {
                 "foo",
-                File::Regular {
+                File::Regular{
                     .contents = "hello\n\0\n\tworld!",
                 },
             },
             {
                 "bar",
-                File::Directory {
-                    .contents = {
+                File::Directory{
+                    .contents =
                         {
-                            "baz",
-                            File::Regular {
-                                .executable = true,
-                                .contents = "good day,\n\0\n\tworld!",
+                            {
+                                "baz",
+                                File::Regular{
+                                    .executable = true,
+                                    .contents = "good day,\n\0\n\tworld!",
+                                },
+                            },
+                            {
+                                "quux",
+                                File::Symlink{
+                                    .target = "/over/there",
+                                },
                             },
                         },
-                        {
-                            "quux",
-                            File::Symlink {
-                                .target = "/over/there",
-                            },
-                        },
-                    },
                 },
             },
         },
@@ -191,14 +207,12 @@ TEST_F(GitTest, both_roundrip) {
     std::function<DumpHook> dumpHook;
     dumpHook = [&](const SourcePath & path) {
         StringSink s;
-        HashSink hashSink { HashAlgorithm::SHA1 };
-        TeeSink s2 { s, hashSink };
-        auto mode = dump(
-            path, s2, dumpHook,
-            defaultPathFilter, mockXpSettings);
+        HashSink hashSink{HashAlgorithm::SHA1};
+        TeeSink s2{s, hashSink};
+        auto mode = dump(path, s2, dumpHook, defaultPathFilter, mockXpSettings);
         auto hash = hashSink.finish().first;
         cas.insert_or_assign(hash, std::move(s.s));
-        return TreeEntry {
+        return TreeEntry{
             .mode = mode,
             .hash = hash,
         };
@@ -208,13 +222,16 @@ TEST_F(GitTest, both_roundrip) {
 
     auto files2 = make_ref<MemorySourceAccessor>();
 
-    MemorySink sinkFiles2 { *files2 };
+    MemorySink sinkFiles2{*files2};
 
     std::function<void(const CanonPath, const Hash &, BlobMode)> mkSinkHook;
     mkSinkHook = [&](auto prefix, auto & hash, auto blobMode) {
-        StringSource in { cas[hash] };
+        StringSource in{cas[hash]};
         parse(
-            sinkFiles2, prefix, in, blobMode,
+            sinkFiles2,
+            prefix,
+            in,
+            blobMode,
             [&](const CanonPath & name, const auto & entry) {
                 mkSinkHook(
                     prefix / name,
@@ -232,7 +249,8 @@ TEST_F(GitTest, both_roundrip) {
     ASSERT_EQ(files->root, files2->root);
 }
 
-TEST(GitLsRemote, parseSymrefLineWithReference) {
+TEST(GitLsRemote, parseSymrefLineWithReference)
+{
     auto line = "ref: refs/head/main	HEAD";
     auto res = parseLsRemoteLine(line);
     ASSERT_TRUE(res.has_value());
@@ -241,7 +259,8 @@ TEST(GitLsRemote, parseSymrefLineWithReference) {
     ASSERT_EQ(res->reference, "HEAD");
 }
 
-TEST(GitLsRemote, parseSymrefLineWithNoReference) {
+TEST(GitLsRemote, parseSymrefLineWithNoReference)
+{
     auto line = "ref: refs/head/main";
     auto res = parseLsRemoteLine(line);
     ASSERT_TRUE(res.has_value());
@@ -250,7 +269,8 @@ TEST(GitLsRemote, parseSymrefLineWithNoReference) {
     ASSERT_EQ(res->reference, std::nullopt);
 }
 
-TEST(GitLsRemote, parseObjectRefLine) {
+TEST(GitLsRemote, parseObjectRefLine)
+{
     auto line = "abc123	refs/head/main";
     auto res = parseLsRemoteLine(line);
     ASSERT_TRUE(res.has_value());

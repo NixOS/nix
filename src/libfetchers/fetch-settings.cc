@@ -2,8 +2,6 @@
 
 namespace nix::fetchers {
 
-Settings::Settings()
-{
-}
+Settings::Settings() {}
 
 }

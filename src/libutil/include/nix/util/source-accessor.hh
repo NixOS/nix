@@ -46,8 +46,7 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
 
     SourceAccessor();
 
-    virtual ~SourceAccessor()
-    { }
+    virtual ~SourceAccessor() {}
 
     /**
      * Return the contents of a file as a string.
@@ -72,24 +71,28 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      * @note subclasses of `SourceAccessor` need to implement at least
      * one of the `readFile()` variants.
      */
-    virtual void readFile(
-        const CanonPath & path,
-        Sink & sink,
-        std::function<void(uint64_t)> sizeCallback = [](uint64_t size){});
+    virtual void
+    readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback = [](uint64_t size) {});
 
     virtual bool pathExists(const CanonPath & path);
 
     enum Type {
-      tRegular, tSymlink, tDirectory,
-      /**
-        Any other node types that may be encountered on the file system, such as device nodes, sockets, named pipe, and possibly even more exotic things.
+        tRegular,
+        tSymlink,
+        tDirectory,
+        /**
+          Any other node types that may be encountered on the file system, such as device nodes, sockets, named pipe,
+          and possibly even more exotic things.
 
-        Responsible for `"unknown"` from `builtins.readFileType "/dev/null"`.
+          Responsible for `"unknown"` from `builtins.readFileType "/dev/null"`.
 
-        Unlike `DT_UNKNOWN`, this must not be used for deferring the lookup of types.
-      */
-      tChar, tBlock, tSocket, tFifo,
-      tUnknown
+          Unlike `DT_UNKNOWN`, this must not be used for deferring the lookup of types.
+        */
+        tChar,
+        tBlock,
+        tSocket,
+        tFifo,
+        tUnknown
     };
 
     struct Stat
@@ -133,15 +136,10 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
 
     virtual std::string readLink(const CanonPath & path) = 0;
 
-    virtual void dumpPath(
-        const CanonPath & path,
-        Sink & sink,
-        PathFilter & filter = defaultPathFilter);
+    virtual void dumpPath(const CanonPath & path, Sink & sink, PathFilter & filter = defaultPathFilter);
 
-    Hash hashPath(
-        const CanonPath & path,
-        PathFilter & filter = defaultPathFilter,
-        HashAlgorithm ha = HashAlgorithm::SHA256);
+    Hash
+    hashPath(const CanonPath & path, PathFilter & filter = defaultPathFilter, HashAlgorithm ha = HashAlgorithm::SHA256);
 
     /**
      * Return a corresponding path in the root filesystem, if
@@ -149,14 +147,16 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      * materialized in the root filesystem.
      */
     virtual std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path)
-    { return std::nullopt; }
+    {
+        return std::nullopt;
+    }
 
-    bool operator == (const SourceAccessor & x) const
+    bool operator==(const SourceAccessor & x) const
     {
         return number == x.number;
     }
 
-    auto operator <=> (const SourceAccessor & x) const
+    auto operator<=>(const SourceAccessor & x) const
     {
         return number <=> x.number;
     }
@@ -172,9 +172,7 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      * @param mode might only be a temporary solution for this.
      * See the discussion in https://github.com/NixOS/nix/pull/9985.
      */
-    CanonPath resolveSymlinks(
-        const CanonPath & path,
-        SymlinkResolution mode = SymlinkResolution::Full);
+    CanonPath resolveSymlinks(const CanonPath & path, SymlinkResolution mode = SymlinkResolution::Full);
 
     /**
      * A string that uniquely represents the contents of this
@@ -187,7 +185,9 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      * tree, if available.
      */
     virtual std::optional<time_t> getLastModified()
-    { return std::nullopt; }
+    {
+        return std::nullopt;
+    }
 };
 
 /**

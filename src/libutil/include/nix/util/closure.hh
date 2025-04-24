@@ -13,11 +13,7 @@ template<typename T>
 using GetEdgesAsync = std::function<void(const T &, std::function<void(std::promise<set<T>> &)>)>;
 
 template<typename T>
-void computeClosure(
-    const set<T> startElts,
-    set<T> & res,
-    GetEdgesAsync<T> getEdgesAsync
-)
+void computeClosure(const set<T> startElts, set<T> & res, GetEdgesAsync<T> getEdgesAsync)
 {
     struct State
     {
@@ -35,8 +31,10 @@ void computeClosure(
     enqueue = [&](const T & current) -> void {
         {
             auto state(state_.lock());
-            if (state->exc) return;
-            if (!state->res.insert(current).second) return;
+            if (state->exc)
+                return;
+            if (!state->res.insert(current).second)
+                return;
             state->pending++;
         }
 
@@ -48,13 +46,16 @@ void computeClosure(
                 {
                     auto state(state_.lock());
                     assert(state->pending);
-                    if (!--state->pending) done.notify_one();
+                    if (!--state->pending)
+                        done.notify_one();
                 }
             } catch (...) {
                 auto state(state_.lock());
-                if (!state->exc) state->exc = std::current_exception();
+                if (!state->exc)
+                    state->exc = std::current_exception();
                 assert(state->pending);
-                if (!--state->pending) done.notify_one();
+                if (!--state->pending)
+                    done.notify_one();
             };
         });
     };
@@ -64,8 +65,10 @@ void computeClosure(
 
     {
         auto state(state_.lock());
-        while (state->pending) state.wait(done);
-        if (state->exc) std::rethrow_exception(state->exc);
+        while (state->pending)
+            state.wait(done);
+        if (state->exc)
+            std::rethrow_exception(state->exc);
     }
 }
 

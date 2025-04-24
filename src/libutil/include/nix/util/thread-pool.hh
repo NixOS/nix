@@ -87,7 +87,8 @@ void processGraph(
     std::function<std::set<T>(const T &)> getEdges,
     std::function<void(const T &)> processNode)
 {
-    struct Graph {
+    struct Graph
+    {
         std::set<T> left;
         std::map<T, std::set<T>> refs, rrefs;
     };
@@ -101,7 +102,6 @@ void processGraph(
     ThreadPool pool;
 
     worker = [&](const T & node) {
-
         {
             auto graph(graph_.lock());
             auto i = graph->refs.find(node);
@@ -110,22 +110,21 @@ void processGraph(
             goto doWork;
         }
 
-    getRefs:
-        {
-            auto refs = getEdges(node);
-            refs.erase(node);
+    getRefs: {
+        auto refs = getEdges(node);
+        refs.erase(node);
 
-            {
-                auto graph(graph_.lock());
-                for (auto & ref : refs)
-                    if (graph->left.count(ref)) {
-                        graph->refs[node].insert(ref);
-                        graph->rrefs[ref].insert(node);
-                    }
-                if (graph->refs[node].empty())
-                    goto doWork;
-            }
+        {
+            auto graph(graph_.lock());
+            for (auto & ref : refs)
+                if (graph->left.count(ref)) {
+                    graph->refs[node].insert(ref);
+                    graph->rrefs[ref].insert(node);
+                }
+            if (graph->refs[node].empty())
+                goto doWork;
         }
+    }
 
         return;
 

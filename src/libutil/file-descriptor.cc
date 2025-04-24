@@ -4,9 +4,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #ifdef _WIN32
-# include <winnt.h>
-# include <fileapi.h>
-# include "nix/util/windows-error.hh"
+#  include <winnt.h>
+#  include <fileapi.h>
+#  include "nix/util/windows-error.hh"
 #endif
 
 namespace nix {
@@ -16,7 +16,6 @@ void writeLine(Descriptor fd, std::string s)
     s += '\n';
     writeFull(fd, s);
 }
-
 
 std::string drainFD(Descriptor fd, bool block, const size_t reserveSize)
 {
@@ -33,31 +32,33 @@ std::string drainFD(Descriptor fd, bool block, const size_t reserveSize)
     return std::move(sink.s);
 }
 
-
 //////////////////////////////////////////////////////////////////////
 
+AutoCloseFD::AutoCloseFD()
+    : fd{INVALID_DESCRIPTOR}
+{
+}
 
-AutoCloseFD::AutoCloseFD() : fd{INVALID_DESCRIPTOR} {}
-
-
-AutoCloseFD::AutoCloseFD(Descriptor fd) : fd{fd} {}
+AutoCloseFD::AutoCloseFD(Descriptor fd)
+    : fd{fd}
+{
+}
 
 // NOTE: This can be noexcept since we are just copying a value and resetting
 // the file descriptor in the rhs.
-AutoCloseFD::AutoCloseFD(AutoCloseFD && that) noexcept : fd{that.fd}
+AutoCloseFD::AutoCloseFD(AutoCloseFD && that) noexcept
+    : fd{that.fd}
 {
     that.fd = INVALID_DESCRIPTOR;
 }
 
-
-AutoCloseFD & AutoCloseFD::operator =(AutoCloseFD && that)
+AutoCloseFD & AutoCloseFD::operator=(AutoCloseFD && that)
 {
     close();
     fd = that.fd;
     that.fd = INVALID_DESCRIPTOR;
     return *this;
 }
-
 
 AutoCloseFD::~AutoCloseFD()
 {
@@ -68,23 +69,21 @@ AutoCloseFD::~AutoCloseFD()
     }
 }
 
-
 Descriptor AutoCloseFD::get() const
 {
     return fd;
 }
 
-
 void AutoCloseFD::close()
 {
     if (fd != INVALID_DESCRIPTOR) {
-        if(
+        if (
 #ifdef _WIN32
-           ::CloseHandle(fd)
+            ::CloseHandle(fd)
 #else
-           ::close(fd)
+            ::close(fd)
 #endif
-           == -1)
+            == -1)
             /* This should never happen. */
             throw NativeSysError("closing file descriptor %1%", fd);
         fd = INVALID_DESCRIPTOR;
@@ -109,24 +108,20 @@ void AutoCloseFD::fsync() const
     }
 }
 
-
-
 void AutoCloseFD::startFsync() const
 {
 #ifdef __linux__
-        if (fd != -1) {
-            /* Ignore failure, since fsync must be run later anyway. This is just a performance optimization. */
-            ::sync_file_range(fd, 0, 0, SYNC_FILE_RANGE_WRITE);
-        }
+    if (fd != -1) {
+        /* Ignore failure, since fsync must be run later anyway. This is just a performance optimization. */
+        ::sync_file_range(fd, 0, 0, SYNC_FILE_RANGE_WRITE);
+    }
 #endif
 }
-
 
 AutoCloseFD::operator bool() const
 {
     return fd != INVALID_DESCRIPTOR;
 }
-
 
 Descriptor AutoCloseFD::release()
 {
@@ -135,9 +130,7 @@ Descriptor AutoCloseFD::release()
     return oldFD;
 }
 
-
 //////////////////////////////////////////////////////////////////////
-
 
 void Pipe::close()
 {

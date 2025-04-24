@@ -7,27 +7,22 @@
 #include <mutex>
 #include <algorithm>
 
-
 namespace nix {
-
 
 static size_t refLength = 32; /* characters */
 
-
-static void search(
-    std::string_view s,
-    StringSet & hashes,
-    StringSet & seen)
+static void search(std::string_view s, StringSet & hashes, StringSet & seen)
 {
     static std::once_flag initialised;
     static bool isBase32[256];
-    std::call_once(initialised, [](){
-        for (unsigned int i = 0; i < 256; ++i) isBase32[i] = false;
+    std::call_once(initialised, []() {
+        for (unsigned int i = 0; i < 256; ++i)
+            isBase32[i] = false;
         for (unsigned int i = 0; i < nix32Chars.size(); ++i)
             isBase32[(unsigned char) nix32Chars[i]] = true;
     });
 
-    for (size_t i = 0; i + refLength <= s.size(); ) {
+    for (size_t i = 0; i + refLength <= s.size();) {
         int j;
         bool match = true;
         for (j = refLength - 1; j >= 0; --j)
@@ -36,7 +31,8 @@ static void search(
                 match = false;
                 break;
             }
-        if (!match) continue;
+        if (!match)
+            continue;
         std::string ref(s.substr(i, refLength));
         if (hashes.erase(ref)) {
             debug("found reference to '%1%' at offset '%2%'", ref, i);
@@ -46,8 +42,7 @@ static void search(
     }
 }
 
-
-void RefScanSink::operator () (std::string_view data)
+void RefScanSink::operator()(std::string_view data)
 {
     /* It's possible that a reference spans the previous and current
        fragment, so search in the concatenation of the tail of the
@@ -65,14 +60,14 @@ void RefScanSink::operator () (std::string_view data)
     tail.append(data.data() + data.size() - tailLen, tailLen);
 }
 
-
 RewritingSink::RewritingSink(const std::string & from, const std::string & to, Sink & nextSink)
     : RewritingSink({{from, to}}, nextSink)
 {
 }
 
 RewritingSink::RewritingSink(const StringMap & rewrites, Sink & nextSink)
-    : rewrites(rewrites), nextSink(nextSink)
+    : rewrites(rewrites)
+    , nextSink(nextSink)
 {
     std::string::size_type maxRewriteSize = 0;
     for (auto & [from, to] : rewrites) {
@@ -82,29 +77,29 @@ RewritingSink::RewritingSink(const StringMap & rewrites, Sink & nextSink)
     this->maxRewriteSize = maxRewriteSize;
 }
 
-void RewritingSink::operator () (std::string_view data)
+void RewritingSink::operator()(std::string_view data)
 {
     std::string s(prev);
     s.append(data);
 
     s = rewriteStrings(s, rewrites);
 
-    prev = s.size() < maxRewriteSize
-        ? s
-        : maxRewriteSize == 0
-            ? ""
-            : std::string(s, s.size() - maxRewriteSize + 1, maxRewriteSize - 1);
+    prev = s.size() < maxRewriteSize ? s
+           : maxRewriteSize == 0     ? ""
+                                     : std::string(s, s.size() - maxRewriteSize + 1, maxRewriteSize - 1);
 
     auto consumed = s.size() - prev.size();
 
     pos += consumed;
 
-    if (consumed) nextSink(s.substr(0, consumed));
+    if (consumed)
+        nextSink(s.substr(0, consumed));
 }
 
 void RewritingSink::flush()
 {
-    if (prev.empty()) return;
+    if (prev.empty())
+        return;
     pos += prev.size();
     nextSink(prev);
     prev.clear();
@@ -116,7 +111,7 @@ HashModuloSink::HashModuloSink(HashAlgorithm ha, const std::string & modulus)
 {
 }
 
-void HashModuloSink::operator () (std::string_view data)
+void HashModuloSink::operator()(std::string_view data)
 {
     rewritingSink(data);
 }

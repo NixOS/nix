@@ -8,13 +8,12 @@
 #include "store-config-private.hh"
 
 #if NIX_SUPPORT_ACL
-# include <sys/xattr.h>
+#  include <sys/xattr.h>
 #endif
 
 namespace nix {
 
 const time_t mtimeStore = 1; /* 1 second into the epoch */
-
 
 static void canonicaliseTimestampAndPermissions(const Path & path, const struct stat & st)
 {
@@ -24,30 +23,24 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
         mode_t mode = st.st_mode & ~S_IFMT;
 
         if (mode != 0444 && mode != 0555) {
-            mode = (st.st_mode & S_IFMT)
-                 | 0444
-                 | (st.st_mode & S_IXUSR ? 0111 : 0);
+            mode = (st.st_mode & S_IFMT) | 0444 | (st.st_mode & S_IXUSR ? 0111 : 0);
             if (chmod(path.c_str(), mode) == -1)
                 throw SysError("changing mode of '%1%' to %2$o", path, mode);
         }
-
     }
 
 #ifndef _WIN32 // TODO implement
     if (st.st_mtime != mtimeStore) {
         struct stat st2 = st;
-        st2.st_mtime = mtimeStore,
-        setWriteTime(path, st2);
+        st2.st_mtime = mtimeStore, setWriteTime(path, st2);
     }
 #endif
 }
-
 
 void canonicaliseTimestampAndPermissions(const Path & path)
 {
     canonicaliseTimestampAndPermissions(path, lstat(path));
 }
-
 
 static void canonicalisePathMetaData_(
     const Path & path,
@@ -87,12 +80,13 @@ static void canonicalisePathMetaData_(
         if ((eaSize = llistxattr(path.c_str(), eaBuf.data(), eaBuf.size())) < 0)
             throw SysError("querying extended attributes of '%s'", path);
 
-        for (auto & eaName: tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
-            if (settings.ignoredAcls.get().count(eaName)) continue;
+        for (auto & eaName : tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
+            if (settings.ignoredAcls.get().count(eaName))
+                continue;
             if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
                 throw SysError("removing extended attribute '%s' from '%s'", eaName, path);
         }
-     }
+    }
 #endif
 
 #ifndef _WIN32
@@ -106,7 +100,9 @@ static void canonicalisePathMetaData_(
         if (S_ISDIR(st.st_mode) || !inodesSeen.count(Inode(st.st_dev, st.st_ino)))
             throw BuildError("invalid ownership on file '%1%'", path);
         mode_t mode = st.st_mode & ~S_IFMT;
-        assert(S_ISLNK(st.st_mode) || (st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore));
+        assert(
+            S_ISLNK(st.st_mode)
+            || (st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore));
         return;
     }
 #endif
@@ -124,14 +120,12 @@ static void canonicalisePathMetaData_(
        store (since that directory is group-writable for the Nix build
        users group); we check for this case below. */
     if (st.st_uid != geteuid()) {
-#if HAVE_LCHOWN
+#  if HAVE_LCHOWN
         if (lchown(path.c_str(), geteuid(), getegid()) == -1)
-#else
-        if (!S_ISLNK(st.st_mode) &&
-            chown(path.c_str(), geteuid(), getegid()) == -1)
-#endif
-            throw SysError("changing owner of '%1%' to %2%",
-                path, geteuid());
+#  else
+        if (!S_ISLNK(st.st_mode) && chown(path.c_str(), geteuid(), getegid()) == -1)
+#  endif
+            throw SysError("changing owner of '%1%' to %2%", path, geteuid());
     }
 #endif
 
@@ -147,7 +141,6 @@ static void canonicalisePathMetaData_(
         }
     }
 }
-
 
 void canonicalisePathMetaData(
     const Path & path,
@@ -175,12 +168,13 @@ void canonicalisePathMetaData(
 #endif
 }
 
-
-void canonicalisePathMetaData(const Path & path
+void canonicalisePathMetaData(
+    const Path & path
 #ifndef _WIN32
-    , std::optional<std::pair<uid_t, uid_t>> uidRange
+    ,
+    std::optional<std::pair<uid_t, uid_t>> uidRange
 #endif
-    )
+)
 {
     InodesSeen inodesSeen;
     canonicalisePathMetaData_(

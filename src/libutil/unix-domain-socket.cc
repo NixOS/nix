@@ -3,12 +3,12 @@
 #include "nix/util/util.hh"
 
 #ifdef _WIN32
-# include <winsock2.h>
-# include <afunix.h>
+#  include <winsock2.h>
+#  include <afunix.h>
 #else
-# include <sys/socket.h>
-# include <sys/un.h>
-# include "nix/util/processes.hh"
+#  include <sys/socket.h>
+#  include <sys/un.h>
+#  include "nix/util/processes.hh"
 #endif
 #include <unistd.h>
 
@@ -16,11 +16,14 @@ namespace nix {
 
 AutoCloseFD createUnixDomainSocket()
 {
-    AutoCloseFD fdSocket = toDescriptor(socket(PF_UNIX, SOCK_STREAM
-        #ifdef SOCK_CLOEXEC
-        | SOCK_CLOEXEC
-        #endif
-        , 0));
+    AutoCloseFD fdSocket = toDescriptor(socket(
+        PF_UNIX,
+        SOCK_STREAM
+#ifdef SOCK_CLOEXEC
+            | SOCK_CLOEXEC
+#endif
+        ,
+        0));
     if (!fdSocket)
         throw SysError("cannot create Unix domain socket");
 #ifndef _WIN32
@@ -28,7 +31,6 @@ AutoCloseFD createUnixDomainSocket()
 #endif
     return fdSocket;
 }
-
 
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
 {
@@ -45,9 +47,8 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
     return fdSocket;
 }
 
-static void bindConnectProcHelper(
-    std::string_view operationName, auto && operation,
-    Socket fd, const std::string & path)
+static void
+bindConnectProcHelper(std::string_view operationName, auto && operation, Socket fd, const std::string & path)
 {
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
@@ -100,14 +101,12 @@ static void bindConnectProcHelper(
     }
 }
 
-
 void bind(Socket fd, const std::string & path)
 {
     unlink(path.c_str());
 
     bindConnectProcHelper("bind", ::bind, fd, path);
 }
-
 
 void connect(Socket fd, const std::string & path)
 {

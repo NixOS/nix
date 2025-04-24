@@ -5,7 +5,6 @@
 #include <string>
 #include "nix/util/ansicolor.hh"
 
-
 namespace nix {
 
 /**
@@ -22,10 +21,11 @@ namespace nix {
  */
 template<class F>
 inline void formatHelper(F & f)
-{ }
+{
+}
 
 template<class F, typename T, typename... Args>
-inline void formatHelper(F & f, const T & x, const Args & ... args)
+inline void formatHelper(F & f, const T & x, const Args &... args)
 {
     // Interpolate one argument and then recurse.
     formatHelper(f % x, args...);
@@ -36,10 +36,7 @@ inline void formatHelper(F & f, const T & x, const Args & ... args)
  */
 inline void setExceptions(boost::format & fmt)
 {
-    fmt.exceptions(
-        boost::io::all_error_bits ^
-        boost::io::too_many_args_bit ^
-        boost::io::too_few_args_bit);
+    fmt.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit ^ boost::io::too_few_args_bit);
 }
 
 /**
@@ -80,7 +77,7 @@ inline std::string fmt(const char * s)
 }
 
 template<typename... Args>
-inline std::string fmt(const std::string & fs, const Args & ... args)
+inline std::string fmt(const std::string & fs, const Args &... args)
 {
     boost::format f(fs);
     setExceptions(f);
@@ -95,14 +92,17 @@ inline std::string fmt(const std::string & fs, const Args & ... args)
  * either wrap the argument in `Uncolored` or add a specialization of
  * `HintFmt::operator%`.
  */
-template <class T>
+template<class T>
 struct Magenta
 {
-    Magenta(const T &s) : value(s) {}
+    Magenta(const T & s)
+        : value(s)
+    {
+    }
     const T & value;
 };
 
-template <class T>
+template<class T>
 std::ostream & operator<<(std::ostream & out, const Magenta<T> & y)
 {
     return out << ANSI_WARNING << y.value << ANSI_NORMAL;
@@ -115,14 +115,17 @@ std::ostream & operator<<(std::ostream & out, const Magenta<T> & y)
  *
  * By default, arguments to `HintFmt` are printed in magenta (see `Magenta`).
  */
-template <class T>
+template<class T>
 struct Uncolored
 {
-    Uncolored(const T & s) : value(s) {}
+    Uncolored(const T & s)
+        : value(s)
+    {
+    }
     const T & value;
 };
 
-template <class T>
+template<class T>
 std::ostream & operator<<(std::ostream & out, const Uncolored<T> & y)
 {
     return out << ANSI_NORMAL << y.value;
@@ -144,9 +147,11 @@ public:
      */
     HintFmt(const std::string & literal)
         : HintFmt("%s", Uncolored(literal))
-    { }
+    {
+    }
 
-    static HintFmt fromFormatString(const std::string & format) {
+    static HintFmt fromFormatString(const std::string & format)
+    {
         return HintFmt(boost::format(format));
     }
 
@@ -154,16 +159,18 @@ public:
      * Interpolate the given arguments into the format string.
      */
     template<typename... Args>
-    HintFmt(const std::string & format, const Args & ... args)
+    HintFmt(const std::string & format, const Args &... args)
         : HintFmt(boost::format(format), args...)
-    { }
+    {
+    }
 
     HintFmt(const HintFmt & hf)
         : fmt(hf.fmt)
-    { }
+    {
+    }
 
     template<typename... Args>
-    HintFmt(boost::format && fmt, const Args & ... args)
+    HintFmt(boost::format && fmt, const Args &... args)
         : fmt(std::move(fmt))
     {
         setExceptions(fmt);

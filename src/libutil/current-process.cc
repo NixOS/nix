@@ -10,23 +10,24 @@
 #include <math.h>
 
 #ifdef __APPLE__
-# include <mach-o/dyld.h>
+#  include <mach-o/dyld.h>
 #endif
 
 #ifdef __linux__
-# include <mutex>
-# include "nix/util/cgroup.hh"
-# include "nix/util/namespaces.hh"
+#  include <mutex>
+#  include "nix/util/cgroup.hh"
+#  include "nix/util/namespaces.hh"
 #endif
 
 namespace nix {
 
 unsigned int getMaxCPU()
 {
-    #ifdef __linux__
+#ifdef __linux__
     try {
         auto cgroupFS = getCgroupFS();
-        if (!cgroupFS) return 0;
+        if (!cgroupFS)
+            return 0;
 
         auto cpuFile = *cgroupFS + "/" + getCurrentCgroup() + "/cpu.max";
 
@@ -40,16 +41,16 @@ unsigned int getMaxCPU()
         auto quota = cpuMaxParts[0];
         auto period = cpuMaxParts[1];
         if (quota != "max")
-                return std::ceil(std::stoi(quota) / std::stof(period));
-    } catch (Error &) { ignoreExceptionInDestructor(lvlDebug); }
-    #endif
+            return std::ceil(std::stoi(quota) / std::stof(period));
+    } catch (Error &) {
+        ignoreExceptionInDestructor(lvlDebug);
+    }
+#endif
 
     return 0;
 }
 
-
 //////////////////////////////////////////////////////////////////////
-
 
 #ifndef _WIN32
 size_t savedStackSize = 0;
@@ -68,9 +69,8 @@ void setStackSize(size_t stackSize)
                     savedStackSize,
                     stackSize,
                     limit.rlim_max,
-                    std::strerror(errno)
-                ).str()
-            );
+                    std::strerror(errno))
+                    .str());
         }
     }
 }
@@ -78,16 +78,16 @@ void setStackSize(size_t stackSize)
 
 void restoreProcessContext(bool restoreMounts)
 {
-    #ifndef _WIN32
+#ifndef _WIN32
     unix::restoreSignals();
-    #endif
+#endif
     if (restoreMounts) {
-        #ifdef __linux__
+#ifdef __linux__
         restoreMountNamespace();
-        #endif
+#endif
     }
 
-    #ifndef _WIN32
+#ifndef _WIN32
     if (savedStackSize) {
         struct rlimit limit;
         if (getrlimit(RLIMIT_STACK, &limit) == 0) {
@@ -95,29 +95,26 @@ void restoreProcessContext(bool restoreMounts)
             setrlimit(RLIMIT_STACK, &limit);
         }
     }
-    #endif
+#endif
 }
-
 
 //////////////////////////////////////////////////////////////////////
 
-
 std::optional<Path> getSelfExe()
 {
-    static auto cached = []() -> std::optional<Path>
-    {
-        #if defined(__linux__) || defined(__GNU__)
+    static auto cached = []() -> std::optional<Path> {
+#if defined(__linux__) || defined(__GNU__)
         return readLink("/proc/self/exe");
-        #elif defined(__APPLE__)
+#elif defined(__APPLE__)
         char buf[1024];
         uint32_t size = sizeof(buf);
         if (_NSGetExecutablePath(buf, &size) == 0)
             return buf;
         else
             return std::nullopt;
-        #else
+#else
         return std::nullopt;
-        #endif
+#endif
     }();
     return cached;
 }

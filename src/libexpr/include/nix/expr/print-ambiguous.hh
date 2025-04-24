@@ -15,10 +15,6 @@ namespace nix {
  * See: https://github.com/NixOS/nix/issues/9730
  */
 void printAmbiguous(
-    Value &v,
-    const SymbolTable &symbols,
-    std::ostream &str,
-    std::set<const void *> *seen,
-    int depth);
+    Value & v, const SymbolTable & symbols, std::ostream & str, std::set<const void *> * seen, int depth);
 
 }

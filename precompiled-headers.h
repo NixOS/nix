@@ -49,15 +49,15 @@
 #include <unistd.h>
 
 #ifndef _WIN32
-# include <grp.h>
-# include <netdb.h>
-# include <pwd.h>
-# include <sys/resource.h>
-# include <sys/select.h>
-# include <sys/socket.h>
-# include <sys/utsname.h>
-# include <sys/wait.h>
-# include <termios.h>
+#  include <grp.h>
+#  include <netdb.h>
+#  include <pwd.h>
+#  include <sys/resource.h>
+#  include <sys/select.h>
+#  include <sys/socket.h>
+#  include <sys/utsname.h>
+#  include <sys/wait.h>
+#  include <termios.h>
 #endif
 
 #include <nlohmann/json.hpp>

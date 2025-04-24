@@ -3,10 +3,7 @@
 
 #include <algorithm>
 
-
 namespace nix {
-
-
 
 /* Allocate a new array of attributes for an attribute set with a specific
    capacity. The space is implicitly reserved after the Bindings
@@ -22,7 +19,6 @@ Bindings * EvalState::allocBindings(size_t capacity)
     return new (allocBytes(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings((Bindings::size_t) capacity);
 }
 
-
 Value & BindingsBuilder::alloc(Symbol name, PosIdx pos)
 {
     auto value = state.allocValue();
@@ -30,24 +26,21 @@ Value & BindingsBuilder::alloc(Symbol name, PosIdx pos)
     return *value;
 }
 
-
 Value & BindingsBuilder::alloc(std::string_view name, PosIdx pos)
 {
     return alloc(state.symbols.create(name), pos);
 }
 
-
 void Bindings::sort()
 {
-    if (size_) std::sort(begin(), end());
+    if (size_)
+        std::sort(begin(), end());
 }
-
 
 Value & Value::mkAttrs(BindingsBuilder & bindings)
 {
     mkAttrs(bindings.finish());
     return *this;
 }
-
 
 }

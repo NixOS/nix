@@ -27,9 +27,8 @@ class RemoteFSAccessor : public SourceAccessor
 
 public:
 
-    RemoteFSAccessor(ref<Store> store,
-        bool requireValidPath = true,
-        const /* FIXME: use std::optional */ Path & cacheDir = "");
+    RemoteFSAccessor(
+        ref<Store> store, bool requireValidPath = true, const /* FIXME: use std::optional */ Path & cacheDir = "");
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override;
 

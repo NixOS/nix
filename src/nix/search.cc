@@ -34,15 +34,14 @@ struct CmdSearch : InstallableValueCommand, MixJSON
     CmdSearch()
     {
         expectArgs("regex", &res);
-        addFlag(Flag {
-            .longName = "exclude",
-            .shortName = 'e',
-            .description = "Hide packages whose attribute path, name or description contain *regex*.",
-            .labels = {"regex"},
-            .handler = {[this](std::string s) {
-                excludeRes.push_back(s);
-            }},
-        });
+        addFlag(
+            Flag{
+                .longName = "exclude",
+                .shortName = 'e',
+                .description = "Hide packages whose attribute path, name or description contain *regex*.",
+                .labels = {"regex"},
+                .handler = {[this](std::string s) { excludeRes.push_back(s); }},
+            });
     }
 
     std::string description() override
@@ -53,16 +52,13 @@ struct CmdSearch : InstallableValueCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "search.md"
-          ;
+#include "search.md"
+            ;
     }
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        return {
-            "packages." + settings.thisSystem.get(),
-            "legacyPackages." + settings.thisSystem.get()
-        };
+        return {"packages." + settings.thisSystem.get(), "legacyPackages." + settings.thisSystem.get()};
     }
 
     void run(ref<Store> store, ref<InstallableValue> installable) override
@@ -72,7 +68,8 @@ struct CmdSearch : InstallableValueCommand, MixJSON
 
         // Recommend "^" here instead of ".*" due to differences in resulting highlighting
         if (res.empty())
-            throw UsageError("Must provide at least one regex! To match all packages, use '%s'.", "nix search <installable> ^");
+            throw UsageError(
+                "Must provide at least one regex! To match all packages, use '%s'.", "nix search <installable> ^");
 
         std::vector<std::regex> regexes;
         std::vector<std::regex> excludeRegexes;
@@ -88,21 +85,20 @@ struct CmdSearch : InstallableValueCommand, MixJSON
         auto state = getEvalState();
 
         std::optional<nlohmann::json> jsonOut;
-        if (json) jsonOut = json::object();
+        if (json)
+            jsonOut = json::object();
 
         uint64_t results = 0;
 
-        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
+        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)>
+            visit;
 
-        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)
-        {
+        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse) {
             auto attrPathS = state->symbols.resolve(attrPath);
 
-            Activity act(*logger, lvlInfo, actUnknown,
-                fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
+            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
             try {
-                auto recurse = [&]()
-                {
+                auto recurse = [&]() {
                     for (const auto & attr : cursor.getAttrs()) {
                         auto cursor2 = cursor.getAttr(state->symbols[attr]);
                         auto attrPath2(attrPath);
@@ -126,9 +122,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                     bool found = false;
 
                     for (auto & regex : excludeRegexes) {
-                        if (
-                            std::regex_search(attrPath2, regex)
-                            || std::regex_search(name.name, regex)
+                        if (std::regex_search(attrPath2, regex) || std::regex_search(name.name, regex)
                             || std::regex_search(description, regex))
                             return;
                     }
@@ -151,8 +145,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                             break;
                     }
 
-                    if (found)
-                    {
+                    if (found) {
                         results++;
                         if (json) {
                             (*jsonOut)[attrPath2] = {
@@ -161,7 +154,8 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                                 {"description", description},
                             };
                         } else {
-                            if (results > 1) logger->cout("");
+                            if (results > 1)
+                                logger->cout("");
                             logger->cout(
                                 "* %s%s",
                                 wrap("\e[0;1m", hiliteMatches(attrPath2, attrPathMatches, ANSI_GREEN, "\e[0;1m")),
@@ -174,8 +168,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                 }
 
                 else if (
-                    attrPath.size() == 0
-                    || (attrPathS[0] == "legacyPackages" && attrPath.size() <= 2)
+                    attrPath.size() == 0 || (attrPathS[0] == "legacyPackages" && attrPath.size() <= 2)
                     || (attrPathS[0] == "packages" && attrPath.size() <= 2))
                     recurse();
 

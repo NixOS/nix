@@ -51,15 +51,16 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
                     warn(e.what());
             }
         }},
-        .completer = [](AddCompletions & completions, size_t index, std::string_view prefix) {
-            if (index == 0) {
-                std::map<std::string, Config::SettingInfo> settings;
-                globalConfig.getSettings(settings);
-                for (auto & s : settings)
-                    if (hasPrefix(s.first, prefix))
-                        completions.add(s.first, fmt("Set the `%s` setting.", s.first));
-            }
-        },
+        .completer =
+            [](AddCompletions & completions, size_t index, std::string_view prefix) {
+                if (index == 0) {
+                    std::map<std::string, Config::SettingInfo> settings;
+                    globalConfig.getSettings(settings);
+                    for (auto & s : settings)
+                        if (hasPrefix(s.first, prefix))
+                            completions.add(s.first, fmt("Set the `%s` setting.", s.first));
+                }
+            },
     });
 
     addFlag({
@@ -75,16 +76,15 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
         .shortName = 'j',
         .description = "The maximum number of parallel builds.",
         .labels = Strings{"jobs"},
-        .handler = {[=](std::string s) {
-            settings.set("max-jobs", s);
-        }},
+        .handler = {[=](std::string s) { settings.set("max-jobs", s); }},
     });
 
     std::string cat = "Options to override configuration settings";
     globalConfig.convertToArgs(*this, cat);
 
     // Backward compatibility hack: nix-env already had a --system flag.
-    if (programName == "nix-env") longFlags.erase("system");
+    if (programName == "nix-env")
+        longFlags.erase("system");
 
     hiddenCategories.insert(cat);
 }
@@ -95,7 +95,7 @@ void MixCommonArgs::initialFlagsProcessed()
     pluginsInited();
 }
 
-template <typename T, typename>
+template<typename T, typename>
 void MixPrintJSON::printJSON(const T /* nlohmann::json */ & json)
 {
     auto suspension = logger->suspend();
@@ -107,6 +107,5 @@ void MixPrintJSON::printJSON(const T /* nlohmann::json */ & json)
 }
 
 template void MixPrintJSON::printJSON(const nlohmann::json & json);
-
 
 } // namespace nix

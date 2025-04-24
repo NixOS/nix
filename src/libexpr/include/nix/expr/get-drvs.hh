@@ -7,7 +7,6 @@
 #include <string>
 #include <map>
 
-
 namespace nix {
 
 /**
@@ -33,7 +32,7 @@ private:
      */
     bool failed = false;
 
-    const Bindings * attrs = nullptr, * meta = nullptr;
+    const Bindings *attrs = nullptr, *meta = nullptr;
 
     const Bindings * getMeta();
 
@@ -45,7 +44,8 @@ public:
      */
     std::string attrPath;
 
-    PackageInfo(EvalState & state) : state(&state) { };
+    PackageInfo(EvalState & state)
+        : state(&state) {};
     PackageInfo(EvalState & state, std::string attrPath, const Bindings * attrs);
     PackageInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs);
 
@@ -74,28 +74,43 @@ public:
     MetaValue queryMetaInfo(EvalState & state, const string & name) const;
     */
 
-    void setName(const std::string & s) { name = s; }
-    void setDrvPath(StorePath path) { drvPath = {{std::move(path)}}; }
-    void setOutPath(StorePath path) { outPath = {{std::move(path)}}; }
+    void setName(const std::string & s)
+    {
+        name = s;
+    }
+    void setDrvPath(StorePath path)
+    {
+        drvPath = {{std::move(path)}};
+    }
+    void setOutPath(StorePath path)
+    {
+        outPath = {{std::move(path)}};
+    }
 
-    void setFailed() { failed = true; };
-    bool hasFailed() { return failed; };
+    void setFailed()
+    {
+        failed = true;
+    };
+    bool hasFailed()
+    {
+        return failed;
+    };
 };
 
-
 typedef std::list<PackageInfo, traceable_allocator<PackageInfo>> PackageInfos;
-
 
 /**
  * If value `v` denotes a derivation, return a PackageInfo object
  * describing it. Otherwise return nothing.
  */
-std::optional<PackageInfo> getDerivation(EvalState & state,
-    Value & v, bool ignoreAssertionFailures);
+std::optional<PackageInfo> getDerivation(EvalState & state, Value & v, bool ignoreAssertionFailures);
 
-void getDerivations(EvalState & state, Value & v, const std::string & pathPrefix,
-    Bindings & autoArgs, PackageInfos & drvs,
+void getDerivations(
+    EvalState & state,
+    Value & v,
+    const std::string & pathPrefix,
+    Bindings & autoArgs,
+    PackageInfos & drvs,
     bool ignoreAssertionFailures);
-
 
 }

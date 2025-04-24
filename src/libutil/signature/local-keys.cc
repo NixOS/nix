@@ -51,8 +51,7 @@ std::string SecretKey::signDetached(std::string_view data) const
 {
     unsigned char sig[crypto_sign_BYTES];
     unsigned long long sigLen;
-    crypto_sign_detached(sig, &sigLen, (unsigned char *) data.data(), data.size(),
-        (unsigned char *) key.data());
+    crypto_sign_detached(sig, &sigLen, (unsigned char *) data.data(), data.size(), (unsigned char *) key.data());
     return name + ":" + base64Encode(std::string((char *) sig, sigLen));
 }
 
@@ -84,7 +83,8 @@ bool PublicKey::verifyDetached(std::string_view data, std::string_view sig) cons
 {
     auto ss = BorrowedCryptoValue::parse(sig);
 
-    if (ss.name != std::string_view { name }) return false;
+    if (ss.name != std::string_view{name})
+        return false;
 
     return verifyDetachedAnon(data, ss.payload);
 }
@@ -100,9 +100,9 @@ bool PublicKey::verifyDetachedAnon(std::string_view data, std::string_view sig) 
     if (sig2.size() != crypto_sign_BYTES)
         throw Error("signature is not valid");
 
-    return crypto_sign_verify_detached((unsigned char *) sig2.data(),
-        (unsigned char *) data.data(), data.size(),
-        (unsigned char *) key.data()) == 0;
+    return crypto_sign_verify_detached(
+               (unsigned char *) sig2.data(), (unsigned char *) data.data(), data.size(), (unsigned char *) key.data())
+           == 0;
 }
 
 bool verifyDetached(std::string_view data, std::string_view sig, const PublicKeys & publicKeys)
@@ -110,7 +110,8 @@ bool verifyDetached(std::string_view data, std::string_view sig, const PublicKey
     auto ss = BorrowedCryptoValue::parse(sig);
 
     auto key = publicKeys.find(std::string(ss.name));
-    if (key == publicKeys.end()) return false;
+    if (key == publicKeys.end())
+        return false;
 
     return key->second.verifyDetachedAnon(data, ss.payload);
 }

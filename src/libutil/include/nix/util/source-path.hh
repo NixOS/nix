@@ -26,7 +26,8 @@ struct SourcePath
     SourcePath(ref<SourceAccessor> accessor, CanonPath path = CanonPath::root)
         : accessor(std::move(accessor))
         , path(std::move(path))
-    { }
+    {
+    }
 
     std::string_view baseName() const;
 
@@ -42,15 +43,15 @@ struct SourcePath
      */
     std::string readFile() const;
 
-    void readFile(
-        Sink & sink,
-        std::function<void(uint64_t)> sizeCallback = [](uint64_t size){}) const
-    { return accessor->readFile(path, sink, sizeCallback); }
+    void readFile(Sink & sink, std::function<void(uint64_t)> sizeCallback = [](uint64_t size) {}) const
+    {
+        return accessor->readFile(path, sink, sizeCallback);
+    }
 
     /**
      * Return whether this `SourcePath` denotes a file (of any type)
      * that exists
-    */
+     */
     bool pathExists() const;
 
     /**
@@ -80,9 +81,7 @@ struct SourcePath
     /**
      * Dump this `SourcePath` to `sink` as a NAR archive.
      */
-    void dumpPath(
-        Sink & sink,
-        PathFilter & filter = defaultPathFilter) const;
+    void dumpPath(Sink & sink, PathFilter & filter = defaultPathFilter) const;
 
     /**
      * Return the location of this path in the "real" filesystem, if
@@ -95,14 +94,14 @@ struct SourcePath
     /**
      * Append a `CanonPath` to this path.
      */
-    SourcePath operator / (const CanonPath & x) const;
+    SourcePath operator/(const CanonPath & x) const;
 
     /**
      * Append a single component `c` to this path. `c` must not
      * contain a slash. A slash is implicitly added between this path
      * and `c`.
      */
-    SourcePath operator / (std::string_view c) const;
+    SourcePath operator/(std::string_view c) const;
 
     bool operator==(const SourcePath & x) const noexcept;
     std::strong_ordering operator<=>(const SourcePath & x) const noexcept;
@@ -110,8 +109,7 @@ struct SourcePath
     /**
      * Convenience wrapper around `SourceAccessor::resolveSymlinks()`.
      */
-    SourcePath resolveSymlinks(
-        SymlinkResolution mode = SymlinkResolution::Full) const
+    SourcePath resolveSymlinks(SymlinkResolution mode = SymlinkResolution::Full) const
     {
         return {accessor, accessor->resolveSymlinks(path, mode)};
     }
@@ -119,7 +117,7 @@ struct SourcePath
     friend class std::hash<nix::SourcePath>;
 };
 
-std::ostream & operator << (std::ostream & str, const SourcePath & path);
+std::ostream & operator<<(std::ostream & str, const SourcePath & path);
 
 }
 

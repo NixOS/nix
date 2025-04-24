@@ -57,22 +57,14 @@ std::string_view renderFileSerialisationMethod(FileSerialisationMethod method);
  * Dump a serialization of the given file system object.
  */
 void dumpPath(
-    const SourcePath & path,
-    Sink & sink,
-    FileSerialisationMethod method,
-    PathFilter & filter = defaultPathFilter);
+    const SourcePath & path, Sink & sink, FileSerialisationMethod method, PathFilter & filter = defaultPathFilter);
 
 /**
  * Restore a serialisation of the given file system object.
  *
  * \todo use an arbitrary `FileSystemObjectSink`.
  */
-void restorePath(
-    const Path & path,
-    Source & source,
-    FileSerialisationMethod method,
-    bool startFsync = false);
-
+void restorePath(const Path & path, Source & source, FileSerialisationMethod method, bool startFsync = false);
 
 /**
  * Compute the hash of the given file system object according to the
@@ -85,9 +77,7 @@ void restorePath(
  * ```
  */
 HashResult hashPath(
-    const SourcePath & path,
-    FileSerialisationMethod method, HashAlgorithm ha,
-    PathFilter & filter = defaultPathFilter);
+    const SourcePath & path, FileSerialisationMethod method, HashAlgorithm ha, PathFilter & filter = defaultPathFilter);
 
 /**
  * An enumeration of the ways we can ingest file system
@@ -153,8 +143,6 @@ std::string_view renderFileIngestionMethod(FileIngestionMethod method);
  * useful defined for a merkle format.
  */
 std::pair<Hash, std::optional<uint64_t>> hashPath(
-    const SourcePath & path,
-    FileIngestionMethod method, HashAlgorithm ha,
-    PathFilter & filter = defaultPathFilter);
+    const SourcePath & path, FileIngestionMethod method, HashAlgorithm ha, PathFilter & filter = defaultPathFilter);
 
 }

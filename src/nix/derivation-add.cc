@@ -20,11 +20,14 @@ struct CmdAddDerivation : MixDryRun, StoreCommand
     std::string doc() override
     {
         return
-          #include "derivation-add.md"
-          ;
+#include "derivation-add.md"
+            ;
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 
     void run(ref<Store> store) override
     {

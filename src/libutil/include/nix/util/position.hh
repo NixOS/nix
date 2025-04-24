@@ -21,34 +21,51 @@ struct Pos
     uint32_t line = 0;
     uint32_t column = 0;
 
-    struct Stdin {
+    struct Stdin
+    {
         ref<std::string> source;
         bool operator==(const Stdin & rhs) const noexcept
-        { return *source == *rhs.source; }
+        {
+            return *source == *rhs.source;
+        }
         std::strong_ordering operator<=>(const Stdin & rhs) const noexcept
-        { return *source <=> *rhs.source; }
+        {
+            return *source <=> *rhs.source;
+        }
     };
-    struct String {
+    struct String
+    {
         ref<std::string> source;
         bool operator==(const String & rhs) const noexcept
-        { return *source == *rhs.source; }
+        {
+            return *source == *rhs.source;
+        }
         std::strong_ordering operator<=>(const String & rhs) const noexcept
-        { return *source <=> *rhs.source; }
+        {
+            return *source <=> *rhs.source;
+        }
     };
 
     typedef std::variant<std::monostate, Stdin, String, SourcePath> Origin;
 
     Origin origin = std::monostate();
 
-    Pos() { }
+    Pos() {}
     Pos(uint32_t line, uint32_t column, Origin origin)
-        : line(line), column(column), origin(origin) { }
+        : line(line)
+        , column(column)
+        , origin(origin)
+    {
+    }
     Pos(Pos & other) = default;
     Pos(const Pos & other) = default;
     Pos(Pos && other) = default;
     Pos(const Pos * other);
 
-    explicit operator bool() const { return line > 0; }
+    explicit operator bool() const
+    {
+        return line > 0;
+    }
 
     /* TODO: Why std::shared_ptr<Pos> and not std::shared_ptr<const Pos>? */
     operator std::shared_ptr<Pos>() const;
@@ -72,39 +89,56 @@ struct Pos
      */
     std::optional<SourcePath> getSourcePath() const;
 
-    struct LinesIterator {
+    struct LinesIterator
+    {
         using difference_type = size_t;
         using value_type = std::string_view;
         using reference = const std::string_view &;
         using pointer = const std::string_view *;
         using iterator_category = std::input_iterator_tag;
 
-        LinesIterator(): pastEnd(true) {}
-        explicit LinesIterator(std::string_view input): input(input), pastEnd(input.empty()) {
+        LinesIterator()
+            : pastEnd(true)
+        {
+        }
+        explicit LinesIterator(std::string_view input)
+            : input(input)
+            , pastEnd(input.empty())
+        {
             if (!pastEnd)
                 bump(true);
         }
 
-        LinesIterator & operator++() {
+        LinesIterator & operator++()
+        {
             bump(false);
             return *this;
         }
-        LinesIterator operator++(int) {
+        LinesIterator operator++(int)
+        {
             auto result = *this;
             ++*this;
             return result;
         }
 
-        reference operator*() const { return curLine; }
-        pointer operator->() const { return &curLine; }
+        reference operator*() const
+        {
+            return curLine;
+        }
+        pointer operator->() const
+        {
+            return &curLine;
+        }
 
-        bool operator!=(const LinesIterator & other) const {
+        bool operator!=(const LinesIterator & other) const
+        {
             return !(*this == other);
         }
-        bool operator==(const LinesIterator & other) const {
+        bool operator==(const LinesIterator & other) const
+        {
             return (pastEnd && other.pastEnd)
-                || (std::forward_as_tuple(input.size(), input.data())
-                    == std::forward_as_tuple(other.input.size(), other.input.data()));
+                   || (std::forward_as_tuple(input.size(), input.data())
+                       == std::forward_as_tuple(other.input.size(), other.input.data()));
         }
 
     private:

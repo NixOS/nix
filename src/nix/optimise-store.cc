@@ -16,8 +16,8 @@ struct CmdOptimiseStore : StoreCommand
     std::string doc() override
     {
         return
-          #include "optimise-store.md"
-          ;
+#include "optimise-store.md"
+            ;
     }
 
     void run(ref<Store> store) override

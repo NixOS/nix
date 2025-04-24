@@ -35,18 +35,15 @@ void Store::exportPath(const StorePath & path, Sink & sink)
        Don't complain if the stored hash is zero (unknown). */
     Hash hash = hashSink.currentHash().first;
     if (hash != info->narHash && info->narHash != Hash(info->narHash.algo))
-        throw Error("hash of path '%s' has changed from '%s' to '%s'!",
-                    printStorePath(path), info->narHash.to_string(HashFormat::Nix32, true), hash.to_string(HashFormat::Nix32, true));
+        throw Error(
+            "hash of path '%s' has changed from '%s' to '%s'!",
+            printStorePath(path),
+            info->narHash.to_string(HashFormat::Nix32, true),
+            hash.to_string(HashFormat::Nix32, true));
 
-    teeSink
-        << exportMagic
-        << printStorePath(path);
-    CommonProto::write(*this,
-        CommonProto::WriteConn { .to = teeSink },
-        info->references);
-    teeSink
-        << (info->deriver ? printStorePath(*info->deriver) : "")
-        << 0;
+    teeSink << exportMagic << printStorePath(path);
+    CommonProto::write(*this, CommonProto::WriteConn{.to = teeSink}, info->references);
+    teeSink << (info->deriver ? printStorePath(*info->deriver) : "") << 0;
 }
 
 StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
@@ -54,12 +51,14 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
     StorePaths res;
     while (true) {
         auto n = readNum<uint64_t>(source);
-        if (n == 0) break;
-        if (n != 1) throw Error("input doesn't look like something created by 'nix-store --export'");
+        if (n == 0)
+            break;
+        if (n != 1)
+            throw Error("input doesn't look like something created by 'nix-store --export'");
 
         /* Extract the NAR from the source. */
         StringSink saved;
-        TeeSource tee { source, saved };
+        TeeSource tee{source, saved};
         NullFileSystemObjectSink ether;
         parseDump(ether, tee);
 
@@ -69,14 +68,13 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
 
         auto path = parseStorePath(readString(source));
 
-        //Activity act(*logger, lvlInfo, "importing path '%s'", info.path);
+        // Activity act(*logger, lvlInfo, "importing path '%s'", info.path);
 
-        auto references = CommonProto::Serialise<StorePathSet>::read(*this,
-            CommonProto::ReadConn { .from = source });
+        auto references = CommonProto::Serialise<StorePathSet>::read(*this, CommonProto::ReadConn{.from = source});
         auto deriver = readString(source);
         auto narHash = hashString(HashAlgorithm::SHA256, saved.s);
 
-        ValidPathInfo info { path, narHash };
+        ValidPathInfo info{path, narHash};
         if (deriver != "")
             info.deriver = parseStorePath(deriver);
         info.references = references;

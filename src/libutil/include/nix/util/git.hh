@@ -16,8 +16,8 @@ namespace nix::git {
 enum struct ObjectType {
     Blob,
     Tree,
-    //Commit,
-    //Tag,
+    // Commit,
+    // Tag,
 };
 
 using RawMode = uint32_t;
@@ -39,8 +39,8 @@ struct TreeEntry
     Mode mode;
     Hash hash;
 
-    bool operator ==(const TreeEntry &) const = default;
-    auto operator <=>(const TreeEntry &) const = default;
+    bool operator==(const TreeEntry &) const = default;
+    auto operator<=>(const TreeEntry &) const = default;
 };
 
 /**
@@ -72,9 +72,8 @@ using SinkHook = void(const CanonPath & name, TreeEntry entry);
  *
  * @throws if prefix not recognized
  */
-ObjectType parseObjectType(
-    Source & source,
-    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+ObjectType
+parseObjectType(Source & source, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * These 3 modes are represented by blob objects.
@@ -82,21 +81,22 @@ ObjectType parseObjectType(
  * Sometimes we need this information to disambiguate how a blob is
  * being used to better match our own "file system object" data model.
  */
-enum struct BlobMode : RawMode
-{
+enum struct BlobMode : RawMode {
     Regular = static_cast<RawMode>(Mode::Regular),
     Executable = static_cast<RawMode>(Mode::Executable),
     Symlink = static_cast<RawMode>(Mode::Symlink),
 };
 
 void parseBlob(
-    FileSystemObjectSink & sink, const CanonPath & sinkPath,
+    FileSystemObjectSink & sink,
+    const CanonPath & sinkPath,
     Source & source,
     BlobMode blobMode,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 void parseTree(
-    FileSystemObjectSink & sink, const CanonPath & sinkPath,
+    FileSystemObjectSink & sink,
+    const CanonPath & sinkPath,
     Source & source,
     std::function<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
@@ -109,7 +109,8 @@ void parseTree(
  * a blob, this is ignored.
  */
 void parse(
-    FileSystemObjectSink & sink, const CanonPath & sinkPath,
+    FileSystemObjectSink & sink,
+    const CanonPath & sinkPath,
     Source & source,
     BlobMode rootModeIfBlob,
     std::function<SinkHook> hook,
@@ -139,15 +140,13 @@ void restore(FileSystemObjectSink & sink, Source & source, std::function<Restore
  * @param xpSettings for testing purposes
  */
 void dumpBlobPrefix(
-    uint64_t size, Sink & sink,
-    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+    uint64_t size, Sink & sink, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * Dumps a representation of a git tree to a sink
  */
 void dumpTree(
-    const Tree & entries, Sink & sink,
-    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+    const Tree & entries, Sink & sink, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * Callback for processing a child with `dump`
@@ -172,10 +171,7 @@ Mode dump(
  *
  * A smaller wrapper around `dump`.
  */
-TreeEntry dumpHash(
-    HashAlgorithm ha,
-    const SourcePath & path,
-    PathFilter & filter = defaultPathFilter);
+TreeEntry dumpHash(HashAlgorithm ha, const SourcePath & path, PathFilter & filter = defaultPathFilter);
 
 /**
  * A line from the output of `git ls-remote --symref`.
@@ -196,11 +192,9 @@ TreeEntry dumpHash(
  *   ```
  *   where {target} is a commit id and {reference} is mandatory
  */
-struct LsRemoteRefLine {
-    enum struct Kind {
-        Symbolic,
-        Object
-    };
+struct LsRemoteRefLine
+{
+    enum struct Kind { Symbolic, Object };
     Kind kind;
     std::string target;
     std::optional<std::string> reference;

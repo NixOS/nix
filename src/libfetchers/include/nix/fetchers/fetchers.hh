@@ -13,7 +13,11 @@
 
 #include "nix/util/ref.hh"
 
-namespace nix { class Store; class StorePath; struct SourceAccessor; }
+namespace nix {
+class Store;
+class StorePath;
+struct SourceAccessor;
+}
 
 namespace nix::fetchers {
 
@@ -36,7 +40,8 @@ struct Input
 
     Input(const Settings & settings)
         : settings{&settings}
-    { }
+    {
+    }
 
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;
@@ -52,22 +57,16 @@ public:
      *
      * The URL indicate which sort of fetcher, and provides information to that fetcher.
      */
-    static Input fromURL(
-        const Settings & settings,
-        const std::string & url, bool requireTree = true);
+    static Input fromURL(const Settings & settings, const std::string & url, bool requireTree = true);
 
-    static Input fromURL(
-        const Settings & settings,
-        const ParsedURL & url, bool requireTree = true);
+    static Input fromURL(const Settings & settings, const ParsedURL & url, bool requireTree = true);
 
     /**
      * Create an `Input` from a an `Attrs`.
      *
      * The URL indicate which sort of fetcher, and provides information to that fetcher.
      */
-    static Input fromAttrs(
-        const Settings & settings,
-        Attrs && attrs);
+    static Input fromAttrs(const Settings & settings, Attrs && attrs);
 
     ParsedURL toURL() const;
 
@@ -108,9 +107,9 @@ public:
      */
     bool isFinal() const;
 
-    bool operator ==(const Input & other) const noexcept;
+    bool operator==(const Input & other) const noexcept;
 
-    bool operator <(const Input & other) const
+    bool operator<(const Input & other) const
     {
         return attrs < other.attrs;
     }
@@ -149,9 +148,7 @@ private:
 
 public:
 
-    Input applyOverrides(
-        std::optional<std::string> ref,
-        std::optional<Hash> rev) const;
+    Input applyOverrides(std::optional<std::string> ref, std::optional<Hash> rev) const;
 
     void clone(const Path & destDir) const;
 
@@ -161,10 +158,7 @@ public:
      * Write a file to this input, for input types that support
      * writing. Optionally commit the change (for e.g. Git inputs).
      */
-    void putFile(
-        const CanonPath & path,
-        std::string_view contents,
-        std::optional<std::string> commitMsg) const;
+    void putFile(const CanonPath & path, std::string_view contents, std::optional<std::string> commitMsg) const;
 
     std::string getName() const;
 
@@ -200,16 +194,12 @@ public:
  */
 struct InputScheme
 {
-    virtual ~InputScheme()
-    { }
+    virtual ~InputScheme() {}
 
-    virtual std::optional<Input> inputFromURL(
-        const Settings & settings,
-        const ParsedURL & url, bool requireTree) const = 0;
+    virtual std::optional<Input>
+    inputFromURL(const Settings & settings, const ParsedURL & url, bool requireTree) const = 0;
 
-    virtual std::optional<Input> inputFromAttrs(
-        const Settings & settings,
-        const Attrs & attrs) const = 0;
+    virtual std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const = 0;
 
     /**
      * What is the name of the scheme?
@@ -231,10 +221,7 @@ struct InputScheme
 
     virtual ParsedURL toURL(const Input & input) const;
 
-    virtual Input applyOverrides(
-        const Input & input,
-        std::optional<std::string> ref,
-        std::optional<Hash> rev) const;
+    virtual Input applyOverrides(const Input & input, std::optional<std::string> ref, std::optional<Hash> rev) const;
 
     virtual void clone(const Input & input, const Path & destDir) const;
 
@@ -254,19 +241,30 @@ struct InputScheme
     virtual std::optional<ExperimentalFeature> experimentalFeature() const;
 
     virtual bool isDirect(const Input & input) const
-    { return true; }
+    {
+        return true;
+    }
 
     virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
-    { return std::nullopt; }
+    {
+        return std::nullopt;
+    }
 
     virtual bool isLocked(const Input & input) const
-    { return false; }
+    {
+        return false;
+    }
 
     virtual std::optional<std::string> isRelative(const Input & input) const
-    { return std::nullopt; }
+    {
+        return std::nullopt;
+    }
 
-    virtual std::optional<std::string> getAccessToken(const fetchers::Settings & settings, const std::string & host, const std::string & url) const
-    { return {};}
+    virtual std::optional<std::string>
+    getAccessToken(const fetchers::Settings & settings, const std::string & host, const std::string & url) const
+    {
+        return {};
+    }
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
@@ -278,10 +276,10 @@ struct PublicKey
     std::string type = "ssh-ed25519";
     std::string key;
 
-    auto operator <=>(const PublicKey &) const = default;
+    auto operator<=>(const PublicKey &) const = default;
 };
 
-std::string publicKeys_to_string(const std::vector<PublicKey>&);
+std::string publicKeys_to_string(const std::vector<PublicKey> &);
 
 }
 

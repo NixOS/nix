@@ -6,7 +6,6 @@
 #include <cerrno>
 #include <cstdlib>
 
-
 namespace nix {
 
 PathLocks::PathLocks()
@@ -14,13 +13,11 @@ PathLocks::PathLocks()
 {
 }
 
-
 PathLocks::PathLocks(const PathSet & paths, const std::string & waitMsg)
     : deletePaths(false)
 {
     lockPaths(paths, waitMsg);
 }
-
 
 PathLocks::~PathLocks()
 {
@@ -31,11 +28,9 @@ PathLocks::~PathLocks()
     }
 }
 
-
 void PathLocks::setDeletion(bool deletePaths)
 {
     this->deletePaths = deletePaths;
 }
-
 
 }

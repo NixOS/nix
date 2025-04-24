@@ -32,18 +32,18 @@ nix_err nix_context_error(nix_c_context * context);
  */
 nix_err call_nix_get_string_callback(const std::string str, nix_get_string_callback callback, void * user_data);
 
-#define NIXC_CATCH_ERRS \
-    catch (...) \
-    { \
+#define NIXC_CATCH_ERRS                    \
+    catch (...)                            \
+    {                                      \
         return nix_context_error(context); \
-    } \
+    }                                      \
     return NIX_OK;
 
-#define NIXC_CATCH_ERRS_RES(def) \
-    catch (...) \
-    { \
+#define NIXC_CATCH_ERRS_RES(def)    \
+    catch (...)                     \
+    {                               \
         nix_context_error(context); \
-        return def; \
+        return def;                 \
     }
 #define NIXC_CATCH_ERRS_NULL NIXC_CATCH_ERRS_RES(nullptr)
 

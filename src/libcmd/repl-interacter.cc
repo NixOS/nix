@@ -3,8 +3,8 @@
 #include <cstdio>
 
 #if USE_READLINE
-#include <readline/history.h>
-#include <readline/readline.h>
+#  include <readline/history.h>
+#  include <readline/readline.h>
 #else
 // editline < 1.15.2 don't wrap their API for C++ usage
 // (added in https://github.com/troglobit/editline/commit/91398ceb3427b730995357e9d120539fb9bb7461).
@@ -12,7 +12,7 @@
 // For compatibility with these versions, we wrap the API here
 // (wrapping multiple times on newer versions is no problem).
 extern "C" {
-#include <editline.h>
+#  include <editline.h>
 }
 #endif
 
@@ -183,8 +183,7 @@ bool ReadlineLikeInteracter::getLine(std::string & input, ReplPromptType promptT
     // editline doesn't echo the input to the output when non-interactive, unlike readline
     // this results in a different behavior when running tests. The echoing is
     // quite useful for reading the test output, so we add it here.
-    if (auto e = getEnv("_NIX_TEST_REPL_ECHO"); s && e && *e == "1")
-    {
+    if (auto e = getEnv("_NIX_TEST_REPL_ECHO"); s && e && *e == "1") {
 #if !USE_READLINE
         // This is probably not right for multi-line input, but we don't use that
         // in the characterisation tests, so it's fine.

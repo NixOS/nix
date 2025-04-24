@@ -16,7 +16,8 @@ namespace nix {
 
 Config::Config(StringMap initials)
     : AbstractConfig(std::move(initials))
-{ }
+{
+}
 
 bool Config::set(const std::string & name, const std::string & value)
 {
@@ -54,8 +55,7 @@ void Config::addSetting(AbstractSetting * setting)
     for (auto & alias : setting->aliases) {
         if (auto i = unknownSettings.find(alias); i != unknownSettings.end()) {
             if (set)
-                warn("setting '%s' is set, but it's an alias of '%s' which is also set",
-                    alias, setting->name);
+                warn("setting '%s' is set, but it's an alias of '%s' which is also set", alias, setting->name);
             else {
                 setting->set(std::move(i->second));
                 setting->overridden = true;
@@ -68,7 +68,8 @@ void Config::addSetting(AbstractSetting * setting)
 
 AbstractConfig::AbstractConfig(StringMap initials)
     : unknownSettings(std::move(initials))
-{ }
+{
+}
 
 void AbstractConfig::warnUnknownSettings()
 {
@@ -87,21 +88,24 @@ void AbstractConfig::reapplyUnknownSettings()
 void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
 {
     for (const auto & opt : _settings)
-        if (!opt.second.isAlias
-            && (!overriddenOnly || opt.second.setting->overridden)
+        if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden)
             && experimentalFeatureSettings.isEnabled(opt.second.setting->experimentalFeature))
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
 
-
 /**
- * Parse configuration in `contents`, and also the configuration files included from there, with their location specified relative to `path`.
+ * Parse configuration in `contents`, and also the configuration files included from there, with their location
+ * specified relative to `path`.
  *
  * `contents` and `path` represent the file that is being parsed.
  * The result is only an intermediate list of key-value pairs of strings.
  * More parsing according to the settings-specific semantics is being done by `loadConfFile` in `libstore/globals.cc`.
-*/
-static void parseConfigFiles(const std::string & contents, const std::string & path, std::vector<std::pair<std::string, std::string>> & parsedContents) {
+ */
+static void parseConfigFiles(
+    const std::string & contents,
+    const std::string & path,
+    std::vector<std::pair<std::string, std::string>> & parsedContents)
+{
     unsigned int pos = 0;
 
     while (pos < contents.size()) {
@@ -114,7 +118,8 @@ static void parseConfigFiles(const std::string & contents, const std::string & p
             line = std::string(line, 0, hash);
 
         auto tokens = tokenizeString<std::vector<std::string>>(line);
-        if (tokens.empty()) continue;
+        if (tokens.empty())
+            continue;
 
         if (tokens.size() < 2)
             throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
@@ -160,7 +165,8 @@ static void parseConfigFiles(const std::string & contents, const std::string & p
     };
 }
 
-void AbstractConfig::applyConfig(const std::string & contents, const std::string & path) {
+void AbstractConfig::applyConfig(const std::string & contents, const std::string & path)
+{
     std::vector<std::pair<std::string, std::string>> parsedContents;
 
     parseConfigFiles(contents, path, parsedContents);
@@ -176,8 +182,7 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
     // but at the time of writing it's not worth building that for just one thing
     for (const auto & [name, value] : parsedContents) {
         if (name != "experimental-features" && name != "extra-experimental-features") {
-            if ((name == "nix-path" || name == "extra-nix-path")
-                && getEnv("NIX_PATH").has_value()) {
+            if ((name == "nix-path" || name == "extra-nix-path") && getEnv("NIX_PATH").has_value()) {
                 continue;
             }
             set(name, value);
@@ -253,37 +258,42 @@ std::map<std::string, nlohmann::json> AbstractSetting::toJSONObject() const
     return obj;
 }
 
-void AbstractSetting::convertToArg(Args & args, const std::string & category)
+void AbstractSetting::convertToArg(Args & args, const std::string & category) {}
+
+bool AbstractSetting::isOverridden() const
 {
+    return overridden;
 }
 
-
-bool AbstractSetting::isOverridden() const { return overridden; }
-
-template<> std::string BaseSetting<std::string>::parse(const std::string & str) const
+template<>
+std::string BaseSetting<std::string>::parse(const std::string & str) const
 {
     return str;
 }
 
-template<> std::string BaseSetting<std::string>::to_string() const
+template<>
+std::string BaseSetting<std::string>::to_string() const
 {
     return value;
 }
 
-template<> std::optional<std::string> BaseSetting<std::optional<std::string>>::parse(const std::string & str) const
+template<>
+std::optional<std::string> BaseSetting<std::optional<std::string>>::parse(const std::string & str) const
 {
     if (str == "")
         return std::nullopt;
     else
-        return { str };
+        return {str};
 }
 
-template<> std::string BaseSetting<std::optional<std::string>>::to_string() const
+template<>
+std::string BaseSetting<std::optional<std::string>>::to_string() const
 {
     return value ? *value : "";
 }
 
-template<> bool BaseSetting<bool>::parse(const std::string & str) const
+template<>
+bool BaseSetting<bool>::parse(const std::string & str) const
 {
     if (str == "true" || str == "yes" || str == "1")
         return true;
@@ -293,12 +303,14 @@ template<> bool BaseSetting<bool>::parse(const std::string & str) const
         throw UsageError("Boolean setting '%s' has invalid value '%s'", name, str);
 }
 
-template<> std::string BaseSetting<bool>::to_string() const
+template<>
+std::string BaseSetting<bool>::to_string() const
 {
     return value ? "true" : "false";
 }
 
-template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string & category)
+template<>
+void BaseSetting<bool>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({
         .longName = name,
@@ -318,40 +330,48 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
     });
 }
 
-template<> Strings BaseSetting<Strings>::parse(const std::string & str) const
+template<>
+Strings BaseSetting<Strings>::parse(const std::string & str) const
 {
     return tokenizeString<Strings>(str);
 }
 
-template<> void BaseSetting<Strings>::appendOrSet(Strings newValue, bool append)
+template<>
+void BaseSetting<Strings>::appendOrSet(Strings newValue, bool append)
 {
-    if (!append) value.clear();
-    value.insert(value.end(), std::make_move_iterator(newValue.begin()),
-                              std::make_move_iterator(newValue.end()));
+    if (!append)
+        value.clear();
+    value.insert(value.end(), std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
 }
 
-template<> std::string BaseSetting<Strings>::to_string() const
+template<>
+std::string BaseSetting<Strings>::to_string() const
 {
     return concatStringsSep(" ", value);
 }
 
-template<> StringSet BaseSetting<StringSet>::parse(const std::string & str) const
+template<>
+StringSet BaseSetting<StringSet>::parse(const std::string & str) const
 {
     return tokenizeString<StringSet>(str);
 }
 
-template<> void BaseSetting<StringSet>::appendOrSet(StringSet newValue, bool append)
+template<>
+void BaseSetting<StringSet>::appendOrSet(StringSet newValue, bool append)
 {
-    if (!append) value.clear();
+    if (!append)
+        value.clear();
     value.insert(std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
 }
 
-template<> std::string BaseSetting<StringSet>::to_string() const
+template<>
+std::string BaseSetting<StringSet>::to_string() const
 {
     return concatStringsSep(" ", value);
 }
 
-template<> std::set<ExperimentalFeature> BaseSetting<std::set<ExperimentalFeature>>::parse(const std::string & str) const
+template<>
+std::set<ExperimentalFeature> BaseSetting<std::set<ExperimentalFeature>>::parse(const std::string & str) const
 {
     std::set<ExperimentalFeature> res;
     for (auto & s : tokenizeString<StringSet>(str)) {
@@ -365,13 +385,16 @@ template<> std::set<ExperimentalFeature> BaseSetting<std::set<ExperimentalFeatur
     return res;
 }
 
-template<> void BaseSetting<std::set<ExperimentalFeature>>::appendOrSet(std::set<ExperimentalFeature> newValue, bool append)
+template<>
+void BaseSetting<std::set<ExperimentalFeature>>::appendOrSet(std::set<ExperimentalFeature> newValue, bool append)
 {
-    if (!append) value.clear();
+    if (!append)
+        value.clear();
     value.insert(std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
 }
 
-template<> std::string BaseSetting<std::set<ExperimentalFeature>>::to_string() const
+template<>
+std::string BaseSetting<std::set<ExperimentalFeature>>::to_string() const
 {
     StringSet stringifiedXpFeatures;
     for (const auto & feature : value)
@@ -379,7 +402,8 @@ template<> std::string BaseSetting<std::set<ExperimentalFeature>>::to_string() c
     return concatStringsSep(" ", stringifiedXpFeatures);
 }
 
-template<> StringMap BaseSetting<StringMap>::parse(const std::string & str) const
+template<>
+StringMap BaseSetting<StringMap>::parse(const std::string & str) const
 {
     StringMap res;
     for (const auto & s : tokenizeString<Strings>(str)) {
@@ -390,17 +414,23 @@ template<> StringMap BaseSetting<StringMap>::parse(const std::string & str) cons
     return res;
 }
 
-template<> void BaseSetting<StringMap>::appendOrSet(StringMap newValue, bool append)
+template<>
+void BaseSetting<StringMap>::appendOrSet(StringMap newValue, bool append)
 {
-    if (!append) value.clear();
+    if (!append)
+        value.clear();
     value.insert(std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
 }
 
-template<> std::string BaseSetting<StringMap>::to_string() const
+template<>
+std::string BaseSetting<StringMap>::to_string() const
 {
-    return std::transform_reduce(value.cbegin(), value.cend(), std::string{},
-        [](const auto & l, const auto  &r) { return l + " " + r; },
-        [](const auto & kvpair){ return kvpair.first + "=" + kvpair.second; });
+    return std::transform_reduce(
+        value.cbegin(),
+        value.cend(),
+        std::string{},
+        [](const auto & l, const auto & r) { return l + " " + r; },
+        [](const auto & kvpair) { return kvpair.first + "=" + kvpair.second; });
 }
 
 template class BaseSetting<int>;
@@ -424,7 +454,8 @@ static Path parsePath(const AbstractSetting & s, const std::string & str)
         return canonPath(str);
 }
 
-PathSetting::PathSetting(Config * options,
+PathSetting::PathSetting(
+    Config * options,
     const Path & def,
     const std::string & name,
     const std::string & description,
@@ -439,8 +470,8 @@ Path PathSetting::parse(const std::string & str) const
     return parsePath(*this, str);
 }
 
-
-OptionalPathSetting::OptionalPathSetting(Config * options,
+OptionalPathSetting::OptionalPathSetting(
+    Config * options,
     const std::optional<Path> & def,
     const std::string & name,
     const std::string & description,
@@ -450,7 +481,6 @@ OptionalPathSetting::OptionalPathSetting(Config * options,
     options->addSetting(this);
 }
 
-
 std::optional<Path> OptionalPathSetting::parse(const std::string & str) const
 {
     if (str == "")
@@ -459,7 +489,7 @@ std::optional<Path> OptionalPathSetting::parse(const std::string & str) const
         return parsePath(*this, str);
 }
 
-void OptionalPathSetting::operator =(const std::optional<Path> & v)
+void OptionalPathSetting::operator=(const std::optional<Path> & v)
 {
     this->assign(v);
 }
@@ -483,7 +513,8 @@ bool ExperimentalFeatureSettings::isEnabled(const std::optional<ExperimentalFeat
 
 void ExperimentalFeatureSettings::require(const std::optional<ExperimentalFeature> & feature) const
 {
-    if (feature) require(*feature);
+    if (feature)
+        require(*feature);
 }
 
 }
