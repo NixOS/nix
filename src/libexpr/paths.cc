@@ -70,7 +70,8 @@ std::string EvalState::computeBaseName(const SourcePath & path)
 StorePath EvalState::mountInput(
     fetchers::Input & input, const fetchers::Input & originalInput, ref<SourceAccessor> accessor, bool requireLockable)
 {
-    auto storePath = StorePath::random(input.getName());
+    auto storePath = settings.lazyTrees ? StorePath::random(input.getName())
+                                        : fetchToStore(*store, accessor, FetchMode::Copy, input.getName());
 
     allowPath(storePath); // FIXME: should just whitelist the entire virtual store
 
@@ -81,11 +82,9 @@ StorePath EvalState::mountInput(
         input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
     }
 
-    // FIXME: check NAR hash
-
-#if 0
-    assert(!originalInput.getNarHash() || storePath == originalInput.computeStorePath(*store));
-#endif
+    // FIXME: what to do with the NAR hash in lazy mode?
+    if (!settings.lazyTrees)
+        assert(!originalInput.getNarHash() || storePath == originalInput.computeStorePath(*store));
 
     return storePath;
 }
