@@ -740,6 +740,29 @@ LockedFlake lockFlake(
                             use --no-write-lock-file. */
                         auto ref = (input2.ref && explicitCliOverrides.contains(inputAttrPath)) ? *input2.ref : *input.ref;
 
+                        /* Warn against the use of indirect flakerefs
+                           (but only at top-level since we don't want
+                           to annoy users about flakes that are not
+                           under their control). */
+                        auto warnRegistry = [&](const FlakeRef & resolvedRef)
+                        {
+                            if (inputAttrPath.size() == 1 && !input.ref->input.isDirect()) {
+                                std::ostringstream s;
+                                printLiteralString(s, resolvedRef.to_string());
+                                warn(
+                                    "Flake input '%1%' uses the flake registry. "
+                                    "Using the registry in flake inputs is deprecated in Determinate Nix. "
+                                    "To make your flake future-proof, add the following to '%2%':\n"
+                                    "\n"
+                                    "  inputs.%1%.url = %3%;\n"
+                                    "\n"
+                                    "For more information, see: https://github.com/DeterminateSystems/nix-src/issues/37",
+                                    inputAttrPathS,
+                                    flake.path,
+                                    s.str());
+                            }
+                        };
+
                         if (input.isFlake) {
                             auto inputFlake = getInputFlake(*input.ref);
 
@@ -771,6 +794,8 @@ LockedFlake lockFlake(
                                 oldLock ? followsPrefix : inputAttrPath,
                                 inputFlake.path,
                                 false);
+
+                            warnRegistry(inputFlake.resolvedRef);
                         }
 
                         else {
@@ -782,6 +807,8 @@ LockedFlake lockFlake(
                                 } else {
                                     auto [accessor, resolvedRef, lockedRef] = fetchOrSubstituteTree(
                                         state, *input.ref, useRegistries, flakeCache);
+
+                                    warnRegistry(resolvedRef);
 
                                     // FIXME: allow input to be lazy.
                                     auto storePath = copyInputToStore(state, lockedRef.input, input.ref->input, accessor);
