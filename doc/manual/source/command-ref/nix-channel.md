@@ -8,6 +8,12 @@
 
 # Description
 
+> **Warning**
+>
+> nix-channel is deprecated in favor of flakes in Determinate Nix.
+> For a guide on Nix flakes, see: <https://zero-to-nix.com/>.
+> For details and to offer feedback on the deprecation process, see: <https://github.com/DeterminateSystems/nix-src/issues/34>.
+
 Channels are a mechanism for referencing remote Nix expressions and conveniently retrieving their latest version.
 
 The moving parts of channels are:
