@@ -134,7 +134,7 @@ void parseTree(
         RawMode rawMode = std::stoi(perms, 0, 8);
         auto modeOpt = decodeMode(rawMode);
         if (!modeOpt)
-            throw Error("Unknown Git permission: %o", perms);
+            throw Error("Unknown Git permission: %o", rawMode);
         auto mode = std::move(*modeOpt);
 
         std::string name = getStringUntil(source, '\0');
