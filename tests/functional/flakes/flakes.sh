@@ -266,6 +266,7 @@ nix registry add user-flake2 "git+file://$percentEncodedFlake2Dir"
 [[ $(nix --flake-registry "" registry list | wc -l) == 2 ]]
 nix --flake-registry "" registry list | grepQuietInverse '^global' # nothing in global registry
 nix --flake-registry "" registry list | grepQuiet '^user'
+nix flake metadata --flake-registry "" user-flake1 | grepQuiet 'URL:.*flake1.*'
 nix registry remove user-flake1
 nix registry remove user-flake2
 [[ $(nix registry list | wc -l) == 4 ]]
