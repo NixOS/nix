@@ -1,3 +1,4 @@
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "nix/util/file-content-address.hh"
@@ -26,8 +27,11 @@ TEST(FileSerialisationMethod, testRoundTripPrintParse_2) {
     }
 }
 
-TEST(FileSerialisationMethod, testParseFileSerialisationMethodOptException) {
-    EXPECT_THROW(parseFileSerialisationMethod("narwhal"), UsageError);
+TEST(FileSerialisationMethod, testParseFileSerialisationMethodOptException)
+{
+    EXPECT_THAT(
+        []() { parseFileSerialisationMethod("narwhal"); },
+        testing::ThrowsMessage<UsageError>(testing::HasSubstr("narwhal")));
 }
 
 /* ----------------------------------------------------------------------------
@@ -54,8 +58,11 @@ TEST(FileIngestionMethod, testRoundTripPrintParse_2) {
     }
 }
 
-TEST(FileIngestionMethod, testParseFileIngestionMethodOptException) {
-    EXPECT_THROW(parseFileIngestionMethod("narwhal"), UsageError);
+TEST(FileIngestionMethod, testParseFileIngestionMethodOptException)
+{
+    EXPECT_THAT(
+        []() { parseFileIngestionMethod("narwhal"); },
+        testing::ThrowsMessage<UsageError>(testing::HasSubstr("narwhal")));
 }
 
 }
