@@ -337,7 +337,7 @@ static FlakeRef applySelfAttrs(
 static Flake getFlake(
     EvalState & state,
     const FlakeRef & originalRef,
-    bool useRegistries,
+    fetchers::UseRegistries useRegistries,
     const InputAttrPath & lockRootAttrPath)
 {
     // Fetch a lazy tree first.
@@ -368,7 +368,7 @@ static Flake getFlake(
     return readFlake(state, originalRef, resolvedRef, lockedRef, state.storePath(storePath), lockRootAttrPath);
 }
 
-Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
+Flake getFlake(EvalState & state, const FlakeRef & originalRef, fetchers::UseRegistries useRegistries)
 {
     return getFlake(state, originalRef, useRegistries, {});
 }
@@ -393,8 +393,14 @@ LockedFlake lockFlake(
     experimentalFeatureSettings.require(Xp::Flakes);
 
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
+    auto useRegistriesTop = useRegistries ? fetchers::UseRegistries::All : fetchers::UseRegistries::No;
+    auto useRegistriesInputs = useRegistries ? fetchers::UseRegistries::Limited : fetchers::UseRegistries::No;
 
-    auto flake = getFlake(state, topRef, useRegistries, {});
+    auto flake = getFlake(
+        state,
+        topRef,
+        useRegistriesTop,
+        {});
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
@@ -569,7 +575,11 @@ LockedFlake lockFlake(
                         if (auto resolvedPath = resolveRelativePath()) {
                             return readFlake(state, ref, ref, ref, *resolvedPath, inputAttrPath);
                         } else {
-                            return getFlake(state, ref, useRegistries, inputAttrPath);
+                            return getFlake(
+                                state,
+                                ref,
+                                useRegistriesInputs,
+                                inputAttrPath);
                         }
                     };
 
@@ -717,7 +727,10 @@ LockedFlake lockFlake(
                                 if (auto resolvedPath = resolveRelativePath()) {
                                     return {*resolvedPath, *input.ref};
                                 } else {
-                                    auto cachedInput = state.inputCache->getAccessor(state.store, input.ref->input, useRegistries);
+                                    auto cachedInput = state.inputCache->getAccessor(
+                                        state.store,
+                                        input.ref->input,
+                                        useRegistriesInputs);
 
                                     auto lockedRef = FlakeRef(std::move(cachedInput.lockedInput), input.ref->subdir);
 
@@ -834,7 +847,10 @@ LockedFlake lockFlake(
                            repo, so we should re-read it. FIXME: we could
                            also just clear the 'rev' field... */
                         auto prevLockedRef = flake.lockedRef;
-                        flake = getFlake(state, topRef, useRegistries);
+                        flake = getFlake(
+                            state,
+                            topRef,
+                            useRegistriesTop);
 
                         if (lockFlags.commitLockFile &&
                             flake.lockedRef.input.getRev() &&

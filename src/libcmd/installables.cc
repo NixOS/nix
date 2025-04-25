@@ -40,7 +40,7 @@ void completeFlakeInputAttrPath(
     std::string_view prefix)
 {
     for (auto & flakeRef : flakeRefs) {
-        auto flake = flake::getFlake(*evalState, flakeRef, true);
+        auto flake = flake::getFlake(*evalState, flakeRef, fetchers::UseRegistries::All);
         for (auto & input : flake.inputs)
             if (hasPrefix(input.first, prefix))
                 completions.add(input.first);
