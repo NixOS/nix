@@ -751,10 +751,12 @@ LockedFlake lockFlake(
                                 printLiteralString(s, resolvedRef.to_string());
                                 warn(
                                     "Flake input '%1%' uses the flake registry. "
-                                    "Using the registry in flake inputs is deprecated. "
+                                    "Using the registry in flake inputs is deprecated in Determinate Nix. "
                                     "To make your flake future-proof, add the following to '%2%':\n"
                                     "\n"
-                                    "  inputs.%1%.url = %3%;",
+                                    "  inputs.%1%.url = %3%;\n"
+                                    "\n"
+                                    "For more information, see: https://github.com/DeterminateSystems/nix-src/issues/37",
                                     inputAttrPathS,
                                     flake.path,
                                     s.str());
