@@ -111,7 +111,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
         (std::string & result, std::string_view & remaining) {
             if (resolveSymlinks && fs::is_symlink(result)) {
                 if (++followCount >= maxFollow)
-                    throw Error("infinite symlink recursion in path '%0%'", remaining);
+                    throw Error("infinite symlink recursion in path '%1%'", remaining);
                 remaining = (temp = concatStrings(readLink(result), remaining));
                 if (isAbsolute(remaining)) {
                     /* restart for symlinks pointing to absolute path */
