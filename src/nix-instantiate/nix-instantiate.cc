@@ -147,6 +147,8 @@ static int main_nix_instantiate(int argc, char * * argv)
                 xmlOutputSourceLocation = false;
             else if (*arg == "--strict")
                 strict = true;
+            else if (*arg == "--replace-eval-errors")
+                evalSettings.replaceEvalErrors = true;
             else if (*arg == "--dry-run")
                 settings.readOnlyMode = true;
             else if (*arg != "" && arg->at(0) == '-')
