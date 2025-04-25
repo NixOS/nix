@@ -109,7 +109,7 @@ jobs:
         with:
           determinate: true
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH flake-regressions/eval-all.sh
+      - run: lscpu && nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 16" flake-regressions/eval-all.sh
 
   manual:
     if: github.event_name != 'merge_group'
