@@ -1,3 +1,5 @@
+#include <string>
+
 #include "nix_api_flake.h"
 #include "nix_api_flake_internal.hh"
 #include "nix_api_util.h"
@@ -78,7 +80,7 @@ nix_err nix_flake_reference_and_fragment_from_string(
     nix_clear_err(context);
     *flakeReferenceOut = nullptr;
     try {
-        std::string str(strData, 0, strSize);
+        std::string str(strData, strSize);
 
         auto [flakeRef, fragment] =
             nix::parseFlakeRefWithFragment(*fetchSettings->settings, str, parseFlags->baseDirectory, true);
