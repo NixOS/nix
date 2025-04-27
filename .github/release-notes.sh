@@ -1,5 +1,10 @@
 #!/bin/sh
 
+# SC2002 disables "useless cat" warnings.
+# I prefer pipelines that start with an explicit input, and go from there.
+# Overly fussy.
+# shellcheck disable=SC2002
+
 scratch=$(mktemp -d -t tmp.XXXXXXXXXX)
 finish() {
   rm -rf "$scratch"
