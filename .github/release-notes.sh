@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # SC2002 disables "useless cat" warnings.
 # I prefer pipelines that start with an explicit input, and go from there.
