@@ -661,7 +661,32 @@ static void movePath(const Path & src, const Path & dst)
 }
 
 
-extern void replaceValidPath(const Path & storePath, const Path & tmpPath);
+static void replaceValidPath(const Path & storePath, const Path & tmpPath)
+{
+    /* We can't atomically replace storePath (the original) with
+       tmpPath (the replacement), so we have to move it out of the
+       way first.  We'd better not be interrupted here, because if
+       we're repairing (say) Glibc, we end up with a broken system. */
+    Path oldPath = fmt("%1%.old-%2%-%3%", storePath, getpid(), rand());
+    if (pathExists(storePath))
+        movePath(storePath, oldPath);
+
+    try {
+        movePath(tmpPath, storePath);
+    } catch (...) {
+        try {
+            // attempt to recover
+            movePath(oldPath, storePath);
+        } catch (...) {
+            ignoreExceptionExceptInterrupt();
+        }
+        throw;
+    }
+
+    deletePath(oldPath);
+}
+
+
 
 
 bool DerivationBuilderImpl::cleanupDecideWhetherDiskFull()

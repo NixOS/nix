@@ -971,64 +971,6 @@ Goal::Co DerivationGoal::repairClosure()
 }
 
 
-static void chmod_(const Path & path, mode_t mode)
-{
-    if (chmod(path.c_str(), mode) == -1)
-        throw SysError("setting permissions on '%s'", path);
-}
-
-
-/* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
-   it's a directory and we're not root (to be able to update the
-   directory's parent link ".."). */
-static void movePath(const Path & src, const Path & dst)
-{
-    auto st = lstat(src);
-
-    bool changePerm = (
-#ifndef _WIN32
-        geteuid()
-#else
-        !isRootUser()
-#endif
-        && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
-
-    if (changePerm)
-        chmod_(src, st.st_mode | S_IWUSR);
-
-    std::filesystem::rename(src, dst);
-
-    if (changePerm)
-        chmod_(dst, st.st_mode);
-}
-
-
-void replaceValidPath(const Path & storePath, const Path & tmpPath)
-{
-    /* We can't atomically replace storePath (the original) with
-       tmpPath (the replacement), so we have to move it out of the
-       way first.  We'd better not be interrupted here, because if
-       we're repairing (say) Glibc, we end up with a broken system. */
-    Path oldPath = fmt("%1%.old-%2%-%3%", storePath, getpid(), rand());
-    if (pathExists(storePath))
-        movePath(storePath, oldPath);
-
-    try {
-        movePath(tmpPath, storePath);
-    } catch (...) {
-        try {
-            // attempt to recover
-            movePath(oldPath, storePath);
-        } catch (...) {
-            ignoreExceptionExceptInterrupt();
-        }
-        throw;
-    }
-
-    deletePath(oldPath);
-}
-
-
 void runPostBuildHook(
     Store & store,
     Logger & logger,
