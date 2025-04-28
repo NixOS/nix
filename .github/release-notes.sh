@@ -29,7 +29,7 @@ trim_trailing_newlines() {
 
 linkify_gh() {
     sed \
-        -e 's#\(https://github.com/DeterminateSystems/nix-src/\(pull\|issue\)/\([[:digit:]]\+\)\)#[dnix\#\3](\1)#' \
+        -e 's!\(https://github.com/DeterminateSystems/nix-src/\(pull\|issue\)/\([[:digit:]]\+\)\)![DeterminateSystems/nix-src#\3](\1)!' \
         -e 's#\(https://github.com/DeterminateSystems/nix-src/compare/\([^ ]\+\)\)#[\2](\1)#'
 }
 
