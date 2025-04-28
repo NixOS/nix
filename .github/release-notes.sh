@@ -22,9 +22,9 @@ gh api "/repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
         -f "tag_name=${TAG_NAME}" > "$scratch/notes.json"
 
 trim_trailing_newlines() {
-    tac \
-        | awk 'flag {print} {if(NF) flag=1}' \
-        | tac
+    local text
+    text="$(cat)"
+    echo -n "${text//$'\n'}"
 }
 
 linkify_gh() {
