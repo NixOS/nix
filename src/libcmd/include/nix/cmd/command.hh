@@ -374,4 +374,41 @@ void printClosureDiff(
  */
 void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & buildables, LocalFSStore & store);
 
-}
+/** `outLink` parameter, `createOutLinksMaybe` method. See `MixOutLinkByDefault`. */
+struct MixOutLinkBase : virtual Args
+{
+    /** Prefix for any output symlinks. Empty means do not write an output symlink. */
+    Path outLink;
+
+    MixOutLinkBase(const std::string & defaultOutLink)
+        : outLink(defaultOutLink)
+    {
+    }
+
+    void createOutLinksMaybe(const std::vector<BuiltPathWithResult> & buildables, ref<Store> & store);
+};
+
+/** `--out-link`, `--no-link`, `createOutLinksMaybe` */
+struct MixOutLinkByDefault : MixOutLinkBase, virtual Args
+{
+    MixOutLinkByDefault()
+        : MixOutLinkBase("result")
+    {
+        addFlag({
+            .longName = "out-link",
+            .shortName = 'o',
+            .description = "Use *path* as prefix for the symlinks to the build results. It defaults to `result`.",
+            .labels = {"path"},
+            .handler = {&outLink},
+            .completer = completePath,
+        });
+
+        addFlag({
+            .longName = "no-link",
+            .description = "Do not create symlinks to the build results.",
+            .handler = {&outLink, Path("")},
+        });
+    }
+};
+
+} // namespace nix
