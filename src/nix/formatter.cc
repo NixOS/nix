@@ -27,7 +27,21 @@ struct CmdFormatter : NixMultiCommand
 
 static auto rCmdFormatter = registerCommand<CmdFormatter>("formatter");
 
-struct CmdFormatterRun : SourceExprCommand, MixJSON
+/** Common implementation bits for the `nix formatter` subcommands. */
+struct MixFormatter : SourceExprCommand
+{
+    Strings getDefaultFlakeAttrPaths() override
+    {
+        return Strings{"formatter." + settings.thisSystem.get()};
+    }
+
+    Strings getDefaultFlakeAttrPathPrefixes() override
+    {
+        return Strings{};
+    }
+};
+
+struct CmdFormatterRun : MixFormatter, MixJSON
 {
     std::vector<std::string> args;
 
@@ -51,16 +65,6 @@ struct CmdFormatterRun : SourceExprCommand, MixJSON
     Category category() override
     {
         return catSecondary;
-    }
-
-    Strings getDefaultFlakeAttrPaths() override
-    {
-        return Strings{"formatter." + settings.thisSystem.get()};
-    }
-
-    Strings getDefaultFlakeAttrPathPrefixes() override
-    {
-        return Strings{};
     }
 
     void run(ref<Store> store) override
@@ -89,7 +93,7 @@ struct CmdFormatterRun : SourceExprCommand, MixJSON
 
 static auto rFormatterRun = registerCommand2<CmdFormatterRun>({"formatter", "run"});
 
-struct CmdFormatterBuild : SourceExprCommand
+struct CmdFormatterBuild : MixFormatter
 {
     Path outLink = "result";
 
@@ -126,16 +130,6 @@ struct CmdFormatterBuild : SourceExprCommand
     Category category() override
     {
         return catSecondary;
-    }
-
-    Strings getDefaultFlakeAttrPaths() override
-    {
-        return Strings{"formatter." + settings.thisSystem.get()};
-    }
-
-    Strings getDefaultFlakeAttrPathPrefixes() override
-    {
-        return Strings{};
     }
 
     void run(ref<Store> store) override
