@@ -95,10 +95,19 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
             } else if (i != s.end() && *i == ']') {
                 // OSC
                 e += *i++;
-                // eat ESC
-                while (i != s.end() && *i != '\e') e += *i++;
-                // eat backslash
-                if (i != s.end() && *i == '\\') e += last = *i++;
+                // https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda defines
+                // two forms of a URI separator:
+                // 1. ESC '\' (standard)
+                // 2. BEL ('\a') (xterm-style, used by gcc)
+
+                // eat ESC or BEL
+                while (i != s.end() && *i != '\e' && *i != '\a') e += *i++;
+                if (i != s.end()) {
+                  char v = *i;
+                  e += *i++;
+                  // eat backslash after ESC
+                  if (i != s.end() && v == '\e' && *i == '\\') e += last = *i++;
+                }
             } else {
                 if (i != s.end() && *i >= 0x40 && *i <= 0x5f) e += *i++;
             }
