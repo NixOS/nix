@@ -42,7 +42,6 @@ struct UnixPathTrait
     }
 };
 
-
 /**
  * Windows-style path primitives.
  *
@@ -75,21 +74,16 @@ struct WindowsPathTrait
     {
         size_t p1 = path.find('/', from);
         size_t p2 = path.find(preferredSep, from);
-        return p1 == String::npos ? p2 :
-               p2 == String::npos ? p1 :
-               std::min(p1, p2);
+        return p1 == String::npos ? p2 : p2 == String::npos ? p1 : std::min(p1, p2);
     }
 
     static size_t rfindPathSep(StringView path, size_t from = String::npos)
     {
         size_t p1 = path.rfind('/', from);
         size_t p2 = path.rfind(preferredSep, from);
-        return p1 == String::npos ? p2 :
-               p2 == String::npos ? p1 :
-               std::max(p1, p2);
+        return p1 == String::npos ? p2 : p2 == String::npos ? p1 : std::max(p1, p2);
     }
 };
-
 
 template<typename CharT>
 using OsPathTrait =
@@ -99,7 +93,6 @@ using OsPathTrait =
     UnixPathTrait
 #endif
     ;
-
 
 /**
  * Core pure path canonicalization algorithm.
@@ -116,9 +109,7 @@ using OsPathTrait =
  *   "result" points to a symlink.
  */
 template<class PathDict>
-typename PathDict::String canonPathInner(
-    typename PathDict::StringView remaining,
-    auto && hookComponent)
+typename PathDict::String canonPathInner(typename PathDict::StringView remaining, auto && hookComponent)
 {
     assert(remaining != "");
 
@@ -131,7 +122,8 @@ typename PathDict::String canonPathInner(
         while (!remaining.empty() && PathDict::isPathSep(remaining[0]))
             remaining.remove_prefix(1);
 
-        if (remaining.empty()) break;
+        if (remaining.empty())
+            break;
 
         auto nextComp = ({
             auto nextPathSep = PathDict::findPathSep(remaining);
@@ -143,9 +135,9 @@ typename PathDict::String canonPathInner(
             remaining.remove_prefix(1);
 
         /* If `..', delete the last component. */
-        else if (nextComp == "..")
-        {
-            if (!result.empty()) result.erase(PathDict::rfindPathSep(result));
+        else if (nextComp == "..") {
+            if (!result.empty())
+                result.erase(PathDict::rfindPathSep(result));
             remaining.remove_prefix(2);
         }
 
@@ -165,7 +157,7 @@ typename PathDict::String canonPathInner(
     }
 
     if (result.empty())
-        result = typename PathDict::String { PathDict::preferredSep };
+        result = typename PathDict::String{PathDict::preferredSep};
 
     return result;
 }

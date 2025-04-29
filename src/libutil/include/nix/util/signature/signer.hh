@@ -37,7 +37,7 @@ struct Signer
     virtual const PublicKey & getPublicKey() = 0;
 };
 
-using Signers = std::map<std::string, Signer*>;
+using Signers = std::map<std::string, Signer *>;
 
 /**
  * Local signer

@@ -2,8 +2,7 @@
 
 namespace nix {
 
-std::optional<std::string_view> LookupPath::Prefix::suffixIfPotentialMatch(
-    std::string_view path) const
+std::optional<std::string_view> LookupPath::Prefix::suffixIfPotentialMatch(std::string_view path) const
 {
     auto n = s.size();
 
@@ -21,28 +20,24 @@ std::optional<std::string_view> LookupPath::Prefix::suffixIfPotentialMatch(
     }
 
     /* Skip next path separator. */
-    return {
-        path.substr(needSeparator ? n + 1 : n)
-    };
+    return {path.substr(needSeparator ? n + 1 : n)};
 }
-
 
 LookupPath::Elem LookupPath::Elem::parse(std::string_view rawElem)
 {
     size_t pos = rawElem.find('=');
 
-    return LookupPath::Elem {
-        .prefix = Prefix {
-            .s = pos == std::string::npos
-                ? std::string { "" }
-                : std::string { rawElem.substr(0, pos) },
-        },
-        .path = Path {
-            .s = std::string { rawElem.substr(pos + 1) },
-        },
+    return LookupPath::Elem{
+        .prefix =
+            Prefix{
+                .s = pos == std::string::npos ? std::string{""} : std::string{rawElem.substr(0, pos)},
+            },
+        .path =
+            Path{
+                .s = std::string{rawElem.substr(pos + 1)},
+            },
     };
 }
-
 
 LookupPath LookupPath::parse(const Strings & rawElems)
 {

@@ -73,7 +73,9 @@ struct EvalSettings : Config
     )"};
 
     Setting<Strings> nixPath{
-        this, {}, "nix-path",
+        this,
+        {},
+        "nix-path",
         R"(
           List of search paths to use for [lookup path](@docroot@/language/constructs/lookup-path.md) resolution.
           This setting determines the value of
@@ -106,10 +108,14 @@ struct EvalSettings : Config
           > If [restricted evaluation](@docroot@/command-ref/conf-file.md#conf-restrict-eval) is enabled, the default value is empty.
           >
           > If [pure evaluation](#conf-pure-eval) is enabled, `builtins.nixPath` *always* evaluates to the empty list `[ ]`.
-        )", {}, false};
+        )",
+        {},
+        false};
 
     Setting<std::string> currentSystem{
-        this, "", "eval-system",
+        this,
+        "",
+        "eval-system",
         R"(
           This option defines
           [`builtins.currentSystem`](@docroot@/language/builtins.md#builtins-currentSystem)
@@ -129,7 +135,9 @@ struct EvalSettings : Config
     const std::string & getCurrentSystem() const;
 
     Setting<bool> restrictEval{
-        this, false, "restrict-eval",
+        this,
+        false,
+        "restrict-eval",
         R"(
           If set to `true`, the Nix evaluator will not allow access to any
           files outside of
@@ -138,7 +146,10 @@ struct EvalSettings : Config
           [`allowed-uris`](@docroot@/command-ref/conf-file.md#conf-allowed-uris).
         )"};
 
-    Setting<bool> pureEval{this, false, "pure-eval",
+    Setting<bool> pureEval{
+        this,
+        false,
+        "pure-eval",
         R"(
           Pure evaluation mode ensures that the result of Nix expressions is fully determined by explicitly declared inputs, and not influenced by external state:
 
@@ -148,11 +159,12 @@ struct EvalSettings : Config
             - [`builtins.currentTime`](@docroot@/language/builtins.md#builtins-currentTime)
             - [`builtins.nixPath`](@docroot@/language/builtins.md#builtins-nixPath)
             - [`builtins.storePath`](@docroot@/language/builtins.md#builtins-storePath)
-        )"
-        };
+        )"};
 
     Setting<bool> enableImportFromDerivation{
-        this, true, "allow-import-from-derivation",
+        this,
+        true,
+        "allow-import-from-derivation",
         R"(
           By default, Nix allows [Import from Derivation](@docroot@/language/import-from-derivation.md).
 
@@ -162,7 +174,10 @@ struct EvalSettings : Config
           regardless of the state of the store.
         )"};
 
-    Setting<Strings> allowedUris{this, {}, "allowed-uris",
+    Setting<Strings> allowedUris{
+        this,
+        {},
+        "allowed-uris",
         R"(
           A list of URI prefixes to which access is allowed in restricted
           evaluation mode. For example, when set to
@@ -175,7 +190,10 @@ struct EvalSettings : Config
           - or the prefix is a URI scheme ended by a colon `:` and the URI has the same scheme.
         )"};
 
-    Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
+    Setting<bool> traceFunctionCalls{
+        this,
+        false,
+        "trace-function-calls",
         R"(
           If set to `true`, the Nix evaluator will trace every function call.
           Nix will print a log message at the "vomit" level for every function
@@ -193,26 +211,38 @@ struct EvalSettings : Config
           `flamegraph.pl`.
         )"};
 
-    Setting<bool> useEvalCache{this, true, "eval-cache",
+    Setting<bool> useEvalCache{
+        this,
+        true,
+        "eval-cache",
         R"(
             Whether to use the flake evaluation cache.
             Certain commands won't have to evaluate when invoked for the second time with a particular version of a flake.
             Intermediate results are not cached.
         )"};
 
-    Setting<bool> ignoreExceptionsDuringTry{this, false, "ignore-try",
+    Setting<bool> ignoreExceptionsDuringTry{
+        this,
+        false,
+        "ignore-try",
         R"(
           If set to true, ignore exceptions inside 'tryEval' calls when evaluating nix expressions in
           debug mode (using the --debugger flag). By default the debugger will pause on all exceptions.
         )"};
 
-    Setting<bool> traceVerbose{this, false, "trace-verbose",
+    Setting<bool> traceVerbose{
+        this,
+        false,
+        "trace-verbose",
         "Whether `builtins.traceVerbose` should trace its first argument when evaluated."};
 
-    Setting<unsigned int> maxCallDepth{this, 10000, "max-call-depth",
-        "The maximum function call depth to allow before erroring."};
+    Setting<unsigned int> maxCallDepth{
+        this, 10000, "max-call-depth", "The maximum function call depth to allow before erroring."};
 
-    Setting<bool> builtinsTraceDebugger{this, false, "debugger-on-trace",
+    Setting<bool> builtinsTraceDebugger{
+        this,
+        false,
+        "debugger-on-trace",
         R"(
           If set to true and the `--debugger` flag is given, the following functions
           will enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
@@ -225,7 +255,10 @@ struct EvalSettings : Config
           This is useful for debugging warnings in third-party Nix code.
         )"};
 
-    Setting<bool> builtinsDebuggerOnWarn{this, false, "debugger-on-warn",
+    Setting<bool> builtinsDebuggerOnWarn{
+        this,
+        false,
+        "debugger-on-warn",
         R"(
           If set to true and the `--debugger` flag is given, [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn)
           will enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
@@ -235,7 +268,10 @@ struct EvalSettings : Config
           Use [`debugger-on-trace`](#conf-debugger-on-trace) to also enter the debugger on legacy warnings that are logged with [`builtins.trace`](@docroot@/language/builtins.md#builtins-trace).
         )"};
 
-    Setting<bool> builtinsAbortOnWarn{this, false, "abort-on-warn",
+    Setting<bool> builtinsAbortOnWarn{
+        this,
+        false,
+        "abort-on-warn",
         R"(
           If set to true, [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn) will throw an error when logging a warning.
 

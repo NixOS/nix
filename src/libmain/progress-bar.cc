@@ -133,8 +133,9 @@ public:
             updateThread.join();
     }
 
-    void pause() override {
-        auto state (state_.lock());
+    void pause() override
+    {
+        auto state(state_.lock());
         state->suspensions++;
         if (state->suspensions > 1) {
             // already paused
@@ -145,8 +146,9 @@ public:
             writeToStderr("\r\e[K");
     }
 
-    void resume() override {
-        auto state (state_.lock());
+    void resume() override
+    {
+        auto state(state_.lock());
         if (state->suspensions == 0) {
             log(lvlError, "nix::ProgressBar: resume() called without a matching preceding pause(). This is a bug.");
             return;
@@ -168,7 +170,8 @@ public:
 
     void log(Verbosity lvl, std::string_view s) override
     {
-        if (lvl > verbosity) return;
+        if (lvl > verbosity)
+            return;
         auto state(state_.lock());
         log(*state, lvl, s);
     }
@@ -193,20 +196,21 @@ public:
         }
     }
 
-    void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
-        const std::string & s, const Fields & fields, ActivityId parent) override
+    void startActivity(
+        ActivityId act,
+        Verbosity lvl,
+        ActivityType type,
+        const std::string & s,
+        const Fields & fields,
+        ActivityId parent) override
     {
         auto state(state_.lock());
 
         if (lvl <= verbosity && !s.empty() && type != actBuildWaiting)
             log(*state, lvl, s + "...");
 
-        state->activities.emplace_back(ActInfo {
-            .s = s,
-            .type = type,
-            .parent = parent,
-            .startTime = std::chrono::steady_clock::now()
-        });
+        state->activities.emplace_back(
+            ActInfo{.s = s, .type = type, .parent = parent, .startTime = std::chrono::steady_clock::now()});
         auto i = std::prev(state->activities.end());
         state->its.emplace(act, i);
         state->activitiesByType[type].its.emplace(act, i);
@@ -231,11 +235,11 @@ public:
         if (type == actSubstitute) {
             auto name = storePathToName(getS(fields, 0));
             auto sub = getS(fields, 1);
-            i->s = fmt(
-                hasPrefix(sub, "local")
-                ? "copying " ANSI_BOLD "%s" ANSI_NORMAL " from %s"
-                : "fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s",
-                name, sub);
+            i->s =
+                fmt(hasPrefix(sub, "local") ? "copying " ANSI_BOLD "%s" ANSI_NORMAL " from %s"
+                                            : "fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s",
+                    name,
+                    sub);
         }
 
         if (type == actPostBuildHook) {
@@ -265,8 +269,10 @@ public:
     {
         while (act != 0) {
             auto i = state.its.find(act);
-            if (i == state.its.end()) break;
-            if (i->second->type == type) return true;
+            if (i == state.its.end())
+                break;
+            if (i->second->type == type)
+                return true;
             act = i->second->parent;
         }
         return false;
@@ -400,7 +406,8 @@ public:
         auto nextWakeup = std::chrono::milliseconds::max();
 
         state.haveUpdate = false;
-        if (state.isPaused() || !state.active) return nextWakeup;
+        if (state.isPaused() || !state.active)
+            return nextWakeup;
 
         std::string line;
 
@@ -414,7 +421,8 @@ public:
         auto now = std::chrono::steady_clock::now();
 
         if (!state.activities.empty()) {
-            if (!status.empty()) line += " ";
+            if (!status.empty())
+                line += " ";
             auto i = state.activities.rbegin();
 
             while (i != state.activities.rend()) {
@@ -426,7 +434,9 @@ public:
                     if (i->startTime + delay < now)
                         break;
                     else
-                        nextWakeup = std::min(nextWakeup, std::chrono::duration_cast<std::chrono::milliseconds>(delay - (now - i->startTime)));
+                        nextWakeup = std::min(
+                            nextWakeup,
+                            std::chrono::duration_cast<std::chrono::milliseconds>(delay - (now - i->startTime)));
                 }
                 ++i;
             }
@@ -439,14 +449,16 @@ public:
                     line += ")";
                 }
                 if (!i->lastLine.empty()) {
-                    if (!i->s.empty()) line += ": ";
+                    if (!i->s.empty())
+                        line += ": ";
                     line += i->lastLine;
                 }
             }
         }
 
         auto width = getWindowSize().second;
-        if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
+        if (width <= 0)
+            width = std::numeric_limits<decltype(width)>::max();
 
         redraw("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");
 
@@ -459,51 +471,60 @@ public:
 
         std::string res;
 
-        auto renderActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
-            auto & act = state.activitiesByType[type];
-            uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
-            for (auto & j : act.its) {
-                done += j.second->done;
-                expected += j.second->expected;
-                running += j.second->running;
-                failed += j.second->failed;
-            }
+        auto renderActivity =
+            [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
+                auto & act = state.activitiesByType[type];
+                uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
+                for (auto & j : act.its) {
+                    done += j.second->done;
+                    expected += j.second->expected;
+                    running += j.second->running;
+                    failed += j.second->failed;
+                }
 
-            expected = std::max(expected, act.expected);
+                expected = std::max(expected, act.expected);
 
-            std::string s;
+                std::string s;
 
-            if (running || done || expected || failed) {
-                if (running)
-                    if (expected != 0)
-                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                            running / unit, done / unit, expected / unit);
+                if (running || done || expected || failed) {
+                    if (running)
+                        if (expected != 0)
+                            s =
+                                fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/"
+                                        + numberFmt,
+                                    running / unit,
+                                    done / unit,
+                                    expected / unit);
+                        else
+                            s =
+                                fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL,
+                                    running / unit,
+                                    done / unit);
+                    else if (expected != done)
+                        if (expected != 0)
+                            s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt, done / unit, expected / unit);
+                        else
+                            s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL, done / unit);
                     else
-                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL,
-                            running / unit, done / unit);
-                else if (expected != done)
-                    if (expected != 0)
-                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                            done / unit, expected / unit);
-                    else
-                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL, done / unit);
-                else
-                    s = fmt(done ? ANSI_GREEN + numberFmt + ANSI_NORMAL : numberFmt, done / unit);
-                s = fmt(itemFmt, s);
+                        s = fmt(done ? ANSI_GREEN + numberFmt + ANSI_NORMAL : numberFmt, done / unit);
+                    s = fmt(itemFmt, s);
 
-                if (failed)
-                    s += fmt(" (" ANSI_RED "%d failed" ANSI_NORMAL ")", failed / unit);
-            }
+                    if (failed)
+                        s += fmt(" (" ANSI_RED "%d failed" ANSI_NORMAL ")", failed / unit);
+                }
 
-            return s;
-        };
+                return s;
+            };
 
-        auto showActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
-            auto s = renderActivity(type, itemFmt, numberFmt, unit);
-            if (s.empty()) return;
-            if (!res.empty()) res += ", ";
-            res += s;
-        };
+        auto showActivity =
+            [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
+                auto s = renderActivity(type, itemFmt, numberFmt, unit);
+                if (s.empty())
+                    return;
+                if (!res.empty())
+                    res += ", ";
+                res += s;
+            };
 
         showActivity(actBuilds, "%s built");
 
@@ -511,9 +532,17 @@ public:
         auto s2 = renderActivity(actCopyPath, "%s MiB", "%.1f", MiB);
 
         if (!s1.empty() || !s2.empty()) {
-            if (!res.empty()) res += ", ";
-            if (s1.empty()) res += "0 copied"; else res += s1;
-            if (!s2.empty()) { res += " ("; res += s2; res += ')'; }
+            if (!res.empty())
+                res += ", ";
+            if (s1.empty())
+                res += "0 copied";
+            else
+                res += s1;
+            if (!s2.empty()) {
+                res += " (";
+                res += s2;
+                res += ')';
+            }
         }
 
         showActivity(actFileTransfer, "%s MiB DL", "%.1f", MiB);
@@ -522,7 +551,8 @@ public:
             auto s = renderActivity(actOptimiseStore, "%s paths optimised");
             if (s != "") {
                 s += fmt(", %.1f MiB / %d inodes freed", state.bytesLinked / MiB, state.filesLinked);
-                if (!res.empty()) res += ", ";
+                if (!res.empty())
+                    res += ", ";
                 res += s;
             }
         }
@@ -531,12 +561,14 @@ public:
         showActivity(actVerifyPaths, "%s paths verified");
 
         if (state.corruptedPaths) {
-            if (!res.empty()) res += ", ";
+            if (!res.empty())
+                res += ", ";
             res += fmt(ANSI_RED "%d corrupted" ANSI_NORMAL, state.corruptedPaths);
         }
 
         if (state.untrustedPaths) {
-            if (!res.empty()) res += ", ";
+            if (!res.empty())
+                res += ", ";
             res += fmt(ANSI_RED "%d untrusted" ANSI_NORMAL, state.untrustedPaths);
         }
 
@@ -558,10 +590,12 @@ public:
     std::optional<char> ask(std::string_view msg) override
     {
         auto state(state_.lock());
-        if (!state->active) return {};
+        if (!state->active)
+            return {};
         std::cerr << fmt("\r\e[K%s ", msg);
         auto s = trim(readLine(getStandardInput(), true));
-        if (s.size() != 1) return {};
+        if (s.size() != 1)
+            return {};
         draw(*state);
         return s[0];
     }

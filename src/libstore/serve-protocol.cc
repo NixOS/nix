@@ -20,33 +20,22 @@ BuildResult ServeProto::Serialise<BuildResult>::read(const StoreDirConfig & stor
     conn.from >> status.errorMsg;
 
     if (GET_PROTOCOL_MINOR(conn.version) >= 3)
-        conn.from
-            >> status.timesBuilt
-            >> status.isNonDeterministic
-            >> status.startTime
-            >> status.stopTime;
+        conn.from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
     if (GET_PROTOCOL_MINOR(conn.version) >= 6) {
         auto builtOutputs = ServeProto::Serialise<DrvOutputs>::read(store, conn);
         for (auto && [output, realisation] : builtOutputs)
-            status.builtOutputs.insert_or_assign(
-                std::move(output.outputName),
-                std::move(realisation));
+            status.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
     }
     return status;
 }
 
-void ServeProto::Serialise<BuildResult>::write(const StoreDirConfig & store, ServeProto::WriteConn conn, const BuildResult & status)
+void ServeProto::Serialise<BuildResult>::write(
+    const StoreDirConfig & store, ServeProto::WriteConn conn, const BuildResult & status)
 {
-    conn.to
-        << status.status
-        << status.errorMsg;
+    conn.to << status.status << status.errorMsg;
 
     if (GET_PROTOCOL_MINOR(conn.version) >= 3)
-        conn.to
-            << status.timesBuilt
-            << status.isNonDeterministic
-            << status.startTime
-            << status.stopTime;
+        conn.to << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
     if (GET_PROTOCOL_MINOR(conn.version) >= 6) {
         DrvOutputs builtOutputs;
         for (auto & [output, realisation] : status.builtOutputs)
@@ -55,12 +44,11 @@ void ServeProto::Serialise<BuildResult>::write(const StoreDirConfig & store, Ser
     }
 }
 
-
 UnkeyedValidPathInfo ServeProto::Serialise<UnkeyedValidPathInfo>::read(const StoreDirConfig & store, ReadConn conn)
 {
     /* Hash should be set below unless very old `nix-store --serve`.
        Caller should assert that it did set it. */
-    UnkeyedValidPathInfo info { Hash::dummy };
+    UnkeyedValidPathInfo info{Hash::dummy};
 
     auto deriver = readString(conn.from);
     if (deriver != "")
@@ -81,25 +69,21 @@ UnkeyedValidPathInfo ServeProto::Serialise<UnkeyedValidPathInfo>::read(const Sto
     return info;
 }
 
-void ServeProto::Serialise<UnkeyedValidPathInfo>::write(const StoreDirConfig & store, WriteConn conn, const UnkeyedValidPathInfo & info)
+void ServeProto::Serialise<UnkeyedValidPathInfo>::write(
+    const StoreDirConfig & store, WriteConn conn, const UnkeyedValidPathInfo & info)
 {
-    conn.to
-        << (info.deriver ? store.printStorePath(*info.deriver) : "");
+    conn.to << (info.deriver ? store.printStorePath(*info.deriver) : "");
 
     ServeProto::write(store, conn, info.references);
     // !!! Maybe we want compression?
-    conn.to
-        << info.narSize // downloadSize, lie a little
-        << info.narSize;
+    conn.to << info.narSize // downloadSize, lie a little
+            << info.narSize;
     if (GET_PROTOCOL_MINOR(conn.version) >= 4)
-        conn.to
-            << info.narHash.to_string(HashFormat::Nix32, true)
-            << renderContentAddress(info.ca)
-            << info.sigs;
+        conn.to << info.narHash.to_string(HashFormat::Nix32, true) << renderContentAddress(info.ca) << info.sigs;
 }
 
-
-ServeProto::BuildOptions ServeProto::Serialise<ServeProto::BuildOptions>::read(const StoreDirConfig & store, ReadConn conn)
+ServeProto::BuildOptions
+ServeProto::Serialise<ServeProto::BuildOptions>::read(const StoreDirConfig & store, ReadConn conn)
 {
     BuildOptions options;
     options.maxSilentTime = readInt(conn.from);
@@ -116,18 +100,14 @@ ServeProto::BuildOptions ServeProto::Serialise<ServeProto::BuildOptions>::read(c
     return options;
 }
 
-void ServeProto::Serialise<ServeProto::BuildOptions>::write(const StoreDirConfig & store, WriteConn conn, const ServeProto::BuildOptions & options)
+void ServeProto::Serialise<ServeProto::BuildOptions>::write(
+    const StoreDirConfig & store, WriteConn conn, const ServeProto::BuildOptions & options)
 {
-    conn.to
-        << options.maxSilentTime
-        << options.buildTimeout;
+    conn.to << options.maxSilentTime << options.buildTimeout;
     if (GET_PROTOCOL_MINOR(conn.version) >= 2)
-        conn.to
-            << options.maxLogSize;
+        conn.to << options.maxLogSize;
     if (GET_PROTOCOL_MINOR(conn.version) >= 3)
-        conn.to
-            << options.nrRepeats
-            << options.enforceDeterminism;
+        conn.to << options.nrRepeats << options.enforceDeterminism;
 
     if (GET_PROTOCOL_MINOR(conn.version) >= 7) {
         conn.to << ((int) options.keepFailed);
