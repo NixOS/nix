@@ -9,7 +9,7 @@ namespace nix {
 
 struct UserLock
 {
-    virtual ~UserLock() { }
+    virtual ~UserLock() {}
 
     /**
      * Get the first and last UID.

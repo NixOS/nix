@@ -7,7 +7,8 @@
 
 namespace nix {
 
-struct StorePathName {
+struct StorePathName
+{
     std::string name;
 };
 
@@ -20,12 +21,14 @@ namespace rc {
 using namespace nix;
 
 template<>
-struct Arbitrary<StorePathName> {
+struct Arbitrary<StorePathName>
+{
     static Gen<StorePathName> arbitrary();
 };
 
 template<>
-struct Arbitrary<StorePath> {
+struct Arbitrary<StorePath>
+{
     static Gen<StorePath> arbitrary();
 };
 

@@ -20,7 +20,6 @@ Path getCacheDir()
     }
 }
 
-
 Path getConfigDir()
 {
     auto dir = getEnv("NIX_CONFIG_HOME");
@@ -41,13 +40,12 @@ std::vector<Path> getConfigDirs()
     Path configHome = getConfigDir();
     auto configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
     std::vector<Path> result = tokenizeString<std::vector<std::string>>(configDirs, ":");
-    for (auto& p : result) {
+    for (auto & p : result) {
         p += "/nix";
     }
     result.insert(result.begin(), configHome);
     return result;
 }
-
 
 Path getDataDir()
 {
@@ -85,7 +83,6 @@ Path createNixStateDir()
     createDirs(dir);
     return dir;
 }
-
 
 std::string expandTilde(std::string_view path)
 {

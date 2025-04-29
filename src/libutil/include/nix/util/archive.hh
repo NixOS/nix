@@ -5,9 +5,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/fs-sink.hh"
 
-
 namespace nix {
-
 
 /**
  * dumpPath creates a Nix archive of the specified path.
@@ -57,14 +55,12 @@ namespace nix {
  *   `+` denotes string concatenation.
  * ```
  */
-void dumpPath(const Path & path, Sink & sink,
-    PathFilter & filter = defaultPathFilter);
+void dumpPath(const Path & path, Sink & sink, PathFilter & filter = defaultPathFilter);
 
 /**
  * Same as dumpPath(), but returns the last modified date of the path.
  */
-time_t dumpPathAndGetMtime(const Path & path, Sink & sink,
-    PathFilter & filter = defaultPathFilter);
+time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter = defaultPathFilter);
 
 /**
  * Dump an archive with a single file with these contents.
@@ -82,10 +78,8 @@ void restorePath(const std::filesystem::path & path, Source & source, bool start
  */
 void copyNAR(Source & source, Sink & sink);
 
-
 inline constexpr std::string_view narVersionMagic1 = "nix-archive-1";
 
 inline constexpr std::string_view caseHackSuffix = "~nix~case~hack~";
-
 
 }

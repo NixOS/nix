@@ -20,8 +20,8 @@ struct CmdCopyLog : virtual CopyCommand, virtual InstallablesCommand
     std::string doc() override
     {
         return
-          #include "store-copy-log.md"
-          ;
+#include "store-copy-log.md"
+            ;
     }
 
     void run(ref<Store> srcStore, Installables && installables) override

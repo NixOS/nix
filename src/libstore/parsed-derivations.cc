@@ -14,7 +14,7 @@ std::optional<StructuredAttrs> StructuredAttrs::tryParse(const StringPairs & env
     auto jsonAttr = env.find("__json");
     if (jsonAttr != env.end()) {
         try {
-            return StructuredAttrs {
+            return StructuredAttrs{
                 .structuredAttrs = nlohmann::json::parse(jsonAttr->second),
             };
         } catch (std::exception & e) {
@@ -36,9 +36,7 @@ static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
  * mechanism to allow this to evolve again and get back in sync, but for
  * now we must not change - not even extend - the behavior.
  */
-static nlohmann::json pathInfoToJSON(
-    Store & store,
-    const StorePathSet & storePaths)
+static nlohmann::json pathInfoToJSON(Store & store, const StorePathSet & storePaths)
 {
     using nlohmann::json;
 
@@ -100,8 +98,7 @@ nlohmann::json StructuredAttrs::prepareStructuredAttrs(
         StorePathSet storePaths;
         for (auto & p : inputPaths)
             storePaths.insert(store.toStorePath(p).first);
-        json[key] = pathInfoToJSON(store,
-            store.exportReferences(storePaths, storePaths));
+        json[key] = pathInfoToJSON(store, store.exportReferences(storePaths, storePaths));
     }
 
     return json;
@@ -133,7 +130,8 @@ std::string StructuredAttrs::writeShell(const nlohmann::json & json)
 
     for (auto & [key, value] : json.items()) {
 
-        if (!std::regex_match(key, shVarName)) continue;
+        if (!std::regex_match(key, shVarName))
+            continue;
 
         auto s = handleSimpleType(value);
         if (s)
@@ -145,8 +143,12 @@ std::string StructuredAttrs::writeShell(const nlohmann::json & json)
 
             for (auto & value2 : value) {
                 auto s3 = handleSimpleType(value2);
-                if (!s3) { good = false; break; }
-                s2 += *s3; s2 += ' ';
+                if (!s3) {
+                    good = false;
+                    break;
+                }
+                s2 += *s3;
+                s2 += ' ';
             }
 
             if (good)
@@ -159,7 +161,10 @@ std::string StructuredAttrs::writeShell(const nlohmann::json & json)
 
             for (auto & [key2, value2] : value.items()) {
                 auto s3 = handleSimpleType(value2);
-                if (!s3) { good = false; break; }
+                if (!s3) {
+                    good = false;
+                    break;
+                }
                 s2 += fmt("[%s]=%s ", escapeShellArgAlways(key2), *s3);
             }
 

@@ -5,10 +5,11 @@
 
 namespace nix {
 
-static void prim_unsafeDiscardStringContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_unsafeDiscardStringContext(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     NixStringContext context;
-    auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.unsafeDiscardStringContext");
+    auto s = state.coerceToString(
+        pos, *args[0], context, "while evaluating the argument passed to builtins.unsafeDiscardStringContext");
     v.mkString(*s);
 }
 
@@ -21,18 +22,17 @@ static RegisterPrimOp primop_unsafeDiscardStringContext({
     .fun = prim_unsafeDiscardStringContext,
 });
 
-
-static void prim_hasContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_hasContext(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     NixStringContext context;
     state.forceString(*args[0], context, pos, "while evaluating the argument passed to builtins.hasContext");
     v.mkBool(!context.empty());
 }
 
-static RegisterPrimOp primop_hasContext({
-    .name = "__hasContext",
-    .args = {"s"},
-    .doc = R"(
+static RegisterPrimOp primop_hasContext(
+    {.name = "__hasContext",
+     .args = {"s"},
+     .doc = R"(
       Return `true` if string *s* has a non-empty context.
       The context can be obtained with
       [`getContext`](#builtins-getContext).
@@ -50,21 +50,18 @@ static RegisterPrimOp primop_hasContext({
       > else { ${name} = meta; }
       > ```
     )",
-    .fun = prim_hasContext
-});
+     .fun = prim_hasContext});
 
-
-static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     NixStringContext context;
-    auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.unsafeDiscardOutputDependency");
+    auto s = state.coerceToString(
+        pos, *args[0], context, "while evaluating the argument passed to builtins.unsafeDiscardOutputDependency");
 
     NixStringContext context2;
     for (auto && c : context) {
         if (auto * ptr = std::get_if<NixStringContextElem::DrvDeep>(&c.raw)) {
-            context2.emplace(NixStringContextElem::Opaque {
-                .path = ptr->drvPath
-            });
+            context2.emplace(NixStringContextElem::Opaque{.path = ptr->drvPath});
         } else {
             /* Can reuse original item */
             context2.emplace(std::move(c).raw);
@@ -74,10 +71,10 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx p
     v.mkString(*s, context2);
 }
 
-static RegisterPrimOp primop_unsafeDiscardOutputDependency({
-    .name = "__unsafeDiscardOutputDependency",
-    .args = {"s"},
-    .doc = R"(
+static RegisterPrimOp primop_unsafeDiscardOutputDependency(
+    {.name = "__unsafeDiscardOutputDependency",
+     .args = {"s"},
+     .doc = R"(
       Create a copy of the given string where every
       [derivation deep](@docroot@/language/string-context.md#string-context-element-derivation-deep)
       string context element is turned into a
@@ -94,58 +91,58 @@ static RegisterPrimOp primop_unsafeDiscardOutputDependency({
 
       [`builtins.addDrvOutputDependencies`]: #builtins-addDrvOutputDependencies
     )",
-    .fun = prim_unsafeDiscardOutputDependency
-});
+     .fun = prim_unsafeDiscardOutputDependency});
 
-
-static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     NixStringContext context;
-    auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.addDrvOutputDependencies");
+    auto s = state.coerceToString(
+        pos, *args[0], context, "while evaluating the argument passed to builtins.addDrvOutputDependencies");
 
-	auto contextSize = context.size();
+    auto contextSize = context.size();
     if (contextSize != 1) {
-        state.error<EvalError>(
-            "context of string '%s' must have exactly one element, but has %d",
-            *s,
-            contextSize
-        ).atPos(pos).debugThrow();
+        state.error<EvalError>("context of string '%s' must have exactly one element, but has %d", *s, contextSize)
+            .atPos(pos)
+            .debugThrow();
     }
-    NixStringContext context2 {
-        (NixStringContextElem { std::visit(overloaded {
-            [&](const NixStringContextElem::Opaque & c) -> NixStringContextElem::DrvDeep {
-                if (!c.path.isDerivation()) {
-                    state.error<EvalError>(
-                        "path '%s' is not a derivation",
-                        state.store->printStorePath(c.path)
-                    ).atPos(pos).debugThrow();
-                }
-                return NixStringContextElem::DrvDeep {
-                    .drvPath = c.path,
-                };
+    NixStringContext context2{
+        (NixStringContextElem{std::visit(
+            overloaded{
+                [&](const NixStringContextElem::Opaque & c) -> NixStringContextElem::DrvDeep {
+                    if (!c.path.isDerivation()) {
+                        state.error<EvalError>("path '%s' is not a derivation", state.store->printStorePath(c.path))
+                            .atPos(pos)
+                            .debugThrow();
+                    }
+                    return NixStringContextElem::DrvDeep{
+                        .drvPath = c.path,
+                    };
+                },
+                [&](const NixStringContextElem::Built & c) -> NixStringContextElem::DrvDeep {
+                    state
+                        .error<EvalError>(
+                            "`addDrvOutputDependencies` can only act on derivations, not on a derivation output such as '%1%'",
+                            c.output)
+                        .atPos(pos)
+                        .debugThrow();
+                },
+                [&](const NixStringContextElem::DrvDeep & c) -> NixStringContextElem::DrvDeep {
+                    /* Reuse original item because we want this to be idempotent. */
+                    /* FIXME: Suspicious move out of const. This is actually a copy, so the comment
+                     above does not make much sense. */
+                    return std::move(c);
+                },
             },
-            [&](const NixStringContextElem::Built & c) -> NixStringContextElem::DrvDeep {
-                state.error<EvalError>(
-                    "`addDrvOutputDependencies` can only act on derivations, not on a derivation output such as '%1%'",
-                    c.output
-                ).atPos(pos).debugThrow();
-            },
-            [&](const NixStringContextElem::DrvDeep & c) -> NixStringContextElem::DrvDeep {
-                /* Reuse original item because we want this to be idempotent. */
-                /* FIXME: Suspicious move out of const. This is actually a copy, so the comment
-                 above does not make much sense. */
-                return std::move(c);
-            },
-        }, context.begin()->raw) }),
+            context.begin()->raw)}),
     };
 
     v.mkString(*s, context2);
 }
 
-static RegisterPrimOp primop_addDrvOutputDependencies({
-    .name = "__addDrvOutputDependencies",
-    .args = {"s"},
-    .doc = R"(
+static RegisterPrimOp primop_addDrvOutputDependencies(
+    {.name = "__addDrvOutputDependencies",
+     .args = {"s"},
+     .doc = R"(
       Create a copy of the given string where a single
       [constant](@docroot@/language/string-context.md#string-context-element-constant)
       string context element is turned into a
@@ -159,9 +156,7 @@ static RegisterPrimOp primop_addDrvOutputDependencies({
 
       This is the opposite of [`builtins.unsafeDiscardOutputDependency`](#builtins-unsafeDiscardOutputDependency).
     )",
-    .fun = prim_addDrvOutputDependencies
-});
-
+     .fun = prim_addDrvOutputDependencies});
 
 /* Extract the context of a string as a structured Nix value.
 
@@ -182,9 +177,10 @@ static RegisterPrimOp primop_addDrvOutputDependencies({
    Note that for a given path any combination of the above attributes
    may be present.
 */
-static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_getContext(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    struct ContextInfo {
+    struct ContextInfo
+    {
         bool path = false;
         bool allOutputs = false;
         Strings outputs;
@@ -193,20 +189,18 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
     state.forceString(*args[0], context, pos, "while evaluating the argument passed to builtins.getContext");
     auto contextInfos = std::map<StorePath, ContextInfo>();
     for (auto && i : context) {
-        std::visit(overloaded {
-            [&](NixStringContextElem::DrvDeep && d) {
-                contextInfos[std::move(d.drvPath)].allOutputs = true;
+        std::visit(
+            overloaded{
+                [&](NixStringContextElem::DrvDeep && d) { contextInfos[std::move(d.drvPath)].allOutputs = true; },
+                [&](NixStringContextElem::Built && b) {
+                    // FIXME should eventually show string context as is, no
+                    // resolving here.
+                    auto drvPath = resolveDerivedPath(*state.store, *b.drvPath);
+                    contextInfos[std::move(drvPath)].outputs.emplace_back(std::move(b.output));
+                },
+                [&](NixStringContextElem::Opaque && o) { contextInfos[std::move(o.path)].path = true; },
             },
-            [&](NixStringContextElem::Built && b) {
-                // FIXME should eventually show string context as is, no
-                // resolving here.
-                auto drvPath = resolveDerivedPath(*state.store, *b.drvPath);
-                contextInfos[std::move(drvPath)].outputs.emplace_back(std::move(b.output));
-            },
-            [&](NixStringContextElem::Opaque && o) {
-                contextInfos[std::move(o.path)].path = true;
-            },
-        }, ((NixStringContextElem &&) i).raw);
+            ((NixStringContextElem &&) i).raw);
     }
 
     auto attrs = state.buildBindings(contextInfos.size());
@@ -231,10 +225,10 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
     v.mkAttrs(attrs);
 }
 
-static RegisterPrimOp primop_getContext({
-    .name = "__getContext",
-    .args = {"s"},
-    .doc = R"(
+static RegisterPrimOp primop_getContext(
+    {.name = "__getContext",
+     .args = {"s"},
+     .doc = R"(
       Return the string context of *s*.
 
       The string context tracks references to derivations within a string.
@@ -253,19 +247,18 @@ static RegisterPrimOp primop_getContext({
       { "/nix/store/arhvjaf6zmlyn8vh8fgn55rpwnxq0n7l-a.drv" = { outputs = [ "out" ]; }; }
       ```
     )",
-    .fun = prim_getContext
-});
-
+     .fun = prim_getContext});
 
 /* Append the given context to a given string.
 
    See the commentary above getContext for details of the
    context representation.
 */
-static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     NixStringContext context;
-    auto orig = state.forceString(*args[0], context, noPos, "while evaluating the first argument passed to builtins.appendContext");
+    auto orig = state.forceString(
+        *args[0], context, noPos, "while evaluating the first argument passed to builtins.appendContext");
 
     state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.appendContext");
 
@@ -274,10 +267,7 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
     for (auto & i : *args[1]->attrs()) {
         const auto & name = state.symbols[i.name];
         if (!state.store->isStorePath(name))
-            state.error<EvalError>(
-                "context key '%s' is not a store path",
-                name
-            ).atPos(i.pos).debugThrow();
+            state.error<EvalError>("context key '%s' is not a store path", name).atPos(i.pos).debugThrow();
         auto namePath = state.store->parseStorePath(name);
         if (!settings.readOnlyMode)
             state.store->ensurePath(namePath);
@@ -285,39 +275,46 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
 
         if (auto attr = i.value->attrs()->get(sPath)) {
             if (state.forceBool(*attr->value, attr->pos, "while evaluating the `path` attribute of a string context"))
-                context.emplace(NixStringContextElem::Opaque {
-                    .path = namePath,
-                });
+                context.emplace(
+                    NixStringContextElem::Opaque{
+                        .path = namePath,
+                    });
         }
 
         if (auto attr = i.value->attrs()->get(sAllOutputs)) {
-            if (state.forceBool(*attr->value, attr->pos, "while evaluating the `allOutputs` attribute of a string context")) {
+            if (state.forceBool(
+                    *attr->value, attr->pos, "while evaluating the `allOutputs` attribute of a string context")) {
                 if (!isDerivation(name)) {
-                    state.error<EvalError>(
-                        "tried to add all-outputs context of %s, which is not a derivation, to a string",
-                        name
-                    ).atPos(i.pos).debugThrow();
+                    state
+                        .error<EvalError>(
+                            "tried to add all-outputs context of %s, which is not a derivation, to a string", name)
+                        .atPos(i.pos)
+                        .debugThrow();
                 }
-                context.emplace(NixStringContextElem::DrvDeep {
-                    .drvPath = namePath,
-                });
+                context.emplace(
+                    NixStringContextElem::DrvDeep{
+                        .drvPath = namePath,
+                    });
             }
         }
 
         if (auto attr = i.value->attrs()->get(state.sOutputs)) {
             state.forceList(*attr->value, attr->pos, "while evaluating the `outputs` attribute of a string context");
             if (attr->value->listSize() && !isDerivation(name)) {
-                state.error<EvalError>(
-                    "tried to add derivation output context of %s, which is not a derivation, to a string",
-                    name
-                ).atPos(i.pos).debugThrow();
+                state
+                    .error<EvalError>(
+                        "tried to add derivation output context of %s, which is not a derivation, to a string", name)
+                    .atPos(i.pos)
+                    .debugThrow();
             }
             for (auto elem : attr->value->listItems()) {
-                auto outputName = state.forceStringNoCtx(*elem, attr->pos, "while evaluating an output name within a string context");
-                context.emplace(NixStringContextElem::Built {
-                    .drvPath = makeConstantStorePathRef(namePath),
-                    .output = std::string { outputName },
-                });
+                auto outputName =
+                    state.forceStringNoCtx(*elem, attr->pos, "while evaluating an output name within a string context");
+                context.emplace(
+                    NixStringContextElem::Built{
+                        .drvPath = makeConstantStorePathRef(namePath),
+                        .output = std::string{outputName},
+                    });
             }
         }
     }
@@ -325,10 +322,6 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
     v.mkString(orig, context);
 }
 
-static RegisterPrimOp primop_appendContext({
-    .name = "__appendContext",
-    .arity = 2,
-    .fun = prim_appendContext
-});
+static RegisterPrimOp primop_appendContext({.name = "__appendContext", .arity = 2, .fun = prim_appendContext});
 
 }

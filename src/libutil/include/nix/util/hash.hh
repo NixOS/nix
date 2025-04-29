@@ -8,9 +8,7 @@
 
 namespace nix {
 
-
 MakeError(BadHash, Error);
-
 
 enum struct HashAlgorithm : char { MD5 = 42, SHA1, SHA256, SHA512, BLAKE3 };
 
@@ -89,12 +87,12 @@ public:
     /**
      * Check whether two hashes are equal.
      */
-    bool operator == (const Hash & h2) const noexcept;
+    bool operator==(const Hash & h2) const noexcept;
 
     /**
      * Compare how two hashes are ordered.
      */
-    std::strong_ordering operator <=> (const Hash & h2) const noexcept;
+    std::strong_ordering operator<=>(const Hash & h2) const noexcept;
 
     /**
      * Returns the length of a base-16 representation of this hash.
@@ -158,7 +156,8 @@ std::string printHash16or32(const Hash & hash);
 /**
  * Compute the hash of the given string.
  */
-Hash hashString(HashAlgorithm ha, std::string_view s, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+Hash hashString(
+    HashAlgorithm ha, std::string_view s, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * Compute the hash of the given file, hashing its contents directly.
@@ -210,7 +209,6 @@ std::optional<HashAlgorithm> parseHashAlgoOpt(std::string_view s);
  */
 std::string_view printHashAlgo(HashAlgorithm ha);
 
-
 union Ctx;
 
 struct AbstractHashSink : virtual Sink
@@ -233,6 +231,5 @@ public:
     HashResult finish() override;
     HashResult currentHash();
 };
-
 
 }

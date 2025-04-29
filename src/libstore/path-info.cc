@@ -17,7 +17,7 @@ GENERATE_CMP_EXT(
     me->references,
     me->registrationTime,
     me->narSize,
-    //me->id,
+    // me->id,
     me->ultimate,
     me->sigs,
     me->ca);
@@ -25,15 +25,11 @@ GENERATE_CMP_EXT(
 std::string ValidPathInfo::fingerprint(const Store & store) const
 {
     if (narSize == 0)
-        throw Error("cannot calculate fingerprint of path '%s' because its size is not known",
-            store.printStorePath(path));
-    return
-            "1;" + store.printStorePath(path) + ";"
-            + narHash.to_string(HashFormat::Nix32, true) + ";"
-            + std::to_string(narSize) + ";"
-        + concatStringsSep(",", store.printStorePathSet(references));
+        throw Error(
+            "cannot calculate fingerprint of path '%s' because its size is not known", store.printStorePath(path));
+    return "1;" + store.printStorePath(path) + ";" + narHash.to_string(HashFormat::Nix32, true) + ";"
+           + std::to_string(narSize) + ";" + concatStringsSep(",", store.printStorePathSet(references));
 }
-
 
 void ValidPathInfo::sign(const Store & store, const Signer & signer)
 {
@@ -43,46 +39,45 @@ void ValidPathInfo::sign(const Store & store, const Signer & signer)
 void ValidPathInfo::sign(const Store & store, const std::vector<std::unique_ptr<Signer>> & signers)
 {
     auto fingerprint = this->fingerprint(store);
-    for (auto & signer: signers) {
+    for (auto & signer : signers) {
         sigs.insert(signer->signDetached(fingerprint));
     }
 }
 
 std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithReferences() const
 {
-    if (! ca)
+    if (!ca)
         return std::nullopt;
 
     switch (ca->method.raw) {
-        case ContentAddressMethod::Raw::Text:
-        {
-            assert(references.count(path) == 0);
-            return TextInfo {
-                .hash = ca->hash,
-                .references = references,
-            };
-        }
+    case ContentAddressMethod::Raw::Text: {
+        assert(references.count(path) == 0);
+        return TextInfo{
+            .hash = ca->hash,
+            .references = references,
+        };
+    }
 
-        case ContentAddressMethod::Raw::Flat:
-        case ContentAddressMethod::Raw::NixArchive:
-        case ContentAddressMethod::Raw::Git:
-        default:
-        {
-            auto refs = references;
-            bool hasSelfReference = false;
-            if (refs.count(path)) {
-                hasSelfReference = true;
-                refs.erase(path);
-            }
-            return FixedOutputInfo {
-                .method = ca->method.getFileIngestionMethod(),
-                .hash = ca->hash,
-                .references = {
+    case ContentAddressMethod::Raw::Flat:
+    case ContentAddressMethod::Raw::NixArchive:
+    case ContentAddressMethod::Raw::Git:
+    default: {
+        auto refs = references;
+        bool hasSelfReference = false;
+        if (refs.count(path)) {
+            hasSelfReference = true;
+            refs.erase(path);
+        }
+        return FixedOutputInfo{
+            .method = ca->method.getFileIngestionMethod(),
+            .hash = ca->hash,
+            .references =
+                {
                     .others = std::move(refs),
                     .self = hasSelfReference,
                 },
-            };
-        }
+        };
+    }
     }
 }
 
@@ -90,7 +85,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
     auto fullCaOpt = contentAddressWithReferences();
 
-    if (! fullCaOpt)
+    if (!fullCaOpt)
         return false;
 
     auto caPath = store.makeFixedOutputPathFromCA(path.name(), *fullCaOpt);
@@ -103,10 +98,10 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
     return res;
 }
 
-
 size_t ValidPathInfo::checkSignatures(const Store & store, const PublicKeys & publicKeys) const
 {
-    if (isContentAddressed(store)) return maxSigs;
+    if (isContentAddressed(store))
+        return maxSigs;
 
     size_t good = 0;
     for (auto & sig : sigs)
@@ -115,12 +110,10 @@ size_t ValidPathInfo::checkSignatures(const Store & store, const PublicKeys & pu
     return good;
 }
 
-
 bool ValidPathInfo::checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const
 {
     return verifyDetached(fingerprint(store), sig, publicKeys);
 }
-
 
 Strings ValidPathInfo::shortRefs() const
 {
@@ -131,34 +124,27 @@ Strings ValidPathInfo::shortRefs() const
 }
 
 ValidPathInfo::ValidPathInfo(
-    const Store & store,
-    std::string_view name,
-    ContentAddressWithReferences && ca,
-    Hash narHash)
-      : UnkeyedValidPathInfo(narHash)
-      , path(store.makeFixedOutputPathFromCA(name, ca))
+    const Store & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash)
+    : UnkeyedValidPathInfo(narHash)
+    , path(store.makeFixedOutputPathFromCA(name, ca))
 {
-    this->ca = ContentAddress {
+    this->ca = ContentAddress{
         .method = ca.getMethod(),
         .hash = ca.getHash(),
     };
-    std::visit(overloaded {
-        [this](TextInfo && ti) {
-            this->references = std::move(ti.references);
+    std::visit(
+        overloaded{
+            [this](TextInfo && ti) { this->references = std::move(ti.references); },
+            [this](FixedOutputInfo && foi) {
+                this->references = std::move(foi.references.others);
+                if (foi.references.self)
+                    this->references.insert(path);
+            },
         },
-        [this](FixedOutputInfo && foi) {
-            this->references = std::move(foi.references.others);
-            if (foi.references.self)
-                this->references.insert(path);
-        },
-    }, std::move(ca).raw);
+        std::move(ca).raw);
 }
 
-
-nlohmann::json UnkeyedValidPathInfo::toJSON(
-    const Store & store,
-    bool includeImpureInfo,
-    HashFormat hashFormat) const
+nlohmann::json UnkeyedValidPathInfo::toJSON(const Store & store, bool includeImpureInfo, HashFormat hashFormat) const
 {
     using nlohmann::json;
 
@@ -173,12 +159,12 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(
             jsonRefs.emplace_back(store.printStorePath(ref));
     }
 
-    jsonObject["ca"] = ca ? (std::optional { renderContentAddress(*ca) }) : std::nullopt;
+    jsonObject["ca"] = ca ? (std::optional{renderContentAddress(*ca)}) : std::nullopt;
 
     if (includeImpureInfo) {
-        jsonObject["deriver"] = deriver ? (std::optional { store.printStorePath(*deriver) }) : std::nullopt;
+        jsonObject["deriver"] = deriver ? (std::optional{store.printStorePath(*deriver)}) : std::nullopt;
 
-        jsonObject["registrationTime"] = registrationTime ? (std::optional { registrationTime }) : std::nullopt;
+        jsonObject["registrationTime"] = registrationTime ? (std::optional{registrationTime}) : std::nullopt;
 
         jsonObject["ultimate"] = ultimate;
 
@@ -190,11 +176,9 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(
     return jsonObject;
 }
 
-UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
-    const Store & store,
-    const nlohmann::json & _json)
+UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const Store & store, const nlohmann::json & _json)
 {
-    UnkeyedValidPathInfo res {
+    UnkeyedValidPathInfo res{
         Hash(Hash::dummy),
     };
 
@@ -205,8 +189,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
     try {
         auto references = getStringList(valueAt(json, "references"));
         for (auto & input : references)
-            res.references.insert(store.parseStorePath(static_cast<const std::string &>
-(input)));
+            res.references.insert(store.parseStorePath(static_cast<const std::string &>(input)));
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'references'");
         throw;

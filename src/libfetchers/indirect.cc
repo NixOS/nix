@@ -8,11 +8,10 @@ std::regex flakeRegex("[a-zA-Z][a-zA-Z0-9_-]*", std::regex::ECMAScript);
 
 struct IndirectInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(
-        const Settings & settings,
-        const ParsedURL & url, bool requireTree) const override
+    std::optional<Input> inputFromURL(const Settings & settings, const ParsedURL & url, bool requireTree) const override
     {
-        if (url.scheme != "flake") return {};
+        if (url.scheme != "flake")
+            return {};
 
         auto path = tokenizeString<std::vector<std::string>>(url.path, "/");
 
@@ -46,8 +45,10 @@ struct IndirectInputScheme : InputScheme
         Input input{settings};
         input.attrs.insert_or_assign("type", "indirect");
         input.attrs.insert_or_assign("id", id);
-        if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
-        if (ref) input.attrs.insert_or_assign("ref", *ref);
+        if (rev)
+            input.attrs.insert_or_assign("rev", rev->gitRev());
+        if (ref)
+            input.attrs.insert_or_assign("ref", *ref);
 
         return input;
     }
@@ -67,9 +68,7 @@ struct IndirectInputScheme : InputScheme
         };
     }
 
-    std::optional<Input> inputFromAttrs(
-        const Settings & settings,
-        const Attrs & attrs) const override
+    std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const override
     {
         auto id = getStrAttr(attrs, "id");
         if (!std::regex_match(id, flakeRegex))
@@ -85,19 +84,24 @@ struct IndirectInputScheme : InputScheme
         ParsedURL url;
         url.scheme = "flake";
         url.path = getStrAttr(input.attrs, "id");
-        if (auto ref = input.getRef()) { url.path += '/'; url.path += *ref; };
-        if (auto rev = input.getRev()) { url.path += '/'; url.path += rev->gitRev(); };
+        if (auto ref = input.getRef()) {
+            url.path += '/';
+            url.path += *ref;
+        };
+        if (auto rev = input.getRev()) {
+            url.path += '/';
+            url.path += rev->gitRev();
+        };
         return url;
     }
 
-    Input applyOverrides(
-        const Input & _input,
-        std::optional<std::string> ref,
-        std::optional<Hash> rev) const override
+    Input applyOverrides(const Input & _input, std::optional<std::string> ref, std::optional<Hash> rev) const override
     {
         auto input(_input);
-        if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
-        if (ref) input.attrs.insert_or_assign("ref", *ref);
+        if (rev)
+            input.attrs.insert_or_assign("rev", rev->gitRev());
+        if (ref)
+            input.attrs.insert_or_assign("ref", *ref);
         return input;
     }
 
@@ -112,7 +116,9 @@ struct IndirectInputScheme : InputScheme
     }
 
     bool isDirect(const Input & input) const override
-    { return false; }
+    {
+        return false;
+    }
 };
 
 static auto rIndirectInputScheme = OnStartup([] { registerInputScheme(std::make_unique<IndirectInputScheme>()); });
