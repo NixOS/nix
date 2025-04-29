@@ -200,7 +200,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
 
     auto & json = getObject(_json);
     res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
-    res.narSize = getInteger(valueAt(json, "narSize"));
+    res.narSize = getUnsigned(valueAt(json, "narSize"));
 
     try {
         auto references = getStringList(valueAt(json, "references"));
@@ -224,7 +224,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
 
     if (json.contains("registrationTime"))
         if (auto * rawRegistrationTime = getNullable(valueAt(json, "registrationTime")))
-            res.registrationTime = getInteger(*rawRegistrationTime);
+            res.registrationTime = getInteger<time_t>(*rawRegistrationTime);
 
     if (json.contains("ultimate"))
         res.ultimate = getBoolean(valueAt(json, "ultimate"));
