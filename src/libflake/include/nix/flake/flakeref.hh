@@ -65,7 +65,7 @@ struct FlakeRef
 
     FlakeRef resolve(
         ref<Store> store,
-        const fetchers::RegistryFilter & filter = {}) const;
+        fetchers::UseRegistries useRegistries = fetchers::UseRegistries::All) const;
 
     static FlakeRef fromAttrs(
         const fetchers::Settings & fetchSettings,

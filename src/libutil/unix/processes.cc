@@ -202,6 +202,7 @@ static int childEntry(void * arg)
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
+    auto newLogger = makeSimpleLogger();
     ChildWrapperFunction wrapper = [&] {
         if (!options.allowVfork) {
             /* Set a simple logger, while releasing (not destroying)
@@ -210,7 +211,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
                ~ProgressBar() tries to join a thread that doesn't
                exist. */
             logger.release();
-            logger = makeSimpleLogger();
+            logger = std::move(newLogger);
         }
         try {
 #ifdef __linux__

@@ -223,7 +223,7 @@ mv "$registry.tmp" "$registry"
 # Ensure that locking ignores the user registry.
 mkdir -p "$TEST_HOME/.config/nix"
 ln -sfn "$registry" "$TEST_HOME/.config/nix/registry.json"
-nix flake metadata flake1
+nix flake metadata --flake-registry '' flake1
 expectStderr 1 nix flake update --flake-registry '' --flake "$flake3Dir" | grepQuiet "cannot find flake 'flake:flake1' in the flake registries"
 rm "$TEST_HOME/.config/nix/registry.json"
 
@@ -266,6 +266,7 @@ nix registry add user-flake2 "git+file://$percentEncodedFlake2Dir"
 [[ $(nix --flake-registry "" registry list | wc -l) == 2 ]]
 nix --flake-registry "" registry list | grepQuietInverse '^global' # nothing in global registry
 nix --flake-registry "" registry list | grepQuiet '^user'
+nix flake metadata --flake-registry "" user-flake1 | grepQuiet 'URL:.*flake1.*'
 nix registry remove user-flake1
 nix registry remove user-flake2
 [[ $(nix registry list | wc -l) == 4 ]]
