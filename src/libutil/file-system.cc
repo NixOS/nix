@@ -629,14 +629,14 @@ void replaceSymlink(const fs::path & target, const fs::path & link)
             fs::create_symlink(target, tmp);
         } catch (fs::filesystem_error & e) {
             if (e.code() == std::errc::file_exists) continue;
-            throw SysError("creating symlink '%1%' -> '%2%'", tmp, target);
+            throw SysError("creating symlink %1% -> %2%", tmp, target);
         }
 
         try {
             fs::rename(tmp, link);
         } catch (fs::filesystem_error & e) {
             if (e.code() == std::errc::file_exists) continue;
-            throw SysError("renaming '%1%' to '%2%'", tmp, link);
+            throw SysError("renaming %1% to %2%", tmp, link);
         }
 
 
