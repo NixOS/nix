@@ -178,7 +178,7 @@ static void fetchTree(
     }
 
     if (!state.settings.pureEval && !input.isDirect())
-        input = lookupInRegistries(state.store, input).first;
+        input = lookupInRegistries(state.store, input, fetchers::UseRegistries::Limited).first;
 
     if (state.settings.pureEval && !input.isLocked()) {
         if (input.getNarHash())

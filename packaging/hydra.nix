@@ -19,14 +19,14 @@ let
 
   testNixVersions =
     pkgs: daemon:
-    pkgs.nixComponents.nix-functional-tests.override {
+    pkgs.nixComponents2.nix-functional-tests.override {
       pname = "nix-daemon-compat-tests";
       version = "${pkgs.nix.version}-with-daemon-${daemon.version}";
 
       test-daemon = daemon;
     };
 
-  # Technically we could just return `pkgs.nixComponents`, but for Hydra it's
+  # Technically we could just return `pkgs.nixComponents2`, but for Hydra it's
   # convention to transpose it, and to transpose it efficiently, we need to
   # enumerate them manually, so that we don't evaluate unnecessary package sets.
   # See listingIsComplete below.
@@ -85,7 +85,7 @@ in
       } (_: null);
       actualPkgs = lib.concatMapAttrs (
         k: v: if lib.strings.hasPrefix "nix-" k then { ${k} = null; } else { }
-      ) nixpkgsFor.${arbitrarySystem}.native.nixComponents;
+      ) nixpkgsFor.${arbitrarySystem}.native.nixComponents2;
       diff = lib.concatStringsSep "\n" (
         lib.concatLists (
           lib.mapAttrsToList (
@@ -111,7 +111,7 @@ in
 
   # Binary package for various platforms.
   build = forAllPackages (
-    pkgName: forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.${pkgName})
+    pkgName: forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.${pkgName})
   );
 
   shellInputs = removeAttrs (forAllSystems (
@@ -119,7 +119,7 @@ in
   )) [ "i686-linux" ];
 
   # Perl bindings for various platforms.
-  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-perl-bindings);
+  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.nix-perl-bindings);
 
   # Binary tarball for various platforms, containing a Nix store
   # with the closure of 'nix' package, and the second half of
@@ -145,13 +145,13 @@ in
   # };
 
   # Nix's manual
-  manual = nixpkgsFor.x86_64-linux.native.nixComponents.nix-manual;
+  manual = nixpkgsFor.x86_64-linux.native.nixComponents2.nix-manual;
 
   # API docs for Nix's unstable internal C++ interfaces.
-  internal-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-internal-api-docs;
+  internal-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents2.nix-internal-api-docs;
 
   # API docs for Nix's C bindings.
-  external-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-external-api-docs;
+  external-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents2.nix-external-api-docs;
 
   # System tests.
   tests =
