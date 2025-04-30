@@ -141,11 +141,7 @@ struct CmdFormatterBuild : MixFormatter
         auto & installable = InstallableValue::require(*installable_);
         auto unresolvedApp = installable.toApp(*evalState);
         auto app = unresolvedApp.resolve(evalStore, store);
-
-        Installables installableContext;
-        for (auto & ctxElt : unresolvedApp.unresolved.context)
-            installableContext.push_back(make_ref<InstallableDerivedPath>(store, DerivedPath{ctxElt}));
-        auto buildables = Installable::build(evalStore, store, Realise::Outputs, installableContext);
+        auto buildables = unresolvedApp.build(evalStore, store);
 
         if (outLink != "")
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
