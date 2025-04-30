@@ -130,19 +130,29 @@ TEST(getString, wrongAssertions) {
     ASSERT_THROW(getString(valueAt(json, "boolean")), Error);
 }
 
-TEST(getInteger, rightAssertions) {
-    auto simple = R"({ "int": 0 })"_json;
+TEST(getIntegralNumber, rightAssertions) {
+    auto simple = R"({ "int": 0, "signed": -1 })"_json;
 
-    ASSERT_EQ(getInteger(valueAt(getObject(simple), "int")), 0);
+    ASSERT_EQ(getUnsigned(valueAt(getObject(simple), "int")), 0);
+    ASSERT_EQ(getInteger<int8_t>(valueAt(getObject(simple), "int")), 0);
+    ASSERT_EQ(getInteger<int8_t>(valueAt(getObject(simple), "signed")), -1);
 }
 
-TEST(getInteger, wrongAssertions) {
-    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
+TEST(getIntegralNumber, wrongAssertions) {
+    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "signed": -256, "large": 128, "boolean": false })"_json;
 
-    ASSERT_THROW(getInteger(valueAt(json, "object")), Error);
-    ASSERT_THROW(getInteger(valueAt(json, "array")), Error);
-    ASSERT_THROW(getInteger(valueAt(json, "string")), Error);
-    ASSERT_THROW(getInteger(valueAt(json, "boolean")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(json, "object")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(json, "array")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(json, "string")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(json, "boolean")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(json, "signed")), Error);
+
+    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "object")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "array")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "string")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "boolean")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "large")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "signed")), Error);
 }
 
 TEST(getBoolean, rightAssertions) {
