@@ -93,27 +93,9 @@ struct CmdFormatterRun : MixFormatter, MixJSON
 
 static auto rFormatterRun = registerCommand2<CmdFormatterRun>({"formatter", "run"});
 
-struct CmdFormatterBuild : MixFormatter
+struct CmdFormatterBuild : MixFormatter, MixOutLinkByDefault
 {
-    Path outLink = "result";
-
-    CmdFormatterBuild()
-    {
-        addFlag({
-            .longName = "out-link",
-            .shortName = 'o',
-            .description = "Use *path* as prefix for the symlink to the build result. It defaults to `result`.",
-            .labels = {"path"},
-            .handler = {&outLink},
-            .completer = completePath,
-        });
-
-        addFlag({
-            .longName = "no-link",
-            .description = "Do not create symlink to the build results.",
-            .handler = {&outLink, Path("")},
-        });
-    }
+    CmdFormatterBuild() {}
 
     std::string description() override
     {
@@ -142,10 +124,7 @@ struct CmdFormatterBuild : MixFormatter
         auto unresolvedApp = installable.toApp(*evalState);
         auto app = unresolvedApp.resolve(evalStore, store);
         auto buildables = unresolvedApp.build(evalStore, store);
-
-        if (outLink != "")
-            if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                createOutLinks(outLink, toBuiltPaths(buildables), *store2);
+        createOutLinksMaybe(buildables, store);
 
         logger->cout("%s", app.program);
     };
