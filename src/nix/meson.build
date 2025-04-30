@@ -78,7 +78,7 @@ nix_sources = [config_priv_h] + files(
   'env.cc',
   'eval.cc',
   'flake.cc',
-  'fmt.cc',
+  'formatter.cc',
   'hash.cc',
   'log.cc',
   'ls.cc',

@@ -132,7 +132,7 @@ suites = [
       'nix-copy-ssh-ng.sh',
       'post-hook.sh',
       'function-trace.sh',
-      'fmt.sh',
+      'formatter.sh',
       'eval-store.sh',
       'why-depends.sh',
       'derivation-json.sh',
