@@ -11,6 +11,7 @@ struct BuiltinBuilderContext
     std::map<std::string, Path> outputs;
     std::string netrcData;
     std::string caFileData;
+    Path tmpDirInSandbox;
 };
 
 using BuiltinBuilder = std::function<void(const BuiltinBuilderContext &)>;

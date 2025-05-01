@@ -1860,7 +1860,10 @@ void DerivationBuilderImpl::runChild()
         /* Make the contents of netrc and the CA certificate bundle
            available to builtin:fetchurl (which may run under a
            different uid and/or in a sandbox). */
-        BuiltinBuilderContext ctx{.drv = drv};
+        BuiltinBuilderContext ctx{
+            .drv = drv,
+            .tmpDirInSandbox = tmpDirInSandbox,
+        };
 
         if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
            try {
