@@ -385,7 +385,7 @@ void recursiveSync(const Path & path)
     while (!dirsToEnumerate.empty()) {
         auto currentDir = dirsToEnumerate.back();
         dirsToEnumerate.pop_back();
-        for (auto & entry : std::filesystem::directory_iterator(currentDir)) {
+        for (auto & entry : DirectoryIterator(currentDir)) {
             auto st = entry.symlink_status();
             if (fs::is_directory(st)) {
                 dirsToEnumerate.emplace_back(entry.path());
@@ -689,7 +689,7 @@ void copyFile(const fs::path & from, const fs::path & to, bool andDelete)
         fs::copy(from, to, fs::copy_options::copy_symlinks | fs::copy_options::overwrite_existing);
     } else if (fs::is_directory(fromStatus)) {
         fs::create_directory(to);
-        for (auto & entry : fs::directory_iterator(from)) {
+        for (auto & entry : DirectoryIterator(from)) {
             copyFile(entry, to / entry.path().filename(), andDelete);
         }
     } else {

@@ -84,7 +84,7 @@ protected:
     {
         StorePathSet paths;
 
-        for (auto & entry : std::filesystem::directory_iterator{binaryCacheDir}) {
+        for (auto & entry : DirectoryIterator{binaryCacheDir}) {
             checkInterrupt();
             auto name = entry.path().filename().string();
             if (name.size() != 40 ||
