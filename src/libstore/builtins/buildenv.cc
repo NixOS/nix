@@ -1,4 +1,5 @@
 #include "nix/store/builtins/buildenv.hh"
+#include "nix/store/builtins.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/signals.hh"
 
@@ -166,7 +167,7 @@ void buildProfile(const Path & out, Packages && pkgs)
     debug("created %d symlinks in user environment", state.symlinks);
 }
 
-void builtinBuildenv(
+static void builtinBuildenv(
     const BasicDerivation & drv,
     const std::map<std::string, Path> & outputs)
 {
@@ -202,5 +203,7 @@ void builtinBuildenv(
 
     createSymlink(getAttr("manifest"), out + "/manifest.nix");
 }
+
+static RegisterBuiltinBuilder registerBuildenv("buildenv", builtinBuildenv);
 
 }
