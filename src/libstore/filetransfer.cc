@@ -309,6 +309,23 @@ struct curlFileTransfer : public FileTransfer
         }
         #endif
 
+        size_t seekCallback(curl_off_t offset, int origin)
+        {
+            if (origin == SEEK_SET) {
+                readOffset = offset;
+            } else if (origin == SEEK_CUR) {
+                readOffset += offset;
+            } else if (origin == SEEK_END) {
+                readOffset = request.data->length() + offset;
+            }
+            return CURL_SEEKFUNC_OK;
+        }
+
+        static size_t seekCallbackWrapper(void *clientp, curl_off_t offset, int origin)
+        {
+            return ((TransferItem *) clientp)->seekCallback(offset, origin);
+        }
+
         void init()
         {
             if (!req) req = curl_easy_init();
@@ -361,6 +378,8 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_READFUNCTION, readCallbackWrapper);
                 curl_easy_setopt(req, CURLOPT_READDATA, this);
                 curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->length());
+                curl_easy_setopt(req, CURLOPT_SEEKFUNCTION, seekCallbackWrapper);
+                curl_easy_setopt(req, CURLOPT_SEEKDATA, this);
             }
 
             if (request.verifyTLS) {
