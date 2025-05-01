@@ -43,6 +43,34 @@ namespace fs {
   }
 }
 
+DirectoryIterator::DirectoryIterator(const std::filesystem::path& p) {
+    try {
+        // **Attempt to create the underlying directory_iterator**
+        it_ = std::filesystem::directory_iterator(p);
+    } catch (const std::filesystem::filesystem_error& e) {
+        // **Catch filesystem_error and throw SysError**
+        // Adapt the error message as needed for SysError
+        throw SysError("cannot read directory %s", p);
+    }
+}
+
+DirectoryIterator& DirectoryIterator::operator++() {
+    // **Attempt to increment the underlying iterator**
+    std::error_code ec;
+    it_.increment(ec);
+    if (ec) {
+        // Try to get path info if possible, might fail if iterator is bad
+        try {
+            if (it_ != std::filesystem::directory_iterator{}) {
+                throw SysError("cannot read directory past %s: %s", it_->path(), ec.message());
+            }
+        } catch (...) {
+            throw SysError("cannot read directory");
+        }
+    }
+    return *this;
+}
+
 bool isAbsolute(PathView path)
 {
     return fs::path { path }.is_absolute();
