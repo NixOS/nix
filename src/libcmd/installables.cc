@@ -491,7 +491,11 @@ Installables SourceExprCommand::parseInstallables(
             throw UsageError("'--file' and '--expr' are exclusive");
 
         // FIXME: backward compatibility hack
-        if (file) evalSettings.pureEval = false;
+        if (file) {
+            if (evalSettings.pureEval && evalSettings.pureEval.overridden)
+                throw UsageError("'--file' is not compatible with '--pure-eval'");
+            evalSettings.pureEval = false;
+        }
 
         auto state = getEvalState();
         auto vFile = state->allocValue();
