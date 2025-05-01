@@ -112,6 +112,7 @@ lexer_tab = custom_target(
   ],
   command : [
     'flex',
+    '-Cf', # Use full scanner tables
     '--outfile',
     '@OUTPUT0@',
     '--header-file=' + '@OUTPUT1@',
