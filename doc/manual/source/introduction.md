@@ -1,8 +1,8 @@
 # Introduction
 
 Nix is a _purely functional package manager_.  This means that it
-treats packages like values in purely functional programming languages
-such as Haskell — they are built by functions that don’t have
+treats packages like values in a purely functional programming language
+— packages are built by functions that don’t have
 side-effects, and they never change after they have been built.  Nix
 stores packages in the _Nix store_, usually the directory
 `/nix/store`, where each package has its own unique subdirectory such
