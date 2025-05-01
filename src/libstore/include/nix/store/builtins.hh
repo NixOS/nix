@@ -5,15 +5,15 @@
 
 namespace nix {
 
-// TODO: make pluggable.
-void builtinFetchurl(
-    const BasicDerivation & drv,
-    const std::map<std::string, Path> & outputs,
-    const std::string & netrcData,
-    const std::string & caFileData);
+struct BuiltinBuilderContext
+{
+    BasicDerivation & drv;
+    std::map<std::string, Path> outputs;
+    std::string netrcData;
+    std::string caFileData;
+};
 
-using BuiltinBuilder =
-    std::function<void(const BasicDerivation & drv, const std::map<std::string, Path> & outputs)>;
+using BuiltinBuilder = std::function<void(const BuiltinBuilderContext &)>;
 
 struct RegisterBuiltinBuilder
 {

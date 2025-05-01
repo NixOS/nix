@@ -1806,15 +1806,15 @@ void LocalDerivationGoal::runChild()
         /* Make the contents of netrc and the CA certificate bundle
            available to builtin:fetchurl (which may run under a
            different uid and/or in a sandbox). */
-        std::string netrcData;
-        std::string caFileData;
+        BuiltinBuilderContext ctx{.drv = *drv};
+
         if (drv->isBuiltin() && drv->builder == "builtin:fetchurl") {
            try {
-               netrcData = readFile(settings.netrcFile);
+               ctx.netrcData = readFile(settings.netrcFile);
            } catch (SystemError &) { }
 
            try {
-               caFileData = readFile(settings.caFile);
+               ctx.caFileData = readFile(settings.caFile);
            } catch (SystemError &) { }
         }
 
@@ -2234,21 +2234,16 @@ void LocalDerivationGoal::runChild()
             try {
                 logger = makeJSONLogger(getStandardError());
 
-                std::map<std::string, Path> outputs;
                 for (auto & e : drv->outputs)
-                    outputs.insert_or_assign(e.first,
+                    ctx.outputs.insert_or_assign(e.first,
                         worker.store.printStorePath(scratchOutputs.at(e.first)));
 
-                if (drv->builder == "builtin:fetchurl")
-                    builtinFetchurl(*drv, outputs, netrcData, caFileData);
-                else {
-                    std::string builtinName = drv->builder.substr(8);
-                    assert(RegisterBuiltinBuilder::builtinBuilders);
-                    if (auto builtin = get(*RegisterBuiltinBuilder::builtinBuilders, builtinName))
-                        (*builtin)(*drv, outputs);
-                    else
-                        throw Error("unsupported builtin builder '%1%'", builtinName);
-                }
+                std::string builtinName = drv->builder.substr(8);
+                assert(RegisterBuiltinBuilder::builtinBuilders);
+                if (auto builtin = get(*RegisterBuiltinBuilder::builtinBuilders, builtinName))
+                    (*builtin)(ctx);
+                else
+                    throw Error("unsupported builtin builder '%1%'", builtinName);
                 _exit(0);
             } catch (std::exception & e) {
                 writeFull(STDERR_FILENO, e.what() + std::string("\n"));
