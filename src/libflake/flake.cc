@@ -99,6 +99,7 @@ static FlakeInput parseFlakeInput(
     auto sUrl = state.symbols.create("url");
     auto sFlake = state.symbols.create("flake");
     auto sFollows = state.symbols.create("follows");
+    auto sBuildTime = state.symbols.create("buildTime");
 
     fetchers::Attrs attrs;
     std::optional<std::string> url;
@@ -123,6 +124,9 @@ static FlakeInput parseFlakeInput(
             } else if (attr.name == sFlake) {
                 expectType(state, nBool, *attr.value, attr.pos);
                 input.isFlake = attr.value->boolean();
+            } else if (attr.name == sBuildTime) {
+                expectType(state, nBool, *attr.value, attr.pos);
+                input.buildTime = attr.value->boolean();
             } else if (attr.name == sInputs) {
                 input.overrides = parseFlakeInputs(state, attr.value, attr.pos, lockRootAttrPath, flakeDir, false).first;
             } else if (attr.name == sFollows) {
@@ -593,6 +597,7 @@ LockedFlake lockFlake(
                             oldLock->lockedRef,
                             oldLock->originalRef,
                             oldLock->isFlake,
+                            oldLock->buildTime,
                             oldLock->parentInputAttrPath);
 
                         node->inputs.insert_or_assign(id, childNode);
@@ -702,6 +707,7 @@ LockedFlake lockFlake(
                                 inputFlake.lockedRef,
                                 ref,
                                 true,
+                                input.buildTime,
                                 overridenParentPath);
 
                             node->inputs.insert_or_assign(id, childNode);
@@ -751,7 +757,7 @@ LockedFlake lockFlake(
                                 }
                             }();
 
-                            auto childNode = make_ref<LockedNode>(lockedRef, ref, false, overridenParentPath);
+                            auto childNode = make_ref<LockedNode>(lockedRef, ref, false, input.buildTime, overridenParentPath);
 
                             nodePaths.emplace(childNode, path);
 

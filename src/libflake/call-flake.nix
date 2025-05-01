@@ -50,7 +50,17 @@ let
         if node ? parent then parentDir + ("/" + dir) else dir;
 
       sourceInfo =
-        if overrides ? ${key} then
+        if node.buildTime or false then
+          derivation {
+            name = "source";
+            builder = "builtin:fetch-tree";
+            system = "builtin";
+            __structuredAttrs = true;
+            input = node.locked;
+            outputHashMode = "recursive";
+            outputHash = node.locked.narHash;
+          }
+        else if overrides ? ${key} then
           overrides.${key}.sourceInfo
         else if node.locked.type == "path" && builtins.substring 0 1 node.locked.path != "/" then
           parentNode.sourceInfo
@@ -97,6 +107,7 @@ let
       result =
         if node.flake or true then
           assert builtins.isFunction flake.outputs;
+          assert !(node.buildTime or false);
           result
         else
           sourceInfo;
