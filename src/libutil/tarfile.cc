@@ -8,10 +8,6 @@
 
 namespace nix {
 
-namespace fs {
-using namespace std::filesystem;
-}
-
 namespace {
 
 int callback_open(struct archive *, void * self)
@@ -127,7 +123,7 @@ TarArchive::~TarArchive()
         archive_read_free(this->archive);
 }
 
-static void extract_archive(TarArchive & archive, const fs::path & destDir)
+static void extract_archive(TarArchive & archive, const std::filesystem::path & destDir)
 {
     int flags = ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_SECURE_SYMLINKS | ARCHIVE_EXTRACT_SECURE_NODOTDOT;
 
@@ -162,7 +158,7 @@ static void extract_archive(TarArchive & archive, const fs::path & destDir)
     archive.close();
 }
 
-void unpackTarfile(Source & source, const fs::path & destDir)
+void unpackTarfile(Source & source, const std::filesystem::path & destDir)
 {
     auto archive = TarArchive(source);
 
@@ -170,7 +166,7 @@ void unpackTarfile(Source & source, const fs::path & destDir)
     extract_archive(archive, destDir);
 }
 
-void unpackTarfile(const fs::path & tarFile, const fs::path & destDir)
+void unpackTarfile(const std::filesystem::path & tarFile, const std::filesystem::path & destDir)
 {
     auto archive = TarArchive(tarFile);
 

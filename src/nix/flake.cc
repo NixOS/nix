@@ -54,7 +54,7 @@ public:
 
     FlakeRef getFlakeRef()
     {
-        return parseFlakeRef(fetchSettings, flakeUrl, fs::current_path().string()); //FIXME
+        return parseFlakeRef(fetchSettings, flakeUrl, std::filesystem::current_path().string()); //FIXME
     }
 
     LockedFlake lockFlake()
@@ -66,7 +66,7 @@ public:
     {
         return {
             // Like getFlakeRef but with expandTilde calld first
-            parseFlakeRef(fetchSettings, expandTilde(flakeUrl), fs::current_path().string())
+            parseFlakeRef(fetchSettings, expandTilde(flakeUrl), std::filesystem::current_path().string())
         };
     }
 };
@@ -885,7 +885,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto evalState = getEvalState();
 
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(
-            fetchSettings, templateUrl, fs::current_path().string());
+            fetchSettings, templateUrl, std::filesystem::current_path().string());
 
         auto installable = InstallableFlake(nullptr,
             evalState, std::move(templateFlakeRef), templateName, ExtendedOutputsSpec::Default(),
@@ -899,11 +899,11 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         NixStringContext context;
         auto templateDir = evalState->coerceToPath(noPos, templateDirAttr, context, "");
 
-        std::vector<fs::path> changedFiles;
-        std::vector<fs::path> conflictedFiles;
+        std::vector<std::filesystem::path> changedFiles;
+        std::vector<std::filesystem::path> conflictedFiles;
 
-        std::function<void(const SourcePath & from, const fs::path & to)> copyDir;
-        copyDir = [&](const SourcePath & from, const fs::path & to)
+        std::function<void(const SourcePath & from, const std::filesystem::path & to)> copyDir;
+        copyDir = [&](const SourcePath & from, const std::filesystem::path & to)
         {
             createDirs(to);
 
@@ -912,12 +912,12 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 auto from2 = from / name;
                 auto to2 = to / name;
                 auto st = from2.lstat();
-                auto to_st = fs::symlink_status(to2);
+                auto to_st = std::filesystem::symlink_status(to2);
                 if (st.type == SourceAccessor::tDirectory)
                     copyDir(from2, to2);
                 else if (st.type == SourceAccessor::tRegular) {
                     auto contents = from2.readFile();
-                    if (fs::exists(to_st)) {
+                    if (std::filesystem::exists(to_st)) {
                         auto contents2 = readFile(to2.string());
                         if (contents != contents2) {
                             printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
@@ -931,8 +931,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 }
                 else if (st.type == SourceAccessor::tSymlink) {
                     auto target = from2.readLink();
-                    if (fs::exists(to_st)) {
-                        if (fs::read_symlink(to2) != target) {
+                    if (std::filesystem::exists(to_st)) {
+                        if (std::filesystem::read_symlink(to2) != target) {
                             printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
                             conflictedFiles.push_back(to2);
                         } else {
@@ -951,7 +951,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         copyDir(templateDir, flakeDir);
 
-        if (!changedFiles.empty() && fs::exists(std::filesystem::path{flakeDir} / ".git")) {
+        if (!changedFiles.empty() && std::filesystem::exists(std::filesystem::path{flakeDir} / ".git")) {
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
             for (auto & s : changedFiles) args.emplace_back(s.string());
             runProgram("git", true, args);
