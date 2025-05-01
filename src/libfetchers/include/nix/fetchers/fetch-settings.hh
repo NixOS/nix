@@ -109,3 +109,12 @@ struct Settings : public Config
 };
 
 }
+
+namespace nix {
+
+/**
+ * @todo Get rid of global setttings variables
+ */
+extern fetchers::Settings fetchSettings;
+
+}

@@ -20,10 +20,6 @@ namespace nix {
 
 namespace fs { using namespace std::filesystem; }
 
-fetchers::Settings fetchSettings;
-
-static GlobalConfig::Register rFetchSettings(&fetchSettings);
-
 EvalSettings evalSettings {
     settings.readOnlyMode,
     {

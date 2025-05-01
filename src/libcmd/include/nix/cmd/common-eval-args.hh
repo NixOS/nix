@@ -22,9 +22,6 @@ struct SourcePath;
 
 namespace flake { struct Settings; }
 
-/**
- * @todo Get rid of global setttings variables
- */
 extern fetchers::Settings fetchSettings;
 
 /**
