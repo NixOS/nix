@@ -164,7 +164,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
 {
     /* Read the `temproots' directory for per-process temporary root
        files. */
-    for (auto & i : std::filesystem::directory_iterator{tempRootsDir}) {
+    for (auto & i : DirectoryIterator{tempRootsDir}) {
         checkInterrupt();
         auto name = i.path().filename().string();
         if (name[0] == '.') {
@@ -232,7 +232,7 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
             type = std::filesystem::symlink_status(path).type();
 
         if (type == std::filesystem::file_type::directory) {
-            for (auto & i : std::filesystem::directory_iterator{path}) {
+            for (auto & i : DirectoryIterator{path}) {
                 checkInterrupt();
                 findRoots(i.path().string(), i.symlink_status().type(), roots);
             }
