@@ -297,4 +297,25 @@ TEST(chmodIfNeeded, nonexistent)
     ASSERT_THROW(chmodIfNeeded("/schnitzel/darmstadt/pommes", 0755), SysError);
 }
 
+/* ----------------------------------------------------------------------------
+ * DirectoryIterator
+ * --------------------------------------------------------------------------*/
+
+TEST(DirectoryIterator, works)
+{
+    auto tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, true);
+
+    nix::writeFile(tmpDir + "/somefile", "");
+
+    for (auto path : DirectoryIterator(tmpDir)) {
+        ASSERT_EQ(path.path().string(), tmpDir + "/somefile");
+    }
+}
+
+TEST(DirectoryIterator, nonexistent)
+{
+    ASSERT_THROW(DirectoryIterator("/schnitzel/darmstadt/pommes"), SysError);
+}
+
 }

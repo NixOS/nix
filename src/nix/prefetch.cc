@@ -116,11 +116,11 @@ std::tuple<StorePath, Hash> prefetchFile(
             createDirs(unpacked);
             unpackTarfile(tmpFile.string(), unpacked);
 
-            auto entries = std::filesystem::directory_iterator{unpacked};
+            auto entries = DirectoryIterator{unpacked};
             /* If the archive unpacks to a single file/directory, then use
                that as the top-level. */
             tmpFile = entries->path();
-            auto fileCount = std::distance(entries, std::filesystem::directory_iterator{});
+            auto fileCount = std::distance(entries, DirectoryIterator{});
             if (fileCount != 1) {
                 /* otherwise, use the directory itself */
                 tmpFile = unpacked;

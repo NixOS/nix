@@ -30,7 +30,7 @@ void removeOldGenerations(fs::path dir)
 
     bool canWrite = access(dir.string().c_str(), W_OK) == 0;
 
-    for (auto & i : fs::directory_iterator{dir}) {
+    for (auto & i : DirectoryIterator{dir}) {
         checkInterrupt();
 
         auto path = i.path().string();
