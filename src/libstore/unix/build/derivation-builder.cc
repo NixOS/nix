@@ -1835,6 +1835,9 @@ void setupSeccomp()
 }
 
 
+RegisterBuiltinBuilder::BuiltinBuilders * RegisterBuiltinBuilder::builtinBuilders = nullptr;
+
+
 void DerivationBuilderImpl::runChild()
 {
     /* Warning: in the child we should absolutely not make any SQLite
@@ -2293,12 +2296,14 @@ void DerivationBuilderImpl::runChild()
 
                 if (drv.builder == "builtin:fetchurl")
                     builtinFetchurl(drv, outputs, netrcData, caFileData);
-                else if (drv.builder == "builtin:buildenv")
-                    builtinBuildenv(drv, outputs);
-                else if (drv.builder == "builtin:unpack-channel")
-                    builtinUnpackChannel(drv, outputs);
-                else
-                    throw Error("unsupported builtin builder '%1%'", drv.builder.substr(8));
+                else {
+                    std::string builtinName = drv.builder.substr(8);
+                    assert(RegisterBuiltinBuilder::builtinBuilders);
+                    if (auto builtin = get(*RegisterBuiltinBuilder::builtinBuilders, builtinName))
+                        (*builtin)(drv, outputs);
+                    else
+                        throw Error("unsupported builtin builder '%1%'", builtinName);
+                }
                 _exit(0);
             } catch (std::exception & e) {
                 writeFull(STDERR_FILENO, e.what() + std::string("\n"));

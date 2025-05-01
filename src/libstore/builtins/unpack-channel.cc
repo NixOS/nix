@@ -3,7 +3,7 @@
 
 namespace nix {
 
-void builtinUnpackChannel(
+static void builtinUnpackChannel(
     const BasicDerivation & drv,
     const std::map<std::string, Path> & outputs)
 {
@@ -41,5 +41,7 @@ void builtinUnpackChannel(
         throw SysError("failed to rename %1% to %2%", fileName, target.string());
     }
 }
+
+static RegisterBuiltinBuilder registerUnpackChannel("unpack-channel", builtinUnpackChannel);
 
 }
