@@ -1809,6 +1809,7 @@ void LocalDerivationGoal::runChild()
         BuiltinBuilderContext ctx{
             .drv = *drv,
             .structuredAttrs = parsedDrv->getStructuredAttrs(),
+            .tmpDirInSandbox = tmpDirInSandbox,
         };
 
         if (drv->isBuiltin() && drv->builder == "builtin:fetchurl") {
