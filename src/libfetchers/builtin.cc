@@ -20,11 +20,18 @@ static void builtinFetchTree(const BuiltinBuilderContext & ctx)
     if (!ctx.structuredAttrs)
         throw Error("'builtin:fetch-tree' must have '__structuredAttrs = true'");
 
+    setenv("NIX_CACHE_HOME", ctx.tmpDirInSandbox.c_str(), 1);
+
     using namespace fetchers;
 
-    fetchers::Settings fetchSettings;
+    fetchers::Settings myFetchSettings;
+    myFetchSettings.accessTokens = fetchSettings.accessTokens.get();
 
-    auto input = Input::fromAttrs(fetchSettings, jsonToAttrs((*ctx.structuredAttrs)["input"]));
+    // FIXME: disable use of the git/tarball cache
+
+    auto input = Input::fromAttrs(myFetchSettings, jsonToAttrs((*ctx.structuredAttrs)["input"]));
+
+    std::cerr << fmt("fetching '%s'...\n", input.to_string());
 
     /* Make sure we don't use the real store because we're in a forked
        process. */
