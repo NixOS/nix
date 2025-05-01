@@ -39,9 +39,7 @@ static void builtinFetchTree(const BuiltinBuilderContext & ctx)
 
     auto [accessor, lockedInput] = input.getAccessor(dummyStore);
 
-    auto source = sinkToSource([&](Sink & sink) {
-        accessor->dumpPath(CanonPath::root, sink);
-    });
+    auto source = sinkToSource([&](Sink & sink) { accessor->dumpPath(CanonPath::root, sink); });
 
     restorePath(ctx.outputs.at("out"), *source);
 }
