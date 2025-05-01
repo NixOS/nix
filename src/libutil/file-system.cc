@@ -31,18 +31,6 @@
 
 namespace nix {
 
-namespace fs {
-  using namespace std::filesystem;
-
-  bool symlink_exists(const std::filesystem::path & path) {
-      try {
-          return std::filesystem::exists(std::filesystem::symlink_status(path));
-      } catch (const std::filesystem::filesystem_error & e) {
-          throw SysError("cannot check existence of %1%", path);
-      }
-  }
-}
-
 DirectoryIterator::DirectoryIterator(const std::filesystem::path& p) {
     try {
         // **Attempt to create the underlying directory_iterator**
@@ -243,9 +231,9 @@ std::optional<struct stat> maybeLstat(const Path & path)
 }
 
 
-bool pathExists(const Path & path)
+bool pathExists(const std::filesystem::path & path)
 {
-    return maybeLstat(path).has_value();
+    return maybeLstat(path.string()).has_value();
 }
 
 bool pathAccessible(const std::filesystem::path & path)

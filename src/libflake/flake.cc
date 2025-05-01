@@ -811,7 +811,7 @@ LockedFlake lockFlake(
                             auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
                             auto outputLockFilePath = *sourcePath / relPath;
 
-                            bool lockFileExists = fs::symlink_exists(outputLockFilePath);
+                            bool lockFileExists = pathExists(outputLockFilePath);
 
                             auto s = chomp(diff);
                             if (lockFileExists) {

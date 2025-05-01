@@ -126,26 +126,8 @@ std::optional<struct stat> maybeLstat(const Path & path);
 
 /**
  * @return true iff the given path exists.
- *
- * In the process of being deprecated for `fs::symlink_exists`.
  */
-bool pathExists(const Path & path);
-
-namespace fs {
-
-/**
- * TODO: we may actually want to use pathExists instead of this function
- *  ```
- *  symlink_exists(p) = std::filesystem::exists(std::filesystem::symlink_status(p))
- *  ```
- *  Missing convenience analogous to
- *  ```
- *  std::filesystem::exists(p) = std::filesystem::exists(std::filesystem::status(p))
- *  ```
- */
-bool symlink_exists(const std::filesystem::path & path);
-
-} // namespace fs
+bool pathExists(const std::filesystem::path & path);
 
 /**
  * Canonicalize a path except for the last component.
