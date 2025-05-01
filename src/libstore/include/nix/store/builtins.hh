@@ -3,11 +3,14 @@
 
 #include "nix/store/derivations.hh"
 
+#include <nlohmann/json_fwd.hpp>
+
 namespace nix {
 
 struct BuiltinBuilderContext
 {
     BasicDerivation & drv;
+    nlohmann::json * structuredAttrs;
     std::map<std::string, Path> outputs;
     std::string netrcData;
     std::string caFileData;
