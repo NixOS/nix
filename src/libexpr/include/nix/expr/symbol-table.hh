@@ -81,26 +81,29 @@ public:
 class SymbolTable
 {
 private:
-    std::unordered_map<std::string_view, std::pair<const std::string *, uint32_t>> symbols;
+    /**
+     * Map from string view (backed by ChunkedVector) -> offset into the store.
+     * ChunkedVector references are never invalidated.
+     */
+    std::unordered_map<std::string_view, uint32_t> symbols;
     ChunkedVector<std::string, 8192> store{16};
 
 public:
 
     /**
-     * converts a string into a symbol.
+     * Converts a string into a symbol.
      */
     Symbol create(std::string_view s)
     {
         // Most symbols are looked up more than once, so we trade off insertion performance
         // for lookup performance.
-        // TODO: could probably be done more efficiently with transparent Hash and Equals
-        // on the original implementation using unordered_set
         // FIXME: make this thread-safe.
         auto it = symbols.find(s);
-        if (it != symbols.end()) return Symbol(it->second.second + 1);
+        if (it != symbols.end())
+            return Symbol(it->second + 1);
 
-        const auto & [rawSym, idx] = store.add(std::string(s));
-        symbols.emplace(rawSym, std::make_pair(&rawSym, idx));
+        const auto & [rawSym, idx] = store.add(s);
+        symbols.emplace(rawSym, idx);
         return Symbol(idx + 1);
     }
 
