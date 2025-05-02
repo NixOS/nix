@@ -3,8 +3,6 @@
 
 namespace nix {
 
-namespace fs { using namespace std::filesystem; }
-
 void builtinUnpackChannel(
     const BasicDerivation & drv,
     const std::map<std::string, Path> & outputs)
@@ -15,11 +13,11 @@ void builtinUnpackChannel(
         return i->second;
     };
 
-    fs::path out{outputs.at("out")};
+    std::filesystem::path out{outputs.at("out")};
     auto & channelName = getAttr("channelName");
     auto & src = getAttr("src");
 
-    if (fs::path{channelName}.filename().string() != channelName) {
+    if (std::filesystem::path{channelName}.filename().string() != channelName) {
         throw Error("channelName is not allowed to contain filesystem separators, got %1%", channelName);
     }
 
@@ -38,8 +36,8 @@ void builtinUnpackChannel(
 
     auto target = out / channelName;
     try {
-        fs::rename(fileName, target);
-    } catch (fs::filesystem_error &) {
+        std::filesystem::rename(fileName, target);
+    } catch (std::filesystem::filesystem_error &) {
         throw SysError("failed to rename %1% to %2%", fileName, target.string());
     }
 }

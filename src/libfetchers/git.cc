@@ -533,7 +533,7 @@ struct GitInputScheme : InputScheme
     static MakeNotAllowedError makeNotAllowedError(std::filesystem::path repoPath)
     {
         return [repoPath{std::move(repoPath)}](const CanonPath & path) -> RestrictedPathError {
-            if (fs::symlink_exists(repoPath / path.rel()))
+            if (pathExists(repoPath / path.rel()))
                 return RestrictedPathError(
                     "Path '%1%' in the repository %2% is not tracked by Git.\n"
                     "\n"

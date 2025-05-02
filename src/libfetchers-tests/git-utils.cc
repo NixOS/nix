@@ -11,14 +11,10 @@
 
 namespace nix {
 
-namespace fs {
-using namespace std::filesystem;
-}
-
 class GitUtilsTest : public ::testing::Test
 {
     // We use a single repository for all tests.
-    fs::path tmpDir;
+    std::filesystem::path tmpDir;
     std::unique_ptr<AutoDelete> delTmpDir;
 
 public:

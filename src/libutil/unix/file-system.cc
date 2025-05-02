@@ -14,16 +14,13 @@
 
 namespace nix {
 
-namespace fs {
-using namespace std::filesystem;
-}
-
 Descriptor openDirectory(const std::filesystem::path & path)
 {
     return open(path.c_str(), O_RDONLY | O_DIRECTORY);
 }
 
-void setWriteTime(const fs::path & path, time_t accessedTime, time_t modificationTime, std::optional<bool> optIsSymlink)
+void setWriteTime(
+    const std::filesystem::path & path, time_t accessedTime, time_t modificationTime, std::optional<bool> optIsSymlink)
 {
     // Would be nice to use std::filesystem unconditionally, but
     // doesn't support access time just modification time.
@@ -57,7 +54,7 @@ void setWriteTime(const fs::path & path, time_t accessedTime, time_t modificatio
     if (lutimes(path.c_str(), times) == -1)
         throw SysError("changing modification time of %s", path);
 #  else
-    bool isSymlink = optIsSymlink ? *optIsSymlink : fs::is_symlink(path);
+    bool isSymlink = optIsSymlink ? *optIsSymlink : std::filesystem::is_symlink(path);
 
     if (!isSymlink) {
         if (utimes(path.c_str(), times) == -1)
