@@ -135,8 +135,9 @@ struct WorkerProto
     }
 
     using Feature = std::string;
+    using FeatureSet = std::set<Feature>;
 
-    static const std::set<Feature> allFeatures;
+    static const FeatureSet allFeatures;
 };
 
 enum struct WorkerProto::Op : uint64_t

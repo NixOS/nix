@@ -685,7 +685,7 @@ TEST_F(WorkerProtoTest, handshake_features)
     toClient.create();
     toServer.create();
 
-    std::tuple<WorkerProto::Version, std::set<WorkerProto::Feature>> clientResult;
+    std::tuple<WorkerProto::Version, WorkerProto::FeatureSet> clientResult;
 
     auto clientThread = std::thread([&]() {
         FdSink out { toServer.writeSide.get() };
@@ -703,7 +703,7 @@ TEST_F(WorkerProtoTest, handshake_features)
 
     EXPECT_EQ(clientResult, daemonResult);
     EXPECT_EQ(std::get<0>(clientResult), 123u);
-    EXPECT_EQ(std::get<1>(clientResult), std::set<WorkerProto::Feature>({"bar", "xyzzy"}));
+    EXPECT_EQ(std::get<1>(clientResult), WorkerProto::FeatureSet({"bar", "xyzzy"}));
 }
 
 /// Has to be a `BufferedSink` for handshake.
