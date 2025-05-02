@@ -63,7 +63,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
         return ExperimentalFeature::LocalOverlayStore;
     }
 
-    static std::set<std::string> uriSchemes()
+    static StringSet uriSchemes()
     {
         return { "local-overlay" };
     }

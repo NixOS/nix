@@ -67,7 +67,7 @@ struct BuildEnvironment
     {
         BuildEnvironment res;
 
-        std::set<std::string> exported;
+        StringSet exported;
 
         for (auto & [name, info] : json["variables"].items()) {
             std::string type = info["type"];
@@ -151,7 +151,7 @@ struct BuildEnvironment
         return structuredAttrs->second;
     }
 
-    void toBash(std::ostream & out, const std::set<std::string> & ignoreVars) const
+    void toBash(std::ostream & out, const StringSet & ignoreVars) const
     {
         for (auto & [name, value] : vars) {
             if (!ignoreVars.count(name)) {
@@ -308,7 +308,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
 
 struct Common : InstallableCommand, MixProfile
 {
-    std::set<std::string> ignoreVars{
+    StringSet ignoreVars{
         "BASHOPTS",
         "HOME", // FIXME: don't ignore in pure mode?
         "NIX_BUILD_TOP",

@@ -15,10 +15,10 @@ struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
         return "HTTP Binary Cache Store";
     }
 
-    static std::set<std::string> uriSchemes()
+    static StringSet uriSchemes()
     {
         static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
-        auto ret = std::set<std::string>({"http", "https"});
+        auto ret = StringSet({"http", "https"});
         if (forceHttp)
             ret.insert("file");
         return ret;

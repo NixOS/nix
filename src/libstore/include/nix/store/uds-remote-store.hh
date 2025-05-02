@@ -38,7 +38,7 @@ protected:
     static constexpr char const * scheme = "unix";
 
 public:
-    static std::set<std::string> uriSchemes()
+    static StringSet uriSchemes()
     { return {scheme}; }
 };
 

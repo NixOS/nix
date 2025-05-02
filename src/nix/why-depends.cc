@@ -193,7 +193,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
             /* Sort the references by distance to `dependency` to
                ensure that the shortest path is printed first. */
             std::multimap<size_t, Node *> refs;
-            std::set<std::string> hashes;
+            StringSet hashes;
 
             for (auto & ref : node.refs) {
                 if (ref == node.path && packagePath != dependencyPath) continue;

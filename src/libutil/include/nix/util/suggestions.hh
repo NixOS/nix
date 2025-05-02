@@ -35,7 +35,7 @@ public:
     ) const;
 
     static Suggestions bestMatches (
-        const std::set<std::string> & allMatches,
+        const StringSet & allMatches,
         std::string_view query
     );
 

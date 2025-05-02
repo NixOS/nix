@@ -224,7 +224,7 @@ ref<SourceAccessor> downloadTarball(
 // An input scheme corresponding to a curl-downloadable resource.
 struct CurlInputScheme : InputScheme
 {
-    const std::set<std::string> transportUrlSchemes = {"file", "http", "https"};
+    const StringSet transportUrlSchemes = {"file", "http", "https"};
 
     bool hasTarballExtension(std::string_view path) const
     {
@@ -236,7 +236,7 @@ struct CurlInputScheme : InputScheme
 
     virtual bool isValidURL(const ParsedURL & url, bool requireTree) const = 0;
 
-    static const std::set<std::string> specialParams;
+    static const StringSet specialParams;
 
     std::optional<Input> inputFromURL(
         const Settings & settings,

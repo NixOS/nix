@@ -386,7 +386,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        std::set<std::string> omittedSystems;
+        StringSet omittedSystems;
 
         // FIXME: rewrite to use EvalCache.
 

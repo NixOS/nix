@@ -22,7 +22,7 @@ struct DummyStoreConfig : virtual StoreConfig {
           ;
     }
 
-    static std::set<std::string> uriSchemes() {
+    static StringSet uriSchemes() {
         return {"dummy"};
     }
 };

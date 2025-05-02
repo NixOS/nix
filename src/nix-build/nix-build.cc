@@ -147,7 +147,7 @@ static void main_nix_build(int argc, char * * argv)
     std::string outLink = "./result";
 
     // List of environment variables kept for --pure
-    std::set<std::string> keepVars{
+    StringSet keepVars{
         "HOME", "XDG_RUNTIME_DIR", "USER", "LOGNAME", "DISPLAY",
         "WAYLAND_DISPLAY", "WAYLAND_SOCKET", "PATH", "TERM", "IN_NIX_SHELL",
         "NIX_SHELL_PRESERVE_PROMPT", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL",

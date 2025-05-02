@@ -363,7 +363,7 @@ void completeFlakeRefWithFragment(
     const Strings & defaultFlakeAttrPaths,
     std::string_view prefix);
 
-std::string showVersions(const std::set<std::string> & versions);
+std::string showVersions(const StringSet & versions);
 
 void printClosureDiff(
     ref<Store> store, const StorePath & beforePath, const StorePath & afterPath, std::string_view indent);

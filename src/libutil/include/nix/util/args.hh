@@ -179,7 +179,7 @@ public:
         using ptr = std::shared_ptr<Flag>;
 
         std::string longName;
-        std::set<std::string> aliases;
+        StringSet aliases;
         char shortName = 0;
         std::string description;
         std::string category;
@@ -263,7 +263,7 @@ protected:
     virtual Strings::iterator rewriteArgs(Strings & args, Strings::iterator pos)
     { return pos; }
 
-    std::set<std::string> hiddenCategories;
+    StringSet hiddenCategories;
 
     /**
      * Called after all command line flags before the first non-flag

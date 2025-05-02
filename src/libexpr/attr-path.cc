@@ -74,7 +74,7 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
 
             auto a = v->attrs()->get(state.symbols.create(attr));
             if (!a) {
-                std::set<std::string> attrNames;
+                StringSet attrNames;
                 for (auto & attr : *v->attrs())
                     attrNames.insert(std::string(state.symbols[attr.name]));
 

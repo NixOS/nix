@@ -67,7 +67,7 @@ struct ProfileElement
      * Return a string representing an installable corresponding to the current
      * element, either a flakeref or a plain store path
      */
-    std::set<std::string> toInstallables(Store & store)
+    StringSet toInstallables(Store & store)
     {
         if (source)
             return {source->to_string()};
@@ -600,7 +600,7 @@ public:
         });
     }
 
-    std::set<std::string> getMatchingElementNames(ProfileManifest & manifest) {
+    StringSet getMatchingElementNames(ProfileManifest & manifest) {
         if (_matchers.empty()) {
             throw UsageError("No packages specified.");
         }
@@ -614,7 +614,7 @@ public:
             return {};
         }
 
-        std::set<std::string> result;
+        StringSet result;
         for (auto & matcher : _matchers) {
             bool foundMatch = false;
             for (auto & [name, element] : manifest.elements) {

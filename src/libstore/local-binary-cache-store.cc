@@ -119,7 +119,7 @@ bool LocalBinaryCacheStore::fileExists(const std::string & path)
     return pathExists(binaryCacheDir + "/" + path);
 }
 
-std::set<std::string> LocalBinaryCacheStoreConfig::uriSchemes()
+StringSet LocalBinaryCacheStoreConfig::uriSchemes()
 {
     if (getEnv("_NIX_FORCE_HTTP") == "1")
         return {};

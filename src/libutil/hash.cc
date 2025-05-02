@@ -32,9 +32,9 @@ static size_t regularHashSize(HashAlgorithm type) {
 }
 
 
-const std::set<std::string> hashAlgorithms = {"blake3", "md5", "sha1", "sha256", "sha512" };
+const StringSet hashAlgorithms = {"blake3", "md5", "sha1", "sha256", "sha512" };
 
-const std::set<std::string> hashFormats = {"base64", "nix32", "base16", "sri" };
+const StringSet hashFormats = {"base64", "nix32", "base16", "sri" };
 
 Hash::Hash(HashAlgorithm algo, const ExperimentalFeatureSettings & xpSettings) : algo(algo)
 {
