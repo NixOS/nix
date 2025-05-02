@@ -90,8 +90,8 @@ struct json_avoids_null<std::vector<T>> : std::true_type {};
 template<typename T>
 struct json_avoids_null<std::list<T>> : std::true_type {};
 
-template<typename T>
-struct json_avoids_null<std::set<T>> : std::true_type {};
+template<typename T, typename Compare>
+struct json_avoids_null<std::set<T, Compare>> : std::true_type {};
 
 template<typename K, typename V>
 struct json_avoids_null<std::map<K, V>> : std::true_type {};

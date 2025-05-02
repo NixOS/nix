@@ -135,7 +135,7 @@ struct WorkerProto
     }
 
     using Feature = std::string;
-    using FeatureSet = std::set<Feature>;
+    using FeatureSet = std::set<Feature, std::less<>>;
 
     static const FeatureSet allFeatures;
 };
@@ -273,12 +273,12 @@ DECLARE_WORKER_SERIALISER(WorkerProto::ClientHandshakeInfo);
 
 template<typename T>
 DECLARE_WORKER_SERIALISER(std::vector<T>);
-template<typename T>
-DECLARE_WORKER_SERIALISER(std::set<T>);
+#define COMMA_ ,
+template<typename T, typename Compare>
+DECLARE_WORKER_SERIALISER(std::set<T COMMA_ Compare>);
 template<typename... Ts>
 DECLARE_WORKER_SERIALISER(std::tuple<Ts...>);
 
-#define COMMA_ ,
 template<typename K, typename V>
 DECLARE_WORKER_SERIALISER(std::map<K COMMA_ V>);
 #undef COMMA_
