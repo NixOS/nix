@@ -43,6 +43,34 @@ namespace fs {
   }
 }
 
+DirectoryIterator::DirectoryIterator(const std::filesystem::path& p) {
+    try {
+        // **Attempt to create the underlying directory_iterator**
+        it_ = std::filesystem::directory_iterator(p);
+    } catch (const std::filesystem::filesystem_error& e) {
+        // **Catch filesystem_error and throw SysError**
+        // Adapt the error message as needed for SysError
+        throw SysError("cannot read directory %s", p);
+    }
+}
+
+DirectoryIterator& DirectoryIterator::operator++() {
+    // **Attempt to increment the underlying iterator**
+    std::error_code ec;
+    it_.increment(ec);
+    if (ec) {
+        // Try to get path info if possible, might fail if iterator is bad
+        try {
+            if (it_ != std::filesystem::directory_iterator{}) {
+                throw SysError("cannot read directory past %s: %s", it_->path(), ec.message());
+            }
+        } catch (...) {
+            throw SysError("cannot read directory");
+        }
+    }
+    return *this;
+}
+
 bool isAbsolute(PathView path)
 {
     return fs::path { path }.is_absolute();
@@ -357,7 +385,7 @@ void recursiveSync(const Path & path)
     while (!dirsToEnumerate.empty()) {
         auto currentDir = dirsToEnumerate.back();
         dirsToEnumerate.pop_back();
-        for (auto & entry : std::filesystem::directory_iterator(currentDir)) {
+        for (auto & entry : DirectoryIterator(currentDir)) {
             auto st = entry.symlink_status();
             if (fs::is_directory(st)) {
                 dirsToEnumerate.emplace_back(entry.path());
@@ -661,7 +689,7 @@ void copyFile(const fs::path & from, const fs::path & to, bool andDelete)
         fs::copy(from, to, fs::copy_options::copy_symlinks | fs::copy_options::overwrite_existing);
     } else if (fs::is_directory(fromStatus)) {
         fs::create_directory(to);
-        for (auto & entry : fs::directory_iterator(from)) {
+        for (auto & entry : DirectoryIterator(from)) {
             copyFile(entry, to / entry.path().filename(), andDelete);
         }
     } else {
