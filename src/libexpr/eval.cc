@@ -1446,7 +1446,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             } else {
                 state.forceAttrs(*vAttrs, pos, "while selecting an attribute");
                 if (!(j = vAttrs->attrs()->get(name))) {
-                    std::set<std::string> allAttrNames;
+                    StringSet allAttrNames;
                     for (auto & attr : *vAttrs->attrs())
                         allAttrNames.insert(std::string(state.symbols[attr.name]));
                     auto suggestions = Suggestions::bestMatches(allAttrNames, state.symbols[name]);
@@ -1603,7 +1603,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                        user. */
                     for (auto & i : *args[0]->attrs())
                         if (!lambda.formals->has(i.name)) {
-                            std::set<std::string> formalNames;
+                            StringSet formalNames;
                             for (auto & formal : lambda.formals->formals)
                                 formalNames.insert(std::string(symbols[formal.name]));
                             auto suggestions = Suggestions::bestMatches(formalNames, symbols[i.name]);

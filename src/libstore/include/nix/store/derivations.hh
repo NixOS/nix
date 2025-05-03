@@ -343,7 +343,7 @@ struct Derivation : BasicDerivation
     /**
      * inputs that are sub-derivations
      */
-    DerivedPathMap<std::set<OutputName>> inputDrvs;
+    DerivedPathMap<std::set<OutputName, std::less<>>> inputDrvs;
 
     /**
      * Print a derivation.

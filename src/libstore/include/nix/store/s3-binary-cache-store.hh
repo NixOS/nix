@@ -98,7 +98,7 @@ public:
         return "S3 Binary Cache Store";
     }
 
-    static std::set<std::string> uriSchemes()
+    static StringSet uriSchemes()
     {
         return {"s3"};
     }

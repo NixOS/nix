@@ -23,7 +23,7 @@ struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
         return "Experimental SSH Store";
     }
 
-    static std::set<std::string> uriSchemes()
+    static StringSet uriSchemes()
     {
         return {"ssh-ng"};
     }
@@ -45,7 +45,7 @@ struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfi
         return "Experimental SSH Store with filesystem mounted";
     }
 
-    static std::set<std::string> uriSchemes()
+    static StringSet uriSchemes()
     {
         return {"mounted-ssh-ng"};
     }

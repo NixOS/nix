@@ -19,7 +19,7 @@ struct PluginFilesSetting : public BaseSetting<Paths>
         const Paths & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
+        const StringSet & aliases = {})
         : BaseSetting<Paths>(def, true, name, description, aliases)
     {
         options->addSetting(this);

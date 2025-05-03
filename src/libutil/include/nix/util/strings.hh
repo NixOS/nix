@@ -1,5 +1,7 @@
 #pragma once
 
+#include "nix/util/types.hh"
+
 #include <list>
 #include <set>
 #include <string_view>
@@ -30,7 +32,7 @@ template<class C>
 C tokenizeString(std::string_view s, std::string_view separators = " \t\n\r");
 
 extern template std::list<std::string> tokenizeString(std::string_view s, std::string_view separators);
-extern template std::set<std::string> tokenizeString(std::string_view s, std::string_view separators);
+extern template StringSet tokenizeString(std::string_view s, std::string_view separators);
 extern template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
 
 /**
@@ -44,7 +46,7 @@ template<typename C>
 C splitString(std::string_view s, std::string_view separators);
 
 extern template std::list<std::string> splitString(std::string_view s, std::string_view separators);
-extern template std::set<std::string> splitString(std::string_view s, std::string_view separators);
+extern template StringSet splitString(std::string_view s, std::string_view separators);
 extern template std::vector<std::string> splitString(std::string_view s, std::string_view separators);
 
 /**
@@ -54,7 +56,7 @@ template<class C>
 std::string concatStringsSep(const std::string_view sep, const C & ss);
 
 extern template std::string concatStringsSep(std::string_view, const std::list<std::string> &);
-extern template std::string concatStringsSep(std::string_view, const std::set<std::string> &);
+extern template std::string concatStringsSep(std::string_view, const StringSet &);
 extern template std::string concatStringsSep(std::string_view, const std::vector<std::string> &);
 extern template std::string concatStringsSep(std::string_view, const boost::container::small_vector<std::string, 64> &);
 
@@ -85,7 +87,7 @@ template<class C>
 dropEmptyInitThenConcatStringsSep(const std::string_view sep, const C & ss);
 
 extern template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const std::list<std::string> &);
-extern template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const std::set<std::string> &);
+extern template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const StringSet &);
 extern template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const std::vector<std::string> &);
 
 /**

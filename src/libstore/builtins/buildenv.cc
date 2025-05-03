@@ -123,7 +123,7 @@ void buildProfile(const Path & out, Packages && pkgs)
 {
     State state;
 
-    std::set<Path> done, postponed;
+    PathSet done, postponed;
 
     auto addPkg = [&](const Path & pkgDir, int priority) {
         if (!done.insert(pkgDir).second) return;
@@ -157,7 +157,7 @@ void buildProfile(const Path & out, Packages && pkgs)
      */
     auto priorityCounter = 1000;
     while (!postponed.empty()) {
-        std::set<Path> pkgDirs;
+        PathSet pkgDirs;
         postponed.swap(pkgDirs);
         for (const auto & pkgDir : pkgDirs)
             addPkg(pkgDir, priorityCounter++);

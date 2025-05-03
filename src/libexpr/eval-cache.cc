@@ -492,7 +492,7 @@ Value & AttrCursor::forceValue()
 Suggestions AttrCursor::getSuggestionsForAttr(Symbol name)
 {
     auto attrNames = getAttrs();
-    std::set<std::string> strAttrNames;
+    StringSet strAttrNames;
     for (auto & name : attrNames)
         strAttrNames.insert(std::string(root->state.symbols[name]));
 

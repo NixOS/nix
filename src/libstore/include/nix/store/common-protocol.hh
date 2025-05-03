@@ -72,14 +72,14 @@ DECLARE_COMMON_SERIALISER(DrvOutput);
 template<>
 DECLARE_COMMON_SERIALISER(Realisation);
 
+#define COMMA_ ,
 template<typename T>
 DECLARE_COMMON_SERIALISER(std::vector<T>);
-template<typename T>
-DECLARE_COMMON_SERIALISER(std::set<T>);
+template<typename T, typename Compare>
+DECLARE_COMMON_SERIALISER(std::set<T COMMA_ Compare>);
 template<typename... Ts>
 DECLARE_COMMON_SERIALISER(std::tuple<Ts...>);
 
-#define COMMA_ ,
 template<typename K, typename V>
 DECLARE_COMMON_SERIALISER(std::map<K COMMA_ V>);
 #undef COMMA_

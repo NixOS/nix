@@ -67,7 +67,7 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 
     const std::string name() override { return "Local Store"; }
 
-    static std::set<std::string> uriSchemes()
+    static StringSet uriSchemes()
     { return {"local"}; }
 
     std::string doc() override;

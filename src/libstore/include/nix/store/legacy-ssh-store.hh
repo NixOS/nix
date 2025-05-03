@@ -37,7 +37,7 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 
     const std::string name() override { return "SSH Store"; }
 
-    static std::set<std::string> uriSchemes() { return {"ssh"}; }
+    static StringSet uriSchemes() { return {"ssh"}; }
 
     std::string doc() override;
 };

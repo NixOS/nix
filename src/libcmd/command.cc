@@ -40,7 +40,7 @@ nlohmann::json NixMultiCommand::toJSON()
 void NixMultiCommand::run()
 {
     if (!command) {
-        std::set<std::string> subCommandTextLines;
+        StringSet subCommandTextLines;
         for (auto & [name, _] : commands)
             subCommandTextLines.insert(fmt("- `%s`", name));
         std::string markdownError =

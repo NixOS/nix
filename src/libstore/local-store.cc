@@ -535,7 +535,7 @@ void LocalStore::upgradeDBSchema(State & state)
 {
     state.db.exec("create table if not exists SchemaMigrations (migration text primary key not null);");
 
-    std::set<std::string> schemaMigrations;
+    StringSet schemaMigrations;
 
     {
         SQLiteStmt querySchemaMigrations;

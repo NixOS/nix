@@ -26,7 +26,9 @@ namespace nix {
     }
 
 SERVE_USE_LENGTH_PREFIX_SERIALISER(template<typename T>, std::vector<T>)
-SERVE_USE_LENGTH_PREFIX_SERIALISER(template<typename T>, std::set<T>)
+#define COMMA_ ,
+SERVE_USE_LENGTH_PREFIX_SERIALISER(template<typename T COMMA_ typename Compare>, std::set<T COMMA_ Compare>)
+#undef COMMA_
 SERVE_USE_LENGTH_PREFIX_SERIALISER(template<typename... Ts>, std::tuple<Ts...>)
 
 #define SERVE_USE_LENGTH_PREFIX_SERIALISER_COMMA ,

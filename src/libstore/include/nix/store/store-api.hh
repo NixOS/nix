@@ -888,7 +888,7 @@ std::list<ref<Store>> getDefaultSubstituters();
 
 struct StoreFactory
 {
-    std::set<std::string> uriSchemes;
+    StringSet uriSchemes;
     /**
      * The `authorityPath` parameter is `<authority>/<path>`, or really
      * whatever comes after `<scheme>://` and before `?<query-params>`.
