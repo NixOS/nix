@@ -31,7 +31,7 @@ Today, a world-wide developer community contributes to Nix and the ecosystem tha
 - [Nixpkgs](https://github.com/NixOS/nixpkgs) is [the largest, most up-to-date free software repository in the world](https://repology.org/repositories/graphs)
 - [NixOS](https://github.com/NixOS/nixpkgs/tree/master/nixos) is a Linux distribution that can be configured fully declaratively
 - [Discourse](https://discourse.nixos.org/)
-- [Matrix](https://matrix.to/#/#nix:nixos.org)
+- Matrix: [#users:nixos.org](https://matrix.to/#/#users:nixos.org) for user support and [#nix-dev:nixos.org](https://matrix.to/#/#nix-dev:nixos.org) for development
 
 ## License
 
