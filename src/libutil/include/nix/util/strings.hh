@@ -97,4 +97,39 @@ extern template std::string dropEmptyInitThenConcatStringsSep(std::string_view, 
  * Arguments that need to be passed to ssh with spaces in them.
  */
 std::list<std::string> shellSplitString(std::string_view s);
+
+/**
+ * Hash implementation that can be used for zero-copy heterogenous lookup from
+ * P1690R1[1] in unordered containers.
+ *
+ * [1]: https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1690r1.html
+ */
+struct StringViewHash
+{
+private:
+    using HashType = std::hash<std::string_view>;
+
+public:
+    using is_transparent = void;
+
+    auto operator()(const char * str) const
+    {
+        /* This has a slight overhead due to an implicit strlen, but there isn't
+           a good way around it because the hash value of all overloads must be
+           consistent. Delegating to string_view is the solution initially proposed
+           in P0919R3. */
+        return HashType{}(std::string_view{str});
+    }
+
+    auto operator()(std::string_view str) const
+    {
+        return HashType{}(str);
+    }
+
+    auto operator()(const std::string & str) const
+    {
+        return HashType{}(std::string_view{str});
+    }
+};
+
 }
