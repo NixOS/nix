@@ -4311,9 +4311,7 @@ struct RegexCache
 {
     struct State
     {
-        // TODO use C++20 transparent comparison when available
-        std::unordered_map<std::string_view, std::regex> cache;
-        std::list<std::string> keys;
+        std::unordered_map<std::string, std::regex, StringViewHash, std::equal_to<>> cache;
     };
 
     Sync<State> state_;
@@ -4324,8 +4322,14 @@ struct RegexCache
         auto it = state->cache.find(re);
         if (it != state->cache.end())
             return it->second;
-        state->keys.emplace_back(re);
-        return state->cache.emplace(state->keys.back(), std::regex(state->keys.back(), std::regex::extended)).first->second;
+        /* No std::regex constructor overload from std::string_view, but can be constructed
+           from a pointer + size or an iterator range. */
+        return state->cache
+            .emplace(
+                std::piecewise_construct,
+                std::forward_as_tuple(re),
+                std::forward_as_tuple(/*s=*/re.data(), /*count=*/re.size(), std::regex::extended))
+            .first->second;
     }
 };
 
