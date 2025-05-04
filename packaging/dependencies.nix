@@ -61,6 +61,7 @@ scope: {
         "--with-container"
         "--with-context"
         "--with-coroutine"
+        "--with-iostreams"
       ];
     }).overrideAttrs
       (old: {
