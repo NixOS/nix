@@ -193,7 +193,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         res["args"] = toJSON();
 
         auto stores = nlohmann::json::object();
-        for (auto & implem : *Implementations::registered) {
+        for (auto & implem : Implementations::registered()) {
             auto storeConfig = implem.getConfig();
             auto storeName = storeConfig->name();
             auto & j = stores[storeName];

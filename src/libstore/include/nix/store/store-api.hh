@@ -902,12 +902,15 @@ struct StoreFactory
 
 struct Implementations
 {
-    static std::vector<StoreFactory> * registered;
+    static std::vector<StoreFactory> & registered()
+    {
+        static std::vector<StoreFactory> registered;
+        return registered;
+    }
 
     template<typename T, typename TConfig>
     static void add()
     {
-        if (!registered) registered = new std::vector<StoreFactory>();
         StoreFactory factory{
             .uriSchemes = TConfig::uriSchemes(),
             .create =
@@ -919,7 +922,7 @@ struct Implementations
                  -> std::shared_ptr<StoreConfig>
                  { return std::make_shared<TConfig>(StringMap({})); })
         };
-        registered->push_back(factory);
+        registered().push_back(factory);
     }
 };
 
