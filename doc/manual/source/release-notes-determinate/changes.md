@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.24 and Determinate Nix 3.4.0.
+This section lists the differences between upstream Nix 2.28 and Determinate Nix 3.4.2.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -15,3 +15,5 @@ This section lists the differences between upstream Nix 2.24 and Determinate Nix
 * Using indirect flake references and implicit inputs is deprecated, see: https://github.com/DeterminateSystems/nix-src/issues/37
 
 * Warnings around "dirty trees" are updated to reduce "dirty" jargon, and now refers to "uncommitted changes".
+
+<!-- Determinate Nix version 3.4.2 -->

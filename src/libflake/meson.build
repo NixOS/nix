@@ -39,13 +39,13 @@ foreach header : [
 endforeach
 
 sources = files(
-  'flake/config.cc',
-  'flake/flake.cc',
-  'flake/flakeref.cc',
-  'flake/lockfile.cc',
-  'flake/flake-primops.cc',
-  'flake/settings.cc',
-  'flake/url-name.cc',
+  'config.cc',
+  'flake.cc',
+  'flakeref.cc',
+  'lockfile.cc',
+  'flake-primops.cc',
+  'settings.cc',
+  'url-name.cc',
 )
 
 subdir('include/nix/flake')
