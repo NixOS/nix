@@ -14,12 +14,10 @@
 
 namespace nix {
 
-RegisterCommand::Commands * RegisterCommand::commands = nullptr;
-
 nix::Commands RegisterCommand::getCommandsFor(const std::vector<std::string> & prefix)
 {
     nix::Commands res;
-    for (auto & [name, command] : *RegisterCommand::commands)
+    for (auto & [name, command] : RegisterCommand::commands())
         if (name.size() == prefix.size() + 1) {
             bool equal = true;
             for (size_t i = 0; i < prefix.size(); ++i)
