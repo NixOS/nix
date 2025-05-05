@@ -373,7 +373,7 @@ void mainWrapped(int argc, char * * argv)
     }
 
     {
-        auto legacy = (*RegisterLegacyCommand::commands)[programName];
+        auto legacy = RegisterLegacyCommand::commands()[programName];
         if (legacy) return legacy(argc, argv);
     }
 
