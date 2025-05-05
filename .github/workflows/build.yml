@@ -37,6 +37,7 @@ jobs:
           path: ./tarball/*.xz
   test:
     if: ${{ inputs.if && inputs.run_tests}}
+    needs: build
     strategy:
       fail-fast: false
     runs-on: ${{ inputs.os }}
