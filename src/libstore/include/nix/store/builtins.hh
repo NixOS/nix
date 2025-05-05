@@ -19,12 +19,15 @@ using BuiltinBuilder = std::function<void(const BuiltinBuilderContext &)>;
 struct RegisterBuiltinBuilder
 {
     typedef std::map<std::string, BuiltinBuilder> BuiltinBuilders;
-    static BuiltinBuilders * builtinBuilders;
+
+    static BuiltinBuilders & builtinBuilders() {
+        static BuiltinBuilders builders;
+        return builders;
+    }
 
     RegisterBuiltinBuilder(const std::string & name, BuiltinBuilder && fun)
     {
-        if (!builtinBuilders) builtinBuilders = new BuiltinBuilders;
-        builtinBuilders->insert_or_assign(name, std::move(fun));
+        builtinBuilders().insert_or_assign(name, std::move(fun));
     }
 };
 

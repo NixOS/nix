@@ -1835,9 +1835,6 @@ void setupSeccomp()
 }
 
 
-RegisterBuiltinBuilder::BuiltinBuilders * RegisterBuiltinBuilder::builtinBuilders = nullptr;
-
-
 void DerivationBuilderImpl::runChild()
 {
     /* Warning: in the child we should absolutely not make any SQLite
@@ -2298,7 +2295,7 @@ void DerivationBuilderImpl::runChild()
 
                 std::string builtinName = drv.builder.substr(8);
                 assert(RegisterBuiltinBuilder::builtinBuilders);
-                if (auto builtin = get(*RegisterBuiltinBuilder::builtinBuilders, builtinName))
+                if (auto builtin = get(RegisterBuiltinBuilder::builtinBuilders(), builtinName))
                     (*builtin)(ctx);
                 else
                     throw Error("unsupported builtin builder '%1%'", builtinName);
