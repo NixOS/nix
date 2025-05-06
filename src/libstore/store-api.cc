@@ -1355,7 +1355,7 @@ ref<Store> openStore(StoreReference && storeURI)
                 return std::make_shared<LocalStore>(params);
         },
         [&](const StoreReference::Specified & g) {
-            for (const auto & implem : *Implementations::registered)
+            for (const auto & implem : Implementations::registered())
                 if (implem.uriSchemes.count(g.scheme))
                     return implem.create(g.scheme, g.authority, params);
 
@@ -1399,6 +1399,10 @@ std::list<ref<Store>> getDefaultSubstituters()
     return stores;
 }
 
-std::vector<StoreFactory> * Implementations::registered = 0;
+std::vector<StoreFactory> & Implementations::registered()
+{
+    static std::vector<StoreFactory> registered;
+    return registered;
+}
 
 }

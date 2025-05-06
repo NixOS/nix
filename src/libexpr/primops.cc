@@ -4713,13 +4713,9 @@ static RegisterPrimOp primop_splitVersion({
  *************************************************************/
 
 
-RegisterPrimOp::PrimOps * RegisterPrimOp::primOps;
-
-
 RegisterPrimOp::RegisterPrimOp(PrimOp && primOp)
 {
-    if (!primOps) primOps = new PrimOps;
-    primOps->push_back(std::move(primOp));
+    primOps().push_back(std::move(primOp));
 }
 
 
@@ -4973,14 +4969,12 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         )",
     });
 
-    if (RegisterPrimOp::primOps)
-        for (auto & primOp : *RegisterPrimOp::primOps)
-            if (experimentalFeatureSettings.isEnabled(primOp.experimentalFeature))
-            {
-                auto primOpAdjusted = primOp;
-                primOpAdjusted.arity = std::max(primOp.args.size(), primOp.arity);
-                addPrimOp(std::move(primOpAdjusted));
-            }
+    for (auto & primOp : RegisterPrimOp::primOps())
+        if (experimentalFeatureSettings.isEnabled(primOp.experimentalFeature)) {
+            auto primOpAdjusted = primOp;
+            primOpAdjusted.arity = std::max(primOp.args.size(), primOp.arity);
+            addPrimOp(std::move(primOpAdjusted));
+        }
 
     for (auto & primOp : evalSettings.extraPrimOps) {
         auto primOpAdjusted = primOp;
