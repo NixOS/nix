@@ -1,10 +1,9 @@
 ---
 name: Feature request
 about: Suggest a new feature
-title: ''
+title: ""
 labels: feature
-assignees: ''
-
+assignees: ""
 ---
 
 ## Is your feature request related to a problem?
@@ -27,13 +26,9 @@ assignees: ''
 
 <!-- make sure this issue is not redundant or obsolete -->
 
-- [ ] checked [latest Nix manual] \([source])
-- [ ] checked [open feature issues and pull requests] for possible duplicates
+- [ ] checked [latest Determinate Nix manual] \([source])
+- [ ] checked [open bug issues and pull requests] for possible duplicates
 
-[latest Nix manual]: https://nixos.org/manual/nix/unstable/
-[source]: https://github.com/NixOS/nix/tree/master/doc/manual/source
-[open feature issues and pull requests]: https://github.com/NixOS/nix/labels/feature
-
----
-
-Add :+1: to [issues you find important](https://github.com/NixOS/nix/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc).
+[latest Determinate Nix manual]: https://manual.determinate.systems/
+[source]: https://github.com/DeterminateSystems/nix-src/tree/detsys-main/doc/manual/source
+[open bug issues and pull requests]: https://github.com/DeterminateSystems/nix-src/labels/bug

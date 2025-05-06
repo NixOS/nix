@@ -84,9 +84,17 @@ bool EvalSettings::isPseudoUrl(std::string_view s)
 
 std::string EvalSettings::resolvePseudoUrl(std::string_view url)
 {
-    if (hasPrefix(url, "channel:"))
-        return "https://nixos.org/channels/" + std::string(url.substr(8)) + "/nixexprs.tar.xz";
-    else
+    if (hasPrefix(url, "channel:")) {
+        auto realUrl = "https://nixos.org/channels/" + std::string(url.substr(8)) + "/nixexprs.tar.xz";
+        static bool haveWarned = false;
+        warnOnce(haveWarned,
+            "Channels are deprecated in favor of flakes in Determinate Nix. "
+            "Instead of '%s', use '%s'. "
+            "See https://zero-to-nix.com for a guide to Nix flakes. "
+            "For details and to offer feedback on the deprecation process, see: https://github.com/DeterminateSystems/nix-src/issues/34.",
+            url, realUrl);
+        return realUrl;
+    } else
         return std::string(url);
 }
 

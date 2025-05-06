@@ -40,7 +40,7 @@ void completeFlakeInputAttrPath(
     std::string_view prefix)
 {
     for (auto & flakeRef : flakeRefs) {
-        auto flake = flake::getFlake(*evalState, flakeRef, true);
+        auto flake = flake::getFlake(*evalState, flakeRef, fetchers::UseRegistries::All);
         for (auto & input : flake.inputs)
             if (hasPrefix(input.first, prefix))
                 completions.add(input.first);
@@ -903,8 +903,13 @@ InstallableCommand::InstallableCommand()
     });
 }
 
+void InstallableCommand::preRun(ref<Store> store)
+{
+}
+
 void InstallableCommand::run(ref<Store> store)
 {
+    preRun(store);
     auto installable = parseInstallable(store, _installable);
     run(store, std::move(installable));
 }

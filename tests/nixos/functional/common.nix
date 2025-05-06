@@ -49,11 +49,11 @@ in
 
               cd ~
 
-              cp -r ${pkgs.nixComponents.nix-functional-tests.src} nix
+              cp -r ${pkgs.nixComponents2.nix-functional-tests.src} nix
               chmod -R +w nix
 
               chmod u+w nix/.version
-              echo ${pkgs.nixComponents.version} > nix/.version
+              echo ${pkgs.nixComponents2.version} > nix/.version
 
               export isTestOnNixOS=1
 

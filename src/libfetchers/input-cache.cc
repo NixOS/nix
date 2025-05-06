@@ -5,7 +5,8 @@
 
 namespace nix::fetchers {
 
-InputCache::CachedResult InputCache::getAccessor(ref<Store> store, const Input & originalInput, bool useRegistries)
+InputCache::CachedResult
+InputCache::getAccessor(ref<Store> store, const Input & originalInput, UseRegistries useRegistries)
 {
     auto fetched = lookup(originalInput);
     Input resolvedInput = originalInput;
@@ -15,13 +16,8 @@ InputCache::CachedResult InputCache::getAccessor(ref<Store> store, const Input &
             auto [accessor, lockedInput] = originalInput.getAccessor(store);
             fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
         } else {
-            if (useRegistries) {
-                auto [res, extraAttrs] =
-                    lookupInRegistries(store, originalInput, [](fetchers::Registry::RegistryType type) {
-                        /* Only use the global registry and CLI flags
-                           to resolve indirect flakerefs. */
-                        return type == fetchers::Registry::Flag || type == fetchers::Registry::Global;
-                    });
+            if (useRegistries != fetchers::UseRegistries::No) {
+                auto [res, extraAttrs] = lookupInRegistries(store, originalInput, useRegistries);
                 resolvedInput = std::move(res);
                 fetched = lookup(resolvedInput);
                 if (!fetched) {

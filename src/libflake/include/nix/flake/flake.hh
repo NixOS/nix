@@ -118,7 +118,7 @@ struct Flake
 Flake getFlake(
     EvalState & state,
     const FlakeRef & flakeRef,
-    bool useRegistries,
+    fetchers::UseRegistries useRegistries,
     bool requireLockable = true);
 
 /**

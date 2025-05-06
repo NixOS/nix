@@ -1,18 +1,17 @@
 ---
 name: Installer issue
 about: Report problems with installation
-title: ''
+title: ""
 labels: installer
-assignees: ''
-
+assignees: ""
 ---
 
 ## Platform
 
-<!-- select the platform on which you tried to install Nix -->
+<!-- select the platform on which you tried to install Determinate Nix -->
 
-- [ ] Linux: <!-- state your distribution, e.g. Arch Linux, Ubuntu, ... -->
 - [ ] macOS
+- [ ] Linux: <!-- state your distribution, e.g. Arch Linux, Ubuntu, ... -->
 - [ ] WSL
 
 ## Additional information
@@ -35,13 +34,9 @@ assignees: ''
 
 <!-- make sure this issue is not redundant or obsolete -->
 
-- [ ] checked [latest Nix manual] \([source])
-- [ ] checked [open installer issues and pull requests] for possible duplicates
+- [ ] checked [latest Determinate Nix manual] \([source])
+- [ ] checked [open bug issues and pull requests] for possible duplicates
 
-[latest Nix manual]: https://nixos.org/manual/nix/unstable/
-[source]: https://github.com/NixOS/nix/tree/master/doc/manual/source
-[open installer issues and pull requests]: https://github.com/NixOS/nix/labels/installer
-
----
-
-Add :+1: to [issues you find important](https://github.com/NixOS/nix/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc).
+[latest Determinate Nix manual]: https://manual.determinate.systems/
+[source]: https://github.com/DeterminateSystems/nix-src/tree/detsys-main/doc/manual/source
+[open bug issues and pull requests]: https://github.com/DeterminateSystems/nix-src/labels/bug

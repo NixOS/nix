@@ -65,7 +65,11 @@ void overrideRegistry(
     const Input & to,
     const Attrs & extraAttrs);
 
-using RegistryFilter = std::function<bool(Registry::RegistryType)>;
+enum class UseRegistries : int {
+    No,
+    All,
+    Limited, // global and flag registry only
+};
 
 /**
  * Rewrite a flakeref using the registries. If `filter` is set, only
@@ -74,6 +78,6 @@ using RegistryFilter = std::function<bool(Registry::RegistryType)>;
 std::pair<Input, Attrs> lookupInRegistries(
     ref<Store> store,
     const Input & input,
-    const RegistryFilter & filter = {});
+    UseRegistries useRegistries);
 
 }

@@ -321,7 +321,7 @@ static FlakeRef applySelfAttrs(
 static Flake getFlake(
     EvalState & state,
     const FlakeRef & originalRef,
-    bool useRegistries,
+    fetchers::UseRegistries useRegistries,
     const InputAttrPath & lockRootAttrPath,
     bool requireLockable)
 {
@@ -341,7 +341,7 @@ static Flake getFlake(
         debug("refetching input '%s' due to self attribute", newLockedRef);
         // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
         newLockedRef.input.attrs.erase("narHash");
-        auto cachedInput2 = state.inputCache->getAccessor(state.store, newLockedRef.input, useRegistries);
+        auto cachedInput2 = state.inputCache->getAccessor(state.store, newLockedRef.input, fetchers::UseRegistries::No);
         cachedInput.accessor = cachedInput2.accessor;
         lockedRef = FlakeRef(std::move(cachedInput2.lockedInput), newLockedRef.subdir);
     }
@@ -353,7 +353,7 @@ static Flake getFlake(
         lockRootAttrPath);
 }
 
-Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries, bool requireLockable)
+Flake getFlake(EvalState & state, const FlakeRef & originalRef, fetchers::UseRegistries useRegistries, bool requireLockable)
 {
     return getFlake(state, originalRef, useRegistries, {}, requireLockable);
 }
@@ -376,8 +376,15 @@ LockedFlake lockFlake(
     const LockFlags & lockFlags)
 {
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
+    auto useRegistriesTop = useRegistries ? fetchers::UseRegistries::All : fetchers::UseRegistries::No;
+    auto useRegistriesInputs = useRegistries ? fetchers::UseRegistries::Limited : fetchers::UseRegistries::No;
 
-    auto flake = getFlake(state, topRef, useRegistries, {}, lockFlags.requireLockable);
+    auto flake = getFlake(
+        state,
+        topRef,
+        useRegistriesTop,
+        {},
+        lockFlags.requireLockable);
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
@@ -552,7 +559,12 @@ LockedFlake lockFlake(
                         if (auto resolvedPath = resolveRelativePath()) {
                             return readFlake(state, ref, ref, ref, *resolvedPath, inputAttrPath);
                         } else {
-                            return getFlake(state, ref, useRegistries, inputAttrPath, true);
+                            return getFlake(
+                                state,
+                                ref,
+                                useRegistriesInputs,
+                                inputAttrPath,
+                                true);
                         }
                     };
 
@@ -660,6 +672,29 @@ LockedFlake lockFlake(
                             use --no-write-lock-file. */
                         auto ref = (input2.ref && explicitCliOverrides.contains(inputAttrPath)) ? *input2.ref : *input.ref;
 
+                        /* Warn against the use of indirect flakerefs
+                           (but only at top-level since we don't want
+                           to annoy users about flakes that are not
+                           under their control). */
+                        auto warnRegistry = [&](const FlakeRef & resolvedRef)
+                        {
+                            if (inputAttrPath.size() == 1 && !input.ref->input.isDirect()) {
+                                std::ostringstream s;
+                                printLiteralString(s, resolvedRef.to_string());
+                                warn(
+                                    "Flake input '%1%' uses the flake registry. "
+                                    "Using the registry in flake inputs is deprecated in Determinate Nix. "
+                                    "To make your flake future-proof, add the following to '%2%':\n"
+                                    "\n"
+                                    "  inputs.%1%.url = %3%;\n"
+                                    "\n"
+                                    "For more information, see: https://github.com/DeterminateSystems/nix-src/issues/37",
+                                    inputAttrPathS,
+                                    flake.path,
+                                    s.str());
+                            }
+                        };
+
                         if (input.isFlake) {
                             auto inputFlake = getInputFlake(*input.ref);
 
@@ -691,6 +726,8 @@ LockedFlake lockFlake(
                                 oldLock ? followsPrefix : inputAttrPath,
                                 inputFlake.path,
                                 false);
+
+                            warnRegistry(inputFlake.resolvedRef);
                         }
 
                         else {
@@ -700,9 +737,12 @@ LockedFlake lockFlake(
                                 if (auto resolvedPath = resolveRelativePath()) {
                                     return {*resolvedPath, *input.ref};
                                 } else {
-                                    auto cachedInput = state.inputCache->getAccessor(state.store, input.ref->input, useRegistries);
+                                    auto cachedInput = state.inputCache->getAccessor(state.store, input.ref->input, useRegistriesTop);
 
+                                    auto resolvedRef = FlakeRef(std::move(cachedInput.resolvedInput), input.ref->subdir);
                                     auto lockedRef = FlakeRef(std::move(cachedInput.lockedInput), input.ref->subdir);
+
+                                    warnRegistry(resolvedRef);
 
                                     return {
                                         state.storePath(state.mountInput(lockedRef.input, input.ref->input, cachedInput.accessor, true)),
@@ -817,7 +857,11 @@ LockedFlake lockFlake(
                            repo, so we should re-read it. FIXME: we could
                            also just clear the 'rev' field... */
                         auto prevLockedRef = flake.lockedRef;
-                        flake = getFlake(state, topRef, useRegistries, lockFlags.requireLockable);
+                        flake = getFlake(
+                            state,
+                            topRef,
+                            useRegistriesTop,
+                            lockFlags.requireLockable);
 
                         if (lockFlags.commitLockFile &&
                             flake.lockedRef.input.getRev() &&
