@@ -91,7 +91,7 @@ jobs:
   flake_regressions:
     #if: github.event_name == 'merge_group'
     needs: build_x86_64-linux
-    runs-on: blacksmith-32vcpu-ubuntu-2204
+    runs-on: namespace-profile-x86-32cpu-64gb
     steps:
       - name: Checkout nix
         uses: actions/checkout@v4
