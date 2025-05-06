@@ -13,10 +13,11 @@
 #  include "nix/util/processes.hh"
 #endif
 
+#include <boost/regex.hpp>
+
 #include <functional>
 #include <queue>
 #include <algorithm>
-#include <regex>
 #include <random>
 
 #include <climits>
@@ -331,8 +332,8 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
 
 static std::string quoteRegexChars(const std::string & raw)
 {
-    static auto specialRegex = std::regex(R"([.^$\\*+?()\[\]{}|])");
-    return std::regex_replace(raw, specialRegex, R"(\$&)");
+    static auto specialRegex = boost::regex(R"([.^$\\*+?()\[\]{}|])");
+    return boost::regex_replace(raw, specialRegex, R"(\$&)");
 }
 
 #ifdef __linux__
@@ -354,12 +355,12 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     auto procDir = AutoCloseDir{opendir("/proc")};
     if (procDir) {
         struct dirent * ent;
-        auto digitsRegex = std::regex(R"(^\d+$)");
-        auto mapRegex = std::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
-        auto storePathRegex = std::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
+        static const auto digitsRegex = boost::regex(R"(^\d+$)");
+        static const auto mapRegex = boost::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
+        auto storePathRegex = boost::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
-            if (std::regex_match(ent->d_name, digitsRegex)) {
+            if (boost::regex_match(ent->d_name, digitsRegex)) {
                 try {
                     readProcLink(fmt("/proc/%s/exe" ,ent->d_name), unchecked);
                     readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
@@ -386,15 +387,15 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
                     std::filesystem::path mapFile = fmt("/proc/%s/maps", ent->d_name);
                     auto mapLines = tokenizeString<std::vector<std::string>>(readFile(mapFile.string()), "\n");
                     for (const auto & line : mapLines) {
-                        auto match = std::smatch{};
-                        if (std::regex_match(line, match, mapRegex))
+                        auto match = boost::smatch{};
+                        if (boost::regex_match(line, match, mapRegex))
                             unchecked[match[1]].emplace(mapFile.string());
                     }
 
                     auto envFile = fmt("/proc/%s/environ", ent->d_name);
                     auto envString = readFile(envFile);
-                    auto env_end = std::sregex_iterator{};
-                    for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
+                    auto env_end = boost::sregex_iterator{};
+                    for (auto i = boost::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
                         unchecked[i->str()].emplace(envFile);
                 } catch (SystemError & e) {
                     if (errno == ENOENT || errno == EACCES || errno == ESRCH)
@@ -413,12 +414,12 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     // Because of this we disable lsof when running the tests.
     if (getEnv("_NIX_TEST_NO_LSOF") != "1") {
         try {
-            std::regex lsofRegex(R"(^n(/.*)$)");
+            boost::regex lsofRegex(R"(^n(/.*)$)");
             auto lsofLines =
                 tokenizeString<std::vector<std::string>>(runProgram(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
             for (const auto & line : lsofLines) {
-                std::smatch match;
-                if (std::regex_match(line, match, lsofRegex))
+                boost::smatch match;
+                if (boost::regex_match(line, match, lsofRegex))
                     unchecked[match[1].str()].emplace("{lsof}");
             }
         } catch (ExecError & e) {
