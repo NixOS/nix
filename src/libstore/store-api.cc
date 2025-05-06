@@ -1399,4 +1399,10 @@ std::list<ref<Store>> getDefaultSubstituters()
     return stores;
 }
 
+std::vector<StoreFactory> & Implementations::registered()
+{
+    static std::vector<StoreFactory> registered;
+    return registered;
+}
+
 }

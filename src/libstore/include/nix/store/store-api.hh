@@ -902,11 +902,7 @@ struct StoreFactory
 
 struct Implementations
 {
-    static std::vector<StoreFactory> & registered()
-    {
-        static std::vector<StoreFactory> registered;
-        return registered;
-    }
+    static std::vector<StoreFactory> & registered();
 
     template<typename T, typename TConfig>
     static void add()
