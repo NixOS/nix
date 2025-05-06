@@ -24,7 +24,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
     std::string description() override
     {
-        return "(deprecated) upgrade Nix to the latest stable version";
+        return "deprecated in favor of determinate-nixd upgrade";
     }
 
     std::string doc() override
