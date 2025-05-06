@@ -38,7 +38,7 @@
     },
     "git-hooks-nix": {
       "inputs": {
-        "flake-compat": [],
+        "flake-compat": "flake-compat",
         "gitignore": [],
         "nixpkgs": [
           "nixpkgs"
@@ -111,7 +111,6 @@
     },
     "root": {
       "inputs": {
-        "flake-compat": "flake-compat",
         "flake-parts": "flake-parts",
         "git-hooks-nix": "git-hooks-nix",
         "nixpkgs": "nixpkgs",
