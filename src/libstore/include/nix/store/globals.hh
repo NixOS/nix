@@ -1217,11 +1217,12 @@ public:
 
     Setting<std::string> upgradeNixStorePathUrl{
         this,
-        "https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix",
+        "",
         "upgrade-nix-store-path-url",
         R"(
-          Used by `nix upgrade-nix`, the URL of the file that contains the
-          store paths of the latest Nix release.
+          Deprecated. This option was used to configure how `nix upgrade-nix` operated.
+
+          Using this setting has no effect. It will be removed in a future release of Determinate Nix.
         )"
     };
 
