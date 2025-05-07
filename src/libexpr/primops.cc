@@ -90,7 +90,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
                     maybePathsOut->emplace(d.drvPath);
             },
             [&](const NixStringContextElem::Path & p) {
-                // FIXME
+                // FIXME: do something?
             },
         }, c.raw);
     }
@@ -1417,6 +1417,8 @@ static void derivationStrictInternal(
        derivation. */
     StringMap rewrites;
 
+    std::optional<std::string> drvS;
+
     for (auto & c : context) {
         std::visit(overloaded {
             /* Since this allows the builder to gain access to every
@@ -1442,7 +1444,15 @@ static void derivationStrictInternal(
                 drv.inputSrcs.insert(state.devirtualize(o.path, &rewrites));
             },
             [&](const NixStringContextElem::Path & p) {
-                // FIXME: do something
+                if (!drvS) drvS = drv.unparse(*state.store, true);
+                if (drvS->find(p.storePath.to_string()) != drvS->npos) {
+                    auto devirtualized = state.devirtualize(p.storePath, &rewrites);
+                    warn(
+                        "Using 'builtins.derivation' to create a derivation named '%s' that references the store path '%s' without a proper context. "
+                        "The resulting derivation will not have a correct store reference, so this is unreliable and may stop working in the future.",
+                        drvName,
+                        state.store->printStorePath(devirtualized));
+                }
             },
         }, c.raw);
     }
@@ -2359,12 +2369,12 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
             refs.insert(p->path);
         else if (auto p = std::get_if<NixStringContextElem::Path>(&c.raw)) {
             if (contents.find(p->storePath.to_string()) != contents.npos) {
+                auto devirtualized = state.devirtualize(p->storePath, &rewrites);
                 warn(
                     "Using 'builtins.toFile' to create a file named '%s' that references the store path '%s' without a proper context. "
                     "The resulting file will not have a correct store reference, so this is unreliable and may stop working in the future.",
                     name,
-                    state.store->printStorePath(p->storePath));
-                state.devirtualize(p->storePath, &rewrites);
+                    state.store->printStorePath(devirtualized));
             }
         }
         else
