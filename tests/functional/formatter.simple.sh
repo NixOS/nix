@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-echo "Formatting(${#}):" "${@}"
+echo "NIX_FLAKE_DIR=$NIX_FLAKE_DIR Formatting(${#}):" "${@}"
