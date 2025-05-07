@@ -14,6 +14,7 @@
 #include "nix/expr/value-to-xml.hh"
 #include "nix/expr/primops.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/util/mounted-source-accessor.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
@@ -75,7 +76,10 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
                 ensureValid(b.drvPath->getBaseStorePath());
             },
             [&](const NixStringContextElem::Opaque & o) {
-                ensureValid(o.path);
+                // We consider virtual store paths valid here. They'll
+                // be devirtualized if needed elsewhere.
+                if (!storeFS->getMount(CanonPath(store->printStorePath(o.path))))
+                    ensureValid(o.path);
                 if (maybePathsOut)
                     maybePathsOut->emplace(o.path);
             },
@@ -1408,6 +1412,8 @@ static void derivationStrictInternal(
     /* Everything in the context of the strings in the derivation
        attributes should be added as dependencies of the resulting
        derivation. */
+    StringMap rewrites;
+
     for (auto & c : context) {
         std::visit(overloaded {
             /* Since this allows the builder to gain access to every
@@ -1430,10 +1436,12 @@ static void derivationStrictInternal(
                 drv.inputDrvs.ensureSlot(*b.drvPath).value.insert(b.output);
             },
             [&](const NixStringContextElem::Opaque & o) {
-                drv.inputSrcs.insert(o.path);
+                drv.inputSrcs.insert(state.devirtualize(o.path, &rewrites));
             },
         }, c.raw);
     }
+
+    drv.applyRewrites(rewrites);
 
     /* Do we have all required attributes? */
     if (drv.builder == "")
@@ -2500,6 +2508,7 @@ static void addPath(
                 {}));
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
+            // FIXME: make this lazy?
             auto dstPath = fetchToStore(
                 *state.store,
                 path.resolveSymlinks(),
@@ -2530,7 +2539,7 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
         "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterSource");
 
-    addPath(state, pos, path.baseName(), path, args[0], ContentAddressMethod::Raw::NixArchive, std::nullopt, v, context);
+    addPath(state, pos, state.computeBaseName(path), path, args[0], ContentAddressMethod::Raw::NixArchive, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({

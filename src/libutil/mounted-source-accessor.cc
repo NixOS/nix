@@ -81,6 +81,15 @@ struct MountedSourceAccessorImpl : MountedSourceAccessor
         // FIXME: thread-safety
         mounts.insert_or_assign(std::move(mountPoint), accessor);
     }
+
+    std::shared_ptr<SourceAccessor> getMount(CanonPath mountPoint) override
+    {
+        auto i = mounts.find(mountPoint);
+        if (i != mounts.end())
+            return i->second;
+        else
+            return nullptr;
+    }
 };
 
 ref<MountedSourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts)

@@ -9,6 +9,7 @@ headers = files(
   'filtering-source-accessor.hh',
   'git-lfs-fetch.hh',
   'git-utils.hh',
+  'input-cache.hh',
   'registry.hh',
   'store-path-accessor.hh',
   'tarball.hh',

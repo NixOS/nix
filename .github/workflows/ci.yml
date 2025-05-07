@@ -91,7 +91,7 @@ jobs:
   flake_regressions:
     if: github.event_name == 'merge_group'
     needs: build_x86_64-linux
-    runs-on: blacksmith-32vcpu-ubuntu-2204
+    runs-on: namespace-profile-x86-32cpu-64gb
     steps:
       - name: Checkout nix
         uses: actions/checkout@v4
@@ -109,7 +109,30 @@ jobs:
         with:
           determinate: true
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=50 flake-regressions/eval-all.sh
+      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 50%" flake-regressions/eval-all.sh
+
+  flake_regressions_lazy:
+    if: github.event_name == 'merge_group'
+    needs: build_x86_64-linux
+    runs-on: namespace-profile-x86-32cpu-64gb
+    steps:
+      - name: Checkout nix
+        uses: actions/checkout@v4
+      - name: Checkout flake-regressions
+        uses: actions/checkout@v4
+        with:
+          repository: DeterminateSystems/flake-regressions
+          path: flake-regressions
+      - name: Checkout flake-regressions-data
+        uses: actions/checkout@v4
+        with:
+          repository: DeterminateSystems/flake-regressions-data
+          path: flake-regressions/tests
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          determinate: true
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 50%" NIX_CONFIG="lazy-trees = true" flake-regressions/eval-all.sh
 
   manual:
     if: github.event_name != 'merge_group'

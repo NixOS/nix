@@ -292,7 +292,7 @@ path11=$(nix eval --impure --raw --expr "(builtins.fetchGit ./.).outPath")
 empty="$TEST_ROOT/empty"
 git init "$empty"
 
-emptyAttrs='{ lastModified = 0; lastModifiedDate = "19700101000000"; narHash = "sha256-pQpattmS9VmO3ZIQUFn66az8GSmB4IvYhTTCFn6SUmo="; rev = "0000000000000000000000000000000000000000"; revCount = 0; shortRev = "0000000"; submodules = false; }'
+emptyAttrs='{ lastModified = 0; lastModifiedDate = "19700101000000"; rev = "0000000000000000000000000000000000000000"; revCount = 0; shortRev = "0000000"; submodules = false; }'
 
 [[ $(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]") = $emptyAttrs ]]
 
