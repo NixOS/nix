@@ -3,6 +3,7 @@
 #include "nix/expr/eval.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/cmd/installable-derived-path.hh"
+#include "nix/util/environment-variables.hh"
 #include "run.hh"
 
 using namespace nix;
@@ -72,6 +73,11 @@ struct CmdFormatterRun : MixFormatter, MixJSON
         auto evalState = getEvalState();
         auto evalStore = getEvalStore();
 
+        auto flakeRef = parseFlakeRef(fetchSettings, ".", std::filesystem::current_path().string());
+        auto maybeFlakeDir = flakeRef.input.getSourcePath();
+        assert(maybeFlakeDir.has_value());
+        auto flakeDir = maybeFlakeDir.value();
+
         auto installable_ = parseInstallable(store, ".");
         auto & installable = InstallableValue::require(*installable_);
         auto app = installable.toApp(*evalState).resolve(evalStore, store);
@@ -87,7 +93,18 @@ struct CmdFormatterRun : MixFormatter, MixJSON
         // we are about to exec out of this process without running C++ destructors.
         evalState->evalCaches.clear();
 
-        execProgramInStore(store, UseLookupPath::DontUse, app.program, programArgs);
+        // Add the path to the flake as an environment variable. This enables formatters to format the entire flake even
+        // if run from a subdirectory.
+        Environment env = getEnv();
+        env["NIX_FLAKE_DIR"] = flakeDir;
+
+        execProgramInStore(
+            store,
+            UseLookupPath::DontUse,
+            app.program,
+            programArgs,
+            std::nullopt, // Use default system
+            env);
     };
 };
 
