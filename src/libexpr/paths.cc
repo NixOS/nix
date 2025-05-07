@@ -83,8 +83,16 @@ StorePath EvalState::mountInput(
     }
 
     // FIXME: what to do with the NAR hash in lazy mode?
-    if (!settings.lazyTrees)
-        assert(!originalInput.getNarHash() || storePath == originalInput.computeStorePath(*store));
+    if (!settings.lazyTrees && originalInput.getNarHash()) {
+        auto expected = originalInput.computeStorePath(*store);
+        if (storePath != expected)
+            throw Error(
+                (unsigned int) 102,
+                "NAR hash mismatch in input '%s', expected '%s' but got '%s'",
+                originalInput.to_string(),
+                store->printStorePath(storePath),
+                store->printStorePath(expected));
+    }
 
     return storePath;
 }
