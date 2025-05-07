@@ -34,13 +34,38 @@ cat << EOF > flake.nix
 }
 EOF
 
+mkdir subflake
+cp ./simple.nix ./simple.builder.sh ./formatter.simple.sh "${config_nix}" "$TEST_HOME/subflake"
+
+cat << EOF > subflake/flake.nix
+{
+  outputs = _: {
+    formatter.$system =
+      with import ./config.nix;
+      mkDerivation {
+        name = "formatter";
+        buildCommand = ''
+          mkdir -p \$out/bin
+          echo "#! ${shell}" > \$out/bin/formatter
+          cat \${./formatter.simple.sh} >> \$out/bin/formatter
+          chmod +x \$out/bin/formatter
+        '';
+      };
+  };
+}
+EOF
+
 # No arguments check
-[[ "$(nix fmt)" = "Formatting(0):" ]]
-[[ "$(nix formatter run)" = "Formatting(0):" ]]
+[[ "$(nix fmt)" = "PRJ_ROOT=$TEST_HOME Formatting(0):" ]]
+[[ "$(nix formatter run)" = "PRJ_ROOT=$TEST_HOME Formatting(0):" ]]
 
 # Argument forwarding check
-nix fmt ./file ./folder | grep 'Formatting(2): ./file ./folder'
-nix formatter run ./file ./folder | grep 'Formatting(2): ./file ./folder'
+nix fmt ./file ./folder | grep "PRJ_ROOT=$TEST_HOME Formatting(2): ./file ./folder"
+nix formatter run ./file ./folder | grep "PRJ_ROOT=$TEST_HOME Formatting(2): ./file ./folder"
+
+# test subflake
+cd subflake
+nix fmt ./file | grep "PRJ_ROOT=$TEST_HOME/subflake Formatting(1): ./file"
 
 # Build checks
 ## Defaults to a ./result.
