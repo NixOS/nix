@@ -7,6 +7,7 @@
 #include "nix/store/builtins.hh"
 #include "nix/store/builtins/buildenv.hh"
 #include "nix/store/path-references.hh"
+#include "nix/util/environment-variables.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/util.hh"
 #include "nix/util/archive.hh"
@@ -187,7 +188,6 @@ private:
     typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
     PathsInChroot pathsInChroot;
 
-    typedef std::map<std::string, std::string> Environment;
     Environment env;
 
     /**
