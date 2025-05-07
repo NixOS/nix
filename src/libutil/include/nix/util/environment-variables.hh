@@ -15,6 +15,8 @@ namespace nix {
 
 static constexpr auto environmentVariablesCategory = "Options that change environment variables";
 
+typedef std::map<std::string, std::string> Environment;
+
 /**
  * @return an environment variable.
  */
@@ -34,7 +36,7 @@ std::optional<std::string> getEnvNonEmpty(const std::string & key);
 /**
  * Get the entire environment.
  */
-std::map<std::string, std::string> getEnv();
+Environment getEnv();
 
 #ifdef _WIN32
 /**
@@ -64,6 +66,6 @@ void clearEnv();
 /**
  * Replace the entire environment with the given one.
  */
-void replaceEnv(const std::map<std::string, std::string> & newEnv);
+void replaceEnv(const Environment & newEnv);
 
 }
