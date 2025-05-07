@@ -89,7 +89,7 @@ jobs:
                 | ".#hydraJobs.tests." + .')
 
   flake_regressions:
-    #if: github.event_name == 'merge_group'
+    if: github.event_name == 'merge_group'
     needs: build_x86_64-linux
     runs-on: namespace-profile-x86-32cpu-64gb
     steps:
@@ -109,10 +109,10 @@ jobs:
         with:
           determinate: true
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: lscpu && nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 50%" flake-regressions/eval-all.sh
+      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 50%" flake-regressions/eval-all.sh
 
   flake_regressions_lazy:
-    #if: github.event_name == 'merge_group'
+    if: github.event_name == 'merge_group'
     needs: build_x86_64-linux
     runs-on: namespace-profile-x86-32cpu-64gb
     steps:
@@ -132,7 +132,7 @@ jobs:
         with:
           determinate: true
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: lscpu && nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 50%" NIX_CONFIG="lazy-trees = true" flake-regressions/eval-all.sh
+      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 50%" NIX_CONFIG="lazy-trees = true" flake-regressions/eval-all.sh
 
   manual:
     if: github.event_name != 'merge_group'
