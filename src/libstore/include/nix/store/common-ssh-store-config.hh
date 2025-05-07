@@ -56,7 +56,7 @@ struct CommonSSHStoreConfig : virtual StoreConfig
      */
     SSHMaster createSSHMaster(
         bool useMaster,
-        Descriptor logFD = INVALID_DESCRIPTOR);
+        Descriptor logFD = INVALID_DESCRIPTOR) const;
 };
 
 }

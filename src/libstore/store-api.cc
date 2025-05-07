@@ -29,13 +29,13 @@ using json = nlohmann::json;
 namespace nix {
 
 
-bool StoreDirConfig::isInStore(PathView path) const
+bool MixStoreDirMethods::isInStore(PathView path) const
 {
     return isInDir(path, storeDir);
 }
 
 
-std::pair<StorePath, Path> StoreDirConfig::toStorePath(PathView path) const
+std::pair<StorePath, Path> MixStoreDirMethods::toStorePath(PathView path) const
 {
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
@@ -77,7 +77,7 @@ to match.
 */
 
 
-StorePath StoreDirConfig::makeStorePath(std::string_view type,
+StorePath MixStoreDirMethods::makeStorePath(std::string_view type,
     std::string_view hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
@@ -88,14 +88,14 @@ StorePath StoreDirConfig::makeStorePath(std::string_view type,
 }
 
 
-StorePath StoreDirConfig::makeStorePath(std::string_view type,
+StorePath MixStoreDirMethods::makeStorePath(std::string_view type,
     const Hash & hash, std::string_view name) const
 {
     return makeStorePath(type, hash.to_string(HashFormat::Base16, true), name);
 }
 
 
-StorePath StoreDirConfig::makeOutputPath(std::string_view id,
+StorePath MixStoreDirMethods::makeOutputPath(std::string_view id,
     const Hash & hash, std::string_view name) const
 {
     return makeStorePath("output:" + std::string { id }, hash, outputPathName(name, id));
@@ -106,7 +106,7 @@ StorePath StoreDirConfig::makeOutputPath(std::string_view id,
    hacky, but we can't put them in, say, <s2> (per the grammar above)
    since that would be ambiguous. */
 static std::string makeType(
-    const StoreDirConfig & store,
+    const MixStoreDirMethods & store,
     std::string && type,
     const StoreReferences & references)
 {
@@ -119,7 +119,7 @@ static std::string makeType(
 }
 
 
-StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
+StorePath MixStoreDirMethods::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
 {
     if (info.method == FileIngestionMethod::Git && info.hash.algo != HashAlgorithm::SHA1)
         throw Error("Git file ingestion must use SHA-1 hash");
@@ -141,7 +141,7 @@ StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const Fixed
 }
 
 
-StorePath StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
+StorePath MixStoreDirMethods::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
 {
     // New template
     return std::visit(overloaded {
@@ -162,7 +162,7 @@ StorePath StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const
 }
 
 
-std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
+std::pair<StorePath, Hash> MixStoreDirMethods::computeStorePath(
     std::string_view name,
     const SourcePath & path,
     ContentAddressMethod method,
@@ -420,7 +420,7 @@ ValidPathInfo Store::addToStoreSlow(
     return info;
 }
 
-StringSet StoreConfig::getDefaultSystemFeatures()
+StringSet Store::Config::getDefaultSystemFeatures()
 {
     auto res = settings.systemFeatures.get();
 
@@ -433,9 +433,10 @@ StringSet StoreConfig::getDefaultSystemFeatures()
     return res;
 }
 
-Store::Store(const Params & params)
-    : StoreConfig(params)
-    , state({(size_t) pathInfoCacheSize})
+Store::Store(const Store::Config & config)
+    : MixStoreDirMethods{config}
+    , config{config}
+    , state({(size_t) config.pathInfoCacheSize})
 {
     assertLibStoreInitialized();
 }
@@ -1205,7 +1206,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
 }
 
 
-std::string StoreDirConfig::showPaths(const StorePathSet & paths)
+std::string MixStoreDirMethods::showPaths(const StorePathSet & paths) const
 {
     std::string s;
     for (auto & i : paths) {
@@ -1312,7 +1313,7 @@ void Store::signRealisation(Realisation & realisation)
 namespace nix {
 
 ref<Store> openStore(const std::string & uri,
-    const Store::Params & extraParams)
+    const Store::Config::Params & extraParams)
 {
     return openStore(StoreReference::parse(uri, extraParams));
 }
@@ -1321,13 +1322,13 @@ ref<Store> openStore(StoreReference && storeURI)
 {
     auto & params = storeURI.params;
 
-    auto store = std::visit(overloaded {
-        [&](const StoreReference::Auto &) -> std::shared_ptr<Store> {
+    auto storeConfig = std::visit(overloaded {
+        [&](const StoreReference::Auto &) -> ref<StoreConfig> {
             auto stateDir = getOr(params, "state", settings.nixStateDir);
             if (access(stateDir.c_str(), R_OK | W_OK) == 0)
-                return std::make_shared<LocalStore>(params);
+                return make_ref<LocalStore::Config>(params);
             else if (pathExists(settings.nixDaemonSocketFile))
-                return std::make_shared<UDSRemoteStore>(params);
+                return make_ref<UDSRemoteStore::Config>(params);
             #ifdef __linux__
             else if (!pathExists(stateDir)
                 && params.empty()
@@ -1343,31 +1344,33 @@ ref<Store> openStore(StoreReference && storeURI)
                     try {
                         createDirs(chrootStore);
                     } catch (SystemError & e) {
-                        return std::make_shared<LocalStore>(params);
+                        return make_ref<LocalStore::Config>(params);
                     }
                     warn("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
                 } else
                     debug("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
-                return std::make_shared<LocalStore>("local", chrootStore, params);
+                return make_ref<LocalStore::Config>("local", chrootStore, params);
             }
             #endif
             else
-                return std::make_shared<LocalStore>(params);
+                return make_ref<LocalStore::Config>(params);
         },
         [&](const StoreReference::Specified & g) {
-            for (const auto & implem : Implementations::registered())
+            for (const auto & [storeName, implem] : Implementations::registered())
                 if (implem.uriSchemes.count(g.scheme))
-                    return implem.create(g.scheme, g.authority, params);
+                    return implem.parseConfig(g.scheme, g.authority, params);
 
             throw Error("don't know how to open Nix store with scheme '%s'", g.scheme);
         },
     }, storeURI.variant);
 
-    experimentalFeatureSettings.require(store->experimentalFeature());
-    store->warnUnknownSettings();
+    experimentalFeatureSettings.require(storeConfig->experimentalFeature());
+    storeConfig->warnUnknownSettings();
+
+    auto store = storeConfig->openStore();
     store->init();
 
-    return ref<Store> { store };
+    return store;
 }
 
 std::list<ref<Store>> getDefaultSubstituters()
@@ -1390,7 +1393,7 @@ std::list<ref<Store>> getDefaultSubstituters()
             addStore(uri);
 
         stores.sort([](ref<Store> & a, ref<Store> & b) {
-            return a->priority < b->priority;
+            return a->config.priority < b->config.priority;
         });
 
         return stores;
@@ -1399,9 +1402,9 @@ std::list<ref<Store>> getDefaultSubstituters()
     return stores;
 }
 
-std::vector<StoreFactory> & Implementations::registered()
+Implementations::Map & Implementations::registered()
 {
-    static std::vector<StoreFactory> registered;
+    static Map registered;
     return registered;
 }
 
