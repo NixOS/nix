@@ -150,8 +150,9 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
                 return std::move(c);
             },
             [&](const NixStringContextElem::Path & p) -> NixStringContextElem::DrvDeep {
-                // FIXME: don't know what to do here.
-                abort();
+                state.error<EvalError>(
+                    "`addDrvOutputDependencies` does not work on a string without context"
+                ).atPos(pos).debugThrow();
             },
         }, context.begin()->raw) }),
     };

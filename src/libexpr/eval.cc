@@ -2512,7 +2512,9 @@ std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedP
             return std::move(b);
         },
         [&](NixStringContextElem::Path && p) -> SingleDerivedPath {
-            abort(); // FIXME
+            error<EvalError>(
+                "string '%s' has no context",
+                s).withTrace(pos, errorCtx).debugThrow();
         },
     }, ((NixStringContextElem &&) *context.begin()).raw);
     return {

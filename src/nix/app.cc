@@ -93,7 +93,7 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                     };
                 },
                 [&](const NixStringContextElem::Path & p) -> DerivedPath {
-                    abort(); // FIXME
+                    throw Error("'program' attribute of an 'app' output cannot have no context");
                 },
             }, c.raw));
         }
