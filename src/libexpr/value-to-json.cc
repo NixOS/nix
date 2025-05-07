@@ -7,9 +7,10 @@
 #include <iomanip>
 #include <nlohmann/json.hpp>
 
-
 namespace nix {
+
 using json = nlohmann::json;
+
 json printValueAsJSON(EvalState & state, bool strict,
     Value & v, const PosIdx pos, NixStringContext & context, bool copyToStore)
 {
@@ -33,6 +34,8 @@ json printValueAsJSON(EvalState & state, bool strict,
             copyContext(v, context);
             // FIXME: only use the context from `v`.
             // FIXME: make devirtualization configurable?
+            // FIXME: don't devirtualize here? It's redundant if
+            // 'toFile' or 'derivation' also do it.
             out = state.devirtualize(v.c_str(), context);
             break;
 

@@ -952,8 +952,8 @@ void EvalState::mkPos(Value & v, PosIdx p)
             // FIXME: only do this for virtual store paths?
             attrs.alloc(sFile).mkString(path->path.abs(),
                 {
-                    NixStringContextElem::Opaque{
-                        .path = store->toStorePath(path->path.abs()).first
+                    NixStringContextElem::Path{
+                        .storePath = store->toStorePath(path->path.abs()).first
                     }
                 });
         else
@@ -2277,7 +2277,10 @@ std::string_view EvalState::forceStringNoCtx(Value & v, const PosIdx pos, std::s
 {
     auto s = forceString(v, pos, errorCtx);
     if (v.context()) {
-        error<EvalError>("the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string_view(), v.context()[0]).withTrace(pos, errorCtx).debugThrow();
+        NixStringContext context;
+        copyContext(v, context);
+        if (hasContext(context))
+            error<EvalError>("the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string_view(), v.context()[0]).withTrace(pos, errorCtx).debugThrow();
     }
     return s;
 }
@@ -2336,7 +2339,16 @@ BackedStringView EvalState::coerceToString(
               v.payload.path.path
             : copyToStore
             ? store->printStorePath(copyPathToStore(context, v.path()))
-            : std::string(v.path().path.abs());
+            : ({
+                auto path = v.path();
+                if (path.accessor == rootFS && store->isInStore(path.path.abs())) {
+                    context.insert(
+                        NixStringContextElem::Path{
+                            .storePath = store->toStorePath(path.path.abs()).first
+                        });
+                }
+                std::string(path.path.abs());
+              });
     }
 
     if (v.type() == nAttrs) {
@@ -2498,6 +2510,9 @@ std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedP
         },
         [&](NixStringContextElem::Built && b) -> SingleDerivedPath {
             return std::move(b);
+        },
+        [&](NixStringContextElem::Path && p) -> SingleDerivedPath {
+            abort(); // FIXME
         },
     }, ((NixStringContextElem &&) *context.begin()).raw);
     return {

@@ -628,6 +628,9 @@ string_t AttrCursor::getStringWithContext()
                         [&](const NixStringContextElem::Opaque & o) -> const StorePath & {
                             return o.path;
                         },
+                        [&](const NixStringContextElem::Path & p) -> const StorePath & {
+                            abort(); // FIXME
+                        },
                     }, c.raw);
                     if (!root->state.store->isValidPath(path)) {
                         valid = false;

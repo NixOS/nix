@@ -92,6 +92,9 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                         .path = o.path,
                     };
                 },
+                [&](const NixStringContextElem::Path & p) -> DerivedPath {
+                    abort(); // FIXME
+                },
             }, c.raw));
         }
 
