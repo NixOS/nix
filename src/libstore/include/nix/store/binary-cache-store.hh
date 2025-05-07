@@ -54,10 +54,17 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
  * @note subclasses must implement at least one of the two
  * virtual getFile() methods.
  */
-class BinaryCacheStore : public virtual BinaryCacheStoreConfig,
-    public virtual Store,
-    public virtual LogStore
+struct BinaryCacheStore :
+    virtual Store,
+    virtual LogStore
 {
+    using Config = BinaryCacheStoreConfig;
+
+    /**
+     * Intentionally mutable because some things we update due to the
+     * cache's own (remote side) settings.
+     */
+    Config & config;
 
 private:
     std::vector<std::unique_ptr<Signer>> signers;
@@ -69,7 +76,7 @@ protected:
 
     const std::string cacheInfoFile = "nix-cache-info";
 
-    BinaryCacheStore(const Params & params);
+    BinaryCacheStore(Config &);
 
 public:
 

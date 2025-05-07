@@ -771,7 +771,7 @@ struct curlFileTransfer : public FileTransfer
     }
 
 #if NIX_WITH_S3_SUPPORT
-    std::tuple<std::string, std::string, Store::Params> parseS3Uri(std::string uri)
+    std::tuple<std::string, std::string, Store::Config::Params> parseS3Uri(std::string uri)
     {
         auto [path, params] = splitUriAndParams(uri);
 

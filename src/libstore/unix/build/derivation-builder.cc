@@ -36,7 +36,7 @@
 #include "store-config-private.hh"
 
 #if HAVE_STATVFS
-#include <sys/statvfs.h>
+# include <sys/statvfs.h>
 #endif
 
 /* Includes required for chroot support. */
@@ -60,9 +60,9 @@
 #endif
 
 #ifdef __APPLE__
-#include <spawn.h>
-#include <sys/sysctl.h>
-#include <sandbox.h>
+# include <spawn.h>
+# include <sys/sysctl.h>
+# include <sandbox.h>
 
 /* This definition is undocumented but depended upon by all major browsers. */
 extern "C" int sandbox_init_with_parameters(const char *profile, uint64_t flags, const char *const parameters[], char **errorbuf);
@@ -494,7 +494,7 @@ bool DerivationBuilderImpl::prepareBuild()
     }
 
     auto & localStore = getLocalStore();
-    if (localStore.storeDir != localStore.realStoreDir.get()) {
+    if (localStore.storeDir != localStore.config->realStoreDir.get()) {
         #ifdef __linux__
             useChroot = true;
         #else
@@ -707,7 +707,7 @@ bool DerivationBuilderImpl::cleanupDecideWhetherDiskFull()
         auto & localStore = getLocalStore();
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
-        if (statvfs(localStore.realStoreDir.get().c_str(), &st) == 0 &&
+        if (statvfs(localStore.config->realStoreDir.get().c_str(), &st) == 0 &&
             (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
         if (statvfs(tmpDir.c_str(), &st) == 0 &&
@@ -871,7 +871,7 @@ void DerivationBuilderImpl::startBuilder()
                 concatStringsSep(", ", drvOptions.getRequiredSystemFeatures(drv)),
                 store.printStorePath(drvPath),
                 settings.thisSystem,
-                concatStringsSep<StringSet>(", ", store.systemFeatures));
+                concatStringsSep<StringSet>(", ", store.config.systemFeatures));
         }
     }
 
@@ -1594,14 +1594,14 @@ void DerivationBuilderImpl::startDaemon()
 {
     experimentalFeatureSettings.require(Xp::RecursiveNix);
 
-    Store::Params params;
-    params["path-info-cache-size"] = "0";
-    params["store"] = store.storeDir;
-    if (auto & optRoot = getLocalStore().rootDir.get())
-        params["root"] = *optRoot;
-    params["state"] = "/no-such-path";
-    params["log"] = "/no-such-path";
-    auto store = makeRestrictedStore(params,
+    auto store = makeRestrictedStore(
+        [&]{
+            auto config = make_ref<LocalStore::Config>(*getLocalStore().config);
+            config->pathInfoCacheSize = 0;
+            config->stateDir = "/no-such-path";
+            config->logDir = "/no-such-path";
+            return config;
+        }(),
         ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
         *this);
 
@@ -1946,7 +1946,7 @@ void DerivationBuilderImpl::runChild()
                 createDirs(chrootRootDir + "/dev/shm");
                 createDirs(chrootRootDir + "/dev/pts");
                 ss.push_back("/dev/full");
-                if (store.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
+                if (store.config.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
                     ss.push_back("/dev/kvm");
                 ss.push_back("/dev/null");
                 ss.push_back("/dev/random");

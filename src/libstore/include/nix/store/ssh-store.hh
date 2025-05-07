@@ -8,7 +8,9 @@
 
 namespace nix {
 
-struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
+struct SSHStoreConfig : std::enable_shared_from_this<SSHStoreConfig>,
+                        virtual RemoteStoreConfig,
+                        virtual CommonSSHStoreConfig
 {
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
     using RemoteStoreConfig::RemoteStoreConfig;
@@ -18,7 +20,7 @@ struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
     const Setting<Strings> remoteProgram{
         this, {"nix-daemon"}, "remote-program", "Path to the `nix-daemon` executable on the remote machine."};
 
-    const std::string name() override
+    static const std::string name()
     {
         return "Experimental SSH Store";
     }
@@ -28,19 +30,17 @@ struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
         return {"ssh-ng"};
     }
 
-    std::string doc() override;
+    static std::string doc();
+
+    ref<Store> openStore() const override;
 };
 
 struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfig
 {
-    using LocalFSStoreConfig::LocalFSStoreConfig;
-    using SSHStoreConfig::SSHStoreConfig;
-
     MountedSSHStoreConfig(StringMap params);
-
     MountedSSHStoreConfig(std::string_view scheme, std::string_view host, StringMap params);
 
-    const std::string name() override
+    static const std::string name()
     {
         return "Experimental SSH Store with filesystem mounted";
     }
@@ -50,12 +50,14 @@ struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfi
         return {"mounted-ssh-ng"};
     }
 
-    std::string doc() override;
+    static std::string doc();
 
-    std::optional<ExperimentalFeature> experimentalFeature() const override
+    static std::optional<ExperimentalFeature> experimentalFeature()
     {
         return ExperimentalFeature::MountedSSHStore;
     }
+
+    ref<Store> openStore() const override;
 };
 
 }

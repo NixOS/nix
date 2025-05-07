@@ -22,8 +22,9 @@ LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
 {
 }
 
-LocalFSStore::LocalFSStore(const Params & params)
-    : Store(params)
+LocalFSStore::LocalFSStore(const Config & config)
+    : Store{static_cast<const Store::Config &>(*this)}
+    , config{config}
 {
 }
 
@@ -33,7 +34,7 @@ struct LocalStoreAccessor : PosixSourceAccessor
     bool requireValidPath;
 
     LocalStoreAccessor(ref<LocalFSStore> store, bool requireValidPath)
-        : PosixSourceAccessor(std::filesystem::path{store->realStoreDir.get()})
+        : PosixSourceAccessor(std::filesystem::path{store->config.realStoreDir.get()})
         , store(store)
         , requireValidPath(requireValidPath)
     {
@@ -104,8 +105,8 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
 
         Path logPath =
             j == 0
-            ? fmt("%s/%s/%s/%s", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
-            : fmt("%s/%s/%s", logDir, drvsLogDir, baseName);
+            ? fmt("%s/%s/%s/%s", config.logDir.get(), drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
+            : fmt("%s/%s/%s", config.logDir.get(), drvsLogDir, baseName);
         Path logBz2Path = logPath + ".bz2";
 
         if (pathExists(logPath))
