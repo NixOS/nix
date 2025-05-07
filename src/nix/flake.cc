@@ -218,9 +218,13 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
         auto lockedFlake = lockFlake();
         auto & flake = lockedFlake.flake;
 
+        /* Hack to show the store path if available. */
         std::optional<StorePath> storePath;
-        if (flake.lockedRef.input.getNarHash())
-            storePath = flake.lockedRef.input.computeStorePath(*store);
+        if (store->isInStore(flake.path.path.abs())) {
+            auto path = store->toStorePath(flake.path.path.abs()).first;
+            if (store->isValidPath(path))
+                storePath = path;
+        }
 
         if (json) {
             nlohmann::json j;
