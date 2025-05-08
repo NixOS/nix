@@ -89,7 +89,14 @@ jobs:
                 | ".#hydraJobs.tests." + .')
 
   flake_regressions:
-    #if: github.event_name == 'merge_group'
+    if: |
+      github.event_name == 'merge_group'
+      || (
+        github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
+        && (
+          (github.event.action == 'labeled' && github.event.label.name == 'flake-regression-test')
+          || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'flake-regression-test'))
+        )
     needs: build_x86_64-linux
     runs-on: namespace-profile-x86-32cpu-64gb
     steps:
@@ -112,7 +119,14 @@ jobs:
       - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 50%" flake-regressions/eval-all.sh
 
   flake_regressions_lazy:
-    #if: github.event_name == 'merge_group'
+    if: |
+      github.event_name == 'merge_group'
+      || (
+        github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
+        && (
+          (github.event.action == 'labeled' && github.event.label.name == 'flake-regression-test')
+          || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'flake-regression-test'))
+        )
     needs: build_x86_64-linux
     runs-on: namespace-profile-x86-32cpu-64gb
     steps:
