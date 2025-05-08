@@ -89,6 +89,9 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
                 if (maybePathsOut)
                     maybePathsOut->emplace(d.drvPath);
             },
+            [&](const NixStringContextElem::Path & p) {
+                // FIXME: do something?
+            },
         }, c.raw);
     }
 
@@ -1414,6 +1417,8 @@ static void derivationStrictInternal(
        derivation. */
     StringMap rewrites;
 
+    std::optional<std::string> drvS;
+
     for (auto & c : context) {
         std::visit(overloaded {
             /* Since this allows the builder to gain access to every
@@ -1437,6 +1442,17 @@ static void derivationStrictInternal(
             },
             [&](const NixStringContextElem::Opaque & o) {
                 drv.inputSrcs.insert(state.devirtualize(o.path, &rewrites));
+            },
+            [&](const NixStringContextElem::Path & p) {
+                if (!drvS) drvS = drv.unparse(*state.store, true);
+                if (drvS->find(p.storePath.to_string()) != drvS->npos) {
+                    auto devirtualized = state.devirtualize(p.storePath, &rewrites);
+                    warn(
+                        "Using 'builtins.derivation' to create a derivation named '%s' that references the store path '%s' without a proper context. "
+                        "The resulting derivation will not have a correct store reference, so this is unreliable and may stop working in the future.",
+                        drvName,
+                        state.store->printStorePath(devirtualized));
+                }
             },
         }, c.raw);
     }
@@ -2346,10 +2362,21 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
     std::string contents(state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.toFile"));
 
     StorePathSet refs;
+    StringMap rewrites;
 
     for (auto c : context) {
         if (auto p = std::get_if<NixStringContextElem::Opaque>(&c.raw))
             refs.insert(p->path);
+        else if (auto p = std::get_if<NixStringContextElem::Path>(&c.raw)) {
+            if (contents.find(p->storePath.to_string()) != contents.npos) {
+                auto devirtualized = state.devirtualize(p->storePath, &rewrites);
+                warn(
+                    "Using 'builtins.toFile' to create a file named '%s' that references the store path '%s' without a proper context. "
+                    "The resulting file will not have a correct store reference, so this is unreliable and may stop working in the future.",
+                    name,
+                    state.store->printStorePath(devirtualized));
+            }
+        }
         else
             state.error<EvalError>(
                 "files created by %1% may not reference derivations, but %2% references %3%",
@@ -2358,6 +2385,8 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
                 c.to_string()
             ).atPos(pos).debugThrow();
     }
+
+    contents = rewriteStrings(contents, rewrites);
 
     auto storePath = settings.readOnlyMode
         ? state.store->makeFixedOutputPathFromCA(name, TextInfo {
