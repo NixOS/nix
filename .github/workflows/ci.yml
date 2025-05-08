@@ -97,6 +97,7 @@ jobs:
           (github.event.action == 'labeled' && github.event.label.name == 'flake-regression-test')
           || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'flake-regression-test'))
         )
+      )
     needs: build_x86_64-linux
     runs-on: namespace-profile-x86-32cpu-64gb
     steps:
@@ -127,6 +128,7 @@ jobs:
           (github.event.action == 'labeled' && github.event.label.name == 'flake-regression-test')
           || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'flake-regression-test'))
         )
+      )
     needs: build_x86_64-linux
     runs-on: namespace-profile-x86-32cpu-64gb
     steps:
