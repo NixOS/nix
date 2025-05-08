@@ -322,6 +322,22 @@ Goal::Co DerivationGoal::haveDerivation()
 }
 
 
+static std::string showKnownOutputs(Store & store, const Derivation & drv)
+{
+    std::string msg;
+    StorePathSet expectedOutputPaths;
+    for (auto & i : drv.outputsAndOptPaths(store))
+        if (i.second.second)
+            expectedOutputPaths.insert(*i.second.second);
+    if (!expectedOutputPaths.empty()) {
+        msg += "\nOutput paths:";
+        for (auto & p : expectedOutputPaths)
+            msg += fmt("\n  %s", Magenta(store.printStorePath(p)));
+    }
+    return msg;
+}
+
+
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
 Goal::Co DerivationGoal::gaveUpOnSubstitution()
@@ -392,9 +408,14 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
     if (nrFailed != 0) {
         if (!useDerivation)
             throw Error("some dependencies of '%s' are missing", worker.store.printStorePath(drvPath));
-        co_return done(BuildResult::DependencyFailed, {}, Error(
-                "%s dependencies of derivation '%s' failed to build",
-                nrFailed, worker.store.printStorePath(drvPath)));
+        auto msg = fmt(
+            "Cannot build '%s'.\n"
+            "Reason: " ANSI_RED "%d %s failed" ANSI_NORMAL ".",
+            Magenta(worker.store.printStorePath(drvPath)),
+            nrFailed,
+            nrFailed == 1 ? "dependency" : "dependencies");
+        msg += showKnownOutputs(worker.store, *drv);
+        co_return done(BuildResult::DependencyFailed, {}, Error(msg));
     }
 
     if (retrySubstitution == RetrySubstitution::YesNeed) {
@@ -955,12 +976,16 @@ Goal::Co DerivationGoal::buildDone()
 
             diskFull |= cleanupDecideWhetherDiskFull();
 
-            auto msg = fmt("builder for '%s' %s",
+            auto msg = fmt(
+                "Cannot build '%s'.\n"
+                "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
                 Magenta(worker.store.printStorePath(drvPath)),
                 statusToString(status));
 
+            msg += showKnownOutputs(worker.store, *drv);
+
             if (!logger->isVerbose() && !logTail.empty()) {
-                msg += fmt(";\nlast %d log lines:\n", logTail.size());
+                msg += fmt("\nLast %d log lines:\n", logTail.size());
                 for (auto & line : logTail) {
                     msg += "> ";
                     msg += line;
