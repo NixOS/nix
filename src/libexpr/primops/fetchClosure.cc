@@ -1,5 +1,5 @@
 #include "nix/expr/primops.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/make-content-addressed.hh"
 #include "nix/util/url.hh"

@@ -3,8 +3,8 @@
 #include "nix/store/path.hh"
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
-#include "nix/store/globals.hh"
-#include "nix/util/configuration.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/store/config-parse.hh"
 
 #include <map>
 #include <string>
@@ -18,24 +18,32 @@ struct SourcePath;
 MakeError(BadStorePath, Error);
 MakeError(BadStorePathName, BadStorePath);
 
-struct StoreDirConfig : public Config
+/**
+ * Underlying store directory configuration type.
+ *
+ * Don't worry to much about the `F` parameter, it just some abstract
+ * nonsense for the "higher-kinded data" pattern. It is used in each
+ * settings record in order to ensure don't forgot to parse or document
+ * settings field.
+ */
+template<template<typename> class F>
+struct StoreDirConfigT
 {
-    using Config::Config;
+    F<Path> _storeDir;
+};
 
-    StoreDirConfig() = delete;
-
-    virtual ~StoreDirConfig() = default;
-
-    const PathSetting storeDir_{this, settings.nixStore,
-        "store",
-        R"(
-          Logical location of the Nix store, usually
-          `/nix/store`. Note that you can only copy store paths
-          between stores if they have the same `store` setting.
-        )"};
-    const Path storeDir = storeDir_;
-
-    // pure methods
+/**
+ * @todo This should just be part of `StoreDirConfig`. However, it would
+ * be a huge amount of churn if `Store` didn't have these methods
+ * anymore, forcing a bunch of code to go from `store.method(...)` to
+ * `store.config.method(...)`.
+ *
+ * So we instead pull out the methods into their own mix-in, so can put
+ * them directly on the Store too.
+ */
+struct MixStoreDirMethods
+{
+    const Path & storeDir;
 
     StorePath parseStorePath(std::string_view path) const;
 
@@ -56,7 +64,7 @@ struct StoreDirConfig : public Config
      * Display a set of paths in human-readable form (i.e., between quotes
      * and separated by commas).
      */
-    std::string showPaths(const StorePathSet & paths);
+    std::string showPaths(const StorePathSet & paths) const;
 
     /**
      * @return true if *path* is in the Nix store (but not the Nix
@@ -102,6 +110,27 @@ struct StoreDirConfig : public Config
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = {},
         PathFilter & filter = defaultPathFilter) const;
+};
+
+/**
+ * Store directory configuration type.
+ *
+ * Combines the underlying `*T` type (with plain values for the fields)
+ * and the methods.
+ *
+ * The order of `StoreDirConfigT<config::PlainValue>` and then
+ * `MixStoreDirMethods` is very important. This ensures that
+ * `StoreDirConfigT<config::PlainValue>::storeDir_` is initialized
+ * before we have our one chance (because references are immutable) to
+ * initialize `MixStoreDirMethods::storeDir`.
+ */
+struct StoreDirConfig : StoreDirConfigT<config::PlainValue>, MixStoreDirMethods
+{
+    static config::SettingDescriptionMap descriptions();
+
+    StoreDirConfig(const StoreReference::Params & params);
+
+    virtual ~StoreDirConfig() = default;
 };
 
 }
