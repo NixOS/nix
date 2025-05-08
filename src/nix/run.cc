@@ -20,6 +20,8 @@
 
 #include <queue>
 
+extern char ** environ __attribute__((weak));
+
 namespace nix::fs { using namespace std::filesystem; }
 
 using namespace nix;
@@ -88,9 +90,11 @@ void execProgramInStore(ref<Store> store,
         linux::setPersonality(*system);
 #endif
 
-    if (useLookupPath == UseLookupPath::Use)
-        execvpe(program.c_str(), stringsToCharPtrs(args).data(), envp);
-    else
+    if (useLookupPath == UseLookupPath::Use) {
+        // We have to set `environ` by hand because there is no `execvpe` on macOS.
+        environ = envp;
+        execvp(program.c_str(), stringsToCharPtrs(args).data());
+    } else
         execve(program.c_str(), stringsToCharPtrs(args).data(), envp);
 
     throw SysError("unable to execute '%s'", program);
