@@ -4,7 +4,7 @@
 #  include "nix/store/build/derivation-builder.hh"
 #endif
 #include "nix/util/processes.hh"
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/util/util.hh"
 #include "nix/util/compression.hh"
@@ -1259,7 +1259,7 @@ Path DerivationGoal::openLogFile()
     /* Create a log file. */
     Path logDir;
     if (auto localStore = dynamic_cast<LocalStore *>(&worker.store))
-        logDir = localStore->logDir;
+        logDir = localStore->config->logDir;
     else
         logDir = settings.nixLogDir;
     Path dir = fmt("%s/%s/%s/", logDir, LocalFSStore::drvsLogDir, baseName.substr(0, 2));

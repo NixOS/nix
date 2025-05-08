@@ -12,8 +12,8 @@
  * instantiation.
  */
 
-#include "nix/util/configuration.hh"
-#include "nix/util/args.hh"
+#include "nix/main/configuration.hh"
+#include "nix/main/args.hh"
 
 namespace nix {
 

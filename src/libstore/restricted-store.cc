@@ -30,32 +30,23 @@ bool RestrictionContext::isAllowed(const DerivedPath & req)
     return isAllowed(pathPartOfReq(req));
 }
 
-struct RestrictedStoreConfig : virtual LocalFSStoreConfig
-{
-    using LocalFSStoreConfig::LocalFSStoreConfig;
-    const std::string name() override
-    {
-        return "Restricted Store";
-    }
-};
-
 /**
  * A wrapper around LocalStore that only allows building/querying of
  * paths that are in the input closures of the build or were added via
  * recursive Nix calls.
  */
-struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual IndirectRootStore, public virtual GcStore
+struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStore
 {
+    ref<const LocalStore::Config> config;
+
     ref<LocalStore> next;
 
     RestrictionContext & goal;
 
-    RestrictedStore(const Params & params, ref<LocalStore> next, RestrictionContext & goal)
-        : StoreConfig(params)
-        , LocalFSStoreConfig(params)
-        , RestrictedStoreConfig(params)
-        , Store(params)
-        , LocalFSStore(params)
+    RestrictedStore(ref<LocalStore::Config> config, ref<LocalStore> next, RestrictionContext & goal)
+        : Store{*config}
+        , LocalFSStore{*config}
+        , config{config}
         , next(next)
         , goal(goal)
     {
@@ -63,7 +54,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
 
     Path getRealStoreDir() override
     {
-        return next->realStoreDir;
+        return next->config->realStoreDir;
     }
 
     std::string getUri() override
@@ -176,9 +167,9 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
     }
 };
 
-ref<Store> makeRestrictedStore(const Store::Params & params, ref<LocalStore> next, RestrictionContext & context)
+ref<Store> makeRestrictedStore(ref<LocalStore::Config> config, ref<LocalStore> next, RestrictionContext & context)
 {
-    return make_ref<RestrictedStore>(params, next, context);
+    return make_ref<RestrictedStore>(config, next, context);
 }
 
 StorePathSet RestrictedStore::queryAllValidPaths()

@@ -1,6 +1,6 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/store/globals.hh"
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/s3.hh"
 #include "nix/util/compression.hh"
@@ -771,7 +771,7 @@ struct curlFileTransfer : public FileTransfer
     }
 
 #if NIX_WITH_S3_SUPPORT
-    std::tuple<std::string, std::string, Store::Params> parseS3Uri(std::string uri)
+    std::tuple<std::string, std::string, StoreReference::Params> parseS3Uri(std::string uri)
     {
         auto [path, params] = splitUriAndParams(uri);
 

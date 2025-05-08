@@ -2,8 +2,6 @@
 
 #if NIX_WITH_S3_SUPPORT
 
-#include <assert.h>
-
 #include "nix/store/s3.hh"
 #include "nix/store/nar-info.hh"
 #include "nix/store/nar-info-disk-cache.hh"
@@ -11,6 +9,8 @@
 #include "nix/util/compression.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/signals.hh"
+#include "nix/store/config-parse-impl.hh"
+#include "nix/store/store-registration.hh"
 
 #include <aws/core/Aws.h>
 #include <aws/core/VersionConfig.h>
@@ -235,28 +235,137 @@ S3Helper::FileTransferResult S3Helper::getObject(
     return res;
 }
 
-S3BinaryCacheStore::S3BinaryCacheStore(const Params & params)
-    : BinaryCacheStoreConfig(params)
-    , BinaryCacheStore(params)
-{ }
 
+constexpr static const S3BinaryCacheStoreConfigT<config::SettingInfo> s3BinaryCacheStoreConfigDescriptions = {
+    .profile{
+        .name = "profile",
+        .description = R"(
+          The name of the AWS configuration profile to use. By default
+          Nix will use the `default` profile.
+        )",
+    },
+    .region{
+        .name = "region",
+        .description = R"(
+          The region of the S3 bucket. If your bucket is not in
+          `us–east-1`, you should always explicitly specify the region
+          parameter.
+        )",
+    },
+    .scheme{
+        .name = "scheme",
+        .description = R"(
+          The scheme used for S3 requests, `https` (default) or `http`. This
+          option allows you to disable HTTPS for binary caches which don't
+          support it.
 
-S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
-    std::string_view uriScheme,
-    std::string_view bucketName,
-    const Params & params)
-    : StoreConfig(params)
-    , BinaryCacheStoreConfig(params)
-    , bucketName(bucketName)
+          > **Note**
+          >
+          > HTTPS should be used if the cache might contain sensitive
+          > information.
+        )",
+    },
+    .endpoint{
+        .name = "endpoint",
+        .description = R"(
+          The URL of the endpoint of an S3-compatible service such as MinIO.
+          Do not specify this setting if you're using Amazon S3.
+
+          > **Note**
+          >
+          > This endpoint must support HTTPS and will use path-based
+          > addressing instead of virtual host based addressing.
+        )",
+    },
+    .narinfoCompression{
+        .name = "narinfo-compression",
+        .description = "Compression method for `.narinfo` files.",
+    },
+    .lsCompression{
+        .name = "ls-compression",
+        .description = "Compression method for `.ls` files.",
+    },
+    .logCompression{
+        .name = "log-compression",
+        .description = R"(
+          Compression method for `log/*` files. It is recommended to
+          use a compression method supported by most web browsers
+          (e.g. `brotli`).
+        )",
+    },
+    .multipartUpload{
+        .name = "multipart-upload",
+        .description = "Whether to use multi-part uploads.",
+    },
+    .bufferSize{
+        .name = "buffer-size",
+        .description = "Size (in bytes) of each part in multi-part uploads.",
+    },
+};
+
+#define S3_BINARY_CACHE_STORE_CONFIG_FIELDS(X) \
+    X(profile), \
+    X(region), \
+    X(scheme), \
+    X(endpoint), \
+    X(narinfoCompression), \
+    X(lsCompression), \
+    X(logCompression), \
+    X(multipartUpload), \
+    X(bufferSize),
+
+MAKE_PARSE(S3BinaryCacheStoreConfig, s3BinaryCacheStoreConfig, S3_BINARY_CACHE_STORE_CONFIG_FIELDS)
+
+static S3BinaryCacheStoreConfigT<config::PlainValue> s3BinaryCacheStoreConfigDefaults()
 {
-    // Don't want to use use AWS SDK in header, so we check the default
-    // here. TODO do this better after we overhaul the store settings
-    // system.
-    assert(std::string{defaultRegion} == std::string{Aws::Region::US_EAST_1});
-
-    if (bucketName.empty())
-        throw UsageError("`%s` store requires a bucket name in its Store URI", uriScheme);
+    return {
+        .profile = {""},
+        .region = {Aws::Region::US_EAST_1},
+        .scheme = {""},
+        .endpoint = {""},
+        .narinfoCompression = {""},
+        .lsCompression = {""},
+        .logCompression = {""},
+        .multipartUpload = {false},
+        .bufferSize = {5 * 1024 * 1024},
+    };
 }
+
+MAKE_APPLY_PARSE(S3BinaryCacheStoreConfig, s3BinaryCacheStoreConfig, S3_BINARY_CACHE_STORE_CONFIG_FIELDS)
+
+config::SettingDescriptionMap S3BinaryCacheStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(BinaryCacheStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = s3BinaryCacheStoreConfigDescriptions;
+        auto defaults = s3BinaryCacheStoreConfigDefaults();
+        ret.merge(decltype(ret){
+            S3_BINARY_CACHE_STORE_CONFIG_FIELDS(DESCRIBE_ROW)
+        });
+    }
+    return ret;
+}
+
+S3BinaryCacheStore::Config::S3BinaryCacheStoreConfig(
+    std::string_view scheme,
+    std::string_view authority,
+    const StoreReference::Params & params)
+    : Store::Config{params}
+    , BinaryCacheStore::Config{*this, params}
+    , S3BinaryCacheStoreConfigT<config::PlainValue>{s3BinaryCacheStoreConfigApplyParse(params)}
+    , bucketName{authority}
+{
+    if (bucketName.empty())
+        throw UsageError("`%s` store requires a bucket name in its Store URI", scheme);
+}
+
+
+S3BinaryCacheStore::S3BinaryCacheStore(ref<const Config> config)
+    : BinaryCacheStore(*config)
+    , config{config}
+{ }
 
 std::string S3BinaryCacheStoreConfig::doc()
 {
@@ -266,40 +375,39 @@ std::string S3BinaryCacheStoreConfig::doc()
 }
 
 
-struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual S3BinaryCacheStore
+struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
 {
     Stats stats;
 
     S3Helper s3Helper;
 
-    S3BinaryCacheStoreImpl(
-        std::string_view uriScheme,
-        std::string_view bucketName,
-        const Params & params)
-        : StoreConfig(params)
-        , BinaryCacheStoreConfig(params)
-        , S3BinaryCacheStoreConfig(uriScheme, bucketName, params)
-        , Store(params)
-        , BinaryCacheStore(params)
-        , S3BinaryCacheStore(params)
-        , s3Helper(profile, region, scheme, endpoint)
+    S3BinaryCacheStoreImpl(ref<const Config> config)
+        : Store{*config}
+        , BinaryCacheStore{*config}
+        , S3BinaryCacheStore{config}
+        , s3Helper(config->profile, config->region, config->scheme, config->endpoint)
     {
         diskCache = getNarInfoDiskCache();
+
+        init();
     }
 
     std::string getUri() override
     {
-        return "s3://" + bucketName;
+        return "s3://" + config->bucketName;
     }
 
     void init() override
     {
         if (auto cacheInfo = diskCache->upToDateCacheExists(getUri())) {
-            wantMassQuery.setDefault(cacheInfo->wantMassQuery);
-            priority.setDefault(cacheInfo->priority);
+            resolvedSubstConfig.wantMassQuery.value =
+                config->storeConfig.wantMassQuery.optValue.value_or(cacheInfo->wantMassQuery);
+            resolvedSubstConfig.priority.value =
+                config->storeConfig.priority.optValue.value_or(cacheInfo->priority);
         } else {
             BinaryCacheStore::init();
-            diskCache->createCache(getUri(), storeDir, wantMassQuery, priority);
+            diskCache->createCache(
+                getUri(), config->storeDir, resolvedSubstConfig.wantMassQuery, resolvedSubstConfig.priority);
         }
     }
 
@@ -328,7 +436,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
         auto res = s3Helper.client->HeadObject(
             Aws::S3::Model::HeadObjectRequest()
-            .WithBucket(bucketName)
+            .WithBucket(config->bucketName)
             .WithKey(path));
 
         if (!res.IsSuccess()) {
@@ -372,7 +480,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         const std::string & mimeType,
         const std::string & contentEncoding)
     {
-        std::string uri = "s3://" + bucketName + "/" + path;
+        std::string uri = "s3://" + config->bucketName + "/" + path;
         Activity act(*logger, lvlTalkative, actFileTransfer,
             fmt("uploading '%s'", uri),
             Logger::Fields{uri}, getCurActivity());
@@ -387,11 +495,11 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
         std::call_once(transferManagerCreated, [&]()
         {
-            if (multipartUpload) {
+            if (config->multipartUpload) {
                 TransferManagerConfiguration transferConfig(executor.get());
 
                 transferConfig.s3Client = s3Helper.client;
-                transferConfig.bufferSize = bufferSize;
+                transferConfig.bufferSize = config->bufferSize;
 
                 transferConfig.uploadProgressCallback =
                     [](const TransferManager * transferManager,
@@ -420,6 +528,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         });
 
         auto now1 = std::chrono::steady_clock::now();
+
+        auto & bucketName = config->bucketName;
 
         if (transferManager) {
 
@@ -508,12 +618,12 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
             return std::make_shared<std::stringstream>(std::move(compressed));
         };
 
-        if (narinfoCompression != "" && hasSuffix(path, ".narinfo"))
-            uploadFile(path, compress(narinfoCompression), mimeType, narinfoCompression);
-        else if (lsCompression != "" && hasSuffix(path, ".ls"))
-            uploadFile(path, compress(lsCompression), mimeType, lsCompression);
-        else if (logCompression != "" && hasPrefix(path, "log/"))
-            uploadFile(path, compress(logCompression), mimeType, logCompression);
+        if (config->narinfoCompression != "" && hasSuffix(path, ".narinfo"))
+            uploadFile(path, compress(config->narinfoCompression), mimeType, config->narinfoCompression);
+        else if (config->lsCompression != "" && hasSuffix(path, ".ls"))
+            uploadFile(path, compress(config->lsCompression), mimeType, config->lsCompression);
+        else if (config->logCompression != "" && hasPrefix(path, "log/"))
+            uploadFile(path, compress(config->logCompression), mimeType, config->logCompression);
         else
             uploadFile(path, istream, mimeType, "");
     }
@@ -523,14 +633,14 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         stats.get++;
 
         // FIXME: stream output to sink.
-        auto res = s3Helper.getObject(bucketName, path);
+        auto res = s3Helper.getObject(config->bucketName, path);
 
         stats.getBytes += res.data ? res.data->size() : 0;
         stats.getTimeMs += res.durationMs;
 
         if (res.data) {
             printTalkative("downloaded 's3://%s/%s' (%d bytes) in %d ms",
-                bucketName, path, res.data->size(), res.durationMs);
+                config->bucketName, path, res.data->size(), res.durationMs);
 
             sink(*res.data);
         } else
@@ -541,6 +651,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     {
         StorePathSet paths;
         std::string marker;
+
+        auto & bucketName = config->bucketName;
 
         do {
             debug("listing bucket 's3://%s' from key '%s'...", bucketName, marker);
@@ -580,7 +692,12 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     }
 };
 
-static RegisterStoreImplementation<S3BinaryCacheStoreImpl, S3BinaryCacheStoreConfig> regS3BinaryCacheStore;
+ref<Store> S3BinaryCacheStoreImpl::Config::openStore() const
+{
+    return make_ref<S3BinaryCacheStoreImpl>(ref{shared_from_this()});
+}
+
+static RegisterStoreImplementation<S3BinaryCacheStoreImpl::Config> regS3BinaryCacheStore;
 
 }
 
