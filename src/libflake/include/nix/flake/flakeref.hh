@@ -72,6 +72,12 @@ struct FlakeRef
         const fetchers::Attrs & attrs);
 
     std::pair<ref<SourceAccessor>, FlakeRef> lazyFetch(ref<Store> store) const;
+
+    /**
+     * Canonicalize a flakeref for the purpose of comparing "old" and
+     * "new" `original` fields in lock files.
+     */
+    FlakeRef canonicalize() const;
 };
 
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);

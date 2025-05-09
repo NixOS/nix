@@ -32,6 +32,7 @@ suites += {
     'symlink-paths.sh',
     'debugger.sh',
     'source-paths.sh',
+    'old-lockfiles.sh',
   ],
   'workdir': meson.current_source_dir(),
 }
