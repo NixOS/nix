@@ -61,6 +61,15 @@ json printValueAsJSON(EvalState & state, bool strict,
                     try {
                         out.emplace(state.symbols[a->name], printValueAsJSON(state, strict, *a->value, a->pos, context, copyToStore));
                     } catch (Error & e) {
+
+                        bool isEvalError = dynamic_cast<EvalError *>(&e);
+                        bool isFileNotFoundError = dynamic_cast<FileNotFound *>(&e);
+                        // Restrict replaceEvalErrors only only evaluation errors
+                        if (state.settings.replaceEvalErrors && (isEvalError || isFileNotFoundError)) {
+                            out.emplace(state.symbols[a->name], "«evaluation error»");
+                            continue;
+                        }
+
                         e.addTrace(state.positions[a->pos],
                             HintFmt("while evaluating attribute '%1%'", state.symbols[a->name]));
                         throw;

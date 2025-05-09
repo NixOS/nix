@@ -53,6 +53,13 @@ struct EvalSettings : Config
 
     std::vector<PrimOp> extraPrimOps;
 
+    Setting<bool> replaceEvalErrors{
+        this, false, "replace-eval-errors",
+        R"(
+          If set to `true`, the Nix evaluator will replace evaluation errors
+          with a fixed value.
+        )"};
+
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation", R"(
         Enable built-in functions that allow executing native code.
 
