@@ -26,6 +26,7 @@ jobs:
       extra-commands-early: |
         echo ${{ inputs.version }} > .version-determinate
         git add .version-determinate
+        git commit -m "Set .version-determinate to ${{ inputs.version }}" || true
         ./.github/release-notes.sh
         git add doc
-        git commit -m "Set .version-determinate to ${{ inputs.version }}" || true
+        git commit -m "Generare release notes for ${{ inputs.version }}" || true
