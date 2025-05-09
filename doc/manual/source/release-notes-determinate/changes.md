@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.28 and Determinate Nix 3.5.0.<!-- differences -->
+This section lists the differences between upstream Nix 2.28 and Determinate Nix 3.5.1.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -19,3 +19,7 @@ This section lists the differences between upstream Nix 2.28 and Determinate Nix
 <!-- Determinate Nix version 3.4.2 -->
 
 <!-- Determinate Nix version 3.5.0 -->
+
+<!-- Determinate Nix version 3.5.1 -->
+
+* Dispatch release notes with a gh token by @grahamc in [DeterminateSystems/nix-src#61](https://github.com/DeterminateSystems/nix-src/pull/61)
