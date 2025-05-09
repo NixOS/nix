@@ -6,33 +6,29 @@
 
 namespace nix {
 
-void builtinFetchurl(
-    const BasicDerivation & drv,
-    const std::map<std::string, Path> & outputs,
-    const std::string & netrcData,
-    const std::string & caFileData)
+static void builtinFetchurl(const BuiltinBuilderContext & ctx)
 {
     /* Make the host's netrc data available. Too bad curl requires
        this to be stored in a file. It would be nice if we could just
        pass a pointer to the data. */
-    if (netrcData != "") {
+    if (ctx.netrcData != "") {
         settings.netrcFile = "netrc";
-        writeFile(settings.netrcFile, netrcData, 0600);
+        writeFile(settings.netrcFile, ctx.netrcData, 0600);
     }
 
     settings.caFile = "ca-certificates.crt";
-    writeFile(settings.caFile, caFileData, 0600);
+    writeFile(settings.caFile, ctx.caFileData, 0600);
 
-    auto out = get(drv.outputs, "out");
+    auto out = get(ctx.drv.outputs, "out");
     if (!out)
         throw Error("'builtin:fetchurl' requires an 'out' output");
 
-    if (!(drv.type().isFixed() || drv.type().isImpure()))
+    if (!(ctx.drv.type().isFixed() || ctx.drv.type().isImpure()))
         throw Error("'builtin:fetchurl' must be a fixed-output or impure derivation");
 
-    auto storePath = outputs.at("out");
-    auto mainUrl = drv.env.at("url");
-    bool unpack = getOr(drv.env, "unpack", "") == "1";
+    auto storePath = ctx.outputs.at("out");
+    auto mainUrl = ctx.drv.env.at("url");
+    bool unpack = getOr(ctx.drv.env, "unpack", "") == "1";
 
     /* Note: have to use a fresh fileTransfer here because we're in
        a forked process. */
@@ -56,8 +52,8 @@ void builtinFetchurl(
         else
             writeFile(storePath, *source);
 
-        auto executable = drv.env.find("executable");
-        if (executable != drv.env.end() && executable->second == "1") {
+        auto executable = ctx.drv.env.find("executable");
+        if (executable != ctx.drv.env.end() && executable->second == "1") {
             if (chmod(storePath.c_str(), 0755) == -1)
                 throw SysError("making '%1%' executable", storePath);
         }
@@ -78,5 +74,7 @@ void builtinFetchurl(
     /* Otherwise try the specified URL. */
     fetch(mainUrl);
 }
+
+static RegisterBuiltinBuilder registerFetchurl("fetchurl", builtinFetchurl);
 
 }
