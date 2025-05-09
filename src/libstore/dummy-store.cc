@@ -3,7 +3,7 @@
 
 namespace nix {
 
-struct DummyStoreConfig : virtual StoreConfig {
+struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>, virtual StoreConfig {
     using StoreConfig::StoreConfig;
 
     DummyStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
@@ -13,9 +13,9 @@ struct DummyStoreConfig : virtual StoreConfig {
             throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
     }
 
-    const std::string name() override { return "Dummy Store"; }
+    static const std::string name() { return "Dummy Store"; }
 
-    std::string doc() override
+    static std::string doc()
     {
         return
           #include "dummy-store.md"
@@ -25,23 +25,24 @@ struct DummyStoreConfig : virtual StoreConfig {
     static StringSet uriSchemes() {
         return {"dummy"};
     }
+
+    ref<Store> openStore() const override;
 };
 
-struct DummyStore : public virtual DummyStoreConfig, public virtual Store
+struct DummyStore : virtual Store
 {
-    DummyStore(std::string_view scheme, std::string_view authority, const Params & params)
-        : StoreConfig(params)
-        , DummyStoreConfig(scheme, authority, params)
-        , Store(params)
-    { }
+    using Config = DummyStoreConfig;
 
-    DummyStore(const Params & params)
-        : DummyStore("dummy", "", params)
+    ref<const Config> config;
+
+    DummyStore(ref<const Config> config)
+        : Store{*config}
+        , config(config)
     { }
 
     std::string getUri() override
     {
-        return *uriSchemes().begin();
+        return *Config::uriSchemes().begin();
     }
 
     void queryPathInfoUncached(const StorePath & path,
@@ -88,6 +89,11 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
     }
 };
 
-static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regDummyStore;
+ref<Store> DummyStore::Config::openStore() const
+{
+    return make_ref<DummyStore>(ref{shared_from_this()});
+}
+
+static RegisterStoreImplementation<DummyStore::Config> regDummyStore;
 
 }

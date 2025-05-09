@@ -35,14 +35,16 @@ struct RemoteStoreConfig : virtual StoreConfig
  * \todo RemoteStore is a misnomer - should be something like
  * DaemonStore.
  */
-class RemoteStore : public virtual RemoteStoreConfig,
+struct RemoteStore :
     public virtual Store,
     public virtual GcStore,
     public virtual LogStore
 {
-public:
+    using Config = RemoteStoreConfig;
 
-    RemoteStore(const Params & params);
+    const Config & config;
+
+    RemoteStore(const Config & config);
 
     /* Implementations of abstract store API methods. */
 

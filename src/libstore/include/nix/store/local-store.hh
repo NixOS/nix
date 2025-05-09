@@ -34,7 +34,7 @@ struct OptimiseStats
     uint64_t bytesFreed = 0;
 };
 
-struct LocalStoreConfig : virtual LocalFSStoreConfig
+struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>, virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
 
@@ -65,18 +65,26 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
           > While the filesystem the database resides on might appear to be read-only, consider whether another user or system might have write access to it.
         )"};
 
-    const std::string name() override { return "Local Store"; }
+    static const std::string name() { return "Local Store"; }
 
     static StringSet uriSchemes()
     { return {"local"}; }
 
-    std::string doc() override;
+    static std::string doc();
+
+    ref<Store> openStore() const override;
 };
 
-class LocalStore : public virtual LocalStoreConfig
-    , public virtual IndirectRootStore
-    , public virtual GcStore
+class LocalStore :
+    public virtual IndirectRootStore,
+    public virtual GcStore
 {
+public:
+
+    using Config = LocalStoreConfig;
+
+    ref<const LocalStoreConfig> config;
+
 private:
 
     /**
@@ -144,11 +152,7 @@ public:
      * Initialise the local store, upgrading the schema if
      * necessary.
      */
-    LocalStore(const Params & params);
-    LocalStore(
-        std::string_view scheme,
-        PathView path,
-        const Params & params);
+    LocalStore(ref<const Config> params);
 
     ~LocalStore();
 
