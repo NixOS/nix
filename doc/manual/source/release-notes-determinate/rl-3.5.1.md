@@ -3,8 +3,7 @@
 * Based on [upstream Nix 2.28.3](../release-notes/rl-2.28.md).
 
 ## What's Changed
-* Deprecate upgrade-nix command by @gustavderdrache in [DeterminateSystems/nix-src#55](https://github.com/DeterminateSystems/nix-src/pull/55)
-* Update flake.lock in light of recent change by @lucperkins in [DeterminateSystems/nix-src#54](https://github.com/DeterminateSystems/nix-src/pull/54)
+* Deprecate upgrade-nix command in favor of `determinate-nixd upgrade`, by @gustavderdrache in [DeterminateSystems/nix-src#55](https://github.com/DeterminateSystems/nix-src/pull/55)
 * Lazy trees v2 by @edolstra in [DeterminateSystems/nix-src#27](https://github.com/DeterminateSystems/nix-src/pull/27)
 * Improve lazy trees backward compatibility by @edolstra in [DeterminateSystems/nix-src#56](https://github.com/DeterminateSystems/nix-src/pull/56)
 * Canonicalize flake input URLs before checking flake.lock file staleness, for dealing with `dir` in URL-style flakerefs by @edolstra in [DeterminateSystems/nix-src#57](https://github.com/DeterminateSystems/nix-src/pull/57)

@@ -22,7 +22,7 @@ This section lists the differences between upstream Nix 2.28 and Determinate Nix
 
 <!-- Determinate Nix version 3.5.1 -->
 
-* Deprecate upgrade-nix command by @gustavderdrache in [DeterminateSystems/nix-src#55](https://github.com/DeterminateSystems/nix-src/pull/55)
+* Deprecate upgrade-nix command in favor of `determinate-nixd upgrade`, by @gustavderdrache in [DeterminateSystems/nix-src#55](https://github.com/DeterminateSystems/nix-src/pull/55)
 
 * Lazy trees v2 by @edolstra in [DeterminateSystems/nix-src#27](https://github.com/DeterminateSystems/nix-src/pull/27)
 
@@ -30,4 +30,4 @@ This section lists the differences between upstream Nix 2.28 and Determinate Nix
 
 * Canonicalize flake input URLs before checking flake.lock file staleness, for dealing with `dir` in URL-style flakerefs by @edolstra in [DeterminateSystems/nix-src#57](https://github.com/DeterminateSystems/nix-src/pull/57)
 
-* Improve build failure error messages by @edolstra in [DeterminateSystems/nix-src#58](https://github.com/DeterminateSystems/nix-src/pull/58)
+* Improved the build failure and dependency failure error messages to include output paths, by @edolstra in [DeterminateSystems/nix-src#58](https://github.com/DeterminateSystems/nix-src/pull/58)
