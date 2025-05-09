@@ -24,7 +24,7 @@ gh api "/repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
 trim_trailing_newlines() {
     local text
     text="$(cat)"
-    echo -n "${text//$'\n'}"
+    echo -n "${text}"
 }
 
 linkify_gh() {
