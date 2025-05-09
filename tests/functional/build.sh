@@ -179,12 +179,14 @@ test "$(<<<"$out" grep -cE '^error:')" = 4
 out="$(nix build -f fod-failing.nix -L x4 2>&1)" && status=0 || status=$?
 test "$status" = 1
 test "$(<<<"$out" grep -cE '^error:')" = 2
-<<<"$out" grepQuiet -E "error: 1 dependencies of derivation '.*-x4\\.drv' failed to build"
+<<<"$out" grepQuiet -E "error: Cannot build '.*-x4\\.drv'"
+<<<"$out" grepQuiet -E "Reason: 1 dependency failed."
 <<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x2\\.drv'"
 
 out="$(nix build -f fod-failing.nix -L x4 --keep-going 2>&1)" && status=0 || status=$?
 test "$status" = 1
 test "$(<<<"$out" grep -cE '^error:')" = 3
-<<<"$out" grepQuiet -E "error: 2 dependencies of derivation '.*-x4\\.drv' failed to build"
+<<<"$out" grepQuiet -E "error: Cannot build '.*-x4\\.drv'"
+<<<"$out" grepQuiet -E "Reason: 2 dependencies failed."
 <<<"$out" grepQuiet -vE "hash mismatch in fixed-output derivation '.*-x3\\.drv'"
 <<<"$out" grepQuiet -vE "hash mismatch in fixed-output derivation '.*-x2\\.drv'"
