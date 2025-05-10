@@ -30,6 +30,8 @@ $ curl -L https://nixos.org/nix/install | sh -s -- --daemon
 
 > Single-user is not supported on Mac.
 
+> `warning: installing Nix as root is not supported by this script!`
+
 This installation has less requirements than the multi-user install, however it
 cannot offer equivalent sharing, isolation, or security.
 
