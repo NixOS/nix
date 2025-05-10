@@ -1066,6 +1066,26 @@ public:
         // Don't document the machine-specific default value
         false};
 
+    Setting<Path> clientCertFile{
+        this,
+        "",
+        "client-ssl-cert-file",
+        R"(
+          The path of a file containing a client TLS certificate used
+          to authenticate Nix to servers when using `https://`
+          downloads.
+        )"};
+
+    Setting<Path> clientKeyFile{
+        this,
+        "",
+        "client-ssl-key-file",
+        R"(
+          The path of a file containing a client TLS private key used
+          to authenticate Nix to servers when using `https://`
+          downloads.
+        )",};
+
 #ifdef __linux__
     Setting<bool> filterSyscalls{
         this, true, "filter-syscalls",

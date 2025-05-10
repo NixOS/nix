@@ -393,6 +393,11 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
             }
 
+            if (settings.clientCertFile != "" && settings.clientKeyFile != "") {
+              curl_easy_setopt(req, CURLOPT_SSLCERT, settings.clientCertFile.get().c_str());
+              curl_easy_setopt(req, CURLOPT_SSLKEY, settings.clientKeyFile.get().c_str());
+            }
+
             #if !defined(_WIN32) && LIBCURL_VERSION_NUM >= 0x071000
             curl_easy_setopt(req, CURLOPT_SOCKOPTFUNCTION, cloexec_callback);
             #endif
