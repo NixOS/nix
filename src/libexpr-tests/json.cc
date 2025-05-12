@@ -9,7 +9,7 @@ namespace nix {
             std::string getJSONValue(Value& value) {
                 std::stringstream ss;
                 NixStringContext ps;
-                printValueAsJSON(state, true, value, noPos, ss, ps);
+                printValueAsJSON(state, true, false, value, noPos, ss, ps);
                 return ss.str();
             }
     };

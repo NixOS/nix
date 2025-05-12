@@ -35,6 +35,23 @@ nix-instantiate --eval -E 'assert 1 + 2 == 3; true'
 [[ $(nix-instantiate -A int --eval - < "./eval.nix") == 123 ]]
 [[ "$(nix-instantiate --eval -E '{"assert"=1;bar=2;}')" == '{ "assert" = 1; bar = 2; }' ]]
 
+expected="$(echo '{
+"missingAttr":"«evaluation error»",
+"insideAList":["«evaluation error»"],
+"deeper":{v:"«evaluation error»"},
+"failedAssertion":"«evaluation error»",
+"missingFile":"«evaluation error»",
+"missingImport":"«evaluation error»",
+"outOfBounds":"«evaluation error»",
+"failedCoersion":"«evaluation error»",
+"failedAddition":"«evaluation error»"
+}' | tr -d '\n')"
+actual="$(nix-instantiate --eval --json --strict --replace-eval-errors "./replace-eval-errors.nix")"
+[[ $actual == "$expected" ]] || diff --unified <(echo "$actual") <(echo "$expected") >&2
+
+actual="$(nix eval --json --replace-eval-errors -f "./replace-eval-errors.nix")"
+[[ $actual == "$expected" ]] || diff --unified <(echo "$actual") <(echo "$expected") >&2
+
 # Check that symlink cycles don't cause a hang.
 ln -sfn cycle.nix "$TEST_ROOT/cycle.nix"
 (! nix eval --file "$TEST_ROOT/cycle.nix")

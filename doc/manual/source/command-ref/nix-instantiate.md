@@ -112,6 +112,11 @@ standard input.
   When used with `--eval`, print the resulting value as an JSON
   representation of the abstract syntax tree rather than as a Nix expression.
 
+- `--replace-eval-errors`
+
+  When used with `--eval` and `--json`, replace any evaluation errors with the string
+  `"«evaluation error»"`.
+
 - `--xml`
 
   When used with `--eval`, print the resulting value as an XML
@@ -204,4 +209,11 @@ $ nix-instantiate --eval --xml --strict --expr '{ x = {}; }'
     </attr>
   </attrs>
 </expr>
+```
+
+Replacing evaluation errors:
+
+```console
+$ nix-instantiate --eval --json --replace-eval-errors --expr '{ a = throw "fail"; }'
+{"a":"«evaluation error»"}
 ```
