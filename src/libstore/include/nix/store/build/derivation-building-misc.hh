@@ -9,6 +9,7 @@
 namespace nix {
 
 class Store;
+struct Derivation;
 
 /**
  * Unless we are repairing, we don't both to test validity and just assume it,
@@ -48,5 +49,10 @@ struct InitialOutput
 };
 
 void runPostBuildHook(Store & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
+
+/**
+ * Format the known outputs of a derivation for use in error messages.
+ */
+std::string showKnownOutputs(Store & store, const Derivation & drv);
 
 }

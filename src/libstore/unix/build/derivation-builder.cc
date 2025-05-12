@@ -585,9 +585,13 @@ std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> Derivation
 
             diskFull |= cleanupDecideWhetherDiskFull();
 
-            auto msg = fmt("builder for '%s' %s",
+            auto msg = fmt(
+                "Cannot build '%s'.\n"
+                "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
                 Magenta(store.printStorePath(drvPath)),
                 statusToString(status));
+
+            msg += showKnownOutputs(store, drv);
 
             miscMethods->appendLogTailErrorMsg(msg);
 
