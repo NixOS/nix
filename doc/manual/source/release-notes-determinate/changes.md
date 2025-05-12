@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.28 and Determinate Nix 3.5.1.<!-- differences -->
+This section lists the differences between upstream Nix 2.28 and Determinate Nix 3.5.2.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -25,3 +25,9 @@ This section lists the differences between upstream Nix 2.28 and Determinate Nix
 * `nix upgrade-nix` is now inert, and suggests using `determinate-nixd upgrade` -- [DeterminateSystems/nix-src#55](https://github.com/DeterminateSystems/nix-src/pull/55)
 
 * Initial Lazy Trees support has been merged, but remains off by default. ([DeterminateSystems/nix-src#27](https://github.com/DeterminateSystems/nix-src/pull/27), [DeterminateSystems/nix-src#56](https://github.com/DeterminateSystems/nix-src/pull/56))
+
+<!-- Determinate Nix version 3.5.2 -->
+
+* Fix emitting narHash in lock files when lazy trees are disabled by @edolstra in [DeterminateSystems/nix-src#63](https://github.com/DeterminateSystems/nix-src/pull/63)
+
+* Improve 'cannot read file from tarball' error by @edolstra in [DeterminateSystems/nix-src#64](https://github.com/DeterminateSystems/nix-src/pull/64)
