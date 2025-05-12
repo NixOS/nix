@@ -595,7 +595,7 @@ LockedFlake lockFlake(
                                 oldLock = *oldLock3;
 
                     if (oldLock
-                        && oldLock->originalRef == *input.ref
+                        && oldLock->originalRef.canonicalize() == input.ref->canonicalize()
                         && oldLock->parentInputAttrPath == overridenParentPath
                         && !hasCliOverride)
                     {
