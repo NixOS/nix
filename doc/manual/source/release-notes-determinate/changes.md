@@ -28,6 +28,4 @@ This section lists the differences between upstream Nix 2.28 and Determinate Nix
 
 <!-- Determinate Nix version 3.5.2 -->
 
-* Fix emitting narHash in lock files when lazy trees are disabled by @edolstra in [DeterminateSystems/nix-src#63](https://github.com/DeterminateSystems/nix-src/pull/63)
-
-* Improve 'cannot read file from tarball' error by @edolstra in [DeterminateSystems/nix-src#64](https://github.com/DeterminateSystems/nix-src/pull/64)
+* Tell users a source is corrupted ("cannot read file from tarball: Truncated tar archive detected while reading data"), improving over the previous 'cannot read file from tarball' error by @edolstra in [DeterminateSystems/nix-src#64](https://github.com/DeterminateSystems/nix-src/pull/64)
