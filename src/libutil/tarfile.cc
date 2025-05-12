@@ -219,7 +219,7 @@ time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & 
                     std::vector<unsigned char> buf(128 * 1024);
                     auto n = archive_read_data(archive.archive, buf.data(), buf.size());
                     if (n < 0)
-                        throw Error("cannot read file '%s' from tarball", path);
+                        checkLibArchive(archive.archive, n, "cannot read file from tarball: %s");
                     if (n == 0)
                         break;
                     crf(std::string_view{
