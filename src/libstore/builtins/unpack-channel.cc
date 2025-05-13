@@ -3,17 +3,15 @@
 
 namespace nix {
 
-void builtinUnpackChannel(
-    const BasicDerivation & drv,
-    const std::map<std::string, Path> & outputs)
+static void builtinUnpackChannel(const BuiltinBuilderContext & ctx)
 {
     auto getAttr = [&](const std::string & name) -> const std::string & {
-        auto i = drv.env.find(name);
-        if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
+        auto i = ctx.drv.env.find(name);
+        if (i == ctx.drv.env.end()) throw Error("attribute '%s' missing", name);
         return i->second;
     };
 
-    std::filesystem::path out{outputs.at("out")};
+    std::filesystem::path out{ctx.outputs.at("out")};
     auto & channelName = getAttr("channelName");
     auto & src = getAttr("src");
 
@@ -41,5 +39,7 @@ void builtinUnpackChannel(
         throw SysError("failed to rename %1% to %2%", fileName, target.string());
     }
 }
+
+static RegisterBuiltinBuilder registerUnpackChannel("unpack-channel", builtinUnpackChannel);
 
 }
