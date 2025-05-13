@@ -69,6 +69,8 @@ git -C "$rootFlake" add flake.nix sub2/flake.nix
 git -C "$rootFlake" add sub2/flake.lock
 [[ $(nix eval "$subflake2#y") = 15 ]]
 
+[[ $(jq --indent 0 . < "$subflake2/flake.lock") =~ ^'{"nodes":{"root":{"inputs":{"root":"root_2","sub1":"sub1"}},"root_2":{"inputs":{"sub0":"sub0"},"locked":{"path":"..","type":"path"},"original":{"path":"..","type":"path"},"parent":[]},"root_3":{"inputs":{"sub0":"sub0_2"},"locked":{"path":"../","type":"path"},"original":{"path":"../","type":"path"},"parent":["sub1"]},"sub0":{"locked":{"path":"sub0","type":"path"},"original":{"path":"sub0","type":"path"},"parent":["root"]},"sub0_2":{"locked":{"path":"sub0","type":"path"},"original":{"path":"sub0","type":"path"},"parent":["sub1","root"]},"sub1":{"inputs":{"root":"root_3"},"locked":{"path":"../sub1","type":"path"},"original":{"path":"../sub1","type":"path"},"parent":[]}},"root":"root","version":7}'$ ]]
+
 # Make sure there are no content locks for relative path flakes.
 (! grep "$TEST_ROOT" "$subflake2/flake.lock")
 if ! isTestOnNixOS; then
