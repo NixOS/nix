@@ -33,11 +33,6 @@ void runPostBuildHook(
  */
 struct DerivationGoal : public Goal
 {
-    /**
-     * Whether to use an on-disk .drv file.
-     */
-    bool useDerivation;
-
     /** The path of the derivation. */
     StorePath drvPath;
 
@@ -166,7 +161,7 @@ struct DerivationGoal : public Goal
     /**
      * The states.
      */
-    Co init();
+    Co loadDerivation();
     Co haveDerivation();
     Co gaveUpOnSubstitution();
     Co tryToBuild();
