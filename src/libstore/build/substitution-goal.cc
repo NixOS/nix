@@ -169,7 +169,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
 
     if (nrFailed > 0) {
         co_return done(
-            nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed,
+            nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed,
             BuildResult::DependencyFailed,
             fmt("some references of path '%s' could not be realised", worker.store.printStorePath(storePath)));
     }

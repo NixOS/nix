@@ -61,7 +61,7 @@ private:
     Goals waitees;
 
 public:
-    typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure} ExitCode;
+    typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters} ExitCode;
 
     /**
      * Backlink to the worker.
@@ -84,12 +84,6 @@ public:
      * failed because there are no substituters.
      */
     size_t nrNoSubstituters = 0;
-
-    /**
-     * Number of substitution goals we are/were waiting for that
-     * failed because they had unsubstitutable references.
-     */
-    size_t nrIncompleteClosure = 0;
 
     /**
      * Name of this goal for debugging purposes.

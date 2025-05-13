@@ -74,32 +74,6 @@ struct DerivationGoal : public Goal
     NeedRestartForMoreOutputs needRestart = NeedRestartForMoreOutputs::OutputsUnmodifedDontNeed;
 
     /**
-     * See `retrySubstitution`; just for that field.
-     */
-    enum RetrySubstitution {
-        /**
-         * No issues have yet arose, no need to restart.
-         */
-        NoNeed,
-        /**
-         * Something failed and there is an incomplete closure. Let's retry
-         * substituting.
-         */
-        YesNeed,
-        /**
-         * We are current or have already retried substitution, and whether or
-         * not something goes wrong we will not retry again.
-         */
-        AlreadyRetried,
-    };
-
-    /**
-     * Whether to retry substituting the outputs after building the
-     * inputs. This is done in case of an incomplete closure.
-     */
-    RetrySubstitution retrySubstitution = RetrySubstitution::NoNeed;
-
-    /**
      * The derivation stored at drvPath.
      */
     std::unique_ptr<Derivation> drv;

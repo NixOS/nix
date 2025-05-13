@@ -285,40 +285,13 @@ Goal::Co DerivationGoal::haveDerivation()
 
     assert(!drv->type().isImpure());
 
-    if (nrFailed > 0 && nrFailed > nrNoSubstituters + nrIncompleteClosure && !settings.tryFallback) {
+    if (nrFailed > 0 && nrFailed > nrNoSubstituters && !settings.tryFallback) {
         co_return done(BuildResult::TransientFailure, {},
             Error("some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
                 worker.store.printStorePath(drvPath)));
     }
 
-    /*  If the substitutes form an incomplete closure, then we should
-        build the dependencies of this derivation, but after that, we
-        can still use the substitutes for this derivation itself.
-
-        If the nrIncompleteClosure != nrFailed, we have another issue as well.
-        In particular, it may be the case that the hole in the closure is
-        an output of the current derivation, which causes a loop if retried.
-     */
-    {
-        bool substitutionFailed =
-            nrIncompleteClosure > 0 &&
-            nrIncompleteClosure == nrFailed;
-        switch (retrySubstitution) {
-        case RetrySubstitution::NoNeed:
-            if (substitutionFailed)
-                retrySubstitution = RetrySubstitution::YesNeed;
-            break;
-        case RetrySubstitution::YesNeed:
-            // Should not be able to reach this state from here.
-            assert(false);
-            break;
-        case RetrySubstitution::AlreadyRetried:
-            debug("substitution failed again, but we already retried once. Not retrying again.");
-            break;
-        }
-    }
-
-    nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
+    nrFailed = nrNoSubstituters = 0;
 
     if (needRestart == NeedRestartForMoreOutputs::OutputsAddedDoNeed) {
         needRestart = NeedRestartForMoreOutputs::OutputsUnmodifedDontNeed;
@@ -454,11 +427,6 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
             nrFailed == 1 ? "dependency" : "dependencies");
         msg += showKnownOutputs(worker.store, *drv);
         co_return done(BuildResult::DependencyFailed, {}, Error(msg));
-    }
-
-    if (retrySubstitution == RetrySubstitution::YesNeed) {
-        retrySubstitution = RetrySubstitution::AlreadyRetried;
-        co_return haveDerivation();
     }
 
     /* Gather information necessary for computing the closure and/or
