@@ -12,7 +12,7 @@ DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(
     Worker & worker,
     RepairFlag repair,
     std::optional<ContentAddress> ca)
-    : Goal(worker)
+    : Goal(worker, init())
     , id(id)
 {
     name = fmt("substitution of '%s'", id.to_string());

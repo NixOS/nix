@@ -166,7 +166,7 @@ struct DerivationGoal : public Goal
     /**
      * The states.
      */
-    Co init() override;
+    Co init();
     Co haveDerivation();
     Co gaveUpOnSubstitution();
     Co tryToBuild();

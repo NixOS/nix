@@ -339,17 +339,6 @@ protected:
     std::optional<Co> top_co;
 
     /**
-     * The entry point for the goal
-     */
-    virtual Co init() = 0;
-
-    /**
-     * Wrapper around @ref init since virtual functions
-     * can't be used in constructors.
-     */
-    inline Co init_wrapper();
-
-    /**
      * Signals that the goal is done.
      * `co_return` the result. If you're not inside a coroutine, you can ignore
      * the return value safely.
@@ -376,8 +365,8 @@ public:
      */
     std::optional<Error> ex;
 
-    Goal(Worker & worker)
-        : worker(worker), top_co(init_wrapper())
+    Goal(Worker & worker, Co init)
+        : worker(worker), top_co(std::move(init))
     {
         // top_co shouldn't have a goal already, should be nullptr.
         assert(!top_co->handle.promise().goal);
@@ -440,7 +429,3 @@ template<typename... ArgTypes>
 struct std::coroutine_traits<nix::Goal::Co, ArgTypes...> {
     using promise_type = nix::Goal::promise_type;
 };
-
-nix::Goal::Co nix::Goal::init_wrapper() {
-    co_return init();
-}

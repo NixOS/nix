@@ -64,7 +64,7 @@ public:
     /**
      * The states.
      */
-    Co init() override;
+    Co init();
     Co gotInfo();
     Co tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool & substituterFailed);
     Co finished();
