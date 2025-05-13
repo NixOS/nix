@@ -15,6 +15,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/util/args.hh"
 #include "nix/util/git.hh"
+#include "nix/util/logging.hh"
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
 # include "nix/util/monitor-fd.hh"
@@ -1050,6 +1051,7 @@ void processConnection(
     if (!recursive) {
         prevLogger_ = std::move(logger);
         logger = std::move(tunnelLogger_);
+        applyJSONLogger();
     }
 
     unsigned int opCount = 0;
