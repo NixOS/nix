@@ -289,6 +289,55 @@ std::pair<ref<SourceAccessor>, FlakeRef> FlakeRef::lazyFetch(ref<Store> store) c
     return {accessor, FlakeRef(std::move(lockedInput), subdir)};
 }
 
+FlakeRef FlakeRef::canonicalize() const
+{
+    auto flakeRef(*this);
+
+    /* Backward compatibility hack: In old versions of Nix, if you had
+       a flake input like
+
+         inputs.foo.url = "git+https://foo/bar?dir=subdir";
+
+       it would result in a lock file entry like
+
+         "original": {
+           "dir": "subdir",
+           "type": "git",
+           "url": "https://foo/bar?dir=subdir"
+         }
+
+       New versions of Nix remove `?dir=subdir` from the `url` field,
+       since the subdirectory is intended for `FlakeRef`, not the
+       fetcher (and specifically the remote server), that is, the
+       flakeref is parsed into
+
+         "original": {
+           "dir": "subdir",
+           "type": "git",
+           "url": "https://foo/bar"
+         }
+
+       However, this causes new versions of Nix to consider the lock
+       file entry to be stale since the `original` ref no longer
+       matches exactly.
+
+       For this reason, we canonicalise the `original` ref by
+       filtering the `dir` query parameter from the URL. */
+    if (auto url = fetchers::maybeGetStrAttr(flakeRef.input.attrs, "url")) {
+        try {
+            auto parsed = parseURL(*url);
+            if (auto dir2 = get(parsed.query, "dir")) {
+                if (flakeRef.subdir != "" && flakeRef.subdir == *dir2)
+                    parsed.query.erase("dir");
+            }
+            flakeRef.input.attrs.insert_or_assign("url", parsed.to_string());
+        } catch (BadURL &) {
+        }
+    }
+
+    return flakeRef;
+}
+
 std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
