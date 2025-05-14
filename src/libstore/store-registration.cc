@@ -12,6 +12,13 @@ ref<Store> openStore(const std::string & uri, const Store::Config::Params & extr
 
 ref<Store> openStore(StoreReference && storeURI)
 {
+    auto store = resolveStoreConfig(std::move(storeURI))->openStore();
+    store->init();
+    return store;
+}
+
+ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
+{
     auto & params = storeURI.params;
 
     auto storeConfig = std::visit(
@@ -58,10 +65,7 @@ ref<Store> openStore(StoreReference && storeURI)
     experimentalFeatureSettings.require(storeConfig->experimentalFeature());
     storeConfig->warnUnknownSettings();
 
-    auto store = storeConfig->openStore();
-    store->init();
-
-    return store;
+    return storeConfig;
 }
 
 std::list<ref<Store>> getDefaultSubstituters()

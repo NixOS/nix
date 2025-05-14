@@ -16,6 +16,11 @@
 namespace nix {
 
 /**
+ * @return The store config denoted by `storeURI` (slight misnomer...).
+ */
+ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI);
+
+/**
  * @return a Store object to access the Nix store denoted by
  * ‘uri’ (slight misnomer...).
  */
