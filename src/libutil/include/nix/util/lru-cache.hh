@@ -11,7 +11,7 @@ namespace nix {
 /**
  * A simple least-recently used cache. Not thread-safe.
  */
-template<typename Key, typename Value>
+template<typename Key, typename Value, typename Compare = std::less<>>
 class LRUCache
 {
 private:
@@ -22,7 +22,7 @@ private:
     // and LRU.
     struct LRUIterator;
 
-    using Data = std::map<Key, std::pair<LRUIterator, Value>>;
+    using Data = std::map<Key, std::pair<LRUIterator, Value>, Compare>;
     using LRU = std::list<typename Data::iterator>;
 
     struct LRUIterator
@@ -43,7 +43,8 @@ public:
     /**
      * Insert or upsert an item in the cache.
      */
-    void upsert(const Key & key, const Value & value)
+    template<typename K>
+    void upsert(const K & key, const Value & value)
     {
         if (capacity == 0)
             return;
@@ -68,7 +69,8 @@ public:
         i->second.first.it = j;
     }
 
-    bool erase(const Key & key)
+    template<typename K>
+    bool erase(const K & key)
     {
         auto i = data.find(key);
         if (i == data.end())
@@ -82,7 +84,8 @@ public:
      * Look up an item in the cache. If it exists, it becomes the most
      * recently used item.
      * */
-    std::optional<Value> get(const Key & key)
+    template<typename K>
+    std::optional<Value> get(const K & key)
     {
         auto i = data.find(key);
         if (i == data.end())

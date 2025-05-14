@@ -541,7 +541,7 @@ bool Store::isValidPath(const StorePath & storePath)
 {
     {
         auto state_(state.lock());
-        auto res = state_->pathInfoCache.get(std::string(storePath.to_string()));
+        auto res = state_->pathInfoCache.get(storePath.to_string());
         if (res && res->isKnownNow()) {
             stats.narInfoReadAverted++;
             return res->didExist();
@@ -553,10 +553,15 @@ bool Store::isValidPath(const StorePath & storePath)
         if (res.first != NarInfoDiskCache::oUnknown) {
             stats.narInfoReadAverted++;
             auto state_(state.lock());
+<<<<<<< HEAD
             state_->pathInfoCache.upsert(
                 std::string(storePath.to_string()),
                 res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{}
                                                         : PathInfoCacheValue{.value = res.second});
+=======
+            state_->pathInfoCache.upsert(storePath.to_string(),
+                res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{} : PathInfoCacheValue { .value = res.second });
+>>>>>>> cd61e922f (libutil: Use heterogeneous lookup for LRUCache)
             return res.first == NarInfoDiskCache::oValid;
         }
     }
@@ -608,7 +613,7 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
     auto hashPart = std::string(storePath.hashPart());
 
     {
-        auto res = state.lock()->pathInfoCache.get(std::string(storePath.to_string()));
+        auto res = state.lock()->pathInfoCache.get(storePath.to_string());
         if (res && res->isKnownNow()) {
             stats.narInfoReadAverted++;
             if (res->didExist())
@@ -624,11 +629,18 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
             stats.narInfoReadAverted++;
             {
                 auto state_(state.lock());
+<<<<<<< HEAD
                 state_->pathInfoCache.upsert(
                     std::string(storePath.to_string()),
                     res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{}
                                                             : PathInfoCacheValue{.value = res.second});
                 if (res.first == NarInfoDiskCache::oInvalid || !goodStorePath(storePath, res.second->path))
+=======
+                state_->pathInfoCache.upsert(storePath.to_string(),
+                    res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{} : PathInfoCacheValue{ .value = res.second });
+                if (res.first == NarInfoDiskCache::oInvalid ||
+                    !goodStorePath(storePath, res.second->path))
+>>>>>>> cd61e922f (libutil: Use heterogeneous lookup for LRUCache)
                     return std::make_optional(nullptr);
             }
             assert(res.second);
@@ -668,7 +680,11 @@ void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidP
 
                 {
                     auto state_(state.lock());
+<<<<<<< HEAD
                     state_->pathInfoCache.upsert(std::string(storePath.to_string()), PathInfoCacheValue{.value = info});
+=======
+                    state_->pathInfoCache.upsert(storePath.to_string(), PathInfoCacheValue { .value = info });
+>>>>>>> cd61e922f (libutil: Use heterogeneous lookup for LRUCache)
                 }
 
                 if (!info || !goodStorePath(storePath, info->path)) {
