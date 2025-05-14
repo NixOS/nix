@@ -1,5 +1,37 @@
 # Release 2.29.0 (2025-05-14)
 
+- Prettified JSON output on the terminal [#12555](https://github.com/NixOS/nix/issues/12555) [#12652](https://github.com/NixOS/nix/pull/12652)
+
+  This makes the output easier to read.
+
+  Scripts are mostly unaffected because for those, stdout will be a file or a pipe, not a terminal, and for those, the old single-line behavior applies.
+
+  `--json --pretty` can be passed to enable it even if the output is not a terminal.
+  If your script creates a pseudoterminal for Nix's stdout, you can pass `--no-pretty` to disable the new behavior.
+
+- Repl: improve continuation prompt for incomplete expressions [#12846](https://github.com/NixOS/nix/pull/12846)
+
+  Improved REPL user experience by updating the continuation prompt from invisible blank spaces to a visible `" > "`, enhancing clarity when entering multi-line expressions.
+
+- REPL `:load-flake` and `:reload` now work together [#8753](https://github.com/NixOS/nix/issues/8753) [#13180](https://github.com/NixOS/nix/pull/13180)
+
+  Previously, `:reload` only reloaded the files specified with `:load` (or on the command line).
+  Now, it also works with the flakes specified with `:load-flake` (or on the command line).
+  This makes it correctly reload everything that was previously loaded, regardless of what sort of thing (plain file or flake) each item is.
+
+- Increase retry delays on HTTP 429 Too Many Requests [#13052](https://github.com/NixOS/nix/pull/13052)
+
+  When downloading Nix, the retry delay was previously set to 0.25 seconds. It has now been increased to 1 minute to better handle transient CI errors, particularly on GitHub.
+
+- S3: opt-in the STSProfileCredentialsProvider [#12646](https://github.com/NixOS/nix/pull/12646)
+
+  Added support for STS-based authentication for S3-based binary caches, i.e. enabling seamless integration with `aws sso login`.
+
+- Reduce connect timeout for http substituter [#12876](https://github.com/NixOS/nix/pull/12876)
+
+  Previously, the Nix setting `connect-timeout` had no limit. It is now set to `5s`, offering a more practical default for users self-hosting binary caches, which may occasionally become unavailable, such as during updates.
+
+
 - C API: functions for locking and loading a flake [#10435](https://github.com/NixOS/nix/issues/10435) [#12877](https://github.com/NixOS/nix/pull/12877) [#13098](https://github.com/NixOS/nix/pull/13098)
 
   This release adds functions to the C API for handling the loading of flakes. Previously, this had to be worked around by using `builtins.getFlake`.
@@ -73,37 +105,6 @@
 
   Improve terminal escape code filtering to understand a second type of hyperlink escape codes.
   This in particular prevents parts of GCC 14's diagnostics from being improperly filtered away.
-
-- Prettified JSON output on the terminal [#12555](https://github.com/NixOS/nix/issues/12555) [#12652](https://github.com/NixOS/nix/pull/12652)
-
-  This makes the output easier to read.
-
-  Scripts are mostly unaffected because for those, stdout will be a file or a pipe, not a terminal, and for those, the old single-line behavior applies.
-
-  `--json --pretty` can be passed to enable it even if the output is not a terminal.
-  If your script creates a pseudoterminal for Nix's stdout, you can pass `--no-pretty` to disable the new behavior.
-
-- Repl: improve continuation prompt for incomplete expressions [#12846](https://github.com/NixOS/nix/pull/12846)
-
-  Improved REPL user experience by updating the continuation prompt from invisible blank spaces to a visible `" > "`, enhancing clarity when entering multi-line expressions.
-
-- REPL `:load-flake` and `:reload` now work together [#8753](https://github.com/NixOS/nix/issues/8753) [#13180](https://github.com/NixOS/nix/pull/13180)
-
-  Previously, `:reload` only reloaded the files specified with `:load` (or on the command line).
-  Now, it also works with the flakes specified with `:load-flake` (or on the command line).
-  This makes it correctly reload everything that was previously loaded, regardless of what sort of thing (plain file or flake) each item is.
-
-- Increase retry delays on HTTP 429 Too Many Requests [#13052](https://github.com/NixOS/nix/pull/13052)
-
-  When downloading Nix, the retry delay was previously set to 0.25 seconds. It has now been increased to 1 minute to better handle transient CI errors, particularly on GitHub.
-
-- S3: opt-in the STSProfileCredentialsProvider [#12646](https://github.com/NixOS/nix/pull/12646)
-
-  Added support for STS-based authentication for S3-based binary caches, i.e. enabling seamless integration with `aws sso login`.
-
-- Reduce connect timeout for http substituter [#12876](https://github.com/NixOS/nix/pull/12876)
-
-  Previously, the Nix setting `connect-timeout` had no limit. It is now set to `5s`, offering a more practical default for users self-hosting binary caches, which may occasionally become unavailable, such as during updates.
 
 
 # Contributors
