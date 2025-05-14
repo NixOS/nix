@@ -26,6 +26,7 @@ struct DownloadFileResult
 
 DownloadFileResult downloadFile(
     ref<Store> store,
+    const Settings & settings,
     const std::string & url,
     const std::string & name,
     const Headers & headers = {});

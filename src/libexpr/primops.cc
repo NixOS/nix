@@ -2539,6 +2539,7 @@ static void addPath(
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
             // FIXME: make this lazy?
             auto dstPath = fetchToStore(
+                state.fetchSettings,
                 *state.store,
                 path.resolveSymlinks(),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,

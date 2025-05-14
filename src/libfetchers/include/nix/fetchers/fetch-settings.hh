@@ -3,6 +3,8 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/configuration.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/sync.hh"
 
 #include <map>
 #include <limits>
@@ -10,6 +12,8 @@
 #include <sys/types.h>
 
 namespace nix::fetchers {
+
+struct Cache;
 
 struct Settings : public Config
 {
@@ -106,6 +110,11 @@ struct Settings : public Config
 
           When empty, disables the global flake registry.
         )"};
+
+    ref<Cache> getCache() const;
+
+private:
+    mutable Sync<std::shared_ptr<Cache>> _cache;
 };
 
 }

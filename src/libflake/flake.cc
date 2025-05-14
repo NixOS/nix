@@ -264,7 +264,7 @@ static Flake readFlake(
                     state.symbols[setting.name],
                     std::string(state.forceStringNoCtx(*setting.value, setting.pos, "")));
             else if (setting.value->type() == nPath) {
-                auto storePath = fetchToStore(*state.store, setting.value->path(), FetchMode::Copy);
+                auto storePath = fetchToStore(state.fetchSettings, *state.store, setting.value->path(), FetchMode::Copy);
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
                     state.store->printStorePath(storePath));
