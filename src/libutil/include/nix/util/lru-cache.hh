@@ -105,12 +105,12 @@ public:
         return value;
     }
 
-    size_t size() const
+    size_t size() const noexcept
     {
         return data.size();
     }
 
-    void clear()
+    void clear() noexcept
     {
         data.clear();
         lru.clear();
