@@ -46,7 +46,7 @@ defined as the timestamp of the newest file inside the tarball.
 This protocol is supported by Gitea since v1.22.1 and by Forgejo since v7.0.4/v8.0.0 and can be used with the following flake URL schema:
 
 ```
-https://<domain name>/<owner>/<repo>/archive/<reference or revison>.tar.gz
+https://<domain name>/<owner>/<repo>/archive/<reference or revision>.tar.gz
 ```
 
 > **Example**
