@@ -13,42 +13,28 @@ namespace nix {
 
 struct NarInfo;
 
-struct BinaryCacheStoreConfig : virtual StoreConfig
+template<template<typename> class F>
+struct BinaryCacheStoreConfigT
 {
-    using StoreConfig::StoreConfig;
-
-    const Setting<std::string> compression{this, "xz", "compression",
-        "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`)."};
-
-    const Setting<bool> writeNARListing{this, false, "write-nar-listing",
-        "Whether to write a JSON file that lists the files in each NAR."};
-
-    const Setting<bool> writeDebugInfo{this, false, "index-debug-info",
-        R"(
-          Whether to index DWARF debug info files by build ID. This allows [`dwarffs`](https://github.com/edolstra/dwarffs) to
-          fetch debug info on demand
-        )"};
-
-    const Setting<Path> secretKeyFile{this, "", "secret-key",
-        "Path to the secret key used to sign the binary cache."};
-
-    const Setting<std::string> secretKeyFiles{this, "", "secret-keys",
-        "List of comma-separated paths to the secret keys used to sign the binary cache."};
-
-    const Setting<Path> localNarCache{this, "", "local-nar-cache",
-        "Path to a local cache of NARs fetched from this binary cache, used by commands such as `nix store cat`."};
-
-    const Setting<bool> parallelCompression{this, false, "parallel-compression",
-        "Enable multi-threaded compression of NARs. This is currently only available for `xz` and `zstd`."};
-
-    const Setting<int> compressionLevel{this, -1, "compression-level",
-        R"(
-          The *preset level* to be used when compressing NARs.
-          The meaning and accepted values depend on the compression method selected.
-          `-1` specifies that the default compression level should be used.
-        )"};
+    F<std::string> compression;
+    F<bool> writeNARListing;
+    F<bool> writeDebugInfo;
+    F<Path> secretKeyFile;
+    F<std::vector<Path>> secretKeyFiles;
+    F<Path> localNarCache;
+    F<bool> parallelCompression;
+    F<int> compressionLevel;
 };
 
+struct BinaryCacheStoreConfig :
+    BinaryCacheStoreConfigT<config::PlainValue>
+{
+    static config::SettingDescriptionMap descriptions();
+
+    const Store::Config & storeConfig;
+
+    BinaryCacheStoreConfig(const Store::Config &, const StoreReference::Params &);
+};
 
 /**
  * @note subclasses must implement at least one of the two
@@ -60,11 +46,7 @@ struct BinaryCacheStore :
 {
     using Config = BinaryCacheStoreConfig;
 
-    /**
-     * Intentionally mutable because some things we update due to the
-     * cache's own (remote side) settings.
-     */
-    Config & config;
+    const Config & config;
 
 private:
     std::vector<std::unique_ptr<Signer>> signers;
@@ -76,7 +58,7 @@ protected:
 
     const std::string cacheInfoFile = "nix-cache-info";
 
-    BinaryCacheStore(Config &);
+    BinaryCacheStore(const Config &);
 
 public:
 
@@ -114,7 +96,11 @@ public:
 
 public:
 
-    virtual void init() override;
+    /**
+     * Perform any necessary effectful operation to make the store up and
+     * running
+     */
+    virtual void init();
 
 private:
 

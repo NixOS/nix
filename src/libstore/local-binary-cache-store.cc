@@ -2,17 +2,27 @@
 #include "nix/store/globals.hh"
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/signals.hh"
+#include "nix/store/store-registration.hh"
 
 #include <atomic>
 
 namespace nix {
+
+config::SettingDescriptionMap LocalBinaryCacheStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(BinaryCacheStoreConfig::descriptions());
+    return ret;
+}
+
 
 LocalBinaryCacheStoreConfig::LocalBinaryCacheStoreConfig(
     std::string_view scheme,
     PathView binaryCacheDir,
     const StoreReference::Params & params)
     : Store::Config{params}
-    , BinaryCacheStoreConfig{params}
+    , BinaryCacheStoreConfig{*this, params}
     , binaryCacheDir(binaryCacheDir)
 {
 }
@@ -31,9 +41,9 @@ struct LocalBinaryCacheStore :
 {
     using Config = LocalBinaryCacheStoreConfig;
 
-    ref<Config> config;
+    ref<const Config> config;
 
-    LocalBinaryCacheStore(ref<Config> config)
+    LocalBinaryCacheStore(ref<const Config> config)
         : Store{*config}
         , BinaryCacheStore{*config}
         , config{config}
@@ -125,10 +135,7 @@ StringSet LocalBinaryCacheStoreConfig::uriSchemes()
 }
 
 ref<Store> LocalBinaryCacheStoreConfig::openStore() const {
-    return make_ref<LocalBinaryCacheStore>(ref{
-        // FIXME we shouldn't actually need a mutable config
-        std::const_pointer_cast<LocalBinaryCacheStore::Config>(shared_from_this())
-    });
+    return make_ref<LocalBinaryCacheStore>(ref{shared_from_this()});
 }
 
 static RegisterStoreImplementation<LocalBinaryCacheStore::Config> regLocalBinaryCacheStore;

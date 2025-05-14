@@ -3,11 +3,8 @@
 include_dirs = [include_directories('../..')]
 
 headers = files(
-  'abstract-setting-to-json.hh',
   'ansicolor.hh',
   'archive.hh',
-  'args.hh',
-  'args/root.hh',
   'callback.hh',
   'canon-path.hh',
   'checked-arithmetic.hh',
@@ -16,9 +13,8 @@ headers = files(
   'comparator.hh',
   'compression.hh',
   'compute-levels.hh',
-  'config-global.hh',
-  'config-impl.hh',
-  'configuration.hh',
+  'config-abstract.hh',
+  'config-abstract.hh',
   'current-process.hh',
   'english.hh',
   'environment-variables.hh',

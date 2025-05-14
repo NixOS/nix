@@ -2,7 +2,7 @@
 ///@file
 
 #include "nix/cmd/installable-value.hh"
-#include "nix/util/args.hh"
+#include "nix/main/args.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/store/path.hh"
 #include "nix/flake/lockfile.hh"

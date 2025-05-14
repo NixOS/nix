@@ -1,6 +1,6 @@
 #include "nix/main/shared.hh"
 #include "nix/store/realisation.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/cmd/legacy.hh"
 #include "man-pages.hh"
 

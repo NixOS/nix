@@ -46,7 +46,7 @@ This completes the infrastructure overhaul for the [RFC 132](https://github.com/
   @@ @@
   -#include "config.hh"
   +// Additionally renamed to distinguish from components' config headers.
-  +#include "nix/util/configuration.hh"
+  +#include "nix/main/configuration.hh"
   @@ @@
   -#if HAVE_ACL_SUPPORT
   +#if NIX_SUPPORT_ACL
