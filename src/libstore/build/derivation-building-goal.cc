@@ -296,7 +296,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
             // FIXME wanted outputs
             auto resolvedDrvGoal = worker.makeDerivationGoal(
-                pathResolved, OutputsSpec::All{}, buildMode);
+                makeConstantStorePathRef(pathResolved), OutputsSpec::All{}, buildMode);
             {
                 Goals waitees{resolvedDrvGoal};
                 co_await await(std::move(waitees));
@@ -338,7 +338,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
                       throw Error(
                           "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/realisation)",
-                          worker.store.printStorePath(resolvedDrvGoal->drvPath), outputName);
+                          resolvedDrvGoal->drvReq->to_string(worker.store), outputName);
                     }();
 
                     if (!drv->type().isImpure()) {

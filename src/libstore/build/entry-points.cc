@@ -30,7 +30,7 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
         if (i->exitCode != Goal::ecSuccess) {
 #ifndef _WIN32 // TODO Enable building on Windows
             if (auto i2 = dynamic_cast<DerivationGoal *>(i.get()))
-                failed.insert(printStorePath(i2->drvPath));
+                failed.insert(i2->drvReq->to_string(*this));
             else
 #endif
             if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
