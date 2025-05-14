@@ -61,7 +61,10 @@ struct NixRepl
 {
     size_t debugTraceIndex;
 
+    // Arguments passed to :load, saved so they can be reloaded with :reload
     Strings loadedFiles;
+    // Arguments passed to :load-flake, saved so they can be reloaded with :reload
+    Strings loadedFlakes;
     std::function<AnnotatedValues()> getValues;
 
     const static int envSize = 32768;
@@ -90,7 +93,8 @@ struct NixRepl
     void loadFile(const Path & path);
     void loadFlake(const std::string & flakeRef);
     void loadFiles();
-    void reloadFiles();
+    void loadFlakes();
+    void reloadFilesAndFlakes();
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol name, Value & v);
     Expr * parseString(std::string s);
@@ -466,7 +470,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
     else if (command == ":r" || command == ":reload") {
         state->resetFileCache();
-        reloadFiles();
+        reloadFilesAndFlakes();
     }
 
     else if (command == ":e" || command == ":edit") {
@@ -501,7 +505,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
         // Reload right after exiting the editor
         state->resetFileCache();
-        reloadFiles();
+        reloadFilesAndFlakes();
     }
 
     else if (command == ":t") {
@@ -716,6 +720,9 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
     if (flakeRefS.empty())
         throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
 
+    loadedFlakes.remove(flakeRefS);
+    loadedFlakes.push_back(flakeRefS);
+
     std::filesystem::path cwd;
     try {
         cwd = std::filesystem::current_path();
@@ -754,11 +761,12 @@ void NixRepl::initEnv()
 }
 
 
-void NixRepl::reloadFiles()
+void NixRepl::reloadFilesAndFlakes()
 {
     initEnv();
 
     loadFiles();
+    loadFlakes();
 }
 
 
@@ -775,6 +783,18 @@ void NixRepl::loadFiles()
     for (auto & [i, what] : getValues()) {
         notice("Loading installable '%1%'...", what);
         addAttrsToScope(*i);
+    }
+}
+
+
+void NixRepl::loadFlakes()
+{
+    Strings old = loadedFlakes;
+    loadedFlakes.clear();
+
+    for (auto & i : old) {
+        notice("Loading flake '%1%'...", i);
+        loadFlake(i);
     }
 }
 
