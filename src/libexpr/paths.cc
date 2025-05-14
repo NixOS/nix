@@ -24,7 +24,11 @@ StorePath EvalState::devirtualize(const StorePath & path, StringMap * rewrites)
 {
     if (auto mount = storeFS->getMount(CanonPath(store->printStorePath(path)))) {
         auto storePath = fetchToStore(
-            fetchSettings, *store, SourcePath{ref(mount)}, settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy, path.name());
+            fetchSettings,
+            *store,
+            SourcePath{ref(mount)},
+            settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
+            path.name());
         assert(storePath.name() == path.name());
         if (rewrites)
             rewrites->emplace(path.hashPart(), storePath.hashPart());
@@ -61,18 +65,23 @@ std::string EvalState::computeBaseName(const SourcePath & path)
                 "This can typically be avoided by rewriting an attribute like `src = ./.` "
                 "to `src = builtins.path { path = ./.; name = \"source\"; }`.",
                 path);
-            return std::string(fetchToStore(fetchSettings, *store, path, FetchMode::DryRun, storePath->name()).to_string());
+            return std::string(
+                fetchToStore(fetchSettings, *store, path, FetchMode::DryRun, storePath->name()).to_string());
         }
     }
     return std::string(path.baseName());
 }
 
 StorePath EvalState::mountInput(
-    fetchers::Input & input, const fetchers::Input & originalInput, ref<SourceAccessor> accessor, bool requireLockable, bool forceNarHash)
+    fetchers::Input & input,
+    const fetchers::Input & originalInput,
+    ref<SourceAccessor> accessor,
+    bool requireLockable,
+    bool forceNarHash)
 {
     auto storePath = settings.lazyTrees
-        ? StorePath::random(input.getName())
-        : fetchToStore(fetchSettings, *store, accessor, FetchMode::Copy, input.getName());
+                         ? StorePath::random(input.getName())
+                         : fetchToStore(fetchSettings, *store, accessor, FetchMode::Copy, input.getName());
 
     allowPath(storePath); // FIXME: should just whitelist the entire virtual store
 
