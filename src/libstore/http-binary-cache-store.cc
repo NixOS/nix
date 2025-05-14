@@ -3,6 +3,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/callback.hh"
+#include "nix/store/store-registration.hh"
 
 namespace nix {
 

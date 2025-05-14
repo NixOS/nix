@@ -5,6 +5,7 @@
 
 #include "nix/store/path.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/build-result.hh"
 
 #include "nix/store/globals.hh"

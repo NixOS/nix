@@ -1,4 +1,4 @@
-#include "nix/store/store-api.hh"
+#include "nix/store/store-registration.hh"
 #include "nix/util/callback.hh"
 
 namespace nix {

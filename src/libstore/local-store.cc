@@ -17,6 +17,8 @@
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/keys.hh"
 #include "nix/util/users.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/store-registration.hh"
 
 #include <iostream>
 #include <algorithm>

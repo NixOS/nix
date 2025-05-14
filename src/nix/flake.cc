@@ -8,7 +8,7 @@
 #include "nix/flake/flake.hh"
 #include "nix/expr/get-drvs.hh"
 #include "nix/util/signals.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/expr/attr-path.hh"
