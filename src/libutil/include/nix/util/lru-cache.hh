@@ -93,12 +93,16 @@ public:
 
         /**
          * Move this item to the back of the LRU list.
+         *
+         * Think of std::list iterators as stable pointers to the list node,
+         * which never get invalidated. Thus, we can reuse the same lru list
+         * element and just splice it to the back of the list without the need
+         * to update its value in the key -> list iterator map.
          */
-        lru.erase(i->second.first.it);
-        auto j = lru.insert(lru.end(), i);
-        i->second.first.it = j;
+        auto & [it, value] = i->second;
+        lru.splice(/*pos=*/lru.end(), /*other=*/lru, it.it);
 
-        return i->second.second;
+        return value;
     }
 
     size_t size() const
