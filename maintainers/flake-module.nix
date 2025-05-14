@@ -360,7 +360,6 @@
               ''^src/libutil/linux/namespaces\.cc$''
               ''^src/libutil/logging\.cc$''
               ''^src/libutil/include/nix/util/logging\.hh$''
-              ''^src/libutil/include/nix/util/lru-cache\.hh$''
               ''^src/libutil/memory-source-accessor\.cc$''
               ''^src/libutil/include/nix/util/memory-source-accessor\.hh$''
               ''^src/libutil/include/nix/util/pool\.hh$''
