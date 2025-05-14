@@ -30,7 +30,7 @@ The *referrers* of a store object are the store objects that reference it.
 
 [transpose graph]: https://en.wikipedia.org/wiki/Transpose_graph
 
-One can also combine both concepts: taking the transitive closure of the tranposed references graph.
+One can also combine both concepts: taking the transitive closure of the transposed references graph.
 The *referrers closure* of a store object are the store objects that can reach the given store object via paths of references.
 
 > **Note**
