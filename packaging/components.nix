@@ -211,6 +211,7 @@ in
 {
   version = baseVersion + versionSuffix;
   inherit versionSuffix;
+  inherit officialRelease;
   inherit maintainers;
 
   inherit filesetToSource;
