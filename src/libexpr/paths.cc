@@ -68,7 +68,7 @@ std::string EvalState::computeBaseName(const SourcePath & path)
 }
 
 StorePath EvalState::mountInput(
-    fetchers::Input & input, const fetchers::Input & originalInput, ref<SourceAccessor> accessor, bool requireLockable)
+    fetchers::Input & input, const fetchers::Input & originalInput, ref<SourceAccessor> accessor, bool requireLockable, bool forceNarHash)
 {
     auto storePath = settings.lazyTrees ? StorePath::random(input.getName())
                                         : fetchToStore(*store, accessor, FetchMode::Copy, input.getName());
@@ -77,7 +77,7 @@ StorePath EvalState::mountInput(
 
     storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
 
-    if (requireLockable && (!settings.lazyTrees || !input.isLocked()) && !input.getNarHash()) {
+    if ((forceNarHash || (requireLockable && (!settings.lazyTrees || !input.isLocked()))) && !input.getNarHash()) {
         auto narHash = accessor->hashPath(CanonPath::root);
         input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
     }

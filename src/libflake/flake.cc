@@ -751,7 +751,7 @@ LockedFlake lockFlake(
                                     warnRegistry(resolvedRef);
 
                                     return {
-                                        state.storePath(state.mountInput(lockedRef.input, input.ref->input, cachedInput.accessor, true)),
+                                        state.storePath(state.mountInput(lockedRef.input, input.ref->input, cachedInput.accessor, true, true)),
                                         lockedRef
                                     };
                                 }
