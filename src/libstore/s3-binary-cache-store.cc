@@ -235,11 +235,6 @@ S3Helper::FileTransferResult S3Helper::getObject(
     return res;
 }
 
-S3BinaryCacheStore::S3BinaryCacheStore(const Params & params)
-    : BinaryCacheStoreConfig(params)
-    , BinaryCacheStore(params)
-{ }
-
 
 S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
     std::string_view uriScheme,
@@ -258,6 +253,12 @@ S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
         throw UsageError("`%s` store requires a bucket name in its Store URI", uriScheme);
 }
 
+
+S3BinaryCacheStore::S3BinaryCacheStore(ref<Config> config)
+    : BinaryCacheStore(*config)
+    , config{config}
+{ }
+
 std::string S3BinaryCacheStoreConfig::doc()
 {
     return
@@ -266,40 +267,37 @@ std::string S3BinaryCacheStoreConfig::doc()
 }
 
 
-struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual S3BinaryCacheStore
+struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
 {
     Stats stats;
 
     S3Helper s3Helper;
 
-    S3BinaryCacheStoreImpl(
-        std::string_view uriScheme,
-        std::string_view bucketName,
-        const Params & params)
-        : StoreConfig(params)
-        , BinaryCacheStoreConfig(params)
-        , S3BinaryCacheStoreConfig(uriScheme, bucketName, params)
-        , Store(params)
-        , BinaryCacheStore(params)
-        , S3BinaryCacheStore(params)
-        , s3Helper(profile, region, scheme, endpoint)
+    S3BinaryCacheStoreImpl(ref<Config> config)
+        : Store{*config}
+        , BinaryCacheStore{*config}
+        , S3BinaryCacheStore{config}
+        , s3Helper(config->profile, config->region, config->scheme, config->endpoint)
     {
         diskCache = getNarInfoDiskCache();
+
+        init();
     }
 
     std::string getUri() override
     {
-        return "s3://" + bucketName;
+        return "s3://" + config->bucketName;
     }
 
     void init() override
     {
         if (auto cacheInfo = diskCache->upToDateCacheExists(getUri())) {
-            wantMassQuery.setDefault(cacheInfo->wantMassQuery);
-            priority.setDefault(cacheInfo->priority);
+            config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
+            config->priority.setDefault(cacheInfo->priority);
         } else {
             BinaryCacheStore::init();
-            diskCache->createCache(getUri(), storeDir, wantMassQuery, priority);
+            diskCache->createCache(
+                getUri(), config->storeDir, config->wantMassQuery, config->priority);
         }
     }
 
@@ -328,7 +326,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
         auto res = s3Helper.client->HeadObject(
             Aws::S3::Model::HeadObjectRequest()
-            .WithBucket(bucketName)
+            .WithBucket(config->bucketName)
             .WithKey(path));
 
         if (!res.IsSuccess()) {
@@ -372,7 +370,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         const std::string & mimeType,
         const std::string & contentEncoding)
     {
-        std::string uri = "s3://" + bucketName + "/" + path;
+        std::string uri = "s3://" + config->bucketName + "/" + path;
         Activity act(*logger, lvlTalkative, actFileTransfer,
             fmt("uploading '%s'", uri),
             Logger::Fields{uri}, getCurActivity());
@@ -387,11 +385,11 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
         std::call_once(transferManagerCreated, [&]()
         {
-            if (multipartUpload) {
+            if (config->multipartUpload) {
                 TransferManagerConfiguration transferConfig(executor.get());
 
                 transferConfig.s3Client = s3Helper.client;
-                transferConfig.bufferSize = bufferSize;
+                transferConfig.bufferSize = config->bufferSize;
 
                 transferConfig.uploadProgressCallback =
                     [](const TransferManager * transferManager,
@@ -420,6 +418,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         });
 
         auto now1 = std::chrono::steady_clock::now();
+
+        auto & bucketName = config->bucketName;
 
         if (transferManager) {
 
@@ -508,12 +508,12 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
             return std::make_shared<std::stringstream>(std::move(compressed));
         };
 
-        if (narinfoCompression != "" && hasSuffix(path, ".narinfo"))
-            uploadFile(path, compress(narinfoCompression), mimeType, narinfoCompression);
-        else if (lsCompression != "" && hasSuffix(path, ".ls"))
-            uploadFile(path, compress(lsCompression), mimeType, lsCompression);
-        else if (logCompression != "" && hasPrefix(path, "log/"))
-            uploadFile(path, compress(logCompression), mimeType, logCompression);
+        if (config->narinfoCompression != "" && hasSuffix(path, ".narinfo"))
+            uploadFile(path, compress(config->narinfoCompression), mimeType, config->narinfoCompression);
+        else if (config->lsCompression != "" && hasSuffix(path, ".ls"))
+            uploadFile(path, compress(config->lsCompression), mimeType, config->lsCompression);
+        else if (config->logCompression != "" && hasPrefix(path, "log/"))
+            uploadFile(path, compress(config->logCompression), mimeType, config->logCompression);
         else
             uploadFile(path, istream, mimeType, "");
     }
@@ -523,14 +523,14 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         stats.get++;
 
         // FIXME: stream output to sink.
-        auto res = s3Helper.getObject(bucketName, path);
+        auto res = s3Helper.getObject(config->bucketName, path);
 
         stats.getBytes += res.data ? res.data->size() : 0;
         stats.getTimeMs += res.durationMs;
 
         if (res.data) {
             printTalkative("downloaded 's3://%s/%s' (%d bytes) in %d ms",
-                bucketName, path, res.data->size(), res.durationMs);
+                config->bucketName, path, res.data->size(), res.durationMs);
 
             sink(*res.data);
         } else
@@ -541,6 +541,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     {
         StorePathSet paths;
         std::string marker;
+
+        auto & bucketName = config->bucketName;
 
         do {
             debug("listing bucket 's3://%s' from key '%s'...", bucketName, marker);
@@ -580,7 +582,15 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     }
 };
 
-static RegisterStoreImplementation<S3BinaryCacheStoreImpl, S3BinaryCacheStoreConfig> regS3BinaryCacheStore;
+ref<Store> S3BinaryCacheStoreImpl::Config::openStore() const
+{
+    return make_ref<S3BinaryCacheStoreImpl>(ref{
+        // FIXME we shouldn't actually need a mutable config
+        std::const_pointer_cast<S3BinaryCacheStore::Config>(shared_from_this())
+    });
+}
+
+static RegisterStoreImplementation<S3BinaryCacheStoreImpl::Config> regS3BinaryCacheStore;
 
 }
 

@@ -18,7 +18,7 @@ extern char ** savedArgv;
 class EvalState;
 struct Pos;
 class Store;
-class LocalFSStore;
+struct LocalFSStore;
 
 static constexpr Command::Category catHelp = -1;
 static constexpr Command::Category catSecondary = 100;

@@ -42,7 +42,7 @@ Store * nix_store_open(nix_c_context * context, const char * uri, const char ***
         if (!params)
             return new Store{nix::openStore(uri_str)};
 
-        nix::Store::Params params_map;
+        nix::Store::Config::Params params_map;
         for (size_t i = 0; params[i] != nullptr; i++) {
             params_map[params[i][0]] = params[i][1];
         }
