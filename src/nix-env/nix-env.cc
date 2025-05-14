@@ -9,7 +9,7 @@
 #include "nix/store/profiles.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/main/shared.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
 #include "user-env.hh"
 #include "nix/expr/value-to-json.hh"

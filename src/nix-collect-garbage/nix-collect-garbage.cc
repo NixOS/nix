@@ -1,6 +1,6 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/store-cast.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/store/profiles.hh"

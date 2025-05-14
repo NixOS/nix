@@ -1,9 +1,12 @@
+#include <regex>
+
 #include "nix/store/local-overlay-store.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/url.hh"
-#include <regex>
+#include "nix/store/store-open.hh"
+#include "nix/store/store-registration.hh"
 
 namespace nix {
 

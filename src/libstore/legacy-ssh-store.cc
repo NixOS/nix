@@ -12,6 +12,7 @@
 #include "nix/store/ssh.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/callback.hh"
+#include "nix/store/store-registration.hh"
 
 namespace nix {
 

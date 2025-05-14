@@ -7,6 +7,7 @@
 #include "nix/store/worker-protocol-impl.hh"
 #include "nix/util/pool.hh"
 #include "nix/store/ssh.hh"
+#include "nix/store/store-registration.hh"
 
 namespace nix {
 

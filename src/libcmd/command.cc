@@ -3,7 +3,7 @@
 
 #include "nix/cmd/command.hh"
 #include "nix/cmd/markdown.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/derivations.hh"
 #include "nix/expr/nixexpr.hh"

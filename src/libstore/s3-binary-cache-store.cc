@@ -11,6 +11,7 @@
 #include "nix/util/compression.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/signals.hh"
+#include "nix/store/store-registration.hh"
 
 #include <aws/core/Aws.h>
 #include <aws/core/VersionConfig.h>

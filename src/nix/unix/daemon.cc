@@ -7,6 +7,7 @@
 #include "nix/store/local-store.hh"
 #include "nix/store/remote-store.hh"
 #include "nix/store/remote-store-connection.hh"
+#include "nix/store/store-open.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/globals.hh"
