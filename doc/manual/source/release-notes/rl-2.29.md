@@ -1,5 +1,9 @@
 # Release 2.29.0 (2025-05-14)
 
+After the special backport-based release of Nix 2.28 (timed to coincide with Nixpkgs 25.05), the release process is back to normal with 2.29.
+As such, we have slightly more weeks of work from `master` (since 2.28 was branched from 2.27) than usual.
+This fact is counterbalanced by the fact that most of those changes are bug fixes rather than larger new features.
+
 - Prettified JSON output on the terminal [#12555](https://github.com/NixOS/nix/issues/12555) [#12652](https://github.com/NixOS/nix/pull/12652)
 
   This makes the output easier to read.
