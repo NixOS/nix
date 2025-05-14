@@ -27,7 +27,7 @@ void runPostBuildHook(
 struct DerivationGoal : public Goal
 {
     /** The path of the derivation. */
-    StorePath drvPath;
+    ref<const SingleDerivedPath> drvReq;
 
     /**
      * The specific outputs that we need to build.
@@ -62,7 +62,7 @@ struct DerivationGoal : public Goal
     NeedRestartForMoreOutputs needRestart = NeedRestartForMoreOutputs::OutputsUnmodifedDontNeed;
 
     /**
-     * The derivation stored at drvPath.
+     * The derivation stored at `drvReq`.
      */
     std::unique_ptr<Derivation> drv;
 
@@ -76,7 +76,7 @@ struct DerivationGoal : public Goal
 
     std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds;
 
-    DerivationGoal(const StorePath & drvPath,
+    DerivationGoal(ref<const SingleDerivedPath> drvReq,
         const OutputsSpec & wantedOutputs, Worker & worker,
         BuildMode buildMode = bmNormal);
     DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
@@ -97,15 +97,15 @@ struct DerivationGoal : public Goal
      * The states.
      */
     Co loadDerivation();
-    Co haveDerivation();
+    Co haveDerivation(StorePath drvPath);
 
     /**
      * Wrappers around the corresponding Store methods that first consult the
      * derivation.  This is currently needed because when there is no drv file
      * there also is no DB entry.
      */
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap();
-    OutputPathMap queryDerivationOutputMap();
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & drvPath);
+    OutputPathMap queryDerivationOutputMap(const StorePath & drvPath);
 
     /**
      * Update 'initialOutputs' to determine the current status of the
@@ -113,17 +113,18 @@ struct DerivationGoal : public Goal
      * whether all outputs are valid and non-corrupt, and a
      * 'SingleDrvOutputs' structure containing the valid outputs.
      */
-    std::pair<bool, SingleDrvOutputs> checkPathValidity();
+    std::pair<bool, SingleDrvOutputs> checkPathValidity(const StorePath & drvPath);
 
     /**
      * Aborts if any output is not valid or corrupt, and otherwise
      * returns a 'SingleDrvOutputs' structure containing all outputs.
      */
-    SingleDrvOutputs assertPathValidity();
+    SingleDrvOutputs assertPathValidity(const StorePath & drvPath);
 
-    Co repairClosure();
+    Co repairClosure(StorePath drvPath);
 
     Done done(
+        const StorePath & drvPath,
         BuildResult::Status status,
         SingleDrvOutputs builtOutputs = {},
         std::optional<Error> ex = {});
