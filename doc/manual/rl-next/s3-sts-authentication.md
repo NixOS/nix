@@ -1,5 +1,5 @@
 ---
-synopsis: "C API: functions for locking and loading a flake"
+synopsis: "S3: opt-in the STSProfileCredentialsProvider"
 issues:
 prs: [12646]
 ---

@@ -4,4 +4,4 @@ issues: [12877, 13098]
 prs: [12538]
 ---
 
-S3 progress bar now correctly display upload/download progress. S3 uploads are now interruptible.
+The progress bar now correctly display upload/download progress for S3 up/downloads. S3 uploads are now interruptible.

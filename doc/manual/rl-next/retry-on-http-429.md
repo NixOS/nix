@@ -1,5 +1,5 @@
 ---
-synopsis: "Increase retry delays on Http 429"
+synopsis: "Increase retry delays on HTTP 429 Too Many Requests"
 issues:
 prs: [13052]
 ---
