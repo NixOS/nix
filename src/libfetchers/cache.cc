@@ -54,8 +54,6 @@ struct CacheImpl : Cache
         const Key & key,
         const Attrs & value) override
     {
-        if (disabled()) return;
-
         _state.lock()->upsert.use()
             (key.first)
             (attrsToJSON(key.second).dump())
@@ -83,20 +81,9 @@ struct CacheImpl : Cache
         return {};
     }
 
-    pid_t originalPid = getpid();
-
-    bool disabled()
-    {
-        // FIXME: Temporary hack to disable the cache in
-        // builtin:fetch-tree builders.
-        return getpid() != originalPid;
-    }
-
     std::optional<Result> lookupExpired(
         const Key & key) override
     {
-        if (disabled()) return {};
-
         auto state(_state.lock());
 
         auto keyJSON = attrsToJSON(key.second).dump();
@@ -124,8 +111,6 @@ struct CacheImpl : Cache
         Attrs value,
         const StorePath & storePath) override
     {
-        if (disabled()) return;
-
         /* Add the store prefix to the cache key to handle multiple
            store prefixes. */
         key.second.insert_or_assign("store", store.storeDir);
