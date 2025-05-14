@@ -695,7 +695,7 @@ following fields:
   The attributes in `locked` are considered "final", meaning that they are the only ones that are passed via the arguments of the `outputs` function of a flake.
   For instance, if `locked` contains a `lastModified` attribute while the fetcher does not return a `lastModified` attribute, then the `lastModified` attribute will be passed to the `outputs` function.
   Conversely, if `locked` does *not* contain a `lastModified` attribute while the fetcher *does* return a `lastModified` attribute, then no `lastModified` attribute will be passed.
-  If `locked` contains a `lastModifed` attribute and the fetcher returns a `lastModified` attribute, then they must have the same value.
+  If `locked` contains a `lastModified` attribute and the fetcher returns a `lastModified` attribute, then they must have the same value.
 
 * `flake`: A Boolean denoting whether this is a flake or non-flake
   dependency. Corresponds to the `flake` attribute in the `inputs`

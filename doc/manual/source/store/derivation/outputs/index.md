@@ -87,7 +87,7 @@ The rules for this are fairly concise:
 
    - If it is pure, it must be floating.
 
-   - Pure, fixed content-addressing derivations are not suppported
+   - Pure, fixed content-addressing derivations are not supported
 
      > There is no use for this forth combination.
      > The sole purpose of an output's store path being fixed is to support the derivation being impure.
