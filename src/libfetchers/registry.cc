@@ -156,7 +156,7 @@ static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, re
         }
 
         if (!isAbsolute(path)) {
-            auto storePath = downloadFile(store, path, "flake-registry.json").storePath;
+            auto storePath = downloadFile(store, settings, path, "flake-registry.json").storePath;
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
                 store2->addPermRoot(storePath, getCacheDir() + "/flake-registry.json");
             path = store->toRealPath(storePath);

@@ -1,6 +1,7 @@
 #include "nix/fetchers/git-utils.hh"
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/cache.hh"
+#include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/signals.hh"
@@ -610,18 +611,18 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             throw Error("Commit signature verification on commit %s failed: %s", rev.gitRev(), output);
     }
 
-    Hash treeHashToNarHash(const Hash & treeHash) override
+    Hash treeHashToNarHash(const fetchers::Settings & settings, const Hash & treeHash) override
     {
         auto accessor = getAccessor(treeHash, false, "");
 
         fetchers::Cache::Key cacheKey{"treeHashToNarHash", {{"treeHash", treeHash.gitRev()}}};
 
-        if (auto res = fetchers::getCache()->lookup(cacheKey))
+        if (auto res = settings.getCache()->lookup(cacheKey))
             return Hash::parseAny(fetchers::getStrAttr(*res, "narHash"), HashAlgorithm::SHA256);
 
         auto narHash = accessor->hashPath(CanonPath::root);
 
-        fetchers::getCache()->upsert(cacheKey, fetchers::Attrs({{"narHash", narHash.to_string(HashFormat::SRI, true)}}));
+        settings.getCache()->upsert(cacheKey, fetchers::Attrs({{"narHash", narHash.to_string(HashFormat::SRI, true)}}));
 
         return narHash;
     }

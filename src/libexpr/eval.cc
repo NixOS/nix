@@ -2423,6 +2423,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
         ? *dstPathCached
         : [&]() {
             auto dstPath = fetchToStore(
+                fetchSettings,
                 *store,
                 path.resolveSymlinks(SymlinkResolution::Ancestors),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
@@ -3125,7 +3126,7 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
                 store,
                 fetchSettings,
                 EvalSettings::resolvePseudoUrl(value));
-            auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
+            auto storePath = fetchToStore(fetchSettings, *store, SourcePath(accessor), FetchMode::Copy);
             return finish(this->storePath(storePath));
         } catch (Error & e) {
             logWarning({
