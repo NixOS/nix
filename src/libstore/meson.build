@@ -254,6 +254,7 @@ sources = files(
   'binary-cache-store.cc',
   'build-result.cc',
   'build/derivation-goal.cc',
+  'build/derivation-creation-and-realisation-goal.cc',
   'build/drv-output-substitution-goal.cc',
   'build/entry-points.cc',
   'build/goal.cc',
