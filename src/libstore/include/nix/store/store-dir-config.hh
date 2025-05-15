@@ -104,7 +104,7 @@ struct MixStoreDirMethods
  * Need to make this a separate class so I can get the right
  * initialization order in the constructor for `StoreDirConfig`.
  */
-struct StoreDirConfigItself : Config
+struct StoreDirConfigBase : Config
 {
     using Config::Config;
 
@@ -118,12 +118,12 @@ struct StoreDirConfigItself : Config
 };
 
 /**
- * The order of `StoreDirConfigItself` and then `MixStoreDirMethods` is
- * very important. This ensures that `StoreDirConfigItself::storeDir_`
+ * The order of `StoreDirConfigBase` and then `MixStoreDirMethods` is
+ * very important. This ensures that `StoreDirConfigBase::storeDir_`
  * is initialized before we have our one chance (because references are
  * immutable) to initialize `MixStoreDirMethods::storeDir`.
  */
-struct StoreDirConfig : StoreDirConfigItself, MixStoreDirMethods
+struct StoreDirConfig : StoreDirConfigBase, MixStoreDirMethods
 {
     using Params = std::map<std::string, std::string>;
 
