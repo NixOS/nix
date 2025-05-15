@@ -114,9 +114,6 @@ pkgs.nixComponents.nix-util.overrideAttrs (
         (pkgs.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
         pkgs.buildPackages.nixfmt-rfc-style
       ]
-      # TODO: Remove the darwin check once
-      # https://github.com/NixOS/nixpkgs/pull/291814 is available
-      ++ lib.optional (stdenv.cc.isClang && !stdenv.buildPlatform.isDarwin) pkgs.buildPackages.bear
       ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (
         lib.hiPrio pkgs.buildPackages.clang-tools
       );
