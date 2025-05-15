@@ -33,6 +33,18 @@ private:
     Data data;
     LRU lru;
 
+    /**
+     * Move this item to the back of the LRU list.
+     */
+    void promote(LRU::iterator it)
+    {
+        /* Think of std::list iterators as stable pointers to the list node,
+         * which never get invalidated. Thus, we can reuse the same lru list
+         * element and just splice it to the back of the list without the need
+         * to update its value in the key -> list iterator map. */
+        lru.splice(/*pos=*/lru.end(), /*other=*/lru, it);
+    }
+
 public:
 
     LRUCache(size_t capacity)
@@ -81,13 +93,22 @@ public:
     /**
      * Look up an item in the cache. If it exists, it becomes the most
      * recently used item.
+<<<<<<< HEAD
      * */
     std::optional<Value> get(const Key & key)
+=======
+     *
+     * @returns corresponding cache entry, std::nullopt if it's not in the cache
+     */
+    template<typename K>
+    std::optional<Value> get(const K & key)
+>>>>>>> 4711720ef (libutil: Add `LRUCache::getOrNullptr`)
     {
         auto i = data.find(key);
         if (i == data.end())
             return {};
 
+<<<<<<< HEAD
         /**
          * Move this item to the back of the LRU list.
          */
@@ -99,6 +120,33 @@ public:
     }
 
     size_t size() const
+=======
+        auto & [it, value] = i->second;
+        promote(it.it);
+        return value;
+    }
+
+    /**
+     * Look up an item in the cache. If it exists, it becomes the most
+     * recently used item.
+     *
+     * @returns mutable pointer to the corresponding cache entry, nullptr if
+     * it's not in the cache
+     */
+    template<typename K>
+    Value * getOrNullptr(const K & key)
+    {
+        auto i = data.find(key);
+        if (i == data.end())
+            return nullptr;
+
+        auto & [it, value] = i->second;
+        promote(it.it);
+        return &value;
+    }
+
+    size_t size() const noexcept
+>>>>>>> 4711720ef (libutil: Add `LRUCache::getOrNullptr`)
     {
         return data.size();
     }
