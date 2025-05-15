@@ -41,6 +41,16 @@ Worker::~Worker()
     assert(expectedNarSize == 0);
 }
 
+template<class G, typename... Args>
+std::shared_ptr<G> Worker::initGoalIfNeeded(std::weak_ptr<G> & goal_weak, Args && ...args)
+{
+    if (auto goal = goal_weak.lock()) return goal;
+
+    auto goal = std::make_shared<G>(args...);
+    goal_weak = goal;
+    wakeUp(goal);
+    return goal;
+}
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
     const StorePath & drvPath,
@@ -79,27 +89,13 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
 
 std::shared_ptr<PathSubstitutionGoal> Worker::makePathSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
 {
-    std::weak_ptr<PathSubstitutionGoal> & goal_weak = substitutionGoals[path];
-    auto goal = goal_weak.lock(); // FIXME
-    if (!goal) {
-        goal = std::make_shared<PathSubstitutionGoal>(path, *this, repair, ca);
-        goal_weak = goal;
-        wakeUp(goal);
-    }
-    return goal;
+    return initGoalIfNeeded(substitutionGoals[path], path, *this, repair, ca);
 }
 
 
 std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal(const DrvOutput& id, RepairFlag repair, std::optional<ContentAddress> ca)
 {
-    std::weak_ptr<DrvOutputSubstitutionGoal> & goal_weak = drvOutputSubstitutionGoals[id];
-    auto goal = goal_weak.lock(); // FIXME
-    if (!goal) {
-        goal = std::make_shared<DrvOutputSubstitutionGoal>(id, *this, repair, ca);
-        goal_weak = goal;
-        wakeUp(goal);
-    }
-    return goal;
+    return initGoalIfNeeded(drvOutputSubstitutionGoals[id], id, *this, repair, ca);
 }
 
 
