@@ -5,7 +5,7 @@
 namespace nix {
 
 StoreDirConfig::StoreDirConfig(const Params & params)
-    : StoreDirConfigItself(params)
+    : StoreDirConfigBase(params)
     , MixStoreDirMethods{storeDir_}
 {
 }
