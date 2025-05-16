@@ -282,7 +282,7 @@ type DerivingPath = ConstantPath | OutputPath;
 
 Under this extended model, `DerivingPath`s are thus inductively built up from a root `ConstantPath`, wrapped with zero or more outer `OutputPath`s.
 
-### Encoding {#deriving-path-encoding}
+### Encoding {#deriving-path-encoding-higher-order}
 
 The encoding is adjusted in the natural way, encoding the `drv` field recursively using the same deriving path encoding.
 The result of this is that it is possible to have a chain of `^<output-name>` at the end of the final string, as opposed to just a single one.
