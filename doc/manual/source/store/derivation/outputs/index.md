@@ -83,7 +83,7 @@ The rules for this are fairly concise:
 
   - A content-addressing derivation may be pure or impure
 
-   - If it is impure, it may be be fixed (typical), or it may be floating if the additional [`impure-derivations`][xp-feature-impure-derivations] experimental feature is enabled.
+   - If it is impure, it may be fixed (typical), or it may be floating if the additional [`impure-derivations`][xp-feature-impure-derivations] experimental feature is enabled.
 
    - If it is pure, it must be floating.
 
