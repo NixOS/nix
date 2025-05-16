@@ -4,14 +4,22 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-profiler.hh"
 
-#include <chrono>
-
 namespace nix {
 
-struct FunctionCallTrace
+class FunctionCallTrace : public EvalProfiler
 {
-    const Pos pos;
-    FunctionCallTrace(const Pos & pos);
-    ~FunctionCallTrace();
+    Hooks getNeededHooksImpl() const override
+    {
+        return Hooks().set(preFunctionCall).set(postFunctionCall);
+    }
+
+public:
+    FunctionCallTrace() = default;
+
+    [[gnu::noinline]] void
+    preFunctionCallHook(const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos) override;
+    [[gnu::noinline]] void
+    postFunctionCallHook(const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos) override;
 };
+
 }

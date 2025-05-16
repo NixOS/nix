@@ -372,6 +372,10 @@ EvalState::EvalState(
     );
 
     createBaseEnv(settings);
+
+    /* Register function call tracer. */
+    if (settings.traceFunctionCalls)
+        profiler.addProfiler(make_ref<FunctionCallTrace>());
 }
 
 
@@ -1526,9 +1530,14 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 {
     auto _level = addCallDepth(pos);
 
-    auto trace = settings.traceFunctionCalls
-        ? std::make_unique<FunctionCallTrace>(positions[pos])
-        : nullptr;
+    auto neededHooks = profiler.getNeededHooks();
+    if (neededHooks.test(EvalProfiler::preFunctionCall)) [[unlikely]]
+        profiler.preFunctionCallHook(*this, fun, args, pos);
+
+    Finally traceExit_{[&](){
+        if (profiler.getNeededHooks().test(EvalProfiler::postFunctionCall)) [[unlikely]]
+            profiler.postFunctionCallHook(*this, fun, args, pos);
+    }};
 
     forceValue(fun, pos);
 
