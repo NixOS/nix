@@ -73,7 +73,7 @@ Derivations can declare some infrequently used optional attributes.
 
     > **Warning**
     >
-    > If set to `true`, other advanced attributes such as [`allowedReferences`](#adv-attr-allowedReferences), [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
+    > If set to `true`, other advanced attributes such as [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
     [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites), maxSize, and maxClosureSize.
     will have no effect.
 
