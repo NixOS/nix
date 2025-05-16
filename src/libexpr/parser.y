@@ -179,7 +179,12 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
 
 %%
 
-start: expr { state->result = $1; };
+start: expr {
+  state->result = $1;
+
+  // This parser does not use yynerrs; suppress the warning.
+  (void) yynerrs;
+};
 
 expr: expr_function;
 

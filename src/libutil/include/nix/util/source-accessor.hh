@@ -220,4 +220,10 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root);
  */
 ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors);
 
+/**
+ * Creates a new source accessor which is confined to the subdirectory
+ * of the given source accessor.
+ */
+ref<SourceAccessor> projectSubdirSourceAccessor(ref<SourceAccessor>, CanonPath subdirectory);
+
 }

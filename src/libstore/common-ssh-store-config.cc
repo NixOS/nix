@@ -28,7 +28,7 @@ CommonSSHStoreConfig::CommonSSHStoreConfig(std::string_view scheme, std::string_
 {
 }
 
-SSHMaster CommonSSHStoreConfig::createSSHMaster(bool useMaster, Descriptor logFD)
+SSHMaster CommonSSHStoreConfig::createSSHMaster(bool useMaster, Descriptor logFD) const
 {
     return {
         host,

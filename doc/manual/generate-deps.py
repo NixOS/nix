@@ -14,7 +14,7 @@ import sys
 # literally. since the rules for these aren't even the same for
 # all three we will just fail when we encounter any of them (if
 # asserts are off for some reason the depfile will likely point
-# to nonexistant paths, making everything phony and thus fine.)
+# to nonexistent paths, making everything phony and thus fine.)
 for path in glob.glob(sys.argv[1] + '/**', recursive=True):
     assert '\\' not in path
     assert ' ' not in path

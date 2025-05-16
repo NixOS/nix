@@ -11,8 +11,6 @@
 #include <filesystem>
 #include <gtest/gtest.h>
 
-namespace fs { using namespace std::filesystem; }
-
 namespace nixC {
 class nix_api_store_test : public nix_api_util_context
 {
@@ -27,10 +25,10 @@ public:
     {
         nix_store_free(store);
 
-        for (auto & path : fs::recursive_directory_iterator(nixDir)) {
-            fs::permissions(path, fs::perms::owner_all);
+        for (auto & path : std::filesystem::recursive_directory_iterator(nixDir)) {
+            std::filesystem::permissions(path, std::filesystem::perms::owner_all);
         }
-        fs::remove_all(nixDir);
+        std::filesystem::remove_all(nixDir);
     }
 
     Store * store;
@@ -45,7 +43,7 @@ protected:
         auto tmpl = nix::defaultTempDir() + "/tests_nix-store.";
         for (size_t i = 0; true; ++i) {
             nixDir = tmpl + std::string { i };
-            if (fs::create_directory(nixDir)) break;
+            if (std::filesystem::create_directory(nixDir)) break;
         }
 #else
         // resolve any symlinks in i.e. on macOS /tmp -> /private/tmp

@@ -15,12 +15,12 @@ typedef std::vector<Machine> Machines;
 struct Machine {
 
     const StoreReference storeUri;
-    const std::set<std::string> systemTypes;
+    const StringSet systemTypes;
     const std::string sshKey;
     const unsigned int maxJobs;
     const float speedFactor;
-    const std::set<std::string> supportedFeatures;
-    const std::set<std::string> mandatoryFeatures;
+    const StringSet supportedFeatures;
+    const StringSet mandatoryFeatures;
     const std::string sshPublicHostKey;
     bool enabled = true;
 
@@ -34,12 +34,12 @@ struct Machine {
      * @return Whether `features` is a subset of the union of `supportedFeatures` and
      * `mandatoryFeatures`.
      */
-    bool allSupported(const std::set<std::string> & features) const;
+    bool allSupported(const StringSet & features) const;
 
     /**
      * @return Whether `mandatoryFeatures` is a subset of `features`.
      */
-    bool mandatoryMet(const std::set<std::string> & features) const;
+    bool mandatoryMet(const StringSet & features) const;
 
     Machine(
         const std::string & storeUri,
@@ -75,7 +75,7 @@ struct Machine {
      * with `@` are interpreted as paths to other configuration files in
      * the same format.
      */
-    static Machines parseConfig(const std::set<std::string> & defaultSystems, const std::string & config);
+    static Machines parseConfig(const StringSet & defaultSystems, const std::string & config);
 };
 
 /**

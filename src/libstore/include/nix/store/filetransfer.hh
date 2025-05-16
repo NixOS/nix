@@ -30,7 +30,7 @@ struct FileTransferSettings : Config
         {"binary-caches-parallel-connections"}};
 
     Setting<unsigned long> connectTimeout{
-        this, 0, "connect-timeout",
+        this, 5, "connect-timeout",
         R"(
           The timeout (in seconds) for establishing connections in the
           binary cache substituter. It corresponds to `curl`’s
@@ -58,6 +58,8 @@ struct FileTransferSettings : Config
 
 extern FileTransferSettings fileTransferSettings;
 
+extern const unsigned int RETRY_TIME_MS_DEFAULT;
+
 struct FileTransferRequest
 {
     std::string uri;
@@ -67,7 +69,7 @@ struct FileTransferRequest
     bool head = false;
     bool post = false;
     size_t tries = fileTransferSettings.tries;
-    unsigned int baseRetryTimeMs = 250;
+    unsigned int baseRetryTimeMs = RETRY_TIME_MS_DEFAULT;
     ActivityId parentAct;
     bool decompress = true;
     std::optional<std::string> data;

@@ -2,6 +2,7 @@
 #include "nix/store/derivations.hh"
 #include "dotgraph.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/store-cast.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/log-store.hh"
@@ -497,7 +498,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     /* Print each environment variable in the derivation in a format
      * that can be sourced by the shell. */
     for (auto & i : drv.env)
-        logger->cout("export %1%; %1%=%2%\n", i.first, shellEscape(i.second));
+        logger->cout("export %1%; %1%=%2%\n", i.first, escapeShellArgAlways(i.second));
 
     /* Also output the arguments.  This doesn't preserve whitespace in
        arguments. */
@@ -506,7 +507,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     for (auto & i : drv.args) {
         if (!first) cout << ' ';
         first = false;
-        cout << shellEscape(i);
+        cout << escapeShellArgAlways(i);
     }
     cout << "'\n";
 }
@@ -563,7 +564,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
 #endif
             if (!hashGiven) {
                 HashResult hash = hashPath(
-                    {store->getFSAccessor(false), CanonPath { store->printStorePath(info->path) }},
+                    {store->getFSAccessor(false), CanonPath { info->path.to_string() }},
                     FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 info->narHash = hash.first;
                 info->narSize = hash.second;

@@ -22,7 +22,7 @@ const int sha1HashSize = 20;
 const int sha256HashSize = 32;
 const int sha512HashSize = 64;
 
-extern const std::set<std::string> hashAlgorithms;
+extern const StringSet hashAlgorithms;
 
 extern const std::string nix32Chars;
 
@@ -42,7 +42,7 @@ enum struct HashFormat : int {
     SRI
 };
 
-extern const std::set<std::string> hashFormats;
+extern const StringSet hashFormats;
 
 struct Hash
 {

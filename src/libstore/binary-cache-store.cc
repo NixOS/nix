@@ -24,13 +24,21 @@
 
 namespace nix {
 
-BinaryCacheStore::BinaryCacheStore(const Params & params)
-    : BinaryCacheStoreConfig(params)
-    , Store(params)
+BinaryCacheStore::BinaryCacheStore(Config & config)
+    : config{config}
 {
-    if (secretKeyFile != "")
-        signer = std::make_unique<LocalSigner>(
-            SecretKey { readFile(secretKeyFile) });
+    if (config.secretKeyFile != "")
+        signers.push_back(std::make_unique<LocalSigner>(
+            SecretKey { readFile(config.secretKeyFile) }));
+
+    if (config.secretKeyFiles != "") {
+        std::stringstream ss(config.secretKeyFiles);
+        Path keyPath;
+        while (std::getline(ss, keyPath, ',')) {
+            signers.push_back(std::make_unique<LocalSigner>(
+                SecretKey { readFile(keyPath) }));
+        }
+    }
 
     StringSink sink;
     sink << narVersionMagic1;
@@ -53,9 +61,9 @@ void BinaryCacheStore::init()
                     throw Error("binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
                         getUri(), value, storeDir);
             } else if (name == "WantMassQuery") {
-                wantMassQuery.setDefault(value == "1");
+                config.wantMassQuery.setDefault(value == "1");
             } else if (name == "Priority") {
-                priority.setDefault(std::stoi(value));
+                config.priority.setDefault(std::stoi(value));
             }
         }
     }
@@ -147,7 +155,11 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     {
     FdSink fileSink(fdTemp.get());
     TeeSink teeSinkCompressed { fileSink, fileHashSink };
-    auto compressionSink = makeCompressionSink(compression, teeSinkCompressed, parallelCompression, compressionLevel);
+    auto compressionSink = makeCompressionSink(
+        config.compression,
+        teeSinkCompressed,
+        config.parallelCompression,
+        config.compressionLevel);
     TeeSink teeSinkUncompressed { *compressionSink, narHashSink };
     TeeSource teeSource { narSource, teeSinkUncompressed };
     narAccessor = makeNarAccessor(teeSource);
@@ -159,17 +171,17 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
     auto info = mkInfo(narHashSink.finish());
     auto narInfo = make_ref<NarInfo>(info);
-    narInfo->compression = compression;
+    narInfo->compression = config.compression;
     auto [fileHash, fileSize] = fileHashSink.finish();
     narInfo->fileHash = fileHash;
     narInfo->fileSize = fileSize;
     narInfo->url = "nar/" + narInfo->fileHash->to_string(HashFormat::Nix32, false) + ".nar"
-                   + (compression == "xz" ? ".xz" :
-           compression == "bzip2" ? ".bz2" :
-           compression == "zstd" ? ".zst" :
-           compression == "lzip" ? ".lzip" :
-           compression == "lz4" ? ".lz4" :
-           compression == "br" ? ".br" :
+                   + (config.compression == "xz" ? ".xz" :
+           config.compression == "bzip2" ? ".bz2" :
+           config.compression == "zstd" ? ".zst" :
+           config.compression == "lzip" ? ".lzip" :
+           config.compression == "lz4" ? ".lz4" :
+           config.compression == "br" ? ".br" :
            "");
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
@@ -191,7 +203,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
     /* Optionally write a JSON file containing a listing of the
        contents of the NAR. */
-    if (writeNARListing) {
+    if (config.writeNARListing) {
         nlohmann::json j = {
             {"version", 1},
             {"root", listNar(ref<SourceAccessor>(narAccessor), CanonPath::root, true)},
@@ -203,7 +215,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     /* Optionally maintain an index of DWARF debug info files
        consisting of JSON files named 'debuginfo/<build-id>' that
        specify the NAR file and member containing the debug info. */
-    if (writeDebugInfo) {
+    if (config.writeDebugInfo) {
 
         CanonPath buildIdDir("lib/debug/.build-id");
 
@@ -270,9 +282,9 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     stats.narWriteCompressedBytes += fileSize;
     stats.narWriteCompressionTimeMs += duration;
 
-    /* Atomically write the NAR info file.*/
-    if (signer) narInfo->sign(*this, *signer);
+    narInfo->sign(*this, signers);
 
+    /* Atomically write the NAR info file.*/
     writeNarInfo(narInfo);
 
     stats.narInfoWrite++;
@@ -515,7 +527,7 @@ void BinaryCacheStore::registerDrvOutput(const Realisation& info) {
 
 ref<SourceAccessor> BinaryCacheStore::getFSAccessor(bool requireValidPath)
 {
-    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), requireValidPath, localNarCache);
+    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), requireValidPath, config.localNarCache);
 }
 
 void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSet & sigs)

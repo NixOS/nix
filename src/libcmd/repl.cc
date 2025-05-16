@@ -12,7 +12,7 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/attr-path.hh"
 #include "nix/util/signals.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/log-store.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/expr/get-drvs.hh"
@@ -61,7 +61,10 @@ struct NixRepl
 {
     size_t debugTraceIndex;
 
+    // Arguments passed to :load, saved so they can be reloaded with :reload
     Strings loadedFiles;
+    // Arguments passed to :load-flake, saved so they can be reloaded with :reload
+    Strings loadedFlakes;
     std::function<AnnotatedValues()> getValues;
 
     const static int envSize = 32768;
@@ -90,7 +93,8 @@ struct NixRepl
     void loadFile(const Path & path);
     void loadFlake(const std::string & flakeRef);
     void loadFiles();
-    void reloadFiles();
+    void loadFlakes();
+    void reloadFilesAndFlakes();
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol name, Value & v);
     Expr * parseString(std::string s);
@@ -244,14 +248,13 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
         try {
             auto dir = std::string(cur, 0, slash);
             auto prefix2 = std::string(cur, slash + 1);
-            for (auto & entry : std::filesystem::directory_iterator{dir == "" ? "/" : dir}) {
+            for (auto & entry : DirectoryIterator{dir == "" ? "/" : dir}) {
                 checkInterrupt();
                 auto name = entry.path().filename().string();
                 if (name[0] != '.' && hasPrefix(name, prefix2))
                     completions.insert(prev + entry.path().string());
             }
         } catch (Error &) {
-        } catch (std::filesystem::filesystem_error &) {
         }
     } else if ((dot = cur.rfind('.')) == std::string::npos) {
         /* This is a variable name; look it up in the current scope. */
@@ -467,7 +470,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
     else if (command == ":r" || command == ":reload") {
         state->resetFileCache();
-        reloadFiles();
+        reloadFilesAndFlakes();
     }
 
     else if (command == ":e" || command == ":edit") {
@@ -502,7 +505,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
         // Reload right after exiting the editor
         state->resetFileCache();
-        reloadFiles();
+        reloadFilesAndFlakes();
     }
 
     else if (command == ":t") {
@@ -717,6 +720,9 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
     if (flakeRefS.empty())
         throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
 
+    loadedFlakes.remove(flakeRefS);
+    loadedFlakes.push_back(flakeRefS);
+
     std::filesystem::path cwd;
     try {
         cwd = std::filesystem::current_path();
@@ -755,11 +761,12 @@ void NixRepl::initEnv()
 }
 
 
-void NixRepl::reloadFiles()
+void NixRepl::reloadFilesAndFlakes()
 {
     initEnv();
 
     loadFiles();
+    loadFlakes();
 }
 
 
@@ -776,6 +783,18 @@ void NixRepl::loadFiles()
     for (auto & [i, what] : getValues()) {
         notice("Loading installable '%1%'...", what);
         addAttrsToScope(*i);
+    }
+}
+
+
+void NixRepl::loadFlakes()
+{
+    Strings old = loadedFlakes;
+    loadedFlakes.clear();
+
+    for (auto & i : old) {
+        notice("Loading flake '%1%'...", i);
+        loadFlake(i);
     }
 }
 

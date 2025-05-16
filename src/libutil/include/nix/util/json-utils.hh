@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <list>
 
+#include "nix/util/error.hh"
 #include "nix/util/types.hh"
 
 namespace nix {
@@ -35,7 +36,26 @@ const nlohmann::json * getNullable(const nlohmann::json & value);
 const nlohmann::json::object_t & getObject(const nlohmann::json & value);
 const nlohmann::json::array_t & getArray(const nlohmann::json & value);
 const nlohmann::json::string_t & getString(const nlohmann::json & value);
-const nlohmann::json::number_integer_t & getInteger(const nlohmann::json & value);
+const nlohmann::json::number_unsigned_t & getUnsigned(const nlohmann::json & value);
+
+template<typename T>
+auto getInteger(const nlohmann::json & value) -> std::enable_if_t<std::is_signed_v<T> && std::is_integral_v<T>, T>
+{
+    if (auto ptr = value.get_ptr<const nlohmann::json::number_unsigned_t *>()) {
+        if (*ptr <= std::make_unsigned_t<T>(std::numeric_limits<T>::max())) {
+            return *ptr;
+        }
+    } else if (auto ptr = value.get_ptr<const nlohmann::json::number_integer_t *>()) {
+        if (*ptr >= std::numeric_limits<T>::min() && *ptr <= std::numeric_limits<T>::max()) {
+            return *ptr;
+        }
+    } else {
+        auto typeName = value.is_number_float() ? "floating point number" : value.type_name();
+        throw Error("Expected JSON value to be an integral number but it is of type '%s': %s", typeName, value.dump());
+    }
+    throw Error("Out of range: JSON value '%s' cannot be casted to %d-bit integer", value.dump(), 8 * sizeof(T));
+}
+
 const nlohmann::json::boolean_t & getBoolean(const nlohmann::json & value);
 Strings getStringList(const nlohmann::json & value);
 StringMap getStringMap(const nlohmann::json & value);
@@ -70,8 +90,8 @@ struct json_avoids_null<std::vector<T>> : std::true_type {};
 template<typename T>
 struct json_avoids_null<std::list<T>> : std::true_type {};
 
-template<typename T>
-struct json_avoids_null<std::set<T>> : std::true_type {};
+template<typename T, typename Compare>
+struct json_avoids_null<std::set<T, Compare>> : std::true_type {};
 
 template<typename K, typename V>
 struct json_avoids_null<std::map<K, V>> : std::true_type {};

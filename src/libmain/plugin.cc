@@ -6,6 +6,7 @@
 
 #include "nix/util/config-global.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/file-system.hh"
 
 namespace nix {
 
@@ -18,7 +19,7 @@ struct PluginFilesSetting : public BaseSetting<Paths>
         const Paths & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
+        const StringSet & aliases = {})
         : BaseSetting<Paths>(def, true, name, description, aliases)
     {
         options->addSetting(this);
@@ -77,13 +78,13 @@ void initPlugins()
     for (const auto & pluginFile : pluginSettings.pluginFiles.get()) {
         std::vector<std::filesystem::path> pluginFiles;
         try {
-            auto ents = std::filesystem::directory_iterator{pluginFile};
+            auto ents = DirectoryIterator{pluginFile};
             for (const auto & ent : ents) {
                 checkInterrupt();
                 pluginFiles.emplace_back(ent.path());
             }
-        } catch (std::filesystem::filesystem_error & e) {
-            if (e.code() != std::errc::not_a_directory)
+        } catch (SysError & e) {
+            if (e.errNo != ENOTDIR)
                 throw;
             pluginFiles.emplace_back(pluginFile);
         }

@@ -6,7 +6,8 @@ project('nix-dev-shell', 'cpp',
   subproject_dir : 'src',
   default_options : [
     'localstatedir=/nix/var',
-  ]
+  ],
+  meson_version : '>= 1.1'
 )
 
 # Internal Libraries
@@ -33,6 +34,7 @@ endif
 # External C wrapper libraries
 subproject('libutil-c')
 subproject('libstore-c')
+subproject('libfetchers-c')
 subproject('libexpr-c')
 subproject('libflake-c')
 subproject('libmain-c')

@@ -71,12 +71,17 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
     # We use this shell with the local checkout, not unpackPhase.
     src = null;
 
-    env = {
-      # For `make format`, to work without installing pre-commit
-      _NIX_PRE_COMMIT_HOOKS_CONFIG = "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml"
-        modular.pre-commit.settings.rawConfig
-      }";
-    };
+    env =
+      {
+        # For `make format`, to work without installing pre-commit
+        _NIX_PRE_COMMIT_HOOKS_CONFIG = "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml"
+          modular.pre-commit.settings.rawConfig
+        }";
+      }
+      // lib.optionalAttrs stdenv.hostPlatform.isLinux {
+        CC_LD = "mold";
+        CXX_LD = "mold";
+      };
 
     mesonFlags =
       map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents2.nix-util.mesonFlags)
@@ -119,7 +124,8 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
       ++ lib.optional (stdenv.cc.isClang && !stdenv.buildPlatform.isDarwin) pkgs.buildPackages.bear
       ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (
         lib.hiPrio pkgs.buildPackages.clang-tools
-      );
+      )
+      ++ lib.optional stdenv.hostPlatform.isLinux pkgs.buildPackages.mold-wrapped;
 
     buildInputs =
       attrs.buildInputs or [ ]

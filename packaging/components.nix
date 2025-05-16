@@ -151,13 +151,6 @@ let
     ];
     separateDebugInfo = !stdenv.hostPlatform.isStatic;
     hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
-    env =
-      prevAttrs.env or { }
-      // lib.optionalAttrs (
-        stdenv.isLinux
-        && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")
-        && !(stdenv.hostPlatform.useLLVM or false)
-      ) { LDFLAGS = "-fuse-ld=gold"; };
   };
 
   mesonLibraryLayer = finalAttrs: prevAttrs: {
@@ -209,6 +202,7 @@ in
 {
   version = baseVersion + versionSuffix;
   inherit versionSuffix;
+  inherit officialRelease;
   inherit maintainers;
 
   inherit filesetToSource;
@@ -331,6 +325,7 @@ in
   nix-store-tests = callPackage ../src/libstore-tests/package.nix { };
 
   nix-fetchers = callPackage ../src/libfetchers/package.nix { };
+  nix-fetchers-c = callPackage ../src/libfetchers-c/package.nix { };
   nix-fetchers-tests = callPackage ../src/libfetchers-tests/package.nix { };
 
   nix-expr = callPackage ../src/libexpr/package.nix { };

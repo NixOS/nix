@@ -34,9 +34,9 @@ static size_t regularHashSize(HashAlgorithm type) {
 }
 
 
-const std::set<std::string> hashAlgorithms = {"blake3", "md5", "sha1", "sha256", "sha512" };
+const StringSet hashAlgorithms = {"blake3", "md5", "sha1", "sha256", "sha512" };
 
-const std::set<std::string> hashFormats = {"base64", "nix32", "base16", "sri" };
+const StringSet hashFormats = {"base64", "nix32", "base16", "sri" };
 
 Hash::Hash(HashAlgorithm algo, const ExperimentalFeatureSettings & xpSettings) : algo(algo)
 {
@@ -309,11 +309,31 @@ static void start(HashAlgorithm ha, Ctx & ctx)
     else if (ha == HashAlgorithm::SHA512) SHA512_Init(&ctx.sha512);
 }
 
+// BLAKE3 data size threshold beyond which parallel hashing with TBB is likely faster.
+//
+// NOTE: This threshold is based on the recommended rule-of-thumb from the official BLAKE3 documentation for typical
+// x86_64 hardware as of 2025. In the future it may make sense to allow the user to tune this through nix.conf.
+const size_t blake3TbbThreshold = 128000;
+
+// Decide which BLAKE3 update strategy to use based on some heuristics. Currently this just checks the data size but in
+// the future it might also take into consideration available system resources or the presence of a shared-memory
+// capable GPU for a heterogenous compute implementation.
+void blake3_hasher_update_with_heuristics(blake3_hasher * blake3, std::string_view data)
+{
+#ifdef BLAKE3_USE_TBB
+    if (data.size() >= blake3TbbThreshold) {
+        blake3_hasher_update_tbb(blake3, data.data(), data.size());
+    } else
+#endif
+    {
+        blake3_hasher_update(blake3, data.data(), data.size());
+    }
+}
 
 static void update(HashAlgorithm ha, Ctx & ctx,
                    std::string_view data)
 {
-    if (ha == HashAlgorithm::BLAKE3) blake3_hasher_update(&ctx.blake3, data.data(), data.size());
+    if (ha == HashAlgorithm::BLAKE3) blake3_hasher_update_with_heuristics(&ctx.blake3, data);
     else if (ha == HashAlgorithm::MD5) MD5_Update(&ctx.md5, data.data(), data.size());
     else if (ha == HashAlgorithm::SHA1) SHA1_Update(&ctx.sha1, data.data(), data.size());
     else if (ha == HashAlgorithm::SHA256) SHA256_Update(&ctx.sha256, data.data(), data.size());
