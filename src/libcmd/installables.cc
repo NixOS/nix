@@ -359,13 +359,28 @@ void completeFlakeRefWithFragment(
 
             for (auto & attrPathPrefixS : attrPathPrefixes) {
                 auto attrPathPrefix = parseAttrPath(*evalState, attrPathPrefixS);
-                auto attrPathS = attrPathPrefixS + std::string(fragment);
-                auto attrPath = parseAttrPath(*evalState, attrPathS);
+                // we receive backslashes as typed; left alone, they get into attr names.
+                auto fragmentUnshell = replaceStrings(std::string(fragment), "\\\"", "\"");
+                auto attrPathS = attrPathPrefixS + fragmentUnshell;
+                auto incompleteQuote = false;
+
+                std::vector<Symbol> attrPath;
+                try {
+                    attrPath = parseAttrPath(*evalState, attrPathS);
+                } catch (const ParseError&) {
+                    attrPath = parseAttrPath(*evalState, attrPathS + "\"");
+                    incompleteQuote = true;
+                }
 
                 std::string lastAttr;
-                if (!attrPath.empty() && !hasSuffix(attrPathS, ".")) {
+                while (!attrPath.empty() && !hasSuffix(attrPathS, ".")) {
                     lastAttr = evalState->symbols[attrPath.back()];
                     attrPath.pop_back();
+                    if (incompleteQuote && lastAttr.empty()) {
+                        incompleteQuote = false;
+                        continue;
+                    }
+                    break;
                 }
 
                 auto attr = root->findAlongAttrPath(attrPath);
@@ -376,8 +391,13 @@ void completeFlakeRefWithFragment(
                         auto attrPath2 = (*attr)->getAttrPath(attr2);
                         /* Strip the attrpath prefix. */
                         attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
-                        // FIXME: handle names with dots
-                        completions.add(flakeRefS + "#" + prefixRoot + concatStringsSep(".", evalState->symbols.resolve(attrPath2)));
+                        Strings escs;
+                        for (auto sym : evalState->symbols.resolve(attrPath2)) {
+                            std::stringstream ss;
+                            ss << sym;
+                            escs.push_back(replaceStrings(ss.str(), "\"", "\\\""));
+                        }
+                        completions.add(flakeRefS + "#" + prefixRoot + concatStringsSep(".", escs));
                     }
                 }
             }
