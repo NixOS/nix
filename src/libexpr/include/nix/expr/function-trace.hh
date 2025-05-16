@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/expr/eval.hh"
+#include "nix/expr/eval-profiler.hh"
 
 #include <chrono>
 
