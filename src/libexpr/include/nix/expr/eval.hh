@@ -3,6 +3,7 @@
 
 #include "nix/expr/attr-set.hh"
 #include "nix/expr/eval-error.hh"
+#include "nix/expr/eval-profiler.hh"
 #include "nix/util/types.hh"
 #include "nix/expr/value.hh"
 #include "nix/expr/nixexpr.hh"
@@ -902,6 +903,9 @@ private:
 
     typedef std::map<ExprLambda *, size_t> FunctionCalls;
     FunctionCalls functionCalls;
+
+    /** Evaluation/call profiler. */
+    MultiEvalProfiler profiler;
 
     void incrFunctionCall(ExprLambda * fun);
 
