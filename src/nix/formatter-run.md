@@ -8,6 +8,9 @@ Flags can be forwarded to the formatter by using `--` followed by the flags.
 
 Any arguments will be forwarded to the formatter. Typically these are the files to format.
 
+The environment variable `NIX_FLAKE_DIR` will be set to the absolute path to the
+directory containing the flake's `flake.nix`.
+
 
 # Example
 
