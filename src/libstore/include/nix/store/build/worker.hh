@@ -196,6 +196,9 @@ public:
      * @ref DerivationGoal "derivation goal"
      */
 private:
+    template<class G, typename... Args>
+    std::shared_ptr<G> initGoalIfNeeded(std::weak_ptr<G> & goal_weak, Args && ...args);
+
     std::shared_ptr<DerivationGoal> makeDerivationGoalCommon(
         const StorePath & drvPath, const OutputsSpec & wantedOutputs,
         std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal);
