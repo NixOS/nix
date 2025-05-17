@@ -276,6 +276,8 @@
               ''^src/libstore/store-api\.cc$''
               ''^src/libstore/include/nix/store/store-api\.hh$''
               ''^src/libstore/include/nix/store/store-dir-config\.hh$''
+              ''^src/libstore/build/derivation-building-goal\.cc$''
+              ''^src/libstore/include/nix/store/build/derivation-building-goal\.hh$''
               ''^src/libstore/build/derivation-goal\.cc$''
               ''^src/libstore/include/nix/store/build/derivation-goal\.hh$''
               ''^src/libstore/build/drv-output-substitution-goal\.cc$''
