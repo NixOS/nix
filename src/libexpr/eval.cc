@@ -372,13 +372,23 @@ EvalState::EvalState(
     );
 
     createBaseEnv(settings);
+
+    /* Register function call tracer. */
+    if (settings.traceFunctionCalls)
+        profiler.addProfiler(make_ref<FunctionCallTrace>());
+
+    profiler.addProfiler(stackSampler);
 }
 
 
 EvalState::~EvalState()
 {
+    auto profileFile = getEnv("NIX_PROFILE_FILE");
+    if (!profileFile.has_value())
+        return;
+    auto os = std::ofstream(*profileFile);
+    stackSampler->saveProfile(*this, os);
 }
-
 
 void EvalState::allowPath(const Path & path)
 {
@@ -1526,9 +1536,14 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 {
     auto _level = addCallDepth(pos);
 
-    auto trace = settings.traceFunctionCalls
-        ? std::make_unique<FunctionCallTrace>(positions[pos])
-        : nullptr;
+    auto neededHooks = profiler.getNeededHooks();
+    if (neededHooks.test(EvalProfiler::preFunctionCall)) [[unlikely]]
+        profiler.preFunctionCallHook(*this, fun, args, pos);
+
+    Finally traceExit_{[&](){
+        if (profiler.getNeededHooks().test(EvalProfiler::postFunctionCall)) [[unlikely]]
+            profiler.postFunctionCallHook(*this, fun, args, pos);
+    }};
 
     forceValue(fun, pos);
 
