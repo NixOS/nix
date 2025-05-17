@@ -1,12 +1,12 @@
-#include "nix/util/source-accessor.hh"
+#include "nix/util/mounted-source-accessor.hh"
 
 namespace nix {
 
-struct MountedSourceAccessor : SourceAccessor
+struct MountedSourceAccessorImpl : MountedSourceAccessor
 {
     std::map<CanonPath, ref<SourceAccessor>> mounts;
 
-    MountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> _mounts)
+    MountedSourceAccessorImpl(std::map<CanonPath, ref<SourceAccessor>> _mounts)
         : mounts(std::move(_mounts))
     {
         displayPrefix.clear();
@@ -21,6 +21,12 @@ struct MountedSourceAccessor : SourceAccessor
     {
         auto [accessor, subpath] = resolve(path);
         return accessor->readFile(subpath);
+    }
+
+    Stat lstat(const CanonPath & path) override
+    {
+        auto [accessor, subpath] = resolve(path);
+        return accessor->lstat(subpath);
     }
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override
@@ -69,11 +75,26 @@ struct MountedSourceAccessor : SourceAccessor
         auto [accessor, subpath] = resolve(path);
         return accessor->getPhysicalPath(subpath);
     }
+
+    void mount(CanonPath mountPoint, ref<SourceAccessor> accessor) override
+    {
+        // FIXME: thread-safety
+        mounts.insert_or_assign(std::move(mountPoint), accessor);
+    }
+
+    std::shared_ptr<SourceAccessor> getMount(CanonPath mountPoint) override
+    {
+        auto i = mounts.find(mountPoint);
+        if (i != mounts.end())
+            return i->second;
+        else
+            return nullptr;
+    }
 };
 
-ref<SourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts)
+ref<MountedSourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts)
 {
-    return make_ref<MountedSourceAccessor>(std::move(mounts));
+    return make_ref<MountedSourceAccessorImpl>(std::move(mounts));
 }
 
 }
