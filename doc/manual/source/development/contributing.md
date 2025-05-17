@@ -20,8 +20,9 @@ prs: 1238
 Here's one or more paragraphs that describe the change.
 
 - It's markdown
-- Add references to the manual using @docroot@
+- Add references to the manual using [links like this](@_at_docroot@/example.md)
 ```
+<!-- for the raw markdown readers: that means using @docroot@ -->
 
 Significant changes should add the following header, which moves them to the top.
 

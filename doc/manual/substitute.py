@@ -57,6 +57,9 @@ def recursive_replace(data: dict[str, t.Any], book_root: Path, search_path: Path
                     ).replace(
                         '@docroot@',
                         ("../" * len(path_to_chapter.parent.parts) or "./")[:-1]
+                    ).replace(
+                        '@_at_',
+                        '@'
                     ),
                     sub_items = [
                         recursive_replace(sub_item, book_root, search_path)
