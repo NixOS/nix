@@ -4,6 +4,7 @@
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-goal.hh"
+#include "nix/store/build/derivation-building-goal.hh"
 #ifndef _WIN32 // TODO Enable building on Windows
 #  include "nix/store/build/hook-instance.hh"
 #endif
@@ -87,6 +88,20 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
 }
 
 
+std::shared_ptr<DerivationBuildingGoal> Worker::makeDerivationBuildingGoal(const StorePath & drvPath,
+    const Derivation & drv, BuildMode buildMode)
+{
+    std::weak_ptr<DerivationBuildingGoal> & goal_weak = derivationBuildingGoals[drvPath];
+    auto goal = goal_weak.lock(); // FIXME
+    if (!goal) {
+        goal = std::make_shared<DerivationBuildingGoal>(drvPath, drv, *this, buildMode);
+        goal_weak = goal;
+        wakeUp(goal);
+    }
+    return goal;
+}
+
+
 std::shared_ptr<PathSubstitutionGoal> Worker::makePathSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
 {
     return initGoalIfNeeded(substitutionGoals[path], path, *this, repair, ca);
@@ -134,8 +149,9 @@ void Worker::removeGoal(GoalPtr goal)
 {
     if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
         nix::removeGoal(drvGoal, derivationGoals);
-    else
-    if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
+    else if (auto drvBuildingGoal = std::dynamic_pointer_cast<DerivationBuildingGoal>(goal))
+        nix::removeGoal(drvBuildingGoal, derivationBuildingGoals);
+    else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
         nix::removeGoal(subGoal, substitutionGoals);
     else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal))
         nix::removeGoal(subGoal, drvOutputSubstitutionGoals);
@@ -198,6 +214,9 @@ void Worker::childStarted(GoalPtr goal, const std::set<MuxablePipePollState::Com
         case JobCategory::Build:
             nrLocalBuilds++;
             break;
+        case JobCategory::Administration:
+            /* Intentionally not limited, see docs */
+            break;
         default:
             unreachable();
         }
@@ -220,6 +239,9 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
         case JobCategory::Build:
             assert(nrLocalBuilds > 0);
             nrLocalBuilds--;
+            break;
+        case JobCategory::Administration:
+            /* Intentionally not limited, see docs */
             break;
         default:
             unreachable();
