@@ -15,6 +15,15 @@ Gen<NixStringContextElem::DrvDeep> Arbitrary<NixStringContextElem::DrvDeep>::arb
     });
 }
 
+Gen<NixStringContextElem::Path> Arbitrary<NixStringContextElem::Path>::arbitrary()
+{
+    return gen::map(gen::arbitrary<StorePath>(), [](StorePath storePath) {
+        return NixStringContextElem::Path{
+            .storePath = storePath,
+        };
+    });
+}
+
 Gen<NixStringContextElem> Arbitrary<NixStringContextElem>::arbitrary()
 {
     return gen::mapcat(
@@ -30,6 +39,9 @@ Gen<NixStringContextElem> Arbitrary<NixStringContextElem>::arbitrary()
             case 2:
                 return gen::map(
                     gen::arbitrary<NixStringContextElem::Built>(), [](NixStringContextElem a) { return a; });
+            case 3:
+                return gen::map(
+                    gen::arbitrary<NixStringContextElem::Path>(), [](NixStringContextElem a) { return a; });
             default:
                 assert(false);
             }
