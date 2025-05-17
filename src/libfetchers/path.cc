@@ -4,6 +4,7 @@
 #include "nix/fetchers/store-path-accessor.hh"
 #include "nix/fetchers/cache.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 namespace nix::fetchers {
 
@@ -149,7 +150,7 @@ struct PathInputScheme : InputScheme
         auto fp = getFingerprint(store, input);
         if (fp) {
             auto cacheKey = makeFetchToStoreCacheKey(input.getName(), *fp, method, "/");
-            fetchers::getCache()->upsert(cacheKey, *store, {}, *storePath);
+            input.settings->getCache()->upsert(cacheKey, *store, {}, *storePath);
         }
 
         /* Trust the lastModified value supplied by the user, if

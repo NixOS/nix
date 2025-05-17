@@ -5,7 +5,7 @@
 
 namespace nix {
 
-namespace fetchers { struct PublicKey; }
+namespace fetchers { struct PublicKey; struct Settings; }
 
 /**
  * A sink that writes into a Git repository. Note that nothing may be written
@@ -115,7 +115,7 @@ struct GitRepo
      * Given a Git tree hash, compute the hash of its NAR
      * serialisation. This is memoised on-disk.
      */
-    virtual Hash treeHashToNarHash(const Hash & treeHash) = 0;
+    virtual Hash treeHashToNarHash(const fetchers::Settings & settings, const Hash & treeHash) = 0;
 
     /**
      * If the specified Git object is a directory with a single entry

@@ -30,7 +30,7 @@ static StorePath copyInputToStore(
     const fetchers::Input & originalInput,
     ref<SourceAccessor> accessor)
 {
-    auto storePath = fetchToStore(*state.store, accessor, FetchMode::Copy, input.getName());
+    auto storePath = fetchToStore(*input.settings, *state.store, accessor, FetchMode::Copy, input.getName());
 
     state.allowPath(storePath);
 
@@ -276,7 +276,7 @@ static Flake readFlake(
                     state.symbols[setting.name],
                     std::string(state.forceStringNoCtx(*setting.value, setting.pos, "")));
             else if (setting.value->type() == nPath) {
-                auto storePath = fetchToStore(*state.store, setting.value->path(), FetchMode::Copy);
+                auto storePath = fetchToStore(state.fetchSettings, *state.store, setting.value->path(), FetchMode::Copy);
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
                     state.store->printStorePath(storePath));

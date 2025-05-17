@@ -1,13 +1,14 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 namespace nix {
 
 fetchers::Cache::Key makeFetchToStoreCacheKey(
-    const std::string &name,
-    const std::string &fingerprint,
+    const std::string & name,
+    const std::string & fingerprint,
     ContentAddressMethod method,
-    const std::string &path)
+    const std::string & path)
 {
     return fetchers::Cache::Key{"fetchToStore", {
         {"name", name},
@@ -19,6 +20,7 @@ fetchers::Cache::Key makeFetchToStoreCacheKey(
 }
 
 StorePath fetchToStore(
+    const fetchers::Settings & settings,
     Store & store,
     const SourcePath & path,
     FetchMode mode,
@@ -34,7 +36,7 @@ StorePath fetchToStore(
 
     if (!filter && path.accessor->fingerprint) {
         cacheKey = makeFetchToStoreCacheKey(std::string{name}, *path.accessor->fingerprint, method, path.path.abs());
-        if (auto res = fetchers::getCache()->lookupStorePath(*cacheKey, store)) {
+        if (auto res = settings.getCache()->lookupStorePath(*cacheKey, store)) {
             debug("store path cache hit for '%s'", path);
             return res->storePath;
         }
@@ -56,7 +58,7 @@ StorePath fetchToStore(
     debug(mode == FetchMode::DryRun ? "hashed '%s'" : "copied '%s' to '%s'", path, store.printStorePath(storePath));
 
     if (cacheKey && mode == FetchMode::Copy)
-        fetchers::getCache()->upsert(*cacheKey, store, {}, storePath);
+        settings.getCache()->upsert(*cacheKey, store, {}, storePath);
 
     return storePath;
 }

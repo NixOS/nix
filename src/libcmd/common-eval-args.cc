@@ -34,7 +34,12 @@ EvalSettings evalSettings {
                 auto flakeRef = parseFlakeRef(fetchSettings, std::string { rest }, {}, true, false);
                 debug("fetching flake search path element '%s''", rest);
                 auto [accessor, lockedRef] = flakeRef.resolve(state.store).lazyFetch(state.store);
-                auto storePath = nix::fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
+                auto storePath = nix::fetchToStore(
+                    state.fetchSettings,
+                    *state.store,
+                    SourcePath(accessor),
+                    FetchMode::Copy,
+                    lockedRef.input.getName());
                 state.allowPath(storePath);
                 return state.storePath(storePath);
             },
@@ -177,7 +182,11 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * bas
             state.store,
             state.fetchSettings,
             EvalSettings::resolvePseudoUrl(s));
-        auto storePath = fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy);
+        auto storePath = fetchToStore(
+            state.fetchSettings,
+            *state.store,
+            SourcePath(accessor),
+            FetchMode::Copy);
         return state.storePath(storePath);
     }
 
@@ -185,7 +194,12 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * bas
         experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(fetchSettings, std::string(s.substr(6)), {}, true, false);
         auto [accessor, lockedRef] = flakeRef.resolve(state.store).lazyFetch(state.store);
-        auto storePath = nix::fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
+        auto storePath = nix::fetchToStore(
+            state.fetchSettings,
+            *state.store,
+            SourcePath(accessor),
+            FetchMode::Copy,
+            lockedRef.input.getName());
         state.allowPath(storePath);
         return state.storePath(storePath);
     }
