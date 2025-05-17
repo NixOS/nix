@@ -110,4 +110,53 @@ public:
     postFunctionCallHook(const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos) override;
 };
 
+class SampleStack : public EvalProfiler
+{
+    constexpr static std::chrono::duration sampleInterval = std::chrono::microseconds(10);
+
+    Hooks getNeededHooksImpl() const override
+    {
+        return Hooks().set(preFunctionCall).set(postFunctionCall);
+    }
+
+public:
+    struct LambdaFrameInfo
+    {
+        ExprLambda * expr;
+        std::ostream & symbolize(const EvalState & state, std::ostream & os) const;
+        auto operator<=>(const LambdaFrameInfo & rhs) const = default;
+    };
+
+    /** Primop call. */
+    struct PrimOpFrameInfo
+    {
+        PrimOp * expr;
+        std::ostream & symbolize(const EvalState & state, std::ostream & os) const;
+        auto operator<=>(const PrimOpFrameInfo & rhs) const = default;
+    };
+
+    struct FallbackFrameInfo
+    {
+        PosIdx pos;
+        std::ostream & symbolize(const EvalState & state, std::ostream & os) const;
+        auto operator<=>(const FallbackFrameInfo & rhs) const = default;
+    };
+
+    using FrameInfo = std::variant<LambdaFrameInfo, PrimOpFrameInfo, FallbackFrameInfo>;
+    using FrameStack = std::vector<FrameInfo>;
+
+    [[gnu::noinline]] void
+    preFunctionCallHook(const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos) override;
+    [[gnu::noinline]] void
+    postFunctionCallHook(const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos) override;
+
+    std::ostream & saveProfile(const EvalState & state, std::ostream & os) const;
+
+private:
+    FrameStack stack;
+    std::map<FrameStack, uint32_t> callCount;
+    std::chrono::time_point<std::chrono::high_resolution_clock> lastStackSample =
+        std::chrono::high_resolution_clock::now();
+};
+
 }

@@ -904,6 +904,7 @@ private:
     typedef std::map<ExprLambda *, size_t> FunctionCalls;
     FunctionCalls functionCalls;
 
+    ref<SampleStack> stackSampler = make_ref<SampleStack>();
     /** Evaluation/call profiler. */
     MultiEvalProfiler profiler;
 

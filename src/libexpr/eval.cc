@@ -376,13 +376,19 @@ EvalState::EvalState(
     /* Register function call tracer. */
     if (settings.traceFunctionCalls)
         profiler.addProfiler(make_ref<FunctionCallTrace>());
+
+    profiler.addProfiler(stackSampler);
 }
 
 
 EvalState::~EvalState()
 {
+    auto profileFile = getEnv("NIX_PROFILE_FILE");
+    if (!profileFile.has_value())
+        return;
+    auto os = std::ofstream(*profileFile);
+    stackSampler->saveProfile(*this, os);
 }
-
 
 void EvalState::allowPath(const Path & path)
 {
