@@ -15,6 +15,7 @@ namespace nix::fs { using namespace std::filesystem; }
 struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 {
     bool raw = false;
+    bool replaceEvalErrors = false;
     std::optional<std::string> apply;
     std::optional<std::filesystem::path> writeTo;
 
@@ -38,6 +39,12 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
             .description = "Write a string or attrset of strings to *path*.",
             .labels = {"path"},
             .handler = {&writeTo},
+        });
+
+        addFlag({
+            .longName = "replace-eval-errors",
+            .description = "When used with `--json` the Nix evaluator will replace evaluation errors with a fixed value.",
+            .handler = {&replaceEvalErrors, true},
         });
     }
 
@@ -118,7 +125,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
         }
 
         else if (json) {
-            printJSON(printValueAsJSON(*state, true, *v, pos, context, false));
+            printJSON(printValueAsJSON(*state, true, replaceEvalErrors, *v, pos, context, false));
         }
 
         else {
