@@ -414,8 +414,13 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     if (getEnv("_NIX_TEST_NO_LSOF") != "1") {
         try {
             std::regex lsofRegex(R"(^n(/.*)$)");
+
+            // Despite installations of Nix explicitly setting the `nobrowse` mount
+            // option on the store, `mdworker` processes continue to run on newly
+            // created files within it, which can result in spurious GC/path deletion
+            // failures if the stars are aligned right.
             auto lsofLines =
-                tokenizeString<std::vector<std::string>>(runProgram(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
+                tokenizeString<std::vector<std::string>>(runProgram(LSOF, true, { "-n", "-w", "-F", "n", "-u", "^89", "-g", "^89" }), "\n");
             for (const auto & line : lsofLines) {
                 std::smatch match;
                 if (std::regex_match(line, match, lsofRegex))
