@@ -2,6 +2,7 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/primops.hh"
 #include "nix/expr/print-options.hh"
+#include "nix/expr/symbol-table.hh"
 #include "nix/util/exit.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
@@ -916,6 +917,11 @@ void Value::mkString(std::string_view s, const NixStringContext & context)
 void Value::mkStringMove(const char * s, const NixStringContext & context)
 {
     mkString(s, encodeContext(context));
+}
+
+void Value::mkString(const SymbolStr & s)
+{
+    mkString(s.c_str(), nullptr);
 }
 
 void Value::mkPath(const SourcePath & path)
@@ -3019,7 +3025,7 @@ void EvalState::printStatistics()
         // XXX: overrides earlier assignment
         topObj["symbols"] = json::array();
         auto &list = topObj["symbols"];
-        symbols.dump([&](const std::string & s) { list.emplace_back(s); });
+        symbols.dump([&](std::string_view s) { list.emplace_back(s); });
     }
     if (outPath == "-") {
         std::cerr << topObj.dump(2) << std::endl;
