@@ -270,7 +270,7 @@ EvalState::EvalState(
                    exception, and make union source accessor
                    catch it, so we don't need to do this hack.
                  */
-                {CanonPath(store->storeDir), store->getFSAccessor(settings.pureEval)},
+                {CanonPath(store->storeDir), makeFSSourceAccessor(dirOf(store->toRealPath(StorePath::dummy)))}
             }))
     , rootFS(
         ({
