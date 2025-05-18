@@ -11,6 +11,7 @@
 #include <span>
 #include <bitset>
 #include <optional>
+#include <filesystem>
 
 namespace nix {
 
@@ -109,5 +110,8 @@ public:
     [[gnu::noinline]] void
     postFunctionCallHook(const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos) override;
 };
+
+ref<EvalProfiler>
+makeSampleStackProfiler(const EvalState & state, std::filesystem::path profileFile, uint64_t frequency);
 
 }

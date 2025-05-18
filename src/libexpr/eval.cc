@@ -376,8 +376,16 @@ EvalState::EvalState(
     /* Register function call tracer. */
     if (settings.traceFunctionCalls)
         profiler.addProfiler(make_ref<FunctionCallTrace>());
-}
 
+    switch (settings.evalProfilerMode) {
+    case EvalProfilerMode::flamegraph:
+        profiler.addProfiler(makeSampleStackProfiler(
+            *this, settings.evalProfileFile.get(), settings.evalProfilerFrequency));
+        break;
+    case EvalProfilerMode::disabled:
+        break;
+    }
+}
 
 EvalState::~EvalState()
 {
@@ -2236,7 +2244,7 @@ bool EvalState::forceBool(Value & v, const PosIdx pos, std::string_view errorCtx
 }
 
 
-bool EvalState::isFunctor(Value & fun)
+bool EvalState::isFunctor(const Value & fun) const
 {
     return fun.type() == nAttrs && fun.attrs()->find(sFunctor) != fun.attrs()->end();
 }

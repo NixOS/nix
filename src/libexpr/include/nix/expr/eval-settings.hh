@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/expr/eval-profiler-settings.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/source-path.hh"
 
@@ -191,6 +192,27 @@ struct EvalSettings : Config
           Use the `contrib/stack-collapse.py` script distributed with the Nix
           source code to convert the trace logs in to a format suitable for
           `flamegraph.pl`.
+        )"};
+
+    Setting<EvalProfilerMode> evalProfilerMode{this, EvalProfilerMode::disabled, "eval-profiler",
+        R"(
+          Enables evaluation profiling. The following modes are supported:
+
+          * `flamegraph` stack sampling profiler. Outputs folded format, one line per stack (suitable for `flamegraph.pl` and compatible tools).
+
+          Use [`eval-profile-file`](#conf-eval-profile-file) to specify where the profile is saved.
+        )"};
+
+    Setting<Path> evalProfileFile{this, "nix.profile", "eval-profile-file",
+        R"(
+          Specifies the file where [evaluation profile](#conf-eval-profiler) is saved.
+        )"};
+
+    Setting<uint32_t> evalProfilerFrequency{this, 99, "eval-profiler-frequency",
+        R"(
+          Specifies the sampling rate in hertz for sampling evaluation profilers.
+          Use `0` to sample the stack after each function call.
+          See [`eval-profiler`](#conf-eval-profiler).
         )"};
 
     Setting<bool> useEvalCache{this, true, "eval-cache",
