@@ -119,6 +119,7 @@ std::string_view showType(ValueType type, bool withArticle)
         case nExternal: return WA("an", "external value");
         case nFloat: return WA("a", "float");
         case nThunk: return WA("a", "thunk");
+        case nFailed: return WA("a", "failure");
     }
     unreachable();
 }
@@ -161,13 +162,12 @@ PosIdx Value::determinePos(const PosIdx pos) const
 bool Value::isTrivial() const
 {
     return
-        internalType != tApp
-        && internalType != tPrimOpApp
-        && (internalType != tThunk
-            || (dynamic_cast<ExprAttrs *>(payload.thunk.expr)
-                && ((ExprAttrs *) payload.thunk.expr)->dynamicAttrs.empty())
-            || dynamic_cast<ExprLambda *>(payload.thunk.expr)
-            || dynamic_cast<ExprList *>(payload.thunk.expr));
+        isFinished()
+        || (internalType == tThunk
+            && ((dynamic_cast<ExprAttrs *>(payload.thunk.expr)
+                    && ((ExprAttrs *) payload.thunk.expr)->dynamicAttrs.empty())
+                || dynamic_cast<ExprLambda *>(payload.thunk.expr)
+                || dynamic_cast<ExprList *>(payload.thunk.expr)));
 }
 
 
@@ -315,8 +315,6 @@ EvalState::EvalState(
     , trylevel(0)
     , regexCache(makeRegexCache())
 #if NIX_USE_BOEHMGC
-    , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
-    , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
     , baseEnv(**baseEnvP)
 #else
@@ -468,7 +466,7 @@ void EvalState::checkURI(const std::string & uri)
 Value * EvalState::addConstant(const std::string & name, Value & v, Constant info)
 {
     Value * v2 = allocValue();
-    *v2 = v;
+    v2->finishValue(v.internalType, v.payload);
     addConstant(name, v2, info);
     return v2;
 }
@@ -485,8 +483,10 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
 
            We might know the type of a thunk in advance, so be allowed
            to just write it down in that case. */
-        if (auto gotType = v->type(true); gotType != nThunk)
-            assert(info.type == gotType);
+        if (v->internalType != tUninitialized) {
+            if (auto gotType = v->type(); gotType != nThunk)
+                assert(info.type == gotType);
+        }
 
         /* Install value the base environment. */
         staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
@@ -674,7 +674,7 @@ void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se)
 // just for the current level of Env, not the whole chain.
 void printWithBindings(const SymbolTable & st, const Env & env)
 {
-    if (!env.values[0]->isThunk()) {
+    if (env.values[0]->isFinished()) {
         std::cout << "with: ";
         std::cout << ANSI_MAGENTA;
         auto j = env.values[0]->attrs()->begin();
@@ -730,7 +730,7 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
     if (env.up && se.up) {
         mapStaticEnvBindings(st, *se.up, *env.up, vm);
 
-        if (se.isWith && !env.values[0]->isThunk()) {
+        if (se.isWith && env.values[0]->isFinished()) {
             // add 'with' bindings.
             for (auto & j : *env.values[0]->attrs())
                 vm.insert_or_assign(std::string(st[j.name]), j.value);
@@ -1105,62 +1105,87 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
+/**
+ * A helper `Expr` class to lets us parse and evaluate Nix expressions
+ * from a thunk, ensuring that every file is parsed/evaluated only
+ * once (via the thunk stored in `EvalState::fileEvalCache`).
+ */
+struct ExprParseFile : Expr
+{
+    SourcePath & path;
+    bool mustBeTrivial;
+
+    ExprParseFile(SourcePath & path, bool mustBeTrivial)
+        : path(path)
+        , mustBeTrivial(mustBeTrivial)
+    { }
+
+    void eval(EvalState & state, Env & env, Value & v) override
+    {
+        printTalkative("evaluating file '%s'", path);
+
+        auto e = state.parseExprFromFile(path);
+
+        try {
+            auto dts = state.debugRepl
+                ? makeDebugTraceStacker(
+                    state,
+                    *e,
+                    state.baseEnv,
+                    e->getPos(),
+                    "while evaluating the file '%s':", path.to_string())
+                : nullptr;
+
+            // Enforce that 'flake.nix' is a direct attrset, not a
+            // computation.
+            if (mustBeTrivial &&
+                !(dynamic_cast<ExprAttrs *>(e)))
+                state.error<EvalError>("file '%s' must be an attribute set", path).debugThrow();
+
+            state.eval(e, v);
+        } catch (Error & e) {
+            state.addErrorTrace(e, "while evaluating the file '%s':", path.to_string());
+            throw;
+        }
+    }
+};
+
+
 void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
-    FileEvalCache::iterator i;
-    if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
-        v = i->second;
+    auto resolvedPath = getOptional(*importResolutionCache.readLock(), path);
+
+    if (!resolvedPath) {
+        resolvedPath = resolveExprPath(path);
+        importResolutionCache.lock()->emplace(path, *resolvedPath);
+    }
+
+    if (auto v2 = get(*fileEvalCache.readLock(), *resolvedPath)) {
+        forceValue(*const_cast<Value *>(v2), noPos);
+        v = *v2;
         return;
     }
 
-    auto resolvedPath = resolveExprPath(path);
-    if ((i = fileEvalCache.find(resolvedPath)) != fileEvalCache.end()) {
-        v = i->second;
-        return;
+    Value * vExpr;
+    ExprParseFile expr{*resolvedPath, mustBeTrivial};
+
+    {
+        auto cache(fileEvalCache.lock());
+        auto [i, inserted] = cache->try_emplace(*resolvedPath);
+        if (inserted)
+            i->second.mkThunk(&baseEnv, &expr);
+        vExpr = &i->second;
     }
 
-    printTalkative("evaluating file '%1%'", resolvedPath);
-    Expr * e = nullptr;
+    forceValue(*vExpr, noPos);
 
-    auto j = fileParseCache.find(resolvedPath);
-    if (j != fileParseCache.end())
-        e = j->second;
-
-    if (!e)
-        e = parseExprFromFile(resolvedPath);
-
-    fileParseCache.emplace(resolvedPath, e);
-
-    try {
-        auto dts = debugRepl
-            ? makeDebugTraceStacker(
-                *this,
-                *e,
-                this->baseEnv,
-                e->getPos(),
-                "while evaluating the file '%1%':", resolvedPath.to_string())
-            : nullptr;
-
-        // Enforce that 'flake.nix' is a direct attrset, not a
-        // computation.
-        if (mustBeTrivial &&
-            !(dynamic_cast<ExprAttrs *>(e)))
-            error<EvalError>("file '%s' must be an attribute set", path).debugThrow();
-        eval(e, v);
-    } catch (Error & e) {
-        addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath.to_string());
-        throw;
-    }
-
-    fileEvalCache.emplace(resolvedPath, v);
-    if (path != resolvedPath) fileEvalCache.emplace(path, v);
+    v = *vExpr;
 }
 
 
 void EvalState::resetFileCache()
 {
-    fileEvalCache.clear();
-    fileParseCache.clear();
+    fileEvalCache.lock()->clear();
     inputCache->clear();
 }
 
@@ -1466,7 +1491,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             if (state.countCalls) state.attrSelects[pos2]++;
         }
 
-        state.forceValue(*vAttrs, (pos2 ? pos2 : this->pos ) );
+        state.forceValue(*vAttrs, pos2 ? pos2 : this->pos);
 
     } catch (Error & e) {
         if (pos2) {
@@ -1529,6 +1554,24 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
     v.mkLambda(&env, this);
 }
 
+thread_local size_t EvalState::callDepth = 0;
+
+namespace {
+/**
+ * Increments a count on construction and decrements on destruction.
+ */
+class CallDepth {
+    size_t & count;
+public:
+    CallDepth(size_t & count) : count(count) {
+        ++count;
+    }
+    ~CallDepth() {
+        --count;
+    }
+};
+};
+
 void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes, const PosIdx pos)
 {
     auto _level = addCallDepth(pos);
@@ -1539,16 +1582,17 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 
     forceValue(fun, pos);
 
-    Value vCur(fun);
+    Value vCur = fun;
 
     auto makeAppChain = [&]()
     {
-        vRes = vCur;
         for (auto arg : args) {
             auto fun2 = allocValue();
-            *fun2 = vRes;
-            vRes.mkPrimOpApp(fun2, arg);
+            *fun2 = vCur;
+            vCur.reset();
+            vCur.mkPrimOpApp(fun2, arg);
         }
+        vRes = vCur;
     };
 
     const Attr * functor;
@@ -1593,7 +1637,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                                              symbols[i.name])
                                     .atPos(lambda.pos)
                                     .withTrace(pos, "from call site")
-                                    .withFrame(*fun.payload.lambda.env, lambda)
+                                    .withFrame(*vCur.payload.lambda.env, lambda)
                                     .debugThrow();
                         }
                         env2.values[displ++] = i.def->maybeThunk(*this, env2);
@@ -1620,7 +1664,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                                 .atPos(lambda.pos)
                                 .withTrace(pos, "from call site")
                                 .withSuggestions(suggestions)
-                                .withFrame(*fun.payload.lambda.env, lambda)
+                                .withFrame(*vCur.payload.lambda.env, lambda)
                                 .debugThrow();
                         }
                     unreachable();
@@ -1641,6 +1685,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                         : "anonymous lambda")
                     : nullptr;
 
+                vCur.reset();
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
@@ -1675,7 +1720,9 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                 if (countCalls) primOpCalls[fn->name]++;
 
                 try {
-                    fn->fun(*this, vCur.determinePos(noPos), args.data(), vCur);
+                    auto pos = vCur.determinePos(noPos);
+                    vCur.reset();
+                    fn->fun(*this, pos, args.data(), vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
@@ -1697,6 +1744,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             assert(primOp->isPrimOp());
             auto arity = primOp->primOp()->arity;
             auto argsLeft = arity - argsDone;
+            assert(argsLeft);
 
             if (args.size() < argsLeft) {
                 /* We still don't have enough arguments, so extend the tPrimOpApp chain. */
@@ -1723,7 +1771,9 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                     // 1. Unify this and above code. Heavily redundant.
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2 etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
-                    fn->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
+                    auto pos = vCur.determinePos(noPos);
+                    vCur.reset();
+                    fn->fun(*this, pos, vArgs, vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
@@ -1740,6 +1790,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                heap-allocate a copy and use that instead. */
             Value * args2[] = {allocValue(), args[0]};
             *args2[0] = vCur;
+            vCur.reset();
             try {
                 callFunction(*functor->value, args2, vCur, functor->pos);
             } catch (Error & e) {
@@ -1758,6 +1809,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                 .debugThrow();
     }
 
+    debug("DONE %x %x", &vRes, &vCur);
     vRes = vCur;
 }
 
@@ -2109,17 +2161,6 @@ void ExprPos::eval(EvalState & state, Env & env, Value & v)
     state.mkPos(v, pos);
 }
 
-void ExprBlackHole::eval(EvalState & state, [[maybe_unused]] Env & env, Value & v)
-{
-    throwInfiniteRecursionError(state, v);
-}
-
-[[gnu::noinline]] [[noreturn]] void ExprBlackHole::throwInfiniteRecursionError(EvalState & state, Value &v) {
-    state.error<InfiniteRecursionError>("infinite recursion encountered")
-        .atPos(v.determinePos(noPos))
-        .debugThrow();
-}
-
 // always force this to be separate, otherwise forceValue may inline it and take
 // a massive perf hit
 [[gnu::noinline]]
@@ -2152,7 +2193,7 @@ void EvalState::forceValueDeep(Value & v)
             for (auto & i : *v.attrs())
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
-                    auto dts = debugRepl && i.value->isThunk()
+                    auto dts = debugRepl && i.value->internalType == tThunk
                         ? makeDebugTraceStacker(*this, *i.value->payload.thunk.expr, *i.value->payload.thunk.env, i.pos,
                             "while evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;
@@ -2766,8 +2807,11 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         }
         return;
 
-    case nThunk: // Must not be left by forceValue
-        assert(false);
+    // Cannot be returned by forceValue().
+    case nThunk:
+    case nFailed:
+        unreachable();
+
     default: // Note that we pass compiler flags that should make `default:` unreachable.
         // Also note that this probably ran after `eqValues`, which implements
         // the same logic more efficiently (without having to unwind stacks),
@@ -2853,8 +2897,11 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
             // !!!
             return v1.fpoint() == v2.fpoint();
 
-        case nThunk: // Must not be left by forceValue
-            assert(false);
+        // Cannot be returned by forceValue().
+        case nThunk:
+        case nFailed:
+            unreachable();
+
         default: // Note that we pass compiler flags that should make `default:` unreachable.
             error<EvalError>("eqValues: cannot compare %1% with %2%", showType(v1), showType(v2)).withTrace(pos, errorCtx).panic();
     }
@@ -2886,6 +2933,14 @@ void EvalState::maybePrintStats()
         }
 #endif
         printStatistics();
+    }
+
+    if (getEnv("NIX_SHOW_THREAD_STATS").value_or("0") != "0") {
+        printError("THUNKS AWAITED: %d", nrThunksAwaited);
+        printError("THUNKS AWAITED SLOW: %d", nrThunksAwaitedSlow);
+        printError("WAITING TIME: %d μs", usWaiting);
+        printError("MAX WAITING: %d", maxWaiting);
+        printError("SPURIOUS WAKEUPS: %d", nrSpuriousWakeups);
     }
 }
 
@@ -3215,10 +3270,10 @@ Expr * EvalState::parse(
     std::shared_ptr<StaticEnv> & staticEnv)
 {
     DocCommentMap tmpDocComments; // Only used when not origin is not a SourcePath
-    DocCommentMap *docComments = &tmpDocComments;
+    auto * docComments = &tmpDocComments;
 
     if (auto sourcePath = std::get_if<SourcePath>(&origin)) {
-        auto [it, _] = positionToDocComment.try_emplace(*sourcePath);
+        auto [it, _] = positionToDocComment.lock()->try_emplace(*sourcePath);
         docComments = &it->second;
     }
 
@@ -3236,8 +3291,10 @@ DocComment EvalState::getDocCommentForPos(PosIdx pos)
     if (!path)
         return {};
 
-    auto table = positionToDocComment.find(*path);
-    if (table == positionToDocComment.end())
+    auto positionToDocComment_ = positionToDocComment.readLock();
+
+    auto table = positionToDocComment_->find(*path);
+    if (table == positionToDocComment_->end())
         return {};
 
     auto it = table->second.find(pos);

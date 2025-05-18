@@ -96,6 +96,7 @@ json printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case nThunk:
+        case nFailed:
         case nFunction:
             state.error<TypeError>(
                 "cannot convert %1% to JSON",

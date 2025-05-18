@@ -1,15 +1,26 @@
 #pragma once
 ///@file
 
-#include <list>
-#include <map>
+#include <array>
 #include <unordered_map>
 
 #include "nix/util/types.hh"
 #include "nix/util/chunked-vector.hh"
 #include "nix/util/error.hh"
+#include "nix/util/sync.hh"
 
 namespace nix {
+
+struct ContiguousArena
+{
+    const char * data;
+    const size_t maxSize;
+    std::atomic<size_t> size{0};
+
+    ContiguousArena(size_t maxSize);
+
+    size_t allocate(size_t bytes);
+};
 
 /**
  * This class mainly exists to give us an operator<< for ostreams. We could also
@@ -21,31 +32,31 @@ class SymbolStr
     friend class SymbolTable;
 
 private:
-    const std::string * s;
+    std::string_view s;
 
-    explicit SymbolStr(const std::string & symbol): s(&symbol) {}
+    explicit SymbolStr(std::string_view s): s(s) {}
 
 public:
     bool operator == (std::string_view s2) const
     {
-        return *s == s2;
+        return s == s2;
     }
 
     const char * c_str() const
     {
-        return s->c_str();
+        return s.data();
     }
 
     operator const std::string_view () const
     {
-        return *s;
+        return s;
     }
 
     friend std::ostream & operator <<(std::ostream & os, const SymbolStr & symbol);
 
     bool empty() const
     {
-        return s->empty();
+        return s.empty();
     }
 };
 
@@ -59,6 +70,7 @@ class Symbol
     friend class SymbolTable;
 
 private:
+    /// The offset of the symbol in `SymbolTable::arena`.
     uint32_t id;
 
     explicit Symbol(uint32_t id): id(id) {}
@@ -81,59 +93,51 @@ public:
 class SymbolTable
 {
 private:
-    /**
-     * Map from string view (backed by ChunkedVector) -> offset into the store.
-     * ChunkedVector references are never invalidated.
-     */
-    std::unordered_map<std::string_view, uint32_t> symbols;
-    ChunkedVector<std::string, 8192> store{16};
+    std::array<SharedSync<std::unordered_map<std::string_view, uint32_t>>, 32> symbolDomains;
+    ContiguousArena arena;
 
 public:
+
+    SymbolTable()
+        : arena(1 << 30)
+    {
+        // Reserve symbol ID 0.
+        arena.allocate(1);
+    }
 
     /**
      * Converts a string into a symbol.
      */
-    Symbol create(std::string_view s)
-    {
-        // Most symbols are looked up more than once, so we trade off insertion performance
-        // for lookup performance.
-        // FIXME: make this thread-safe.
-        auto it = symbols.find(s);
-        if (it != symbols.end())
-            return Symbol(it->second + 1);
-
-        const auto & [rawSym, idx] = store.add(s);
-        symbols.emplace(rawSym, idx);
-        return Symbol(idx + 1);
-    }
+    Symbol create(std::string_view s);
 
     std::vector<SymbolStr> resolve(const std::vector<Symbol> & symbols) const
     {
         std::vector<SymbolStr> result;
         result.reserve(symbols.size());
-        for (auto sym : symbols)
+        for (auto & sym : symbols)
             result.push_back((*this)[sym]);
         return result;
     }
 
     SymbolStr operator[](Symbol s) const
     {
-        if (s.id == 0 || s.id > store.size())
+        if (s.id == 0 || s.id > arena.size)
             unreachable();
-        return SymbolStr(store[s.id - 1]);
+        return SymbolStr(std::string_view(arena.data + s.id));
     }
 
-    size_t size() const
+    size_t size() const;
+
+    size_t totalSize() const
     {
-        return store.size();
+        return arena.size;
     }
-
-    size_t totalSize() const;
 
     template<typename T>
     void dump(T callback) const
     {
-        store.forEach(callback);
+        // FIXME
+        //state_.read()->store.forEach(callback);
     }
 };
 
