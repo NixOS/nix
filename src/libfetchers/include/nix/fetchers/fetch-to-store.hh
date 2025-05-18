@@ -15,6 +15,7 @@ enum struct FetchMode { DryRun, Copy };
  * Copy the `path` to the Nix store.
  */
 StorePath fetchToStore(
+    const fetchers::Settings & settings,
     Store & store,
     const SourcePath & path,
     FetchMode mode,

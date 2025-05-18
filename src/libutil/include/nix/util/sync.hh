@@ -39,6 +39,7 @@ public:
     SyncBase() { }
     SyncBase(const T & data) : data(data) { }
     SyncBase(T && data) noexcept : data(std::move(data)) { }
+    SyncBase(SyncBase && other) noexcept : data(std::move(*other.lock())) { }
 
     template<class L>
     class Lock
