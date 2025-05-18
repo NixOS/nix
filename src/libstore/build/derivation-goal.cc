@@ -872,6 +872,7 @@ Goal::Co DerivationGoal::tryToBuild()
                     *drvOptions,
                     inputPaths,
                     initialOutputs,
+                    act
                 });
         }
 

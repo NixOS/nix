@@ -2709,14 +2709,12 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                             store.printStorePath(drvPath),
                             wanted.to_string(HashFormat::SRI, true),
                             got.to_string(HashFormat::SRI, true)));
-#if 0 // FIXME
                     act->result(resHashMismatch,
                         {
                             {"storePath", store.printStorePath(drvPath)},
                             {"wanted", wanted},
                             {"got", got},
                         });
-#endif
                 }
                 if (!newInfo0.references.empty()) {
                     auto numViolations = newInfo.references.size();

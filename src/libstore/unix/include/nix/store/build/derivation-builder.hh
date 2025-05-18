@@ -58,6 +58,11 @@ struct DerivationBuilderParams
 
     const BuildMode & buildMode;
 
+    /**
+     * The activity corresponding to the build.
+     */
+    std::unique_ptr<Activity> & act;
+
     DerivationBuilderParams(
         const StorePath & drvPath,
         const BuildMode & buildMode,
@@ -66,7 +71,8 @@ struct DerivationBuilderParams
         const StructuredAttrs * parsedDrv,
         const DerivationOptions & drvOptions,
         const StorePathSet & inputPaths,
-        std::map<std::string, InitialOutput> & initialOutputs)
+        std::map<std::string, InitialOutput> & initialOutputs,
+        std::unique_ptr<Activity> & act)
         : drvPath{drvPath}
         , buildResult{buildResult}
         , drv{drv}
@@ -75,6 +81,7 @@ struct DerivationBuilderParams
         , inputPaths{inputPaths}
         , initialOutputs{initialOutputs}
         , buildMode{buildMode}
+        , act{act}
     { }
 
     DerivationBuilderParams(DerivationBuilderParams &&) = default;
