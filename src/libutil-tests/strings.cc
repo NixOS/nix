@@ -106,7 +106,7 @@ TEST(concatMapStringsSep, two)
 
 TEST(concatMapStringsSep, map)
 {
-    std::map<std::string, std::string> strings;
+    StringMap strings;
     strings["this"] = "that";
     strings["1"] = "one";
 

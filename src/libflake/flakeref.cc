@@ -15,7 +15,7 @@ const static std::string subDirRegex = subDirElemRegex + "(?:/" + subDirElemRege
 
 std::string FlakeRef::to_string() const
 {
-    std::map<std::string, std::string> extraQuery;
+    StringMap extraQuery;
     if (subdir != "")
         extraQuery.insert_or_assign("dir", subdir);
     return input.toURLString(extraQuery);

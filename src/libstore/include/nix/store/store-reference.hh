@@ -41,7 +41,7 @@ namespace nix {
  */
 struct StoreReference
 {
-    using Params = std::map<std::string, std::string>;
+    using Params = StringMap;
 
     /**
      * Special store reference `""` or `"auto"`

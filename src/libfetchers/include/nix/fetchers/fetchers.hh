@@ -71,7 +71,7 @@ public:
 
     ParsedURL toURL() const;
 
-    std::string toURLString(const std::map<std::string, std::string> & extraQuery = {}) const;
+    std::string toURLString(const StringMap & extraQuery = {}) const;
 
     std::string to_string() const;
 

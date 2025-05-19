@@ -89,9 +89,9 @@ bool getBoolAttr(const Attrs & attrs, const std::string & name)
     return *s;
 }
 
-std::map<std::string, std::string> attrsToQuery(const Attrs & attrs)
+StringMap attrsToQuery(const Attrs & attrs)
 {
-    std::map<std::string, std::string> query;
+    StringMap query;
     for (auto & attr : attrs) {
         if (auto v = std::get_if<uint64_t>(&attr.second)) {
             query.insert_or_assign(attr.first, fmt("%d", *v));

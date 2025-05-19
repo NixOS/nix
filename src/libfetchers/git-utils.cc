@@ -368,7 +368,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         if (git_config_iterator_glob_new(Setter(it), config.get(), "^submodule\\..*\\.(path|url|branch)$"))
             throw Error("iterating over .gitmodules: %s", git_error_last()->message);
 
-        std::map<std::string, std::string> entries;
+        StringMap entries;
 
         while (true) {
             git_config_entry * entry = nullptr;
