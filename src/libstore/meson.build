@@ -98,7 +98,7 @@ subdir('nix-meson-build-support/libatomic')
 
 boost = dependency(
   'boost',
-  modules : ['container'],
+  modules : ['container', 'regex'],
   include_type: 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
