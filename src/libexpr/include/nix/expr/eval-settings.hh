@@ -247,6 +247,11 @@ struct EvalSettings : Config
 
           This option can be enabled by setting `NIX_ABORT_ON_WARN=1` in the environment.
         )"};
+
+    Setting<bool> lazyTrees{this, false, "lazy-trees",
+        R"(
+          If set to true, flakes and trees fetched by [`builtins.fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree) are only copied to the Nix store when they're used as a dependency of a derivation. This avoids copying (potentially large) source trees unnecessarily.
+        )"};
 };
 
 /**

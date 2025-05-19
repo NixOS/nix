@@ -215,8 +215,12 @@ StorePath Store::addToStore(
     auto sink = sourceToSink([&](Source & source) {
         LengthSource lengthSource(source);
         storePath = addToStoreFromDump(lengthSource, name, fsm, method, hashAlgo, references, repair);
-        if (settings.warnLargePathThreshold && lengthSource.total >= settings.warnLargePathThreshold)
-            warn("copied large path '%s' to the store (%s)", path, renderSize(lengthSource.total));
+        if (settings.warnLargePathThreshold && lengthSource.total >= settings.warnLargePathThreshold) {
+            static bool failOnLargePath = getEnv("_NIX_TEST_FAIL_ON_LARGE_PATH").value_or("") == "1";
+            if (failOnLargePath)
+                throw Error("won't copy large path '%s' to the store (%d)", path, renderSize(lengthSource.total));
+            warn("copied large path '%s' to the store (%d)", path, renderSize(lengthSource.total));
+        }
     });
     dumpPath(path, *sink, fsm, filter);
     sink->finish();
