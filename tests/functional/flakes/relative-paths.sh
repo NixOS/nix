@@ -131,3 +131,46 @@ EOF
   # would fail:
   nix eval .#ok
 )
+
+# https://github.com/NixOS/nix/issues/13164
+mkdir -p "$TEST_ROOT/issue-13164/nested-flake1/nested-flake2"
+(
+  cd "$TEST_ROOT/issue-13164"
+  git init
+  git config --global user.email "you@example.com"
+  git config --global user.name "Your Name"
+  cat >flake.nix <<EOF
+{
+  inputs.nestedFlake1.url = "path:./nested-flake1";
+  outputs = { self, nestedFlake1 }: {
+    inherit nestedFlake1;
+  };
+}
+EOF
+
+  cat >nested-flake1/flake.nix <<EOF
+{
+  inputs.nestedFlake2.url = "path:./nested-flake2";
+
+  outputs = { self, nestedFlake2 }: {
+    name = "nestedFlake1";
+    inherit nestedFlake2;
+  };
+}
+EOF
+
+  cat >nested-flake1/nested-flake2/flake.nix <<EOF
+{
+  outputs = { self }: {
+    name = "nestedFlake2";
+  };
+}
+EOF
+
+  git add .
+  git commit -m "Initial commit"
+
+  # I don't understand why two calls are necessary to reproduce the issue.
+  nix eval --json .#nestedFlake1.nestedFlake2 --no-eval-cache
+  nix eval --json .#nestedFlake1.nestedFlake2 --no-eval-cache
+)
