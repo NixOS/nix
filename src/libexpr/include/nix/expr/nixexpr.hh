@@ -306,6 +306,9 @@ struct Formal
 struct Formals
 {
     typedef std::vector<Formal> Formals_;
+    /**
+     * @pre Sorted according to predicate (std::tie(a.name, a.pos) < std::tie(b.name, b.pos)).
+     */
     Formals_ formals;
     bool ellipsis;
 
