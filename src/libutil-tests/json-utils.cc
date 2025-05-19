@@ -131,7 +131,7 @@ TEST(getString, wrongAssertions) {
 TEST(getIntegralNumber, rightAssertions) {
     auto simple = R"({ "int": 0, "signed": -1 })"_json;
 
-    ASSERT_EQ(getUnsigned(valueAt(getObject(simple), "int")), 0);
+    ASSERT_EQ(getUnsigned(valueAt(getObject(simple), "int")), 0u);
     ASSERT_EQ(getInteger<int8_t>(valueAt(getObject(simple), "int")), 0);
     ASSERT_EQ(getInteger<int8_t>(valueAt(getObject(simple), "signed")), -1);
 }
