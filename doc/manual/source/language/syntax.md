@@ -225,8 +225,8 @@ passed in first , e.g.,
 
 ```nix
 let add = { __functor = self: x: x + self.x; };
-    inc = add // { x = 1; };
-in inc 1
+    inc = add // { x = 1; }; # inc is { x = 1; __functor = (...) }
+in inc 1 # equivalent of `add.__functor add 1` i.e. `1 + self.x`
 ```
 
 evaluates to `2`. This can be used to attach metadata to a function
