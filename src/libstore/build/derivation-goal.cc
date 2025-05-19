@@ -974,7 +974,7 @@ void runPostBuildHook(
             fmt("running post-build-hook '%s'", settings.postBuildHook),
             Logger::Fields{store.printStorePath(drvPath)});
     PushActivity pact(act.id);
-    std::map<std::string, std::string> hookEnvironment = getEnv();
+    StringMap hookEnvironment = getEnv();
 
     hookEnvironment.emplace("DRV_PATH", store.printStorePath(drvPath));
     hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));

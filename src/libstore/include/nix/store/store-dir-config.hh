@@ -125,7 +125,7 @@ struct StoreDirConfigBase : Config
  */
 struct StoreDirConfig : StoreDirConfigBase, MixStoreDirMethods
 {
-    using Params = std::map<std::string, std::string>;
+    using Params = StringMap;
 
     StoreDirConfig(const Params & params);
 

@@ -187,7 +187,7 @@ private:
     typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
     PathsInChroot pathsInChroot;
 
-    typedef std::map<std::string, std::string> Environment;
+    typedef StringMap Environment;
     Environment env;
 
     /**

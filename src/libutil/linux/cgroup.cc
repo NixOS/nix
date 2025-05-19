@@ -31,9 +31,9 @@ std::optional<Path> getCgroupFS()
 }
 
 // FIXME: obsolete, check for cgroup2
-std::map<std::string, std::string> getCgroups(const Path & cgroupFile)
+StringMap getCgroups(const Path & cgroupFile)
 {
-    std::map<std::string, std::string> cgroups;
+    StringMap cgroups;
 
     for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cgroupFile), "\n")) {
         static std::regex regex("([0-9]+):([^:]*):(.*)");

@@ -10,7 +10,7 @@
 namespace nix {
 
 
-typedef std::map<std::string, std::string> XMLAttrs;
+typedef std::map<std::string, std::string, std::less<>> XMLAttrs;
 
 
 class XMLWriter
