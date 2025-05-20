@@ -32,6 +32,6 @@ This command adds [_installables_](./nix.md#installables) to a Nix profile.
 
 > **Note**
 >
-> `nix profile install` is an alias for `nix profile add` in Determinate Nix.
+> `nix profile install` is an alias for `nix profile add`.
 
 )""
