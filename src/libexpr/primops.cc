@@ -97,11 +97,19 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
 
     if (drvs.empty()) return {};
 
-    if (isIFD && !settings.enableImportFromDerivation)
-        error<IFDError>(
-            "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
-            drvs.begin()->to_string(*store)
-        ).debugThrow();
+    if (isIFD) {
+        if (!settings.enableImportFromDerivation)
+            error<IFDError>(
+                "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
+                drvs.begin()->to_string(*store)
+            ).debugThrow();
+
+        if (settings.traceImportFromDerivation)
+            warn(
+                "built '%1%' during evaluation due to an import from derivation",
+                drvs.begin()->to_string(*store)
+            );
+    }
 
     /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
