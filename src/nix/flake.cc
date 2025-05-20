@@ -1332,8 +1332,10 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         try {
                             if (visitor.isDerivation())
                                 showDerivation();
-                            else
-                                throw Error("expected a derivation");
+                            else {
+                                auto name = visitor.getAttrPathStr(state->sName);
+                                logger->warn(fmt("%s must be a derivation", name));
+                            }
                         } catch (IFDError & e) {
                             if (!json) {
                                 logger->cout(fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL, headerPrefix));
