@@ -338,14 +338,14 @@ builtPathsPerInstallable(
     return res;
 }
 
-struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
+struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
 {
     std::optional<int64_t> priority;
 
-    CmdProfileInstall() {
+    CmdProfileAdd() {
         addFlag({
             .longName = "priority",
-            .description = "The priority of the package to install.",
+            .description = "The priority of the package to add.",
             .labels = {"priority"},
             .handler = {&priority},
         });
@@ -353,13 +353,13 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
     std::string description() override
     {
-        return "install a package into a profile";
+        return "add a package to a profile";
     }
 
     std::string doc() override
     {
         return
-          #include "profile-install.md"
+          #include "profile-add.md"
           ;
     }
 
@@ -415,7 +415,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     && existingSource->originalRef == elementSource->originalRef
                     && existingSource->attrPath == elementSource->attrPath
                     ) {
-                    warn("'%s' is already installed", elementName);
+                    warn("'%s' is already added", elementName);
                     continue;
                 }
             }
@@ -462,15 +462,15 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 "\n"
                 "  nix profile remove %3%\n"
                 "\n"
-                "The new package can also be installed next to the existing one by assigning a different priority.\n"
+                "The new package can also be added next to the existing one by assigning a different priority.\n"
                 "The conflicting packages have a priority of %5%.\n"
                 "To prioritise the new package:\n"
                 "\n"
-                "  nix profile install %4% --priority %6%\n"
+                "  nix profile add %4% --priority %6%\n"
                 "\n"
                 "To prioritise the existing package:\n"
                 "\n"
-                "  nix profile install %4% --priority %7%\n",
+                "  nix profile add %4% --priority %7%\n",
                 originalConflictingFilePath,
                 newConflictingFilePath,
                 originalEntryName,
@@ -708,16 +708,14 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
             if (!element.source) {
                 warn(
-                    "Found package '%s', but it was not installed from a flake, so it can't be checked for upgrades!",
-                    element.identifier()
-                );
+                    "Found package '%s', but it was not added from a flake, so it can't be checked for upgrades!",
+                    element.identifier());
                 continue;
             }
             if (element.source->originalRef.input.isLocked()) {
                 warn(
-                    "Found package '%s', but it was installed from a locked flake reference so it can't be upgraded!",
-                    element.identifier()
-                );
+                    "Found package '%s', but it was added from a locked flake reference so it can't be upgraded!",
+                    element.identifier());
                 continue;
             }
 
@@ -787,7 +785,7 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
 {
     std::string description() override
     {
-        return "list installed packages";
+        return "list packages in the profile";
     }
 
     std::string doc() override
@@ -978,7 +976,7 @@ struct CmdProfile : NixMultiCommand
         : NixMultiCommand(
             "profile",
             {
-              {"install", []() { return make_ref<CmdProfileInstall>(); }},
+              {"add", []() { return make_ref<CmdProfileAdd>(); }},
               {"remove", []() { return make_ref<CmdProfileRemove>(); }},
               {"upgrade", []() { return make_ref<CmdProfileUpgrade>(); }},
               {"list", []() { return make_ref<CmdProfileList>(); }},
@@ -987,7 +985,11 @@ struct CmdProfile : NixMultiCommand
               {"rollback", []() { return make_ref<CmdProfileRollback>(); }},
               {"wipe-history", []() { return make_ref<CmdProfileWipeHistory>(); }},
           })
-    { }
+    {
+        aliases = {
+            {"install", { AliasStatus::Deprecated, {"add"}}},
+        };
+    }
 
     std::string description() override
     {
