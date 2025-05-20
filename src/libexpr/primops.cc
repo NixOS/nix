@@ -3148,10 +3148,16 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value * * arg
         return;
     }
 
-    auto attrs = state.buildBindings(args[0]->payload.lambda.fun->formals->formals.size());
-    for (auto & i : args[0]->payload.lambda.fun->formals->formals)
+    const auto &formals = args[0]->payload.lambda.fun->formals->formals;
+    auto attrs = state.buildBindings(formals.size());
+    for (auto & i : formals)
         attrs.insert(i.name, state.getBool(i.def), i.pos);
-    v.mkAttrs(attrs);
+    /* Optimization: avoid sorting bindings. `formals` must already be sorted according to
+       (std::tie(a.name, a.pos) < std::tie(b.name, b.pos)) predicate, so the following assertion
+       always holds:
+       assert(std::is_sorted(attrs.alreadySorted()->begin(), attrs.alreadySorted()->end()));
+       .*/
+    v.mkAttrs(attrs.alreadySorted());
 }
 
 static RegisterPrimOp primop_functionArgs({
