@@ -9,7 +9,7 @@
 namespace nix {
 
 PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
-    : Goal(worker)
+    : Goal(worker, init())
     , storePath(storePath)
     , repair(repair)
     , ca(ca)

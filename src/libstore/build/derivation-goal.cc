@@ -25,8 +25,7 @@ namespace nix {
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath,
     const OutputsSpec & wantedOutputs, Worker & worker, BuildMode buildMode)
-    : Goal(worker)
-    , useDerivation(true)
+    : Goal(worker, loadDerivation())
     , drvPath(drvPath)
     , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
@@ -43,8 +42,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath,
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
     const OutputsSpec & wantedOutputs, Worker & worker, BuildMode buildMode)
-    : Goal(worker)
-    , useDerivation(false)
+    : Goal(worker, haveDerivation())
     , drvPath(drvPath)
     , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
@@ -143,10 +141,10 @@ void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
 }
 
 
-Goal::Co DerivationGoal::init() {
-    trace("init");
+Goal::Co DerivationGoal::loadDerivation() {
+    trace("local derivation");
 
-    if (useDerivation) {
+    {
         /* The first thing to do is to make sure that the derivation
            exists.  If it doesn't, it may be created through a
            substitute. */
@@ -355,7 +353,7 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
 
     std::map<ref<const SingleDerivedPath>, GoalPtr, value_comparison> inputGoals;
 
-    if (useDerivation) {
+    {
         std::function<void(ref<const SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)> addWaiteeDerivedPath;
 
         addWaiteeDerivedPath = [&](ref<const SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
@@ -375,7 +373,7 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
                     childNode);
         };
 
-        for (const auto & [inputDrvPath, inputNode] : dynamic_cast<Derivation *>(drv.get())->inputDrvs.map) {
+        for (const auto & [inputDrvPath, inputNode] : drv->inputDrvs.map) {
             /* Ensure that pure, non-fixed-output derivations don't
                depend on impure derivations. */
             if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && !drv->type().isImpure() && !drv->type().isFixed()) {
@@ -417,8 +415,6 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
     trace("all inputs realised");
 
     if (nrFailed != 0) {
-        if (!useDerivation)
-            throw Error("some dependencies of '%s' are missing", worker.store.printStorePath(drvPath));
         auto msg = fmt(
             "Cannot build '%s'.\n"
             "Reason: " ANSI_RED "%d %s failed" ANSI_NORMAL ".",
@@ -435,8 +431,8 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
     /* Determine the full set of input paths. */
 
     /* First, the input derivations. */
-    if (useDerivation) {
-        auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
+    {
+        auto & fullDrv = *drv;
 
         auto drvType = fullDrv.type();
         bool resolveDrv = std::visit(overloaded {
@@ -918,7 +914,12 @@ Goal::Co DerivationGoal::repairClosure()
        derivation is responsible for which path in the output
        closure. */
     StorePathSet inputClosure;
-    if (useDerivation) worker.store.computeFSClosure(drvPath, inputClosure);
+
+    /* If we're working from an in-memory derivation with no in-store
+       `*.drv` file, we cannot do this part. */
+    if (worker.store.isValidPath(drvPath))
+        worker.store.computeFSClosure(drvPath, inputClosure);
+
     std::map<StorePath, StorePath> outputsToDrv;
     for (auto & i : inputClosure)
         if (i.isDerivation()) {
@@ -1133,7 +1134,9 @@ HookReply DerivationGoal::tryBuildHook()
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
 #else
-    if (settings.buildHook.get().empty() || !worker.tryBuildHook || !useDerivation) return rpDecline;
+    /* This should use `worker.evalStore`, but per #13179 the build hook
+       doesn't work with eval store anyways. */
+    if (settings.buildHook.get().empty() || !worker.tryBuildHook || !worker.store.isValidPath(drvPath)) return rpDecline;
 
     if (!worker.hook)
         worker.hook = std::make_unique<HookInstance>();
@@ -1399,33 +1402,32 @@ void DerivationGoal::flushLine()
 std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDerivationOutputMap()
 {
     assert(!drv->type().isImpure());
-    if (!useDerivation || drv->type().hasKnownOutputPaths()) {
-        std::map<std::string, std::optional<StorePath>> res;
-        for (auto & [name, output] : drv->outputs)
-            res.insert_or_assign(name, output.path(worker.store, drv->name, name));
-        return res;
-    } else {
-        for (auto * drvStore : { &worker.evalStore, &worker.store })
-            if (drvStore->isValidPath(drvPath))
-                return worker.store.queryPartialDerivationOutputMap(drvPath, drvStore);
-        assert(false);
-    }
+
+    for (auto * drvStore : { &worker.evalStore, &worker.store })
+        if (drvStore->isValidPath(drvPath))
+            return worker.store.queryPartialDerivationOutputMap(drvPath, drvStore);
+
+    /* In-memory derivation will naturally fall back on this case, where
+       we do best-effort with static information. */
+    std::map<std::string, std::optional<StorePath>> res;
+    for (auto & [name, output] : drv->outputs)
+        res.insert_or_assign(name, output.path(worker.store, drv->name, name));
+    return res;
 }
 
 OutputPathMap DerivationGoal::queryDerivationOutputMap()
 {
     assert(!drv->type().isImpure());
-    if (!useDerivation || drv->type().hasKnownOutputPaths()) {
-        OutputPathMap res;
-        for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
-            res.insert_or_assign(name, *output.second);
-        return res;
-    } else {
-        for (auto * drvStore : { &worker.evalStore, &worker.store })
-            if (drvStore->isValidPath(drvPath))
-                return worker.store.queryDerivationOutputMap(drvPath, drvStore);
-        assert(false);
-    }
+
+    for (auto * drvStore : { &worker.evalStore, &worker.store })
+        if (drvStore->isValidPath(drvPath))
+            return worker.store.queryDerivationOutputMap(drvPath, drvStore);
+
+    // See comment in `DerivationGoal::queryPartialDerivationOutputMap`.
+    OutputPathMap res;
+    for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
+        res.insert_or_assign(name, *output.second);
+    return res;
 }
 
 
