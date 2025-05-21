@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/util/args.hh"
+#include "nix/main/args.hh"
 #include "nix/util/canon-path.hh"
 #include "nix/main/common-args.hh"
 #include "nix/expr/search-path.hh"

@@ -13,7 +13,7 @@
 #include "nix/util/finally.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
-#include "nix/util/args.hh"
+#include "nix/main/args.hh"
 #include "nix/util/git.hh"
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?

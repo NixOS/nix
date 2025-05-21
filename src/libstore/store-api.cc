@@ -19,6 +19,7 @@
 #include "nix/store/worker-protocol.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/users.hh"
+#include "nix/store/config-parse-impl.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -28,7 +29,6 @@
 using json = nlohmann::json;
 
 namespace nix {
-
 
 bool MixStoreDirMethods::isInStore(PathView path) const
 {
@@ -186,6 +186,114 @@ std::pair<StorePath, Hash> MixStoreDirMethods::computeStorePath(
                 })),
         h,
     };
+}
+
+
+constexpr static const StoreConfigT<config::SettingInfo> storeConfigDescriptions = {
+    .pathInfoCacheSize{
+        .name = "path-info-cache-size",
+        .description = "Size of the in-memory store path metadata cache.",
+    },
+    .isTrusted{
+        .name = "trusted",
+        .description = R"(
+          Whether paths from this store can be used as substitutes
+          even if they are not signed by a key listed in the
+          [`trusted-public-keys`](@docroot@/command-ref/conf-file.md#conf-trusted-public-keys)
+          setting.
+        )",
+    },
+    .systemFeatures{
+        .name = "system-features",
+        .description = R"(
+          Optional [system features](@docroot@/command-ref/conf-file.md#conf-system-features) available on the system this store uses to build derivations.
+
+          Example: `"kvm"`
+        )",
+        // The default value is CPU- and OS-specific, and thus
+        // unsuitable to be rendered in the documentation.
+        .documentDefault = false,
+    },
+};
+
+constexpr static const SubstituterConfigT<config::SettingInfo> substituterConfigDescriptions = {
+    .priority{
+        .name = "priority",
+        .description = R"(
+          Priority of this store when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
+          A lower value means a higher priority.
+        )",
+    },
+    .wantMassQuery{
+        .name = "want-mass-query",
+        .description = R"(
+          Whether this store can be queried efficiently for path validity when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
+        )",
+    },
+};
+
+
+#define STORE_CONFIG_FIELDS(X) \
+    X(pathInfoCacheSize), \
+    X(isTrusted), \
+    X(systemFeatures),
+
+#define SUBSTITUTER_CONFIG_FIELDS(X) \
+    X(priority), \
+    X(wantMassQuery),
+
+
+MAKE_PARSE(StoreConfig, storeConfig, STORE_CONFIG_FIELDS)
+MAKE_PARSE(SubstituterConfig, substituterConfig, SUBSTITUTER_CONFIG_FIELDS)
+
+
+static StoreConfigT<config::PlainValue> storeConfigDefaults()
+{
+    return {
+        .pathInfoCacheSize = {65536},
+        .isTrusted = {false},
+        .systemFeatures = {StoreConfig::getDefaultSystemFeatures()},
+    };
+};
+
+SubstituterConfigT<config::PlainValue> substituterConfigDefaults()
+{
+    return {
+        .priority = {0},
+        .wantMassQuery = {false},
+    };
+};
+
+
+MAKE_APPLY_PARSE(StoreConfig, storeConfig, STORE_CONFIG_FIELDS)
+
+
+Store::Config::StoreConfig(const StoreReference::Params & params)
+    : StoreDirConfig{params}
+    , StoreConfigT<config::PlainValue>{storeConfigApplyParse(params)}
+    , SubstituterConfigT<config::OptValue>{substituterConfigParse(params)}
+{
+}
+
+
+config::SettingDescriptionMap StoreConfig::descriptions()
+{
+    auto ret = StoreDirConfig::descriptions();
+    {
+        constexpr auto & descriptions = storeConfigDescriptions;
+        auto defaults = storeConfigDefaults();
+        ret.merge(config::SettingDescriptionMap {
+            STORE_CONFIG_FIELDS(DESCRIBE_ROW)
+        });
+    }
+    {
+        constexpr auto & descriptions = substituterConfigDescriptions;
+        auto defaults = substituterConfigDefaults();
+        ret.merge(config::SettingDescriptionMap {
+            SUBSTITUTER_CONFIG_FIELDS(DESCRIBE_ROW)
+        });
+    };
+    return ret;
 }
 
 

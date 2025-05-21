@@ -6,6 +6,7 @@
 #include <optional>
 
 #include "nix/util/types.hh"
+#include "nix/util/experimental-feature-settings.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/source-path.hh"

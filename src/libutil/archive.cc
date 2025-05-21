@@ -6,7 +6,6 @@
 #include <strings.h> // for strcasecmp
 
 #include "nix/util/archive.hh"
-#include "nix/util/config-global.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/util/source-path.hh"
 #include "nix/util/file-system.hh"
@@ -14,21 +13,19 @@
 
 namespace nix {
 
-struct ArchiveSettings : Config
-{
-    Setting<bool> useCaseHack{this,
-        #ifdef __APPLE__
-            true,
-        #else
-            false,
-        #endif
-        "use-case-hack",
-        "Whether to enable a macOS-specific hack for dealing with file name case collisions."};
+const extern ArchiveSettings<config::JustValue> archiveSettingsDefaults = {
+    .useCaseHack = {
+        .value =
+#ifdef __APPLE__
+            true
+#else
+            false
+#endif
+    },
 };
 
-static ArchiveSettings archiveSettings;
+ArchiveSettings<config::JustValue> archiveSettings = archiveSettingsDefaults;
 
-static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
 PathFilter defaultPathFilter = [](const Path &) { return true; };
 

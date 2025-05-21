@@ -12,18 +12,75 @@
 #include "nix/store/ssh.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/callback.hh"
+#include "nix/store/config-parse-impl.hh"
 #include "nix/store/store-registration.hh"
 
 namespace nix {
 
-LegacySSHStoreConfig::LegacySSHStoreConfig(
+constexpr static const LegacySSHStoreConfigT<config::SettingInfo> legacySSHStoreConfigDescriptions = {
+    .remoteProgram{
+        .name = "remote-program",
+        .description = "Path to the `nix-store` executable on the remote machine.",
+    },
+    .maxConnections{
+        .name = "max-connections",
+        .description = "Maximum number of concurrent SSH connections.",
+    },
+};
+
+
+#define LEGACY_SSH_STORE_CONFIG_FIELDS(X) \
+    X(remoteProgram), \
+    X(maxConnections)
+
+
+MAKE_PARSE(LegacySSHStoreConfig, legacySSHStoreConfig, LEGACY_SSH_STORE_CONFIG_FIELDS)
+
+
+static LegacySSHStoreConfigT<config::PlainValue> legacySSHStoreConfigDefaults()
+{
+    return {
+        .remoteProgram = {{"nix-store"}},
+        .maxConnections = {1},
+    };
+}
+
+
+MAKE_APPLY_PARSE(LegacySSHStoreConfig, legacySSHStoreConfig, LEGACY_SSH_STORE_CONFIG_FIELDS)
+
+
+config::SettingDescriptionMap LegacySSHStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(CommonSSHStoreConfig::descriptions());
+    ret.merge(RemoteStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = legacySSHStoreConfigDescriptions;
+        auto defaults = legacySSHStoreConfigDefaults();
+        ret.merge(decltype(ret){
+            LEGACY_SSH_STORE_CONFIG_FIELDS(DESCRIBE_ROW)
+        });
+    }
+    return ret;
+}
+
+
+LegacySSHStore::Config::LegacySSHStoreConfig(
     std::string_view scheme,
     std::string_view authority,
-    const Params & params)
-    : StoreConfig(params)
-    , CommonSSHStoreConfig(scheme, authority, params)
+    const StoreReference::Params & params)
+    : Store::Config{params}
+    , CommonSSHStoreConfig{scheme, authority, params}
+    , LegacySSHStoreConfigT<config::PlainValue>{legacySSHStoreConfigApplyParse(params)}
 {
+#ifndef _WIN32
+    if (auto * p = get(params, "log-fd")) {
+        logFD = p->get<decltype(logFD)>();
+    }
+#endif
 }
+
 
 std::string LegacySSHStoreConfig::doc()
 {
