@@ -666,7 +666,8 @@ Path makeTempPath(const Path & root, const Path & suffix)
 {
     // start the counter at a random value to minimize issues with preexisting temp paths
     static std::atomic_uint_fast32_t counter(std::random_device{}());
-    return fmt("%1%%2%-%3%-%4%", root, suffix, getpid(), counter.fetch_add(1, std::memory_order_relaxed));
+    auto tmpRoot = canonPath(root.empty() ? defaultTempDir() : root, true);
+    return fmt("%1%/%2%-%3%-%4%", tmpRoot, suffix, getpid(), counter.fetch_add(1, std::memory_order_relaxed));
 }
 
 void createSymlink(const Path & target, const Path & link)
