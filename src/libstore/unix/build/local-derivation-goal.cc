@@ -1,4 +1,9 @@
+<<<<<<< HEAD:src/libstore/unix/build/local-derivation-goal.cc
 #include "nix/store/build/local-derivation-goal.hh"
+=======
+#include "nix/store/build/derivation-builder.hh"
+#include "nix/util/file-system.hh"
+>>>>>>> 9e26549c2 (Consolidate tempName and makeTempPath):src/libstore/unix/build/derivation-builder.cc
 #include "nix/store/local-store.hh"
 #include "nix/util/processes.hh"
 #include "nix/store/builtins.hh"
@@ -576,8 +581,12 @@ void LocalDerivationGoal::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
+<<<<<<< HEAD:src/libstore/unix/build/local-derivation-goal.cc
     topTmpDir = createTempDir(
         settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+=======
+    topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), 0700);
+>>>>>>> 9e26549c2 (Consolidate tempName and makeTempPath):src/libstore/unix/build/derivation-builder.cc
 #ifdef __APPLE__
     if (false) {
 #else
