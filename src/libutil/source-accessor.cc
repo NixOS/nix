@@ -1,5 +1,5 @@
+#include <atomic>
 #include "nix/util/source-accessor.hh"
-#include "nix/util/archive.hh"
 
 namespace nix {
 
