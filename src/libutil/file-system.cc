@@ -8,12 +8,12 @@
 #include "nix/util/util.hh"
 
 #include <atomic>
+#include <random>
 #include <cerrno>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <deque>
-#include <sstream>
 #include <filesystem>
 
 #include <fcntl.h>
@@ -24,10 +24,6 @@
 #ifdef _WIN32
 #  include <io.h>
 #endif
-
-#include "nix/util/strings-inline.hh"
-
-#include "util-config-private.hh"
 
 namespace nix {
 
@@ -648,6 +644,13 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
     unix::closeOnExec(fd.get());
 #endif
     return {std::move(fd), tmpl};
+}
+
+Path makeTempPath(const Path & root, const Path & suffix)
+{
+    // start the counter at a random value to minimize issues with preexisting temp paths
+    static std::atomic_uint_fast32_t counter(std::random_device{}());
+    return fmt("%1%%2%-%3%-%4%", root, suffix, getpid(), counter.fetch_add(1, std::memory_order_relaxed));
 }
 
 void createSymlink(const Path & target, const Path & link)

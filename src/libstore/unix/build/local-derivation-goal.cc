@@ -1,22 +1,14 @@
 #include "nix/store/build/local-derivation-goal.hh"
 #include "nix/store/local-store.hh"
 #include "nix/util/processes.hh"
-#include "nix/store/indirect-root-store.hh"
-#include "nix/store/build/hook-instance.hh"
-#include "nix/store/build/worker.hh"
 #include "nix/store/builtins.hh"
-#include "nix/store/builtins/buildenv.hh"
 #include "nix/store/path-references.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/util.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/git.hh"
-#include "nix/util/compression.hh"
 #include "nix/store/daemon.hh"
 #include "nix/util/topo-sort.hh"
-#include "nix/util/callback.hh"
-#include "nix/util/json-utils.hh"
-#include "nix/util/current-process.hh"
 #include "nix/store/build/child.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
@@ -310,7 +302,41 @@ extern void replaceValidPath(const Path & storePath, const Path & tmpPath);
 
 int LocalDerivationGoal::getChildStatus()
 {
+<<<<<<< HEAD:src/libstore/unix/build/local-derivation-goal.cc
     return hook ? DerivationGoal::getChildStatus() : pid.kill();
+=======
+    /* We can't atomically replace storePath (the original) with
+       tmpPath (the replacement), so we have to move it out of the
+       way first.  We'd better not be interrupted here, because if
+       we're repairing (say) Glibc, we end up with a broken system. */
+    Path oldPath;
+    
+    if (pathExists(storePath)) {
+        // why do we loop here?
+        // although makeTempPath should be unique, we can't 
+        // guarantee that.
+        do {
+            oldPath = makeTempPath(storePath, ".old");
+            // store paths are often directories so we can't just unlink() it
+            // let's make sure the path doesn't exist before we try to use it
+        } while (pathExists(oldPath));
+        movePath(storePath, oldPath);
+    }
+    try {
+        movePath(tmpPath, storePath);
+    } catch (...) {
+        try {
+            // attempt to recover
+            if (!oldPath.empty())
+                movePath(oldPath, storePath);
+        } catch (...) {
+            ignoreExceptionExceptInterrupt();
+        }
+        throw;
+    }
+    if (!oldPath.empty())
+        deletePath(oldPath);
+>>>>>>> 6aed9d877 (cherry-pick https://gerrit.lix.systems/c/lix/+/2100):src/libstore/unix/build/derivation-builder.cc
 }
 
 void LocalDerivationGoal::closeReadPipes()
