@@ -578,26 +578,11 @@ std::string defaultTempDir() {
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");
 }
 
-static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
-    std::atomic<unsigned int> & counter)
+Path createTempDir(const Path & tmpRoot, const Path & prefix, mode_t mode)
 {
-    tmpRoot = canonPath(tmpRoot.empty() ? defaultTempDir() : tmpRoot, true);
-    if (includePid)
-        return fmt("%1%/%2%-%3%-%4%", tmpRoot, prefix, getpid(), counter++);
-    else
-        return fmt("%1%/%2%-%3%", tmpRoot, prefix, counter++);
-}
-
-Path createTempDir(const Path & tmpRoot, const Path & prefix,
-    bool includePid, bool useGlobalCounter, mode_t mode)
-{
-    static std::atomic<unsigned int> globalCounter = 0;
-    std::atomic<unsigned int> localCounter = 0;
-    auto & counter(useGlobalCounter ? globalCounter : localCounter);
-
     while (1) {
         checkInterrupt();
-        Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
+        Path tmpDir = makeTempPath(tmpRoot, prefix);
         if (mkdir(tmpDir.c_str()
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
                     , mode

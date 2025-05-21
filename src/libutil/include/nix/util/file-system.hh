@@ -310,8 +310,8 @@ typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
 /**
  * Create a temporary directory.
  */
-Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
-    bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
+Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix", 
+                   mode_t mode = 0755);
 
 /**
  * Create a temporary file, returning a file handle and its path.

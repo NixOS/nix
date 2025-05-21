@@ -1,4 +1,5 @@
 #include "nix/store/build/derivation-builder.hh"
+#include "nix/util/file-system.hh"
 #include "nix/store/local-store.hh"
 #include "nix/util/processes.hh"
 #include "nix/store/builtins.hh"
@@ -879,7 +880,7 @@ void DerivationBuilderImpl::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
-    topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+    topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), 0700);
 #ifdef __APPLE__
     if (false) {
 #else
