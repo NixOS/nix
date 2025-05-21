@@ -3,7 +3,7 @@ if test -z "$HOME" || test -n "$__ETC_PROFILE_NIX_SOURCED"
     exit
 end
 
-set --global __ETC_PROFILE_NIX_SOURCED 1
+set --global --export __ETC_PROFILE_NIX_SOURCED 1
 
 # Local helpers
 
