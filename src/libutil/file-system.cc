@@ -594,6 +594,7 @@ std::string defaultTempDir()
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");
 }
 
+<<<<<<< HEAD
 static Path tempName(Path tmpRoot, const Path & prefix, bool includePid, std::atomic<unsigned int> & counter)
 {
     tmpRoot = canonPath(tmpRoot.empty() ? defaultTempDir() : tmpRoot, true);
@@ -614,6 +615,14 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix, bool includePid, b
         Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
         if (mkdir(
                 tmpDir.c_str()
+=======
+Path createTempDir(const Path & tmpRoot, const Path & prefix, mode_t mode)
+{
+    while (1) {
+        checkInterrupt();
+        Path tmpDir = makeTempPath(tmpRoot, prefix);
+        if (mkdir(tmpDir.c_str()
+>>>>>>> 9e26549c2 (Consolidate tempName and makeTempPath)
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
                     ,
                 mode
