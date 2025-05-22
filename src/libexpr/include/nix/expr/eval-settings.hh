@@ -157,7 +157,7 @@ struct EvalSettings : Config
           By default, Nix allows [Import from Derivation](@docroot@/language/import-from-derivation.md).
 
           When this setting is `true`, Nix will log a warning indicating that it performed such an import.
-          The `allow-import-from-derivation` setting takes precedence, and no warnings will be logged if that setting is also enabled.
+          This option has no effect if `allow-import-from-derivation` is disabled.
         )"
         };
 
