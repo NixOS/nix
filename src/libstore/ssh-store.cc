@@ -7,6 +7,7 @@
 #include "nix/store/worker-protocol-impl.hh"
 #include "nix/util/pool.hh"
 #include "nix/store/ssh.hh"
+#include "nix/store/store-registration.hh"
 
 namespace nix {
 
@@ -14,11 +15,12 @@ SSHStoreConfig::SSHStoreConfig(
     std::string_view scheme,
     std::string_view authority,
     const Params & params)
-    : StoreConfig(params)
-    , RemoteStoreConfig(params)
-    , CommonSSHStoreConfig(scheme, authority, params)
+    : Store::Config{params}
+    , RemoteStore::Config{params}
+    , CommonSSHStoreConfig{scheme, authority, params}
 {
 }
+
 
 std::string SSHStoreConfig::doc()
 {
@@ -27,21 +29,18 @@ std::string SSHStoreConfig::doc()
       ;
 }
 
-class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
-{
-public:
 
-    SSHStore(
-        std::string_view scheme,
-        std::string_view host,
-        const Params & params)
-        : StoreConfig(params)
-        , RemoteStoreConfig(params)
-        , CommonSSHStoreConfig(scheme, host, params)
-        , SSHStoreConfig(scheme, host, params)
-        , Store(params)
-        , RemoteStore(params)
-        , master(createSSHMaster(
+struct SSHStore : virtual RemoteStore
+{
+    using Config = SSHStoreConfig;
+
+    ref<const Config> config;
+
+    SSHStore(ref<const Config> config)
+        : Store{*config}
+        , RemoteStore{*config}
+        , config{config}
+        , master(config->createSSHMaster(
             // Use SSH master only if using more than 1 connection.
             connections->capacity() > 1))
     {
@@ -49,7 +48,7 @@ public:
 
     std::string getUri() override
     {
-        return *uriSchemes().begin() + "://" + host;
+        return *Config::uriSchemes().begin() + "://" + host;
     }
 
     // FIXME extend daemon protocol, move implementation to RemoteStore
@@ -101,7 +100,7 @@ MountedSSHStoreConfig::MountedSSHStoreConfig(std::string_view scheme, std::strin
     : StoreConfig(params)
     , RemoteStoreConfig(params)
     , CommonSSHStoreConfig(scheme, host, params)
-    , SSHStoreConfig(params)
+    , SSHStoreConfig(scheme, host, params)
     , LocalFSStoreConfig(params)
 {
 }
@@ -128,33 +127,19 @@ std::string MountedSSHStoreConfig::doc()
  * The difference lies in how they manage GC roots. See addPermRoot
  * below for details.
  */
-class MountedSSHStore : public virtual MountedSSHStoreConfig, public virtual SSHStore, public virtual LocalFSStore
+struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
 {
-public:
+    using Config = MountedSSHStoreConfig;
 
-    MountedSSHStore(
-        std::string_view scheme,
-        std::string_view host,
-        const Params & params)
-        : StoreConfig(params)
-        , RemoteStoreConfig(params)
-        , CommonSSHStoreConfig(scheme, host, params)
-        , SSHStoreConfig(params)
-        , LocalFSStoreConfig(params)
-        , MountedSSHStoreConfig(params)
-        , Store(params)
-        , RemoteStore(params)
-        , SSHStore(scheme, host, params)
-        , LocalFSStore(params)
+    MountedSSHStore(ref<const Config> config)
+        : Store{*config}
+        , RemoteStore{*config}
+        , SSHStore{config}
+        , LocalFSStore{*config}
     {
         extraRemoteProgramArgs = {
             "--process-ops",
         };
-    }
-
-    std::string getUri() override
-    {
-        return *uriSchemes().begin() + "://" + host;
     }
 
     void narFromPath(const StorePath & path, Sink & sink) override
@@ -198,14 +183,26 @@ public:
     }
 };
 
+
+ref<Store> SSHStore::Config::openStore() const {
+    return make_ref<SSHStore>(ref{shared_from_this()});
+}
+
+ref<Store> MountedSSHStore::Config::openStore() const {
+    return make_ref<MountedSSHStore>(ref{
+        std::dynamic_pointer_cast<const MountedSSHStore::Config>(shared_from_this())
+    });
+}
+
+
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-    Strings command = remoteProgram.get();
+    Strings command = config->remoteProgram.get();
     command.push_back("--stdio");
-    if (remoteStore.get() != "") {
+    if (config->remoteStore.get() != "") {
         command.push_back("--store");
-        command.push_back(remoteStore.get());
+        command.push_back(config->remoteStore.get());
     }
     command.insert(command.end(),
         extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());
@@ -215,7 +212,7 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
     return conn;
 }
 
-static RegisterStoreImplementation<SSHStore, SSHStoreConfig> regSSHStore;
-static RegisterStoreImplementation<MountedSSHStore, MountedSSHStoreConfig> regMountedSSHStore;
+static RegisterStoreImplementation<SSHStore::Config> regSSHStore;
+static RegisterStoreImplementation<MountedSSHStore::Config> regMountedSSHStore;
 
 }

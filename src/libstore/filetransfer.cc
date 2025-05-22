@@ -33,6 +33,9 @@ using namespace std::string_literals;
 
 namespace nix {
 
+const unsigned int RETRY_TIME_MS_DEFAULT = 250;
+const unsigned int RETRY_TIME_MS_TOO_MANY_REQUESTS = 60000;
+
 FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
@@ -309,6 +312,23 @@ struct curlFileTransfer : public FileTransfer
         }
         #endif
 
+        size_t seekCallback(curl_off_t offset, int origin)
+        {
+            if (origin == SEEK_SET) {
+                readOffset = offset;
+            } else if (origin == SEEK_CUR) {
+                readOffset += offset;
+            } else if (origin == SEEK_END) {
+                readOffset = request.data->length() + offset;
+            }
+            return CURL_SEEKFUNC_OK;
+        }
+
+        static size_t seekCallbackWrapper(void *clientp, curl_off_t offset, int origin)
+        {
+            return ((TransferItem *) clientp)->seekCallback(offset, origin);
+        }
+
         void init()
         {
             if (!req) req = curl_easy_init();
@@ -363,6 +383,8 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_READFUNCTION, readCallbackWrapper);
                 curl_easy_setopt(req, CURLOPT_READDATA, this);
                 curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->length());
+                curl_easy_setopt(req, CURLOPT_SEEKFUNCTION, seekCallbackWrapper);
+                curl_easy_setopt(req, CURLOPT_SEEKDATA, this);
             }
 
             if (request.verifyTLS) {
@@ -400,6 +422,8 @@ struct curlFileTransfer : public FileTransfer
         void finish(CURLcode code)
         {
             auto finishTime = std::chrono::steady_clock::now();
+
+            auto retryTimeMs = request.baseRetryTimeMs;
 
             auto httpStatus = getHTTPStatus();
 
@@ -451,10 +475,12 @@ struct curlFileTransfer : public FileTransfer
                 } else if (httpStatus == 401 || httpStatus == 403 || httpStatus == 407) {
                     // Don't retry on authentication/authorization failures
                     err = Forbidden;
-                } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408 && httpStatus != 429) {
+                } else if (httpStatus == 429) {
+                    // 429 means too many requests, so we retry (with a substantially longer delay)
+                    retryTimeMs = RETRY_TIME_MS_TOO_MANY_REQUESTS;
+                } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408) {
                     // Most 4xx errors are client errors and are probably not worth retrying:
                     //   * 408 means the server timed out waiting for us, so we try again
-                    //   * 429 means too many requests, so we retry (with a delay)
                     err = Misc;
                 } else if (httpStatus == 501 || httpStatus == 505 || httpStatus == 511) {
                     // Let's treat most 5xx (server) errors as transient, except for a handful:
@@ -520,7 +546,7 @@ struct curlFileTransfer : public FileTransfer
                         || writtenToSink == 0
                         || (acceptRanges && encoding.empty())))
                 {
-                    int ms = request.baseRetryTimeMs * std::pow(2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(fileTransfer.mt19937));
+                    int ms = retryTimeMs * std::pow(2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(fileTransfer.mt19937));
                     if (writtenToSink)
                         warn("%s; retrying from offset %d in %d ms", exc.what(), writtenToSink, ms);
                     else
@@ -747,7 +773,7 @@ struct curlFileTransfer : public FileTransfer
     }
 
 #if NIX_WITH_S3_SUPPORT
-    std::tuple<std::string, std::string, Store::Params> parseS3Uri(std::string uri)
+    std::tuple<std::string, std::string, Store::Config::Params> parseS3Uri(std::string uri)
     {
         auto [path, params] = splitUriAndParams(uri);
 

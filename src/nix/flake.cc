@@ -8,7 +8,7 @@
 #include "nix/flake/flake.hh"
 #include "nix/expr/get-drvs.hh"
 #include "nix/util/signals.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/expr/attr-path.hh"
@@ -54,7 +54,7 @@ public:
 
     FlakeRef getFlakeRef()
     {
-        return parseFlakeRef(fetchSettings, flakeUrl, fs::current_path().string()); //FIXME
+        return parseFlakeRef(fetchSettings, flakeUrl, std::filesystem::current_path().string()); //FIXME
     }
 
     LockedFlake lockFlake()
@@ -66,7 +66,7 @@ public:
     {
         return {
             // Like getFlakeRef but with expandTilde calld first
-            parseFlakeRef(fetchSettings, expandTilde(flakeUrl), fs::current_path().string())
+            parseFlakeRef(fetchSettings, expandTilde(flakeUrl), std::filesystem::current_path().string())
         };
     }
 };
@@ -251,7 +251,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             j["locks"] = lockedFlake.lockFile.toJSON().first;
             if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
-            logger->cout("%s", j.dump());
+            printJSON(j);
         } else {
             logger->cout(
                 ANSI_BOLD "Resolved URL:" ANSI_NORMAL "  %s",
@@ -396,7 +396,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        std::set<std::string> omittedSystems;
+        StringSet omittedSystems;
 
         // FIXME: rewrite to use EvalCache.
 
@@ -895,7 +895,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto evalState = getEvalState();
 
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(
-            fetchSettings, templateUrl, fs::current_path().string());
+            fetchSettings, templateUrl, std::filesystem::current_path().string());
 
         auto installable = InstallableFlake(nullptr,
             evalState, std::move(templateFlakeRef), templateName, ExtendedOutputsSpec::Default(),
@@ -909,11 +909,11 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         NixStringContext context;
         auto templateDir = evalState->coerceToPath(noPos, templateDirAttr, context, "");
 
-        std::vector<fs::path> changedFiles;
-        std::vector<fs::path> conflictedFiles;
+        std::vector<std::filesystem::path> changedFiles;
+        std::vector<std::filesystem::path> conflictedFiles;
 
-        std::function<void(const SourcePath & from, const fs::path & to)> copyDir;
-        copyDir = [&](const SourcePath & from, const fs::path & to)
+        std::function<void(const SourcePath & from, const std::filesystem::path & to)> copyDir;
+        copyDir = [&](const SourcePath & from, const std::filesystem::path & to)
         {
             createDirs(to);
 
@@ -922,12 +922,12 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 auto from2 = from / name;
                 auto to2 = to / name;
                 auto st = from2.lstat();
-                auto to_st = fs::symlink_status(to2);
+                auto to_st = std::filesystem::symlink_status(to2);
                 if (st.type == SourceAccessor::tDirectory)
                     copyDir(from2, to2);
                 else if (st.type == SourceAccessor::tRegular) {
                     auto contents = from2.readFile();
-                    if (fs::exists(to_st)) {
+                    if (std::filesystem::exists(to_st)) {
                         auto contents2 = readFile(to2.string());
                         if (contents != contents2) {
                             printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
@@ -941,8 +941,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 }
                 else if (st.type == SourceAccessor::tSymlink) {
                     auto target = from2.readLink();
-                    if (fs::exists(to_st)) {
-                        if (fs::read_symlink(to2) != target) {
+                    if (std::filesystem::exists(to_st)) {
+                        if (std::filesystem::read_symlink(to2) != target) {
                             printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
                             conflictedFiles.push_back(to2);
                         } else {
@@ -961,7 +961,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         copyDir(templateDir, flakeDir);
 
-        if (!changedFiles.empty() && fs::exists(std::filesystem::path{flakeDir} / ".git")) {
+        if (!changedFiles.empty() && std::filesystem::exists(std::filesystem::path{flakeDir} / ".git")) {
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
             for (auto & s : changedFiles) args.emplace_back(s.string());
             runProgram("git", true, args);
@@ -1128,7 +1128,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
                 {"path", store->printStorePath(storePath)},
                 {"inputs", traverse(*flake.lockFile.root)},
             };
-            logger->cout("%s", jsonRoot);
+            printJSON(jsonRoot);
         } else {
             traverse(*flake.lockFile.root);
         }
@@ -1342,18 +1342,34 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
                         }
                     } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else
-                            throw Error("expected a derivation");
+                        try {
+                            if (visitor.isDerivation())
+                                showDerivation();
+                            else
+                                throw Error("expected a derivation");
+                        } catch (IFDError & e) {
+                            if (!json) {
+                                logger->cout(fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL, headerPrefix));
+                            } else {
+                                logger->warn(fmt("%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                            }
+                        }
                     }
                 }
 
                 else if (attrPath.size() > 0 && attrPathS[0] == "hydraJobs") {
-                    if (visitor.isDerivation())
-                        showDerivation();
-                    else
-                        recurse();
+                    try {
+                        if (visitor.isDerivation())
+                            showDerivation();
+                        else
+                            recurse();
+                    } catch (IFDError & e) {
+                        if (!json) {
+                            logger->cout(fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL, headerPrefix));
+                        } else {
+                            logger->warn(fmt("%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                        }
+                    }
                 }
 
                 else if (attrPath.size() > 0 && attrPathS[0] == "legacyPackages") {
@@ -1372,11 +1388,19 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
                         }
                     } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else if (attrPath.size() <= 2)
-                            // FIXME: handle recurseIntoAttrs
-                            recurse();
+                        try {
+                            if (visitor.isDerivation())
+                                showDerivation();
+                            else if (attrPath.size() <= 2)
+                                // FIXME: handle recurseIntoAttrs
+                                recurse();
+                        } catch (IFDError & e) {
+                            if (!json) {
+                                logger->cout(fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL, headerPrefix));
+                            } else {
+                                logger->warn(fmt("%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                            }
+                        }
                     }
                 }
 
@@ -1440,7 +1464,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
         auto j = visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
         if (json)
-            logger->cout("%s", j.dump());
+            printJSON(j);
     }
 };
 
@@ -1486,7 +1510,8 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
             res["hash"] = hash.to_string(HashFormat::SRI, true);
             res["original"] = fetchers::attrsToJSON(resolvedRef.toAttrs());
             res["locked"] = fetchers::attrsToJSON(lockedRef.toAttrs());
-            logger->cout(res.dump());
+            res["locked"].erase("__final"); // internal for now
+            printJSON(res);
         } else {
             notice("Downloaded '%s' to '%s' (hash '%s').",
                 lockedRef.to_string(),

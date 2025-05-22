@@ -194,7 +194,7 @@ struct MercurialInputScheme : InputScheme
 
                 input.attrs.insert_or_assign("ref", chomp(runHg({ "branch", "-R", actualUrl })));
 
-                auto files = tokenizeString<std::set<std::string>>(
+                auto files = tokenizeString<StringSet>(
                     runHg({ "status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0" }), "\0"s);
 
                 Path actualPath(absPath(actualUrl));

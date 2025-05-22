@@ -98,7 +98,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     if (drvs.empty()) return {};
 
     if (isIFD && !settings.enableImportFromDerivation)
-        error<EvalBaseError>(
+        error<IFDError>(
             "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
             drvs.begin()->to_string(*store)
         ).debugThrow();
@@ -895,18 +895,40 @@ static void prim_ceil(EvalState & state, const PosIdx pos, Value * * args, Value
 {
     auto value = state.forceFloat(*args[0], args[0]->determinePos(pos),
             "while evaluating the first argument passed to builtins.ceil");
-    v.mkInt(ceil(value));
+    auto ceilValue = ceil(value);
+    bool isInt = args[0]->type() == nInt;
+    constexpr NixFloat int_min = std::numeric_limits<NixInt::Inner>::min(); // power of 2, so that no rounding occurs
+    if (ceilValue >= int_min && ceilValue < -int_min) {
+        v.mkInt(ceilValue);
+    } else if (isInt) {
+        // a NixInt, e.g. INT64_MAX, can be rounded to -int_min due to the cast to NixFloat
+        state.error<EvalError>("Due to a bug (see https://github.com/NixOS/nix/issues/12899) the NixInt argument %1% caused undefined behavior in previous Nix versions.\n\tFuture Nix versions might implement the correct behavior.", args[0]->integer().value).atPos(pos).debugThrow();
+    } else {
+        state.error<EvalError>("NixFloat argument %1% is not in the range of NixInt", args[0]->fpoint()).atPos(pos).debugThrow();
+    }
+    // `forceFloat` casts NixInt to NixFloat, but instead NixInt args shall be returned unmodified
+    if (isInt) {
+        auto arg = args[0]->integer();
+        auto res = v.integer();
+        if (arg != res) {
+            state.error<EvalError>("Due to a bug (see https://github.com/NixOS/nix/issues/12899) a loss of precision occured in previous Nix versions because the NixInt argument %1% was rounded to %2%.\n\tFuture Nix versions might implement the correct behavior.", arg, res).atPos(pos).debugThrow();
+        }
+    }
 }
 
 static RegisterPrimOp primop_ceil({
     .name = "__ceil",
-    .args = {"double"},
+    .args = {"number"},
     .doc = R"(
-        Converts an IEEE-754 double-precision floating-point number (*double*) to
-        the next higher integer.
+        Rounds and converts *number* to the next higher NixInt value if possible, i.e. `ceil *number* >= *number*` and
+        `ceil *number* - *number* < 1`.
 
-        If the datatype is neither an integer nor a "float", an evaluation error will be
-        thrown.
+        An evaluation error is thrown, if there exists no such NixInt value `ceil *number*`.
+        Due to bugs in previous Nix versions an evaluation error might be thrown, if the datatype of *number* is
+        a NixInt and if `*number* < -9007199254740992` or `*number* > 9007199254740992`.
+
+        If the datatype of *number* is neither a NixInt (signed 64-bit integer) nor a NixFloat
+        (IEEE-754 double-precision floating-point number), an evaluation error will be thrown.
     )",
     .fun = prim_ceil,
 });
@@ -914,18 +936,40 @@ static RegisterPrimOp primop_ceil({
 static void prim_floor(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     auto value = state.forceFloat(*args[0], args[0]->determinePos(pos), "while evaluating the first argument passed to builtins.floor");
-    v.mkInt(floor(value));
+    auto floorValue = floor(value);
+    bool isInt = args[0]->type() == nInt;
+    constexpr NixFloat int_min = std::numeric_limits<NixInt::Inner>::min(); // power of 2, so that no rounding occurs
+    if (floorValue >= int_min && floorValue < -int_min) {
+        v.mkInt(floorValue);
+    } else if (isInt) {
+        // a NixInt, e.g. INT64_MAX, can be rounded to -int_min due to the cast to NixFloat
+        state.error<EvalError>("Due to a bug (see https://github.com/NixOS/nix/issues/12899) the NixInt argument %1% caused undefined behavior in previous Nix versions.\n\tFuture Nix versions might implement the correct behavior.", args[0]->integer().value).atPos(pos).debugThrow();
+    } else {
+        state.error<EvalError>("NixFloat argument %1% is not in the range of NixInt", args[0]->fpoint()).atPos(pos).debugThrow();
+    }
+    // `forceFloat` casts NixInt to NixFloat, but instead NixInt args shall be returned unmodified
+    if (isInt) {
+        auto arg = args[0]->integer();
+        auto res = v.integer();
+        if (arg != res) {
+            state.error<EvalError>("Due to a bug (see https://github.com/NixOS/nix/issues/12899) a loss of precision occured in previous Nix versions because the NixInt argument %1% was rounded to %2%.\n\tFuture Nix versions might implement the correct behavior.", arg, res).atPos(pos).debugThrow();
+        }
+    }
 }
 
 static RegisterPrimOp primop_floor({
     .name = "__floor",
-    .args = {"double"},
+    .args = {"number"},
     .doc = R"(
-        Converts an IEEE-754 double-precision floating-point number (*double*) to
-        the next lower integer.
+        Rounds and converts *number* to the next lower NixInt value if possible, i.e. `floor *number* <= *number*` and
+        `*number* - floor *number* < 1`.
 
-        If the datatype is neither an integer nor a "float", an evaluation error will be
-        thrown.
+        An evaluation error is thrown, if there exists no such NixInt value `floor *number*`.
+        Due to bugs in previous Nix versions an evaluation error might be thrown, if the datatype of *number* is
+        a NixInt and if `*number* < -9007199254740992` or `*number* > 9007199254740992`.
+
+        If the datatype of *number* is neither a NixInt (signed 64-bit integer) nor a NixFloat
+        (IEEE-754 double-precision floating-point number), an evaluation error will be thrown.
     )",
     .fun = prim_floor,
 });
@@ -2813,7 +2857,13 @@ static void prim_unsafeGetAttrPos(EvalState & state, const PosIdx pos, Value * *
 
 static RegisterPrimOp primop_unsafeGetAttrPos(PrimOp {
     .name = "__unsafeGetAttrPos",
+    .args = {"s", "set"},
     .arity = 2,
+    .doc = R"(
+      `unsafeGetAttrPos` returns the position of the attribute named *s*
+      from *set*. This is used by Nixpkgs to provide location information
+      in error messages.
+    )",
     .fun = prim_unsafeGetAttrPos,
 });
 
@@ -4299,9 +4349,7 @@ struct RegexCache
 {
     struct State
     {
-        // TODO use C++20 transparent comparison when available
-        std::unordered_map<std::string_view, std::regex> cache;
-        std::list<std::string> keys;
+        std::unordered_map<std::string, std::regex, StringViewHash, std::equal_to<>> cache;
     };
 
     Sync<State> state_;
@@ -4312,8 +4360,14 @@ struct RegexCache
         auto it = state->cache.find(re);
         if (it != state->cache.end())
             return it->second;
-        state->keys.emplace_back(re);
-        return state->cache.emplace(state->keys.back(), std::regex(state->keys.back(), std::regex::extended)).first->second;
+        /* No std::regex constructor overload from std::string_view, but can be constructed
+           from a pointer + size or an iterator range. */
+        return state->cache
+            .emplace(
+                std::piecewise_construct,
+                std::forward_as_tuple(re),
+                std::forward_as_tuple(/*s=*/re.data(), /*count=*/re.size(), std::regex::extended))
+            .first->second;
     }
 };
 
@@ -4697,13 +4751,9 @@ static RegisterPrimOp primop_splitVersion({
  *************************************************************/
 
 
-RegisterPrimOp::PrimOps * RegisterPrimOp::primOps;
-
-
 RegisterPrimOp::RegisterPrimOp(PrimOp && primOp)
 {
-    if (!primOps) primOps = new PrimOps;
-    primOps->push_back(std::move(primOp));
+    primOps().push_back(std::move(primOp));
 }
 
 
@@ -4957,14 +5007,18 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         )",
     });
 
-    if (RegisterPrimOp::primOps)
-        for (auto & primOp : *RegisterPrimOp::primOps)
-            if (experimentalFeatureSettings.isEnabled(primOp.experimentalFeature))
-            {
-                auto primOpAdjusted = primOp;
-                primOpAdjusted.arity = std::max(primOp.args.size(), primOp.arity);
-                addPrimOp(std::move(primOpAdjusted));
-            }
+    for (auto & primOp : RegisterPrimOp::primOps())
+        if (experimentalFeatureSettings.isEnabled(primOp.experimentalFeature)) {
+            auto primOpAdjusted = primOp;
+            primOpAdjusted.arity = std::max(primOp.args.size(), primOp.arity);
+            addPrimOp(std::move(primOpAdjusted));
+        }
+
+    for (auto & primOp : evalSettings.extraPrimOps) {
+        auto primOpAdjusted = primOp;
+        primOpAdjusted.arity = std::max(primOp.args.size(), primOp.arity);
+        addPrimOp(std::move(primOpAdjusted));
+    }
 
     for (auto & primOp : evalSettings.extraPrimOps) {
         auto primOpAdjusted = primOp;

@@ -2,10 +2,9 @@
 ///@file
 
 #include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivations.hh"
 #include "nix/store/derivation-options.hh"
-#ifndef _WIN32
-#  include "nix/store/user-lock.hh"
-#endif
+#include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/pathlocks.hh"
@@ -17,43 +16,17 @@ using std::map;
 
 #ifndef _WIN32 // TODO enable build hook on Windows
 struct HookInstance;
+struct DerivationBuilder;
 #endif
 
 typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
 
-/**
- * Unless we are repairing, we don't both to test validity and just assume it,
- * so the choices are `Absent` or `Valid`.
- */
-enum struct PathStatus {
-    Corrupt,
-    Absent,
-    Valid,
-};
-
-struct InitialOutputStatus {
-    StorePath path;
-    PathStatus status;
-    /**
-     * Valid in the store, and additionally non-corrupt if we are repairing
-     */
-    bool isValid() const {
-        return status == PathStatus::Valid;
-    }
-    /**
-     * Merely present, allowed to be corrupt
-     */
-    bool isPresent() const {
-        return status == PathStatus::Corrupt
-            || status == PathStatus::Valid;
-    }
-};
-
-struct InitialOutput {
-    bool wanted;
-    Hash outputHash;
-    std::optional<InitialOutputStatus> known;
-};
+/** Used internally */
+void runPostBuildHook(
+    Store & store,
+    Logger & logger,
+    const StorePath & drvPath,
+    const StorePathSet & outputPaths);
 
 /**
  * A goal for building some or all of the outputs of a derivation.
@@ -69,21 +42,9 @@ struct DerivationGoal : public Goal
     StorePath drvPath;
 
     /**
-     * The goal for the corresponding resolved derivation
-     */
-    std::shared_ptr<DerivationGoal> resolvedDrvGoal;
-
-    /**
      * The specific outputs that we need to build.
      */
     OutputsSpec wantedOutputs;
-
-    /**
-     * Mapping from input derivations + output names to actual store
-     * paths. This is filled in by waiteeDone() as each dependency
-     * finishes, before `trace("all inputs realised")` is reached.
-     */
-    std::map<std::pair<StorePath, std::string>, StorePath> inputDrvOutputs;
 
     /**
      * See `needRestart`; just for that field.
@@ -143,7 +104,7 @@ struct DerivationGoal : public Goal
      */
     std::unique_ptr<Derivation> drv;
 
-    std::unique_ptr<ParsedDerivation> parsedDrv;
+    std::unique_ptr<StructuredAttrs> parsedDrv;
     std::unique_ptr<DerivationOptions> drvOptions;
 
     /**
@@ -189,12 +150,9 @@ struct DerivationGoal : public Goal
      * The build hook.
      */
     std::unique_ptr<HookInstance> hook;
-#endif
 
-    /**
-     * The sort of derivation we are building.
-     */
-    std::optional<DerivationType> derivationType;
+    std::unique_ptr<DerivationBuilder> builder;
+#endif
 
     BuildMode buildMode;
 
@@ -220,7 +178,7 @@ struct DerivationGoal : public Goal
     DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
         const OutputsSpec & wantedOutputs, Worker & worker,
         BuildMode buildMode = bmNormal);
-    virtual ~DerivationGoal();
+    ~DerivationGoal();
 
     void timedOut(Error && ex) override;
 
@@ -238,23 +196,12 @@ struct DerivationGoal : public Goal
     Co haveDerivation();
     Co gaveUpOnSubstitution();
     Co tryToBuild();
-    virtual Co tryLocalBuild();
-    Co buildDone();
-
-    Co resolvedFinished();
+    Co hookDone();
 
     /**
      * Is the build hook willing to perform the build?
      */
     HookReply tryBuildHook();
-
-    virtual int getChildStatus();
-
-    /**
-     * Check that the derivation outputs all exist and register them
-     * as valid.
-     */
-    virtual SingleDrvOutputs registerOutputs();
 
     /**
      * Open a log file and a pipe to it.
@@ -262,31 +209,11 @@ struct DerivationGoal : public Goal
     Path openLogFile();
 
     /**
-     * Sign the newly built realisation if the store allows it
-     */
-    virtual void signRealisation(Realisation&) {}
-
-    /**
      * Close the log file.
      */
     void closeLogFile();
 
-    /**
-     * Close the read side of the logger pipe.
-     */
-    virtual void closeReadPipes();
-
-    /**
-     * Cleanup hooks for buildDone()
-     */
-    virtual void cleanupHookFinally();
-    virtual void cleanupPreChildKill();
-    virtual void cleanupPostChildKill();
-    virtual bool cleanupDecideWhetherDiskFull();
-    virtual void cleanupPostOutputsRegisteredModeCheck();
-    virtual void cleanupPostOutputsRegisteredModeNonCheck();
-
-    virtual bool isReadDesc(Descriptor fd);
+    bool isReadDesc(Descriptor fd);
 
     /**
      * Callback used by the worker to write to the log.
@@ -320,7 +247,7 @@ struct DerivationGoal : public Goal
     /**
      * Forcibly kill the child process, if any.
      */
-    virtual void killChild();
+    void killChild();
 
     Co repairClosure();
 
@@ -331,7 +258,7 @@ struct DerivationGoal : public Goal
         SingleDrvOutputs builtOutputs = {},
         std::optional<Error> ex = {});
 
-    void waiteeDone(GoalPtr waitee, ExitCode result) override;
+    void appendLogTailErrorMsg(std::string & msg);
 
     StorePathSet exportReferences(const StorePathSet & storePaths);
 
@@ -339,7 +266,5 @@ struct DerivationGoal : public Goal
         return JobCategory::Build;
     };
 };
-
-MakeError(NotDeterministic, BuildError);
 
 }

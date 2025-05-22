@@ -64,13 +64,11 @@ struct BuildEnvironment
     std::map<std::string, std::string> bashFunctions;
     std::optional<std::pair<std::string, std::string>> structuredAttrs;
 
-    static BuildEnvironment fromJSON(std::string_view in)
+    static BuildEnvironment fromJSON(const nlohmann::json & json)
     {
         BuildEnvironment res;
 
-        std::set<std::string> exported;
-
-        auto json = nlohmann::json::parse(in);
+        StringSet exported;
 
         for (auto & [name, info] : json["variables"].items()) {
             std::string type = info["type"];
@@ -93,7 +91,14 @@ struct BuildEnvironment
         return res;
     }
 
-    std::string toJSON() const
+    static BuildEnvironment parseJSON(std::string_view in)
+    {
+        auto json = nlohmann::json::parse(in);
+
+        return fromJSON(json);
+    }
+
+    nlohmann::json toJSON() const
     {
         auto res = nlohmann::json::object();
 
@@ -125,11 +130,9 @@ struct BuildEnvironment
             res["structuredAttrs"] = std::move(contents);
         }
 
-        auto json = res.dump();
+        assert(BuildEnvironment::fromJSON(res) == *this);
 
-        assert(BuildEnvironment::fromJSON(json) == *this);
-
-        return json;
+        return res;
     }
 
     bool providesStructuredAttrs() const
@@ -149,25 +152,25 @@ struct BuildEnvironment
         return structuredAttrs->second;
     }
 
-    void toBash(std::ostream & out, const std::set<std::string> & ignoreVars) const
+    void toBash(std::ostream & out, const StringSet & ignoreVars) const
     {
         for (auto & [name, value] : vars) {
             if (!ignoreVars.count(name)) {
                 if (auto str = std::get_if<String>(&value)) {
-                    out << fmt("%s=%s\n", name, shellEscape(str->value));
+                    out << fmt("%s=%s\n", name, escapeShellArgAlways(str->value));
                     if (str->exported)
                         out << fmt("export %s\n", name);
                 }
                 else if (auto arr = std::get_if<Array>(&value)) {
                     out << "declare -a " << name << "=(";
                     for (auto & s : *arr)
-                        out << shellEscape(s) << " ";
+                        out << escapeShellArgAlways(s) << " ";
                     out << ")\n";
                 }
                 else if (auto arr = std::get_if<Associative>(&value)) {
                     out << "declare -A " << name << "=(";
                     for (auto & [n, v] : *arr)
-                        out << "[" << shellEscape(n) << "]=" << shellEscape(v) << " ";
+                        out << "[" << escapeShellArgAlways(n) << "]=" << escapeShellArgAlways(v) << " ";
                     out << ")\n";
                 }
             }
@@ -306,7 +309,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
 
 struct Common : InstallableCommand, MixProfile
 {
-    std::set<std::string> ignoreVars{
+    StringSet ignoreVars{
         "BASHOPTS",
         "HOME", // FIXME: don't ignore in pure mode?
         "NIX_BUILD_TOP",
@@ -343,7 +346,7 @@ struct Common : InstallableCommand, MixProfile
         ref<Store> store,
         const BuildEnvironment & buildEnvironment,
         const std::filesystem::path & tmpDir,
-        const std::filesystem::path & outputsDir = fs::path { fs::current_path() } / "outputs")
+        const std::filesystem::path & outputsDir = std::filesystem::path { std::filesystem::current_path() } / "outputs")
     {
         // A list of colon-separated environment variables that should be
         // prepended to, rather than overwritten, in order to keep the shell usable.
@@ -506,7 +509,7 @@ struct Common : InstallableCommand, MixProfile
 
         debug("reading environment file '%s'", strPath);
 
-        return {BuildEnvironment::fromJSON(readFile(store->toRealPath(shellOutPath))), strPath};
+        return {BuildEnvironment::parseJSON(readFile(store->toRealPath(shellOutPath))), strPath};
     }
 };
 
@@ -617,7 +620,7 @@ struct CmdDevelop : Common, MixEnvironment
             std::vector<std::string> args;
             args.reserve(command.size());
             for (const auto & s : command)
-                args.push_back(shellEscape(s));
+                args.push_back(escapeShellArgAlways(s));
             script += fmt("exec %s\n", concatStringsSep(" ", args));
         }
 
@@ -625,13 +628,13 @@ struct CmdDevelop : Common, MixEnvironment
             script = "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\nshopt -u expand_aliases\n" + script + "\nshopt -s expand_aliases\n";
             if (developSettings.bashPrompt != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n",
-                    shellEscape(developSettings.bashPrompt.get()));
+                    escapeShellArgAlways(developSettings.bashPrompt.get()));
             if (developSettings.bashPromptPrefix != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1=%s\"$PS1\";\n",
-                    shellEscape(developSettings.bashPromptPrefix.get()));
+                    escapeShellArgAlways(developSettings.bashPromptPrefix.get()));
             if (developSettings.bashPromptSuffix != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n",
-                    shellEscape(developSettings.bashPromptSuffix.get()));
+                    escapeShellArgAlways(developSettings.bashPromptSuffix.get()));
         }
 
         writeFull(rcFileFd.get(), script);
@@ -739,7 +742,7 @@ struct CmdPrintDevEnv : Common, MixJSON
         logger->stop();
 
         if (json) {
-            logger->writeToStdout(buildEnvironment.toJSON());
+            printJSON(buildEnvironment.toJSON());
         } else {
             AutoDelete tmpDir(createTempDir("", "nix-dev-env"), true);
             logger->writeToStdout(makeRcScript(store, buildEnvironment, tmpDir));

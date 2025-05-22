@@ -34,7 +34,7 @@ public:
     GoalState state;
 
     Co init() override;
-    Co realisationFetched(std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub);
+    Co realisationFetched(Goals waitees, std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub);
 
     void timedOut(Error && ex) override { unreachable(); };
 

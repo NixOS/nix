@@ -72,7 +72,7 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
 
         auto newOutputs = std::visit(overloaded {
             [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
-                std::set<std::string> outputsToInstall;
+                StringSet outputsToInstall;
                 for (auto & output : packageInfo.queryOutputs(false, true))
                     outputsToInstall.insert(output.first);
                 if (outputsToInstall.empty())

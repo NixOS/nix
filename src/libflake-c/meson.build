@@ -17,12 +17,14 @@ subdir('nix-meson-build-support/deps-lists')
 deps_private_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
+  dependency('nix-fetchers'),
   dependency('nix-expr'),
   dependency('nix-flake'),
 ]
 deps_public_maybe_subproject = [
   dependency('nix-util-c'),
   dependency('nix-store-c'),
+  dependency('nix-fetchers-c'),
   dependency('nix-expr-c'),
 ]
 subdir('nix-meson-build-support/subprojects')
@@ -37,6 +39,7 @@ include_dirs = [include_directories('.')]
 
 headers = files(
   'nix_api_flake.h',
+  'nix_api_flake_internal.hh',
 )
 
 # TODO move this header to libexpr, maybe don't use it in tests?

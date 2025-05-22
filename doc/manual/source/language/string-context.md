@@ -13,8 +13,8 @@ The purpose of string contexts is to collect non-string values attached to strin
 [string concatenation](./operators.md#string-concatenation),
 [string interpolation](./string-interpolation.md),
 and similar operations.
-The idea is that a user can combine together values to create a build instructions for derivations without manually keeping track of where they come from.
-Then the Nix language implicitly does that bookkeeping to efficiently obtain the closure of derivation inputs.
+The idea is that a user can reference other files when creating text files through Nix expressions, without manually keeping track of the exact paths.
+Nix will ensure that the all referenced files are accessible – that all [store paths](@docroot@/glossary.md#gloss-store-path) are [valid](@docroot@/glossary.md#gloss-validity).
 
 > **Note**
 >

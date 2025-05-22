@@ -191,7 +191,7 @@ void unix::closeExtraFDs()
 
 #ifdef __linux__
     try {
-        for (auto & s : std::filesystem::directory_iterator{"/proc/self/fd"}) {
+        for (auto & s : DirectoryIterator{"/proc/self/fd"}) {
             checkInterrupt();
             auto fd = std::stoi(s.path().filename());
             if (fd > MAX_KEPT_FD) {
@@ -201,7 +201,6 @@ void unix::closeExtraFDs()
         }
         return;
     } catch (SysError &) {
-    } catch (std::filesystem::filesystem_error &) {
     }
 #endif
 

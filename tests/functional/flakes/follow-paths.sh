@@ -131,7 +131,7 @@ EOF
 git -C $flakeFollowsA add flake.nix
 
 expect 1 nix flake lock $flakeFollowsA 2>&1 | grep '/flakeB.*is forbidden in pure evaluation mode'
-expect 1 nix flake lock --impure $flakeFollowsA 2>&1 | grep '/flakeB.*does not exist'
+expect 1 nix flake lock --impure $flakeFollowsA 2>&1 | grep '/flakeB.*does not exist' # FIXME
 
 # Test relative non-flake inputs.
 cat > $flakeFollowsA/flake.nix <<EOF

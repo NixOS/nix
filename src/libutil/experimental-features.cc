@@ -348,7 +348,7 @@ nlohmann::json documentExperimentalFeatures()
     return (nlohmann::json) res;
 }
 
-std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> & rawFeatures)
+std::set<ExperimentalFeature> parseFeatures(const StringSet & rawFeatures)
 {
     std::set<ExperimentalFeature> res;
     for (auto & rawFeature : rawFeatures)

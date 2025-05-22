@@ -163,8 +163,8 @@ TEST(machines, getMachinesWithIncorrectFormat) {
 }
 
 TEST(machines, getMachinesWithCorrectFileReference) {
-    auto path = fs::weakly_canonical(getUnitTestData() / "machines/valid");
-    ASSERT_TRUE(fs::exists(path));
+    auto path = std::filesystem::weakly_canonical(getUnitTestData() / "machines/valid");
+    ASSERT_TRUE(std::filesystem::exists(path));
 
     auto actual = Machine::parseConfig({}, "@" + path.string());
     ASSERT_THAT(actual, SizeIs(3));
@@ -174,22 +174,22 @@ TEST(machines, getMachinesWithCorrectFileReference) {
 }
 
 TEST(machines, getMachinesWithCorrectFileReferenceToEmptyFile) {
-    fs::path path = "/dev/null";
-    ASSERT_TRUE(fs::exists(path));
+    std::filesystem::path path = "/dev/null";
+    ASSERT_TRUE(std::filesystem::exists(path));
 
     auto actual = Machine::parseConfig({}, "@" + path.string());
     ASSERT_THAT(actual, SizeIs(0));
 }
 
 TEST(machines, getMachinesWithIncorrectFileReference) {
-    auto path = fs::weakly_canonical("/not/a/file");
-    ASSERT_TRUE(!fs::exists(path));
+    auto path = std::filesystem::weakly_canonical("/not/a/file");
+    ASSERT_TRUE(!std::filesystem::exists(path));
     auto actual = Machine::parseConfig({}, "@" + path.string());
     ASSERT_THAT(actual, SizeIs(0));
 }
 
 TEST(machines, getMachinesWithCorrectFileReferenceToIncorrectFile) {
     EXPECT_THROW(
-        Machine::parseConfig({}, "@" + fs::weakly_canonical(getUnitTestData() / "machines" / "bad_format").string()),
+        Machine::parseConfig({}, "@" + std::filesystem::weakly_canonical(getUnitTestData() / "machines" / "bad_format").string()),
         FormatError);
 }

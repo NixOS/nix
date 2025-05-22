@@ -39,6 +39,9 @@ nix-instantiate --eval -E 'assert 1 + 2 == 3; true'
 ln -sfn cycle.nix "$TEST_ROOT/cycle.nix"
 (! nix eval --file "$TEST_ROOT/cycle.nix")
 
+# --file and --pure-eval don't mix.
+expectStderr 1 nix eval --pure-eval --file "$TEST_ROOT/cycle.nix" | grepQuiet "not compatible"
+
 # Check that relative symlinks are resolved correctly.
 mkdir -p "$TEST_ROOT/xyzzy" "$TEST_ROOT/foo"
 ln -sfn ../xyzzy "$TEST_ROOT/foo/bar"

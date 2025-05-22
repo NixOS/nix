@@ -574,7 +574,7 @@ VERSIONED_CHARACTERIZATION_TEST(
     set,
     "set",
     defaultVersion,
-    (std::tuple<std::set<std::string>, std::set<std::string>, std::set<std::string>, std::set<std::set<std::string>>> {
+    (std::tuple<StringSet, StringSet, StringSet, std::set<StringSet>> {
         { },
         { "" },
         { "", "foo", "bar" },
@@ -685,7 +685,7 @@ TEST_F(WorkerProtoTest, handshake_features)
     toClient.create();
     toServer.create();
 
-    std::tuple<WorkerProto::Version, std::set<WorkerProto::Feature>> clientResult;
+    std::tuple<WorkerProto::Version, WorkerProto::FeatureSet> clientResult;
 
     auto clientThread = std::thread([&]() {
         FdSink out { toServer.writeSide.get() };
@@ -702,8 +702,8 @@ TEST_F(WorkerProtoTest, handshake_features)
     clientThread.join();
 
     EXPECT_EQ(clientResult, daemonResult);
-    EXPECT_EQ(std::get<0>(clientResult), 123);
-    EXPECT_EQ(std::get<1>(clientResult), std::set<WorkerProto::Feature>({"bar", "xyzzy"}));
+    EXPECT_EQ(std::get<0>(clientResult), 123u);
+    EXPECT_EQ(std::get<1>(clientResult), WorkerProto::FeatureSet({"bar", "xyzzy"}));
 }
 
 /// Has to be a `BufferedSink` for handshake.

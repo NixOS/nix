@@ -44,14 +44,14 @@
         client.succeed("chmod 600 /root/.ssh/id_ed25519")
 
         # Install the SSH key on the builders.
-        client.wait_for_unit("network-online.target")
+        client.wait_for_unit("network-addresses-eth1.service")
 
         remote.succeed("mkdir -p -m 700 /root/.ssh")
         remote.copy_from_host("key.pub", "/root/.ssh/authorized_keys")
         remote.wait_for_unit("sshd")
         remote.wait_for_unit("multi-user.target")
-        remote.wait_for_unit("network-online.target")
-        client.wait_for_unit("network-online.target")
+        remote.wait_for_unit("network-addresses-eth1.service")
+        client.wait_for_unit("network-addresses-eth1.service")
         client.succeed(f"ssh -o StrictHostKeyChecking=no {remote.name} 'echo hello world'")
 
         remote.succeed("""

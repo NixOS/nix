@@ -1244,7 +1244,12 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     auto configS = accessor->readFile(modulesFile);
 
     auto [fdTemp, pathTemp] = createTempFile("nix-git-submodules");
-    writeFull(fdTemp.get(), configS);
+    try {
+        writeFull(fdTemp.get(), configS);
+    } catch (SysError & e) {
+        e.addTrace({}, "while writing .gitmodules file to temporary file");
+        throw;
+    }
 
     std::vector<std::tuple<Submodule, Hash>> result;
 

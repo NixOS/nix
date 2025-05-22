@@ -144,6 +144,7 @@ struct ValidPathInfo : UnkeyedValidPathInfo {
     std::string fingerprint(const Store & store) const;
 
     void sign(const Store & store, const Signer & signer);
+    void sign(const Store & store, const std::vector<std::unique_ptr<Signer>> & signers);
 
     /**
      * @return The `ContentAddressWithReferences` that determines the

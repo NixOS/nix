@@ -7,7 +7,7 @@
   channelName ? "nixpkgs",
   channelURL ? "https://nixos.org/channels/nixpkgs-unstable",
   extraPkgs ? [ ],
-  maxLayers ? 100,
+  maxLayers ? 70,
   nixConf ? { },
   flake-registry ? null,
   uid ? 0,

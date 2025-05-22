@@ -7,7 +7,7 @@
 namespace nix {
 
 TEST(OutputsSpec, no_empty_names) {
-    ASSERT_DEATH(OutputsSpec::Names { std::set<std::string> { } }, "");
+    ASSERT_DEATH(OutputsSpec::Names { StringSet { } }, "");
 }
 
 #define TEST_DONT_PARSE(NAME, STR)           \

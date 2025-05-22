@@ -11,7 +11,7 @@
 
 namespace nix {
 
-struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
+struct S3BinaryCacheStoreConfig : std::enable_shared_from_this<S3BinaryCacheStoreConfig>, virtual BinaryCacheStoreConfig
 {
     std::string bucketName;
 
@@ -93,26 +93,28 @@ public:
     const Setting<uint64_t> bufferSize{
         this, 5 * 1024 * 1024, "buffer-size", "Size (in bytes) of each part in multi-part uploads."};
 
-    const std::string name() override
+    static const std::string name()
     {
         return "S3 Binary Cache Store";
     }
 
-    static std::set<std::string> uriSchemes()
+    static StringSet uriSchemes()
     {
         return {"s3"};
     }
 
-    std::string doc() override;
+    static std::string doc();
+
+    ref<Store> openStore() const override;
 };
 
-class S3BinaryCacheStore : public virtual BinaryCacheStore
+struct S3BinaryCacheStore : virtual BinaryCacheStore
 {
-protected:
+    using Config = S3BinaryCacheStoreConfig;
 
-    S3BinaryCacheStore(const Params & params);
+    ref<Config> config;
 
-public:
+    S3BinaryCacheStore(ref<Config>);
 
     struct Stats
     {

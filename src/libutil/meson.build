@@ -50,13 +50,14 @@ endif
 
 blake3 = dependency(
   'libblake3',
-  version: '>= 1.5.5',
+  version: '>= 1.8.2',
+  method : 'pkg-config',
 )
 deps_private += blake3
 
 boost = dependency(
   'boost',
-  modules : ['context', 'coroutine'],
+  modules : ['context', 'coroutine', 'iostreams'],
   include_type: 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
@@ -91,7 +92,7 @@ cpuid_required = get_option('cpuid')
 if host_machine.cpu_family() != 'x86_64' and cpuid_required.enabled()
   warning('Force-enabling seccomp on non-x86_64 does not make sense')
 endif
-cpuid = dependency('libcpuid', 'cpuid', required : cpuid_required)
+cpuid = dependency('libcpuid', 'cpuid', version : '>= 0.7.0', required : cpuid_required)
 configdata.set('HAVE_LIBCPUID', cpuid.found().to_int())
 deps_private += cpuid
 
@@ -142,6 +143,7 @@ sources = [config_priv_h] + files(
   'signature/signer.cc',
   'source-accessor.cc',
   'source-path.cc',
+  'subdir-source-accessor.cc',
   'strings.cc',
   'suggestions.cc',
   'tarfile.cc',

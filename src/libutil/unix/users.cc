@@ -9,8 +9,6 @@
 
 namespace nix {
 
-namespace fs { using namespace std::filesystem; }
-
 std::string getUserName()
 {
     auto pw = getpwuid(geteuid());

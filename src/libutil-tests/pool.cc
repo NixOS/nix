@@ -26,8 +26,8 @@ namespace nix {
 
         Pool<TestResource> pool = Pool<TestResource>((size_t)1, createResource, isGood);
 
-        ASSERT_EQ(pool.count(), 0);
-        ASSERT_EQ(pool.capacity(), 1);
+        ASSERT_EQ(pool.count(), 0u);
+        ASSERT_EQ(pool.capacity(), 1u);
     }
 
     TEST(Pool, freshPoolCanGetAResource) {
@@ -35,12 +35,12 @@ namespace nix {
         auto createResource = []() { return make_ref<TestResource>(); };
 
         Pool<TestResource> pool = Pool<TestResource>((size_t)1, createResource, isGood);
-        ASSERT_EQ(pool.count(), 0);
+        ASSERT_EQ(pool.count(), 0u);
 
         TestResource r = *(pool.get());
 
-        ASSERT_EQ(pool.count(), 1);
-        ASSERT_EQ(pool.capacity(), 1);
+        ASSERT_EQ(pool.count(), 1u);
+        ASSERT_EQ(pool.capacity(), 1u);
         ASSERT_EQ(r.dummyValue, 1);
         ASSERT_EQ(r.good, true);
     }
@@ -50,9 +50,9 @@ namespace nix {
         auto createResource = []() { return make_ref<TestResource>(); };
 
         Pool<TestResource> pool = Pool<TestResource>((size_t)1, createResource, isGood);
-        ASSERT_EQ(pool.capacity(), 1);
+        ASSERT_EQ(pool.capacity(), 1u);
         pool.incCapacity();
-        ASSERT_EQ(pool.capacity(), 2);
+        ASSERT_EQ(pool.capacity(), 2u);
     }
 
     TEST(Pool, capacityCanBeDecremented) {
@@ -60,9 +60,9 @@ namespace nix {
         auto createResource = []() { return make_ref<TestResource>(); };
 
         Pool<TestResource> pool = Pool<TestResource>((size_t)1, createResource, isGood);
-        ASSERT_EQ(pool.capacity(), 1);
+        ASSERT_EQ(pool.capacity(), 1u);
         pool.decCapacity();
-        ASSERT_EQ(pool.capacity(), 0);
+        ASSERT_EQ(pool.capacity(), 0u);
     }
 
     TEST(Pool, flushBadDropsOutOfScopeResources) {
@@ -73,11 +73,11 @@ namespace nix {
 
         {
             auto _r = pool.get();
-            ASSERT_EQ(pool.count(), 1);
+            ASSERT_EQ(pool.count(), 1u);
         }
 
         pool.flushBad();
-        ASSERT_EQ(pool.count(), 0);
+        ASSERT_EQ(pool.count(), 0u);
     }
 
     // Test that the resources we allocate are being reused when they are still good.

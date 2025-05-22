@@ -45,7 +45,7 @@ Self-references however cannot be referred to by their path, because we are in t
 > As far as we know, this is equivalent to finding a hash collision.
 
 Instead we have a "has self-reference" boolean, which ends up affecting the digest:
-In all currently-supported store object content-addressing methods, when hashing the file system object data, any occurence of store object's own store path in the digested data is replaced with a [sentinel value](https://en.wikipedia.org/wiki/Sentinel_value).
+In all currently-supported store object content-addressing methods, when hashing the file system object data, any occurrence of store object's own store path in the digested data is replaced with a [sentinel value](https://en.wikipedia.org/wiki/Sentinel_value).
 The hashes of these modified input streams are used instead.
 
 When validating the content address of a store object after the fact, the above process works as written.
