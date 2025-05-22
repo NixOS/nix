@@ -17,31 +17,30 @@ namespace nix::git {
 using namespace nix;
 using namespace std::string_literals;
 
-std::optional<Mode> decodeMode(RawMode m) {
+std::optional<Mode> decodeMode(RawMode m)
+{
     switch (m) {
-        case (RawMode) Mode::Directory:
-        case (RawMode) Mode::Executable:
-        case (RawMode) Mode::Regular:
-        case (RawMode) Mode::Symlink:
-            return (Mode) m;
-        default:
-            return std::nullopt;
+    case (RawMode) Mode::Directory:
+    case (RawMode) Mode::Executable:
+    case (RawMode) Mode::Regular:
+    case (RawMode) Mode::Symlink:
+        return (Mode) m;
+    default:
+        return std::nullopt;
     }
 }
-
 
 static std::string getStringUntil(Source & source, char byte)
 {
     std::string s;
-    char n[1] = { 0 };
-    source(std::string_view { n, 1 });
+    char n[1] = {0};
+    source(std::string_view{n, 1});
     while (*n != byte) {
         s += *n;
-        source(std::string_view { n, 1 });
+        source(std::string_view{n, 1});
     }
     return s;
 }
-
 
 static std::string getString(Source & source, int n)
 {
@@ -75,7 +74,7 @@ void parseBlob(
 
             while (left) {
                 checkInterrupt();
-                buf.resize(std::min((unsigned long long)buf.capacity(), left));
+                buf.resize(std::min((unsigned long long) buf.capacity(), left));
                 source(buf);
                 crf(buf);
                 left -= buf.size();
@@ -93,16 +92,13 @@ void parseBlob(
         doRegularFile(true);
         break;
 
-    case BlobMode::Symlink:
-    {
+    case BlobMode::Symlink: {
         std::string target;
         target.resize(size, '0');
         target.reserve(size);
         for (size_t n = 0; n < target.size();) {
             checkInterrupt();
-            n += source.read(
-                const_cast<char *>(target.c_str()) + n,
-                target.size() - n);
+            n += source.read(const_cast<char *>(target.c_str()) + n, target.size() - n);
         }
 
         sink.createSymlink(sinkPath, target);
@@ -147,16 +143,16 @@ void parseTree(
         Hash hash(HashAlgorithm::SHA1);
         std::copy(hashs.begin(), hashs.end(), hash.hash);
 
-        hook(CanonPath{name}, TreeEntry {
-            .mode = mode,
-            .hash = hash,
-        });
+        hook(
+            CanonPath{name},
+            TreeEntry{
+                .mode = mode,
+                .hash = hash,
+            });
     }
 }
 
-ObjectType parseObjectType(
-    Source & source,
-    const ExperimentalFeatureSettings & xpSettings)
+ObjectType parseObjectType(Source & source, const ExperimentalFeatureSettings & xpSettings)
 {
     xpSettings.require(Xp::GitHashing);
 
@@ -166,7 +162,8 @@ ObjectType parseObjectType(
         return ObjectType::Blob;
     } else if (type == "tree ") {
         return ObjectType::Tree;
-    } else throw Error("input doesn't look like a Git object");
+    } else
+        throw Error("input doesn't look like a Git object");
 }
 
 void parse(
@@ -193,22 +190,25 @@ void parse(
     };
 }
 
-
 std::optional<Mode> convertMode(SourceAccessor::Type type)
 {
     switch (type) {
-    case SourceAccessor::tSymlink:   return Mode::Symlink;
-    case SourceAccessor::tRegular:   return Mode::Regular;
-    case SourceAccessor::tDirectory: return Mode::Directory;
+    case SourceAccessor::tSymlink:
+        return Mode::Symlink;
+    case SourceAccessor::tRegular:
+        return Mode::Regular;
+    case SourceAccessor::tDirectory:
+        return Mode::Directory;
     case SourceAccessor::tChar:
     case SourceAccessor::tBlock:
     case SourceAccessor::tSocket:
-    case SourceAccessor::tFifo:      return std::nullopt;
+    case SourceAccessor::tFifo:
+        return std::nullopt;
     case SourceAccessor::tUnknown:
-    default: unreachable();
+    default:
+        unreachable();
     }
 }
-
 
 void restore(FileSystemObjectSink & sink, Source & source, std::function<RestoreHook> hook)
 {
@@ -217,35 +217,30 @@ void restore(FileSystemObjectSink & sink, Source & source, std::function<Restore
         auto stat = accessor->lstat(from);
         auto gotOpt = convertMode(stat.type);
         if (!gotOpt)
-            throw Error("file '%s' (git hash %s) has an unsupported type",
+            throw Error(
+                "file '%s' (git hash %s) has an unsupported type",
                 from,
                 entry.hash.to_string(HashFormat::Base16, false));
         auto & got = *gotOpt;
         if (got != entry.mode)
-            throw Error("git mode of file '%s' (git hash %s) is %o but expected %o",
+            throw Error(
+                "git mode of file '%s' (git hash %s) is %o but expected %o",
                 from,
                 entry.hash.to_string(HashFormat::Base16, false),
                 (RawMode) got,
                 (RawMode) entry.mode);
-        copyRecursive(
-            *accessor, from,
-            sink, name);
+        copyRecursive(*accessor, from, sink, name);
     });
 }
 
-
-void dumpBlobPrefix(
-    uint64_t size, Sink & sink,
-    const ExperimentalFeatureSettings & xpSettings)
+void dumpBlobPrefix(uint64_t size, Sink & sink, const ExperimentalFeatureSettings & xpSettings)
 {
     xpSettings.require(Xp::GitHashing);
     auto s = fmt("blob %d\0"s, std::to_string(size));
     sink(s);
 }
 
-
-void dumpTree(const Tree & entries, Sink & sink,
-    const ExperimentalFeatureSettings & xpSettings)
+void dumpTree(const Tree & entries, Sink & sink, const ExperimentalFeatureSettings & xpSettings)
 {
     xpSettings.require(Xp::GitHashing);
 
@@ -270,7 +265,6 @@ void dumpTree(const Tree & entries, Sink & sink,
     sink(v1);
 }
 
-
 Mode dump(
     const SourcePath & path,
     Sink & sink,
@@ -281,22 +275,17 @@ Mode dump(
     auto st = path.lstat();
 
     switch (st.type) {
-    case SourceAccessor::tRegular:
-    {
-        path.readFile(sink, [&](uint64_t size) {
-            dumpBlobPrefix(size, sink, xpSettings);
-        });
-        return st.isExecutable
-            ? Mode::Executable
-            : Mode::Regular;
+    case SourceAccessor::tRegular: {
+        path.readFile(sink, [&](uint64_t size) { dumpBlobPrefix(size, sink, xpSettings); });
+        return st.isExecutable ? Mode::Executable : Mode::Regular;
     }
 
-    case SourceAccessor::tDirectory:
-    {
+    case SourceAccessor::tDirectory: {
         Tree entries;
         for (auto & [name, _] : path.readDirectory()) {
             auto child = path / name;
-            if (!filter(child.path.abs())) continue;
+            if (!filter(child.path.abs()))
+                continue;
 
             auto entry = hook(child);
 
@@ -310,8 +299,7 @@ Mode dump(
         return Mode::Directory;
     }
 
-    case SourceAccessor::tSymlink:
-    {
+    case SourceAccessor::tSymlink: {
         auto target = path.readLink();
         dumpBlobPrefix(target.size(), sink, xpSettings);
         sink(target);
@@ -328,11 +316,7 @@ Mode dump(
     }
 }
 
-
-TreeEntry dumpHash(
-    HashAlgorithm ha,
-    const SourcePath & path,
-    PathFilter & filter)
+TreeEntry dumpHash(HashAlgorithm ha, const SourcePath & path, PathFilter & filter)
 {
     std::function<DumpHook> hook;
     hook = [&](const SourcePath & path) -> TreeEntry {
@@ -348,7 +332,6 @@ TreeEntry dumpHash(
     return hook(path);
 }
 
-
 std::optional<LsRemoteRefLine> parseLsRemoteLine(std::string_view line)
 {
     const static std::regex line_regex("^(ref: *)?([^\\s]+)(?:\\t+(.*))?$");
@@ -356,13 +339,10 @@ std::optional<LsRemoteRefLine> parseLsRemoteLine(std::string_view line)
     if (!std::regex_match(line.cbegin(), line.cend(), match, line_regex))
         return std::nullopt;
 
-    return LsRemoteRefLine {
-        .kind = match[1].length() == 0
-            ? LsRemoteRefLine::Kind::Object
-            : LsRemoteRefLine::Kind::Symbolic,
+    return LsRemoteRefLine{
+        .kind = match[1].length() == 0 ? LsRemoteRefLine::Kind::Object : LsRemoteRefLine::Kind::Symbolic,
         .target = match[2],
-        .reference = match[3].length() == 0 ? std::nullopt : std::optional<std::string>{ match[3] }
-    };
+        .reference = match[3].length() == 0 ? std::nullopt : std::optional<std::string>{match[3]}};
 }
 
 }

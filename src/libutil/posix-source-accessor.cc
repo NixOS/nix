@@ -15,43 +15,41 @@ PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && argRoot)
 }
 
 PosixSourceAccessor::PosixSourceAccessor()
-    : PosixSourceAccessor(std::filesystem::path {})
-{ }
+    : PosixSourceAccessor(std::filesystem::path{})
+{
+}
 
 SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
 {
     std::filesystem::path path2 = absPath(path);
     return {
         make_ref<PosixSourceAccessor>(path2.root_path()),
-        CanonPath { path2.relative_path().string() },
+        CanonPath{path2.relative_path().string()},
     };
 }
 
 std::filesystem::path PosixSourceAccessor::makeAbsPath(const CanonPath & path)
 {
-    return root.empty()
-        ? (std::filesystem::path { path.abs() })
-        : path.isRoot()
-        ? /* Don't append a slash for the root of the accessor, since
-             it can be a non-directory (e.g. in the case of `fetchTree
-             { type = "file" }`). */
-          root
-        : root / path.rel();
+    return root.empty()    ? (std::filesystem::path{path.abs()})
+           : path.isRoot() ? /* Don't append a slash for the root of the accessor, since
+                                it can be a non-directory (e.g. in the case of `fetchTree
+                                { type = "file" }`). */
+               root
+                           : root / path.rel();
 }
 
-void PosixSourceAccessor::readFile(
-    const CanonPath & path,
-    Sink & sink,
-    std::function<void(uint64_t)> sizeCallback)
+void PosixSourceAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
 {
     assertNoSymlinks(path);
 
     auto ap = makeAbsPath(path);
 
-    AutoCloseFD fd = toDescriptor(open(ap.string().c_str(), O_RDONLY
-    #ifndef _WIN32
-        | O_NOFOLLOW | O_CLOEXEC
-    #endif
+    AutoCloseFD fd = toDescriptor(open(
+        ap.string().c_str(),
+        O_RDONLY
+#ifndef _WIN32
+            | O_NOFOLLOW | O_CLOEXEC
+#endif
         ));
     if (!fd)
         throw SysError("opening file '%1%'", ap.string());
@@ -71,8 +69,7 @@ void PosixSourceAccessor::readFile(
         if (rd == -1) {
             if (errno != EINTR)
                 throw SysError("reading from file '%s'", showPath(path));
-        }
-        else if (rd == 0)
+        } else if (rd == 0)
             throw SysError("unexpected end-of-file reading '%s'", showPath(path));
         else {
             assert(rd <= left);
@@ -84,7 +81,8 @@ void PosixSourceAccessor::readFile(
 
 bool PosixSourceAccessor::pathExists(const CanonPath & path)
 {
-    if (auto parent = path.parent()) assertNoSymlinks(*parent);
+    if (auto parent = path.parent())
+        assertNoSymlinks(*parent);
     return nix::pathExists(makeAbsPath(path).string());
 }
 
@@ -99,13 +97,15 @@ std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & pa
     {
         auto cache(_cache.readLock());
         auto i = cache->find(absPath);
-        if (i != cache->end()) return i->second;
+        if (i != cache->end())
+            return i->second;
     }
 
     auto st = nix::maybeLstat(absPath.c_str());
 
     auto cache(_cache.lock());
-    if (cache->size() >= 16384) cache->clear();
+    if (cache->size() >= 16384)
+        cache->clear();
     cache->emplace(absPath, st);
 
     return st;
@@ -113,22 +113,25 @@ std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & pa
 
 std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonPath & path)
 {
-    if (auto parent = path.parent()) assertNoSymlinks(*parent);
+    if (auto parent = path.parent())
+        assertNoSymlinks(*parent);
     auto st = cachedLstat(path);
-    if (!st) return std::nullopt;
+    if (!st)
+        return std::nullopt;
     mtime = std::max(mtime, st->st_mtime);
-    return Stat {
-        .type =
-            S_ISREG(st->st_mode) ? tRegular :
-            S_ISDIR(st->st_mode) ? tDirectory :
-            S_ISLNK(st->st_mode) ? tSymlink :
-            S_ISCHR(st->st_mode) ? tChar :
-            S_ISBLK(st->st_mode) ? tBlock :
+    return Stat{
+        .type = S_ISREG(st->st_mode)   ? tRegular
+                : S_ISDIR(st->st_mode) ? tDirectory
+                : S_ISLNK(st->st_mode) ? tSymlink
+                : S_ISCHR(st->st_mode) ? tChar
+                : S_ISBLK(st->st_mode) ? tBlock
+                :
 #ifdef S_ISSOCK
-            S_ISSOCK(st->st_mode) ? tSocket :
+                S_ISSOCK(st->st_mode) ? tSocket
+                :
 #endif
-            S_ISFIFO(st->st_mode) ? tFifo :
-            tUnknown,
+                S_ISFIFO(st->st_mode) ? tFifo
+                                      : tUnknown,
         .fileSize = S_ISREG(st->st_mode) ? std::optional<uint64_t>(st->st_size) : std::nullopt,
         .isExecutable = S_ISREG(st->st_mode) && st->st_mode & S_IXUSR,
     };
@@ -150,23 +153,39 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
                 // already, but this isn't always the case.)
                 if (e.code() == std::errc::permission_denied || e.code() == std::errc::operation_not_permitted)
                     return std::nullopt;
-                else throw;
+                else
+                    throw;
             }
 
             // cannot exhaustively enumerate because implementation-specific
             // additional file types are allowed.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch-enum"
-        switch (nativeType) {
-        case std::filesystem::file_type::regular: return Type::tRegular; break;
-        case std::filesystem::file_type::symlink: return Type::tSymlink; break;
-        case std::filesystem::file_type::directory: return Type::tDirectory; break;
-        case std::filesystem::file_type::character: return Type::tChar; break;
-        case std::filesystem::file_type::block: return Type::tBlock; break;
-        case std::filesystem::file_type::fifo: return Type::tFifo; break;
-        case std::filesystem::file_type::socket: return Type::tSocket; break;
-        default: return tUnknown;
-        }
+            switch (nativeType) {
+            case std::filesystem::file_type::regular:
+                return Type::tRegular;
+                break;
+            case std::filesystem::file_type::symlink:
+                return Type::tSymlink;
+                break;
+            case std::filesystem::file_type::directory:
+                return Type::tDirectory;
+                break;
+            case std::filesystem::file_type::character:
+                return Type::tChar;
+                break;
+            case std::filesystem::file_type::block:
+                return Type::tBlock;
+                break;
+            case std::filesystem::file_type::fifo:
+                return Type::tFifo;
+                break;
+            case std::filesystem::file_type::socket:
+                return Type::tSocket;
+                break;
+            default:
+                return tUnknown;
+            }
 #pragma GCC diagnostic pop
         }();
         res.emplace(entry.path().filename().string(), type);
@@ -176,7 +195,8 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
 
 std::string PosixSourceAccessor::readLink(const CanonPath & path)
 {
-    if (auto parent = path.parent()) assertNoSymlinks(*parent);
+    if (auto parent = path.parent())
+        assertNoSymlinks(*parent);
     return nix::readLink(makeAbsPath(path).string());
 }
 

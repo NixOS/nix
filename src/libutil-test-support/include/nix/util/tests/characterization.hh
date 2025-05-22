@@ -13,7 +13,8 @@ namespace nix {
  * The path to the unit test data directory. See the contributing guide
  * in the manual for further details.
  */
-static inline std::filesystem::path getUnitTestData() {
+static inline std::filesystem::path getUnitTestData()
+{
     return getEnv("_NIX_TEST_UNIT_DATA").value();
 }
 
@@ -22,7 +23,8 @@ static inline std::filesystem::path getUnitTestData() {
  * against them. See the contributing guide in the manual for further
  * details.
  */
-static inline bool testAccept() {
+static inline bool testAccept()
+{
     return getEnv("_NIX_TEST_ACCEPT") == "1";
 }
 
@@ -49,15 +51,9 @@ public:
     {
         auto file = goldenMaster(testStem);
 
-        if (testAccept())
-        {
-            GTEST_SKIP()
-                << "Cannot read golden master "
-                << file
-                << "because another test is also updating it";
-        }
-        else
-        {
+        if (testAccept()) {
+            GTEST_SKIP() << "Cannot read golden master " << file << "because another test is also updating it";
+        } else {
             test(readFile(file));
         }
     }
@@ -68,23 +64,17 @@ public:
      * @param test hook that produces contents of the file and does the
      * actual work
      */
-    void writeTest(
-        PathView testStem, auto && test, auto && readFile2, auto && writeFile2)
+    void writeTest(PathView testStem, auto && test, auto && readFile2, auto && writeFile2)
     {
         auto file = goldenMaster(testStem);
 
         auto got = test();
 
-        if (testAccept())
-        {
+        if (testAccept()) {
             std::filesystem::create_directories(file.parent_path());
             writeFile2(file, got);
-            GTEST_SKIP()
-                << "Updating golden master "
-                << file;
-        }
-        else
-        {
+            GTEST_SKIP() << "Updating golden master " << file;
+        } else {
             decltype(got) expected = readFile2(file);
             ASSERT_EQ(got, expected);
         }
@@ -96,13 +86,10 @@ public:
     void writeTest(PathView testStem, auto && test)
     {
         writeTest(
-            testStem, test,
-            [](const std::filesystem::path & f) -> std::string {
-                return readFile(f);
-            },
-            [](const std::filesystem::path & f, const std::string & c) {
-                return writeFile(f, c);
-            });
+            testStem,
+            test,
+            [](const std::filesystem::path & f) -> std::string { return readFile(f); },
+            [](const std::filesystem::path & f, const std::string & c) { return writeFile(f, c); });
     }
 };
 

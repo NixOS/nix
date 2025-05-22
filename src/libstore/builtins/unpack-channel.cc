@@ -7,7 +7,8 @@ static void builtinUnpackChannel(const BuiltinBuilderContext & ctx)
 {
     auto getAttr = [&](const std::string & name) -> const std::string & {
         auto i = ctx.drv.env.find(name);
-        if (i == ctx.drv.env.end()) throw Error("attribute '%s' missing", name);
+        if (i == ctx.drv.env.end())
+            throw Error("attribute '%s' missing", name);
         return i->second;
     };
 

@@ -7,10 +7,9 @@
 
 namespace nix {
 
-struct UDSRemoteStoreConfig :
-    std::enable_shared_from_this<UDSRemoteStoreConfig>,
-    virtual LocalFSStoreConfig,
-    virtual RemoteStoreConfig
+struct UDSRemoteStoreConfig : std::enable_shared_from_this<UDSRemoteStoreConfig>,
+                              virtual LocalFSStoreConfig,
+                              virtual RemoteStoreConfig
 {
     // TODO(fzakaria): Delete this constructor once moved over to the factory pattern
     // outlined in https://github.com/NixOS/nix/issues/10766
@@ -20,14 +19,14 @@ struct UDSRemoteStoreConfig :
     /**
      * @param authority is the socket path.
      */
-    UDSRemoteStoreConfig(
-        std::string_view scheme,
-        std::string_view authority,
-        const Params & params);
+    UDSRemoteStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
 
     UDSRemoteStoreConfig(const Params & params);
 
-    static const std::string name() { return "Local Daemon Store"; }
+    static const std::string name()
+    {
+        return "Local Daemon Store";
+    }
 
     static std::string doc();
 
@@ -40,14 +39,14 @@ struct UDSRemoteStoreConfig :
     Path path;
 
     static StringSet uriSchemes()
-    { return {"unix"}; }
+    {
+        return {"unix"};
+    }
 
     ref<Store> openStore() const override;
 };
 
-struct UDSRemoteStore :
-    virtual IndirectRootStore,
-    virtual RemoteStore
+struct UDSRemoteStore : virtual IndirectRootStore, virtual RemoteStore
 {
     using Config = UDSRemoteStoreConfig;
 
@@ -58,10 +57,14 @@ struct UDSRemoteStore :
     std::string getUri() override;
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override
-    { return LocalFSStore::getFSAccessor(requireValidPath); }
+    {
+        return LocalFSStore::getFSAccessor(requireValidPath);
+    }
 
     void narFromPath(const StorePath & path, Sink & sink) override
-    { LocalFSStore::narFromPath(path, sink); }
+    {
+        LocalFSStore::narFromPath(path, sink);
+    }
 
     /**
      * Implementation of `IndirectRootStore::addIndirectRoot()` which

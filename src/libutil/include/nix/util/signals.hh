@@ -41,10 +41,9 @@ inline void checkInterrupt();
  */
 MakeError(Interrupted, BaseError);
 
-
 struct InterruptCallback
 {
-    virtual ~InterruptCallback() { };
+    virtual ~InterruptCallback() {};
 };
 
 /**
@@ -53,8 +52,7 @@ struct InterruptCallback
  *
  * @note Does nothing on Windows
  */
-std::unique_ptr<InterruptCallback> createInterruptCallback(
-    std::function<void()> callback);
+std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()> callback);
 
 /**
  * A RAII class that causes the current thread to receive SIGUSR1 when

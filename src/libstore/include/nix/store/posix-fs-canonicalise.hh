@@ -12,7 +12,6 @@ namespace nix {
 typedef std::pair<dev_t, ino_t> Inode;
 typedef std::set<Inode> InodesSeen;
 
-
 /**
  * "Fix", or canonicalise, the meta-data of the files in a store path
  * after it has been built.  In particular:
@@ -40,9 +39,10 @@ void canonicalisePathMetaData(
 void canonicalisePathMetaData(
     const Path & path
 #ifndef _WIN32
-    , std::optional<std::pair<uid_t, uid_t>> uidRange = std::nullopt
+    ,
+    std::optional<std::pair<uid_t, uid_t>> uidRange = std::nullopt
 #endif
-    );
+);
 
 void canonicaliseTimestampAndPermissions(const Path & path);
 

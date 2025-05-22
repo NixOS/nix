@@ -12,7 +12,8 @@ struct Machine;
 
 typedef std::vector<Machine> Machines;
 
-struct Machine {
+struct Machine
+{
 
     const StoreReference storeUri;
     const StringSet systemTypes;

@@ -57,7 +57,8 @@ protected:
     /**
      * A pointer to the completion and its two arguments; a thunk;
      */
-    struct DeferredCompletion {
+    struct DeferredCompletion
+    {
         const CompleterClosure & completer;
         size_t n;
         std::string prefix;

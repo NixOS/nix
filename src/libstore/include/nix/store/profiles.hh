@@ -13,11 +13,9 @@
 #include <optional>
 #include <time.h>
 
-
 namespace nix {
 
 class StorePath;
-
 
 /**
  * A positive number identifying a generation for a given profile.
@@ -65,7 +63,6 @@ struct Generation
  * All the generations of a profile
  */
 typedef std::list<Generation> Generations;
-
 
 /**
  * Find all generations for the given profile.
@@ -119,7 +116,8 @@ void deleteGeneration(const Path & profile, GenerationNumber gen);
 /**
  * Delete the given set of generations.
  *
- * @param profile The profile, specified by its name and location combined into a path, whose generations we want to delete.
+ * @param profile The profile, specified by its name and location combined into a path, whose generations we want to
+ * delete.
  *
  * @param gensToDelete The generations to delete, specified by a set of
  * numbers.
@@ -135,7 +133,8 @@ void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & 
 /**
  * Delete generations older than `max` passed the current generation.
  *
- * @param profile The profile, specified by its name and location combined into a path, whose generations we want to delete.
+ * @param profile The profile, specified by its name and location combined into a path, whose generations we want to
+ * delete.
  *
  * @param max How many generations to keep up to the current one. Must
  * be at least 1 so we don't delete the current one.
@@ -148,7 +147,8 @@ void deleteGenerationsGreaterThan(const Path & profile, GenerationNumber max, bo
 /**
  * Delete all generations other than the current one
  *
- * @param profile The profile, specified by its name and location combined into a path, whose generations we want to delete.
+ * @param profile The profile, specified by its name and location combined into a path, whose generations we want to
+ * delete.
  *
  * @param dryRun Log what would be deleted instead of actually doing
  * so.
@@ -159,7 +159,8 @@ void deleteOldGenerations(const Path & profile, bool dryRun);
  * Delete generations older than `t`, except for the most recent one
  * older than `t`.
  *
- * @param profile The profile, specified by its name and location combined into a path, whose generations we want to delete.
+ * @param profile The profile, specified by its name and location combined into a path, whose generations we want to
+ * delete.
  *
  * @param dryRun Log what would be deleted instead of actually doing
  * so.
@@ -185,10 +186,7 @@ void switchLink(Path link, Path target);
  * Roll back a profile to the specified generation, or to the most
  * recent one older than the current.
  */
-void switchGeneration(
-    const Path & profile,
-    std::optional<GenerationNumber> dstGen,
-    bool dryRun);
+void switchGeneration(const Path & profile, std::optional<GenerationNumber> dstGen, bool dryRun);
 
 /**
  * Ensure exclusive access to a profile.  Any command that modifies

@@ -30,7 +30,7 @@ VERSIONED_CHARACTERIZATION_TEST(
     string,
     "string",
     defaultVersion,
-    (std::tuple<std::string, std::string, std::string, std::string, std::string> {
+    (std::tuple<std::string, std::string, std::string, std::string, std::string>{
         "",
         "hi",
         "white rabbit",
@@ -45,9 +45,9 @@ VERSIONED_CHARACTERIZATION_TEST(
     storePath,
     "store-path",
     defaultVersion,
-    (std::tuple<StorePath, StorePath> {
-        StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
-        StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo-bar" },
+    (std::tuple<StorePath, StorePath>{
+        StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+        StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo-bar"},
     }))
 
 VERSIONED_CHARACTERIZATION_TEST(
@@ -55,16 +55,16 @@ VERSIONED_CHARACTERIZATION_TEST(
     contentAddress,
     "content-address",
     defaultVersion,
-    (std::tuple<ContentAddress, ContentAddress, ContentAddress> {
-        ContentAddress {
+    (std::tuple<ContentAddress, ContentAddress, ContentAddress>{
+        ContentAddress{
             .method = ContentAddressMethod::Raw::Text,
             .hash = hashString(HashAlgorithm::SHA256, "Derive(...)"),
         },
-        ContentAddress {
+        ContentAddress{
             .method = ContentAddressMethod::Raw::Flat,
             .hash = hashString(HashAlgorithm::SHA1, "blob blob..."),
         },
-        ContentAddress {
+        ContentAddress{
             .method = ContentAddressMethod::Raw::NixArchive,
             .hash = hashString(HashAlgorithm::SHA256, "(...)"),
         },
@@ -75,12 +75,12 @@ VERSIONED_CHARACTERIZATION_TEST(
     drvOutput,
     "drv-output",
     defaultVersion,
-    (std::tuple<DrvOutput, DrvOutput> {
+    (std::tuple<DrvOutput, DrvOutput>{
         {
             .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
             .outputName = "baz",
         },
-        DrvOutput {
+        DrvOutput{
             .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
             .outputName = "quux",
         },
@@ -93,70 +93,88 @@ VERSIONED_CHARACTERIZATION_TEST(
     realisation,
     "realisation",
     defaultVersion,
-    (std::tuple<Realisation, Realisation> {
-        Realisation {
-            .id = DrvOutput {
-                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-                .outputName = "baz",
-            },
-            .outPath = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
-            .signatures = { "asdf", "qwer" },
-        },
-        Realisation {
-            .id = {
-                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-                .outputName = "baz",
-            },
-            .outPath = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
-            .signatures = { "asdf", "qwer" },
-            .dependentRealisations = {
-                {
-                    DrvOutput {
-                        .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                        .outputName = "quux",
-                    },
-                    StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
+    (std::tuple<Realisation, Realisation>{
+        Realisation{
+            .id =
+                DrvOutput{
+                    .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                    .outputName = "baz",
                 },
-            },
+            .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+            .signatures = {"asdf", "qwer"},
+        },
+        Realisation{
+            .id =
+                {
+                    .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                    .outputName = "baz",
+                },
+            .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+            .signatures = {"asdf", "qwer"},
+            .dependentRealisations =
+                {
+                    {
+                        DrvOutput{
+                            .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
+                            .outputName = "quux",
+                        },
+                        StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+                    },
+                },
         },
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
-    ServeProtoTest,
-    buildResult_2_2,
-    "build-result-2.2",
-    2 << 8 | 2,
-    ({
-        using namespace std::literals::chrono_literals;
-        std::tuple<BuildResult, BuildResult, BuildResult> t {
-            BuildResult {
-                .status = BuildResult::OutputRejected,
-                .errorMsg = "no idea why",
-            },
-            BuildResult {
-                .status = BuildResult::NotDeterministic,
-                .errorMsg = "no idea why",
-            },
-            BuildResult {
-                .status = BuildResult::Built,
-            },
-        };
-        t;
-    }))
+VERSIONED_CHARACTERIZATION_TEST(ServeProtoTest, buildResult_2_2, "build-result-2.2", 2 << 8 | 2, ({
+                                    using namespace std::literals::chrono_literals;
+                                    std::tuple<BuildResult, BuildResult, BuildResult> t{
+                                        BuildResult{
+                                            .status = BuildResult::OutputRejected,
+                                            .errorMsg = "no idea why",
+                                        },
+                                        BuildResult{
+                                            .status = BuildResult::NotDeterministic,
+                                            .errorMsg = "no idea why",
+                                        },
+                                        BuildResult{
+                                            .status = BuildResult::Built,
+                                        },
+                                    };
+                                    t;
+                                }))
+
+VERSIONED_CHARACTERIZATION_TEST(ServeProtoTest, buildResult_2_3, "build-result-2.3", 2 << 8 | 3, ({
+                                    using namespace std::literals::chrono_literals;
+                                    std::tuple<BuildResult, BuildResult, BuildResult> t{
+                                        BuildResult{
+                                            .status = BuildResult::OutputRejected,
+                                            .errorMsg = "no idea why",
+                                        },
+                                        BuildResult{
+                                            .status = BuildResult::NotDeterministic,
+                                            .errorMsg = "no idea why",
+                                            .timesBuilt = 3,
+                                            .isNonDeterministic = true,
+                                            .startTime = 30,
+                                            .stopTime = 50,
+                                        },
+                                        BuildResult{
+                                            .status = BuildResult::Built,
+                                            .startTime = 30,
+                                            .stopTime = 50,
+                                        },
+                                    };
+                                    t;
+                                }))
 
 VERSIONED_CHARACTERIZATION_TEST(
-    ServeProtoTest,
-    buildResult_2_3,
-    "build-result-2.3",
-    2 << 8 | 3,
-    ({
+    ServeProtoTest, buildResult_2_6, "build-result-2.6", 2 << 8 | 6, ({
         using namespace std::literals::chrono_literals;
-        std::tuple<BuildResult, BuildResult, BuildResult> t {
-            BuildResult {
+        std::tuple<BuildResult, BuildResult, BuildResult> t{
+            BuildResult{
                 .status = BuildResult::OutputRejected,
                 .errorMsg = "no idea why",
             },
-            BuildResult {
+            BuildResult{
                 .status = BuildResult::NotDeterministic,
                 .errorMsg = "no idea why",
                 .timesBuilt = 3,
@@ -164,60 +182,36 @@ VERSIONED_CHARACTERIZATION_TEST(
                 .startTime = 30,
                 .stopTime = 50,
             },
-            BuildResult {
-                .status = BuildResult::Built,
-                .startTime = 30,
-                .stopTime = 50,
-            },
-        };
-        t;
-    }))
-
-VERSIONED_CHARACTERIZATION_TEST(
-    ServeProtoTest,
-    buildResult_2_6,
-    "build-result-2.6",
-    2 << 8 | 6,
-    ({
-        using namespace std::literals::chrono_literals;
-        std::tuple<BuildResult, BuildResult, BuildResult> t {
-            BuildResult {
-                .status = BuildResult::OutputRejected,
-                .errorMsg = "no idea why",
-            },
-            BuildResult {
-                .status = BuildResult::NotDeterministic,
-                .errorMsg = "no idea why",
-                .timesBuilt = 3,
-                .isNonDeterministic = true,
-                .startTime = 30,
-                .stopTime = 50,
-            },
-            BuildResult {
+            BuildResult{
                 .status = BuildResult::Built,
                 .timesBuilt = 1,
-                .builtOutputs = {
+                .builtOutputs =
                     {
-                        "foo",
                         {
-                            .id = DrvOutput {
-                                .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                .outputName = "foo",
+                            "foo",
+                            {
+                                .id =
+                                    DrvOutput{
+                                        .drvHash =
+                                            Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
+                                        .outputName = "foo",
+                                    },
+                                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
                             },
-                            .outPath = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
+                        },
+                        {
+                            "bar",
+                            {
+                                .id =
+                                    DrvOutput{
+                                        .drvHash =
+                                            Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
+                                        .outputName = "bar",
+                                    },
+                                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar"},
+                            },
                         },
                     },
-                    {
-                        "bar",
-                        {
-                            .id = DrvOutput {
-                                .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                .outputName = "bar",
-                            },
-                            .outPath = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar" },
-                        },
-                    },
-                },
                 .startTime = 30,
                 .stopTime = 50,
 #if 0
@@ -237,19 +231,19 @@ VERSIONED_CHARACTERIZATION_TEST(
     unkeyedValidPathInfo_2_3,
     "unkeyed-valid-path-info-2.3",
     2 << 8 | 3,
-    (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo> {
+    (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo>{
         ({
-            UnkeyedValidPathInfo info { Hash::dummy };
+            UnkeyedValidPathInfo info{Hash::dummy};
             info.narSize = 34878;
             info;
         }),
         ({
-            UnkeyedValidPathInfo info { Hash::dummy };
-            info.deriver = StorePath {
+            UnkeyedValidPathInfo info{Hash::dummy};
+            info.deriver = StorePath{
                 "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
             };
             info.references = {
-                StorePath {
+                StorePath{
                     "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo.drv",
                 },
             };
@@ -263,16 +257,16 @@ VERSIONED_CHARACTERIZATION_TEST(
     unkeyedValidPathInfo_2_4,
     "unkeyed-valid-path-info-2.4",
     2 << 8 | 4,
-    (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo> {
+    (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo>{
         ({
-            UnkeyedValidPathInfo info {
+            UnkeyedValidPathInfo info{
                 Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
             };
-            info.deriver = StorePath {
+            info.deriver = StorePath{
                 "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
             };
             info.references = {
-                StorePath {
+                StorePath{
                     "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo.drv",
                 },
             };
@@ -280,31 +274,34 @@ VERSIONED_CHARACTERIZATION_TEST(
             info;
         }),
         ({
-            ValidPathInfo info {
+            ValidPathInfo info{
                 *LibStoreTest::store,
                 "foo",
-                FixedOutputInfo {
+                FixedOutputInfo{
                     .method = FileIngestionMethod::NixArchive,
                     .hash = hashString(HashAlgorithm::SHA256, "(...)"),
-                    .references = {
-                        .others = {
-                            StorePath {
-                                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
-                            },
+                    .references =
+                        {
+                            .others =
+                                {
+                                    StorePath{
+                                        "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                                    },
+                                },
+                            .self = true,
                         },
-                        .self = true,
-                    },
                 },
                 Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
             };
-            info.deriver = StorePath {
+            info.deriver = StorePath{
                 "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
             };
             info.narSize = 34878;
-            info.sigs = {
-                "fake-sig-1",
-                "fake-sig-2",
-            },
+            info.sigs =
+                {
+                    "fake-sig-1",
+                    "fake-sig-2",
+                },
             static_cast<UnkeyedValidPathInfo>(std::move(info));
         }),
     }))
@@ -314,7 +311,7 @@ VERSIONED_CHARACTERIZATION_TEST(
     build_options_2_1,
     "build-options-2.1",
     2 << 8 | 1,
-    (ServeProto::BuildOptions {
+    (ServeProto::BuildOptions{
         .maxSilentTime = 5,
         .buildTimeout = 6,
     }))
@@ -324,7 +321,7 @@ VERSIONED_CHARACTERIZATION_TEST(
     build_options_2_2,
     "build-options-2.2",
     2 << 8 | 2,
-    (ServeProto::BuildOptions {
+    (ServeProto::BuildOptions{
         .maxSilentTime = 5,
         .buildTimeout = 6,
         .maxLogSize = 7,
@@ -335,7 +332,7 @@ VERSIONED_CHARACTERIZATION_TEST(
     build_options_2_3,
     "build-options-2.3",
     2 << 8 | 3,
-    (ServeProto::BuildOptions {
+    (ServeProto::BuildOptions{
         .maxSilentTime = 5,
         .buildTimeout = 6,
         .maxLogSize = 7,
@@ -348,7 +345,7 @@ VERSIONED_CHARACTERIZATION_TEST(
     build_options_2_7,
     "build-options-2.7",
     2 << 8 | 7,
-    (ServeProto::BuildOptions {
+    (ServeProto::BuildOptions{
         .maxSilentTime = 5,
         .buildTimeout = 6,
         .maxLogSize = 7,
@@ -362,11 +359,15 @@ VERSIONED_CHARACTERIZATION_TEST(
     vector,
     "vector",
     defaultVersion,
-    (std::tuple<std::vector<std::string>, std::vector<std::string>, std::vector<std::string>, std::vector<std::vector<std::string>>> {
-        { },
-        { "" },
-        { "", "foo", "bar" },
-        { {}, { "" }, { "", "1", "2" } },
+    (std::tuple<
+        std::vector<std::string>,
+        std::vector<std::string>,
+        std::vector<std::string>,
+        std::vector<std::vector<std::string>>>{
+        {},
+        {""},
+        {"", "foo", "bar"},
+        {{}, {""}, {"", "1", "2"}},
     }))
 
 VERSIONED_CHARACTERIZATION_TEST(
@@ -374,11 +375,11 @@ VERSIONED_CHARACTERIZATION_TEST(
     set,
     "set",
     defaultVersion,
-    (std::tuple<StringSet, StringSet, StringSet, std::set<StringSet>> {
-        { },
-        { "" },
-        { "", "foo", "bar" },
-        { {}, { "" }, { "", "1", "2" } },
+    (std::tuple<StringSet, StringSet, StringSet, std::set<StringSet>>{
+        {},
+        {""},
+        {"", "foo", "bar"},
+        {{}, {""}, {"", "1", "2"}},
     }))
 
 VERSIONED_CHARACTERIZATION_TEST(
@@ -386,10 +387,10 @@ VERSIONED_CHARACTERIZATION_TEST(
     optionalStorePath,
     "optional-store-path",
     defaultVersion,
-    (std::tuple<std::optional<StorePath>, std::optional<StorePath>> {
+    (std::tuple<std::optional<StorePath>, std::optional<StorePath>>{
         std::nullopt,
-        std::optional {
-            StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo-bar" },
+        std::optional{
+            StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo-bar"},
         },
     }))
 
@@ -398,10 +399,10 @@ VERSIONED_CHARACTERIZATION_TEST(
     optionalContentAddress,
     "optional-content-address",
     defaultVersion,
-    (std::tuple<std::optional<ContentAddress>, std::optional<ContentAddress>> {
+    (std::tuple<std::optional<ContentAddress>, std::optional<ContentAddress>>{
         std::nullopt,
-        std::optional {
-            ContentAddress {
+        std::optional{
+            ContentAddress{
                 .method = ContentAddressMethod::Raw::Flat,
                 .hash = hashString(HashAlgorithm::SHA1, "blob blob..."),
             },
@@ -420,18 +421,16 @@ TEST_F(ServeProtoTest, handshake_log)
         ServeProto::Version clientResult;
 
         auto thread = std::thread([&]() {
-            FdSink out { toServer.writeSide.get() };
-            FdSource in0 { toClient.readSide.get() };
-            TeeSource in { in0, toClientLog };
-            clientResult = ServeProto::BasicClientConnection::handshake(
-                out, in, defaultVersion, "blah");
+            FdSink out{toServer.writeSide.get()};
+            FdSource in0{toClient.readSide.get()};
+            TeeSource in{in0, toClientLog};
+            clientResult = ServeProto::BasicClientConnection::handshake(out, in, defaultVersion, "blah");
         });
 
         {
-            FdSink out { toClient.writeSide.get() };
-            FdSource in { toServer.readSide.get() };
-            ServeProto::BasicServerConnection::handshake(
-                out, in, defaultVersion);
+            FdSink out{toClient.writeSide.get()};
+            FdSource in{toServer.readSide.get()};
+            ServeProto::BasicServerConnection::handshake(out, in, defaultVersion);
         };
 
         thread.join();
@@ -441,8 +440,9 @@ TEST_F(ServeProtoTest, handshake_log)
 }
 
 /// Has to be a `BufferedSink` for handshake.
-struct NullBufferedSink : BufferedSink {
-    void writeUnbuffered(std::string_view data) override { }
+struct NullBufferedSink : BufferedSink
+{
+    void writeUnbuffered(std::string_view data) override {}
 };
 
 TEST_F(ServeProtoTest, handshake_client_replay)
@@ -450,9 +450,8 @@ TEST_F(ServeProtoTest, handshake_client_replay)
     CharacterizationTest::readTest("handshake-to-client", [&](std::string toClientLog) {
         NullBufferedSink nullSink;
 
-        StringSource in { toClientLog };
-        auto clientResult = ServeProto::BasicClientConnection::handshake(
-            nullSink, in, defaultVersion, "blah");
+        StringSource in{toClientLog};
+        auto clientResult = ServeProto::BasicClientConnection::handshake(nullSink, in, defaultVersion, "blah");
 
         EXPECT_EQ(clientResult, defaultVersion);
     });
@@ -486,23 +485,18 @@ TEST_F(ServeProtoTest, handshake_client_corrupted_throws)
             ++toClientLogCorrupt[idx];
 
             NullBufferedSink nullSink;
-            StringSource in { toClientLogCorrupt };
+            StringSource in{toClientLogCorrupt};
 
             if (idx < 4 || idx == 9) {
                 // magic bytes don't match
-                EXPECT_THROW(
-                    ServeProto::BasicClientConnection::handshake(
-                        nullSink, in, defaultVersion, "blah"),
-                    Error);
+                EXPECT_THROW(ServeProto::BasicClientConnection::handshake(nullSink, in, defaultVersion, "blah"), Error);
             } else if (idx < 8 || idx >= 12) {
                 // Number out of bounds
                 EXPECT_THROW(
-                    ServeProto::BasicClientConnection::handshake(
-                        nullSink, in, defaultVersion, "blah"),
+                    ServeProto::BasicClientConnection::handshake(nullSink, in, defaultVersion, "blah"),
                     SerialisationError);
             } else {
-                auto ver = ServeProto::BasicClientConnection::handshake(
-                    nullSink, in, defaultVersion, "blah");
+                auto ver = ServeProto::BasicClientConnection::handshake(nullSink, in, defaultVersion, "blah");
                 // `std::min` of this and the other version saves us
                 EXPECT_EQ(ver, defaultVersion);
             }

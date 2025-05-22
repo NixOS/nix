@@ -15,7 +15,7 @@ struct ParsedURL
 
     std::string to_string() const;
 
-    bool operator ==(const ParsedURL & other) const noexcept;
+    bool operator==(const ParsedURL & other) const noexcept;
 
     /**
      * Remove `.` and `..` path elements.
@@ -23,12 +23,12 @@ struct ParsedURL
     ParsedURL canonicalise();
 };
 
-std::ostream & operator << (std::ostream & os, const ParsedURL & url);
+std::ostream & operator<<(std::ostream & os, const ParsedURL & url);
 
 MakeError(BadURL, Error);
 
 std::string percentDecode(std::string_view in);
-std::string percentEncode(std::string_view s, std::string_view keep="");
+std::string percentEncode(std::string_view s, std::string_view keep = "");
 
 StringMap decodeQuery(const std::string & query);
 
@@ -44,7 +44,8 @@ ParsedURL parseURL(const std::string & url);
  * For example git uses `git+https` to designate remotes using a Git
  * protocol over http.
  */
-struct ParsedUrlScheme {
+struct ParsedUrlScheme
+{
     std::optional<std::string_view> application;
     std::string_view transport;
 };

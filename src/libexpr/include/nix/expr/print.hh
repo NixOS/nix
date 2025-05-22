@@ -26,10 +26,12 @@ struct Value;
  * @param s The logical string
  */
 std::ostream & printLiteralString(std::ostream & o, std::string_view s);
-inline std::ostream & printLiteralString(std::ostream & o, const char * s) {
+inline std::ostream & printLiteralString(std::ostream & o, const char * s)
+{
     return printLiteralString(o, std::string_view(s));
 }
-inline std::ostream & printLiteralString(std::ostream & o, const std::string & s) {
+inline std::ostream & printLiteralString(std::ostream & o, const std::string & s)
+{
     return printLiteralString(o, std::string_view(s));
 }
 
@@ -60,26 +62,30 @@ bool isReservedKeyword(const std::string_view str);
  */
 std::ostream & printIdentifier(std::ostream & o, std::string_view s);
 
-void printValue(EvalState & state, std::ostream & str, Value & v, PrintOptions options = PrintOptions {});
+void printValue(EvalState & state, std::ostream & str, Value & v, PrintOptions options = PrintOptions{});
 
 /**
  * A partially-applied form of `printValue` which can be formatted using `<<`
  * without allocating an intermediate string.
  */
-class ValuePrinter {
-    friend std::ostream & operator << (std::ostream & output, const ValuePrinter & printer);
+class ValuePrinter
+{
+    friend std::ostream & operator<<(std::ostream & output, const ValuePrinter & printer);
 private:
     EvalState & state;
     Value & value;
     PrintOptions options;
 
 public:
-    ValuePrinter(EvalState & state, Value & value, PrintOptions options = PrintOptions {})
-        : state(state), value(value), options(options) { }
+    ValuePrinter(EvalState & state, Value & value, PrintOptions options = PrintOptions{})
+        : state(state)
+        , value(value)
+        , options(options)
+    {
+    }
 };
 
 std::ostream & operator<<(std::ostream & output, const ValuePrinter & printer);
-
 
 /**
  * `ValuePrinter` does its own ANSI formatting, so we don't color it

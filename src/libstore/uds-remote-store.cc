@@ -9,19 +9,17 @@
 #include <unistd.h>
 
 #ifdef _WIN32
-# include <winsock2.h>
-# include <afunix.h>
+#  include <winsock2.h>
+#  include <afunix.h>
 #else
-# include <sys/socket.h>
-# include <sys/un.h>
+#  include <sys/socket.h>
+#  include <sys/un.h>
 #endif
 
 namespace nix {
 
 UDSRemoteStoreConfig::UDSRemoteStoreConfig(
-    std::string_view scheme,
-    std::string_view authority,
-    const StoreReference::Params & params)
+    std::string_view scheme, std::string_view authority, const StoreReference::Params & params)
     : Store::Config{params}
     , LocalFSStore::Config{params}
     , RemoteStore::Config{params}
@@ -32,14 +30,12 @@ UDSRemoteStoreConfig::UDSRemoteStoreConfig(
     }
 }
 
-
 std::string UDSRemoteStoreConfig::doc()
 {
     return
-        #include "uds-remote-store.md"
+#include "uds-remote-store.md"
         ;
 }
-
 
 // A bit gross that we now pass empty string but this is knowing that
 // empty string will later default to the same nixDaemonSocketFile. Why
@@ -50,7 +46,6 @@ UDSRemoteStoreConfig::UDSRemoteStoreConfig(const Params & params)
 {
 }
 
-
 UDSRemoteStore::UDSRemoteStore(ref<const Config> config)
     : Store{*config}
     , LocalFSStore{*config}
@@ -59,24 +54,21 @@ UDSRemoteStore::UDSRemoteStore(ref<const Config> config)
 {
 }
 
-
 std::string UDSRemoteStore::getUri()
 {
     return config->path == settings.nixDaemonSocketFile
-        ? // FIXME: Not clear why we return daemon here and not default
-          // to settings.nixDaemonSocketFile
-          //
-          // unix:// with no path also works. Change what we return?
-          "daemon"
-        : std::string(*Config::uriSchemes().begin()) + "://" + config->path;
+               ? // FIXME: Not clear why we return daemon here and not default
+                 // to settings.nixDaemonSocketFile
+                 //
+                 // unix:// with no path also works. Change what we return?
+               "daemon"
+               : std::string(*Config::uriSchemes().begin()) + "://" + config->path;
 }
-
 
 void UDSRemoteStore::Connection::closeWrite()
 {
     shutdown(toSocket(fd.get()), SHUT_WR);
 }
-
 
 ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 {
@@ -95,7 +87,6 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     return conn;
 }
 
-
 void UDSRemoteStore::addIndirectRoot(const Path & path)
 {
     auto conn(getConnection());
@@ -104,11 +95,10 @@ void UDSRemoteStore::addIndirectRoot(const Path & path)
     readInt(conn->from);
 }
 
-
-ref<Store> UDSRemoteStore::Config::openStore() const {
+ref<Store> UDSRemoteStore::Config::openStore() const
+{
     return make_ref<UDSRemoteStore>(ref{shared_from_this()});
 }
-
 
 static RegisterStoreImplementation<UDSRemoteStore::Config> regUDSRemoteStore;
 

@@ -5,10 +5,10 @@
 #include "nix/store/sqlite.hh"
 #include <sqlite3.h>
 
-
 namespace nix {
 
-TEST(NarInfoDiskCacheImpl, create_and_read) {
+TEST(NarInfoDiskCacheImpl, create_and_read)
+{
     // This is a large single test to avoid some setup overhead.
 
     int prio = 12345;
@@ -36,7 +36,8 @@ TEST(NarInfoDiskCacheImpl, create_and_read) {
 
         // Check that the fields are saved and returned correctly. This does not test
         // the select statement yet, because of in-memory caching.
-        savedId = cache->createCache("http://foo", "/nix/storedir", wantMassQuery, prio);;
+        savedId = cache->createCache("http://foo", "/nix/storedir", wantMassQuery, prio);
+        ;
         {
             auto r = cache->upToDateCacheExists("http://foo");
             ASSERT_TRUE(r);

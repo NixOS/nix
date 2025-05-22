@@ -5,18 +5,11 @@
 namespace nix {
 
 fetchers::Cache::Key makeFetchToStoreCacheKey(
-    const std::string & name,
-    const std::string & fingerprint,
-    ContentAddressMethod method,
-    const std::string & path)
+    const std::string & name, const std::string & fingerprint, ContentAddressMethod method, const std::string & path)
 {
-    return fetchers::Cache::Key{"fetchToStore", {
-        {"name", name},
-        {"fingerprint", fingerprint},
-        {"method", std::string{method.render()}},
-        {"path", path}
-    }};
-
+    return fetchers::Cache::Key{
+        "fetchToStore",
+        {{"name", name}, {"fingerprint", fingerprint}, {"method", std::string{method.render()}}, {"path", path}}};
 }
 
 StorePath fetchToStore(
@@ -43,17 +36,17 @@ StorePath fetchToStore(
     } else
         debug("source path '%s' is uncacheable", path);
 
-    Activity act(*logger, lvlChatty, actUnknown,
+    Activity act(
+        *logger,
+        lvlChatty,
+        actUnknown,
         fmt(mode == FetchMode::DryRun ? "hashing '%s'" : "copying '%s' to the store", path));
 
     auto filter2 = filter ? *filter : defaultPathFilter;
 
-    auto storePath =
-        mode == FetchMode::DryRun
-        ? store.computeStorePath(
-            name, path, method, HashAlgorithm::SHA256, {}, filter2).first
-        : store.addToStore(
-            name, path, method, HashAlgorithm::SHA256, {}, filter2, repair);
+    auto storePath = mode == FetchMode::DryRun
+                         ? store.computeStorePath(name, path, method, HashAlgorithm::SHA256, {}, filter2).first
+                         : store.addToStore(name, path, method, HashAlgorithm::SHA256, {}, filter2, repair);
 
     debug(mode == FetchMode::DryRun ? "hashed '%s'" : "copied '%s' to '%s'", path, store.printStorePath(storePath));
 

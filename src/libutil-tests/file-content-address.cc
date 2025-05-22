@@ -9,20 +9,22 @@ namespace nix {
  * parseFileSerialisationMethod, renderFileSerialisationMethod
  * --------------------------------------------------------------------------*/
 
-TEST(FileSerialisationMethod, testRoundTripPrintParse_1) {
+TEST(FileSerialisationMethod, testRoundTripPrintParse_1)
+{
     for (const FileSerialisationMethod fim : {
-        FileSerialisationMethod::Flat,
-        FileSerialisationMethod::NixArchive,
-    }) {
+             FileSerialisationMethod::Flat,
+             FileSerialisationMethod::NixArchive,
+         }) {
         EXPECT_EQ(parseFileSerialisationMethod(renderFileSerialisationMethod(fim)), fim);
     }
 }
 
-TEST(FileSerialisationMethod, testRoundTripPrintParse_2) {
+TEST(FileSerialisationMethod, testRoundTripPrintParse_2)
+{
     for (const std::string_view fimS : {
-        "flat",
-        "nar",
-    }) {
+             "flat",
+             "nar",
+         }) {
         EXPECT_EQ(renderFileSerialisationMethod(parseFileSerialisationMethod(fimS)), fimS);
     }
 }
@@ -38,22 +40,24 @@ TEST(FileSerialisationMethod, testParseFileSerialisationMethodOptException)
  * parseFileIngestionMethod, renderFileIngestionMethod
  * --------------------------------------------------------------------------*/
 
-TEST(FileIngestionMethod, testRoundTripPrintParse_1) {
+TEST(FileIngestionMethod, testRoundTripPrintParse_1)
+{
     for (const FileIngestionMethod fim : {
-        FileIngestionMethod::Flat,
-        FileIngestionMethod::NixArchive,
-        FileIngestionMethod::Git,
-    }) {
+             FileIngestionMethod::Flat,
+             FileIngestionMethod::NixArchive,
+             FileIngestionMethod::Git,
+         }) {
         EXPECT_EQ(parseFileIngestionMethod(renderFileIngestionMethod(fim)), fim);
     }
 }
 
-TEST(FileIngestionMethod, testRoundTripPrintParse_2) {
+TEST(FileIngestionMethod, testRoundTripPrintParse_2)
+{
     for (const std::string_view fimS : {
-        "flat",
-        "nar",
-        "git",
-    }) {
+             "flat",
+             "nar",
+             "git",
+         }) {
         EXPECT_EQ(renderFileIngestionMethod(parseFileIngestionMethod(fimS)), fimS);
     }
 }

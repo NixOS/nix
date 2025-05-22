@@ -6,7 +6,7 @@
 
 namespace nix {
 
-//static constexpr auto commonArgsCategory = "Miscellaneous common options";
+// static constexpr auto commonArgsCategory = "Miscellaneous common options";
 static constexpr auto loggingCategory = "Logging-related options";
 static constexpr auto miscCategory = "Miscellaneous global options";
 
@@ -86,7 +86,7 @@ struct MixPrintJSON : virtual Args
      * but you _can_ print a sole JSON string by explicitly coercing it to
      * `nlohmann::json` first.
      */
-    template <typename T, typename = std::enable_if_t<std::is_same_v<T, nlohmann::json>>>
+    template<typename T, typename = std::enable_if_t<std::is_same_v<T, nlohmann::json>>>
     void printJSON(const T & json);
 };
 
@@ -113,9 +113,8 @@ struct MixRepair : virtual Args
     {
         addFlag({
             .longName = "repair",
-            .description =
-                "During evaluation, rewrite missing or corrupted files in the Nix store. "
-                "During building, rebuild missing or corrupted store paths.",
+            .description = "During evaluation, rewrite missing or corrupted files in the Nix store. "
+                           "During building, rebuild missing or corrupted store paths.",
             .category = miscCategory,
             .handler = {&repair, Repair},
         });

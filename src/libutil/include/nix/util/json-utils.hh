@@ -21,9 +21,7 @@ nlohmann::json * get(nlohmann::json & map, const std::string & key);
  *
  * Use instead of nlohmann::json::at() to avoid ugly exceptions.
  */
-const nlohmann::json & valueAt(
-    const nlohmann::json::object_t & map,
-    const std::string & key);
+const nlohmann::json & valueAt(const nlohmann::json::object_t & map, const std::string & key);
 
 std::optional<nlohmann::json> optionalValueAt(const nlohmann::json::object_t & value, const std::string & key);
 std::optional<nlohmann::json> nullableValueAt(const nlohmann::json::object_t & value, const std::string & key);
@@ -73,34 +71,43 @@ struct json_avoids_null;
  * Handle numbers in default impl
  */
 template<typename T>
-struct json_avoids_null : std::bool_constant<std::is_integral<T>::value> {};
+struct json_avoids_null : std::bool_constant<std::is_integral<T>::value>
+{};
 
 template<>
-struct json_avoids_null<std::nullptr_t> : std::false_type {};
+struct json_avoids_null<std::nullptr_t> : std::false_type
+{};
 
 template<>
-struct json_avoids_null<bool> : std::true_type {};
+struct json_avoids_null<bool> : std::true_type
+{};
 
 template<>
-struct json_avoids_null<std::string> : std::true_type {};
+struct json_avoids_null<std::string> : std::true_type
+{};
 
 template<typename T>
-struct json_avoids_null<std::vector<T>> : std::true_type {};
+struct json_avoids_null<std::vector<T>> : std::true_type
+{};
 
 template<typename T>
-struct json_avoids_null<std::list<T>> : std::true_type {};
+struct json_avoids_null<std::list<T>> : std::true_type
+{};
 
 template<typename T, typename Compare>
-struct json_avoids_null<std::set<T, Compare>> : std::true_type {};
+struct json_avoids_null<std::set<T, Compare>> : std::true_type
+{};
 
 template<typename K, typename V>
-struct json_avoids_null<std::map<K, V>> : std::true_type {};
+struct json_avoids_null<std::map<K, V>> : std::true_type
+{};
 
 /**
  * `ExperimentalFeature` is always rendered as a string.
  */
 template<>
-struct json_avoids_null<ExperimentalFeature> : std::true_type {};
+struct json_avoids_null<ExperimentalFeature> : std::true_type
+{};
 
 }
 
@@ -123,12 +130,8 @@ struct adl_serializer<std::optional<T>>
      */
     static void from_json(const json & json, std::optional<T> & t)
     {
-        static_assert(
-            nix::json_avoids_null<T>::value,
-            "null is already in use for underlying type's JSON");
-        t = json.is_null()
-            ? std::nullopt
-            : std::make_optional(json.template get<T>());
+        static_assert(nix::json_avoids_null<T>::value, "null is already in use for underlying type's JSON");
+        t = json.is_null() ? std::nullopt : std::make_optional(json.template get<T>());
     }
 
     /**
@@ -137,9 +140,7 @@ struct adl_serializer<std::optional<T>>
      */
     static void to_json(json & json, const std::optional<T> & t)
     {
-        static_assert(
-            nix::json_avoids_null<T>::value,
-            "null is already in use for underlying type's JSON");
+        static_assert(nix::json_avoids_null<T>::value, "null is already in use for underlying type's JSON");
         if (t)
             json = *t;
         else

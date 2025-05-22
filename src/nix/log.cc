@@ -16,11 +16,14 @@ struct CmdLog : InstallableCommand
     std::string doc() override
     {
         return
-          #include "log.md"
-          ;
+#include "log.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
     void run(ref<Store> store, ref<Installable> installable) override
     {
@@ -33,14 +36,12 @@ struct CmdLog : InstallableCommand
         auto b = installable->toDerivedPath();
 
         // For compat with CLI today, TODO revisit
-        auto oneUp = std::visit(overloaded {
-            [&](const DerivedPath::Opaque & bo) {
-                return make_ref<const SingleDerivedPath>(bo);
+        auto oneUp = std::visit(
+            overloaded{
+                [&](const DerivedPath::Opaque & bo) { return make_ref<const SingleDerivedPath>(bo); },
+                [&](const DerivedPath::Built & bfd) { return bfd.drvPath; },
             },
-            [&](const DerivedPath::Built & bfd) {
-                return bfd.drvPath;
-            },
-        }, b.path.raw());
+            b.path.raw());
         auto path = resolveDerivedPath(*store, *oneUp);
 
         RunPager pager;
@@ -53,7 +54,8 @@ struct CmdLog : InstallableCommand
             auto & logSub = *logSubP;
 
             auto log = logSub.getBuildLog(path);
-            if (!log) continue;
+            if (!log)
+                continue;
             logger->stop();
             printInfo("got build log for '%s' from '%s'", installable->what(), logSub.getUri());
             writeFull(getStandardOutput(), *log);

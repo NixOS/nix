@@ -5,7 +5,7 @@
 
 using namespace nix;
 
-int main (int argc, char **argv)
+int main(int argc, char ** argv)
 {
     try {
         if (argc != 2) {
@@ -21,12 +21,8 @@ int main (int argc, char **argv)
 
         // build the derivation
 
-        std::vector<DerivedPath> paths {
-            DerivedPath::Built {
-                .drvPath = makeConstantStorePathRef(store->parseStorePath(drvPath)),
-                .outputs = OutputsSpec::Names{"out"}
-            }
-        };
+        std::vector<DerivedPath> paths{DerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(store->parseStorePath(drvPath)), .outputs = OutputsSpec::Names{"out"}}};
 
         const auto results = store->buildPathsWithResults(paths, bmNormal, store);
 

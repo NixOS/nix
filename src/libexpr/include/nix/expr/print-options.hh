@@ -110,7 +110,7 @@ struct PrintOptions
  * `PrintOptions` for unknown and therefore potentially large values in error messages,
  * to avoid printing "too much" output.
  */
-static PrintOptions errorPrintOptions = PrintOptions {
+static PrintOptions errorPrintOptions = PrintOptions{
     .ansiColors = true,
     .maxDepth = 10,
     .maxAttrs = 10,

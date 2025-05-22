@@ -36,11 +36,11 @@
 #include <fcntl.h>
 
 #ifdef __linux__
-#include "nix/util/cgroup.hh"
+#  include "nix/util/cgroup.hh"
 #endif
 
 #if defined(__APPLE__) || defined(__FreeBSD__)
-#include <sys/ucred.h>
+#  include <sys/ucred.h>
 #endif
 
 using namespace nix;
@@ -59,10 +59,13 @@ using namespace nix::daemon;
  * exposed in a header); all authentication and authorization happens in
  * `daemon.cc`.
  */
-struct AuthorizationSettings : Config {
+struct AuthorizationSettings : Config
+{
 
     Setting<Strings> trustedUsers{
-        this, {"root"}, "trusted-users",
+        this,
+        {"root"},
+        "trusted-users",
         R"(
           A list of user names, separated by whitespace.
           These users will have additional rights when connecting to the Nix daemon, such as the ability to specify additional [substituters](#conf-substituters), or to import unsigned realisations or unsigned input-addressed store objects.
@@ -80,7 +83,9 @@ struct AuthorizationSettings : Config {
      * Who we trust to use the daemon in safe ways
      */
     Setting<Strings> allowedUsers{
-        this, {"*"}, "allowed-users",
+        this,
+        {"*"},
+        "allowed-users",
         R"(
           A list user names, separated by whitespace.
           These users are allowed to connect to the Nix daemon.
@@ -100,8 +105,8 @@ AuthorizationSettings authorizationSettings;
 static GlobalConfig::Register rSettings(&authorizationSettings);
 
 #ifndef __linux__
-#define SPLICE_F_MOVE 0
-static ssize_t splice(int fd_in, void *off_in, int fd_out, void *off_out, size_t len, unsigned int flags)
+#  define SPLICE_F_MOVE 0
+static ssize_t splice(int fd_in, void * off_in, int fd_out, void * off_out, size_t len, unsigned int flags)
 {
     // We ignore most parameters, we just have them for conformance with the linux syscall
     std::vector<char> buf(8192);
@@ -119,16 +124,15 @@ static ssize_t splice(int fd_in, void *off_in, int fd_out, void *off_out, size_t
 }
 #endif
 
-
 static void sigChldHandler(int sigNo)
 {
     // Ensure we don't modify errno of whatever we've interrupted
     auto saved_errno = errno;
     //  Reap all dead children.
-    while (waitpid(-1, 0, WNOHANG) > 0) ;
+    while (waitpid(-1, 0, WNOHANG) > 0)
+        ;
     errno = saved_errno;
 }
-
 
 static void setSigChldAction(bool autoReap)
 {
@@ -149,11 +153,11 @@ static void setSigChldAction(bool autoReap)
  */
 static bool matchUser(std::string_view user, const struct group & gr)
 {
-    for (char * * mem = gr.gr_mem; *mem; mem++)
-        if (user == std::string_view(*mem)) return true;
+    for (char ** mem = gr.gr_mem; *mem; mem++)
+        if (user == std::string_view(*mem))
+            return true;
     return false;
 }
-
 
 /**
  * Does the given user (specified by user name and primary group name)
@@ -179,15 +183,17 @@ static bool matchUser(const std::string & user, const std::string & group, const
 
     for (auto & i : users)
         if (i.substr(0, 1) == "@") {
-            if (group == i.substr(1)) return true;
+            if (group == i.substr(1))
+                return true;
             struct group * gr = getgrnam(i.c_str() + 1);
-            if (!gr) continue;
-            if (matchUser(user, *gr)) return true;
+            if (!gr)
+                continue;
+            if (matchUser(user, *gr))
+                return true;
         }
 
     return false;
 }
-
 
 struct PeerInfo
 {
@@ -199,46 +205,43 @@ struct PeerInfo
     gid_t gid;
 };
 
-
 /**
  * Get the identity of the caller, if possible.
  */
 static PeerInfo getPeerInfo(int remote)
 {
-    PeerInfo peer = { false, 0, false, 0, false, 0 };
+    PeerInfo peer = {false, 0, false, 0, false, 0};
 
 #if defined(SO_PEERCRED)
 
-# if defined(__OpenBSD__)
-   struct sockpeercred cred;
-# else
-   ucred cred;
-# endif
+#  if defined(__OpenBSD__)
+    struct sockpeercred cred;
+#  else
+    ucred cred;
+#  endif
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
         throw SysError("getting peer credentials");
-    peer = { true, cred.pid, true, cred.uid, true, cred.gid };
+    peer = {true, cred.pid, true, cred.uid, true, cred.gid};
 
 #elif defined(LOCAL_PEERCRED)
 
-# if !defined(SOL_LOCAL)
-# define SOL_LOCAL 0
-# endif
+#  if !defined(SOL_LOCAL)
+#    define SOL_LOCAL 0
+#  endif
 
     xucred cred;
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == -1)
         throw SysError("getting peer credentials");
-    peer = { false, 0, true, cred.cr_uid, false, 0 };
+    peer = {false, 0, true, cred.cr_uid, false, 0};
 
 #endif
 
     return peer;
 }
 
-
 #define SD_LISTEN_FDS_START 3
-
 
 /**
  * Open a store without a path info cache.
@@ -281,9 +284,8 @@ static std::pair<TrustedFlag, std::string> authPeer(const PeerInfo & peer)
     if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
         throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
 
-    return { trusted, std::move(user) };
+    return {trusted, std::move(user)};
 }
-
 
 /**
  * Run a server. The loop opens a socket and accepts new connections from that
@@ -318,7 +320,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
     //  Get rid of children automatically; don't let them become zombies.
     setSigChldAction(true);
 
-    #ifdef __linux__
+#ifdef __linux__
     if (settings.useCgroups) {
         experimentalFeatureSettings.require(Xp::Cgroups);
 
@@ -337,7 +339,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
         //  Move daemon into the new cgroup.
         writeFile(daemonCgroupPath + "/cgroup.procs", fmt("%d", getpid()));
     }
-    #endif
+#endif
 
     //  Loop accepting connections.
     while (1) {
@@ -347,17 +349,17 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
             struct sockaddr_un remoteAddr;
             socklen_t remoteAddrLen = sizeof(remoteAddr);
 
-            AutoCloseFD remote = accept(fdSocket.get(),
-                (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+            AutoCloseFD remote = accept(fdSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             checkInterrupt();
             if (!remote) {
-                if (errno == EINTR) continue;
+                if (errno == EINTR)
+                    continue;
                 throw SysError("accepting connection");
             }
 
             unix::closeOnExec(remote.get());
 
-            PeerInfo peer { .pidKnown = false };
+            PeerInfo peer{.pidKnown = false};
             TrustedFlag trusted;
             std::string user;
 
@@ -370,7 +372,8 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                 user = _user;
             };
 
-            printInfo((std::string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""),
+            printInfo(
+                (std::string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""),
                 peer.pidKnown ? std::to_string(peer.pid) : "<unknown>",
                 peer.uidKnown ? user : "<unknown>");
 
@@ -380,32 +383,30 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
             options.dieWithParent = false;
             options.runExitHandlers = true;
             options.allowVfork = false;
-            startProcess([&]() {
-                fdSocket = -1;
+            startProcess(
+                [&]() {
+                    fdSocket = -1;
 
-                //  Background the daemon.
-                if (setsid() == -1)
-                    throw SysError("creating a new session");
+                    //  Background the daemon.
+                    if (setsid() == -1)
+                        throw SysError("creating a new session");
 
-                //  Restore normal handling of SIGCHLD.
-                setSigChldAction(false);
+                    //  Restore normal handling of SIGCHLD.
+                    setSigChldAction(false);
 
-                //  For debugging, stuff the pid into argv[1].
-                if (peer.pidKnown && savedArgv[1]) {
-                    auto processName = std::to_string(peer.pid);
-                    strncpy(savedArgv[1], processName.c_str(), strlen(savedArgv[1]));
-                }
+                    //  For debugging, stuff the pid into argv[1].
+                    if (peer.pidKnown && savedArgv[1]) {
+                        auto processName = std::to_string(peer.pid);
+                        strncpy(savedArgv[1], processName.c_str(), strlen(savedArgv[1]));
+                    }
 
-                //  Handle the connection.
-                processConnection(
-                    openUncachedStore(),
-                    FdSource(remote.get()),
-                    FdSink(remote.get()),
-                    trusted,
-                    NotRecursive);
+                    //  Handle the connection.
+                    processConnection(
+                        openUncachedStore(), FdSource(remote.get()), FdSink(remote.get()), trusted, NotRecursive);
 
-                exit(0);
-            }, options);
+                    exit(0);
+                },
+                options);
 
         } catch (Interrupted & e) {
             return;
@@ -426,7 +427,8 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
  *
  * Loops until standard input disconnects, or an error is encountered.
  */
-static void forwardStdioConnection(RemoteStore & store) {
+static void forwardStdioConnection(RemoteStore & store)
+{
     auto conn = store.openConnectionWrapper();
     int from = conn->from.fd;
     int to = conn->to.fd;
@@ -467,11 +469,7 @@ static void forwardStdioConnection(RemoteStore & store) {
  */
 static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
 {
-    processConnection(
-        store,
-        FdSource(STDIN_FILENO),
-        FdSink(STDOUT_FILENO),
-        trustClient, NotRecursive);
+    processConnection(store, FdSource(STDIN_FILENO), FdSink(STDOUT_FILENO), trustClient, NotRecursive);
 }
 
 /**
@@ -507,7 +505,7 @@ static void runDaemon(bool stdio, std::optional<TrustedFlag> forceTrustClientOpt
         daemonLoop(forceTrustClientOpt);
 }
 
-static int main_nix_daemon(int argc, char * * argv)
+static int main_nix_daemon(int argc, char ** argv)
 {
     {
         auto stdio = false;
@@ -535,7 +533,8 @@ static int main_nix_daemon(int argc, char * * argv)
             } else if (*arg == "--process-ops") {
                 experimentalFeatureSettings.require(Xp::MountedSSHStore);
                 processOps = true;
-            } else return false;
+            } else
+                return false;
             return true;
         });
 
@@ -564,27 +563,22 @@ struct CmdDaemon : Command
         addFlag({
             .longName = "force-trusted",
             .description = "Force the daemon to trust connecting clients.",
-            .handler = {[&]() {
-                isTrustedOpt = Trusted;
-            }},
+            .handler = {[&]() { isTrustedOpt = Trusted; }},
             .experimentalFeature = Xp::DaemonTrustOverride,
         });
 
         addFlag({
             .longName = "force-untrusted",
-            .description = "Force the daemon to not trust connecting clients. The connection will be processed by the receiving daemon before forwarding commands.",
-            .handler = {[&]() {
-                isTrustedOpt = NotTrusted;
-            }},
+            .description =
+                "Force the daemon to not trust connecting clients. The connection will be processed by the receiving daemon before forwarding commands.",
+            .handler = {[&]() { isTrustedOpt = NotTrusted; }},
             .experimentalFeature = Xp::DaemonTrustOverride,
         });
 
         addFlag({
             .longName = "default-trust",
             .description = "Use Nix's default trust.",
-            .handler = {[&]() {
-                isTrustedOpt = std::nullopt;
-            }},
+            .handler = {[&]() { isTrustedOpt = std::nullopt; }},
             .experimentalFeature = Xp::DaemonTrustOverride,
         });
 
@@ -595,9 +589,7 @@ struct CmdDaemon : Command
 
               This is useful for the `mounted-ssh://` store where some actions need to be performed on the remote end but as connected user, and not as the user of the underlying daemon on the remote end.
             )",
-            .handler = {[&]() {
-                processOps = true;
-            }},
+            .handler = {[&]() { processOps = true; }},
             .experimentalFeature = Xp::MountedSSHStore,
         });
     }
@@ -607,13 +599,16 @@ struct CmdDaemon : Command
         return "daemon to perform store operations on behalf of non-root clients";
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 
     std::string doc() override
     {
         return
-          #include "daemon.md"
-          ;
+#include "daemon.md"
+            ;
     }
 
     void run() override

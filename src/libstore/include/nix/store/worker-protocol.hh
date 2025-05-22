@@ -7,7 +7,6 @@
 
 namespace nix {
 
-
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
@@ -17,16 +16,14 @@ namespace nix {
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
-
-#define STDERR_NEXT  0x6f6c6d67
-#define STDERR_READ  0x64617461 // data needed from source
+#define STDERR_NEXT 0x6f6c6d67
+#define STDERR_READ 0x64617461  // data needed from source
 #define STDERR_WRITE 0x64617416 // data for sink
-#define STDERR_LAST  0x616c7473
+#define STDERR_LAST 0x616c7473
 #define STDERR_ERROR 0x63787470
 #define STDERR_START_ACTIVITY 0x53545254
-#define STDERR_STOP_ACTIVITY  0x53544f50
-#define STDERR_RESULT         0x52534c54
-
+#define STDERR_STOP_ACTIVITY 0x53544f50
+#define STDERR_RESULT 0x52534c54
 
 struct StoreDirConfig;
 struct Source;
@@ -39,7 +36,6 @@ struct ValidPathInfo;
 struct UnkeyedValidPathInfo;
 enum BuildMode : uint8_t;
 enum TrustedFlag : bool;
-
 
 /**
  * The "worker protocol", used by unix:// and ssh-ng:// stores.
@@ -65,7 +61,8 @@ struct WorkerProto
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
-    struct ReadConn {
+    struct ReadConn
+    {
         Source & from;
         Version version;
     };
@@ -74,7 +71,8 @@ struct WorkerProto
      * A unidirectional write connection, to be used by the write half of the
      * canonical serializers below.
      */
-    struct WriteConn {
+    struct WriteConn
+    {
         Sink & to;
         Version version;
     };
@@ -140,11 +138,10 @@ struct WorkerProto
     static const FeatureSet allFeatures;
 };
 
-enum struct WorkerProto::Op : uint64_t
-{
+enum struct WorkerProto::Op : uint64_t {
     IsValidPath = 1,
     HasSubstitutes = 3,
-    QueryPathHash = 4, // obsolete
+    QueryPathHash = 4,   // obsolete
     QueryReferences = 5, // obsolete
     QueryReferrers = 6,
     AddToStore = 7,
@@ -155,7 +152,7 @@ enum struct WorkerProto::Op : uint64_t
     AddIndirectRoot = 12,
     SyncWithGC = 13,
     FindRoots = 14,
-    ExportPath = 16, // obsolete
+    ExportPath = 16,   // obsolete
     QueryDeriver = 18, // obsolete
     SetOptions = 19,
     CollectGarbage = 20,
@@ -165,7 +162,7 @@ enum struct WorkerProto::Op : uint64_t
     QueryFailedPaths = 24,
     ClearFailedPaths = 25,
     QueryPathInfo = 26,
-    ImportPaths = 27, // obsolete
+    ImportPaths = 27,                // obsolete
     QueryDerivationOutputNames = 28, // obsolete
     QueryPathFromHashPart = 29,
     QuerySubstitutablePathInfos = 30,
@@ -211,7 +208,7 @@ struct WorkerProto::ClientHandshakeInfo
      */
     std::optional<TrustedFlag> remoteTrustsUs;
 
-    bool operator == (const ClientHandshakeInfo &) const = default;
+    bool operator==(const ClientHandshakeInfo &) const = default;
 };
 
 /**
@@ -220,7 +217,7 @@ struct WorkerProto::ClientHandshakeInfo
  * @todo Switch to using `WorkerProto::Serialise` instead probably. But
  * this was not done at this time so there would be less churn.
  */
-inline Sink & operator << (Sink & sink, WorkerProto::Op op)
+inline Sink & operator<<(Sink & sink, WorkerProto::Op op)
 {
     return sink << static_cast<uint64_t>(op);
 }
@@ -230,7 +227,7 @@ inline Sink & operator << (Sink & sink, WorkerProto::Op op)
  *
  * @todo Perhaps render known opcodes more nicely.
  */
-inline std::ostream & operator << (std::ostream & s, WorkerProto::Op op)
+inline std::ostream & operator<<(std::ostream & s, WorkerProto::Op op)
 {
     return s << static_cast<uint64_t>(op);
 }
@@ -245,10 +242,10 @@ inline std::ostream & operator << (std::ostream & s, WorkerProto::Op op)
  * be legal specialization syntax. See below for what that looks like in
  * practice.
  */
-#define DECLARE_WORKER_SERIALISER(T) \
-    struct WorkerProto::Serialise< T > \
-    { \
-        static T read(const StoreDirConfig & store, WorkerProto::ReadConn conn); \
+#define DECLARE_WORKER_SERIALISER(T)                                                               \
+    struct WorkerProto::Serialise<T>                                                               \
+    {                                                                                              \
+        static T read(const StoreDirConfig & store, WorkerProto::ReadConn conn);                   \
         static void write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const T & t); \
     };
 
