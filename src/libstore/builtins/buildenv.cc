@@ -58,13 +58,9 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
          * Python package brings its own
          * `$out/lib/pythonX.Y/site-packages/easy-install.pth'.)
          */
-        if (hasSuffix(srcFile, "/propagated-build-inputs") ||
-            hasSuffix(srcFile, "/nix-support") ||
-            hasSuffix(srcFile, "/perllocal.pod") ||
-            hasSuffix(srcFile, "/info/dir") ||
-            hasSuffix(srcFile, "/log") ||
-            hasSuffix(srcFile, "/manifest.nix") ||
-            hasSuffix(srcFile, "/manifest.json"))
+        if (hasSuffix(srcFile, "/propagated-build-inputs") || hasSuffix(srcFile, "/nix-support")
+            || hasSuffix(srcFile, "/perllocal.pod") || hasSuffix(srcFile, "/info/dir") || hasSuffix(srcFile, "/log")
+            || hasSuffix(srcFile, "/manifest.nix") || hasSuffix(srcFile, "/manifest.json"))
             continue;
 
         else if (S_ISDIR(srcSt.st_mode)) {
@@ -80,11 +76,14 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                         throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
                     if (unlink(dstFile.c_str()) == -1)
                         throw SysError("unlinking '%1%'", dstFile);
-                    if (mkdir(dstFile.c_str()
-                #ifndef _WIN32 // TODO abstract mkdir perms for Windows
-                            , 0755
-                #endif
-                            ) == -1)
+                    if (mkdir(
+                            dstFile.c_str()
+#ifndef _WIN32 // TODO abstract mkdir perms for Windows
+                                ,
+                            0755
+#endif
+                            )
+                        == -1)
                         throw SysError("creating directory '%1%'", dstFile);
                     createLinks(state, target, dstFile, state.priorities[dstFile]);
                     createLinks(state, srcFile, dstFile, priority);
@@ -100,11 +99,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                 if (S_ISLNK(dstSt.st_mode)) {
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
-                        throw BuildEnvFileConflictError(
-                            readLink(dstFile),
-                            srcFile,
-                            priority
-                        );
+                        throw BuildEnvFileConflictError(readLink(dstFile), srcFile, priority);
                     if (prevPriority < priority)
                         continue;
                     if (unlink(dstFile.c_str()) == -1)
@@ -127,16 +122,18 @@ void buildProfile(const Path & out, Packages && pkgs)
     PathSet done, postponed;
 
     auto addPkg = [&](const Path & pkgDir, int priority) {
-        if (!done.insert(pkgDir).second) return;
+        if (!done.insert(pkgDir).second)
+            return;
         createLinks(state, pkgDir, out, priority);
 
         try {
             for (const auto & p : tokenizeString<std::vector<std::string>>(
-                    readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
+                     readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
                 if (!done.count(p))
                     postponed.insert(p);
         } catch (SysError & e) {
-            if (e.errNo != ENOENT && e.errNo != ENOTDIR) throw;
+            if (e.errNo != ENOENT && e.errNo != ENOTDIR)
+                throw;
         }
     };
 
@@ -171,7 +168,8 @@ static void builtinBuildenv(const BuiltinBuilderContext & ctx)
 {
     auto getAttr = [&](const std::string & name) {
         auto i = ctx.drv.env.find(name);
-        if (i == ctx.drv.env.end()) throw Error("attribute '%s' missing", name);
+        if (i == ctx.drv.env.end())
+            throw Error("attribute '%s' missing", name);
         return i->second;
     };
 
@@ -191,7 +189,7 @@ static void builtinBuildenv(const BuiltinBuilderContext & ctx)
             const int priority = stoi(*itemIt++);
             const size_t outputs = stoul(*itemIt++);
 
-            for (size_t n {0}; n < outputs; n++) {
+            for (size_t n{0}; n < outputs; n++) {
                 pkgs.emplace_back(std::move(*itemIt++), active, priority);
             }
         }

@@ -14,10 +14,7 @@ struct LegacySSHStoreConfig : std::enable_shared_from_this<LegacySSHStoreConfig>
 {
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    LegacySSHStoreConfig(
-        std::string_view scheme,
-        std::string_view authority,
-        const Params & params);
+    LegacySSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
 
 #ifndef _WIN32
     // Hack for getting remote build log output.
@@ -28,11 +25,10 @@ struct LegacySSHStoreConfig : std::enable_shared_from_this<LegacySSHStoreConfig>
     Descriptor logFD = INVALID_DESCRIPTOR;
 #endif
 
-    const Setting<Strings> remoteProgram{this, {"nix-store"}, "remote-program",
-        "Path to the `nix-store` executable on the remote machine."};
+    const Setting<Strings> remoteProgram{
+        this, {"nix-store"}, "remote-program", "Path to the `nix-store` executable on the remote machine."};
 
-    const Setting<int> maxConnections{this, 1, "max-connections",
-        "Maximum number of concurrent SSH connections."};
+    const Setting<int> maxConnections{this, 1, "max-connections", "Maximum number of concurrent SSH connections."};
 
     /**
      * Hack for hydra
@@ -44,9 +40,15 @@ struct LegacySSHStoreConfig : std::enable_shared_from_this<LegacySSHStoreConfig>
      */
     std::optional<size_t> connPipeSize;
 
-    static const std::string name() { return "SSH Store"; }
+    static const std::string name()
+    {
+        return "SSH Store";
+    }
 
-    static StringSet uriSchemes() { return {"ssh"}; }
+    static StringSet uriSchemes()
+    {
+        return {"ssh"};
+    }
 
     static std::string doc();
 
@@ -71,14 +73,12 @@ struct LegacySSHStore : public virtual Store
 
     std::string getUri() override;
 
-    void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+    void queryPathInfoUncached(
+        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
-    std::map<StorePath, UnkeyedValidPathInfo> queryPathInfosUncached(
-        const StorePathSet & paths);
+    std::map<StorePath, UnkeyedValidPathInfo> queryPathInfosUncached(const StorePathSet & paths);
 
-    void addToStore(const ValidPathInfo & info, Source & source,
-        RepairFlag repair, CheckSigsFlag checkSigs) override;
+    void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     void narFromPath(const StorePath & path, Sink & sink) override;
 
@@ -93,7 +93,9 @@ struct LegacySSHStore : public virtual Store
     void narFromPath(const StorePath & path, std::function<void(Source &)> fun);
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
-    { unsupported("queryPathFromHashPart"); }
+    {
+        unsupported("queryPathFromHashPart");
+    }
 
     StorePath addToStore(
         std::string_view name,
@@ -103,7 +105,9 @@ struct LegacySSHStore : public virtual Store
         const StorePathSet & references,
         PathFilter & filter,
         RepairFlag repair) override
-    { unsupported("addToStore"); }
+    {
+        unsupported("addToStore");
+    }
 
     virtual StorePath addToStoreFromDump(
         Source & dump,
@@ -113,12 +117,13 @@ struct LegacySSHStore : public virtual Store
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) override
-    { unsupported("addToStore"); }
+    {
+        unsupported("addToStore");
+    }
 
 public:
 
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode) override;
+    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode) override;
 
     /**
      * Note, the returned function must only be called once, or we'll
@@ -127,16 +132,20 @@ public:
      * @todo Use C++23 `std::move_only_function`.
      */
     std::function<BuildResult()> buildDerivationAsync(
-        const StorePath & drvPath, const BasicDerivation & drv,
-        const ServeProto::BuildOptions & options);
+        const StorePath & drvPath, const BasicDerivation & drv, const ServeProto::BuildOptions & options);
 
-    void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
+    void buildPaths(
+        const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
 
     void ensurePath(const StorePath & path) override
-    { unsupported("ensurePath"); }
+    {
+        unsupported("ensurePath");
+    }
 
     virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
-    { unsupported("getFSAccessor"); }
+    {
+        unsupported("getFSAccessor");
+    }
 
     /**
      * The default instance would schedule the work on the client side, but
@@ -147,14 +156,18 @@ public:
      * without it being a breaking change.
      */
     void repairPath(const StorePath & path) override
-    { unsupported("repairPath"); }
+    {
+        unsupported("repairPath");
+    }
 
-    void computeFSClosure(const StorePathSet & paths,
-        StorePathSet & out, bool flipDirection = false,
-        bool includeOutputs = false, bool includeDerivers = false) override;
+    void computeFSClosure(
+        const StorePathSet & paths,
+        StorePathSet & out,
+        bool flipDirection = false,
+        bool includeOutputs = false,
+        bool includeDerivers = false) override;
 
-    StorePathSet queryValidPaths(const StorePathSet & paths,
-        SubstituteFlag maybeSubstitute = NoSubstitute) override;
+    StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     /**
      * Custom variation that atomically creates temp locks on the remote
@@ -164,9 +177,7 @@ public:
      * garbage-collects paths that are already there. Optionally, ask
      * the remote host to substitute missing paths.
      */
-    StorePathSet queryValidPaths(const StorePathSet & paths,
-        bool lock,
-        SubstituteFlag maybeSubstitute = NoSubstitute);
+    StorePathSet queryValidPaths(const StorePathSet & paths, bool lock, SubstituteFlag maybeSubstitute = NoSubstitute);
 
     /**
      * Just exists because this is exactly what Hydra was doing, and we
@@ -178,7 +189,8 @@ public:
 
     unsigned int getProtocol() override;
 
-    struct ConnectionStats {
+    struct ConnectionStats
+    {
         size_t bytesReceived, bytesSent;
     };
 
@@ -192,10 +204,12 @@ public:
      */
     std::optional<TrustedFlag> isTrustedClient() override;
 
-    void queryRealisationUncached(const DrvOutput &,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
+    void
+    queryRealisationUncached(const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override
     // TODO: Implement
-    { unsupported("queryRealisation"); }
+    {
+        unsupported("queryRealisation");
+    }
 };
 
 }

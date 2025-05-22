@@ -5,7 +5,10 @@
 
 namespace nix {
 
-namespace fetchers { struct PublicKey; struct Settings; }
+namespace fetchers {
+struct PublicKey;
+struct Settings;
+}
 
 /**
  * A sink that writes into a Git repository. Note that nothing may be written
@@ -21,8 +24,7 @@ struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
 
 struct GitRepo
 {
-    virtual ~GitRepo()
-    { }
+    virtual ~GitRepo() {}
 
     static ref<GitRepo> openRepo(const std::filesystem::path & path, bool create = false, bool bare = false);
 
@@ -86,30 +88,23 @@ struct GitRepo
 
     virtual bool hasObject(const Hash & oid) = 0;
 
-    virtual ref<SourceAccessor> getAccessor(
-        const Hash & rev,
-        bool exportIgnore,
-        std::string displayPrefix,
-        bool smudgeLfs = false) = 0;
+    virtual ref<SourceAccessor>
+    getAccessor(const Hash & rev, bool exportIgnore, std::string displayPrefix, bool smudgeLfs = false) = 0;
 
-    virtual ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
+    virtual ref<SourceAccessor>
+    getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
 
     virtual ref<GitFileSystemObjectSink> getFileSystemObjectSink() = 0;
 
     virtual void flush() = 0;
 
-    virtual void fetch(
-        const std::string & url,
-        const std::string & refspec,
-        bool shallow) = 0;
+    virtual void fetch(const std::string & url, const std::string & refspec, bool shallow) = 0;
 
     /**
      * Verify that commit `rev` is signed by one of the keys in
      * `publicKeys`. Throw an error if it isn't.
      */
-    virtual void verifyCommit(
-        const Hash & rev,
-        const std::vector<fetchers::PublicKey> & publicKeys) = 0;
+    virtual void verifyCommit(const Hash & rev, const std::vector<fetchers::PublicKey> & publicKeys) = 0;
 
     /**
      * Given a Git tree hash, compute the hash of its NAR
@@ -131,8 +126,11 @@ ref<GitRepo> getTarballCache();
 template<auto del>
 struct Deleter
 {
-    template <typename T>
-    void operator()(T * p) const { del(p); };
+    template<typename T>
+    void operator()(T * p) const
+    {
+        del(p);
+    };
 };
 
 // A helper to ensure that we don't leak objects returned by libgit2.
@@ -142,11 +140,21 @@ struct Setter
     T & t;
     typename T::pointer p = nullptr;
 
-    Setter(T & t) : t(t) { }
+    Setter(T & t)
+        : t(t)
+    {
+    }
 
-    ~Setter() { if (p) t = T(p); }
+    ~Setter()
+    {
+        if (p)
+            t = T(p);
+    }
 
-    operator typename T::pointer * () { return &p; }
+    operator typename T::pointer *()
+    {
+        return &p;
+    }
 };
 
 }

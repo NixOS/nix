@@ -73,8 +73,8 @@ struct ContentAddressMethod
 
     Raw raw;
 
-    bool operator ==(const ContentAddressMethod &) const = default;
-    auto operator <=>(const ContentAddressMethod &) const = default;
+    bool operator==(const ContentAddressMethod &) const = default;
+    auto operator<=>(const ContentAddressMethod &) const = default;
 
     MAKE_WRAPPER_CONSTRUCTOR(ContentAddressMethod);
 
@@ -132,7 +132,6 @@ struct ContentAddressMethod
     FileIngestionMethod getFileIngestionMethod() const;
 };
 
-
 /*
  * Mini content address
  */
@@ -161,8 +160,8 @@ struct ContentAddress
      */
     Hash hash;
 
-    bool operator ==(const ContentAddress &) const = default;
-    auto operator <=>(const ContentAddress &) const = default;
+    bool operator==(const ContentAddress &) const = default;
+    auto operator<=>(const ContentAddress &) const = default;
 
     /**
      * Compute the content-addressability assertion
@@ -183,7 +182,6 @@ struct ContentAddress
  * string otherwise.
  */
 std::string renderContentAddress(std::optional<ContentAddress> ca);
-
 
 /*
  * Full content address
@@ -221,9 +219,9 @@ struct StoreReferences
      */
     size_t size() const;
 
-    bool operator ==(const StoreReferences &) const = default;
+    bool operator==(const StoreReferences &) const = default;
     // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
-    //auto operator <=>(const StoreReferences &) const = default;
+    // auto operator <=>(const StoreReferences &) const = default;
 };
 
 // This matches the additional info that we need for makeTextPath
@@ -240,9 +238,9 @@ struct TextInfo
      */
     StorePathSet references;
 
-    bool operator ==(const TextInfo &) const = default;
+    bool operator==(const TextInfo &) const = default;
     // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
-    //auto operator <=>(const TextInfo &) const = default;
+    // auto operator <=>(const TextInfo &) const = default;
 };
 
 struct FixedOutputInfo
@@ -262,9 +260,9 @@ struct FixedOutputInfo
      */
     StoreReferences references;
 
-    bool operator ==(const FixedOutputInfo &) const = default;
+    bool operator==(const FixedOutputInfo &) const = default;
     // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
-    //auto operator <=>(const FixedOutputInfo &) const = default;
+    // auto operator <=>(const FixedOutputInfo &) const = default;
 };
 
 /**
@@ -274,16 +272,13 @@ struct FixedOutputInfo
  */
 struct ContentAddressWithReferences
 {
-    typedef std::variant<
-        TextInfo,
-        FixedOutputInfo
-    > Raw;
+    typedef std::variant<TextInfo, FixedOutputInfo> Raw;
 
     Raw raw;
 
-    bool operator ==(const ContentAddressWithReferences &) const = default;
+    bool operator==(const ContentAddressWithReferences &) const = default;
     // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
-    //auto operator <=>(const ContentAddressWithReferences &) const = default;
+    // auto operator <=>(const ContentAddressWithReferences &) const = default;
 
     MAKE_WRAPPER_CONSTRUCTOR(ContentAddressWithReferences);
 
@@ -306,8 +301,7 @@ struct ContentAddressWithReferences
      * *partial function* and exceptions will be thrown for invalid
      * combinations.
      */
-    static ContentAddressWithReferences fromParts(
-        ContentAddressMethod method, Hash hash, StoreReferences refs);
+    static ContentAddressWithReferences fromParts(ContentAddressMethod method, Hash hash, StoreReferences refs);
 
     ContentAddressMethod getMethod() const;
 

@@ -35,7 +35,8 @@ InstallableAttrPath::InstallableAttrPath(
     , v(allocRootValue(v))
     , attrPath(attrPath)
     , extendedOutputsSpec(std::move(extendedOutputsSpec))
-{ }
+{
+}
 
 std::pair<Value *, PosIdx> InstallableAttrPath::toValue(EvalState & state)
 {
@@ -48,12 +49,9 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
 {
     auto [v, pos] = toValue(*state);
 
-    if (std::optional derivedPathWithInfo = trySinglePathToDerivedPaths(
-        *v,
-        pos,
-        fmt("while evaluating the attribute '%s'", attrPath)))
-    {
-        return { *derivedPathWithInfo };
+    if (std::optional derivedPathWithInfo =
+            trySinglePathToDerivedPaths(*v, pos, fmt("while evaluating the attribute '%s'", attrPath))) {
+        return {*derivedPathWithInfo};
     }
 
     Bindings & autoArgs = *cmd.getAutoArgs(*state);
@@ -70,19 +68,19 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
         if (!drvPath)
             throw Error("'%s' is not a derivation", what());
 
-        auto newOutputs = std::visit(overloaded {
-            [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
-                StringSet outputsToInstall;
-                for (auto & output : packageInfo.queryOutputs(false, true))
-                    outputsToInstall.insert(output.first);
-                if (outputsToInstall.empty())
-                    outputsToInstall.insert("out");
-                return OutputsSpec::Names { std::move(outputsToInstall) };
+        auto newOutputs = std::visit(
+            overloaded{
+                [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
+                    StringSet outputsToInstall;
+                    for (auto & output : packageInfo.queryOutputs(false, true))
+                        outputsToInstall.insert(output.first);
+                    if (outputsToInstall.empty())
+                        outputsToInstall.insert("out");
+                    return OutputsSpec::Names{std::move(outputsToInstall)};
+                },
+                [&](const ExtendedOutputsSpec::Explicit & e) -> OutputsSpec { return e; },
             },
-            [&](const ExtendedOutputsSpec::Explicit & e) -> OutputsSpec {
-                return e;
-            },
-        }, extendedOutputsSpec.raw);
+            extendedOutputsSpec.raw);
 
         auto [iter, didInsert] = byDrvPath.emplace(*drvPath, newOutputs);
 
@@ -93,11 +91,12 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
     DerivedPathsWithInfo res;
     for (auto & [drvPath, outputs] : byDrvPath)
         res.push_back({
-            .path = DerivedPath::Built {
-                .drvPath = makeConstantStorePathRef(drvPath),
-                .outputs = outputs,
-            },
-            .info = make_ref<ExtraPathInfoValue>(ExtraPathInfoValue::Value {
+            .path =
+                DerivedPath::Built{
+                    .drvPath = makeConstantStorePathRef(drvPath),
+                    .outputs = outputs,
+                },
+            .info = make_ref<ExtraPathInfoValue>(ExtraPathInfoValue::Value{
                 .extendedOutputsSpec = outputs,
                 /* FIXME: reconsider backwards compatibility above
                    so we can fill in this info. */
@@ -115,8 +114,10 @@ InstallableAttrPath InstallableAttrPath::parse(
     ExtendedOutputsSpec extendedOutputsSpec)
 {
     return {
-        state, cmd, v,
-        prefix == "." ? "" : std::string { prefix },
+        state,
+        cmd,
+        v,
+        prefix == "." ? "" : std::string{prefix},
         std::move(extendedOutputsSpec),
     };
 }

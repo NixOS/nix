@@ -45,28 +45,31 @@ void readFull(int fd, char * buf, size_t count)
         ssize_t res = read(fd, buf, count);
         if (res == -1) {
             switch (errno) {
-            case EINTR: continue;
+            case EINTR:
+                continue;
             case EAGAIN:
                 pollFD(fd, POLLIN);
                 continue;
             }
             throw SysError("reading from file");
         }
-        if (res == 0) throw EndOfFile("unexpected end-of-file");
+        if (res == 0)
+            throw EndOfFile("unexpected end-of-file");
         count -= res;
         buf += res;
     }
 }
 
-
 void writeFull(int fd, std::string_view s, bool allowInterrupts)
 {
     while (!s.empty()) {
-        if (allowInterrupts) checkInterrupt();
+        if (allowInterrupts)
+            checkInterrupt();
         ssize_t res = write(fd, s.data(), s.size());
         if (res == -1) {
             switch (errno) {
-            case EINTR: continue;
+            case EINTR:
+                continue;
             case EAGAIN:
                 pollFD(fd, POLLOUT);
                 continue;
@@ -78,7 +81,6 @@ void writeFull(int fd, std::string_view s, bool allowInterrupts)
     }
 }
 
-
 std::string readLine(int fd, bool eofOk)
 {
     std::string s;
@@ -89,7 +91,8 @@ std::string readLine(int fd, bool eofOk)
         ssize_t rd = read(fd, &ch, 1);
         if (rd == -1) {
             switch (errno) {
-            case EINTR: continue;
+            case EINTR:
+                continue;
             case EAGAIN: {
                 pollFD(fd, POLLIN);
                 continue;
@@ -102,14 +105,13 @@ std::string readLine(int fd, bool eofOk)
                 return s;
             else
                 throw EndOfFile("unexpected EOF reading a line");
-        }
-        else {
-            if (ch == '\n') return s;
+        } else {
+            if (ch == '\n')
+                return s;
             s += ch;
         }
     }
 }
-
 
 void drainFD(int fd, Sink & sink, bool block)
 {
@@ -138,9 +140,10 @@ void drainFD(int fd, Sink & sink, bool block)
                 break;
             if (errno != EINTR)
                 throw SysError("reading from file");
-        }
-        else if (rd == 0) break;
-        else sink({reinterpret_cast<char *>(buf.data()), (size_t) rd});
+        } else if (rd == 0)
+            break;
+        else
+            sink({reinterpret_cast<char *>(buf.data()), (size_t) rd});
     }
 }
 
@@ -150,9 +153,11 @@ void Pipe::create()
 {
     int fds[2];
 #if HAVE_PIPE2
-    if (pipe2(fds, O_CLOEXEC) != 0) throw SysError("creating pipe");
+    if (pipe2(fds, O_CLOEXEC) != 0)
+        throw SysError("creating pipe");
 #else
-    if (pipe(fds) != 0) throw SysError("creating pipe");
+    if (pipe(fds) != 0)
+        throw SysError("creating pipe");
     unix::closeOnExec(fds[0]);
     unix::closeOnExec(fds[1]);
 #endif
@@ -160,17 +165,16 @@ void Pipe::create()
     writeSide = fds[1];
 }
 
-
 //////////////////////////////////////////////////////////////////////
 
 #if defined(__linux__) || defined(__FreeBSD__)
 static int unix_close_range(unsigned int first, unsigned int last, int flags)
 {
-#if !HAVE_CLOSE_RANGE
-    return syscall(SYS_close_range, first, last, (unsigned int)flags);
-#else
+#  if !HAVE_CLOSE_RANGE
+    return syscall(SYS_close_range, first, last, (unsigned int) flags);
+#  else
     return close_range(first, last, flags);
-#endif
+#  endif
 }
 #endif
 
@@ -212,12 +216,10 @@ void unix::closeExtraFDs()
         close(fd); /* ignore result */
 }
 
-
 void unix::closeOnExec(int fd)
 {
     int prev;
-    if ((prev = fcntl(fd, F_GETFD, 0)) == -1 ||
-        fcntl(fd, F_SETFD, prev | FD_CLOEXEC) == -1)
+    if ((prev = fcntl(fd, F_GETFD, 0)) == -1 || fcntl(fd, F_SETFD, prev | FD_CLOEXEC) == -1)
         throw SysError("setting close-on-exec flag");
 }
 

@@ -17,7 +17,6 @@
 
 namespace nix {
 
-
 static void makeWritable(const Path & path)
 {
     auto st = lstat(path);
@@ -25,22 +24,24 @@ static void makeWritable(const Path & path)
         throw SysError("changing writability of '%1%'", path);
 }
 
-
 struct MakeReadOnly
 {
     Path path;
-    MakeReadOnly(const PathView path) : path(path) { }
+    MakeReadOnly(const PathView path)
+        : path(path)
+    {
+    }
     ~MakeReadOnly()
     {
         try {
             /* This will make the path read-only. */
-            if (path != "") canonicaliseTimestampAndPermissions(path);
+            if (path != "")
+                canonicaliseTimestampAndPermissions(path);
         } catch (...) {
             ignoreExceptionInDestructor();
         }
     }
 };
-
 
 LocalStore::InodeHash LocalStore::loadInodeHash()
 {
@@ -48,7 +49,8 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     InodeHash inodeHash;
 
     AutoCloseDir dir(opendir(linksDir.c_str()));
-    if (!dir) throw SysError("opening directory '%1%'", linksDir);
+    if (!dir)
+        throw SysError("opening directory '%1%'", linksDir);
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir.get())) { /* sic */
@@ -56,20 +58,21 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
         // We don't care if we hit non-hash files, anything goes
         inodeHash.insert(dirent->d_ino);
     }
-    if (errno) throw SysError("reading directory '%1%'", linksDir);
+    if (errno)
+        throw SysError("reading directory '%1%'", linksDir);
 
     printMsg(lvlTalkative, "loaded %1% hash inodes", inodeHash.size());
 
     return inodeHash;
 }
 
-
 Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash)
 {
     Strings names;
 
     AutoCloseDir dir(opendir(path.c_str()));
-    if (!dir) throw SysError("opening directory '%1%'", path);
+    if (!dir)
+        throw SysError("opening directory '%1%'", path);
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir.get())) { /* sic */
@@ -81,17 +84,18 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
         }
 
         std::string name = dirent->d_name;
-        if (name == "." || name == "..") continue;
+        if (name == "." || name == "..")
+            continue;
         names.push_back(name);
     }
-    if (errno) throw SysError("reading directory '%1%'", path);
+    if (errno)
+        throw SysError("reading directory '%1%'", path);
 
     return names;
 }
 
-
-void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
-    const Path & path, InodeHash & inodeHash, RepairFlag repair)
+void LocalStore::optimisePath_(
+    Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash, RepairFlag repair)
 {
     checkInterrupt();
 
@@ -104,8 +108,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        See https://github.com/NixOS/nix/issues/1443 and
        https://github.com/NixOS/nix/pull/2230 for more discussion. */
 
-    if (std::regex_search(path, std::regex("\\.app/Contents/.+$")))
-    {
+    if (std::regex_search(path, std::regex("\\.app/Contents/.+$"))) {
         debug("'%1%' is not allowed to be linked in macOS", path);
         return;
     }
@@ -123,7 +126,8 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 #if CAN_LINK_SYMLINK
         && !S_ISLNK(st.st_mode)
 #endif
-        ) return;
+    )
+        return;
 
     /* Sometimes SNAFUs can cause files in the Nix store to be
        modified, in particular when running programs as root under
@@ -152,7 +156,9 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     Hash hash = ({
         hashPath(
             {make_ref<PosixSourceAccessor>(), CanonPath(path)},
-            FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256).first;
+            FileSerialisationMethod::NixArchive,
+            HashAlgorithm::SHA256)
+            .first;
     });
     debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Nix32, true));
 
@@ -162,17 +168,18 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     /* Maybe delete the link, if it has been corrupted. */
     if (std::filesystem::exists(std::filesystem::symlink_status(linkPath))) {
         auto stLink = lstat(linkPath.string());
-        if (st.st_size != stLink.st_size
-            || (repair && hash != ({
-                hashPath(
-                    PosixSourceAccessor::createAtRoot(linkPath),
-                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256).first;
-           })))
-        {
+        if (st.st_size != stLink.st_size || (repair && hash != ({
+                                                           hashPath(
+                                                               PosixSourceAccessor::createAtRoot(linkPath),
+                                                               FileSerialisationMethod::NixArchive,
+                                                               HashAlgorithm::SHA256)
+                                                               .first;
+                                                       }))) {
             // XXX: Consider overwriting linkPath with our valid version.
             warn("removing corrupted link %s", linkPath);
-            warn("There may be more corrupted paths."
-                 "\nYou should run `nix-store --verify --check-contents --repair` to fix them all");
+            warn(
+                "There may be more corrupted paths."
+                "\nYou should run `nix-store --verify --check-contents --repair` to fix them all");
             std::filesystem::remove(linkPath);
         }
     }
@@ -197,7 +204,8 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
                 return;
             }
 
-            else throw;
+            else
+                throw;
         }
     }
 
@@ -217,7 +225,8 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        permissions). */
     const Path dirOfPath(dirOf(path));
     bool mustToggle = dirOfPath != config->realStoreDir.get();
-    if (mustToggle) makeWritable(dirOfPath);
+    if (mustToggle)
+        makeWritable(dirOfPath);
 
     /* When we're done, make the directory read-only again and reset
        its timestamp back to 0. */
@@ -245,7 +254,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
         std::filesystem::rename(tempLink, path);
     } catch (std::filesystem::filesystem_error & e) {
         std::filesystem::remove(tempLink);
-            printError("unable to unlink '%1%'", tempLink);
+        printError("unable to unlink '%1%'", tempLink);
         if (e.code() == std::errc::too_many_links) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it
@@ -261,13 +270,15 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     stats.bytesFreed += st.st_size;
 
     if (act)
-        act->result(resFileLinked, st.st_size
+        act->result(
+            resFileLinked,
+            st.st_size
 #ifndef _WIN32
-            , st.st_blocks
+            ,
+            st.st_blocks
 #endif
-            );
+        );
 }
-
 
 void LocalStore::optimiseStore(OptimiseStats & stats)
 {
@@ -282,7 +293,8 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
 
     for (auto & i : paths) {
         addTempRoot(i);
-        if (!isValidPath(i)) continue; /* path was GC'ed, probably */
+        if (!isValidPath(i))
+            continue; /* path was GC'ed, probably */
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
             optimisePath_(&act, stats, config->realStoreDir + "/" + std::string(i.to_string()), inodeHash, NoRepair);
@@ -298,9 +310,7 @@ void LocalStore::optimiseStore()
 
     optimiseStore(stats);
 
-    printInfo("%s freed by hard-linking %d files",
-        showBytes(stats.bytesFreed),
-        stats.filesLinked);
+    printInfo("%s freed by hard-linking %d files", showBytes(stats.bytesFreed), stats.filesLinked);
 }
 
 void LocalStore::optimisePath(const Path & path, RepairFlag repair)
@@ -308,8 +318,8 @@ void LocalStore::optimisePath(const Path & path, RepairFlag repair)
     OptimiseStats stats;
     InodeHash inodeHash;
 
-    if (settings.autoOptimiseStore) optimisePath_(nullptr, stats, path, inodeHash, repair);
+    if (settings.autoOptimiseStore)
+        optimisePath_(nullptr, stats, path, inodeHash, repair);
 }
-
 
 }

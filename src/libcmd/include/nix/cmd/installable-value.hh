@@ -9,7 +9,10 @@ namespace nix {
 struct PackageInfo;
 struct SourceExprCommand;
 
-namespace eval_cache { class EvalCache; class AttrCursor; }
+namespace eval_cache {
+class EvalCache;
+class AttrCursor;
+}
 
 struct App
 {
@@ -37,7 +40,8 @@ struct ExtraPathInfoValue : ExtraPathInfo
     /**
      * Extra struct to get around C++ designated initializer limitations
      */
-    struct Value {
+    struct Value
+    {
         /**
          * An optional priority for use with "build envs". See Package
          */
@@ -61,7 +65,8 @@ struct ExtraPathInfoValue : ExtraPathInfo
 
     ExtraPathInfoValue(Value && v)
         : value(std::move(v))
-    { }
+    {
+    }
 
     virtual ~ExtraPathInfoValue() = default;
 };
@@ -74,9 +79,12 @@ struct InstallableValue : Installable
 {
     ref<EvalState> state;
 
-    InstallableValue(ref<EvalState> state) : state(state) {}
+    InstallableValue(ref<EvalState> state)
+        : state(state)
+    {
+    }
 
-    virtual ~InstallableValue() { }
+    virtual ~InstallableValue() {}
 
     virtual std::pair<Value *, PosIdx> toValue(EvalState & state) = 0;
 
@@ -85,15 +93,13 @@ struct InstallableValue : Installable
      * However if none exists, throw exception instead of returning
      * empty vector.
      */
-    virtual std::vector<ref<eval_cache::AttrCursor>>
-    getCursors(EvalState & state);
+    virtual std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState & state);
 
     /**
      * Get the first and most preferred cursor this Installable could
      * refer to, or throw an exception if none exists.
      */
-    virtual ref<eval_cache::AttrCursor>
-    getCursor(EvalState & state);
+    virtual ref<eval_cache::AttrCursor> getCursor(EvalState & state);
 
     UnresolvedApp toApp(EvalState & state);
 
@@ -116,7 +122,8 @@ protected:
      * @result A derived path (with empty info, for now) if the value
      * matched the above criteria.
      */
-    std::optional<DerivedPathWithInfo> trySinglePathToDerivedPaths(Value & v, const PosIdx pos, std::string_view errorCtx);
+    std::optional<DerivedPathWithInfo>
+    trySinglePathToDerivedPaths(Value & v, const PosIdx pos, std::string_view errorCtx);
 };
 
 }

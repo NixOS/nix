@@ -36,10 +36,19 @@ private:
 
 public:
 
-    SyncBase() { }
-    SyncBase(const T & data) : data(data) { }
-    SyncBase(T && data) noexcept : data(std::move(data)) { }
-    SyncBase(SyncBase && other) noexcept : data(std::move(*other.lock())) { }
+    SyncBase() {}
+    SyncBase(const T & data)
+        : data(data)
+    {
+    }
+    SyncBase(T && data) noexcept
+        : data(std::move(data))
+    {
+    }
+    SyncBase(SyncBase && other) noexcept
+        : data(std::move(*other.lock()))
+    {
+    }
 
     template<class L>
     class Lock
@@ -48,11 +57,19 @@ public:
         SyncBase * s;
         L lk;
         friend SyncBase;
-        Lock(SyncBase * s) : s(s), lk(s->mutex) { }
+        Lock(SyncBase * s)
+            : s(s)
+            , lk(s->mutex)
+        {
+        }
     public:
-        Lock(Lock && l) : s(l.s) { unreachable(); }
+        Lock(Lock && l)
+            : s(l.s)
+        {
+            unreachable();
+        }
         Lock(const Lock & l) = delete;
-        ~Lock() { }
+        ~Lock() {}
 
         void wait(std::condition_variable & cv)
         {
@@ -61,25 +78,22 @@ public:
         }
 
         template<class Rep, class Period>
-        std::cv_status wait_for(std::condition_variable & cv,
-            const std::chrono::duration<Rep, Period> & duration)
+        std::cv_status wait_for(std::condition_variable & cv, const std::chrono::duration<Rep, Period> & duration)
         {
             assert(s);
             return cv.wait_for(lk, duration);
         }
 
         template<class Rep, class Period, class Predicate>
-        bool wait_for(std::condition_variable & cv,
-            const std::chrono::duration<Rep, Period> & duration,
-            Predicate pred)
+        bool wait_for(std::condition_variable & cv, const std::chrono::duration<Rep, Period> & duration, Predicate pred)
         {
             assert(s);
             return cv.wait_for(lk, duration, pred);
         }
 
         template<class Clock, class Duration>
-        std::cv_status wait_until(std::condition_variable & cv,
-            const std::chrono::time_point<Clock, Duration> & duration)
+        std::cv_status
+        wait_until(std::condition_variable & cv, const std::chrono::time_point<Clock, Duration> & duration)
         {
             assert(s);
             return cv.wait_until(lk, duration);
@@ -88,32 +102,51 @@ public:
 
     struct WriteLock : Lock<WL>
     {
-        T * operator -> () { return &WriteLock::s->data; }
-        T & operator * () { return WriteLock::s->data; }
+        T * operator->()
+        {
+            return &WriteLock::s->data;
+        }
+        T & operator*()
+        {
+            return WriteLock::s->data;
+        }
     };
 
     /**
      * Acquire write (exclusive) access to the inner value.
      */
-    WriteLock lock() { return WriteLock(this); }
+    WriteLock lock()
+    {
+        return WriteLock(this);
+    }
 
     struct ReadLock : Lock<RL>
     {
-        const T * operator -> () { return &ReadLock::s->data; }
-        const T & operator * () { return ReadLock::s->data; }
+        const T * operator->()
+        {
+            return &ReadLock::s->data;
+        }
+        const T & operator*()
+        {
+            return ReadLock::s->data;
+        }
     };
 
     /**
      * Acquire read access to the inner value. When using
      * `std::shared_mutex`, this will use a shared lock.
      */
-    ReadLock readLock() const { return ReadLock(const_cast<SyncBase *>(this)); }
+    ReadLock readLock() const
+    {
+        return ReadLock(const_cast<SyncBase *>(this));
+    }
 };
 
 template<class T>
 using Sync = SyncBase<T, std::mutex, std::unique_lock<std::mutex>, std::unique_lock<std::mutex>>;
 
 template<class T>
-using SharedSync = SyncBase<T, std::shared_mutex, std::unique_lock<std::shared_mutex>, std::shared_lock<std::shared_mutex>>;
+using SharedSync =
+    SyncBase<T, std::shared_mutex, std::unique_lock<std::shared_mutex>, std::shared_lock<std::shared_mutex>>;
 
 }

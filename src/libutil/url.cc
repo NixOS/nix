@@ -13,18 +13,15 @@ std::regex revRegex(revRegexS, std::regex::ECMAScript);
 ParsedURL parseURL(const std::string & url)
 {
     static std::regex uriRegex(
-        "((" + schemeNameRegex + "):"
-        + "(?:(?://(" + authorityRegex + ")(" + absPathRegex + "))|(/?" + pathRegex + ")))"
-        + "(?:\\?(" + queryRegex + "))?"
-        + "(?:#(" + fragmentRegex + "))?",
+        "((" + schemeNameRegex + "):" + "(?:(?://(" + authorityRegex + ")(" + absPathRegex + "))|(/?" + pathRegex
+            + ")))" + "(?:\\?(" + queryRegex + "))?" + "(?:#(" + fragmentRegex + "))?",
         std::regex::ECMAScript);
 
     std::smatch match;
 
     if (std::regex_match(url, match, uriRegex)) {
         std::string scheme = match[2];
-        auto authority = match[3].matched
-            ? std::optional<std::string>(match[3]) : std::nullopt;
+        auto authority = match[3].matched ? std::optional<std::string>(match[3]) : std::nullopt;
         std::string path = match[4].matched ? match[4] : match[5];
         auto & query = match[6];
         auto & fragment = match[7];
@@ -32,8 +29,7 @@ ParsedURL parseURL(const std::string & url)
         auto transportIsFile = parseUrlScheme(scheme).transport == "file";
 
         if (authority && *authority != "" && transportIsFile)
-            throw BadURL("file:// URL '%s' has unexpected authority '%s'",
-                url, *authority);
+            throw BadURL("file:// URL '%s' has unexpected authority '%s'", url, *authority);
 
         if (transportIsFile && path.empty())
             path = "/";
@@ -43,8 +39,7 @@ ParsedURL parseURL(const std::string & url)
             .authority = authority,
             .path = percentDecode(path),
             .query = decodeQuery(query),
-            .fragment = percentDecode(std::string(fragment))
-        };
+            .fragment = percentDecode(std::string(fragment))};
     }
 
     else
@@ -54,7 +49,7 @@ ParsedURL parseURL(const std::string & url)
 std::string percentDecode(std::string_view in)
 {
     std::string decoded;
-    for (size_t i = 0; i < in.size(); ) {
+    for (size_t i = 0; i < in.size();) {
         if (in[i] == '%') {
             if (i + 2 >= in.size())
                 throw BadURL("invalid URI parameter '%s'", in);
@@ -81,9 +76,7 @@ StringMap decodeQuery(const std::string & query)
             continue;
         }
 
-        result.emplace(
-            s.substr(0, e),
-            percentDecode(std::string_view(s).substr(e + 1)));
+        result.emplace(s.substr(0, e), percentDecode(std::string_view(s).substr(e + 1)));
     }
 
     return result;
@@ -97,10 +90,7 @@ std::string percentEncode(std::string_view s, std::string_view keep)
     std::string res;
     for (auto & c : s)
         // unreserved + keep
-        if ((c >= 'a' && c <= 'z')
-            || (c >= 'A' && c <= 'Z')
-            || (c >= '0' && c <= '9')
-            || strchr("-._~", c)
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || strchr("-._~", c)
             || keep.find(c) != std::string::npos)
             res += c;
         else
@@ -113,7 +103,8 @@ std::string encodeQuery(const StringMap & ss)
     std::string res;
     bool first = true;
     for (auto & [name, value] : ss) {
-        if (!first) res += '&';
+        if (!first)
+            res += '&';
         first = false;
         res += percentEncode(name, allowedInQuery);
         res += '=';
@@ -124,29 +115,20 @@ std::string encodeQuery(const StringMap & ss)
 
 std::string ParsedURL::to_string() const
 {
-    return
-        scheme
-        + ":"
-        + (authority ? "//" + *authority : "")
-        + percentEncode(path, allowedInPath)
-        + (query.empty() ? "" : "?" + encodeQuery(query))
-        + (fragment.empty() ? "" : "#" + percentEncode(fragment));
+    return scheme + ":" + (authority ? "//" + *authority : "") + percentEncode(path, allowedInPath)
+           + (query.empty() ? "" : "?" + encodeQuery(query)) + (fragment.empty() ? "" : "#" + percentEncode(fragment));
 }
 
-std::ostream & operator << (std::ostream & os, const ParsedURL & url)
+std::ostream & operator<<(std::ostream & os, const ParsedURL & url)
 {
     os << url.to_string();
     return os;
 }
 
-bool ParsedURL::operator ==(const ParsedURL & other) const noexcept
+bool ParsedURL::operator==(const ParsedURL & other) const noexcept
 {
-    return
-        scheme == other.scheme
-        && authority == other.authority
-        && path == other.path
-        && query == other.query
-        && fragment == other.fragment;
+    return scheme == other.scheme && authority == other.authority && path == other.path && query == other.query
+           && fragment == other.fragment;
 }
 
 ParsedURL ParsedURL::canonicalise()
@@ -167,7 +149,7 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
 {
     auto application = splitPrefixTo(scheme, '+');
     auto transport = scheme;
-    return ParsedUrlScheme {
+    return ParsedUrlScheme{
         .application = application,
         .transport = transport,
     };
@@ -181,11 +163,7 @@ std::string fixGitURL(const std::string & url)
     if (hasPrefix(url, "file:"))
         return url;
     if (url.find("://") == std::string::npos) {
-        return (ParsedURL {
-            .scheme = "file",
-            .authority = "",
-            .path = url
-        }).to_string();
+        return (ParsedURL{.scheme = "file", .authority = "", .path = url}).to_string();
     }
     return url;
 }

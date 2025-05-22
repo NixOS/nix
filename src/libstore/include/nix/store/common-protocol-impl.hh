@@ -15,14 +15,15 @@ namespace nix {
 
 /* protocol-agnostic templates */
 
-#define COMMON_USE_LENGTH_PREFIX_SERIALISER(TEMPLATE, T) \
-    TEMPLATE T CommonProto::Serialise< T >::read(const StoreDirConfig & store, CommonProto::ReadConn conn) \
-    { \
-        return LengthPrefixedProtoHelper<CommonProto, T >::read(store, conn); \
-    } \
-    TEMPLATE void CommonProto::Serialise< T >::write(const StoreDirConfig & store, CommonProto::WriteConn conn, const T & t) \
-    { \
-        LengthPrefixedProtoHelper<CommonProto, T >::write(store, conn, t); \
+#define COMMON_USE_LENGTH_PREFIX_SERIALISER(TEMPLATE, T)                                                 \
+    TEMPLATE T CommonProto::Serialise<T>::read(const StoreDirConfig & store, CommonProto::ReadConn conn) \
+    {                                                                                                    \
+        return LengthPrefixedProtoHelper<CommonProto, T>::read(store, conn);                             \
+    }                                                                                                    \
+    TEMPLATE void CommonProto::Serialise<T>::write(                                                      \
+        const StoreDirConfig & store, CommonProto::WriteConn conn, const T & t)                          \
+    {                                                                                                    \
+        LengthPrefixedProtoHelper<CommonProto, T>::write(store, conn, t);                                \
     }
 
 #define COMMA_ ,
@@ -30,11 +31,8 @@ COMMON_USE_LENGTH_PREFIX_SERIALISER(template<typename T>, std::vector<T>)
 COMMON_USE_LENGTH_PREFIX_SERIALISER(template<typename T COMMA_ typename Compare>, std::set<T COMMA_ Compare>)
 COMMON_USE_LENGTH_PREFIX_SERIALISER(template<typename... Ts>, std::tuple<Ts...>)
 
-COMMON_USE_LENGTH_PREFIX_SERIALISER(
-    template<typename K COMMA_ typename V>,
-    std::map<K COMMA_ V>)
+COMMON_USE_LENGTH_PREFIX_SERIALISER(template<typename K COMMA_ typename V>, std::map<K COMMA_ V>)
 #undef COMMA_
-
 
 /* protocol-specific templates */
 

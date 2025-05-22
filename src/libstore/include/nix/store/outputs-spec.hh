@@ -23,11 +23,13 @@ typedef std::string OutputName;
  */
 typedef std::string_view OutputNameView;
 
-struct OutputsSpec {
+struct OutputsSpec
+{
     /**
      * A non-empty set of outputs, specified by name
      */
-    struct Names : std::set<OutputName, std::less<>> {
+    struct Names : std::set<OutputName, std::less<>>
+    {
     private:
         using BaseType = std::set<OutputName, std::less<>>;
 
@@ -38,14 +40,18 @@ struct OutputsSpec {
 
         Names(const BaseType & s)
             : BaseType(s)
-        { assert(!empty()); }
+        {
+            assert(!empty());
+        }
 
         /**
          * Needs to be "inherited manually"
          */
         Names(BaseType && s)
             : BaseType(std::move(s))
-        { assert(!empty()); }
+        {
+            assert(!empty());
+        }
 
         /* This set should always be non-empty, so we delete this
            constructor in order make creating empty ones by mistake harder.
@@ -56,15 +62,17 @@ struct OutputsSpec {
     /**
      * The set of all outputs, without needing to name them explicitly
      */
-    struct All : std::monostate { };
+    struct All : std::monostate
+    {};
 
     typedef std::variant<All, Names> Raw;
 
     Raw raw;
 
-    bool operator == (const OutputsSpec &) const = default;
+    bool operator==(const OutputsSpec &) const = default;
     // TODO libc++ 16 (used by darwin) missing `std::set::operator <=>`, can't do yet.
-    bool operator < (const OutputsSpec & other) const {
+    bool operator<(const OutputsSpec & other) const
+    {
         return raw < other.raw;
     }
 
@@ -97,17 +105,19 @@ struct OutputsSpec {
     std::string to_string() const;
 };
 
-struct ExtendedOutputsSpec {
-    struct Default : std::monostate { };
+struct ExtendedOutputsSpec
+{
+    struct Default : std::monostate
+    {};
     using Explicit = OutputsSpec;
 
     typedef std::variant<Default, Explicit> Raw;
 
     Raw raw;
 
-    bool operator == (const ExtendedOutputsSpec &) const = default;
+    bool operator==(const ExtendedOutputsSpec &) const = default;
     // TODO libc++ 16 (used by darwin) missing `std::set::operator <=>`, can't do yet.
-    bool operator < (const ExtendedOutputsSpec &) const;
+    bool operator<(const ExtendedOutputsSpec &) const;
 
     MAKE_WRAPPER_CONSTRUCTOR(ExtendedOutputsSpec);
 

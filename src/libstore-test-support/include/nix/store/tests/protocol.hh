@@ -14,8 +14,9 @@ class ProtoTest : public CharacterizationTest, public LibStoreTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / protocolDir;
 
-    std::filesystem::path goldenMaster(std::string_view testStem) const override {
-        return unitTestData / (std::string { testStem + ".bin" });
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / (std::string{testStem + ".bin"});
     }
 };
 
@@ -31,10 +32,10 @@ public:
     {
         CharacterizationTest::readTest(testStem, [&](const auto & encoded) {
             T got = ({
-                StringSource from { encoded };
+                StringSource from{encoded};
                 Proto::template Serialise<T>::read(
                     *LibStoreTest::store,
-                    typename Proto::ReadConn {
+                    typename Proto::ReadConn{
                         .from = from,
                         .version = version,
                     });
@@ -54,7 +55,7 @@ public:
             StringSink to;
             Proto::template Serialise<T>::write(
                 *LibStoreTest::store,
-                typename Proto::WriteConn {
+                typename Proto::WriteConn{
                     .to = to,
                     .version = version,
                 },
@@ -65,11 +66,13 @@ public:
 };
 
 #define VERSIONED_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, VERSION, VALUE) \
-    TEST_F(FIXTURE, NAME ## _read) { \
-        readProtoTest(STEM, VERSION, VALUE); \
-    } \
-    TEST_F(FIXTURE, NAME ## _write) { \
-        writeProtoTest(STEM, VERSION, VALUE); \
+    TEST_F(FIXTURE, NAME##_read)                                             \
+    {                                                                        \
+        readProtoTest(STEM, VERSION, VALUE);                                 \
+    }                                                                        \
+    TEST_F(FIXTURE, NAME##_write)                                            \
+    {                                                                        \
+        writeProtoTest(STEM, VERSION, VALUE);                                \
     }
 
 }

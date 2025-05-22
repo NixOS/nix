@@ -6,9 +6,10 @@
 namespace nix {
 
 template<typename T, typename Compare>
-std::vector<T> topoSort(std::set<T, Compare> items,
-        std::function<std::set<T, Compare>(const T &)> getChildren,
-        std::function<Error(const T &, const T &)> makeCycleError)
+std::vector<T> topoSort(
+    std::set<T, Compare> items,
+    std::function<std::set<T, Compare>(const T &)> getChildren,
+    std::function<Error(const T &, const T &)> makeCycleError)
 {
     std::vector<T> sorted;
     decltype(items) visited, parents;
@@ -16,9 +17,11 @@ std::vector<T> topoSort(std::set<T, Compare> items,
     std::function<void(const T & path, const T * parent)> dfsVisit;
 
     dfsVisit = [&](const T & path, const T * parent) {
-        if (parents.count(path)) throw makeCycleError(path, *parent);
+        if (parents.count(path))
+            throw makeCycleError(path, *parent);
 
-        if (!visited.insert(path).second) return;
+        if (!visited.insert(path).second)
+            return;
         parents.insert(path);
 
         auto references = getChildren(path);

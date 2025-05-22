@@ -14,7 +14,6 @@ struct ContentAddress;
 struct DrvOutput;
 struct Realisation;
 
-
 /**
  * Shared serializers between the worker protocol, serve protocol, and a
  * few others.
@@ -28,7 +27,8 @@ struct CommonProto
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
-    struct ReadConn {
+    struct ReadConn
+    {
         Source & from;
     };
 
@@ -36,7 +36,8 @@ struct CommonProto
      * A unidirectional write connection, to be used by the write half of the
      * canonical serializers below.
      */
-    struct WriteConn {
+    struct WriteConn
+    {
         Sink & to;
     };
 
@@ -54,10 +55,10 @@ struct CommonProto
     }
 };
 
-#define DECLARE_COMMON_SERIALISER(T) \
-    struct CommonProto::Serialise< T > \
-    { \
-        static T read(const StoreDirConfig & store, CommonProto::ReadConn conn); \
+#define DECLARE_COMMON_SERIALISER(T)                                                                 \
+    struct CommonProto::Serialise<T>                                                                 \
+    {                                                                                                \
+        static T read(const StoreDirConfig & store, CommonProto::ReadConn conn);                     \
         static void write(const StoreDirConfig & store, CommonProto::WriteConn conn, const T & str); \
     }
 

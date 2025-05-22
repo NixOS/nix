@@ -113,6 +113,7 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
       ) pkgs.buildPackages.mesonEmulatorHook
       ++ [
         pkgs.buildPackages.cmake
+        pkgs.buildPackages.gnused
         pkgs.buildPackages.shellcheck
         pkgs.buildPackages.changelog-d
         modular.pre-commit.settings.package

@@ -17,31 +17,42 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<std::string> compression{this, "xz", "compression",
-        "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`)."};
+    const Setting<std::string> compression{
+        this, "xz", "compression", "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`)."};
 
-    const Setting<bool> writeNARListing{this, false, "write-nar-listing",
-        "Whether to write a JSON file that lists the files in each NAR."};
+    const Setting<bool> writeNARListing{
+        this, false, "write-nar-listing", "Whether to write a JSON file that lists the files in each NAR."};
 
-    const Setting<bool> writeDebugInfo{this, false, "index-debug-info",
+    const Setting<bool> writeDebugInfo{
+        this,
+        false,
+        "index-debug-info",
         R"(
           Whether to index DWARF debug info files by build ID. This allows [`dwarffs`](https://github.com/edolstra/dwarffs) to
           fetch debug info on demand
         )"};
 
-    const Setting<Path> secretKeyFile{this, "", "secret-key",
-        "Path to the secret key used to sign the binary cache."};
+    const Setting<Path> secretKeyFile{this, "", "secret-key", "Path to the secret key used to sign the binary cache."};
 
-    const Setting<std::string> secretKeyFiles{this, "", "secret-keys",
-        "List of comma-separated paths to the secret keys used to sign the binary cache."};
+    const Setting<std::string> secretKeyFiles{
+        this, "", "secret-keys", "List of comma-separated paths to the secret keys used to sign the binary cache."};
 
-    const Setting<Path> localNarCache{this, "", "local-nar-cache",
+    const Setting<Path> localNarCache{
+        this,
+        "",
+        "local-nar-cache",
         "Path to a local cache of NARs fetched from this binary cache, used by commands such as `nix store cat`."};
 
-    const Setting<bool> parallelCompression{this, false, "parallel-compression",
+    const Setting<bool> parallelCompression{
+        this,
+        false,
+        "parallel-compression",
         "Enable multi-threaded compression of NARs. This is currently only available for `xz` and `zstd`."};
 
-    const Setting<int> compressionLevel{this, -1, "compression-level",
+    const Setting<int> compressionLevel{
+        this,
+        -1,
+        "compression-level",
         R"(
           The *preset level* to be used when compressing NARs.
           The meaning and accepted values depend on the compression method selected.
@@ -49,14 +60,11 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
         )"};
 };
 
-
 /**
  * @note subclasses must implement at least one of the two
  * virtual getFile() methods.
  */
-struct BinaryCacheStore :
-    virtual Store,
-    virtual LogStore
+struct BinaryCacheStore : virtual Store, virtual LogStore
 {
     using Config = BinaryCacheStoreConfig;
 
@@ -82,11 +90,11 @@ public:
 
     virtual bool fileExists(const std::string & path) = 0;
 
-    virtual void upsertFile(const std::string & path,
-        std::shared_ptr<std::basic_iostream<char>> istream,
-        const std::string & mimeType) = 0;
+    virtual void upsertFile(
+        const std::string & path, std::shared_ptr<std::basic_iostream<char>> istream, const std::string & mimeType) = 0;
 
-    void upsertFile(const std::string & path,
+    void upsertFile(
+        const std::string & path,
         // FIXME: use std::string_view
         std::string && data,
         const std::string & mimeType);
@@ -106,9 +114,7 @@ public:
      * Fetch the specified file and call the specified callback with
      * the result. A subclass may implement this asynchronously.
      */
-    virtual void getFile(
-        const std::string & path,
-        Callback<std::optional<std::string>> callback) noexcept;
+    virtual void getFile(const std::string & path, Callback<std::optional<std::string>> callback) noexcept;
 
     std::optional<std::string> getFile(const std::string & path);
 
@@ -125,20 +131,22 @@ private:
     void writeNarInfo(ref<NarInfo> narInfo);
 
     ref<const ValidPathInfo> addToStoreCommon(
-        Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs,
+        Source & narSource,
+        RepairFlag repair,
+        CheckSigsFlag checkSigs,
         std::function<ValidPathInfo(HashResult)> mkInfo);
 
 public:
 
     bool isValidPathUncached(const StorePath & path) override;
 
-    void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+    void queryPathInfoUncached(
+        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
-    void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair, CheckSigsFlag checkSigs) override;
+    void
+    addToStore(const ValidPathInfo & info, Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     StorePath addToStoreFromDump(
         Source & dump,
@@ -160,8 +168,8 @@ public:
 
     void registerDrvOutput(const Realisation & info) override;
 
-    void queryRealisationUncached(const DrvOutput &,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+    void queryRealisationUncached(
+        const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
     void narFromPath(const StorePath & path, Sink & sink) override;
 
@@ -172,7 +180,6 @@ public:
     std::optional<std::string> getBuildLogExact(const StorePath & path) override;
 
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
-
 };
 
 MakeError(NoSuchBinaryCacheFile, Error);

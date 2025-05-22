@@ -13,23 +13,20 @@ namespace nix {
 std::string LocalOverlayStoreConfig::doc()
 {
     return
-        #include "local-overlay-store.md"
+#include "local-overlay-store.md"
         ;
 }
 
 ref<Store> LocalOverlayStoreConfig::openStore() const
 {
-    return make_ref<LocalOverlayStore>(ref{
-        std::dynamic_pointer_cast<const LocalOverlayStoreConfig>(shared_from_this())
-    });
+    return make_ref<LocalOverlayStore>(
+        ref{std::dynamic_pointer_cast<const LocalOverlayStoreConfig>(shared_from_this())});
 }
-
 
 Path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) const
 {
     return upperLayer + "/" + path.to_string();
 }
-
 
 LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
     : Store{*config}
@@ -60,12 +57,10 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
             debug("expected lowerdir: %s", expectedLowerDir);
             debug("expected upperdir: %s", config->upperLayer);
             debug("actual mount: %s", mountInfo);
-            throw Error("overlay filesystem '%s' mounted incorrectly",
-                config->realStoreDir.get());
+            throw Error("overlay filesystem '%s' mounted incorrectly", config->realStoreDir.get());
         }
     }
 }
-
 
 void LocalOverlayStore::registerDrvOutput(const Realisation & info)
 {
@@ -77,14 +72,13 @@ void LocalOverlayStore::registerDrvOutput(const Realisation & info)
     LocalStore::registerDrvOutput(info);
 }
 
-
-void LocalOverlayStore::queryPathInfoUncached(const StorePath & path,
-    Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
+void LocalOverlayStore::queryPathInfoUncached(
+    const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-    LocalStore::queryPathInfoUncached(path,
-        {[this, path, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
+    LocalStore::queryPathInfoUncached(
+        path, {[this, path, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
             try {
                 auto info = fut.get();
                 if (info)
@@ -93,25 +87,23 @@ void LocalOverlayStore::queryPathInfoUncached(const StorePath & path,
                 return callbackPtr->rethrow();
             }
             // If we don't have it, check lower store
-            lowerStore->queryPathInfo(path,
-                {[path, callbackPtr](std::future<ref<const ValidPathInfo>> fut) {
-                    try {
-                        (*callbackPtr)(fut.get().get_ptr());
-                    } catch (...) {
-                        return callbackPtr->rethrow();
-                    }
-                }});
+            lowerStore->queryPathInfo(path, {[path, callbackPtr](std::future<ref<const ValidPathInfo>> fut) {
+                                          try {
+                                              (*callbackPtr)(fut.get().get_ptr());
+                                          } catch (...) {
+                                              return callbackPtr->rethrow();
+                                          }
+                                      }});
         }});
 }
 
-
-void LocalOverlayStore::queryRealisationUncached(const DrvOutput & drvOutput,
-    Callback<std::shared_ptr<const Realisation>> callback) noexcept
+void LocalOverlayStore::queryRealisationUncached(
+    const DrvOutput & drvOutput, Callback<std::shared_ptr<const Realisation>> callback) noexcept
 {
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-    LocalStore::queryRealisationUncached(drvOutput,
-        {[this, drvOutput, callbackPtr](std::future<std::shared_ptr<const Realisation>> fut) {
+    LocalStore::queryRealisationUncached(
+        drvOutput, {[this, drvOutput, callbackPtr](std::future<std::shared_ptr<const Realisation>> fut) {
             try {
                 auto info = fut.get();
                 if (info)
@@ -120,8 +112,8 @@ void LocalOverlayStore::queryRealisationUncached(const DrvOutput & drvOutput,
                 return callbackPtr->rethrow();
             }
             // If we don't have it, check lower store
-            lowerStore->queryRealisation(drvOutput,
-                {[callbackPtr](std::future<std::shared_ptr<const Realisation>> fut) {
+            lowerStore->queryRealisation(
+                drvOutput, {[callbackPtr](std::future<std::shared_ptr<const Realisation>> fut) {
                     try {
                         (*callbackPtr)(fut.get());
                     } catch (...) {
@@ -131,11 +123,11 @@ void LocalOverlayStore::queryRealisationUncached(const DrvOutput & drvOutput,
         }});
 }
 
-
 bool LocalOverlayStore::isValidPathUncached(const StorePath & path)
 {
     auto res = LocalStore::isValidPathUncached(path);
-    if (res) return res;
+    if (res)
+        return res;
     res = lowerStore->isValidPath(path);
     if (res) {
         // Get path info from lower store so upper DB genuinely has it.
@@ -149,19 +141,16 @@ bool LocalOverlayStore::isValidPathUncached(const StorePath & path)
     return res;
 }
 
-
 void LocalOverlayStore::queryReferrers(const StorePath & path, StorePathSet & referrers)
 {
     LocalStore::queryReferrers(path, referrers);
     lowerStore->queryReferrers(path, referrers);
 }
 
-
 void LocalOverlayStore::queryGCReferrers(const StorePath & path, StorePathSet & referrers)
 {
     LocalStore::queryReferrers(path, referrers);
 }
-
 
 StorePathSet LocalOverlayStore::queryValidDerivers(const StorePath & path)
 {
@@ -171,7 +160,6 @@ StorePathSet LocalOverlayStore::queryValidDerivers(const StorePath & path)
     return res;
 }
 
-
 std::optional<StorePath> LocalOverlayStore::queryPathFromHashPart(const std::string & hashPart)
 {
     auto res = LocalStore::queryPathFromHashPart(hashPart);
@@ -180,7 +168,6 @@ std::optional<StorePath> LocalOverlayStore::queryPathFromHashPart(const std::str
     else
         return lowerStore->queryPathFromHashPart(hashPart);
 }
-
 
 void LocalOverlayStore::registerValidPaths(const ValidPathInfos & infos)
 {
@@ -200,14 +187,12 @@ void LocalOverlayStore::registerValidPaths(const ValidPathInfos & infos)
     LocalStore::registerValidPaths(infos);
 }
 
-
 void LocalOverlayStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
     LocalStore::collectGarbage(options, results);
 
     remountIfNecessary();
 }
-
 
 void LocalOverlayStore::deleteStorePath(const Path & path, uint64_t & bytesFreed)
 {
@@ -236,7 +221,6 @@ void LocalOverlayStore::deleteStorePath(const Path & path, uint64_t & bytesFreed
     }
 }
 
-
 void LocalOverlayStore::optimiseStore()
 {
     Activity act(*logger, actOptimiseStore);
@@ -261,7 +245,6 @@ void LocalOverlayStore::optimiseStore()
     remountIfNecessary();
 }
 
-
 LocalStore::VerificationResult LocalOverlayStore::verifyAllValidPaths(RepairFlag repair)
 {
     StorePathSet done;
@@ -282,10 +265,10 @@ LocalStore::VerificationResult LocalOverlayStore::verifyAllValidPaths(RepairFlag
     };
 }
 
-
 void LocalOverlayStore::remountIfNecessary()
 {
-    if (!_remountRequired) return;
+    if (!_remountRequired)
+        return;
 
     if (config->remountHook.get().empty()) {
         warn("'%s' needs remounting, set remount-hook to do this automatically", config->realStoreDir.get());
@@ -295,7 +278,6 @@ void LocalOverlayStore::remountIfNecessary()
 
     _remountRequired = false;
 }
-
 
 static RegisterStoreImplementation<LocalOverlayStore::Config> regLocalOverlayStore;
 

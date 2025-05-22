@@ -31,18 +31,28 @@ public:
 
     /**
      * Return a short one-line description of the command.
-    */
-    virtual std::string description() { return ""; }
+     */
+    virtual std::string description()
+    {
+        return "";
+    }
 
-    virtual bool forceImpureByDefault() { return false; }
+    virtual bool forceImpureByDefault()
+    {
+        return false;
+    }
 
     /**
      * Return documentation about this command, in Markdown format.
      */
-    virtual std::string doc() { return ""; }
+    virtual std::string doc()
+    {
+        return "";
+    }
 
     /**
-     * @brief Get the [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory) for the command.
+     * @brief Get the [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory) for the
+     * command.
      *
      * @return Generally the working directory, but in case of a shebang
      *         interpreter, returns the directory of the script.
@@ -78,73 +88,79 @@ protected:
         Handler(std::function<void(std::vector<std::string>)> && fun)
             : fun(std::move(fun))
             , arity(ArityAny)
-        { }
+        {
+        }
 
         Handler(std::function<void()> && handler)
             : fun([handler{std::move(handler)}](std::vector<std::string>) { handler(); })
             , arity(0)
-        { }
+        {
+        }
 
         Handler(std::function<void(std::string)> && handler)
-            : fun([handler{std::move(handler)}](std::vector<std::string> ss) {
-                handler(std::move(ss[0]));
-              })
+            : fun([handler{std::move(handler)}](std::vector<std::string> ss) { handler(std::move(ss[0])); })
             , arity(1)
-        { }
+        {
+        }
 
         Handler(std::function<void(std::string, std::string)> && handler)
             : fun([handler{std::move(handler)}](std::vector<std::string> ss) {
                 handler(std::move(ss[0]), std::move(ss[1]));
-              })
+            })
             , arity(2)
-        { }
+        {
+        }
 
         Handler(std::vector<std::string> * dest)
             : fun([dest](std::vector<std::string> ss) { *dest = ss; })
             , arity(ArityAny)
-        { }
+        {
+        }
 
         Handler(std::string * dest)
             : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
             , arity(1)
-        { }
+        {
+        }
 
         Handler(std::optional<std::string> * dest)
             : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
             , arity(1)
-        { }
+        {
+        }
 
         Handler(std::filesystem::path * dest)
             : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
             , arity(1)
-        { }
+        {
+        }
 
         Handler(std::optional<std::filesystem::path> * dest)
             : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
             , arity(1)
-        { }
+        {
+        }
 
         template<class T>
         Handler(T * dest, const T & val)
             : fun([dest, val](std::vector<std::string> ss) { *dest = val; })
             , arity(0)
-        { }
+        {
+        }
 
         template<class I>
         Handler(I * dest)
-            : fun([dest](std::vector<std::string> ss) {
-                *dest = string2IntWithUnitPrefix<I>(ss[0]);
-              })
+            : fun([dest](std::vector<std::string> ss) { *dest = string2IntWithUnitPrefix<I>(ss[0]); })
             , arity(1)
-        { }
+        {
+        }
 
         template<class I>
         Handler(std::optional<I> * dest)
-            : fun([dest](std::vector<std::string> ss) {
-                *dest = string2IntWithUnitPrefix<I>(ss[0]);
-            })
+            : fun([dest](std::vector<std::string> ss) { *dest = string2IntWithUnitPrefix<I>(ss[0]); })
             , arity(1)
-        { }
+        {
+        }
     };
 
     /**
@@ -248,8 +264,8 @@ protected:
      * This list is used to extend the lifetime of the argument forms.
      * If this is not done, some closures that reference the command
      * itself will segfault.
-    */
-   std::list<ExpectedArg> processedArgs;
+     */
+    std::list<ExpectedArg> processedArgs;
 
     /**
      * Process some positional arugments
@@ -261,7 +277,9 @@ protected:
     virtual bool processArgs(const Strings & args, bool finish);
 
     virtual Strings::iterator rewriteArgs(Strings & args, Strings::iterator pos)
-    { return pos; }
+    {
+        return pos;
+    }
 
     StringSet hiddenCategories;
 
@@ -287,11 +305,7 @@ public:
      */
     void expectArg(const std::string & label, std::string * dest, bool optional = false)
     {
-        expectArgs({
-            .label = label,
-            .optional = optional,
-            .handler = {dest}
-        });
+        expectArgs({.label = label, .optional = optional, .handler = {dest}});
     }
 
     /**
@@ -299,11 +313,7 @@ public:
      */
     void expectArg(const std::string & label, std::filesystem::path * dest, bool optional = false)
     {
-        expectArgs({
-            .label = label,
-            .optional = optional,
-            .handler = {dest}
-        });
+        expectArgs({.label = label, .optional = optional, .handler = {dest}});
     }
 
     /**
@@ -311,10 +321,7 @@ public:
      */
     void expectArgs(const std::string & label, std::vector<std::string> * dest)
     {
-        expectArgs({
-            .label = label,
-            .handler = {dest}
-        });
+        expectArgs({.label = label, .handler = {dest}});
     }
 
     static CompleterFun completePath;
@@ -364,7 +371,10 @@ struct Command : virtual public Args
 
     virtual std::optional<ExperimentalFeature> experimentalFeature();
 
-    virtual Category category() { return catDefault; }
+    virtual Category category()
+    {
+        return catDefault;
+    }
 };
 
 using Commands = std::map<std::string, std::function<ref<Command>()>>;
@@ -401,7 +411,8 @@ public:
     };
 
     /** An alias, except for the original syntax, which is in the map key. */
-    struct AliasInfo {
+    struct AliasInfo
+    {
         AliasStatus status;
         std::vector<std::string> replacement;
     };
@@ -419,9 +430,10 @@ protected:
     bool aliasUsed = false;
 };
 
-Strings argvToStrings(int argc, char * * argv);
+Strings argvToStrings(int argc, char ** argv);
 
-struct Completion {
+struct Completion
+{
     std::string completion;
     std::string description;
 

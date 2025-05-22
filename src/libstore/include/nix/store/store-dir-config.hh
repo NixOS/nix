@@ -10,7 +10,6 @@
 #include <string>
 #include <variant>
 
-
 namespace nix {
 
 struct SourcePath;
@@ -75,13 +74,10 @@ struct MixStoreDirMethods
     /**
      * Constructs a unique store path name.
      */
-    StorePath makeStorePath(std::string_view type,
-        std::string_view hash, std::string_view name) const;
-    StorePath makeStorePath(std::string_view type,
-        const Hash & hash, std::string_view name) const;
+    StorePath makeStorePath(std::string_view type, std::string_view hash, std::string_view name) const;
+    StorePath makeStorePath(std::string_view type, const Hash & hash, std::string_view name) const;
 
-    StorePath makeOutputPath(std::string_view id,
-        const Hash & hash, std::string_view name) const;
+    StorePath makeOutputPath(std::string_view id, const Hash & hash, std::string_view name) const;
 
     StorePath makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const;
 
@@ -108,7 +104,9 @@ struct StoreDirConfigBase : Config
 {
     using Config::Config;
 
-    const PathSetting storeDir_{this, settings.nixStore,
+    const PathSetting storeDir_{
+        this,
+        settings.nixStore,
         "store",
         R"(
           Logical location of the Nix store, usually

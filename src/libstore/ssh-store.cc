@@ -11,24 +11,19 @@
 
 namespace nix {
 
-SSHStoreConfig::SSHStoreConfig(
-    std::string_view scheme,
-    std::string_view authority,
-    const Params & params)
+SSHStoreConfig::SSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
     : Store::Config{params}
     , RemoteStore::Config{params}
     , CommonSSHStoreConfig{scheme, authority, params}
 {
 }
 
-
 std::string SSHStoreConfig::doc()
 {
     return
-      #include "ssh-store.md"
-      ;
+#include "ssh-store.md"
+        ;
 }
-
 
 struct SSHStore : virtual RemoteStore
 {
@@ -41,8 +36,8 @@ struct SSHStore : virtual RemoteStore
         , RemoteStore{*config}
         , config{config}
         , master(config->createSSHMaster(
-            // Use SSH master only if using more than 1 connection.
-            connections->capacity() > 1))
+              // Use SSH master only if using more than 1 connection.
+              connections->capacity() > 1))
     {
     }
 
@@ -53,7 +48,9 @@ struct SSHStore : virtual RemoteStore
 
     // FIXME extend daemon protocol, move implementation to RemoteStore
     std::optional<std::string> getBuildLogExact(const StorePath & path) override
-    { unsupported("getBuildLogExact"); }
+    {
+        unsupported("getBuildLogExact");
+    }
 
 protected:
 
@@ -75,8 +72,7 @@ protected:
 
     SSHMaster master;
 
-    void setOptions(RemoteStore::Connection & conn) override
-    {
+    void setOptions(RemoteStore::Connection & conn) override {
         /* TODO Add a way to explicitly ask for some options to be
            forwarded. One option: A way to query the daemon for its
            settings, and then a series of params to SSHStore like
@@ -85,7 +81,6 @@ protected:
         */
     };
 };
-
 
 MountedSSHStoreConfig::MountedSSHStoreConfig(StringMap params)
     : StoreConfig(params)
@@ -108,10 +103,9 @@ MountedSSHStoreConfig::MountedSSHStoreConfig(std::string_view scheme, std::strin
 std::string MountedSSHStoreConfig::doc()
 {
     return
-      #include "mounted-ssh-store.md"
-      ;
+#include "mounted-ssh-store.md"
+        ;
 }
-
 
 /**
  * The mounted ssh store assumes that filesystems on the remote host are
@@ -183,17 +177,15 @@ struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
     }
 };
 
-
-ref<Store> SSHStore::Config::openStore() const {
+ref<Store> SSHStore::Config::openStore() const
+{
     return make_ref<SSHStore>(ref{shared_from_this()});
 }
 
-ref<Store> MountedSSHStore::Config::openStore() const {
-    return make_ref<MountedSSHStore>(ref{
-        std::dynamic_pointer_cast<const MountedSSHStore::Config>(shared_from_this())
-    });
+ref<Store> MountedSSHStore::Config::openStore() const
+{
+    return make_ref<MountedSSHStore>(ref{std::dynamic_pointer_cast<const MountedSSHStore::Config>(shared_from_this())});
 }
-
 
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
@@ -204,8 +196,7 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
         command.push_back("--store");
         command.push_back(config->remoteStore.get());
     }
-    command.insert(command.end(),
-        extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());
+    command.insert(command.end(), extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());
     conn->sshConn = master.startCommand(std::move(command));
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());

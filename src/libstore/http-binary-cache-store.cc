@@ -9,7 +9,6 @@ namespace nix {
 
 MakeError(UploadToHTTP, Error);
 
-
 StringSet HttpBinaryCacheStoreConfig::uriSchemes()
 {
     static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
@@ -20,33 +19,26 @@ StringSet HttpBinaryCacheStoreConfig::uriSchemes()
 }
 
 HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
-    std::string_view scheme,
-    std::string_view _cacheUri,
-    const Params & params)
+    std::string_view scheme, std::string_view _cacheUri, const Params & params)
     : StoreConfig(params)
     , BinaryCacheStoreConfig(params)
     , cacheUri(
-        std::string { scheme }
-        + "://"
-        + (!_cacheUri.empty()
-            ? _cacheUri
-            : throw UsageError("`%s` Store requires a non-empty authority in Store URL", scheme)))
+          std::string{scheme} + "://"
+          + (!_cacheUri.empty() ? _cacheUri
+                                : throw UsageError("`%s` Store requires a non-empty authority in Store URL", scheme)))
 {
     while (!cacheUri.empty() && cacheUri.back() == '/')
         cacheUri.pop_back();
 }
 
-
 std::string HttpBinaryCacheStoreConfig::doc()
 {
     return
-      #include "http-binary-cache-store.md"
-      ;
+#include "http-binary-cache-store.md"
+        ;
 }
 
-
-class HttpBinaryCacheStore :
-    public virtual BinaryCacheStore
+class HttpBinaryCacheStore : public virtual BinaryCacheStore
 {
     struct State
     {
@@ -63,8 +55,7 @@ public:
     ref<Config> config;
 
     HttpBinaryCacheStore(ref<Config> config)
-        : Store{*config}
-        // TODO it will actually mutate the configuration
+        : Store{*config} // TODO it will actually mutate the configuration
         , BinaryCacheStore{*config}
         , config{config}
     {
@@ -108,7 +99,8 @@ protected:
     void checkEnabled()
     {
         auto state(_state.lock());
-        if (state->enabled) return;
+        if (state->enabled)
+            return;
         if (std::chrono::steady_clock::now() > state->disabledUntil) {
             state->enabled = true;
             debug("re-enabling binary cache '%s'", getUri());
@@ -136,7 +128,8 @@ protected:
         }
     }
 
-    void upsertFile(const std::string & path,
+    void upsertFile(
+        const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) override
     {
@@ -154,9 +147,8 @@ protected:
     {
         return FileTransferRequest(
             hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
-            ? path
-            : config->cacheUri + "/" + path);
-
+                ? path
+                : config->cacheUri + "/" + path);
     }
 
     void getFile(const std::string & path, Sink & sink) override
@@ -173,8 +165,7 @@ protected:
         }
     }
 
-    void getFile(const std::string & path,
-        Callback<std::optional<std::string>> callback) noexcept override
+    void getFile(const std::string & path, Callback<std::optional<std::string>> callback) noexcept override
     {
         try {
             checkEnabled();
@@ -183,8 +174,8 @@ protected:
 
             auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-            getFileTransfer()->enqueueFileTransfer(request,
-                {[callbackPtr, this](std::future<FileTransferResult> result) {
+            getFileTransfer()->enqueueFileTransfer(
+                request, {[callbackPtr, this](std::future<FileTransferResult> result) {
                     try {
                         (*callbackPtr)(std::move(result.get().data));
                     } catch (FileTransferError & e) {
@@ -195,7 +186,7 @@ protected:
                     } catch (...) {
                         callbackPtr->rethrow();
                     }
-            }});
+                }});
 
         } catch (...) {
             callback.rethrow();
@@ -232,10 +223,9 @@ protected:
 
 ref<Store> HttpBinaryCacheStore::Config::openStore() const
 {
-    return make_ref<HttpBinaryCacheStore>(ref{
-        // FIXME we shouldn't actually need a mutable config
-        std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())
-    });
+    return make_ref<HttpBinaryCacheStore>(
+        ref{// FIXME we shouldn't actually need a mutable config
+            std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())});
 }
 
 static RegisterStoreImplementation<HttpBinaryCacheStore::Config> regHttpBinaryCacheStore;

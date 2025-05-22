@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-
 #include <list>
 #include <set>
 #include <string>
@@ -67,7 +66,10 @@ typedef std::vector<std::pair<std::string, std::string>> Headers;
 template<typename T>
 struct OnStartup
 {
-    OnStartup(T && t) { t(); }
+    OnStartup(T && t)
+    {
+        t();
+    }
 };
 
 /**
@@ -75,17 +77,17 @@ struct OnStartup
  * cast to a bool in Attr.
  */
 template<typename T>
-struct Explicit {
+struct Explicit
+{
     T t;
 
-    bool operator ==(const Explicit<T> & other) const = default;
+    bool operator==(const Explicit<T> & other) const = default;
 
-    bool operator <(const Explicit<T> & other) const
+    bool operator<(const Explicit<T> & other) const
     {
         return t < other.t;
     }
 };
-
 
 /**
  * This wants to be a little bit like rust's Cow type.
@@ -97,7 +99,8 @@ struct Explicit {
  * since those can easily become ambiguous to the reader and can degrade
  * into copying behaviour we want to avoid.
  */
-class BackedStringView {
+class BackedStringView
+{
 private:
     std::variant<std::string, std::string_view> data;
 
@@ -106,19 +109,35 @@ private:
      * a pointer. Without this we'd need to store the view object
      * even when we already own a string.
      */
-    class Ptr {
+    class Ptr
+    {
     private:
         std::string_view view;
     public:
-        Ptr(std::string_view view): view(view) {}
-        const std::string_view * operator->() const { return &view; }
+        Ptr(std::string_view view)
+            : view(view)
+        {
+        }
+        const std::string_view * operator->() const
+        {
+            return &view;
+        }
     };
 
 public:
-    BackedStringView(std::string && s): data(std::move(s)) {}
-    BackedStringView(std::string_view sv): data(sv) {}
+    BackedStringView(std::string && s)
+        : data(std::move(s))
+    {
+    }
+    BackedStringView(std::string_view sv)
+        : data(sv)
+    {
+    }
     template<size_t N>
-    BackedStringView(const char (& lit)[N]): data(std::string_view(lit)) {}
+    BackedStringView(const char (&lit)[N])
+        : data(std::string_view(lit))
+    {
+    }
 
     BackedStringView(const BackedStringView &) = delete;
     BackedStringView & operator=(const BackedStringView &) = delete;
@@ -137,18 +156,17 @@ public:
 
     std::string toOwned() &&
     {
-        return isOwned()
-            ? std::move(std::get<std::string>(data))
-            : std::string(std::get<std::string_view>(data));
+        return isOwned() ? std::move(std::get<std::string>(data)) : std::string(std::get<std::string_view>(data));
     }
 
     std::string_view operator*() const
     {
-        return isOwned()
-            ? std::get<std::string>(data)
-            : std::get<std::string_view>(data);
+        return isOwned() ? std::get<std::string>(data) : std::get<std::string_view>(data);
     }
-    Ptr operator->() const { return Ptr(**this); }
+    Ptr operator->() const
+    {
+        return Ptr(**this);
+    }
 };
 
 }

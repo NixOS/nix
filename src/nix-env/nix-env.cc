@@ -33,26 +33,16 @@
 using namespace nix;
 using std::cout;
 
-
-typedef enum {
-    srcNixExprDrvs,
-    srcNixExprs,
-    srcStorePaths,
-    srcProfile,
-    srcAttrPath,
-    srcUnknown
-} InstallSourceType;
-
+typedef enum { srcNixExprDrvs, srcNixExprs, srcStorePaths, srcProfile, srcAttrPath, srcUnknown } InstallSourceType;
 
 struct InstallSourceInfo
 {
     InstallSourceType type;
     std::shared_ptr<SourcePath> nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
-    Path profile; /* for srcProfile */
-    std::string systemFilter; /* for srcNixExprDrvs */
+    Path profile;                            /* for srcProfile */
+    std::string systemFilter;                /* for srcNixExprDrvs */
     Bindings * autoArgs;
 };
-
 
 struct Globals
 {
@@ -66,57 +56,49 @@ struct Globals
     bool prebuiltOnly;
 };
 
+typedef void (*Operation)(Globals & globals, Strings opFlags, Strings opArgs);
 
-typedef void (* Operation) (Globals & globals,
-    Strings opFlags, Strings opArgs);
-
-
-static std::string needArg(Strings::iterator & i,
-    Strings & args, const std::string & arg)
+static std::string needArg(Strings::iterator & i, Strings & args, const std::string & arg)
 {
-    if (i == args.end()) throw UsageError("'%1%' requires an argument", arg);
+    if (i == args.end())
+        throw UsageError("'%1%' requires an argument", arg);
     return *i++;
 }
 
-
-static bool parseInstallSourceOptions(Globals & globals,
-    Strings::iterator & i, Strings & args, const std::string & arg)
+static bool parseInstallSourceOptions(Globals & globals, Strings::iterator & i, Strings & args, const std::string & arg)
 {
     if (arg == "--from-expression" || arg == "-E")
         globals.instSource.type = srcNixExprs;
     else if (arg == "--from-profile") {
         globals.instSource.type = srcProfile;
         globals.instSource.profile = needArg(i, args, arg);
-    }
-    else if (arg == "--attr" || arg == "-A")
+    } else if (arg == "--attr" || arg == "-A")
         globals.instSource.type = srcAttrPath;
-    else return false;
+    else
+        return false;
     return true;
 }
 
-
 static bool isNixExpr(const SourcePath & path, struct SourceAccessor::Stat & st)
 {
-    return
-        st.type == SourceAccessor::tRegular
-        || (st.type == SourceAccessor::tDirectory && (path / "default.nix").resolveSymlinks().pathExists());
+    return st.type == SourceAccessor::tRegular
+           || (st.type == SourceAccessor::tDirectory && (path / "default.nix").resolveSymlinks().pathExists());
 }
-
 
 static constexpr size_t maxAttrs = 1024;
 
-
-static void getAllExprs(EvalState & state,
-    const SourcePath & path, StringSet & seen, BindingsBuilder & attrs)
+static void getAllExprs(EvalState & state, const SourcePath & path, StringSet & seen, BindingsBuilder & attrs)
 {
     StringSet namesSorted;
-    for (auto & [name, _] : path.resolveSymlinks().readDirectory()) namesSorted.insert(name);
+    for (auto & [name, _] : path.resolveSymlinks().readDirectory())
+        namesSorted.insert(name);
 
     for (auto & i : namesSorted) {
         /* Ignore the manifest.nix used by profiles.  This is
            necessary to prevent it from showing up in channels (which
            are implemented using profiles). */
-        if (i == "manifest.nix") continue;
+        if (i == "manifest.nix")
+            continue;
 
         auto path2 = (path / i).resolveSymlinks();
 
@@ -137,10 +119,15 @@ static void getAllExprs(EvalState & state,
                 attrName = std::string(attrName, 0, attrName.size() - 4);
             if (!seen.insert(attrName).second) {
                 std::string suggestionMessage = "";
-                if (path2.path.abs().find("channels") != std::string::npos && path.path.abs().find("channels") != std::string::npos)
-                    suggestionMessage = fmt("\nsuggestion: remove '%s' from either the root channels or the user channels", attrName);
-                printError("warning: name collision in input Nix expressions, skipping '%1%'"
-                            "%2%", path2, suggestionMessage);
+                if (path2.path.abs().find("channels") != std::string::npos
+                    && path.path.abs().find("channels") != std::string::npos)
+                    suggestionMessage =
+                        fmt("\nsuggestion: remove '%s' from either the root channels or the user channels", attrName);
+                printError(
+                    "warning: name collision in input Nix expressions, skipping '%1%'"
+                    "%2%",
+                    path2,
+                    suggestionMessage);
                 continue;
             }
             /* Load the expression on demand. */
@@ -149,15 +136,12 @@ static void getAllExprs(EvalState & state,
             if (seen.size() == maxAttrs)
                 throw Error("too many Nix expressions in directory '%1%'", path);
             attrs.alloc(attrName).mkApp(&state.getBuiltin("import"), vArg);
-        }
-        else if (st.type == SourceAccessor::tDirectory)
+        } else if (st.type == SourceAccessor::tDirectory)
             /* `path2' is a directory (with no default.nix in it);
                recurse into it. */
             getAllExprs(state, path2, seen, attrs);
     }
 }
-
-
 
 static void loadSourceExpr(EvalState & state, const SourcePath & path, Value & v)
 {
@@ -180,13 +164,17 @@ static void loadSourceExpr(EvalState & state, const SourcePath & path, Value & v
         v.mkAttrs(attrs);
     }
 
-    else throw Error("path '%s' is not a directory or a Nix expression", path);
+    else
+        throw Error("path '%s' is not a directory or a Nix expression", path);
 }
 
-
-static void loadDerivations(EvalState & state, const SourcePath & nixExprPath,
-    std::string systemFilter, Bindings & autoArgs,
-    const std::string & pathPrefix, PackageInfos & elems)
+static void loadDerivations(
+    EvalState & state,
+    const SourcePath & nixExprPath,
+    std::string systemFilter,
+    Bindings & autoArgs,
+    const std::string & pathPrefix,
+    PackageInfos & elems)
 {
     Value vRoot;
     loadSourceExpr(state, nixExprPath, vRoot);
@@ -198,34 +186,32 @@ static void loadDerivations(EvalState & state, const SourcePath & nixExprPath,
     /* Filter out all derivations not applicable to the current
        system. */
     for (PackageInfos::iterator i = elems.begin(), j; i != elems.end(); i = j) {
-        j = i; j++;
+        j = i;
+        j++;
         if (systemFilter != "*" && i->querySystem() != systemFilter)
             elems.erase(i);
     }
 }
-
 
 static NixInt getPriority(EvalState & state, PackageInfo & drv)
 {
     return drv.queryMetaInt("priority", NixInt(0));
 }
 
-
 static std::strong_ordering comparePriorities(EvalState & state, PackageInfo & drv1, PackageInfo & drv2)
 {
     return getPriority(state, drv2) <=> getPriority(state, drv1);
 }
-
 
 // FIXME: this function is rather slow since it checks a single path
 // at a time.
 static bool isPrebuilt(EvalState & state, PackageInfo & elem)
 {
     auto path = elem.queryOutPath();
-    if (state.store->isValidPath(path)) return true;
+    if (state.store->isValidPath(path))
+        return true;
     return state.store->querySubstitutablePaths({path}).count(path);
 }
-
 
 static void checkSelectorUse(DrvNames & selectors)
 {
@@ -235,14 +221,14 @@ static void checkSelectorUse(DrvNames & selectors)
             throw Error("selector '%1%' matches no derivations", i.fullName);
 }
 
-
 namespace {
 
-StringSet searchByPrefix(const PackageInfos & allElems, std::string_view prefix) {
+StringSet searchByPrefix(const PackageInfos & allElems, std::string_view prefix)
+{
     constexpr std::size_t maxResults = 3;
     StringSet result;
     for (const auto & packageInfo : allElems) {
-        const auto drvName = DrvName { packageInfo.queryName() };
+        const auto drvName = DrvName{packageInfo.queryName()};
         if (hasPrefix(drvName.name, prefix)) {
             result.emplace(drvName.name);
 
@@ -260,9 +246,10 @@ struct Match
     std::size_t index;
 
     Match(PackageInfo packageInfo_, std::size_t index_)
-    : packageInfo{std::move(packageInfo_)}
-    , index{index_}
-    {}
+        : packageInfo{std::move(packageInfo_)}
+        , index{index_}
+    {
+    }
 };
 
 /* If a selector matches multiple derivations
@@ -272,7 +259,8 @@ struct Match
    derivations, pick the one with the highest version.
    Finally, if there are still multiple derivations,
    arbitrarily pick the first one. */
-std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches) {
+std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
+{
     /* Map from package names to derivations. */
     std::map<std::string, Match> newest;
     StringSet multiple;
@@ -280,7 +268,7 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
     for (auto & match : matches) {
         auto & oneDrv = match.packageInfo;
 
-        const auto drvName = DrvName { oneDrv.queryName() };
+        const auto drvName = DrvName{oneDrv.queryName()};
         std::strong_ordering comparison = std::strong_ordering::greater;
 
         const auto itOther = newest.find(drvName.name);
@@ -288,14 +276,14 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
         if (itOther != newest.end()) {
             auto & newestDrv = itOther->second.packageInfo;
 
-            comparison =
-                oneDrv.querySystem() == newestDrv.querySystem() ? std::strong_ordering::equal :
-                oneDrv.querySystem() == settings.thisSystem ? std::strong_ordering::greater :
-                newestDrv.querySystem() == settings.thisSystem ? std::strong_ordering::less : std::strong_ordering::equal;
+            comparison = oneDrv.querySystem() == newestDrv.querySystem()  ? std::strong_ordering::equal
+                         : oneDrv.querySystem() == settings.thisSystem    ? std::strong_ordering::greater
+                         : newestDrv.querySystem() == settings.thisSystem ? std::strong_ordering::less
+                                                                          : std::strong_ordering::equal;
             if (comparison == 0)
                 comparison = comparePriorities(state, oneDrv, newestDrv);
             if (comparison == 0)
-                comparison = compareVersions(drvName.version, DrvName { newestDrv.queryName() }.version);
+                comparison = compareVersions(drvName.version, DrvName{newestDrv.queryName()}.version);
         }
 
         if (comparison > 0) {
@@ -310,9 +298,7 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
     matches.clear();
     for (auto & [name, match] : newest) {
         if (multiple.find(name) != multiple.end())
-            warn(
-                "there are multiple derivations named '%1%'; using the first one",
-                name);
+            warn("there are multiple derivations named '%1%'; using the first one", name);
         matches.push_back(match);
     }
 
@@ -321,8 +307,8 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
 
 } // end namespace
 
-static PackageInfos filterBySelector(EvalState & state, const PackageInfos & allElems,
-    const Strings & args, bool newestOnly)
+static PackageInfos
+filterBySelector(EvalState & state, const PackageInfos & allElems, const Strings & args, bool newestOnly)
 {
     DrvNames selectors = drvNamesFromArgs(args);
     if (selectors.empty())
@@ -334,7 +320,7 @@ static PackageInfos filterBySelector(EvalState & state, const PackageInfos & all
     for (auto & selector : selectors) {
         std::vector<Match> matches;
         for (const auto & [index, packageInfo] : enumerate(allElems)) {
-            const auto drvName = DrvName { packageInfo.queryName() };
+            const auto drvName = DrvName{packageInfo.queryName()};
             if (selector.matches(drvName)) {
                 ++selector.hits;
                 matches.emplace_back(packageInfo, index);
@@ -369,16 +355,13 @@ static PackageInfos filterBySelector(EvalState & state, const PackageInfos & all
     return elems;
 }
 
-
 static bool isPath(std::string_view s)
 {
     return s.find('/') != std::string_view::npos;
 }
 
-
-static void queryInstSources(EvalState & state,
-    InstallSourceInfo & instSource, const Strings & args,
-    PackageInfos & elems, bool newestOnly)
+static void queryInstSources(
+    EvalState & state, InstallSourceInfo & instSource, const Strings & args, PackageInfos & elems, bool newestOnly)
 {
     InstallSourceType type = instSource.type;
     if (type == srcUnknown && args.size() > 0 && isPath(args.front()))
@@ -386,97 +369,92 @@ static void queryInstSources(EvalState & state,
 
     switch (type) {
 
-        /* Get the available user environment elements from the
-           derivations specified in a Nix expression, including only
-           those with names matching any of the names in `args'. */
-        case srcUnknown:
-        case srcNixExprDrvs: {
+    /* Get the available user environment elements from the
+       derivations specified in a Nix expression, including only
+       those with names matching any of the names in `args'. */
+    case srcUnknown:
+    case srcNixExprDrvs: {
 
-            /* Load the derivations from the (default or specified)
-               Nix expression. */
-            PackageInfos allElems;
-            loadDerivations(state, *instSource.nixExprPath,
-                instSource.systemFilter, *instSource.autoArgs, "", allElems);
+        /* Load the derivations from the (default or specified)
+           Nix expression. */
+        PackageInfos allElems;
+        loadDerivations(state, *instSource.nixExprPath, instSource.systemFilter, *instSource.autoArgs, "", allElems);
 
-            elems = filterBySelector(state, allElems, args, newestOnly);
+        elems = filterBySelector(state, allElems, args, newestOnly);
 
-            break;
+        break;
+    }
+
+    /* Get the available user environment elements from the Nix
+       expressions specified on the command line; these should be
+       functions that take the default Nix expression file as
+       argument, e.g., if the file is `./foo.nix', then the
+       argument `x: x.bar' is equivalent to `(x: x.bar)
+       (import ./foo.nix)' = `(import ./foo.nix).bar'. */
+    case srcNixExprs: {
+
+        Value vArg;
+        loadSourceExpr(state, *instSource.nixExprPath, vArg);
+
+        for (auto & i : args) {
+            Expr * eFun = state.parseExprFromString(i, state.rootPath("."));
+            Value vFun, vTmp;
+            state.eval(eFun, vFun);
+            vTmp.mkApp(&vFun, &vArg);
+            getDerivations(state, vTmp, "", *instSource.autoArgs, elems, true);
         }
 
-        /* Get the available user environment elements from the Nix
-           expressions specified on the command line; these should be
-           functions that take the default Nix expression file as
-           argument, e.g., if the file is `./foo.nix', then the
-           argument `x: x.bar' is equivalent to `(x: x.bar)
-           (import ./foo.nix)' = `(import ./foo.nix).bar'. */
-        case srcNixExprs: {
+        break;
+    }
 
-            Value vArg;
-            loadSourceExpr(state, *instSource.nixExprPath, vArg);
+    /* The available user environment elements are specified as a
+       list of store paths (which may or may not be
+       derivations). */
+    case srcStorePaths: {
 
-            for (auto & i : args) {
-                Expr * eFun = state.parseExprFromString(i, state.rootPath("."));
-                Value vFun, vTmp;
-                state.eval(eFun, vFun);
-                vTmp.mkApp(&vFun, &vArg);
-                getDerivations(state, vTmp, "", *instSource.autoArgs, elems, true);
-            }
+        for (auto & i : args) {
+            auto path = state.store->followLinksToStorePath(i);
 
-            break;
+            std::string name(path.name());
+
+            PackageInfo elem(state, "", nullptr);
+            elem.setName(name);
+
+            if (path.isDerivation()) {
+                elem.setDrvPath(path);
+                auto outputs = state.store->queryDerivationOutputMap(path);
+                elem.setOutPath(outputs.at("out"));
+                if (name.size() >= drvExtension.size()
+                    && std::string(name, name.size() - drvExtension.size()) == drvExtension)
+                    name = name.substr(0, name.size() - drvExtension.size());
+            } else
+                elem.setOutPath(path);
+
+            elems.push_back(elem);
         }
 
-        /* The available user environment elements are specified as a
-           list of store paths (which may or may not be
-           derivations). */
-        case srcStorePaths: {
+        break;
+    }
 
-            for (auto & i : args) {
-                auto path = state.store->followLinksToStorePath(i);
+    /* Get the available user environment elements from another
+       user environment.  These are then filtered as in the
+       `srcNixExprDrvs' case. */
+    case srcProfile: {
+        elems = filterBySelector(state, queryInstalled(state, instSource.profile), args, newestOnly);
+        break;
+    }
 
-                std::string name(path.name());
-
-                PackageInfo elem(state, "", nullptr);
-                elem.setName(name);
-
-                if (path.isDerivation()) {
-                    elem.setDrvPath(path);
-                    auto outputs = state.store->queryDerivationOutputMap(path);
-                    elem.setOutPath(outputs.at("out"));
-                    if (name.size() >= drvExtension.size() &&
-                        std::string(name, name.size() - drvExtension.size()) == drvExtension)
-                        name = name.substr(0, name.size() - drvExtension.size());
-                }
-                else
-                    elem.setOutPath(path);
-
-                elems.push_back(elem);
-            }
-
-            break;
+    case srcAttrPath: {
+        Value vRoot;
+        loadSourceExpr(state, *instSource.nixExprPath, vRoot);
+        for (auto & i : args) {
+            Value & v(*findAlongAttrPath(state, i, *instSource.autoArgs, vRoot).first);
+            getDerivations(state, v, "", *instSource.autoArgs, elems, true);
         }
-
-        /* Get the available user environment elements from another
-           user environment.  These are then filtered as in the
-           `srcNixExprDrvs' case. */
-        case srcProfile: {
-            elems = filterBySelector(state,
-                queryInstalled(state, instSource.profile),
-                args, newestOnly);
-            break;
-        }
-
-        case srcAttrPath: {
-            Value vRoot;
-            loadSourceExpr(state, *instSource.nixExprPath, vRoot);
-            for (auto & i : args) {
-                Value & v(*findAlongAttrPath(state, i, *instSource.autoArgs, vRoot).first);
-                getDerivations(state, v, "", *instSource.autoArgs, elems, true);
-            }
-            break;
-        }
+        break;
+    }
     }
 }
-
 
 static void printMissing(EvalState & state, PackageInfos & elems)
 {
@@ -485,34 +463,32 @@ static void printMissing(EvalState & state, PackageInfos & elems)
         if (auto drvPath = i.queryDrvPath()) {
             auto path = DerivedPath::Built{
                 .drvPath = makeConstantStorePathRef(*drvPath),
-                .outputs = OutputsSpec::All { },
+                .outputs = OutputsSpec::All{},
             };
             targets.emplace_back(std::move(path));
         } else
-            targets.emplace_back(DerivedPath::Opaque{
-                .path = i.queryOutPath(),
-            });
+            targets.emplace_back(
+                DerivedPath::Opaque{
+                    .path = i.queryOutPath(),
+                });
 
     printMissing(state.store, targets);
 }
-
 
 static bool keep(PackageInfo & drv)
 {
     return drv.queryMetaBool("keep", false);
 }
 
-static void setMetaFlag(EvalState & state, PackageInfo & drv,
-    const std::string & name, const std::string & value)
+static void setMetaFlag(EvalState & state, PackageInfo & drv, const std::string & name, const std::string & value)
 {
     auto v = state.allocValue();
     v->mkString(value);
     drv.setMeta(name, v);
 }
 
-
-static void installDerivations(Globals & globals,
-    const Strings & args, const Path & profile, std::optional<int> priority)
+static void
+installDerivations(Globals & globals, const Strings & args, const Path & profile, std::optional<int> priority)
 {
     debug("installing derivations");
 
@@ -554,9 +530,7 @@ static void installDerivations(Globals & globals,
 
             for (auto & i : installedElems) {
                 DrvName drvName(i.queryName());
-                if (!globals.preserveInstalled &&
-                    newNames.find(drvName.name) != newNames.end() &&
-                    !keep(i))
+                if (!globals.preserveInstalled && newNames.find(drvName.name) != newNames.end() && !keep(i))
                     printInfo("replacing old '%s'", i.queryName());
                 else
                     allElems.push_back(i);
@@ -568,20 +542,21 @@ static void installDerivations(Globals & globals,
 
         printMissing(*globals.state, newElems);
 
-        if (globals.dryRun) return;
+        if (globals.dryRun)
+            return;
 
-        if (createUserEnv(*globals.state, allElems,
-                profile, settings.envKeepDerivations, lockToken)) break;
+        if (createUserEnv(*globals.state, allElems, profile, settings.envKeepDerivations, lockToken))
+            break;
     }
 }
-
 
 static void opInstall(Globals & globals, Strings opFlags, Strings opArgs)
 {
     std::optional<int> priority;
-    for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
+    for (Strings::iterator i = opFlags.begin(); i != opFlags.end();) {
         auto arg = *i++;
-        if (parseInstallSourceOptions(globals, i, opFlags, arg)) ;
+        if (parseInstallSourceOptions(globals, i, opFlags, arg))
+            ;
         else if (arg == "--preserve-installed" || arg == "-P")
             globals.preserveInstalled = true;
         else if (arg == "--remove-all" || arg == "-r")
@@ -592,19 +567,16 @@ static void opInstall(Globals & globals, Strings opFlags, Strings opArgs)
             priority = string2Int<int>(*i++);
             if (!priority)
                 throw UsageError("'--priority' requires an integer argument");
-        }
-        else throw UsageError("unknown flag '%1%'", arg);
+        } else
+            throw UsageError("unknown flag '%1%'", arg);
     }
 
     installDerivations(globals, opArgs, globals.profile, priority);
 }
 
-
 typedef enum { utLt, utLeq, utEq, utAlways } UpgradeType;
 
-
-static void upgradeDerivations(Globals & globals,
-    const Strings & args, UpgradeType upgradeType)
+static void upgradeDerivations(Globals & globals, const Strings & args, UpgradeType upgradeType)
 {
     debug("upgrading derivations");
 
@@ -649,15 +621,13 @@ static void upgradeDerivations(Globals & globals,
                     DrvName newName(j->queryName());
                     if (newName.name == drvName.name) {
                         std::strong_ordering d = compareVersions(drvName.version, newName.version);
-                        if ((upgradeType == utLt && d < 0) ||
-                            (upgradeType == utLeq && d <= 0) ||
-                            (upgradeType == utEq && d == 0) ||
-                            upgradeType == utAlways)
-                        {
+                        if ((upgradeType == utLt && d < 0) || (upgradeType == utLeq && d <= 0)
+                            || (upgradeType == utEq && d == 0) || upgradeType == utAlways) {
                             std::strong_ordering d2 = std::strong_ordering::less;
                             if (bestElem != availElems.end()) {
                                 d2 = comparePriorities(*globals.state, *bestElem, *j);
-                                if (d2 == 0) d2 = compareVersions(bestVersion, newName.version);
+                                if (d2 == 0)
+                                    d2 = compareVersions(bestVersion, newName.version);
                             }
                             if (d2 < 0 && (!globals.prebuiltOnly || isPrebuilt(*globals.state, *j))) {
                                 bestElem = j;
@@ -667,16 +637,13 @@ static void upgradeDerivations(Globals & globals,
                     }
                 }
 
-                if (bestElem != availElems.end() &&
-                    i.queryOutPath() !=
-                    bestElem->queryOutPath())
-                {
-                    const char * action = compareVersions(drvName.version, bestVersion) <= 0
-                        ? "upgrading" : "downgrading";
-                    printInfo("%1% '%2%' to '%3%'",
-                        action, i.queryName(), bestElem->queryName());
+                if (bestElem != availElems.end() && i.queryOutPath() != bestElem->queryOutPath()) {
+                    const char * action =
+                        compareVersions(drvName.version, bestVersion) <= 0 ? "upgrading" : "downgrading";
+                    printInfo("%1% '%2%' to '%3%'", action, i.queryName(), bestElem->queryName());
                     newElems.push_back(*bestElem);
-                } else newElems.push_back(i);
+                } else
+                    newElems.push_back(i);
 
             } catch (Error & e) {
                 e.addTrace(nullptr, "while trying to find an upgrade for '%s'", i.queryName());
@@ -686,30 +653,35 @@ static void upgradeDerivations(Globals & globals,
 
         printMissing(*globals.state, newElems);
 
-        if (globals.dryRun) return;
+        if (globals.dryRun)
+            return;
 
-        if (createUserEnv(*globals.state, newElems,
-                globals.profile, settings.envKeepDerivations, lockToken)) break;
+        if (createUserEnv(*globals.state, newElems, globals.profile, settings.envKeepDerivations, lockToken))
+            break;
     }
 }
-
 
 static void opUpgrade(Globals & globals, Strings opFlags, Strings opArgs)
 {
     UpgradeType upgradeType = utLt;
-    for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
+    for (Strings::iterator i = opFlags.begin(); i != opFlags.end();) {
         std::string arg = *i++;
-        if (parseInstallSourceOptions(globals, i, opFlags, arg)) ;
-        else if (arg == "--lt") upgradeType = utLt;
-        else if (arg == "--leq") upgradeType = utLeq;
-        else if (arg == "--eq") upgradeType = utEq;
-        else if (arg == "--always") upgradeType = utAlways;
-        else throw UsageError("unknown flag '%1%'", arg);
+        if (parseInstallSourceOptions(globals, i, opFlags, arg))
+            ;
+        else if (arg == "--lt")
+            upgradeType = utLt;
+        else if (arg == "--leq")
+            upgradeType = utLeq;
+        else if (arg == "--eq")
+            upgradeType = utEq;
+        else if (arg == "--always")
+            upgradeType = utAlways;
+        else
+            throw UsageError("unknown flag '%1%'", arg);
     }
 
     upgradeDerivations(globals, opArgs, upgradeType);
 }
-
 
 static void opSetFlag(Globals & globals, Strings opFlags, Strings opArgs)
 {
@@ -743,21 +715,23 @@ static void opSetFlag(Globals & globals, Strings opFlags, Strings opArgs)
         checkSelectorUse(selectors);
 
         /* Write the new user environment. */
-        if (createUserEnv(*globals.state, installedElems,
-                globals.profile, settings.envKeepDerivations, lockToken)) break;
+        if (createUserEnv(*globals.state, installedElems, globals.profile, settings.envKeepDerivations, lockToken))
+            break;
     }
 }
-
 
 static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
 {
     auto store2 = globals.state->store.dynamic_pointer_cast<LocalFSStore>();
-    if (!store2) throw Error("--set is not supported for this Nix store");
+    if (!store2)
+        throw Error("--set is not supported for this Nix store");
 
-    for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
+    for (Strings::iterator i = opFlags.begin(); i != opFlags.end();) {
         std::string arg = *i++;
-        if (parseInstallSourceOptions(globals, i, opFlags, arg)) ;
-        else throw UsageError("unknown flag '%1%'", arg);
+        if (parseInstallSourceOptions(globals, i, opFlags, arg))
+            ;
+        else
+            throw UsageError("unknown flag '%1%'", arg);
     }
 
     PackageInfos elems;
@@ -772,31 +746,26 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
         drv.setName(globals.forceName);
 
     auto drvPath = drv.queryDrvPath();
-    std::vector<DerivedPath> paths {
-        drvPath
-        ? (DerivedPath) (DerivedPath::Built {
-            .drvPath = makeConstantStorePathRef(*drvPath),
-            .outputs = OutputsSpec::All { },
-        })
-        : (DerivedPath) (DerivedPath::Opaque {
-            .path = drv.queryOutPath(),
-        }),
+    std::vector<DerivedPath> paths{
+        drvPath ? (DerivedPath) (DerivedPath::Built{
+                      .drvPath = makeConstantStorePathRef(*drvPath),
+                      .outputs = OutputsSpec::All{},
+                  })
+                : (DerivedPath) (DerivedPath::Opaque{
+                      .path = drv.queryOutPath(),
+                  }),
     };
     printMissing(globals.state->store, paths);
-    if (globals.dryRun) return;
+    if (globals.dryRun)
+        return;
     globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
 
     debug("switching to new user environment");
-    Path generation = createGeneration(
-        *store2,
-        globals.profile,
-        drv.queryOutPath());
+    Path generation = createGeneration(*store2, globals.profile, drv.queryOutPath());
     switchLink(globals.profile, generation);
 }
 
-
-static void uninstallDerivations(Globals & globals, Strings & selectors,
-    Path & profile)
+static void uninstallDerivations(Globals & globals, Strings & selectors, Path & profile)
 {
     while (true) {
         auto lockToken = optimisticLockProfile(profile);
@@ -808,20 +777,15 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
             if (isPath(selector)) {
                 StorePath selectorStorePath = globals.state->store->followLinksToStorePath(selector);
                 split = std::partition(
-                    workingElems.begin(), workingElems.end(),
-                    [&selectorStorePath, globals](auto &elem) {
+                    workingElems.begin(), workingElems.end(), [&selectorStorePath, globals](auto & elem) {
                         return selectorStorePath != elem.queryOutPath();
-                    }
-                );
+                    });
             } else {
                 DrvName selectorName(selector);
-                split = std::partition(
-                    workingElems.begin(), workingElems.end(),
-                    [&selectorName](auto &elem){
-                        DrvName elemName(elem.queryName());
-                        return !selectorName.matches(elemName);
-                    }
-                );
+                split = std::partition(workingElems.begin(), workingElems.end(), [&selectorName](auto & elem) {
+                    DrvName elemName(elem.queryName());
+                    return !selectorName.matches(elemName);
+                });
             }
             if (split == workingElems.end())
                 warn("selector '%s' matched no installed derivations", selector);
@@ -831,13 +795,13 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
             workingElems.erase(split, workingElems.end());
         }
 
-        if (globals.dryRun) return;
+        if (globals.dryRun)
+            return;
 
-        if (createUserEnv(*globals.state, workingElems,
-                profile, settings.envKeepDerivations, lockToken)) break;
+        if (createUserEnv(*globals.state, workingElems, profile, settings.envKeepDerivations, lockToken))
+            break;
     }
 }
-
 
 static void opUninstall(Globals & globals, Strings opFlags, Strings opArgs)
 {
@@ -846,25 +810,19 @@ static void opUninstall(Globals & globals, Strings opFlags, Strings opArgs)
     uninstallDerivations(globals, opArgs, globals.profile);
 }
 
-
 static bool cmpChars(char a, char b)
 {
     return toupper(a) < toupper(b);
 }
 
-
 static bool cmpElemByName(const PackageInfo & a, const PackageInfo & b)
 {
     auto a_name = a.queryName();
     auto b_name = b.queryName();
-    return lexicographical_compare(
-        a_name.begin(), a_name.end(),
-        b_name.begin(), b_name.end(), cmpChars);
+    return lexicographical_compare(a_name.begin(), a_name.end(), b_name.begin(), b_name.end(), cmpChars);
 }
 
-
 typedef std::list<Strings> Table;
-
 
 void printTable(Table & table)
 {
@@ -878,7 +836,8 @@ void printTable(Table & table)
         Strings::iterator j;
         size_t column;
         for (j = i.begin(), column = 0; j != i.end(); ++j, ++column)
-            if (j->size() > widths[column]) widths[column] = j->size();
+            if (j->size() > widths[column])
+                widths[column] = j->size();
     }
 
     for (auto & i : table) {
@@ -895,7 +854,6 @@ void printTable(Table & table)
     }
 }
 
-
 /* This function compares the version of an element against the
    versions in the given set of elements.  `cvLess' means that only
    lower versions are in the set, `cvEqual' means that at most an
@@ -905,8 +863,7 @@ void printTable(Table & table)
 
 typedef enum { cvLess, cvEqual, cvGreater, cvUnavail } VersionDiff;
 
-static VersionDiff compareVersionAgainstSet(
-    const PackageInfo & elem, const PackageInfos & elems, std::string & version)
+static VersionDiff compareVersionAgainstSet(const PackageInfo & elem, const PackageInfos & elems, std::string & version)
 {
     DrvName name(elem.queryName());
 
@@ -920,12 +877,10 @@ static VersionDiff compareVersionAgainstSet(
             if (d < 0) {
                 diff = cvGreater;
                 version = name2.version;
-            }
-            else if (diff != cvGreater && d == 0) {
+            } else if (diff != cvGreater && d == 0) {
                 diff = cvEqual;
                 version = name2.version;
-            }
-            else if (diff != cvGreater && diff != cvEqual && d > 0) {
+            } else if (diff != cvGreater && diff != cvEqual && d > 0) {
                 diff = cvLess;
                 if (version == "" || compareVersions(version, name2.version) < 0)
                     version = name2.version;
@@ -936,18 +891,18 @@ static VersionDiff compareVersionAgainstSet(
     return diff;
 }
 
-
-static void queryJSON(Globals & globals, std::vector<PackageInfo> & elems, bool printOutPath, bool printDrvPath, bool printMeta)
+static void
+queryJSON(Globals & globals, std::vector<PackageInfo> & elems, bool printOutPath, bool printDrvPath, bool printMeta)
 {
     using nlohmann::json;
     json topObj = json::object();
     for (auto & i : elems) {
         try {
-            if (i.hasFailed()) continue;
-
+            if (i.hasFailed())
+                continue;
 
             auto drvName = DrvName(i.queryName());
-            json &pkgObj = topObj[i.attrPath];
+            json & pkgObj = topObj[i.attrPath];
             pkgObj = {
                 {"name", drvName.fullName},
                 {"pname", drvName.name},
@@ -958,7 +913,7 @@ static void queryJSON(Globals & globals, std::vector<PackageInfo> & elems, bool 
 
             {
                 PackageInfo::Outputs outputs = i.queryOutputs(printOutPath);
-                json &outputObj = pkgObj["outputs"];
+                json & outputObj = pkgObj["outputs"];
                 outputObj = json::object();
                 for (auto & j : outputs) {
                     if (j.second)
@@ -970,11 +925,12 @@ static void queryJSON(Globals & globals, std::vector<PackageInfo> & elems, bool 
 
             if (printDrvPath) {
                 auto drvPath = i.queryDrvPath();
-                if (drvPath) pkgObj["drvPath"] = globals.state->store->printStorePath(*drvPath);
+                if (drvPath)
+                    pkgObj["drvPath"] = globals.state->store->printStorePath(*drvPath);
             }
 
             if (printMeta) {
-                json &metaObj = pkgObj["meta"];
+                json & metaObj = pkgObj["meta"];
                 metaObj = json::object();
                 StringSet metaNames = i.queryMetaNames();
                 for (auto & j : metaNames) {
@@ -998,10 +954,9 @@ static void queryJSON(Globals & globals, std::vector<PackageInfo> & elems, bool 
     std::cout << topObj.dump(2);
 }
 
-
 static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 {
-    auto & store { *globals.state->store };
+    auto & store{*globals.state->store};
 
     Strings remaining;
     std::string attrPath;
@@ -1022,21 +977,34 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
     settings.readOnlyMode = true; /* makes evaluation a bit faster */
 
-    for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
+    for (Strings::iterator i = opFlags.begin(); i != opFlags.end();) {
         auto arg = *i++;
-        if (arg == "--status" || arg == "-s") printStatus = true;
-        else if (arg == "--no-name") printName = false;
-        else if (arg == "--system") printSystem = true;
-        else if (arg == "--description") printDescription = true;
-        else if (arg == "--compare-versions" || arg == "-c") compareVersions = true;
-        else if (arg == "--drv-path") printDrvPath = true;
-        else if (arg == "--out-path") printOutPath = true;
-        else if (arg == "--meta") printMeta = true;
-        else if (arg == "--installed") source = sInstalled;
-        else if (arg == "--available" || arg == "-a") source = sAvailable;
-        else if (arg == "--xml") xmlOutput = true;
-        else if (arg == "--json") jsonOutput = true;
-        else if (arg == "--attr-path" || arg == "-P") printAttrPath = true;
+        if (arg == "--status" || arg == "-s")
+            printStatus = true;
+        else if (arg == "--no-name")
+            printName = false;
+        else if (arg == "--system")
+            printSystem = true;
+        else if (arg == "--description")
+            printDescription = true;
+        else if (arg == "--compare-versions" || arg == "-c")
+            compareVersions = true;
+        else if (arg == "--drv-path")
+            printDrvPath = true;
+        else if (arg == "--out-path")
+            printOutPath = true;
+        else if (arg == "--meta")
+            printMeta = true;
+        else if (arg == "--installed")
+            source = sInstalled;
+        else if (arg == "--available" || arg == "-a")
+            source = sAvailable;
+        else if (arg == "--xml")
+            xmlOutput = true;
+        else if (arg == "--json")
+            jsonOutput = true;
+        else if (arg == "--attr-path" || arg == "-P")
+            printAttrPath = true;
         else if (arg == "--attr" || arg == "-A")
             attrPath = needArg(i, opFlags, arg);
         else
@@ -1053,23 +1021,25 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         installedElems = queryInstalled(*globals.state, globals.profile);
 
     if (source == sAvailable || compareVersions)
-        loadDerivations(*globals.state, *globals.instSource.nixExprPath,
-            globals.instSource.systemFilter, *globals.instSource.autoArgs,
-            attrPath, availElems);
+        loadDerivations(
+            *globals.state,
+            *globals.instSource.nixExprPath,
+            globals.instSource.systemFilter,
+            *globals.instSource.autoArgs,
+            attrPath,
+            availElems);
 
-    PackageInfos elems_ = filterBySelector(*globals.state,
-        source == sInstalled ? installedElems : availElems,
-        opArgs, false);
+    PackageInfos elems_ =
+        filterBySelector(*globals.state, source == sInstalled ? installedElems : availElems, opArgs, false);
 
     PackageInfos & otherElems(source == sInstalled ? availElems : installedElems);
-
 
     /* Sort them by name. */
     /* !!! */
     std::vector<PackageInfo> elems;
-    for (auto & i : elems_) elems.push_back(i);
+    for (auto & i : elems_)
+        elems.push_back(i);
     sort(elems.begin(), elems.end(), cmpElemByName);
-
 
     /* We only need to know the installed paths when we are querying
        the status of the derivation. */
@@ -1078,7 +1048,6 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
     if (printStatus)
         for (auto & i : installedElems)
             installed.insert(i.queryOutPath());
-
 
     /* Query which paths have substitutes. */
     StorePathSet validPaths;
@@ -1089,13 +1058,13 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             try {
                 paths.insert(i.queryOutPath());
             } catch (AssertionError & e) {
-                printMsg(lvlTalkative, "skipping derivation named '%s' which gives an assertion failure", i.queryName());
+                printMsg(
+                    lvlTalkative, "skipping derivation named '%s' which gives an assertion failure", i.queryName());
                 i.setFailed();
             }
         validPaths = store.queryValidPaths(paths);
         substitutablePaths = store.querySubstitutablePaths(paths);
     }
-
 
     /* Print the desired columns, or XML output. */
     if (jsonOutput) {
@@ -1114,13 +1083,13 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
     for (auto & i : elems) {
         try {
-            if (i.hasFailed()) continue;
+            if (i.hasFailed())
+                continue;
 
-            //Activity act(*logger, lvlDebug, "outputting query result '%1%'", i.attrPath);
+            // Activity act(*logger, lvlDebug, "outputting query result '%1%'", i.attrPath);
 
-            if (globals.prebuiltOnly &&
-                !validPaths.count(i.queryOutPath()) &&
-                !substitutablePaths.count(i.queryOutPath()))
+            if (globals.prebuiltOnly && !validPaths.count(i.queryOutPath())
+                && !substitutablePaths.count(i.queryOutPath()))
                 continue;
 
             /* For table output. */
@@ -1140,9 +1109,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                     attrs["substitutable"] = hasSubs ? "1" : "0";
                 } else
                     columns.push_back(
-                        (std::string) (isInstalled ? "I" : "-")
-                        + (isValid ? "P" : "-")
-                        + (hasSubs ? "S" : "-"));
+                        (std::string) (isInstalled ? "I" : "-") + (isValid ? "P" : "-") + (hasSubs ? "S" : "-"));
             }
 
             if (xmlOutput)
@@ -1169,11 +1136,20 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
                 char ch;
                 switch (diff) {
-                    case cvLess: ch = '>'; break;
-                    case cvEqual: ch = '='; break;
-                    case cvGreater: ch = '<'; break;
-                    case cvUnavail: ch = '-'; break;
-                    default: unreachable();
+                case cvLess:
+                    ch = '>';
+                    break;
+                case cvEqual:
+                    ch = '=';
+                    break;
+                case cvGreater:
+                    ch = '<';
+                    break;
+                case cvUnavail:
+                    ch = '-';
+                    break;
+                default:
+                    unreachable();
                 }
 
                 if (xmlOutput) {
@@ -1190,15 +1166,16 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             }
 
             if (xmlOutput) {
-                if (i.querySystem() != "") attrs["system"] = i.querySystem();
-            }
-            else if (printSystem)
+                if (i.querySystem() != "")
+                    attrs["system"] = i.querySystem();
+            } else if (printSystem)
                 columns.push_back(i.querySystem());
 
             if (printDrvPath) {
                 auto drvPath = i.queryDrvPath();
                 if (xmlOutput) {
-                    if (drvPath) attrs["drvPath"] = store.printStorePath(*drvPath);
+                    if (drvPath)
+                        attrs["drvPath"] = store.printStorePath(*drvPath);
                 } else
                     columns.push_back(drvPath ? store.printStorePath(*drvPath) : "-");
             }
@@ -1210,8 +1187,12 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                 PackageInfo::Outputs outputs = i.queryOutputs();
                 std::string s;
                 for (auto & j : outputs) {
-                    if (!s.empty()) s += ';';
-                    if (j.first != "out") { s += j.first; s += "="; }
+                    if (!s.empty())
+                        s += ';';
+                    if (j.first != "out") {
+                        s += j.first;
+                        s += "=";
+                    }
                     s += store.printStorePath(*j.second);
                 }
                 columns.push_back(s);
@@ -1220,7 +1201,8 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             if (printDescription) {
                 auto descr = i.queryMetaString("description");
                 if (xmlOutput) {
-                    if (descr != "") attrs["description"] = descr;
+                    if (descr != "")
+                        attrs["description"] = descr;
                 } else
                     columns.push_back(descr);
             }
@@ -1242,9 +1224,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                         attrs2["name"] = j;
                         Value * v = i.queryMeta(j);
                         if (!v)
-                            printError(
-                                "derivation '%s' has invalid meta attribute '%s'",
-                                i.queryName(), j);
+                            printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
                         else {
                             if (v->type() == nString) {
                                 attrs2["type"] = "string";
@@ -1266,7 +1246,8 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                 attrs2["type"] = "strings";
                                 XMLOpenElement m(xml, "meta", attrs2);
                                 for (auto elem : v->listItems()) {
-                                    if (elem->type() != nString) continue;
+                                    if (elem->type() != nString)
+                                        continue;
                                     XMLAttrs attrs3;
                                     attrs3["value"] = elem->c_str();
                                     xml.writeEmptyElement("string", attrs3);
@@ -1275,12 +1256,13 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                 attrs2["type"] = "strings";
                                 XMLOpenElement m(xml, "meta", attrs2);
                                 for (auto & i : *v->attrs()) {
-                                    if (i.value->type() != nString) continue;
+                                    if (i.value->type() != nString)
+                                        continue;
                                     XMLAttrs attrs3;
                                     attrs3["type"] = globals.state->symbols[i.name];
                                     attrs3["value"] = i.value->c_str();
                                     xml.writeEmptyElement("string", attrs3);
-                            }
+                                }
                             }
                         }
                     }
@@ -1298,9 +1280,9 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         }
     }
 
-    if (!xmlOutput) printTable(table);
+    if (!xmlOutput)
+        printTable(table);
 }
-
 
 static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
 {
@@ -1315,7 +1297,6 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
     switchLink(profileLink, profile);
 }
 
-
 static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
@@ -1329,7 +1310,6 @@ static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArg
         throw UsageError("expected a generation number");
 }
 
-
 static void opRollback(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
@@ -1339,7 +1319,6 @@ static void opRollback(Globals & globals, Strings opFlags, Strings opArgs)
 
     switchGeneration(globals.profile, {}, globals.dryRun);
 }
-
 
 static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs)
 {
@@ -1366,14 +1345,18 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
         if (!localtime_r(&i.creationTime, &t))
             throw Error("cannot convert time");
 #endif
-        logger->cout("%|4|   %|4|-%|02|-%|02| %|02|:%|02|:%|02|   %||",
+        logger->cout(
+            "%|4|   %|4|-%|02|-%|02| %|02|:%|02|:%|02|   %||",
             i.number,
-            t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
-            t.tm_hour, t.tm_min, t.tm_sec,
+            t.tm_year + 1900,
+            t.tm_mon + 1,
+            t.tm_mday,
+            t.tm_hour,
+            t.tm_min,
+            t.tm_sec,
             i.number == curGen ? "(current)" : "");
     }
 }
-
 
 static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opArgs)
 {
@@ -1405,14 +1388,12 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
     }
 }
 
-
 static void opVersion(Globals & globals, Strings opFlags, Strings opArgs)
 {
     printVersion("nix-env");
 }
 
-
-static int main_nix_env(int argc, char * * argv)
+static int main_nix_env(int argc, char ** argv)
 {
     {
         Strings opFlags, opArgs;
@@ -1431,14 +1412,11 @@ static int main_nix_env(int argc, char * * argv)
         if (!pathExists(nixExprPath)) {
             try {
                 createDirs(nixExprPath);
-                replaceSymlink(
-                    defaultChannelsDir(),
-                    nixExprPath + "/channels");
+                replaceSymlink(defaultChannelsDir(), nixExprPath + "/channels");
                 if (!isRootUser())
-                    replaceSymlink(
-                        rootChannelsDir(),
-                        nixExprPath + "/channels_root");
-            } catch (Error &) { }
+                    replaceSymlink(rootChannelsDir(), nixExprPath + "/channels_root");
+            } catch (Error &) {
+            }
         }
 
         globals.dryRun = false;
@@ -1461,70 +1439,56 @@ static int main_nix_env(int argc, char * * argv)
             else if (*arg == "--install" || *arg == "-i") {
                 op = opInstall;
                 opName = "-install";
-            }
-            else if (*arg == "--force-name") // undocumented flag for nix-install-package
+            } else if (*arg == "--force-name") // undocumented flag for nix-install-package
                 globals.forceName = getArg(*arg, arg, end);
             else if (*arg == "--uninstall" || *arg == "-e") {
                 op = opUninstall;
                 opName = "-uninstall";
-            }
-            else if (*arg == "--upgrade" || *arg == "-u") {
+            } else if (*arg == "--upgrade" || *arg == "-u") {
                 op = opUpgrade;
                 opName = "-upgrade";
-            }
-            else if (*arg == "--set-flag") {
+            } else if (*arg == "--set-flag") {
                 op = opSetFlag;
                 opName = arg->substr(1);
-            }
-            else if (*arg == "--set") {
+            } else if (*arg == "--set") {
                 op = opSet;
                 opName = arg->substr(1);
-            }
-            else if (*arg == "--query" || *arg == "-q") {
+            } else if (*arg == "--query" || *arg == "-q") {
                 op = opQuery;
                 opName = "-query";
-            }
-            else if (*arg == "--profile" || *arg == "-p")
+            } else if (*arg == "--profile" || *arg == "-p")
                 globals.profile = absPath(getArg(*arg, arg, end));
             else if (*arg == "--file" || *arg == "-f")
                 file = getArg(*arg, arg, end);
             else if (*arg == "--switch-profile" || *arg == "-S") {
                 op = opSwitchProfile;
                 opName = "-switch-profile";
-            }
-            else if (*arg == "--switch-generation" || *arg == "-G") {
+            } else if (*arg == "--switch-generation" || *arg == "-G") {
                 op = opSwitchGeneration;
                 opName = "-switch-generation";
-            }
-            else if (*arg == "--rollback") {
+            } else if (*arg == "--rollback") {
                 op = opRollback;
                 opName = arg->substr(1);
-            }
-            else if (*arg == "--list-generations") {
+            } else if (*arg == "--list-generations") {
                 op = opListGenerations;
                 opName = arg->substr(1);
-            }
-            else if (*arg == "--delete-generations") {
+            } else if (*arg == "--delete-generations") {
                 op = opDeleteGenerations;
                 opName = arg->substr(1);
-            }
-            else if (*arg == "--dry-run") {
+            } else if (*arg == "--dry-run") {
                 printInfo("(dry run; not doing anything)");
                 globals.dryRun = true;
-            }
-            else if (*arg == "--system-filter")
+            } else if (*arg == "--system-filter")
                 globals.instSource.systemFilter = getArg(*arg, arg, end);
             else if (*arg == "--prebuilt-only" || *arg == "-b")
                 globals.prebuiltOnly = true;
             else if (*arg != "" && arg->at(0) == '-') {
                 opFlags.push_back(*arg);
                 /* FIXME: hacky */
-                if (*arg == "--from-profile" ||
-                    (op == opQuery && (*arg == "--attr" || *arg == "-A")) ||
-                    (op == opInstall && (*arg == "--priority")))
+                if (*arg == "--from-profile" || (op == opQuery && (*arg == "--attr" || *arg == "-A"))
+                    || (op == opInstall && (*arg == "--priority")))
                     opFlags.push_back(getArg(*arg, arg, end));
-            }
-            else
+            } else
                 opArgs.push_back(*arg);
 
             if (oldOp && oldOp != op)
@@ -1535,18 +1499,19 @@ static int main_nix_env(int argc, char * * argv)
 
         myArgs.parseCmdline(argvToStrings(argc, argv));
 
-        if (showHelp) showManPage("nix-env" + opName);
-        if (!op) throw UsageError("no operation specified");
+        if (showHelp)
+            showManPage("nix-env" + opName);
+        if (!op)
+            throw UsageError("no operation specified");
 
         auto store = openStore();
 
-        globals.state = std::shared_ptr<EvalState>(new EvalState(myArgs.lookupPath, store, fetchSettings, evalSettings));
+        globals.state =
+            std::shared_ptr<EvalState>(new EvalState(myArgs.lookupPath, store, fetchSettings, evalSettings));
         globals.state->repair = myArgs.repair;
 
         globals.instSource.nixExprPath = std::make_shared<SourcePath>(
-            file != ""
-            ? lookupFileArg(*globals.state, file)
-            : globals.state->rootPath(CanonPath(nixExprPath)));
+            file != "" ? lookupFileArg(*globals.state, file) : globals.state->rootPath(CanonPath(nixExprPath)));
 
         globals.instSource.autoArgs = myArgs.getAutoArgs(*globals.state);
 

@@ -39,9 +39,7 @@ nlohmann::json dumpRegisterInputSchemeInfo()
     return res;
 }
 
-Input Input::fromURL(
-    const Settings & settings,
-    const std::string & url, bool requireTree)
+Input Input::fromURL(const Settings & settings, const std::string & url, bool requireTree)
 {
     return fromURL(settings, parseURL(url), requireTree);
 }
@@ -55,9 +53,7 @@ static void fixupInput(Input & input)
     input.getLastModified();
 }
 
-Input Input::fromURL(
-    const Settings & settings,
-    const ParsedURL & url, bool requireTree)
+Input Input::fromURL(const Settings & settings, const ParsedURL & url, bool requireTree)
 {
     for (auto & [_, inputScheme] : inputSchemes()) {
         auto res = inputScheme->inputFromURL(settings, url, requireTree);
@@ -86,7 +82,7 @@ Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
         // but not all of them. Doing this is to support those other
         // operations which are supposed to be robust on
         // unknown/uninterpretable inputs.
-        Input input { settings };
+        Input input{settings};
         input.attrs = attrs;
         fixupInput(input);
         return input;
@@ -97,7 +93,8 @@ Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
         i ? *i : nullptr;
     });
 
-    if (!inputScheme) return raw();
+    if (!inputScheme)
+        return raw();
 
     experimentalFeatureSettings.require(inputScheme->experimentalFeature());
 
@@ -108,7 +105,8 @@ Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
             throw Error("input attribute '%s' not supported by scheme '%s'", name, schemeName);
 
     auto res = inputScheme->inputFromAttrs(settings, attrs);
-    if (!res) return raw();
+    if (!res)
+        return raw();
     res->scheme = inputScheme;
     fixupInput(*res);
     return std::move(*res);
@@ -116,9 +114,11 @@ Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
 
 std::optional<std::string> Input::getFingerprint(ref<Store> store) const
 {
-    if (!scheme) return std::nullopt;
+    if (!scheme)
+        return std::nullopt;
 
-    if (cachedFingerprint) return *cachedFingerprint;
+    if (cachedFingerprint)
+        return *cachedFingerprint;
 
     auto fingerprint = scheme->getFingerprint(store, *this);
 
@@ -173,18 +173,20 @@ Attrs Input::toAttrs() const
     return attrs;
 }
 
-bool Input::operator ==(const Input & other) const noexcept
+bool Input::operator==(const Input & other) const noexcept
 {
     return attrs == other.attrs;
 }
 
 bool Input::contains(const Input & other) const
 {
-    if (*this == other) return true;
+    if (*this == other)
+        return true;
     auto other2(other);
     other2.attrs.erase("ref");
     other2.attrs.erase("rev");
-    if (*this == other2) return true;
+    if (*this == other2)
+        return true;
     return false;
 }
 
@@ -198,7 +200,8 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
         try {
             auto [accessor, result] = getAccessorUnchecked(store);
 
-            auto storePath = nix::fetchToStore(*settings, *store, SourcePath(accessor), FetchMode::Copy, result.getName());
+            auto storePath =
+                nix::fetchToStore(*settings, *store, SourcePath(accessor), FetchMode::Copy, result.getName());
 
             auto narHash = store->queryPathInfo(storePath)->narHash;
             result.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
@@ -237,7 +240,8 @@ void Input::checkLocks(Input specified, Input & result)
         for (auto & field : specified.attrs) {
             auto field2 = result.attrs.find(field.first);
             if (field2 != result.attrs.end() && field.second != field2->second)
-                throw Error("mismatch in field '%s' of input '%s', got '%s'",
+                throw Error(
+                    "mismatch in field '%s' of input '%s', got '%s'",
                     field.first,
                     attrsToJSON(specified.attrs),
                     attrsToJSON(result.attrs));
@@ -251,30 +255,38 @@ void Input::checkLocks(Input specified, Input & result)
     if (auto prevNarHash = specified.getNarHash()) {
         if (result.getNarHash() != prevNarHash) {
             if (result.getNarHash())
-                throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s' but got '%s'",
-                    specified.to_string(), prevNarHash->to_string(HashFormat::SRI, true), result.getNarHash()->to_string(HashFormat::SRI, true));
+                throw Error(
+                    (unsigned int) 102,
+                    "NAR hash mismatch in input '%s', expected '%s' but got '%s'",
+                    specified.to_string(),
+                    prevNarHash->to_string(HashFormat::SRI, true),
+                    result.getNarHash()->to_string(HashFormat::SRI, true));
             else
-                throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s' but got none",
-                    specified.to_string(), prevNarHash->to_string(HashFormat::SRI, true));
+                throw Error(
+                    (unsigned int) 102,
+                    "NAR hash mismatch in input '%s', expected '%s' but got none",
+                    specified.to_string(),
+                    prevNarHash->to_string(HashFormat::SRI, true));
         }
     }
 
     if (auto prevLastModified = specified.getLastModified()) {
         if (result.getLastModified() != prevLastModified)
-            throw Error("'lastModified' attribute mismatch in input '%s', expected %d, got %d",
-                result.to_string(), *prevLastModified, result.getLastModified().value_or(-1));
+            throw Error(
+                "'lastModified' attribute mismatch in input '%s', expected %d, got %d",
+                result.to_string(),
+                *prevLastModified,
+                result.getLastModified().value_or(-1));
     }
 
     if (auto prevRev = specified.getRev()) {
         if (result.getRev() != prevRev)
-            throw Error("'rev' attribute mismatch in input '%s', expected %s",
-                result.to_string(), prevRev->gitRev());
+            throw Error("'rev' attribute mismatch in input '%s', expected %s", result.to_string(), prevRev->gitRev());
     }
 
     if (auto prevRevCount = specified.getRevCount()) {
         if (result.getRevCount() != prevRevCount)
-            throw Error("'revCount' attribute mismatch in input '%s', expected %d",
-                result.to_string(), *prevRevCount);
+            throw Error("'revCount' attribute mismatch in input '%s', expected %d", result.to_string(), *prevRevCount);
     }
 }
 
@@ -318,8 +330,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
             store->ensurePath(storePath);
 
-            debug("using substituted/cached input '%s' in '%s'",
-                to_string(), store->printStorePath(storePath));
+            debug("using substituted/cached input '%s' in '%s'", to_string(), store->printStorePath(storePath));
 
             auto accessor = makeStorePathAccessor(store, storePath);
 
@@ -341,11 +352,10 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
     return {accessor, std::move(result)};
 }
 
-Input Input::applyOverrides(
-    std::optional<std::string> ref,
-    std::optional<Hash> rev) const
+Input Input::applyOverrides(std::optional<std::string> ref, std::optional<Hash> rev) const
 {
-    if (!scheme) return *this;
+    if (!scheme)
+        return *this;
     return scheme->applyOverrides(*this, ref, rev);
 }
 
@@ -361,10 +371,7 @@ std::optional<std::filesystem::path> Input::getSourcePath() const
     return scheme->getSourcePath(*this);
 }
 
-void Input::putFile(
-    const CanonPath & path,
-    std::string_view contents,
-    std::optional<std::string> commitMsg) const
+void Input::putFile(const CanonPath & path, std::string_view contents, std::optional<std::string> commitMsg) const
 {
     assert(scheme);
     return scheme->putFile(*this, path, contents, commitMsg);
@@ -380,11 +387,13 @@ StorePath Input::computeStorePath(Store & store) const
     auto narHash = getNarHash();
     if (!narHash)
         throw Error("cannot compute store path for unlocked input '%s'", to_string());
-    return store.makeFixedOutputPath(getName(), FixedOutputInfo {
-        .method = FileIngestionMethod::NixArchive,
-        .hash = *narHash,
-        .references = {},
-    });
+    return store.makeFixedOutputPath(
+        getName(),
+        FixedOutputInfo{
+            .method = FileIngestionMethod::NixArchive,
+            .hash = *narHash,
+            .references = {},
+        });
 }
 
 std::string Input::getType() const
@@ -417,7 +426,7 @@ std::optional<Hash> Input::getRev() const
     if (auto s = maybeGetStrAttr(attrs, "rev")) {
         try {
             hash = Hash::parseAnyPrefixed(*s);
-        } catch (BadHash &e) {
+        } catch (BadHash & e) {
             // Default to sha1 for backwards compatibility with existing
             // usages (e.g. `builtins.fetchTree` calls or flake inputs).
             hash = Hash::parseAny(*s, HashAlgorithm::SHA1);
@@ -446,10 +455,7 @@ ParsedURL InputScheme::toURL(const Input & input) const
     throw Error("don't know how to convert input '%s' to a URL", attrsToJSON(input.attrs));
 }
 
-Input InputScheme::applyOverrides(
-    const Input & input,
-    std::optional<std::string> ref,
-    std::optional<Hash> rev) const
+Input InputScheme::applyOverrides(const Input & input, std::optional<std::string> ref, std::optional<Hash> rev) const
 {
     if (ref)
         throw Error("don't know how to set branch/tag name of input '%s' to '%s'", input.to_string(), *ref);
@@ -464,10 +470,7 @@ std::optional<std::filesystem::path> InputScheme::getSourcePath(const Input & in
 }
 
 void InputScheme::putFile(
-    const Input & input,
-    const CanonPath & path,
-    std::string_view contents,
-    std::optional<std::string> commitMsg) const
+    const Input & input, const CanonPath & path, std::string_view contents, std::optional<std::string> commitMsg) const
 {
     throw Error("input '%s' does not support modifying file '%s'", input.to_string(), path);
 }
@@ -482,7 +485,7 @@ std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const
     return {};
 }
 
-std::string publicKeys_to_string(const std::vector<PublicKey>& publicKeys)
+std::string publicKeys_to_string(const std::vector<PublicKey> & publicKeys)
 {
     return ((nlohmann::json) publicKeys).dump();
 }
@@ -497,7 +500,7 @@ using namespace nix;
 
 fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json)
 {
-    fetchers::PublicKey res = { };
+    fetchers::PublicKey res = {};
     if (auto type = optionalValueAt(json, "type"))
         res.type = getString(*type);
 

@@ -10,23 +10,13 @@
 namespace nix {
 
 // Custom implementation to avoid `ref` ptr equality
-GENERATE_CMP_EXT(
-    ,
-    std::strong_ordering,
-    SingleBuiltPathBuilt,
-    *me->drvPath,
-    me->output);
+GENERATE_CMP_EXT(, std::strong_ordering, SingleBuiltPathBuilt, *me->drvPath, me->output);
 
 // Custom implementation to avoid `ref` ptr equality
 
 // TODO no `GENERATE_CMP_EXT` because no `std::set::operator<=>` on
 // Darwin, per header.
-GENERATE_EQUAL(
-    ,
-    BuiltPathBuilt ::,
-    BuiltPathBuilt,
-    *me->drvPath,
-    me->outputs);
+GENERATE_EQUAL(, BuiltPathBuilt ::, BuiltPathBuilt, *me->drvPath, me->outputs);
 
 StorePath SingleBuiltPath::outPath() const
 {
@@ -34,8 +24,8 @@ StorePath SingleBuiltPath::outPath() const
         overloaded{
             [](const SingleBuiltPath::Opaque & p) { return p.path; },
             [](const SingleBuiltPath::Built & b) { return b.output.second; },
-        }, raw()
-    );
+        },
+        raw());
 }
 
 StorePathSet BuiltPath::outPaths() const
@@ -49,13 +39,13 @@ StorePathSet BuiltPath::outPaths() const
                     res.insert(path);
                 return res;
             },
-        }, raw()
-    );
+        },
+        raw());
 }
 
 SingleDerivedPath::Built SingleBuiltPath::Built::discardOutputPath() const
 {
-    return SingleDerivedPath::Built {
+    return SingleDerivedPath::Built{
         .drvPath = make_ref<SingleDerivedPath>(drvPath->discardOutputPath()),
         .output = output.first,
     };
@@ -65,14 +55,10 @@ SingleDerivedPath SingleBuiltPath::discardOutputPath() const
 {
     return std::visit(
         overloaded{
-            [](const SingleBuiltPath::Opaque & p) -> SingleDerivedPath {
-                return p;
-            },
-            [](const SingleBuiltPath::Built & b) -> SingleDerivedPath {
-                return b.discardOutputPath();
-            },
-        }, raw()
-    );
+            [](const SingleBuiltPath::Opaque & p) -> SingleDerivedPath { return p; },
+            [](const SingleBuiltPath::Built & b) -> SingleDerivedPath { return b.discardOutputPath(); },
+        },
+        raw());
 }
 
 nlohmann::json BuiltPath::Built::toJSON(const StoreDirConfig & store) const
@@ -97,16 +83,12 @@ nlohmann::json SingleBuiltPath::Built::toJSON(const StoreDirConfig & store) cons
 
 nlohmann::json SingleBuiltPath::toJSON(const StoreDirConfig & store) const
 {
-    return std::visit([&](const auto & buildable) {
-        return buildable.toJSON(store);
-    }, raw());
+    return std::visit([&](const auto & buildable) { return buildable.toJSON(store); }, raw());
 }
 
 nlohmann::json BuiltPath::toJSON(const StoreDirConfig & store) const
 {
-    return std::visit([&](const auto & buildable) {
-        return buildable.toJSON(store);
-    }, raw());
+    return std::visit([&](const auto & buildable) { return buildable.toJSON(store); }, raw());
 }
 
 RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
@@ -116,20 +98,18 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
         overloaded{
             [&](const BuiltPath::Opaque & p) { res.insert(p.path); },
             [&](const BuiltPath::Built & p) {
-                auto drvHashes =
-                    staticOutputHashes(store, store.readDerivation(p.drvPath->outPath()));
-                for (auto& [outputName, outputPath] : p.outputs) {
-                    if (experimentalFeatureSettings.isEnabled(
-                                Xp::CaDerivations)) {
+                auto drvHashes = staticOutputHashes(store, store.readDerivation(p.drvPath->outPath()));
+                for (auto & [outputName, outputPath] : p.outputs) {
+                    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                         auto drvOutput = get(drvHashes, outputName);
                         if (!drvOutput)
                             throw Error(
                                 "the derivation '%s' has unrealised output '%s' (derived-path.cc/toRealisedPaths)",
-                                store.printStorePath(p.drvPath->outPath()), outputName);
-                        auto thisRealisation = store.queryRealisation(
-                            DrvOutput{*drvOutput, outputName});
-                        assert(thisRealisation);  // We’ve built it, so we must
-                                                  // have the realisation
+                                store.printStorePath(p.drvPath->outPath()),
+                                outputName);
+                        auto thisRealisation = store.queryRealisation(DrvOutput{*drvOutput, outputName});
+                        assert(thisRealisation); // We’ve built it, so we must
+                                                 // have the realisation
                         res.insert(*thisRealisation);
                     } else {
                         res.insert(outputPath);

@@ -16,12 +16,13 @@ namespace nix {
 
 struct ArchiveSettings : Config
 {
-    Setting<bool> useCaseHack{this,
-        #ifdef __APPLE__
-            true,
-        #else
-            false,
-        #endif
+    Setting<bool> useCaseHack{
+        this,
+#ifdef __APPLE__
+        true,
+#else
+        false,
+#endif
         "use-case-hack",
         "Whether to enable a macOS-specific hack for dealing with file name case collisions."};
 };
@@ -32,18 +33,12 @@ static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
 PathFilter defaultPathFilter = [](const Path &) { return true; };
 
-
-void SourceAccessor::dumpPath(
-    const CanonPath & path,
-    Sink & sink,
-    PathFilter & filter)
+void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & filter)
 {
-    auto dumpContents = [&](const CanonPath & path)
-    {
+    auto dumpContents = [&](const CanonPath & path) {
         sink << "contents";
         std::optional<uint64_t> size;
-        readFile(path, sink, [&](uint64_t _size)
-        {
+        readFile(path, sink, [&](uint64_t _size) {
             size = _size;
             sink << _size;
         });
@@ -82,9 +77,8 @@ void SourceAccessor::dumpPath(
                         name.erase(pos);
                     }
                     if (!unhacked.emplace(name, i.first).second)
-                        throw Error("file name collision between '%s' and '%s'",
-                            (path / unhacked[name]),
-                            (path / i.first));
+                        throw Error(
+                            "file name collision between '%s' and '%s'", (path / unhacked[name]), (path / i.first));
                 } else
                     unhacked.emplace(i.first, i.first);
 
@@ -99,7 +93,8 @@ void SourceAccessor::dumpPath(
         else if (st.type == tSymlink)
             sink << "type" << "symlink" << "target" << readLink(path);
 
-        else throw Error("file '%s' has an unsupported type", path);
+        else
+            throw Error("file '%s' has an unsupported type", path);
 
         sink << ")";
     };
@@ -107,7 +102,6 @@ void SourceAccessor::dumpPath(
     sink << narVersionMagic1;
     dump(path);
 }
-
 
 time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
 {
@@ -121,19 +115,16 @@ void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
     dumpPathAndGetMtime(path, sink, filter);
 }
 
-
 void dumpString(std::string_view s, Sink & sink)
 {
     sink << narVersionMagic1 << "(" << "type" << "regular" << "contents" << s << ")";
 }
 
-
 template<typename... Args>
-static SerialisationError badArchive(std::string_view s, const Args & ... args)
+static SerialisationError badArchive(std::string_view s, const Args &... args)
 {
     return SerialisationError("bad archive: " + s, args...);
 }
-
 
 static void parseContents(CreateRegularFileSink & sink, Source & source)
 {
@@ -147,7 +138,8 @@ static void parseContents(CreateRegularFileSink & sink, Source & source)
     while (left) {
         checkInterrupt();
         auto n = buf.size();
-        if ((uint64_t)n > left) n = left;
+        if ((uint64_t) n > left)
+            n = left;
         source(buf.data(), n);
         sink({buf.data(), n});
         left -= n;
@@ -156,15 +148,13 @@ static void parseContents(CreateRegularFileSink & sink, Source & source)
     readPadding(size, source);
 }
 
-
 struct CaseInsensitiveCompare
 {
-    bool operator() (const std::string & a, const std::string & b) const
+    bool operator()(const std::string & a, const std::string & b) const
     {
         return strcasecmp(a.c_str(), b.c_str()) < 0;
     }
 };
-
 
 static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath & path)
 {
@@ -191,7 +181,8 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
 
             if (tag == "executable") {
                 auto s2 = getString();
-                if (s2 != "") throw badArchive("executable marker has non-empty value");
+                if (s2 != "")
+                    throw badArchive("executable marker has non-empty value");
                 crf.isExecutable();
                 tag = getString();
             }
@@ -213,7 +204,8 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
         while (1) {
             auto tag = getString();
 
-            if (tag == ")") break;
+            if (tag == ")")
+                break;
 
             if (tag != "entry")
                 throw badArchive("expected tag 'entry' or ')', got '%s'", tag);
@@ -223,7 +215,8 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
             expectTag("name");
 
             auto name = getString();
-            if (name.empty() || name == "." || name == ".." || name.find('/') != std::string::npos || name.find((char) 0) != std::string::npos)
+            if (name.empty() || name == "." || name == ".." || name.find('/') != std::string::npos
+                || name.find((char) 0) != std::string::npos)
                 throw badArchive("NAR contains invalid file name '%1%'", name);
             if (name <= prevName)
                 throw badArchive("NAR directory is not sorted");
@@ -236,7 +229,10 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
                     name += std::to_string(++i->second);
                     auto j = names.find(name);
                     if (j != names.end())
-                        throw badArchive("NAR contains file name '%s' that collides with case-hacked file name '%s'", prevName, j->first);
+                        throw badArchive(
+                            "NAR contains file name '%s' that collides with case-hacked file name '%s'",
+                            prevName,
+                            j->first);
                 } else
                     names[name] = 0;
             }
@@ -258,9 +254,9 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
         expectTag(")");
     }
 
-    else throw badArchive("unknown file type '%s'", type);
+    else
+        throw badArchive("unknown file type '%s'", type);
 }
-
 
 void parseDump(FileSystemObjectSink & sink, Source & source)
 {
@@ -276,14 +272,12 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
     parse(sink, source, CanonPath::root);
 }
 
-
 void restorePath(const std::filesystem::path & path, Source & source, bool startFsync)
 {
     RestoreSink sink{startFsync};
     sink.dstPath = path;
     parseDump(sink, source);
 }
-
 
 void copyNAR(Source & source, Sink & sink)
 {
@@ -292,10 +286,9 @@ void copyNAR(Source & source, Sink & sink)
 
     NullFileSystemObjectSink parseSink; /* just parse the NAR */
 
-    TeeSource wrapper { source, sink };
+    TeeSource wrapper{source, sink};
 
     parseDump(parseSink, wrapper);
 }
-
 
 }

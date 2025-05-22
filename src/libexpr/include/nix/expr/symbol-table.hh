@@ -23,10 +23,13 @@ class SymbolStr
 private:
     const std::string * s;
 
-    explicit SymbolStr(const std::string & symbol): s(&symbol) {}
+    explicit SymbolStr(const std::string & symbol)
+        : s(&symbol)
+    {
+    }
 
 public:
-    bool operator == (std::string_view s2) const
+    bool operator==(std::string_view s2) const
     {
         return *s == s2;
     }
@@ -36,12 +39,12 @@ public:
         return s->c_str();
     }
 
-    operator const std::string_view () const
+    operator const std::string_view() const
     {
         return *s;
     }
 
-    friend std::ostream & operator <<(std::ostream & os, const SymbolStr & symbol);
+    friend std::ostream & operator<<(std::ostream & os, const SymbolStr & symbol);
 
     bool empty() const
     {
@@ -61,15 +64,30 @@ class Symbol
 private:
     uint32_t id;
 
-    explicit Symbol(uint32_t id): id(id) {}
+    explicit Symbol(uint32_t id)
+        : id(id)
+    {
+    }
 
 public:
-    Symbol() : id(0) {}
+    Symbol()
+        : id(0)
+    {
+    }
 
-    explicit operator bool() const { return id > 0; }
+    explicit operator bool() const
+    {
+        return id > 0;
+    }
 
-    auto operator<=>(const Symbol other) const { return id <=> other.id; }
-    bool operator==(const Symbol other) const { return id == other.id; }
+    auto operator<=>(const Symbol other) const
+    {
+        return id <=> other.id;
+    }
+    bool operator==(const Symbol other) const
+    {
+        return id == other.id;
+    }
 
     friend class std::hash<Symbol>;
 };

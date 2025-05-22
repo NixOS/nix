@@ -9,26 +9,21 @@
 namespace nix {
 
 LocalBinaryCacheStoreConfig::LocalBinaryCacheStoreConfig(
-    std::string_view scheme,
-    PathView binaryCacheDir,
-    const StoreReference::Params & params)
+    std::string_view scheme, PathView binaryCacheDir, const StoreReference::Params & params)
     : Store::Config{params}
     , BinaryCacheStoreConfig{params}
     , binaryCacheDir(binaryCacheDir)
 {
 }
 
-
 std::string LocalBinaryCacheStoreConfig::doc()
 {
     return
-      #include "local-binary-cache-store.md"
-      ;
+#include "local-binary-cache-store.md"
+        ;
 }
 
-
-struct LocalBinaryCacheStore :
-    virtual BinaryCacheStore
+struct LocalBinaryCacheStore : virtual BinaryCacheStore
 {
     using Config = LocalBinaryCacheStoreConfig;
 
@@ -53,7 +48,8 @@ protected:
 
     bool fileExists(const std::string & path) override;
 
-    void upsertFile(const std::string & path,
+    void upsertFile(
+        const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) override
     {
@@ -85,12 +81,9 @@ protected:
         for (auto & entry : DirectoryIterator{config->binaryCacheDir}) {
             checkInterrupt();
             auto name = entry.path().filename().string();
-            if (name.size() != 40 ||
-                !hasSuffix(name, ".narinfo"))
+            if (name.size() != 40 || !hasSuffix(name, ".narinfo"))
                 continue;
-            paths.insert(parseStorePath(
-                    storeDir + "/" + name.substr(0, name.size() - 8)
-                    + "-" + MissingName));
+            paths.insert(parseStorePath(storeDir + "/" + name.substr(0, name.size() - 8) + "-" + MissingName));
         }
 
         return paths;
@@ -125,11 +118,11 @@ StringSet LocalBinaryCacheStoreConfig::uriSchemes()
         return {"file"};
 }
 
-ref<Store> LocalBinaryCacheStoreConfig::openStore() const {
-    return make_ref<LocalBinaryCacheStore>(ref{
-        // FIXME we shouldn't actually need a mutable config
-        std::const_pointer_cast<LocalBinaryCacheStore::Config>(shared_from_this())
-    });
+ref<Store> LocalBinaryCacheStoreConfig::openStore() const
+{
+    return make_ref<LocalBinaryCacheStore>(
+        ref{// FIXME we shouldn't actually need a mutable config
+            std::const_pointer_cast<LocalBinaryCacheStore::Config>(shared_from_this())});
 }
 
 static RegisterStoreImplementation<LocalBinaryCacheStore::Config> regLocalBinaryCacheStore;

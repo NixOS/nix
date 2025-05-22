@@ -3,7 +3,8 @@
 
 namespace nix {
 
-struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>, virtual StoreConfig {
+struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>, virtual StoreConfig
+{
     using StoreConfig::StoreConfig;
 
     DummyStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
@@ -13,16 +14,20 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
             throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
     }
 
-    static const std::string name() { return "Dummy Store"; }
+    static const std::string name()
+    {
+        return "Dummy Store";
+    }
 
     static std::string doc()
     {
         return
-          #include "dummy-store.md"
-          ;
+#include "dummy-store.md"
+            ;
     }
 
-    static StringSet uriSchemes() {
+    static StringSet uriSchemes()
+    {
         return {"dummy"};
     }
 
@@ -38,15 +43,16 @@ struct DummyStore : virtual Store
     DummyStore(ref<const Config> config)
         : Store{*config}
         , config(config)
-    { }
+    {
+    }
 
     std::string getUri() override
     {
         return *Config::uriSchemes().begin();
     }
 
-    void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
+    void queryPathInfoUncached(
+        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
     {
         callback(nullptr);
     }
@@ -60,11 +66,14 @@ struct DummyStore : virtual Store
     }
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
-    { unsupported("queryPathFromHashPart"); }
+    {
+        unsupported("queryPathFromHashPart");
+    }
 
-    void addToStore(const ValidPathInfo & info, Source & source,
-        RepairFlag repair, CheckSigsFlag checkSigs) override
-    { unsupported("addToStore"); }
+    void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override
+    {
+        unsupported("addToStore");
+    }
 
     virtual StorePath addToStoreFromDump(
         Source & dump,
@@ -74,14 +83,20 @@ struct DummyStore : virtual Store
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) override
-    { unsupported("addToStore"); }
+    {
+        unsupported("addToStore");
+    }
 
     void narFromPath(const StorePath & path, Sink & sink) override
-    { unsupported("narFromPath"); }
+    {
+        unsupported("narFromPath");
+    }
 
-    void queryRealisationUncached(const DrvOutput &,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
-    { callback(nullptr); }
+    void
+    queryRealisationUncached(const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override
+    {
+        callback(nullptr);
+    }
 
     virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
     {

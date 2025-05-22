@@ -18,7 +18,8 @@ Path trustedListPath()
 static TrustedList readTrustedList()
 {
     auto path = trustedListPath();
-    if (!pathExists(path)) return {};
+    if (!pathExists(path))
+        return {};
     auto json = nlohmann::json::parse(readFile(path));
     return json;
 }
@@ -32,7 +33,13 @@ static void writeTrustedList(const TrustedList & trustedList)
 
 void ConfigFile::apply(const Settings & flakeSettings)
 {
-    StringSet whitelist{"bash-prompt", "bash-prompt-prefix", "bash-prompt-suffix", "flake-registry", "commit-lock-file-summary", "commit-lockfile-summary"};
+    StringSet whitelist{
+        "bash-prompt",
+        "bash-prompt-prefix",
+        "bash-prompt-suffix",
+        "flake-registry",
+        "commit-lock-file-summary",
+        "commit-lockfile-summary"};
 
     for (auto & [name, value] : settings) {
 
@@ -40,11 +47,11 @@ void ConfigFile::apply(const Settings & flakeSettings)
 
         // FIXME: Move into libutil/config.cc.
         std::string valueS;
-        if (auto* s = std::get_if<std::string>(&value))
+        if (auto * s = std::get_if<std::string>(&value))
             valueS = *s;
-        else if (auto* n = std::get_if<int64_t>(&value))
+        else if (auto * n = std::get_if<int64_t>(&value))
             valueS = fmt("%d", *n);
-        else if (auto* b = std::get_if<Explicit<bool>>(&value))
+        else if (auto * b = std::get_if<Explicit<bool>>(&value))
             valueS = b->t ? "true" : "false";
         else if (auto ss = std::get_if<std::vector<std::string>>(&value))
             valueS = dropEmptyInitThenConcatStringsSep(" ", *ss); // FIXME: evil
@@ -57,19 +64,35 @@ void ConfigFile::apply(const Settings & flakeSettings)
             auto tlname = get(trustedList, name);
             if (auto saved = tlname ? get(*tlname, valueS) : nullptr) {
                 trusted = *saved;
-                printInfo("Using saved setting for '%s = %s' from ~/.local/share/nix/trusted-settings.json.", name, valueS);
+                printInfo(
+                    "Using saved setting for '%s = %s' from ~/.local/share/nix/trusted-settings.json.", name, valueS);
             } else {
                 // FIXME: filter ANSI escapes, newlines, \r, etc.
-                if (std::tolower(logger->ask(fmt("do you want to allow configuration setting '%s' to be set to '" ANSI_RED "%s" ANSI_NORMAL "' (y/N)?", name, valueS)).value_or('n')) == 'y') {
+                if (std::tolower(logger
+                                     ->ask(
+                                         fmt("do you want to allow configuration setting '%s' to be set to '" ANSI_RED
+                                             "%s" ANSI_NORMAL "' (y/N)?",
+                                             name,
+                                             valueS))
+                                     .value_or('n'))
+                    == 'y') {
                     trusted = true;
                 }
-                if (std::tolower(logger->ask(fmt("do you want to permanently mark this value as %s (y/N)?",  trusted ? "trusted": "untrusted" )).value_or('n')) == 'y') {
+                if (std::tolower(logger
+                                     ->ask(
+                                         fmt("do you want to permanently mark this value as %s (y/N)?",
+                                             trusted ? "trusted" : "untrusted"))
+                                     .value_or('n'))
+                    == 'y') {
                     trustedList[name][valueS] = trusted;
                     writeTrustedList(trustedList);
                 }
             }
             if (!trusted) {
-                warn("ignoring untrusted flake configuration setting '%s'.\nPass '%s' to trust it", name, "--accept-flake-config");
+                warn(
+                    "ignoring untrusted flake configuration setting '%s'.\nPass '%s' to trust it",
+                    name,
+                    "--accept-flake-config");
                 continue;
             }
         }

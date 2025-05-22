@@ -9,7 +9,8 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 {
     LocalOverlayStoreConfig(const StringMap & params)
         : LocalOverlayStoreConfig("local-overlay", "", params)
-    { }
+    {
+    }
 
     LocalOverlayStoreConfig(std::string_view scheme, PathView path, const Params & params)
         : StoreConfig(params)
@@ -18,7 +19,10 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
     {
     }
 
-    const Setting<std::string> lowerStoreUri{(StoreConfig*) this, "", "lower-store",
+    const Setting<std::string> lowerStoreUri{
+        (StoreConfig *) this,
+        "",
+        "lower-store",
         R"(
           [Store URL](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
           for the lower store. The default is `auto` (i.e. use the Nix daemon or `/nix/store` directly).
@@ -27,12 +31,18 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           Must be used as OverlayFS lower layer for this store's store dir.
         )"};
 
-    const PathSetting upperLayer{(StoreConfig*) this, "", "upper-layer",
+    const PathSetting upperLayer{
+        (StoreConfig *) this,
+        "",
+        "upper-layer",
         R"(
           Directory containing the OverlayFS upper layer for this store's store dir.
         )"};
 
-    Setting<bool> checkMount{(StoreConfig*) this, true, "check-mount",
+    Setting<bool> checkMount{
+        (StoreConfig *) this,
+        true,
+        "check-mount",
         R"(
           Check that the overlay filesystem is correctly mounted.
 
@@ -43,7 +53,10 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           default, but can be disabled if needed.
         )"};
 
-    const PathSetting remountHook{(StoreConfig*) this, "", "remount-hook",
+    const PathSetting remountHook{
+        (StoreConfig *) this,
+        "",
+        "remount-hook",
         R"(
           Script or other executable to run when overlay filesystem needs remounting.
 
@@ -56,7 +69,10 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           The store directory is passed as an argument to the invoked executable.
         )"};
 
-    static const std::string name() { return "Experimental Local Overlay Store"; }
+    static const std::string name()
+    {
+        return "Experimental Local Overlay Store";
+    }
 
     static std::optional<ExperimentalFeature> experimentalFeature()
     {
@@ -65,7 +81,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 
     static StringSet uriSchemes()
     {
-        return { "local-overlay" };
+        return {"local-overlay"};
     }
 
     static std::string doc();
@@ -124,8 +140,8 @@ private:
     /**
      * Check lower store if upper DB does not have.
      */
-    void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+    void queryPathInfoUncached(
+        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     /**
      * Check lower store if upper DB does not have.
@@ -159,8 +175,8 @@ private:
     /**
      * Check lower store if upper DB does not have.
      */
-    void queryRealisationUncached(const DrvOutput&,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+    void queryRealisationUncached(
+        const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
     /**
      * Call `remountIfNecessary` after collecting garbage normally.

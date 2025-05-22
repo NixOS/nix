@@ -33,24 +33,28 @@ struct PathSubstitutionGoal : public Goal
      */
     std::thread thr;
 
-    std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
-        maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
+    std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions, maintainRunningSubstitutions,
+        maintainExpectedNar, maintainExpectedDownload;
 
     /**
      * Content address for recomputing store path
      */
     std::optional<ContentAddress> ca;
 
-    Done done(
-        ExitCode result,
-        BuildResult::Status status,
-        std::optional<std::string> errorMsg = {});
+    Done done(ExitCode result, BuildResult::Status status, std::optional<std::string> errorMsg = {});
 
 public:
-    PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    PathSubstitutionGoal(
+        const StorePath & storePath,
+        Worker & worker,
+        RepairFlag repair = NoRepair,
+        std::optional<ContentAddress> ca = std::nullopt);
     ~PathSubstitutionGoal();
 
-    void timedOut(Error && ex) override { unreachable(); };
+    void timedOut(Error && ex) override
+    {
+        unreachable();
+    };
 
     /**
      * We prepend "a$" to the key name to ensure substitution goals
@@ -66,7 +70,8 @@ public:
      */
     Co init();
     Co gotInfo();
-    Co tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool & substituterFailed);
+    Co tryToRun(
+        StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool & substituterFailed);
     Co finished();
 
     /**
@@ -78,7 +83,8 @@ public:
     /* Called by destructor, can't be overridden */
     void cleanup() override final;
 
-    JobCategory jobCategory() const override {
+    JobCategory jobCategory() const override
+    {
         return JobCategory::Substitution;
     };
 };
