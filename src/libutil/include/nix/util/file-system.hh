@@ -6,8 +6,6 @@
  */
 
 #include "nix/util/types.hh"
-#include "nix/util/error.hh"
-#include "nix/util/logging.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-path.hh"
 
@@ -18,12 +16,8 @@
 #ifdef _WIN32
 # include <windef.h>
 #endif
-#include <signal.h>
 
-#include <atomic>
 #include <functional>
-#include <map>
-#include <sstream>
 #include <optional>
 
 /**
@@ -316,8 +310,8 @@ typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
 /**
  * Create a temporary directory.
  */
-Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
-    bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
+Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix", 
+                   mode_t mode = 0755);
 
 /**
  * Create a temporary file, returning a file handle and its path.
@@ -334,6 +328,14 @@ Path defaultTempDir();
  * whether it resolves to a file that is executable.
  */
 bool isExecutableFileAmbient(const std::filesystem::path & exe);
+
+/**
+ * Return temporary path constructed by appending a suffix to a root path.
+ *
+ * The constructed path looks like `<root><suffix>-<pid>-<unique>`. To create a
+ * path nested in a directory, provide a suffix starting with `/`.
+ */
+Path makeTempPath(const Path & root, const Path & suffix = ".tmp");
 
 /**
  * Used in various places.
