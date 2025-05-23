@@ -864,7 +864,7 @@ void DerivationBuilderImpl::startBuilder()
     if (!drvOptions.canBuildLocally(store, drv)) {
         auto msg = fmt(
             "Cannot build '%s'.\n"
-            "Reason: " ANSI_RED "unmet system or feature dependency" ANSI_NORMAL "\n"
+            "Reason: " ANSI_RED "required system or feature not available" ANSI_NORMAL "\n"
             "Required system: '%s' with features {%s}\n"
             "Current system: '%s' with features {%s}",
             Magenta(store.printStorePath(drvPath)),
