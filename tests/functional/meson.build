@@ -133,6 +133,7 @@ suites = [
       'post-hook.sh',
       'function-trace.sh',
       'formatter.sh',
+      'flamegraph-profiler.sh',
       'eval-store.sh',
       'why-depends.sh',
       'derivation-json.sh',
