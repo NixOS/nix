@@ -11,12 +11,18 @@ endforeach
 requires_public += deps_public
 
 extra_pkg_config_variables = get_variable('extra_pkg_config_variables', {})
+
+extra_cflags = []
+if not meson.project_name().endswith('-c')
+    extra_cflags += ['-std=c++2a']
+endif
+
 import('pkgconfig').generate(
   this_library,
   filebase : meson.project_name(),
   name : 'Nix',
   description : 'Nix Package Manager',
-  extra_cflags : ['-std=c++2a'],
+  extra_cflags : extra_cflags,
   requires : requires_public,
   requires_private : requires_private,
   libraries_private : libraries_private,
