@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-echo "Formatting(${#}):" "${@}"
+echo "PRJ_ROOT=$PRJ_ROOT Formatting(${#}):" "${@}"

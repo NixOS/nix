@@ -14,6 +14,7 @@ void execProgramInStore(ref<Store> store,
     UseLookupPath useLookupPath,
     const std::string & program,
     const Strings & args,
-    std::optional<std::string_view> system = std::nullopt);
+    std::optional<std::string_view> system = std::nullopt,
+    std::optional<StringMap> env = std::nullopt);
 
 }
