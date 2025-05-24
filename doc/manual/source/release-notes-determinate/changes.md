@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.29 and Determinate Nix 3.6.0.<!-- differences -->
+This section lists the differences between upstream Nix 2.29 and Determinate Nix 3.6.1.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -32,3 +32,6 @@ This section lists the differences between upstream Nix 2.29 and Determinate Nix
 <!-- Determinate Nix version 3.6.0 -->
 
 * Emit warnings when using import-from-derivation by setting the `trace-import-from-derivation` option to `true` by @gustavderdrache in [DeterminateSystems/nix-src#70](https://github.com/DeterminateSystems/nix-src/pull/70)
+<!-- Determinate Nix version 3.6.1 -->
+
+* Fix nlohmann error in fromStructuredAttrs() by @edolstra in [DeterminateSystems/nix-src#73](https://github.com/DeterminateSystems/nix-src/pull/73)
