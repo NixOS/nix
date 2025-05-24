@@ -907,11 +907,6 @@ void Value::mkStringMove(const char * s, const NixStringContext & context)
     mkString(s, encodeContext(context));
 }
 
-void Value::mkString(const SymbolStr & s)
-{
-    mkString(s.c_str(), nullptr);
-}
-
 void Value::mkPath(const SourcePath & path)
 {
     mkPath(&*path.accessor, makeImmutableString(path.path.abs()));
