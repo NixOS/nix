@@ -440,33 +440,43 @@ std::string outputPathName(std::string_view drvName, OutputNameView outputName);
  * derivations (fixed-output or not) will have a different hash for each
  * output.
  */
-struct DrvHash {
+struct DrvHashModulo
+{
     /**
-     * Map from output names to hashes
+     * Single hash for the derivation
+     *
+     * This is for an input-addressed derivation that doesn't
+     * transitively depend on any floating-CA derivations.
      */
-    std::map<std::string, Hash> hashes;
+    using DrvHash = Hash;
 
-    enum struct Kind : bool {
-        /**
-         * Statically determined derivations.
-         * This hash will be directly used to compute the output paths
-         */
-        Regular,
-
-        /**
-         * Floating-output derivations (and their reverse dependencies).
-         */
-        Deferred,
-    };
+	/**
+     * Known CA drv's output hashes, for fixed-output derivations whose
+     * output hashes are always known since they are fixed up-front.
+	 */
+	using CaOutputHashes = std::map<std::string, Hash>;
 
     /**
-     * The kind of derivation this is, simplified for just "derivation hash
-     * modulo" purposes.
+     * This derivation doesn't yet have known output hashes.
+     *
+     * Either because itself is floating CA, or it (transtively) depends
+     * on a floating CA derivation.
      */
-    Kind kind;
+    using DeferredDrv = std::monostate;
+
+	using Raw = std::variant<
+	    DrvHash,
+	    CaOutputHashes,
+	    DeferredDrv
+	>;
+
+	Raw raw;
+
+    bool operator == (const DrvHashModulo &) const = default;
+    //auto operator <=> (const DrvHashModulo &) const = default;
+
+    MAKE_WRAPPER_CONSTRUCTOR(DrvHashModulo);
 };
-
-void operator |= (DrvHash::Kind & self, const DrvHash::Kind & other) noexcept;
 
 /**
  * Returns hashes with the details of fixed-output subderivations
@@ -492,20 +502,23 @@ void operator |= (DrvHash::Kind & self, const DrvHash::Kind & other) noexcept;
  * ATerm, after subderivations have been likewise expunged from that
  * derivation.
  */
-DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
+DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
+
 
 /**
- * Return a map associating each output to a hash that uniquely identifies its
- * derivation (modulo the self-references).
+ * If a derivation is input addressed and doesn't yet have its input
+ * addressed (is deferred) try using `hashDerivationModulo`.
  *
- * \todo What is the Hash in this map?
+ * Does nothing if not deferred input-addressed, or
+ * `hashDerivationModulo` indicates it is missing inputs' output paths
+ * and is not yet ready (and must stay deferred).
  */
-std::map<std::string, Hash> staticOutputHashes(Store & store, const Derivation & drv);
+void resolveInputAddressed(Store & store, Derivation & drv);
 
 /**
  * Memoisation of hashDerivationModulo().
  */
-typedef std::map<StorePath, DrvHash> DrvHashes;
+typedef std::map<StorePath, DrvHashModulo> DrvHashes;
 
 // FIXME: global, though at least thread-safe.
 extern Sync<DrvHashes> drvHashes;
