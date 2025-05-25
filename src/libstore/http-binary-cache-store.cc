@@ -176,12 +176,12 @@ protected:
     void getFile(const std::string & path,
         Callback<std::optional<std::string>> callback) noexcept override
     {
+        auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
         try {
             checkEnabled();
 
             auto request(makeRequest(path));
-
-            auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
             getFileTransfer()->enqueueFileTransfer(request,
                 {[callbackPtr, this](std::future<FileTransferResult> result) {
@@ -198,7 +198,7 @@ protected:
             }});
 
         } catch (...) {
-            callback.rethrow();
+            callbackPtr->rethrow();
             return;
         }
     }
