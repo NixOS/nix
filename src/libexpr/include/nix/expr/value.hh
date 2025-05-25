@@ -5,7 +5,6 @@
 #include <span>
 
 #include "nix/expr/eval-gc.hh"
-#include "nix/expr/symbol-table.hh"
 #include "nix/expr/value/context.hh"
 #include "nix/util/source-path.hh"
 #include "nix/expr/print-options.hh"
@@ -330,11 +329,6 @@ public:
     void mkString(std::string_view s, const NixStringContext & context);
 
     void mkStringMove(const char * s, const NixStringContext & context);
-
-    inline void mkString(const SymbolStr & s)
-    {
-        mkString(s.c_str());
-    }
 
     void mkPath(const SourcePath & path);
     void mkPath(std::string_view path);

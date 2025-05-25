@@ -2,6 +2,7 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/primops.hh"
 #include "nix/expr/print-options.hh"
+#include "nix/expr/symbol-table.hh"
 #include "nix/util/exit.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
@@ -3009,7 +3010,7 @@ void EvalState::printStatistics()
         // XXX: overrides earlier assignment
         topObj["symbols"] = json::array();
         auto &list = topObj["symbols"];
-        symbols.dump([&](const std::string & s) { list.emplace_back(s); });
+        symbols.dump([&](auto & s) { list.emplace_back(std::string_view{s}); });
     }
     if (outPath == "-") {
         std::cerr << topObj.dump(2) << std::endl;

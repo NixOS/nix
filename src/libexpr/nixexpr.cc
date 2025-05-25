@@ -606,7 +606,7 @@ void ExprLambda::setDocComment(DocComment docComment) {
 size_t SymbolTable::totalSize() const
 {
     size_t n = 0;
-    dump([&] (const std::string & s) { n += s.size(); });
+    dump([&] (auto & s) { n += s.size(); });
     return n;
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nix/expr/value.hh"
+#include "nix/expr/symbol-table.hh"
 
 namespace nix {
 
