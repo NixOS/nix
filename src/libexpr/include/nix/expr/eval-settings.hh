@@ -13,7 +13,7 @@ struct PrimOp;
 struct EvalSettings : Config
 {
     /**
-     * Function used to interpet look path entries of a given scheme.
+     * Function used to interpret look path entries of a given scheme.
      *
      * The argument is the non-scheme part of the lookup path entry (see
      * `LookupPathHooks` below).

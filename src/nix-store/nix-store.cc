@@ -862,7 +862,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
         auto options = ServeProto::Serialise<ServeProto::BuildOptions>::read(*store, rconn);
 
-        // Only certain feilds get initialized based on the protocol
+        // Only certain fields get initialized based on the protocol
         // version. This is why not all the code below is unconditional.
         // See how the serialization logic in
         // `ServeProto::Serialise<ServeProto::BuildOptions>` matches

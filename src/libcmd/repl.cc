@@ -294,7 +294,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
         } catch (BadURL & e) {
             // Quietly ignore BadURL flake-related errors.
         } catch (FileNotFound & e) {
-            // Quietly ignore non-existent file beeing `import`-ed.
+            // Quietly ignore non-existent file being `import`-ed.
         }
     }
 

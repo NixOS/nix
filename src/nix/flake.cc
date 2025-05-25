@@ -65,7 +65,7 @@ public:
     std::vector<FlakeRef> getFlakeRefsForCompletion() override
     {
         return {
-            // Like getFlakeRef but with expandTilde calld first
+            // Like getFlakeRef but with expandTilde called first
             parseFlakeRef(fetchSettings, expandTilde(flakeUrl), std::filesystem::current_path().string())
         };
     }

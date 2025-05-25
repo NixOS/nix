@@ -481,7 +481,7 @@ static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
  * @param forceTrustClientOpt See `daemonLoop()` and the parameter with
  * the same name over there for details.
  *
- * @param procesOps Whether to force processing ops even if the next
+ * @param processOps Whether to force processing ops even if the next
  * store also is a remote store and could process it directly.
  */
 static void runDaemon(bool stdio, std::optional<TrustedFlag> forceTrustClientOpt, bool processOps)

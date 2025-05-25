@@ -890,7 +890,7 @@ static void prim_ceil(EvalState & state, const PosIdx pos, Value * * args, Value
         auto arg = args[0]->integer();
         auto res = v.integer();
         if (arg != res) {
-            state.error<EvalError>("Due to a bug (see https://github.com/NixOS/nix/issues/12899) a loss of precision occured in previous Nix versions because the NixInt argument %1% was rounded to %2%.\n\tFuture Nix versions might implement the correct behavior.", arg, res).atPos(pos).debugThrow();
+            state.error<EvalError>("Due to a bug (see https://github.com/NixOS/nix/issues/12899) a loss of precision occurred in previous Nix versions because the NixInt argument %1% was rounded to %2%.\n\tFuture Nix versions might implement the correct behavior.", arg, res).atPos(pos).debugThrow();
         }
     }
 }
@@ -931,7 +931,7 @@ static void prim_floor(EvalState & state, const PosIdx pos, Value * * args, Valu
         auto arg = args[0]->integer();
         auto res = v.integer();
         if (arg != res) {
-            state.error<EvalError>("Due to a bug (see https://github.com/NixOS/nix/issues/12899) a loss of precision occured in previous Nix versions because the NixInt argument %1% was rounded to %2%.\n\tFuture Nix versions might implement the correct behavior.", arg, res).atPos(pos).debugThrow();
+            state.error<EvalError>("Due to a bug (see https://github.com/NixOS/nix/issues/12899) a loss of precision occurred in previous Nix versions because the NixInt argument %1% was rounded to %2%.\n\tFuture Nix versions might implement the correct behavior.", arg, res).atPos(pos).debugThrow();
         }
     }
 }
@@ -965,7 +965,7 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
     ReplExitStatus (* savedDebugRepl)(ref<EvalState> es, const ValMap & extraEnv) = nullptr;
     if (state.debugRepl && state.settings.ignoreExceptionsDuringTry)
     {
-        /* to prevent starting the repl from exceptions withing a tryEval, null it. */
+        /* to prevent starting the repl from exceptions within a tryEval, null it. */
         savedDebugRepl = state.debugRepl;
         state.debugRepl = nullptr;
     }
@@ -2172,7 +2172,7 @@ static RegisterPrimOp primop_outputOf({
       [input placeholder string](@docroot@/store/derivation/index.md#input-placeholder)
       if needed.
 
-      If the derivation has a statically-known output path (i.e. the derivation output is input-addressed, or fixed content-addresed), the output path will just be returned.
+      If the derivation has a statically-known output path (i.e. the derivation output is input-addressed, or fixed content-addressed), the output path will just be returned.
       But if the derivation is content-addressed or if the derivation is itself not-statically produced (i.e. is the output of another derivation), an input placeholder will be returned instead.
 
       *`derivation reference`* must be a string that may contain a regular store path to a derivation, or may be an input placeholder reference.
@@ -2815,7 +2815,7 @@ static RegisterPrimOp primop_unsafeGetAttrPos(PrimOp {
     .fun = prim_unsafeGetAttrPos,
 });
 
-// access to exact position information (ie, line and colum numbers) is deferred
+// access to exact position information (ie, line and column numbers) is deferred
 // due to the cost associated with calculating that information and how rarely
 // it is used in practice. this is achieved by creating thunks to otherwise
 // inaccessible primops that are not exposed as __op or under builtins to turn
@@ -2827,7 +2827,7 @@ static RegisterPrimOp primop_unsafeGetAttrPos(PrimOp {
 // but each type of thunk has an associated runtime cost in the current evaluator.
 // as with black holes this cost is too high to justify another thunk type to check
 // for in the very hot path that is forceValue.
-static struct LazyPosAcessors {
+static struct LazyPosAccessors {
     PrimOp primop_lineOfPos{
         .arity = 1,
         .fun = [] (EvalState & state, PosIdx pos, Value * * args, Value & v) {
@@ -2843,7 +2843,7 @@ static struct LazyPosAcessors {
 
     Value lineOfPos, columnOfPos;
 
-    LazyPosAcessors()
+    LazyPosAccessors()
     {
         lineOfPos.mkPrimOp(&primop_lineOfPos);
         columnOfPos.mkPrimOp(&primop_columnOfPos);
@@ -3623,7 +3623,7 @@ static void prim_genList(EvalState & state, const PosIdx pos, Value * * args, Va
 
     size_t len = size_t(len_);
 
-    // More strict than striclty (!) necessary, but acceptable
+    // More strict than strictly (!) necessary, but acceptable
     // as evaluating map without accessing any values makes little sense.
     state.forceFunction(*args[0], noPos, "while evaluating the first argument passed to builtins.genList");
 
@@ -4126,7 +4126,7 @@ static void prim_substring(EvalState & state, const PosIdx pos, Value * * args, 
     }
 
     // Special-case on empty substring to avoid O(n) strlen
-    // This allows for the use of empty substrings to efficently capture string context
+    // This allows for the use of empty substrings to efficiently capture string context
     if (len == 0) {
         state.forceValue(*args[2], pos);
         if (args[2]->type() == nString) {
@@ -4442,7 +4442,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
             // Add a list for matched substrings.
             const size_t slen = match.size() - 1;
 
-            // Start at 1, beacause the first match is the whole string.
+            // Start at 1, because the first match is the whole string.
             auto list2 = state.buildList(slen);
             for (const auto & [si, v2] : enumerate(list2)) {
                 if (!match[si + 1].matched)

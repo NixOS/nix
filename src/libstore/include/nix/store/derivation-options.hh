@@ -170,7 +170,7 @@ struct DerivationOptions
     /**
      * Parse this information from its legacy encoding as part of the
      * environment. This should not be used with nice greenfield formats
-     * (e.g. JSON) but is necessary for supporing old formats (e.g.
+     * (e.g. JSON) but is necessary for supporting old formats (e.g.
      * ATerm).
      */
     static DerivationOptions

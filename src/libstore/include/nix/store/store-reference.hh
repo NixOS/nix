@@ -9,7 +9,7 @@ namespace nix {
 
 /**
  * A parsed Store URI (URI is a slight misnomer...), parsed but not yet
- * resolved to a specific instance and query parms validated.
+ * resolved to a specific instance and query params validated.
  *
  * Supported values are:
  *

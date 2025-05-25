@@ -97,7 +97,7 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
 
     /**
      * After calling handshake, must call this to exchange some basic
-     * information abou the connection.
+     * information about the connection.
      */
     ClientHandshakeInfo postHandshake(const StoreDirConfig & store);
 
@@ -157,7 +157,7 @@ struct WorkerProto::BasicServerConnection : WorkerProto::BasicConnection
 
     /**
      * After calling handshake, must call this to exchange some basic
-     * information abou the connection.
+     * information about the connection.
      */
     void postHandshake(const StoreDirConfig & store, const ClientHandshakeInfo & info);
 };

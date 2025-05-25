@@ -587,7 +587,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         });
 
         /* Evaluate result through status code and checking if public
-           key fingerprints appear on stderr. This is neccessary
+           key fingerprints appear on stderr. This is necessary
            because the git command might also succeed due to the
            commit being signed by gpg keys that are present in the
            users key agent. */

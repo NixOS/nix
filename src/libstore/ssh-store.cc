@@ -120,7 +120,7 @@ std::string MountedSSHStoreConfig::doc()
  * store.
  *
  * MountedSSHStore is very similar to UDSRemoteStore --- ignoring the
- * superficial differnce of SSH vs Unix domain sockets, they both are
+ * superficial difference of SSH vs Unix domain sockets, they both are
  * accessing remote stores, and they both assume the store will be
  * mounted in the local filesystem.
  *

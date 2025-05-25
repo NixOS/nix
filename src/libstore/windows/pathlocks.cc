@@ -127,7 +127,7 @@ bool PathLocks::lockPaths(const PathSet & paths, const std::string & waitMsg, bo
                 }
             }
 
-            debug("lock aquired on '%1%'", lockPath);
+            debug("lock acquired on '%1%'", lockPath);
 
             struct _stat st;
             if (_fstat(fromDescriptorReadOnly(fd.get()), &st) == -1)

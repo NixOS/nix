@@ -54,7 +54,7 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      *
      * @note Unlike Unix, this method should *not* follow symlinks. Nix
      * by default wants to manipulate symlinks explicitly, and not
-     * implictly follow them, as they are frequently untrusted user data
+     * implicitly follow them, as they are frequently untrusted user data
      * and thus may point to arbitrary locations. Acting on the targets
      * targets of symlinks should only occasionally be done, and only
      * with care.
