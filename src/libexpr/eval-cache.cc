@@ -618,18 +618,21 @@ string_t AttrCursor::getStringWithContext()
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
                 bool valid = true;
                 for (auto & c : s->second) {
-                    const StorePath & path = std::visit(overloaded {
-                        [&](const NixStringContextElem::DrvDeep & d) -> const StorePath & {
-                            return d.drvPath;
+                    const StorePath * path = std::visit(overloaded {
+                        [&](const NixStringContextElem::DrvDeep & d) -> const StorePath * {
+                            return &d.drvPath;
                         },
-                        [&](const NixStringContextElem::Built & b) -> const StorePath & {
-                            return b.drvPath->getBaseStorePath();
+                        [&](const NixStringContextElem::Built & b) -> const StorePath * {
+                            return &b.drvPath->getBaseStorePath();
                         },
-                        [&](const NixStringContextElem::Opaque & o) -> const StorePath & {
-                            return o.path;
+                        [&](const NixStringContextElem::Opaque & o) -> const StorePath * {
+                            return &o.path;
+                        },
+                        [&](const NixStringContextElem::Path & p) -> const StorePath * {
+                            return nullptr;
                         },
                     }, c.raw);
-                    if (!root->state.store->isValidPath(path)) {
+                    if (!path || !root->state.store->isValidPath(*path)) {
                         valid = false;
                         break;
                     }

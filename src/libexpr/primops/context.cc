@@ -7,9 +7,15 @@ namespace nix {
 
 static void prim_unsafeDiscardStringContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    NixStringContext context;
+    NixStringContext context, filtered;
+
     auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.unsafeDiscardStringContext");
-    v.mkString(*s);
+
+    for (auto & c : context)
+        if (auto * p = std::get_if<NixStringContextElem::Path>(&c.raw))
+            filtered.insert(*p);
+
+    v.mkString(*s, filtered);
 }
 
 static RegisterPrimOp primop_unsafeDiscardStringContext({
@@ -21,12 +27,19 @@ static RegisterPrimOp primop_unsafeDiscardStringContext({
     .fun = prim_unsafeDiscardStringContext,
 });
 
+bool hasContext(const NixStringContext & context)
+{
+    for (auto & c : context)
+        if (!std::get_if<NixStringContextElem::Path>(&c.raw))
+            return true;
+    return false;
+}
 
 static void prim_hasContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
     state.forceString(*args[0], context, pos, "while evaluating the argument passed to builtins.hasContext");
-    v.mkBool(!context.empty());
+    v.mkBool(hasContext(context));
 }
 
 static RegisterPrimOp primop_hasContext({
@@ -103,7 +116,7 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
     NixStringContext context;
     auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.addDrvOutputDependencies");
 
-	auto contextSize = context.size();
+    auto contextSize = context.size();
     if (contextSize != 1) {
         state.error<EvalError>(
             "context of string '%s' must have exactly one element, but has %d",
@@ -135,6 +148,11 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
                 /* FIXME: Suspicious move out of const. This is actually a copy, so the comment
                  above does not make much sense. */
                 return std::move(c);
+            },
+            [&](const NixStringContextElem::Path & p) -> NixStringContextElem::DrvDeep {
+                state.error<EvalError>(
+                    "`addDrvOutputDependencies` does not work on a string without context"
+                ).atPos(pos).debugThrow();
             },
         }, context.begin()->raw) }),
     };
@@ -205,6 +223,8 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
             },
             [&](NixStringContextElem::Opaque && o) {
                 contextInfos[std::move(o.path)].path = true;
+            },
+            [&](NixStringContextElem::Path && p) {
             },
         }, ((NixStringContextElem &&) i).raw);
     }
