@@ -1,6 +1,6 @@
 # Nix Language
 
-The Nix language is designed for conveniently creating and composing *derivations* – precise descriptions of how contents of existing files are used to derive new files.
+The Nix language is designed for conveniently creating and composing [derivations](@docroot@/glossary.md#gloss-derivation) – precise descriptions of how contents of existing files are used to derive new files.
 
 > **Tip**
 >
