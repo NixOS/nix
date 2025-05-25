@@ -961,32 +961,30 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case WorkerProto::Op::RegisterDrvOutput: {
         logger->startWork();
-        if (GET_PROTOCOL_MINOR(conn.protoVersion) < 31) {
-            auto outputId = DrvOutput::parse(readString(conn.from));
-            auto outputPath = StorePath(readString(conn.from));
-            store->registerDrvOutput(Realisation{
-                .id = outputId, .outPath = outputPath});
-        } else {
-            auto realisation = WorkerProto::Serialise<Realisation>::read(*store, rconn);
-            store->registerDrvOutput(realisation);
-        }
+        // TODO move to WorkerProto::Serialise<DrvOutput> and friends
+        //if (GET_PROTOCOL_MINOR(conn.protoVersion) < 39) {
+        //    throw Error("old-style build traces no longer supported");
+        //}
+        auto realisation = WorkerProto::Serialise<Realisation>::read(*store, rconn);
+        store->registerDrvOutput(realisation);
         logger->stopWork();
         break;
     }
 
     case WorkerProto::Op::QueryRealisation: {
         logger->startWork();
-        auto outputId = DrvOutput::parse(readString(conn.from));
-        auto info = store->queryRealisation(outputId);
+        auto outputId = WorkerProto::Serialise<DrvOutput>::read(*store, rconn);
+        std::optional<UnkeyedRealisation> info = *store->queryRealisation(outputId);
         logger->stopWork();
         if (GET_PROTOCOL_MINOR(conn.protoVersion) < 31) {
             std::set<StorePath> outPaths;
             if (info) outPaths.insert(info->outPath);
             WorkerProto::write(*store, wconn, outPaths);
+        } else if (GET_PROTOCOL_MINOR(conn.protoVersion) < 39) {
+            // No longer support this format
+            WorkerProto::write(*store, wconn, StringSet{});
         } else {
-            std::set<Realisation> realisations;
-            if (info) realisations.insert(*info);
-            WorkerProto::write(*store, wconn, realisations);
+            WorkerProto::write(*store, wconn, info);
         }
         break;
     }

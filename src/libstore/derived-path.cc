@@ -41,49 +41,30 @@ nlohmann::json DerivedPath::Opaque::toJSON(const StoreDirConfig & store) const
     return store.printStorePath(path);
 }
 
-nlohmann::json SingleDerivedPath::Built::toJSON(Store & store) const {
-    nlohmann::json res;
-    res["drvPath"] = drvPath->toJSON(store);
-    // Fallback for the input-addressed derivation case: We expect to always be
-    // able to print the output paths, so let’s do it
-    // FIXME try-resolve on drvPath
-    const auto outputMap = store.queryPartialDerivationOutputMap(resolveDerivedPath(store, *drvPath));
-    res["output"] = output;
-    auto outputPathIter = outputMap.find(output);
-    if (outputPathIter == outputMap.end())
-        res["outputPath"] = nullptr;
-    else if (std::optional p = outputPathIter->second)
-        res["outputPath"] = store.printStorePath(*p);
-    else
-        res["outputPath"] = nullptr;
-    return res;
+nlohmann::json SingleDerivedPath::Built::toJSON(const StoreDirConfig & store) const
+{
+    return nlohmann::json{
+        {"drvPath", drvPath->toJSON(store)},
+        {"output", output},
+    };
 }
 
-nlohmann::json DerivedPath::Built::toJSON(Store & store) const {
-    nlohmann::json res;
-    res["drvPath"] = drvPath->toJSON(store);
-    // Fallback for the input-addressed derivation case: We expect to always be
-    // able to print the output paths, so let’s do it
-    // FIXME try-resolve on drvPath
-    const auto outputMap = store.queryPartialDerivationOutputMap(resolveDerivedPath(store, *drvPath));
-    for (const auto & [output, outputPathOpt] : outputMap) {
-        if (!outputs.contains(output)) continue;
-        if (outputPathOpt)
-            res["outputs"][output] = store.printStorePath(*outputPathOpt);
-        else
-            res["outputs"][output] = nullptr;
-    }
-    return res;
+nlohmann::json DerivedPath::Built::toJSON(const StoreDirConfig & store) const
+{
+    return nlohmann::json{
+        {"drvPath", drvPath->toJSON(store)},
+        {"outputs", outputs},
+    };
 }
 
-nlohmann::json SingleDerivedPath::toJSON(Store & store) const
+nlohmann::json SingleDerivedPath::toJSON(const StoreDirConfig & store) const
 {
     return std::visit([&](const auto & buildable) {
         return buildable.toJSON(store);
     }, raw());
 }
 
-nlohmann::json DerivedPath::toJSON(Store & store) const
+nlohmann::json DerivedPath::toJSON(const StoreDirConfig & store) const
 {
     return std::visit([&](const auto & buildable) {
         return buildable.toJSON(store);

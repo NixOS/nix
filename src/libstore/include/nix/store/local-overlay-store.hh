@@ -160,7 +160,7 @@ private:
      * Check lower store if upper DB does not have.
      */
     void queryRealisationUncached(const DrvOutput&,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+        Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     /**
      * Call `remountIfNecessary` after collecting garbage normally.

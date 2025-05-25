@@ -338,10 +338,10 @@ public:
         const std::string & outputName,
         const StorePath & output);
 
-    std::optional<const Realisation> queryRealisation_(State & state, const DrvOutput & id);
-    std::optional<std::pair<int64_t, Realisation>> queryRealisationCore_(State & state, const DrvOutput & id);
+    std::optional<const UnkeyedRealisation> queryRealisation_(State & state, const DrvOutput & id);
+    std::optional<std::pair<int64_t, UnkeyedRealisation>> queryRealisationCore_(State & state, const DrvOutput & id);
     void queryRealisationUncached(const DrvOutput&,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+        Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     std::optional<std::string> getVersion() override;
 
