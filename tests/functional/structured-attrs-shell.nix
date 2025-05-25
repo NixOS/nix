@@ -21,7 +21,7 @@ mkDerivation {
     "b"
     "c"
   ];
-  exportReferencesGraph.refs = [ dep ];
+  exportReferencesGraph.refs = dep;
   buildCommand = ''
     touch ''${outputs[out]}; touch ''${outputs[dev]}
   '';
