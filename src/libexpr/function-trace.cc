@@ -4,7 +4,7 @@
 namespace nix {
 
 void FunctionCallTrace::preFunctionCallHook(
-    const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos)
+    EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos)
 {
     auto duration = std::chrono::high_resolution_clock::now().time_since_epoch();
     auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(duration);
@@ -12,7 +12,7 @@ void FunctionCallTrace::preFunctionCallHook(
 }
 
 void FunctionCallTrace::postFunctionCallHook(
-    const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos)
+    EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos)
 {
     auto duration = std::chrono::high_resolution_clock::now().time_since_epoch();
     auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(duration);

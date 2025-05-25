@@ -5,18 +5,14 @@
 
 namespace nix {
 
-void EvalProfiler::preFunctionCallHook(
-    const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos)
-{
-}
+void EvalProfiler::preFunctionCallHook(EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos) {}
 
-void EvalProfiler::postFunctionCallHook(
-    const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos)
+void EvalProfiler::postFunctionCallHook(EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos)
 {
 }
 
 void MultiEvalProfiler::preFunctionCallHook(
-    const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos)
+    EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos)
 {
     for (auto & profiler : profilers) {
         if (profiler->getNeededHooks().test(Hook::preFunctionCall))
@@ -25,7 +21,7 @@ void MultiEvalProfiler::preFunctionCallHook(
 }
 
 void MultiEvalProfiler::postFunctionCallHook(
-    const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos)
+    EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos)
 {
     for (auto & profiler : profilers) {
         if (profiler->getNeededHooks().test(Hook::postFunctionCall))
@@ -126,7 +122,7 @@ class SampleStack : public EvalProfiler
     }
 
 public:
-    SampleStack(const EvalState & state, std::filesystem::path profileFile, std::chrono::nanoseconds period)
+    SampleStack(EvalState & state, std::filesystem::path profileFile, std::chrono::nanoseconds period)
         : state(state)
         , sampleInterval(period)
         , profileFd([&]() {
@@ -140,9 +136,9 @@ public:
     }
 
     [[gnu::noinline]] void
-    preFunctionCallHook(const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos) override;
+    preFunctionCallHook(EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos) override;
     [[gnu::noinline]] void
-    postFunctionCallHook(const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos) override;
+    postFunctionCallHook(EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos) override;
 
     void maybeSaveProfile(std::chrono::time_point<std::chrono::high_resolution_clock> now);
     void saveProfile();
@@ -156,7 +152,7 @@ public:
 
 private:
     /** Hold on to an instance of EvalState for symbolizing positions. */
-    const EvalState & state;
+    EvalState & state;
     std::chrono::nanoseconds sampleInterval;
     AutoCloseFD profileFd;
     FrameStack stack;
@@ -191,7 +187,7 @@ FrameInfo SampleStack::getFrameInfoFromValueAndPos(const Value & v, PosIdx pos)
 }
 
 [[gnu::noinline]] void SampleStack::preFunctionCallHook(
-    const EvalState & state, const Value & v, [[maybe_unused]] std::span<Value *> args, const PosIdx pos)
+    EvalState & state, const Value & v, [[maybe_unused]] std::span<Value *> args, const PosIdx pos)
 {
     stack.push_back(getFrameInfoFromValueAndPos(v, pos));
 
@@ -208,9 +204,8 @@ FrameInfo SampleStack::getFrameInfoFromValueAndPos(const Value & v, PosIdx pos)
 }
 
 [[gnu::noinline]] void
-SampleStack::postFunctionCallHook(const EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos)
+SampleStack::postFunctionCallHook(EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos)
 {
-
     if (!stack.empty())
         stack.pop_back();
 }
@@ -300,8 +295,7 @@ SampleStack::~SampleStack()
 
 } // namespace
 
-ref<EvalProfiler>
-makeSampleStackProfiler(const EvalState & state, std::filesystem::path profileFile, uint64_t frequency)
+ref<EvalProfiler> makeSampleStackProfiler(EvalState & state, std::filesystem::path profileFile, uint64_t frequency)
 {
     /* 0 is a special value for sampling stack after each call. */
     std::chrono::nanoseconds period = frequency == 0
