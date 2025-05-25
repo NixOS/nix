@@ -322,8 +322,17 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
             for (size_t n = 0; n < git_commit_parentcount(commit->get()); ++n) {
                 git_commit * parent;
-                if (git_commit_parent(&parent, commit->get(), n))
-                    throw Error("getting parent of Git commit '%s': %s", *git_commit_id(commit->get()), git_error_last()->message);
+                if (git_commit_parent(&parent, commit->get(), n)) {
+                    throw Error(
+                        "Failed to retrieve the parent of Git commit '%s': %s. "
+                        "This may be due to an incomplete repository history. "
+                        "To resolve this, either enable the shallow parameter in your flake URL (?shallow=1) "
+                        "or add set the shallow parameter to true in builtins.fetchGit, "
+                        "or fetch the complete history for this branch.",
+                        *git_commit_id(commit->get()),
+                        git_error_last()->message
+                    );
+                }
                 todo.push(Commit(parent));
             }
         }
