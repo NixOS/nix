@@ -2243,6 +2243,16 @@ bool EvalState::forceBool(Value & v, const PosIdx pos, std::string_view errorCtx
     return v.boolean();
 }
 
+Bindings::const_iterator EvalState::getAttr(Symbol attrSym, const Bindings * attrSet, std::string_view errorCtx)
+{
+    auto value = attrSet->find(attrSym);
+    if (value == attrSet->end()) {
+        error<TypeError>("attribute '%s' missing", symbols[attrSym])
+            .withTrace(noPos, errorCtx)
+            .debugThrow();
+    }
+    return value;
+}
 
 bool EvalState::isFunctor(const Value & fun) const
 {
