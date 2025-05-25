@@ -65,6 +65,14 @@
               ''^tests/functional/lang/eval-fail-set\.nix$''
             ];
           };
+          clang-tidy = {
+            enable = true;
+            # TODO: this requires meson to have been configured
+            # we could optionally wrap this in a script that runs meson first
+            # but for now let us keep it simple
+            entry = "${pkgs.clang-tools}/bin/clang-tidy --fix -p ./build";
+            files = ''^src/libstore'';
+          };
           clang-format = {
             enable = true;
             # https://github.com/cachix/git-hooks.nix/pull/532
