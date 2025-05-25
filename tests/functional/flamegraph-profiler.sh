@@ -89,3 +89,13 @@ expect_trace 'let f2 = (x: x); in f2 1 2' "
 expect_trace '1 2' "
 «string»:1:1 1
 "
+
+# Derivation
+expect_trace 'builtins.derivationStrict { name = "somepackage"; }' "
+«string»:1:1:primop derivationStrict:somepackage 1
+"
+
+# Derivation without name attr
+expect_trace 'builtins.derivationStrict { }' "
+«string»:1:1:primop derivationStrict 1
+"
