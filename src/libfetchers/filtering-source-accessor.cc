@@ -21,8 +21,13 @@ bool FilteringSourceAccessor::pathExists(const CanonPath & path)
 
 std::optional<SourceAccessor::Stat> FilteringSourceAccessor::maybeLstat(const CanonPath & path)
 {
+    return isAllowed(path) ? next->maybeLstat(prefix / path) : std::nullopt;
+}
+
+SourceAccessor::Stat FilteringSourceAccessor::lstat(const CanonPath & path)
+{
     checkAccess(path);
-    return next->maybeLstat(prefix / path);
+    return next->lstat(prefix / path);
 }
 
 SourceAccessor::DirEntries FilteringSourceAccessor::readDirectory(const CanonPath & path)

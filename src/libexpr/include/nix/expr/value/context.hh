@@ -54,10 +54,35 @@ struct NixStringContextElem {
      */
     using Built = SingleDerivedPath::Built;
 
+    /**
+     * A store path that will not result in a store reference when
+     * used in a derivation or toFile.
+     *
+     * When you apply `builtins.toString` to a path value representing
+     * a path in the Nix store (as is the case with flake inputs),
+     * historically you got a string without context
+     * (e.g. `/nix/store/...-source`). This is broken, since it allows
+     * you to pass a store path to a derivation/toFile without a
+     * proper store reference. This is especially a problem with lazy
+     * trees, since the store path is a virtual path that doesn't
+     * exist.
+     *
+     * For backwards compatibility, and to warn users about this
+     * unsafe use of `toString`, we keep track of such strings as a
+     * special type of context.
+     */
+    struct Path
+    {
+        StorePath storePath;
+
+        GENERATE_CMP(Path, me->storePath);
+    };
+
     using Raw = std::variant<
         Opaque,
         DrvDeep,
-        Built
+        Built,
+        Path
     >;
 
     Raw raw;
@@ -81,5 +106,11 @@ struct NixStringContextElem {
 };
 
 typedef std::set<NixStringContextElem> NixStringContext;
+
+/**
+ * Returns false if `context` has no elements other than
+ * `NixStringContextElem::Path`.
+ */
+bool hasContext(const NixStringContext & context);
 
 }
