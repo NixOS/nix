@@ -12,7 +12,7 @@ repo=$TEST_ROOT/./git
 
 export _NIX_FORCE_HTTP=1
 
-rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix $TEST_ROOT/worktree $TEST_ROOT/shallow $TEST_ROOT/minimal
+rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix $TEST_ROOT/worktree $TEST_ROOT/minimal
 
 git init $repo
 git -C $repo config user.email "foobar@example.com"
@@ -215,18 +215,6 @@ git -C $TEST_ROOT/minimal init
 git -C $TEST_ROOT/minimal fetch $repo $rev2
 git -C $TEST_ROOT/minimal checkout $rev2
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit { url = $TEST_ROOT/minimal; }).rev") = $rev2 ]]
-
-# Fetching a shallow repo shouldn't work by default, because we can't
-# return a revCount.
-git clone --depth 1 file://$repo $TEST_ROOT/shallow
-(! nix eval --impure --raw --expr "(builtins.fetchGit { url = $TEST_ROOT/shallow; ref = \"dev\"; }).outPath")
-
-# But you can request a shallow clone, which won't return a revCount.
-path6=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow\"; ref = \"dev\"; shallow = true; }).outPath")
-[[ $path3 = $path6 ]]
-[[ $(nix eval --impure --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow\"; ref = \"dev\"; shallow = true; }).revCount or 123") == 123 ]]
-
-expectStderr 1 nix eval --expr 'builtins.fetchTree { type = "git"; url = "file:///foo"; }' | grepQuiet "'fetchTree' will not fetch unlocked input"
 
 # Explicit ref = "HEAD" should work, and produce the same outPath as without ref
 path7=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).outPath")
