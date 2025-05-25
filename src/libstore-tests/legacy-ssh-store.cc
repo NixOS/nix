@@ -9,11 +9,13 @@ TEST(LegacySSHStore, constructConfig)
     LegacySSHStoreConfig config{
         "ssh",
         "localhost",
-        StoreConfig::Params{
+        StoreReference::Params{
             {
                 "remote-program",
-                // TODO #11106, no more split on space
-                "foo bar",
+                {
+                    "foo",
+                    "bar",
+                },
             },
         }};
     EXPECT_EQ(
