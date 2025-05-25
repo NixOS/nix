@@ -412,7 +412,7 @@ Derivation parseDerivation(
         expect(str, "rvWithVersion(");
         auto versionS = parseString(str);
         if (*versionS == "xp-dyn-drv") {
-            // Only verison we have so far
+            // Only version we have so far
             version = DerivationATermVersion::DynamicDerivations;
             xpSettings.require(Xp::DynamicDerivations);
         } else {
@@ -553,7 +553,7 @@ static void unparseDerivedPathMapNode(const StoreDirConfig & store, std::string 
  * derivation?
  *
  * In other words, does it on the output of derivation that is itself an
- * ouput of a derivation? This corresponds to a dependency that is an
+ * output of a derivation? This corresponds to a dependency that is an
  * inductive derived path with more than one layer of
  * `DerivedPath::Built`.
  */

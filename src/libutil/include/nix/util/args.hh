@@ -252,7 +252,7 @@ protected:
    std::list<ExpectedArg> processedArgs;
 
     /**
-     * Process some positional arugments
+     * Process some positional arguments
      *
      * @param finish: We have parsed everything else, and these are the only
      * arguments left. Used because we accumulate some "pending args" we might

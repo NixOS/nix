@@ -382,7 +382,7 @@ public:
 
     /**
      * Query the mapping outputName => outputPath for the given
-     * derivation. All outputs are mentioned so ones mising the mapping
+     * derivation. All outputs are mentioned so ones missing the mapping
      * are mapped to `std::nullopt`.
      */
     virtual std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(
@@ -809,7 +809,7 @@ protected:
 
     /**
      * Helper for methods that are not unsupported: this is used for
-     * default definitions for virtual methods that are meant to be overriden.
+     * default definitions for virtual methods that are meant to be overridden.
      *
      * @todo Using this should be a last resort. It is better to make
      * the method "virtual pure" and/or move it to a subclass.

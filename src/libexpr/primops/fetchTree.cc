@@ -305,7 +305,7 @@ static RegisterPrimOp primop_fetchTree({
       - `"tarball"`
 
         Download a tar archive and extract it into the Nix store.
-        This has the same underyling implementation as [`builtins.fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball)
+        This has the same underlying implementation as [`builtins.fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball)
 
         - `url` (String, required)
 

@@ -11,7 +11,7 @@
 namespace nix {
 
 /**
- * Unix-style path primives.
+ * Unix-style path primitives.
  *
  * Nix'result own "logical" paths are always Unix-style. So this is always
  * used for that, and additionally used for native paths on Unix.
@@ -51,7 +51,7 @@ struct UnixPathTrait
  * often manipulating them converted to UTF-8 (*) using `char`.
  *
  * (Actually neither are guaranteed to be valid unicode; both are
- * arbitrary non-0 8- or 16-bit bytes. But for charcters with specifical
+ * arbitrary non-0 8- or 16-bit bytes. But for characters with specifical
  * meaning like '/', '\\', ':', etc., we refer to an encoding scheme,
  * and also for sake of UIs that display paths a text.)
  */

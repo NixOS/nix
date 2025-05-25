@@ -7,7 +7,7 @@
  * those implementations.
  *
  * Consumers of an arbitrary store from a URL/JSON configuration instead
- * just need the defintions `nix/store/store-open.hh`; those do use this
+ * just need the definitions `nix/store/store-open.hh`; those do use this
  * but only as an implementation. Consumers of a specific extra type of
  * store can skip both these, and just use the definition of the store
  * in question directly.
@@ -71,7 +71,7 @@ struct Implementations
         };
         auto [it, didInsert] = registered().insert({TConfig::name(), std::move(factory)});
         if (!didInsert) {
-            throw Error("Already registred store with name '%s'", it->first);
+            throw Error("Already registered store with name '%s'", it->first);
         }
     }
 };

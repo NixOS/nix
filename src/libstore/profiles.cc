@@ -331,7 +331,7 @@ Path getDefaultProfile()
         if (!pathExists(profileLink)) {
             replaceSymlink(profile, profileLink);
         }
-        // Backwards compatibiliy measure: Make root's profile available as
+        // Backwards compatibility measure: Make root's profile available as
         // `.../default` as it's what NixOS and most of the init scripts expect
         Path globalProfileLink = settings.nixStateDir + "/profiles/default";
         if (isRootUser() && !pathExists(globalProfileLink)) {

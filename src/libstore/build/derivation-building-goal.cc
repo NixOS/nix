@@ -329,7 +329,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                       auto take1 = get(resolvedResult.builtOutputs, outputName);
                       if (take1) return *take1;
 
-                      /* The above `get` should work. But sateful tracking of
+                      /* The above `get` should work. But stateful tracking of
                          outputs in resolvedResult, this can get out of sync with the
                          store, which is our actual source of truth. For now we just
                          check the store directly if it fails. */
@@ -1150,7 +1150,7 @@ std::pair<bool, SingleDrvOutputs> DerivationBuildingGoal::checkPathValidity()
     for (auto & i : queryPartialDerivationOutputMap()) {
         auto initialOutput = get(initialOutputs, i.first);
         if (!initialOutput)
-            // this is an invalid output, gets catched with (!wantedOutputsLeft.empty())
+            // this is an invalid output, gets caught with (!wantedOutputsLeft.empty())
             continue;
         auto & info = *initialOutput;
         info.wanted = true;

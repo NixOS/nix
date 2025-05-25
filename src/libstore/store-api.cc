@@ -333,10 +333,10 @@ digraph graphname {
     node [shape=box]
     fileSource -> narSink
     narSink [style=dashed]
-    narSink -> unsualHashTee [style = dashed, label = "Recursive && !SHA-256"]
+    narSink -> unusualHashTee [style = dashed, label = "Recursive && !SHA-256"]
     narSink -> narHashSink [style = dashed, label = "else"]
-    unsualHashTee -> narHashSink
-    unsualHashTee -> caHashSink
+    unusualHashTee -> narHashSink
+    unusualHashTee -> caHashSink
     fileSource -> parseSink
     parseSink [style=dashed]
     parseSink-> fileSink [style = dashed, label = "Flat"]

@@ -1987,7 +1987,7 @@ void DerivationBuilderImpl::runChild()
             }
 
             for (auto & i : ss) {
-                // For backwards-compatibiliy, resolve all the symlinks in the
+                // For backwards-compatibility, resolve all the symlinks in the
                 // chroot paths
                 auto canonicalPath = canonPath(i, true);
                 pathsInChroot.emplace(i, canonicalPath);

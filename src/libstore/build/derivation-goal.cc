@@ -86,7 +86,7 @@ void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
 {
     auto newWanted = wantedOutputs.union_(outputs);
     switch (needRestart) {
-    case NeedRestartForMoreOutputs::OutputsUnmodifedDontNeed:
+    case NeedRestartForMoreOutputs::OutputsUnmodifiedDontNeed:
         if (!newWanted.isSubsetOf(wantedOutputs))
             needRestart = NeedRestartForMoreOutputs::OutputsAddedDoNeed;
         break;
@@ -303,7 +303,7 @@ Goal::Co DerivationGoal::haveDerivation(StorePath drvPath)
     nrFailed = nrNoSubstituters = 0;
 
     if (needRestart == NeedRestartForMoreOutputs::OutputsAddedDoNeed) {
-        needRestart = NeedRestartForMoreOutputs::OutputsUnmodifedDontNeed;
+        needRestart = NeedRestartForMoreOutputs::OutputsUnmodifiedDontNeed;
         co_return haveDerivation(std::move(drvPath));
     }
 
@@ -458,7 +458,7 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity(const StoreP
     for (auto & i : queryPartialDerivationOutputMap(drvPath)) {
         auto initialOutput = get(initialOutputs, i.first);
         if (!initialOutput)
-            // this is an invalid output, gets catched with (!wantedOutputsLeft.empty())
+            // this is an invalid output, gets caught with (!wantedOutputsLeft.empty())
             continue;
         auto & info = *initialOutput;
         info.wanted = wantedOutputs.contains(i.first);

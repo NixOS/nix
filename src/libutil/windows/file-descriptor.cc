@@ -47,7 +47,7 @@ void writeFull(HANDLE handle, std::string_view s, bool allowInterrupts)
         if (allowInterrupts) checkInterrupt();
         DWORD res;
 #if _WIN32_WINNT >= 0x0600
-        auto path = handleToPath(handle); // debug; do it before becuase handleToPath changes lasterror
+        auto path = handleToPath(handle); // debug; do it before because handleToPath changes lasterror
         if (!WriteFile(handle, s.data(), s.size(), &res, NULL)) {
             throw WinError("writing to file %1%:%2%", handle, path);
         }

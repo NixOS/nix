@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-// inluding the generated headers twice leads to errors
+// including the generated headers twice leads to errors
 #ifndef BISON_HEADER
 #  include "lexer-tab.hh"
 #  include "parser-tab.hh"

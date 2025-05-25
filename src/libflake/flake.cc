@@ -531,7 +531,7 @@ LockedFlake lockFlake(
 
                     /* Resolve relative 'path:' inputs relative to
                        the source path of the overrider. */
-                    auto overridenSourcePath = hasOverride ? i->second.sourcePath : sourcePath;
+                    auto overriddenSourcePath = hasOverride ? i->second.sourcePath : sourcePath;
 
                     /* Respect the "flakeness" of the input even if we
                        override it. */
@@ -552,7 +552,7 @@ LockedFlake lockFlake(
 
                     assert(input.ref);
 
-                    auto overridenParentPath =
+                    auto overriddenParentPath =
                         input.ref->input.isRelative()
                         ? std::optional<InputAttrPath>(hasOverride ? i->second.parentInputAttrPath : inputAttrPathPrefix)
                         : std::nullopt;
@@ -561,8 +561,8 @@ LockedFlake lockFlake(
                     {
                         if (auto relativePath = input.ref->input.isRelative()) {
                             return SourcePath {
-                                overridenSourcePath.accessor,
-                                CanonPath(*relativePath, overridenSourcePath.path.parent().value())
+                                overriddenSourcePath.accessor,
+                                CanonPath(*relativePath, overriddenSourcePath.path.parent().value())
                             };
                         } else
                             return std::nullopt;
@@ -596,7 +596,7 @@ LockedFlake lockFlake(
 
                     if (oldLock
                         && oldLock->originalRef.canonicalize() == input.ref->canonicalize()
-                        && oldLock->parentInputAttrPath == overridenParentPath
+                        && oldLock->parentInputAttrPath == overriddenParentPath
                         && !hasCliOverride)
                     {
                         debug("keeping existing input '%s'", inputAttrPathS);
@@ -694,7 +694,7 @@ LockedFlake lockFlake(
                                 inputFlake.lockedRef,
                                 ref,
                                 true,
-                                overridenParentPath);
+                                overriddenParentPath);
 
                             node->inputs.insert_or_assign(id, childNode);
 
@@ -741,7 +741,7 @@ LockedFlake lockFlake(
                                 }
                             }();
 
-                            auto childNode = make_ref<LockedNode>(lockedRef, ref, false, overridenParentPath);
+                            auto childNode = make_ref<LockedNode>(lockedRef, ref, false, overriddenParentPath);
 
                             nodePaths.emplace(childNode, path);
 

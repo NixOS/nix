@@ -657,7 +657,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             Value & functor = *v.attrs()->find(sFunctor)->value;
             Value * vp[] = {&v};
             Value partiallyApplied;
-            // The first paramater is not user-provided, and may be
+            // The first parameter is not user-provided, and may be
             // handled by code that is opaque to the user, like lib.const = x: y: y;
             // So preferably we show docs that are relevant to the
             // "partially applied" function returned by e.g. `const`.
@@ -2495,7 +2495,7 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
         }
     }
 
-    /* Any other value should be coercable to a string, interpreted
+    /* Any other value should be coercible to a string, interpreted
        relative to the root filesystem. */
     auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
     if (path == "" || path[0] != '/')
@@ -2866,7 +2866,7 @@ bool EvalState::fullGC() {
     GC_gcollect();
     // Check that it ran. We might replace this with a version that uses more
     // of the boehm API to get this reliably, at a maintenance cost.
-    // We use a 1K margin because technically this has a race condtion, but we
+    // We use a 1K margin because technically this has a race condition, but we
     // probably won't encounter it in practice, because the CLI isn't concurrent
     // like that.
     return GC_get_bytes_since_gc() < 1024;

@@ -42,7 +42,7 @@ struct DerivationGoal : public Goal
          * The goal state machine is progressing based on the current value of
          * `wantedOutputs. No actions are needed.
          */
-        OutputsUnmodifedDontNeed,
+        OutputsUnmodifiedDontNeed,
         /**
          * `wantedOutputs` has been extended, but the state machine is
          * proceeding according to its old value, so we need to restart.
@@ -59,7 +59,7 @@ struct DerivationGoal : public Goal
     /**
      * Whether additional wanted outputs have been added.
      */
-    NeedRestartForMoreOutputs needRestart = NeedRestartForMoreOutputs::OutputsUnmodifedDontNeed;
+    NeedRestartForMoreOutputs needRestart = NeedRestartForMoreOutputs::OutputsUnmodifiedDontNeed;
 
     /**
      * The derivation stored at `drvReq`.
