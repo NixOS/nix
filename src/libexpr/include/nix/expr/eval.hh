@@ -542,6 +542,11 @@ public:
     std::string_view forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     std::string_view forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx);
 
+    /**
+     * Get attribute from an attribute set and throw an error if it doesn't exist.
+     */
+    Bindings::const_iterator getAttr(Symbol attrSym, const Bindings * attrSet, std::string_view errorCtx);
+
     template<typename... Args>
     [[gnu::noinline]]
     void addErrorTrace(Error & e, const Args & ... formatArgs) const;
