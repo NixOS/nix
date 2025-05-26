@@ -92,8 +92,11 @@ MakeError(NotDeterministic, BuildError);
  * rather than incoming call edges that either should be removed, or
  * become (higher order) function parameters.
  */
-class DerivationBuilderImpl : public DerivationBuilder, DerivationBuilderParams
+// FIXME: rename this to UnixDerivationBuilder or something like that.
+class DerivationBuilderImpl : public DerivationBuilder, public DerivationBuilderParams
 {
+protected:
+
     Store & store;
 
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
@@ -110,9 +113,7 @@ public:
         , derivationType(drv.type())
       { }
 
-      LocalStore & getLocalStore();
-
-private:
+protected:
 
     /**
      * User selected for running the builder.
@@ -141,31 +142,15 @@ private:
     Path tmpDirInSandbox;
 
     /**
-     * Pipe for synchronising updates to the builder namespaces.
-     */
-    Pipe userNamespaceSync;
-
-    /**
-     * The mount namespace and user namespace of the builder, used to add additional
-     * paths to the sandbox as a result of recursive Nix calls.
-     */
-    AutoCloseFD sandboxMountNamespace;
-    AutoCloseFD sandboxUserNamespace;
-
-    /**
-     * On Linux, whether we're doing the build in its own user
-     * namespace.
-     */
-    bool usingUserNamespace = true;
-
-    /**
      * Whether we're currently doing a chroot build.
      */
+    // FIXME: remove
     bool useChroot = false;
 
     /**
      * The root of the chroot environment.
      */
+    // FIXME: move
     Path chrootRootDir;
 
     /**
@@ -219,9 +204,6 @@ private:
      */
     OutputPathMap scratchOutputs;
 
-    uid_t sandboxUid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID(); }
-    gid_t sandboxGid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100  : 0) : buildUser->getGID(); }
-
     const static Path homeDir;
 
     /**
@@ -260,7 +242,10 @@ private:
     /**
      * Whether we need to perform hash rewriting if there are valid output paths.
      */
-    bool needsHashRewrite();
+    virtual bool needsHashRewrite()
+    {
+        return true;
+    }
 
 public:
 
@@ -270,6 +255,25 @@ public:
 
     std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> unprepareBuild() override;
 
+protected:
+
+    /**
+     * Called by prepareBuild() to do any setup in the parent to
+     * prepare for a sandboxed build.
+     */
+    virtual void prepareSandbox();
+
+    /**
+     * Open the slave side of the pseudoterminal and use it as stderr.
+     */
+    void openSlave();
+
+    /**
+     * Called by prepareBuild() to start the child process for the
+     * build. Must set `pid`. The child must call runChild().
+     */
+    virtual void startChild();
+
 private:
 
     /**
@@ -277,10 +281,14 @@ private:
      */
     void initEnv();
 
+protected:
+
     /**
      * Process messages send by the sandbox initialization.
      */
     void processSandboxSetupMessages();
+
+private:
 
     /**
      * Setup tmp dir location.
@@ -305,6 +313,8 @@ private:
 
     void addDependency(const StorePath & path) override;
 
+protected:
+
     /**
      * Make a file owned by the builder.
      */
@@ -314,6 +324,28 @@ private:
      * Run the builder's process.
      */
     void runChild();
+
+private:
+
+    /**
+     * Move the current process into the chroot, if any. Called early
+     * by runChild().
+     */
+    virtual void enterChroot()
+    {
+    }
+
+    /**
+     * Change the current process's uid/gid to the build user, if
+     * any. Called by runChild().
+     */
+    virtual void setUser();
+
+    /**
+     * Execute the derivation builder process. Called by runChild() as
+     * its final step. Should not return unless there is an error.
+     */
+    virtual void execBuilder(const Strings & args, const Strings & envStrs);
 
     /**
      * Check that the derivation outputs all exist and register them
@@ -355,17 +387,6 @@ private:
     StorePath makeFallbackPath(OutputNameView outputName);
 };
 
-std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
-    Store & store,
-    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
-    DerivationBuilderParams params)
-{
-    return std::make_unique<DerivationBuilderImpl>(
-        store,
-        std::move(miscMethods),
-        std::move(params));
-}
-
 void handleDiffHook(
     uid_t uid, uid_t gid,
     const Path & tryA, const Path & tryB,
@@ -403,18 +424,7 @@ void handleDiffHook(
 const Path DerivationBuilderImpl::homeDir = "/homeless-shelter";
 
 
-inline bool DerivationBuilderImpl::needsHashRewrite()
-{
-#ifdef __linux__
-    return !useChroot;
-#else
-    /* Darwin requires hash rewriting even when sandboxing is enabled. */
-    return true;
-#endif
-}
-
-
-LocalStore & DerivationBuilderImpl::getLocalStore()
+static LocalStore & getLocalStore(Store & store)
 {
     auto p = dynamic_cast<LocalStore *>(&store);
     assert(p);
@@ -446,45 +456,6 @@ void DerivationBuilderImpl::killSandbox(bool getStats)
 
 bool DerivationBuilderImpl::prepareBuild()
 {
-    /* Are we doing a chroot build? */
-    {
-        if (settings.sandboxMode == smEnabled) {
-            if (drvOptions.noChroot)
-                throw Error("derivation '%s' has '__noChroot' set, "
-                    "but that's not allowed when 'sandbox' is 'true'", store.printStorePath(drvPath));
-#ifdef __APPLE__
-            if (drvOptions.additionalSandboxProfile != "")
-                throw Error("derivation '%s' specifies a sandbox profile, "
-                    "but this is only allowed when 'sandbox' is 'relaxed'", store.printStorePath(drvPath));
-#endif
-            useChroot = true;
-        }
-        else if (settings.sandboxMode == smDisabled)
-            useChroot = false;
-        else if (settings.sandboxMode == smRelaxed)
-            useChroot = derivationType.isSandboxed() && !drvOptions.noChroot;
-    }
-
-    auto & localStore = getLocalStore();
-    if (localStore.storeDir != localStore.config->realStoreDir.get()) {
-        #ifdef __linux__
-            useChroot = true;
-        #else
-            throw Error("building using a diverted store is not supported on this platform");
-        #endif
-    }
-
-    #ifdef __linux__
-    if (useChroot) {
-        if (!mountAndPidNamespacesSupported()) {
-            if (!settings.sandboxFallback)
-                throw Error("this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
-            debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
-            useChroot = false;
-        }
-    }
-    #endif
-
     if (useBuildUsers()) {
         if (!buildUser)
             buildUser = acquireUserLock(drvOptions.useUidRange(drv) ? 65536 : 1, useChroot);
@@ -500,15 +471,13 @@ bool DerivationBuilderImpl::prepareBuild()
 
 std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> DerivationBuilderImpl::unprepareBuild()
 {
+    // FIXME: get rid of this, rely on RAII.
     Finally releaseBuildUser([&](){
         /* Release the build user at the end of this function. We don't do
            it right away because we don't want another build grabbing this
            uid and then messing around with our output. */
         buildUser.reset();
     });
-
-    sandboxMountNamespace = -1;
-    sandboxUserNamespace = -1;
 
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
@@ -675,7 +644,7 @@ bool DerivationBuilderImpl::cleanupDecideWhetherDiskFull()
        so, we don't mark this build as a permanent failure. */
 #if HAVE_STATVFS
     {
-        auto & localStore = getLocalStore();
+        auto & localStore = getLocalStore(store);
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
         if (statvfs(localStore.config->realStoreDir.get().c_str(), &st) == 0 &&
@@ -1028,117 +997,12 @@ void DerivationBuilderImpl::startBuilder()
                macOS 11+ has no /usr/lib/libSystem*.dylib */
             pathsInChroot[i] = {i, true};
         }
-
-#ifdef __linux__
-        /* Create a temporary directory in which we set up the chroot
-           environment using bind-mounts.  We put it in the Nix store
-           so that the build outputs can be moved efficiently from the
-           chroot to their final location. */
-        auto chrootParentDir = store.Store::toRealPath(drvPath) + ".chroot";
-        deletePath(chrootParentDir);
-
-        /* Clean up the chroot directory automatically. */
-        autoDelChroot = std::make_shared<AutoDelete>(chrootParentDir);
-
-        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootParentDir);
-
-        if (mkdir(chrootParentDir.c_str(), 0700) == -1)
-            throw SysError("cannot create '%s'", chrootRootDir);
-
-        chrootRootDir = chrootParentDir + "/root";
-
-        if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
-            throw SysError("cannot create '%1%'", chrootRootDir);
-
-        if (buildUser && chown(chrootRootDir.c_str(), buildUser->getUIDCount() != 1 ? buildUser->getUID() : 0, buildUser->getGID()) == -1)
-            throw SysError("cannot change ownership of '%1%'", chrootRootDir);
-
-        /* Create a writable /tmp in the chroot.  Many builders need
-           this.  (Of course they should really respect $TMPDIR
-           instead.) */
-        Path chrootTmpDir = chrootRootDir + "/tmp";
-        createDirs(chrootTmpDir);
-        chmod_(chrootTmpDir, 01777);
-
-        /* Create a /etc/passwd with entries for the build user and the
-           nobody account.  The latter is kind of a hack to support
-           Samba-in-QEMU. */
-        createDirs(chrootRootDir + "/etc");
-        if (drvOptions.useUidRange(drv))
-            chownToBuilder(chrootRootDir + "/etc");
-
-        if (drvOptions.useUidRange(drv) && (!buildUser || buildUser->getUIDCount() < 65536))
-            throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
-
-        /* Declare the build user's group so that programs get a consistent
-           view of the system (e.g., "id -gn"). */
-        writeFile(chrootRootDir + "/etc/group",
-            fmt("root:x:0:\n"
-                "nixbld:!:%1%:\n"
-                "nogroup:x:65534:\n", sandboxGid()));
-
-        /* Create /etc/hosts with localhost entry. */
-        if (derivationType.isSandboxed())
-            writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n::1 localhost\n");
-
-        /* Make the closure of the inputs available in the chroot,
-           rather than the whole Nix store.  This prevents any access
-           to undeclared dependencies.  Directories are bind-mounted,
-           while other inputs are hard-linked (since only directories
-           can be bind-mounted).  !!! As an extra security
-           precaution, make the fake Nix store only writable by the
-           build user. */
-        Path chrootStoreDir = chrootRootDir + store.storeDir;
-        createDirs(chrootStoreDir);
-        chmod_(chrootStoreDir, 01775);
-
-        if (buildUser && chown(chrootStoreDir.c_str(), 0, buildUser->getGID()) == -1)
-            throw SysError("cannot change ownership of '%1%'", chrootStoreDir);
-
-        for (auto & i : inputPaths) {
-            auto p = store.printStorePath(i);
-            Path r = store.toRealPath(p);
-            pathsInChroot.insert_or_assign(p, r);
-        }
-
-        /* If we're repairing, checking or rebuilding part of a
-           multiple-outputs derivation, it's possible that we're
-           rebuilding a path that is in settings.sandbox-paths
-           (typically the dependencies of /bin/sh).  Throw them
-           out. */
-        for (auto & i : drv.outputsAndOptPaths(store)) {
-            /* If the name isn't known a priori (i.e. floating
-               content-addressing derivation), the temporary location we use
-               should be fresh.  Freshness means it is impossible that the path
-               is already in the sandbox, so we don't need to worry about
-               removing it.  */
-            if (i.second.second)
-                pathsInChroot.erase(store.printStorePath(*i.second.second));
-        }
-
-        if (cgroup) {
-            if (mkdir(cgroup->c_str(), 0755) != 0)
-                throw SysError("creating cgroup '%s'", *cgroup);
-            chownToBuilder(*cgroup);
-            chownToBuilder(*cgroup + "/cgroup.procs");
-            chownToBuilder(*cgroup + "/cgroup.threads");
-            //chownToBuilder(*cgroup + "/cgroup.subtree_control");
-        }
-
-#else
-        if (drvOptions.useUidRange(drv))
-            throw Error("feature 'uid-range' is not supported on this platform");
-        #ifdef __APPLE__
-            /* We don't really have any parent prep work to do (yet?)
-               All work happens in the child, instead. */
-        #else
-            throw Error("sandboxing builds is not supported on this platform");
-        #endif
-#endif
     } else {
         if (drvOptions.useUidRange(drv))
             throw Error("feature 'uid-range' is only supported in sandboxed builds");
     }
+
+    prepareSandbox();
 
     if (needsHashRewrite() && pathExists(homeDir))
         throw Error("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing", homeDir);
@@ -1218,194 +1082,52 @@ void DerivationBuilderImpl::startBuilder()
     if (unlockpt(builderOut.get()))
         throw SysError("unlocking pseudoterminal");
 
-    /* Open the slave side of the pseudoterminal and use it as stderr. */
-    auto openSlave = [&]()
-    {
-        AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
-        if (!builderOut)
-            throw SysError("opening pseudoterminal slave");
-
-        // Put the pt into raw mode to prevent \n -> \r\n translation.
-        struct termios term;
-        if (tcgetattr(builderOut.get(), &term))
-            throw SysError("getting pseudoterminal attributes");
-
-        cfmakeraw(&term);
-
-        if (tcsetattr(builderOut.get(), TCSANOW, &term))
-            throw SysError("putting pseudoterminal into raw mode");
-
-        if (dup2(builderOut.get(), STDERR_FILENO) == -1)
-            throw SysError("cannot pipe standard error into log file");
-    };
-
     buildResult.startTime = time(0);
 
-    /* Fork a child to build the package. */
+    /* Start a child process to build the derivation. */
+    startChild();
 
-#ifdef __linux__
-    if (useChroot) {
-        /* Set up private namespaces for the build:
-
-           - The PID namespace causes the build to start as PID 1.
-             Processes outside of the chroot are not visible to those
-             on the inside, but processes inside the chroot are
-             visible from the outside (though with different PIDs).
-
-           - The private mount namespace ensures that all the bind
-             mounts we do will only show up in this process and its
-             children, and will disappear automatically when we're
-             done.
-
-           - The private network namespace ensures that the builder
-             cannot talk to the outside world (or vice versa).  It
-             only has a private loopback interface. (Fixed-output
-             derivations are not run in a private network namespace
-             to allow functions like fetchurl to work.)
-
-           - The IPC namespace prevents the builder from communicating
-             with outside processes using SysV IPC mechanisms (shared
-             memory, message queues, semaphores).  It also ensures
-             that all IPC objects are destroyed when the builder
-             exits.
-
-           - The UTS namespace ensures that builders see a hostname of
-             localhost rather than the actual hostname.
-
-           We use a helper process to do the clone() to work around
-           clone() being broken in multi-threaded programs due to
-           at-fork handlers not being run. Note that we use
-           CLONE_PARENT to ensure that the real builder is parented to
-           us.
-        */
-
-        userNamespaceSync.create();
-
-        usingUserNamespace = userNamespacesSupported();
-
-        Pipe sendPid;
-        sendPid.create();
-
-        Pid helper = startProcess([&]() {
-            sendPid.readSide.close();
-
-            /* We need to open the slave early, before
-               CLONE_NEWUSER. Otherwise we get EPERM when running as
-               root. */
-            openSlave();
-
-            try {
-                /* Drop additional groups here because we can't do it
-                   after we've created the new user namespace. */
-                if (setgroups(0, 0) == -1) {
-                    if (errno != EPERM)
-                        throw SysError("setgroups failed");
-                    if (settings.requireDropSupplementaryGroups)
-                        throw Error("setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
-                }
-
-                ProcessOptions options;
-                options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
-                if (derivationType.isSandboxed())
-                    options.cloneFlags |= CLONE_NEWNET;
-                if (usingUserNamespace)
-                    options.cloneFlags |= CLONE_NEWUSER;
-
-                pid_t child = startProcess([&]() { runChild(); }, options);
-
-                writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
-                _exit(0);
-            } catch (...) {
-                handleChildException(true);
-                _exit(1);
-            }
-        });
-
-        sendPid.writeSide.close();
-
-        if (helper.wait() != 0) {
-            processSandboxSetupMessages();
-            // Only reached if the child process didn't send an exception.
-            throw Error("unable to start build process");
-        }
-
-        userNamespaceSync.readSide = -1;
-
-        /* Close the write side to prevent runChild() from hanging
-           reading from this. */
-        Finally cleanup([&]() {
-            userNamespaceSync.writeSide = -1;
-        });
-
-        auto ss = tokenizeString<std::vector<std::string>>(readLine(sendPid.readSide.get()));
-        assert(ss.size() == 1);
-        pid = string2Int<pid_t>(ss[0]).value();
-
-        if (usingUserNamespace) {
-            /* Set the UID/GID mapping of the builder's user namespace
-               such that the sandbox user maps to the build user, or to
-               the calling user (if build users are disabled). */
-            uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
-            uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
-            uid_t nrIds = buildUser ? buildUser->getUIDCount() : 1;
-
-            writeFile("/proc/" + std::to_string(pid) + "/uid_map",
-                fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
-
-            if (!buildUser || buildUser->getUIDCount() == 1)
-                writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
-
-            writeFile("/proc/" + std::to_string(pid) + "/gid_map",
-                fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
-        } else {
-            debug("note: not using a user namespace");
-            if (!buildUser)
-                throw Error("cannot perform a sandboxed build because user namespaces are not enabled; check /proc/sys/user/max_user_namespaces");
-        }
-
-        /* Now that we now the sandbox uid, we can write
-           /etc/passwd. */
-        writeFile(chrootRootDir + "/etc/passwd", fmt(
-                "root:x:0:0:Nix build user:%3%:/noshell\n"
-                "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
-                "nobody:x:65534:65534:Nobody:/:/noshell\n",
-                sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
-
-        /* Save the mount- and user namespace of the child. We have to do this
-           *before* the child does a chroot. */
-        sandboxMountNamespace = open(fmt("/proc/%d/ns/mnt", (pid_t) pid).c_str(), O_RDONLY);
-        if (sandboxMountNamespace.get() == -1)
-            throw SysError("getting sandbox mount namespace");
-
-        if (usingUserNamespace) {
-            sandboxUserNamespace = open(fmt("/proc/%d/ns/user", (pid_t) pid).c_str(), O_RDONLY);
-            if (sandboxUserNamespace.get() == -1)
-                throw SysError("getting sandbox user namespace");
-        }
-
-        /* Move the child into its own cgroup. */
-        if (cgroup)
-            writeFile(*cgroup + "/cgroup.procs", fmt("%d", (pid_t) pid));
-
-        /* Signal the builder that we've updated its user namespace. */
-        writeFull(userNamespaceSync.writeSide.get(), "1");
-
-    } else
-#endif
-    {
-        pid = startProcess([&]() {
-            openSlave();
-            runChild();
-        });
-    }
-
-    /* parent */
     pid.setSeparatePG(true);
     miscMethods->childStarted(builderOut.get());
 
     processSandboxSetupMessages();
 }
 
+void DerivationBuilderImpl::prepareSandbox()
+{
+    if (drvOptions.useUidRange(drv))
+        throw Error("feature 'uid-range' is not supported on this platform");
+}
+
+void DerivationBuilderImpl::openSlave()
+{
+    std::string slaveName = ptsname(builderOut.get());
+
+    AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
+    if (!builderOut)
+        throw SysError("opening pseudoterminal slave");
+
+    // Put the pt into raw mode to prevent \n -> \r\n translation.
+    struct termios term;
+    if (tcgetattr(builderOut.get(), &term))
+        throw SysError("getting pseudoterminal attributes");
+
+    cfmakeraw(&term);
+
+    if (tcsetattr(builderOut.get(), TCSANOW, &term))
+        throw SysError("putting pseudoterminal into raw mode");
+
+    if (dup2(builderOut.get(), STDERR_FILENO) == -1)
+        throw SysError("cannot pipe standard error into log file");
+}
+
+void DerivationBuilderImpl::startChild()
+{
+    pid = startProcess([&]() {
+        openSlave();
+        runChild();
+    });
+}
 
 void DerivationBuilderImpl::processSandboxSetupMessages()
 {
@@ -1583,7 +1305,7 @@ void DerivationBuilderImpl::startDaemon()
 
     auto store = makeRestrictedStore(
         [&]{
-            auto config = make_ref<LocalStore::Config>(*getLocalStore().config);
+            auto config = make_ref<LocalStore::Config>(*getLocalStore(this->store).config);
             config->pathInfoCacheSize = 0;
             config->stateDir = "/no-such-path";
             config->logDir = "/no-such-path";
@@ -1683,51 +1405,6 @@ void DerivationBuilderImpl::addDependency(const StorePath & path)
     if (isAllowed(path)) return;
 
     addedPaths.insert(path);
-
-    /* If we're doing a sandbox build, then we have to make the path
-       appear in the sandbox. */
-    if (useChroot) {
-
-        debug("materialising '%s' in the sandbox", store.printStorePath(path));
-
-        #ifdef __linux__
-
-            Path source = store.Store::toRealPath(path);
-            Path target = chrootRootDir + store.printStorePath(path);
-
-            if (pathExists(target)) {
-                // There is a similar debug message in doBind, so only run it in this block to not have double messages.
-                debug("bind-mounting %s -> %s", target, source);
-                throw Error("store path '%s' already exists in the sandbox", store.printStorePath(path));
-            }
-
-            /* Bind-mount the path into the sandbox. This requires
-               entering its mount namespace, which is not possible
-               in multithreaded programs. So we do this in a
-               child process.*/
-            Pid child(startProcess([&]() {
-
-                if (usingUserNamespace && (setns(sandboxUserNamespace.get(), 0) == -1))
-                    throw SysError("entering sandbox user namespace");
-
-                if (setns(sandboxMountNamespace.get(), 0) == -1)
-                    throw SysError("entering sandbox mount namespace");
-
-                doBind(source, target);
-
-                _exit(0);
-            }));
-
-            int status = child.wait();
-            if (status != 0)
-                throw Error("could not add path '%s' to sandbox", store.printStorePath(path));
-
-        #else
-            throw Error("don't know how to make path '%s' (produced by a recursive Nix call) appear in the sandbox",
-                store.printStorePath(path));
-        #endif
-
-    }
 }
 
 void DerivationBuilderImpl::chownToBuilder(const Path & path)
@@ -1843,8 +1520,6 @@ void DerivationBuilderImpl::runChild()
             if (buildUser) throw;
         }
 
-        bool setUser = true;
-
         /* Make the contents of netrc and the CA certificate bundle
            available to builtin:fetchurl (which may run under a
            different uid and/or in a sandbox). */
@@ -1863,234 +1538,7 @@ void DerivationBuilderImpl::runChild()
            } catch (SystemError &) { }
         }
 
-#ifdef __linux__
-        if (useChroot) {
-
-            userNamespaceSync.writeSide = -1;
-
-            if (drainFD(userNamespaceSync.readSide.get()) != "1")
-                throw Error("user namespace initialisation failed");
-
-            userNamespaceSync.readSide = -1;
-
-            if (derivationType.isSandboxed()) {
-
-                /* Initialise the loopback interface. */
-                AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
-                if (!fd) throw SysError("cannot open IP socket");
-
-                struct ifreq ifr;
-                strcpy(ifr.ifr_name, "lo");
-                ifr.ifr_flags = IFF_UP | IFF_LOOPBACK | IFF_RUNNING;
-                if (ioctl(fd.get(), SIOCSIFFLAGS, &ifr) == -1)
-                    throw SysError("cannot set loopback interface flags");
-            }
-
-            /* Set the hostname etc. to fixed values. */
-            char hostname[] = "localhost";
-            if (sethostname(hostname, sizeof(hostname)) == -1)
-                throw SysError("cannot set host name");
-            char domainname[] = "(none)"; // kernel default
-            if (setdomainname(domainname, sizeof(domainname)) == -1)
-                throw SysError("cannot set domain name");
-
-            /* Make all filesystems private.  This is necessary
-               because subtrees may have been mounted as "shared"
-               (MS_SHARED).  (Systemd does this, for instance.)  Even
-               though we have a private mount namespace, mounting
-               filesystems on top of a shared subtree still propagates
-               outside of the namespace.  Making a subtree private is
-               local to the namespace, though, so setting MS_PRIVATE
-               does not affect the outside world. */
-            if (mount(0, "/", 0, MS_PRIVATE | MS_REC, 0) == -1)
-                throw SysError("unable to make '/' private");
-
-            /* Bind-mount chroot directory to itself, to treat it as a
-               different filesystem from /, as needed for pivot_root. */
-            if (mount(chrootRootDir.c_str(), chrootRootDir.c_str(), 0, MS_BIND, 0) == -1)
-                throw SysError("unable to bind mount '%1%'", chrootRootDir);
-
-            /* Bind-mount the sandbox's Nix store onto itself so that
-               we can mark it as a "shared" subtree, allowing bind
-               mounts made in *this* mount namespace to be propagated
-               into the child namespace created by the
-               unshare(CLONE_NEWNS) call below.
-
-               Marking chrootRootDir as MS_SHARED causes pivot_root()
-               to fail with EINVAL. Don't know why. */
-            Path chrootStoreDir = chrootRootDir + store.storeDir;
-
-            if (mount(chrootStoreDir.c_str(), chrootStoreDir.c_str(), 0, MS_BIND, 0) == -1)
-                throw SysError("unable to bind mount the Nix store", chrootStoreDir);
-
-            if (mount(0, chrootStoreDir.c_str(), 0, MS_SHARED, 0) == -1)
-                throw SysError("unable to make '%s' shared", chrootStoreDir);
-
-            /* Set up a nearly empty /dev, unless the user asked to
-               bind-mount the host /dev. */
-            Strings ss;
-            if (pathsInChroot.find("/dev") == pathsInChroot.end()) {
-                createDirs(chrootRootDir + "/dev/shm");
-                createDirs(chrootRootDir + "/dev/pts");
-                ss.push_back("/dev/full");
-                if (store.config.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
-                    ss.push_back("/dev/kvm");
-                ss.push_back("/dev/null");
-                ss.push_back("/dev/random");
-                ss.push_back("/dev/tty");
-                ss.push_back("/dev/urandom");
-                ss.push_back("/dev/zero");
-                createSymlink("/proc/self/fd", chrootRootDir + "/dev/fd");
-                createSymlink("/proc/self/fd/0", chrootRootDir + "/dev/stdin");
-                createSymlink("/proc/self/fd/1", chrootRootDir + "/dev/stdout");
-                createSymlink("/proc/self/fd/2", chrootRootDir + "/dev/stderr");
-            }
-
-            /* Fixed-output derivations typically need to access the
-               network, so give them access to /etc/resolv.conf and so
-               on. */
-            if (!derivationType.isSandboxed()) {
-                // Only use nss functions to resolve hosts and
-                // services. Don’t use it for anything else that may
-                // be configured for this system. This limits the
-                // potential impurities introduced in fixed-outputs.
-                writeFile(chrootRootDir + "/etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
-
-                /* N.B. it is realistic that these paths might not exist. It
-                   happens when testing Nix building fixed-output derivations
-                   within a pure derivation. */
-                for (auto & path : { "/etc/resolv.conf", "/etc/services", "/etc/hosts" })
-                    if (pathExists(path))
-                        ss.push_back(path);
-
-                if (settings.caFile != "") {
-                    Path caFile = settings.caFile;
-                    if (pathExists(caFile))
-                       pathsInChroot.try_emplace("/etc/ssl/certs/ca-certificates.crt", canonPath(caFile, true), true);
-                }
-            }
-
-            for (auto & i : ss) {
-                // For backwards-compatibiliy, resolve all the symlinks in the
-                // chroot paths
-                auto canonicalPath = canonPath(i, true);
-                pathsInChroot.emplace(i, canonicalPath);
-            }
-
-            /* Bind-mount all the directories from the "host"
-               filesystem that we want in the chroot
-               environment. */
-            for (auto & i : pathsInChroot) {
-                if (i.second.source == "/proc") continue; // backwards compatibility
-
-                #if HAVE_EMBEDDED_SANDBOX_SHELL
-                if (i.second.source == "__embedded_sandbox_shell__") {
-                    static unsigned char sh[] = {
-                        #include "embedded-sandbox-shell.gen.hh"
-                    };
-                    auto dst = chrootRootDir + i.first;
-                    createDirs(dirOf(dst));
-                    writeFile(dst, std::string_view((const char *) sh, sizeof(sh)));
-                    chmod_(dst, 0555);
-                } else
-                #endif
-                    doBind(i.second.source, chrootRootDir + i.first, i.second.optional);
-            }
-
-            /* Bind a new instance of procfs on /proc. */
-            createDirs(chrootRootDir + "/proc");
-            if (mount("none", (chrootRootDir + "/proc").c_str(), "proc", 0, 0) == -1)
-                throw SysError("mounting /proc");
-
-            /* Mount sysfs on /sys. */
-            if (buildUser && buildUser->getUIDCount() != 1) {
-                createDirs(chrootRootDir + "/sys");
-                if (mount("none", (chrootRootDir + "/sys").c_str(), "sysfs", 0, 0) == -1)
-                    throw SysError("mounting /sys");
-            }
-
-            /* Mount a new tmpfs on /dev/shm to ensure that whatever
-               the builder puts in /dev/shm is cleaned up automatically. */
-            if (pathExists("/dev/shm") && mount("none", (chrootRootDir + "/dev/shm").c_str(), "tmpfs", 0,
-                    fmt("size=%s", settings.sandboxShmSize).c_str()) == -1)
-                throw SysError("mounting /dev/shm");
-
-            /* Mount a new devpts on /dev/pts.  Note that this
-               requires the kernel to be compiled with
-               CONFIG_DEVPTS_MULTIPLE_INSTANCES=y (which is the case
-               if /dev/ptx/ptmx exists). */
-            if (pathExists("/dev/pts/ptmx") &&
-                !pathExists(chrootRootDir + "/dev/ptmx")
-                && !pathsInChroot.count("/dev/pts"))
-            {
-                if (mount("none", (chrootRootDir + "/dev/pts").c_str(), "devpts", 0, "newinstance,mode=0620") == 0)
-                {
-                    createSymlink("/dev/pts/ptmx", chrootRootDir + "/dev/ptmx");
-
-                    /* Make sure /dev/pts/ptmx is world-writable.  With some
-                       Linux versions, it is created with permissions 0.  */
-                    chmod_(chrootRootDir + "/dev/pts/ptmx", 0666);
-                } else {
-                    if (errno != EINVAL)
-                        throw SysError("mounting /dev/pts");
-                    doBind("/dev/pts", chrootRootDir + "/dev/pts");
-                    doBind("/dev/ptmx", chrootRootDir + "/dev/ptmx");
-                }
-            }
-
-            /* Make /etc unwritable */
-            if (!drvOptions.useUidRange(drv))
-                chmod_(chrootRootDir + "/etc", 0555);
-
-            /* Unshare this mount namespace. This is necessary because
-               pivot_root() below changes the root of the mount
-               namespace. This means that the call to setns() in
-               addDependency() would hide the host's filesystem,
-               making it impossible to bind-mount paths from the host
-               Nix store into the sandbox. Therefore, we save the
-               pre-pivot_root namespace in
-               sandboxMountNamespace. Since we made /nix/store a
-               shared subtree above, this allows addDependency() to
-               make paths appear in the sandbox. */
-            if (unshare(CLONE_NEWNS) == -1)
-                throw SysError("unsharing mount namespace");
-
-            /* Unshare the cgroup namespace. This means
-               /proc/self/cgroup will show the child's cgroup as '/'
-               rather than whatever it is in the parent. */
-            if (cgroup && unshare(CLONE_NEWCGROUP) == -1)
-                throw SysError("unsharing cgroup namespace");
-
-            /* Do the chroot(). */
-            if (chdir(chrootRootDir.c_str()) == -1)
-                throw SysError("cannot change directory to '%1%'", chrootRootDir);
-
-            if (mkdir("real-root", 0500) == -1)
-                throw SysError("cannot create real-root directory");
-
-            if (pivot_root(".", "real-root") == -1)
-                throw SysError("cannot pivot old root directory onto '%1%'", (chrootRootDir + "/real-root"));
-
-            if (chroot(".") == -1)
-                throw SysError("cannot change root directory to '%1%'", chrootRootDir);
-
-            if (umount2("real-root", MNT_DETACH) == -1)
-                throw SysError("cannot unmount real root filesystem");
-
-            if (rmdir("real-root") == -1)
-                throw SysError("cannot remove real-root directory");
-
-            /* Switch to the sandbox uid/gid in the user namespace,
-               which corresponds to the build user or calling user in
-               the parent namespace. */
-            if (setgid(sandboxGid()) == -1)
-                throw SysError("setgid failed");
-            if (setuid(sandboxUid()) == -1)
-                throw SysError("setuid failed");
-
-            setUser = false;
-        }
-#endif
+        enterChroot();
 
         if (chdir(tmpDirInSandbox.c_str()) == -1)
             throw SysError("changing into '%1%'", tmpDir);
@@ -2098,184 +1546,20 @@ void DerivationBuilderImpl::runChild()
         /* Close all other file descriptors. */
         unix::closeExtraFDs();
 
-#ifdef __linux__
-        linux::setPersonality(drv.platform);
-#endif
-
         /* Disable core dumps by default. */
         struct rlimit limit = { 0, RLIM_INFINITY };
         setrlimit(RLIMIT_CORE, &limit);
 
         // FIXME: set other limits to deterministic values?
 
-        /* Fill in the environment. */
-        Strings envStrs;
-        for (auto & i : env)
-            envStrs.push_back(rewriteStrings(i.first + "=" + i.second, inputRewrites));
-
-        /* If we are running in `build-users' mode, then switch to the
-           user we allocated above.  Make sure that we drop all root
-           privileges.  Note that above we have closed all file
-           descriptors except std*, so that's safe.  Also note that
-           setuid() when run as root sets the real, effective and
-           saved UIDs. */
-        if (setUser && buildUser) {
-            /* Preserve supplementary groups of the build user, to allow
-               admins to specify groups such as "kvm".  */
-            auto gids = buildUser->getSupplementaryGIDs();
-            if (setgroups(gids.size(), gids.data()) == -1)
-                throw SysError("cannot set supplementary groups of build user");
-
-            if (setgid(buildUser->getGID()) == -1 ||
-                getgid() != buildUser->getGID() ||
-                getegid() != buildUser->getGID())
-                throw SysError("setgid failed");
-
-            if (setuid(buildUser->getUID()) == -1 ||
-                getuid() != buildUser->getUID() ||
-                geteuid() != buildUser->getUID())
-                throw SysError("setuid failed");
-        }
-
-#ifdef __APPLE__
-        /* This has to appear before import statements. */
-        std::string sandboxProfile = "(version 1)\n";
-
-        if (useChroot) {
-
-            /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
-            PathSet ancestry;
-
-            /* We build the ancestry before adding all inputPaths to the store because we know they'll
-               all have the same parents (the store), and there might be lots of inputs. This isn't
-               particularly efficient... I doubt it'll be a bottleneck in practice */
-            for (auto & i : pathsInChroot) {
-                Path cur = i.first;
-                while (cur.compare("/") != 0) {
-                    cur = dirOf(cur);
-                    ancestry.insert(cur);
-                }
-            }
-
-            /* And we want the store in there regardless of how empty pathsInChroot. We include the innermost
-               path component this time, since it's typically /nix/store and we care about that. */
-            Path cur = store.storeDir;
-            while (cur.compare("/") != 0) {
-                ancestry.insert(cur);
-                cur = dirOf(cur);
-            }
-
-            /* Add all our input paths to the chroot */
-            for (auto & i : inputPaths) {
-                auto p = store.printStorePath(i);
-                pathsInChroot[p] = p;
-            }
-
-            /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
-            if (settings.darwinLogSandboxViolations) {
-                sandboxProfile += "(deny default)\n";
-            } else {
-                sandboxProfile += "(deny default (with no-log))\n";
-            }
-
-            sandboxProfile +=
-                #include "sandbox-defaults.sb"
-                ;
-
-            if (!derivationType->isSandboxed())
-                sandboxProfile +=
-                    #include "sandbox-network.sb"
-                    ;
-
-            /* Add the output paths we'll use at build-time to the chroot */
-            sandboxProfile += "(allow file-read* file-write* process-exec\n";
-            for (auto & [_, path] : scratchOutputs)
-                sandboxProfile += fmt("\t(subpath \"%s\")\n", store.printStorePath(path));
-
-            sandboxProfile += ")\n";
-
-            /* Our inputs (transitive dependencies and any impurities computed above)
-
-               without file-write* allowed, access() incorrectly returns EPERM
-             */
-            sandboxProfile += "(allow file-read* file-write* process-exec\n";
-
-            // We create multiple allow lists, to avoid exceeding a limit in the darwin sandbox interpreter.
-            // See https://github.com/NixOS/nix/issues/4119
-            // We split our allow groups approximately at half the actual limit, 1 << 16
-            const size_t breakpoint = sandboxProfile.length() + (1 << 14);
-            for (auto & i : pathsInChroot) {
-
-                if (sandboxProfile.length() >= breakpoint) {
-                    debug("Sandbox break: %d %d", sandboxProfile.length(), breakpoint);
-                    sandboxProfile += ")\n(allow file-read* file-write* process-exec\n";
-                }
-
-                if (i.first != i.second.source)
-                    throw Error(
-                        "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin",
-                        i.first, i.second.source);
-
-                std::string path = i.first;
-                auto optSt = maybeLstat(path.c_str());
-                if (!optSt) {
-                    if (i.second.optional)
-                        continue;
-                    throw SysError("getting attributes of required path '%s", path);
-                }
-                if (S_ISDIR(optSt->st_mode))
-                    sandboxProfile += fmt("\t(subpath \"%s\")\n", path);
-                else
-                    sandboxProfile += fmt("\t(literal \"%s\")\n", path);
-            }
-            sandboxProfile += ")\n";
-
-            /* Allow file-read* on full directory hierarchy to self. Allows realpath() */
-            sandboxProfile += "(allow file-read*\n";
-            for (auto & i : ancestry) {
-                sandboxProfile += fmt("\t(literal \"%s\")\n", i);
-            }
-            sandboxProfile += ")\n";
-
-            sandboxProfile += drvOptions.additionalSandboxProfile;
-        } else
-            sandboxProfile +=
-                #include "sandbox-minimal.sb"
-                ;
-
-        debug("Generated sandbox profile:");
-        debug(sandboxProfile);
-
-        /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
-            to find temporary directories, so we want to open up a broader place for them to put their files, if needed. */
-        Path globalTmpDir = canonPath(defaultTempDir(), true);
-
-        /* They don't like trailing slashes on subpath directives */
-        while (!globalTmpDir.empty() && globalTmpDir.back() == '/')
-            globalTmpDir.pop_back();
-
-        if (getEnv("_NIX_TEST_NO_SANDBOX") != "1") {
-            Strings sandboxArgs;
-            sandboxArgs.push_back("_GLOBAL_TMP_DIR");
-            sandboxArgs.push_back(globalTmpDir);
-            if (drvOptions.allowLocalNetworking) {
-                sandboxArgs.push_back("_ALLOW_LOCAL_NETWORKING");
-                sandboxArgs.push_back("1");
-            }
-            char * sandbox_errbuf = nullptr;
-            if (sandbox_init_with_parameters(sandboxProfile.c_str(), 0, stringsToCharPtrs(sandboxArgs).data(), &sandbox_errbuf)) {
-                writeFull(STDERR_FILENO, fmt("failed to configure sandbox: %s\n", sandbox_errbuf ? sandbox_errbuf : "(null)"));
-                _exit(1);
-            }
-        }
-#endif
+        setUser();
 
         /* Indicate that we managed to set up the build environment. */
         writeFull(STDERR_FILENO, std::string("\2\n"));
 
         sendException = false;
 
-        /* Execute the program.  This should not return. */
+        /* If this is a builtin builder, call it now. This should not return. */
         if (drv.isBuiltin()) {
             try {
                 logger = makeJSONLogger(getStandardError());
@@ -2297,7 +1581,7 @@ void DerivationBuilderImpl::runChild()
             }
         }
 
-        // Now builder is not builtin
+        /* It's not a builtin builder, so execute the program. */
 
         Strings args;
         args.push_back(std::string(baseNameOf(drv.builder)));
@@ -2305,31 +1589,11 @@ void DerivationBuilderImpl::runChild()
         for (auto & i : drv.args)
             args.push_back(rewriteStrings(i, inputRewrites));
 
-#ifdef __APPLE__
-        posix_spawnattr_t attrp;
+        Strings envStrs;
+        for (auto & i : env)
+            envStrs.push_back(rewriteStrings(i.first + "=" + i.second, inputRewrites));
 
-        if (posix_spawnattr_init(&attrp))
-            throw SysError("failed to initialize builder");
-
-        if (posix_spawnattr_setflags(&attrp, POSIX_SPAWN_SETEXEC))
-            throw SysError("failed to initialize builder");
-
-        if (drv.platform == "aarch64-darwin") {
-            // Unset kern.curproc_arch_affinity so we can escape Rosetta
-            int affinity = 0;
-            sysctlbyname("kern.curproc_arch_affinity", NULL, NULL, &affinity, sizeof(affinity));
-
-            cpu_type_t cpu = CPU_TYPE_ARM64;
-            posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
-        } else if (drv.platform == "x86_64-darwin") {
-            cpu_type_t cpu = CPU_TYPE_X86_64;
-            posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
-        }
-
-        posix_spawn(NULL, drv.builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
-#else
-        execve(drv.builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
-#endif
+        execBuilder(args, envStrs);
 
         throw SysError("executing '%1%'", drv.builder);
 
@@ -2339,6 +1603,37 @@ void DerivationBuilderImpl::runChild()
     }
 }
 
+void DerivationBuilderImpl::setUser()
+{
+    /* If we are running in `build-users' mode, then switch to the
+       user we allocated above.  Make sure that we drop all root
+       privileges.  Note that above we have closed all file
+       descriptors except std*, so that's safe.  Also note that
+       setuid() when run as root sets the real, effective and
+       saved UIDs. */
+    if (buildUser) {
+        /* Preserve supplementary groups of the build user, to allow
+           admins to specify groups such as "kvm".  */
+        auto gids = buildUser->getSupplementaryGIDs();
+        if (setgroups(gids.size(), gids.data()) == -1)
+            throw SysError("cannot set supplementary groups of build user");
+
+        if (setgid(buildUser->getGID()) == -1 ||
+            getgid() != buildUser->getGID() ||
+            getegid() != buildUser->getGID())
+            throw SysError("setgid failed");
+
+        if (setuid(buildUser->getUID()) == -1 ||
+            getuid() != buildUser->getUID() ||
+            geteuid() != buildUser->getUID())
+            throw SysError("setuid failed");
+    }
+}
+
+void DerivationBuilderImpl::execBuilder(const Strings & args, const Strings & envStrs)
+{
+    execve(drv.builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+}
 
 SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 {
@@ -2777,7 +2072,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             }
         }
 
-        auto & localStore = getLocalStore();
+        auto & localStore = getLocalStore(store);
 
         if (buildMode == bmCheck) {
 
@@ -2854,7 +2149,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
     {
-        auto & localStore = getLocalStore();
+        auto & localStore = getLocalStore(store);
 
         ValidPathInfos infos2;
         for (auto & [outputName, newInfo] : infos) {
@@ -3075,5 +2370,70 @@ StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
         Hash(HashAlgorithm::SHA256), path.name());
 }
 
+// FIXME: do this properly
+#include "linux-derivation-builder.cc"
+#include "darwin-derivation-builder.cc"
+
+std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
+    Store & store,
+    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+    DerivationBuilderParams params)
+{
+    bool useSandbox = false;
+
+    /* Are we doing a sandboxed build? */
+    {
+        if (settings.sandboxMode == smEnabled) {
+            if (params.drvOptions.noChroot)
+                throw Error("derivation '%s' has '__noChroot' set, "
+                    "but that's not allowed when 'sandbox' is 'true'", store.printStorePath(params.drvPath));
+#ifdef __APPLE__
+            if (drvOptions.additionalSandboxProfile != "")
+                throw Error("derivation '%s' specifies a sandbox profile, "
+                    "but this is only allowed when 'sandbox' is 'relaxed'", store.printStorePath(params.drvPath));
+#endif
+            useSandbox = true;
+        }
+        else if (settings.sandboxMode == smDisabled)
+            useSandbox = false;
+        else if (settings.sandboxMode == smRelaxed)
+            // FIXME: cache derivationType
+            useSandbox = params.drv.type().isSandboxed() && !params.drvOptions.noChroot;
+    }
+
+    auto & localStore = getLocalStore(store);
+    if (localStore.storeDir != localStore.config->realStoreDir.get()) {
+        #ifdef __linux__
+            useSandbox = true;
+        #else
+            throw Error("building using a diverted store is not supported on this platform");
+        #endif
+    }
+
+    #ifdef __linux__
+    if (useSandbox) {
+        if (!mountAndPidNamespacesSupported()) {
+            if (!settings.sandboxFallback)
+                throw Error("this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
+            debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
+            useSandbox = false;
+        }
+    }
+
+    if (useSandbox)
+        return std::make_unique<LinuxDerivationBuilder>(
+            store,
+            std::move(miscMethods),
+            std::move(params));
+    #endif
+
+    if (useSandbox)
+        throw Error("sandboxing builds is not supported on this platform");
+
+    return std::make_unique<DerivationBuilderImpl>(
+        store,
+        std::move(miscMethods),
+        std::move(params));
+}
 
 }
