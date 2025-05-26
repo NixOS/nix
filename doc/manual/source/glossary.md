@@ -31,9 +31,22 @@
 
   The industry term for storage and retrieval systems using [content addressing](#gloss-content-address). A Nix store also has [input addressing](#gloss-input-addressed-store-object), and metadata.
 
+- [derivation]{#gloss-derivation}
+
+  A derivation can be thought of as a [pure function](https://en.wikipedia.org/wiki/Pure_function) that produces new [store objects][store object] from existing store objects.
+
+  Derivations are implemented as [operating system processes that run in a sandbox](@docroot@/store/building.md#builder-execution).
+  This sandbox by default only allows reading from store objects specified as inputs, and only allows writing to designated [outputs][output] to be [captured as store objects](@docroot@/store/building.md#processing-outputs).
+
+  A derivation is typically specified as a [derivation expression] in the [Nix language], and [instantiated][instantiate] to a [store derivation].
+  There are multiple ways of obtaining store objects from store derivatons, collectively called [realisation][realise].
+
+  [derivation]: #gloss-derivation
+
 - [store derivation]{#gloss-store-derivation}
 
-  A single build task.
+  A [derivation] represented as a [store object].
+
   See [Store Derivation](@docroot@/store/derivation/index.md#store-derivation) for details.
 
   [store derivation]: #gloss-store-derivation
@@ -57,10 +70,7 @@
 
 - [derivation expression]{#gloss-derivation-expression}
 
-  A description of a [store derivation] in the Nix language.
-  The output(s) of a derivation are store objects.
-  Derivations are typically specified in Nix expressions using the [`derivation` primitive](./language/derivations.md).
-  These are translated into store layer *derivations* (implicitly by `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
+  A description of a [store derivation] using the [`derivation` primitive](./language/derivations.md) in the [Nix language].
 
   [derivation expression]: #gloss-derivation-expression
 
