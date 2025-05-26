@@ -107,6 +107,11 @@ public:
 private:
 
     /**
+     * User selected for running the builder.
+     */
+    std::unique_ptr<UserLock> buildUser;
+
+    /**
      * The cgroup of the builder, if any.
      */
     std::optional<Path> cgroup;
@@ -251,30 +256,10 @@ private:
 
 public:
 
-    /**
-     * Set up build environment / sandbox, acquiring resources (e.g.
-     * locks as needed). After this is run, the builder should be
-     * started.
-     *
-     * @returns true if successful, false if we could not acquire a build
-     * user. In that case, the caller must wait and then try again.
-     */
     bool prepareBuild() override;
 
-    /**
-     * Start building a derivation.
-     */
-    void startBuilder() override;;
+    void startBuilder() override;
 
-    /**
-     * Tear down build environment after the builder exits (either on
-     * its own or if it is killed).
-     *
-     * @returns The first case indicates failure during output
-     * processing. A status code and exception are returned, providing
-     * more information. The second case indicates success, and
-     * realisations for each output of the derivation are returned.
-     */
     std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> unprepareBuild() override;
 
 private:
@@ -306,10 +291,6 @@ private:
 
 public:
 
-    /**
-     * Stop the in-process nix daemon thread.
-     * @see startDaemon
-     */
     void stopDaemon() override;
 
 private:
@@ -341,15 +322,8 @@ private:
 
 public:
 
-    /**
-     * Delete the temporary directory, if we have one.
-     */
     void deleteTmpDir(bool force) override;
 
-    /**
-     * Kill any processes running under the build user UID or in the
-     * cgroup of the build.
-     */
     void killSandbox(bool getStats) override;
 
 private:

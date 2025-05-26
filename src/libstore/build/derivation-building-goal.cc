@@ -655,8 +655,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         builder->startBuilder();
 
     } catch (BuildError & e) {
+        builder.reset();
         outputLocks.unlock();
-        builder->buildUser.reset();
         worker.permanentFailure = true;
         co_return done(BuildResult::InputRejected, {}, std::move(e));
     }
