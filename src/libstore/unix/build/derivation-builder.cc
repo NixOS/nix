@@ -156,6 +156,7 @@ protected:
     /**
      * RAII object to delete the chroot directory.
      */
+    // FIXME: move
     std::shared_ptr<AutoDelete> autoDelChroot;
 
     /**
@@ -176,7 +177,6 @@ protected:
         { }
     };
     typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
-    PathsInChroot pathsInChroot;
 
     typedef std::map<std::string, std::string> Environment;
     Environment env;
@@ -256,6 +256,17 @@ public:
     std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> unprepareBuild() override;
 
 protected:
+
+    /**
+     * Return the paths that should be made available in the sandbox.
+     * This includes:
+     *
+     * * The paths specified by the `sandbox-paths` setting, and their closure in the Nix store.
+     * * The contents of the `__impureHostDeps` derivation attribute, if the sandbox is in relaxed mode.
+     * * The paths returned by the `pre-build-hook`.
+     * * The paths in the input closure of the derivation.
+     */
+    PathsInChroot getPathsInSandbox();
 
     /**
      * Called by prepareBuild() to do any setup in the parent to
@@ -918,130 +929,10 @@ void DerivationBuilderImpl::startBuilder()
         }
     }
 
-    if (useChroot) {
-
-        /* Allow a user-configurable set of directories from the
-           host file system. */
-        pathsInChroot.clear();
-
-        for (auto i : settings.sandboxPaths.get()) {
-            if (i.empty()) continue;
-            bool optional = false;
-            if (i[i.size() - 1] == '?') {
-                optional = true;
-                i.pop_back();
-            }
-            size_t p = i.find('=');
-
-            std::string inside, outside;
-            if (p == std::string::npos) {
-                inside = i;
-                outside = i;
-            } else {
-                inside = i.substr(0, p);
-                outside = i.substr(p + 1);
-            }
-
-            if (!optional && !maybeLstat(outside)) {
-              throw SysError("path '%s' is configured as part of the `sandbox-paths` option, but is inaccessible", outside);
-            }
-
-            pathsInChroot[inside] = {outside, optional};
-        }
-        if (hasPrefix(store.storeDir, tmpDirInSandbox))
-        {
-            throw Error("`sandbox-build-dir` must not contain the storeDir");
-        }
-        pathsInChroot[tmpDirInSandbox] = tmpDir;
-
-        /* Add the closure of store paths to the chroot. */
-        StorePathSet closure;
-        for (auto & i : pathsInChroot)
-            try {
-                if (store.isInStore(i.second.source))
-                    store.computeFSClosure(store.toStorePath(i.second.source).first, closure);
-            } catch (InvalidPath & e) {
-            } catch (Error & e) {
-                e.addTrace({}, "while processing 'sandbox-paths'");
-                throw;
-            }
-        for (auto & i : closure) {
-            auto p = store.printStorePath(i);
-            pathsInChroot.insert_or_assign(p, p);
-        }
-
-        PathSet allowedPaths = settings.allowedImpureHostPrefixes;
-
-        /* This works like the above, except on a per-derivation level */
-        auto impurePaths = drvOptions.impureHostDeps;
-
-        for (auto & i : impurePaths) {
-            bool found = false;
-            /* Note: we're not resolving symlinks here to prevent
-               giving a non-root user info about inaccessible
-               files. */
-            Path canonI = canonPath(i);
-            /* If only we had a trie to do this more efficiently :) luckily, these are generally going to be pretty small */
-            for (auto & a : allowedPaths) {
-                Path canonA = canonPath(a);
-                if (isDirOrInDir(canonI, canonA)) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found)
-                throw Error("derivation '%s' requested impure path '%s', but it was not in allowed-impure-host-deps",
-                    store.printStorePath(drvPath), i);
-
-            /* Allow files in drvOptions.impureHostDeps to be missing; e.g.
-               macOS 11+ has no /usr/lib/libSystem*.dylib */
-            pathsInChroot[i] = {i, true};
-        }
-    } else {
-        if (drvOptions.useUidRange(drv))
-            throw Error("feature 'uid-range' is only supported in sandboxed builds");
-    }
-
     prepareSandbox();
 
     if (needsHashRewrite() && pathExists(homeDir))
         throw Error("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing", homeDir);
-
-    if (useChroot && settings.preBuildHook != "") {
-        printMsg(lvlChatty, "executing pre-build hook '%1%'", settings.preBuildHook);
-        auto args = useChroot ? Strings({store.printStorePath(drvPath), chrootRootDir}) :
-            Strings({ store.printStorePath(drvPath) });
-        enum BuildHookState {
-            stBegin,
-            stExtraChrootDirs
-        };
-        auto state = stBegin;
-        auto lines = runProgram(settings.preBuildHook, false, args);
-        auto lastPos = std::string::size_type{0};
-        for (auto nlPos = lines.find('\n'); nlPos != std::string::npos;
-                nlPos = lines.find('\n', lastPos))
-        {
-            auto line = lines.substr(lastPos, nlPos - lastPos);
-            lastPos = nlPos + 1;
-            if (state == stBegin) {
-                if (line == "extra-sandbox-paths" || line == "extra-chroot-dirs") {
-                    state = stExtraChrootDirs;
-                } else {
-                    throw Error("unknown pre-build hook command '%1%'", line);
-                }
-            } else if (state == stExtraChrootDirs) {
-                if (line == "") {
-                    state = stBegin;
-                } else {
-                    auto p = line.find('=');
-                    if (p == std::string::npos)
-                        pathsInChroot[line] = line;
-                    else
-                        pathsInChroot[line.substr(0, p)] = line.substr(p + 1);
-                }
-            }
-        }
-    }
 
     /* Fire up a Nix daemon to process recursive Nix calls from the
        builder. */
@@ -1091,6 +982,125 @@ void DerivationBuilderImpl::startBuilder()
     miscMethods->childStarted(builderOut.get());
 
     processSandboxSetupMessages();
+}
+
+DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
+{
+    PathsInChroot pathsInChroot;
+
+    /* Allow a user-configurable set of directories from the
+       host file system. */
+    for (auto i : settings.sandboxPaths.get()) {
+        if (i.empty()) continue;
+        bool optional = false;
+        if (i[i.size() - 1] == '?') {
+            optional = true;
+            i.pop_back();
+        }
+        size_t p = i.find('=');
+
+        std::string inside, outside;
+        if (p == std::string::npos) {
+            inside = i;
+            outside = i;
+        } else {
+            inside = i.substr(0, p);
+            outside = i.substr(p + 1);
+        }
+
+        if (!optional && !maybeLstat(outside)) {
+          throw SysError("path '%s' is configured as part of the `sandbox-paths` option, but is inaccessible", outside);
+        }
+
+        pathsInChroot[inside] = {outside, optional};
+    }
+    if (hasPrefix(store.storeDir, tmpDirInSandbox))
+    {
+        throw Error("`sandbox-build-dir` must not contain the storeDir");
+    }
+    pathsInChroot[tmpDirInSandbox] = tmpDir;
+
+    /* Add the closure of store paths to the chroot. */
+    StorePathSet closure;
+    for (auto & i : pathsInChroot)
+        try {
+            if (store.isInStore(i.second.source))
+                store.computeFSClosure(store.toStorePath(i.second.source).first, closure);
+        } catch (InvalidPath & e) {
+        } catch (Error & e) {
+            e.addTrace({}, "while processing 'sandbox-paths'");
+            throw;
+        }
+    for (auto & i : closure) {
+        auto p = store.printStorePath(i);
+        pathsInChroot.insert_or_assign(p, p);
+    }
+
+    PathSet allowedPaths = settings.allowedImpureHostPrefixes;
+
+    /* This works like the above, except on a per-derivation level */
+    auto impurePaths = drvOptions.impureHostDeps;
+
+    for (auto & i : impurePaths) {
+        bool found = false;
+        /* Note: we're not resolving symlinks here to prevent
+           giving a non-root user info about inaccessible
+           files. */
+        Path canonI = canonPath(i);
+        /* If only we had a trie to do this more efficiently :) luckily, these are generally going to be pretty small */
+        for (auto & a : allowedPaths) {
+            Path canonA = canonPath(a);
+            if (isDirOrInDir(canonI, canonA)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            throw Error("derivation '%s' requested impure path '%s', but it was not in allowed-impure-host-deps",
+                store.printStorePath(drvPath), i);
+
+        /* Allow files in drvOptions.impureHostDeps to be missing; e.g.
+           macOS 11+ has no /usr/lib/libSystem*.dylib */
+        pathsInChroot[i] = {i, true};
+    }
+
+    if (settings.preBuildHook != "") {
+        printMsg(lvlChatty, "executing pre-build hook '%1%'", settings.preBuildHook);
+        auto args = useChroot ? Strings({store.printStorePath(drvPath), chrootRootDir}) :
+            Strings({ store.printStorePath(drvPath) });
+        enum BuildHookState {
+            stBegin,
+            stExtraChrootDirs
+        };
+        auto state = stBegin;
+        auto lines = runProgram(settings.preBuildHook, false, args);
+        auto lastPos = std::string::size_type{0};
+        for (auto nlPos = lines.find('\n'); nlPos != std::string::npos;
+                nlPos = lines.find('\n', lastPos))
+        {
+            auto line = lines.substr(lastPos, nlPos - lastPos);
+            lastPos = nlPos + 1;
+            if (state == stBegin) {
+                if (line == "extra-sandbox-paths" || line == "extra-chroot-dirs") {
+                    state = stExtraChrootDirs;
+                } else {
+                    throw Error("unknown pre-build hook command '%1%'", line);
+                }
+            } else if (state == stExtraChrootDirs) {
+                if (line == "") {
+                    state = stBegin;
+                } else {
+                    auto p = line.find('=');
+                    if (p == std::string::npos)
+                        pathsInChroot[line] = line;
+                    else
+                        pathsInChroot[line.substr(0, p)] = line.substr(p + 1);
+                }
+            }
+        }
+    }
+
+    return pathsInChroot;
 }
 
 void DerivationBuilderImpl::prepareSandbox()
@@ -2429,6 +2439,9 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
 
     if (useSandbox)
         throw Error("sandboxing builds is not supported on this platform");
+
+    if (params.drvOptions.useUidRange(params.drv))
+        throw Error("feature 'uid-range' is only supported in sandboxed builds");
 
     return std::make_unique<DerivationBuilderImpl>(
         store,
