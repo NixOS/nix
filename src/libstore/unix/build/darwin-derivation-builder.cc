@@ -2,11 +2,18 @@
 
 struct DarwinDerivationBuilder : DerivationBuilderImpl
 {
+    PathsInChroot pathsInChroot;
+
     DarwinDerivationBuilder(
         Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderImpl(store, std::move(miscMethods), std::move(params))
     {
         useChroot = true;
+    }
+
+    void prepareSandbox() override
+    {
+        pathsInChroot = getPathsInSandbox();
     }
 
     void execBuilder(const Strings & args, const Strings & envStrs) override
@@ -69,7 +76,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
             /* Add all our input paths to the chroot */
             for (auto & i : inputPaths) {
                 auto p = store.printStorePath(i);
-                pathsInChroot[p] = p;
+                pathsInChroot.insert_or_assign(p, p);
             }
 
             /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be

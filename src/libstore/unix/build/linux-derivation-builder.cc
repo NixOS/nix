@@ -20,6 +20,8 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
      */
     bool usingUserNamespace = true;
 
+    PathsInChroot pathsInChroot;
+
     LinuxDerivationBuilder(
         Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderImpl(store, std::move(miscMethods), std::move(params))
@@ -102,12 +104,6 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
         if (buildUser && chown(chrootStoreDir.c_str(), 0, buildUser->getGID()) == -1)
             throw SysError("cannot change ownership of '%1%'", chrootStoreDir);
 
-        for (auto & i : inputPaths) {
-            auto p = store.printStorePath(i);
-            Path r = store.toRealPath(p);
-            pathsInChroot.insert_or_assign(p, r);
-        }
-
         /* If we're repairing, checking or rebuilding part of a
            multiple-outputs derivation, it's possible that we're
            rebuilding a path that is in settings.sandbox-paths
@@ -130,6 +126,13 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
             chownToBuilder(*cgroup + "/cgroup.procs");
             chownToBuilder(*cgroup + "/cgroup.threads");
             //chownToBuilder(*cgroup + "/cgroup.subtree_control");
+        }
+
+        pathsInChroot = getPathsInSandbox();
+
+        for (auto & i : inputPaths) {
+            auto p = store.printStorePath(i);
+            pathsInChroot.insert_or_assign(p, store.toRealPath(p));
         }
     }
 
