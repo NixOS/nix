@@ -213,7 +213,7 @@ public:
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
-        sRight, sWrong, sStructuredAttrs,
+        sRight, sWrong, sStructuredAttrs, sJson,
         sAllowedReferences, sAllowedRequisites, sDisallowedReferences, sDisallowedRequisites,
         sMaxSize, sMaxClosureSize,
         sBuilder, sArgs,
