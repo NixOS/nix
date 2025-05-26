@@ -1,6 +1,10 @@
 #ifdef __linux__
 
+#  include "nix/store/personality.hh"
+#  include "nix/util/cgroup.hh"
+#  include "nix/util/namespaces.hh"
 #  include "linux/fchmodat2-compat.hh"
+
 #  include <sys/ioctl.h>
 #  include <net/if.h>
 #  include <netinet/ip.h>
@@ -9,13 +13,12 @@
 #  include <sys/param.h>
 #  include <sys/mount.h>
 #  include <sys/syscall.h>
-#  include "nix/util/namespaces.hh"
+
 #  if HAVE_SECCOMP
 #    include <seccomp.h>
 #  endif
+
 #  define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
-#  include "nix/util/cgroup.hh"
-#  include "nix/store/personality.hh"
 
 namespace nix {
 
@@ -182,6 +185,11 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
 
     PathsInChroot pathsInChroot;
 
+    /**
+     * The cgroup of the builder, if any.
+     */
+    std::optional<Path> cgroup;
+
     LinuxDerivationBuilder(
         Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderImpl(store, std::move(miscMethods), std::move(params))
@@ -233,6 +241,51 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
         /* In a sandbox, for determinism, always use the same temporary
            directory. */
         return settings.sandboxBuildDir;
+    }
+
+    void prepareUser() override
+    {
+        if ((buildUser && buildUser->getUIDCount() != 1) || settings.useCgroups) {
+            experimentalFeatureSettings.require(Xp::Cgroups);
+
+            /* If we're running from the daemon, then this will return the
+               root cgroup of the service. Otherwise, it will return the
+               current cgroup. */
+            auto rootCgroup = getRootCgroup();
+            auto cgroupFS = getCgroupFS();
+            if (!cgroupFS)
+                throw Error("cannot determine the cgroups file system");
+            auto rootCgroupPath = canonPath(*cgroupFS + "/" + rootCgroup);
+            if (!pathExists(rootCgroupPath))
+                throw Error("expected cgroup directory '%s'", rootCgroupPath);
+
+            static std::atomic<unsigned int> counter{0};
+
+            cgroup = buildUser ? fmt("%s/nix-build-uid-%d", rootCgroupPath, buildUser->getUID())
+                               : fmt("%s/nix-build-pid-%d-%d", rootCgroupPath, getpid(), counter++);
+
+            debug("using cgroup '%s'", *cgroup);
+
+            /* When using a build user, record the cgroup we used for that
+               user so that if we got interrupted previously, we can kill
+               any left-over cgroup first. */
+            if (buildUser) {
+                auto cgroupsDir = settings.nixStateDir + "/cgroups";
+                createDirs(cgroupsDir);
+
+                auto cgroupFile = fmt("%s/%d", cgroupsDir, buildUser->getUID());
+
+                if (pathExists(cgroupFile)) {
+                    auto prevCgroup = readFile(cgroupFile);
+                    destroyCgroup(prevCgroup);
+                }
+
+                writeFile(cgroupFile, *cgroup);
+            }
+        }
+
+        // Kill any processes left in the cgroup or build user.
+        DerivationBuilderImpl::prepareUser();
     }
 
     void prepareSandbox() override
@@ -745,6 +798,20 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
         sandboxUserNamespace = -1;
 
         return DerivationBuilderImpl::unprepareBuild();
+    }
+
+    void killSandbox(bool getStats) override
+    {
+        if (cgroup) {
+            auto stats = destroyCgroup(*cgroup);
+            if (getStats) {
+                buildResult.cpuUser = stats.cpuUser;
+                buildResult.cpuSystem = stats.cpuSystem;
+            }
+            return;
+        }
+
+        DerivationBuilderImpl::killSandbox(getStats);
     }
 
     void cleanupBuild() override

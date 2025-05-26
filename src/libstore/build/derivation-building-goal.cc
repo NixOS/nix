@@ -86,6 +86,8 @@ void DerivationBuildingGoal::killChild()
     if (builder && builder->pid != -1) {
         worker.childTerminated(this);
 
+        // FIXME: move this into DerivationBuilder.
+
         /* If we're using a build user, then there is a tricky race
            condition: if we kill the build user before the child has
            done its setuid() to the build user uid, then it won't be
