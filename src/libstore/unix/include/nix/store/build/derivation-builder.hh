@@ -146,11 +146,6 @@ struct DerivationBuilderCallbacks
 struct DerivationBuilder : RestrictionContext
 {
     /**
-     * User selected for running the builder.
-     */
-    std::unique_ptr<UserLock> buildUser;
-
-    /**
      * The process ID of the builder.
      */
     Pid pid;

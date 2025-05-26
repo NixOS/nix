@@ -114,6 +114,11 @@ public:
 private:
 
     /**
+     * User selected for running the builder.
+     */
+    std::unique_ptr<UserLock> buildUser;
+
+    /**
      * The cgroup of the builder, if any.
      */
     std::optional<Path> cgroup;
@@ -271,7 +276,7 @@ public:
     /**
      * Start building a derivation.
      */
-    void startBuilder() override;;
+    void startBuilder() override;
 
     /**
      * Tear down build environment after the builder exits (either on
