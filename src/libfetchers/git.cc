@@ -798,8 +798,10 @@ struct GitInputScheme : InputScheme
             auto rev = repoInfo.workdirInfo.headRev.value_or(nullRev);
 
             input.attrs.insert_or_assign("rev", rev.gitRev());
-            input.attrs.insert_or_assign("revCount",
-                rev == nullRev ? 0 : getRevCount(*input.settings, repoInfo, repoPath, rev));
+            if (!getShallowAttr(input)) {
+                input.attrs.insert_or_assign("revCount",
+                    rev == nullRev ? 0 : getRevCount(*input.settings, repoInfo, repoPath, rev));
+            }
 
             verifyCommit(input, repo);
         } else {
