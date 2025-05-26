@@ -1,5 +1,7 @@
 #ifdef __linux__
 
+namespace nix {
+
 struct LinuxDerivationBuilder : DerivationBuilderImpl
 {
     /**
@@ -20,21 +22,54 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
      */
     bool usingUserNamespace = true;
 
+    /**
+     * The root of the chroot environment.
+     */
+    Path chrootRootDir;
+
     PathsInChroot pathsInChroot;
 
     LinuxDerivationBuilder(
         Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderImpl(store, std::move(miscMethods), std::move(params))
     {
-        useChroot = true;
     }
 
-    uid_t sandboxUid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID(); }
-    gid_t sandboxGid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100  : 0) : buildUser->getGID(); }
+    uid_t sandboxUid()
+    {
+        return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID();
+    }
+
+    gid_t sandboxGid()
+    {
+        return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100 : 0) : buildUser->getGID();
+    }
 
     bool needsHashRewrite() override
     {
         return false;
+    }
+
+    std::unique_ptr<UserLock> getBuildUser() override
+    {
+        return acquireUserLock(drvOptions.useUidRange(drv) ? 65536 : 1, true);
+    }
+
+    void setBuildTmpDir() override
+    {
+        /* If sandboxing is enabled, put the actual TMPDIR underneath
+           an inaccessible root-owned directory, to prevent outside
+           access.
+
+           On macOS, we don't use an actual chroot, so this isn't
+           possible. Any mitigation along these lines would have to be
+           done directly in the sandbox profile. */
+        tmpDir = topTmpDir + "/build";
+        createDir(tmpDir, 0700);
+
+        /* In a sandbox, for determinism, always use the same temporary
+           directory. */
+        tmpDirInSandbox = settings.sandboxBuildDir;
     }
 
     void prepareSandbox() override
@@ -59,7 +94,10 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
         if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
             throw SysError("cannot create '%1%'", chrootRootDir);
 
-        if (buildUser && chown(chrootRootDir.c_str(), buildUser->getUIDCount() != 1 ? buildUser->getUID() : 0, buildUser->getGID()) == -1)
+        if (buildUser
+            && chown(
+                   chrootRootDir.c_str(), buildUser->getUIDCount() != 1 ? buildUser->getUID() : 0, buildUser->getGID())
+                   == -1)
             throw SysError("cannot change ownership of '%1%'", chrootRootDir);
 
         /* Create a writable /tmp in the chroot.  Many builders need
@@ -81,10 +119,12 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
-        writeFile(chrootRootDir + "/etc/group",
+        writeFile(
+            chrootRootDir + "/etc/group",
             fmt("root:x:0:\n"
                 "nixbld:!:%1%:\n"
-                "nogroup:x:65534:\n", sandboxGid()));
+                "nogroup:x:65534:\n",
+                sandboxGid()));
 
         /* Create /etc/hosts with localhost entry. */
         if (derivationType.isSandboxed())
@@ -125,7 +165,7 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
             chownToBuilder(*cgroup);
             chownToBuilder(*cgroup + "/cgroup.procs");
             chownToBuilder(*cgroup + "/cgroup.threads");
-            //chownToBuilder(*cgroup + "/cgroup.subtree_control");
+            // chownToBuilder(*cgroup + "/cgroup.subtree_control");
         }
 
         pathsInChroot = getPathsInSandbox();
@@ -134,6 +174,18 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
             auto p = store.printStorePath(i);
             pathsInChroot.insert_or_assign(p, store.toRealPath(p));
         }
+    }
+
+    Strings getPreBuildHookArgs() override
+    {
+        assert(!chrootRootDir.empty());
+        return Strings({store.printStorePath(drvPath), chrootRootDir});
+    }
+
+    Path realPathInSandbox(const Path & p) override
+    {
+        // FIXME: why the needsHashRewrite() conditional?
+        return !needsHashRewrite() ? chrootRootDir + p : store.toRealPath(p);
     }
 
     void startChild() override
@@ -194,7 +246,8 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
                     if (errno != EPERM)
                         throw SysError("setgroups failed");
                     if (settings.requireDropSupplementaryGroups)
-                        throw Error("setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
+                        throw Error(
+                            "setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
                 }
 
                 ProcessOptions options;
@@ -226,9 +279,7 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
 
         /* Close the write side to prevent runChild() from hanging
            reading from this. */
-        Finally cleanup([&]() {
-            userNamespaceSync.writeSide = -1;
-        });
+        Finally cleanup([&]() { userNamespaceSync.writeSide = -1; });
 
         auto ss = tokenizeString<std::vector<std::string>>(readLine(sendPid.readSide.get()));
         assert(ss.size() == 1);
@@ -242,30 +293,32 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
             uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
             uid_t nrIds = buildUser ? buildUser->getUIDCount() : 1;
 
-            writeFile("/proc/" + std::to_string(pid) + "/uid_map",
-                fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
+            writeFile("/proc/" + std::to_string(pid) + "/uid_map", fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
 
             if (!buildUser || buildUser->getUIDCount() == 1)
                 writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
 
-            writeFile("/proc/" + std::to_string(pid) + "/gid_map",
-                fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
+            writeFile("/proc/" + std::to_string(pid) + "/gid_map", fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
         } else {
             debug("note: not using a user namespace");
             if (!buildUser)
-                throw Error("cannot perform a sandboxed build because user namespaces are not enabled; check /proc/sys/user/max_user_namespaces");
+                throw Error(
+                    "cannot perform a sandboxed build because user namespaces are not enabled; check /proc/sys/user/max_user_namespaces");
         }
 
         /* Now that we now the sandbox uid, we can write
            /etc/passwd. */
-        writeFile(chrootRootDir + "/etc/passwd", fmt(
-                "root:x:0:0:Nix build user:%3%:/noshell\n"
+        writeFile(
+            chrootRootDir + "/etc/passwd",
+            fmt("root:x:0:0:Nix build user:%3%:/noshell\n"
                 "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
-                sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
+                sandboxUid(),
+                sandboxGid(),
+                settings.sandboxBuildDir));
 
         /* Save the mount- and user namespace of the child. We have to do this
-           *before* the child does a chroot. */
+         *before* the child does a chroot. */
         sandboxMountNamespace = open(fmt("/proc/%d/ns/mnt", (pid_t) pid).c_str(), O_RDONLY);
         if (sandboxMountNamespace.get() == -1)
             throw SysError("getting sandbox mount namespace");
@@ -528,6 +581,24 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
         return DerivationBuilderImpl::unprepareBuild();
     }
 
+    void cleanupBuild() override
+    {
+        DerivationBuilderImpl::cleanupBuild();
+
+        /* Move paths out of the chroot for easier debugging of
+           build failures. */
+        if (buildMode == bmNormal)
+            for (auto & [_, status] : initialOutputs) {
+                if (!status.known)
+                    continue;
+                if (buildMode != bmCheck && status.known->isValid())
+                    continue;
+                auto p = store.toRealPath(status.known->path);
+                if (pathExists(chrootRootDir + p))
+                    std::filesystem::rename((chrootRootDir + p), p);
+            }
+    }
+
     void addDependency(const StorePath & path) override
     {
         if (isAllowed(path))
@@ -567,5 +638,7 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
             throw Error("could not add path '%s' to sandbox", store.printStorePath(path));
     }
 };
+
+}
 
 #endif

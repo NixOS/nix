@@ -52,15 +52,6 @@
 # include "nix/store/personality.hh"
 #endif
 
-#ifdef __APPLE__
-# include <spawn.h>
-# include <sys/sysctl.h>
-# include <sandbox.h>
-
-/* This definition is undocumented but depended upon by all major browsers. */
-extern "C" int sandbox_init_with_parameters(const char *profile, uint64_t flags, const char *const parameters[], char **errorbuf);
-#endif
-
 #include <pwd.h>
 #include <grp.h>
 #include <iostream>
@@ -116,6 +107,7 @@ protected:
     /**
      * The cgroup of the builder, if any.
      */
+    // FIXME: move
     std::optional<Path> cgroup;
 
     /**
@@ -133,18 +125,6 @@ protected:
      * The path of the temporary directory in the sandbox.
      */
     Path tmpDirInSandbox;
-
-    /**
-     * Whether we're currently doing a chroot build.
-     */
-    // FIXME: remove
-    bool useChroot = false;
-
-    /**
-     * The root of the chroot environment.
-     */
-    // FIXME: move
-    Path chrootRootDir;
 
     /**
      * RAII object to delete the chroot directory.
@@ -251,6 +231,14 @@ public:
 protected:
 
     /**
+     * Acquire a build user lock. Return nullptr if no lock is available.
+     */
+    virtual std::unique_ptr<UserLock> getBuildUser()
+    {
+        return acquireUserLock(1, false);
+    }
+
+    /**
      * Return the paths that should be made available in the sandbox.
      * This includes:
      *
@@ -261,11 +249,27 @@ protected:
      */
     PathsInChroot getPathsInSandbox();
 
+    virtual void setBuildTmpDir()
+    {
+        tmpDir = topTmpDir;
+        tmpDirInSandbox = topTmpDir;
+    }
+
     /**
      * Called by prepareBuild() to do any setup in the parent to
      * prepare for a sandboxed build.
      */
     virtual void prepareSandbox();
+
+    virtual Strings getPreBuildHookArgs()
+    {
+        return Strings({store.printStorePath(drvPath)});
+    }
+
+    virtual Path realPathInSandbox(const Path & p)
+    {
+        return store.toRealPath(p);
+    }
 
     /**
      * Open the slave side of the pseudoterminal and use it as stderr.
@@ -370,9 +374,13 @@ public:
 
     void killSandbox(bool getStats) override;
 
+protected:
+
+    virtual void cleanupBuild();
+
 private:
 
-    bool cleanupDecideWhetherDiskFull();
+    bool decideWhetherDiskFull();
 
     /**
      * Create alternative path calculated from but distinct from the
@@ -462,11 +470,10 @@ bool DerivationBuilderImpl::prepareBuild()
 {
     if (useBuildUsers()) {
         if (!buildUser)
-            buildUser = acquireUserLock(drvOptions.useUidRange(drv) ? 65536 : 1, useChroot);
+            buildUser = getBuildUser();
 
-        if (!buildUser) {
+        if (!buildUser)
             return false;
-        }
     }
 
     return true;
@@ -528,7 +535,9 @@ std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> Derivation
         /* Check the exit status. */
         if (!statusOk(status)) {
 
-            diskFull |= cleanupDecideWhetherDiskFull();
+            diskFull |= decideWhetherDiskFull();
+
+            cleanupBuild();
 
             auto msg = fmt(
                 "Cannot build '%s'.\n"
@@ -582,6 +591,10 @@ std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> Derivation
     }
 }
 
+void DerivationBuilderImpl::cleanupBuild()
+{
+    deleteTmpDir(false);
+}
 
 static void chmod_(const Path & path, mode_t mode)
 {
@@ -644,10 +657,7 @@ static void replaceValidPath(const Path & storePath, const Path & tmpPath)
         deletePath(oldPath);
 }
 
-
-
-
-bool DerivationBuilderImpl::cleanupDecideWhetherDiskFull()
+bool DerivationBuilderImpl::decideWhetherDiskFull()
 {
     bool diskFull = false;
 
@@ -669,19 +679,6 @@ bool DerivationBuilderImpl::cleanupDecideWhetherDiskFull()
             diskFull = true;
     }
 #endif
-
-    deleteTmpDir(false);
-
-    /* Move paths out of the chroot for easier debugging of
-       build failures. */
-    if (useChroot && buildMode == bmNormal)
-        for (auto & [_, status] : initialOutputs) {
-            if (!status.known) continue;
-            if (buildMode != bmCheck && status.known->isValid()) continue;
-            auto p = store.toRealPath(status.known->path);
-            if (pathExists(chrootRootDir + p))
-                std::filesystem::rename((chrootRootDir + p), p);
-        }
 
     return diskFull;
 }
@@ -832,23 +829,9 @@ void DerivationBuilderImpl::startBuilder()
     /* Create a temporary directory where the build will take
        place. */
     topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), 0700);
-#ifdef __APPLE__
-    if (false) {
-#else
-    if (useChroot) {
-#endif
-        /* If sandboxing is enabled, put the actual TMPDIR underneath
-           an inaccessible root-owned directory, to prevent outside
-           access.
-
-           On macOS, we don't use an actual chroot, so this isn't
-           possible. Any mitigation along these lines would have to be
-           done directly in the sandbox profile. */
-        tmpDir = topTmpDir + "/build";
-        createDir(tmpDir, 0700);
-    } else {
-        tmpDir = topTmpDir;
-    }
+    setBuildTmpDir();
+    assert(!tmpDir.empty());
+    assert(!tmpDirInSandbox.empty());
     chownToBuilder(tmpDir);
 
     for (auto & [outputName, status] : initialOutputs) {
@@ -1053,14 +1036,12 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
 
     if (settings.preBuildHook != "") {
         printMsg(lvlChatty, "executing pre-build hook '%1%'", settings.preBuildHook);
-        auto args = useChroot ? Strings({store.printStorePath(drvPath), chrootRootDir}) :
-            Strings({ store.printStorePath(drvPath) });
         enum BuildHookState {
             stBegin,
             stExtraChrootDirs
         };
         auto state = stBegin;
-        auto lines = runProgram(settings.preBuildHook, false, args);
+        auto lines = runProgram(settings.preBuildHook, false, getPreBuildHookArgs());
         auto lastPos = std::string::size_type{0};
         for (auto nlPos = lines.find('\n'); nlPos != std::string::npos;
                 nlPos = lines.find('\n', lastPos))
@@ -1157,14 +1138,6 @@ void DerivationBuilderImpl::processSandboxSetupMessages()
 
 void DerivationBuilderImpl::initTmpDir()
 {
-    /* In a sandbox, for determinism, always use the same temporary
-       directory. */
-#ifdef __linux__
-    tmpDirInSandbox = useChroot ? settings.sandboxBuildDir : tmpDir;
-#else
-    tmpDirInSandbox = tmpDir;
-#endif
-
     /* In non-structured mode, set all bindings either directory in the
        environment or via a file, as specified by
        `DerivationOptions::passAsFile`. */
@@ -1653,14 +1626,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     for (auto & i : scratchOutputs) referenceablePaths.insert(i.second);
     for (auto & p : addedPaths) referenceablePaths.insert(p);
 
-    /* FIXME `needsHashRewrite` should probably be removed and we get to the
-       real reason why we aren't using the chroot dir */
-    auto toRealPathChroot = [&](const Path & p) -> Path {
-        return useChroot && !needsHashRewrite()
-            ? chrootRootDir + p
-            : store.toRealPath(p);
-    };
-
     /* Check whether the output paths were created, and make all
        output paths read-only.  Then get the references of each output (that we
        might need to register), so we can topologically sort them. For the ones
@@ -1677,7 +1642,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             throw BuildError(
                 "builder for '%s' has no scratch output for '%s'",
                 store.printStorePath(drvPath), outputName);
-        auto actualPath = toRealPathChroot(store.printStorePath(*scratchOutput));
+        auto actualPath = realPathInSandbox(store.printStorePath(*scratchOutput));
 
         outputsToSort.insert(outputName);
 
@@ -1786,7 +1751,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto output = get(drv.outputs, outputName);
         auto scratchPath = get(scratchOutputs, outputName);
         assert(output && scratchPath);
-        auto actualPath = toRealPathChroot(store.printStorePath(*scratchPath));
+        auto actualPath = realPathInSandbox(store.printStorePath(*scratchPath));
 
         auto finish = [&](StorePath finalStorePath) {
             /* Store the final path */
@@ -2361,9 +2326,13 @@ StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
         Hash(HashAlgorithm::SHA256), path.name());
 }
 
+}
+
 // FIXME: do this properly
 #include "linux-derivation-builder.cc"
 #include "darwin-derivation-builder.cc"
+
+namespace nix {
 
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     Store & store,

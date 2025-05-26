@@ -1,5 +1,15 @@
 #ifdef __APPLE__
 
+#  include <spawn.h>
+#  include <sys/sysctl.h>
+#  include <sandbox.h>
+
+/* This definition is undocumented but depended upon by all major browsers. */
+extern "C" int
+sandbox_init_with_parameters(const char * profile, uint64_t flags, const char * const parameters[], char ** errorbuf);
+
+namespace nix {
+
 struct DarwinDerivationBuilder : DerivationBuilderImpl
 {
     PathsInChroot pathsInChroot;
@@ -183,6 +193,8 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
             }
         }
     }
+}
+
 }
 
 #endif
