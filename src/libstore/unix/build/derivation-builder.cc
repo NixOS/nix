@@ -39,10 +39,6 @@
 # include <sys/statvfs.h>
 #endif
 
-#ifdef __linux__
-# include "nix/util/cgroup.hh"
-#endif
-
 #include <pwd.h>
 #include <grp.h>
 #include <iostream>
@@ -94,12 +90,6 @@ protected:
      * User selected for running the builder.
      */
     std::unique_ptr<UserLock> buildUser;
-
-    /**
-     * The cgroup of the builder, if any.
-     */
-    // FIXME: move
-    std::optional<Path> cgroup;
 
     /**
      * The temporary directory used for the build.
@@ -241,6 +231,15 @@ protected:
     {
         assert(!topTmpDir.empty());
         return topTmpDir;
+    }
+
+    /**
+     * Ensure that there are no processes running that conflict with
+     * `buildUser`.
+     */
+    virtual void prepareUser()
+    {
+        killSandbox(false);
     }
 
     /**
@@ -429,19 +428,7 @@ static LocalStore & getLocalStore(Store & store)
 
 void DerivationBuilderImpl::killSandbox(bool getStats)
 {
-    if (cgroup) {
-        #ifdef __linux__
-        auto stats = destroyCgroup(*cgroup);
-        if (getStats) {
-            buildResult.cpuUser = stats.cpuUser;
-            buildResult.cpuSystem = stats.cpuSystem;
-        }
-        #else
-        unreachable();
-        #endif
-    }
-
-    else if (buildUser) {
+    if (buildUser) {
         auto uid = buildUser->getUID();
         assert(uid != 0);
         killUser(uid);
@@ -690,60 +677,10 @@ static void handleChildException(bool sendException)
 
 void DerivationBuilderImpl::startBuilder()
 {
-    if ((buildUser && buildUser->getUIDCount() != 1)
-        #ifdef __linux__
-        || settings.useCgroups
-        #endif
-        )
-    {
-        #ifdef __linux__
-        experimentalFeatureSettings.require(Xp::Cgroups);
-
-        /* If we're running from the daemon, then this will return the
-           root cgroup of the service. Otherwise, it will return the
-           current cgroup. */
-        auto rootCgroup = getRootCgroup();
-        auto cgroupFS = getCgroupFS();
-        if (!cgroupFS)
-            throw Error("cannot determine the cgroups file system");
-        auto rootCgroupPath = canonPath(*cgroupFS + "/" + rootCgroup);
-        if (!pathExists(rootCgroupPath))
-            throw Error("expected cgroup directory '%s'", rootCgroupPath);
-
-        static std::atomic<unsigned int> counter{0};
-
-        cgroup = buildUser
-            ? fmt("%s/nix-build-uid-%d", rootCgroupPath, buildUser->getUID())
-            : fmt("%s/nix-build-pid-%d-%d", rootCgroupPath, getpid(), counter++);
-
-        debug("using cgroup '%s'", *cgroup);
-
-        /* When using a build user, record the cgroup we used for that
-           user so that if we got interrupted previously, we can kill
-           any left-over cgroup first. */
-        if (buildUser) {
-            auto cgroupsDir = settings.nixStateDir + "/cgroups";
-            createDirs(cgroupsDir);
-
-            auto cgroupFile = fmt("%s/%d", cgroupsDir, buildUser->getUID());
-
-            if (pathExists(cgroupFile)) {
-                auto prevCgroup = readFile(cgroupFile);
-                destroyCgroup(prevCgroup);
-            }
-
-            writeFile(cgroupFile, *cgroup);
-        }
-
-        #else
-        throw Error("cgroups are not supported on this platform");
-        #endif
-    }
-
     /* Make sure that no other processes are executing under the
        sandbox uids. This must be done before any chownToBuilder()
        calls. */
-    killSandbox(false);
+    prepareUser();
 
     /* Right platform? */
     if (!drvOptions.canBuildLocally(store, drv)) {
