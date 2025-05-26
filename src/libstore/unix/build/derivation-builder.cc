@@ -809,7 +809,7 @@ void DerivationBuilderImpl::startBuilder()
     writeStructuredAttrs();
 
     /* Handle exportReferencesGraph(), if set. */
-    if (!parsedDrv) {
+    if (!drv.structuredAttrs) {
         for (auto & [fileName, ss] : drvOptions.exportReferencesGraph) {
             StorePathSet storePathSet;
             for (auto & storePathS : ss) {
@@ -1081,7 +1081,7 @@ void DerivationBuilderImpl::initEnv()
     /* In non-structured mode, set all bindings either directory in the
        environment or via a file, as specified by
        `DerivationOptions::passAsFile`. */
-    if (!parsedDrv) {
+    if (!drv.structuredAttrs) {
         for (auto & i : drv.env) {
             if (drvOptions.passAsFile.find(i.first) == drvOptions.passAsFile.end()) {
                 env[i.first] = i.second;
@@ -1149,8 +1149,8 @@ void DerivationBuilderImpl::initEnv()
 
 void DerivationBuilderImpl::writeStructuredAttrs()
 {
-    if (parsedDrv) {
-        auto json = parsedDrv->prepareStructuredAttrs(store, drvOptions, inputPaths, drv.outputs);
+    if (drv.structuredAttrs) {
+        auto json = drv.structuredAttrs->prepareStructuredAttrs(store, drvOptions, inputPaths, drv.outputs);
         nlohmann::json rewritten;
         for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {
             /* The placeholder must have a rewrite, so we use it to cover both the

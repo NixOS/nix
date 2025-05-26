@@ -176,6 +176,9 @@ struct DerivationOptions
     static DerivationOptions
     fromStructuredAttrs(const StringMap & env, const StructuredAttrs * parsed, bool shouldWarn = true);
 
+    static DerivationOptions
+    fromStructuredAttrs(const StringMap & env, const std::optional<StructuredAttrs> & parsed, bool shouldWarn = true);
+
     /**
      * @param drv Must be the same derivation we parsed this from. In
      * the future we'll flip things around so a `BasicDerivation` has
