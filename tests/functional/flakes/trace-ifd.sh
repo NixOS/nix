@@ -29,5 +29,5 @@ cat > "$flake1Dir/flake.nix" <<'EOF'
 }
 EOF
 
-nix build "$flake1Dir#ifd" --option trace-import-from-derivation true 2>&1 \
+nix build --no-link "$flake1Dir#ifd" --option trace-import-from-derivation true 2>&1 \
   | grepQuiet 'warning: built .* during evaluation due to an import from derivation'
