@@ -287,11 +287,6 @@ protected:
 private:
 
     /**
-     * Setup tmp dir location.
-     */
-    void initTmpDir();
-
-    /**
      * Write a JSON file containing the derivation attributes.
      */
     void writeStructuredAttrs();
@@ -1089,9 +1084,32 @@ void DerivationBuilderImpl::processSandboxSetupMessages()
     }
 }
 
-
-void DerivationBuilderImpl::initTmpDir()
+void DerivationBuilderImpl::initEnv()
 {
+    env.clear();
+
+    /* Most shells initialise PATH to some default (/bin:/usr/bin:...) when
+       PATH is not set.  We don't want this, so we fill it in with some dummy
+       value. */
+    env["PATH"] = "/path-not-set";
+
+    /* Set HOME to a non-existing path to prevent certain programs from using
+       /etc/passwd (or NIS, or whatever) to locate the home directory (for
+       example, wget looks for ~/.wgetrc).  I.e., these tools use /etc/passwd
+       if HOME is not set, but they will just assume that the settings file
+       they are looking for does not exist if HOME is set but points to some
+       non-existing path. */
+    env["HOME"] = homeDir;
+
+    /* Tell the builder where the Nix store is.  Usually they
+       shouldn't care, but this is useful for purity checking (e.g.,
+       the compiler or linker might only want to accept paths to files
+       in the store or in the build directory). */
+    env["NIX_STORE"] = store.storeDir;
+
+    /* The maximum number of cores to utilize for parallel building. */
+    env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores);
+
     /* In non-structured mode, set all bindings either directory in the
        environment or via a file, as specified by
        `DerivationOptions::passAsFile`. */
@@ -1123,36 +1141,6 @@ void DerivationBuilderImpl::initTmpDir()
        inode of the current directory doesn't appear in .. (because
        getdents returns the inode of the mount point). */
     env["PWD"] = tmpDirInSandbox();
-}
-
-
-void DerivationBuilderImpl::initEnv()
-{
-    env.clear();
-
-    /* Most shells initialise PATH to some default (/bin:/usr/bin:...) when
-       PATH is not set.  We don't want this, so we fill it in with some dummy
-       value. */
-    env["PATH"] = "/path-not-set";
-
-    /* Set HOME to a non-existing path to prevent certain programs from using
-       /etc/passwd (or NIS, or whatever) to locate the home directory (for
-       example, wget looks for ~/.wgetrc).  I.e., these tools use /etc/passwd
-       if HOME is not set, but they will just assume that the settings file
-       they are looking for does not exist if HOME is set but points to some
-       non-existing path. */
-    env["HOME"] = homeDir;
-
-    /* Tell the builder where the Nix store is.  Usually they
-       shouldn't care, but this is useful for purity checking (e.g.,
-       the compiler or linker might only want to accept paths to files
-       in the store or in the build directory). */
-    env["NIX_STORE"] = store.storeDir;
-
-    /* The maximum number of cores to utilize for parallel building. */
-    env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores);
-
-    initTmpDir();
 
     /* Compatibility hack with Nix <= 0.7: if this is a fixed-output
        derivation, tell the builder, so that for instance `fetchurl'
