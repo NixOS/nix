@@ -8,20 +8,50 @@
 
 namespace nix {
 
+static constexpr std::string_view envVarName = "__json";
+
+StructuredAttrs StructuredAttrs::parse(const std::string & encoded)
+{
+    try {
+        return StructuredAttrs {
+            .structuredAttrs = nlohmann::json::parse(encoded),
+        };
+    } catch (std::exception & e) {
+        throw Error("cannot process __json attribute: %s", e.what());
+    }
+}
+
 std::optional<StructuredAttrs> StructuredAttrs::tryParse(const StringPairs & env)
 {
     /* Parse the __json attribute, if any. */
-    auto jsonAttr = env.find("__json");
+    auto jsonAttr = env.find(envVarName);
+    if (jsonAttr != env.end())
+        return parse(jsonAttr->second);
+    else
+        return {};
+}
+
+std::optional<StructuredAttrs> StructuredAttrs::tryExtract(StringPairs & env)
+{
+    /* Parse the __json attribute, if any. */
+    auto jsonAttr = env.find(envVarName);
     if (jsonAttr != env.end()) {
-        try {
-            return StructuredAttrs {
-                .structuredAttrs = nlohmann::json::parse(jsonAttr->second),
-            };
-        } catch (std::exception & e) {
-            throw Error("cannot process __json attribute: %s", e.what());
-        }
-    }
-    return {};
+        auto encoded = std::move(jsonAttr->second);
+        env.erase(jsonAttr);
+        return parse(encoded);
+    } else
+        return {};
+}
+
+std::pair<std::string_view, std::string> StructuredAttrs::unparse() const
+{
+    return {envVarName, structuredAttrs.dump()};
+}
+
+void StructuredAttrs::checkKeyNotInUse(const StringPairs & env)
+{
+    if (env.count(envVarName))
+        throw Error("Cannot have an environment variable named '__json'. This key is reserved for encoding structured attrs");
 }
 
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
@@ -170,4 +200,5 @@ std::string StructuredAttrs::writeShell(const nlohmann::json & json)
 
     return jsonSh;
 }
+
 }
