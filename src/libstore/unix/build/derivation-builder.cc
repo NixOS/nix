@@ -106,11 +106,6 @@ protected:
     Path topTmpDir;
 
     /**
-     * The path of the temporary directory in the sandbox.
-     */
-    Path tmpDirInSandbox;
-
-    /**
      * The sort of derivation we are building.
      *
      * Just a cached value, computed from `drv`.
@@ -230,7 +225,15 @@ protected:
     virtual void setBuildTmpDir()
     {
         tmpDir = topTmpDir;
-        tmpDirInSandbox = topTmpDir;
+    }
+
+    /**
+     * Return the path of the temporary directory in the sandbox.
+     */
+    virtual Path tmpDirInSandbox()
+    {
+        assert(!topTmpDir.empty());
+        return topTmpDir;
     }
 
     /**
@@ -770,7 +773,6 @@ void DerivationBuilderImpl::startBuilder()
     topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), 0700);
     setBuildTmpDir();
     assert(!tmpDir.empty());
-    assert(!tmpDirInSandbox.empty());
     chownToBuilder(tmpDir);
 
     for (auto & [outputName, status] : initialOutputs) {
@@ -923,11 +925,11 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
         else
             pathsInChroot[i.substr(0, p)] = {i.substr(p + 1), optional};
     }
-    if (hasPrefix(store.storeDir, tmpDirInSandbox))
+    if (hasPrefix(store.storeDir, tmpDirInSandbox()))
     {
         throw Error("`sandbox-build-dir` must not contain the storeDir");
     }
-    pathsInChroot[tmpDirInSandbox] = tmpDir;
+    pathsInChroot[tmpDirInSandbox()] = tmpDir;
 
     /* Add the closure of store paths to the chroot. */
     StorePathSet closure;
@@ -1090,7 +1092,7 @@ void DerivationBuilderImpl::initTmpDir()
                 Path p = tmpDir + "/" + fn;
                 writeFile(p, rewriteStrings(i.second, inputRewrites));
                 chownToBuilder(p);
-                env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
+                env[i.first + "Path"] = tmpDirInSandbox() + "/" + fn;
             }
         }
 
@@ -1098,16 +1100,16 @@ void DerivationBuilderImpl::initTmpDir()
 
     /* For convenience, set an environment pointing to the top build
        directory. */
-    env["NIX_BUILD_TOP"] = tmpDirInSandbox;
+    env["NIX_BUILD_TOP"] = tmpDirInSandbox();
 
     /* Also set TMPDIR and variants to point to this directory. */
-    env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDirInSandbox;
+    env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDirInSandbox();
 
     /* Explicitly set PWD to prevent problems with chroot builds.  In
        particular, dietlibc cannot figure out the cwd because the
        inode of the current directory doesn't appear in .. (because
        getdents returns the inode of the mount point). */
-    env["PWD"] = tmpDirInSandbox;
+    env["PWD"] = tmpDirInSandbox();
 }
 
 
@@ -1200,10 +1202,10 @@ void DerivationBuilderImpl::writeStructuredAttrs()
 
         writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
         chownToBuilder(tmpDir + "/.attrs.sh");
-        env["NIX_ATTRS_SH_FILE"] = tmpDirInSandbox + "/.attrs.sh";
+        env["NIX_ATTRS_SH_FILE"] = tmpDirInSandbox() + "/.attrs.sh";
         writeFile(tmpDir + "/.attrs.json", rewriteStrings(json.dump(), inputRewrites));
         chownToBuilder(tmpDir + "/.attrs.json");
-        env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox + "/.attrs.json";
+        env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox() + "/.attrs.json";
     }
 }
 
@@ -1227,7 +1229,7 @@ void DerivationBuilderImpl::startDaemon()
 
     auto socketName = ".nix-socket";
     Path socketPath = tmpDir + "/" + socketName;
-    env["NIX_REMOTE"] = "unix://" + tmpDirInSandbox + "/" + socketName;
+    env["NIX_REMOTE"] = "unix://" + tmpDirInSandbox() + "/" + socketName;
 
     daemonSocket = createUnixDomainSocket(socketPath, 0600);
 
@@ -1339,7 +1341,7 @@ void DerivationBuilderImpl::runChild()
            different uid and/or in a sandbox). */
         BuiltinBuilderContext ctx{
             .drv = drv,
-            .tmpDirInSandbox = tmpDirInSandbox,
+            .tmpDirInSandbox = tmpDirInSandbox(),
         };
 
         if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
@@ -1354,7 +1356,7 @@ void DerivationBuilderImpl::runChild()
 
         enterChroot();
 
-        if (chdir(tmpDirInSandbox.c_str()) == -1)
+        if (chdir(tmpDirInSandbox().c_str()) == -1)
             throw SysError("changing into '%1%'", tmpDir);
 
         /* Close all other file descriptors. */

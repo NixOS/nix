@@ -226,10 +226,13 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
            done directly in the sandbox profile. */
         tmpDir = topTmpDir + "/build";
         createDir(tmpDir, 0700);
+    }
 
+    Path tmpDirInSandbox() override
+    {
         /* In a sandbox, for determinism, always use the same temporary
            directory. */
-        tmpDirInSandbox = settings.sandboxBuildDir;
+        return settings.sandboxBuildDir;
     }
 
     void prepareSandbox() override
