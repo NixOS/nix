@@ -40,3 +40,11 @@ jsonOut="$(nix print-dev-env -f structured-attrs-shell.nix --json)"
 test "$(<<<"$jsonOut" jq '.structuredAttrs|keys|.[]' -r)" = "$(printf ".attrs.json\n.attrs.sh")"
 
 test "$(<<<"$jsonOut" jq '.variables.outputs.value.out' -r)" = "$(<<<"$jsonOut" jq '.structuredAttrs.".attrs.json"' -r | jq -r '.outputs.out')"
+
+# Hacky way of making structured attrs. We should preserve for now for back compat, but also deprecate.
+
+hackyExpr='derivation { name = "a"; system = "foo"; builder = "/bin/sh"; __json = builtins.toJSON { a = 1; }; }'
+
+# Check it works with the expected structured attrs
+hacky=$(nix-instantiate --expr "$hackyExpr")
+nix derivation show "$hacky" | jq --exit-status '."'"$hacky"'".env.__json | fromjson | . == {"a": 1}'
