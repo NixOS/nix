@@ -107,6 +107,7 @@ public:
         : DerivationBuilderParams{std::move(params)}
         , store{store}
         , miscMethods{std::move(miscMethods)}
+        , derivationType(drv.type())
       { }
 
       LocalStore & getLocalStore();
@@ -175,9 +176,9 @@ private:
     /**
      * The sort of derivation we are building.
      *
-     * Just a cached value, can be recomputed from `drv`.
+     * Just a cached value, computed from `drv`.
      */
-    std::optional<DerivationType> derivationType;
+    const DerivationType derivationType;
 
     /**
      * Stuff we need to pass to initChild().
@@ -445,9 +446,6 @@ void DerivationBuilderImpl::killSandbox(bool getStats)
 
 bool DerivationBuilderImpl::prepareBuild()
 {
-    /* Cache this */
-    derivationType = drv.type();
-
     /* Are we doing a chroot build? */
     {
         if (settings.sandboxMode == smEnabled) {
@@ -464,7 +462,7 @@ bool DerivationBuilderImpl::prepareBuild()
         else if (settings.sandboxMode == smDisabled)
             useChroot = false;
         else if (settings.sandboxMode == smRelaxed)
-            useChroot = derivationType->isSandboxed() && !drvOptions.noChroot;
+            useChroot = derivationType.isSandboxed() && !drvOptions.noChroot;
     }
 
     auto & localStore = getLocalStore();
@@ -601,11 +599,10 @@ std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> Derivation
         return std::move(builtOutputs);
 
     } catch (BuildError & e) {
-        assert(derivationType);
         BuildResult::Status st =
             dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
             statusOk(status) ? BuildResult::OutputRejected :
-            !derivationType->isSandboxed() || diskFull ? BuildResult::TransientFailure :
+            !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure :
             BuildResult::PermanentFailure;
 
         return std::pair{std::move(st), std::move(e)};
@@ -1081,7 +1078,7 @@ void DerivationBuilderImpl::startBuilder()
                 "nogroup:x:65534:\n", sandboxGid()));
 
         /* Create /etc/hosts with localhost entry. */
-        if (derivationType->isSandboxed())
+        if (derivationType.isSandboxed())
             writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n::1 localhost\n");
 
         /* Make the closure of the inputs available in the chroot,
@@ -1309,7 +1306,7 @@ void DerivationBuilderImpl::startBuilder()
 
                 ProcessOptions options;
                 options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
-                if (derivationType->isSandboxed())
+                if (derivationType.isSandboxed())
                     options.cloneFlags |= CLONE_NEWNET;
                 if (usingUserNamespace)
                     options.cloneFlags |= CLONE_NEWUSER;
@@ -1515,7 +1512,7 @@ void DerivationBuilderImpl::initEnv()
        derivation, tell the builder, so that for instance `fetchurl'
        can skip checking the output.  On older Nixes, this environment
        variable won't be set, so `fetchurl' will do the check. */
-    if (derivationType->isFixed()) env["NIX_OUTPUT_CHECKED"] = "1";
+    if (derivationType.isFixed()) env["NIX_OUTPUT_CHECKED"] = "1";
 
     /* *Only* if this is a fixed-output derivation, propagate the
        values of the environment variables specified in the
@@ -1526,7 +1523,7 @@ void DerivationBuilderImpl::initEnv()
        to the builder is generally impure, but the output of
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
-    if (!derivationType->isSandboxed()) {
+    if (!derivationType.isSandboxed()) {
         auto & impureEnv = settings.impureEnv.get();
         if (!impureEnv.empty())
             experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
@@ -1876,7 +1873,7 @@ void DerivationBuilderImpl::runChild()
 
             userNamespaceSync.readSide = -1;
 
-            if (derivationType->isSandboxed()) {
+            if (derivationType.isSandboxed()) {
 
                 /* Initialise the loopback interface. */
                 AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
@@ -1952,7 +1949,7 @@ void DerivationBuilderImpl::runChild()
             /* Fixed-output derivations typically need to access the
                network, so give them access to /etc/resolv.conf and so
                on. */
-            if (!derivationType->isSandboxed()) {
+            if (!derivationType.isSandboxed()) {
                 // Only use nss functions to resolve hosts and
                 // services. Don’t use it for anything else that may
                 // be configured for this system. This limits the
