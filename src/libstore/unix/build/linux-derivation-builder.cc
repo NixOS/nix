@@ -175,12 +175,24 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
      */
     Path chrootRootDir;
 
+    /**
+     * RAII object to delete the chroot directory.
+     */
+    std::shared_ptr<AutoDelete> autoDelChroot;
+
     PathsInChroot pathsInChroot;
 
     LinuxDerivationBuilder(
         Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderImpl(store, std::move(miscMethods), std::move(params))
     {
+    }
+
+    void deleteTmpDir(bool force) override
+    {
+        autoDelChroot.reset(); /* this runs the destructor */
+
+        DerivationBuilderImpl::deleteTmpDir(force);
     }
 
     uid_t sandboxUid()

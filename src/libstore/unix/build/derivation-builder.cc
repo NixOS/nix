@@ -118,12 +118,6 @@ protected:
     Path tmpDirInSandbox;
 
     /**
-     * RAII object to delete the chroot directory.
-     */
-    // FIXME: move
-    std::shared_ptr<AutoDelete> autoDelChroot;
-
-    /**
      * The sort of derivation we are building.
      *
      * Just a cached value, computed from `drv`.
@@ -563,9 +557,6 @@ std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> Derivation
         /* Delete unused redirected outputs (when doing hash rewriting). */
         for (auto & i : redirectedOutputs)
             deletePath(store.Store::toRealPath(i.second));
-
-        /* Delete the chroot (if we were using one). */
-        autoDelChroot.reset(); /* this runs the destructor */
 
         deleteTmpDir(true);
 
