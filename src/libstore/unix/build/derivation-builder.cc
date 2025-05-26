@@ -39,24 +39,13 @@
 # include <sys/statvfs.h>
 #endif
 
-/* Includes required for chroot support. */
 #ifdef __linux__
 # include "linux/fchmodat2-compat.hh"
-# include <sys/ioctl.h>
-# include <net/if.h>
-# include <netinet/ip.h>
-# include <sys/mman.h>
-# include <sched.h>
-# include <sys/param.h>
-# include <sys/mount.h>
 # include <sys/syscall.h>
-# include "nix/util/namespaces.hh"
 # if HAVE_SECCOMP
 #   include <seccomp.h>
 # endif
-# define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 # include "nix/util/cgroup.hh"
-# include "nix/store/personality.hh"
 #endif
 
 #include <pwd.h>
@@ -679,42 +668,6 @@ bool DerivationBuilderImpl::decideWhetherDiskFull()
 
     return diskFull;
 }
-
-
-#ifdef __linux__
-static void doBind(const Path & source, const Path & target, bool optional = false) {
-    debug("bind mounting '%1%' to '%2%'", source, target);
-
-    auto bindMount = [&]() {
-        if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-            throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
-    };
-
-    auto maybeSt = maybeLstat(source);
-    if (!maybeSt) {
-        if (optional)
-            return;
-        else
-            throw SysError("getting attributes of path '%1%'", source);
-    }
-    auto st = *maybeSt;
-
-    if (S_ISDIR(st.st_mode)) {
-        createDirs(target);
-        bindMount();
-    } else if (S_ISLNK(st.st_mode)) {
-        // Symlinks can (apparently) not be bind-mounted, so just copy it
-        createDirs(dirOf(target));
-        copyFile(
-            std::filesystem::path(source),
-            std::filesystem::path(target), false);
-    } else {
-        createDirs(dirOf(target));
-        writeFile(target, "");
-        bindMount();
-    }
-};
-#endif
 
 /**
  * Rethrow the current exception as a subclass of `Error`.
