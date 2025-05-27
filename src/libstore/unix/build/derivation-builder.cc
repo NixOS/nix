@@ -315,8 +315,6 @@ protected:
      */
     void runChild();
 
-private:
-
     /**
      * Move the current process into the chroot, if any. Called early
      * by runChild().
@@ -336,6 +334,8 @@ private:
      * its final step. Should not return unless there is an error.
      */
     virtual void execBuilder(const Strings & args, const Strings & envStrs);
+
+private:
 
     /**
      * Check that the derivation outputs all exist and register them
@@ -2138,7 +2138,7 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
                 throw Error("derivation '%s' has '__noChroot' set, "
                     "but that's not allowed when 'sandbox' is 'true'", store.printStorePath(params.drvPath));
 #ifdef __APPLE__
-            if (drvOptions.additionalSandboxProfile != "")
+            if (params.drvOptions.additionalSandboxProfile != "")
                 throw Error("derivation '%s' specifies a sandbox profile, "
                     "but this is only allowed when 'sandbox' is 'relaxed'", store.printStorePath(params.drvPath));
 #endif
@@ -2177,16 +2177,24 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
             std::move(params));
     #endif
 
-    if (useSandbox)
-        throw Error("sandboxing builds is not supported on this platform");
-
     if (params.drvOptions.useUidRange(params.drv))
         throw Error("feature 'uid-range' is only supported in sandboxed builds");
+
+    #ifdef __APPLE__
+    return std::make_unique<DarwinDerivationBuilder>(
+        store,
+        std::move(miscMethods),
+        std::move(params),
+        useSandbox);
+    #else
+    if (useSandbox)
+        throw Error("sandboxing builds is not supported on this platform");
 
     return std::make_unique<DerivationBuilderImpl>(
         store,
         std::move(miscMethods),
         std::move(params));
+    #endif
 }
 
 }
