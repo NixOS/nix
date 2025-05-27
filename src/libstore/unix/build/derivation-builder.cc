@@ -802,7 +802,7 @@ void DerivationBuilderImpl::startBuilder()
         printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 
     /* Create the log file. */
-    [[maybe_unused]] Path logFile = miscMethods->openLogFile();
+    miscMethods->openLogFile();
 
     /* Create a pseudoterminal to get the output of the builder. */
     builderOut = posix_openpt(O_RDWR | O_NOCTTY);
