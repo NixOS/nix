@@ -23,6 +23,11 @@
 
 #include <boost/iostreams/device/mapped_file.hpp>
 
+#ifdef __FreeBSD__
+# include <sys/param.h>
+# include <sys/mount.h>
+#endif
+
 #ifdef _WIN32
 # include <io.h>
 #endif
@@ -364,6 +369,13 @@ void syncParent(const Path & path)
     fd.fsync();
 }
 
+#ifdef __FreeBSD__
+#define MOUNTEDPATHS_PARAM , std::set<Path> &mountedPaths
+#define MOUNTEDPATHS_ARG , mountedPaths
+#else
+#define MOUNTEDPATHS_PARAM
+#define MOUNTEDPATHS_ARG
+#endif
 
 void recursiveSync(const Path & path)
 {
@@ -410,10 +422,18 @@ void recursiveSync(const Path & path)
 }
 
 
-static void _deletePath(Descriptor parentfd, const std::filesystem::path & path, uint64_t & bytesFreed)
+static void _deletePath(Descriptor parentfd, const std::filesystem::path & path, uint64_t & bytesFreed MOUNTEDPATHS_PARAM)
 {
 #ifndef _WIN32
     checkInterrupt();
+
+#ifdef __FreeBSD__
+    // In case of emergency (unmount fails for some reason) not recurse into mountpoints.
+    // This prevents us from tearing up the nullfs-mounted nix store.
+    if (mountedPaths.find(path) != mountedPaths.end()) {
+        return;
+    }
+#endif
 
     std::string name(baseNameOf(path.native()));
 
@@ -468,7 +488,7 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
             checkInterrupt();
             std::string childName = dirent->d_name;
             if (childName == "." || childName == "..") continue;
-            _deletePath(dirfd(dir.get()), path + "/" + childName, bytesFreed);
+            _deletePath(dirfd(dir.get()), path + "/" + childName, bytesFreed MOUNTEDPATHS_ARG);
         }
         if (errno) throw SysError("reading directory %1%", path);
     }
@@ -484,7 +504,7 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
 #endif
 }
 
-static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
+static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFreed MOUNTEDPATHS_PARAM)
 {
     Path dir = dirOf(path.string());
     if (dir == "")
@@ -496,7 +516,7 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
         throw SysError("opening directory '%1%'", path);
     }
 
-    _deletePath(dirfd.get(), path, bytesFreed);
+    _deletePath(dirfd.get(), path, bytesFreed MOUNTEDPATHS_ARG);
 }
 
 
@@ -529,8 +549,20 @@ void createDirs(const std::filesystem::path & path)
 void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
 {
     //Activity act(*logger, lvlDebug, "recursively deleting path '%1%'", path);
+#ifdef __FreeBSD__
+    std::set<Path> mountedPaths;
+    struct statfs *mntbuf;
+    int count;
+    if ((count = getmntinfo(&mntbuf, MNT_WAIT)) < 0) {
+        throw SysError("getmntinfo");
+    }
+
+    for (int i = 0; i < count; i++) {
+        mountedPaths.emplace(mntbuf[i].f_mntonname);
+    }
+#endif
     bytesFreed = 0;
-    _deletePath(path, bytesFreed);
+    _deletePath(path, bytesFreed MOUNTEDPATHS_ARG);
 }
 
 
@@ -571,6 +603,30 @@ void AutoDelete::reset(const std::filesystem::path & p, bool recursive) {
 }
 
 //////////////////////////////////////////////////////////////////////
+
+#ifdef __FreeBSD__
+AutoUnmount::AutoUnmount() : del{false} {}
+
+AutoUnmount::AutoUnmount(Path &p) : path(p), del(true) {}
+
+AutoUnmount::~AutoUnmount()
+{
+    try {
+        if (del) {
+            if (unmount(path.c_str(), 0) < 0) {
+                throw SysError("Failed to unmount path %1%", path);
+            }
+        }
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
+}
+
+void AutoUnmount::cancel()
+{
+    del = false;
+}
+#endif
 
 //////////////////////////////////////////////////////////////////////
 

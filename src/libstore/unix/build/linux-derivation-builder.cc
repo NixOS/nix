@@ -2,7 +2,7 @@
 
 #  include "nix/store/personality.hh"
 #  include "nix/util/cgroup.hh"
-#  include "nix/util/namespaces.hh"
+#  include "nix/util/linux-namespaces.hh"
 #  include "linux/fchmodat2-compat.hh"
 
 #  include <sys/ioctl.h>

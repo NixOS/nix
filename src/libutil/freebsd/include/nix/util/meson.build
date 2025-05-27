@@ -3,6 +3,5 @@
 include_dirs += include_directories('../..')
 
 headers += files(
-  'cgroup.hh',
-  'linux-namespaces.hh',
+  'freebsd-jail.hh',
 )
