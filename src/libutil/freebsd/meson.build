@@ -1,6 +1,5 @@
 sources += files(
-  'cgroup.cc',
-  'linux-namespaces.cc',
+  'freebsd-jail.cc',
 )
 
 subdir('include/nix/util')

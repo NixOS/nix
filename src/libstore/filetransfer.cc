@@ -14,7 +14,7 @@
 #endif
 
 #ifdef __linux__
-# include "nix/util/namespaces.hh"
+# include "nix/util/linux-namespaces.hh"
 #endif
 
 #include <unistd.h>

@@ -682,7 +682,9 @@ public:
             description of the `size` option of `tmpfs` in mount(8). The default
             is `50%`.
         )"};
+#endif
 
+#if defined(__linux__) || defined(__FreeBSD__)
     Setting<Path> sandboxBuildDir{this, "/build", "sandbox-build-dir",
         R"(
             *Linux only*
