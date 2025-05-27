@@ -14,42 +14,25 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
 {
     PathsInChroot pathsInChroot;
 
+    /**
+     * Whether full sandboxing is enabled. Note that macOS builds
+     * always have *some* sandboxing (see sandbox-minimal.sb).
+     */
+    bool useSandbox;
+
     DarwinDerivationBuilder(
-        Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+        Store & store,
+        std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+        DerivationBuilderParams params,
+        bool useSandbox)
         : DerivationBuilderImpl(store, std::move(miscMethods), std::move(params))
+        , useSandbox(useSandbox)
     {
-        useChroot = true;
     }
 
     void prepareSandbox() override
     {
         pathsInChroot = getPathsInSandbox();
-    }
-
-    void execBuilder(const Strings & args, const Strings & envStrs) override
-    {
-        posix_spawnattr_t attrp;
-
-        if (posix_spawnattr_init(&attrp))
-            throw SysError("failed to initialize builder");
-
-        if (posix_spawnattr_setflags(&attrp, POSIX_SPAWN_SETEXEC))
-            throw SysError("failed to initialize builder");
-
-        if (drv.platform == "aarch64-darwin") {
-            // Unset kern.curproc_arch_affinity so we can escape Rosetta
-            int affinity = 0;
-            sysctlbyname("kern.curproc_arch_affinity", NULL, NULL, &affinity, sizeof(affinity));
-
-            cpu_type_t cpu = CPU_TYPE_ARM64;
-            posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
-        } else if (drv.platform == "x86_64-darwin") {
-            cpu_type_t cpu = CPU_TYPE_X86_64;
-            posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
-        }
-
-        posix_spawn(
-            NULL, drv.builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
     }
 
     void setUser() override
@@ -59,7 +42,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
         /* This has to appear before import statements. */
         std::string sandboxProfile = "(version 1)\n";
 
-        if (useChroot) {
+        if (useSandbox) {
 
             /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
             PathSet ancestry;
@@ -101,7 +84,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
 #  include "sandbox-defaults.sb"
                 ;
 
-            if (!derivationType->isSandboxed())
+            if (!derivationType.isSandboxed())
                 sandboxProfile +=
 #  include "sandbox-network.sb"
                     ;
@@ -193,7 +176,33 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
             }
         }
     }
-}
+
+    void execBuilder(const Strings & args, const Strings & envStrs) override
+    {
+        posix_spawnattr_t attrp;
+
+        if (posix_spawnattr_init(&attrp))
+            throw SysError("failed to initialize builder");
+
+        if (posix_spawnattr_setflags(&attrp, POSIX_SPAWN_SETEXEC))
+            throw SysError("failed to initialize builder");
+
+        if (drv.platform == "aarch64-darwin") {
+            // Unset kern.curproc_arch_affinity so we can escape Rosetta
+            int affinity = 0;
+            sysctlbyname("kern.curproc_arch_affinity", NULL, NULL, &affinity, sizeof(affinity));
+
+            cpu_type_t cpu = CPU_TYPE_ARM64;
+            posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
+        } else if (drv.platform == "x86_64-darwin") {
+            cpu_type_t cpu = CPU_TYPE_X86_64;
+            posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
+        }
+
+        posix_spawn(
+            NULL, drv.builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+    }
+};
 
 }
 
