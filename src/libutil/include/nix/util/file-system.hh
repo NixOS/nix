@@ -310,7 +310,7 @@ typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
 /**
  * Create a temporary directory.
  */
-Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix", 
+Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
                    mode_t mode = 0755);
 
 /**
@@ -419,5 +419,18 @@ public:
 private:
     std::filesystem::directory_iterator it_;
 };
+
+#ifdef __FreeBSD__
+class AutoUnmount
+{
+    Path path;
+    bool del;
+public:
+    AutoUnmount(Path&);
+    AutoUnmount();
+    ~AutoUnmount();
+    void cancel();
+};
+#endif
 
 }

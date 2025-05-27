@@ -43,7 +43,7 @@
 # include <sys/param.h>
 # include <sys/mount.h>
 # include <sys/syscall.h>
-# include "nix/util/namespaces.hh"
+# include "nix/util/linux-namespaces.hh"
 # if HAVE_SECCOMP
 #   include <seccomp.h>
 # endif

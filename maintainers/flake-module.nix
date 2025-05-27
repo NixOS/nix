@@ -359,7 +359,7 @@
               ''^src/libutil/json-utils\.cc$''
               ''^src/libutil/include/nix/util/json-utils\.hh$''
               ''^src/libutil/linux/cgroup\.cc$''
-              ''^src/libutil/linux/namespaces\.cc$''
+              ''^src/libutil/linux/linux-namespaces\.cc$''
               ''^src/libutil/logging\.cc$''
               ''^src/libutil/include/nix/util/logging\.hh$''
               ''^src/libutil/memory-source-accessor\.cc$''
