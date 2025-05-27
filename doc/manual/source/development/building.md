@@ -291,6 +291,16 @@ To refresh pre-commit hook's config file, do the following:
 1. Exit the development shell and start it again by running `nix develop`.
 2. If you also use the pre-commit hook, also run `pre-commit-hooks-install` again.
 
+#### Hooks
+
+##### clang-tidy
+
+Portions of the codebase are checked with [clang-tidy](https://clang.llvm.org/extra/clang-tidy/).
+
+> clang-tidy is a clang-based C++ “linter” tool. 
+
+The current build system, Meson, by default outputs a `compile_commands.json` file which is used by all Clang tooling (clang-tidy, clangd etc..).
+
 ### VSCode
 
 Insert the following json into your `.vscode/settings.json` file to configure `nixfmt`.

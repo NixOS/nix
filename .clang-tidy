@@ -1,6 +1,5 @@
 # We use pointers to aggregates in a couple of places, intentionally.
 # void * would look weird.
 Checks: '
-  misc-include-cleaner,
   -bugprone-sizeof-expression
   '
