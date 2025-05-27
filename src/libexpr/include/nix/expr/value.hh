@@ -64,7 +64,6 @@ struct ExprLambda;
 struct ExprBlackHole;
 struct PrimOp;
 class Symbol;
-class SymbolStr;
 class PosIdx;
 struct Pos;
 class StorePath;
@@ -330,8 +329,6 @@ public:
     void mkString(std::string_view s, const NixStringContext & context);
 
     void mkStringMove(const char * s, const NixStringContext & context);
-
-    void mkString(const SymbolStr & s);
 
     void mkPath(const SourcePath & path);
     void mkPath(std::string_view path);
