@@ -681,7 +681,9 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
                 chmod_(dst, 0555);
             } else
 #  endif
+            {
                 doBind(i.second.source, chrootRootDir + i.first, i.second.optional);
+            }
         }
 
         /* Bind a new instance of procfs on /proc. */
