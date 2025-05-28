@@ -92,7 +92,7 @@ struct CmdFormatterRun : MixFormatter, MixJSON
         // Add the path to the flake as an environment variable. This enables formatters to format the entire flake even
         // if run from a subdirectory.
         StringMap env = getEnv();
-        env["PRJ_ROOT"] = flakeDir;
+        env["PRJ_ROOT"] = flakeDir.string();
 
         // Release our references to eval caches to ensure they are persisted to disk, because
         // we are about to exec out of this process without running C++ destructors.

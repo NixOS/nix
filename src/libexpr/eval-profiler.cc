@@ -137,7 +137,7 @@ public:
         : state(state)
         , sampleInterval(period)
         , profileFd([&]() {
-            AutoCloseFD fd = toDescriptor(open(profileFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0660));
+            AutoCloseFD fd = toDescriptor(open(profileFile.string().c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0660));
             if (!fd)
                 throw SysError("opening file %s", profileFile);
             return fd;
