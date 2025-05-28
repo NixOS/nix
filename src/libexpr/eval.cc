@@ -212,6 +212,7 @@ EvalState::EvalState(
     , sRight(symbols.create("right"))
     , sWrong(symbols.create("wrong"))
     , sStructuredAttrs(symbols.create("__structuredAttrs"))
+    , sJson(symbols.create("__json"))
     , sAllowedReferences(symbols.create("allowedReferences"))
     , sAllowedRequisites(symbols.create("allowedRequisites"))
     , sDisallowedReferences(symbols.create("disallowedReferences"))
