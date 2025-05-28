@@ -1340,10 +1340,14 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         }
                     } else {
                         try {
-                            if (visitor.isDerivation())
-                                showDerivation();
-                            else
-                                throw Error("expected a derivation");
+                            if (visitor.isNull()) {
+                                j = nullptr;
+                            } else{
+                                if (visitor.isDerivation())
+                                    showDerivation();
+                                else
+                                    throw Error("expected a derivation");
+                            }
                         } catch (IFDError & e) {
                             if (!json) {
                                 logger->cout(fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL, headerPrefix));
