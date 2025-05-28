@@ -190,11 +190,7 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
      */
     std::optional<Path> cgroup;
 
-    LinuxDerivationBuilder(
-        Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderImpl(store, std::move(miscMethods), std::move(params))
-    {
-    }
+    using DerivationBuilderImpl::DerivationBuilderImpl;
 
     void deleteTmpDir(bool force) override
     {
