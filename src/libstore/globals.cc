@@ -309,6 +309,17 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
     }
 }
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Settings::ExternalBuilder, systems, program);
+
+template<> Settings::ExternalBuilders BaseSetting<Settings::ExternalBuilders>::parse(const std::string & str) const
+{
+    return nlohmann::json::parse(str).template get<Settings::ExternalBuilders>();
+}
+
+template<> std::string BaseSetting<Settings::ExternalBuilders>::to_string() const
+{
+    return nlohmann::json(value).dump();
+}
 
 static void preloadNSS()
 {

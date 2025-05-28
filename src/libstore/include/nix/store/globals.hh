@@ -1236,6 +1236,23 @@ public:
           Set it to 1 to warn on all paths.
         )"
     };
+
+    struct ExternalBuilder
+    {
+        std::vector<std::string> systems;
+        Path program;
+    };
+
+    using ExternalBuilders = std::vector<ExternalBuilder>;
+
+    Setting<ExternalBuilders> externalBuilders{
+        this,
+        {},
+        "external-builders",
+        R"(
+          Helper programs that execute derivations.
+        )"
+    };
 };
 
 
