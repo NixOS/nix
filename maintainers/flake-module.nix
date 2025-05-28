@@ -81,7 +81,6 @@
               # We haven't applied formatting to these files yet
               ''^doc/manual/redirects\.js$''
               ''^doc/manual/theme/highlight\.js$''
-              ''^precompiled-headers\.h$''
               ''^src/build-remote/build-remote\.cc$''
               ''^src/libcmd/built-path\.cc$''
               ''^src/libcmd/include/nix/cmd/built-path\.hh$''
