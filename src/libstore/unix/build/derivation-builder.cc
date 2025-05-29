@@ -2157,7 +2157,7 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     }
 
     if (useSandbox)
-        return std::make_unique<LinuxDerivationBuilder>(
+        return std::make_unique<ChrootLinuxDerivationBuilder>(
             store,
             std::move(miscMethods),
             std::move(params));
@@ -2172,6 +2172,11 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
         std::move(miscMethods),
         std::move(params),
         useSandbox);
+    #elif defined(__linux__)
+    return std::make_unique<LinuxDerivationBuilder>(
+        store,
+        std::move(miscMethods),
+        std::move(params));
     #else
     if (useSandbox)
         throw Error("sandboxing builds is not supported on this platform");
