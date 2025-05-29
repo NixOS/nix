@@ -34,3 +34,15 @@ rm -rf $TEST_ROOT/eval-out
 (! nix eval --store dummy:// --write-to $TEST_ROOT/eval-out --expr '{ "." = "bla"; }')
 
 (! nix eval --expr '~/foo')
+
+expectStderr 0 nix eval --expr "/some/absolute/path" \
+  | grepQuiet "/some/absolute/path"
+
+expectStderr 0 nix eval --expr "/some/absolute/path" --impure \
+  | grepQuiet "/some/absolute/path"
+
+expectStderr 0 nix eval --expr "some/relative/path" \
+  | grepQuiet "$PWD/some/relative/path"
+
+expectStderr 0 nix eval --expr "some/relative/path" --impure \
+  | grepQuiet "$PWD/some/relative/path"
