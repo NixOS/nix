@@ -179,19 +179,6 @@
               };
 
           nix = final.nixComponents2.nix-cli;
-
-          # See https://github.com/NixOS/nixpkgs/pull/214409
-          # Remove when fixed in this flake's nixpkgs
-          pre-commit =
-            if prev.stdenv.hostPlatform.system == "i686-linux" then
-              (prev.pre-commit.override (o: {
-                dotnet-sdk = "";
-              })).overridePythonAttrs
-                (o: {
-                  doCheck = false;
-                })
-            else
-              prev.pre-commit;
         };
 
     in
