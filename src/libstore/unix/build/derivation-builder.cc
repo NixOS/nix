@@ -2147,13 +2147,11 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     }
 
     #ifdef __linux__
-    if (useSandbox) {
-        if (!mountAndPidNamespacesSupported()) {
-            if (!settings.sandboxFallback)
-                throw Error("this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
-            debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
-            useSandbox = false;
-        }
+    if (useSandbox && !mountAndPidNamespacesSupported()) {
+        if (!settings.sandboxFallback)
+            throw Error("this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
+        debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
+        useSandbox = false;
     }
 
     if (useSandbox)
@@ -2163,7 +2161,7 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
             std::move(params));
     #endif
 
-    if (params.drvOptions.useUidRange(params.drv))
+    if (!useSandbox && params.drvOptions.useUidRange(params.drv))
         throw Error("feature 'uid-range' is only supported in sandboxed builds");
 
     #ifdef __APPLE__
