@@ -413,7 +413,12 @@ void recursiveSync(const Path & path)
     }
 }
 
+<<<<<<< HEAD
 static void _deletePath(Descriptor parentfd, const fs::path & path, uint64_t & bytesFreed)
+=======
+
+static void _deletePath(Descriptor parentfd, const std::filesystem::path & path, uint64_t & bytesFreed, std::exception_ptr & ex MOUNTEDPATHS_PARAM)
+>>>>>>> 6b6d3dcf3 (deletePath(): Keep going when encountering an undeletable file)
 {
 #ifndef _WIN32
     checkInterrupt();
@@ -471,9 +476,14 @@ static void _deletePath(Descriptor parentfd, const fs::path & path, uint64_t & b
         while (errno = 0, dirent = readdir(dir.get())) { /* sic */
             checkInterrupt();
             std::string childName = dirent->d_name;
+<<<<<<< HEAD
             if (childName == "." || childName == "..")
                 continue;
             _deletePath(dirfd(dir.get()), path / childName, bytesFreed);
+=======
+            if (childName == "." || childName == "..") continue;
+            _deletePath(dirfd(dir.get()), path + "/" + childName, bytesFreed, ex MOUNTEDPATHS_ARG);
+>>>>>>> 6b6d3dcf3 (deletePath(): Keep going when encountering an undeletable file)
         }
         if (errno)
             throw SysError("reading directory %1%", path);
@@ -481,9 +491,21 @@ static void _deletePath(Descriptor parentfd, const fs::path & path, uint64_t & b
 
     int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
     if (unlinkat(parentfd, name.c_str(), flags) == -1) {
+<<<<<<< HEAD
         if (errno == ENOENT)
             return;
         throw SysError("cannot unlink %1%", path);
+=======
+        if (errno == ENOENT) return;
+        try {
+            throw SysError("cannot unlink %1%", path);
+        } catch (...) {
+            if (!ex)
+                ex = std::current_exception();
+            else
+                ignoreExceptionExceptInterrupt();
+        }
+>>>>>>> 6b6d3dcf3 (deletePath(): Keep going when encountering an undeletable file)
     }
 #else
     // TODO implement
@@ -503,7 +525,16 @@ static void _deletePath(const fs::path & path, uint64_t & bytesFreed)
         throw SysError("opening directory %s", path.parent_path());
     }
 
+<<<<<<< HEAD
     _deletePath(dirfd.get(), path, bytesFreed);
+=======
+    std::exception_ptr ex;
+
+    _deletePath(dirfd.get(), path, bytesFreed, ex MOUNTEDPATHS_ARG);
+
+    if (ex)
+        std::rethrow_exception(ex);
+>>>>>>> 6b6d3dcf3 (deletePath(): Keep going when encountering an undeletable file)
 }
 
 void deletePath(const fs::path & path)
