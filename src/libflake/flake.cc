@@ -91,7 +91,7 @@ static void parseFlakeInputAttr(
             if (attr.name == state.symbols.create("publicKeys")) {
                 experimentalFeatureSettings.require(Xp::VerifiedFetches);
                 NixStringContext emptyContext = {};
-                attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, attr.pos, emptyContext).dump());
+                attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, false, *attr.value, attr.pos, emptyContext).dump());
             } else
                 state.error<TypeError>("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
                     state.symbols[attr.name], showType(*attr.value)).debugThrow();
