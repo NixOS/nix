@@ -60,6 +60,10 @@ Goal::Co PathSubstitutionGoal::init()
 
     for (const auto & sub : subs) {
         trace("trying next substituter");
+        // If sub is not first, previous one must have failed, so warn
+        if (&sub != &subs.front()) {
+            warn("trying next substituter, '%s'", sub->getUri());
+        }
 
         cleanup();
 
@@ -80,14 +84,21 @@ Goal::Co PathSubstitutionGoal::init()
             continue;
         }
 
+        auto path = subPath ? *subPath : storePath;
         try {
             // FIXME: make async
-            info = sub->queryPathInfo(subPath ? *subPath : storePath);
+            info = sub->queryPathInfo(path);
+            // Because the path doesn't exist
         } catch (InvalidPath &) {
             continue;
+            // Because the substituter has failed recently
         } catch (SubstituterDisabled & e) {
-            if (settings.tryFallback) continue;
-            else throw e;
+            warn(
+                "Substituter '%s' was disabled when getting info for path '%s'",
+                sub->getUri(),
+                sub->printStorePath(path));
+            continue;
+            // Any other error
         } catch (Error & e) {
             if (settings.tryFallback) {
                 logError(e.info());
