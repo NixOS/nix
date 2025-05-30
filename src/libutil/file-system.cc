@@ -422,7 +422,7 @@ void recursiveSync(const Path & path)
 }
 
 
-static void _deletePath(Descriptor parentfd, const std::filesystem::path & path, uint64_t & bytesFreed MOUNTEDPATHS_PARAM)
+static void _deletePath(Descriptor parentfd, const std::filesystem::path & path, uint64_t & bytesFreed, std::exception_ptr & ex MOUNTEDPATHS_PARAM)
 {
 #ifndef _WIN32
     checkInterrupt();
@@ -488,7 +488,7 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
             checkInterrupt();
             std::string childName = dirent->d_name;
             if (childName == "." || childName == "..") continue;
-            _deletePath(dirfd(dir.get()), path + "/" + childName, bytesFreed MOUNTEDPATHS_ARG);
+            _deletePath(dirfd(dir.get()), path + "/" + childName, bytesFreed, ex MOUNTEDPATHS_ARG);
         }
         if (errno) throw SysError("reading directory %1%", path);
     }
@@ -496,7 +496,14 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
     int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
     if (unlinkat(parentfd, name.c_str(), flags) == -1) {
         if (errno == ENOENT) return;
-        throw SysError("cannot unlink %1%", path);
+        try {
+            throw SysError("cannot unlink %1%", path);
+        } catch (...) {
+            if (!ex)
+                ex = std::current_exception();
+            else
+                ignoreExceptionExceptInterrupt();
+        }
     }
 #else
     // TODO implement
@@ -516,7 +523,12 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
         throw SysError("opening directory '%1%'", path);
     }
 
-    _deletePath(dirfd.get(), path, bytesFreed MOUNTEDPATHS_ARG);
+    std::exception_ptr ex;
+
+    _deletePath(dirfd.get(), path, bytesFreed, ex MOUNTEDPATHS_ARG);
+
+    if (ex)
+        std::rethrow_exception(ex);
 }
 
 
