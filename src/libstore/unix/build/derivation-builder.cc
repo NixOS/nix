@@ -1016,7 +1016,7 @@ void DerivationBuilderImpl::processSandboxSetupMessages()
                 e.addTrace({}, "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
                     store.printStorePath(drvPath),
                     statusToString(status),
-                    concatStringsSep("|", msgs));
+                    concatStringsSep("\n", msgs));
                 throw;
             }
         }();
