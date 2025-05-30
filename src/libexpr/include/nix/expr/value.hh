@@ -167,6 +167,7 @@ struct Value
 {
 private:
     InternalType internalType = tUninitialized;
+    uint32_t pos{0};
 
     friend std::string showType(const Value & v);
 
@@ -289,10 +290,11 @@ public:
             unreachable();
     }
 
-    inline void finishValue(InternalType newType, Payload newPayload)
+    inline void finishValue(InternalType newType, Payload newPayload, uint32_t newPos = 0)
     {
         payload = newPayload;
         internalType = newType;
+        pos = newPos;
     }
 
     /**
@@ -339,9 +341,9 @@ public:
     void mkPath(const SourcePath & path);
     void mkPath(std::string_view path);
 
-    inline void mkPath(SourceAccessor * accessor, const char * path)
+    inline void mkPath(SourceAccessor * accessor, const char * path, uint32_t pos)
     {
-        finishValue(tPath, { .path = { .accessor = accessor, .path = path } });
+        finishValue(tPath, { .path = { .accessor = accessor, .path = path } }, pos);
     }
 
     inline void mkNull()
@@ -482,6 +484,9 @@ public:
 
     NixFloat fpoint() const
     { return payload.fpoint; }
+
+    inline uint32_t getPos() const
+    { return pos; }
 };
 
 
