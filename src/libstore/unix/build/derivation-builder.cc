@@ -589,10 +589,10 @@ static void replaceValidPath(const Path & storePath, const Path & tmpPath)
        way first.  We'd better not be interrupted here, because if
        we're repairing (say) Glibc, we end up with a broken system. */
     Path oldPath;
-    
+
     if (pathExists(storePath)) {
         // why do we loop here?
-        // although makeTempPath should be unique, we can't 
+        // although makeTempPath should be unique, we can't
         // guarantee that.
         do {
             oldPath = makeTempPath(storePath, ".old");
@@ -1871,7 +1871,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
            also a source for non-determinism. */
         if (delayedException)
             std::rethrow_exception(delayedException);
-        return miscMethods->assertPathValidity();
+        return {};
     }
 
     /* Apply output checks. */
