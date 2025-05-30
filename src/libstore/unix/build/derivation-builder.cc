@@ -2147,23 +2147,21 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     }
 
     #ifdef __linux__
-    if (useSandbox) {
-        if (!mountAndPidNamespacesSupported()) {
-            if (!settings.sandboxFallback)
-                throw Error("this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
-            debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
-            useSandbox = false;
-        }
+    if (useSandbox && !mountAndPidNamespacesSupported()) {
+        if (!settings.sandboxFallback)
+            throw Error("this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
+        debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
+        useSandbox = false;
     }
 
     if (useSandbox)
-        return std::make_unique<LinuxDerivationBuilder>(
+        return std::make_unique<ChrootLinuxDerivationBuilder>(
             store,
             std::move(miscMethods),
             std::move(params));
     #endif
 
-    if (params.drvOptions.useUidRange(params.drv))
+    if (!useSandbox && params.drvOptions.useUidRange(params.drv))
         throw Error("feature 'uid-range' is only supported in sandboxed builds");
 
     #ifdef __APPLE__
@@ -2172,6 +2170,11 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
         std::move(miscMethods),
         std::move(params),
         useSandbox);
+    #elif defined(__linux__)
+    return std::make_unique<LinuxDerivationBuilder>(
+        store,
+        std::move(miscMethods),
+        std::move(params));
     #else
     if (useSandbox)
         throw Error("sandboxing builds is not supported on this platform");

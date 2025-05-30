@@ -155,6 +155,18 @@ static void doBind(const Path & source, const Path & target, bool optional = fal
 
 struct LinuxDerivationBuilder : DerivationBuilderImpl
 {
+    using DerivationBuilderImpl::DerivationBuilderImpl;
+
+    void enterChroot() override
+    {
+        setupSeccomp();
+
+        linux::setPersonality(drv.platform);
+    }
+};
+
+struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
+{
     /**
      * Pipe for synchronising updates to the builder namespaces.
      */
@@ -190,11 +202,7 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
      */
     std::optional<Path> cgroup;
 
-    LinuxDerivationBuilder(
-        Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderImpl(store, std::move(miscMethods), std::move(params))
-    {
-    }
+    using LinuxDerivationBuilder::LinuxDerivationBuilder;
 
     void deleteTmpDir(bool force) override
     {
@@ -776,11 +784,7 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
         if (rmdir("real-root") == -1)
             throw SysError("cannot remove real-root directory");
 
-        // FIXME: move to LinuxDerivationBuilder
-        setupSeccomp();
-
-        // FIXME: move to LinuxDerivationBuilder
-        linux::setPersonality(drv.platform);
+        LinuxDerivationBuilder::enterChroot();
     }
 
     void setUser() override
