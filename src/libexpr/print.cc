@@ -249,7 +249,11 @@ private:
 
     void printString(Value & v)
     {
-        printLiteralString(output, v.string_view(), options.maxStringLength, options.ansiColors);
+        NixStringContext context;
+        copyContext(v, context);
+        std::ostringstream s;
+        printLiteralString(s, v.string_view(), options.maxStringLength, options.ansiColors);
+        output << state.devirtualize(s.str(), context);
     }
 
     void printPath(Value & v)

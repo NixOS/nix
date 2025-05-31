@@ -37,6 +37,7 @@ class Store;
 namespace fetchers {
 struct Settings;
 struct InputCache;
+struct Input;
 }
 struct EvalSettings;
 class EvalState;
@@ -44,6 +45,7 @@ class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct MemorySourceAccessor;
+struct MountedSourceAccessor;
 namespace eval_cache {
     class EvalCache;
 }
@@ -272,7 +274,7 @@ public:
     /**
      * The accessor corresponding to `store`.
      */
-    const ref<SourceAccessor> storeFS;
+    const ref<MountedSourceAccessor> storeFS;
 
     /**
      * The accessor for the root filesystem.
@@ -451,6 +453,15 @@ public:
     void checkURI(const std::string & uri);
 
     /**
+     * Mount an input on the Nix store.
+     */
+    StorePath mountInput(
+        fetchers::Input & input,
+        const fetchers::Input & originalInput,
+        ref<SourceAccessor> accessor,
+        bool requireLockable);
+
+    /**
      * Parse a Nix expression from the specified file.
      */
     Expr * parseExprFromFile(const SourcePath & path);
@@ -564,6 +575,18 @@ public:
     std::optional<std::string> tryAttrsToString(const PosIdx pos, Value & v,
         NixStringContext & context, bool coerceMore = false, bool copyToStore = true);
 
+    StorePath devirtualize(
+        const StorePath & path,
+        StringMap * rewrites = nullptr);
+
+    SingleDerivedPath devirtualize(
+        const SingleDerivedPath & path,
+        StringMap * rewrites = nullptr);
+
+    std::string devirtualize(
+        std::string_view s,
+        const NixStringContext & context);
+
     /**
      * String coercion.
      *
@@ -578,6 +601,19 @@ public:
         bool canonicalizePath = true);
 
     StorePath copyPathToStore(NixStringContext & context, const SourcePath & path);
+
+
+    /**
+     * Compute the base name for a `SourcePath`. For non-store paths,
+     * this is just `SourcePath::baseName()`. But for store paths, for
+     * backwards compatibility, it needs to be `<hash>-source`,
+     * i.e. as if the path were copied to the Nix store. This results
+     * in a "double-copied" store path like
+     * `/nix/store/<hash1>-<hash2>-source`. We don't need to
+     * materialize /nix/store/<hash2>-source though. Still, this
+     * requires reading/hashing the path twice.
+     */
+    std::string computeBaseName(const SourcePath & path);
 
     /**
      * Path coercion.
