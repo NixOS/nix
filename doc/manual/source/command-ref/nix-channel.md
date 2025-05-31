@@ -53,6 +53,11 @@ This command has the following operations:
   Download the Nix expressions of subscribed channels and create a new generation.
   Update all channels if none is specified, and only those included in *names* otherwise.
 
+  > **Note**
+  >
+  > `--update` uses [fetchTarball](@docroot@/language/builtins.md#builtins-fetchTarball) under the hood, so it will cache channels.
+  > Use `--tarball-ttl` or the nix configuration option `tarball-ttl` to change this behavior.
+
 - `--list-generations`
 
   Prints a list of all the current existing generations for the
