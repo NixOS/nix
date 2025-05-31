@@ -47,3 +47,6 @@ result-*
 .DS_Store
 
 flake-regressions
+
+# direnv
+.direnv/

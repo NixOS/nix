@@ -32,8 +32,8 @@ deps_private += rapidcheck
 gtest = dependency('gtest')
 deps_private += gtest
 
-gtest = dependency('gmock')
-deps_private += gtest
+gmock = dependency('gmock')
+deps_private += gmock
 
 configdata = configuration_data()
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
