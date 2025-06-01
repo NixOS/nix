@@ -423,7 +423,7 @@ void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
             "while evaluating the first element of the argument passed to builtins.exec",
             false, false).toOwned();
     Strings commandArgs;
-    for (unsigned int i = 1; i < args[0]->listSize(); ++i) {
+    for (size_t i = 1; i < count; ++i) {
         commandArgs.push_back(
                 state.coerceToString(pos, *elems[i], context,
                         "while evaluating an element of the argument passed to builtins.exec",
@@ -3106,7 +3106,7 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
     }
 
     auto list = state.buildList(found);
-    for (unsigned int n = 0; n < found; ++n)
+    for (size_t n = 0; n < found; ++n)
         list[n] = res[n];
     v.mkList(list);
 }
@@ -3319,7 +3319,7 @@ static void prim_elemAt(EvalState & state, const PosIdx pos, Value * * args, Val
 {
     NixInt::Inner n = state.forceInt(*args[1], pos, "while evaluating the second argument passed to 'builtins.elemAt'").value;
     state.forceList(*args[0], pos, "while evaluating the first argument passed to 'builtins.elemAt'");
-    if (n < 0 || (unsigned int) n >= args[0]->listSize())
+    if (n < 0 || std::make_unsigned_t<NixInt::Inner>(n) >= args[0]->listSize())
         state.error<EvalError>(
             "'builtins.elemAt' called with index %d on a list of size %d",
             n,
@@ -3442,11 +3442,12 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Val
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filter");
 
-    SmallValueVector<nonRecursiveStackReservation> vs(args[1]->listSize());
+    auto len = args[1]->listSize();
+    SmallValueVector<nonRecursiveStackReservation> vs(len);
     size_t k = 0;
 
     bool same = true;
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
+    for (size_t n = 0; n < len; ++n) {
         Value res;
         state.callFunction(*args[0], *args[1]->listElems()[n], res, noPos);
         if (state.forceBool(res, pos, "while evaluating the return value of the filtering function passed to builtins.filter"))
@@ -3628,7 +3629,7 @@ static void prim_genList(EvalState & state, const PosIdx pos, Value * * args, Va
 {
     auto len_ = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.genList").value;
 
-    if (len_ < 0)
+    if (len_ < 0 || std::make_unsigned_t<NixInt::Inner>(len_) > std::numeric_limits<size_t>::max())
         state.error<EvalError>("cannot create list of size %1%", len_).atPos(pos).debugThrow();
 
     size_t len = size_t(len_);
@@ -3734,7 +3735,7 @@ static void prim_partition(EvalState & state, const PosIdx pos, Value * * args, 
 
     ValueVector right, wrong;
 
-    for (unsigned int n = 0; n < len; ++n) {
+    for (size_t n = 0; n < len; ++n) {
         auto vElem = args[1]->listElems()[n];
         state.forceValue(*vElem, pos);
         Value res;
@@ -3847,7 +3848,7 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
     SmallTemporaryValueVector<conservativeStackReservation> lists(nrLists);
     size_t len = 0;
 
-    for (unsigned int n = 0; n < nrLists; ++n) {
+    for (size_t n = 0; n < nrLists; ++n) {
         Value * vElem = args[1]->listElems()[n];
         state.callFunction(*args[0], *vElem, lists[n], pos);
         state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)), "while evaluating the return value of the function passed to builtins.concatMap");
@@ -3856,7 +3857,7 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
 
     auto list = state.buildList(len);
     auto out = list.elems;
-    for (unsigned int n = 0, pos = 0; n < nrLists; ++n) {
+    for (size_t n = 0, pos = 0; n < nrLists; ++n) {
         auto l = lists[n].listSize();
         if (l)
             memcpy(out + pos, lists[n].listElems(), l * sizeof(Value *));
@@ -4121,19 +4122,17 @@ static RegisterPrimOp primop_toString({
    non-negative. */
 static void prim_substring(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    using NixUInt = std::make_unsigned_t<NixInt::Inner>;
     NixInt::Inner start = state.forceInt(*args[0], pos, "while evaluating the first argument (the start offset) passed to builtins.substring").value;
 
     if (start < 0)
         state.error<EvalError>("negative start position in 'substring'").atPos(pos).debugThrow();
 
-
     NixInt::Inner len = state.forceInt(*args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring").value;
 
     // Negative length may be idiomatically passed to builtins.substring to get
     // the tail of the string.
-    if (len < 0) {
-        len = std::numeric_limits<NixInt::Inner>::max();
-    }
+    auto _len = std::numeric_limits<std::string::size_type>::max();
 
     // Special-case on empty substring to avoid O(n) strlen
     // This allows for the use of empty substrings to efficiently capture string context
@@ -4145,10 +4144,14 @@ static void prim_substring(EvalState & state, const PosIdx pos, Value * * args, 
         }
     }
 
+    if (len >= 0 && NixUInt(len) < _len) {
+        _len = len;
+    }
+
     NixStringContext context;
     auto s = state.coerceToString(pos, *args[2], context, "while evaluating the third argument (the string) passed to builtins.substring");
 
-    v.mkString((unsigned int) start >= s->size() ? "" : s->substr(start, len), context);
+    v.mkString(NixUInt(start) >= s->size() ? "" : s->substr(start, _len), context);
 }
 
 static RegisterPrimOp primop_substring({
