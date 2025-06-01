@@ -307,11 +307,18 @@ TEST_F(PrimOpTest, mapAttrs)
     auto v = eval("builtins.mapAttrs (name: value: value * 10) { a = 1; b = 2; }");
     ASSERT_THAT(v, IsAttrsOfSize(2));
 
+<<<<<<< HEAD
     auto a = v.attrs()->find(createSymbol("a"));
     ASSERT_NE(a, nullptr);
     ASSERT_THAT(*a->value, IsThunk());
     state.forceValue(*a->value, noPos);
     ASSERT_THAT(*a->value, IsIntEq(10));
+=======
+    TEST_F(PrimOpTest, elemtAtOutOfBounds) {
+        ASSERT_THROW(eval("builtins.elemAt [0 1 2 3] 5"), Error);
+        ASSERT_THROW(eval("builtins.elemAt [0] 4294967296"), Error);
+    }
+>>>>>>> afd9c7850 (libexpr: fix various overflows and type mismatches)
 
     auto b = v.attrs()->find(createSymbol("b"));
     ASSERT_NE(b, nullptr);
@@ -671,11 +678,28 @@ TEST_F(PrimOpTest, substringSmallerString)
     ASSERT_THAT(v, IsStringEq("n"));
 }
 
+<<<<<<< HEAD
 TEST_F(PrimOpTest, substringEmptyString)
 {
     auto v = eval("builtins.substring 1 3 \"\"");
     ASSERT_THAT(v, IsStringEq(""));
 }
+=======
+    TEST_F(PrimOpTest, substringHugeStart){
+        auto v = eval("builtins.substring 4294967296 5 \"nixos\"");
+        ASSERT_THAT(v, IsStringEq(""));
+    }
+
+    TEST_F(PrimOpTest, substringHugeLength){
+        auto v = eval("builtins.substring 0 4294967296 \"nixos\"");
+        ASSERT_THAT(v, IsStringEq("nixos"));
+    }
+
+    TEST_F(PrimOpTest, substringEmptyString){
+        auto v = eval("builtins.substring 1 3 \"\"");
+        ASSERT_THAT(v, IsStringEq(""));
+    }
+>>>>>>> afd9c7850 (libexpr: fix various overflows and type mismatches)
 
 TEST_F(PrimOpTest, stringLength)
 {
