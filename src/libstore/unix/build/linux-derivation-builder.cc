@@ -121,13 +121,18 @@ static void setupSeccomp()
 #  endif
 }
 
-static void doBind(const Path & source, const Path & target, bool optional = false)
+static void doBind(const Path & source, const Path & target, bool optional = false, bool rdonly = false)
 {
     debug("bind mounting '%1%' to '%2%'", source, target);
 
     auto bindMount = [&]() {
         if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
             throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
+
+        if (rdonly)
+            // initial mount wouldn't respect MS_RDONLY, must remount
+            if (mount("", target.c_str(), "", MS_REMOUNT | MS_BIND | MS_RDONLY, 0) == -1)
+                throw (SysError("making bind mount '%s' read-only failed", target));
     };
 
     auto maybeSt = maybeLstat(source);

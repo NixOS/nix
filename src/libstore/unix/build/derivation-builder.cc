@@ -108,8 +108,9 @@ protected:
     struct ChrootPath {
         Path source;
         bool optional;
-        ChrootPath(Path source = "", bool optional = false)
-            : source(source), optional(optional)
+        bool rdonly;
+        ChrootPath(Path source = "", bool optional = false, bool rdonly = false)
+            : source(source), optional(optional), rdonly(rdonly)
         { }
     };
     typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
@@ -847,20 +848,29 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
 {
     PathsInChroot pathsInChroot;
 
+    auto addPathWithOptions = [&](std::string s) {
+        if (s.empty()) return;
+        bool optional = false;
+        bool rdonly = false;
+        if (s[s.size() - 1] == '?') {
+            optional = true;
+            s.pop_back();
+        }
+        if (s.size() > 3 && s.substr(s.size() - 3) == ":ro") {
+            rdonly = true;
+            s.resize(s.size() - 3);
+        }
+        size_t p = s.find('=');
+        if (p == std::string::npos)
+            pathsInChroot[s] = {s, optional, rdonly};
+        else
+            pathsInChroot[s.substr(0, p)] = {s.substr(p + 1), optional, rdonly};
+    };
+
     /* Allow a user-configurable set of directories from the
        host file system. */
     for (auto i : settings.sandboxPaths.get()) {
-        if (i.empty()) continue;
-        bool optional = false;
-        if (i[i.size() - 1] == '?') {
-            optional = true;
-            i.pop_back();
-        }
-        size_t p = i.find('=');
-        if (p == std::string::npos)
-            pathsInChroot[i] = {i, optional};
-        else
-            pathsInChroot[i.substr(0, p)] = {i.substr(p + 1), optional};
+        addPathWithOptions(i);
     }
     if (hasPrefix(store.storeDir, tmpDirInSandbox()))
     {
@@ -936,11 +946,7 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
                 if (line == "") {
                     state = stBegin;
                 } else {
-                    auto p = line.find('=');
-                    if (p == std::string::npos)
-                        pathsInChroot[line] = line;
-                    else
-                        pathsInChroot[line.substr(0, p)] = line.substr(p + 1);
+                    addPathWithOptions(line);
                 }
             }
         }
