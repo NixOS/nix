@@ -56,7 +56,7 @@ This command has the following operations:
   > **Note**
   >
   > Downloaded channel contents are cached.
-  > Use `--tarball-ttl` or the nix configuration option `tarball-ttl` to change this behavior.
+  > Use `--tarball-ttl` or the [`tarball-ttl` configuration option](@docroot@/command-ref/conf-file.md#conf-tarball-ttl) to change the validity period of cached downloads.
 
 - `--list-generations`
 
