@@ -43,9 +43,6 @@ struct Pos
     Pos() { }
     Pos(uint32_t line, uint32_t column, Origin origin)
         : line(line), column(column), origin(origin) { }
-    Pos(Pos & other) = default;
-    Pos(const Pos & other) = default;
-    Pos(Pos && other) = default;
 
     explicit operator bool() const { return line > 0; }
 
