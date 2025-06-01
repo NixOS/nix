@@ -55,7 +55,7 @@ This command has the following operations:
 
   > **Note**
   >
-  > `--update` uses [fetchTarball](@docroot@/language/builtins.md#builtins-fetchTarball) under the hood, so it will cache channels.
+  > Downloaded channel contents are cached.
   > Use `--tarball-ttl` or the nix configuration option `tarball-ttl` to change this behavior.
 
 - `--list-generations`
