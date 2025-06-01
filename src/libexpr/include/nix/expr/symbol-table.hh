@@ -145,6 +145,12 @@ public:
         return s->size_;
     }
 
+    [[gnu::always_inline]]
+    const Value * valuePtr() const noexcept
+    {
+        return s;
+    }
+
     explicit operator Symbol() const noexcept
     {
         return Symbol{s->idx + 1};

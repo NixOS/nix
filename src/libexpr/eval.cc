@@ -90,6 +90,11 @@ std::string printValue(EvalState & state, Value & v)
     return out.str();
 }
 
+Value * Value::toPtr(SymbolStr str) noexcept
+{
+    return const_cast<Value *>(str.valuePtr());
+}
+
 void Value::print(EvalState & state, std::ostream & str, PrintOptions options)
 {
     printValue(state, str, *this, options);
@@ -917,11 +922,6 @@ void Value::mkString(std::string_view s, const NixStringContext & context)
 void Value::mkStringMove(const char * s, const NixStringContext & context)
 {
     mkString(s, encodeContext(context));
-}
-
-void Value::mkString(const SymbolStr & s)
-{
-    mkString(s.c_str(), nullptr);
 }
 
 void Value::mkPath(const SourcePath & path)

@@ -172,6 +172,11 @@ private:
 
 public:
 
+    /**
+     * Never modify the backing `Value` object!
+     */
+    static Value * toPtr(SymbolStr str) noexcept;
+
     void print(EvalState &state, std::ostream &str, PrintOptions options = PrintOptions {});
 
     // Functions needed to distinguish the type
@@ -330,8 +335,6 @@ public:
     void mkString(std::string_view s, const NixStringContext & context);
 
     void mkStringMove(const char * s, const NixStringContext & context);
-
-    void mkString(const SymbolStr & s);
 
     void mkPath(const SourcePath & path);
     void mkPath(std::string_view path);
