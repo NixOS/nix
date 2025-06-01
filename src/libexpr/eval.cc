@@ -94,15 +94,6 @@ void Value::print(EvalState & state, std::ostream & str, PrintOptions options)
     printValue(state, str, *this, options);
 }
 
-const Value * getPrimOp(const Value &v) {
-    const Value * primOp = &v;
-    while (primOp->isPrimOpApp()) {
-        primOp = primOp->payload.primOpApp.left;
-    }
-    assert(primOp->isPrimOp());
-    return primOp;
-}
-
 std::string_view showType(ValueType type, bool withArticle)
 {
     #define WA(a, w) withArticle ? a " " w : w
@@ -133,7 +124,7 @@ std::string showType(const Value & v)
         case tPrimOp:
             return fmt("the built-in function '%s'", std::string(v.payload.primOp->name));
         case tPrimOpApp:
-            return fmt("the partially applied built-in function '%s'", std::string(getPrimOp(v)->payload.primOp->name));
+            return fmt("the partially applied built-in function '%s'", v.primOpAppPrimOp()->name);
         case tExternal: return v.external()->showType();
         case tThunk: return v.isBlackhole() ? "a black hole" : "a thunk";
         case tApp: return "a function application";
@@ -535,6 +526,8 @@ const PrimOp * Value::primOpAppPrimOp() const
 
     if (!left)
         return nullptr;
+
+    assert(left->isPrimOp());
     return left->primOp();
 }
 
