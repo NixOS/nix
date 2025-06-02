@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.29 and Determinate Nix 3.6.1.<!-- differences -->
+This section lists the differences between upstream Nix 2.29 and Determinate Nix 3.6.2.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -35,3 +35,20 @@ This section lists the differences between upstream Nix 2.29 and Determinate Nix
 <!-- Determinate Nix version 3.6.1 -->
 
 * Fix nlohmann error in fromStructuredAttrs() by @edolstra in [DeterminateSystems/nix-src#73](https://github.com/DeterminateSystems/nix-src/pull/73)
+<!-- Determinate Nix version 3.6.2 -->
+
+* Fix trace-ifd test failure in dev shell by @edolstra in [DeterminateSystems/nix-src#76](https://github.com/DeterminateSystems/nix-src/pull/76)
+
+* nix store copy-sigs: Use http-connections setting to control parallelism by @edolstra in [DeterminateSystems/nix-src#80](https://github.com/DeterminateSystems/nix-src/pull/80)
+
+* Document how to replicate nix-store --query --deriver with the nix cli by @grahamc in [DeterminateSystems/nix-src#82](https://github.com/DeterminateSystems/nix-src/pull/82)
+
+* Garbage collector: Keep going even when encountering an undeletable file by @edolstra in [DeterminateSystems/nix-src#83](https://github.com/DeterminateSystems/nix-src/pull/83)
+
+* nix profile: Replace ε and ∅ with descriptive English words by @grahamc in [DeterminateSystems/nix-src#81](https://github.com/DeterminateSystems/nix-src/pull/81)
+
+* Rework README by @lucperkins in [DeterminateSystems/nix-src#84](https://github.com/DeterminateSystems/nix-src/pull/84)
+
+* Include the source location when warning about inefficient double copies by @edolstra in [DeterminateSystems/nix-src#79](https://github.com/DeterminateSystems/nix-src/pull/79)
+
+* Call out that `--keep-failed` with remote builders will keep the failed build directory on that builder by @cole-h in [DeterminateSystems/nix-src#85](https://github.com/DeterminateSystems/nix-src/pull/85)
