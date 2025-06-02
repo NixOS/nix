@@ -7,7 +7,7 @@ R""(
   ```console
   # nix profile history
   Version 508 (2020-04-10):
-    flake:nixpkgs#legacyPackages.x86_64-linux.awscli: ∅ -> 1.17.13
+    flake:nixpkgs#legacyPackages.x86_64-linux.awscli: 1.17.13 added
 
   Version 509 (2020-05-16) <- 508:
     flake:nixpkgs#legacyPackages.x86_64-linux.awscli: 1.17.13 -> 1.18.211
@@ -20,7 +20,7 @@ between subsequent versions of a profile. It only shows top-level
 packages, not dependencies; for that, use [`nix profile
 diff-closures`](./nix3-profile-diff-closures.md).
 
-The addition of a package to a profile is denoted by the string `∅ ->`
-*version*, whereas the removal is denoted by *version* `-> ∅`.
+The addition of a package to a profile is denoted by the string
+*version* `added`, whereas the removal is denoted by *version* ` removed`.
 
 )""
