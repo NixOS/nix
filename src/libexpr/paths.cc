@@ -57,9 +57,10 @@ std::string EvalState::computeBaseName(const SourcePath & path, PosIdx pos)
     if (path.accessor == rootFS) {
         if (auto storePath = store->maybeParseStorePath(path.path.abs())) {
             warn(
-                "Performing inefficient double copy of path '%s' to the store at %s. "
-                "This can typically be avoided by rewriting an attribute like `src = ./.` "
-                "to `src = builtins.path { path = ./.; name = \"source\"; }`.",
+                "Copying '%s' to the store again\n"
+                "You can make Nix evaluate faster and copy fewer files by replacing `./.` with the `self` flake input, "
+                "or `builtins.path { path = ./.; name = \"source\"; }`\n\n"
+                "Location: %s\n",
                 path,
                 positions[pos]);
             return std::string(fetchToStore(*store, path, FetchMode::DryRun, storePath->name()).to_string());
