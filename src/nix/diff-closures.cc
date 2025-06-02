@@ -97,8 +97,13 @@ void printClosureDiff(
 
         if (showDelta || !removed.empty() || !added.empty()) {
             std::vector<std::string> items;
-            if (!removed.empty() || !added.empty())
+            if (!removed.empty() && !added.empty()) {
                 items.push_back(fmt("%s → %s", showVersions(removed), showVersions(added)));
+            } else if (!removed.empty()) {
+                items.push_back(fmt("%s removed", showVersions(removed)));
+            } else if (!added.empty()) {
+                items.push_back(fmt("%s added", showVersions(added)));
+            }
             if (showDelta)
                 items.push_back(fmt("%s%+.1f KiB" ANSI_NORMAL, sizeDelta > 0 ? ANSI_RED : ANSI_GREEN, sizeDelta / 1024.0));
             logger->cout("%s%s: %s", indent, name, concatStringsSep(", ", items));

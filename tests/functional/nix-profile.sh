@@ -58,7 +58,7 @@ nix profile list | grep -A4 'Name:.*flake1' | grep 'Locked flake URL:.*narHash'
 [ -e $TEST_HOME/.nix-profile/share/man ]
 (! [ -e $TEST_HOME/.nix-profile/include ])
 nix profile history
-nix profile history | grep "packages.$system.default: 1.0 added"
+nix profile history | grep "packages.$system.default: 1.0, 1.0-man added"
 nix profile diff-closures | grep 'env-manifest.nix: (no version) removed'
 
 # Test XDG Base Directories support
