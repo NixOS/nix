@@ -559,15 +559,17 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
             } catch (SubstituterDisabled &) {
             } catch (Error & e) {
                 // if last substituter, THEN log error and throw, otherwise warn
-                if (&sub == &substituters.back() && settings.tryFallback) {
+                if (&sub == &substituters.back() && !settings.tryFallback) {
                     logError(e.info());
                     throw;
                 } else {
-                    warn(
-                        "Unable to download '%s' from subsituter '%s'\n%s",
+                    /* This gets VERY spammy
+                    warn( "Unable to download '%s' from subsituter '%s'\n%s",
                         sub->printStorePath(subPath),
                         sub->getUri(),
                         e.message());
+                    */
+                    continue;
                 }
             }
         }
