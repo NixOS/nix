@@ -20,7 +20,7 @@ Determinate Nix is part of the [Determinate platform][determinate], which also i
 
 ## Installing Determinate
 
-You can install Determinate on [macOS](#macos), non-NixOS [Linux](#linux), and [NixOS](#nixos).
+You can install Determinate on [macOS](#macos), non-NixOS [Linux](#linux) and WSL, and [NixOS](#nixos).
 
 ### macOS
 
