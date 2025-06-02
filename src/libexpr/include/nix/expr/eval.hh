@@ -594,7 +594,7 @@ public:
         bool coerceMore = false, bool copyToStore = true,
         bool canonicalizePath = true);
 
-    StorePath copyPathToStore(NixStringContext & context, const SourcePath & path);
+    StorePath copyPathToStore(NixStringContext & context, const SourcePath & path, PosIdx pos);
 
 
     /**
@@ -607,7 +607,7 @@ public:
      * materialize /nix/store/<hash2>-source though. Still, this
      * requires reading/hashing the path twice.
      */
-    std::string computeBaseName(const SourcePath & path);
+    std::string computeBaseName(const SourcePath & path, PosIdx pos);
 
     /**
      * Path coercion.
