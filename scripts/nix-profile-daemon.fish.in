@@ -62,6 +62,13 @@ else
     end
 end
 
+# Only use MANPATH if it is already set. In general `man` will just simply
+# pick up `.nix-profile/share/man` because is it close to `.nix-profile/bin`
+# which is in the $PATH. For more info, run `manpath -d`.
+if set --query MANPATH
+    set --export --prepend --path MANPATH "$NIX_LINK/share/man"
+end
+
 add_path "@localstatedir@/nix/profiles/default/bin"
 add_path "$NIX_LINK/bin"
 

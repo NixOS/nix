@@ -33,7 +33,7 @@ namespace nix {
                 ASSERT_EQ(PrintToString(e.info().msg),
                           PrintToString(HintFmt("puppy")));
                 auto trace = e.info().traces.rbegin();
-                ASSERT_EQ(e.info().traces.size(), 2);
+                ASSERT_EQ(e.info().traces.size(), 2u);
                 ASSERT_EQ(PrintToString(trace->hint),
                           PrintToString(HintFmt("doggy")));
                 trace++;
@@ -54,8 +54,8 @@ namespace nix {
             } catch (Error & e2) {
                 e.addTrace(state.positions[noPos], "beans2");
                 //e2.addTrace(state.positions[noPos], "Something", "");
-                ASSERT_TRUE(e.info().traces.size() == 2);
-                ASSERT_TRUE(e2.info().traces.size() == 0);
+                ASSERT_TRUE(e.info().traces.size() == 2u);
+                ASSERT_TRUE(e2.info().traces.size() == 0u);
                 ASSERT_FALSE(&e.info() == &e2.info());
             }
         }
@@ -71,7 +71,7 @@ namespace nix {
             } catch (BaseError & e) {                                       \
                 ASSERT_EQ(PrintToString(e.info().msg),                      \
                           PrintToString(message));                          \
-                ASSERT_EQ(e.info().traces.size(), 1) << "while testing " args << std::endl << e.what(); \
+                ASSERT_EQ(e.info().traces.size(), 1u) << "while testing " args << std::endl << e.what(); \
                 auto trace = e.info().traces.rbegin();                      \
                 ASSERT_EQ(PrintToString(trace->hint),                       \
                           PrintToString(HintFmt("while calling the '%s' builtin", name))); \
@@ -90,7 +90,7 @@ namespace nix {
             } catch (BaseError & e) {                                       \
                 ASSERT_EQ(PrintToString(e.info().msg),                      \
                           PrintToString(message));                          \
-                ASSERT_EQ(e.info().traces.size(), 2) << "while testing " args << std::endl << e.what(); \
+                ASSERT_EQ(e.info().traces.size(), 2u) << "while testing " args << std::endl << e.what(); \
                 auto trace = e.info().traces.rbegin();                      \
                 ASSERT_EQ(PrintToString(trace->hint),                       \
                           PrintToString(context));                          \
@@ -112,7 +112,7 @@ namespace nix {
             } catch (BaseError & e) {                                       \
                 ASSERT_EQ(PrintToString(e.info().msg),                      \
                           PrintToString(message));                          \
-                ASSERT_EQ(e.info().traces.size(), 3) << "while testing " args << std::endl << e.what(); \
+                ASSERT_EQ(e.info().traces.size(), 3u) << "while testing " args << std::endl << e.what(); \
                 auto trace = e.info().traces.rbegin();                      \
                 ASSERT_EQ(PrintToString(trace->hint),                       \
                           PrintToString(context1));                         \
@@ -137,7 +137,7 @@ namespace nix {
             } catch (BaseError & e) {                                       \
                 ASSERT_EQ(PrintToString(e.info().msg),                      \
                           PrintToString(message));                          \
-                ASSERT_EQ(e.info().traces.size(), 4) << "while testing " args << std::endl << e.what(); \
+                ASSERT_EQ(e.info().traces.size(), 4u) << "while testing " args << std::endl << e.what(); \
                 auto trace = e.info().traces.rbegin();                      \
                 ASSERT_EQ(PrintToString(trace->hint),                       \
                           PrintToString(context1));                         \

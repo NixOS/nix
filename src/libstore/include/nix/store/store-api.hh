@@ -26,32 +26,6 @@
 
 namespace nix {
 
-/**
- * About the class hierarchy of the store types:
- *
- * Each store type `Foo` consists of two classes:
- *
- * 1. A class `FooConfig : virtual StoreConfig` that contains the configuration
- *   for the store
- *
- *   It should only contain members of type `const Setting<T>` (or subclasses
- *   of it) and inherit the constructors of `StoreConfig`
- *   (`using StoreConfig::StoreConfig`).
- *
- * 2. A class `Foo : virtual Store, virtual FooConfig` that contains the
- *   implementation of the store.
- *
- *   This class is expected to have a constructor `Foo(const Params & params)`
- *   that calls `StoreConfig(params)` (otherwise you're gonna encounter an
- *   `assertion failure` when trying to instantiate it).
- *
- * You can then register the new store using:
- *
- * ```
- * cpp static RegisterStoreImplementation<Foo, FooConfig> regStore;
- * ```
- */
-
 MakeError(SubstError, Error);
 /**
  * denotes a permanent build failure
@@ -97,27 +71,48 @@ struct KeyedBuildResult;
 
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
+
+/**
+ * About the class hierarchy of the store types:
+ *
+ * Each store type `Foo` consists of two classes:
+ *
+ * 1. A class `FooConfig : virtual StoreConfig` that contains the configuration
+ *   for the store
+ *
+ *   It should only contain members of type `Setting<T>` (or subclasses
+ *   of it) and inherit the constructors of `StoreConfig`
+ *   (`using StoreConfig::StoreConfig`).
+ *
+ * 2. A class `Foo : virtual Store` that contains the
+ *   implementation of the store.
+ *
+ *   This class is expected to have:
+ *
+ *   1. an alias `using Config = FooConfig;`
+ *
+ *   2. a constructor `Foo(ref<const Config> params)`.
+ *
+ * You can then register the new store using:
+ *
+ * ```
+ * cpp static RegisterStoreImplementation<FooConfig> regStore;
+ * ```
+ */
 struct StoreConfig : public StoreDirConfig
 {
-    using Params = StoreReference::Params;
-
     using StoreDirConfig::StoreDirConfig;
 
     StoreConfig() = delete;
 
-    static StringSet getDefaultSystemFeatures();
-
     virtual ~StoreConfig() { }
 
-    /**
-     * The name of this type of store.
-     */
-    virtual const std::string name() = 0;
+    static StringSet getDefaultSystemFeatures();
 
     /**
      * Documentation for this type of store.
      */
-    virtual std::string doc()
+    static std::string doc()
     {
         return "";
     }
@@ -126,15 +121,15 @@ struct StoreConfig : public StoreDirConfig
      * An experimental feature this type store is gated, if it is to be
      * experimental.
      */
-    virtual std::optional<ExperimentalFeature> experimentalFeature() const
+    static std::optional<ExperimentalFeature> experimentalFeature()
     {
         return std::nullopt;
     }
 
-    const Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size",
+    Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size",
         "Size of the in-memory store path metadata cache."};
 
-    const Setting<bool> isTrusted{this, false, "trusted",
+    Setting<bool> isTrusted{this, false, "trusted",
         R"(
           Whether paths from this store can be used as substitutes
           even if they are not signed by a key listed in the
@@ -163,10 +158,38 @@ struct StoreConfig : public StoreDirConfig
         {},
         // Don't document the machine-specific default value
         false};
+
+    /**
+     * Open a store of the type corresponding to this configuration
+     * type.
+     */
+    virtual ref<Store> openStore() const = 0;
 };
 
-class Store : public std::enable_shared_from_this<Store>, public virtual StoreConfig
+/**
+ * A Store (client)
+ *
+ * This is an interface type allowing for create and read operations on
+ * a collection of store objects, and also building new store objects
+ * from `Derivation`s. See the manual for further details.
+ *
+ * "client" used is because this is just one view/actor onto an
+ * underlying resource, which could be an external process (daemon
+ * server), file system state, etc.
+ */
+class Store : public std::enable_shared_from_this<Store>, public MixStoreDirMethods
 {
+public:
+
+    using Config = StoreConfig;
+
+    const Config & config;
+
+    /**
+     * @note Avoid churn, since we used to inherit from `Config`.
+     */
+    operator const Config &() const { return config; }
+
 protected:
 
     struct PathInfoCacheValue {
@@ -205,7 +228,7 @@ protected:
 
     std::shared_ptr<NarInfoDiskCache> diskCache;
 
-    Store(const Params & params);
+    Store(const Store::Config & config);
 
 public:
     /**
@@ -622,6 +645,14 @@ public:
     virtual void addSignatures(const StorePath & storePath, const StringSet & sigs)
     { unsupported("addSignatures"); }
 
+    /**
+     * Add signatures to a ValidPathInfo or Realisation using the secret keys
+     * specified by the ‘secret-key-files’ option.
+     */
+    void signPathInfo(ValidPathInfo & info);
+
+    void signRealisation(Realisation &);
+
     /* Utility functions. */
 
     /**
@@ -855,74 +886,6 @@ void removeTempRoots();
  */
 StorePath resolveDerivedPath(Store &, const SingleDerivedPath &, Store * evalStore = nullptr);
 OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * evalStore = nullptr);
-
-
-/**
- * @return a Store object to access the Nix store denoted by
- * ‘uri’ (slight misnomer...).
- */
-ref<Store> openStore(StoreReference && storeURI);
-
-
-/**
- * Opens the store at `uri`, where `uri` is in the format expected by `StoreReference::parse`
-
- */
-ref<Store> openStore(const std::string & uri = settings.storeUri.get(),
-    const Store::Params & extraParams = Store::Params());
-
-
-/**
- * @return the default substituter stores, defined by the
- * ‘substituters’ option and various legacy options.
- */
-std::list<ref<Store>> getDefaultSubstituters();
-
-struct StoreFactory
-{
-    std::set<std::string> uriSchemes;
-    /**
-     * The `authorityPath` parameter is `<authority>/<path>`, or really
-     * whatever comes after `<scheme>://` and before `?<query-params>`.
-     */
-    std::function<std::shared_ptr<Store> (
-        std::string_view scheme,
-        std::string_view authorityPath,
-        const Store::Params & params)> create;
-    std::function<std::shared_ptr<StoreConfig> ()> getConfig;
-};
-
-struct Implementations
-{
-    static std::vector<StoreFactory> * registered;
-
-    template<typename T, typename TConfig>
-    static void add()
-    {
-        if (!registered) registered = new std::vector<StoreFactory>();
-        StoreFactory factory{
-            .uriSchemes = TConfig::uriSchemes(),
-            .create =
-                ([](auto scheme, auto uri, auto & params)
-                 -> std::shared_ptr<Store>
-                 { return std::make_shared<T>(scheme, uri, params); }),
-            .getConfig =
-                ([]()
-                 -> std::shared_ptr<StoreConfig>
-                 { return std::make_shared<TConfig>(StringMap({})); })
-        };
-        registered->push_back(factory);
-    }
-};
-
-template<typename T, typename TConfig>
-struct RegisterStoreImplementation
-{
-    RegisterStoreImplementation()
-    {
-        Implementations::add<T, TConfig>();
-    }
-};
 
 
 /**

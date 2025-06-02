@@ -98,7 +98,7 @@ subdir('nix-meson-build-support/libatomic')
 
 boost = dependency(
   'boost',
-  modules : ['container'],
+  modules : ['container', 'regex'],
   include_type: 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
@@ -139,6 +139,9 @@ if aws_s3.found()
       '-L' + aws_s3.get_variable('libdir'),
       '-laws-cpp-sdk-transfer',
       '-laws-cpp-sdk-s3',
+      '-laws-cpp-sdk-identity-management',
+      '-laws-cpp-sdk-cognito-identity',
+      '-laws-cpp-sdk-sts',
       '-laws-cpp-sdk-core',
       '-laws-crt-cpp',
     ],
@@ -304,6 +307,7 @@ sources = files(
   'realisation.cc',
   'remote-fs-accessor.cc',
   'remote-store.cc',
+  'restricted-store.cc',
   's3-binary-cache-store.cc',
   'serve-protocol-connection.cc',
   'serve-protocol.cc',
@@ -311,6 +315,8 @@ sources = files(
   'ssh-store.cc',
   'ssh.cc',
   'store-api.cc',
+  'store-dir-config.cc',
+  'store-registration.cc',
   'store-reference.cc',
   'uds-remote-store.cc',
   'worker-protocol-connection.cc',

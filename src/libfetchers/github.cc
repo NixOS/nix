@@ -149,6 +149,9 @@ struct GitArchiveInputScheme : InputScheme
         };
         if (auto narHash = input.getNarHash())
             url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
+        auto host = maybeGetStrAttr(input.attrs, "host");
+        if (host)
+            url.query.insert_or_assign("host", *host);
         return url;
     }
 

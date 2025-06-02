@@ -73,11 +73,13 @@ Derivations can declare some infrequently used optional attributes.
 
     > **Warning**
     >
-    > If set to `true`, other advanced attributes such as [`allowedReferences`](#adv-attr-allowedReferences), [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
+    > If set to `true`, other advanced attributes such as [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
     [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites), maxSize, and maxClosureSize.
     will have no effect.
 
 ## Output checks
+
+See the [corresponding section in the derivation output page](@docroot@/store/derivation/outputs/index.md).
 
   - [`allowedReferences`]{#adv-attr-allowedReferences}\
     The optional attribute `allowedReferences` specifies a list of legal
@@ -280,7 +282,7 @@ All other combinations are invalid.
 
   <!--
 
-  `__contentAddressed` is ignored, becaused fixed-output derivations always content-address their outputs, by definition.
+  `__contentAddressed` is ignored, because fixed-output derivations always content-address their outputs, by definition.
 
   **TODO CHECK**
 
@@ -333,17 +335,17 @@ Here is more information on the `output*` attributes, and what values they may b
 
   - [`outputHashAlgo`]{#adv-attr-outputHashAlgo}
 
-    This specifies the hash alorithm used to digest the [file system object] data of a content-addressing derivation output.
+    This specifies the hash algorithm used to digest the [file system object] data of a content-addressing derivation output.
 
     This works in conjunction with [`outputHashMode`](#adv-attr-outputHashAlgo).
-    Specifying one without the other is an error (unless [`outputHash` is also specified and includes its own hash algorithm as described below).
+    Specifying one without the other is an error (unless `outputHash` is also specified and includes its own hash algorithm as described below).
 
     The `outputHashAlgo` attribute specifies the hash algorithm used to compute the hash.
-    It can currently be `"blake3"`, "sha1"`, `"sha256"`, `"sha512"`, or `null`.
+    It can currently be `"blake3"`, `"sha1"`, `"sha256"`, `"sha512"`, or `null`.
 
     `outputHashAlgo` can only be `null` when `outputHash` follows the SRI format, because in that case the choice of hash algorithm is determined by `outputHash`.
 
-  - [`outputHash`]{#adv-attr-outputHashAlgo}; [`outputHash`]{#adv-attr-outputHashMode}\
+  - [`outputHash`]{#adv-attr-outputHashAlgo}; [`outputHash`]{#adv-attr-outputHashMode}
 
     This will specify the output hash of the single output of a [fixed-output derivation].
 

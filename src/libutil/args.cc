@@ -593,7 +593,7 @@ MultiCommand::MultiCommand(std::string_view commandName, const Commands & comman
             assert(!command);
             auto i = commands.find(s);
             if (i == commands.end()) {
-                std::set<std::string> commandNames;
+                StringSet commandNames;
                 for (auto & [name, _] : commands)
                     commandNames.insert(name);
                 auto suggestions = Suggestions::bestMatches(commandNames, s);

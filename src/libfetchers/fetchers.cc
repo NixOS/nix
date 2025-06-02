@@ -12,24 +12,26 @@ namespace nix::fetchers {
 
 using InputSchemeMap = std::map<std::string_view, std::shared_ptr<InputScheme>>;
 
-std::unique_ptr<InputSchemeMap> inputSchemes = nullptr;
+static InputSchemeMap & inputSchemes()
+{
+    static InputSchemeMap inputSchemeMap;
+    return inputSchemeMap;
+}
 
 void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
 {
-    if (!inputSchemes)
-        inputSchemes = std::make_unique<InputSchemeMap>();
     auto schemeName = inputScheme->schemeName();
-    if (inputSchemes->count(schemeName) > 0)
+    if (!inputSchemes().emplace(schemeName, std::move(inputScheme)).second)
         throw Error("Input scheme with name %s already registered", schemeName);
-    inputSchemes->insert_or_assign(schemeName, std::move(inputScheme));
 }
 
-nlohmann::json dumpRegisterInputSchemeInfo() {
+nlohmann::json dumpRegisterInputSchemeInfo()
+{
     using nlohmann::json;
 
     auto res = json::object();
 
-    for (auto & [name, scheme] : *inputSchemes) {
+    for (auto & [name, scheme] : inputSchemes()) {
         auto & r = res[name] = json::object();
         r["allowedAttrs"] = scheme->allowedAttrs();
     }
@@ -57,7 +59,7 @@ Input Input::fromURL(
     const Settings & settings,
     const ParsedURL & url, bool requireTree)
 {
-    for (auto & [_, inputScheme] : *inputSchemes) {
+    for (auto & [_, inputScheme] : inputSchemes()) {
         auto res = inputScheme->inputFromURL(settings, url, requireTree);
         if (res) {
             experimentalFeatureSettings.require(inputScheme->experimentalFeature());
@@ -91,8 +93,8 @@ Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
     };
 
     std::shared_ptr<InputScheme> inputScheme = ({
-        auto i = inputSchemes->find(schemeName);
-        i == inputSchemes->end() ? nullptr : i->second;
+        auto i = get(inputSchemes(), schemeName);
+        i ? *i : nullptr;
     });
 
     if (!inputScheme) return raw();

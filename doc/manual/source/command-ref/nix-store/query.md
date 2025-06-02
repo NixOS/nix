@@ -45,10 +45,19 @@ symlink.
 
   [output paths]: @docroot@/glossary.md#gloss-output-path
 
+- `--references`
+
+  Prints the set of [references] of the store paths
+  *paths*, that is, their immediate dependencies. (For *all*
+  dependencies, use `--requisites`.)
+
+  [references]: @docroot@/glossary.md#gloss-reference
+
 - `--requisites` / `-R`
 
-  Prints out the [closure] of the store path *paths*.
+  Prints out the set of [*requisites*][requisite] (better known as the [closure]) of the store path *paths*.
 
+  [requisite]: @docroot@/glossary.md#gloss-requisite
   [closure]: @docroot@/glossary.md#gloss-closure
 
   This query has one option:
@@ -65,28 +74,24 @@ symlink.
   dependencies) is obtained by distributing the closure of a store
   derivation and specifying the option `--include-outputs`.
 
-- `--references`
-
-  Prints the set of [references] of the store paths
-  *paths*, that is, their immediate dependencies. (For *all*
-  dependencies, use `--requisites`.)
-
-  [references]: @docroot@/glossary.md#gloss-reference
-
 - `--referrers`
 
-  Prints the set of *referrers* of the store paths *paths*, that is,
+  Prints the set of [*referrers*][referrer] of the store paths *paths*, that is,
   the store paths currently existing in the Nix store that refer to
   one of *paths*. Note that contrary to the references, the set of
   referrers is not constant; it can change as store paths are added or
   removed.
 
+  [referrer]: @docroot@/glossary.md#gloss-referrer
+
 - `--referrers-closure`
 
   Prints the closure of the set of store paths *paths* under the
-  referrers relation; that is, all store paths that directly or
+  [referrers relation][referrer]; that is, all store paths that directly or
   indirectly refer to one of *paths*. These are all the path currently
   in the Nix store that are dependent on *paths*.
+
+  [referrer]: @docroot@/glossary.md#gloss-referrer
 
 - `--deriver` / `-d`
 
@@ -97,6 +102,13 @@ symlink.
   The returned deriver is not guaranteed to exist in the local store, for
   example when *paths* were substituted from a binary cache.
   Use `--valid-derivers` instead to obtain valid paths only.
+
+  > **Note**
+  >
+  > `nix-store --query --deriver` is replaced with the following `nix` command:
+  >
+  >    nix path-info --json ... | jq -r '.[].deriver'
+
 
   [deriver]: @docroot@/glossary.md#gloss-deriver
 

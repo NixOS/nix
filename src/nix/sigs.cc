@@ -1,8 +1,9 @@
 #include "nix/util/signals.hh"
 #include "nix/cmd/command.hh"
 #include "nix/main/shared.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/util/thread-pool.hh"
+#include "nix/store/filetransfer.hh"
 
 #include <atomic>
 
@@ -28,6 +29,13 @@ struct CmdCopySigs : StorePathsCommand
         return "copy store path signatures from substituters";
     }
 
+    std::string doc() override
+    {
+        return
+          #include "store-copy-sigs.md"
+          ;
+    }
+
     void run(ref<Store> store, StorePaths && storePaths) override
     {
         if (substituterUris.empty())
@@ -38,7 +46,7 @@ struct CmdCopySigs : StorePathsCommand
         for (auto & s : substituterUris)
             substituters.push_back(openStore(s));
 
-        ThreadPool pool;
+        ThreadPool pool{fileTransferSettings.httpConnections};
 
         std::atomic<size_t> added{0};
 

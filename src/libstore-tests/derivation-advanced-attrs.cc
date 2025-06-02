@@ -99,6 +99,8 @@ TEST_ATERM_JSON(advancedAttributes_structuredAttrs_defaults, "advanced-attribute
 
 #undef TEST_ATERM_JSON
 
+using ExportReferencesMap = decltype(DerivationOptions::exportReferencesGraph);
+
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
 {
     this->readTest("advanced-attributes-defaults.drv", [&](auto encoded) {
@@ -106,16 +108,17 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, parsedDrv ? &*parsedDrv : nullptr);
 
-        EXPECT_TRUE(!parsedDrv.hasStructuredAttrs());
+        EXPECT_TRUE(!parsedDrv);
 
         EXPECT_EQ(options.additionalSandboxProfile, "");
         EXPECT_EQ(options.noChroot, false);
         EXPECT_EQ(options.impureHostDeps, StringSet{});
         EXPECT_EQ(options.impureEnvVars, StringSet{});
         EXPECT_EQ(options.allowLocalNetworking, false);
+        EXPECT_EQ(options.exportReferencesGraph, ExportReferencesMap{});
         {
             auto * checksForAllOutputs_ = std::get_if<0>(&options.outputChecks);
             ASSERT_TRUE(checksForAllOutputs_ != nullptr);
@@ -140,8 +143,8 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_defaults)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, parsedDrv ? &*parsedDrv : nullptr);
 
         EXPECT_EQ(options.getRequiredSystemFeatures(got), StringSet{});
     });
@@ -154,8 +157,8 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_defaults)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, parsedDrv ? &*parsedDrv : nullptr);
 
         EXPECT_EQ(options.getRequiredSystemFeatures(got), StringSet{"ca-derivations"});
     });
@@ -168,10 +171,10 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, parsedDrv ? &*parsedDrv : nullptr);
 
-        EXPECT_TRUE(!parsedDrv.hasStructuredAttrs());
+        EXPECT_TRUE(!parsedDrv);
 
         EXPECT_EQ(options.additionalSandboxProfile, "sandcastle");
         EXPECT_EQ(options.noChroot, true);
@@ -192,8 +195,25 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, parsedDrv ? &*parsedDrv : nullptr);
+
+        EXPECT_EQ(
+            options.exportReferencesGraph,
+            (ExportReferencesMap{
+                {
+                    "refs1",
+                    {
+                        "/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo",
+                    },
+                },
+                {
+                    "refs2",
+                    {
+                        "/nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv",
+                    },
+                },
+            }));
 
         {
             auto * checksForAllOutputs_ = std::get_if<0>(&options.outputChecks);
@@ -225,8 +245,25 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, parsedDrv ? &*parsedDrv : nullptr);
+
+        EXPECT_EQ(
+            options.exportReferencesGraph,
+            (ExportReferencesMap{
+                {
+                    "refs1",
+                    {
+                        "/164j69y6zir9z0339n8pjigg3rckinlr77bxsavzizdaaljb7nh9",
+                    },
+                },
+                {
+                    "refs2",
+                    {
+                        "/nix/store/qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv",
+                    },
+                },
+            }));
 
         {
             auto * checksForAllOutputs_ = std::get_if<0>(&options.outputChecks);
@@ -261,23 +298,24 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_d
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, parsedDrv ? &*parsedDrv : nullptr);
 
-        EXPECT_TRUE(parsedDrv.hasStructuredAttrs());
+        EXPECT_TRUE(parsedDrv);
 
         EXPECT_EQ(options.additionalSandboxProfile, "");
         EXPECT_EQ(options.noChroot, false);
         EXPECT_EQ(options.impureHostDeps, StringSet{});
         EXPECT_EQ(options.impureEnvVars, StringSet{});
         EXPECT_EQ(options.allowLocalNetworking, false);
+        EXPECT_EQ(options.exportReferencesGraph, ExportReferencesMap{});
 
         {
             auto * checksPerOutput_ = std::get_if<1>(&options.outputChecks);
             ASSERT_TRUE(checksPerOutput_ != nullptr);
             auto & checksPerOutput = *checksPerOutput_;
 
-            EXPECT_EQ(checksPerOutput.size(), 0);
+            EXPECT_EQ(checksPerOutput.size(), 0u);
         }
 
         EXPECT_EQ(options.canBuildLocally(*this->store, got), false);
@@ -294,8 +332,8 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_defaults)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, parsedDrv ? &*parsedDrv : nullptr);
 
         EXPECT_EQ(options.getRequiredSystemFeatures(got), StringSet{});
     });
@@ -308,8 +346,8 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_default
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, parsedDrv ? &*parsedDrv : nullptr);
 
         EXPECT_EQ(options.getRequiredSystemFeatures(got), StringSet{"ca-derivations"});
     });
@@ -322,10 +360,10 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, parsedDrv ? &*parsedDrv : nullptr);
 
-        EXPECT_TRUE(parsedDrv.hasStructuredAttrs());
+        EXPECT_TRUE(parsedDrv);
 
         EXPECT_EQ(options.additionalSandboxProfile, "sandcastle");
         EXPECT_EQ(options.noChroot, true);
@@ -356,8 +394,25 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, parsedDrv ? &*parsedDrv : nullptr);
+
+        EXPECT_EQ(
+            options.exportReferencesGraph,
+            (ExportReferencesMap{
+                {
+                    "refs1",
+                    {
+                        "/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo",
+                    },
+                },
+                {
+                    "refs2",
+                    {
+                        "/nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv",
+                    },
+                },
+            }));
 
         {
             {
@@ -393,8 +448,25 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        ParsedDerivation parsedDrv(drvPath, got);
-        DerivationOptions options = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(got.env);
+        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, parsedDrv ? &*parsedDrv : nullptr);
+
+        EXPECT_EQ(
+            options.exportReferencesGraph,
+            (ExportReferencesMap{
+                {
+                    "refs1",
+                    {
+                        "/164j69y6zir9z0339n8pjigg3rckinlr77bxsavzizdaaljb7nh9",
+                    },
+                },
+                {
+                    "refs2",
+                    {
+                        "/nix/store/qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv",
+                    },
+                },
+            }));
 
         {
             {

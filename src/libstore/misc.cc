@@ -4,7 +4,7 @@
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/globals.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/topo-sort.hh"
@@ -222,8 +222,18 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
             if (knownOutputPaths && invalid.empty()) return;
 
             auto drv = make_ref<Derivation>(derivationFromPath(drvPath));
-            ParsedDerivation parsedDrv(StorePath(drvPath), *drv);
-            DerivationOptions drvOptions = DerivationOptions::fromParsedDerivation(parsedDrv);
+            auto parsedDrv = StructuredAttrs::tryParse(drv->env);
+            DerivationOptions drvOptions;
+            try {
+                // FIXME: this is a lot of work just to get the value
+                // of `allowSubstitutes`.
+                drvOptions = DerivationOptions::fromStructuredAttrs(
+                    drv->env,
+                    parsedDrv ? &*parsedDrv : nullptr);
+            } catch (Error & e) {
+                e.addTrace({}, "while parsing derivation '%s'", printStorePath(drvPath));
+                throw;
+            }
 
             if (!knownOutputPaths && settings.useSubstitutes && drvOptions.substitutesAllowed()) {
                 experimentalFeatureSettings.require(Xp::CaDerivations);

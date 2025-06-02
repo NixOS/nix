@@ -5,7 +5,6 @@
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-goal.hh"
 #ifndef _WIN32 // TODO Enable building on Windows
-#  include "nix/store/build/local-derivation-goal.hh"
 #  include "nix/store/build/hook-instance.hh"
 #endif
 #include "nix/util/signals.hh"
@@ -65,13 +64,7 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drv
     const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
-        return
-#ifndef _WIN32 // TODO Enable building on Windows
-            dynamic_cast<LocalStore *>(&store)
-            ? std::make_shared<LocalDerivationGoal>(drvPath, wantedOutputs, *this, buildMode)
-            :
-#endif
-            std::make_shared</* */DerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
+        return std::make_shared<DerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
     });
 }
 
@@ -79,13 +72,7 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
     const BasicDerivation & drv, const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
-        return
-#ifndef _WIN32 // TODO Enable building on Windows
-            dynamic_cast<LocalStore *>(&store)
-            ? std::make_shared<LocalDerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode)
-            :
-#endif
-            std::make_shared</* */DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
+        return std::make_shared<DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
     });
 }
 
@@ -524,7 +511,7 @@ bool Worker::pathContentsGood(const StorePath & path)
         res = false;
     else {
         auto current = hashPath(
-            {store.getFSAccessor(), CanonPath(store.printStorePath(path))},
+            {store.getFSAccessor(), CanonPath(path.to_string())},
             FileIngestionMethod::NixArchive, info->narHash.algo).first;
         Hash nullHash(HashAlgorithm::SHA256);
         res = info->narHash == nullHash || info->narHash == current;
@@ -548,6 +535,11 @@ GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal)
 }
 
 GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal)
+{
+    return subGoal;
+}
+
+GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal)
 {
     return subGoal;
 }

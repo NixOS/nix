@@ -3,11 +3,21 @@
 #include "nix/store/globals.hh"
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/callback.hh"
+#include "nix/store/store-registration.hh"
 
 namespace nix {
 
 MakeError(UploadToHTTP, Error);
 
+
+StringSet HttpBinaryCacheStoreConfig::uriSchemes()
+{
+    static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
+    auto ret = StringSet{"http", "https"};
+    if (forceHttp)
+        ret.insert("file");
+    return ret;
+}
 
 HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
     std::string_view scheme,
@@ -35,10 +45,9 @@ std::string HttpBinaryCacheStoreConfig::doc()
 }
 
 
-class HttpBinaryCacheStore : public virtual HttpBinaryCacheStoreConfig, public virtual BinaryCacheStore
+class HttpBinaryCacheStore :
+    public virtual BinaryCacheStore
 {
-private:
-
     struct State
     {
         bool enabled = true;
@@ -49,37 +58,37 @@ private:
 
 public:
 
-    HttpBinaryCacheStore(
-        std::string_view scheme,
-        PathView cacheUri,
-        const Params & params)
-        : StoreConfig(params)
-        , BinaryCacheStoreConfig(params)
-        , HttpBinaryCacheStoreConfig(scheme, cacheUri, params)
-        , Store(params)
-        , BinaryCacheStore(params)
+    using Config = HttpBinaryCacheStoreConfig;
+
+    ref<Config> config;
+
+    HttpBinaryCacheStore(ref<Config> config)
+        : Store{*config}
+        // TODO it will actually mutate the configuration
+        , BinaryCacheStore{*config}
+        , config{config}
     {
         diskCache = getNarInfoDiskCache();
     }
 
     std::string getUri() override
     {
-        return cacheUri;
+        return config->cacheUri;
     }
 
     void init() override
     {
         // FIXME: do this lazily?
-        if (auto cacheInfo = diskCache->upToDateCacheExists(cacheUri)) {
-            wantMassQuery.setDefault(cacheInfo->wantMassQuery);
-            priority.setDefault(cacheInfo->priority);
+        if (auto cacheInfo = diskCache->upToDateCacheExists(config->cacheUri)) {
+            config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
+            config->priority.setDefault(cacheInfo->priority);
         } else {
             try {
                 BinaryCacheStore::init();
             } catch (UploadToHTTP &) {
-                throw Error("'%s' does not appear to be a binary cache", cacheUri);
+                throw Error("'%s' does not appear to be a binary cache", config->cacheUri);
             }
-            diskCache->createCache(cacheUri, storeDir, wantMassQuery, priority);
+            diskCache->createCache(config->cacheUri, config->storeDir, config->wantMassQuery, config->priority);
         }
     }
 
@@ -137,7 +146,7 @@ protected:
         try {
             getFileTransfer()->upload(req);
         } catch (FileTransferError & e) {
-            throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", cacheUri, e.msg());
+            throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", config->cacheUri, e.msg());
         }
     }
 
@@ -146,7 +155,7 @@ protected:
         return FileTransferRequest(
             hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
             ? path
-            : cacheUri + "/" + path);
+            : config->cacheUri + "/" + path);
 
     }
 
@@ -167,12 +176,12 @@ protected:
     void getFile(const std::string & path,
         Callback<std::optional<std::string>> callback) noexcept override
     {
+        auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
         try {
             checkEnabled();
 
             auto request(makeRequest(path));
-
-            auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
             getFileTransfer()->enqueueFileTransfer(request,
                 {[callbackPtr, this](std::future<FileTransferResult> result) {
@@ -189,7 +198,7 @@ protected:
             }});
 
         } catch (...) {
-            callback.rethrow();
+            callbackPtr->rethrow();
             return;
         }
     }
@@ -221,6 +230,14 @@ protected:
     }
 };
 
-static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regHttpBinaryCacheStore;
+ref<Store> HttpBinaryCacheStore::Config::openStore() const
+{
+    return make_ref<HttpBinaryCacheStore>(ref{
+        // FIXME we shouldn't actually need a mutable config
+        std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())
+    });
+}
+
+static RegisterStoreImplementation<HttpBinaryCacheStore::Config> regHttpBinaryCacheStore;
 
 }

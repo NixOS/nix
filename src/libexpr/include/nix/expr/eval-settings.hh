@@ -151,6 +151,16 @@ struct EvalSettings : Config
         )"
         };
 
+    Setting<bool> traceImportFromDerivation{
+        this, false, "trace-import-from-derivation",
+        R"(
+          By default, Nix allows [Import from Derivation](@docroot@/language/import-from-derivation.md).
+
+          When this setting is `true`, Nix will log a warning indicating that it performed such an import.
+          This option has no effect if `allow-import-from-derivation` is disabled.
+        )"
+        };
+
     Setting<bool> enableImportFromDerivation{
         this, true, "allow-import-from-derivation",
         R"(

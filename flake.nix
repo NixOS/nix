@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
@@ -42,12 +42,12 @@
       systems = linuxSystems ++ darwinSystems;
 
       crossSystems = [
-        "armv6l-unknown-linux-gnueabihf"
-        "armv7l-unknown-linux-gnueabihf"
-        "riscv64-unknown-linux-gnu"
+        #"armv6l-unknown-linux-gnueabihf"
+        #"armv7l-unknown-linux-gnueabihf"
+        #"riscv64-unknown-linux-gnu"
         # Disabled because of https://github.com/NixOS/nixpkgs/issues/344423
         # "x86_64-unknown-netbsd"
-        "x86_64-unknown-freebsd"
+        #"x86_64-unknown-freebsd"
       ];
 
       stdenvs = [
@@ -384,6 +384,7 @@
               "nix-store-tests" = { };
 
               "nix-fetchers" = { };
+              "nix-fetchers-c" = { };
               "nix-fetchers-tests" = { };
 
               "nix-expr" = { };
@@ -392,6 +393,7 @@
               "nix-expr-tests" = { };
 
               "nix-flake" = { };
+              "nix-flake-c" = { };
               "nix-flake-tests" = { };
 
               "nix-main" = { };

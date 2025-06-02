@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.28 and Determinate Nix 3.5.2.<!-- differences -->
+This section lists the differences between upstream Nix 2.29 and Determinate Nix 3.6.1.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -29,3 +29,9 @@ This section lists the differences between upstream Nix 2.28 and Determinate Nix
 <!-- Determinate Nix version 3.5.2 -->
 
 * Tell users a source is corrupted ("cannot read file from tarball: Truncated tar archive detected while reading data"), improving over the previous 'cannot read file from tarball' error by @edolstra in [DeterminateSystems/nix-src#64](https://github.com/DeterminateSystems/nix-src/pull/64)
+<!-- Determinate Nix version 3.6.0 -->
+
+* Emit warnings when using import-from-derivation by setting the `trace-import-from-derivation` option to `true` by @gustavderdrache in [DeterminateSystems/nix-src#70](https://github.com/DeterminateSystems/nix-src/pull/70)
+<!-- Determinate Nix version 3.6.1 -->
+
+* Fix nlohmann error in fromStructuredAttrs() by @edolstra in [DeterminateSystems/nix-src#73](https://github.com/DeterminateSystems/nix-src/pull/73)

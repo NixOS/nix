@@ -16,7 +16,7 @@
 #include "nix/store/globals.hh"
 #include "nix/util/serialise.hh"
 #include "nix/store/build-result.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/util/strings.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/local-store.hh"
@@ -42,9 +42,9 @@ static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
     return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri.render()), slot), true);
 }
 
-static bool allSupportedLocally(Store & store, const std::set<std::string>& requiredFeatures) {
+static bool allSupportedLocally(Store & store, const StringSet& requiredFeatures) {
     for (auto & feature : requiredFeatures)
-        if (!store.systemFeatures.get().count(feature)) return false;
+        if (!store.config.systemFeatures.get().count(feature)) return false;
     return true;
 }
 
@@ -85,7 +85,7 @@ static int main_build_remote(int argc, char * * argv)
            that gets cleared on reboot, but it wouldn't work on macOS. */
         auto currentLoadName = "/current-load";
         if (auto localStore = store.dynamic_pointer_cast<LocalFSStore>())
-            currentLoad = std::string { localStore->stateDir } + currentLoadName;
+            currentLoad = std::string { localStore->config.stateDir } + currentLoadName;
         else
             currentLoad = settings.nixStateDir + currentLoadName;
 
@@ -113,7 +113,7 @@ static int main_build_remote(int argc, char * * argv)
             auto amWilling = readInt(source);
             auto neededSystem = readString(source);
             drvPath = store->parseStorePath(readString(source));
-            auto requiredFeatures = readStrings<std::set<std::string>>(source);
+            auto requiredFeatures = readStrings<StringSet>(source);
 
             /* It would be possible to build locally after some builds clear out,
                so don't show the warning now: */

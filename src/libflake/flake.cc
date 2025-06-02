@@ -307,7 +307,7 @@ static FlakeRef applySelfAttrs(
 {
     auto newRef(ref);
 
-    std::set<std::string> allowedAttrs{"submodules", "lfs"};
+    StringSet allowedAttrs{"submodules", "lfs"};
 
     for (auto & attr : flake.selfAttrs) {
         if (!allowedAttrs.contains(attr.first))
@@ -821,16 +821,16 @@ LockedFlake lockFlake(
                             auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
                             auto outputLockFilePath = *sourcePath / relPath;
 
-                            bool lockFileExists = fs::symlink_exists(outputLockFilePath);
+                            bool lockFileExists = pathExists(outputLockFilePath);
 
                             auto s = chomp(diff);
                             if (lockFileExists) {
                                 if (s.empty())
-                                    warn("updating lock file '%s'", outputLockFilePath);
+                                    warn("updating lock file %s", outputLockFilePath);
                                 else
-                                    warn("updating lock file '%s':\n%s", outputLockFilePath, s);
+                                    warn("updating lock file %s:\n%s", outputLockFilePath, s);
                             } else
-                                warn("creating lock file '%s': \n%s", outputLockFilePath, s);
+                                warn("creating lock file %s: \n%s", outputLockFilePath, s);
 
                             std::optional<std::string> commitMessage = std::nullopt;
 

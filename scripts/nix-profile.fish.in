@@ -1,5 +1,5 @@
 # Only execute this file once per shell.
-if test -z "$HOME" || test -z "$USER" || \
+if test -z "$HOME" || \
     test -n "$__ETC_PROFILE_NIX_SOURCED"
     exit
 end
@@ -53,6 +53,13 @@ else if test -e "$NIX_LINK/etc/ssl/certs/ca-bundle.crt" # fall back to cacert in
     set --export NIX_SSL_CERT_FILE "$NIX_LINK/etc/ssl/certs/ca-bundle.crt"
 else if test -e "$NIX_LINK/etc/ca-bundle.crt" # old cacert in Nix profile
     set --export NIX_SSL_CERT_FILE "$NIX_LINK/etc/ca-bundle.crt"
+else
+    # Fall back to what is in the nix profiles, favouring whatever is defined last.
+    for i in (string split ' ' $NIX_PROFILES)
+        if test -e "$i/etc/ssl/certs/ca-bundle.crt"
+            set --export NIX_SSL_CERT_FILE "$i/etc/ssl/certs/ca-bundle.crt"
+        end
+    end
 end
 
 # Only use MANPATH if it is already set. In general `man` will just simply
@@ -62,6 +69,7 @@ if set --query MANPATH
     set --export --prepend --path MANPATH "$NIX_LINK/share/man"
 end
 
+add_path "@localstatedir@/nix/profiles/default/bin"
 add_path "$NIX_LINK/bin"
 
 # Cleanup

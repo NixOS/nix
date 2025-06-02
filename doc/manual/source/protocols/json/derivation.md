@@ -18,7 +18,7 @@ is a JSON object with the following fields:
 
 
   * `method`:
-    For an output which will be [content addresed], a string representing the [method](@docroot@/store/store-object/content-address.md) of content addressing that is chosen.
+    For an output which will be [content addressed], a string representing the [method](@docroot@/store/store-object/content-address.md) of content addressing that is chosen.
     Valid method strings are:
 
     - [`flat`](@docroot@/store/store-object/content-address.md#method-flat)
@@ -29,7 +29,7 @@ is a JSON object with the following fields:
     Otherwise, `null`.
 
   * `hashAlgo`:
-    For an output which will be [content addresed], the name of the hash algorithm used.
+    For an output which will be [content addressed], the name of the hash algorithm used.
     Valid algorithm strings are:
 
     - `blake3`

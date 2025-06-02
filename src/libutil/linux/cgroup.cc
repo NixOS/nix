@@ -65,7 +65,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
 
     /* Otherwise, manually kill every process in the subcgroups and
        this cgroup. */
-    for (auto & entry : std::filesystem::directory_iterator{cgroup}) {
+    for (auto & entry : DirectoryIterator{cgroup}) {
         checkInterrupt();
         if (entry.symlink_status().type() != std::filesystem::file_type::directory) continue;
         destroyCgroup(cgroup / entry.path().filename(), false);
@@ -134,7 +134,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
     }
 
     if (rmdir(cgroup.c_str()) == -1)
-        throw SysError("deleting cgroup '%s'", cgroup);
+        throw SysError("deleting cgroup %s", cgroup);
 
     return stats;
 }

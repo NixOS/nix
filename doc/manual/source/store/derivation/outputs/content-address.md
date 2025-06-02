@@ -23,7 +23,7 @@ The output spec for an output with a fixed content addresses additionally contai
 > **Design note**
 >
 > In principle, the output spec could also specify the references the store object should have, since the references and file system objects are equally parts of a content-addressed store object proper that contribute to its content-addressed.
-> However, at this time, the references are not not done because all fixed content-addressed outputs are required to have no references (including no self-reference).
+> However, at this time, the references are not done because all fixed content-addressed outputs are required to have no references (including no self-reference).
 >
 > Also in principle, rather than specifying the references and file system object data with separate hashes, a single hash that constraints both could be used.
 > This could be done with the final store path's digest, or better yet, the hash that will become the store path's digest before it is truncated.
@@ -110,18 +110,18 @@ Because the derivation output is not fixed (just like with [input addressing]), 
 >
 > Strictly speaking, the extent to which sandboxing and deprivilaging is possible varies with the environment Nix is running in.
 > Nix's configuration settings indicate what level of sandboxing is required or enabled.
-> Builds of derivations will fail if they request an absense of sandboxing which is not allowed.
-> Builds of derivations will also fail if the level of sandboxing specified in the configure exceeds what is possible in teh given environment.
+> Builds of derivations will fail if they request an absence of sandboxing which is not allowed.
+> Builds of derivations will also fail if the level of sandboxing specified in the configure exceeds what is possible in the given environment.
 >
-> (The "environment", in this case, consists of attributes such as the Operating System Nix runs atop, along with the operating-system-specific privilages that Nix has been granted.
-> Because of how conventional operating systems like macos, Linux, etc. work, granting builders *fewer* privilages may ironically require that Nix be run with *more* privilages.)
+> (The "environment", in this case, consists of attributes such as the Operating System Nix runs atop, along with the operating-system-specific privileges that Nix has been granted.
+> Because of how conventional operating systems like macos, Linux, etc. work, granting builders *fewer* privileges may ironically require that Nix be run with *more* privileges.)
 
-That said, derivations producing floating content-addressed outputs may declare their builders as impure (like the builders of derivations producing producing fixed outputs).
+That said, derivations producing floating content-addressed outputs may declare their builders as impure (like the builders of derivations producing fixed outputs).
 This is provisionally supported as part of the [`impure-derivations`][xp-feature-impure-derivations] experimental feature.
 
 ### Compatibility negotiation
 
-Any derivation producing a floating content-addresssed output implicitly requires the `ca-derivations` [system feature](@docroot@/command-ref/conf-file.md#conf-system-features).
+Any derivation producing a floating content-addressed output implicitly requires the `ca-derivations` [system feature](@docroot@/command-ref/conf-file.md#conf-system-features).
 This prevents scheduling the building of the derivation on a machine without the experimental feature enabled.
 Even once the experimental feature is stabilized, this is still useful in order to be allow using remote builder running odler versions of Nix, or alternative implementations that do not support floating content addressing.
 
@@ -132,7 +132,7 @@ For store objects produced by manually inserting into the store to create a stor
 But for store objects produced by derivation, the "method is quite formal" --- the whole point of derivations is to be a formal notion of building, after all.
 In this case, we can elevate this informal property to a formal one.
 
-A *determinstic* content-addressing derivation should produce outputs with the same content addresses:
+A *deterministic* content-addressing derivation should produce outputs with the same content addresses:
 
 1. Every time the builder is run
 
@@ -144,7 +144,7 @@ A *determinstic* content-addressing derivation should produce outputs with the s
   The choice of provisional store path can be thought of as an impurity, since it is an arbitrary choice.
 
   If provisional outputs paths are deterministically chosen, we are in the first branch of part (1).
-  The builder the data it produces based on it in arbitrary ways, but this gets us closer to to [input addressing].
+  The builder the data it produces based on it in arbitrary ways, but this gets us closer to [input addressing].
   Deterministically choosing the provisional path may be considered "complete sandboxing" by removing an impurity, but this is unsatisfactory
 
   <!--

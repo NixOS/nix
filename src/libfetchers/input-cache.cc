@@ -16,7 +16,7 @@ InputCache::getAccessor(ref<Store> store, const Input & originalInput, UseRegist
             auto [accessor, lockedInput] = originalInput.getAccessor(store);
             fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
         } else {
-            if (useRegistries != fetchers::UseRegistries::No) {
+            if (useRegistries != UseRegistries::No) {
                 auto [res, extraAttrs] = lookupInRegistries(store, originalInput, useRegistries);
                 resolvedInput = std::move(res);
                 fetched = lookup(resolvedInput);

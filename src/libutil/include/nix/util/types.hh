@@ -12,9 +12,21 @@
 namespace nix {
 
 typedef std::list<std::string> Strings;
-typedef std::set<std::string> StringSet;
 typedef std::map<std::string, std::string> StringMap;
 typedef std::map<std::string, std::string> StringPairs;
+
+/**
+ * Alias to ordered set container with transparent comparator.
+ *
+ * Used instead of std::set<std::string> to use C++14 N3657 [1]
+ * heterogenous lookup consistently across the whole codebase.
+ * Transparent comparators get rid of creation of unnecessary
+ * temporary variables when looking up keys by `std::string_view`
+ * or C-style `const char *` strings.
+ *
+ * [1]: https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3657.htm
+ */
+using StringSet = std::set<std::string, std::less<>>;
 
 /**
  * Paths are just strings.
@@ -22,7 +34,13 @@ typedef std::map<std::string, std::string> StringPairs;
 typedef std::string Path;
 typedef std::string_view PathView;
 typedef std::list<Path> Paths;
-typedef std::set<Path> PathSet;
+
+/**
+ * Alias to an ordered set of `Path`s. Uses transparent comparator.
+ *
+ * @see StringSet
+ */
+using PathSet = std::set<Path, std::less<>>;
 
 typedef std::vector<std::pair<std::string, std::string>> Headers;
 

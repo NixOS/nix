@@ -24,11 +24,11 @@
 namespace nix {
 
 /* TODO: Separate these store types into different files, give them better names */
-RemoteStore::RemoteStore(const Params & params)
-    : RemoteStoreConfig(params)
-    , Store(params)
+RemoteStore::RemoteStore(const Config & config)
+    : Store{config}
+    , config{config}
     , connections(make_ref<Pool<Connection>>(
-            std::max(1, (int) maxConnections),
+            std::max(1, config.maxConnections.get()),
             [this]() {
                 auto conn = openConnectionWrapper();
                 try {
@@ -44,7 +44,7 @@ RemoteStore::RemoteStore(const Params & params)
                     r->to.good()
                     && r->from.good()
                     && std::chrono::duration_cast<std::chrono::seconds>(
-                        std::chrono::steady_clock::now() - r->startTime).count() < maxConnectionAge;
+                        std::chrono::steady_clock::now() - r->startTime).count() < this->config.maxConnectionAge;
             }
             ))
 {
@@ -122,7 +122,7 @@ void RemoteStore::setOptions(Connection & conn)
        << settings.useSubstitutes;
 
     if (GET_PROTOCOL_MINOR(conn.protoVersion) >= 12) {
-        std::map<std::string, Config::SettingInfo> overrides;
+        std::map<std::string, nix::Config::SettingInfo> overrides;
         settings.getSettings(overrides, true); // libstore settings
         fileTransferSettings.getSettings(overrides, true);
         overrides.erase(settings.keepFailed.name);
