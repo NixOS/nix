@@ -75,6 +75,7 @@ Check the [contributing guide][contributing] if you want to get involved with de
 [flakehub]: https://flakehub.com
 [flakes]: https://zero-to-nix.com/concepts/flakes
 [gui]: https://install.determinate.systems/determinate-pkg/stable/Universal
+[installer]: https://github.com/DeterminateSystems/nix-installer
 [language]: https://zero-to-nix.com/concepts/nix-language
 [license]: ./COPYING
 [manual]: https://manual.determinate.systems
