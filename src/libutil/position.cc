@@ -2,19 +2,9 @@
 
 namespace nix {
 
-Pos::Pos(const Pos * other)
+Pos::operator std::shared_ptr<const Pos>() const
 {
-    if (!other) {
-        return;
-    }
-    line = other->line;
-    column = other->column;
-    origin = other->origin;
-}
-
-Pos::operator std::shared_ptr<Pos>() const
-{
-    return std::make_shared<Pos>(&*this);
+    return std::make_shared<const Pos>(*this);
 }
 
 std::optional<LinesOfCode> Pos::getCodeLines() const

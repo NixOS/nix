@@ -166,7 +166,7 @@ Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     logger.startActivity(id, lvl, type, s, fields, parent);
 }
 
-void to_json(nlohmann::json & json, std::shared_ptr<Pos> pos)
+void to_json(nlohmann::json & json, std::shared_ptr<const Pos> pos)
 {
     if (pos) {
         json["line"] = pos->line;
