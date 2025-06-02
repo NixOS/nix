@@ -52,7 +52,7 @@ std::string showVersions(const StringSet & versions)
     if (versions.empty()) return "∅";
     StringSet versions2;
     for (auto & version : versions)
-        versions2.insert(version.empty() ? "ε" : version);
+        versions2.insert(version.empty() ? "(no version)" : version);
     return concatStringsSep(", ", versions2);
 }
 

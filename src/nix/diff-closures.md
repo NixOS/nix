@@ -36,7 +36,7 @@ No size change is shown if it's below the threshold. If the package
 does not exist in either the *before* or *after* closures, it is
 represented using `∅` (empty set) on the appropriate side of the
 arrow. If a package has an empty version string, the version is
-rendered as `ε` (epsilon).
+rendered as `(no version)`.
 
 There may be multiple versions of a package in each closure. In that
 case, only the changed versions are shown. Thus,

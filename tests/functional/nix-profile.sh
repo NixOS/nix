@@ -59,7 +59,7 @@ nix profile list | grep -A4 'Name:.*flake1' | grep 'Locked flake URL:.*narHash'
 (! [ -e $TEST_HOME/.nix-profile/include ])
 nix profile history
 nix profile history | grep "packages.$system.default: ∅ -> 1.0"
-nix profile diff-closures | grep 'env-manifest.nix: ε → ∅'
+nix profile diff-closures | grep 'env-manifest.nix: (no version) → ∅'
 
 # Test XDG Base Directories support
 export NIX_CONFIG="use-xdg-base-directories = true"
