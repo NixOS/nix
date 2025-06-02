@@ -323,9 +323,21 @@ static int main_build_remote(int argc, char ** argv)
                 drv.inputSrcs = store->parseStorePathSet(inputs);
             optResult = sshStore->buildDerivation(*drvPath, (const BasicDerivation &) drv);
             auto & result = *optResult;
+<<<<<<< HEAD
             if (!result.success())
                 throw Error(
                     "build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
+=======
+            if (!result.success()) {
+                if (settings.keepFailed) {
+                    warn(
+                        "The failed build directory was kept on the remote builder due to `--keep-failed`. "
+                        "If the build's architecture matches your host, you can re-run the command with `--builders ''` to disable remote building for this invocation."
+                    );
+                }
+                throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
+            }
+>>>>>>> 071233991 (`--keep-failed` with remote builders will keep the failed build directory on that builder)
         } else {
             copyClosure(*store, *sshStore, StorePathSet{*drvPath}, NoRepair, NoCheckSigs, substitute);
             auto res = sshStore->buildPathsWithResults({DerivedPath::Built{
