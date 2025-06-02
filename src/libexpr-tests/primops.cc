@@ -301,6 +301,7 @@ namespace nix {
 
     TEST_F(PrimOpTest, elemtAtOutOfBounds) {
         ASSERT_THROW(eval("builtins.elemAt [0 1 2 3] 5"), Error);
+        ASSERT_THROW(eval("builtins.elemAt [0] 4294967296"), Error);
     }
 
     TEST_F(PrimOpTest, head) {
@@ -590,6 +591,16 @@ namespace nix {
     TEST_F(PrimOpTest, substringSmallerString){
         auto v = eval("builtins.substring 0 3 \"n\"");
         ASSERT_THAT(v, IsStringEq("n"));
+    }
+
+    TEST_F(PrimOpTest, substringHugeStart){
+        auto v = eval("builtins.substring 4294967296 5 \"nixos\"");
+        ASSERT_THAT(v, IsStringEq(""));
+    }
+
+    TEST_F(PrimOpTest, substringHugeLength){
+        auto v = eval("builtins.substring 0 4294967296 \"nixos\"");
+        ASSERT_THAT(v, IsStringEq("nixos"));
     }
 
     TEST_F(PrimOpTest, substringEmptyString){
