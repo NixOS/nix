@@ -49,7 +49,7 @@ GroupedPaths getClosureInfo(ref<Store> store, const StorePath & toplevel)
 
 std::string showVersions(const StringSet & versions)
 {
-    if (versions.empty()) return "∅";
+    if (versions.empty()) return "(absent)";
     StringSet versions2;
     for (auto & version : versions)
         versions2.insert(version.empty() ? "(no version)" : version);
