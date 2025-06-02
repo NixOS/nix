@@ -51,8 +51,8 @@ Today, a worldwide developer community contributes to Nix and the ecosystem that
 
 ## Reference
 
-You can find full reference documentation in the [Determinate Nix manual][manual].
-This resource is a work in progress.
+The primary documentation for Determinate and Determinate Nix is available at [docs.determinate.systems][determinate].
+For deeply technical reference material, see the [Determinate Nix manual][manual] which is based on the upstream Nix manual.
 
 ## License
 
