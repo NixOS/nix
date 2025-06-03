@@ -40,7 +40,6 @@ jobs:
         extra_nix_config: |
           sandbox = true
           max-jobs = 1
-    - uses: DeterminateSystems/magic-nix-cache-action@main
     # Since ubuntu 22.30, unprivileged usernamespaces are no longer allowed to map to the root user:
     # https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
     - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
@@ -134,7 +133,6 @@ jobs:
     - uses: cachix/install-nix-action@v31
       with:
         install_url: https://releases.nixos.org/nix/nix-2.20.3/install
-    - uses: DeterminateSystems/magic-nix-cache-action@main
     - run: echo NIX_VERSION="$(nix --experimental-features 'nix-command flakes' eval .\#nix.version | tr -d \")" >> $GITHUB_ENV
     - run: nix --experimental-features 'nix-command flakes' build .#dockerImage -L
     - run: docker load -i ./result/image.tar.gz
@@ -176,7 +174,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: |
           nix build -L \
             .#hydraJobs.tests.functional_user \
@@ -202,5 +199,4 @@ jobs:
           repository: NixOS/flake-regressions-data
           path: flake-regressions/tests
       - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=25 flake-regressions/eval-all.sh
