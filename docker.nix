@@ -155,7 +155,7 @@ let
 
   nixConfContents =
     (lib.concatStringsSep "\n" (
-      lib.mapAttrsFlatten (
+      lib.mapAttrsToList (
         n: v:
         let
           vStr = if builtins.isList v then lib.concatStringsSep " " v else v;
