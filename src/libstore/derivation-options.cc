@@ -211,8 +211,13 @@ DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAt
                     auto e = optionalValueAt(parsed->structuredAttrs, "exportReferencesGraph");
                     if (!e || !e->is_object())
                         return ret;
-                    for (auto & [key, storePathsJson] : getObject(*e)) {
-                        ret.insert_or_assign(key, storePathsJson);
+                    for (auto & [key, value] : getObject(*e)) {
+                        if (value.is_array())
+                            ret.insert_or_assign(key, value);
+                        else if (value.is_string())
+                            ret.insert_or_assign(key, StringSet{value});
+                        else
+                            throw Error("'exportReferencesGraph' value is not an array or a string");
                     }
                 } else {
                     auto s = getOr(env, "exportReferencesGraph", "");

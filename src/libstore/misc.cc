@@ -225,6 +225,8 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
             auto parsedDrv = StructuredAttrs::tryParse(drv->env);
             DerivationOptions drvOptions;
             try {
+                // FIXME: this is a lot of work just to get the value
+                // of `allowSubstitutes`.
                 drvOptions = DerivationOptions::fromStructuredAttrs(
                     drv->env,
                     parsedDrv ? &*parsedDrv : nullptr);

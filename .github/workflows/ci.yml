@@ -20,9 +20,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: DeterminateSystems/nix-installer-action@main
-        with:
-          determinate: true
+      - uses: DeterminateSystems/determinate-nix-action@main
       - run: nix flake show --all-systems --json
 
   build_x86_64-linux:
@@ -57,9 +55,7 @@ jobs:
     runs-on: blacksmith-32vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-        with:
-          determinate: true
+      - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: |
           nix build -L \
@@ -75,9 +71,7 @@ jobs:
     runs-on: blacksmith-32vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-        with:
-          determinate: true
+      - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: |
           nix build -L --keep-going \
@@ -113,9 +107,7 @@ jobs:
         with:
           repository: DeterminateSystems/flake-regressions-data
           path: flake-regressions/tests
-      - uses: DeterminateSystems/nix-installer-action@main
-        with:
-          determinate: true
+      - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 50%" flake-regressions/eval-all.sh
 
@@ -144,9 +136,7 @@ jobs:
         with:
           repository: DeterminateSystems/flake-regressions-data
           path: flake-regressions/tests
-      - uses: DeterminateSystems/nix-installer-action@main
-        with:
-          determinate: true
+      - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 50%" NIX_CONFIG="lazy-trees = true" flake-regressions/eval-all.sh
 
@@ -163,9 +153,7 @@ jobs:
     steps:
       - name: Checkout nix
         uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-        with:
-          determinate: true
+      - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
       - name: Build manual
         run: nix build .#hydraJobs.manual

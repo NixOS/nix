@@ -185,6 +185,7 @@ struct Value
 {
 private:
     std::atomic<InternalType> internalType{tUninitialized};
+    uint32_t pos{0};
 
     friend std::string showType(const Value & v);
     friend class EvalState;
@@ -339,10 +340,11 @@ public:
      * Finish a pending thunk, waking up any threads that are waiting
      * on it.
      */
-    inline void finishValue(InternalType newType, Payload newPayload)
+    inline void finishValue(InternalType newType, Payload newPayload, uint32_t newPos = 0)
     {
         debug("FINISH %x %d %d", this, internalType, newType);
         payload = newPayload;
+        pos = newPos;
 
         auto oldType = internalType.exchange(newType, std::memory_order_release);
 
@@ -434,9 +436,9 @@ public:
     void mkPath(const SourcePath & path);
     void mkPath(std::string_view path);
 
-    inline void mkPath(SourceAccessor * accessor, const char * path)
+    inline void mkPath(SourceAccessor * accessor, const char * path, uint32_t pos)
     {
-        finishValue(tPath, { .path = { .accessor = accessor, .path = path } });
+        finishValue(tPath, { .path = { .accessor = accessor, .path = path } }, pos);
     }
 
     inline void mkNull()
@@ -583,6 +585,9 @@ public:
 
     NixFloat fpoint() const
     { return payload.fpoint; }
+
+    inline uint32_t getPos() const
+    { return pos; }
 };
 
 

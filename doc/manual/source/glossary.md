@@ -343,14 +343,6 @@
 
   See [Nix Archive](store/file-system-object/content-address.html#serial-nix-archive) for details.
 
-- [`∅`]{#gloss-empty-set}
-
-  The empty set symbol. In the context of profile history, this denotes a package is not present in a particular version of the profile.
-
-- [`ε`]{#gloss-epsilon}
-
-  The epsilon symbol. In the context of a package, this means the version is empty. More precisely, the derivation does not have a version attribute.
-
 - [package]{#package}
 
   A software package; files that belong together for a particular purpose, and metadata.

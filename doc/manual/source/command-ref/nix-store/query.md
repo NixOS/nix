@@ -103,6 +103,13 @@ symlink.
   example when *paths* were substituted from a binary cache.
   Use `--valid-derivers` instead to obtain valid paths only.
 
+  > **Note**
+  >
+  > `nix-store --query --deriver` is replaced with the following `nix` command:
+  >
+  >    nix path-info --json ... | jq -r '.[].deriver'
+
+
   [deriver]: @docroot@/glossary.md#gloss-deriver
 
 - `--valid-derivers`

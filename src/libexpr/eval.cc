@@ -150,6 +150,8 @@ PosIdx Value::determinePos(const PosIdx pos) const
     // Allow selecting a subset of enum values
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wswitch-enum"
+    if (this->pos != 0)
+        return PosIdx(this->pos);
     switch (internalType) {
         case tAttrs: return attrs()->pos;
         case tLambda: return payload.lambda.fun->pos;
@@ -906,7 +908,7 @@ void Value::mkStringMove(const char * s, const NixStringContext & context)
 
 void Value::mkPath(const SourcePath & path)
 {
-    mkPath(&*path.accessor, makeImmutableString(path.path.abs()));
+    mkPath(&*path.accessor, makeImmutableString(path.path.abs()), noPos.get());
 }
 
 
@@ -2397,7 +2399,7 @@ BackedStringView EvalState::coerceToString(
               // slash, as in /foo/${x}.
               v.payload.path.path
             : copyToStore
-            ? store->printStorePath(copyPathToStore(context, v.path()))
+            ? store->printStorePath(copyPathToStore(context, v.path(), v.determinePos(pos)))
             : ({
                 auto path = v.path();
                 if (path.accessor == rootFS && store->isInStore(path.path.abs())) {
@@ -2475,7 +2477,7 @@ BackedStringView EvalState::coerceToString(
 }
 
 
-StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePath & path)
+StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePath & path, PosIdx pos)
 {
     if (nix::isDerivation(path.path.abs()))
         error<EvalError>("file names are not allowed to end in '%1%'", drvExtension).debugThrow();
@@ -2489,7 +2491,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
                 *store,
                 path.resolveSymlinks(SymlinkResolution::Ancestors),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
-                computeBaseName(path),
+                computeBaseName(path, pos),
                 ContentAddressMethod::Raw::NixArchive,
                 nullptr,
                 repair);

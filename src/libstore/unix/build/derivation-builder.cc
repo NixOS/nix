@@ -862,17 +862,22 @@ void DerivationBuilderImpl::startBuilder()
 
     /* Right platform? */
     if (!drvOptions.canBuildLocally(store, drv)) {
+        auto msg = fmt(
+            "Cannot build '%s'.\n"
+            "Reason: " ANSI_RED "required system or feature not available" ANSI_NORMAL "\n"
+            "Required system: '%s' with features {%s}\n"
+            "Current system: '%s' with features {%s}",
+            Magenta(store.printStorePath(drvPath)),
+            Magenta(drv.platform),
+            concatStringsSep(", ", drvOptions.getRequiredSystemFeatures(drv)),
+            Magenta(settings.thisSystem),
+            concatStringsSep<StringSet>(", ", store.config.systemFeatures));
+
         // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware - we should tell them to run the command to install Darwin 2
-        if (drv.platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin") {
-            throw Error("run `/usr/sbin/softwareupdate --install-rosetta` to enable your %s to run programs for %s", settings.thisSystem, drv.platform);
-        } else {
-            throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
-                drv.platform,
-                concatStringsSep(", ", drvOptions.getRequiredSystemFeatures(drv)),
-                store.printStorePath(drvPath),
-                settings.thisSystem,
-                concatStringsSep<StringSet>(", ", store.config.systemFeatures));
-        }
+        if (drv.platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin")
+          msg += fmt("\nNote: run `%s` to run programs for x86_64-darwin", Magenta("/usr/sbin/softwareupdate --install-rosetta"));
+
+        throw BuildError(msg);
     }
 
     /* Create a temporary directory where the build will take

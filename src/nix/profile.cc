@@ -289,12 +289,12 @@ struct ProfileManifest
 
         while (i != prev.elements.end() || j != cur.elements.end()) {
             if (j != cur.elements.end() && (i == prev.elements.end() || i->first > j->first)) {
-                logger->cout("%s%s: ∅ -> %s", indent, j->second.identifier(), j->second.versions());
+                logger->cout("%s%s: %s added", indent, j->second.identifier(), j->second.versions());
                 changes = true;
                 ++j;
             }
             else if (i != prev.elements.end() && (j == cur.elements.end() || i->first < j->first)) {
-                logger->cout("%s%s: %s -> ∅", indent, i->second.identifier(), i->second.versions());
+                logger->cout("%s%s: %s removed", indent, i->second.identifier(), i->second.versions());
                 changes = true;
                 ++i;
             }

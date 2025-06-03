@@ -63,6 +63,7 @@ scope: {
         "--with-coroutine"
         "--with-iostreams"
       ];
+      enableIcu = false;
     }).overrideAttrs
       (old: {
         # Need to remove `--with-*` to use `--with-libraries=...`

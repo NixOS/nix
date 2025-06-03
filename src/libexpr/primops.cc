@@ -97,11 +97,19 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
 
     if (drvs.empty()) return {};
 
-    if (isIFD && !settings.enableImportFromDerivation)
-        error<IFDError>(
-            "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
-            drvs.begin()->to_string(*store)
-        ).debugThrow();
+    if (isIFD) {
+        if (!settings.enableImportFromDerivation)
+            error<IFDError>(
+                "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
+                drvs.begin()->to_string(*store)
+            ).debugThrow();
+
+        if (settings.traceImportFromDerivation)
+            warn(
+                "built '%1%' during evaluation due to an import from derivation",
+                drvs.begin()->to_string(*store)
+            );
+    }
 
     /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
@@ -2614,7 +2622,7 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
         "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterSource");
 
-    addPath(state, pos, state.computeBaseName(path), path, args[0], ContentAddressMethod::Raw::NixArchive, std::nullopt, v, context);
+    addPath(state, pos, state.computeBaseName(path, pos), path, args[0], ContentAddressMethod::Raw::NixArchive, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({
