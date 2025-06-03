@@ -331,8 +331,10 @@ static int main_build_remote(int argc, char ** argv)
             if (!result.success()) {
                 if (settings.keepFailed) {
                     warn(
-                        "The failed build directory was kept on the remote builder due to `--keep-failed`. "
-                        "If the build's architecture matches your host, you can re-run the command with `--builders ''` to disable remote building for this invocation."
+                        "The failed build directory was kept on the remote builder due to `--keep-failed`.%s",
+                        (settings.thisSystem == drv.platform || settings.extraPlatforms.get().count(drv.platform) > 0)
+                            ? " You can re-run the command with `--builders ''` to disable remote building for this invocation."
+                            : ""
                     );
                 }
                 throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
