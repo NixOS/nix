@@ -655,28 +655,40 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, 
 
 struct GitSourceAccessor : SourceAccessor
 {
-    ref<GitRepoImpl> repo;
-    Object root;
-    std::optional<lfs::Fetch> lfsFetch = std::nullopt;
+    struct State
+    {
+        ref<GitRepoImpl> repo;
+        Object root;
+        std::optional<lfs::Fetch> lfsFetch = std::nullopt;
+    };
+
+    Sync<State> state_;
 
     GitSourceAccessor(ref<GitRepoImpl> repo_, const Hash & rev, bool smudgeLfs)
-        : repo(repo_)
-        , root(peelToTreeOrBlob(lookupObject(*repo, hashToOID(rev)).get()))
+        : state_{
+                State {
+                    .repo = repo_,
+                    .root = peelToTreeOrBlob(lookupObject(*repo_, hashToOID(rev)).get()),
+                    .lfsFetch = smudgeLfs ? std::make_optional(lfs::Fetch(*repo_, hashToOID(rev))) : std::nullopt,
+                }
+            }
     {
-        if (smudgeLfs)
-            lfsFetch = std::make_optional(lfs::Fetch(*repo, hashToOID(rev)));
     }
 
     std::string readBlob(const CanonPath & path, bool symlink)
     {
-        const auto blob = getBlob(path, symlink);
+        auto state(state_.lock());
 
-        if (lfsFetch) {
-            if (lfsFetch->shouldFetch(path)) {
+        const auto blob = getBlob(*state, path, symlink);
+
+        if (state->lfsFetch) {
+            if (state->lfsFetch->shouldFetch(path)) {
                 StringSink s;
                 try {
+                    // FIXME: do we need to hold the state lock while
+                    // doing this?
                     auto contents = std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
-                    lfsFetch->fetch(contents, path, s, [&s](uint64_t size){ s.s.reserve(size); });
+                    state->lfsFetch->fetch(contents, path, s, [&s](uint64_t size){ s.s.reserve(size); });
                 } catch (Error & e) {
                     e.addTrace({}, "while smudging git-lfs file '%s'", path);
                     throw;
@@ -695,15 +707,18 @@ struct GitSourceAccessor : SourceAccessor
 
     bool pathExists(const CanonPath & path) override
     {
-        return path.isRoot() ? true : (bool) lookup(path);
+        auto state(state_.lock());
+        return path.isRoot() ? true : (bool) lookup(*state, path);
     }
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
-        if (path.isRoot())
-            return Stat { .type = git_object_type(root.get()) == GIT_OBJECT_TREE ? tDirectory : tRegular };
+        auto state(state_.lock());
 
-        auto entry = lookup(path);
+        if (path.isRoot())
+            return Stat { .type = git_object_type(state->root.get()) == GIT_OBJECT_TREE ? tDirectory : tRegular };
+
+        auto entry = lookup(*state, path);
         if (!entry)
             return std::nullopt;
 
@@ -731,6 +746,8 @@ struct GitSourceAccessor : SourceAccessor
 
     DirEntries readDirectory(const CanonPath & path) override
     {
+        auto state(state_.lock());
+
         return std::visit(overloaded {
             [&](Tree tree) {
                 DirEntries res;
@@ -748,7 +765,7 @@ struct GitSourceAccessor : SourceAccessor
             [&](Submodule) {
                 return DirEntries();
             }
-        }, getTree(path));
+        }, getTree(*state, path));
     }
 
     std::string readLink(const CanonPath & path) override
@@ -762,7 +779,9 @@ struct GitSourceAccessor : SourceAccessor
      */
     std::optional<Hash> getSubmoduleRev(const CanonPath & path)
     {
-        auto entry = lookup(path);
+        auto state(state_.lock());
+
+        auto entry = lookup(*state, path);
 
         if (!entry || git_tree_entry_type(entry) != GIT_OBJECT_COMMIT)
             return std::nullopt;
@@ -773,7 +792,7 @@ struct GitSourceAccessor : SourceAccessor
     std::unordered_map<CanonPath, TreeEntry> lookupCache;
 
     /* Recursively look up 'path' relative to the root. */
-    git_tree_entry * lookup(const CanonPath & path)
+    git_tree_entry * lookup(State & state, const CanonPath & path)
     {
         auto i = lookupCache.find(path);
         if (i != lookupCache.end()) return i->second.get();
@@ -783,7 +802,7 @@ struct GitSourceAccessor : SourceAccessor
 
         auto name = path.baseName().value();
 
-        auto parentTree = lookupTree(*parent);
+        auto parentTree = lookupTree(state, *parent);
         if (!parentTree) return nullptr;
 
         auto count = git_tree_entrycount(parentTree->get());
@@ -812,29 +831,29 @@ struct GitSourceAccessor : SourceAccessor
         return res;
     }
 
-    std::optional<Tree> lookupTree(const CanonPath & path)
+    std::optional<Tree> lookupTree(State & state, const CanonPath & path)
     {
         if (path.isRoot()) {
-            if (git_object_type(root.get()) == GIT_OBJECT_TREE)
-                return dupObject<Tree>((git_tree *) &*root);
+            if (git_object_type(state.root.get()) == GIT_OBJECT_TREE)
+                return dupObject<Tree>((git_tree *) &*state.root);
             else
                 return std::nullopt;
         }
 
-        auto entry = lookup(path);
+        auto entry = lookup(state, path);
         if (!entry || git_tree_entry_type(entry) != GIT_OBJECT_TREE)
             return std::nullopt;
 
         Tree tree;
-        if (git_tree_entry_to_object((git_object * *) (git_tree * *) Setter(tree), *repo, entry))
+        if (git_tree_entry_to_object((git_object * *) (git_tree * *) Setter(tree), *state.repo, entry))
             throw Error("looking up directory '%s': %s", showPath(path), git_error_last()->message);
 
         return tree;
     }
 
-    git_tree_entry * need(const CanonPath & path)
+    git_tree_entry * need(State & state, const CanonPath & path)
     {
-        auto entry = lookup(path);
+        auto entry = lookup(state, path);
         if (!entry)
             throw Error("'%s' does not exist", showPath(path));
         return entry;
@@ -842,16 +861,16 @@ struct GitSourceAccessor : SourceAccessor
 
     struct Submodule { };
 
-    std::variant<Tree, Submodule> getTree(const CanonPath & path)
+    std::variant<Tree, Submodule> getTree(State & state, const CanonPath & path)
     {
         if (path.isRoot()) {
-            if (git_object_type(root.get()) == GIT_OBJECT_TREE)
-                return dupObject<Tree>((git_tree *) &*root);
+            if (git_object_type(state.root.get()) == GIT_OBJECT_TREE)
+                return dupObject<Tree>((git_tree *) &*state.root);
             else
-                throw Error("Git root object '%s' is not a directory", *git_object_id(root.get()));
+                throw Error("Git root object '%s' is not a directory", *git_object_id(state.root.get()));
         }
 
-        auto entry = need(path);
+        auto entry = need(state, path);
 
         if (git_tree_entry_type(entry) == GIT_OBJECT_COMMIT)
             return Submodule();
@@ -860,16 +879,16 @@ struct GitSourceAccessor : SourceAccessor
             throw Error("'%s' is not a directory", showPath(path));
 
         Tree tree;
-        if (git_tree_entry_to_object((git_object * *) (git_tree * *) Setter(tree), *repo, entry))
+        if (git_tree_entry_to_object((git_object * *) (git_tree * *) Setter(tree), *state.repo, entry))
             throw Error("looking up directory '%s': %s", showPath(path), git_error_last()->message);
 
         return tree;
     }
 
-    Blob getBlob(const CanonPath & path, bool expectSymlink)
+    Blob getBlob(State & state, const CanonPath & path, bool expectSymlink)
     {
-        if (!expectSymlink && git_object_type(root.get()) == GIT_OBJECT_BLOB)
-            return dupObject<Blob>((git_blob *) &*root);
+        if (!expectSymlink && git_object_type(state.root.get()) == GIT_OBJECT_BLOB)
+            return dupObject<Blob>((git_blob *) &*state.root);
 
         auto notExpected = [&]()
         {
@@ -882,7 +901,7 @@ struct GitSourceAccessor : SourceAccessor
 
         if (path.isRoot()) notExpected();
 
-        auto entry = need(path);
+        auto entry = need(state, path);
 
         if (git_tree_entry_type(entry) != GIT_OBJECT_BLOB)
             notExpected();
@@ -897,7 +916,7 @@ struct GitSourceAccessor : SourceAccessor
         }
 
         Blob blob;
-        if (git_tree_entry_to_object((git_object * *) (git_blob * *) Setter(blob), *repo, entry))
+        if (git_tree_entry_to_object((git_object * *) (git_blob * *) Setter(blob), *state.repo, entry))
             throw Error("looking up file '%s': %s", showPath(path), git_error_last()->message);
 
         return blob;
