@@ -381,7 +381,7 @@ struct CmdFlakeCheck : FlakeCommand
         auto flake = lockFlake();
         auto localSystem = std::string(settings.thisSystem.get());
 
-        bool hasErrors = false;
+        std::atomic_bool hasErrors = false;
         auto reportError = [&](const Error & e) {
             try {
                 throw e;
@@ -397,7 +397,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        StringSet omittedSystems;
+        Sync<StringSet> omittedSystems;
 
         // FIXME: rewrite to use EvalCache.
 
@@ -421,7 +421,7 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkSystemType = [&](std::string_view system, const PosIdx pos) {
             if (!checkAllSystems && system != localSystem) {
-                omittedSystems.insert(std::string(system));
+                omittedSystems.lock()->insert(std::string(system));
                 return false;
             } else {
                 return true;
@@ -453,6 +453,9 @@ struct CmdFlakeCheck : FlakeCommand
         };
 
         std::vector<DerivedPath> drvPaths;
+
+        Executor executor(state->settings);
+        FutureVector futures(executor);
 
         auto checkApp = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
@@ -525,9 +528,9 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        std::function<void(std::string_view attrPath, Value & v, const PosIdx pos)> checkHydraJobs;
+        std::function<void(const std::string & attrPath, Value & v, const PosIdx pos)> checkHydraJobs;
 
-        checkHydraJobs = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
+        checkHydraJobs = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
                 Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking Hydra job '%s'", attrPath));
@@ -536,7 +539,7 @@ struct CmdFlakeCheck : FlakeCommand
                 if (state->isDerivation(v))
                     throw Error("jobset should not be a derivation at top-level");
 
-                for (auto & attr : *v.attrs()) {
+                for (auto & attr : *v.attrs()) futures.spawn(1, [&, attrPath]() {
                     state->forceAttrs(*attr.value, attr.pos, "");
                     auto attrPath2 = concatStrings(attrPath, ".", state->symbols[attr.name]);
                     if (state->isDerivation(*attr.value)) {
@@ -545,7 +548,7 @@ struct CmdFlakeCheck : FlakeCommand
                         checkDerivation(attrPath2, *attr.value, attr.pos);
                     } else
                         checkHydraJobs(attrPath2, *attr.value, attr.pos);
-                }
+                });
 
             } catch (Error & e) {
                 e.addTrace(resolve(pos), HintFmt("while checking the Hydra jobset '%s'", attrPath));
@@ -616,6 +619,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
+        auto checkFlake = [&]()
         {
             Activity act(*logger, lvlInfo, actUnknown, "evaluating flake");
 
@@ -624,7 +628,7 @@ struct CmdFlakeCheck : FlakeCommand
 
             enumerateOutputs(*state,
                 *vFlake,
-                [&](std::string_view name, Value & vOutput, const PosIdx pos) {
+                [&](std::string_view name, Value & vOutput, const PosIdx pos) { futures.spawn(2, [&, name, pos]() {
                     Activity act(*logger, lvlInfo, actUnknown,
                         fmt("checking flake output '%s'", name));
 
@@ -647,7 +651,7 @@ struct CmdFlakeCheck : FlakeCommand
 
                         if (name == "checks") {
                             state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs()) {
+                            for (auto & attr : *vOutput.attrs()) futures.spawn(3, [&, name]() {
                                 const auto & attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
                                 if (checkSystemType(attr_name, attr.pos)) {
@@ -665,7 +669,7 @@ struct CmdFlakeCheck : FlakeCommand
                                         }
                                     }
                                 }
-                            }
+                            });
                         }
 
                         else if (name == "formatter") {
@@ -683,7 +687,7 @@ struct CmdFlakeCheck : FlakeCommand
 
                         else if (name == "packages" || name == "devShells") {
                             state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs()) {
+                            for (auto & attr : *vOutput.attrs()) futures.spawn(3, [&, name]() {
                                 const auto & attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
                                 if (checkSystemType(attr_name, attr.pos)) {
@@ -693,7 +697,7 @@ struct CmdFlakeCheck : FlakeCommand
                                             fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
                                             *attr2.value, attr2.pos);
                                 };
-                            }
+                            });
                         }
 
                         else if (name == "apps") {
@@ -774,7 +778,7 @@ struct CmdFlakeCheck : FlakeCommand
                         }
 
                         else if (name == "hydraJobs")
-                            checkHydraJobs(name, vOutput, pos);
+                            checkHydraJobs(std::string(name), vOutput, pos);
 
                         else if (name == "defaultTemplate")
                             checkTemplate(name, vOutput, pos);
@@ -837,10 +841,14 @@ struct CmdFlakeCheck : FlakeCommand
                         e.addTrace(resolve(pos), HintFmt("while checking flake output '%s'", name));
                         reportError(e);
                     }
-                });
-        }
+                }); });
+        };
+
+        futures.spawn(1, checkFlake);
+        futures.finishAll();
 
         if (build && !drvPaths.empty()) {
+            // FIXME: should start building while evaluating.
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("running %d flake checks", drvPaths.size()));
             store->buildPaths(drvPaths);
@@ -848,12 +856,12 @@ struct CmdFlakeCheck : FlakeCommand
         if (hasErrors)
             throw Error("some errors were encountered during the evaluation");
 
-        if (!omittedSystems.empty()) {
+        if (!omittedSystems.lock()->empty()) {
             // TODO: empty system is not visible; render all as nix strings?
             warn(
                 "The check omitted these incompatible systems: %s\n"
                 "Use '--all-systems' to check all.",
-                concatStringsSep(", ", omittedSystems)
+                concatStringsSep(", ", *omittedSystems.lock())
             );
         };
     };
@@ -1204,7 +1212,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         const auto & attrName = state->symbols[attr];
                         auto visitor2 = visitor.getAttr(attrName);
                         auto & j2 = *j.emplace(attrName, nlohmann::json::object()).first;
-                        futures.spawn({{[&, visitor2]() { visit(*visitor2, j2); }, 1}});
+                        futures.spawn(1, [&, visitor2]() { visit(*visitor2, j2); });
                     }
                 };
 
@@ -1352,7 +1360,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             }
         };
 
-        futures.spawn({{[&]() { visit(*cache->getRoot(), j); }, 1}});
+        futures.spawn(1, [&]() { visit(*cache->getRoot(), j); });
         futures.finishAll();
 
         if (json)

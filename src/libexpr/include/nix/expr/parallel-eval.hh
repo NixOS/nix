@@ -142,6 +142,11 @@ struct FutureVector
             state->futures.push_back(std::move(future));
     }
 
+    void spawn(uint8_t prioPrefix, Executor::work_t && work)
+    {
+        spawn({{std::move(work), prioPrefix}});
+    }
+
     void finishAll()
     {
         while (true) {
