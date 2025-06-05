@@ -57,7 +57,8 @@ std::optional<DerivedPathWithInfo> InstallableValue::trySinglePathToDerivedPaths
     else if (v.type() == nString) {
         return {{
             .path = DerivedPath::fromSingle(
-                state->coerceToSingleDerivedPath(pos, v, errorCtx)),
+                state->devirtualize(
+                    state->coerceToSingleDerivedPath(pos, v, errorCtx))),
             .info = make_ref<ExtraPathInfo>(),
         }};
     }

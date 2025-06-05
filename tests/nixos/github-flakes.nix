@@ -205,7 +205,7 @@ in
       cat_log()
 
       # ... otherwise it should use the API
-      out = client.succeed("nix flake metadata private-flake --json --access-tokens github.com=ghp_000000000000000000000000000000000000 --tarball-ttl 0")
+      out = client.succeed("nix flake metadata private-flake --json --access-tokens github.com=ghp_000000000000000000000000000000000000 --tarball-ttl 0 --no-trust-tarballs-from-git-forges")
       print(out)
       info = json.loads(out)
       assert info["revision"] == "${private-flake-rev}", f"revision mismatch: {info['revision']} != ${private-flake-rev}"
@@ -223,6 +223,10 @@ in
       # Test fetchTree on a github URL.
       hash = client.succeed(f"nix eval --no-trust-tarballs-from-git-forges --raw --expr '(fetchTree {info['url']}).narHash'")
       assert hash == info['locked']['narHash']
+
+      # Fetching with an incorrect NAR hash should fail.
+      out = client.fail(f"nix eval --no-trust-tarballs-from-git-forges --raw --expr '(fetchTree \"github:fancy-enterprise/private-flake/{info['revision']}?narHash=sha256-HsrRFZYg69qaVe/wDyWBYLeS6ca7ACEJg2Z%2BGpEFw4A%3D\").narHash' 2>&1")
+      assert "NAR hash mismatch in input" in out, "NAR hash check did not fail with the expected error"
 
       # Fetching without a narHash should succeed if trust-github is set and fail otherwise.
       client.succeed(f"nix eval --raw --expr 'builtins.fetchTree github:github:fancy-enterprise/private-flake/{info['revision']}'")

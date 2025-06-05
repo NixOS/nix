@@ -10,4 +10,4 @@ error:
 
        … while calling the 'hashFile' builtin
 
-       error: opening file '/pwd/lang/this-file-is-definitely-not-there-7392097': No such file or directory
+       error: path '/pwd/lang/this-file-is-definitely-not-there-7392097' does not exist
