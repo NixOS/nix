@@ -22,7 +22,7 @@ struct RemoteStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<int> maxConnections{this, 1, "max-connections",
+    const Setting<int> maxConnections{this, 64, "max-connections",
         "Maximum number of concurrent connections to the Nix daemon."};
 
     const Setting<unsigned int> maxConnectionAge{this,
