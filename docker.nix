@@ -173,7 +173,12 @@ let
       channel = pkgs.runCommand "channel-nixos" { inherit bundleNixpkgs; } ''
         mkdir $out
         if [ "$bundleNixpkgs" ]; then
-          ln -s ${nixpkgs} $out/nixpkgs
+          ln -s ${
+            builtins.path {
+              path = nixpkgs;
+              name = "source";
+            }
+          } $out/nixpkgs
           echo "[]" > $out/manifest.nix
         fi
       '';
