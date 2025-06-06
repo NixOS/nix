@@ -165,12 +165,7 @@ let
           echo "[]" > $out/manifest.nix
         fi
       '';
-      rootEnv = pkgs.buildPackages.buildEnv {
-        name = "root-profile-env";
-        paths = defaultPkgs;
-      };
       # doc/manual/source/command-ref/files/manifest.nix.md
-      # may get replaced by pkgs.buildEnv once manifest.json can get written
       manifest = pkgs.buildPackages.runCommand "manifest.nix" { } ''
         cat > $out <<EOF
         [
@@ -200,11 +195,15 @@ let
         ]
         EOF
       '';
-      profile = pkgs.buildPackages.runCommand "user-environment" { } ''
-        mkdir $out
-        cp -a ${rootEnv}/* $out/
-        ln -s ${manifest} $out/manifest.nix
-      '';
+      profile = pkgs.buildPackages.buildEnv {
+        name = "root-profile-env";
+        paths = defaultPkgs;
+
+        postBuild = ''
+          mv $out/manifest $out/manifest.nix
+        '';
+        inherit manifest;
+      };
       flake-registry-path =
         if (flake-registry == null) then
           null
