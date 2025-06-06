@@ -3055,6 +3055,8 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path)
 Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv)
 {
     auto buffer = path.resolveSymlinks().readFile();
+
+    if (buffer.size() == 0) throw Error("cannot import empty file '%s'", path);
     // readFile hopefully have left some extra space for terminators
     buffer.append("\0\0", 2);
     return parse(buffer.data(), buffer.size(), Pos::Origin(path), path.parent(), staticEnv);
