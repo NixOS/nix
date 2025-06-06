@@ -839,6 +839,8 @@ void NixRepl::evalString(std::string s, Value & v)
             // For parse errors on incomplete input, we continue waiting for the next line of
             // input without clearing the input so far.
             throw IncompleteReplExpr(e.msg());
+        else
+            throw;
     }
     e->eval(*state, *env, v);
     state->forceValue(v, v.determinePos(noPos));
