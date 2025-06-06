@@ -305,7 +305,7 @@ struct SubstitutedSourceAccessor : ForwardingSourceAccessor
 
     std::string showPath(const CanonPath & path) override
     {
-        return displayPrefix + path.abs() + displaySuffix;;
+        return displayPrefix + path.abs() + displaySuffix;
     }
 };
 
