@@ -165,6 +165,8 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
     return out;
 }
 
+MakeError(IncompleteReplExpr, ParseError);
+
 static bool isFirstRepl = true;
 
 ReplExitStatus NixRepl::mainLoop()
@@ -213,6 +215,7 @@ ReplExitStatus NixRepl::mainLoop()
             default:
                 unreachable();
             }
+<<<<<<< HEAD
         } catch (ParseError & e) {
             if (e.msg().find("unexpected end of file") != std::string::npos) {
                 // For parse errors on incomplete input, we continue waiting for the next line of
@@ -223,6 +226,10 @@ ReplExitStatus NixRepl::mainLoop()
             }
         } catch (EvalError & e) {
             printMsg(lvlError, e.msg());
+=======
+        } catch (IncompleteReplExpr &) {
+            continue;
+>>>>>>> d8b067b54 (repl: Don't wait on incomplete parses from imported file)
         } catch (Error & e) {
             printMsg(lvlError, e.msg());
         } catch (Interrupted & e) {
@@ -841,7 +848,15 @@ Expr * NixRepl::parseString(std::string s)
 
 void NixRepl::evalString(std::string s, Value & v)
 {
-    Expr * e = parseString(s);
+    Expr * e;
+    try {
+        e = parseString(s);
+    } catch (ParseError & e) {
+        if (e.msg().find("unexpected end of file") != std::string::npos)
+            // For parse errors on incomplete input, we continue waiting for the next line of
+            // input without clearing the input so far.
+            throw IncompleteReplExpr(e.msg());
+    }
     e->eval(*state, *env, v);
     state->forceValue(v, v.determinePos(noPos));
 }
