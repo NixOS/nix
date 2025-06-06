@@ -8,7 +8,7 @@
 
   # dev tooling
   inputs.flake-parts.url = "https://flakehub.com/f/hercules-ci/flake-parts/0.1";
-  inputs.git-hooks-nix.url = "https://flakehub.com/f/cachix/git-hooks.nix/0.1";
+  inputs.git-hooks-nix.url = "https://flakehub.com/f/cachix/git-hooks.nix/0.1.941";
   # work around https://github.com/NixOS/nix/issues/7730
   inputs.flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
   inputs.git-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";

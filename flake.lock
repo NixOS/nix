@@ -53,7 +53,7 @@
       },
       "original": {
         "type": "tarball",
-        "url": "https://flakehub.com/f/cachix/git-hooks.nix/0.1"
+        "url": "https://flakehub.com/f/cachix/git-hooks.nix/0.1.941"
       }
     },
     "nixpkgs": {
