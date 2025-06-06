@@ -36,6 +36,7 @@ expectStderr 1 nix flake lock "$flake2Dir" --override-input flake1 "$TEST_ROOT/f
   grepQuiet "Will not write lock file.*because it has an unlocked input"
 
 nix flake lock "$flake2Dir" --override-input flake1 "$TEST_ROOT/flake1" --allow-dirty-locks
+_NIX_TEST_FAIL_ON_LARGE_PATH=1 nix flake lock "$flake2Dir" --override-input flake1 "$TEST_ROOT/flake1" --allow-dirty-locks --warn-large-path-threshold 1 --lazy-trees
 
 # Using a lock file with a dirty lock does not require --allow-dirty-locks, but should print a warning.
 expectStderr 0 nix eval "$flake2Dir#x" |

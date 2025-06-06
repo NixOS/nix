@@ -115,7 +115,11 @@ struct Flake
     }
 };
 
-Flake getFlake(EvalState & state, const FlakeRef & flakeRef, fetchers::UseRegistries useRegistries);
+Flake getFlake(
+    EvalState & state,
+    const FlakeRef & flakeRef,
+    fetchers::UseRegistries useRegistries,
+    bool requireLockable = true);
 
 /**
  * Fingerprint of a locked flake; used as a cache key.
@@ -213,6 +217,11 @@ struct LockFlags
      * for those inputs will be ignored.
      */
     std::set<InputAttrPath> inputUpdates;
+
+    /**
+     * Whether to require a locked input.
+     */
+    bool requireLockable = true;
 };
 
 LockedFlake lockFlake(

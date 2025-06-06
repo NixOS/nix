@@ -7,10 +7,10 @@ namespace nix {
 
 // See: https://github.com/NixOS/nix/issues/9730
 void printAmbiguous(
-    Value &v,
-    const SymbolTable &symbols,
-    std::ostream &str,
-    std::set<const void *> *seen,
+    EvalState & state,
+    Value & v,
+    std::ostream & str,
+    std::set<const void *> * seen,
     int depth)
 {
     checkInterrupt();
@@ -26,9 +26,13 @@ void printAmbiguous(
     case nBool:
         printLiteralBool(str, v.boolean());
         break;
-    case nString:
-        printLiteralString(str, v.string_view());
+    case nString: {
+        NixStringContext context;
+        copyContext(v, context);
+        // FIXME: make devirtualization configurable?
+        printLiteralString(str, state.devirtualize(v.string_view(), context));
         break;
+    }
     case nPath:
         str << v.path().to_string(); // !!! escaping?
         break;
@@ -40,9 +44,9 @@ void printAmbiguous(
             str << "«repeated»";
         else {
             str << "{ ";
-            for (auto & i : v.attrs()->lexicographicOrder(symbols)) {
-                str << symbols[i->name] << " = ";
-                printAmbiguous(*i->value, symbols, str, seen, depth - 1);
+            for (auto & i : v.attrs()->lexicographicOrder(state.symbols)) {
+                str << state.symbols[i->name] << " = ";
+                printAmbiguous(state, *i->value, str, seen, depth - 1);
                 str << "; ";
             }
             str << "}";
@@ -56,7 +60,7 @@ void printAmbiguous(
             str << "[ ";
             for (auto v2 : v.listItems()) {
                 if (v2)
-                    printAmbiguous(*v2, symbols, str, seen, depth - 1);
+                    printAmbiguous(state, *v2, str, seen, depth - 1);
                 else
                     str << "(nullptr)";
                 str << " ";

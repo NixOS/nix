@@ -92,6 +92,9 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                         .path = o.path,
                     };
                 },
+                [&](const NixStringContextElem::Path & p) -> DerivedPath {
+                    throw Error("'program' attribute of an 'app' output cannot have no context");
+                },
             }, c.raw));
         }
 
