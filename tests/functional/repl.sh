@@ -277,6 +277,12 @@ testReplResponseNoRegex '
 }
 '
 
+# Don't prompt for more input when getting unexpected EOF in imported files.
+testReplResponse "
+import $testDir/lang/parse-fail-eof-pos.nix
+" \
+'.*error: syntax error, unexpected end of file.*'
+
 # TODO: move init to characterisation/framework.sh
 badDiff=0
 badExitCode=0
