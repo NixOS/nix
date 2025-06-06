@@ -57,7 +57,7 @@ struct LoggerSettings : Config
     Setting<Path> jsonLogPath{
         this, "", "json-log-path",
         R"(
-          A path to which JSON records of Nix's log output will be
+          A path to which JSON records of Nix's log output are
           written, in the same format as `--log-format internal-json`
           (without the `@nix ` prefixes on each line).
         )"};
