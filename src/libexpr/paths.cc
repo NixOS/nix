@@ -80,6 +80,7 @@ StorePath EvalState::mountInput(
     storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
 
     if (requireLockable && (!settings.lazyTrees || !input.isLocked()) && !input.getNarHash()) {
+        // FIXME: use fetchToStore to make it cache this
         auto narHash = accessor->hashPath(CanonPath::root);
         input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
     }

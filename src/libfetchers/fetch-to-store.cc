@@ -31,15 +31,16 @@ StorePath fetchToStore(
     // a `PosixSourceAccessor` pointing to a store path.
 
     std::optional<fetchers::Cache::Key> cacheKey;
+    std::optional<std::string> fingerprint;
 
-    if (!filter && path.accessor->fingerprint) {
-        cacheKey = makeFetchToStoreCacheKey(std::string{name}, *path.accessor->fingerprint, method, path.path.abs());
+    if (!filter && (fingerprint = path.accessor->getFingerprint(path.path))) {
+        cacheKey = makeFetchToStoreCacheKey(std::string{name}, *fingerprint, method, path.path.abs());
         if (auto res = fetchers::getCache()->lookupStorePath(*cacheKey, store)) {
             debug("store path cache hit for '%s'", path);
             return res->storePath;
         }
     } else
-        debug("source path '%s' is uncacheable", path);
+        debug("source path '%s' is uncacheable (%d, %d)", path, filter, (bool) fingerprint);
 
     Activity act(*logger, lvlChatty, actUnknown,
         fmt(mode == FetchMode::DryRun ? "hashing '%s'" : "copying '%s' to the store", path));
