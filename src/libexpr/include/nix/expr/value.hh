@@ -5,7 +5,6 @@
 #include <span>
 
 #include "nix/expr/eval-gc.hh"
-#include "nix/expr/symbol-table.hh"
 #include "nix/expr/value/context.hh"
 #include "nix/util/source-path.hh"
 #include "nix/expr/print-options.hh"
@@ -65,6 +64,7 @@ struct ExprLambda;
 struct ExprBlackHole;
 struct PrimOp;
 class Symbol;
+class SymbolStr;
 class PosIdx;
 struct Pos;
 class StorePath;
@@ -171,6 +171,11 @@ private:
     friend std::string showType(const Value & v);
 
 public:
+
+    /**
+     * Never modify the backing `Value` object!
+     */
+    static Value * toPtr(SymbolStr str) noexcept;
 
     void print(EvalState &state, std::ostream &str, PrintOptions options = PrintOptions {});
 
@@ -330,11 +335,6 @@ public:
     void mkString(std::string_view s, const NixStringContext & context);
 
     void mkStringMove(const char * s, const NixStringContext & context);
-
-    inline void mkString(const SymbolStr & s)
-    {
-        mkString(s.c_str());
-    }
 
     void mkPath(const SourcePath & path);
     void mkPath(std::string_view path);
