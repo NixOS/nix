@@ -157,6 +157,32 @@ foo + baz
 ' "3" \
     ./flake ./flake\#bar --experimental-features 'flakes'
 
+testReplResponse $'
+:a { a = 1; b = 2; longerName = 3; "with spaces" = 4; }
+' 'Added 4 variables.
+a, b, longerName, "with spaces"
+'
+
+cat <<EOF > attribute-set.nix
+{
+    a = 1;
+    b = 2;
+    longerName = 3;
+    "with spaces" = 4;
+}
+EOF
+testReplResponse '
+:l ./attribute-set.nix
+' 'Added 4 variables.
+a, b, longerName, "with spaces"
+'
+
+testReplResponseNoRegex $'
+:a builtins.foldl\' (x: y: x // y) {} (map (x: { ${builtins.toString x} = x; }) (builtins.genList (x: x) 23))
+' 'Added 23 variables.
+"0", "1", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "2", "20", "21", "22", "3", "4", "5", "6"
+... and 3 more; view with :ll'
+
 # Test the `:reload` mechansim with flakes:
 # - Eval `./flake#changingThing`
 # - Modify the flake
@@ -328,7 +354,8 @@ runRepl () {
       -e "s@$testDir@/path/to/tests/functional@g" \
       -e "s@$testDirNoUnderscores@/path/to/tests/functional@g" \
       -e "s@$nixVersion@<nix version>@g" \
-      -e "s@Added [0-9]* variables@Added <number omitted> variables@g" \
+      -e "/Added [0-9]* variables/{s@ [0-9]* @ <number omitted> @;n;d}" \
+      -e '/\.\.\. and [0-9]* more; view with :ll/d' \
     | grep -vF $'warning: you don\'t have Internet access; disabling some network-dependent features' \
     ;
 }

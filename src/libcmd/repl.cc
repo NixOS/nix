@@ -69,6 +69,7 @@ struct NixRepl
 
     const static int envSize = 32768;
     std::shared_ptr<StaticEnv> staticEnv;
+    Value lastLoaded;
     Env * env;
     int displ;
     StringSet varNames;
@@ -95,6 +96,7 @@ struct NixRepl
     void loadFiles();
     void loadFlakes();
     void reloadFilesAndFlakes();
+    void showLastLoaded();
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol name, Value & v);
     Expr * parseString(std::string s);
@@ -372,6 +374,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
              << "                               current profile\n"
              << "  :l, :load <path>             Load Nix expression and add it to scope\n"
              << "  :lf, :load-flake <ref>       Load Nix flake and add it to scope\n"
+             << "  :ll, :last-loaded            Show most recently loaded variables added to scope\n"
              << "  :p, :print <expr>            Evaluate and print expression recursively\n"
              << "                               Strings are printed directly, without escaping.\n"
              << "  :q, :quit                    Exit nix-repl\n"
@@ -460,6 +463,10 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
     else if (command == ":lf" || command == ":load-flake") {
         loadFlake(arg);
+    }
+
+    else if (command == ":ll" || command == ":last-loaded") {
+        showLastLoaded();
     }
 
     else if (command == ":r" || command == ":reload") {
@@ -754,6 +761,16 @@ void NixRepl::initEnv()
         varNames.emplace(state->symbols[i.first]);
 }
 
+void NixRepl::showLastLoaded()
+{
+    RunPager pager;
+
+    for (auto & i : *lastLoaded.attrs()) {
+        std::string_view name = state->symbols[i.name];
+        logger->cout(name);
+    }
+}
+
 
 void NixRepl::reloadFilesAndFlakes()
 {
@@ -807,6 +824,27 @@ void NixRepl::addAttrsToScope(Value & attrs)
     staticEnv->sort();
     staticEnv->deduplicate();
     notice("Added %1% variables.", attrs.attrs()->size());
+
+    lastLoaded = attrs;
+
+    const int max_print = 20;
+    int counter = 0;
+    std::ostringstream loaded;
+    for (auto & i : attrs.attrs()->lexicographicOrder(state->symbols)) {
+        if (counter >= max_print)
+            break;
+
+        if (counter > 0)
+            loaded << ", ";
+
+        printIdentifier(loaded, state->symbols[i->name]);
+        counter += 1;
+    }
+
+    notice("%1%", loaded.str());
+
+    if (attrs.attrs()->size() > max_print)
+        notice("... and %1% more; view with :ll", attrs.attrs()->size() - max_print);
 }
 
 
