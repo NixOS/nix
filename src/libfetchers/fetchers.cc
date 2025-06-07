@@ -5,6 +5,7 @@
 #include "nix/util/json-utils.hh"
 #include "nix/fetchers/store-path-accessor.hh"
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/forwarding-source-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -293,6 +294,21 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessor(ref<Store> store) const
     }
 }
 
+/**
+ * Helper class that ensures that paths in substituted source trees
+ * are rendered as `«input»/path` rather than
+ * `«input»/nix/store/<hash>-source/path`.
+ */
+struct SubstitutedSourceAccessor : ForwardingSourceAccessor
+{
+    using ForwardingSourceAccessor::ForwardingSourceAccessor;
+
+    std::string showPath(const CanonPath & path) override
+    {
+        return displayPrefix + path.abs() + displaySuffix;
+    }
+};
+
 std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> store) const
 {
     // FIXME: cache the accessor
@@ -320,10 +336,12 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
             debug("using substituted/cached input '%s' in '%s'",
                 to_string(), store->printStorePath(storePath));
 
-            auto accessor = makeStorePathAccessor(store, storePath);
+            auto accessor = make_ref<SubstitutedSourceAccessor>(makeStorePathAccessor(store, storePath));
 
             accessor->fingerprint = getFingerprint(store);
 
+            // FIXME: ideally we would use the `showPath()` of the
+            // "real" accessor for this fetcher type.
             accessor->setPathDisplay("«" + to_string() + "»");
 
             return {accessor, *this};
