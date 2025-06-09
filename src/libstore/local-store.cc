@@ -221,7 +221,16 @@ LocalStore::LocalStore(ref<const Config> config)
        schema upgrade is in progress. */
     if (!config->readOnly) {
         Path globalLockPath = dbDir + "/big-lock";
-        globalLock = openLockFile(globalLockPath.c_str(), true);
+        try {
+            globalLock = openLockFile(globalLockPath.c_str(), true);
+        } catch (SysError & e) {
+            if (e.errNo == EACCES || e.errNo == EPERM) {
+                e.addTrace({},
+                    "This command may have been run as non-root in a single-user Nix installation,\n"
+                    "or the Nix daemon may have crashed.");
+            }
+            throw;
+        }
     }
 
     if (!config->readOnly && !lockFile(globalLock.get(), ltRead, false)) {
