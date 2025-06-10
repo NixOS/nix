@@ -29,7 +29,7 @@ class SymbolValue : protected Value
 public:
     operator std::string_view() const noexcept
     {
-        return {payload.string.c_str, size_};
+        return {c_str(), size_};
     }
 };
 
@@ -122,7 +122,7 @@ public:
     [[gnu::always_inline]]
     const char * c_str() const noexcept
     {
-        return s->payload.string.c_str;
+        return s->c_str();
     }
 
     [[gnu::always_inline]]
