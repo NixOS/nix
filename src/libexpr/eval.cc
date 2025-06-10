@@ -128,7 +128,7 @@ std::string showType(const Value & v)
     switch (v.internalType) {
         case tString: return v.payload.string.context ? "a string with context" : "a string";
         case tPrimOp:
-            return fmt("the built-in function '%s'", std::string(v.payload.primOp->name));
+            return fmt("the built-in function '%s'", std::string(v.primOp()->name));
         case tPrimOpApp:
             return fmt("the partially applied built-in function '%s'", v.primOpAppPrimOp()->name);
         case tExternal: return v.external()->showType();
