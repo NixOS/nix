@@ -126,9 +126,9 @@ std::string showType(const Value & v)
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (v.internalType) {
-        case tString: return v.payload.string.context ? "a string with context" : "a string";
+        case tString: return v.context() ? "a string with context" : "a string";
         case tPrimOp:
-            return fmt("the built-in function '%s'", std::string(v.payload.primOp->name));
+            return fmt("the built-in function '%s'", std::string(v.primOp()->name));
         case tPrimOpApp:
             return fmt("the partially applied built-in function '%s'", v.primOpAppPrimOp()->name);
         case tExternal: return v.external()->showType();
@@ -2297,8 +2297,8 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
 
 void copyContext(const Value & v, NixStringContext & context, const ExperimentalFeatureSettings & xpSettings)
 {
-    if (v.payload.string.context)
-        for (const char * * p = v.payload.string.context; *p; ++p)
+    if (v.context())
+        for (const char * * p = v.context(); *p; ++p)
             context.insert(NixStringContextElem::parse(*p, xpSettings));
 }
 
