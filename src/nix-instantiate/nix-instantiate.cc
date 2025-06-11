@@ -17,6 +17,7 @@
 #include <map>
 #include <iostream>
 
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 
@@ -61,8 +62,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             else if (output == okXML)
                 printValueAsXML(state, strict, location, vRes, std::cout, context, noPos);
             else if (output == okJSON) {
-                printValueAsJSON(state, strict, vRes, v.determinePos(noPos), std::cout, context);
-                std::cout << std::endl;
+                auto j = printValueAsJSON(state, strict, vRes, v.determinePos(noPos), context);
+                std::cout << state.devirtualize(j.dump(), context) << std::endl;
             } else {
                 if (strict) state.forceValueDeep(vRes);
                 std::set<const void *> seen;
