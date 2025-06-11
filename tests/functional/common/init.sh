@@ -54,6 +54,7 @@ flake-registry = $TEST_ROOT/registry.json
 show-trace = true
 include nix.conf.extra
 trusted-users = $(whoami)
+${_NIX_TEST_EXTRA_CONFIG:-}
 EOF
 
 cat > "$NIX_CONF_DIR"/nix.conf.extra <<EOF
