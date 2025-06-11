@@ -163,7 +163,8 @@ foo + baz
 # - Re-eval it
 # - Check that the result has changed
 mkfifo repl_fifo
-nix repl ./flake < repl_fifo > repl_output 2>&1 &
+touch repl_output
+nix repl ./flake < repl_fifo >> repl_output 2>&1 &
 repl_pid=$!
 exec 3>repl_fifo # Open fifo for writing
 echo "changingThing" >&3
