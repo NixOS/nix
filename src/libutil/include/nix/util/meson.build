@@ -1,6 +1,6 @@
 # Public headers directory
 
-include_dirs = [include_directories('../..')]
+include_dirs = [ include_directories('../..') ]
 
 headers = files(
   'abstract-setting-to-json.hh',
@@ -63,8 +63,8 @@ headers = files(
   'source-path.hh',
   'split.hh',
   'std-hash.hh',
-  'strings.hh',
   'strings-inline.hh',
+  'strings.hh',
   'suggestions.hh',
   'sync.hh',
   'tarfile.hh',
