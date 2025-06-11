@@ -365,7 +365,7 @@ public:
 
           To build only on remote machines and disable local builds, set [`max-jobs`](#conf-max-jobs) to 0.
 
-          If you want the remote machines to use substituters, set [`builders-use-substitutes`](#conf-builders-use-substituters) to `true`.
+          If you want the remote machines to use substituters, set [`builders-use-substitutes`](#conf-builders-use-substitutes) to `true`.
         )",
         {}, false};
 
