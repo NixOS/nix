@@ -59,12 +59,16 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                         context);
                 // We intentionally don't output a newline here. The default PS1 for Bash in NixOS starts with a newline
                 // and other interactive shells like Zsh are smart enough to print a missing newline before the prompt.
-            else if (output == okXML)
-                printValueAsXML(state, strict, location, vRes, std::cout, context, noPos);
+            else if (output == okXML) {
+                std::ostringstream s;
+                printValueAsXML(state, strict, location, vRes, s, context, noPos);
+                std::cout << state.devirtualize(s.str(), context);
+            }
             else if (output == okJSON) {
                 auto j = printValueAsJSON(state, strict, vRes, v.determinePos(noPos), context);
                 std::cout << state.devirtualize(j.dump(), context) << std::endl;
-            } else {
+            }
+            else {
                 if (strict) state.forceValueDeep(vRes);
                 std::set<const void *> seen;
                 printAmbiguous(state, vRes, std::cout, &seen, std::numeric_limits<int>::max());
