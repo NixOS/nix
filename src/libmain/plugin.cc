@@ -43,9 +43,9 @@ struct PluginSettings : Config
         {},
         "plugin-files",
         R"(
-          A list of plugin files to be loaded by Nix. Each of these files will
-          be dlopened by Nix. If they contain the symbol `nix_plugin_entry()`,
-          this symbol will be called. Alternatively, they can affect execution
+          A list of plugin files to be loaded by Nix. Each of these files is
+          dlopened by Nix. If they contain the symbol `nix_plugin_entry()`,
+          this symbol is called. Alternatively, they can affect execution
           through static initialization. In particular, these plugins may construct
           static instances of RegisterPrimOp to add new primops or constants to the
           expression language, RegisterStoreImplementation to add new store
@@ -60,7 +60,7 @@ struct PluginSettings : Config
           itself, they must be DSOs compatible with the instance of Nix
           running at the time (i.e. compiled against the same headers, not
           linked to any incompatible libraries). They should not be linked to
-          any Nix libs directly, as those will be available already at load
+          any Nix libraries directly, as those are already at load
           time.
 
           If an entry in the list is a directory, all files in the directory

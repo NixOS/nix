@@ -46,7 +46,7 @@ struct FileTransferSettings : Config
         )"};
 
     Setting<unsigned int> tries{this, 5, "download-attempts",
-        "How often Nix will attempt to download a file before giving up."};
+        "The number of times Nix will attempt to download a file before giving up."};
 
     Setting<size_t> downloadBufferSize{this, 64 * 1024 * 1024, "download-buffer-size",
         R"(
