@@ -21,7 +21,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
             for (auto & system : handler.systems)
                 if (params.drv.platform == system)
                     return std::make_unique<ExternalDerivationBuilder>(
-                        store, std::move(miscMethods), std::move(params), std::move(handler));
+                        store, std::move(miscMethods), std::move(params), handler);
         }
         return {};
     }
