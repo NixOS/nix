@@ -42,14 +42,14 @@ jobs:
   build-x86_64-darwin:
     uses: ./.github/workflows/build.yml
     with:
-      os: macos-13
+      os: macos-latest-large
       system: x86_64-darwin
       run_tests: false
 
   build-aarch64-darwin:
     uses: ./.github/workflows/build.yml
     with:
-      os: macos-latest
+      os: macos-latest-xlarge
       system: aarch64-darwin
       run_tests: false
 

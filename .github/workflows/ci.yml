@@ -40,7 +40,7 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       if: ${{ github.event_name == 'merge_group' }}
-      os: namespace-profile-mac-m2-12c28g
+      os: macos-latest-large
       system: x86_64-darwin
 
   build_aarch64-darwin:
