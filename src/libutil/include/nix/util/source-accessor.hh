@@ -177,10 +177,27 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
         SymlinkResolution mode = SymlinkResolution::Full);
 
     /**
-     * A string that uniquely represents the contents of this
-     * accessor. This is used for caching lookups (see `fetchToStore()`).
+     * Return a string that uniquely represents the contents of this
+     * accessor. This is used for caching lookups (see
+     * `fetchToStore()`).
+     *
+     * Fingerprints are generally for the entire accessor, but this
+     * method takes a `path` argument to support accessors like
+     * `MountedSourceAccessor` that combine multiple underlying
+     * accessors. A fingerprint should only be returned if it uniquely
+     * represents everything under `path`.
      */
-    std::optional<std::string> fingerprint;
+    virtual std::optional<std::string> getFingerprint(const CanonPath & path)
+    {
+        return _fingerprint;
+    }
+
+    virtual void setFingerprint(std::string fingerprint)
+    {
+        _fingerprint = std::move(fingerprint);
+    }
+
+    std::optional<std::string> _fingerprint;
 
     /**
      * Return the maximum last-modified time of the files in this
