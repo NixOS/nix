@@ -444,8 +444,8 @@ public:
     {
         assert(internalType == tPath);
         return SourcePath(
-            ref(payload.path.accessor->shared_from_this()),
-            CanonPath(CanonPath::unchecked_t(), payload.path.path));
+            ref(pathAccessor()->shared_from_this()),
+            CanonPath(CanonPath::unchecked_t(), pathStr()));
     }
 
     std::string_view string_view() const
@@ -482,6 +482,24 @@ public:
 
     NixFloat fpoint() const
     { return payload.fpoint; }
+
+    Lambda lambda() const
+    { return payload.lambda; }
+
+    ClosureThunk thunk() const
+    { return payload.thunk; }
+
+    FunctionApplicationThunk primOpApp() const
+    { return payload.primOpApp; }
+
+    FunctionApplicationThunk app() const
+    { return payload.app; }
+
+    const char * pathStr() const
+    { return payload.path.path; }
+
+    SourceAccessor * pathAccessor() const
+    { return payload.path.accessor; }
 };
 
 
@@ -489,7 +507,7 @@ extern ExprBlackHole eBlackHole;
 
 bool Value::isBlackhole() const
 {
-    return internalType == tThunk && payload.thunk.expr == (Expr*) &eBlackHole;
+    return internalType == tThunk && thunk().expr == (Expr*) &eBlackHole;
 }
 
 void Value::mkBlackhole()

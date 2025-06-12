@@ -147,8 +147,8 @@ PosIdx Value::determinePos(const PosIdx pos) const
     #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (internalType) {
         case tAttrs: return attrs()->pos;
-        case tLambda: return payload.lambda.fun->pos;
-        case tApp: return payload.app.left->determinePos(pos);
+        case tLambda: return lambda().fun->pos;
+        case tApp: return app().left->determinePos(pos);
         default: return pos;
     }
     #pragma GCC diagnostic pop
@@ -160,10 +160,10 @@ bool Value::isTrivial() const
         internalType != tApp
         && internalType != tPrimOpApp
         && (internalType != tThunk
-            || (dynamic_cast<ExprAttrs *>(payload.thunk.expr)
-                && ((ExprAttrs *) payload.thunk.expr)->dynamicAttrs.empty())
-            || dynamic_cast<ExprLambda *>(payload.thunk.expr)
-            || dynamic_cast<ExprList *>(payload.thunk.expr));
+            || (dynamic_cast<ExprAttrs *>(thunk().expr)
+                && ((ExprAttrs *) thunk().expr)->dynamicAttrs.empty())
+            || dynamic_cast<ExprLambda *>(thunk().expr)
+            || dynamic_cast<ExprList *>(thunk().expr));
 }
 
 
@@ -525,9 +525,9 @@ std::ostream & operator<<(std::ostream & output, const PrimOp & primOp)
 
 const PrimOp * Value::primOpAppPrimOp() const
 {
-    Value * left = payload.primOpApp.left;
+    Value * left = primOpApp().left;
     while (left && !left->isPrimOp()) {
-        left = left->payload.primOpApp.left;
+        left = left->primOpApp().left;
     }
 
     if (!left)
@@ -610,7 +610,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             };
     }
     if (v.isLambda()) {
-        auto exprLambda = v.payload.lambda.fun;
+        auto exprLambda = v.lambda().fun;
 
         std::ostringstream s;
         std::string name;
@@ -1567,13 +1567,13 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 
         if (vCur.isLambda()) {
 
-            ExprLambda & lambda(*vCur.payload.lambda.fun);
+            ExprLambda & lambda(*vCur.lambda().fun);
 
             auto size =
                 (!lambda.arg ? 0 : 1) +
                 (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
             Env & env2(allocEnv(size));
-            env2.up = vCur.payload.lambda.env;
+            env2.up = vCur.lambda().env;
 
             Displacement displ = 0;
 
@@ -1603,7 +1603,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                                              symbols[i.name])
                                     .atPos(lambda.pos)
                                     .withTrace(pos, "from call site")
-                                    .withFrame(*fun.payload.lambda.env, lambda)
+                                    .withFrame(*fun.lambda().env, lambda)
                                     .debugThrow();
                         }
                         env2.values[displ++] = i.def->maybeThunk(*this, env2);
@@ -1630,7 +1630,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                                 .atPos(lambda.pos)
                                 .withTrace(pos, "from call site")
                                 .withSuggestions(suggestions)
-                                .withFrame(*fun.payload.lambda.env, lambda)
+                                .withFrame(*fun.lambda().env, lambda)
                                 .debugThrow();
                         }
                     unreachable();
@@ -1702,7 +1702,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             Value * primOp = &vCur;
             while (primOp->isPrimOpApp()) {
                 argsDone++;
-                primOp = primOp->payload.primOpApp.left;
+                primOp = primOp->primOpApp().left;
             }
             assert(primOp->isPrimOp());
             auto arity = primOp->primOp()->arity;
@@ -1718,8 +1718,8 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 
                 Value * vArgs[maxPrimOpArity];
                 auto n = argsDone;
-                for (Value * arg = &vCur; arg->isPrimOpApp(); arg = arg->payload.primOpApp.left)
-                    vArgs[--n] = arg->payload.primOpApp.right;
+                for (Value * arg = &vCur; arg->isPrimOpApp(); arg = arg->primOpApp().left)
+                    vArgs[--n] = arg->primOpApp().right;
 
                 for (size_t i = 0; i < argsLeft; ++i)
                     vArgs[argsDone + i] = args[i];
@@ -1825,14 +1825,14 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
         }
     }
 
-    if (!fun.isLambda() || !fun.payload.lambda.fun->hasFormals()) {
+    if (!fun.isLambda() || !fun.lambda().fun->hasFormals()) {
         res = fun;
         return;
     }
 
-    auto attrs = buildBindings(std::max(static_cast<uint32_t>(fun.payload.lambda.fun->formals->formals.size()), args.size()));
+    auto attrs = buildBindings(std::max(static_cast<uint32_t>(fun.lambda().fun->formals->formals.size()), args.size()));
 
-    if (fun.payload.lambda.fun->formals->ellipsis) {
+    if (fun.lambda().fun->formals->ellipsis) {
         // If the formals have an ellipsis (eg the function accepts extra args) pass
         // all available automatic arguments (which includes arguments specified on
         // the command line via --arg/--argstr)
@@ -1840,7 +1840,7 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
             attrs.insert(v);
     } else {
         // Otherwise, only pass the arguments that the function accepts
-        for (auto & i : fun.payload.lambda.fun->formals->formals) {
+        for (auto & i : fun.lambda().fun->formals->formals) {
             auto j = args.get(i.name);
             if (j) {
                 attrs.insert(*j);
@@ -1850,7 +1850,7 @@ Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
 https://nixos.org/manual/nix/stable/language/constructs.html#functions.)", symbols[i.name])
-                    .atPos(i.pos).withFrame(*fun.payload.lambda.env, *fun.payload.lambda.fun).debugThrow();
+                    .atPos(i.pos).withFrame(*fun.lambda().env, *fun.lambda().fun).debugThrow();
             }
         }
     }
@@ -2163,7 +2163,7 @@ void EvalState::forceValueDeep(Value & v)
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
                     auto dts = debugRepl && i.value->isThunk()
-                        ? makeDebugTraceStacker(*this, *i.value->payload.thunk.expr, *i.value->payload.thunk.env, i.pos,
+                        ? makeDebugTraceStacker(*this, *i.value->thunk().expr, *i.value->thunk().env, i.pos,
                             "while evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;
 
@@ -2368,7 +2368,7 @@ BackedStringView EvalState::coerceToString(
             !canonicalizePath && !copyToStore
             ? // FIXME: hack to preserve path literals that end in a
               // slash, as in /foo/${x}.
-              v.payload.path.path
+              v.pathStr()
             : copyToStore
             ? store->printStorePath(copyPathToStore(context, v.path()))
             : std::string(v.path().path.abs());
@@ -2636,14 +2636,14 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         return;
 
     case nPath:
-        if (v1.payload.path.accessor != v2.payload.path.accessor) {
+        if (v1.pathAccessor() != v2.pathAccessor()) {
             error<AssertionError>(
                 "path '%s' is not equal to path '%s' because their accessors are different",
                 ValuePrinter(*this, v1, errorPrintOptions),
                 ValuePrinter(*this, v2, errorPrintOptions))
                 .debugThrow();
         }
-        if (strcmp(v1.payload.path.path, v2.payload.path.path) != 0) {
+        if (strcmp(v1.pathStr(), v2.pathStr()) != 0) {
             error<AssertionError>(
                 "path '%s' is not equal to path '%s'",
                 ValuePrinter(*this, v1, errorPrintOptions),
@@ -2810,8 +2810,8 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         case nPath:
             return
                 // FIXME: compare accessors by their fingerprint.
-                v1.payload.path.accessor == v2.payload.path.accessor
-                && strcmp(v1.payload.path.path, v2.payload.path.path) == 0;
+                v1.pathAccessor() == v2.pathAccessor()
+                && strcmp(v1.pathStr(), v2.pathStr()) == 0;
 
         case nNull:
             return true;

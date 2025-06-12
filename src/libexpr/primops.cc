@@ -651,7 +651,7 @@ struct CompareValues
                     // Note: we don't take the accessor into account
                     // since it's not obvious how to compare them in a
                     // reproducible way.
-                    return strcmp(v1->payload.path.path, v2->payload.path.path) < 0;
+                    return strcmp(v1->pathStr(), v2->pathStr()) < 0;
                 case nList:
                     // Lexicographic comparison
                     for (size_t i = 0;; i++) {
@@ -3138,12 +3138,12 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value * * arg
     if (!args[0]->isLambda())
         state.error<TypeError>("'functionArgs' requires a function").atPos(pos).debugThrow();
 
-    if (!args[0]->payload.lambda.fun->hasFormals()) {
+    if (!args[0]->lambda().fun->hasFormals()) {
         v.mkAttrs(&state.emptyBindings);
         return;
     }
 
-    const auto &formals = args[0]->payload.lambda.fun->formals->formals;
+    const auto &formals = args[0]->lambda().fun->formals->formals;
     auto attrs = state.buildBindings(formals.size());
     for (auto & i : formals)
         attrs.insert(i.name, state.getBool(i.def), i.pos);
