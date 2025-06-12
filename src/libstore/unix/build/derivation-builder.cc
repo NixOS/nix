@@ -2093,8 +2093,8 @@ void DerivationBuilderImpl::checkOutputs(const std::map<std::string, ValidPathIn
 void DerivationBuilderImpl::deleteTmpDir(bool force)
 {
     if (topTmpDir != "") {
-        /* As an extra caution, even in the event of `deletePath` failing to
-         * cleaning up behind. The `tmpDir` will be chown as if we were to move
+        /* As an extra precaution, even in the event of `deletePath` failing to
+         * clean up, the `tmpDir` will be chowned as if we were to move
          * it inside the Nix store.
          *
          * This hardens against an attack which smuggles a file descriptor
