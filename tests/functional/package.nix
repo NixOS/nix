@@ -26,6 +26,9 @@
 
   # For running the functional tests against a different pre-built Nix.
   test-daemon ? null,
+
+  # Whether to run tests with lazy trees enabled.
+  lazyTrees ? false,
 }:
 
 let
@@ -94,6 +97,8 @@ mkMesonDerivation (
     installPhase = ''
       mkdir $out
     '';
+
+    _NIX_TEST_EXTRA_CONFIG = lib.optionalString lazyTrees "lazy-trees = true";
 
     meta = {
       platforms = lib.platforms.unix;
