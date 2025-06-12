@@ -79,8 +79,7 @@ StorePath EvalState::mountInput(
 
     std::optional<Hash> _narHash;
 
-    auto getNarHash = [&]()
-    {
+    auto getNarHash = [&]() {
         if (!_narHash) {
             if (store->isValidPath(storePath))
                 _narHash = store->queryPathInfo(storePath)->narHash;

@@ -28,7 +28,7 @@
   test-daemon ? null,
 
   # Whether to run tests with lazy trees enabled.
-  lazyTrees ? false
+  lazyTrees ? false,
 }:
 
 let
