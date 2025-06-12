@@ -491,6 +491,9 @@ public:
 
     FunctionApplicationThunk primOpApp() const
     { return payload.primOpApp; }
+
+    FunctionApplicationThunk app() const
+    { return payload.app; }
 };
 
 

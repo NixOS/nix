@@ -106,7 +106,7 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
         }
     }
     else if (v.isApp())
-        callFunction(*v.payload.app.left, *v.payload.app.right, v, pos);
+        callFunction(*v.app().left, *v.app().right, v, pos);
 }
 
 

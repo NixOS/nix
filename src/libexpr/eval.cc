@@ -148,7 +148,7 @@ PosIdx Value::determinePos(const PosIdx pos) const
     switch (internalType) {
         case tAttrs: return attrs()->pos;
         case tLambda: return lambda().fun->pos;
-        case tApp: return payload.app.left->determinePos(pos);
+        case tApp: return app().left->determinePos(pos);
         default: return pos;
     }
     #pragma GCC diagnostic pop
