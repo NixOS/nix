@@ -317,6 +317,13 @@ protected:
     void chownToBuilder(int fd, const Path & path);
 
     /**
+     * Create a file in `tmpDir` owned by the builder.
+     */
+    void writeBuilderFile(
+        const std::string & name,
+        std::string_view contents);
+
+    /**
      * Run the builder's process.
      */
     void runChild();
@@ -1069,16 +1076,10 @@ void DerivationBuilderImpl::initEnv()
             } else {
                 auto hash = hashString(HashAlgorithm::SHA256, i.first);
                 std::string fn = ".attr-" + hash.to_string(HashFormat::Nix32, false);
-                Path p = tmpDir + "/" + fn;
-                AutoCloseFD passAsFileFd{openat(tmpDirFd.get(), fn.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666)};
-                if (!passAsFileFd)
-                    throw SysError("opening `passAsFile` file in the sandbox '%1%'", p);
-                writeFile(passAsFileFd, p, rewriteStrings(i.second, inputRewrites));
-                chownToBuilder(passAsFileFd.get(), p);
+                writeBuilderFile(fn, rewriteStrings(i.second, inputRewrites));
                 env[i.first + "Path"] = tmpDirInSandbox() + "/" + fn;
             }
         }
-
     }
 
     /* For convenience, set an environment pointing to the top build
@@ -1153,11 +1154,9 @@ void DerivationBuilderImpl::writeStructuredAttrs()
 
         auto jsonSh = StructuredAttrs::writeShell(json);
 
-        writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
-        chownToBuilder(tmpDir + "/.attrs.sh");
+        writeBuilderFile(".attrs.sh", rewriteStrings(jsonSh, inputRewrites));
         env["NIX_ATTRS_SH_FILE"] = tmpDirInSandbox() + "/.attrs.sh";
-        writeFile(tmpDir + "/.attrs.json", rewriteStrings(json.dump(), inputRewrites));
-        chownToBuilder(tmpDir + "/.attrs.json");
+        writeBuilderFile(".attrs.json", rewriteStrings(json.dump(), inputRewrites));
         env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox() + "/.attrs.json";
     }
 }
@@ -1283,6 +1282,18 @@ void DerivationBuilderImpl::chownToBuilder(int fd, const Path & path)
     if (!buildUser) return;
     if (fchown(fd, buildUser->getUID(), buildUser->getGID()) == -1)
         throw SysError("cannot change ownership of file '%1%'", path);
+}
+
+void DerivationBuilderImpl::writeBuilderFile(
+    const std::string & name,
+    std::string_view contents)
+{
+    auto path = std::filesystem::path(tmpDir) / name;
+    AutoCloseFD fd{openat(tmpDirFd.get(), name.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666)};
+    if (!fd)
+        throw SysError("creating file %s", path);
+    writeFile(fd, path, contents);
+    chownToBuilder(fd.get(), path);
 }
 
 void DerivationBuilderImpl::runChild()
