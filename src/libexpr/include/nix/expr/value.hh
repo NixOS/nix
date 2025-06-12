@@ -488,6 +488,9 @@ public:
 
     ClosureThunk thunk() const
     { return payload.thunk; }
+
+    FunctionApplicationThunk primOpApp() const
+    { return payload.primOpApp; }
 };
 
 

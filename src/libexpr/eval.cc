@@ -525,9 +525,9 @@ std::ostream & operator<<(std::ostream & output, const PrimOp & primOp)
 
 const PrimOp * Value::primOpAppPrimOp() const
 {
-    Value * left = payload.primOpApp.left;
+    Value * left = primOpApp().left;
     while (left && !left->isPrimOp()) {
-        left = left->payload.primOpApp.left;
+        left = left->primOpApp().left;
     }
 
     if (!left)
@@ -1702,7 +1702,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             Value * primOp = &vCur;
             while (primOp->isPrimOpApp()) {
                 argsDone++;
-                primOp = primOp->payload.primOpApp.left;
+                primOp = primOp->primOpApp().left;
             }
             assert(primOp->isPrimOp());
             auto arity = primOp->primOp()->arity;
@@ -1718,8 +1718,8 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 
                 Value * vArgs[maxPrimOpArity];
                 auto n = argsDone;
-                for (Value * arg = &vCur; arg->isPrimOpApp(); arg = arg->payload.primOpApp.left)
-                    vArgs[--n] = arg->payload.primOpApp.right;
+                for (Value * arg = &vCur; arg->isPrimOpApp(); arg = arg->primOpApp().left)
+                    vArgs[--n] = arg->primOpApp().right;
 
                 for (size_t i = 0; i < argsLeft; ++i)
                     vArgs[argsDone + i] = args[i];
