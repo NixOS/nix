@@ -60,7 +60,7 @@ struct PluginSettings : Config
           itself, they must be DSOs compatible with the instance of Nix
           running at the time (i.e. compiled against the same headers, not
           linked to any incompatible libraries). They should not be linked to
-          any Nix libraries directly, as those are already at load
+          any Nix libraries directly, as those are already available at load
           time.
 
           If an entry in the list is a directory, all files in the directory
