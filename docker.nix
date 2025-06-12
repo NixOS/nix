@@ -33,7 +33,7 @@
   cacert,
   findutils,
   iana-etc,
-  git,
+  gitMinimal,
   openssh,
   # Other dependencies
   shadow,
@@ -54,7 +54,7 @@ let
     cacert.out
     findutils
     iana-etc
-    git
+    gitMinimal
     openssh
   ] ++ extraPkgs;
 
