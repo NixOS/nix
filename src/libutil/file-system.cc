@@ -304,7 +304,7 @@ void readFile(const Path & path, Sink & sink, bool memory_map)
 }
 
 
-void writeFile(const Path & path, std::string_view s, mode_t mode)
+void writeFile(const Path & path, std::string_view s, mode_t mode, FsSync sync)
 {
     AutoCloseFD fd = toDescriptor(open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT
 // TODO
@@ -315,40 +315,28 @@ void writeFile(const Path & path, std::string_view s, mode_t mode)
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
-    writeFile(fd, path, s, mode);
+    writeFile(fd, path, s, mode, sync);
 
     /* Close explicitly to propagate the exceptions. */
     fd.close();
 }
 
-void writeFile(AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode)
+void writeFile(AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode, FsSync sync)
 {
     assert(fd);
     try {
         writeFull(fd.get(), s);
+
+        if (sync == FsSync::Yes)
+            fd.fsync();
+
     } catch (Error & e) {
         e.addTrace({}, "writing file '%1%'", origPath);
         throw;
     }
 }
 
-void writeFileAndSync(const Path & path, std::string_view s, mode_t mode)
-{
-    {
-        AutoCloseFD fd{open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode)};
-        if (!fd)
-            throw SysError("opening file '%1%'", path);
-
-        writeFile(fd, path, s, mode);
-        fd.fsync();
-        /* Close explicitly to ensure that exceptions are propagated. */
-        fd.close();
-    }
-
-    syncParent(path);
-}
-
-void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
+void writeFile(const Path & path, Source & source, mode_t mode, FsSync sync)
 {
     AutoCloseFD fd = toDescriptor(open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT
 // TODO
@@ -372,11 +360,11 @@ void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
         e.addTrace({}, "writing file '%1%'", path);
         throw;
     }
-    if (sync)
+    if (sync == FsSync::Yes)
         fd.fsync();
     // Explicitly close to make sure exceptions are propagated.
     fd.close();
-    if (sync)
+    if (sync == FsSync::Yes)
         syncParent(path);
 }
 
