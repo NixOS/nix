@@ -359,3 +359,63 @@ rm "$flakeFollowsCustomUrlA"/flake.lock
 json=$(nix flake metadata "$flakeFollowsCustomUrlA" --override-input B/C "$flakeFollowsCustomUrlD" --json)
 echo "$json" | jq .locks.nodes.C.original
 [[ $(echo "$json" | jq -r .locks.nodes.C.original.path) = './flakeC' ]]
+
+# Test deep overrides, e.g. `inputs.B.inputs.C.inputs.D.follows = ...`.
+
+cat <<EOF > $flakeFollowsD/flake.nix
+{ outputs = _: {}; }
+EOF
+cat <<EOF > $flakeFollowsC/flake.nix
+{
+  inputs.D.url = "path:nosuchflake";
+  outputs = _: {};
+}
+EOF
+cat <<EOF > $flakeFollowsB/flake.nix
+{
+  inputs.C.url = "path:$flakeFollowsC";
+  outputs = _: {};
+}
+EOF
+cat <<EOF > $flakeFollowsA/flake.nix
+{
+  inputs.B.url = "path:$flakeFollowsB";
+  inputs.D.url = "path:$flakeFollowsD";
+  inputs.B.inputs.C.inputs.D.follows = "D";
+  outputs = _: {};
+}
+EOF
+
+nix flake lock $flakeFollowsA
+
+[[ $(jq -c .nodes.C.inputs.D $flakeFollowsA/flake.lock) = '["D"]' ]]
+
+# Test overlapping flake follows: B has D follow C/D, while A has B/C follow C
+
+cat <<EOF > $flakeFollowsC/flake.nix
+{
+  inputs.D.url = "path:$flakeFollowsD";
+  outputs = _: {};
+}
+EOF
+cat <<EOF > $flakeFollowsB/flake.nix
+{
+  inputs.C.url = "path:nosuchflake";
+  inputs.D.url = "path:nosuchflake";
+  inputs.D.follows = "C/D";
+  outputs = _: {};
+}
+EOF
+cat <<EOF > $flakeFollowsA/flake.nix
+{
+  inputs.B.url = "path:$flakeFollowsB";
+  inputs.C.url = "path:$flakeFollowsC";
+  inputs.B.inputs.C.follows = "C";
+  outputs = _: {};
+}
+EOF
+
+# bug was not triggered without recreating the lockfile
+nix flake lock $flakeFollowsA --recreate-lock-file
+
+[[ $(jq -c .nodes.B.inputs.D $flakeFollowsA/flake.lock) = '["B","C","D"]' ]]
