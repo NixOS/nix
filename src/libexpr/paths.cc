@@ -81,9 +81,13 @@ StorePath EvalState::mountInput(
 
     auto getNarHash = [&]()
     {
-        if (!_narHash)
-            // FIXME: use fetchToStore to make it cache this
-            _narHash = accessor->hashPath(CanonPath::root);
+        if (!_narHash) {
+            if (store->isValidPath(storePath))
+                _narHash = store->queryPathInfo(storePath)->narHash;
+            else
+                // FIXME: use fetchToStore to make it cache this
+                _narHash = accessor->hashPath(CanonPath::root);
+        }
         return _narHash;
     };
 
