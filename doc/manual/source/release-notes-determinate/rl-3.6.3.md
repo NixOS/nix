@@ -5,7 +5,6 @@
 ## What's Changed
 * When remote building with --keep-failed, only show "you can rerun" message if the derivation's platform is supported on this machine by @cole-h in [DeterminateSystems/nix-src#87](https://github.com/DeterminateSystems/nix-src/pull/87)
 * Indicate that sandbox-paths specifies a missing file in the corresponding error message. by @cole-h in [DeterminateSystems/nix-src#88](https://github.com/DeterminateSystems/nix-src/pull/88)
-* Use 'published' release type to avoid double uploads by @gustavderdrache in [DeterminateSystems/nix-src#90](https://github.com/DeterminateSystems/nix-src/pull/90)
 * Render lazy tree paths in messages withouth the/nix/store/hash... prefix in substituted source trees by @edolstra in [DeterminateSystems/nix-src#91](https://github.com/DeterminateSystems/nix-src/pull/91)
 * Use FlakeHub inputs by @lucperkins in [DeterminateSystems/nix-src#89](https://github.com/DeterminateSystems/nix-src/pull/89)
 * Proactively cache more flake inputs and fetches by @edolstra in [DeterminateSystems/nix-src#93](https://github.com/DeterminateSystems/nix-src/pull/93)
