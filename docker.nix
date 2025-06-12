@@ -290,7 +290,7 @@ let
           echo "${channelURL} ${channelName}" > $out${userHome}/.nix-channels
 
           mkdir -p $out/bin $out/usr/bin
-          ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
+          ln -s ${pkgs.coreutils-full}/bin/env $out/usr/bin/env
           ln -s ${pkgs.bashInteractive}/bin/bash $out/bin/sh
 
         ''
