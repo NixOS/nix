@@ -35,7 +35,7 @@ StorePath fetchToStore(
 
     if (!filter && (fingerprint = path.accessor->getFingerprint(path.path))) {
         cacheKey = makeFetchToStoreCacheKey(std::string{name}, *fingerprint, method, path.path.abs());
-        if (auto res = fetchers::getCache()->lookupStorePath(*cacheKey, store)) {
+        if (auto res = fetchers::getCache()->lookupStorePath(*cacheKey, store, mode == FetchMode::DryRun)) {
             debug("store path cache hit for '%s'", path);
             return res->storePath;
         }
