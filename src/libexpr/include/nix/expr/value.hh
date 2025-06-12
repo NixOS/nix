@@ -485,6 +485,9 @@ public:
 
     Lambda lambda() const
     { return payload.lambda; }
+
+    ClosureThunk thunk() const
+    { return payload.thunk; }
 };
 
 
@@ -492,7 +495,7 @@ extern ExprBlackHole eBlackHole;
 
 bool Value::isBlackhole() const
 {
-    return internalType == tThunk && payload.thunk.expr == (Expr*) &eBlackHole;
+    return internalType == tThunk && thunk().expr == (Expr*) &eBlackHole;
 }
 
 void Value::mkBlackhole()

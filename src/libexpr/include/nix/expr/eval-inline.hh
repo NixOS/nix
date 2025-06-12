@@ -89,9 +89,9 @@ Env & EvalState::allocEnv(size_t size)
 void EvalState::forceValue(Value & v, const PosIdx pos)
 {
     if (v.isThunk()) {
-        Env * env = v.payload.thunk.env;
+        Env * env = v.thunk().env;
         assert(env || v.isBlackhole());
-        Expr * expr = v.payload.thunk.expr;
+        Expr * expr = v.thunk().expr;
         try {
             v.mkBlackhole();
             //checkInterrupt();

@@ -160,10 +160,10 @@ bool Value::isTrivial() const
         internalType != tApp
         && internalType != tPrimOpApp
         && (internalType != tThunk
-            || (dynamic_cast<ExprAttrs *>(payload.thunk.expr)
-                && ((ExprAttrs *) payload.thunk.expr)->dynamicAttrs.empty())
-            || dynamic_cast<ExprLambda *>(payload.thunk.expr)
-            || dynamic_cast<ExprList *>(payload.thunk.expr));
+            || (dynamic_cast<ExprAttrs *>(thunk().expr)
+                && ((ExprAttrs *) thunk().expr)->dynamicAttrs.empty())
+            || dynamic_cast<ExprLambda *>(thunk().expr)
+            || dynamic_cast<ExprList *>(thunk().expr));
 }
 
 
@@ -2163,7 +2163,7 @@ void EvalState::forceValueDeep(Value & v)
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
                     auto dts = debugRepl && i.value->isThunk()
-                        ? makeDebugTraceStacker(*this, *i.value->payload.thunk.expr, *i.value->payload.thunk.env, i.pos,
+                        ? makeDebugTraceStacker(*this, *i.value->thunk().expr, *i.value->thunk().env, i.pos,
                             "while evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;
 
