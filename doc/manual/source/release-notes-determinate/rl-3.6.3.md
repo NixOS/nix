@@ -9,12 +9,10 @@
 * Use FlakeHub inputs by @lucperkins in [DeterminateSystems/nix-src#89](https://github.com/DeterminateSystems/nix-src/pull/89)
 * Proactively cache more flake inputs and fetches by @edolstra in [DeterminateSystems/nix-src#93](https://github.com/DeterminateSystems/nix-src/pull/93)
 * Fix: register extra builtins just once by @edolstra in [DeterminateSystems/nix-src#97](https://github.com/DeterminateSystems/nix-src/pull/97)
-* Fix: Make the S3 test more robust by @gustavderdrache in [DeterminateSystems/nix-src#101](https://github.com/DeterminateSystems/nix-src/pull/101)
 * Fix the link to `builders-use-substitutes` documentation for `builders` by @lucperkins in [DeterminateSystems/nix-src#102](https://github.com/DeterminateSystems/nix-src/pull/102)
 * Improve error messages that use the hypothetical future tense of "will" by @lucperkins in [DeterminateSystems/nix-src#92](https://github.com/DeterminateSystems/nix-src/pull/92)
 * Make the `nix repl` test more stable by @edolstra in [DeterminateSystems/nix-src#103](https://github.com/DeterminateSystems/nix-src/pull/103)
 * Run nixpkgsLibTests against lazy trees by @edolstra in [DeterminateSystems/nix-src#100](https://github.com/DeterminateSystems/nix-src/pull/100)
-* Go back to x86 native macOS builds by @grahamc in [DeterminateSystems/nix-src#104](https://github.com/DeterminateSystems/nix-src/pull/104)
 * Improve caching of inputs in dry-run mode by @edolstra in [DeterminateSystems/nix-src#98](https://github.com/DeterminateSystems/nix-src/pull/98)
 
 
