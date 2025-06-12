@@ -651,7 +651,7 @@ struct CompareValues
                     // Note: we don't take the accessor into account
                     // since it's not obvious how to compare them in a
                     // reproducible way.
-                    return strcmp(v1->payload.path.path, v2->payload.path.path) < 0;
+                    return strcmp(v1->pathStr(), v2->pathStr()) < 0;
                 case nList:
                     // Lexicographic comparison
                     for (size_t i = 0;; i++) {

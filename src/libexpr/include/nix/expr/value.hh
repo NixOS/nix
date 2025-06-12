@@ -445,7 +445,7 @@ public:
         assert(internalType == tPath);
         return SourcePath(
             ref(payload.path.accessor->shared_from_this()),
-            CanonPath(CanonPath::unchecked_t(), payload.path.path));
+            CanonPath(CanonPath::unchecked_t(), pathStr()));
     }
 
     std::string_view string_view() const
@@ -494,6 +494,9 @@ public:
 
     FunctionApplicationThunk app() const
     { return payload.app; }
+
+    const char * pathStr() const
+    { return payload.path.path; }
 };
 
 

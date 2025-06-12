@@ -2368,7 +2368,7 @@ BackedStringView EvalState::coerceToString(
             !canonicalizePath && !copyToStore
             ? // FIXME: hack to preserve path literals that end in a
               // slash, as in /foo/${x}.
-              v.payload.path.path
+              v.pathStr()
             : copyToStore
             ? store->printStorePath(copyPathToStore(context, v.path()))
             : std::string(v.path().path.abs());
@@ -2643,7 +2643,7 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
                 ValuePrinter(*this, v2, errorPrintOptions))
                 .debugThrow();
         }
-        if (strcmp(v1.payload.path.path, v2.payload.path.path) != 0) {
+        if (strcmp(v1.pathStr(), v2.pathStr()) != 0) {
             error<AssertionError>(
                 "path '%s' is not equal to path '%s'",
                 ValuePrinter(*this, v1, errorPrintOptions),
@@ -2811,7 +2811,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
             return
                 // FIXME: compare accessors by their fingerprint.
                 v1.payload.path.accessor == v2.payload.path.accessor
-                && strcmp(v1.payload.path.path, v2.payload.path.path) == 0;
+                && strcmp(v1.pathStr(), v2.pathStr()) == 0;
 
         case nNull:
             return true;
