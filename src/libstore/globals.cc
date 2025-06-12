@@ -6,7 +6,6 @@
 #include "nix/util/abstract-setting-to-json.hh"
 #include "nix/util/compute-levels.hh"
 #include "nix/util/signals.hh"
-#include "nix/util/types.hh"
 
 #include <algorithm>
 #include <map>

@@ -34,7 +34,8 @@ struct OptimiseStats
     uint64_t bytesFreed = 0;
 };
 
-struct LocalBuildStoreConfig : virtual LocalFSStoreConfig {
+struct LocalBuildStoreConfig : virtual LocalFSStoreConfig
+{
 
 private:
     /**
