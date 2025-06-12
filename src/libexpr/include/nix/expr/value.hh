@@ -444,7 +444,7 @@ public:
     {
         assert(internalType == tPath);
         return SourcePath(
-            ref(payload.path.accessor->shared_from_this()),
+            ref(pathAccessor()->shared_from_this()),
             CanonPath(CanonPath::unchecked_t(), pathStr()));
     }
 
@@ -497,6 +497,9 @@ public:
 
     const char * pathStr() const
     { return payload.path.path; }
+
+    SourceAccessor * pathAccessor() const
+    { return payload.path.accessor; }
 };
 
 

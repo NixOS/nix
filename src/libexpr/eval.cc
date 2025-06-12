@@ -2636,7 +2636,7 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         return;
 
     case nPath:
-        if (v1.payload.path.accessor != v2.payload.path.accessor) {
+        if (v1.pathAccessor() != v2.pathAccessor()) {
             error<AssertionError>(
                 "path '%s' is not equal to path '%s' because their accessors are different",
                 ValuePrinter(*this, v1, errorPrintOptions),
@@ -2810,7 +2810,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         case nPath:
             return
                 // FIXME: compare accessors by their fingerprint.
-                v1.payload.path.accessor == v2.payload.path.accessor
+                v1.pathAccessor() == v2.pathAccessor()
                 && strcmp(v1.pathStr(), v2.pathStr()) == 0;
 
         case nNull:
