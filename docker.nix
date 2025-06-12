@@ -147,23 +147,11 @@ let
     "${k}:x:${toString gid}:${lib.concatStringsSep "," members}";
   groupContents = (lib.concatStringsSep "\n" (lib.attrValues (lib.mapAttrs groupToGroup groups)));
 
-  defaultNixConf = {
-    sandbox = "false";
-    build-users-group = "nixbld";
-    trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
-  };
-
   nixConfContents =
-    (lib.concatStringsSep "\n" (
-      lib.mapAttrsToList (
-        n: v:
-        let
-          vStr = if builtins.isList v then lib.concatStringsSep " " v else v;
-        in
-        "${n} = ${vStr}"
-      ) (defaultNixConf // nixConf)
-    ))
-    + "\n";
+    pkgs.dockerTools.nixConf
+    {
+      build-users-group = "nixbld";
+    };
 
   userHome = if uid == 0 then "/root" else "/home/${uname}";
 
@@ -182,10 +170,7 @@ let
           echo "[]" > $out/manifest.nix
         fi
       '';
-      rootEnv = pkgs.buildPackages.buildEnv {
-        name = "root-profile-env";
-        paths = defaultPkgs;
-      };
+      # doc/manual/source/command-ref/files/manifest.nix.md
       manifest = pkgs.buildPackages.runCommand "manifest.nix" { } ''
         cat > $out <<EOF
         [
@@ -215,11 +200,15 @@ let
         ]
         EOF
       '';
-      profile = pkgs.buildPackages.runCommand "user-environment" { } ''
-        mkdir $out
-        cp -a ${rootEnv}/* $out/
-        ln -s ${manifest} $out/manifest.nix
-      '';
+      profile = pkgs.buildPackages.buildEnv {
+        name = "root-profile-env";
+        paths = defaultPkgs;
+
+        postBuild = ''
+          mv $out/manifest $out/manifest.nix
+        '';
+        inherit manifest;
+      };
       flake-registry-path =
         if (flake-registry == null) then
           null
@@ -251,6 +240,7 @@ let
           set -x
           mkdir -p $out/etc
 
+          # may get replaced by pkgs.dockerTools.caCertificates
           mkdir -p $out/etc/ssl/certs
           ln -s /nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt $out/etc/ssl/certs
 
@@ -278,17 +268,21 @@ let
           mkdir -p $out${userHome}
           mkdir -p $out/nix/var/nix/profiles/per-user/${uname}
 
+          # see doc/manual/source/command-ref/files/profiles.md
           ln -s ${profile} $out/nix/var/nix/profiles/default-1-link
           ln -s /nix/var/nix/profiles/default-1-link $out/nix/var/nix/profiles/default
           ln -s /nix/var/nix/profiles/default $out${userHome}/.nix-profile
 
+          # see doc/manual/source/command-ref/files/channels.md
           ln -s ${channel} $out/nix/var/nix/profiles/per-user/${uname}/channels-1-link
           ln -s /nix/var/nix/profiles/per-user/${uname}/channels-1-link $out/nix/var/nix/profiles/per-user/${uname}/channels
 
+          # see doc/manual/source/command-ref/files/default-nix-expression.md
           mkdir -p $out${userHome}/.nix-defexpr
           ln -s /nix/var/nix/profiles/per-user/${uname}/channels $out${userHome}/.nix-defexpr/channels
           echo "${channelURL} ${channelName}" > $out${userHome}/.nix-channels
 
+          # may get replaced by pkgs.dockerTools.binSh & pkgs.dockerTools.usrBinEnv
           mkdir -p $out/bin $out/usr/bin
           ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
           ln -s ${pkgs.bashInteractive}/bin/bash $out/bin/sh
