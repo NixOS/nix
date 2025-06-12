@@ -147,7 +147,7 @@ PosIdx Value::determinePos(const PosIdx pos) const
     #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (internalType) {
         case tAttrs: return attrs()->pos;
-        case tLambda: return payload.lambda.fun->pos;
+        case tLambda: return lambda().fun->pos;
         case tApp: return payload.app.left->determinePos(pos);
         default: return pos;
     }
@@ -610,7 +610,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             };
     }
     if (v.isLambda()) {
-        auto exprLambda = v.payload.lambda.fun;
+        auto exprLambda = v.lambda().fun;
 
         std::ostringstream s;
         std::string name;
@@ -1567,13 +1567,13 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 
         if (vCur.isLambda()) {
 
-            ExprLambda & lambda(*vCur.payload.lambda.fun);
+            ExprLambda & lambda(*vCur.lambda().fun);
 
             auto size =
                 (!lambda.arg ? 0 : 1) +
                 (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
             Env & env2(allocEnv(size));
-            env2.up = vCur.payload.lambda.env;
+            env2.up = vCur.lambda().env;
 
             Displacement displ = 0;
 
@@ -1603,7 +1603,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                                              symbols[i.name])
                                     .atPos(lambda.pos)
                                     .withTrace(pos, "from call site")
-                                    .withFrame(*fun.payload.lambda.env, lambda)
+                                    .withFrame(*fun.lambda().env, lambda)
                                     .debugThrow();
                         }
                         env2.values[displ++] = i.def->maybeThunk(*this, env2);
@@ -1630,7 +1630,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                                 .atPos(lambda.pos)
                                 .withTrace(pos, "from call site")
                                 .withSuggestions(suggestions)
-                                .withFrame(*fun.payload.lambda.env, lambda)
+                                .withFrame(*fun.lambda().env, lambda)
                                 .debugThrow();
                         }
                     unreachable();
@@ -1825,14 +1825,14 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
         }
     }
 
-    if (!fun.isLambda() || !fun.payload.lambda.fun->hasFormals()) {
+    if (!fun.isLambda() || !fun.lambda().fun->hasFormals()) {
         res = fun;
         return;
     }
 
-    auto attrs = buildBindings(std::max(static_cast<uint32_t>(fun.payload.lambda.fun->formals->formals.size()), args.size()));
+    auto attrs = buildBindings(std::max(static_cast<uint32_t>(fun.lambda().fun->formals->formals.size()), args.size()));
 
-    if (fun.payload.lambda.fun->formals->ellipsis) {
+    if (fun.lambda().fun->formals->ellipsis) {
         // If the formals have an ellipsis (eg the function accepts extra args) pass
         // all available automatic arguments (which includes arguments specified on
         // the command line via --arg/--argstr)
@@ -1840,7 +1840,7 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
             attrs.insert(v);
     } else {
         // Otherwise, only pass the arguments that the function accepts
-        for (auto & i : fun.payload.lambda.fun->formals->formals) {
+        for (auto & i : fun.lambda().fun->formals->formals) {
             auto j = args.get(i.name);
             if (j) {
                 attrs.insert(*j);
@@ -1850,7 +1850,7 @@ Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
 https://nixos.org/manual/nix/stable/language/constructs.html#functions.)", symbols[i.name])
-                    .atPos(i.pos).withFrame(*fun.payload.lambda.env, *fun.payload.lambda.fun).debugThrow();
+                    .atPos(i.pos).withFrame(*fun.lambda().env, *fun.lambda().fun).debugThrow();
             }
         }
     }

@@ -482,6 +482,9 @@ public:
 
     NixFloat fpoint() const
     { return payload.fpoint; }
+
+    Lambda lambda() const
+    { return payload.lambda; }
 };
 
 
