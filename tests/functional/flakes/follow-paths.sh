@@ -401,7 +401,6 @@ EOF
 cat <<EOF > $flakeFollowsB/flake.nix
 {
   inputs.C.url = "path:nosuchflake";
-  inputs.D.url = "path:nosuchflake";
   inputs.D.follows = "C/D";
   outputs = _: {};
 }
@@ -419,3 +418,15 @@ EOF
 nix flake lock $flakeFollowsA --recreate-lock-file
 
 [[ $(jq -c .nodes.B.inputs.D $flakeFollowsA/flake.lock) = '["B","C","D"]' ]]
+
+# Check that you can't have both a flakeref and a follows attribute on an input.
+cat <<EOF > $flakeFollowsB/flake.nix
+{
+  inputs.C.url = "path:nosuchflake";
+  inputs.D.url = "path:nosuchflake";
+  inputs.D.follows = "C/D";
+  outputs = _: {};
+}
+EOF
+
+expectStderr 1 nix flake lock $flakeFollowsA --recreate-lock-file | grepQuiet "flake input has both a flake reference and a follows attribute"
