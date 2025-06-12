@@ -67,10 +67,4 @@ This section lists the differences between upstream Nix 2.29 and Determinate Nix
 
 * Improve error messages that use the hypothetical future tense of "will" by @lucperkins in [DeterminateSystems/nix-src#92](https://github.com/DeterminateSystems/nix-src/pull/92)
 
-* Make the `nix repl` test more stable by @edolstra in [DeterminateSystems/nix-src#103](https://github.com/DeterminateSystems/nix-src/pull/103)
-
-* Run nixpkgsLibTests against lazy trees by @edolstra in [DeterminateSystems/nix-src#100](https://github.com/DeterminateSystems/nix-src/pull/100)
-
-* Go back to x86 native macOS builds by @grahamc in [DeterminateSystems/nix-src#104](https://github.com/DeterminateSystems/nix-src/pull/104)
-
 * Improve caching of inputs in dry-run mode by @edolstra in [DeterminateSystems/nix-src#98](https://github.com/DeterminateSystems/nix-src/pull/98)
