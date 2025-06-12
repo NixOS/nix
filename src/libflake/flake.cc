@@ -154,6 +154,9 @@ static FlakeInput parseFlakeInput(
             input.ref = parseFlakeRef(state.fetchSettings, *url, {}, true, input.isFlake, true);
     }
 
+    if (input.ref && input.follows)
+        throw Error("flake input has both a flake reference and a follows attribute, at %s", state.positions[pos]);
+
     return input;
 }
 
