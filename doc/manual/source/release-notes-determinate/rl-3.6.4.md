@@ -1,4 +1,4 @@
-# Release 3.6.3 (2025-06-12)
+# Release 3.6.4 (2025-06-12)
 
 * Based on [upstream Nix 2.29.0](../release-notes/rl-2.29.md).
 
@@ -17,4 +17,4 @@
 * Improve caching of inputs in dry-run mode by @edolstra in [DeterminateSystems/nix-src#98](https://github.com/DeterminateSystems/nix-src/pull/98)
 
 
-**Full Changelog**: [v3.6.2...v3.6.3](https://github.com/DeterminateSystems/nix-src/compare/v3.6.2...v3.6.3)
+**Full Changelog**: [v3.6.2...v3.6.4](https://github.com/DeterminateSystems/nix-src/compare/v3.6.2...v3.6.4)
