@@ -223,38 +223,53 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        its timestamp back to 0. */
     MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : "");
 
-    std::filesystem::path tempLink = fmt("%1%/.tmp-link-%2%-%3%", config->realStoreDir, getpid(), rand());
+    /* Retry loop for temporary link creation to handle race conditions */
+    while (true) {
+        Path tempLink = makeTempPath(config->realStoreDir.get(), ".tmp-link");
 
-    try {
-        std::filesystem::create_hard_link(linkPath, tempLink);
-        inodeHash.insert(st.st_ino);
-    } catch (std::filesystem::filesystem_error & e) {
-        if (e.code() == std::errc::too_many_links) {
-            /* Too many links to the same file (>= 32000 on most file
-               systems).  This is likely to happen with empty files.
-               Just shrug and ignore. */
-            if (st.st_size)
-                printInfo("'%1%' has maximum number of links", linkPath);
-            return;
+        try {
+            std::filesystem::create_hard_link(linkPath, tempLink);
+            inodeHash.insert(st.st_ino);
+        } catch (std::filesystem::filesystem_error & e) {
+            if (e.code() == std::errc::too_many_links) {
+                /* Too many links to the same file (>= 32000 on most file
+                   systems).  This is likely to happen with empty files.
+                   Just shrug and ignore. */
+                if (st.st_size)
+                    printInfo("'%1%' has maximum number of links", linkPath);
+                return;
+            }
+            throw SysError("creating temporary link '%1%'", tempLink);
         }
-        throw;
-    }
 
-    /* Atomically replace the old file with the new hard link. */
-    try {
-        std::filesystem::rename(tempLink, path);
-    } catch (std::filesystem::filesystem_error & e) {
-        std::filesystem::remove(tempLink);
-            printError("unable to unlink '%1%'", tempLink);
-        if (e.code() == std::errc::too_many_links) {
-            /* Some filesystems generate too many links on the rename,
-               rather than on the original link.  (Probably it
-               temporarily increases the st_nlink field before
-               decreasing it again.) */
-            debug("'%s' has reached maximum number of links", linkPath);
-            return;
+        /* Atomically replace the old file with the new hard link. */
+        try {
+            std::filesystem::rename(tempLink, path);
+            break; /* Success! */
+        } catch (std::filesystem::filesystem_error & e) {
+            try {
+                std::filesystem::remove(tempLink);
+            } catch (...) {
+                /* Ignore errors removing the temp link */
+            }
+
+            if (e.code() == std::errc::too_many_links) {
+                /* Some filesystems generate too many links on the rename,
+                   rather than on the original link.  (Probably it
+                   temporarily increases the st_nlink field before
+                   decreasing it again.) */
+                debug("%s has reached maximum number of links", linkPath);
+                return;
+            }
+
+            if (e.code() == std::errc::file_exists) {
+                /* Race condition: another process created the same temp link.
+                   Try again with a different name. */
+                continue;
+            }
+
+            throw SysError("renaming temporary link '%1%' to '%2%'", tempLink, path);
         }
-        throw;
     }
 
     stats.filesLinked++;
