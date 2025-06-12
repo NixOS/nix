@@ -314,7 +314,7 @@ protected:
     /**
      * Make a file owned by the builder addressed by its file descriptor.
      */
-    void chownToBuilder(const AutoCloseFD & fd);
+    void chownToBuilder(int fd, const Path & path);
 
     /**
      * Run the builder's process.
@@ -730,7 +730,7 @@ void DerivationBuilderImpl::startBuilder()
     if (!tmpDirFd)
         throw SysError("failed to open the build temporary directory descriptor '%1%'", tmpDir);
 
-    chownToBuilder(tmpDirFd);
+    chownToBuilder(tmpDirFd.get(), tmpDir);
 
     for (auto & [outputName, status] : initialOutputs) {
         /* Set scratch path we'll actually use during the build.
@@ -1073,8 +1073,8 @@ void DerivationBuilderImpl::initEnv()
                 AutoCloseFD passAsFileFd{openat(tmpDirFd.get(), fn.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666)};
                 if (!passAsFileFd)
                     throw SysError("opening `passAsFile` file in the sandbox '%1%'", p);
-                writeFile(passAsFileFd, rewriteStrings(i.second, inputRewrites));
-                chownToBuilder(passAsFileFd);
+                writeFile(passAsFileFd, p, rewriteStrings(i.second, inputRewrites));
+                chownToBuilder(passAsFileFd.get(), p);
                 env[i.first + "Path"] = tmpDirInSandbox() + "/" + fn;
             }
         }
@@ -1278,11 +1278,11 @@ void DerivationBuilderImpl::chownToBuilder(const Path & path)
         throw SysError("cannot change ownership of '%1%'", path);
 }
 
-void DerivationBuilderImpl::chownToBuilder(const AutoCloseFD & fd)
+void DerivationBuilderImpl::chownToBuilder(int fd, const Path & path)
 {
     if (!buildUser) return;
-    if (fchown(fd.get(), buildUser->getUID(), buildUser->getGID()) == -1)
-        throw SysError("cannot change ownership of file '%1%'", fd.guessOrInventPath());
+    if (fchown(fd, buildUser->getUID(), buildUser->getGID()) == -1)
+        throw SysError("cannot change ownership of file '%1%'", path);
 }
 
 void DerivationBuilderImpl::runChild()

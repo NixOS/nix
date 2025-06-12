@@ -37,8 +37,6 @@ foreach funcspec : check_funcs
   configdata.set(define_name, define_value, description: funcspec[1])
 endforeach
 
-configdata.set('HAVE_F_GETPATH', cxx.has_header_symbol('fcntl.h', 'F_GETPATH').to_int())
-
 subdir('nix-meson-build-support/libatomic')
 
 if host_machine.system() == 'windows'

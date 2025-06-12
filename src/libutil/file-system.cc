@@ -315,19 +315,19 @@ void writeFile(const Path & path, std::string_view s, mode_t mode)
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
-    writeFile(fd, s, mode);
+    writeFile(fd, path, s, mode);
 
     /* Close explicitly to propagate the exceptions. */
     fd.close();
 }
 
-void writeFile(AutoCloseFD & fd, std::string_view s, mode_t mode)
+void writeFile(AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode)
 {
     assert(fd);
     try {
         writeFull(fd.get(), s);
     } catch (Error & e) {
-        e.addTrace({}, "writing file '%1%'", fd.guessOrInventPath());
+        e.addTrace({}, "writing file '%1%'", origPath);
         throw;
     }
 }
@@ -339,7 +339,7 @@ void writeFileAndSync(const Path & path, std::string_view s, mode_t mode)
         if (!fd)
             throw SysError("opening file '%1%'", path);
 
-        writeFile(fd, s, mode);
+        writeFile(fd, path, s, mode);
         fd.fsync();
         /* Close explicitly to ensure that exceptions are propagated. */
         fd.close();
@@ -444,8 +444,6 @@ void recursiveSync(const Path & path)
 static void _deletePath(Descriptor parentfd, const std::filesystem::path & path, uint64_t & bytesFreed, std::exception_ptr & ex MOUNTEDPATHS_PARAM)
 {
 #ifndef _WIN32
-    /* This ensures that `name` is an immediate child of `parentfd`. */
-    assert(!path.empty() && path.string().find('/') == std::string::npos && "`name` is an immediate child to `parentfd`");
     checkInterrupt();
 
 #ifdef __FreeBSD__
@@ -456,13 +454,14 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
     }
 #endif
 
-    std::string name(path.native());
+    std::string name(path.filename());
+    assert(name != "." && name != ".." && !name.empty());
 
     struct stat st;
     if (fstatat(parentfd, name.c_str(), &st,
             AT_SYMLINK_NOFOLLOW) == -1) {
         if (errno == ENOENT) return;
-        throw SysError("getting status of '%1%' in directory '%2%'", name, guessOrInventPathFromFD(parentfd));
+        throw SysError("getting status of %1%", path);
     }
 
     if (!S_ISDIR(st.st_mode)) {
@@ -493,24 +492,23 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
         /* Make the directory accessible. */
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
         if ((st.st_mode & PERM_MASK) != PERM_MASK) {
-            if (fchmodat(parentfd, name.c_str(), st.st_mode | PERM_MASK, 0) == -1) {
-                throw SysError("chmod '%1%' in directory '%2%'", name, guessOrInventPathFromFD(parentfd));
-            }
+            if (fchmodat(parentfd, name.c_str(), st.st_mode | PERM_MASK, 0) == -1)
+                throw SysError("chmod %1%", path);
         }
 
         int fd = openat(parentfd, name.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
         if (fd == -1)
-            throw SysError("opening directory '%1%' in directory '%2%'", name, guessOrInventPathFromFD(parentfd));
+            throw SysError("opening directory %1%", path);
         AutoCloseDir dir(fdopendir(fd));
         if (!dir)
-            throw SysError("opening directory '%1%' in directory '%2%'", name, guessOrInventPathFromFD(parentfd));
+            throw SysError("opening directory %1%", path);
 
         struct dirent * dirent;
         while (errno = 0, dirent = readdir(dir.get())) { /* sic */
             checkInterrupt();
             std::string childName = dirent->d_name;
             if (childName == "." || childName == "..") continue;
-            _deletePath(dirfd(dir.get()), childName, bytesFreed, ex MOUNTEDPATHS_ARG);
+            _deletePath(dirfd(dir.get()), path / childName, bytesFreed, ex MOUNTEDPATHS_ARG);
         }
         if (errno) throw SysError("reading directory %1%", path);
     }
@@ -519,7 +517,7 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
     if (unlinkat(parentfd, name.c_str(), flags) == -1) {
         if (errno == ENOENT) return;
         try {
-            throw SysError("cannot unlink '%1%' in directory '%2%'", name, guessOrInventPathFromFD(parentfd));
+            throw SysError("cannot unlink %1%", path);
         } catch (...) {
             if (!ex)
                 ex = std::current_exception();
@@ -535,19 +533,18 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
 
 static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFreed MOUNTEDPATHS_PARAM)
 {
-    Path dir = dirOf(path.string());
-    if (dir == "")
-        dir = "/";
+    assert(path.is_absolute());
+    assert(path.parent_path() != path);
 
-    AutoCloseFD dirfd = toDescriptor(open(dir.c_str(), O_RDONLY));
+    AutoCloseFD dirfd = toDescriptor(open(path.parent_path().string().c_str(), O_RDONLY));
     if (!dirfd) {
         if (errno == ENOENT) return;
-        throw SysError("opening directory '%1%'", path);
+        throw SysError("opening directory %s", path.parent_path());
     }
 
     std::exception_ptr ex;
 
-    _deletePath(dirfd.get(), path.filename(), bytesFreed, ex MOUNTEDPATHS_ARG);
+    _deletePath(dirfd.get(), path, bytesFreed, ex MOUNTEDPATHS_ARG);
 
     if (ex)
         std::rethrow_exception(ex);
