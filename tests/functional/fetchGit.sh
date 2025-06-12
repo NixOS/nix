@@ -81,7 +81,7 @@ path2=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"
 [[ $(nix eval --raw --expr "builtins.readFile (fetchGit { url = file://$repo; rev = \"$rev2\"; } + \"/hello\")") = world ]]
 
 # But without a hash, it fails.
-expectStderr 1 nix eval --expr 'builtins.fetchGit "file:///foo"' | grepQuiet "'fetchGit' will not fetch unlocked input"
+expectStderr 1 nix eval --expr 'builtins.fetchGit "file:///foo"' | grepQuiet "'fetchGit' doesn't fetch unlocked input"
 
 # Fetch again. This should be cached.
 mv $repo ${repo}-tmp
