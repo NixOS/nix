@@ -84,8 +84,7 @@ StorePath EvalState::mountInput(
             if (store->isValidPath(storePath))
                 _narHash = store->queryPathInfo(storePath)->narHash;
             else
-                // FIXME: use fetchToStore to make it cache this
-                _narHash = accessor->hashPath(CanonPath::root);
+                _narHash = fetchToStore2(*store, accessor, FetchMode::DryRun, input.getName()).second;
         }
         return _narHash;
     };

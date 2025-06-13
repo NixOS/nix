@@ -144,37 +144,22 @@ struct PathInputScheme : InputScheme
             storePath = store->addToStoreFromDump(*src, "source");
         }
 
-        // To avoid copying the path again to the /nix/store, we need to add a cache entry.
-        ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive;
-        auto fp = getFingerprint(store, input);
-        if (fp) {
-            auto cacheKey = makeFetchToStoreCacheKey(input.getName(), *fp, method, "/");
-            fetchers::getCache()->upsert(cacheKey, *store, {}, *storePath);
-        }
+        auto accessor = makeStorePathAccessor(store, *storePath);
+
+        // To prevent `fetchToStore()` copying the path again to Nix
+        // store, pre-create an entry in the fetcher cache.
+        auto info = store->queryPathInfo(*storePath);
+        accessor->fingerprint = fmt("path:%s", store->queryPathInfo(*storePath)->narHash.to_string(HashFormat::SRI, true));
+        fetchers::getCache()->upsert(
+            makeSourcePathToHashCacheKey(*accessor->fingerprint, ContentAddressMethod::Raw::NixArchive, "/"),
+            {{"hash", info->narHash.to_string(HashFormat::SRI, true)}});
 
         /* Trust the lastModified value supplied by the user, if
            any. It's not a "secure" attribute so we don't care. */
         if (!input.getLastModified())
             input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
 
-        return {makeStorePathAccessor(store, *storePath), std::move(input)};
-    }
-
-    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
-    {
-        if (isRelative(input))
-            return std::nullopt;
-
-        /* If this path is in the Nix store, use the hash of the
-           store object and the subpath. */
-        auto path = getAbsPath(input);
-        try {
-            auto [storePath, subPath] = store->toStorePath(path.string());
-            auto info = store->queryPathInfo(storePath);
-            return fmt("path:%s:%s", info->narHash.to_string(HashFormat::Base16, false), subPath);
-        } catch (Error &) {
-            return std::nullopt;
-        }
+        return {accessor, std::move(input)};
     }
 };
 
