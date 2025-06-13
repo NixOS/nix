@@ -35,7 +35,7 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       system: x86_64-linux
-      runner: UbuntuLatest32Cores128G
+      runner: namespace-profile-linuxamd32c64g-cache
       runner_small: ubuntu-latest
       run_tests: true
       run_vm_tests: true

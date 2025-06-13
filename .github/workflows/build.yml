@@ -135,6 +135,11 @@ jobs:
           FLAKE_REGRESSION_GLOB: ${{ matrix.glob }}
           NIX_CONFIG: ${{ matrix.nix_config }}
         run: |
+          set -x
+          if [ ! -z "${NSC_CACHE_PATH:-}" ]; then
+            mkdir -p "${NSC_CACHE_PATH}/nix/xdg-cache"
+            export XDG_CACHE_HOME="${NSC_CACHE_PATH}/nix/xdg-cache"
+          fi
           nix build -L --out-link ./new-nix
           export PATH=$(pwd)/new-nix/bin:$PATH
 
