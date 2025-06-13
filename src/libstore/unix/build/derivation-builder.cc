@@ -105,15 +105,8 @@ protected:
     /**
      * Stuff we need to pass to initChild().
      */
-    struct ChrootPath {
-        Path source;
-        bool optional;
-        bool rdonly;
-        ChrootPath(Path source = "", bool optional = false, bool rdonly = false)
-            : source(source), optional(optional), rdonly(rdonly)
-        { }
-    };
-    typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
+
+    typedef SandboxPaths PathsInChroot; // maps target path to source path
 
     typedef StringMap Environment;
     Environment env;
@@ -848,35 +841,16 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
 {
     PathsInChroot pathsInChroot;
 
-    auto addPathWithOptions = [&](std::string s) {
-        if (s.empty()) return;
-        bool optional = false;
-        bool rdonly = false;
-        if (s[s.size() - 1] == '?') {
-            optional = true;
-            s.pop_back();
-        }
-        if (s.size() > 3 && s.substr(s.size() - 3) == ":ro") {
-            rdonly = true;
-            s.resize(s.size() - 3);
-        }
-        size_t p = s.find('=');
-        if (p == std::string::npos)
-            pathsInChroot[s] = {s, optional, rdonly};
-        else
-            pathsInChroot[s.substr(0, p)] = {s.substr(p + 1), optional, rdonly};
-    };
-
     /* Allow a user-configurable set of directories from the
        host file system. */
-    for (auto i : settings.sandboxPaths.get()) {
-        addPathWithOptions(i);
-    }
+    for (const auto & [k, v] : settings.sandboxPaths.get())
+        pathsInChroot.insert_or_assign(k, v);
+
     if (hasPrefix(store.storeDir, tmpDirInSandbox()))
     {
         throw Error("`sandbox-build-dir` must not contain the storeDir");
     }
-    pathsInChroot[tmpDirInSandbox()] = tmpDir;
+    pathsInChroot.insert_or_assign(tmpDirInSandbox(), tmpDir);
 
     /* Add the closure of store paths to the chroot. */
     StorePathSet closure;
@@ -946,7 +920,8 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
                 if (line == "") {
                     state = stBegin;
                 } else {
-                    addPathWithOptions(line);
+                    for (const auto & [k, v] : SandboxPath().parse(line))
+                        pathsInChroot.try_emplace(k, v);
                 }
             }
         }

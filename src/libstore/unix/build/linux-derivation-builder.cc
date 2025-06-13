@@ -121,18 +121,38 @@ static void setupSeccomp()
 #  endif
 }
 
-static void doBind(const Path & source, const Path & target, bool optional = false, bool rdonly = false)
+static auto combineMountOpts(auto init, auto iter)
 {
+    return std::transform_reduce(iter.cbegin(), iter.cend(), init,
+        [](unsigned long a, unsigned long b) {
+            if (b & (MS_NOATIME | MS_RELATIME | MS_NODIRATIME | MS_STRICTATIME)) {
+                return (a & ~(MS_NOATIME | MS_NODIRATIME | MS_RELATIME | MS_STRICTATIME)) | b;
+            }
+            return a | b;
+        },
+        [](const SandboxPath::MountOpt & o) { return static_cast<unsigned long>(o); });
+};
+
+
+static void doBind(const SandboxPath & pval, const Path & target)
+{
+    auto source = pval.source;
+    auto optional = pval.optional;
     debug("bind mounting '%1%' to '%2%'", source, target);
 
     auto bindMount = [&]() {
         if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
             throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
 
-        if (rdonly)
+        // set extra options when wanted
+        auto flags = pval.readOnly ? combineMountOpts(0, pval.readOnlyDefaults) : 0;
+        flags = combineMountOpts(flags, pval.options);
+        if (flags != 0) {
             // initial mount wouldn't respect MS_RDONLY, must remount
-            if (mount("", target.c_str(), "", MS_REMOUNT | MS_BIND | MS_RDONLY, 0) == -1)
-                throw (SysError("making bind mount '%s' read-only failed", target));
+            debug("remounting '%s' with flags: %d", target, flags);
+            if (mount("", target.c_str(), "", MS_REMOUNT | MS_BIND | flags, 0) == -1)
+                throw SysError("mount: updating bind-mount flags of '%s' failed", target);
+        }
     };
 
     auto maybeSt = maybeLstat(source);
@@ -677,7 +697,7 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
             // For backwards-compatibility, resolve all the symlinks in the
             // chroot paths.
             auto canonicalPath = canonPath(i, true);
-            pathsInChroot.emplace(i, canonicalPath);
+            pathsInChroot.try_emplace(i, canonicalPath);
         }
 
         /* Bind-mount all the directories from the "host"
@@ -699,7 +719,7 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
             } else
 #  endif
             {
-                doBind(i.second.source, chrootRootDir + i.first, i.second.optional);
+                doBind(i.second, chrootRootDir + i.first);
             }
         }
 

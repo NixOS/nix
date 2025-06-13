@@ -86,12 +86,12 @@ Settings::Settings()
     }
 
 #if (defined(__linux__) || defined(__FreeBSD__)) && defined(SANDBOX_SHELL)
-    sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
+    sandboxPaths = SandboxPaths { { "/bin/sh", SandboxPath(SANDBOX_SHELL) } };
 #endif
 
     /* chroot-like behavior from Apple's sandbox */
 #ifdef __APPLE__
-    sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
+    sandboxPaths.setDefault("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
 }
@@ -295,6 +295,94 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
         .handler = {[this]() { override(smRelaxed); }},
     });
 }
+
+NLOHMANN_JSON_SERIALIZE_ENUM(SandboxPath::MountOpt, {
+    {SandboxPath::MountOpt::ro,          "ro"},
+#ifdef __linux__
+    {SandboxPath::MountOpt::nodev,       "nodev"},
+    {SandboxPath::MountOpt::noexec,      "noexec"},
+    {SandboxPath::MountOpt::nosuid,      "nosuid"},
+    {SandboxPath::MountOpt::noatime,     "noatime"},
+    {SandboxPath::MountOpt::nodiratime,  "nodiratime"},
+    {SandboxPath::MountOpt::relatime,    "relatime"},
+    {SandboxPath::MountOpt::strictatime, "strictatime"},
+    {SandboxPath::MountOpt::private_,    "private"},
+    {SandboxPath::MountOpt::slave,       "slave"},
+    {SandboxPath::MountOpt::unbindable,  "unbindable"},
+#endif
+});
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(SandboxPath, source, optional, readOnly, options);
+
+/**
+ * Parses either old (strings) or new (json object) format sandbox-paths.
+ */
+SandboxPaths SandboxPath::parse(const std::string_view & str, const std::string & ctx)
+{
+    SandboxPaths res;
+
+    auto add = [&](std::string target, SandboxPath v) {
+        if (target == "")
+            throw UsageError("setting '%s' is an object whose keys are paths and paths cannot be empty", ctx);
+        target = canonPath(std::move(target));
+        if (v.source == "") v.source = target;
+        if (!res.try_emplace(target, std::move(v)).second)
+            throw UsageError("Sandbox path declared twice in '%s': %s", ctx, target);
+    };
+
+    if (str.starts_with('{')) {
+        for (auto & [k, v] : nlohmann::json::parse(str, nullptr, false, true).template get<SandboxPaths>())
+            add(k, std::move(v));
+    } else {
+        /* Parses legacy format sandbox-path e.g. "path[=source][?]".
+         * This format supports only a subset of options available with JSON format. */
+        for (std::string_view s : tokenizeString<Strings>(str)) {
+            bool optional = s.ends_with('?');
+            if (optional) s.remove_suffix(1);
+            if (size_t eq = s.find('='); eq != s.npos) {
+                add(std::string(s, 0, eq), { std::string(s.data() + eq + 1, s.size() - eq - 1), optional });
+            } else
+                add(std::string(s), { "", optional });
+        }
+    }
+    return res;
+}
+
+template<> SandboxPaths BaseSetting<SandboxPaths>::parse(const std::string & str) const
+{
+    return SandboxPath().parse(str, this->name);
+}
+
+template<> struct BaseSetting<SandboxPaths>::trait
+{
+    static constexpr bool appendable = true;
+};
+
+/* Omits keys that are set to their default values. */
+template<> std::string BaseSetting<SandboxPaths>::to_string() const
+{
+    if (value.empty())
+        return "";
+    nlohmann::json res = nlohmann::json::object();
+    for (const auto & [k, v] : value) {
+        auto po = nlohmann::json::object();
+        if (v.source != "" && v.source != k) po.emplace("source", v.source);
+        if (v.optional) po.emplace("optional", v.optional);
+        if (v.readOnly) po.emplace("readOnly", v.readOnly);
+        if (!v.options.empty()) po.emplace("options", v.options);
+        res.emplace(k, std::move(po));
+    }
+    return res.dump();
+}
+
+template<> void BaseSetting<SandboxPaths>::appendOrSet(SandboxPaths newValue, bool append)
+{
+    if (!append) value.clear();
+    for (auto & [k, v] : newValue)
+        value.insert_or_assign(std::move(k), std::move(v));
+}
+
+template class BaseSetting<SandboxPaths>;
 
 unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
 {
