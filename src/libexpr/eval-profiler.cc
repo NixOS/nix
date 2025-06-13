@@ -204,7 +204,7 @@ FrameInfo SampleStack::getFrameInfoFromValueAndPos(const Value & v, std::span<Va
     /* NOTE: No actual references to garbage collected values are not held in
        the profiler. */
     if (v.isLambda())
-        return LambdaFrameInfo{.expr = v.payload.lambda.fun, .callPos = pos};
+        return LambdaFrameInfo{.expr = v.lambda().fun, .callPos = pos};
     else if (v.isPrimOp()) {
         return getPrimOpFrameInfo(*v.primOp(), args, pos);
     } else if (v.isPrimOpApp())

@@ -404,8 +404,7 @@
           dockerImage =
             let
               pkgs = nixpkgsFor.${system}.native;
-              image = import ./docker.nix {
-                inherit pkgs;
+              image = pkgs.callPackage ./docker.nix {
                 tag = pkgs.nix.version;
               };
             in

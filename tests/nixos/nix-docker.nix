@@ -1,21 +1,15 @@
 # Test the container built by ../../docker.nix.
 
 {
-  lib,
   config,
-  nixpkgs,
-  hostPkgs,
   ...
 }:
 
 let
   pkgs = config.nodes.machine.nixpkgs.pkgs;
 
-  nixImage = import ../../docker.nix {
-    inherit (config.nodes.machine.nixpkgs) pkgs;
-  };
-  nixUserImage = import ../../docker.nix {
-    inherit (config.nodes.machine.nixpkgs) pkgs;
+  nixImage = pkgs.callPackage ../../docker.nix { };
+  nixUserImage = pkgs.callPackage ../../docker.nix {
     name = "nix-user";
     uid = 1000;
     gid = 1000;
