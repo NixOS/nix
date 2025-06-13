@@ -110,11 +110,8 @@ jobs:
           - "lazy-trees = true"
           - "lazy-trees = false"
         glob:
-          - "[0-d]*"
-          - "[e-l]*"
-          - "[m]*"
-          - "[n-r]*"
-          - "[s-z]*"
+          - "[0-l]*"
+          - "[m-z]*"
     steps:
       - name: Checkout nix
         uses: actions/checkout@v4
