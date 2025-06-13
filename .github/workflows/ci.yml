@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   eval:
-    runs-on: blacksmith-32vcpu-ubuntu-2204
+    runs-on: UbuntuLatest32Cores128G
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,7 +35,7 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       system: x86_64-linux
-      runner: blacksmith-32vcpu-ubuntu-2204
+      runner: UbuntuLatest32Cores128G
       runner_small: ubuntu-latest
       run_tests: true
       run_vm_tests: true
@@ -46,8 +46,8 @@ jobs:
     with:
       if: ${{ github.event_name == 'merge_group' }}
       system: aarch64-linux
-      runner: blacksmith-32vcpu-ubuntu-2204-arm
-      runner_small: blacksmith-32vcpu-ubuntu-2204-arm
+      runner: UbuntuLatest32Cores128GArm
+      runner_small: UbuntuLatest32Cores128GArm
 
   build_x86_64-darwin:
     uses: ./.github/workflows/build.yml
