@@ -4,14 +4,22 @@ on:
   pull_request:
   push:
     branches:
+      # NOTE: make sure any branches here are also valid directory names,
+      # otherwise creating the directory and uploading to s3 will fail
       - detsys-main
       - main
       - master
   merge_group:
+  release:
+    types:
+      - published
 
 permissions:
   id-token: "write"
   contents: "read"
+  pull-requests: "write"
+  statuses: "write"
+  deployments: "write"
 
 jobs:
   eval:
@@ -26,150 +34,103 @@ jobs:
   build_x86_64-linux:
     uses: ./.github/workflows/build.yml
     with:
-      os: blacksmith-32vcpu-ubuntu-2204
       system: x86_64-linux
+      runner: blacksmith-32vcpu-ubuntu-2204
+      runner_small: ubuntu-latest
+      run_tests: true
+      run_vm_tests: true
+      run_regression_tests: true
 
   build_aarch64-linux:
     uses: ./.github/workflows/build.yml
     with:
       if: ${{ github.event_name == 'merge_group' }}
-      os: blacksmith-32vcpu-ubuntu-2204-arm
       system: aarch64-linux
+      runner: blacksmith-32vcpu-ubuntu-2204-arm
+      runner_small: blacksmith-32vcpu-ubuntu-2204-arm
 
   build_x86_64-darwin:
     uses: ./.github/workflows/build.yml
     with:
       if: ${{ github.event_name == 'merge_group' }}
-      os: macos-latest-large
       system: x86_64-darwin
+      runner: macos-latest-large
+      runner_small: macos-latest-large
 
   build_aarch64-darwin:
     uses: ./.github/workflows/build.yml
     with:
-      os: namespace-profile-mac-m2-12c28g
       system: aarch64-darwin
+      runner: namespace-profile-mac-m2-12c28g
+      runner_small: macos-latest-xlarge
 
-  vm_tests_smoke:
-    if: github.event_name != 'merge_group'
-    needs: build_x86_64-linux
-    runs-on: blacksmith-32vcpu-ubuntu-2204
+  success:
+    runs-on: ubuntu-latest
+    needs:
+      - eval
+      - build_x86_64-linux
+      - build_aarch64-linux
+      - build_x86_64-darwin
+      - build_aarch64-darwin
+    if: ${{ always() }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/determinate-nix-action@main
-      - uses: DeterminateSystems/flakehub-cache-action@main
+      - run: "true"
       - run: |
-          nix build -L \
-            .#hydraJobs.tests.functional_user \
-            .#hydraJobs.tests.githubFlakes \
-            .#hydraJobs.tests.nix-docker \
-            .#hydraJobs.tests.tarballFlakes \
-            ;
-
-  vm_tests_all:
-    if: github.event_name == 'merge_group'
-    needs: build_x86_64-linux
-    runs-on: blacksmith-32vcpu-ubuntu-2204
-    steps:
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/determinate-nix-action@main
-      - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: |
-          nix build -L --keep-going \
-            $(nix flake show --json \
-              | jq -r '
-                .hydraJobs.tests
-                | with_entries(select(.value.type == "derivation"))
-                | keys[]
-                | ".#hydraJobs.tests." + .')
-
-  flake_regressions:
-    if: |
-      github.event_name == 'merge_group'
-      || (
-        github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
-        && (
-          (github.event.action == 'labeled' && github.event.label.name == 'flake-regression-test')
-          || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'flake-regression-test'))
-        )
-      )
-    needs: build_x86_64-linux
-    runs-on: namespace-profile-x86-32cpu-64gb
-    steps:
-      - name: Checkout nix
-        uses: actions/checkout@v4
-      - name: Checkout flake-regressions
-        uses: actions/checkout@v4
-        with:
-          repository: DeterminateSystems/flake-regressions
-          path: flake-regressions
-      - name: Checkout flake-regressions-data
-        uses: actions/checkout@v4
-        with:
-          repository: DeterminateSystems/flake-regressions-data
-          path: flake-regressions/tests
-      - uses: DeterminateSystems/determinate-nix-action@main
-      - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 50%" flake-regressions/eval-all.sh
-
-  flake_regressions_lazy:
-    if: |
-      github.event_name == 'merge_group'
-      || (
-        github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
-        && (
-          (github.event.action == 'labeled' && github.event.label.name == 'flake-regression-test')
-          || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'flake-regression-test'))
-        )
-      )
-    needs: build_x86_64-linux
-    runs-on: namespace-profile-x86-32cpu-64gb
-    steps:
-      - name: Checkout nix
-        uses: actions/checkout@v4
-      - name: Checkout flake-regressions
-        uses: actions/checkout@v4
-        with:
-          repository: DeterminateSystems/flake-regressions
-          path: flake-regressions
-      - name: Checkout flake-regressions-data
-        uses: actions/checkout@v4
-        with:
-          repository: DeterminateSystems/flake-regressions-data
-          path: flake-regressions/tests
-      - uses: DeterminateSystems/determinate-nix-action@main
-      - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 50%" NIX_CONFIG="lazy-trees = true" flake-regressions/eval-all.sh
-
-  manual:
-    if: github.event_name != 'merge_group'
-    needs: build_x86_64-linux
-    runs-on: blacksmith
-    permissions:
-      id-token: "write"
-      contents: "read"
-      pull-requests: "write"
-      statuses: "write"
-      deployments: "write"
-    steps:
-      - name: Checkout nix
-        uses: actions/checkout@v4
-      - uses: DeterminateSystems/determinate-nix-action@main
-      - uses: DeterminateSystems/flakehub-cache-action@main
-      - name: Build manual
-        run: nix build .#hydraJobs.manual
-      - uses: nwtgck/actions-netlify@v3.0
-        with:
-          publish-dir: "./result/share/doc/nix/manual"
-          production-branch: detsys-main
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          deploy-message: "Deploy from GitHub Actions"
-          # NOTE(cole-h): We have a perpetual PR displaying our changes against upstream open, but
-          # its conversation is locked, so this PR comment can never be posted.
-          # https://github.com/DeterminateSystems/nix-src/pull/4
-          enable-pull-request-comment: ${{ github.event.pull_request.number != 4 }}
-          enable-commit-comment: true
-          enable-commit-status: true
-          overwrites-pull-request-comment: true
+          echo "A dependent in the build matrix failed:"
+          echo "$needs"
+          exit 1
         env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          needs: ${{ toJSON(needs) }}
+        if: |
+          contains(needs.*.result, 'failure') ||
+          contains(needs.*.result, 'cancelled')
+
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@main
+
+      - name: Create artifacts directory
+        run: mkdir -p ./artifacts
+
+      - name: Fetch artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded
+      - name: Move downloaded artifacts to artifacts directory
+        run: |
+          for dir in ./downloaded/*; do
+            arch="$(basename "$dir")"
+            mv "$dir"/*.xz ./artifacts/"${arch}"
+          done
+
+      - name: Build fallback-paths.nix
+        run: |
+          nix build .#fallbackPathsNix --out-link fallback
+          cat fallback > ./artifacts/fallback-paths.nix
+
+      - uses: DeterminateSystems/push-artifact-ids@main
+        with:
+          s3_upload_role: ${{ secrets.AWS_S3_UPLOAD_ROLE_ARN }}
+          bucket: ${{ secrets.AWS_S3_UPLOAD_BUCKET_NAME }}
+          directory: ./artifacts
+          ids_project_name: determinate-nix
+          ids_binary_prefix: determinate-nix
+          skip_acl: true
+          allowed_branches: '["detsys-main"]'
+
+  publish:
+    needs:
+      - success
+    if: (!github.repository.fork && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/')))
+    environment: ${{ github.event_name == 'release' && 'production' || '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@main
+      - uses: DeterminateSystems/flakehub-push@main
+        with:
+          rolling: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+          visibility: "public"
+          tag: "${{ github.ref_name }}"
