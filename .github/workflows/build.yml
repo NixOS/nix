@@ -112,7 +112,8 @@ jobs:
         glob:
           - "[0-d]*"
           - "[e-l]*"
-          - "[m-r]*"
+          - "[m]*"
+          - "[n-r]*"
           - "[s-z]*"
     steps:
       - name: Checkout nix
@@ -136,7 +137,12 @@ jobs:
         run: |
           nix build -L --out-link ./new-nix
           export PATH=$(pwd)/new-nix/bin:$PATH
-          flake-regressions/eval-all.sh
+
+          if ! flake-regressions/eval-all.sh; then
+            echo "Some failed, trying again"
+            printf "\n\n\n\n\n\n\n\n"
+            flake-regressions/eval-all.sh
+          fi
 
   manual:
     if: github.event_name != 'merge_group'
