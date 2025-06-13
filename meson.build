@@ -1,13 +1,13 @@
 # This is just a stub project to include all the others as subprojects
 # for development shell purposes
 
-project('nix-dev-shell', 'cpp',
+project(
+  'nix-dev-shell',
+  'cpp',
   version : files('.version'),
   subproject_dir : 'src',
-  default_options : [
-    'localstatedir=/nix/var',
-  ],
-  meson_version : '>= 1.1'
+  default_options : [ 'localstatedir=/nix/var' ],
+  meson_version : '>= 1.1',
 )
 
 # Internal Libraries

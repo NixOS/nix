@@ -1,5 +1,3 @@
-sources += files(
-  'personality.cc',
-)
+sources += files('personality.cc')
 
 subdir('include/nix/store')
