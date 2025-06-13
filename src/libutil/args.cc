@@ -236,7 +236,8 @@ void ParseQuoted::operator()(std::shared_ptr<Parser> &state, Strings & r) {
     assert(false);
 }
 
-Strings parseShebangContent(std::string_view s) {
+Strings parseShebangContent(std::string_view s)
+{
     Strings result;
     std::shared_ptr<Parser> parserState(std::make_shared<ParseUnquoted>(ParseUnquoted(s)));
 
