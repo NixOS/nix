@@ -355,7 +355,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
     assert(!accessor->getFingerprint(CanonPath::root));
 
-    if (auto fingerprint = getFingerprint(store))
+    if (auto fingerprint = result.getFingerprint(store))
         accessor->setFingerprint(*fingerprint);
 
     return {accessor, std::move(result)};

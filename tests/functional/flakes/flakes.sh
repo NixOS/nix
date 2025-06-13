@@ -112,6 +112,12 @@ nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir#default"
 nix build -o "$TEST_ROOT/result" "$flake1Dir?ref=HEAD#default"
 nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir?ref=HEAD#default"
 
+# Check that the fetcher cache works.
+if [[ $(nix config show lazy-trees) = false ]]; then
+    nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir?ref=HEAD#default" -vvvvv 2>&1 | grepQuietInverse "source path.*is uncacheable"
+    nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir?ref=HEAD#default" -vvvvv 2>&1 | grepQuiet "store path cache hit"
+fi
+
 # Check that relative paths are allowed for git flakes.
 # This may change in the future once git submodule support is refined.
 # See: https://discourse.nixos.org/t/57783 and #9708.
