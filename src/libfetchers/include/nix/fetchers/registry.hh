@@ -45,7 +45,8 @@ struct Registry
     void add(
         const Input & from,
         const Input & to,
-        const Attrs & extraAttrs);
+        const Attrs & extraAttrs,
+        bool exact);
 
     void remove(const Input & input);
 };
