@@ -338,8 +338,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
             auto accessor = make_ref<SubstitutedSourceAccessor>(makeStorePathAccessor(store, storePath));
 
-            if (auto fingerprint = getFingerprint(store))
-                accessor->setFingerprint(*fingerprint);
+            accessor->fingerprint = getFingerprint(store);
 
             // FIXME: ideally we would use the `showPath()` of the
             // "real" accessor for this fetcher type.
@@ -353,10 +352,8 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
     auto [accessor, result] = scheme->getAccessor(store, *this);
 
-    assert(!accessor->getFingerprint(CanonPath::root));
-
-    if (auto fingerprint = result.getFingerprint(store))
-        accessor->setFingerprint(*fingerprint);
+    assert(!accessor->fingerprint);
+    accessor->fingerprint = result.getFingerprint(store);
 
     return {accessor, std::move(result)};
 }

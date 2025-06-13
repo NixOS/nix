@@ -31,10 +31,14 @@ StorePath fetchToStore(
     // a `PosixSourceAccessor` pointing to a store path.
 
     std::optional<fetchers::Cache::Key> cacheKey;
-    std::optional<std::string> fingerprint;
 
-    if (!filter && (fingerprint = path.accessor->getFingerprint(path.path))) {
-        cacheKey = makeFetchToStoreCacheKey(std::string{name}, *fingerprint, method, path.path.abs());
+    auto [subpath, fingerprint] =
+        filter
+        ? std::pair<CanonPath, std::optional<std::string>>{path.path, std::nullopt}
+        : path.accessor->getFingerprint(path.path);
+
+    if (fingerprint) {
+        cacheKey = makeFetchToStoreCacheKey(std::string{name}, *fingerprint, method, subpath.abs());
         if (auto res = fetchers::getCache()->lookupStorePath(*cacheKey, store, mode == FetchMode::DryRun)) {
             debug("store path cache hit for '%s'", path);
             return res->storePath;
