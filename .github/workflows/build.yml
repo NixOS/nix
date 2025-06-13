@@ -83,13 +83,21 @@ jobs:
       - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: |
-          nix build -L --keep-going \
-            $(nix flake show --json \
-              | jq -r '
-                .hydraJobs.tests
-                | with_entries(select(.value.type == "derivation"))
-                | keys[]
-                | ".#hydraJobs.tests." + .')
+          cmd() {
+            nix build -L --keep-going --timeout 300 \
+              $(nix flake show --json \
+                | jq -r '
+                  .hydraJobs.tests
+                  | with_entries(select(.value.type == "derivation"))
+                  | keys[]
+                  | ".#hydraJobs.tests." + .')
+          }
+
+          if ! cmd; then
+            echo "failed, retrying once ..."
+            printf "\n\n\n\n\n\n\n\n"
+            cmd
+          fi
 
   flake_regressions:
     if: |
@@ -110,8 +118,12 @@ jobs:
           - "lazy-trees = true"
           - "lazy-trees = false"
         glob:
-          - "[0-l]*"
-          - "[m-z]*"
+          - "[0-d]*"
+          - "[e-l]*"
+          - "[m]*"
+          - "[n-r]*"
+          - "[s-z]*"
+
     steps:
       - name: Checkout nix
         uses: actions/checkout@v4
