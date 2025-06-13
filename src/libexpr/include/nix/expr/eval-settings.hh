@@ -270,9 +270,9 @@ struct EvalSettings : Config
         false,
         "lazy-locks",
         R"(
-          If enabled, Nix will only include NAR hashes in lock file entries if they're necessary to lock the input (i.e. when there is no other attribute that allows the content to be verified, like a Git revision).
+          If enabled, Nix only includes NAR hashes in lock file entries if they're necessary to lock the input (i.e. when there is no other attribute that allows the content to be verified, like a Git revision).
           This is not backward compatible with older versions of Nix.
-          If disabled, lock file entries will always contain a NAR hash.
+          If disabled, lock file entries always contain a NAR hash.
         )"
     };
 };
