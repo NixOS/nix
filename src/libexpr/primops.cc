@@ -4710,6 +4710,16 @@ static RegisterPrimOp primop_splitVersion({
     .fun = prim_splitVersion,
 });
 
+static void prim_testThrowErrorMaybe(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    if (getEnv("_NIX_TEST_DO_THROW_ERROR") == "1") {
+        state.error<EvalError>("this is a dummy error").atPos(pos).debugThrow();
+    } else {
+        state.forceValue(*args[0], pos);
+        v = *args[0];
+    }
+}
+
 
 /*************************************************************
  * Primop registration
@@ -4932,6 +4942,16 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         )",
         .fun = settings.traceVerbose ? prim_trace : prim_second,
     });
+
+    if (getEnv("_NIX_TEST_PRIMOPS") == "1") {
+        addPrimOp({
+            .name = "__testThrowErrorMaybe",
+            .args = { "e" },
+            .arity = 1,
+            .doc = "throw dummy error if _NIX_TEST_DO_THROW_ERROR == 1, return arg otherwise",
+            .fun = prim_testThrowErrorMaybe
+        });
+    }
 
     /* Add a value containing the current Nix expression search path. */
     auto list = buildList(lookupPath.elements.size());
