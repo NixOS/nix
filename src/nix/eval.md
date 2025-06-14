@@ -48,6 +48,13 @@ R""(
   # cat ./out/subdir/bla
   123
 
+* Replace evaluation errors:
+
+  ```console
+  $ nix eval --json --replace-eval-errors --expr '{ a = throw "fail"; }'
+  {"a":"«evaluation error»"}
+  ```
+
 # Description
 
 This command evaluates the given Nix expression, and prints the result on standard output.

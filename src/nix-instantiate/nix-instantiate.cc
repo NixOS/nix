@@ -28,7 +28,7 @@ static int rootNr = 0;
 enum OutputKind { okPlain, okRaw, okXML, okJSON };
 
 void processExpr(EvalState & state, const Strings & attrPaths,
-    bool parseOnly, bool strict, Bindings & autoArgs,
+    bool parseOnly, bool strict, bool replaceEvalErrors, Bindings & autoArgs,
     bool evalOnly, OutputKind output, bool location, Expr * e)
 {
     if (parseOnly) {
@@ -58,7 +58,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             else if (output == okXML)
                 printValueAsXML(state, strict, location, vRes, std::cout, context, noPos);
             else if (output == okJSON) {
-                printValueAsJSON(state, strict, vRes, v.determinePos(noPos), std::cout, context);
+                printValueAsJSON(state, strict, replaceEvalErrors, vRes, v.determinePos(noPos), std::cout, context);
                 std::cout << std::endl;
             } else {
                 if (strict) state.forceValueDeep(vRes);
@@ -106,6 +106,7 @@ static int main_nix_instantiate(int argc, char * * argv)
         OutputKind outputKind = okPlain;
         bool xmlOutputSourceLocation = true;
         bool strict = false;
+        bool replaceEvalErrors = false;
         Strings attrPaths;
         bool wantsReadWrite = false;
 
@@ -147,6 +148,8 @@ static int main_nix_instantiate(int argc, char * * argv)
                 xmlOutputSourceLocation = false;
             else if (*arg == "--strict")
                 strict = true;
+            else if (*arg == "--replace-eval-errors")
+                replaceEvalErrors = true;
             else if (*arg == "--dry-run")
                 settings.readOnlyMode = true;
             else if (*arg != "" && arg->at(0) == '-')
@@ -184,7 +187,7 @@ static int main_nix_instantiate(int argc, char * * argv)
 
         if (readStdin) {
             Expr * e = state->parseStdin();
-            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
+            processExpr(*state, attrPaths, parseOnly, strict, replaceEvalErrors, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
@@ -193,7 +196,7 @@ static int main_nix_instantiate(int argc, char * * argv)
             Expr * e = fromArgs
                 ? state->parseExprFromString(i, state->rootPath("."))
                 : state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, i)));
-            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
+            processExpr(*state, attrPaths, parseOnly, strict, replaceEvalErrors, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         }
 
