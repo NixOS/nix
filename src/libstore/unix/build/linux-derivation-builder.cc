@@ -336,7 +336,7 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
         printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootParentDir);
 
         if (mkdir(chrootParentDir.c_str(), 0700) == -1)
-            throw SysError("cannot create '%s'", chrootRootDir);
+            throw SysError("cannot create '%s'", chrootParentDir);
 
         chrootRootDir = chrootParentDir + "/root";
 
