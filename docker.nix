@@ -2,6 +2,7 @@
   # Core dependencies
   pkgs,
   lib,
+  dockerTools,
   runCommand,
   buildPackages,
   # Image configuration
@@ -325,7 +326,7 @@ let
       );
 
 in
-pkgs.dockerTools.buildLayeredImageWithNixDb {
+dockerTools.buildLayeredImageWithNixDb {
 
   inherit
     name
