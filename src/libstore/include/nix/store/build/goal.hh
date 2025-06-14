@@ -105,13 +105,11 @@ public:
      */
     ExitCode exitCode = ecBusy;
 
-protected:
     /**
      * Build result.
      */
     BuildResult buildResult;
 
-public:
     /**
      * Suspend our goal and wait until we get `work`-ed again.
      * `co_await`-able by @ref Co.
@@ -357,18 +355,6 @@ protected:
 
 public:
     virtual void cleanup() { }
-
-    /**
-     * Project a `BuildResult` with just the information that pertains
-     * to the given request.
-     *
-     * In general, goals may be aliased between multiple requests, and
-     * the stored `BuildResult` has information for the union of all
-     * requests. We don't want to leak what the other request are for
-     * sake of both privacy and determinism, and this "safe accessor"
-     * ensures we don't.
-     */
-    BuildResult getBuildResult(const DerivedPath &) const;
 
     /**
      * Hack to say that this goal should not log `ex`, but instead keep

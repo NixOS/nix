@@ -22,7 +22,7 @@ namespace nix {
  * @param V A type to instantiate for each output. It should probably
  * should be an "optional" type so not every interior node has to have a
  * value. For example, the scheduler uses
- * `DerivedPathMap<std::weak_ptr<DerivationCreationAndRealisationGoal>>` to
+ * `DerivedPathMap<std::weak_ptr<DerivationTrampolineGoal>>` to
  * remember which goals correspond to which outputs. `* const Something`
  * or `std::optional<Something>` would also be good choices for
  * "optional" types.
