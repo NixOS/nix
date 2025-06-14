@@ -11,7 +11,7 @@ struct AbstractNixRepl
     Bindings * autoArgs;
 
     AbstractNixRepl(ref<EvalState> state)
-        : state(state)
+        : state(state), autoArgs(nullptr)
     { }
 
     virtual ~AbstractNixRepl()
