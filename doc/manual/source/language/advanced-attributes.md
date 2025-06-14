@@ -53,23 +53,13 @@ Derivations can declare some infrequently used optional attributes.
 
   - [`__structuredAttrs`]{#adv-attr-structuredAttrs}\
     If the special attribute `__structuredAttrs` is set to `true`, the other derivation
-    attributes are serialised into a file in JSON format. The environment variable
-    `NIX_ATTRS_JSON_FILE` points to the exact location of that file both in a build
-    and a [`nix-shell`](../command-ref/nix-shell.md). This obviates the need for
-    [`passAsFile`](#adv-attr-passAsFile) since JSON files have no size restrictions,
-    unlike process environments.
+    attributes are serialised into a file in JSON format.
 
-    It also makes it possible to tweak derivation settings in a structured way; see
-    [`outputChecks`](#adv-attr-outputChecks) for example.
+    This obviates the need for [`passAsFile`](#adv-attr-passAsFile) since JSON files have no size restrictions, unlike process environments.
+    It also makes it possible to tweak derivation settings in a structured way;
+    see [`outputChecks`](#adv-attr-outputChecks) for example.
 
-    As a convenience to Bash builders,
-    Nix writes a script that initialises shell variables
-    corresponding to all attributes that are representable in Bash. The
-    environment variable `NIX_ATTRS_SH_FILE` points to the exact
-    location of the script, both in a build and a
-    [`nix-shell`](../command-ref/nix-shell.md). This includes non-nested
-    (associative) arrays. For example, the attribute `hardening.format = true`
-    ends up as the Bash associative array element `${hardening[format]}`.
+    See the [corresponding section in the derivation page](@docroot@/store/derivation/index.md#structured-attrs) for further details.
 
     > **Warning**
     >

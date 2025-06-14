@@ -138,6 +138,17 @@ See [Wikipedia](https://en.wikipedia.org/wiki/Argv) for details.
 
 Environment variables which will be passed to the [builder](#builder) executable.
 
+#### Structured Attributes {#structured-attrs}
+
+Nix also has special support for embedding JSON in the derivations.
+
+The environment variable `NIX_ATTRS_JSON_FILE` points to the exact location of that file both in a build and a [`nix-shell`](@docroot@/command-ref/nix-shell.md).
+
+As a convenience to Bash builders, Nix writes a script that initialises shell variables corresponding to all attributes that are representable in Bash.
+The environment variable `NIX_ATTRS_SH_FILE` points to the exact location of the script, both in a build and a [`nix-shell`](@docroot@/command-ref/nix-shell.md).
+This includes non-nested (associative) arrays.
+For example, the attribute `hardening.format = true` ends up as the Bash associative array element `${hardening[format]}`.
+
 ### Placeholders
 
 Placeholders are opaque values used within the [process creation fields] to [store objects] for which we don't yet know [store path]s.

@@ -91,3 +91,7 @@ is a JSON object with the following fields:
 
 * `env`:
   The environment passed to the `builder`.
+
+* `structuredAttrs`:
+  [Strucutured Attributes](@docroot@/store/derivation/index.md#structured-attrs), only defined if the derivation contains them.
+  Structured attributes are JSON, and thus embedded as-is.
