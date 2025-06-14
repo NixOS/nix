@@ -25,7 +25,7 @@ struct S3BinaryCacheStoreConfig : std::enable_shared_from_this<S3BinaryCacheStor
         "profile",
         R"(
           The name of the AWS configuration profile to use. By default
-          Nix will use the `default` profile.
+          Nix uses the `default` profile.
         )"};
 
 protected:
@@ -40,7 +40,7 @@ public:
         "region",
         R"(
           The region of the S3 bucket. If your bucket is not in
-          `us–east-1`, you should always explicitly specify the region
+          `us-east-1`, you should always explicitly specify the region
           parameter.
         )"};
 
@@ -69,7 +69,7 @@ public:
 
           > **Note**
           >
-          > This endpoint must support HTTPS and will use path-based
+          > This endpoint must support HTTPS and uses path-based
           > addressing instead of virtual host based addressing.
         )"};
 
