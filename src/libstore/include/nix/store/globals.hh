@@ -25,6 +25,7 @@ struct SandboxPath;
 using SandboxPaths = std::map<Path, SandboxPath, std::less<>>;
 struct SandboxPath
 {
+public:
     typedef enum {
 #ifdef __linux__
         ro = MS_RDONLY,
@@ -39,14 +40,19 @@ struct SandboxPath
         slave = MS_SLAVE,
         unbindable = MS_UNBINDABLE
 #else
-        ro // FIXME: do any options make sense on other that linux?
+        ro  // FIXME: do any options make sense on other that linux?
 #endif
     } MountOpt;
 
 #ifdef __linux__
     /* Options to set when readOnly=true */
-    static constexpr std::array<MountOpt, 5> readOnlyDefaults = {
-        ro, nodev, noexec, nosuid, noatime
+    constexpr static MountOpt readOnlyDefaults[] = { ro, nodev, noexec, nosuid, noatime };
+
+    /* Only one atime option should be enabled at a time. Same for propagation
+     * style.*/
+    constexpr static std::pair<uint64_t, const char*> exclusiveOptionMasks[] = {
+        {MS_NOATIME | MS_NODIRATIME | MS_RELATIME | MS_STRICTATIME, "option-atime"},
+        {MS_SHARED | MS_PRIVATE | MS_SLAVE, "propagation"},
     };
 #endif
 
@@ -65,10 +71,18 @@ struct SandboxPath
 
     std::vector<MountOpt> options;
 
-    SandboxPath(const Path & source = "",
-        bool optional = false, bool readOnly = false, const std::vector<MountOpt> & options = { })
-        : source(source), optional(optional), readOnly(readOnly), options(options) { };
-    SandboxPath(const char * source) : SandboxPath(Path(source)) { };
+    SandboxPath(std::string source = "", bool optional = false,
+        bool readOnly = false, std::vector<MountOpt> options = { }) :
+        source(std::string(std::move(source))), optional(optional),
+        readOnly(readOnly), options(std::move(options)) { }
+
+    /* This is to enable the full implicit conversion from e.g. const char[],
+     * even when binding a reference. Code can specify paths with literals and
+     * nothing extra. (Have angried the C++ deities with this? Seems like
+     * there should be a better way?) */
+    template<typename S, typename = std::enable_if_t<std::is_convertible_v<S, Path>>>
+    SandboxPath(S&& source, bool optional = false, bool readOnly = false) :
+        SandboxPath(Path(std::forward<S>(source)), optional, readOnly) { }
 
     static SandboxPaths parse(const std::string_view & str, const std::string& = "(unknown)");
 };

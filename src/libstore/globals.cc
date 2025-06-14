@@ -86,7 +86,7 @@ Settings::Settings()
     }
 
 #if (defined(__linux__) || defined(__FreeBSD__)) && defined(SANDBOX_SHELL)
-    sandboxPaths = SandboxPaths { { "/bin/sh", SandboxPath(SANDBOX_SHELL) } };
+    sandboxPaths = { { "/bin/sh", SANDBOX_SHELL } };
 #endif
 
     /* chroot-like behavior from Apple's sandbox */
@@ -297,25 +297,26 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(SandboxPath::MountOpt, {
-    {SandboxPath::MountOpt::ro,          "ro"},
+    {SandboxPath::MountOpt::ro, "ro"},
 #ifdef __linux__
-    {SandboxPath::MountOpt::nodev,       "nodev"},
-    {SandboxPath::MountOpt::noexec,      "noexec"},
-    {SandboxPath::MountOpt::nosuid,      "nosuid"},
-    {SandboxPath::MountOpt::noatime,     "noatime"},
-    {SandboxPath::MountOpt::nodiratime,  "nodiratime"},
-    {SandboxPath::MountOpt::relatime,    "relatime"},
+    {SandboxPath::MountOpt::nodev, "nodev"},
+    {SandboxPath::MountOpt::noexec, "noexec"},
+    {SandboxPath::MountOpt::nosuid, "nosuid"},
+    {SandboxPath::MountOpt::noatime, "noatime"},
+    {SandboxPath::MountOpt::nodiratime, "nodiratime"},
+    {SandboxPath::MountOpt::relatime, "relatime"},
     {SandboxPath::MountOpt::strictatime, "strictatime"},
-    {SandboxPath::MountOpt::private_,    "private"},
-    {SandboxPath::MountOpt::slave,       "slave"},
-    {SandboxPath::MountOpt::unbindable,  "unbindable"},
+    {SandboxPath::MountOpt::private_, "private"},
+    {SandboxPath::MountOpt::slave, "slave"},
+    {SandboxPath::MountOpt::unbindable, "unbindable"},
 #endif
 });
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(SandboxPath, source, optional, readOnly, options);
 
 /**
- * Parses either old (strings) or new (json object) format sandbox-paths.
+ * Parses either old ("path[=source][?]" strings) or new (json object) format
+ * sandbox-paths. Legacy format supports only a subset of available settings.
  */
 SandboxPaths SandboxPath::parse(const std::string_view & str, const std::string & ctx)
 {
@@ -334,15 +335,14 @@ SandboxPaths SandboxPath::parse(const std::string_view & str, const std::string 
         for (auto & [k, v] : nlohmann::json::parse(str, nullptr, false, true).template get<SandboxPaths>())
             add(k, std::move(v));
     } else {
-        /* Parses legacy format sandbox-path e.g. "path[=source][?]".
-         * This format supports only a subset of options available with JSON format. */
         for (std::string_view s : tokenizeString<Strings>(str)) {
             bool optional = s.ends_with('?');
             if (optional) s.remove_suffix(1);
             if (size_t eq = s.find('='); eq != s.npos) {
                 add(std::string(s, 0, eq), { std::string(s.data() + eq + 1, s.size() - eq - 1), optional });
-            } else
+            } else {
                 add(std::string(s), { "", optional });
+            }
         }
     }
     return res;
@@ -350,7 +350,7 @@ SandboxPaths SandboxPath::parse(const std::string_view & str, const std::string 
 
 template<> SandboxPaths BaseSetting<SandboxPaths>::parse(const std::string & str) const
 {
-    return SandboxPath().parse(str, this->name);
+    return SandboxPath::parse(str, this->name);
 }
 
 template<> struct BaseSetting<SandboxPaths>::trait

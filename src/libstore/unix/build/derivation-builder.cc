@@ -106,7 +106,7 @@ protected:
      * Stuff we need to pass to initChild().
      */
 
-    typedef SandboxPaths PathsInChroot; // maps target path to source path
+    typedef SandboxPaths PathsInChroot;
 
     typedef StringMap Environment;
     Environment env;
@@ -920,7 +920,7 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
                 if (line == "") {
                     state = stBegin;
                 } else {
-                    for (const auto & [k, v] : SandboxPath().parse(line))
+                    for (const auto & [k, v] : SandboxPath::parse(line, "extra-sandbox-paths (via pre-build-hook)"))
                         pathsInChroot.try_emplace(k, v);
                 }
             }

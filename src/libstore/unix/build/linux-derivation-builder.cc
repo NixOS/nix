@@ -121,32 +121,30 @@ static void setupSeccomp()
 #  endif
 }
 
-static auto combineMountOpts(auto init, auto iter)
-{
-    return std::transform_reduce(iter.cbegin(), iter.cend(), init,
-        [](unsigned long a, unsigned long b) {
-            if (b & (MS_NOATIME | MS_RELATIME | MS_NODIRATIME | MS_STRICTATIME)) {
-                return (a & ~(MS_NOATIME | MS_NODIRATIME | MS_RELATIME | MS_STRICTATIME)) | b;
-            }
-            return a | b;
-        },
-        [](const SandboxPath::MountOpt & o) { return static_cast<unsigned long>(o); });
+static uint64_t mergeIntoMountOpts(uint64_t oset, uint64_t o) {
+    for (const auto & [mask, _] : SandboxPath::exclusiveOptionMasks)
+        if (o & mask) return (oset & ~mask) | o;
+    return oset | o;
 };
 
-
-static void doBind(const SandboxPath & pval, const Path & target)
+template<typename Iterable>
+static uint64_t combineMountOpts(uint64_t init, const Iterable& opts)
 {
-    auto source = pval.source;
-    auto optional = pval.optional;
-    debug("bind mounting '%1%' to '%2%'", source, target);
+    return std::transform_reduce(std::begin(opts), std::end(opts), init, mergeIntoMountOpts,
+        [](const SandboxPath::MountOpt & o) { return static_cast<uint64_t>(o); });
+};
+
+static void doBind(const SandboxPath & v, const Path & target)
+{
+    debug("bind mounting '%1%' to '%2%'", v.source, target);
 
     auto bindMount = [&]() {
-        if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-            throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
+        if (mount(v.source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+            throw SysError("bind mount from '%1%' to '%2%' failed", v.source, target);
 
         // set extra options when wanted
-        auto flags = pval.readOnly ? combineMountOpts(0, pval.readOnlyDefaults) : 0;
-        flags = combineMountOpts(flags, pval.options);
+        auto flags = v.readOnly ? combineMountOpts(0, SandboxPath::readOnlyDefaults) : 0;
+        flags = combineMountOpts(flags, v.options);
         if (flags != 0) {
             // initial mount wouldn't respect MS_RDONLY, must remount
             debug("remounting '%s' with flags: %d", target, flags);
@@ -155,12 +153,12 @@ static void doBind(const SandboxPath & pval, const Path & target)
         }
     };
 
-    auto maybeSt = maybeLstat(source);
+    auto maybeSt = maybeLstat(v.source);
     if (!maybeSt) {
-        if (optional)
+        if (v.optional)
             return;
         else
-            throw SysError("getting attributes of path '%1%'", source);
+            throw SysError("getting attributes of path '%1%'", v.source);
     }
     auto st = *maybeSt;
 
@@ -170,7 +168,7 @@ static void doBind(const SandboxPath & pval, const Path & target)
     } else if (S_ISLNK(st.st_mode)) {
         // Symlinks can (apparently) not be bind-mounted, so just copy it
         createDirs(dirOf(target));
-        copyFile(std::filesystem::path(source), std::filesystem::path(target), false);
+        copyFile(std::filesystem::path(v.source), std::filesystem::path(target), false);
     } else {
         createDirs(dirOf(target));
         writeFile(target, "");
