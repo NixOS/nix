@@ -1179,7 +1179,7 @@ static void prim_second(EvalState & state, const PosIdx pos, Value * * args, Val
 
 static void derivationStrictInternal(
     EvalState & state,
-    const std::string & name,
+    std::string_view name,
     const Bindings * attrs,
     Value & v);
 
@@ -1199,7 +1199,7 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
     /* Figure out the name first (for stack backtraces). */
     auto nameAttr = state.getAttr(state.sName, attrs, "in the attrset passed as argument to builtins.derivationStrict");
 
-    std::string drvName;
+    std::string_view drvName;
     try {
         drvName = state.forceStringNoCtx(*nameAttr->value, pos, "while evaluating the `name` attribute passed to builtins.derivationStrict");
     } catch (Error & e) {
@@ -1258,7 +1258,7 @@ static void checkDerivationName(EvalState & state, std::string_view drvName)
 
 static void derivationStrictInternal(
     EvalState & state,
-    const std::string & drvName,
+    std::string_view drvName,
     const Bindings * attrs,
     Value & v)
 {
@@ -1898,7 +1898,7 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
 
         try {
             auto rewrites = state.realiseContext(context);
-            path = rewriteStrings(path, rewrites);
+            path = rewriteStrings(std::move(path), rewrites);
         } catch (InvalidPathError & e) {
             state.error<EvalError>(
                 "cannot find '%1%', since path '%2%' is not valid",
@@ -1908,8 +1908,8 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
         }
 
         lookupPath.elements.emplace_back(LookupPath::Elem {
-            .prefix = LookupPath::Prefix { .s = prefix },
-            .path = LookupPath::Path { .s = path },
+            .prefix = LookupPath::Prefix { .s = std::move(prefix) },
+            .path = LookupPath::Path { .s = std::move(path) },
         });
     }
 
@@ -2374,8 +2374,8 @@ static RegisterPrimOp primop_fromJSON({
 static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
-    std::string name(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.toFile"));
-    std::string contents(state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.toFile"));
+    auto name = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.toFile");
+    auto contents = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.toFile");
 
     StorePathSet refs;
 
@@ -2632,7 +2632,7 @@ static RegisterPrimOp primop_filterSource({
 static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     std::optional<SourcePath> path;
-    std::string name;
+    std::string_view name;
     Value * filterFun = nullptr;
     auto method = ContentAddressMethod::Raw::NixArchive;
     std::optional<Hash> expectedHash;
@@ -4562,12 +4562,12 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value * * a
             "'from' and 'to' arguments passed to builtins.replaceStrings have different lengths"
         ).atPos(pos).debugThrow();
 
-    std::vector<std::string> from;
+    std::vector<std::string_view> from;
     from.reserve(args[0]->listSize());
     for (auto elem : args[0]->listItems())
         from.emplace_back(state.forceString(*elem, pos, "while evaluating one of the strings to replace passed to builtins.replaceStrings"));
 
-    std::unordered_map<size_t, std::string> cache;
+    std::unordered_map<size_t, std::string_view> cache;
     auto to = args[1]->listItems();
 
     NixStringContext context;
