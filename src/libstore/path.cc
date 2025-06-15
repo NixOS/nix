@@ -77,6 +77,9 @@ StorePath StorePath::random(std::string_view name)
 
 StorePath MixStoreDirMethods::parseStorePath(std::string_view path) const
 {
+    if (path.empty())
+        throw BadStorePath("empty path is not a valid store path");
+
     // On Windows, `/nix/store` is not a canonical path. More broadly it
     // is unclear whether this function should be using the native
     // notion of a canonical path at all. For example, it makes to
