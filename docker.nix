@@ -26,6 +26,7 @@
     "org.opencontainers.image.version" = nix.version;
     "org.opencontainers.image.description" = "Nix container image";
   },
+  Cmd ? [ (lib.getExe bashInteractive) ],
   # Default Packages
   nix,
   bashInteractive,
@@ -359,8 +360,7 @@ dockerTools.buildLayeredImageWithNixDb {
   '';
 
   config = {
-    inherit Labels;
-    Cmd = [ (lib.getExe bashInteractive) ];
+    inherit Cmd Labels;
     User = "${toString uid}:${toString gid}";
     Env = [
       "USER=${uname}"
