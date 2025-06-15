@@ -14,6 +14,7 @@
 #include "nix/expr/value-to-xml.hh"
 #include "nix/expr/primops.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/util/sort.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
@@ -3695,10 +3696,14 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
         return state.forceBool(vBool, pos, "while evaluating the return value of the sorting function passed to builtins.sort");
     };
 
-    /* FIXME: std::sort can segfault if the comparator is not a strict
-       weak ordering. What to do? std::stable_sort() seems more
-       resilient, but no guarantees... */
-    std::stable_sort(list.begin(), list.end(), comparator);
+    /* NOTE: Using custom implementation because std::sort and std::stable_sort
+       are not resilient to comparators that violate strict weak ordering. Diagnosing
+       incorrect implementations is a O(n^3) problem, so doing the checks is much more
+       expensive that doing the sorting. For this reason we choose to use sorting algorithms
+       that are can't be broken by invalid comprators. peeksort (mergesort)
+       doesn't misbehave when any of the strict weak order properties is
+       violated - output is always a reordering of the input. */
+    peeksort(list.begin(), list.end(), comparator);
 
     v.mkList(list);
 }
@@ -3720,6 +3725,32 @@ static RegisterPrimOp primop_sort({
 
       This is a stable sort: it preserves the relative order of elements
       deemed equal by the comparator.
+
+      *comparator* must impose a strict weak ordering on the set of values
+      in the *list*. This means that for any elements *a*, *b* and *c* from the
+      *list*, *comparator* must satisfy the following relations:
+
+        1. Transitivity
+
+        ```nix
+        comparator a b && comparator b c -> comparator a c
+        ```
+
+        1. Irreflexivity
+
+        ```nix
+        comparator a a == false
+        ```
+
+        1. Transitivity of equivalence
+
+        ```nix
+        let equiv = a: b: (!comparator a b && !comparator b a); in
+        equiv a b && equiv b c -> equiv a c
+        ```
+
+      If the *comparator* violates any of these properties, then `builtins.sort`
+      reorders elements in an unspecified manner.
     )",
     .fun = prim_sort,
 });

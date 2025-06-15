@@ -59,6 +59,7 @@ headers = files(
   'signals.hh',
   'signature/local-keys.hh',
   'signature/signer.hh',
+  'sort.hh',
   'source-accessor.hh',
   'source-path.hh',
   'split.hh',
