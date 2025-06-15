@@ -107,7 +107,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .name = "git-hashing",
         .description = R"(
             Allow creating (content-addressed) store objects which are hashed via Git's hashing algorithm.
-            These store objects will not be understandable by older versions of Nix.
+            These store objects aren't understandable by older versions of Nix.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/41",
     },
