@@ -2961,25 +2961,47 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value * * args
 {
     state.forceList(*args[0], pos, "while evaluating the argument passed to builtins.listToAttrs");
 
-    auto attrs = state.buildBindings(args[0]->listSize());
+    // Step 1. Sort the name-value attrsets in place using the memory we allocate for the result
+    size_t listSize = args[0]->listSize();
+    auto & bindings = *state.allocBindings(listSize);
+    using ElemPtr = decltype(&bindings[0].value);
 
-    std::set<Symbol> seen;
-
-    for (auto v2 : args[0]->listItems()) {
+    for (const auto & [n, v2] : enumerate(args[0]->listItems())) {
         state.forceAttrs(*v2, pos, "while evaluating an element of the list passed to builtins.listToAttrs");
 
         auto j = state.getAttr(state.sName, v2->attrs(), "in a {name=...; value=...;} pair");
 
         auto name = state.forceStringNoCtx(*j->value, j->pos, "while evaluating the `name` attribute of an element of the list passed to builtins.listToAttrs");
-
         auto sym = state.symbols.create(name);
-        if (seen.insert(sym).second) {
-            auto j2 = state.getAttr(state.sValue, v2->attrs(), "in a {name=...; value=...;} pair");
-            attrs.insert(sym, j2->value, j2->pos);
-        }
+
+        // (ab)use Attr to store a Value * * instead of a Value *, so that we can stabilize the sort using the Value * *
+        bindings[n] = Attr(sym, std::bit_cast<Value *>(&v2));
     }
 
-    v.mkAttrs(attrs);
+    std::sort(&bindings[0], &bindings[listSize], [](const Attr & a, const Attr & b) {
+        // Note that .value is actually a Value * * that corresponds to the position in the list
+        return a < b || (!(a > b) && std::bit_cast<ElemPtr>(a.value) < std::bit_cast<ElemPtr>(b.value));
+    });
+
+    // Step 2. Unpack the bindings in place and skip name-value pairs with duplicate names
+    Symbol prev;
+    for (size_t n = 0; n < listSize; n++) {
+        auto attr = bindings[n];
+        if (prev == attr.name) {
+            continue;
+        }
+        // Note that .value is actually a Value * *; see earlier comments
+        Value * v2 = *std::bit_cast<ElemPtr>(attr.value);
+
+        auto j = state.getAttr(state.sValue, v2->attrs(), "in a {name=...; value=...;} pair");
+        prev = attr.name;
+        bindings.push_back({prev, j->value, j->pos});
+    }
+    // help GC and clear end of allocated array
+    for (size_t n = bindings.size(); n < listSize; n++) {
+        bindings[n] = Attr{};
+    }
+    v.mkAttrs(&bindings);
 }
 
 static RegisterPrimOp primop_listToAttrs({
