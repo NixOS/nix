@@ -3725,6 +3725,32 @@ static RegisterPrimOp primop_sort({
 
       This is a stable sort: it preserves the relative order of elements
       deemed equal by the comparator.
+
+      *comparator* must impose a strict weak ordering on the set of values
+      in the *list*. This means that for any elements *a*, *b* and *c* from the
+      *list*, *comparator* must satisfy the following relations:
+
+        1. Transitivity
+
+        ```nix
+        comparator a b && comparator b c -> comparator a c
+        ```
+
+        1. Irreflexivity
+
+        ```nix
+        comparator a a == false
+        ```
+
+        1. Transitivity of equivalence
+
+        ```nix
+        let equiv = a: b: (!comparator a b && !comparator b a); in
+        equiv a b && equiv b c -> equiv a c
+        ```
+
+      If the *comparator* violates any of these properties, then `builtins.sort`
+      reorders elements in an unspecified manner.
     )",
     .fun = prim_sort,
 });
