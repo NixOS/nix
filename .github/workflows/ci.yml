@@ -36,6 +36,7 @@ jobs:
     with:
       system: x86_64-linux
       runner: namespace-profile-linuxamd32c64g-cache
+      runner_for_virt: UbuntuLatest32Cores128G
       runner_small: ubuntu-latest
       run_tests: true
       run_vm_tests: true
@@ -47,6 +48,7 @@ jobs:
       if: ${{ github.event_name != 'pull_request' }}
       system: aarch64-linux
       runner: UbuntuLatest32Cores128GArm
+      runner_for_virt: UbuntuLatest32Cores128GArm
       runner_small: UbuntuLatest32Cores128GArm
 
   build_x86_64-darwin:
@@ -55,6 +57,7 @@ jobs:
       if: ${{ github.event_name != 'pull_request' }}
       system: x86_64-darwin
       runner: macos-latest-large
+      runner_for_virt: macos-latest-large
       runner_small: macos-latest-large
 
   build_aarch64-darwin:
@@ -62,6 +65,7 @@ jobs:
     with:
       system: aarch64-darwin
       runner: namespace-profile-mac-m2-12c28g
+      runner_for_virt: namespace-profile-mac-m2-12c28g
       runner_small: macos-latest-xlarge
 
   success:
