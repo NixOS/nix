@@ -44,7 +44,7 @@ jobs:
   build_aarch64-linux:
     uses: ./.github/workflows/build.yml
     with:
-      if: ${{ github.event_name == 'merge_group' }}
+      if: ${{ github.event_name != 'pull_request' }}
       system: aarch64-linux
       runner: UbuntuLatest32Cores128GArm
       runner_small: UbuntuLatest32Cores128GArm
@@ -52,7 +52,7 @@ jobs:
   build_x86_64-darwin:
     uses: ./.github/workflows/build.yml
     with:
-      if: ${{ github.event_name == 'merge_group' }}
+      if: ${{ github.event_name != 'pull_request' }}
       system: x86_64-darwin
       runner: macos-latest-large
       runner_small: macos-latest-large
@@ -103,6 +103,7 @@ jobs:
           done
 
       - name: Build fallback-paths.nix
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           nix build .#fallbackPathsNix --out-link fallback
           cat fallback > ./artifacts/fallback-paths.nix
