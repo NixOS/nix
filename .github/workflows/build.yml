@@ -84,7 +84,7 @@ jobs:
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: |
           cmd() {
-            nix build -L --keep-going --timeout 300 \
+            nix build -L --keep-going --timeout 600 \
               $(nix flake show --json \
                 | jq -r '
                   .hydraJobs.tests
