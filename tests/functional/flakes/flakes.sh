@@ -114,7 +114,6 @@ nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir?ref=HEAD#default"
 
 # Check that the fetcher cache works.
 if [[ $(nix config show lazy-trees) = false ]]; then
-    nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir?ref=HEAD#default" -vvvvv 2>&1 | grepQuietInverse "source path.*is uncacheable"
     nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir?ref=HEAD#default" -vvvvv 2>&1 | grepQuiet "source path.*cache hit"
 fi
 

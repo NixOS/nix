@@ -55,9 +55,13 @@ std::pair<StorePath, Hash> fetchToStore2(
             }
             debug("source path '%s' not in store", path);
         }
-    } else
+    } else {
+        static auto barf = getEnv("_NIX_TEST_BARF_ON_UNCACHEABLE").value_or("") == "1";
+        if (barf)
+            throw Error("source path '%s' is uncacheable (filter=%d)", path, (bool) filter);
         // FIXME: could still provide in-memory caching keyed on `SourcePath`.
-        debug("source path '%s' is uncacheable (%d, %d)", path, (bool) filter, (bool) fingerprint);
+        debug("source path '%s' is uncacheable", path);
+    }
 
     Activity act(*logger, lvlChatty, actUnknown,
         fmt(mode == FetchMode::DryRun ? "hashing '%s'" : "copying '%s' to the store", path));
