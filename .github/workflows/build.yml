@@ -7,6 +7,9 @@ on:
       runner:
         required: true
         type: string
+      runner_for_virt:
+        required: true
+        type: string
       runner_small:
         required: true
         type: string
@@ -61,7 +64,7 @@ jobs:
   vm_tests_smoke:
     if: inputs.run_vm_tests && github.event_name != 'merge_group'
     needs: build
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner_for_virt }}
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@main
@@ -77,7 +80,7 @@ jobs:
   vm_tests_all:
     if: inputs.run_vm_tests && github.event_name == 'merge_group'
     needs: build
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner_for_virt }}
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@main
