@@ -64,26 +64,37 @@ std::pair<StorePath, Hash> fetchToStore2(
 
     auto filter2 = filter ? *filter : defaultPathFilter;
 
-    if (mode == FetchMode::DryRun) {
-        auto [storePath, hash] = store.computeStorePath(
-            name, path, method, HashAlgorithm::SHA256, {}, filter2);
-        debug("hashed '%s' to '%s'", path, store.printStorePath(storePath));
-        if (cacheKey)
-            fetchers::getCache()->upsert(*cacheKey, {{"hash", hash.to_string(HashFormat::SRI, true)}});
-        return {storePath, hash};
-    } else {
-        auto storePath = store.addToStore(
-            name, path, method, HashAlgorithm::SHA256, {}, filter2, repair);
-        debug("copied '%s' to '%s'", path, store.printStorePath(storePath));
-        // FIXME: this is the wrong hash when method !=
-        // ContentAddressMethod::Raw::NixArchive. Doesn't matter at
-        // the moment since the only place where that's the case
-        // doesn't use the hash.
-        auto hash = store.queryPathInfo(storePath)->narHash;
-        if (cacheKey)
-            fetchers::getCache()->upsert(*cacheKey, {{"hash", hash.to_string(HashFormat::SRI, true)}});
-        return {storePath, hash};
-    }
+    auto [storePath, hash] =
+        mode == FetchMode::DryRun
+        ? ({
+            auto [storePath, hash] = store.computeStorePath(
+                name, path, method, HashAlgorithm::SHA256, {}, filter2);
+            debug("hashed '%s' to '%s' (hash '%s')", path, store.printStorePath(storePath), hash.to_string(HashFormat::SRI, true));
+            std::make_pair(storePath, hash);
+        })
+        : ({
+            // FIXME: ideally addToStore() would return the hash
+            // right away (like computeStorePath()).
+            auto storePath = store.addToStore(
+                name, path, method, HashAlgorithm::SHA256, {}, filter2, repair);
+            auto info = store.queryPathInfo(storePath);
+            assert(info->references.empty());
+            auto hash =
+                method == ContentAddressMethod::Raw::NixArchive
+                ? info->narHash
+                : ({
+                    if (!info->ca || info->ca->method != method)
+                        throw Error("path '%s' lacks a CA field", store.printStorePath(storePath));
+                    info->ca->hash;
+                });
+            debug("copied '%s' to '%s' (hash '%s')", path, store.printStorePath(storePath), hash.to_string(HashFormat::SRI, true));
+            std::make_pair(storePath, hash);
+        });
+
+    if (cacheKey)
+        fetchers::getCache()->upsert(*cacheKey, {{"hash", hash.to_string(HashFormat::SRI, true)}});
+
+    return {storePath, hash};
 }
 
 }
