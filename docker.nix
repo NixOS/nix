@@ -19,6 +19,14 @@
   gid ? 0,
   uname ? "root",
   gname ? "root",
+  Labels ? {
+    "org.opencontainers.image.title" = "Nix";
+    "org.opencontainers.image.source" = "https://github.com/NixOS/nix";
+    "org.opencontainers.image.vendor" = "Nix project";
+    "org.opencontainers.image.version" = nix.version;
+    "org.opencontainers.image.description" = "Nix container image";
+  },
+  Cmd ? [ (lib.getExe bashInteractive) ],
   # Default Packages
   nix,
   bashInteractive,
@@ -352,7 +360,7 @@ dockerTools.buildLayeredImageWithNixDb {
   '';
 
   config = {
-    Cmd = [ (lib.getExe bashInteractive) ];
+    inherit Cmd Labels;
     User = "${toString uid}:${toString gid}";
     Env = [
       "USER=${uname}"
