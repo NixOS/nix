@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.29 and Determinate Nix 3.6.4.<!-- differences -->
+This section lists the differences between upstream Nix 2.29 and Determinate Nix 3.6.5.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -47,8 +47,9 @@ This section lists the differences between upstream Nix 2.29 and Determinate Nix
 * Call out that `--keep-failed` with remote builders will keep the failed build directory on that builder by @cole-h in [DeterminateSystems/nix-src#85](https://github.com/DeterminateSystems/nix-src/pull/85)
 <!-- Determinate Nix version 3.6.3 revoked -->
 
-<!-- Determinate Nix version 3.6.4 -->
+<!-- Determinate Nix version 3.6.4 revoked -->
 
+<!-- Determinate Nix version 3.6.5 -->
 
 * When remote building with --keep-failed, only show "you can rerun" message if the derivation's platform is supported on this machine by @cole-h in [DeterminateSystems/nix-src#87](https://github.com/DeterminateSystems/nix-src/pull/87)
 

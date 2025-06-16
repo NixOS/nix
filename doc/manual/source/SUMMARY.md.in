@@ -129,7 +129,7 @@
   - [Contributing](development/contributing.md)
 - [Determinate Nix Release Notes](release-notes-determinate/index.md)
   - [Changes between Nix and Determinate Nix](release-notes-determinate/changes.md)<!-- next -->
-  - [Release 3.6.4 (2025-06-12)](release-notes-determinate/rl-3.6.4.md)
+  - [Release 3.6.5 (2025-06-16)](release-notes-determinate/rl-3.6.5.md)
   - [Release 3.6.2 (2025-06-02)](release-notes-determinate/rl-3.6.2.md)
   - [Release 3.6.1 (2025-05-24)](release-notes-determinate/rl-3.6.1.md)
   - [Release 3.6.0 (2025-05-22)](release-notes-determinate/rl-3.6.0.md)

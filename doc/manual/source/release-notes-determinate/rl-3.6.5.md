@@ -1,4 +1,4 @@
-# Release 3.6.4 (2025-06-12)
+# Release 3.6.5 (2025-06-12)
 
 * Based on [upstream Nix 2.29.0](../release-notes/rl-2.29.md).
 
@@ -14,7 +14,6 @@
 * Make the `nix repl` test more stable by @edolstra in [DeterminateSystems/nix-src#103](https://github.com/DeterminateSystems/nix-src/pull/103)
 * Run nixpkgsLibTests against lazy trees by @edolstra in [DeterminateSystems/nix-src#100](https://github.com/DeterminateSystems/nix-src/pull/100)
 * Run the Nix test suite against lazy trees by @edolstra in [DeterminateSystems/nix-src#105](https://github.com/DeterminateSystems/nix-src/pull/105)
-* Improve caching of inputs in dry-run mode by @edolstra in [DeterminateSystems/nix-src#98](https://github.com/DeterminateSystems/nix-src/pull/98)
+* Improve caching of inputs by @edolstra in [DeterminateSystems/nix-src#98](https://github.com/DeterminateSystems/nix-src/pull/98), [DeterminateSystems/nix-src#110](https://github.com/DeterminateSystems/nix-src/pull/110), and [DeterminateSystems/nix-src#115](https://github.com/DeterminateSystems/nix-src/pull/115)
 
-
-**Full Changelog**: [v3.6.2...v3.6.4](https://github.com/DeterminateSystems/nix-src/compare/v3.6.2...v3.6.4)
+**Full Changelog**: [v3.6.2...v3.6.5](https://github.com/DeterminateSystems/nix-src/compare/v3.6.2...v3.6.4)
