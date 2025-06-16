@@ -46,12 +46,11 @@ std::pair<StorePath, Hash> fetchToStore2(
     if (fingerprint) {
         cacheKey = makeSourcePathToHashCacheKey(*fingerprint, method, subpath.abs());
         if (auto res = fetchers::getCache()->lookup(*cacheKey)) {
-            debug("source path hash cache hit for '%s'", path);
             auto hash = Hash::parseSRI(fetchers::getStrAttr(*res, "hash"));
             auto storePath = store.makeFixedOutputPathFromCA(name,
                 ContentAddressWithReferences::fromParts(method, hash, {}));
-            if (store.isValidPath(storePath)) {
-                debug("source path '%s' has valid store path '%s'", path, store.printStorePath(storePath));
+            if (mode == FetchMode::DryRun || store.isValidPath(storePath)) {
+                debug("source path '%s' cache hit in '%s' (hash '%s')", path, store.printStorePath(storePath), hash.to_string(HashFormat::SRI, true));
                 return {storePath, hash};
             }
             debug("source path '%s' not in store", path);
