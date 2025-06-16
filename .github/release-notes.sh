@@ -45,6 +45,7 @@ linkify_gh() {
         | trim_trailing_newlines \
         | sed -e 's/^\* /\n* /' \
         | linkify_gh
+    echo "" # final newline
 ) > "$scratch/changes.md"
 
 (
