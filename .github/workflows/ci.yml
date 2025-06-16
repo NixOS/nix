@@ -103,6 +103,7 @@ jobs:
           done
 
       - name: Build fallback-paths.nix
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           nix build .#fallbackPathsNix --out-link fallback
           cat fallback > ./artifacts/fallback-paths.nix
