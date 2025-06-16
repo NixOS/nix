@@ -29,4 +29,4 @@ jobs:
         git commit -m "Set .version-determinate to ${{ inputs.version }}" || true
         ./.github/release-notes.sh
         git add doc
-        git commit -m "Generare release notes for ${{ inputs.version }}" || true
+        git commit -m "Generate release notes for ${{ inputs.version }}" || true
