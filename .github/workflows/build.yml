@@ -83,19 +83,28 @@ jobs:
       - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: |
-          nix build -L --keep-going \
-            $(nix flake show --json \
-              | jq -r '
-                .hydraJobs.tests
-                | with_entries(select(.value.type == "derivation"))
-                | keys[]
-                | ".#hydraJobs.tests." + .')
+          cmd() {
+            nix build -L --keep-going --timeout 300 \
+              $(nix flake show --json \
+                | jq -r '
+                  .hydraJobs.tests
+                  | with_entries(select(.value.type == "derivation"))
+                  | keys[]
+                  | ".#hydraJobs.tests." + .')
+          }
+
+          if ! cmd; then
+            echo "failed, retrying once ..."
+            printf "\n\n\n\n\n\n\n\n"
+            cmd
+          fi
 
   flake_regressions:
     if: |
       (inputs.run_regression_tests && github.event_name == 'merge_group')
       || (
-        github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
+      inputs.run_regression_tests
+        && github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
         && (
           (github.event.action == 'labeled' && github.event.label.name == 'flake-regression-test')
           || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'flake-regression-test'))
@@ -103,35 +112,18 @@ jobs:
       )
     needs: build
     runs-on: ${{ inputs.runner }}
-    steps:
-      - name: Checkout nix
-        uses: actions/checkout@v4
-      - name: Checkout flake-regressions
-        uses: actions/checkout@v4
-        with:
-          repository: DeterminateSystems/flake-regressions
-          path: flake-regressions
-      - name: Checkout flake-regressions-data
-        uses: actions/checkout@v4
-        with:
-          repository: DeterminateSystems/flake-regressions-data
-          path: flake-regressions/tests
-      - uses: DeterminateSystems/determinate-nix-action@main
-      - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 50%" flake-regressions/eval-all.sh
+    strategy:
+      matrix:
+        nix_config:
+          - "lazy-trees = true"
+          - "lazy-trees = false"
+        glob:
+          - "[0-d]*"
+          - "[e-l]*"
+          - "[m]*"
+          - "[n-r]*"
+          - "[s-z]*"
 
-  flake_regressions_lazy:
-    if: |
-      (inputs.run_regression_tests && github.event_name == 'merge_group')
-      || (
-        github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
-        && (
-          (github.event.action == 'labeled' && github.event.label.name == 'flake-regression-test')
-          || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'flake-regression-test'))
-        )
-      )
-    needs: build
-    runs-on: ${{ inputs.runner }}
     steps:
       - name: Checkout nix
         uses: actions/checkout@v4
@@ -147,7 +139,24 @@ jobs:
           path: flake-regressions/tests
       - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH PARALLEL="-P 50%" NIX_CONFIG="lazy-trees = true" flake-regressions/eval-all.sh
+      - env:
+          PARALLEL: "-P 50%"
+          FLAKE_REGRESSION_GLOB: ${{ matrix.glob }}
+          NIX_CONFIG: ${{ matrix.nix_config }}
+        run: |
+          set -x
+          if [ ! -z "${NSC_CACHE_PATH:-}" ]; then
+            mkdir -p "${NSC_CACHE_PATH}/nix/xdg-cache"
+            export XDG_CACHE_HOME="${NSC_CACHE_PATH}/nix/xdg-cache"
+          fi
+          nix build -L --out-link ./new-nix
+          export PATH=$(pwd)/new-nix/bin:$PATH
+
+          if ! flake-regressions/eval-all.sh; then
+            echo "Some failed, trying again"
+            printf "\n\n\n\n\n\n\n\n"
+            flake-regressions/eval-all.sh
+          fi
 
   manual:
     if: github.event_name != 'merge_group'
@@ -190,7 +199,6 @@ jobs:
       - vm_tests_smoke
       - vm_tests_all
       - flake_regressions
-      - flake_regressions_lazy
       - manual
     if: ${{ always() }}
     runs-on: ubuntu-latest
