@@ -309,7 +309,7 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
     }
 }
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Settings::ExternalBuilder, systems, program);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Settings::ExternalBuilder, systems, program, args);
 
 template<> Settings::ExternalBuilders BaseSetting<Settings::ExternalBuilders>::parse(const std::string & str) const
 {

@@ -83,6 +83,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
         json.emplace("realStoreDir", getLocalStore(store).config->realStoreDir.get());
         json.emplace("system", drv.platform);
 
+        // FIXME: maybe write this JSON into the builder's stdin instead....?
         auto jsonFile = topTmpDir + "/build.json";
         writeFile(jsonFile, json.dump());
 
@@ -91,8 +92,15 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
             try {
                 commonChildInit();
 
-                Strings args = {externalBuilder.program, jsonFile};
+                Strings args = {externalBuilder.program};
 
+                if (externalBuilder.args) {
+                    args.insert(args.end(), externalBuilder.args->begin(), externalBuilder.args->end());
+                }
+
+                args.insert(args.end(), jsonFile);
+
+                debug("executing external builder: %s", concatStringsSep(" ", args));
                 execv(externalBuilder.program.c_str(), stringsToCharPtrs(args).data());
 
                 throw SysError("executing '%s'", externalBuilder.program);
