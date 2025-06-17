@@ -91,7 +91,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .name = "git-hashing",
         .description = R"(
             Allow creating (content-addressed) store objects which are hashed via Git's hashing algorithm.
-            These store objects will not be understandable by older versions of Nix.
+            These store objects aren't understandable by older versions of Nix.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/41",
     },
@@ -154,7 +154,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
             "http://foo"
             ```
 
-            But enabling this experimental feature will cause the Nix parser to
+            But enabling this experimental feature causes the Nix parser to
             throw an error when encountering a URL literal:
 
             ```

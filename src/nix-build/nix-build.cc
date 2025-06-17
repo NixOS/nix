@@ -474,7 +474,7 @@ static void main_nix_build(int argc, char * * argv)
 
             } catch (Error & e) {
                 logError(e.info());
-                notice("will use bash from your environment");
+                notice("uses bash from your environment");
                 shell = "bash";
             }
         }

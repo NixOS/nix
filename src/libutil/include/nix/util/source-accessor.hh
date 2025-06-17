@@ -183,6 +183,27 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
     std::optional<std::string> fingerprint;
 
     /**
+     * Return the fingerprint for `path`. This is usually the
+     * fingerprint of the current accessor, but for composite
+     * accessors (like `MountedSourceAccessor`), we want to return the
+     * fingerprint of the "inner" accessor if the current one lacks a
+     * fingerprint.
+     *
+     * So this method is intended to return the most-outer accessor
+     * that has a fingerprint for `path`. It also returns the path that `path`
+     * corresponds to in that accessor.
+     *
+     * For example: in a `MountedSourceAccessor` that has
+     * `/nix/store/foo` mounted,
+     * `getFingerprint("/nix/store/foo/bar")` will return the path
+     * `/bar` and the fingerprint of the `/nix/store/foo` accessor.
+     */
+    virtual std::pair<CanonPath, std::optional<std::string>> getFingerprint(const CanonPath & path)
+    {
+        return {path, fingerprint};
+    }
+
+    /**
      * Return the maximum last-modified time of the files in this
      * tree, if available.
      */

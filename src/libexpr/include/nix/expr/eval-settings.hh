@@ -131,9 +131,9 @@ struct EvalSettings : Config
     Setting<bool> restrictEval{
         this, false, "restrict-eval",
         R"(
-          If set to `true`, the Nix evaluator will not allow access to any
+          If set to `true`, the Nix evaluator doesn't allow access to any
           files outside of
-          [`builtins.nixPath`](@docroot@/language/builtins.md#builtins-nixPath),
+          [`builtins.nixPath`](@docroot@/language/builtins.md#builtins-nixPath)
           or to URIs outside of
           [`allowed-uris`](@docroot@/command-ref/conf-file.md#conf-allowed-uris).
         )"};
@@ -156,7 +156,7 @@ struct EvalSettings : Config
         R"(
           By default, Nix allows [Import from Derivation](@docroot@/language/import-from-derivation.md).
 
-          When this setting is `true`, Nix will log a warning indicating that it performed such an import.
+          When this setting is `true`, Nix logs a warning indicating that it performed such an import.
           This option has no effect if `allow-import-from-derivation` is disabled.
         )"
         };
@@ -166,9 +166,9 @@ struct EvalSettings : Config
         R"(
           By default, Nix allows [Import from Derivation](@docroot@/language/import-from-derivation.md).
 
-          With this option set to `false`, Nix will throw an error when evaluating an expression that uses this feature,
+          With this option set to `false`, Nix throws an error when evaluating an expression that uses this feature,
           even when the required store object is readily available.
-          This ensures that evaluation will not require any builds to take place,
+          This ensures that evaluation doesn't require any builds to take place,
           regardless of the state of the store.
         )"};
 
@@ -187,8 +187,8 @@ struct EvalSettings : Config
 
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
         R"(
-          If set to `true`, the Nix evaluator will trace every function call.
-          Nix will print a log message at the "vomit" level for every function
+          If set to `true`, the Nix evaluator traces every function call.
+          Nix prints a log message at the "vomit" level for every function
           entrance and function exit.
 
               function-trace entered undefined position at 1565795816999559622
@@ -213,7 +213,7 @@ struct EvalSettings : Config
     Setting<bool> ignoreExceptionsDuringTry{this, false, "ignore-try",
         R"(
           If set to true, ignore exceptions inside 'tryEval' calls when evaluating nix expressions in
-          debug mode (using the --debugger flag). By default the debugger will pause on all exceptions.
+          debug mode (using the --debugger flag). By default, the debugger pauses on all exceptions.
         )"};
 
     Setting<bool> traceVerbose{this, false, "trace-verbose",
@@ -225,7 +225,7 @@ struct EvalSettings : Config
     Setting<bool> builtinsTraceDebugger{this, false, "debugger-on-trace",
         R"(
           If set to true and the `--debugger` flag is given, the following functions
-          will enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
+          enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
 
           * [`builtins.trace`](@docroot@/language/builtins.md#builtins-trace)
           * [`builtins.traceVerbose`](@docroot@/language/builtins.md#builtins-traceVerbose)
@@ -238,7 +238,7 @@ struct EvalSettings : Config
     Setting<bool> builtinsDebuggerOnWarn{this, false, "debugger-on-warn",
         R"(
           If set to true and the `--debugger` flag is given, [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn)
-          will enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
+          enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
 
           This is useful for debugging warnings in third-party Nix code.
 
@@ -247,9 +247,9 @@ struct EvalSettings : Config
 
     Setting<bool> builtinsAbortOnWarn{this, false, "abort-on-warn",
         R"(
-          If set to true, [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn) will throw an error when logging a warning.
+          If set to true, [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn) throws an error when logging a warning.
 
-          This will give you a stack trace that leads to the location of the warning.
+          This gives you a stack trace that leads to the location of the warning.
 
           This is useful for finding information about warnings in third-party Nix code when you can not start the interactive debugger, such as when Nix is called from a non-interactive script. See [`debugger-on-warn`](#conf-debugger-on-warn).
 

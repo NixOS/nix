@@ -122,7 +122,8 @@ struct CacheImpl : Cache
 
     std::optional<ResultWithStorePath> lookupStorePath(
         Key key,
-        Store & store) override
+        Store & store,
+        bool allowInvalid) override
     {
         key.second.insert_or_assign("store", store.storeDir);
 
@@ -135,7 +136,7 @@ struct CacheImpl : Cache
         ResultWithStorePath res2(*res, StorePath(storePathS));
 
         store.addTempRoot(res2.storePath);
-        if (!store.isValidPath(res2.storePath)) {
+        if (!allowInvalid && !store.isValidPath(res2.storePath)) {
             // FIXME: we could try to substitute 'storePath'.
             debug("ignoring disappeared cache entry '%s:%s' -> '%s'",
                 key.first,
@@ -157,7 +158,7 @@ struct CacheImpl : Cache
         Key key,
         Store & store) override
     {
-        auto res = lookupStorePath(std::move(key), store);
+        auto res = lookupStorePath(std::move(key), store, false);
         return res && !res->expired ? res : std::nullopt;
     }
 };

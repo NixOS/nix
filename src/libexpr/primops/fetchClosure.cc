@@ -214,7 +214,7 @@ static RegisterPrimOp primop_fetchClosure({
     .doc = R"(
       Fetch a store path [closure](@docroot@/glossary.md#gloss-closure) from a binary cache, and return the store path as a string with context.
 
-      This function can be invoked in three ways, that we will discuss in order of preference.
+      This function can be invoked in three ways that we will discuss in order of preference.
 
       **Fetch a content-addressed store path**
 

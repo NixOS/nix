@@ -77,24 +77,30 @@ StorePath EvalState::mountInput(
 
     allowPath(storePath); // FIXME: should just whitelist the entire virtual store
 
+    std::optional<Hash> _narHash;
+
+    auto getNarHash = [&]() {
+        if (!_narHash) {
+            if (store->isValidPath(storePath))
+                _narHash = store->queryPathInfo(storePath)->narHash;
+            else
+                _narHash = fetchToStore2(*store, accessor, FetchMode::DryRun, input.getName()).second;
+        }
+        return _narHash;
+    };
+
     storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
 
-    if (requireLockable && (!settings.lazyTrees || !input.isLocked()) && !input.getNarHash()) {
-        auto narHash = accessor->hashPath(CanonPath::root);
-        input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
-    }
+    if (requireLockable && (!settings.lazyTrees || !input.isLocked()) && !input.getNarHash())
+        input.attrs.insert_or_assign("narHash", getNarHash()->to_string(HashFormat::SRI, true));
 
-    // FIXME: what to do with the NAR hash in lazy mode?
-    if (!settings.lazyTrees && originalInput.getNarHash()) {
-        auto expected = originalInput.computeStorePath(*store);
-        if (storePath != expected)
-            throw Error(
-                (unsigned int) 102,
-                "NAR hash mismatch in input '%s', expected '%s' but got '%s'",
-                originalInput.to_string(),
-                store->printStorePath(storePath),
-                store->printStorePath(expected));
-    }
+    if (originalInput.getNarHash() && *getNarHash() != *originalInput.getNarHash())
+        throw Error(
+            (unsigned int) 102,
+            "NAR hash mismatch in input '%s', expected '%s' but got '%s'",
+            originalInput.to_string(),
+            getNarHash()->to_string(HashFormat::SRI, true),
+            originalInput.getNarHash()->to_string(HashFormat::SRI, true));
 
     return storePath;
 }

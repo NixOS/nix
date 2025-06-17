@@ -218,7 +218,7 @@ StorePath Store::addToStore(
         if (settings.warnLargePathThreshold && lengthSource.total >= settings.warnLargePathThreshold) {
             static bool failOnLargePath = getEnv("_NIX_TEST_FAIL_ON_LARGE_PATH").value_or("") == "1";
             if (failOnLargePath)
-                throw Error("won't copy large path '%s' to the store (%d)", path, renderSize(lengthSource.total));
+                throw Error("doesn't copy large path '%s' to the store (%d)", path, renderSize(lengthSource.total));
             warn("copied large path '%s' to the store (%d)", path, renderSize(lengthSource.total));
         }
     });
