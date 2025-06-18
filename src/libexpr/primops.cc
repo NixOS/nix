@@ -14,6 +14,7 @@
 #include "nix/expr/value-to-xml.hh"
 #include "nix/expr/primops.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/util/sort.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
@@ -651,7 +652,7 @@ struct CompareValues
                     // Note: we don't take the accessor into account
                     // since it's not obvious how to compare them in a
                     // reproducible way.
-                    return strcmp(v1->payload.path.path, v2->payload.path.path) < 0;
+                    return strcmp(v1->pathStr(), v2->pathStr()) < 0;
                 case nList:
                     // Lexicographic comparison
                     for (size_t i = 0;; i++) {
@@ -3138,12 +3139,12 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value * * arg
     if (!args[0]->isLambda())
         state.error<TypeError>("'functionArgs' requires a function").atPos(pos).debugThrow();
 
-    if (!args[0]->payload.lambda.fun->hasFormals()) {
+    if (!args[0]->lambda().fun->hasFormals()) {
         v.mkAttrs(&state.emptyBindings);
         return;
     }
 
-    const auto &formals = args[0]->payload.lambda.fun->formals->formals;
+    const auto &formals = args[0]->lambda().fun->formals->formals;
     auto attrs = state.buildBindings(formals.size());
     for (auto & i : formals)
         attrs.insert(i.name, state.getBool(i.def), i.pos);
@@ -3695,10 +3696,14 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
         return state.forceBool(vBool, pos, "while evaluating the return value of the sorting function passed to builtins.sort");
     };
 
-    /* FIXME: std::sort can segfault if the comparator is not a strict
-       weak ordering. What to do? std::stable_sort() seems more
-       resilient, but no guarantees... */
-    std::stable_sort(list.begin(), list.end(), comparator);
+    /* NOTE: Using custom implementation because std::sort and std::stable_sort
+       are not resilient to comparators that violate strict weak ordering. Diagnosing
+       incorrect implementations is a O(n^3) problem, so doing the checks is much more
+       expensive that doing the sorting. For this reason we choose to use sorting algorithms
+       that are can't be broken by invalid comprators. peeksort (mergesort)
+       doesn't misbehave when any of the strict weak order properties is
+       violated - output is always a reordering of the input. */
+    peeksort(list.begin(), list.end(), comparator);
 
     v.mkList(list);
 }
@@ -3720,6 +3725,32 @@ static RegisterPrimOp primop_sort({
 
       This is a stable sort: it preserves the relative order of elements
       deemed equal by the comparator.
+
+      *comparator* must impose a strict weak ordering on the set of values
+      in the *list*. This means that for any elements *a*, *b* and *c* from the
+      *list*, *comparator* must satisfy the following relations:
+
+        1. Transitivity
+
+        ```nix
+        comparator a b && comparator b c -> comparator a c
+        ```
+
+        1. Irreflexivity
+
+        ```nix
+        comparator a a == false
+        ```
+
+        1. Transitivity of equivalence
+
+        ```nix
+        let equiv = a: b: (!comparator a b && !comparator b a); in
+        equiv a b && equiv b c -> equiv a c
+        ```
+
+      If the *comparator* violates any of these properties, then `builtins.sort`
+      reorders elements in an unspecified manner.
     )",
     .fun = prim_sort,
 });

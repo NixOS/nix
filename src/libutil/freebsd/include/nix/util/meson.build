@@ -2,6 +2,4 @@
 
 include_dirs += include_directories('../..')
 
-headers += files(
-  'freebsd-jail.hh',
-)
+headers += files('freebsd-jail.hh')

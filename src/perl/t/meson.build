@@ -5,9 +5,7 @@
 # src
 #---------------------------------------------------
 
-nix_perl_tests = files(
-  'init.t',
-)
+nix_perl_tests = files('init.t')
 
 
 foreach f : nix_perl_tests
