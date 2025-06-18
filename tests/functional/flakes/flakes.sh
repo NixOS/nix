@@ -160,6 +160,10 @@ expect 1 nix build -o "$TEST_ROOT/result" "$flake2Dir#bar" --no-update-lock-file
 nix build -o "$TEST_ROOT/result" "$flake2Dir#bar" --commit-lock-file
 [[ -e "$flake2Dir/flake.lock" ]]
 [[ -z $(git -C "$flake2Dir" diff main || echo failed) ]]
+<<<<<<< HEAD
+=======
+[[ $(jq --indent 0 --compact-output . < "$flake2Dir/flake.lock") =~ ^'{"nodes":{"flake1":{"locked":{"lastModified":'.*',"narHash":"sha256-'.*'","ref":"refs/heads/master","rev":"'.*'","revCount":2,"type":"git","url":"file:///'.*'"},"original":{"id":"flake1","type":"indirect"}},"root":{"inputs":{"flake1":"flake1"}}},"root":"root","version":7}'$ ]]
+>>>>>>> 77f6b6532 (tests: fixup with jq-1.8.0)
 
 # Rerunning the build should not change the lockfile.
 nix build -o "$TEST_ROOT/result" "$flake2Dir#bar"
