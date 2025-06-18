@@ -21,6 +21,7 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/input-cache.hh"
+#include "nix/expr/parallel-eval.hh"
 
 #include "parser-tab.hh"
 
@@ -195,6 +196,7 @@ EvalState::EvalState(
     std::shared_ptr<Store> buildStore)
     : fetchSettings{fetchSettings}
     , settings{settings}
+    , executor{make_ref<Executor>(settings)}
     , sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))

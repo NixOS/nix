@@ -93,8 +93,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
 
         std::atomic<uint64_t> results = 0;
 
-        Executor executor(state->settings);
-        FutureVector futures(executor);
+        FutureVector futures(*state->executor);
 
         std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
 

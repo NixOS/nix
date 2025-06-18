@@ -48,6 +48,7 @@ struct MountedSourceAccessor;
 namespace eval_cache {
     class EvalCache;
 }
+struct Executor;
 
 /**
  * Increments a count on construction and decrements on destruction.
@@ -208,6 +209,9 @@ class EvalState : public std::enable_shared_from_this<EvalState>
 public:
     const fetchers::Settings & fetchSettings;
     const EvalSettings & settings;
+
+    ref<Executor> executor;
+
     SymbolTable symbols;
     PosTable positions;
 

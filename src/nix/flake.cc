@@ -454,8 +454,7 @@ struct CmdFlakeCheck : FlakeCommand
 
         std::vector<DerivedPath> drvPaths;
 
-        Executor executor(state->settings);
-        FutureVector futures(executor);
+        FutureVector futures(*state->executor);
 
         auto checkApp = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
@@ -1194,8 +1193,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
         std::function<void(eval_cache::AttrCursor & visitor, nlohmann::json & result)> visit;
 
-        Executor executor(state->settings);
-        FutureVector futures(executor);
+        FutureVector futures(*state->executor);
 
         visit = [&](eval_cache::AttrCursor & visitor, nlohmann::json & j)
         {
