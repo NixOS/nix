@@ -1,7 +1,8 @@
-{ lib
-, config
-, nixpkgs
-, ...
+{
+  lib,
+  config,
+  nixpkgs,
+  ...
 }:
 let
   pkgs = config.nodes.client.nixpkgs.pkgs;
@@ -146,11 +147,12 @@ in
       };
 
     client =
-      { config
-      , lib
-      , pkgs
-      , nodes
-      , ...
+      {
+        config,
+        lib,
+        pkgs,
+        nodes,
+        ...
       }:
       {
         virtualisation.writableStore = true;
