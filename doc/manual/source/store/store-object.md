@@ -18,7 +18,7 @@ In particular, the edge corresponding to a reference is from the store object th
 References other than a self-reference must not form a cycle.
 The graph of references excluding self-references thus forms a [directed acyclic graph].
 
-[directed acyclic graph]: @docroot@/glossary.md#gloss-directed acyclic graph
+[directed acyclic graph]: @docroot@/glossary.md#gloss-directed-acyclic-graph
 
 We can take the [transitive closure] of the references graph, which any pair of store objects have an edge not if there is a single reference from the first to the second, but a path of one or more references from the first to the second.
 The *requisites* of a store object are all store objects reachable by paths of references which start with given store object's references.
