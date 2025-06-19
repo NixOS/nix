@@ -700,7 +700,7 @@ void DerivationBuilderImpl::startBuilder()
 
         // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware - we should tell them to run the command to install Darwin 2
         if (drv.platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin")
-          msg += fmt("\nNote: run `%s` to run programs for x86_64-darwin", Magenta("/usr/sbin/softwareupdate --install-rosetta"));
+          msg += fmt("\nNote: run `%s` to run programs for x86_64-darwin", Magenta("/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
 
         throw BuildError(msg);
     }
