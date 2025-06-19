@@ -5,6 +5,9 @@
 #include <limits>
 
 #include <sys/types.h>
+#ifdef __linux__
+#include <sys/mount.h>
+#endif
 
 #include "nix/util/types.hh"
 #include "nix/util/configuration.hh"
@@ -17,6 +20,72 @@
 namespace nix {
 
 typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
+
+struct SandboxPath;
+using SandboxPaths = std::map<Path, SandboxPath, std::less<>>;
+struct SandboxPath
+{
+public:
+    typedef enum {
+#ifdef __linux__
+        ro = MS_RDONLY,
+        nodev = MS_NODEV,
+        noexec = MS_NOEXEC,
+        nosuid = MS_NOSUID,
+        noatime = MS_NOATIME,
+        nodiratime = MS_NODIRATIME,
+        relatime = MS_RELATIME,
+        strictatime = MS_STRICTATIME, /* overrides any atime/relatime */
+        private_ = MS_PRIVATE,
+        slave = MS_SLAVE,
+        unbindable = MS_UNBINDABLE
+#else
+        ro  // FIXME: do any options make sense on other that linux?
+#endif
+    } MountOpt;
+
+#ifdef __linux__
+    /* Options to set when readOnly=true */
+    constexpr static MountOpt readOnlyDefaults[] = { ro, nodev, noexec, nosuid, noatime };
+
+    /* Only one atime option should be enabled at a time. Same for propagation
+     * style.*/
+    constexpr static std::pair<uint64_t, const char*> exclusiveOptionMasks[] = {
+        {MS_NOATIME | MS_NODIRATIME | MS_RELATIME | MS_STRICTATIME, "option-atime"},
+        {MS_SHARED | MS_PRIVATE | MS_SLAVE, "propagation"},
+    };
+#endif
+
+    Path source;
+
+    /**
+     * Ignore path if source is missing.
+     */
+    bool optional;
+
+    /**
+     * Enables MS_RDONLY, NODEV, NOSUID, NOEXEC and NOATIME. You can get finer
+     * control with 'options' instead.
+     * */
+    bool readOnly;
+
+    std::vector<MountOpt> options;
+
+    SandboxPath(std::string source = "", bool optional = false,
+        bool readOnly = false, std::vector<MountOpt> options = { }) :
+        source(std::string(std::move(source))), optional(optional),
+        readOnly(readOnly), options(std::move(options)) { }
+
+    /* This is to enable the full implicit conversion from e.g. const char[],
+     * even when binding a reference. Code can specify paths with literals and
+     * nothing extra. (Have angried the C++ deities with this? Seems like
+     * there should be a better way?) */
+    template<typename S, typename = std::enable_if_t<std::is_convertible_v<S, Path>>>
+    SandboxPath(S&& source, bool optional = false, bool readOnly = false) :
+        SandboxPath(Path(std::forward<S>(source)), optional, readOnly) { }
+
+    static SandboxPaths parse(const std::string_view & str, const std::string& = "(unknown)");
+};
 
 struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
@@ -629,19 +698,76 @@ public:
         )",
         {"build-use-chroot", "build-use-sandbox"}};
 
-    Setting<PathSet> sandboxPaths{
+    Setting<SandboxPaths> sandboxPaths{
         this, {}, "sandbox-paths",
         R"(
-          A list of paths bind-mounted into Nix sandbox environments. You can
-          use the syntax `target=source` to mount a path in a different
-          location in the sandbox; for instance, `/bin=/nix-bin` will mount
-          the path `/nix-bin` as `/bin` inside the sandbox. If *source* is
-          followed by `?`, then it is not an error if *source* does not exist;
-          for example, `/dev/nvidiactl?` specifies that `/dev/nvidiactl` will
-          only be mounted in the sandbox if it exists in the host filesystem.
+          Paths to bind-mount into Nix sandbox environments.
+          Two syntaxes can be used:
 
-          If the source is in the Nix store, then its closure will be added to
-          the sandbox as well.
+          1. Original (old) syntax: Strings separated by whitespace. Entries
+             are parsed as `TARGET[=SOURCE][?]`. Only the `TARGET` path is
+             required.
+
+             `SOURCE` can be set following an equals sign (`=`) to specify a
+             different source path (the value of `TARGET` is used by default
+             for the source path as well). For instance, `/bin=/nix-bin` would
+             mount path `/nix-bin` in `/bin` inside the sandbox.
+
+             A `?` suffix can be used to make it not an error if the `SOURCE`
+             path does not exist. Without it an error is raised for an
+             unavailable path. For instance, `/dev/nvidiactl?` specifies that
+             `/dev/nvidiactl` will only be mounted in the sandbox if it exists
+             in the host filesystem.
+
+          2. JSON syntax (new): Using this form more configurable settings
+             become available. All paths are specified in a single JSON object
+             so that every key is a target path inside the sandbox and the
+             corresponding values can contain additional (platform-specific)
+             settings.
+
+          For instance:
+
+          ```nix
+          sandbox-paths = {"/bin/sh":{}}                         # /bin/sh
+          sandbox-paths = {"/bin/sh":{"source":"/usr/bin/bash"}} # /bin/sh=/usr/bin/bash
+          sandbox-paths = {"/etc/nix/netrc":{"optional":true}}   # /etc/nix/netrc?
+          ```
+
+          Additional per-path options are available on Linux:
+
+          - `readOnly` (boolean)
+
+            When this is `true`, the bind-mount is made read-only and
+            additional mount-point flags are enabled. In particular these
+            options are enabled by this flag: `ro`, `nosuid`, `nodev`,
+            `noexec` and `noatime`.
+
+          - `options` (string array)
+
+            This setting can be used to add/modify (some) mount(-point) flags
+            directly. In addition to flags used by `readOnly` the following
+            flags can also be used: `nodiratime`, `relatime`, `strictatime`,
+            `unbindable`, `private`, `slave`.
+
+          Full example:
+
+          ```nix
+          sandbox-paths = {
+            "/path/to" : {
+              "source"   : "/path/from",                  # ()
+              "optional" : true,                          # (false)
+              "readOnly" : true,                          # (false)
+              "options"  : [ "optionA", "optionB", ... ], # ()
+            },
+
+            # ...
+          }
+          ```
+
+          > **Note:**
+          >
+          > If the source is in the Nix store, then its closure will
+          > be added to the sandbox as well.
 
           Depending on how Nix was built, the default value for this option
           may be empty or provide `/bin/sh` as a bind-mount of `bash`.
