@@ -91,7 +91,7 @@ StorePath EvalState::mountInput(
 
     storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
 
-    if (requireLockable && (!settings.lazyTrees || !input.isLocked()) && !input.getNarHash())
+    if (requireLockable && (!settings.lazyTrees || !settings.lazyLocks || !input.isLocked()) && !input.getNarHash())
         input.attrs.insert_or_assign("narHash", getNarHash()->to_string(HashFormat::SRI, true));
 
     if (originalInput.getNarHash() && *getNarHash() != *originalInput.getNarHash())
