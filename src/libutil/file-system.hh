@@ -148,12 +148,16 @@ Descriptor openDirectory(const std::filesystem::path & path);
 std::string readFile(const Path & path);
 void readFile(const Path & path, Sink & sink);
 
+enum struct FsSync { Yes, No };
+
 /**
  * Write a string to a file.
  */
-void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, bool sync = false);
+void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No);
 
-void writeFile(const Path & path, Source & source, mode_t mode = 0666, bool sync = false);
+void writeFile(const Path & path, Source & source, mode_t mode = 0666, FsSync sync = FsSync::No);
+
+void writeFile(AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No);
 
 /**
  * Flush a file's parent directory to disk
