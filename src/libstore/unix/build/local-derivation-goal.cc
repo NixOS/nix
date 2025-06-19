@@ -559,7 +559,14 @@ void LocalDerivationGoal::startBuilder()
     } else {
         tmpDir = topTmpDir;
     }
-    chownToBuilder(tmpDir);
+
+    /* The TOCTOU between the previous mkdir call and this open call is unavoidable due to
+       POSIX semantics.*/
+    tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
+    if (!tmpDirFd)
+        throw SysError("failed to open the build temporary directory descriptor '%1%'", tmpDir);
+
+    chownToBuilder(tmpDirFd.get(), tmpDir);
 
     for (auto & [outputName, status] : initialOutputs) {
         /* Set scratch path we'll actually use during the build.
@@ -1157,9 +1164,7 @@ void LocalDerivationGoal::initTmpDir()
             } else {
                 auto hash = hashString(HashAlgorithm::SHA256, i.first);
                 std::string fn = ".attr-" + hash.to_string(HashFormat::Nix32, false);
-                Path p = tmpDir + "/" + fn;
-                writeFile(p, rewriteStrings(i.second, inputRewrites));
-                chownToBuilder(p);
+                writeBuilderFile(fn, rewriteStrings(i.second, inputRewrites));
                 env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
             }
         }
@@ -1264,11 +1269,9 @@ void LocalDerivationGoal::writeStructuredAttrs()
 
         auto jsonSh = writeStructuredAttrsShell(json);
 
-        writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
-        chownToBuilder(tmpDir + "/.attrs.sh");
+        writeBuilderFile(".attrs.sh", rewriteStrings(jsonSh, inputRewrites));
         env["NIX_ATTRS_SH_FILE"] = tmpDirInSandbox + "/.attrs.sh";
-        writeFile(tmpDir + "/.attrs.json", rewriteStrings(json.dump(), inputRewrites));
-        chownToBuilder(tmpDir + "/.attrs.json");
+        writeBuilderFile(".attrs.json", rewriteStrings(json.dump(), inputRewrites));
         env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox + "/.attrs.json";
     }
 }
@@ -1779,6 +1782,24 @@ void setupSeccomp()
 #endif
 }
 
+void LocalDerivationGoal::chownToBuilder(int fd, const Path & path)
+{
+    if (!buildUser) return;
+    if (fchown(fd, buildUser->getUID(), buildUser->getGID()) == -1)
+        throw SysError("cannot change ownership of file '%1%'", path);
+}
+
+void LocalDerivationGoal::writeBuilderFile(
+    const std::string & name,
+    std::string_view contents)
+{
+    auto path = std::filesystem::path(tmpDir) / name;
+    AutoCloseFD fd{openat(tmpDirFd.get(), name.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666)};
+    if (!fd)
+        throw SysError("creating file %s", path);
+    writeFile(fd, path, contents);
+    chownToBuilder(fd.get(), path);
+}
 
 void LocalDerivationGoal::runChild()
 {
@@ -3053,6 +3074,15 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
 void LocalDerivationGoal::deleteTmpDir(bool force)
 {
     if (topTmpDir != "") {
+        /* As an extra precaution, even in the event of `deletePath` failing to
+         * clean up, the `tmpDir` will be chowned as if we were to move
+         * it inside the Nix store.
+         *
+         * This hardens against an attack which smuggles a file descriptor
+         * to make use of the temporary directory.
+         */
+        chmod(topTmpDir.c_str(), 0000);
+
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv->isBuiltin()) {
