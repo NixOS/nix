@@ -922,7 +922,7 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
                 store.computeFSClosure(store.toStorePath(i.second.source).first, closure);
         } catch (InvalidPath & e) {
         } catch (Error & e) {
-            e.addTrace({}, "while processing 'sandbox-paths'");
+            e.addTrace({}, "while processing sandbox path '%s'", i.second.source);
             throw;
         }
     for (auto & i : closure) {
