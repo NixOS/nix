@@ -14,6 +14,7 @@
 namespace nix {
 
 /* Forward definition. */
+struct DerivationTrampolineGoal;
 struct DerivationGoal;
 struct DerivationBuildingGoal;
 struct PathSubstitutionGoal;
@@ -33,6 +34,7 @@ class DrvOutputSubstitutionGoal;
  */
 GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal);
 GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
 
@@ -106,8 +108,9 @@ private:
      * same derivation / path.
      */
 
-    DerivedPathMap<std::weak_ptr<DerivationGoal>> derivationGoals;
+    DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<DerivationTrampolineGoal>>> derivationTrampolineGoals;
 
+    std::map<StorePath, std::map<OutputName, std::weak_ptr<DerivationGoal>>> derivationGoals;
     std::map<StorePath, std::weak_ptr<DerivationBuildingGoal>> derivationBuildingGoals;
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
@@ -204,16 +207,20 @@ private:
     template<class G, typename... Args>
     std::shared_ptr<G> initGoalIfNeeded(std::weak_ptr<G> & goal_weak, Args && ...args);
 
-    std::shared_ptr<DerivationGoal> makeDerivationGoalCommon(
-        ref<const SingleDerivedPath> drvReq, const OutputsSpec & wantedOutputs,
-        std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal);
-public:
-    std::shared_ptr<DerivationGoal> makeDerivationGoal(
+    std::shared_ptr<DerivationTrampolineGoal> makeDerivationTrampolineGoal(
         ref<const SingleDerivedPath> drvReq,
         const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
-    std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(
-        const StorePath & drvPath, const BasicDerivation & drv,
-        const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
+
+public:
+    std::shared_ptr<DerivationTrampolineGoal> makeDerivationTrampolineGoal(
+        const StorePath & drvPath,
+        const OutputsSpec & wantedOutputs,
+        const Derivation & drv,
+        BuildMode buildMode = bmNormal);
+
+    std::shared_ptr<DerivationGoal> makeDerivationGoal(
+        const StorePath & drvPath, const Derivation & drv,
+        const OutputName & wantedOutput, BuildMode buildMode = bmNormal);
 
     /**
      * @ref DerivationBuildingGoal "derivation goal"
@@ -232,7 +239,7 @@ public:
      * Make a goal corresponding to the `DerivedPath`.
      *
      * It will be a `DerivationGoal` for a `DerivedPath::Built` or
-     * a `SubstitutionGoal` for a `DerivedPath::Opaque`.
+     * a `PathSubstitutionGoal` for a `DerivedPath::Opaque`.
      */
     GoalPtr makeGoal(const DerivedPath & req, BuildMode buildMode = bmNormal);
 
