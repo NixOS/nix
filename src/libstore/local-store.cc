@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <cstring>
 
+#include <atomic>
 #include <memory>
 #include <new>
 #include <sys/types.h>
@@ -1666,11 +1667,35 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     createDirs(dirOf(logPath));
 
-    auto tmpFile = fmt("%s.tmp.%d", logPath, getpid());
+    /* Retry loop for temporary log file creation to handle race conditions */
+    while (true) {
+        auto tmpFile = makeTempPath(dirOf(logPath), baseNameOf(logPath) + ".tmp");
 
-    writeFile(tmpFile, compress("bzip2", log));
+        try {
+            writeFile(tmpFile, compress("bzip2", log));
+        } catch (Error & e) {
+            e.addTrace({}, "writing build log to '%s'", tmpFile);
+            throw;
+        }
 
-    std::filesystem::rename(tmpFile, logPath);
+        try {
+            std::filesystem::rename(tmpFile, logPath);
+            break; /* Success! */
+        } catch (std::filesystem::filesystem_error & e) {
+            try {
+                std::filesystem::remove(tmpFile);
+            } catch (...) {
+                /* Ignore errors removing the temp file */
+            }
+
+            if (e.code() == std::errc::file_exists) {
+                /* Another process created the log file. That's fine, we're done. */
+                break;
+            }
+
+            throw SysError("renaming temporary file '%1%' to '%2%'", tmpFile, logPath);
+        }
+    }
 }
 
 std::optional<std::string> LocalStore::getVersion()
