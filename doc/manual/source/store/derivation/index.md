@@ -200,7 +200,7 @@ This ensures that there is a canonical [store path] used to refer to the derivat
 > **Note**
 >
 > Currently, the canonical encoding for every derivation is the "ATerm" format,
-> but this is subject to change for types derivations which are not yet stable.
+> but this is subject to change for the types of derivations which are not yet stable.
 
 Regardless of the format used, when serializing a derivation to a store object, that store object will be content-addressed.
 
