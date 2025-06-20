@@ -6,7 +6,10 @@ project(
   'cpp',
   version : files('.version'),
   subproject_dir : 'src',
-  default_options : [ 'localstatedir=/nix/var' ],
+  default_options : [
+    'localstatedir=/nix/var',
+    # hack for trailing newline
+  ],
   meson_version : '>= 1.1',
 )
 
