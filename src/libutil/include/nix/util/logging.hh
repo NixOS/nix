@@ -55,7 +55,7 @@ struct LoggerSettings : Config
     Setting<Path> jsonLogPath{
         this, "", "json-log-path",
         R"(
-          A file or unix socket to which JSON records of Nix's log output will be
+          A file or unix socket to which JSON records of Nix's log output are
           written, in the same format as `--log-format internal-json`
           (without the `@nix ` prefixes on each line).
           Concurrent writes to the same file by multiple Nix processes are not supported and

@@ -794,10 +794,10 @@ LockedFlake lockFlake(
                     if (auto unlockedInput = newLockFile.isUnlocked(state.fetchSettings)) {
                         if (lockFlags.failOnUnlocked)
                             throw Error(
-                                "Will not write lock file of flake '%s' because it has an unlocked input ('%s'). "
+                                "Not writing lock file of flake '%s' because it has an unlocked input ('%s'). "
                                 "Use '--allow-dirty-locks' to allow this anyway.", topRef, *unlockedInput);
                         if (state.fetchSettings.warnDirty)
-                            warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
+                            warn("not writing lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
                     } else {
                         if (!lockFlags.updateLockFile)
                             throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
