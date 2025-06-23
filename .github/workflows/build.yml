@@ -120,6 +120,7 @@ jobs:
         nix_config:
           - "lazy-trees = true"
           - "lazy-trees = false"
+          - "eval-cores = 24"
         glob:
           - "[0-d]*"
           - "[e-l]*"
@@ -146,6 +147,7 @@ jobs:
           PARALLEL: "-P 50%"
           FLAKE_REGRESSION_GLOB: ${{ matrix.glob }}
           NIX_CONFIG: ${{ matrix.nix_config }}
+          GC_INITIAL_HEAP_SIZE: "32G"
         run: |
           set -x
           if [ ! -z "${NSC_CACHE_PATH:-}" ]; then
