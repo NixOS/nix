@@ -162,7 +162,7 @@ There are two types of placeholder, corresponding to the two cases where this pr
 
 > **Explanation**
 >
-> In general, we need to realise [realise] a [store object] in order to be sure to have a store object for it.
+> In general, we need to [realise] a [store object] in order to be sure to have a store object for it.
 > But for these two cases this is either impossible or impractical:
 >
 > - In the output case this is impossible:
