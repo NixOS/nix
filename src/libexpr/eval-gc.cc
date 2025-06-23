@@ -38,7 +38,7 @@ static size_t getFreeMem()
 {
     /* On Linux, use the `MemAvailable` or `MemFree` fields from
        /proc/cpuinfo. */
-#  if __linux__
+#  ifdef __linux__
     {
         std::unordered_map<std::string, std::string> fields;
         for (auto & line :
