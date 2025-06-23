@@ -3,7 +3,10 @@
 
 namespace nix {
 
+thread_local bool Executor::amWorkerThread{false};
+
 Executor::Executor(const EvalSettings & evalSettings)
+    : enabled(evalSettings.evalCores > 1)
 {
     debug("executor using %d threads", evalSettings.evalCores);
     auto state(state_.lock());
@@ -39,6 +42,8 @@ Executor::~Executor()
 
 void Executor::worker()
 {
+    amWorkerThread = true;
+
     while (true) {
         Item item;
 

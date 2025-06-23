@@ -34,6 +34,8 @@ struct Executor
         bool quit = false;
     };
 
+    const bool enabled;
+
     Sync<State> state_;
 
     std::condition_variable wakeup;
@@ -45,6 +47,8 @@ struct Executor
     void worker();
 
     std::vector<std::future<void>> spawn(std::vector<std::pair<work_t, uint8_t>> && items);
+
+    static thread_local bool amWorkerThread;
 };
 
 struct FutureVector
