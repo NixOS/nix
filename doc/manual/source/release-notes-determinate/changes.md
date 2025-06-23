@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.29 and Determinate Nix 3.6.5.<!-- differences -->
+This section lists the differences between upstream Nix 2.29 and Determinate Nix 3.6.6.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -72,3 +72,5 @@ This section lists the differences between upstream Nix 2.29 and Determinate Nix
 * Improve error messages that use the hypothetical future tense of "will" by @lucperkins in [DeterminateSystems/nix-src#92](https://github.com/DeterminateSystems/nix-src/pull/92)
 
 * Improve caching of inputs in dry-run mode by @edolstra in [DeterminateSystems/nix-src#98](https://github.com/DeterminateSystems/nix-src/pull/98)
+
+<!-- Determinate Nix version 3.6.6 -->
