@@ -38,6 +38,8 @@ public:
     Store * store;
     std::string nixDir;
     std::string nixStoreDir;
+    std::string nixStateDir;
+    std::string nixLogDir;
 
 protected:
     void init_local_store()
@@ -58,11 +60,13 @@ protected:
 #endif
 
         nixStoreDir = nixDir + "/my_nix_store";
+        nixStateDir = nixDir + "/my_state";
+        nixLogDir = nixDir + "/my_log";
 
         // Options documented in `nix help-stores`
         const char * p1[] = {"store", nixStoreDir.c_str()};
-        const char * p2[] = {"state", (new std::string(nixDir + "/my_state"))->c_str()};
-        const char * p3[] = {"log", (new std::string(nixDir + "/my_log"))->c_str()};
+        const char * p2[] = {"state", nixStateDir.c_str()};
+        const char * p3[] = {"log", nixLogDir.c_str()};
 
         const char ** params[] = {p1, p2, p3, nullptr};
 
