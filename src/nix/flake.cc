@@ -20,6 +20,8 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/expr/parallel-eval.hh"
+#include "nix/util/thread-pool.hh"
+#include "nix/store/filetransfer.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -1148,6 +1150,59 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
     }
 };
 
+struct CmdFlakePrefetchInputs : FlakeCommand
+{
+    std::string description() override
+    {
+        return "fetch the inputs of a flake";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-prefetch-inputs.md"
+          ;
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        auto flake = lockFlake();
+
+        ThreadPool pool{fileTransferSettings.httpConnections};
+
+        struct State
+        {
+            std::set<const Node *> done;
+        };
+
+        Sync<State> state_;
+
+        std::function<void(const Node & node)> visit;
+        visit = [&](const Node & node)
+        {
+            if (!state_.lock()->done.insert(&node).second)
+                return;
+
+            if (auto lockedNode = dynamic_cast<const LockedNode *>(&node)) {
+                Activity act(*logger, lvlInfo, actUnknown,
+                    fmt("fetching '%s'", lockedNode->lockedRef));
+                auto accessor = lockedNode->lockedRef.input.getAccessor(store).first;
+                if (!evalSettings.lazyTrees)
+                    fetchToStore(*store, accessor, FetchMode::Copy, lockedNode->lockedRef.input.getName());
+            }
+
+            for (auto & [inputName, input] : node.inputs) {
+                if (auto inputNode = std::get_if<0>(&input))
+                    pool.enqueue(std::bind(visit, **inputNode));
+            }
+        };
+
+        pool.enqueue(std::bind(visit, *flake.lockFile.root));
+
+        pool.process();
+    }
+};
+
 struct CmdFlakeShow : FlakeCommand, MixJSON
 {
     bool showLegacy = false;
@@ -1503,6 +1558,7 @@ struct CmdFlake : NixMultiCommand
                 {"new", []() { return make_ref<CmdFlakeNew>(); }},
                 {"clone", []() { return make_ref<CmdFlakeClone>(); }},
                 {"archive", []() { return make_ref<CmdFlakeArchive>(); }},
+                {"prefetch-inputs", []() { return make_ref<CmdFlakePrefetchInputs>(); }},
                 {"show", []() { return make_ref<CmdFlakeShow>(); }},
                 {"prefetch", []() { return make_ref<CmdFlakePrefetch>(); }},
             })
