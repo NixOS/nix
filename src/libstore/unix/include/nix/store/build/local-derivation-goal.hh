@@ -38,6 +38,11 @@ struct LocalDerivationGoal : public DerivationGoal
     Path topTmpDir;
 
     /**
+     * The file descriptor of the temporary directory.
+     */
+    AutoCloseFD tmpDirFd;
+
+    /**
      * The path of the temporary directory in the sandbox.
      */
     Path tmpDirInSandbox;
@@ -239,8 +244,23 @@ struct LocalDerivationGoal : public DerivationGoal
 
     /**
      * Make a file owned by the builder.
+     *
+     * SAFETY: this function is prone to TOCTOU as it receives a path and not a descriptor.
+     * It's only safe to call in a child of a directory only visible to the owner.
      */
     void chownToBuilder(const Path & path);
+
+    /**
+     * Make a file owned by the builder addressed by its file descriptor.
+     */
+    void chownToBuilder(int fd, const Path & path);
+
+    /**
+     * Create a file in `tmpDir` owned by the builder.
+     */
+    void writeBuilderFile(
+        const std::string & name,
+        std::string_view contents);
 
     int getChildStatus() override;
 
