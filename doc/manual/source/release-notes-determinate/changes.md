@@ -76,9 +76,3 @@ This section lists the differences between upstream Nix 2.29 and Determinate Nix
 <!-- Determinate Nix version 3.6.6 -->
 
 <!-- Determinate Nix version 3.6.7 -->
-
-* Fix fetchToStore() caching with --impure, improve testing by @edolstra in [DeterminateSystems/nix-src#117](https://github.com/DeterminateSystems/nix-src/pull/117)
-
-* Add lazy-locks setting by @edolstra in [DeterminateSystems/nix-src#113](https://github.com/DeterminateSystems/nix-src/pull/113)
-
-* Sync 2.29.1 by @edolstra in [DeterminateSystems/nix-src#124](https://github.com/DeterminateSystems/nix-src/pull/124)
