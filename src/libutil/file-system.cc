@@ -304,7 +304,7 @@ void readFile(const Path & path, Sink & sink, bool memory_map)
 }
 
 
-void writeFile(const Path & path, std::string_view s, mode_t mode, bool sync)
+void writeFile(const Path & path, std::string_view s, mode_t mode, FsSync sync)
 {
     AutoCloseFD fd = toDescriptor(open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT
 // TODO
@@ -314,22 +314,29 @@ void writeFile(const Path & path, std::string_view s, mode_t mode, bool sync)
        , mode));
     if (!fd)
         throw SysError("opening file '%1%'", path);
-    try {
-        writeFull(fd.get(), s);
-    } catch (Error & e) {
-        e.addTrace({}, "writing file '%1%'", path);
-        throw;
-    }
-    if (sync)
-        fd.fsync();
-    // Explicitly close to make sure exceptions are propagated.
+
+    writeFile(fd, path, s, mode, sync);
+
+    /* Close explicitly to propagate the exceptions. */
     fd.close();
-    if (sync)
-        syncParent(path);
 }
 
+void writeFile(AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode, FsSync sync)
+{
+    assert(fd);
+    try {
+        writeFull(fd.get(), s);
 
-void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
+        if (sync == FsSync::Yes)
+            fd.fsync();
+
+    } catch (Error & e) {
+        e.addTrace({}, "writing file '%1%'", origPath);
+        throw;
+    }
+}
+
+void writeFile(const Path & path, Source & source, mode_t mode, FsSync sync)
 {
     AutoCloseFD fd = toDescriptor(open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT
 // TODO
@@ -353,11 +360,11 @@ void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
         e.addTrace({}, "writing file '%1%'", path);
         throw;
     }
-    if (sync)
+    if (sync == FsSync::Yes)
         fd.fsync();
     // Explicitly close to make sure exceptions are propagated.
     fd.close();
-    if (sync)
+    if (sync == FsSync::Yes)
         syncParent(path);
 }
 
@@ -435,7 +442,8 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
     }
 #endif
 
-    std::string name(baseNameOf(path.native()));
+    std::string name(path.filename());
+    assert(name != "." && name != ".." && !name.empty());
 
     struct stat st;
     if (fstatat(parentfd, name.c_str(), &st,
@@ -476,7 +484,7 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
                 throw SysError("chmod %1%", path);
         }
 
-        int fd = openat(parentfd, path.c_str(), O_RDONLY);
+        int fd = openat(parentfd, name.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
         if (fd == -1)
             throw SysError("opening directory %1%", path);
         AutoCloseDir dir(fdopendir(fd));
@@ -488,7 +496,7 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
             checkInterrupt();
             std::string childName = dirent->d_name;
             if (childName == "." || childName == "..") continue;
-            _deletePath(dirfd(dir.get()), path + "/" + childName, bytesFreed, ex MOUNTEDPATHS_ARG);
+            _deletePath(dirfd(dir.get()), path / childName, bytesFreed, ex MOUNTEDPATHS_ARG);
         }
         if (errno) throw SysError("reading directory %1%", path);
     }
@@ -513,14 +521,13 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
 
 static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFreed MOUNTEDPATHS_PARAM)
 {
-    Path dir = dirOf(path.string());
-    if (dir == "")
-        dir = "/";
+    assert(path.is_absolute());
+    assert(path.parent_path() != path);
 
-    AutoCloseFD dirfd = toDescriptor(open(dir.c_str(), O_RDONLY));
+    AutoCloseFD dirfd = toDescriptor(open(path.parent_path().string().c_str(), O_RDONLY));
     if (!dirfd) {
         if (errno == ENOENT) return;
-        throw SysError("opening directory '%1%'", path);
+        throw SysError("opening directory %s", path.parent_path());
     }
 
     std::exception_ptr ex;

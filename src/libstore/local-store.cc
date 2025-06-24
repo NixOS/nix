@@ -77,6 +77,16 @@ std::string LocalStoreConfig::doc()
         ;
 }
 
+Path LocalBuildStoreConfig::getBuildDir() const
+{
+    return
+        settings.buildDir.get().has_value()
+        ? *settings.buildDir.get()
+        : buildDir.get().has_value()
+        ? *buildDir.get()
+        : stateDir.get() + "/builds";
+}
+
 ref<Store> LocalStore::Config::openStore() const
 {
     return make_ref<LocalStore>(ref{shared_from_this()});
@@ -247,7 +257,7 @@ LocalStore::LocalStore(ref<const Config> config)
     else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
         openDB(*state, true);
-        writeFile(schemaPath, fmt("%1%", curSchema), 0666, true);
+        writeFile(schemaPath, fmt("%1%", curSchema), 0666, FsSync::Yes);
     }
 
     else if (curSchema < nixSchemaVersion) {
@@ -298,7 +308,7 @@ LocalStore::LocalStore(ref<const Config> config)
             txn.commit();
         }
 
-        writeFile(schemaPath, fmt("%1%", nixSchemaVersion), 0666, true);
+        writeFile(schemaPath, fmt("%1%", nixSchemaVersion), 0666, FsSync::Yes);
 
         lockFile(globalLock.get(), ltRead, true);
     }

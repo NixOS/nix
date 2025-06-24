@@ -96,6 +96,11 @@ protected:
     Path topTmpDir;
 
     /**
+     * The file descriptor of the temporary directory.
+     */
+    AutoCloseFD tmpDirFd;
+
+    /**
      * The sort of derivation we are building.
      *
      * Just a cached value, computed from `drv`.
@@ -300,8 +305,23 @@ protected:
 
     /**
      * Make a file owned by the builder.
+     *
+     * SAFETY: this function is prone to TOCTOU as it receives a path and not a descriptor.
+     * It's only safe to call in a child of a directory only visible to the owner.
      */
     void chownToBuilder(const Path & path);
+
+    /**
+     * Make a file owned by the builder addressed by its file descriptor.
+     */
+    void chownToBuilder(int fd, const Path & path);
+
+    /**
+     * Create a file in `tmpDir` owned by the builder.
+     */
+    void writeBuilderFile(
+        const std::string & name,
+        std::string_view contents);
 
     /**
      * Run the builder's process.
@@ -678,6 +698,18 @@ static void handleChildException(bool sendException)
     }
 }
 
+static bool checkNotWorldWritable(std::filesystem::path path)
+{
+    while (true) {
+        auto st = lstat(path);
+        if (st.st_mode & S_IWOTH)
+            return false;
+        if (path == path.parent_path()) break;
+        path = path.parent_path();
+    }
+    return true;
+}
+
 void DerivationBuilderImpl::startBuilder()
 {
     /* Make sure that no other processes are executing under the
@@ -705,12 +737,26 @@ void DerivationBuilderImpl::startBuilder()
         throw BuildError(msg);
     }
 
+    auto buildDir = getLocalStore(store).config->getBuildDir();
+
+    createDirs(buildDir);
+
+    if (buildUser && !checkNotWorldWritable(buildDir))
+        throw Error("Path %s or a parent directory is world-writable or a symlink. That's not allowed for security.", buildDir);
+
     /* Create a temporary directory where the build will take
        place. */
-    topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), 0700);
+    topTmpDir = createTempDir(buildDir, "nix-build-" + std::string(drvPath.name()), 0700);
     setBuildTmpDir();
     assert(!tmpDir.empty());
-    chownToBuilder(tmpDir);
+
+    /* The TOCTOU between the previous mkdir call and this open call is unavoidable due to
+       POSIX semantics.*/
+    tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
+    if (!tmpDirFd)
+        throw SysError("failed to open the build temporary directory descriptor '%1%'", tmpDir);
+
+    chownToBuilder(tmpDirFd.get(), tmpDir);
 
     for (auto & [outputName, status] : initialOutputs) {
         /* Set scratch path we'll actually use during the build.
@@ -876,7 +922,7 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
                 store.computeFSClosure(store.toStorePath(i.second.source).first, closure);
         } catch (InvalidPath & e) {
         } catch (Error & e) {
-            e.addTrace({}, "while processing 'sandbox-paths'");
+            e.addTrace({}, "while processing sandbox path '%s'", i.second.source);
             throw;
         }
     for (auto & i : closure) {
@@ -1049,13 +1095,10 @@ void DerivationBuilderImpl::initEnv()
             } else {
                 auto hash = hashString(HashAlgorithm::SHA256, i.first);
                 std::string fn = ".attr-" + hash.to_string(HashFormat::Nix32, false);
-                Path p = tmpDir + "/" + fn;
-                writeFile(p, rewriteStrings(i.second, inputRewrites));
-                chownToBuilder(p);
+                writeBuilderFile(fn, rewriteStrings(i.second, inputRewrites));
                 env[i.first + "Path"] = tmpDirInSandbox() + "/" + fn;
             }
         }
-
     }
 
     /* For convenience, set an environment pointing to the top build
@@ -1130,11 +1173,9 @@ void DerivationBuilderImpl::writeStructuredAttrs()
 
         auto jsonSh = StructuredAttrs::writeShell(json);
 
-        writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
-        chownToBuilder(tmpDir + "/.attrs.sh");
+        writeBuilderFile(".attrs.sh", rewriteStrings(jsonSh, inputRewrites));
         env["NIX_ATTRS_SH_FILE"] = tmpDirInSandbox() + "/.attrs.sh";
-        writeFile(tmpDir + "/.attrs.json", rewriteStrings(json.dump(), inputRewrites));
-        chownToBuilder(tmpDir + "/.attrs.json");
+        writeBuilderFile(".attrs.json", rewriteStrings(json.dump(), inputRewrites));
         env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox() + "/.attrs.json";
     }
 }
@@ -1253,6 +1294,25 @@ void DerivationBuilderImpl::chownToBuilder(const Path & path)
     if (!buildUser) return;
     if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
         throw SysError("cannot change ownership of '%1%'", path);
+}
+
+void DerivationBuilderImpl::chownToBuilder(int fd, const Path & path)
+{
+    if (!buildUser) return;
+    if (fchown(fd, buildUser->getUID(), buildUser->getGID()) == -1)
+        throw SysError("cannot change ownership of file '%1%'", path);
+}
+
+void DerivationBuilderImpl::writeBuilderFile(
+    const std::string & name,
+    std::string_view contents)
+{
+    auto path = std::filesystem::path(tmpDir) / name;
+    AutoCloseFD fd{openat(tmpDirFd.get(), name.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666)};
+    if (!fd)
+        throw SysError("creating file %s", path);
+    writeFile(fd, path, contents);
+    chownToBuilder(fd.get(), path);
 }
 
 void DerivationBuilderImpl::runChild()
@@ -2063,6 +2123,15 @@ void DerivationBuilderImpl::checkOutputs(const std::map<std::string, ValidPathIn
 void DerivationBuilderImpl::deleteTmpDir(bool force)
 {
     if (topTmpDir != "") {
+        /* As an extra precaution, even in the event of `deletePath` failing to
+         * clean up, the `tmpDir` will be chowned as if we were to move
+         * it inside the Nix store.
+         *
+         * This hardens against an attack which smuggles a file descriptor
+         * to make use of the temporary directory.
+         */
+        chmod(topTmpDir.c_str(), 0000);
+
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv.isBuiltin()) {
