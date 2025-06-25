@@ -100,5 +100,7 @@ nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
 assert show_output.packages.${builtins.currentSystem}.default == { };
+assert show_output.checks.${builtins.currentSystem} == { };
+assert show_output.formatter == { };
 true
 '
