@@ -177,27 +177,31 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
         SymlinkResolution mode = SymlinkResolution::Full);
 
     /**
-     * Return a string that uniquely represents the contents of this
-     * accessor. This is used for caching lookups (see
-     * `fetchToStore()`).
-     *
-     * Fingerprints are generally for the entire accessor, but this
-     * method takes a `path` argument to support accessors like
-     * `MountedSourceAccessor` that combine multiple underlying
-     * accessors. A fingerprint should only be returned if it uniquely
-     * represents everything under `path`.
+     * A string that uniquely represents the contents of this
+     * accessor. This is used for caching lookups (see `fetchToStore()`).
      */
-    virtual std::optional<std::string> getFingerprint(const CanonPath & path)
-    {
-        return _fingerprint;
-    }
+    std::optional<std::string> fingerprint;
 
-    virtual void setFingerprint(std::string fingerprint)
+    /**
+     * Return the fingerprint for `path`. This is usually the
+     * fingerprint of the current accessor, but for composite
+     * accessors (like `MountedSourceAccessor`), we want to return the
+     * fingerprint of the "inner" accessor if the current one lacks a
+     * fingerprint.
+     *
+     * So this method is intended to return the most-outer accessor
+     * that has a fingerprint for `path`. It also returns the path that `path`
+     * corresponds to in that accessor.
+     *
+     * For example: in a `MountedSourceAccessor` that has
+     * `/nix/store/foo` mounted,
+     * `getFingerprint("/nix/store/foo/bar")` will return the path
+     * `/bar` and the fingerprint of the `/nix/store/foo` accessor.
+     */
+    virtual std::pair<CanonPath, std::optional<std::string>> getFingerprint(const CanonPath & path)
     {
-        _fingerprint = std::move(fingerprint);
+        return {path, fingerprint};
     }
-
-    std::optional<std::string> _fingerprint;
 
     /**
      * Return the maximum last-modified time of the files in this

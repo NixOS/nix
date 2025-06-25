@@ -220,6 +220,11 @@
             '';
           repl-completion = nixpkgsFor.${system}.native.callPackage ./tests/repl-completion.nix { };
 
+          lazyTrees = nixpkgsFor.${system}.native.nixComponents2.nix-functional-tests.override {
+            pname = "nix-lazy-trees-tests";
+            lazyTrees = true;
+          };
+
           /**
             Checks for our packaging expressions.
             This shouldn't build anything significant; just check that things

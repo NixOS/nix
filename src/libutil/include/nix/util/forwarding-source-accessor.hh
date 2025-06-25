@@ -52,16 +52,6 @@ struct ForwardingSourceAccessor : SourceAccessor
     {
         return next->getPhysicalPath(path);
     }
-
-    std::optional<std::string> getFingerprint(const CanonPath & path) override
-    {
-        return next->getFingerprint(path);
-    }
-
-    void setFingerprint(std::string fingerprint) override
-    {
-        next->setFingerprint(std::move(fingerprint));
-    }
 };
 
 }

@@ -1,10 +1,16 @@
 on:
   workflow_call:
     inputs:
-      os:
+      system:
         required: true
         type: string
-      system:
+      runner:
+        required: true
+        type: string
+      runner_for_virt:
+        required: true
+        type: string
+      runner_small:
         required: true
         type: string
       if:
@@ -15,13 +21,21 @@ on:
         required: false
         default: true
         type: boolean
+      run_vm_tests:
+        required: false
+        default: false
+        type: boolean
+      run_regression_tests:
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   build:
     if: ${{ inputs.if }}
     strategy:
       fail-fast: false
-    runs-on: ${{ inputs.os }}
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -33,15 +47,172 @@ jobs:
         with:
           name: ${{ inputs.system }}
           path: ./tarball/*.xz
+
   test:
     if: ${{ inputs.if && inputs.run_tests}}
     needs: build
     strategy:
       fail-fast: false
-    runs-on: ${{ inputs.os }}
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: nix flake check -L --system ${{ inputs.system }}
+
+  vm_tests_smoke:
+    if: inputs.run_vm_tests && github.event_name != 'merge_group'
+    needs: build
+    runs-on: ${{ inputs.runner_for_virt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@main
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - run: |
+          nix build -L \
+            .#hydraJobs.tests.functional_user \
+            .#hydraJobs.tests.githubFlakes \
+            .#hydraJobs.tests.nix-docker \
+            .#hydraJobs.tests.tarballFlakes \
+            ;
+
+  vm_tests_all:
+    if: inputs.run_vm_tests && github.event_name == 'merge_group'
+    needs: build
+    runs-on: ${{ inputs.runner_for_virt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@main
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - run: |
+          cmd() {
+            nix build -L --keep-going --timeout 600 \
+              $(nix flake show --json \
+                | jq -r '
+                  .hydraJobs.tests
+                  | with_entries(select(.value.type == "derivation"))
+                  | keys[]
+                  | ".#hydraJobs.tests." + .')
+          }
+
+          if ! cmd; then
+            echo "failed, retrying once ..."
+            printf "\n\n\n\n\n\n\n\n"
+            cmd
+          fi
+
+  flake_regressions:
+    if: |
+      (inputs.run_regression_tests && github.event_name == 'merge_group')
+      || (
+      inputs.run_regression_tests
+        && github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
+        && (
+          (github.event.action == 'labeled' && github.event.label.name == 'flake-regression-test')
+          || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'flake-regression-test'))
+        )
+      )
+    needs: build
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      matrix:
+        nix_config:
+          - "lazy-trees = true"
+          - "lazy-trees = false"
+        glob:
+          - "[0-d]*"
+          - "[e-l]*"
+          - "[m]*"
+          - "[n-r]*"
+          - "[s-z]*"
+
+    steps:
+      - name: Checkout nix
+        uses: actions/checkout@v4
+      - name: Checkout flake-regressions
+        uses: actions/checkout@v4
+        with:
+          repository: DeterminateSystems/flake-regressions
+          path: flake-regressions
+      - name: Checkout flake-regressions-data
+        uses: actions/checkout@v4
+        with:
+          repository: DeterminateSystems/flake-regressions-data
+          path: flake-regressions/tests
+      - uses: DeterminateSystems/determinate-nix-action@main
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - env:
+          PARALLEL: "-P 50%"
+          FLAKE_REGRESSION_GLOB: ${{ matrix.glob }}
+          NIX_CONFIG: ${{ matrix.nix_config }}
+        run: |
+          set -x
+          if [ ! -z "${NSC_CACHE_PATH:-}" ]; then
+            mkdir -p "${NSC_CACHE_PATH}/nix/xdg-cache"
+            export XDG_CACHE_HOME="${NSC_CACHE_PATH}/nix/xdg-cache"
+          fi
+          nix build -L --out-link ./new-nix
+          export PATH=$(pwd)/new-nix/bin:$PATH
+
+          if ! flake-regressions/eval-all.sh; then
+            echo "Some failed, trying again"
+            printf "\n\n\n\n\n\n\n\n"
+            flake-regressions/eval-all.sh
+          fi
+
+  manual:
+    if: github.event_name != 'merge_group'
+    needs: build
+    runs-on: ${{ inputs.runner_small }}
+    permissions:
+      id-token: "write"
+      contents: "read"
+      pull-requests: "write"
+      statuses: "write"
+      deployments: "write"
+    steps:
+      - name: Checkout nix
+        uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@main
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - name: Build manual
+        run: nix build .#hydraJobs.manual
+      - uses: nwtgck/actions-netlify@v3.0
+        with:
+          publish-dir: "./result/share/doc/nix/manual"
+          production-branch: detsys-main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Deploy from GitHub Actions"
+          # NOTE(cole-h): We have a perpetual PR displaying our changes against upstream open, but
+          # its conversation is locked, so this PR comment can never be posted.
+          # https://github.com/DeterminateSystems/nix-src/pull/4
+          enable-pull-request-comment: ${{ github.event.pull_request.number != 4 }}
+          enable-commit-comment: true
+          enable-commit-status: true
+          overwrites-pull-request-comment: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+  success:
+    needs:
+      - build
+      - test
+      - vm_tests_smoke
+      - vm_tests_all
+      - flake_regressions
+      - manual
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: "true"
+      - run: |
+          echo "A dependent in the build matrix failed:"
+          echo "$needs"
+          exit 1
+        env:
+          needs: ${{ toJSON(needs) }}
+        if: |
+          contains(needs.*.result, 'failure') ||
+          contains(needs.*.result, 'cancelled')
