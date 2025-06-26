@@ -148,6 +148,7 @@ let
   groupContents = (lib.concatStringsSep "\n" (lib.attrValues (lib.mapAttrs groupToGroup groups)));
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   nixConfContents =
 <<<<<<< HEAD
     (lib.concatStringsSep "\n" (
@@ -172,6 +173,15 @@ let
       mkValueString = v: if lib.isList v then lib.concatStringsSep " " v else mkValueStringDefault { } v;
     } " = ";
   };
+=======
+  toConf =
+    with pkgs.lib.generators;
+    toKeyValue {
+      mkKeyValue = mkKeyValueDefault {
+        mkValueString = v: if lib.isList v then lib.concatStringsSep " " v else mkValueStringDefault { } v;
+      } " = ";
+    };
+>>>>>>> ba12adc0f (format)
 
   nixConfContents = toConf {
     sandbox = false;
