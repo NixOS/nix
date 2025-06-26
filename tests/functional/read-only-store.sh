@@ -42,7 +42,8 @@ chmod -R -w $TEST_ROOT/var
 
 # Make sure we fail on add operations on the read-only store
 # This is only for adding files that are not *already* in the store
-expectStderr 1 nix-store --add eval.nix | grepQuiet "error: opening lock file '$(readlink -e $TEST_ROOT)/var/nix/db/big-lock'"
+# Should show enhanced error message with helpful context
+expectStderr 1 nix-store --add eval.nix | grepQuiet "This command may have been run as non-root in a single-user Nix installation"
 expectStderr 1 nix-store --store local?read-only=true --add eval.nix | grepQuiet "Permission denied"
 
 # Test the same operations from before should again succeed
