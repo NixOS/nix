@@ -347,13 +347,13 @@ void writeFile(const Path & path, Source & source, mode_t mode, FsSync sync)
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
-    std::array<char, 64 * 1024> buf;
+    auto buf = std::make_unique<std::array<char, 64 * 1024>>();
 
     try {
         while (true) {
             try {
-                auto n = source.read(buf.data(), buf.size());
-                writeFull(fd.get(), {buf.data(), n});
+                auto n = source.read(buf->data(), buf->size());
+                writeFull(fd.get(), {buf->data(), n});
             } catch (EndOfFile &) { break; }
         }
     } catch (Error & e) {
