@@ -147,6 +147,7 @@ let
     "${k}:x:${toString gid}:${lib.concatStringsSep "," members}";
   groupContents = (lib.concatStringsSep "\n" (lib.attrValues (lib.mapAttrs groupToGroup groups)));
 
+<<<<<<< HEAD
   nixConfContents =
 <<<<<<< HEAD
     (lib.concatStringsSep "\n" (
@@ -165,6 +166,19 @@ let
       build-users-group = "nixbld";
     };
 >>>>>>> e72a0ad8c (docker: add docu references & remove duplicate code)
+=======
+  toConf = with pkgs.lib.generators; toKeyValue {
+    mkKeyValue = mkKeyValueDefault {
+      mkValueString = v: if lib.isList v then lib.concatStringsSep " " v else mkValueStringDefault { } v;
+    } " = ";
+  };
+
+  nixConfContents = toConf {
+    sandbox = false;
+    build-users-group = "nixbld";
+    trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
+  };
+>>>>>>> 8fbc27af4 (enhancements)
 
   userHome = if uid == 0 then "/root" else "/home/${uname}";
 
