@@ -1,5 +1,5 @@
 #include "nix/store/build/derivation-building-goal.hh"
-#include "nix/store/build/derivation-goal.hh"
+#include "nix/store/build/derivation-trampoline-goal.hh"
 #ifndef _WIN32 // TODO enable build hook on Windows
 #  include "nix/store/build/hook-instance.hh"
 #  include "nix/store/build/derivation-builder.hh"
@@ -72,7 +72,7 @@ std::string DerivationBuildingGoal::key()
     /* Ensure that derivations get built in order of their name,
        i.e. a derivation named "aardvark" always comes before
        "baboon". And substitution goals always happen before
-       derivation goals (due to "b$"). */
+       derivation goals (due to "bd$"). */
     return "bd$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
 
@@ -266,7 +266,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                     auto mEntry = get(inputGoals, drvPath);
                     if (!mEntry) return std::nullopt;
 
-                    auto buildResult = (*mEntry)->getBuildResult(DerivedPath::Built{drvPath, OutputsSpec::Names{outputName}});
+                    auto & buildResult = (*mEntry)->buildResult;
                     if (!buildResult.success()) return std::nullopt;
 
                     auto i = get(buildResult.builtOutputs, outputName);
@@ -296,9 +296,11 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                        worker.store.printStorePath(pathResolved),
                    });
 
-            // FIXME wanted outputs
-            auto resolvedDrvGoal = worker.makeDerivationGoal(
-                makeConstantStorePathRef(pathResolved), OutputsSpec::All{}, buildMode);
+            /* TODO https://github.com/NixOS/nix/issues/13247 we should
+               let the calling goal do this, so it has a change to pass
+               just the output(s) it cares about. */
+            auto resolvedDrvGoal = worker.makeDerivationTrampolineGoal(
+                pathResolved, OutputsSpec::All{}, drvResolved, buildMode);
             {
                 Goals waitees{resolvedDrvGoal};
                 co_await await(std::move(waitees));
@@ -306,20 +308,16 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
             trace("resolved derivation finished");
 
-            auto resolvedDrv = *resolvedDrvGoal->drv;
-            auto resolvedResult = resolvedDrvGoal->getBuildResult(DerivedPath::Built{
-                .drvPath = makeConstantStorePathRef(pathResolved),
-                .outputs = OutputsSpec::All{},
-            });
+            auto resolvedResult = resolvedDrvGoal->buildResult;
 
             SingleDrvOutputs builtOutputs;
 
             if (resolvedResult.success()) {
-                auto resolvedHashes = staticOutputHashes(worker.store, resolvedDrv);
+                auto resolvedHashes = staticOutputHashes(worker.store, drvResolved);
 
                 StorePathSet outputPaths;
 
-                for (auto & outputName : resolvedDrv.outputNames()) {
+                for (auto & outputName : drvResolved.outputNames()) {
                     auto initialOutput = get(initialOutputs, outputName);
                     auto resolvedHash = get(resolvedHashes, outputName);
                     if ((!initialOutput) || (!resolvedHash))
@@ -340,7 +338,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
                       throw Error(
                           "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/realisation)",
-                          resolvedDrvGoal->drvReq->to_string(worker.store), outputName);
+                          worker.store.printStorePath(pathResolved), outputName);
                     }();
 
                     if (!drv->type().isImpure()) {
