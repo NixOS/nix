@@ -1,11 +1,9 @@
-#include "nix/cmd/command.hh"
-#include "nix/cmd/installable-flake.hh"
+#include "flake-command.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval-settings.hh"
-#include "nix/flake/flake.hh"
 #include "nix/expr/get-drvs.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/store-open.hh"
@@ -20,8 +18,6 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/expr/parallel-eval.hh"
-#include "nix/util/thread-pool.hh"
-#include "nix/store/filetransfer.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -36,43 +32,36 @@ using namespace nix::flake;
 using json = nlohmann::json;
 
 struct CmdFlakeUpdate;
-class FlakeCommand : virtual Args, public MixFlakeOptions
+
+FlakeCommand::FlakeCommand()
 {
-protected:
-    std::string flakeUrl = ".";
+    expectArgs({
+        .label = "flake-url",
+        .optional = true,
+        .handler = {&flakeUrl},
+        .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+            completeFlakeRef(completions, getStore(), prefix);
+        }}
+    });
+}
 
-public:
+FlakeRef FlakeCommand::getFlakeRef()
+{
+    return parseFlakeRef(fetchSettings, flakeUrl, std::filesystem::current_path().string()); //FIXME
+}
 
-    FlakeCommand()
-    {
-        expectArgs({
-            .label = "flake-url",
-            .optional = true,
-            .handler = {&flakeUrl},
-            .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
-                completeFlakeRef(completions, getStore(), prefix);
-            }}
-        });
-    }
+LockedFlake FlakeCommand::lockFlake()
+{
+    return flake::lockFlake(flakeSettings, *getEvalState(), getFlakeRef(), lockFlags);
+}
 
-    FlakeRef getFlakeRef()
-    {
-        return parseFlakeRef(fetchSettings, flakeUrl, std::filesystem::current_path().string()); //FIXME
-    }
-
-    LockedFlake lockFlake()
-    {
-        return flake::lockFlake(flakeSettings, *getEvalState(), getFlakeRef(), lockFlags);
-    }
-
-    std::vector<FlakeRef> getFlakeRefsForCompletion() override
-    {
-        return {
-            // Like getFlakeRef but with expandTilde calld first
-            parseFlakeRef(fetchSettings, expandTilde(flakeUrl), std::filesystem::current_path().string())
-        };
-    }
-};
+std::vector<FlakeRef> FlakeCommand::getFlakeRefsForCompletion()
+{
+    return {
+        // Like getFlakeRef but with expandTilde calld first
+        parseFlakeRef(fetchSettings, expandTilde(flakeUrl), std::filesystem::current_path().string())
+    };
+}
 
 struct CmdFlakeUpdate : FlakeCommand
 {
@@ -1150,59 +1139,6 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
     }
 };
 
-struct CmdFlakePrefetchInputs : FlakeCommand
-{
-    std::string description() override
-    {
-        return "fetch the inputs of a flake";
-    }
-
-    std::string doc() override
-    {
-        return
-          #include "flake-prefetch-inputs.md"
-          ;
-    }
-
-    void run(nix::ref<nix::Store> store) override
-    {
-        auto flake = lockFlake();
-
-        ThreadPool pool{fileTransferSettings.httpConnections};
-
-        struct State
-        {
-            std::set<const Node *> done;
-        };
-
-        Sync<State> state_;
-
-        std::function<void(const Node & node)> visit;
-        visit = [&](const Node & node)
-        {
-            if (!state_.lock()->done.insert(&node).second)
-                return;
-
-            if (auto lockedNode = dynamic_cast<const LockedNode *>(&node)) {
-                Activity act(*logger, lvlInfo, actUnknown,
-                    fmt("fetching '%s'", lockedNode->lockedRef));
-                auto accessor = lockedNode->lockedRef.input.getAccessor(store).first;
-                if (!evalSettings.lazyTrees)
-                    fetchToStore(*store, accessor, FetchMode::Copy, lockedNode->lockedRef.input.getName());
-            }
-
-            for (auto & [inputName, input] : node.inputs) {
-                if (auto inputNode = std::get_if<0>(&input))
-                    pool.enqueue(std::bind(visit, **inputNode));
-            }
-        };
-
-        pool.enqueue(std::bind(visit, *flake.lockFile.root));
-
-        pool.process();
-    }
-};
-
 struct CmdFlakeShow : FlakeCommand, MixJSON
 {
     bool showLegacy = false;
@@ -1546,22 +1482,7 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
 struct CmdFlake : NixMultiCommand
 {
     CmdFlake()
-        : NixMultiCommand(
-            "flake",
-            {
-                {"update", []() { return make_ref<CmdFlakeUpdate>(); }},
-                {"lock", []() { return make_ref<CmdFlakeLock>(); }},
-                {"metadata", []() { return make_ref<CmdFlakeMetadata>(); }},
-                {"info", []() { return make_ref<CmdFlakeInfo>(); }},
-                {"check", []() { return make_ref<CmdFlakeCheck>(); }},
-                {"init", []() { return make_ref<CmdFlakeInit>(); }},
-                {"new", []() { return make_ref<CmdFlakeNew>(); }},
-                {"clone", []() { return make_ref<CmdFlakeClone>(); }},
-                {"archive", []() { return make_ref<CmdFlakeArchive>(); }},
-                {"prefetch-inputs", []() { return make_ref<CmdFlakePrefetchInputs>(); }},
-                {"show", []() { return make_ref<CmdFlakeShow>(); }},
-                {"prefetch", []() { return make_ref<CmdFlakePrefetch>(); }},
-            })
+        : NixMultiCommand("flake", RegisterCommand::getCommandsFor({"flake"}))
     {
     }
 
@@ -1579,3 +1500,14 @@ struct CmdFlake : NixMultiCommand
 };
 
 static auto rCmdFlake = registerCommand<CmdFlake>("flake");
+static auto rCmdFlakeArchive = registerCommand2<CmdFlakeArchive>({"flake", "archive"});
+static auto rCmdFlakeCheck = registerCommand2<CmdFlakeCheck>({"flake", "check"});
+static auto rCmdFlakeClone = registerCommand2<CmdFlakeClone>({"flake", "clone"});
+static auto rCmdFlakeInfo = registerCommand2<CmdFlakeInfo>({"flake", "info"});
+static auto rCmdFlakeInit = registerCommand2<CmdFlakeInit>({"flake", "init"});
+static auto rCmdFlakeLock = registerCommand2<CmdFlakeLock>({"flake", "lock"});
+static auto rCmdFlakeMetadata = registerCommand2<CmdFlakeMetadata>({"flake", "metadata"});
+static auto rCmdFlakeNew = registerCommand2<CmdFlakeNew>({"flake", "new"});
+static auto rCmdFlakePrefetch = registerCommand2<CmdFlakePrefetch>({"flake", "prefetch"});
+static auto rCmdFlakeShow = registerCommand2<CmdFlakeShow>({"flake", "show"});
+static auto rCmdFlakeUpdate = registerCommand2<CmdFlakeUpdate>({"flake", "update"});
