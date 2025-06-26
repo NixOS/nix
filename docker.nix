@@ -176,11 +176,17 @@ let
     "${k}:x:${toString gid}:${lib.concatStringsSep "," members}";
   groupContents = (lib.concatStringsSep "\n" (lib.attrValues (lib.mapAttrs groupToGroup groups)));
 
-  nixConfContents =
-    pkgs.dockerTools.nixConf
-    {
-      build-users-group = "nixbld";
-    };
+  toConf = with pkgs.lib.generators; toKeyValue {
+    mkKeyValue = mkKeyValueDefault {
+      mkValueString = v: if lib.isList v then lib.concatStringsSep " " v else mkValueStringDefault { } v;
+    } " = ";
+  };
+
+  nixConfContents = toConf {
+    sandbox = false;
+    build-users-group = "nixbld";
+    trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
+  };
 
   userHome = if uid == 0 then "/root" else "/home/${uname}";
 
