@@ -176,11 +176,13 @@ let
     "${k}:x:${toString gid}:${lib.concatStringsSep "," members}";
   groupContents = (lib.concatStringsSep "\n" (lib.attrValues (lib.mapAttrs groupToGroup groups)));
 
-  toConf = with pkgs.lib.generators; toKeyValue {
-    mkKeyValue = mkKeyValueDefault {
-      mkValueString = v: if lib.isList v then lib.concatStringsSep " " v else mkValueStringDefault { } v;
-    } " = ";
-  };
+  toConf =
+    with pkgs.lib.generators;
+    toKeyValue {
+      mkKeyValue = mkKeyValueDefault {
+        mkValueString = v: if lib.isList v then lib.concatStringsSep " " v else mkValueStringDefault { } v;
+      } " = ";
+    };
 
   nixConfContents = toConf {
     sandbox = false;
