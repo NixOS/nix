@@ -5,7 +5,6 @@
 #include <span>
 
 #include "nix/expr/eval-gc.hh"
-#include "nix/expr/symbol-table.hh"
 #include "nix/expr/value/context.hh"
 #include "nix/util/source-path.hh"
 #include "nix/expr/print-options.hh"
@@ -65,6 +64,7 @@ struct ExprLambda;
 struct ExprBlackHole;
 struct PrimOp;
 class Symbol;
+class SymbolStr;
 class PosIdx;
 struct Pos;
 class StorePath;
@@ -171,6 +171,11 @@ private:
     friend std::string showType(const Value & v);
 
 public:
+
+    /**
+     * Never modify the backing `Value` object!
+     */
+    static Value * toPtr(SymbolStr str) noexcept;
 
     void print(EvalState &state, std::ostream &str, PrintOptions options = PrintOptions {});
 
@@ -331,11 +336,6 @@ public:
 
     void mkStringMove(const char * s, const NixStringContext & context);
 
-    inline void mkString(const SymbolStr & s)
-    {
-        mkString(s.c_str());
-    }
-
     void mkPath(const SourcePath & path);
     void mkPath(std::string_view path);
 
@@ -410,11 +410,6 @@ public:
         return internalType == tList1 || internalType == tList2 || internalType == tListN;
     }
 
-    Value * const * listElems()
-    {
-        return internalType == tList1 || internalType == tList2 ? payload.smallList : payload.bigList.elems;
-    }
-
     std::span<Value * const> listItems() const
     {
         assert(isList());
@@ -444,8 +439,8 @@ public:
     {
         assert(internalType == tPath);
         return SourcePath(
-            ref(payload.path.accessor->shared_from_this()),
-            CanonPath(CanonPath::unchecked_t(), payload.path.path));
+            ref(pathAccessor()->shared_from_this()),
+            CanonPath(CanonPath::unchecked_t(), pathStr()));
     }
 
     std::string_view string_view() const
@@ -482,6 +477,24 @@ public:
 
     NixFloat fpoint() const
     { return payload.fpoint; }
+
+    Lambda lambda() const
+    { return payload.lambda; }
+
+    ClosureThunk thunk() const
+    { return payload.thunk; }
+
+    FunctionApplicationThunk primOpApp() const
+    { return payload.primOpApp; }
+
+    FunctionApplicationThunk app() const
+    { return payload.app; }
+
+    const char * pathStr() const
+    { return payload.path.path; }
+
+    SourceAccessor * pathAccessor() const
+    { return payload.path.accessor; }
 };
 
 
@@ -489,7 +502,7 @@ extern ExprBlackHole eBlackHole;
 
 bool Value::isBlackhole() const
 {
-    return internalType == tThunk && payload.thunk.expr == (Expr*) &eBlackHole;
+    return internalType == tThunk && thunk().expr == (Expr*) &eBlackHole;
 }
 
 void Value::mkBlackhole()

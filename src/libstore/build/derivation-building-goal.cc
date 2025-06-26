@@ -613,9 +613,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 void closeLogFile() override {
                     goal.closeLogFile();
                 }
-                SingleDrvOutputs assertPathValidity() override {
-                    return goal.assertPathValidity();
-                }
                 void appendLogTailErrorMsg(std::string & msg) override {
                     goal.appendLogTailErrorMsg(msg);
                 }

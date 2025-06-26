@@ -43,7 +43,7 @@ path=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url
 [[ $(nix eval --impure --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow-clone\"; ref = \"dev\"; shallow = true; }).revCount or 123") == 123 ]]
 
 # Test 3: Check unlocked input error message
-expectStderr 1 nix eval --expr 'builtins.fetchTree { type = "git"; url = "file:///foo"; }' | grepQuiet "'fetchTree' will not fetch unlocked input"
+expectStderr 1 nix eval --expr 'builtins.fetchTree { type = "git"; url = "file:///foo"; }' | grepQuiet "'fetchTree' doesn't fetch unlocked input"
 
 # Test 4: Regression test for revCount in worktrees derived from shallow clones
 # Add a worktree to the shallow clone

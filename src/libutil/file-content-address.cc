@@ -93,7 +93,7 @@ void restorePath(
 {
     switch (method) {
     case FileSerialisationMethod::Flat:
-        writeFile(path, source, 0666, startFsync);
+        writeFile(path, source, 0666, startFsync ? FsSync::Yes : FsSync::No);
         break;
     case FileSerialisationMethod::NixArchive:
         restorePath(path, source, startFsync);

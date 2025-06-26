@@ -25,7 +25,7 @@ This performs the default type of installation for your platform:
 
 We recommend the multi-user installation if it supports your platform and you can authenticate with `sudo`.
 
-The installer can configured with various command line arguments and environment variables.
+The installer can be configured with various command line arguments and environment variables.
 To show available command line flags:
 
 ```console

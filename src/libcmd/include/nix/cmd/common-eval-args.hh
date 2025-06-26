@@ -5,6 +5,7 @@
 #include "nix/util/canon-path.hh"
 #include "nix/main/common-args.hh"
 #include "nix/expr/search-path.hh"
+#include "nix/expr/eval-settings.hh"
 
 #include <filesystem>
 
@@ -15,10 +16,8 @@ class Store;
 namespace fetchers { struct Settings; }
 
 class EvalState;
-struct EvalSettings;
 struct CompatibilitySettings;
 class Bindings;
-struct SourcePath;
 
 namespace flake { struct Settings; }
 

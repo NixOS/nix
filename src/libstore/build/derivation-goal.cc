@@ -210,6 +210,13 @@ Goal::Co DerivationGoal::haveDerivation(StorePath drvPath)
             .outputs = wantedOutputs,
         });
 
+        if (buildMode == bmCheck) {
+            /* In checking mode, the builder will not register any outputs.
+               So we want to make sure the ones that we wanted to check are
+               properly there. */
+            buildResult.builtOutputs = assertPathValidity(drvPath);
+        }
+
         co_return amDone(g->exitCode, g->ex);
     };
 

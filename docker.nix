@@ -1,6 +1,11 @@
 {
-  pkgs ? import <nixpkgs> { },
-  lib ? pkgs.lib,
+  # Core dependencies
+  pkgs,
+  lib,
+  dockerTools,
+  runCommand,
+  buildPackages,
+  # Image configuration
   name ? "nix",
   tag ? "latest",
   bundleNixpkgs ? true,
@@ -14,36 +19,60 @@
   gid ? 0,
   uname ? "root",
   gname ? "root",
+  Labels ? {
+    "org.opencontainers.image.title" = "Nix";
+    "org.opencontainers.image.source" = "https://github.com/NixOS/nix";
+    "org.opencontainers.image.vendor" = "Nix project";
+    "org.opencontainers.image.version" = nix.version;
+    "org.opencontainers.image.description" = "Nix container image";
+  },
+  Cmd ? [ (lib.getExe bashInteractive) ],
+  # Default Packages
+  nix,
+  bashInteractive,
+  coreutils-full,
+  gnutar,
+  gzip,
+  gnugrep,
+  which,
+  curl,
+  less,
+  wget,
+  man,
+  cacert,
+  findutils,
+  iana-etc,
+  gitMinimal,
+  openssh,
+  # Other dependencies
+  shadow,
 }:
 let
-  defaultPkgs =
-    with pkgs;
-    [
-      nix
-      bashInteractive
-      coreutils-full
-      gnutar
-      gzip
-      gnugrep
-      which
-      curl
-      less
-      wget
-      man
-      cacert.out
-      findutils
-      iana-etc
-      git
-      openssh
-    ]
-    ++ extraPkgs;
+  defaultPkgs = [
+    nix
+    bashInteractive
+    coreutils-full
+    gnutar
+    gzip
+    gnugrep
+    which
+    curl
+    less
+    wget
+    man
+    cacert.out
+    findutils
+    iana-etc
+    gitMinimal
+    openssh
+  ] ++ extraPkgs;
 
   users =
     {
 
       root = {
         uid = 0;
-        shell = "${pkgs.bashInteractive}/bin/bash";
+        shell = lib.getExe bashInteractive;
         home = "/root";
         gid = 0;
         groups = [ "root" ];
@@ -52,7 +81,7 @@ let
 
       nobody = {
         uid = 65534;
-        shell = "${pkgs.shadow}/bin/nologin";
+        shell = lib.getExe' shadow "nologin";
         home = "/var/empty";
         gid = 65534;
         groups = [ "nobody" ];
@@ -63,7 +92,7 @@ let
     // lib.optionalAttrs (uid != 0) {
       "${uname}" = {
         uid = uid;
-        shell = "${pkgs.bashInteractive}/bin/bash";
+        shell = lib.getExe bashInteractive;
         home = "/home/${uname}";
         gid = gid;
         groups = [ "${gname}" ];
@@ -158,15 +187,20 @@ let
   baseSystem =
     let
       nixpkgs = pkgs.path;
-      channel = pkgs.runCommand "channel-nixos" { inherit bundleNixpkgs; } ''
+      channel = runCommand "channel-nixos" { inherit bundleNixpkgs; } ''
         mkdir $out
         if [ "$bundleNixpkgs" ]; then
-          ln -s ${nixpkgs} $out/nixpkgs
+          ln -s ${
+            builtins.path {
+              path = nixpkgs;
+              name = "source";
+            }
+          } $out/nixpkgs
           echo "[]" > $out/manifest.nix
         fi
       '';
       # doc/manual/source/command-ref/files/manifest.nix.md
-      manifest = pkgs.buildPackages.runCommand "manifest.nix" { } ''
+      manifest = buildPackages.runCommand "manifest.nix" { } ''
         cat > $out <<EOF
         [
         ${lib.concatStringsSep "\n" (
@@ -195,7 +229,7 @@ let
         ]
         EOF
       '';
-      profile = pkgs.buildPackages.buildEnv {
+      profile = buildPackages.buildEnv {
         name = "root-profile-env";
         paths = defaultPkgs;
 
@@ -212,7 +246,7 @@ let
         else
           flake-registry;
     in
-    pkgs.runCommand "base-system"
+    runCommand "base-system"
       {
         inherit
           passwdContents
@@ -266,7 +300,6 @@ let
           # see doc/manual/source/command-ref/files/profiles.md
           ln -s ${profile} $out/nix/var/nix/profiles/default-1-link
           ln -s /nix/var/nix/profiles/default-1-link $out/nix/var/nix/profiles/default
-          ln -s /nix/var/nix/profiles/default $out${userHome}/.nix-profile
 
           # see doc/manual/source/command-ref/files/channels.md
           ln -s ${channel} $out/nix/var/nix/profiles/per-user/${uname}/channels-1-link
@@ -279,8 +312,8 @@ let
 
           # may get replaced by pkgs.dockerTools.binSh & pkgs.dockerTools.usrBinEnv
           mkdir -p $out/bin $out/usr/bin
-          ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
-          ln -s ${pkgs.bashInteractive}/bin/bash $out/bin/sh
+          ln -s ${lib.getExe' coreutils-full "env"} $out/usr/bin/env
+          ln -s ${lib.getExe bashInteractive} $out/bin/sh
 
         ''
         + (lib.optionalString (flake-registry-path != null) ''
@@ -289,13 +322,13 @@ let
           globalFlakeRegistryPath="$nixCacheDir/flake-registry.json"
           ln -s ${flake-registry-path} $out$globalFlakeRegistryPath
           mkdir -p $out/nix/var/nix/gcroots/auto
-          rootName=$(${pkgs.nix}/bin/nix --extra-experimental-features nix-command hash file --type sha1 --base32 <(echo -n $globalFlakeRegistryPath))
+          rootName=$(${lib.getExe' nix "nix"} --extra-experimental-features nix-command hash file --type sha1 --base32 <(echo -n $globalFlakeRegistryPath))
           ln -s $globalFlakeRegistryPath $out/nix/var/nix/gcroots/auto/$rootName
         '')
       );
 
 in
-pkgs.dockerTools.buildLayeredImageWithNixDb {
+dockerTools.buildLayeredImageWithNixDb {
 
   inherit
     name
@@ -321,7 +354,7 @@ pkgs.dockerTools.buildLayeredImageWithNixDb {
   '';
 
   config = {
-    Cmd = [ "${userHome}/.nix-profile/bin/bash" ];
+    inherit Cmd Labels;
     User = "${toString uid}:${toString gid}";
     Env = [
       "USER=${uname}"
