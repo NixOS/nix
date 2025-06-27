@@ -43,8 +43,6 @@ const uint32_t maxIdsPerBuild =
 
 class Settings : public Config {
 
-    unsigned int getDefaultCores();
-
     StringSet getDefaultSystemFeatures();
 
     StringSet getDefaultExtraPlatforms();
@@ -56,6 +54,8 @@ class Settings : public Config {
 public:
 
     Settings();
+
+    unsigned int getDefaultCores() const;
 
     Path nixPrefix;
 
@@ -153,7 +153,7 @@ public:
 
     Setting<unsigned int> buildCores{
         this,
-        getDefaultCores(),
+        0,
         "cores",
         R"(
           Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/language/derivations.md#builder-execution) of a derivation.
@@ -166,15 +166,13 @@ public:
           -->
           For instance, in Nixpkgs, if the attribute `enableParallelBuilding` for the `mkDerivation` build helper is set to `true`, it passes the `-j${NIX_BUILD_CORES}` flag to GNU Make.
 
-          The value `0` means that the `builder` should use all available CPU cores in the system.
+          If set to `0`, nix will detect the number of CPU cores and pass this number via NIX_BUILD_CORES.
 
           > **Note**
           >
           > The number of parallel local Nix build jobs is independently controlled with the [`max-jobs`](#conf-max-jobs) setting.
         )",
-        {"build-cores"},
-        // Don't document the machine-specific default value
-        false};
+        {"build-cores"}};
 
     /**
      * Read-only mode.  Don't copy stuff to the store, don't change
