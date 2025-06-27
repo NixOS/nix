@@ -175,20 +175,26 @@ std::string readFile(const Path & path);
 std::string readFile(const std::filesystem::path & path);
 void readFile(const Path & path, Sink & sink, bool memory_map = true);
 
+enum struct FsSync { Yes, No };
+
 /**
  * Write a string to a file.
  */
-void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, bool sync = false);
-static inline void writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode = 0666, bool sync = false)
+void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No);
+
+static inline void writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No)
 {
     return writeFile(path.string(), s, mode, sync);
 }
 
-void writeFile(const Path & path, Source & source, mode_t mode = 0666, bool sync = false);
-static inline void writeFile(const std::filesystem::path & path, Source & source, mode_t mode = 0666, bool sync = false)
+void writeFile(const Path & path, Source & source, mode_t mode = 0666, FsSync sync = FsSync::No);
+
+static inline void writeFile(const std::filesystem::path & path, Source & source, mode_t mode = 0666, FsSync sync = FsSync::No)
 {
     return writeFile(path.string(), source, mode, sync);
 }
+
+void writeFile(AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No);
 
 /**
  * Flush a path's parent directory to disk.

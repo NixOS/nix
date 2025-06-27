@@ -262,6 +262,19 @@ struct EvalSettings : Config
         R"(
           If set to true, flakes and trees fetched by [`builtins.fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree) are only copied to the Nix store when they're used as a dependency of a derivation. This avoids copying (potentially large) source trees unnecessarily.
         )"};
+
+    // FIXME: this setting should really be in libflake, but it's
+    // currently needed in mountInput().
+    Setting<bool> lazyLocks{
+        this,
+        false,
+        "lazy-locks",
+        R"(
+          If enabled, Nix only includes NAR hashes in lock file entries if they're necessary to lock the input (i.e. when there is no other attribute that allows the content to be verified, like a Git revision).
+          This is not backward compatible with older versions of Nix.
+          If disabled, lock file entries always contain a NAR hash.
+        )"
+    };
 };
 
 /**
