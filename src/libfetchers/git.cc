@@ -883,7 +883,8 @@ struct GitInputScheme : InputScheme
 
     bool isLocked(const Input & input) const override
     {
-        return (bool) input.getRev();
+        auto rev = input.getRev();
+        return rev && rev != nullRev;
     }
 };
 
