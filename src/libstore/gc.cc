@@ -622,10 +622,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        GC root. Any new roots will be sent to our socket. */
     Roots tempRoots;
     findTempRoots(tempRoots, true);
-    for (auto & root : tempRoots) {
+    for (auto & root : tempRoots)
         _shared.lock()->tempRoots.insert(std::string(root.first.hashPart()));
-        roots.insert(root.first);
-    }
 
     /* Synchronisation point for testing, see tests/functional/gc-non-blocking.sh. */
     if (auto p = getEnv("_NIX_TEST_GC_SYNC_2"))
@@ -718,19 +716,31 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
             /* If this is a root, bail out. */
             if (roots.count(*path)) {
+                if (options.action == GCOptions::gcDeleteSpecific)
+                    throw Error(
+                        "Cannot delete path '%s' because it's a GC root.",
+                        printStorePath(start));
                 debug("cannot delete '%s' because it's a root", printStorePath(*path));
                 return markAlive();
             }
 
             if (options.action == GCOptions::gcDeleteSpecific
                 && !options.pathsToDelete.count(*path))
-                return;
+            {
+                throw Error(
+                    "Cannot delete path '%s' because it's referenced by path '%s'.",
+                    printStorePath(start),
+                    printStorePath(*path));
+            }
 
             {
                 auto hashPart = std::string(path->hashPart());
                 auto shared(_shared.lock());
                 if (shared->tempRoots.count(hashPart)) {
-                    debug("cannot delete '%s' because it's a temporary root", printStorePath(*path));
+                    if (options.action == GCOptions::gcDeleteSpecific)
+                        throw Error(
+                            "Cannot delete path '%s' because it's in use by a Nix process.",
+                            printStorePath(start));
                     return markAlive();
                 }
                 shared->pending = hashPart;
@@ -789,12 +799,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         for (auto & i : options.pathsToDelete) {
             deleteReferrersClosure(i);
-            if (!dead.count(i))
-                throw Error(
-                    "Cannot delete path '%1%' since it is still alive. "
-                    "To find out why, use: "
-                    "nix-store --query --roots and nix-store --query --referrers",
-                    printStorePath(i));
+            assert(dead.count(i));
         }
 
     } else if (options.maxFreed > 0) {
