@@ -208,7 +208,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
         while ((end = contents.find((char) 0, pos)) != std::string::npos) {
             Path root(contents, pos, end - pos);
             debug("got temporary root '%s'", root);
-            tempRoots[parseStorePath(root)].emplace(censor ? censored : fmt("{temp:%d}", pid));
+            tempRoots[parseStorePath(root)].emplace(censor ? censored : fmt("{nix-process:%d}", pid));
             pos = end + 1;
         }
     }
@@ -465,7 +465,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     {
         // The temp roots only store the hash part to make it easier to
         // ignore suffixes like '.lock', '.chroot' and '.check'.
-        std::unordered_set<std::string> tempRoots;
+        std::unordered_map<std::string, GcRootInfo> tempRoots;
 
         // Hash part of the store path currently being deleted, if
         // any.
@@ -574,7 +574,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                                 debug("got new GC root '%s'", path);
                                 auto hashPart = std::string(storePath->hashPart());
                                 auto shared(_shared.lock());
-                                shared->tempRoots.insert(hashPart);
+                                // FIXME: could get the PID from the socket.
+                                shared->tempRoots.insert_or_assign(hashPart, "{nix-process:unknown}");
                                 /* If this path is currently being
                                    deleted, then we have to wait until
                                    deletion is finished to ensure that
@@ -618,10 +619,14 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Read the temporary roots created before we acquired the global
        GC root. Any new roots will be sent to our socket. */
-    Roots tempRoots;
-    findTempRoots(tempRoots, options.censor);
-    for (auto & root : tempRoots)
-        _shared.lock()->tempRoots.insert(std::string(root.first.hashPart()));
+    {
+        Roots tempRoots;
+        findTempRoots(tempRoots, options.censor);
+        for (auto & root : tempRoots)
+            _shared.lock()->tempRoots.insert_or_assign(
+                std::string(root.first.hashPart()),
+                *root.second.begin());
+    }
 
     /* Synchronisation point for testing, see tests/functional/gc-non-blocking.sh. */
     if (auto p = getEnv("_NIX_TEST_GC_SYNC_2"))
@@ -735,11 +740,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             {
                 auto hashPart = std::string(path->hashPart());
                 auto shared(_shared.lock());
-                if (shared->tempRoots.count(hashPart)) {
+                if (auto i = shared->tempRoots.find(hashPart); i != shared->tempRoots.end()) {
                     if (options.action == GCOptions::gcDeleteSpecific)
                         throw Error(
-                            "Cannot delete path '%s' because it's in use by a Nix process.",
-                            printStorePath(start));
+                            "Cannot delete path '%s' because it's in use by '%s'.",
+                            printStorePath(start),
+                            i->second);
                     return markAlive();
                 }
                 shared->pending = hashPart;

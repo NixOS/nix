@@ -21,11 +21,16 @@ nix-env -p "$profiles/test" -f ./gc-runtime.nix -i gc-runtime
 outPath=$(nix-env -p "$profiles/test" -q --no-name --out-path gc-runtime)
 echo "$outPath"
 
+fifo="$TEST_ROOT/fifo"
+mkfifo "$fifo"
+
 echo "backgrounding program..."
-"$profiles"/test/program &
-sleep 2 # hack - wait for the program to get started
+"$profiles"/test/program "$fifo" &
 child=$!
 echo PID=$child
+cat "$fifo"
+
+expectStderr 1 nix-store --delete "$outPath" | grepQuiet "Cannot delete path.*because it's referenced by the GC root '/proc/"
 
 nix-env -p "$profiles/test" -e gc-runtime
 nix-env -p "$profiles/test" --delete-generations old
