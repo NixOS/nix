@@ -56,6 +56,7 @@ FlakeRef parseFlakeRef(
     return flakeRef;
 }
 
+<<<<<<< HEAD
 std::optional<FlakeRef> maybeParseFlakeRef(
     const fetchers::Settings & fetchSettings, const std::string & url, const std::optional<Path> & baseDir)
 {
@@ -68,6 +69,12 @@ std::optional<FlakeRef> maybeParseFlakeRef(
 
 static std::pair<FlakeRef, std::string>
 fromParsedURL(const fetchers::Settings & fetchSettings, ParsedURL && parsedURL, bool isFlake)
+=======
+static std::pair<FlakeRef, std::string> fromParsedURL(
+    const fetchers::Settings & fetchSettings,
+    ParsedURL && parsedURL,
+    bool isFlake)
+>>>>>>> 75412ebc3 (libflake: Remove unused maybeParseFlakeRef and maybeParseFlakeRefWithFragment)
 {
     auto dir = getOr(parsedURL.query, "dir", "");
     parsedURL.query.erase("dir");
@@ -248,6 +255,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     }
 }
 
+<<<<<<< HEAD
 std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
     const fetchers::Settings & fetchSettings, const std::string & url, const std::optional<Path> & baseDir)
 {
@@ -259,6 +267,11 @@ std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
 }
 
 FlakeRef FlakeRef::fromAttrs(const fetchers::Settings & fetchSettings, const fetchers::Attrs & attrs)
+=======
+FlakeRef FlakeRef::fromAttrs(
+    const fetchers::Settings & fetchSettings,
+    const fetchers::Attrs & attrs)
+>>>>>>> 75412ebc3 (libflake: Remove unused maybeParseFlakeRef and maybeParseFlakeRefWithFragment)
 {
     auto attrs2(attrs);
     attrs2.erase("dir");
