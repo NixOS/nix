@@ -458,7 +458,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     bool gcKeepOutputs = settings.gcKeepOutputs;
     bool gcKeepDerivations = settings.gcKeepDerivations;
 
-    std::unordered_set<StorePath> roots, dead, alive;
+    Roots roots;
+    std::unordered_set<StorePath> dead, alive;
 
     struct Shared
     {
@@ -612,11 +613,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
     printInfo("finding garbage collector roots...");
-    Roots rootMap;
     if (!options.ignoreLiveness)
-        findRootsNoTemp(rootMap, true);
-
-    for (auto & i : rootMap) roots.insert(i.first);
+        findRootsNoTemp(roots, true);
 
     /* Read the temporary roots created before we acquired the global
        GC root. Any new roots will be sent to our socket. */
@@ -715,11 +713,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             };
 
             /* If this is a root, bail out. */
-            if (roots.count(*path)) {
+            if (auto i = roots.find(*path); i != roots.end()) {
                 if (options.action == GCOptions::gcDeleteSpecific)
                     throw Error(
-                        "Cannot delete path '%s' because it's a GC root.",
-                        printStorePath(start));
+                        "Cannot delete path '%s' because it's referenced by the GC root '%s'.",
+                        printStorePath(start),
+                        *i->second.begin());
                 debug("cannot delete '%s' because it's a root", printStorePath(*path));
                 return markAlive();
             }
