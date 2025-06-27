@@ -220,7 +220,7 @@ Derivation makeSimpleDrv(const Store & store) {
         "bar",
         "baz",
     };
-    drv.env = {
+    drv.env = StringPairs{
         {
             "BIG_BAD",
             "WOLF",
@@ -278,7 +278,7 @@ Derivation makeDynDepDerivation(const Store & store) {
         "bar",
         "baz",
     };
-    drv.env = {
+    drv.env = StringPairs{
         {
             "BIG_BAD",
             "WOLF",
