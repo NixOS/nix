@@ -1,4 +1,5 @@
 #include "nix/store/indirect-root-store.hh"
+#include "nix/util/file-system.hh"
 
 namespace nix {
 
@@ -7,12 +8,32 @@ void IndirectRootStore::makeSymlink(const Path & link, const Path & target)
     /* Create directories up to `gcRoot'. */
     createDirs(dirOf(link));
 
-    /* Create the new symlink. */
-    Path tempLink = fmt("%1%.tmp-%2%-%3%", link, getpid(), rand());
-    createSymlink(target, tempLink);
+    /* Retry loop for temporary symlink creation to handle race conditions */
+    while (true) {
+        Path tempLink = makeTempPath(dirOf(link), baseNameOf(link) + ".tmp");
 
-    /* Atomically replace the old one. */
-    std::filesystem::rename(tempLink, link);
+        createSymlink(target, tempLink);
+
+        /* Atomically replace the old one. */
+        try {
+            std::filesystem::rename(tempLink, link);
+            break; /* Success! */
+        } catch (std::filesystem::filesystem_error & e) {
+            try {
+                std::filesystem::remove(tempLink);
+            } catch (...) {
+                /* Ignore errors removing the temp link */
+            }
+
+            if (e.code() == std::errc::file_exists) {
+                /* Race condition: another process created the same temp link.
+                   Try again with a different name. */
+                continue;
+            }
+
+            throw SysError("failed to create symlink '%1%' -> '%2%'", link, target);
+        }
+    }
 }
 
 Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
