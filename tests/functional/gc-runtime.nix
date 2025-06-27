@@ -9,6 +9,7 @@ mkDerivation {
 
       cat > $out/program <<EOF
       #! ${shell}
+      echo x > \$TEST_ROOT/fifo
       sleep 10000
       EOF
 

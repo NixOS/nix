@@ -23,10 +23,10 @@ if nix-store --gc --print-dead | grep -E "$outPath"$; then false; fi
 nix-store --gc --print-dead
 
 inUse=$(readLink "$outPath/reference-to-input-2")
-if nix-store --delete "$inUse"; then false; fi
+expectStderr 1 nix-store --delete "$inUse" | grepQuiet "Cannot delete path.*because it's referenced by the GC root "
 test -e "$inUse"
 
-if nix-store --delete "$outPath"; then false; fi
+expectStderr 1 nix-store --delete "$outPath" | grepQuiet "Cannot delete path.*because it's referenced by the GC root "
 test -e "$outPath"
 
 for i in "$NIX_STORE_DIR"/*; do
