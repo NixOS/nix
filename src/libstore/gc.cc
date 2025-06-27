@@ -614,12 +614,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        permanent roots cannot increase now. */
     printInfo("finding garbage collector roots...");
     if (!options.ignoreLiveness)
-        findRootsNoTemp(roots, true);
+        findRootsNoTemp(roots, options.censor);
 
     /* Read the temporary roots created before we acquired the global
        GC root. Any new roots will be sent to our socket. */
     Roots tempRoots;
-    findTempRoots(tempRoots, true);
+    findTempRoots(tempRoots, options.censor);
     for (auto & root : tempRoots)
         _shared.lock()->tempRoots.insert(std::string(root.first.hashPart()));
 
