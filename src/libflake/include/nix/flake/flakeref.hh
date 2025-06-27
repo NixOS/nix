@@ -96,14 +96,6 @@ FlakeRef parseFlakeRef(
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
  */
-std::optional<FlakeRef> maybeParseFlake(
-    const fetchers::Settings & fetchSettings,
-    const std::string & url,
-    const std::optional<Path> & baseDir = {});
-
-/**
- * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
- */
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
@@ -111,14 +103,6 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     bool allowMissing = false,
     bool isFlake = true,
     bool preserveRelativePaths = false);
-
-/**
- * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
- */
-std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
-    const fetchers::Settings & fetchSettings,
-    const std::string & url,
-    const std::optional<Path> & baseDir = {});
 
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
