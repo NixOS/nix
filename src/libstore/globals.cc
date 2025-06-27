@@ -140,7 +140,7 @@ std::vector<Path> getUserConfigFiles()
     return files;
 }
 
-unsigned int Settings::getDefaultCores()
+unsigned int Settings::getDefaultCores() const
 {
     const unsigned int concurrency = std::max(1U, std::thread::hardware_concurrency());
     const unsigned int maxCPU = getMaxCPU();
