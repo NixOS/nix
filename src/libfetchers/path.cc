@@ -127,8 +127,6 @@ struct PathInputScheme : InputScheme
 
         auto absPath = getAbsPath(input);
 
-        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying %s to the store", absPath));
-
         // FIXME: check whether access to 'path' is allowed.
         auto storePath = store->maybeParseStorePath(absPath.string());
 
@@ -137,6 +135,7 @@ struct PathInputScheme : InputScheme
 
         time_t mtime = 0;
         if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying %s to the store", absPath));
             // FIXME: try to substitute storePath.
             auto src = sinkToSource([&](Sink & sink) {
                 mtime = dumpPathAndGetMtime(absPath.string(), sink, defaultPathFilter);
