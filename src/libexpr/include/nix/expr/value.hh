@@ -175,6 +175,18 @@ struct Value
 private:
     InternalType internalType = tUninitialized;
 
+    InternalType getInternalType() const noexcept
+    {
+        return internalType;
+    }
+
+    /** Check if currently stored value type is either of Vs. */
+    template<InternalType... Vs>
+    bool isa() const noexcept
+    {
+        return ((getInternalType() == Vs) || ...);
+    }
+
     friend std::string showType(const Value & v);
 
 public:
@@ -193,26 +205,26 @@ public:
     // type() == nThunk
     inline bool isThunk() const
     {
-        return internalType == tThunk;
+        return isa<tThunk>();
     };
     inline bool isApp() const
     {
-        return internalType == tApp;
+        return isa<tApp>();
     };
     inline bool isBlackhole() const;
 
     // type() == nFunction
     inline bool isLambda() const
     {
-        return internalType == tLambda;
+        return isa<tLambda>();
     };
     inline bool isPrimOp() const
     {
-        return internalType == tPrimOp;
+        return isa<tPrimOp>();
     };
     inline bool isPrimOpApp() const
     {
-        return internalType == tPrimOpApp;
+        return isa<tPrimOpApp>();
     };
 
     /**
@@ -302,7 +314,7 @@ public:
      */
     inline ValueType type(bool invalidIsThunk = false) const
     {
-        switch (internalType) {
+        switch (getInternalType()) {
         case tUninitialized:
             break;
         case tInt:
@@ -351,7 +363,7 @@ public:
      */
     inline bool isValid() const
     {
-        return internalType != tUninitialized;
+        return !isa<tUninitialized>();
     }
 
     inline void mkInt(NixInt::Inner n)
@@ -451,7 +463,7 @@ public:
 
     bool isList() const
     {
-        return internalType == tListSmall || internalType == tListN;
+        return isa<tListSmall, tListN>();
     }
 
     std::span<Value * const> listItems() const
@@ -462,12 +474,12 @@ public:
 
     Value * const * listElems() const
     {
-        return internalType == tListSmall ? payload.smallList : payload.bigList.elems;
+        return isa<tListSmall>() ? payload.smallList : payload.bigList.elems;
     }
 
     size_t listSize() const
     {
-        return internalType == tListSmall ? (payload.smallList[1] == nullptr ? 1 : 2) : payload.bigList.size;
+        return isa<tListSmall>() ? (payload.smallList[1] == nullptr ? 1 : 2) : payload.bigList.size;
     }
 
     PosIdx determinePos(const PosIdx pos) const;
@@ -481,19 +493,19 @@ public:
 
     SourcePath path() const
     {
-        assert(internalType == tPath);
+        assert(isa<tPath>());
         return SourcePath(ref(pathAccessor()->shared_from_this()), CanonPath(CanonPath::unchecked_t(), pathStr()));
     }
 
     std::string_view string_view() const
     {
-        assert(internalType == tString);
+        assert(isa<tString>());
         return std::string_view(payload.string.c_str);
     }
 
     const char * c_str() const
     {
-        assert(internalType == tString);
+        assert(isa<tString>());
         return payload.string.c_str;
     }
 
@@ -567,7 +579,7 @@ extern ExprBlackHole eBlackHole;
 
 bool Value::isBlackhole() const
 {
-    return internalType == tThunk && thunk().expr == (Expr *) &eBlackHole;
+    return isa<tThunk>() && thunk().expr == (Expr *) &eBlackHole;
 }
 
 void Value::mkBlackhole()

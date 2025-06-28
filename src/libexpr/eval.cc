@@ -125,7 +125,7 @@ std::string showType(const Value & v)
     // Allow selecting a subset of enum values
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wswitch-enum"
-    switch (v.internalType) {
+    switch (v.getInternalType()) {
         case tString: return v.context() ? "a string with context" : "a string";
         case tPrimOp:
             return fmt("the built-in function '%s'", std::string(v.primOp()->name));
@@ -145,7 +145,7 @@ PosIdx Value::determinePos(const PosIdx pos) const
     // Allow selecting a subset of enum values
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wswitch-enum"
-    switch (internalType) {
+    switch (getInternalType()) {
         case tAttrs: return attrs()->pos;
         case tLambda: return lambda().fun->pos;
         case tApp: return app().left->determinePos(pos);
@@ -157,9 +157,8 @@ PosIdx Value::determinePos(const PosIdx pos) const
 bool Value::isTrivial() const
 {
     return
-        internalType != tApp
-        && internalType != tPrimOpApp
-        && (internalType != tThunk
+        !isa<tApp, tPrimOpApp>()
+        && (!isa<tThunk>()
             || (dynamic_cast<ExprAttrs *>(thunk().expr)
                 && ((ExprAttrs *) thunk().expr)->dynamicAttrs.empty())
             || dynamic_cast<ExprLambda *>(thunk().expr)
