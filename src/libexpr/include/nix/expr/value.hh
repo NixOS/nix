@@ -21,21 +21,24 @@ class BindingsBuilder;
 
 typedef enum {
     tUninitialized = 0,
+    /* Single/zero field payload */
     tInt = 1,
     tBool,
+    tNull,
+    tFloat,
+    tExternal,
+    tPrimOp,
+    tAttrs,
+    /* Pair of pointers payload */
+    tListSmall,
+    tPrimOpApp,
+    tApp,
+    tThunk,
+    tLambda,
+    /* Single untaggable field */
+    tListN,
     tString,
     tPath,
-    tNull,
-    tAttrs,
-    tListSmall,
-    tListN,
-    tThunk,
-    tApp,
-    tLambda,
-    tPrimOp,
-    tPrimOpApp,
-    tExternal,
-    tFloat
 } InternalType;
 
 /**
@@ -252,6 +255,45 @@ struct ValueBase
         Value * const * elems;
     };
 };
+
+template<typename T>
+struct PayloadTypeToInternalType
+{};
+
+/* All stored types must be distinct (not type aliases) for the purposes of
+   overload resolution in setStorage. This ensures there's a bijection from
+   InternalType <-> C++ type. */
+#define NIX_VALUE_STORAGE_FOR_EACH_FIELD(MACRO)                     \
+    MACRO(NixInt, integer, tInt)                                    \
+    MACRO(bool, boolean, tBool)                                     \
+    MACRO(ValueBase::StringWithContext, string, tString)            \
+    MACRO(ValueBase::Path, path, tPath)                             \
+    MACRO(ValueBase::Null, null_, tNull)                            \
+    MACRO(Bindings *, attrs, tAttrs)                                \
+    MACRO(ValueBase::List, bigList, tListN)                         \
+    MACRO(ValueBase::SmallList, smallList, tListSmall)              \
+    MACRO(ValueBase::ClosureThunk, thunk, tThunk)                   \
+    MACRO(ValueBase::FunctionApplicationThunk, app, tApp)           \
+    MACRO(ValueBase::Lambda, lambda, tLambda)                       \
+    MACRO(PrimOp *, primOp, tPrimOp)                                \
+    MACRO(ValueBase::PrimOpApplicationThunk, primOpApp, tPrimOpApp) \
+    MACRO(ExternalValueBase *, external, tExternal)                 \
+    MACRO(NixFloat, fpoint, tFloat)
+
+#define NIX_VALUE_PAYLOAD_TYPE(T, FIELD_NAME, DISCRIMINATOR) \
+    template<>                                               \
+    struct PayloadTypeToInternalType<T>                      \
+    {                                                        \
+        static constexpr InternalType value = DISCRIMINATOR; \
+    };
+
+NIX_VALUE_STORAGE_FOR_EACH_FIELD(NIX_VALUE_PAYLOAD_TYPE)
+
+#undef NIX_VALUE_PAYLOAD_TYPE
+
+template<typename T>
+inline constexpr InternalType payloadTypeToInternalType = PayloadTypeToInternalType<T>::value;
+
 }
 
 /**
@@ -265,29 +307,10 @@ struct ValueBase
  * All specializations of this type need to implement getStorage, setStorage and
  * getInternalType methods.
  */
-template<std::size_t ptrSize>
+template<std::size_t ptrSize, typename Enable = void>
 class ValueStorage : public detail::ValueBase
 {
 protected:
-    /* All stored types must be distinct (not type aliases) for the purposes of
-       overload resolution in setStorage. This ensures there's a bijection from
-       InternalType <-> C++ type. */
-#define NIX_VALUE_STORAGE_FOR_EACH_FIELD(MACRO)          \
-    MACRO(NixInt, integer, tInt)                         \
-    MACRO(bool, boolean, tBool)                          \
-    MACRO(StringWithContext, string, tString)            \
-    MACRO(Path, path, tPath)                             \
-    MACRO(Null, null_, tNull)                            \
-    MACRO(Bindings *, attrs, tAttrs)                     \
-    MACRO(List, bigList, tListN)                         \
-    MACRO(SmallList, smallList, tListSmall)              \
-    MACRO(ClosureThunk, thunk, tThunk)                   \
-    MACRO(FunctionApplicationThunk, app, tApp)           \
-    MACRO(Lambda, lambda, tLambda)                       \
-    MACRO(PrimOp *, primOp, tPrimOp)                     \
-    MACRO(PrimOpApplicationThunk, primOpApp, tPrimOpApp) \
-    MACRO(ExternalValueBase *, external, tExternal)      \
-    MACRO(NixFloat, fpoint, tFloat)
 
     using Payload = union
     {
@@ -345,12 +368,334 @@ public:
 #undef NIX_VALUE_STORAGE_SET_IMPL
     }
 
-#undef NIX_VALUE_STORAGE_FOR_EACH_FIELD
-
     /** Get internal type currently occupying the storage. */
     InternalType getInternalType() const noexcept
     {
         return internalType;
+    }
+};
+
+#undef NIX_VALUE_STORAGE_FOR_EACH_FIELD
+
+namespace detail {
+
+/* Whether to use a specialization of ValueStorage that does bitpacking into
+   alignment niches. */
+template<std::size_t ptrSize>
+inline constexpr bool useBitPackedValueStorage = (ptrSize == 8) && (__STDCPP_DEFAULT_NEW_ALIGNMENT__ >= 8);
+
+} // namespace detail
+
+/**
+ * Value storage that is optimized for 64 bit systems.
+ * Packs discriminator bits into the pointer alignment niches.
+ */
+template<std::size_t ptrSize>
+class ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<ptrSize>>> : public detail::ValueBase
+{
+    /* Needs a dependent type name in order for member functions (and potentially ill-formed bit casts)
+       to be SFINAE'd out. Otherwise some member functions could possibly be instantiated for 32 bit systems
+       and fail due to an unsatisfied constraint. */
+    template<std::size_t size>
+    struct PackedPointerTypeStruct
+    {
+        using type = std::uint64_t;
+    };
+
+    using PackedPointerType = typename PackedPointerTypeStruct<ptrSize>::type;
+    std::array<PackedPointerType, 2> payload = {};
+
+    static constexpr int discriminatorBits = 3;
+    static constexpr PackedPointerType discriminatorMask = (PackedPointerType(1) << discriminatorBits) - 1;
+
+    /**
+     * The value is stored as a pair of 8-byte double words. All pointers are assumed
+     * to be 8-byte aligned. This gives us at most 6 bits of discriminator bits
+     * of free storage. In some cases when one double word can't be tagged the whole
+     * discriminator is stored in the first double word.
+     *
+     * The layout of discriminator bits is determined by the 3 bits of PrimaryDiscriminator,
+     * which are always stored in the lower 3 bits of the first dword of the payload.
+     * The memory layout has 3 types depending on the PrimaryDiscriminator value.
+     *
+     * PrimaryDiscriminator::pdSingleDWord - Only the second dword carries the data.
+     * That leaves the first 8 bytes free for storing the InternalType in the upper
+     * bits.
+     *
+     * PrimaryDiscriminator::pdListN - pdPath - Only has 3 available padding bits
+     * because:
+     * - tListN needs a size, whose lower bits we can't borrow.
+     * - tString and tPath have C-string fields, which don't necessarily need to
+     * be aligned.
+     *
+     * In this case we reserve their discriminators directly in the PrimaryDiscriminator
+     * bits stored in payload[0].
+     *
+     * PrimaryDiscriminator::pdPairOfPointers - Payloads that consist of a pair of pointers.
+     * In this case the 3 lower bits of payload[1] can be tagged.
+     *
+     * The primary discriminator with value 0 is reserved for uninitialized Values,
+     * which are useful for diagnostics in C bindings.
+     */
+
+    enum class PrimaryDiscriminator : int {
+        uninitialized = 0,
+        singleDWord,
+        /* The order must match that of the enumerations defined in InternalType. */
+        listN,
+        string,
+        path,
+        pairOfPointers,
+    };
+
+    template<typename T>
+        requires std::is_pointer_v<T>
+    static T untagPointer(PackedPointerType val) noexcept
+    {
+        return std::bit_cast<T>(val & ~discriminatorMask);
+    }
+
+    PrimaryDiscriminator getPrimaryDiscriminator() const noexcept
+    {
+        return static_cast<PrimaryDiscriminator>(payload[0] & discriminatorMask);
+    }
+
+    int getSecondaryDiscriminator() const noexcept
+    {
+        return payload[1] & discriminatorMask;
+    }
+
+    template<InternalType type>
+    void setSingleDWordPayload(PackedPointerType untaggedVal) noexcept
+    {
+        /* There's plenty of free upper bits in the first dword, which is
+           used only for the discriminator. */
+        payload[0] =
+            static_cast<int>(PrimaryDiscriminator::singleDWord) | (static_cast<int>(type) << discriminatorBits);
+        payload[1] = untaggedVal;
+    }
+
+    static void assertAligned(PackedPointerType val) noexcept
+    {
+        assert((val & discriminatorMask) == 0 && "Pointer is not 8 bytes aligned");
+    }
+
+    template<PrimaryDiscriminator discriminator, typename T, typename U>
+    void setUntaggablePayload(T * firstPtrField, U untaggableField) noexcept
+    {
+        static_assert(discriminator >= PrimaryDiscriminator::listN && discriminator <= PrimaryDiscriminator::path);
+        auto firstFieldPayload = std::bit_cast<PackedPointerType>(firstPtrField);
+        assertAligned(firstFieldPayload);
+        payload[0] = static_cast<int>(discriminator) | firstFieldPayload;
+        payload[1] = std::bit_cast<PackedPointerType>(untaggableField);
+    }
+
+    template<InternalType type, typename T, typename U>
+    void setPairOfPointersPayload(T * firstPtrField, U * secondPtrField) noexcept
+    {
+        static_assert(type >= tListSmall && type <= tLambda);
+        {
+            auto firstFieldPayload = std::bit_cast<PackedPointerType>(firstPtrField);
+            assertAligned(firstFieldPayload);
+            payload[0] = static_cast<int>(PrimaryDiscriminator::pairOfPointers) | firstFieldPayload;
+        }
+        {
+            auto secondFieldPayload = std::bit_cast<PackedPointerType>(secondPtrField);
+            assertAligned(secondFieldPayload);
+            payload[1] = (type - tListSmall) | secondFieldPayload;
+        }
+    }
+
+    template<typename T, typename U>
+        requires std::is_pointer_v<T> && std::is_pointer_v<U>
+    void untagPairOfPointersPayload(T & firstPtrField, U & secondPtrField) const noexcept
+    {
+        firstPtrField = untagPointer<T>(payload[0]);
+        secondPtrField = untagPointer<U>(payload[1]);
+    }
+
+protected:
+    /** Get internal type currently occupying the storage. */
+    InternalType getInternalType() const noexcept
+    {
+        switch (auto pd = getPrimaryDiscriminator()) {
+        case PrimaryDiscriminator::uninitialized:
+            return tUninitialized;
+        case PrimaryDiscriminator::singleDWord:
+            return InternalType(payload[0] >> discriminatorBits);
+        /* The order must match that of the enumerations defined in InternalType. */
+        case PrimaryDiscriminator::listN:
+        case PrimaryDiscriminator::string:
+        case PrimaryDiscriminator::path:
+            return static_cast<InternalType>(
+                static_cast<int>(pd) - static_cast<int>(PrimaryDiscriminator::listN) + tListN);
+        case PrimaryDiscriminator::pairOfPointers:
+            return static_cast<InternalType>(getSecondaryDiscriminator() + tListSmall);
+        }
+        unreachable();
+    }
+
+private:
+    void getStorage(NixInt & integer) const noexcept
+    {
+        /* PackedPointerType -> int64_t here is well-formed, since the standard requires
+           this conversion to follow 2's complement rules. This is just a no-op. */
+        integer = NixInt(payload[1]);
+    }
+
+    void getStorage(bool & boolean) const noexcept
+    {
+        boolean = payload[1];
+    }
+
+    void getStorage(Null & null) const noexcept {}
+
+    void getStorage(NixFloat & fpoint) const noexcept
+    {
+        fpoint = std::bit_cast<NixFloat>(payload[1]);
+    }
+
+    void getStorage(ExternalValueBase *& external) const noexcept
+    {
+        external = std::bit_cast<ExternalValueBase *>(payload[1]);
+    }
+
+    void getStorage(PrimOp *& primOp) const noexcept
+    {
+        primOp = std::bit_cast<PrimOp *>(payload[1]);
+    }
+
+    void getStorage(Bindings *& attrs) const noexcept
+    {
+        attrs = std::bit_cast<Bindings *>(payload[1]);
+    }
+
+    void getStorage(List & list) const noexcept
+    {
+        list.elems = untagPointer<decltype(list.elems)>(payload[0]);
+        list.size = payload[1];
+    }
+
+    void getStorage(StringWithContext & string) const noexcept
+    {
+        string.context = untagPointer<decltype(string.context)>(payload[0]);
+        string.c_str = std::bit_cast<const char *>(payload[1]);
+    }
+
+    void getStorage(Path & path) const noexcept
+    {
+        path.accessor = untagPointer<decltype(path.accessor)>(payload[0]);
+        path.path = std::bit_cast<const char *>(payload[1]);
+    }
+
+    void getStorage(SmallList & list) const noexcept
+    {
+        untagPairOfPointersPayload(list[0], list[1]);
+    }
+
+    void getStorage(PrimOpApplicationThunk & primOpApp) const noexcept
+    {
+        untagPairOfPointersPayload(primOpApp.left, primOpApp.right);
+    }
+
+    void getStorage(FunctionApplicationThunk & app) const noexcept
+    {
+        untagPairOfPointersPayload(app.left, app.right);
+    }
+
+    void getStorage(ClosureThunk & thunk) const noexcept
+    {
+        untagPairOfPointersPayload(thunk.env, thunk.expr);
+    }
+
+    void getStorage(Lambda & lambda) const noexcept
+    {
+        untagPairOfPointersPayload(lambda.env, lambda.fun);
+    }
+
+protected:
+    template<typename T>
+    T getStorage() const noexcept
+    {
+        T out;
+        assert(getInternalType() == detail::payloadTypeToInternalType<T>);
+        getStorage(out);
+        return out;
+    }
+
+    void setStorage(NixInt integer) noexcept
+    {
+        setSingleDWordPayload<tInt>(integer.value);
+    }
+
+    void setStorage(bool boolean) noexcept
+    {
+        setSingleDWordPayload<tBool>(boolean);
+    }
+
+    void setStorage(Null path) noexcept
+    {
+        setSingleDWordPayload<tNull>(0);
+    }
+
+    void setStorage(NixFloat fpoint) noexcept
+    {
+        setSingleDWordPayload<tFloat>(std::bit_cast<PackedPointerType>(fpoint));
+    }
+
+    void setStorage(ExternalValueBase * external) noexcept
+    {
+        setSingleDWordPayload<tExternal>(std::bit_cast<PackedPointerType>(external));
+    }
+
+    void setStorage(PrimOp * primOp) noexcept
+    {
+        setSingleDWordPayload<tPrimOp>(std::bit_cast<PackedPointerType>(primOp));
+    }
+
+    void setStorage(Bindings * bindings) noexcept
+    {
+        setSingleDWordPayload<tAttrs>(std::bit_cast<PackedPointerType>(bindings));
+    }
+
+    void setStorage(List list) noexcept
+    {
+        setUntaggablePayload<PrimaryDiscriminator::listN>(list.elems, list.size);
+    }
+
+    void setStorage(StringWithContext string) noexcept
+    {
+        setUntaggablePayload<PrimaryDiscriminator::string>(string.context, string.c_str);
+    }
+
+    void setStorage(Path path) noexcept
+    {
+        setUntaggablePayload<PrimaryDiscriminator::path>(path.accessor, path.path);
+    }
+
+    void setStorage(SmallList smallList) noexcept
+    {
+        setPairOfPointersPayload<tListSmall>(smallList[0], smallList[1]);
+    }
+
+    void setStorage(PrimOpApplicationThunk primOpApp) noexcept
+    {
+        setPairOfPointersPayload<tPrimOpApp>(primOpApp.left, primOpApp.right);
+    }
+
+    void setStorage(FunctionApplicationThunk app) noexcept
+    {
+        setPairOfPointersPayload<tApp>(app.left, app.right);
+    }
+
+    void setStorage(ClosureThunk thunk) noexcept
+    {
+        setPairOfPointersPayload<tThunk>(thunk.env, thunk.expr);
+    }
+
+    void setStorage(Lambda lambda) noexcept
+    {
+        setPairOfPointersPayload<tLambda>(lambda.env, lambda.fun);
     }
 };
 
