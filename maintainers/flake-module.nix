@@ -256,7 +256,6 @@
               ''^src/libexpr/include/nix/expr/value-to-json\.hh$''
               ''^src/libexpr/value-to-xml\.cc$''
               ''^src/libexpr/include/nix/expr/value-to-xml\.hh$''
-              ''^src/libexpr/include/nix/expr/value\.hh$''
               ''^src/libexpr/value/context\.cc$''
               ''^src/libexpr/include/nix/expr/value/context\.hh$''
               ''^src/libfetchers/attrs\.cc$''
