@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <span>
+#include <type_traits>
 
 #include "nix/expr/eval-gc.hh"
 #include "nix/expr/value/context.hh"
@@ -170,24 +171,205 @@ public:
     friend struct Value;
 };
 
-struct Value
+namespace detail {
+
+/**
+ * Implementation mixin class for defining the public types
+ * In can be inherited from by the actual ValueStorage implementations
+ * for free due to Empty Base Class Optimization (EBCO).
+ */
+struct ValueBase
 {
+    /**
+     * Strings in the evaluator carry a so-called `context` which
+     * is a list of strings representing store paths.  This is to
+     * allow users to write things like
+     *
+     *   "--with-freetype2-library=" + freetype + "/lib"
+     *
+     * where `freetype` is a derivation (or a source to be copied
+     * to the store).  If we just concatenated the strings without
+     * keeping track of the referenced store paths, then if the
+     * string is used as a derivation attribute, the derivation
+     * will not have the correct dependencies in its inputDrvs and
+     * inputSrcs.
+
+     * The semantics of the context is as follows: when a string
+     * with context C is used as a derivation attribute, then the
+     * derivations in C will be added to the inputDrvs of the
+     * derivation, and the other store paths in C will be added to
+     * the inputSrcs of the derivations.
+
+     * For canonicity, the store paths should be in sorted order.
+     */
+    struct StringWithContext
+    {
+        const char * c_str;
+        const char ** context; // must be in sorted order
+    };
+
+    struct Path
+    {
+        SourceAccessor * accessor;
+        const char * path;
+    };
+
+    struct Null
+    {};
+
+    struct ClosureThunk
+    {
+        Env * env;
+        Expr * expr;
+    };
+
+    struct FunctionApplicationThunk
+    {
+        Value *left, *right;
+    };
+
+    /**
+     * Like FunctionApplicationThunk, but must be a distinct type in order to
+     * resolve overloads to `tPrimOpApp` instead of `tApp`.
+     * This type helps with the efficient implementation of arity>=2 primop calls.
+     */
+    struct PrimOpApplicationThunk
+    {
+        Value *left, *right;
+    };
+
+    struct Lambda
+    {
+        Env * env;
+        ExprLambda * fun;
+    };
+
+    using SmallList = std::array<Value *, 2>;
+
+    struct List
+    {
+        size_t size;
+        Value * const * elems;
+    };
+};
+
+template<typename T>
+struct PayloadTypeToInternalType
+{};
+
+/**
+ * All stored types must be distinct (not type aliases) for the purposes of
+ * overload resolution in setStorage. This ensures there's a bijection from
+ * InternalType <-> C++ type.
+ */
+#define NIX_VALUE_STORAGE_FOR_EACH_FIELD(MACRO)                     \
+    MACRO(NixInt, integer, tInt)                                    \
+    MACRO(bool, boolean, tBool)                                     \
+    MACRO(ValueBase::StringWithContext, string, tString)            \
+    MACRO(ValueBase::Path, path, tPath)                             \
+    MACRO(ValueBase::Null, null_, tNull)                            \
+    MACRO(Bindings *, attrs, tAttrs)                                \
+    MACRO(ValueBase::List, bigList, tListN)                         \
+    MACRO(ValueBase::SmallList, smallList, tListSmall)              \
+    MACRO(ValueBase::ClosureThunk, thunk, tThunk)                   \
+    MACRO(ValueBase::FunctionApplicationThunk, app, tApp)           \
+    MACRO(ValueBase::Lambda, lambda, tLambda)                       \
+    MACRO(PrimOp *, primOp, tPrimOp)                                \
+    MACRO(ValueBase::PrimOpApplicationThunk, primOpApp, tPrimOpApp) \
+    MACRO(ExternalValueBase *, external, tExternal)                 \
+    MACRO(NixFloat, fpoint, tFloat)
+
+#define NIX_VALUE_PAYLOAD_TYPE(T, FIELD_NAME, DISCRIMINATOR) \
+    template<>                                               \
+    struct PayloadTypeToInternalType<T>                      \
+    {                                                        \
+        static constexpr InternalType value = DISCRIMINATOR; \
+    };
+
+NIX_VALUE_STORAGE_FOR_EACH_FIELD(NIX_VALUE_PAYLOAD_TYPE)
+
+#undef NIX_VALUE_PAYLOAD_TYPE
+
+template<typename T>
+inline constexpr InternalType payloadTypeToInternalType = PayloadTypeToInternalType<T>::value;
+
+}
+
+/**
+ * Discriminated union of types stored in the value.
+ * The union discriminator is @ref InternalType enumeration.
+ *
+ * This class can be specialized with a non-type template parameter
+ * of pointer size for more optimized data layouts on when pointer alignment
+ * bits can be used for storing the discriminator.
+ *
+ * All specializations of this type need to implement getStorage, setStorage and
+ * getInternalType methods.
+ */
+template<std::size_t ptrSize>
+class ValueStorage : public detail::ValueBase
+{
+protected:
+    using Payload = union
+    {
+#define NIX_VALUE_STORAGE_DEFINE_FIELD(T, FIELD_NAME, DISCRIMINATOR) T FIELD_NAME;
+        NIX_VALUE_STORAGE_FOR_EACH_FIELD(NIX_VALUE_STORAGE_DEFINE_FIELD)
+#undef NIX_VALUE_STORAGE_DEFINE_FIELD
+    };
+
+    Payload payload;
+
 private:
     InternalType internalType = tUninitialized;
 
+public:
+#define NIX_VALUE_STORAGE_GET_IMPL(K, FIELD_NAME, DISCRIMINATOR) \
+    void getStorage(K & val) const noexcept                      \
+    {                                                            \
+        assert(internalType == DISCRIMINATOR);                   \
+        val = payload.FIELD_NAME;                                \
+    }
+
+#define NIX_VALUE_STORAGE_SET_IMPL(K, FIELD_NAME, DISCRIMINATOR) \
+    void setStorage(K val) noexcept                              \
+    {                                                            \
+        payload.FIELD_NAME = val;                                \
+        internalType = DISCRIMINATOR;                            \
+    }
+
+    NIX_VALUE_STORAGE_FOR_EACH_FIELD(NIX_VALUE_STORAGE_GET_IMPL)
+    NIX_VALUE_STORAGE_FOR_EACH_FIELD(NIX_VALUE_STORAGE_SET_IMPL)
+
+#undef NIX_VALUE_STORAGE_SET_IMPL
+#undef NIX_VALUE_STORAGE_GET_IMPL
+#undef NIX_VALUE_STORAGE_FOR_EACH_FIELD
+
+    /** Get internal type currently occupying the storage. */
     InternalType getInternalType() const noexcept
     {
         return internalType;
     }
+};
 
-    /** Check if currently stored value type is either of Vs. */
-    template<InternalType... Vs>
+struct Value : public ValueStorage<sizeof(void *)>
+{
+    friend std::string showType(const Value & v);
+
+    template<InternalType... discriminator>
     bool isa() const noexcept
     {
-        return ((getInternalType() == Vs) || ...);
+        return ((getInternalType() == discriminator) || ...);
     }
 
-    friend std::string showType(const Value & v);
+    template<typename T>
+    T getStorage() const noexcept
+    {
+        if (getInternalType() != detail::payloadTypeToInternalType<T>) [[unlikely]]
+            unreachable();
+        T out;
+        ValueStorage::getStorage(out);
+        return out;
+    }
 
 public:
 
@@ -226,84 +408,6 @@ public:
     {
         return isa<tPrimOpApp>();
     };
-
-    /**
-     * Strings in the evaluator carry a so-called `context` which
-     * is a list of strings representing store paths.  This is to
-     * allow users to write things like
-     *
-     *   "--with-freetype2-library=" + freetype + "/lib"
-     *
-     * where `freetype` is a derivation (or a source to be copied
-     * to the store).  If we just concatenated the strings without
-     * keeping track of the referenced store paths, then if the
-     * string is used as a derivation attribute, the derivation
-     * will not have the correct dependencies in its inputDrvs and
-     * inputSrcs.
-
-     * The semantics of the context is as follows: when a string
-     * with context C is used as a derivation attribute, then the
-     * derivations in C will be added to the inputDrvs of the
-     * derivation, and the other store paths in C will be added to
-     * the inputSrcs of the derivations.
-
-     * For canonicity, the store paths should be in sorted order.
-     */
-    struct StringWithContext
-    {
-        const char * c_str;
-        const char ** context; // must be in sorted order
-    };
-
-    struct Path
-    {
-        SourceAccessor * accessor;
-        const char * path;
-    };
-
-    struct ClosureThunk
-    {
-        Env * env;
-        Expr * expr;
-    };
-
-    struct FunctionApplicationThunk
-    {
-        Value *left, *right;
-    };
-
-    struct Lambda
-    {
-        Env * env;
-        ExprLambda * fun;
-    };
-
-    using Payload = union
-    {
-        NixInt integer;
-        bool boolean;
-
-        StringWithContext string;
-
-        Path path;
-
-        Bindings * attrs;
-        struct
-        {
-            size_t size;
-            Value * const * elems;
-        } bigList;
-        Value * smallList[2];
-        ClosureThunk thunk;
-        FunctionApplicationThunk app;
-        Lambda lambda;
-        PrimOp * primOp;
-        FunctionApplicationThunk primOpApp;
-        ExternalValueBase * external;
-        NixFloat fpoint;
-    };
-
-    Payload payload;
 
     /**
      * Returns the normal type of a Value. This only returns nThunk if
@@ -350,40 +454,34 @@ public:
             unreachable();
     }
 
-    inline void finishValue(InternalType newType, Payload newPayload)
-    {
-        payload = newPayload;
-        internalType = newType;
-    }
-
     /**
      * A value becomes valid when it is initialized. We don't use this
      * in the evaluator; only in the bindings, where the slight extra
      * cost is warranted because of inexperienced callers.
      */
-    inline bool isValid() const
+    inline bool isValid() const noexcept
     {
         return !isa<tUninitialized>();
     }
 
-    inline void mkInt(NixInt::Inner n)
+    inline void mkInt(NixInt::Inner n) noexcept
     {
         mkInt(NixInt{n});
     }
 
-    inline void mkInt(NixInt n)
+    inline void mkInt(NixInt n) noexcept
     {
-        finishValue(tInt, {.integer = n});
+        setStorage(NixInt{n});
     }
 
-    inline void mkBool(bool b)
+    inline void mkBool(bool b) noexcept
     {
-        finishValue(tBool, {.boolean = b});
+        setStorage(b);
     }
 
-    inline void mkString(const char * s, const char ** context = 0)
+    inline void mkString(const char * s, const char ** context = 0) noexcept
     {
-        finishValue(tString, {.string = {.c_str = s, .context = context}});
+        setStorage(StringWithContext{.c_str = s, .context = context});
     }
 
     void mkString(std::string_view s);
@@ -395,55 +493,55 @@ public:
     void mkPath(const SourcePath & path);
     void mkPath(std::string_view path);
 
-    inline void mkPath(SourceAccessor * accessor, const char * path)
+    inline void mkPath(SourceAccessor * accessor, const char * path) noexcept
     {
-        finishValue(tPath, {.path = {.accessor = accessor, .path = path}});
+        setStorage(Path{.accessor = accessor, .path = path});
     }
 
-    inline void mkNull()
+    inline void mkNull() noexcept
     {
-        finishValue(tNull, {});
+        setStorage(Null{});
     }
 
-    inline void mkAttrs(Bindings * a)
+    inline void mkAttrs(Bindings * a) noexcept
     {
-        finishValue(tAttrs, {.attrs = a});
+        setStorage(a);
     }
 
     Value & mkAttrs(BindingsBuilder & bindings);
 
-    void mkList(const ListBuilder & builder)
+    void mkList(const ListBuilder & builder) noexcept
     {
         if (builder.size == 1)
-            finishValue(tListSmall, {.smallList = {builder.inlineElems[0], nullptr}});
+            setStorage(std::array<Value *, 2>{builder.inlineElems[0], nullptr});
         else if (builder.size == 2)
-            finishValue(tListSmall, {.smallList = {builder.inlineElems[0], builder.inlineElems[1]}});
+            setStorage(std::array<Value *, 2>{builder.inlineElems[0], builder.inlineElems[1]});
         else
-            finishValue(tListN, {.bigList = {.size = builder.size, .elems = builder.elems}});
+            setStorage(List{.size = builder.size, .elems = builder.elems});
     }
 
-    inline void mkThunk(Env * e, Expr * ex)
+    inline void mkThunk(Env * e, Expr * ex) noexcept
     {
-        finishValue(tThunk, {.thunk = {.env = e, .expr = ex}});
+        setStorage(ClosureThunk{.env = e, .expr = ex});
     }
 
-    inline void mkApp(Value * l, Value * r)
+    inline void mkApp(Value * l, Value * r) noexcept
     {
-        finishValue(tApp, {.app = {.left = l, .right = r}});
+        setStorage(FunctionApplicationThunk{.left = l, .right = r});
     }
 
-    inline void mkLambda(Env * e, ExprLambda * f)
+    inline void mkLambda(Env * e, ExprLambda * f) noexcept
     {
-        finishValue(tLambda, {.lambda = {.env = e, .fun = f}});
+        setStorage(Lambda{.env = e, .fun = f});
     }
 
     inline void mkBlackhole();
 
     void mkPrimOp(PrimOp * p);
 
-    inline void mkPrimOpApp(Value * l, Value * r)
+    inline void mkPrimOpApp(Value * l, Value * r) noexcept
     {
-        finishValue(tPrimOpApp, {.primOpApp = {.left = l, .right = r}});
+        setStorage(PrimOpApplicationThunk{.left = l, .right = r});
     }
 
     /**
@@ -451,35 +549,35 @@ public:
      */
     const PrimOp * primOpAppPrimOp() const;
 
-    inline void mkExternal(ExternalValueBase * e)
+    inline void mkExternal(ExternalValueBase * e) noexcept
     {
-        finishValue(tExternal, {.external = e});
+        setStorage(e);
     }
 
-    inline void mkFloat(NixFloat n)
+    inline void mkFloat(NixFloat n) noexcept
     {
-        finishValue(tFloat, {.fpoint = n});
+        setStorage(n);
     }
 
-    bool isList() const
+    bool isList() const noexcept
     {
         return isa<tListSmall, tListN>();
     }
 
-    std::span<Value * const> listItems() const
+    std::span<Value * const> listItems() const noexcept
     {
         assert(isList());
         return std::span<Value * const>(listElems(), listSize());
     }
 
-    Value * const * listElems() const
+    Value * const * listElems() const noexcept
     {
-        return isa<tListSmall>() ? payload.smallList : payload.bigList.elems;
+        return isa<tListSmall>() ? payload.smallList.data() : getStorage<List>().elems;
     }
 
-    size_t listSize() const
+    size_t listSize() const noexcept
     {
-        return isa<tListSmall>() ? (payload.smallList[1] == nullptr ? 1 : 2) : payload.bigList.size;
+        return isa<tListSmall>() ? (getStorage<SmallList>()[1] == nullptr ? 1 : 2) : getStorage<List>().size;
     }
 
     PosIdx determinePos(const PosIdx pos) const;
@@ -493,85 +591,82 @@ public:
 
     SourcePath path() const
     {
-        assert(isa<tPath>());
         return SourcePath(ref(pathAccessor()->shared_from_this()), CanonPath(CanonPath::unchecked_t(), pathStr()));
     }
 
-    std::string_view string_view() const
+    std::string_view string_view() const noexcept
     {
-        assert(isa<tString>());
-        return std::string_view(payload.string.c_str);
+        return std::string_view(getStorage<StringWithContext>().c_str);
     }
 
-    const char * c_str() const
+    const char * c_str() const noexcept
     {
-        assert(isa<tString>());
-        return payload.string.c_str;
+        return getStorage<StringWithContext>().c_str;
     }
 
-    const char ** context() const
+    const char ** context() const noexcept
     {
-        return payload.string.context;
+        return getStorage<StringWithContext>().context;
     }
 
-    ExternalValueBase * external() const
+    ExternalValueBase * external() const noexcept
     {
-        return payload.external;
+        return getStorage<ExternalValueBase *>();
     }
 
-    const Bindings * attrs() const
+    const Bindings * attrs() const noexcept
     {
-        return payload.attrs;
+        return getStorage<Bindings *>();
     }
 
-    const PrimOp * primOp() const
+    const PrimOp * primOp() const noexcept
     {
-        return payload.primOp;
+        return getStorage<PrimOp *>();
     }
 
-    bool boolean() const
+    bool boolean() const noexcept
     {
-        return payload.boolean;
+        return getStorage<bool>();
     }
 
-    NixInt integer() const
+    NixInt integer() const noexcept
     {
-        return payload.integer;
+        return getStorage<NixInt>();
     }
 
-    NixFloat fpoint() const
+    NixFloat fpoint() const noexcept
     {
-        return payload.fpoint;
+        return getStorage<NixFloat>();
     }
 
-    Lambda lambda() const
+    Lambda lambda() const noexcept
     {
-        return payload.lambda;
+        return getStorage<Lambda>();
     }
 
-    ClosureThunk thunk() const
+    ClosureThunk thunk() const noexcept
     {
-        return payload.thunk;
+        return getStorage<ClosureThunk>();
     }
 
-    FunctionApplicationThunk primOpApp() const
+    PrimOpApplicationThunk primOpApp() const noexcept
     {
-        return payload.primOpApp;
+        return getStorage<PrimOpApplicationThunk>();
     }
 
-    FunctionApplicationThunk app() const
+    FunctionApplicationThunk app() const noexcept
     {
-        return payload.app;
+        return getStorage<FunctionApplicationThunk>();
     }
 
-    const char * pathStr() const
+    const char * pathStr() const noexcept
     {
-        return payload.path.path;
+        return getStorage<Path>().path;
     }
 
-    SourceAccessor * pathAccessor() const
+    SourceAccessor * pathAccessor() const noexcept
     {
-        return payload.path.accessor;
+        return getStorage<Path>().accessor;
     }
 };
 
@@ -579,7 +674,7 @@ extern ExprBlackHole eBlackHole;
 
 bool Value::isBlackhole() const
 {
-    return isa<tThunk>() && thunk().expr == (Expr *) &eBlackHole;
+    return isThunk() && thunk().expr == (Expr *) &eBlackHole;
 }
 
 void Value::mkBlackhole()
@@ -606,5 +701,4 @@ typedef std::shared_ptr<Value *> RootValue;
 RootValue allocRootValue(Value * v);
 
 void forceNoNullByte(std::string_view s, std::function<Pos()> = nullptr);
-
 }

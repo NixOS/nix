@@ -5050,7 +5050,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
-    getBuiltins().payload.attrs->sort();
+    const_cast<Bindings *>(getBuiltins().attrs())->sort();
 
     staticBaseEnv->sort();
 
