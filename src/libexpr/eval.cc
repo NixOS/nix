@@ -125,7 +125,7 @@ std::string showType(const Value & v)
     // Allow selecting a subset of enum values
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wswitch-enum"
-    switch (v.internalType) {
+    switch (v.getInternalType()) {
         case tString: return v.context() ? "a string with context" : "a string";
         case tPrimOp:
             return fmt("the built-in function '%s'", std::string(v.primOp()->name));
@@ -145,7 +145,7 @@ PosIdx Value::determinePos(const PosIdx pos) const
     // Allow selecting a subset of enum values
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wswitch-enum"
-    switch (internalType) {
+    switch (getInternalType()) {
         case tAttrs: return attrs()->pos;
         case tLambda: return lambda().fun->pos;
         case tApp: return app().left->determinePos(pos);
@@ -157,9 +157,8 @@ PosIdx Value::determinePos(const PosIdx pos) const
 bool Value::isTrivial() const
 {
     return
-        internalType != tApp
-        && internalType != tPrimOpApp
-        && (internalType != tThunk
+        !isa<tApp, tPrimOpApp>()
+        && (!isa<tThunk>()
             || (dynamic_cast<ExprAttrs *>(thunk().expr)
                 && ((ExprAttrs *) thunk().expr)->dynamicAttrs.empty())
             || dynamic_cast<ExprLambda *>(thunk().expr)
@@ -503,7 +502,7 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
         /* Install value the base environment. */
         staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
-        getBuiltins().payload.attrs->push_back(Attr(symbols.create(name2), v));
+        const_cast<Bindings *>(getBuiltins().attrs())->push_back(Attr(symbols.create(name2), v));
     }
 }
 
@@ -541,7 +540,7 @@ const PrimOp * Value::primOpAppPrimOp() const
 void Value::mkPrimOp(PrimOp * p)
 {
     p->check();
-    finishValue(tPrimOp, { .primOp = p });
+    setStorage(p);
 }
 
 
@@ -573,7 +572,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
     else {
         staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
-        getBuiltins().payload.attrs->push_back(Attr(symbols.create(primOp.name), v));
+        const_cast<Bindings *>(getBuiltins().attrs())->push_back(Attr(symbols.create(primOp.name), v));
     }
 
     return v;
@@ -2008,9 +2007,10 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * const * lists, co
     auto list = buildList(len);
     auto out = list.elems;
     for (size_t n = 0, pos = 0; n < nrLists; ++n) {
-        auto l = lists[n]->listSize();
+        auto listView = lists[n]->listView();
+        auto l = listView.size();
         if (l)
-            memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
+            memcpy(out + pos, listView.data(), l * sizeof(Value *));
         pos += l;
     }
     v.mkList(list);
@@ -2175,7 +2175,7 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
-            for (auto v2 : v.listItems())
+            for (auto v2 : v.listView())
                 recurse(*v2);
         }
     };
@@ -2412,7 +2412,8 @@ BackedStringView EvalState::coerceToString(
 
         if (v.isList()) {
             std::string result;
-            for (auto [n, v2] : enumerate(v.listItems())) {
+            auto listView = v.listView();
+            for (auto [n, v2] : enumerate(listView)) {
                 try {
                     result += *coerceToString(pos, *v2, context,
                             "while evaluating one element of the list",
@@ -2667,7 +2668,7 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         }
         for (size_t n = 0; n < v1.listSize(); ++n) {
             try {
-                assertEqValues(*v1.listElems()[n], *v2.listElems()[n], pos, errorCtx);
+                assertEqValues(*v1.listView()[n], *v2.listView()[n], pos, errorCtx);
             } catch (Error & e) {
                 e.addTrace(positions[pos], "while comparing list element %d", n);
                 throw;
@@ -2819,7 +2820,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         case nList:
             if (v1.listSize() != v2.listSize()) return false;
             for (size_t n = 0; n < v1.listSize(); ++n)
-                if (!eqValues(*v1.listElems()[n], *v2.listElems()[n], pos, errorCtx)) return false;
+                if (!eqValues(*v1.listView()[n], *v2.listView()[n], pos, errorCtx)) return false;
             return true;
 
         case nAttrs: {

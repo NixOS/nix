@@ -1265,7 +1265,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                             } else if (v->type() == nList) {
                                 attrs2["type"] = "strings";
                                 XMLOpenElement m(xml, "meta", attrs2);
-                                for (auto elem : v->listItems()) {
+                                for (auto elem : v->listView()) {
                                     if (elem->type() != nString) continue;
                                     XMLAttrs attrs3;
                                     attrs3["value"] = elem->c_str();

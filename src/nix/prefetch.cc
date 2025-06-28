@@ -46,7 +46,7 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
     if (mirrorList->value->listSize() < 1)
         throw Error("mirror URL '%s' did not expand to anything", url);
 
-    std::string mirror(state.forceString(*mirrorList->value->listElems()[0], noPos, "while evaluating the first available mirror"));
+    std::string mirror(state.forceString(*mirrorList->value->listView()[0], noPos, "while evaluating the first available mirror"));
     return mirror + (hasSuffix(mirror, "/") ? "" : "/") + s.substr(p + 1);
 }
 
@@ -221,7 +221,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             state->forceList(*attr->value, noPos, "while evaluating the urls to prefetch");
             if (attr->value->listSize() < 1)
                 throw Error("'urls' list is empty");
-            url = state->forceString(*attr->value->listElems()[0], noPos, "while evaluating the first url from the urls list");
+            url = state->forceString(*attr->value->listView()[0], noPos, "while evaluating the first url from the urls list");
 
             /* Extract the hash mode. */
             auto attr2 = v.attrs()->get(state->symbols.create("outputHashMode"));
