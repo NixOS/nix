@@ -25,8 +25,7 @@ typedef enum {
     tPath,
     tNull,
     tAttrs,
-    tList1,
-    tList2,
+    tListSmall,
     tListN,
     tThunk,
     tApp,
@@ -318,8 +317,7 @@ public:
             return nNull;
         case tAttrs:
             return nAttrs;
-        case tList1:
-        case tList2:
+        case tListSmall:
         case tListN:
             return nList;
         case tLambda:
@@ -405,9 +403,9 @@ public:
     void mkList(const ListBuilder & builder)
     {
         if (builder.size == 1)
-            finishValue(tList1, {.smallList = {builder.inlineElems[0]}});
+            finishValue(tListSmall, {.smallList = {builder.inlineElems[0], nullptr}});
         else if (builder.size == 2)
-            finishValue(tList2, {.smallList = {builder.inlineElems[0], builder.inlineElems[1]}});
+            finishValue(tListSmall, {.smallList = {builder.inlineElems[0], builder.inlineElems[1]}});
         else
             finishValue(tListN, {.bigList = {.size = builder.size, .elems = builder.elems}});
     }
@@ -453,7 +451,7 @@ public:
 
     bool isList() const
     {
-        return internalType == tList1 || internalType == tList2 || internalType == tListN;
+        return internalType == tListSmall || internalType == tListN;
     }
 
     std::span<Value * const> listItems() const
@@ -464,12 +462,12 @@ public:
 
     Value * const * listElems() const
     {
-        return internalType == tList1 || internalType == tList2 ? payload.smallList : payload.bigList.elems;
+        return internalType == tListSmall ? payload.smallList : payload.bigList.elems;
     }
 
     size_t listSize() const
     {
-        return internalType == tList1 ? 1 : internalType == tList2 ? 2 : payload.bigList.size;
+        return internalType == tListSmall ? (payload.smallList[1] == nullptr ? 1 : 2) : payload.bigList.size;
     }
 
     PosIdx determinePos(const PosIdx pos) const;
