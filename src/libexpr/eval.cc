@@ -502,7 +502,7 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
         /* Install value the base environment. */
         staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
-        getBuiltins().payload.attrs->push_back(Attr(symbols.create(name2), v));
+        const_cast<Bindings *>(getBuiltins().attrs())->push_back(Attr(symbols.create(name2), v));
     }
 }
 
@@ -540,7 +540,7 @@ const PrimOp * Value::primOpAppPrimOp() const
 void Value::mkPrimOp(PrimOp * p)
 {
     p->check();
-    finishValue(tPrimOp, { .primOp = p });
+    setStorage(p);
 }
 
 
@@ -572,7 +572,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
     else {
         staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
-        getBuiltins().payload.attrs->push_back(Attr(symbols.create(primOp.name), v));
+        const_cast<Bindings *>(getBuiltins().attrs())->push_back(Attr(symbols.create(primOp.name), v));
     }
 
     return v;
