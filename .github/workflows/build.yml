@@ -136,6 +136,7 @@ jobs:
         with:
           repository: DeterminateSystems/flake-regressions
           path: flake-regressions
+          ref: prefetch
       - name: Checkout flake-regressions-data
         uses: actions/checkout@v4
         with:
@@ -147,6 +148,7 @@ jobs:
           PARALLEL: "-P 50%"
           FLAKE_REGRESSION_GLOB: ${{ matrix.glob }}
           NIX_CONFIG: ${{ matrix.nix_config }}
+          PREFETCH: "1"
           GC_INITIAL_HEAP_SIZE: "32G"
         run: |
           set -x
