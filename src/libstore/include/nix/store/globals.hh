@@ -1241,7 +1241,7 @@ public:
     {
         std::vector<std::string> systems;
         Path program;
-        std::optional<std::vector<std::string>> args;
+        std::vector<std::string> args;
     };
 
     using ExternalBuilders = std::vector<ExternalBuilder>;

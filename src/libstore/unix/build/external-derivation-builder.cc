@@ -94,8 +94,8 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
 
                 Strings args = {externalBuilder.program};
 
-                if (externalBuilder.args) {
-                    args.insert(args.end(), externalBuilder.args->begin(), externalBuilder.args->end());
+                if (!externalBuilder.args.empty()) {
+                    args.insert(args.end(), externalBuilder.args.begin(), externalBuilder.args.end());
                 }
 
                 args.insert(args.end(), jsonFile);
