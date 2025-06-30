@@ -2,6 +2,7 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/util/exit.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -35,16 +36,23 @@ struct CmdFlakePrefetchInputs : FlakeCommand
 
         Sync<State> state_;
 
+        std::atomic<size_t> nrFailed{0};
+
         std::function<void(const Node & node)> visit;
         visit = [&](const Node & node) {
             if (!state_.lock()->done.insert(&node).second)
                 return;
 
             if (auto lockedNode = dynamic_cast<const LockedNode *>(&node)) {
-                Activity act(*logger, lvlInfo, actUnknown, fmt("fetching '%s'", lockedNode->lockedRef));
-                auto accessor = lockedNode->lockedRef.input.getAccessor(store).first;
-                if (!evalSettings.lazyTrees)
-                    fetchToStore(*store, accessor, FetchMode::Copy, lockedNode->lockedRef.input.getName());
+                try {
+                    Activity act(*logger, lvlInfo, actUnknown, fmt("fetching '%s'", lockedNode->lockedRef));
+                    auto accessor = lockedNode->lockedRef.input.getAccessor(store).first;
+                    if (!evalSettings.lazyTrees)
+                        fetchToStore(*store, accessor, FetchMode::Copy, lockedNode->lockedRef.input.getName());
+                } catch (Error & e) {
+                    printError("%s", e.what());
+                    nrFailed++;
+                }
             }
 
             for (auto & [inputName, input] : node.inputs) {
@@ -56,6 +64,8 @@ struct CmdFlakePrefetchInputs : FlakeCommand
         pool.enqueue(std::bind(visit, *flake.lockFile.root));
 
         pool.process();
+
+        throw Exit(nrFailed ? 1 : 0);
     }
 };
 
