@@ -374,6 +374,7 @@ nix build -o $TEST_ROOT/result git+file://$flakeGitBare
 mkdir -p $flake5Dir
 writeDependentFlake $flake5Dir
 nix flake lock path://$flake5Dir
+[[ "$(nix flake metadata path://$flake5Dir --json | jq -r .fingerprint)" != null ]]
 
 # Test tarball flakes.
 tar cfz $TEST_ROOT/flake.tar.gz -C $TEST_ROOT flake5
