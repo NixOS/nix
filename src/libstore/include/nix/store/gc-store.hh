@@ -7,8 +7,11 @@
 
 namespace nix {
 
+// FIXME: should turn this into an std::variant to represent the
+// several root types.
+using GcRootInfo = std::string;
 
-typedef std::unordered_map<StorePath, std::unordered_set<std::string>> Roots;
+typedef std::unordered_map<StorePath, std::unordered_set<GcRootInfo>> Roots;
 
 
 struct GCOptions
@@ -53,6 +56,12 @@ struct GCOptions
      * Stop after at least `maxFreed` bytes have been freed.
      */
     uint64_t maxFreed{std::numeric_limits<uint64_t>::max()};
+
+    /**
+     * Whether to hide potentially sensitive information about GC
+     * roots (such as PIDs).
+     */
+    bool censor = false;
 };
 
 
