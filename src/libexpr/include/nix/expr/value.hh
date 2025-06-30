@@ -19,23 +19,35 @@ namespace nix {
 struct Value;
 class BindingsBuilder;
 
+/**
+ * Internal type discriminator, which is more detailed than `ValueType`, as
+ * it specifies the exact representation used (for types that have multiple
+ * possible representations).
+ *
+ * @warning The ordering is very significant. See ValueStorage::getInternalType() for details
+ * about how this is mapped into the alignment bits to save significant memory.
+ * This also restricts the number of internal types represented with distinct memory layouts.
+ */
 typedef enum {
     tUninitialized = 0,
+    /* layout: Single/zero field payload */
     tInt = 1,
     tBool,
+    tNull,
+    tFloat,
+    tExternal,
+    tPrimOp,
+    tAttrs,
+    /* layout: Pair of pointers payload */
+    tListSmall,
+    tPrimOpApp,
+    tApp,
+    tThunk,
+    tLambda,
+    /* layout: Single untaggable field */
+    tListN,
     tString,
     tPath,
-    tNull,
-    tAttrs,
-    tListSmall,
-    tListN,
-    tThunk,
-    tApp,
-    tLambda,
-    tPrimOp,
-    tPrimOpApp,
-    tExternal,
-    tFloat
 } InternalType;
 
 /**
@@ -307,7 +319,7 @@ inline constexpr InternalType payloadTypeToInternalType = PayloadTypeToInternalT
  * All specializations of this type need to implement getStorage, setStorage and
  * getInternalType methods.
  */
-template<std::size_t ptrSize>
+template<std::size_t ptrSize, typename Enable = void>
 class ValueStorage : public detail::ValueBase
 {
 protected:
@@ -348,6 +360,287 @@ protected:
     InternalType getInternalType() const noexcept
     {
         return internalType;
+    }
+};
+
+namespace detail {
+
+/* Whether to use a specialization of ValueStorage that does bitpacking into
+   alignment niches. */
+template<std::size_t ptrSize>
+inline constexpr bool useBitPackedValueStorage = (ptrSize == 8) && (__STDCPP_DEFAULT_NEW_ALIGNMENT__ >= 8);
+
+} // namespace detail
+
+/**
+ * Value storage that is optimized for 64 bit systems.
+ * Packs discriminator bits into the pointer alignment niches.
+ */
+template<std::size_t ptrSize>
+class ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<ptrSize>>> : public detail::ValueBase
+{
+    /* Needs a dependent type name in order for member functions (and
+     * potentially ill-formed bit casts) to be SFINAE'd out.
+     *
+     * Otherwise some member functions could possibly be instantiated for 32 bit
+     * systems and fail due to an unsatisfied constraint.
+     */
+    template<std::size_t size>
+    struct PackedPointerTypeStruct
+    {
+        using type = std::uint64_t;
+    };
+
+    using PackedPointer = typename PackedPointerTypeStruct<ptrSize>::type;
+    using Payload = std::array<PackedPointer, 2>;
+    Payload payload = {};
+
+    static constexpr int discriminatorBits = 3;
+    static constexpr PackedPointer discriminatorMask = (PackedPointer(1) << discriminatorBits) - 1;
+
+    /**
+     * The value is stored as a pair of 8-byte double words. All pointers are assumed
+     * to be 8-byte aligned. This gives us at most 6 bits of discriminator bits
+     * of free storage. In some cases when one double word can't be tagged the whole
+     * discriminator is stored in the first double word.
+     *
+     * The layout of discriminator bits is determined by the 3 bits of PrimaryDiscriminator,
+     * which are always stored in the lower 3 bits of the first dword of the payload.
+     * The memory layout has 3 types depending on the PrimaryDiscriminator value.
+     *
+     * PrimaryDiscriminator::pdSingleDWord - Only the second dword carries the data.
+     * That leaves the first 8 bytes free for storing the InternalType in the upper
+     * bits.
+     *
+     * PrimaryDiscriminator::pdListN - pdPath - Only has 3 available padding bits
+     * because:
+     * - tListN needs a size, whose lower bits we can't borrow.
+     * - tString and tPath have C-string fields, which don't necessarily need to
+     * be aligned.
+     *
+     * In this case we reserve their discriminators directly in the PrimaryDiscriminator
+     * bits stored in payload[0].
+     *
+     * PrimaryDiscriminator::pdPairOfPointers - Payloads that consist of a pair of pointers.
+     * In this case the 3 lower bits of payload[1] can be tagged.
+     *
+     * The primary discriminator with value 0 is reserved for uninitialized Values,
+     * which are useful for diagnostics in C bindings.
+     */
+    enum PrimaryDiscriminator : int {
+        pdUninitialized = 0,
+        pdSingleDWord, //< layout: Single/zero field payload
+        /* The order of these enumations must be the same as in InternalType. */
+        pdListN, //< layout: Single untaggable field.
+        pdString,
+        pdPath,
+        pdPairOfPointers, //< layout: Pair of pointers payload
+    };
+
+    template<typename T>
+        requires std::is_pointer_v<T>
+    static T untagPointer(PackedPointer val) noexcept
+    {
+        return std::bit_cast<T>(val & ~discriminatorMask);
+    }
+
+    PrimaryDiscriminator getPrimaryDiscriminator() const noexcept
+    {
+        return static_cast<PrimaryDiscriminator>(payload[0] & discriminatorMask);
+    }
+
+    static void assertAligned(PackedPointer val) noexcept
+    {
+        assert((val & discriminatorMask) == 0 && "Pointer is not 8 bytes aligned");
+    }
+
+    template<InternalType type>
+    void setSingleDWordPayload(PackedPointer untaggedVal) noexcept
+    {
+        /* There's plenty of free upper bits in the first dword, which is
+           used only for the discriminator. */
+        payload[0] = static_cast<int>(pdSingleDWord) | (static_cast<int>(type) << discriminatorBits);
+        payload[1] = untaggedVal;
+    }
+
+    template<PrimaryDiscriminator discriminator, typename T, typename U>
+    void setUntaggablePayload(T * firstPtrField, U untaggableField) noexcept
+    {
+        static_assert(discriminator >= pdListN && discriminator <= pdPath);
+        auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
+        assertAligned(firstFieldPayload);
+        payload[0] = static_cast<int>(discriminator) | firstFieldPayload;
+        payload[1] = std::bit_cast<PackedPointer>(untaggableField);
+    }
+
+    template<InternalType type, typename T, typename U>
+    void setPairOfPointersPayload(T * firstPtrField, U * secondPtrField) noexcept
+    {
+        static_assert(type >= tListSmall && type <= tLambda);
+        {
+            auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
+            assertAligned(firstFieldPayload);
+            payload[0] = static_cast<int>(pdPairOfPointers) | firstFieldPayload;
+        }
+        {
+            auto secondFieldPayload = std::bit_cast<PackedPointer>(secondPtrField);
+            assertAligned(secondFieldPayload);
+            payload[1] = (type - tListSmall) | secondFieldPayload;
+        }
+    }
+
+    template<typename T, typename U>
+        requires std::is_pointer_v<T> && std::is_pointer_v<U>
+    void getPairOfPointersPayload(T & firstPtrField, U & secondPtrField) const noexcept
+    {
+        firstPtrField = untagPointer<T>(payload[0]);
+        secondPtrField = untagPointer<U>(payload[1]);
+    }
+
+protected:
+    /** Get internal type currently occupying the storage. */
+    InternalType getInternalType() const noexcept
+    {
+        switch (auto pd = getPrimaryDiscriminator()) {
+        case pdUninitialized:
+            /* Discriminator value of zero is used to distinguish uninitialized values. */
+            return tUninitialized;
+        case pdSingleDWord:
+            /* Payloads that only use up a single double word store the InternalType
+               in the upper bits of the first double word. */
+            return InternalType(payload[0] >> discriminatorBits);
+        /* The order must match that of the enumerations defined in InternalType. */
+        case pdListN:
+        case pdString:
+        case pdPath:
+            return static_cast<InternalType>(tListN + (pd - pdListN));
+        case pdPairOfPointers:
+            return static_cast<InternalType>(tListSmall + (payload[1] & discriminatorMask));
+        [[unlikely]] default:
+            unreachable();
+        }
+    }
+
+#define NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(TYPE, MEMBER_A, MEMBER_B)                                   \
+                                                                                                       \
+    void getStorage(TYPE & val) const noexcept                                                         \
+    {                                                                                                  \
+        getPairOfPointersPayload(val MEMBER_A, val MEMBER_B);                                          \
+    }                                                                                                  \
+                                                                                                       \
+    void setStorage(TYPE val) noexcept                                                                 \
+    {                                                                                                  \
+        setPairOfPointersPayload<detail::payloadTypeToInternalType<TYPE>>(val MEMBER_A, val MEMBER_B); \
+    }
+
+    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(SmallList, [0], [1])
+    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(PrimOpApplicationThunk, .left, .right)
+    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(FunctionApplicationThunk, .left, .right)
+    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(ClosureThunk, .env, .expr)
+    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(Lambda, .env, .fun)
+
+#undef NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS
+
+    void getStorage(NixInt & integer) const noexcept
+    {
+        /* PackedPointerType -> int64_t here is well-formed, since the standard requires
+           this conversion to follow 2's complement rules. This is just a no-op. */
+        integer = NixInt(payload[1]);
+    }
+
+    void getStorage(bool & boolean) const noexcept
+    {
+        boolean = payload[1];
+    }
+
+    void getStorage(Null & null) const noexcept {}
+
+    void getStorage(NixFloat & fpoint) const noexcept
+    {
+        fpoint = std::bit_cast<NixFloat>(payload[1]);
+    }
+
+    void getStorage(ExternalValueBase *& external) const noexcept
+    {
+        external = std::bit_cast<ExternalValueBase *>(payload[1]);
+    }
+
+    void getStorage(PrimOp *& primOp) const noexcept
+    {
+        primOp = std::bit_cast<PrimOp *>(payload[1]);
+    }
+
+    void getStorage(Bindings *& attrs) const noexcept
+    {
+        attrs = std::bit_cast<Bindings *>(payload[1]);
+    }
+
+    void getStorage(List & list) const noexcept
+    {
+        list.elems = untagPointer<decltype(list.elems)>(payload[0]);
+        list.size = payload[1];
+    }
+
+    void getStorage(StringWithContext & string) const noexcept
+    {
+        string.context = untagPointer<decltype(string.context)>(payload[0]);
+        string.c_str = std::bit_cast<const char *>(payload[1]);
+    }
+
+    void getStorage(Path & path) const noexcept
+    {
+        path.accessor = untagPointer<decltype(path.accessor)>(payload[0]);
+        path.path = std::bit_cast<const char *>(payload[1]);
+    }
+
+    void setStorage(NixInt integer) noexcept
+    {
+        setSingleDWordPayload<tInt>(integer.value);
+    }
+
+    void setStorage(bool boolean) noexcept
+    {
+        setSingleDWordPayload<tBool>(boolean);
+    }
+
+    void setStorage(Null path) noexcept
+    {
+        setSingleDWordPayload<tNull>(0);
+    }
+
+    void setStorage(NixFloat fpoint) noexcept
+    {
+        setSingleDWordPayload<tFloat>(std::bit_cast<PackedPointer>(fpoint));
+    }
+
+    void setStorage(ExternalValueBase * external) noexcept
+    {
+        setSingleDWordPayload<tExternal>(std::bit_cast<PackedPointer>(external));
+    }
+
+    void setStorage(PrimOp * primOp) noexcept
+    {
+        setSingleDWordPayload<tPrimOp>(std::bit_cast<PackedPointer>(primOp));
+    }
+
+    void setStorage(Bindings * bindings) noexcept
+    {
+        setSingleDWordPayload<tAttrs>(std::bit_cast<PackedPointer>(bindings));
+    }
+
+    void setStorage(List list) noexcept
+    {
+        setUntaggablePayload<pdListN>(list.elems, list.size);
+    }
+
+    void setStorage(StringWithContext string) noexcept
+    {
+        setUntaggablePayload<pdString>(string.context, string.c_str);
+    }
+
+    void setStorage(Path path) noexcept
+    {
+        setUntaggablePayload<pdPath>(path.accessor, path.path);
     }
 };
 
