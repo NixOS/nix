@@ -717,6 +717,15 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 } catch (InvalidPath &) { }
             };
 
+            if (options.action == GCOptions::gcDeleteSpecific
+                && !options.pathsToDelete.count(*path))
+            {
+                throw Error(
+                    "Cannot delete path '%s' because it's referenced by path '%s'.",
+                    printStorePath(start),
+                    printStorePath(*path));
+            }
+
             /* If this is a root, bail out. */
             if (auto i = roots.find(*path); i != roots.end()) {
                 if (options.action == GCOptions::gcDeleteSpecific)
@@ -726,15 +735,6 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                         *i->second.begin());
                 debug("cannot delete '%s' because it's a root", printStorePath(*path));
                 return markAlive();
-            }
-
-            if (options.action == GCOptions::gcDeleteSpecific
-                && !options.pathsToDelete.count(*path))
-            {
-                throw Error(
-                    "Cannot delete path '%s' because it's referenced by path '%s'.",
-                    printStorePath(start),
-                    printStorePath(*path));
             }
 
             {
