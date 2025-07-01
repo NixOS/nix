@@ -57,18 +57,6 @@ FlakeRef parseFlakeRef(
     return flakeRef;
 }
 
-std::optional<FlakeRef> maybeParseFlakeRef(
-    const fetchers::Settings & fetchSettings,
-    const std::string & url,
-    const std::optional<Path> & baseDir)
-{
-    try {
-        return parseFlakeRef(fetchSettings, url, baseDir);
-    } catch (Error &) {
-        return {};
-    }
-}
-
 static std::pair<FlakeRef, std::string> fromParsedURL(
     const fetchers::Settings & fetchSettings,
     ParsedURL && parsedURL,
@@ -258,17 +246,6 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         return *res;
     } else {
         return parsePathFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake, preserveRelativePaths);
-    }
-}
-
-std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
-    const fetchers::Settings & fetchSettings,
-    const std::string & url, const std::optional<Path> & baseDir)
-{
-    try {
-        return parseFlakeRefWithFragment(fetchSettings, url, baseDir);
-    } catch (Error & e) {
-        return {};
     }
 }
 
