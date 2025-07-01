@@ -101,7 +101,6 @@ static void parseFlakeInputAttr(
 
 static FlakeInput parseFlakeInput(
     EvalState & state,
-    std::string_view inputName,
     Value * value,
     const PosIdx pos,
     const InputAttrPath & lockRootAttrPath,
@@ -171,8 +170,8 @@ static FlakeInput parseFlakeInput(
             input.ref = parseFlakeRef(state.fetchSettings, *url, {}, true, input.isFlake, true);
     }
 
-    if (!input.follows && !input.ref)
-        input.ref = FlakeRef::fromAttrs(state.fetchSettings, {{"type", "indirect"}, {"id", std::string(inputName)}});
+    if (input.ref && input.follows)
+        throw Error("flake input has both a flake reference and a follows attribute, at %s", state.positions[pos]);
 
     return input;
 }
@@ -201,7 +200,6 @@ static std::pair<std::map<FlakeId, FlakeInput>, fetchers::Attrs> parseFlakeInput
         } else {
             inputs.emplace(inputName,
                 parseFlakeInput(state,
-                    inputName,
                     inputAttr.value,
                     inputAttr.pos,
                     lockRootAttrPath,
@@ -483,18 +481,27 @@ LockedFlake lockFlake(
 
             /* Get the overrides (i.e. attributes of the form
                'inputs.nixops.inputs.nixpkgs.url = ...'). */
-            for (auto & [id, input] : flakeInputs) {
+            std::function<void(const FlakeInput & input, const InputAttrPath & prefix)> addOverrides;
+            addOverrides = [&](const FlakeInput & input, const InputAttrPath & prefix)
+            {
                 for (auto & [idOverride, inputOverride] : input.overrides) {
-                    auto inputAttrPath(inputAttrPathPrefix);
-                    inputAttrPath.push_back(id);
+                    auto inputAttrPath(prefix);
                     inputAttrPath.push_back(idOverride);
-                    overrides.emplace(inputAttrPath,
-                        OverrideTarget {
-                            .input = inputOverride,
-                            .sourcePath = sourcePath,
-                            .parentInputAttrPath = inputAttrPathPrefix
-                        });
+                    if (inputOverride.ref || inputOverride.follows)
+                        overrides.emplace(inputAttrPath,
+                            OverrideTarget {
+                                .input = inputOverride,
+                                .sourcePath = sourcePath,
+                                .parentInputAttrPath = inputAttrPathPrefix
+                            });
+                    addOverrides(inputOverride, inputAttrPath);
                 }
+            };
+
+            for (auto & [id, input] : flakeInputs) {
+                auto inputAttrPath(inputAttrPathPrefix);
+                inputAttrPath.push_back(id);
+                addOverrides(input, inputAttrPath);
             }
 
             /* Check whether this input has overrides for a
@@ -550,7 +557,8 @@ LockedFlake lockFlake(
                         continue;
                     }
 
-                    assert(input.ref);
+                    if (!input.ref)
+                        input.ref = FlakeRef::fromAttrs(state.fetchSettings, {{"type", "indirect"}, {"id", std::string(id)}});
 
                     auto overriddenParentPath =
                         input.ref->input.isRelative()
