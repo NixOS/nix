@@ -324,7 +324,7 @@ nix_value * nix_get_list_byidx(nix_c_context * context, const nix_value * value,
     try {
         auto & v = check_value_in(value);
         assert(v.type() == nix::nList);
-        auto * p = v.listElems()[ix];
+        auto * p = v.listView()[ix];
         nix_gc_incref(nullptr, p);
         if (p != nullptr)
             state->state.forceValue(*p, nix::noPos);

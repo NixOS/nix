@@ -4,6 +4,7 @@
 #include <cassert>
 #include <span>
 #include <type_traits>
+#include <concepts>
 
 #include "nix/expr/eval-gc.hh"
 #include "nix/expr/value/context.hh"
@@ -317,12 +318,11 @@ protected:
 #undef NIX_VALUE_STORAGE_DEFINE_FIELD
     };
 
-    Payload payload;
-
 private:
     InternalType internalType = tUninitialized;
+    Payload payload;
 
-public:
+protected:
 #define NIX_VALUE_STORAGE_GET_IMPL(K, FIELD_NAME, DISCRIMINATOR) \
     void getStorage(K & val) const noexcept                      \
     {                                                            \
@@ -350,6 +350,189 @@ public:
         return internalType;
     }
 };
+
+/**
+ * View into a list of Value * that is itself immutable.
+ *
+ * Since not all representations of ValueStorage can provide
+ * a pointer to a const array of Value * this proxy class either
+ * stores the small list inline or points to the big list.
+ */
+class ListView
+{
+    using SpanType = std::span<Value * const>;
+    using SmallList = detail::ValueBase::SmallList;
+    using List = detail::ValueBase::List;
+
+    std::variant<SmallList, List> raw;
+
+public:
+    ListView(SmallList list)
+        : raw(list)
+    {
+    }
+
+    ListView(List list)
+        : raw(list)
+    {
+    }
+
+    Value * const * data() const & noexcept
+    {
+        return std::visit(
+            overloaded{
+                [](const SmallList & list) { return list.data(); }, [](const List & list) { return list.elems; }},
+            raw);
+    }
+
+    std::size_t size() const noexcept
+    {
+        return std::visit(
+            overloaded{
+                [](const SmallList & list) -> std::size_t { return list.back() == nullptr ? 1 : 2; },
+                [](const List & list) -> std::size_t { return list.size; }},
+            raw);
+    }
+
+    Value * operator[](std::size_t i) const noexcept
+    {
+        return data()[i];
+    }
+
+    SpanType span() const &
+    {
+        return SpanType(data(), size());
+    }
+
+    /* Ensure that no dangling views can be created accidentally, as that
+       would lead to hard to diagnose bugs that only affect small lists. */
+    SpanType span() && = delete;
+    Value * const * data() && noexcept = delete;
+
+    /**
+     * Random-access iterator that only allows iterating over a constant range
+     * of mutable Value pointers.
+     *
+     * @note Not a pointer to minimize potential misuses and implicitly relying
+     * on the iterator being a pointer.
+     **/
+    class iterator
+    {
+    public:
+        using value_type = Value *;
+        using pointer = const value_type *;
+        using reference = const value_type &;
+        using difference_type = std::ptrdiff_t;
+        using iterator_category = std::random_access_iterator_tag;
+
+    private:
+        pointer ptr = nullptr;
+
+        friend class ListView;
+
+        iterator(pointer ptr)
+            : ptr(ptr)
+        {
+        }
+
+    public:
+        iterator() = default;
+
+        reference operator*() const
+        {
+            return *ptr;
+        }
+
+        const value_type * operator->() const
+        {
+            return ptr;
+        }
+
+        reference operator[](difference_type diff) const
+        {
+            return ptr[diff];
+        }
+
+        iterator & operator++()
+        {
+            ++ptr;
+            return *this;
+        }
+
+        iterator operator++(int)
+        {
+            pointer tmp = ptr;
+            ++*this;
+            return iterator(tmp);
+        }
+
+        iterator & operator--()
+        {
+            --ptr;
+            return *this;
+        }
+
+        iterator operator--(int)
+        {
+            pointer tmp = ptr;
+            --*this;
+            return iterator(tmp);
+        }
+
+        iterator & operator+=(difference_type diff)
+        {
+            ptr += diff;
+            return *this;
+        }
+
+        iterator operator+(difference_type diff) const
+        {
+            return iterator(ptr + diff);
+        }
+
+        friend iterator operator+(difference_type diff, const iterator & rhs)
+        {
+            return iterator(diff + rhs.ptr);
+        }
+
+        iterator & operator-=(difference_type diff)
+        {
+            ptr -= diff;
+            return *this;
+        }
+
+        iterator operator-(difference_type diff) const
+        {
+            return iterator(ptr - diff);
+        }
+
+        difference_type operator-(const iterator & rhs) const
+        {
+            return ptr - rhs.ptr;
+        }
+
+        std::strong_ordering operator<=>(const iterator & rhs) const = default;
+    };
+
+    using const_iterator = iterator;
+
+    iterator begin() const &
+    {
+        return data();
+    }
+
+    iterator end() const &
+    {
+        return data() + size();
+    }
+
+    /* Ensure that no dangling iterators can be created accidentally, as that
+       would lead to hard to diagnose bugs that only affect small lists. */
+    iterator begin() && = delete;
+    iterator end() && = delete;
+};
+
+static_assert(std::random_access_iterator<ListView::iterator>);
 
 struct Value : public ValueStorage<sizeof(void *)>
 {
@@ -564,15 +747,9 @@ public:
         return isa<tListSmall, tListN>();
     }
 
-    std::span<Value * const> listItems() const noexcept
+    ListView listView() const noexcept
     {
-        assert(isList());
-        return std::span<Value * const>(listElems(), listSize());
-    }
-
-    Value * const * listElems() const noexcept
-    {
-        return isa<tListSmall>() ? payload.smallList.data() : getStorage<List>().elems;
+        return isa<tListSmall>() ? ListView(getStorage<SmallList>()) : ListView(getStorage<List>());
     }
 
     size_t listSize() const noexcept

@@ -2007,9 +2007,10 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * const * lists, co
     auto list = buildList(len);
     auto out = list.elems;
     for (size_t n = 0, pos = 0; n < nrLists; ++n) {
-        auto l = lists[n]->listSize();
+        auto listView = lists[n]->listView();
+        auto l = listView.size();
         if (l)
-            memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
+            memcpy(out + pos, listView.data(), l * sizeof(Value *));
         pos += l;
     }
     v.mkList(list);
@@ -2174,7 +2175,7 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
-            for (auto v2 : v.listItems())
+            for (auto v2 : v.listView())
                 recurse(*v2);
         }
     };
@@ -2411,7 +2412,8 @@ BackedStringView EvalState::coerceToString(
 
         if (v.isList()) {
             std::string result;
-            for (auto [n, v2] : enumerate(v.listItems())) {
+            auto listView = v.listView();
+            for (auto [n, v2] : enumerate(listView)) {
                 try {
                     result += *coerceToString(pos, *v2, context,
                             "while evaluating one element of the list",
@@ -2666,7 +2668,7 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         }
         for (size_t n = 0; n < v1.listSize(); ++n) {
             try {
-                assertEqValues(*v1.listElems()[n], *v2.listElems()[n], pos, errorCtx);
+                assertEqValues(*v1.listView()[n], *v2.listView()[n], pos, errorCtx);
             } catch (Error & e) {
                 e.addTrace(positions[pos], "while comparing list element %d", n);
                 throw;
@@ -2818,7 +2820,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         case nList:
             if (v1.listSize() != v2.listSize()) return false;
             for (size_t n = 0; n < v1.listSize(); ++n)
-                if (!eqValues(*v1.listElems()[n], *v2.listElems()[n], pos, errorCtx)) return false;
+                if (!eqValues(*v1.listView()[n], *v2.listView()[n], pos, errorCtx)) return false;
             return true;
 
         case nAttrs: {

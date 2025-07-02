@@ -415,8 +415,8 @@ private:
         if (depth < options.maxDepth) {
             increaseIndent();
             output << "[";
-            auto listItems = v.listItems();
-            auto prettyPrint = shouldPrettyPrintList(listItems);
+            auto listItems = v.listView();
+            auto prettyPrint = shouldPrettyPrintList(listItems.span());
 
             size_t currentListItemsPrinted = 0;
 

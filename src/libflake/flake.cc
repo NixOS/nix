@@ -289,7 +289,7 @@ static Flake readFlake(
                     Explicit<bool> { state.forceBool(*setting.value, setting.pos, "") });
             else if (setting.value->type() == nList) {
                 std::vector<std::string> ss;
-                for (auto elem : setting.value->listItems()) {
+                for (auto elem : setting.value->listView()) {
                     if (elem->type() != nString)
                         state.error<TypeError>("list element in flake configuration setting '%s' is %s while a string is expected",
                             state.symbols[setting.name], showType(*setting.value)).debugThrow();

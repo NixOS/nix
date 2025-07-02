@@ -114,7 +114,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
         case nList: {
             XMLOpenElement _(doc, "list");
-            for (auto v2 : v.listItems())
+            for (auto v2 : v.listView())
                 printValueAsXML(state, strict, location, *v2, doc, context, drvsSeen, pos);
             break;
         }
