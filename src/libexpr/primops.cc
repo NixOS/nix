@@ -415,7 +415,7 @@ void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Valu
 void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.exec");
-    auto elems = args[0]->listElems();
+    auto elems = args[0]->listView();
     auto count = args[0]->listSize();
     if (count == 0)
         state.error<EvalError>("at least one argument to 'exec' required").atPos(pos).debugThrow();
@@ -660,8 +660,8 @@ struct CompareValues
                             return false;
                         } else if (i == v1->listSize()) {
                             return true;
-                        } else if (!state.eqValues(*v1->listElems()[i], *v2->listElems()[i], pos, errorCtx)) {
-                            return (*this)(v1->listElems()[i], v2->listElems()[i], "while comparing two list elements");
+                        } else if (!state.eqValues(*v1->listView()[i], *v2->listView()[i], pos, errorCtx)) {
+                            return (*this)(v1->listView()[i], v2->listView()[i], "while comparing two list elements");
                         }
                     }
                 default:
@@ -689,7 +689,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value * * a
     state.forceList(*startSet->value, noPos, "while evaluating the 'startSet' attribute passed as argument to builtins.genericClosure");
 
     ValueList workSet;
-    for (auto elem : startSet->value->listItems())
+    for (auto elem : startSet->value->listView())
         workSet.push_back(elem);
 
     if (startSet->value->listSize() == 0) {
@@ -727,7 +727,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value * * a
         state.forceList(newElements, noPos, "while evaluating the return value of the `operator` passed to builtins.genericClosure");
 
         /* Add the values returned by the operator to the work set. */
-        for (auto elem : newElements.listItems()) {
+        for (auto elem : newElements.listView()) {
             state.forceValue(*elem, noPos); // "while evaluating one one of the elements returned by the `operator` passed to builtins.genericClosure");
             workSet.push_back(elem);
         }
@@ -1367,7 +1367,7 @@ static void derivationStrictInternal(
                command-line arguments to the builder. */
             else if (i->name == state.sArgs) {
                 state.forceList(*i->value, pos, context_below);
-                for (auto elem : i->value->listItems()) {
+                for (auto elem : i->value->listView()) {
                     auto s = state.coerceToString(pos, *elem, context,
                             "while evaluating an element of the argument list",
                             true).toOwned();
@@ -1399,7 +1399,7 @@ static void derivationStrictInternal(
                         /* Require ‘outputs’ to be a list of strings. */
                         state.forceList(*i->value, pos, context_below);
                         Strings ss;
-                        for (auto elem : i->value->listItems())
+                        for (auto elem : i->value->listView())
                             ss.emplace_back(state.forceStringNoCtx(*elem, pos, context_below));
                         handleOutputs(ss);
                     }
@@ -1882,7 +1882,7 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
 
     LookupPath lookupPath;
 
-    for (auto v2 : args[0]->listItems()) {
+    for (auto v2 : args[0]->listView()) {
         state.forceAttrs(*v2, pos, "while evaluating an element of the list passed to builtins.findFile");
 
         std::string prefix;
@@ -2920,7 +2920,7 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value * * args
     // 64: large enough to fit the attributes of a derivation
     boost::container::small_vector<Attr, 64> names;
     names.reserve(args[1]->listSize());
-    for (auto elem : args[1]->listItems()) {
+    for (auto elem : args[1]->listView()) {
         state.forceStringNoCtx(*elem, pos, "while evaluating the values of the second argument passed to builtins.removeAttrs");
         names.emplace_back(state.symbols.create(elem->string_view()), nullptr);
     }
@@ -2963,11 +2963,12 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value * * args
     state.forceList(*args[0], pos, "while evaluating the argument passed to builtins.listToAttrs");
 
     // Step 1. Sort the name-value attrsets in place using the memory we allocate for the result
-    size_t listSize = args[0]->listSize();
+    auto listView = args[0]->listView();
+    size_t listSize = listView.size();
     auto & bindings = *state.allocBindings(listSize);
     using ElemPtr = decltype(&bindings[0].value);
 
-    for (const auto & [n, v2] : enumerate(args[0]->listItems())) {
+    for (const auto & [n, v2] : enumerate(listView)) {
         state.forceAttrs(*v2, pos, "while evaluating an element of the list passed to builtins.listToAttrs");
 
         auto j = state.getAttr(state.sName, v2->attrs(), "in a {name=...; value=...;} pair");
@@ -3122,7 +3123,7 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
     SmallValueVector<nonRecursiveStackReservation> res(args[1]->listSize());
     size_t found = 0;
 
-    for (auto v2 : args[1]->listItems()) {
+    for (auto v2 : args[1]->listView()) {
         state.forceAttrs(*v2, pos, "while evaluating an element in the list passed as second argument to builtins.catAttrs");
         if (auto i = v2->attrs()->get(attrName))
             res[found++] = i->value;
@@ -3247,7 +3248,7 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * arg
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.zipAttrsWith");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.zipAttrsWith");
-    const auto listItems = args[1]->listItems();
+    const auto listItems = args[1]->listView();
 
     for (auto & vElem : listItems) {
         state.forceAttrs(*vElem, noPos, "while evaluating a value of the list passed as second argument to builtins.zipAttrsWith");
@@ -3346,8 +3347,8 @@ static void prim_elemAt(EvalState & state, const PosIdx pos, Value * * args, Val
             n,
             args[0]->listSize()
         ).atPos(pos).debugThrow();
-    state.forceValue(*args[0]->listElems()[n], pos);
-    v = *args[0]->listElems()[n];
+    state.forceValue(*args[0]->listView()[n], pos);
+    v = *args[0]->listView()[n];
 }
 
 static RegisterPrimOp primop_elemAt({
@@ -3368,8 +3369,8 @@ static void prim_head(EvalState & state, const PosIdx pos, Value * * args, Value
         state.error<EvalError>(
             "'builtins.head' called on an empty list"
         ).atPos(pos).debugThrow();
-    state.forceValue(*args[0]->listElems()[0], pos);
-    v = *args[0]->listElems()[0];
+    state.forceValue(*args[0]->listView()[0], pos);
+    v = *args[0]->listView()[0];
 }
 
 static RegisterPrimOp primop_head({
@@ -3394,7 +3395,7 @@ static void prim_tail(EvalState & state, const PosIdx pos, Value * * args, Value
 
     auto list = state.buildList(args[0]->listSize() - 1);
     for (const auto & [n, v] : enumerate(list))
-        v = args[0]->listElems()[n + 1];
+        v = args[0]->listView()[n + 1];
     v.mkList(list);
 }
 
@@ -3429,7 +3430,7 @@ static void prim_map(EvalState & state, const PosIdx pos, Value * * args, Value 
     auto list = state.buildList(args[1]->listSize());
     for (const auto & [n, v] : enumerate(list))
         (v = state.allocValue())->mkApp(
-            args[0], args[1]->listElems()[n]);
+            args[0], args[1]->listView()[n]);
     v.mkList(list);
 }
 
@@ -3470,9 +3471,9 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Val
     bool same = true;
     for (size_t n = 0; n < len; ++n) {
         Value res;
-        state.callFunction(*args[0], *args[1]->listElems()[n], res, noPos);
+        state.callFunction(*args[0], *args[1]->listView()[n], res, noPos);
         if (state.forceBool(res, pos, "while evaluating the return value of the filtering function passed to builtins.filter"))
-            vs[k++] = args[1]->listElems()[n];
+            vs[k++] = args[1]->listView()[n];
         else
             same = false;
     }
@@ -3501,7 +3502,7 @@ static void prim_elem(EvalState & state, const PosIdx pos, Value * * args, Value
 {
     bool res = false;
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.elem");
-    for (auto elem : args[1]->listItems())
+    for (auto elem : args[1]->listView())
         if (state.eqValues(*args[0], *elem, pos, "while searching for the presence of the given element in the list")) {
             res = true;
             break;
@@ -3523,7 +3524,8 @@ static RegisterPrimOp primop_elem({
 static void prim_concatLists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.concatLists");
-    state.concatLists(v, args[0]->listSize(), args[0]->listElems(), pos, "while evaluating a value of the list passed to builtins.concatLists");
+    auto listView = args[0]->listView();
+    state.concatLists(v, args[0]->listSize(), listView.data(), pos, "while evaluating a value of the list passed to builtins.concatLists");
 }
 
 static RegisterPrimOp primop_concatLists({
@@ -3561,7 +3563,8 @@ static void prim_foldlStrict(EvalState & state, const PosIdx pos, Value * * args
     if (args[2]->listSize()) {
         Value * vCur = args[1];
 
-        for (auto [n, elem] : enumerate(args[2]->listItems())) {
+        auto listView = args[2]->listView();
+        for (auto [n, elem] : enumerate(listView)) {
             Value * vs []{vCur, elem};
             vCur = n == args[2]->listSize() - 1 ? &v : state.allocValue();
             state.callFunction(*args[0], vs, *vCur, pos);
@@ -3603,7 +3606,7 @@ static void anyOrAll(bool any, EvalState & state, const PosIdx pos, Value * * ar
         : "while evaluating the return value of the function passed to builtins.all";
 
     Value vTmp;
-    for (auto elem : args[1]->listItems()) {
+    for (auto elem : args[1]->listView()) {
         state.callFunction(*args[0], *elem, vTmp, pos);
         bool res = state.forceBool(vTmp, pos, errorCtx);
         if (res == any) {
@@ -3701,7 +3704,7 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
 
     auto list = state.buildList(len);
     for (const auto & [n, v] : enumerate(list))
-        state.forceValue(*(v = args[1]->listElems()[n]), pos);
+        state.forceValue(*(v = args[1]->listView()[n]), pos);
 
     auto comparator = [&](Value * a, Value * b) {
         /* Optimization: if the comparator is lessThan, bypass
@@ -3787,7 +3790,7 @@ static void prim_partition(EvalState & state, const PosIdx pos, Value * * args, 
     ValueVector right, wrong;
 
     for (size_t n = 0; n < len; ++n) {
-        auto vElem = args[1]->listElems()[n];
+        auto vElem = args[1]->listView()[n];
         state.forceValue(*vElem, pos);
         Value res;
         state.callFunction(*args[0], *vElem, res, pos);
@@ -3844,7 +3847,7 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value * * args, Va
 
     ValueVectorMap attrs;
 
-    for (auto vElem : args[1]->listItems()) {
+    for (auto vElem : args[1]->listView()) {
         Value res;
         state.callFunction(*args[0], *vElem, res, pos);
         auto name = state.forceStringNoCtx(res, pos, "while evaluating the return value of the grouping function passed to builtins.groupBy");
@@ -3900,7 +3903,7 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
     size_t len = 0;
 
     for (size_t n = 0; n < nrLists; ++n) {
-        Value * vElem = args[1]->listElems()[n];
+        Value * vElem = args[1]->listView()[n];
         state.callFunction(*args[0], *vElem, lists[n], pos);
         state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)), "while evaluating the return value of the function passed to builtins.concatMap");
         len += lists[n].listSize();
@@ -3909,9 +3912,10 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
     auto list = state.buildList(len);
     auto out = list.elems;
     for (size_t n = 0, pos = 0; n < nrLists; ++n) {
-        auto l = lists[n].listSize();
+        auto listView = lists[n].listView();
+        auto l = listView.size();
         if (l)
-            memcpy(out + pos, lists[n].listElems(), l * sizeof(Value *));
+            memcpy(out + pos, listView.data(), l * sizeof(Value *));
         pos += l;
     }
     v.mkList(list);
@@ -4587,7 +4591,7 @@ static void prim_concatStringsSep(EvalState & state, const PosIdx pos, Value * *
     res.reserve((args[1]->listSize() + 32) * sep.size());
     bool first = true;
 
-    for (auto elem : args[1]->listItems()) {
+    for (auto elem : args[1]->listView()) {
         if (first) first = false; else res += sep;
         res += *state.coerceToString(pos, *elem, context, "while evaluating one element of the list of strings to concat passed to builtins.concatStringsSep");
     }
@@ -4617,11 +4621,11 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value * * a
 
     std::vector<std::string_view> from;
     from.reserve(args[0]->listSize());
-    for (auto elem : args[0]->listItems())
+    for (auto elem : args[0]->listView())
         from.emplace_back(state.forceString(*elem, pos, "while evaluating one of the strings to replace passed to builtins.replaceStrings"));
 
     std::unordered_map<size_t, std::string_view> cache;
-    auto to = args[1]->listItems();
+    auto to = args[1]->listView();
 
     NixStringContext context;
     auto s = state.forceString(*args[2], context, pos, "while evaluating the third argument passed to builtins.replaceStrings");
@@ -5050,7 +5054,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
-    getBuiltins().payload.attrs->sort();
+    const_cast<Bindings *>(getBuiltins().attrs())->sort();
 
     staticBaseEnv->sort();
 
