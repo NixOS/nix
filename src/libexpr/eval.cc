@@ -3071,10 +3071,10 @@ void EvalState::printStatistics()
     }
 
     if (getEnv("NIX_SHOW_SYMBOLS").value_or("0") != "0") {
+        auto list = json::array();
+        symbols.dump([&](std::string_view s) { list.emplace_back(std::string(s)); });
         // XXX: overrides earlier assignment
-        topObj["symbols"] = json::array();
-        auto &list = topObj["symbols"];
-        symbols.dump([&](const std::string & s) { list.emplace_back(s); });
+        topObj["symbols"] = std::move(list);
     }
     if (outPath == "-") {
         std::cerr << topObj.dump(2) << std::endl;

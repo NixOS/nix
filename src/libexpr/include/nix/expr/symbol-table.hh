@@ -136,8 +136,13 @@ public:
     template<typename T>
     void dump(T callback) const
     {
-        // FIXME
-        //state_.read()->store.forEach(callback);
+        std::string_view left{arena.data, arena.size};
+        while (!left.empty()) {
+            auto p = left.find((char) 0);
+            if (p == left.npos) break;
+            callback(left.substr(0, p));
+            left = left.substr(p + 1);
+        }
     }
 };
 
