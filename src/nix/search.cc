@@ -100,7 +100,6 @@ struct CmdSearch : InstallableValueCommand, MixJSON
         visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)
         {
             auto attrPathS = state->symbols.resolve(attrPath);
-            //printError("AT %d", concatStringsSep(".", attrPathS));
 
             /*
             Activity act(*logger, lvlInfo, actUnknown,
@@ -121,7 +120,6 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                             },
                             std::string_view(state->symbols[attr]).find("Packages") != std::string_view::npos ? 0 : 2);
                     }
-                    //printError("ADD %d %s", work.size(), concatStringsSep(".", attrPathS));
                     futures.spawn(std::move(work));
                 };
 
@@ -205,7 +203,6 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             } catch (EvalError & e) {
                 if (!(attrPath.size() > 0 && attrPathS[0] == "legacyPackages"))
                     throw;
-                //printError("ERROR: %d", e.what());
             }
         };
 
