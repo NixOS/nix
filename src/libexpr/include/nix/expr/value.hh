@@ -478,6 +478,12 @@ public:
         finishValue(tLambda, { .lambda = { .env = e, .fun = f } });
     }
 
+    /// Only used for testing.
+    inline void mkBlackhole()
+    {
+        internalType = tPending;
+    }
+
     void mkPrimOp(PrimOp * p);
 
     inline void mkPrimOpApp(Value * l, Value * r)
