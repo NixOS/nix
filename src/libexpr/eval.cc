@@ -2938,14 +2938,6 @@ void EvalState::maybePrintStats()
 #endif
         printStatistics();
     }
-
-    if (getEnv("NIX_SHOW_THREAD_STATS").value_or("0") != "0") {
-        printError("THUNKS AWAITED: %d", nrThunksAwaited);
-        printError("THUNKS AWAITED SLOW: %d", nrThunksAwaitedSlow);
-        printError("WAITING TIME: %d μs", usWaiting);
-        printError("MAX WAITING: %d", maxWaiting);
-        printError("SPURIOUS WAKEUPS: %d", nrSpuriousWakeups);
-    }
 }
 
 void EvalState::printStatistics()
@@ -3023,6 +3015,11 @@ void EvalState::printStatistics()
     topObj["nrOpUpdates"] = nrOpUpdates.load();
     topObj["nrOpUpdateValuesCopied"] = nrOpUpdateValuesCopied.load();
     topObj["nrThunks"] = nrThunks.load();
+    topObj["nrThunksAwaited"] = nrThunksAwaited.load();
+    topObj["nrThunksAwaitedSlow"] = nrThunksAwaitedSlow.load();
+    topObj["nrSpuriousWakeups"] = nrSpuriousWakeups.load();
+    topObj["maxWaiting"] = maxWaiting.load();
+    topObj["waitingTime"] = usWaiting / (double) 1000000;
     topObj["nrAvoided"] = nrAvoided.load();
     topObj["nrLookups"] = nrLookups.load();
     topObj["nrPrimOpCalls"] = nrPrimOpCalls.load();
