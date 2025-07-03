@@ -89,8 +89,8 @@ This section lists the differences between upstream Nix 2.29 and Determinate Nix
 
 <!-- Determinate Nix version 3.7.0 -->
 
-* Overriding deeply transitive flake inputs now works, by @edolstra in [DeterminateSystems/nix-src#108](https://github.com/DeterminateSystems/nix-src/pull/108)
+* Overriding deeply-nested transitive flake inputs now works, by @edolstra in [DeterminateSystems/nix-src#108](https://github.com/DeterminateSystems/nix-src/pull/108)
 
-* `nix store delete` now exlpains why deletion fails by @edolstra in [DeterminateSystems/nix-src#130](https://github.com/DeterminateSystems/nix-src/pull/130)
+* `nix store delete` now explains why deletion fails by @edolstra in [DeterminateSystems/nix-src#130](https://github.com/DeterminateSystems/nix-src/pull/130)
 
 * New command: `nix flake prefetch-inputs` for improved CI performance, by @edolstra in [DeterminateSystems/nix-src#127](https://github.com/DeterminateSystems/nix-src/pull/127)
