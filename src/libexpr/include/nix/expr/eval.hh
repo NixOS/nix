@@ -961,19 +961,19 @@ private:
      */
     std::string mkSingleDerivedPathStringRaw(const SingleDerivedPath & p);
 
-    unsigned long nrEnvs = 0;
-    unsigned long nrValuesInEnvs = 0;
-    unsigned long nrValues = 0;
-    unsigned long nrListElems = 0;
-    unsigned long nrLookups = 0;
-    unsigned long nrAttrsets = 0;
-    unsigned long nrAttrsInAttrsets = 0;
-    unsigned long nrAvoided = 0;
-    unsigned long nrOpUpdates = 0;
-    unsigned long nrOpUpdateValuesCopied = 0;
-    unsigned long nrListConcats = 0;
-    unsigned long nrPrimOpCalls = 0;
-    unsigned long nrFunctionCalls = 0;
+    std::atomic<uint64_t> nrEnvs = 0;
+    std::atomic<uint64_t> nrValuesInEnvs = 0;
+    std::atomic<uint64_t> nrValues = 0;
+    std::atomic<uint64_t> nrListElems = 0;
+    std::atomic<uint64_t> nrLookups = 0;
+    std::atomic<uint64_t> nrAttrsets = 0;
+    std::atomic<uint64_t> nrAttrsInAttrsets = 0;
+    std::atomic<uint64_t> nrAvoided = 0;
+    std::atomic<uint64_t> nrOpUpdates = 0;
+    std::atomic<uint64_t> nrOpUpdateValuesCopied = 0;
+    std::atomic<uint64_t> nrListConcats = 0;
+    std::atomic<uint64_t> nrPrimOpCalls = 0;
+    std::atomic<uint64_t> nrFunctionCalls = 0;
 
     bool countCalls;
 
