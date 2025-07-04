@@ -143,13 +143,7 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
         unsupported("addSignatures");
     }
 
-    void queryMissing(
-        const std::vector<DerivedPath> & targets,
-        StorePathSet & willBuild,
-        StorePathSet & willSubstitute,
-        StorePathSet & unknown,
-        uint64_t & downloadSize,
-        uint64_t & narSize) override;
+    MissingPaths queryMissing(const std::vector<DerivedPath> & targets) override;
 
     virtual std::optional<std::string> getBuildLogExact(const StorePath & path) override
     {
@@ -306,19 +300,14 @@ std::vector<KeyedBuildResult> RestrictedStore::buildPathsWithResults(
     return results;
 }
 
-void RestrictedStore::queryMissing(
-    const std::vector<DerivedPath> & targets,
-    StorePathSet & willBuild,
-    StorePathSet & willSubstitute,
-    StorePathSet & unknown,
-    uint64_t & downloadSize,
-    uint64_t & narSize)
+MissingPaths RestrictedStore::queryMissing(const std::vector<DerivedPath> & targets)
 {
     /* This is slightly impure since it leaks information to the
        client about what paths will be built/substituted or are
        already present. Probably not a big deal. */
 
     std::vector<DerivedPath> allowed;
+    StorePathSet unknown;
     for (auto & req : targets) {
         if (goal.isAllowed(req))
             allowed.emplace_back(req);
@@ -326,7 +315,12 @@ void RestrictedStore::queryMissing(
             unknown.insert(pathPartOfReq(req));
     }
 
-    next->queryMissing(allowed, willBuild, willSubstitute, unknown, downloadSize, narSize);
+    auto res = next->queryMissing(allowed);
+
+    for (auto & p : unknown)
+        res.unknown.insert(p);
+
+    return res;
 }
 
 }
