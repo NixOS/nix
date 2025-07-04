@@ -71,6 +71,18 @@ struct KeyedBuildResult;
 
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
+/**
+ * Information about what paths will be built or substituted, returned
+ * by Store::queryMissing().
+ */
+struct MissingPaths
+{
+    StorePathSet willBuild;
+    StorePathSet willSubstitute;
+    StorePathSet unknown;
+    uint64_t downloadSize{0};
+    uint64_t narSize{0};
+};
 
 /**
  * About the class hierarchy of the store types:
@@ -694,9 +706,7 @@ public:
      * derivations that will be built, and the set of output paths that
      * will be substituted.
      */
-    virtual void queryMissing(const std::vector<DerivedPath> & targets,
-        StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-        uint64_t & downloadSize, uint64_t & narSize);
+    virtual MissingPaths queryMissing(const std::vector<DerivedPath> & targets);
 
     /**
      * Sort a set of paths topologically under the references
