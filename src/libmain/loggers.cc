@@ -1,4 +1,5 @@
 #include "nix/main/loggers.hh"
+#include "nix/util/logging-diffs.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/main/progress-bar.hh"
 
@@ -14,6 +15,8 @@ LogFormat parseLogFormat(const std::string & logFormatStr)
         return LogFormat::rawWithLogs;
     else if (logFormatStr == "internal-json")
         return LogFormat::internalJSON;
+    else if (logFormatStr == "diffs")
+        return LogFormat::diffs;
     else if (logFormatStr == "bar")
         return LogFormat::bar;
     else if (logFormatStr == "bar-with-logs")
@@ -30,6 +33,8 @@ std::unique_ptr<Logger> makeDefaultLogger()
         return makeSimpleLogger(true);
     case LogFormat::internalJSON:
         return makeJSONLogger(getStandardError());
+    case LogFormat::diffs:
+        return makeDiffLogger(getStandardError());
     case LogFormat::bar:
         return makeProgressBar();
     case LogFormat::barWithLogs: {
