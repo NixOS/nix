@@ -158,7 +158,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     }
 
     if (settings.printMissing)
-        printMissing(ref<Store>(store), missing.willBuild, missing.willSubstitute, missing.unknown, missing.downloadSize, missing.narSize);
+        printMissing(ref<Store>(store), missing);
 
     if (dryRun) return;
 
