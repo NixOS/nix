@@ -362,23 +362,14 @@ void Worker::run(const Goals & _topGoals)
         else if (awake.empty() && 0U == settings.maxBuildJobs) {
             if (getMachines().empty())
                throw Error(
-                    R"(
-                    Unable to start any build;
-                    either increase '--max-jobs' or enable remote builds.
-
-                    For more information run 'man nix.conf' and search for '/machines'.
-                    )"
-                );
+                   "Unable to start any build; either increase '--max-jobs' or enable remote builds.\n"
+                   "\n"
+                   "For more information run 'man nix.conf' and search for '/machines'.");
             else
                throw Error(
-                    R"(
-                    Unable to start any build;
-                    remote machines may not have all required system features.
-
-                    For more information run 'man nix.conf' and search for '/machines'.
-                    )"
-                );
-
+                   "Unable to start any build; remote machines may not have all required system features.\n"
+                   "\n"
+                   "For more information run 'man nix.conf' and search for '/machines'.");
         } else assert(!awake.empty());
     }
 
