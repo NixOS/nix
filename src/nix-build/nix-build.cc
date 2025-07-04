@@ -425,7 +425,7 @@ static void main_nix_build(int argc, char * * argv)
         auto missing = store->queryMissing(paths);
 
         if (settings.printMissing)
-            printMissing(ref<Store>(store), missing.willBuild, missing.willSubstitute, missing.unknown, missing.downloadSize, missing.narSize);
+            printMissing(ref<Store>(store), missing);
 
         if (!dryRun)
             store->buildPaths(paths, buildMode, evalStore);
