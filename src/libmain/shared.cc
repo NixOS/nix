@@ -46,10 +46,8 @@ void printGCWarning()
 
 void printMissing(ref<Store> store, const std::vector<DerivedPath> & paths, Verbosity lvl)
 {
-    uint64_t downloadSize, narSize;
-    StorePathSet willBuild, willSubstitute, unknown;
-    store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
-    printMissing(store, willBuild, willSubstitute, unknown, downloadSize, narSize, lvl);
+    auto missing = store->queryMissing(paths);
+    printMissing(store, missing.willBuild, missing.willSubstitute, missing.unknown, missing.downloadSize, missing.narSize, lvl);
 }
 
 

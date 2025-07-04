@@ -422,13 +422,10 @@ static void main_nix_build(int argc, char * * argv)
     auto buildPaths = [&](const std::vector<DerivedPath> & paths) {
         /* Note: we do this even when !printMissing to efficiently
            fetch binary cache data. */
-        uint64_t downloadSize, narSize;
-        StorePathSet willBuild, willSubstitute, unknown;
-        store->queryMissing(paths,
-            willBuild, willSubstitute, unknown, downloadSize, narSize);
+        auto missing = store->queryMissing(paths);
 
         if (settings.printMissing)
-            printMissing(ref<Store>(store), willBuild, willSubstitute, unknown, downloadSize, narSize);
+            printMissing(ref<Store>(store), missing.willBuild, missing.willSubstitute, missing.unknown, missing.downloadSize, missing.narSize);
 
         if (!dryRun)
             store->buildPaths(paths, buildMode, evalStore);
