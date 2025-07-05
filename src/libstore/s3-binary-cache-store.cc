@@ -19,8 +19,12 @@
 #include <aws/core/auth/AWSCredentialsProviderChain.h>
 #include <aws/core/client/ClientConfiguration.h>
 #include <aws/core/client/DefaultRetryStrategy.h>
+#include <aws/core/http/standard/StandardHttpResponse.h>
+#include <aws/core/http/standard/StandardHttpRequest.h>
+#include <aws/core/http/HttpClient.h>
 #include <aws/core/utils/logging/FormattedLogSystem.h>
 #include <aws/core/utils/logging/LogMacros.h>
+#include <aws/core/utils/ratelimiter/RateLimiterInterface.h>
 #include <aws/core/utils/threading/Executor.h>
 #include <aws/identity-management/auth/STSProfileCredentialsProvider.h>
 #include <aws/s3/S3Client.h>
@@ -58,6 +62,49 @@ R && checkAws(std::string_view s, Aws::Utils::Outcome<R, E> && outcome)
                 outcome.GetError().GetRequestId()));
     return outcome.GetResultWithOwnership();
 }
+
+class AwsHttpClient : public Aws::Http::HttpClient
+{
+public:
+    AwsHttpClient(const Aws::Client::ClientConfiguration& clientConfig) : HttpClient() {}
+
+    std::shared_ptr<Aws::Http::HttpResponse> MakeRequest(const std::shared_ptr<Aws::Http::HttpRequest>& request,
+                Aws::Utils::RateLimits::RateLimiterInterface* readLimiter = nullptr,
+                Aws::Utils::RateLimits::RateLimiterInterface* writeLimiter = nullptr) const override {
+        Aws::Http::URI uri = request->GetUri();
+        Aws::String url = uri.GetURIString();
+
+        debug("Making request %s", url);
+
+        std::shared_ptr<Aws::Http::Standard::StandardHttpResponse> response = std::make_shared<Aws::Http::Standard::StandardHttpResponse>(request);
+
+        if (writeLimiter != nullptr) {
+            writeLimiter->ApplyAndPayForCost(request->GetSize());
+        }
+
+        FileTransferRequest ftr = FileTransferRequest(url);
+        getFileTransfer()->download(ftr);
+        return response;
+    }
+};
+
+class AwsHttpClientFactory : public Aws::Http::HttpClientFactory
+{
+public:
+    std::shared_ptr<Aws::Http::HttpClient> CreateHttpClient(const Aws::Client::ClientConfiguration& clientConfiguration) const override {
+        return std::make_shared<AwsHttpClient>(clientConfiguration);
+    }
+
+    std::shared_ptr<Aws::Http::HttpRequest> CreateHttpRequest(const Aws::String& uri, Aws::Http::HttpMethod method, const Aws::IOStreamFactory& streamFactory) const override {
+        return CreateHttpRequest(Aws::Http::URI(uri), method, streamFactory);
+    }
+
+    std::shared_ptr<Aws::Http::HttpRequest> CreateHttpRequest(const Aws::Http::URI& uri, Aws::Http::HttpMethod method, const Aws::IOStreamFactory& streamFactory) const override {
+        auto request = std::make_shared<Aws::Http::Standard::StandardHttpRequest>(uri, method);
+        request->SetResponseStreamFactory(streamFactory);
+        return request;
+    }
+};
 
 class AwsLogger : public Aws::Utils::Logging::FormattedLogSystem
 {
@@ -105,6 +152,10 @@ static void initAWS()
         /* We install our own OpenSSL locking function (see
            shared.cc), so don't let aws-sdk-cpp override it. */
         options.cryptoOptions.initAndCleanupOpenSSL = false;
+
+        options.httpOptions.httpClientFactory_create_fn = []() {
+            return std::make_shared<AwsHttpClientFactory>();
+        };
 
         if (verbosity >= lvlDebug) {
             options.loggingOptions.logLevel =
