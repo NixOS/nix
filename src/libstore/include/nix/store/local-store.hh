@@ -435,7 +435,6 @@ private:
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
     friend struct PathSubstitutionGoal;
-    friend struct SubstitutionGoal;
     friend struct DerivationGoal;
 };
 
