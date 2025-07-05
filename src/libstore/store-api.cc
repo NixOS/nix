@@ -520,7 +520,8 @@ StorePathSet Store::queryDerivationOutputs(const StorePath & path)
 void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos)
 {
     if (!settings.useSubstitutes) return;
-    for (auto & sub : getDefaultSubstituters()) {
+    auto substituters = getDefaultSubstituters();
+    for (auto & sub : substituters) {
         for (auto & path : paths) {
             if (infos.count(path.first))
                 // Choose first succeeding substituter.
@@ -557,10 +558,19 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
             } catch (InvalidPath &) {
             } catch (SubstituterDisabled &) {
             } catch (Error & e) {
-                if (settings.tryFallback)
+                // if last substituter, THEN log error and throw, otherwise warn
+                if (&sub == &substituters.back() && !settings.tryFallback) {
                     logError(e.info());
-                else
                     throw;
+                } else {
+                    /* This gets VERY spammy
+                    warn( "Unable to download '%s' from subsituter '%s'\n%s",
+                        sub->printStorePath(subPath),
+                        sub->getUri(),
+                        e.message());
+                    */
+                    continue;
+                }
             }
         }
     }
