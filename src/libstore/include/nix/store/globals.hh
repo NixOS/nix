@@ -484,6 +484,35 @@ public:
         "id-count",
         "The number of UIDs/GIDs to use for dynamic ID allocation."};
 
+    Setting<StringSet> supplementaryGroups{
+        this, {"kvm"}, "supplementary-groups",
+        R"(
+          A list of supplementary groups to be added to build users when dynamic
+          UID/GID allocation [`auto-allocate-uids`](#conf-auto-allocate-uids) is
+          enabled.
+
+          By default, each listed group is mapped into the build sandbox using its
+          host system GID. You can override the mapped GID by appending `:GID` to
+          the group name. If a group does not exist on the host (i.e., has no
+          assigned GID), it is silently ignored.
+
+          Example:
+
+          ```nix
+          extra-supplementary-groups = nixbld users:10100
+          ```
+
+          This maps the `nixbld` group using its assigned GID (usually 30000).
+          And the `users` group gets assigned GID 10100.
+
+          > **Note**
+          >
+          > When using [`build-users-group`](#conf-build-users-group),
+          > supplementary groups should instead be specified directly in the
+          > user definitions.
+        )",
+        {"build-supplementary-groups"}};
+
     #ifdef __linux__
     Setting<bool> useCgroups{
         this, false, "use-cgroups",
