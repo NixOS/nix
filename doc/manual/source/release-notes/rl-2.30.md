@@ -1,5 +1,25 @@
 # Release 2.30.0 (2025-07-07)
 
+- Reduce the size of value from 24 to 16 bytes [#13407](https://github.com/NixOS/nix/pull/13407)
+
+  This shaves off a very significant amount of memory used for evaluation (~20% percent reduction in maximum heap size and ~17% in total bytes).
+
+- `builtins.sort` uses PeekSort [#12623](https://github.com/NixOS/nix/pull/12623)
+
+  Previously it used libstdc++'s `std::stable_sort()`. However, that implementation is not reliable if the user-supplied comparison function is not a strict weak ordering.
+
+- `nix repl` prints which variables were loaded [#11406](https://github.com/NixOS/nix/pull/11406)
+
+  Instead of `Added <n> variables` it now prints the first 10 variables that were added to the global scope.
+
+- `nix flake archive`: add `--no-check-sigs` option [#13277](https://github.com/NixOS/nix/pull/13277)
+
+  This is useful when using `nix flake archive` with the destination set to a remote store.
+
+- Emit warnings for IFDs with `trace-import-from-derivation` option [#13279](https://github.com/NixOS/nix/pull/13279)
+
+  While we have the setting `allow-import-from-derivation` to deny import-from-derivation (IFD), sometimes users would like to observe IFDs during CI processes to gradually phase out the idiom. The new setting `trace-import-from-derivation`, when set, logs a simple warning to the console.
+
 - `build-dir` no longer defaults to `$TMPDIR`
 
   The directory in which temporary build directories are created no longer defaults
