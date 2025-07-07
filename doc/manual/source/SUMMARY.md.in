@@ -137,6 +137,7 @@
   - [Contributing](development/contributing.md)
 - [Releases](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
+  - [Release 2.30 (2025-07-07)](release-notes/rl-2.30.md)
   - [Release 2.29 (2025-05-14)](release-notes/rl-2.29.md)
   - [Release 2.28 (2025-04-02)](release-notes/rl-2.28.md)
   - [Release 2.27 (2025-03-03)](release-notes/rl-2.27.md)
