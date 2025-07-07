@@ -1,24 +1,6 @@
 # Release 2.30.0 (2025-07-07)
 
-- Reduce the size of value from 24 to 16 bytes [#13407](https://github.com/NixOS/nix/pull/13407)
-
-  This shaves off a very significant amount of memory used for evaluation (~20% percent reduction in maximum heap size and ~17% in total bytes).
-
-- `builtins.sort` uses PeekSort [#12623](https://github.com/NixOS/nix/pull/12623)
-
-  Previously it used libstdc++'s `std::stable_sort()`. However, that implementation is not reliable if the user-supplied comparison function is not a strict weak ordering.
-
-- `nix repl` prints which variables were loaded [#11406](https://github.com/NixOS/nix/pull/11406)
-
-  Instead of `Added <n> variables` it now prints the first 10 variables that were added to the global scope.
-
-- `nix flake archive`: add `--no-check-sigs` option [#13277](https://github.com/NixOS/nix/pull/13277)
-
-  This is useful when using `nix flake archive` with the destination set to a remote store.
-
-- Emit warnings for IFDs with `trace-import-from-derivation` option [#13279](https://github.com/NixOS/nix/pull/13279)
-
-  While we have the setting `allow-import-from-derivation` to deny import-from-derivation (IFD), sometimes users would like to observe IFDs during CI processes to gradually phase out the idiom. The new setting `trace-import-from-derivation`, when set, logs a simple warning to the console.
+## Backward-incompatible changes and deprecations
 
 - `build-dir` no longer defaults to `$TMPDIR`
 
@@ -28,7 +10,7 @@
   cause build impurities even when not used maliciously. We now default to `builds`
   in `NIX_STATE_DIR` (which is `/nix/var/nix/builds` in the default configuration).
 
-- Deprecate manually making structured attrs with `__json = ...;` [#13220](https://github.com/NixOS/nix/pull/13220)
+- Deprecate manually making structured attrs using the `__json` attribute [#13220](https://github.com/NixOS/nix/pull/13220)
 
   The proper way to create a derivation using [structured attrs] in the Nix language is by using `__structuredAttrs = true` with [`builtins.derivation`].
   However, by exploiting how structured attrs are implementated, it has also been possible to create them by setting the `__json` environment variable to a serialized JSON string.
@@ -36,6 +18,20 @@
 
   [structured attrs]: @docroot@/language/advanced-attributes.md#adv-attr-structuredAttrs
   [`builtins.derivation`]: @docroot@/language/builtins.html#builtins-derivation
+
+- Rename `nix profile install` to `nix profile add` [#13224](https://github.com/NixOS/nix/pull/13224)
+
+  The command `nix profile install` has been renamed to `nix profile add` (though the former is still available as an alias). This is because the verb "add" is a better antonym for the verb "remove" (i.e. `nix profile remove`). Nix also does not have install hooks or general behavior often associated with "installing".
+
+## Performance improvements
+
+This release has a number performance improvements, in particular:
+
+- Reduce the size of value from 24 to 16 bytes [#13407](https://github.com/NixOS/nix/pull/13407)
+
+  This shaves off a very significant amount of memory used for evaluation (~20% percent reduction in maximum heap size and ~17% in total bytes).
+
+## Features
 
 - Add stack sampling evaluation profiler [#13220](https://github.com/NixOS/nix/pull/13220)
 
@@ -48,13 +44,21 @@
   Unlike existing `--trace-function-calls` this profiler includes the name of the function
   being called when it's available.
 
+- `nix repl` prints which variables were loaded [#11406](https://github.com/NixOS/nix/pull/11406)
+
+  Instead of `Added <n> variables` it now prints the first 10 variables that were added to the global scope.
+
+- `nix flake archive`: Add `--no-check-sigs` option [#13277](https://github.com/NixOS/nix/pull/13277)
+
+  This is useful when using `nix flake archive` with the destination set to a remote store.
+
+- Emit warnings for IFDs with `trace-import-from-derivation` option [#13279](https://github.com/NixOS/nix/pull/13279)
+
+  While we have the setting `allow-import-from-derivation` to deny import-from-derivation (IFD), sometimes users would like to observe IFDs during CI processes to gradually phase out the idiom. The new setting `trace-import-from-derivation`, when set, logs a simple warning to the console.
+
 - `json-log-path` setting [#13003](https://github.com/NixOS/nix/pull/13003)
 
   New setting `json-log-path` that sends a copy of all Nix log messages (in JSON format) to a file or Unix domain socket.
-
-- Rename `nix profile install` to `nix profile add` [#13224](https://github.com/NixOS/nix/pull/13224)
-
-  The command `nix profile install` has been renamed to `nix profile add` (though the former is still available as an alias). This is because the verb "add" is a better antonym for the verb "remove" (i.e. `nix profile remove`). Nix also does not have install hooks or general behavior often associated with "installing".
 
 - Non-flake inputs now contain a `sourceInfo` attribute [#13164](https://github.com/NixOS/nix/issues/13164) [#13170](https://github.com/NixOS/nix/pull/13170)
 
@@ -70,13 +74,19 @@
   This iterates on the work done in 2.26 to improve relative path support ([#10089](https://github.com/NixOS/nix/pull/10089)),
   and resolves a regression introduced in 2.28 relating to nested relative path inputs ([#13164](https://github.com/NixOS/nix/issues/13164)).
 
+## Miscellaneous changes
+
+- `builtins.sort` uses PeekSort [#12623](https://github.com/NixOS/nix/pull/12623)
+
+  Previously it used libstdc++'s `std::stable_sort()`. However, that implementation is not reliable if the user-supplied comparison function is not a strict weak ordering.
+
 - Revert incomplete closure mixed download and build feature [#77](https://github.com/NixOS/nix/issues/77) [#12628](https://github.com/NixOS/nix/issues/12628) [#13176](https://github.com/NixOS/nix/pull/13176)
 
   Since Nix 1.3 (299141ecbd08bae17013226dbeae71e842b4fdd7 in 2013) Nix has attempted to mix together upstream fresh builds and downstream substitutions when remote substuters contain an "incomplete closure" (have some store objects, but not the store objects they reference).
   This feature is now removed.
 
-  Worst case, removing this feature could cause more building downstream, but it should not cause outright failures, since this is not happening for opaque store objects that we don't know how to build if we decide not to substitute.
-  In practice, however, we doubt even the more building is very likely to happen.
+  In the worst case, removing this feature could cause more building downstream, but it should not cause outright failures, since this is not happening for opaque store objects that we don't know how to build if we decide not to substitute.
+  In practice, however, we doubt even more building is very likely to happen.
   Remote stores that are missing dependencies in arbitrary ways (e.g. corruption) don't seem to be very common.
 
   On the contrary, when remote stores fail to implement the [closure property](@docroot@/store/store-object.md#closure-property), it is usually an *intentional* choice on the part of the remote store, because it wishes to serve as an "overlay" store over another store, such as `https://cache.nixos.org`.
@@ -84,9 +94,7 @@
 
   (In the future, we should make it easier for remote stores to indicate this to clients, to catch settings that won't work in general before a missing dependency is actually encountered.)
 
-
-# Contributors
-
+## Contributors
 
 This release was made possible by the following 32 contributors:
 
