@@ -3,6 +3,7 @@
   buildPackages,
   stdenv,
   mkMesonExecutable,
+  writableTmpDirAsHomeHook,
 
   nix-store,
   nix-store-c,
@@ -72,11 +73,10 @@ mkMesonExecutable (finalAttrs: {
         runCommand "${finalAttrs.pname}-run"
           {
             meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
+            buildInputs = [ writableTmpDirAsHomeHook ];
           }
           (''
             export _NIX_TEST_UNIT_DATA=${data + "/src/libstore-tests/data"}
-            export HOME="$TMPDIR/home"
-            mkdir -p "$HOME"
             ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
             touch $out
           '');
