@@ -38,8 +38,8 @@
 
 - Non-flake inputs now contain a `sourceInfo` attribute [#13164](https://github.com/NixOS/nix/issues/13164) [#13170](https://github.com/NixOS/nix/pull/13170)
 
-  Flakes have always a `sourceInfo` attribute which describes the source of the flake.
-  The `sourceInfo.outPath` is often identical to the flake's `outPath`, however it can differ when the flake is located in a subdirectory of its source.
+  Flakes have always had a `sourceInfo` attribute which describes the source of the flake.
+  The `sourceInfo.outPath` is often identical to the flake's `outPath`. However, it can differ when the flake is located in a subdirectory of its source.
 
   Non-flake inputs (i.e. inputs with `flake = false`) can also be located at some path _within_ a wider source.
   This usually happens when defining a relative path input within the same source as the parent flake, e.g. `inputs.foo.url = ./some-file.nix`.
