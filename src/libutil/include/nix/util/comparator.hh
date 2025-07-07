@@ -16,7 +16,7 @@
 
 /**
  * Awful hacky generation of the comparison operators by doing a lexicographic
- * comparison between the choosen fields.
+ * comparison between the chosen fields.
  *
  * ```
  * GENERATE_CMP(ClassName, me->field1, me->field2, ...)

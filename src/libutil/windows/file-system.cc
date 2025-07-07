@@ -1,4 +1,5 @@
 #include "nix/util/file-system.hh"
+#include "nix/util/logging.hh"
 
 #ifdef _WIN32
 namespace nix {

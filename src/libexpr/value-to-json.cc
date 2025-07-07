@@ -74,7 +74,7 @@ json printValueAsJSON(EvalState & state, bool strict,
         case nList: {
             out = json::array();
             int i = 0;
-            for (auto elem : v.listItems()) {
+            for (auto elem : v.listView()) {
                 try {
                     out.push_back(printValueAsJSON(state, strict, *elem, pos, context, copyToStore));
                 } catch (Error & e) {

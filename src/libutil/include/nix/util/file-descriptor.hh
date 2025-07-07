@@ -68,7 +68,7 @@ static inline int fromDescriptorReadOnly(Descriptor fd)
 std::string readFile(Descriptor fd);
 
 /**
- * Wrappers arount read()/write() that read/write exactly the
+ * Wrappers around read()/write() that read/write exactly the
  * requested number of bytes.
  */
 void readFull(Descriptor fd, char * buf, size_t count);

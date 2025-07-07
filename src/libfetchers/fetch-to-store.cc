@@ -1,5 +1,6 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 namespace nix {
 
@@ -16,6 +17,7 @@ fetchers::Cache::Key makeSourcePathToHashCacheKey(
 }
 
 StorePath fetchToStore(
+    const fetchers::Settings & settings,
     Store & store,
     const SourcePath & path,
     FetchMode mode,
@@ -24,10 +26,11 @@ StorePath fetchToStore(
     PathFilter * filter,
     RepairFlag repair)
 {
-    return fetchToStore2(store, path, mode, name, method, filter, repair).first;
+    return fetchToStore2(settings, store, path, mode, name, method, filter, repair).first;
 }
 
 std::pair<StorePath, Hash> fetchToStore2(
+    const fetchers::Settings & settings,
     Store & store,
     const SourcePath & path,
     FetchMode mode,
@@ -45,7 +48,7 @@ std::pair<StorePath, Hash> fetchToStore2(
 
     if (fingerprint) {
         cacheKey = makeSourcePathToHashCacheKey(*fingerprint, method, subpath.abs());
-        if (auto res = fetchers::getCache()->lookup(*cacheKey)) {
+        if (auto res = settings.getCache()->lookup(*cacheKey)) {
             auto hash = Hash::parseSRI(fetchers::getStrAttr(*res, "hash"));
             auto storePath = store.makeFixedOutputPathFromCA(name,
                 ContentAddressWithReferences::fromParts(method, hash, {}));
@@ -96,7 +99,7 @@ std::pair<StorePath, Hash> fetchToStore2(
         });
 
     if (cacheKey)
-        fetchers::getCache()->upsert(*cacheKey, {{"hash", hash.to_string(HashFormat::SRI, true)}});
+        settings.getCache()->upsert(*cacheKey, {{"hash", hash.to_string(HashFormat::SRI, true)}});
 
     return {storePath, hash};
 }

@@ -52,6 +52,7 @@
   - [Tuning Cores and Jobs](advanced-topics/cores-vs-jobs.md)
   - [Verifying Build Reproducibility](advanced-topics/diff-hook.md)
   - [Using the `post-build-hook`](advanced-topics/post-build-hook.md)
+  - [Evaluation profiler](advanced-topics/eval-profiler.md)
 - [Command Reference](command-ref/index.md)
   - [Common Options](command-ref/opt-common.md)
   - [Common Environment Variables](command-ref/env-common.md)
@@ -147,6 +148,7 @@
   - [Release 3.0.0 (2025-03-04)](release-notes-determinate/rl-3.0.0.md)
 - [Nix Release Notes](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
+  - [Release 2.30 (2025-07-07)](release-notes/rl-2.30.md)
   - [Release 2.29 (2025-05-14)](release-notes/rl-2.29.md)
   - [Release 2.28 (2025-04-02)](release-notes/rl-2.28.md)
   - [Release 2.27 (2025-03-03)](release-notes/rl-2.27.md)

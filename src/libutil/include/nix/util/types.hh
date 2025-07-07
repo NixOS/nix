@@ -12,8 +12,25 @@
 namespace nix {
 
 typedef std::list<std::string> Strings;
-typedef std::map<std::string, std::string> StringMap;
-typedef std::map<std::string, std::string> StringPairs;
+
+/**
+ * Alias to ordered std::string -> std::string map container with transparent comparator.
+ *
+ * Used instead of std::map<std::string, std::string> to use C++14 N3657 [1]
+ * heterogenous lookup consistently across the whole codebase.
+ * Transparent comparators get rid of creation of unnecessary
+ * temporary variables when looking up keys by `std::string_view`
+ * or C-style `const char *` strings.
+ *
+ * [1]: https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3657.htm
+ */
+using StringMap = std::map<std::string, std::string, std::less<>>;
+/**
+ * Alias to an ordered map of std::string -> std::string. Uses transparent comparator.
+ *
+ * @see StringMap
+ */
+using StringPairs = StringMap;
 
 /**
  * Alias to ordered set container with transparent comparator.

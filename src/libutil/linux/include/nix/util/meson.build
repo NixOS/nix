@@ -4,5 +4,6 @@ include_dirs += include_directories('../..')
 
 headers += files(
   'cgroup.hh',
-  'namespaces.hh',
+  'linux-namespaces.hh',
+  # hack for trailing newline
 )

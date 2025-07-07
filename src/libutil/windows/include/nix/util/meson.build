@@ -6,4 +6,5 @@ headers += files(
   'signals-impl.hh',
   'windows-async-pipe.hh',
   'windows-error.hh',
+  # hack for trailing newline
 )

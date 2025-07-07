@@ -332,7 +332,7 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
                     name
                 ).atPos(i.pos).debugThrow();
             }
-            for (auto elem : attr->value->listItems()) {
+            for (auto elem : attr->value->listView()) {
                 auto outputName = state.forceStringNoCtx(*elem, attr->pos, "while evaluating an output name within a string context");
                 context.emplace(NixStringContextElem::Built {
                     .drvPath = makeConstantStorePathRef(namePath),

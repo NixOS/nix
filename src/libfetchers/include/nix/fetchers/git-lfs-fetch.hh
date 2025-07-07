@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include "nix/util/canon-path.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/url.hh"

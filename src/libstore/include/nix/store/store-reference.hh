@@ -9,7 +9,7 @@ namespace nix {
 
 /**
  * A parsed Store URI (URI is a slight misnomer...), parsed but not yet
- * resolved to a specific instance and query parms validated.
+ * resolved to a specific instance and query params validated.
  *
  * Supported values are:
  *
@@ -41,7 +41,7 @@ namespace nix {
  */
 struct StoreReference
 {
-    using Params = std::map<std::string, std::string>;
+    using Params = StringMap;
 
     /**
      * Special store reference `""` or `"auto"`

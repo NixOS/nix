@@ -790,7 +790,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                     deleteFromStore(path.to_string());
                     referrersCache.erase(path);
                 } catch (PathInUse &e) {
-                    // If we end up here, it's likely a new occurence
+                    // If we end up here, it's likely a new occurrence
                     // of https://github.com/NixOS/nix/issues/11923
                     printError("BUG: %s", e.what());
                 }

@@ -458,7 +458,7 @@ namespace nix {
                       HintFmt("expected a function but found %s: %s", "a list", Uncolored("[ ]")),
                       HintFmt("while evaluating the first argument passed to builtins.filterSource"));
 
-        // Usupported by store "dummy"
+        // Unsupported by store "dummy"
 
         // ASSERT_TRACE2("filterSource (_: 1) ./.",
         //               TypeError,
@@ -636,7 +636,7 @@ namespace nix {
                       HintFmt("expected a set but found %s: %s", "a list", Uncolored("[ ]")),
                       HintFmt("while evaluating the second argument passed to builtins.mapAttrs"));
 
-        // XXX: defered
+        // XXX: deferred
         // ASSERT_TRACE2("mapAttrs \"\" { foo.bar = 1; }",
         //               TypeError,
         //               HintFmt("attempt to call something which is not a function but %s", "a string"),
@@ -666,9 +666,9 @@ namespace nix {
                       HintFmt("expected a set but found %s: %s", "an integer", Uncolored(ANSI_CYAN "1" ANSI_NORMAL)),
                       HintFmt("while evaluating a value of the list passed as second argument to builtins.zipAttrsWith"));
 
-        // XXX: How to properly tell that the fucntion takes two arguments ?
+        // XXX: How to properly tell that the function takes two arguments ?
         // The same question also applies to sort, and maybe others.
-        // Due to lazyness, we only create a thunk, and it fails later on.
+        // Due to laziness, we only create a thunk, and it fails later on.
         // ASSERT_TRACE2("zipAttrsWith (_: 1) [ { foo = 1; } ]",
         //               TypeError,
         //               HintFmt("attempt to call something which is not a function but %s", "an integer"),
@@ -877,7 +877,7 @@ namespace nix {
                       HintFmt("expected a function but found %s: %s", "an integer", Uncolored(ANSI_CYAN "1" ANSI_NORMAL)),
                       HintFmt("while evaluating the first argument passed to builtins.genList"));
 
-        // XXX: defered
+        // XXX: deferred
         // ASSERT_TRACE2("genList (x: x + \"foo\") 2 #TODO",
         //               TypeError,
         //               HintFmt("cannot add %s to an integer", "a string"),

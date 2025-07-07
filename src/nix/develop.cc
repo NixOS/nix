@@ -56,12 +56,12 @@ struct BuildEnvironment
 
     using Array = std::vector<std::string>;
 
-    using Associative = std::map<std::string, std::string>;
+    using Associative = StringMap;
 
     using Value = std::variant<String, Array, Associative>;
 
     std::map<std::string, Value> vars;
-    std::map<std::string, std::string> bashFunctions;
+    StringMap bashFunctions;
     std::optional<std::pair<std::string, std::string>> structuredAttrs;
 
     static BuildEnvironment fromJSON(const nlohmann::json & json)

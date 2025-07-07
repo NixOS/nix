@@ -303,7 +303,7 @@ static RegisterPrimOp primop_fetchTree({
       - `"tarball"`
 
         Download a tar archive and extract it into the Nix store.
-        This has the same underyling implementation as [`builtins.fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball)
+        This has the same underlying implementation as [`builtins.fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball)
 
         - `url` (String, required)
 
@@ -533,11 +533,12 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     auto storePath =
         unpack
         ? fetchToStore(
+            state.fetchSettings,
             *state.store,
             fetchers::downloadTarball(state.store, state.fetchSettings, *url),
             FetchMode::Copy,
             name)
-        : fetchers::downloadFile(state.store, *url, name).storePath;
+        : fetchers::downloadFile(state.store, state.fetchSettings, *url, name).storePath;
 
     if (expectedHash) {
         auto hash = unpack

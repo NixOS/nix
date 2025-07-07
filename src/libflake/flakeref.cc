@@ -15,7 +15,7 @@ const static std::string subDirRegex = subDirElemRegex + "(?:/" + subDirElemRege
 
 std::string FlakeRef::to_string() const
 {
-    std::map<std::string, std::string> extraQuery;
+    StringMap extraQuery;
     if (subdir != "")
         extraQuery.insert_or_assign("dir", subdir);
     return input.toURLString(extraQuery);
@@ -55,18 +55,6 @@ FlakeRef parseFlakeRef(
     if (fragment != "")
         throw Error("unexpected fragment '%s' in flake reference '%s'", fragment, url);
     return flakeRef;
-}
-
-std::optional<FlakeRef> maybeParseFlakeRef(
-    const fetchers::Settings & fetchSettings,
-    const std::string & url,
-    const std::optional<Path> & baseDir)
-{
-    try {
-        return parseFlakeRef(fetchSettings, url, baseDir);
-    } catch (Error &) {
-        return {};
-    }
 }
 
 static std::pair<FlakeRef, std::string> fromParsedURL(
@@ -258,17 +246,6 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         return *res;
     } else {
         return parsePathFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake, preserveRelativePaths);
-    }
-}
-
-std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
-    const fetchers::Settings & fetchSettings,
-    const std::string & url, const std::optional<Path> & baseDir)
-{
-    try {
-        return parseFlakeRefWithFragment(fetchSettings, url, baseDir);
-    } catch (Error & e) {
-        return {};
     }
 }
 
