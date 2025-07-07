@@ -35,13 +35,13 @@ This release has a number performance improvements, in particular:
 
 - Add stack sampling evaluation profiler [#13220](https://github.com/NixOS/nix/pull/13220)
 
-  Nix evaluator now supports stack sampling evaluation profiling via `--eval-profiler flamegraph` setting.
-  It collects collapsed call stack information to output file specified by
+  The Nix evaluator now supports [stack sampling evaluation profiling](@docroot@/advanced-topics/eval-profiler.md) via the `--eval-profiler flamegraph` setting.
+  It outputs collapsed call stack information to the file specified by
   `--eval-profile-file` (`nix.profile` by default) in a format directly consumable
   by `flamegraph.pl` and compatible tools like [speedscope](https://speedscope.app/).
   Sampling frequency can be configured via `--eval-profiler-frequency` (99 Hz by default).
 
-  Unlike existing `--trace-function-calls` this profiler includes the name of the function
+  Unlike the existing `--trace-function-calls`, this profiler includes the name of the function
   being called when it's available.
 
 - `nix repl` prints which variables were loaded [#11406](https://github.com/NixOS/nix/pull/11406)
