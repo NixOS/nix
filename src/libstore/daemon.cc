@@ -948,14 +948,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case WorkerProto::Op::QueryMissing: {
         auto targets = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         logger->startWork();
-        StorePathSet willBuild, willSubstitute, unknown;
-        uint64_t downloadSize, narSize;
-        store->queryMissing(targets, willBuild, willSubstitute, unknown, downloadSize, narSize);
+        auto missing = store->queryMissing(targets);
         logger->stopWork();
-        WorkerProto::write(*store, wconn, willBuild);
-        WorkerProto::write(*store, wconn, willSubstitute);
-        WorkerProto::write(*store, wconn, unknown);
-        conn.to << downloadSize << narSize;
+        WorkerProto::write(*store, wconn, missing.willBuild);
+        WorkerProto::write(*store, wconn, missing.willSubstitute);
+        WorkerProto::write(*store, wconn, missing.unknown);
+        conn.to << missing.downloadSize << missing.narSize;
         break;
     }
 
