@@ -47,7 +47,7 @@
   blake3-34P4p+iZXcbbyB1i4uoF7eWCGcZHjmaRn6Y7QdynLwU=
   ```
 
-# Contributors
+## Contributors
 
 This release was made possible by the following 21 contributors:
 

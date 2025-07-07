@@ -269,7 +269,7 @@
   e.g. `--warn-large-path-threshold 100M`.
 
 
-# Contributors
+## Contributors
 
 This release was made possible by the following 43 contributors:
 
