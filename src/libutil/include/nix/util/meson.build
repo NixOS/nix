@@ -41,6 +41,7 @@ headers = files(
   'json-impls.hh',
   'json-utils.hh',
   'logging.hh',
+  'logging-diffs.hh',
   'lru-cache.hh',
   'memory-source-accessor.hh',
   'muxable-pipe.hh',
