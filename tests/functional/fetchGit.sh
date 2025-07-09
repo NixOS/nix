@@ -326,3 +326,4 @@ export GIT_CONFIG_GLOBAL="$TEST_ROOT/gitconfig"
 git config --global core.autocrlf true
 new_narhash=$(nix eval --raw --impure --expr "(builtins.fetchGit { url = \"$repo\"; ref = \"master\"; }).narHash")
 [[ "$new_narhash" = "$narhash" ]]
+unset GIT_CONFIG_GLOBAL
