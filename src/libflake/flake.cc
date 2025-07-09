@@ -715,16 +715,12 @@ LockedFlake lockFlake(
                             Finally cleanup([&]() { parents.pop_back(); });
 
                             /* Recursively process the inputs of this
-                               flake. Also, unless we already have this flake
-                               in the top-level lock file, use this flake's
-                               own lock file. */
+                               flake, using its own lock file. */
                             nodePaths.emplace(childNode, inputFlake.path.parent());
                             computeLocks(
                                 inputFlake.inputs, childNode, inputAttrPath,
-                                oldLock
-                                ? std::dynamic_pointer_cast<const Node>(oldLock)
-                                : readLockFile(state.fetchSettings, inputFlake.lockFilePath()).root.get_ptr(),
-                                oldLock ? followsPrefix : inputAttrPath,
+                                readLockFile(state.fetchSettings, inputFlake.lockFilePath()).root.get_ptr(),
+                                inputAttrPath,
                                 inputFlake.path,
                                 false);
                         }
