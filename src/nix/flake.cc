@@ -833,8 +833,31 @@ struct CmdFlakeCheck : FlakeCommand
         if (build && !drvPaths.empty()) {
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("running %d flake checks", drvPaths.size()));
-            store->buildPaths(drvPaths);
+
+            auto missing = store->queryMissing(drvPaths);
+
+            /* This command doesn't need to actually substitute
+               derivation outputs if they're missing but
+               substitutable. So filter out derivations that are
+               substitutable or already built. */
+            std::vector<DerivedPath> toBuild;
+            for (auto & path : drvPaths) {
+                std::visit(overloaded {
+                    [&](const DerivedPath::Built & bfd) {
+                        auto drvPathP = std::get_if<DerivedPath::Opaque>(&*bfd.drvPath);
+                        if (!drvPathP || missing.willBuild.contains(drvPathP->path))
+                            toBuild.push_back(path);
+                    },
+                    [&](const DerivedPath::Opaque & bo) {
+                        if (!missing.willSubstitute.contains(bo.path))
+                            toBuild.push_back(path);
+                    },
+                }, path.raw());
+            }
+
+            store->buildPaths(toBuild);
         }
+
         if (hasErrors)
             throw Error("some errors were encountered during the evaluation");
 
