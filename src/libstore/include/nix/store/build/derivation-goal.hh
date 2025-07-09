@@ -74,7 +74,7 @@ private:
      * The remainder is state held during the build.
      */
 
-    std::map<std::string, InitialOutput> initialOutputs;
+    InitialOutput initialOutput;
 
     BuildMode buildMode;
 
@@ -86,7 +86,7 @@ private:
     Co haveDerivation();
 
     /**
-     * Update 'initialOutputs' to determine the current status of the
+     * Update 'initialOutput' to determine the current status of the
      * outputs of the derivation. Also returns a Boolean denoting
      * whether all outputs are valid and non-corrupt, and a
      * 'SingleDrvOutputs' structure containing the valid outputs.

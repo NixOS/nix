@@ -24,15 +24,16 @@
 
 namespace nix {
 
-DerivationGoal::DerivationGoal(
-    const StorePath & drvPath,
-    const Derivation & drv,
-    const OutputName & wantedOutput,
-    Worker & worker,
-    BuildMode buildMode)
+DerivationGoal::DerivationGoal(const StorePath & drvPath, const Derivation & drv,
+    const OutputName & wantedOutput, Worker & worker, BuildMode buildMode)
     : Goal(worker, haveDerivation())
     , drvPath(drvPath)
     , wantedOutput(wantedOutput)
+    , initialOutput{
+        .wanted = true,
+        .outputHash = Hash::dummy, // will be updated
+        .known = {},
+    }
     , buildMode(buildMode)
 {
     this->drv = std::make_unique<Derivation>(drv);
@@ -125,9 +126,10 @@ Goal::Co DerivationGoal::haveDerivation()
 
         auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
         for (auto & [outputName, outputHash] : outputHashes) {
-            InitialOutput v{
-                .wanted = true, // Will be refined later
-                .outputHash = outputHash};
+            if (outputName != wantedOutput)
+                continue;
+
+            InitialOutput v{.wanted = true, .outputHash = outputHash};
 
             /* TODO we might want to also allow randomizing the paths
                for regular CA derivations, e.g. for sake of checking
@@ -139,10 +141,8 @@ Goal::Co DerivationGoal::haveDerivation()
                 };
             }
 
-            initialOutputs.insert({
-                outputName,
-                std::move(v),
-            });
+            initialOutput = std::move(v);
+            break;
         }
 
         if (impure) {
@@ -167,21 +167,18 @@ Goal::Co DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    if (settings.useSubstitutes && drvOptions.substitutesAllowed())
-        for (auto & [outputName, status] : initialOutputs) {
-            if (!status.wanted)
-                continue;
-            if (!status.known)
-                waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(
-                    DrvOutput{status.outputHash, outputName}, buildMode == bmRepair ? Repair : NoRepair)));
-            else {
-                auto * cap = getDerivationCA(*drv);
-                waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
-                    status.known->path,
-                    buildMode == bmRepair ? Repair : NoRepair,
-                    cap ? std::optional{*cap} : std::nullopt)));
-            }
+    if (settings.useSubstitutes && drvOptions.substitutesAllowed()) {
+        if (!initialOutput.known)
+            waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(
+                DrvOutput{initialOutput.outputHash, wantedOutput}, buildMode == bmRepair ? Repair : NoRepair)));
+        else {
+            auto * cap = getDerivationCA(*drv);
+            waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
+                initialOutput.known->path,
+                buildMode == bmRepair ? Repair : NoRepair,
+                cap ? std::optional{*cap} : std::nullopt)));
         }
+    }
 
     co_await await(std::move(waitees));
 
@@ -317,7 +314,6 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
         return {false, {}};
 
     bool checkHash = buildMode == bmRepair;
-    StringSet wantedOutputsLeft{wantedOutput};
     SingleDrvOutputs validOutputs;
 
     auto partialDerivationOutputMap = [&] {
@@ -333,17 +329,10 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
         return res;
     }();
 
-    for (auto & i : partialDerivationOutputMap) {
-        auto initialOutput = get(initialOutputs, i.first);
-        if (!initialOutput)
-            // this is an invalid output, gets caught with (!wantedOutputsLeft.empty())
-            continue;
-        auto & info = *initialOutput;
-        info.wanted = wantedOutput == i.first;
-        if (info.wanted)
-            wantedOutputsLeft.erase(i.first);
-        if (i.second) {
-            auto outputPath = *i.second;
+    if (auto * mpath = get(partialDerivationOutputMap, wantedOutput)) {
+        auto & info = initialOutput;
+        if (*mpath) {
+            auto & outputPath = **mpath;
             info.known = {
                 .path = outputPath,
                 .status = !worker.store.isValidPath(outputPath)               ? PathStatus::Absent
@@ -351,7 +340,7 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
                                                                               : PathStatus::Corrupt,
             };
         }
-        auto drvOutput = DrvOutput{info.outputHash, i.first};
+        auto drvOutput = DrvOutput{info.outputHash, wantedOutput};
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
             if (auto real = worker.store.queryRealisation(drvOutput)) {
                 info.known = {
@@ -371,25 +360,19 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
             }
         }
         if (info.known && info.known->isValid())
-            validOutputs.emplace(i.first, Realisation{drvOutput, info.known->path});
+            validOutputs.emplace(wantedOutput, Realisation{drvOutput, info.known->path});
+    } else {
+        // If we requested all the outputs, we are always fine.
+        // If we requested specific elements, the loop above removes all the valid
+        // ones, so any that are left must be invalid.
+        throw Error(
+            "derivation '%s' does not have wanted outputs '%s'", worker.store.printStorePath(drvPath), wantedOutput);
     }
 
-    // If we requested all the outputs, we are always fine.
-    // If we requested specific elements, the loop above removes all the valid
-    // ones, so any that are left must be invalid.
-    if (!wantedOutputsLeft.empty())
-        throw Error(
-            "derivation '%s' does not have wanted outputs %s",
-            worker.store.printStorePath(drvPath),
-            concatStringsSep(", ", quoteStrings(wantedOutputsLeft)));
-
     bool allValid = true;
-    for (auto & [_, status] : initialOutputs) {
-        if (!status.wanted)
-            continue;
-        if (!status.known || !status.known->isValid()) {
+    {
+        if (!initialOutput.known || !initialOutput.known->isValid()) {
             allValid = false;
-            break;
         }
     }
 
