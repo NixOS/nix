@@ -13,13 +13,13 @@ namespace nix {
 
 /**
  * An (owned) output name. Just a type alias used to make code more
- * readible.
+ * readable.
  */
 typedef std::string OutputName;
 
 /**
  * A borrowed output name. Just a type alias used to make code more
- * readible.
+ * readable.
  */
 typedef std::string_view OutputNameView;
 

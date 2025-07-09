@@ -12,7 +12,7 @@ DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(
     Worker & worker,
     RepairFlag repair,
     std::optional<ContentAddress> ca)
-    : Goal(worker)
+    : Goal(worker, init())
     , id(id)
 {
     name = fmt("substitution of '%s'", id.to_string());
@@ -139,7 +139,7 @@ Goal::Co DrvOutputSubstitutionGoal::realisationFetched(Goals waitees, std::share
 
     if (nrFailed > 0) {
         debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
-        co_return amDone(nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed);
+        co_return amDone(nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed);
     }
 
     worker.store.registerDrvOutput(*outputInfo);

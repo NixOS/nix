@@ -35,15 +35,17 @@ void printVersion(const std::string & programName);
 void printGCWarning();
 
 class Store;
+struct MissingPaths;
 
 void printMissing(
     ref<Store> store,
     const std::vector<DerivedPath> & paths,
     Verbosity lvl = lvlInfo);
 
-void printMissing(ref<Store> store, const StorePathSet & willBuild,
-    const StorePathSet & willSubstitute, const StorePathSet & unknown,
-    uint64_t downloadSize, uint64_t narSize, Verbosity lvl = lvlInfo);
+void printMissing(
+    ref<Store> store,
+    const MissingPaths & missing,
+    Verbosity lvl = lvlInfo);
 
 std::string getArg(const std::string & opt,
     Strings::iterator & i, const Strings::iterator & end);

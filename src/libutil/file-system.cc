@@ -8,12 +8,12 @@
 #include "nix/util/util.hh"
 
 #include <atomic>
+#include <random>
 #include <cerrno>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <deque>
-#include <sstream>
 #include <filesystem>
 
 #include <fcntl.h>
@@ -23,13 +23,14 @@
 
 #include <boost/iostreams/device/mapped_file.hpp>
 
+#ifdef __FreeBSD__
+# include <sys/param.h>
+# include <sys/mount.h>
+#endif
+
 #ifdef _WIN32
 # include <io.h>
 #endif
-
-#include "nix/util/strings-inline.hh"
-
-#include "util-config-private.hh"
 
 namespace nix {
 
@@ -375,6 +376,13 @@ void syncParent(const Path & path)
     fd.fsync();
 }
 
+#ifdef __FreeBSD__
+#define MOUNTEDPATHS_PARAM , std::set<Path> &mountedPaths
+#define MOUNTEDPATHS_ARG , mountedPaths
+#else
+#define MOUNTEDPATHS_PARAM
+#define MOUNTEDPATHS_ARG
+#endif
 
 void recursiveSync(const Path & path)
 {
@@ -421,10 +429,18 @@ void recursiveSync(const Path & path)
 }
 
 
-static void _deletePath(Descriptor parentfd, const std::filesystem::path & path, uint64_t & bytesFreed, std::exception_ptr & ex)
+static void _deletePath(Descriptor parentfd, const std::filesystem::path & path, uint64_t & bytesFreed, std::exception_ptr & ex MOUNTEDPATHS_PARAM)
 {
 #ifndef _WIN32
     checkInterrupt();
+
+#ifdef __FreeBSD__
+    // In case of emergency (unmount fails for some reason) not recurse into mountpoints.
+    // This prevents us from tearing up the nullfs-mounted nix store.
+    if (mountedPaths.find(path) != mountedPaths.end()) {
+        return;
+    }
+#endif
 
     std::string name(path.filename());
     assert(name != "." && name != ".." && !name.empty());
@@ -480,7 +496,7 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
             checkInterrupt();
             std::string childName = dirent->d_name;
             if (childName == "." || childName == "..") continue;
-            _deletePath(dirfd(dir.get()), path / childName, bytesFreed, ex);
+            _deletePath(dirfd(dir.get()), path / childName, bytesFreed, ex MOUNTEDPATHS_ARG);
         }
         if (errno) throw SysError("reading directory %1%", path);
     }
@@ -503,7 +519,7 @@ static void _deletePath(Descriptor parentfd, const std::filesystem::path & path,
 #endif
 }
 
-static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
+static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFreed MOUNTEDPATHS_PARAM)
 {
     assert(path.is_absolute());
     assert(path.parent_path() != path);
@@ -516,7 +532,7 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
 
     std::exception_ptr ex;
 
-    _deletePath(dirfd.get(), path, bytesFreed, ex);
+    _deletePath(dirfd.get(), path, bytesFreed, ex MOUNTEDPATHS_ARG);
 
     if (ex)
         std::rethrow_exception(ex);
@@ -552,8 +568,20 @@ void createDirs(const std::filesystem::path & path)
 void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
 {
     //Activity act(*logger, lvlDebug, "recursively deleting path '%1%'", path);
+#ifdef __FreeBSD__
+    std::set<Path> mountedPaths;
+    struct statfs *mntbuf;
+    int count;
+    if ((count = getmntinfo(&mntbuf, MNT_WAIT)) < 0) {
+        throw SysError("getmntinfo");
+    }
+
+    for (int i = 0; i < count; i++) {
+        mountedPaths.emplace(mntbuf[i].f_mntonname);
+    }
+#endif
     bytesFreed = 0;
-    _deletePath(path, bytesFreed);
+    _deletePath(path, bytesFreed MOUNTEDPATHS_ARG);
 }
 
 
@@ -595,32 +623,41 @@ void AutoDelete::reset(const std::filesystem::path & p, bool recursive) {
 
 //////////////////////////////////////////////////////////////////////
 
+#ifdef __FreeBSD__
+AutoUnmount::AutoUnmount() : del{false} {}
+
+AutoUnmount::AutoUnmount(Path &p) : path(p), del(true) {}
+
+AutoUnmount::~AutoUnmount()
+{
+    try {
+        if (del) {
+            if (unmount(path.c_str(), 0) < 0) {
+                throw SysError("Failed to unmount path %1%", path);
+            }
+        }
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
+}
+
+void AutoUnmount::cancel()
+{
+    del = false;
+}
+#endif
+
 //////////////////////////////////////////////////////////////////////
 
 std::string defaultTempDir() {
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");
 }
 
-static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
-    std::atomic<unsigned int> & counter)
+Path createTempDir(const Path & tmpRoot, const Path & prefix, mode_t mode)
 {
-    tmpRoot = canonPath(tmpRoot.empty() ? defaultTempDir() : tmpRoot, true);
-    if (includePid)
-        return fmt("%1%/%2%-%3%-%4%", tmpRoot, prefix, getpid(), counter++);
-    else
-        return fmt("%1%/%2%-%3%", tmpRoot, prefix, counter++);
-}
-
-Path createTempDir(const Path & tmpRoot, const Path & prefix,
-    bool includePid, bool useGlobalCounter, mode_t mode)
-{
-    static std::atomic<unsigned int> globalCounter = 0;
-    std::atomic<unsigned int> localCounter = 0;
-    auto & counter(useGlobalCounter ? globalCounter : localCounter);
-
     while (1) {
         checkInterrupt();
-        Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
+        Path tmpDir = makeTempPath(tmpRoot, prefix);
         if (mkdir(tmpDir.c_str()
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
                     , mode
@@ -658,6 +695,14 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
     unix::closeOnExec(fd.get());
 #endif
     return {std::move(fd), tmpl};
+}
+
+Path makeTempPath(const Path & root, const Path & suffix)
+{
+    // start the counter at a random value to minimize issues with preexisting temp paths
+    static std::atomic<uint32_t> counter(std::random_device{}());
+    auto tmpRoot = canonPath(root.empty() ? defaultTempDir() : root, true);
+    return fmt("%1%/%2%-%3%-%4%", tmpRoot, suffix, getpid(), counter.fetch_add(1, std::memory_order_relaxed));
 }
 
 void createSymlink(const Path & target, const Path & link)

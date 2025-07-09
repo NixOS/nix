@@ -146,7 +146,7 @@ Hash Hash::parseSRI(std::string_view original)
 {
     auto rest = original;
 
-    // Parse the has type before the separater, if there was one.
+    // Parse the has type before the separator, if there was one.
     auto hashRaw = splitPrefixTo(rest, '-');
     if (!hashRaw)
         throw BadHash("hash '%s' is not SRI", original);

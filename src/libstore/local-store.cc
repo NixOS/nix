@@ -77,6 +77,16 @@ std::string LocalStoreConfig::doc()
         ;
 }
 
+Path LocalBuildStoreConfig::getBuildDir() const
+{
+    return
+        settings.buildDir.get().has_value()
+        ? *settings.buildDir.get()
+        : buildDir.get().has_value()
+        ? *buildDir.get()
+        : stateDir.get() + "/builds";
+}
+
 ref<Store> LocalStore::Config::openStore() const
 {
     return make_ref<LocalStore>(ref{shared_from_this()});
@@ -133,7 +143,7 @@ LocalStore::LocalStore(ref<const Config> config)
     Path gcRootsDir = config->stateDir + "/gcroots";
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
-        createSymlink(profilesDir, gcRootsDir + "/profiles");
+        replaceSymlink(profilesDir, gcRootsDir + "/profiles");
     }
 
     for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {

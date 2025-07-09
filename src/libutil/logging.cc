@@ -166,7 +166,7 @@ Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     logger.startActivity(id, lvl, type, s, fields, parent);
 }
 
-void to_json(nlohmann::json & json, std::shared_ptr<Pos> pos)
+void to_json(nlohmann::json & json, std::shared_ptr<const Pos> pos)
 {
     if (pos) {
         json["line"] = pos->line;
@@ -334,7 +334,7 @@ std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool 
     AutoCloseFD fd =
         std::filesystem::is_socket(path)
         ? connect(path)
-        : toDescriptor(open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0644));
+        : toDescriptor(open(path.string().c_str(), O_CREAT | O_APPEND | O_WRONLY, 0644));
     if (!fd)
         throw SysError("opening log file %1%", path);
 

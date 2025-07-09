@@ -59,6 +59,11 @@ This command has the following operations:
   Download the Nix expressions of subscribed channels and create a new generation.
   Update all channels if none is specified, and only those included in *names* otherwise.
 
+  > **Note**
+  >
+  > Downloaded channel contents are cached.
+  > Use `--tarball-ttl` or the [`tarball-ttl` configuration option](@docroot@/command-ref/conf-file.md#conf-tarball-ttl) to change the validity period of cached downloads.
+
 - `--list-generations`
 
   Prints a list of all the current existing generations for the

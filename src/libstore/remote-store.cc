@@ -855,9 +855,7 @@ void RemoteStore::addSignatures(const StorePath & storePath, const StringSet & s
 }
 
 
-void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
-    StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-    uint64_t & downloadSize, uint64_t & narSize)
+MissingPaths RemoteStore::queryMissing(const std::vector<DerivedPath> & targets)
 {
     {
         auto conn(getConnection());
@@ -868,16 +866,16 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
         conn->to << WorkerProto::Op::QueryMissing;
         WorkerProto::write(*this, *conn, targets);
         conn.processStderr();
-        willBuild = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
-        willSubstitute = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
-        unknown = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
-        conn->from >> downloadSize >> narSize;
-        return;
+        MissingPaths res;
+        res.willBuild = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+        res.willSubstitute = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+        res.unknown = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+        conn->from >> res.downloadSize >> res.narSize;
+        return res;
     }
 
  fallback:
-    return Store::queryMissing(targets, willBuild, willSubstitute,
-        unknown, downloadSize, narSize);
+    return Store::queryMissing(targets);
 }
 
 

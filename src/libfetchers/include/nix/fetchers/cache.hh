@@ -92,6 +92,4 @@ struct Cache
         Store & store) = 0;
 };
 
-ref<Cache> getCache();
-
 }

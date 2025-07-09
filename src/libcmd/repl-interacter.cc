@@ -2,6 +2,8 @@
 
 #include <cstdio>
 
+#include <signal.h>
+
 #if USE_READLINE
 #include <readline/history.h>
 #include <readline/readline.h>

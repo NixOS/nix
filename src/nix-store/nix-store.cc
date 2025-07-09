@@ -146,23 +146,19 @@ static void opRealise(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs)
         paths.push_back(followLinksToStorePathWithOutputs(*store, i));
 
-    uint64_t downloadSize, narSize;
-    StorePathSet willBuild, willSubstitute, unknown;
-    store->queryMissing(
-        toDerivedPaths(paths),
-        willBuild, willSubstitute, unknown, downloadSize, narSize);
+    auto missing = store->queryMissing(toDerivedPaths(paths));
 
     /* Filter out unknown paths from `paths`. */
     if (ignoreUnknown) {
         std::vector<StorePathWithOutputs> paths2;
         for (auto & i : paths)
-            if (!unknown.count(i.path)) paths2.push_back(i);
+            if (!missing.unknown.count(i.path)) paths2.push_back(i);
         paths = std::move(paths2);
-        unknown = StorePathSet();
+        missing.unknown = StorePathSet();
     }
 
     if (settings.printMissing)
-        printMissing(ref<Store>(store), willBuild, willSubstitute, unknown, downloadSize, narSize);
+        printMissing(ref<Store>(store), missing);
 
     if (dryRun) return;
 
@@ -862,7 +858,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
         auto options = ServeProto::Serialise<ServeProto::BuildOptions>::read(*store, rconn);
 
-        // Only certain feilds get initialized based on the protocol
+        // Only certain fields get initialized based on the protocol
         // version. This is why not all the code below is unconditional.
         // See how the serialization logic in
         // `ServeProto::Serialise<ServeProto::BuildOptions>` matches

@@ -78,7 +78,7 @@ enum struct TracePrint {
 };
 
 struct Trace {
-    std::shared_ptr<Pos> pos;
+    std::shared_ptr<const Pos> pos;
     HintFmt hint;
     TracePrint print = TracePrint::Default;
 };
@@ -88,7 +88,7 @@ inline std::strong_ordering operator<=>(const Trace& lhs, const Trace& rhs);
 struct ErrorInfo {
     Verbosity level;
     HintFmt msg;
-    std::shared_ptr<Pos> pos;
+    std::shared_ptr<const Pos> pos;
     std::list<Trace> traces;
     /**
      * Some messages are generated directly by expressions; notably `builtins.warn`, `abort`, `throw`.
@@ -172,7 +172,7 @@ public:
         err.status = status;
     }
 
-    void atPos(std::shared_ptr<Pos> pos) {
+    void atPos(std::shared_ptr<const Pos> pos) {
         err.pos = pos;
     }
 
@@ -182,12 +182,12 @@ public:
     }
 
     template<typename... Args>
-    void addTrace(std::shared_ptr<Pos> && e, std::string_view fs, const Args & ... args)
+    void addTrace(std::shared_ptr<const Pos> && e, std::string_view fs, const Args & ... args)
     {
         addTrace(std::move(e), HintFmt(std::string(fs), args...));
     }
 
-    void addTrace(std::shared_ptr<Pos> && e, HintFmt hint, TracePrint print = TracePrint::Default);
+    void addTrace(std::shared_ptr<const Pos> && e, HintFmt hint, TracePrint print = TracePrint::Default);
 
     bool hasTrace() const { return !err.traces.empty(); }
 

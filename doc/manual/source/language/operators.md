@@ -196,7 +196,7 @@ All comparison operators are implemented in terms of `<`, and the following equi
 
 ## Logical implication
 
-Equivalent to `!`*b1* `||` *b2*.
+Equivalent to `!`*b1* `||` *b2*  (or `if` *b1* `then` *b2* `else true`)
 
 [Logical implication]: #logical-implication
 

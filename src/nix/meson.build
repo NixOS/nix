@@ -227,7 +227,7 @@ foreach linkname : nix_symlinks
     # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
     build_by_default: true
   )
-  # TODO(Ericson3214): Dosen't yet work
+  # TODO(Ericson3214): Doesn't yet work
   #meson.override_find_program(linkname, t)
 endforeach
 
@@ -247,7 +247,7 @@ custom_target(
   # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
   build_by_default: true
 )
-# TODO(Ericson3214): Dosen't yet work
+# TODO(Ericson3214): Doesn't yet work
 #meson.override_find_program(linkname, t)
 
 localstatedir = nix_store.get_variable(

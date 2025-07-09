@@ -27,7 +27,7 @@ extern "C" {
 typedef struct nix_flake_settings nix_flake_settings;
 
 /**
- * @brief Context and paramaters for parsing a flake reference
+ * @brief Context and parameters for parsing a flake reference
  * @see nix_flake_reference_parse_flags_free
  * @see nix_flake_reference_parse_string
  */

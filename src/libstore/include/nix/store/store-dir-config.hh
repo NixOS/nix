@@ -89,7 +89,7 @@ struct MixStoreDirMethods
 
     /**
      * Read-only variant of addToStore(). It returns the store
-     * path for the given file sytem object.
+     * path for the given file system object.
      */
     std::pair<StorePath, Hash> computeStorePath(
         std::string_view name,
@@ -125,7 +125,7 @@ struct StoreDirConfigBase : Config
  */
 struct StoreDirConfig : StoreDirConfigBase, MixStoreDirMethods
 {
-    using Params = std::map<std::string, std::string>;
+    using Params = StringMap;
 
     StoreDirConfig(const Params & params);
 

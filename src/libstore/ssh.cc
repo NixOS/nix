@@ -34,7 +34,7 @@ SSHMaster::SSHMaster(
         throw Error("invalid SSH host name '%s'", host);
 
     auto state(state_.lock());
-    state->tmpDir = std::make_unique<AutoDelete>(createTempDir("", "nix", true, true, 0700));
+    state->tmpDir = std::make_unique<AutoDelete>(createTempDir("", "nix", 0700));
 }
 
 void SSHMaster::addCommonSSHOpts(Strings & args)
@@ -83,7 +83,7 @@ bool SSHMaster::isMasterRunning() {
 Strings createSSHEnv()
 {
     // Copy the environment and set SHELL=/bin/sh
-    std::map<std::string, std::string> env = getEnv();
+    StringMap env = getEnv();
 
     // SSH will invoke the "user" shell for -oLocalCommand, but that means
     // $SHELL. To keep things simple and avoid potential issues with other
