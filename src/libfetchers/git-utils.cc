@@ -725,7 +725,7 @@ struct GitSourceAccessor : SourceAccessor
             const git_error *e = git_error_last();
             std::string errorMsg = e ? e->message : "Unknown error";
             git_buf_dispose(&filtered);
-            throw std::runtime_error("Failed to filter blob: " + errorMsg);
+            throw Error("Failed to filter blob: " + errorMsg);
         }
         std::string result(filtered.ptr, filtered.size);
         git_buf_dispose(&filtered);
