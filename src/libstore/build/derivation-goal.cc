@@ -241,7 +241,17 @@ Goal::Co DerivationGoal::repairClosure()
        that produced those outputs. */
 
     /* Get the output closure. */
-    auto outputs = queryDerivationOutputMap();
+    auto outputs = [&] {
+        for (auto * drvStore : {&worker.evalStore, &worker.store})
+            if (drvStore->isValidPath(drvPath))
+                return worker.store.queryDerivationOutputMap(drvPath, drvStore);
+
+        OutputPathMap res;
+        for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
+            res.insert_or_assign(name, *output.second);
+        return res;
+    }();
+
     StorePathSet outputClosure;
     if (auto mPath = get(outputs, wantedOutput)) {
         worker.store.computeFSClosure(*mPath, outputClosure);
@@ -304,37 +314,6 @@ Goal::Co DerivationGoal::repairClosure()
     co_return done(BuildResult::AlreadyValid, assertPathValidity());
 }
 
-std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDerivationOutputMap()
-{
-    assert(!drv->type().isImpure());
-
-    for (auto * drvStore : {&worker.evalStore, &worker.store})
-        if (drvStore->isValidPath(drvPath))
-            return worker.store.queryPartialDerivationOutputMap(drvPath, drvStore);
-
-    /* In-memory derivation will naturally fall back on this case, where
-       we do best-effort with static information. */
-    std::map<std::string, std::optional<StorePath>> res;
-    for (auto & [name, output] : drv->outputs)
-        res.insert_or_assign(name, output.path(worker.store, drv->name, name));
-    return res;
-}
-
-OutputPathMap DerivationGoal::queryDerivationOutputMap()
-{
-    assert(!drv->type().isImpure());
-
-    for (auto * drvStore : {&worker.evalStore, &worker.store})
-        if (drvStore->isValidPath(drvPath))
-            return worker.store.queryDerivationOutputMap(drvPath, drvStore);
-
-    // See comment in `DerivationGoal::queryPartialDerivationOutputMap`.
-    OutputPathMap res;
-    for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
-        res.insert_or_assign(name, *output.second);
-    return res;
-}
-
 std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
 {
     if (drv->type().isImpure())
@@ -344,7 +323,20 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
     StringSet wantedOutputsLeft{wantedOutput};
     SingleDrvOutputs validOutputs;
 
-    for (auto & i : queryPartialDerivationOutputMap()) {
+    auto partialDerivationOutputMap = [&] {
+        for (auto * drvStore : {&worker.evalStore, &worker.store})
+            if (drvStore->isValidPath(drvPath))
+                return worker.store.queryPartialDerivationOutputMap(drvPath, drvStore);
+
+        /* In-memory derivation will naturally fall back on this case, where
+           we do best-effort with static information. */
+        std::map<std::string, std::optional<StorePath>> res;
+        for (auto & [name, output] : drv->outputs)
+            res.insert_or_assign(name, output.path(worker.store, drv->name, name));
+        return res;
+    }();
+
+    for (auto & i : partialDerivationOutputMap) {
         auto initialOutput = get(initialOutputs, i.first);
         if (!initialOutput)
             // this is an invalid output, gets caught with (!wantedOutputsLeft.empty())

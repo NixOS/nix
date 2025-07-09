@@ -79,14 +79,6 @@ struct DerivationGoal : public Goal
     Co haveDerivation();
 
     /**
-     * Wrappers around the corresponding Store methods that first consult the
-     * derivation.  This is currently needed because when there is no drv file
-     * there also is no DB entry.
-     */
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap();
-    OutputPathMap queryDerivationOutputMap();
-
-    /**
      * Update 'initialOutputs' to determine the current status of the
      * outputs of the derivation. Also returns a Boolean denoting
      * whether all outputs are valid and non-corrupt, and a
