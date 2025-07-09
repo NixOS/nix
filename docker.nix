@@ -184,11 +184,11 @@ let
       } " = ";
     };
 
-  nixConfContents = toConf {
+  nixConfContents = toConf ({
     sandbox = false;
     build-users-group = "nixbld";
     trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
-  };
+  } // nixConf);
 
   userHome = if uid == 0 then "/root" else "/home/${uname}";
 
