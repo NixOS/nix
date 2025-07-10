@@ -97,12 +97,6 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 
 <!-- Determinate Nix version 3.8.0 -->
 
-* Sync with upstream 2.30.0 by @edolstra in [DeterminateSystems/nix-src#135](https://github.com/DeterminateSystems/nix-src/pull/135)
-
 * nix flake check: Skip substitutable derivations by @edolstra in [DeterminateSystems/nix-src#134](https://github.com/DeterminateSystems/nix-src/pull/134)
 
 * lockFlake(): When updating a lock, respect the input's lock file by @edolstra in [DeterminateSystems/nix-src#137](https://github.com/DeterminateSystems/nix-src/pull/137)
-
-* Hide double copy warning by @edolstra in [DeterminateSystems/nix-src#138](https://github.com/DeterminateSystems/nix-src/pull/138)
-
-* Remove some dead code to minimize the upstream diff by @edolstra in [DeterminateSystems/nix-src#139](https://github.com/DeterminateSystems/nix-src/pull/139)
