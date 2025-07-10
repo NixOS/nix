@@ -58,13 +58,32 @@ protected:
         const std::string & mimeType) override
     {
         auto path2 = config->binaryCacheDir + "/" + path;
-        static std::atomic<int> counter{0};
-        Path tmp = fmt("%s.tmp.%d.%d", path2, getpid(), ++counter);
-        AutoDelete del(tmp, false);
-        StreamToSourceAdapter source(istream);
-        writeFile(tmp, source);
-        std::filesystem::rename(tmp, path2);
-        del.cancel();
+
+        /* Retry loop for handling race conditions */
+        while (true) {
+            Path tmp = makeTempPath(dirOf(path2), baseNameOf(path2) + ".tmp");
+            AutoDelete del(tmp, false);
+
+            StreamToSourceAdapter source(istream);
+            try {
+                writeFile(tmp, source);
+            } catch (Error & e) {
+                e.addTrace({}, "while writing to temporary file '%s' for '%s'", tmp, path2);
+            }
+
+            try {
+                std::filesystem::rename(tmp, path2);
+                del.cancel();
+                break; /* Success! */
+            } catch (std::filesystem::filesystem_error & e) {
+                if (e.code() == std::errc::file_exists) {
+                    /* Race condition: another process created the same file.
+                       Try again with a different name. */
+                    continue;
+                }
+                throw SysError("renaming '%s' to '%s'", tmp, path2);
+            }
+        }
     }
 
     void getFile(const std::string & path, Sink & sink) override
