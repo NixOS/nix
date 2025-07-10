@@ -12,7 +12,7 @@ $ ln -s /nix/store/d718ef...-foo /nix/var/nix/gcroots/bar
 That is, after this command, the garbage collector will not remove
 `/nix/store/d718ef...-foo` or any of its dependencies.
 
-Subdirectories of `prefix/nix/var/nix/gcroots` are also searched for
-symlinks. Symlinks to non-store paths are followed and searched for
-roots, but symlinks to non-store paths *inside* the paths reached in
-that way are not followed to prevent infinite recursion.
+Subdirectories of `prefix/nix/var/nix/gcroots` are searched
+recursively. Symlinks to store paths count as roots. Symlinks to
+non-store paths are ignored, unless the non-store path is itself a
+symlink to a store path.
