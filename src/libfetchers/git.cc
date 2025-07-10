@@ -571,7 +571,8 @@ struct GitInputScheme : InputScheme
 
         auto originalRef = input.getRef();
         bool shallow = getShallowAttr(input);
-        auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo, shallow);
+        auto defaultRef = getDefaultRef(repoInfo, shallow);
+        auto ref = originalRef ? *originalRef : defaultRef;
         input.attrs.insert_or_assign("ref", ref);
 
         std::filesystem::path repoDir;
@@ -621,16 +622,27 @@ struct GitInputScheme : InputScheme
             if (doFetch) {
                 bool shallow = getShallowAttr(input);
                 try {
-                    auto fetchRef =
-                        getAllRefsAttr(input)
-                        ? "refs/*:refs/*"
-                        : input.getRev()
-                        ? input.getRev()->gitRev()
-                        : ref.compare(0, 5, "refs/") == 0
-                        ? fmt("%1%:%1%", ref)
-                        : ref == "HEAD"
-                        ? ref
-                        : fmt("%1%:%1%", "refs/heads/" + ref);
+
+                    std::string fetchRef;
+                    // try all refs first if it's specified as it's the broadest
+                    // option
+                    if (getAllRefsAttr(input)) {
+                        fetchRef = "refs/*:refs/*";
+                    } else if (originalRef) {
+                        // FIXME: We should just use input.getRef() but it's modified above
+                        // If ref is specified try that next to fetch the latest ref
+                        // we will then check that the commit is part of it if given.
+                        if (ref.compare(0, 5, "refs/")) {
+                            fetchRef = fmt("%1%:%1%", ref);
+                        } else {
+                            fetchRef = *originalRef;
+                        }
+                    } else if (input.getRev()) {
+                        fetchRef = input.getRev()->gitRev();
+                    } else {
+                        fetchRef = defaultRef;
+                        Activity act(*logger, lvlChatty, actUnknown, fmt("using default reference as no ref or rev were specified: '%s'", defaultRef));
+                    }
 
                     repo->fetch(repoUrl.to_string(), fetchRef, shallow);
                 } catch (Error & e) {
