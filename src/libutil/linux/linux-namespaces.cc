@@ -1,3 +1,4 @@
+#include "nix/util/linux-namespaces.hh"
 #include "nix/util/current-process.hh"
 #include "nix/util/util.hh"
 #include "nix/util/finally.hh"

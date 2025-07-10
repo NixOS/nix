@@ -46,43 +46,41 @@ void printGCWarning()
 
 void printMissing(ref<Store> store, const std::vector<DerivedPath> & paths, Verbosity lvl)
 {
-    uint64_t downloadSize, narSize;
-    StorePathSet willBuild, willSubstitute, unknown;
-    store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
-    printMissing(store, willBuild, willSubstitute, unknown, downloadSize, narSize, lvl);
+    printMissing(store, store->queryMissing(paths), lvl);
 }
 
 
-void printMissing(ref<Store> store, const StorePathSet & willBuild,
-    const StorePathSet & willSubstitute, const StorePathSet & unknown,
-    uint64_t downloadSize, uint64_t narSize, Verbosity lvl)
+void printMissing(
+    ref<Store> store,
+    const MissingPaths & missing,
+    Verbosity lvl)
 {
-    if (!willBuild.empty()) {
-        if (willBuild.size() == 1)
+    if (!missing.willBuild.empty()) {
+        if (missing.willBuild.size() == 1)
             printMsg(lvl, "this derivation will be built:");
         else
-            printMsg(lvl, "these %d derivations will be built:", willBuild.size());
-        auto sorted = store->topoSortPaths(willBuild);
+            printMsg(lvl, "these %d derivations will be built:", missing.willBuild.size());
+        auto sorted = store->topoSortPaths(missing.willBuild);
         reverse(sorted.begin(), sorted.end());
         for (auto & i : sorted)
             printMsg(lvl, "  %s", store->printStorePath(i));
     }
 
-    if (!willSubstitute.empty()) {
-        const float downloadSizeMiB = downloadSize / (1024.f * 1024.f);
-        const float narSizeMiB = narSize / (1024.f * 1024.f);
-        if (willSubstitute.size() == 1) {
+    if (!missing.willSubstitute.empty()) {
+        const float downloadSizeMiB = missing.downloadSize / (1024.f * 1024.f);
+        const float narSizeMiB = missing.narSize / (1024.f * 1024.f);
+        if (missing.willSubstitute.size() == 1) {
             printMsg(lvl, "this path will be fetched (%.2f MiB download, %.2f MiB unpacked):",
                 downloadSizeMiB,
                 narSizeMiB);
         } else {
             printMsg(lvl, "these %d paths will be fetched (%.2f MiB download, %.2f MiB unpacked):",
-                willSubstitute.size(),
+                missing.willSubstitute.size(),
                 downloadSizeMiB,
                 narSizeMiB);
         }
         std::vector<const StorePath *> willSubstituteSorted = {};
-        std::for_each(willSubstitute.begin(), willSubstitute.end(),
+        std::for_each(missing.willSubstitute.begin(), missing.willSubstitute.end(),
                    [&](const StorePath &p) { willSubstituteSorted.push_back(&p); });
         std::sort(willSubstituteSorted.begin(), willSubstituteSorted.end(),
                   [](const StorePath *lhs, const StorePath *rhs) {
@@ -95,10 +93,10 @@ void printMissing(ref<Store> store, const StorePathSet & willBuild,
             printMsg(lvl, "  %s", store->printStorePath(*p));
     }
 
-    if (!unknown.empty()) {
+    if (!missing.unknown.empty()) {
         printMsg(lvl, "don't know how to build these paths%s:",
                 (settings.readOnlyMode ? " (may be caused by read-only store access)" : ""));
-        for (auto & i : unknown)
+        for (auto & i : missing.unknown)
             printMsg(lvl, "  %s", store->printStorePath(i));
     }
 }
@@ -176,16 +174,6 @@ void initNix(bool loadConfig)
        now.  In particular, store objects should be readable by
        everybody. */
     umask(0022);
-
-    /* Initialise the PRNG. */
-    struct timeval tv;
-    gettimeofday(&tv, 0);
-#ifndef _WIN32
-    srandom(tv.tv_usec);
-#endif
-    srand(tv.tv_usec);
-
-
 }
 
 
@@ -327,29 +315,34 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
     std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
         try {
-            fun();
-        } catch (...) {
-            /* Subtle: we have to make sure that any `interrupted'
-               condition is discharged before we reach printMsg()
-               below, since otherwise it will throw an (uncaught)
-               exception. */
-            setInterruptThrown();
-            throw;
+            try {
+                fun();
+            } catch (...) {
+                /* Subtle: we have to make sure that any `interrupted'
+                   condition is discharged before we reach printMsg()
+                   below, since otherwise it will throw an (uncaught)
+                   exception. */
+                setInterruptThrown();
+                throw;
+            }
+        } catch (Exit & e) {
+            return e.status;
+        } catch (UsageError & e) {
+            logError(e.info());
+            printError("Try '%1% --help' for more information.", programName);
+            return 1;
+        } catch (BaseError & e) {
+            logError(e.info());
+            return e.info().status;
+        } catch (std::bad_alloc & e) {
+            printError(error + "out of memory");
+            return 1;
+        } catch (std::exception & e) {
+            printError(error + e.what());
+            return 1;
         }
-    } catch (Exit & e) {
-        return e.status;
-    } catch (UsageError & e) {
-        logError(e.info());
-        printError("Try '%1% --help' for more information.", programName);
-        return 1;
-    } catch (BaseError & e) {
-        logError(e.info());
-        return e.info().status;
-    } catch (std::bad_alloc & e) {
-        printError(error + "out of memory");
-        return 1;
-    } catch (std::exception & e) {
-        printError(error + e.what());
+    } catch (...) {
+        /* In case logger also throws just give up. */
         return 1;
     }
 

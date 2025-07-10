@@ -515,7 +515,7 @@ public:
         R"(
           If set to `true` (the default), build logs written to
           `/nix/var/log/nix/drvs` are compressed on the fly using bzip2.
-          Otherwise, they aren't compressed.
+          Otherwise, they are not compressed.
         )",
         {"build-compress-log"}};
 
@@ -637,8 +637,8 @@ public:
           location in the sandbox; for instance, `/bin=/nix-bin` mounts
           the path `/nix-bin` as `/bin` inside the sandbox. If *source* is
           followed by `?`, then it is not an error if *source* does not exist;
-          for example, `/dev/nvidiactl?` specifies that `/dev/nvidiactl` only
-          be mounted in the sandbox if it exists in the host filesystem.
+          for example, `/dev/nvidiactl?` specifies that `/dev/nvidiactl`
+          only be mounted in the sandbox if it exists in the host filesystem.
 
           If the source is in the Nix store, then its closure is added to
           the sandbox as well.
@@ -682,7 +682,9 @@ public:
             description of the `size` option of `tmpfs` in mount(8). The default
             is `50%`.
         )"};
+#endif
 
+#if defined(__linux__) || defined(__FreeBSD__)
     Setting<Path> sandboxBuildDir{this, "/build", "sandbox-build-dir",
         R"(
             *Linux only*
@@ -695,14 +697,7 @@ public:
 
     Setting<std::optional<Path>> buildDir{this, std::nullopt, "build-dir",
         R"(
-            The directory on the host, in which derivations' temporary build directories are created.
-
-            If not set, Nix uses the system temporary directory indicated by the `TMPDIR` environment variable.
-            Note that builds are often performed by the Nix daemon, so its `TMPDIR` is used, and not that of the Nix command line interface.
-
-            This is also the location where [`--keep-failed`](@docroot@/command-ref/opt-common.md#opt-keep-failed) leaves its files.
-
-            If Nix runs without sandbox, or if the platform does not support sandboxing with bind mounts (e.g. macOS), then the [`builder`](@docroot@/language/derivations.md#attr-builder)'s environment contains this directory instead of the virtual location [`sandbox-build-dir`](#conf-sandbox-build-dir).
+            Override the `build-dir` store setting for all stores that have this setting.
         )"};
 
     Setting<PathSet> allowedImpureHostPrefixes{this, {}, "allowed-impure-host-deps",

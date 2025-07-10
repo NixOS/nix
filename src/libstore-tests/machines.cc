@@ -87,7 +87,7 @@ TEST(machines, getMachinesWithCommentsAndSemicolonSeparator) {
 
 TEST(machines, getMachinesWithFunnyWhitespace) {
     auto actual = Machine::parseConfig({},
-        "        # commment ; comment\n"
+        "        # comment ; comment\n"
         "   nix@scratchy.labs.cs.uu.nl ; nix@itchy.labs.cs.uu.nl   \n"
         "\n    \n"
         "\n ;;; \n"

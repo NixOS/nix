@@ -172,19 +172,6 @@
               };
 
           nix = final.nixComponents2.nix-cli;
-
-          # See https://github.com/NixOS/nixpkgs/pull/214409
-          # Remove when fixed in this flake's nixpkgs
-          pre-commit =
-            if prev.stdenv.hostPlatform.system == "i686-linux" then
-              (prev.pre-commit.override (o: {
-                dotnet-sdk = "";
-              })).overridePythonAttrs
-                (o: {
-                  doCheck = false;
-                })
-            else
-              prev.pre-commit;
         };
 
     in
@@ -230,28 +217,24 @@
             This shouldn't build anything significant; just check that things
             (including derivations) are _set up_ correctly.
           */
-          # Disabled due to a bug in `testEqualContents` (see
-          # https://github.com/NixOS/nix/issues/12690).
-          /*
-            packaging-overriding =
-              let
-                pkgs = nixpkgsFor.${system}.native;
-                nix = self.packages.${system}.nix;
-              in
-              assert (nix.appendPatches [ pkgs.emptyFile ]).libs.nix-util.src.patches == [ pkgs.emptyFile ];
-              if pkgs.stdenv.buildPlatform.isDarwin then
-                lib.warn "packaging-overriding check currently disabled because of a permissions issue on macOS" pkgs.emptyFile
-              else
-                # If this fails, something might be wrong with how we've wired the scope,
-                # or something could be broken in Nixpkgs.
-                pkgs.testers.testEqualContents {
-                  assertion = "trivial patch does not change source contents";
-                  expected = "${./.}";
-                  actual =
-                    # Same for all components; nix-util is an arbitrary pick
-                    (nix.appendPatches [ pkgs.emptyFile ]).libs.nix-util.src;
-                };
-          */
+          packaging-overriding =
+            let
+              pkgs = nixpkgsFor.${system}.native;
+              nix = self.packages.${system}.nix;
+            in
+            assert (nix.appendPatches [ pkgs.emptyFile ]).libs.nix-util.src.patches == [ pkgs.emptyFile ];
+            if pkgs.stdenv.buildPlatform.isDarwin then
+              lib.warn "packaging-overriding check currently disabled because of a permissions issue on macOS" pkgs.emptyFile
+            else
+              # If this fails, something might be wrong with how we've wired the scope,
+              # or something could be broken in Nixpkgs.
+              pkgs.testers.testEqualContents {
+                assertion = "trivial patch does not change source contents";
+                expected = "${./.}";
+                actual =
+                  # Same for all components; nix-util is an arbitrary pick
+                  (nix.appendPatches [ pkgs.emptyFile ]).libs.nix-util.src;
+              };
         }
         // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
           dockerImage = self.hydraJobs.dockerImage.${system};
@@ -450,8 +433,7 @@
           dockerImage =
             let
               pkgs = nixpkgsFor.${system}.native;
-              image = import ./docker.nix {
-                inherit pkgs;
+              image = pkgs.callPackage ./docker.nix {
                 tag = pkgs.nix.version;
               };
             in

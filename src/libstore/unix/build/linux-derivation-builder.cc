@@ -2,7 +2,7 @@
 
 #  include "nix/store/personality.hh"
 #  include "nix/util/cgroup.hh"
-#  include "nix/util/namespaces.hh"
+#  include "nix/util/linux-namespaces.hh"
 #  include "linux/fchmodat2-compat.hh"
 
 #  include <sys/ioctl.h>
@@ -155,6 +155,18 @@ static void doBind(const Path & source, const Path & target, bool optional = fal
 
 struct LinuxDerivationBuilder : DerivationBuilderImpl
 {
+    using DerivationBuilderImpl::DerivationBuilderImpl;
+
+    void enterChroot() override
+    {
+        setupSeccomp();
+
+        linux::setPersonality(drv.platform);
+    }
+};
+
+struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
+{
     /**
      * Pipe for synchronising updates to the builder namespaces.
      */
@@ -190,7 +202,7 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
      */
     std::optional<Path> cgroup;
 
-    using DerivationBuilderImpl::DerivationBuilderImpl;
+    using LinuxDerivationBuilder::LinuxDerivationBuilder;
 
     void deleteTmpDir(bool force) override
     {
@@ -356,6 +368,13 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
         if (buildUser && chown(chrootStoreDir.c_str(), 0, buildUser->getGID()) == -1)
             throw SysError("cannot change ownership of '%1%'", chrootStoreDir);
 
+        pathsInChroot = getPathsInSandbox();
+
+        for (auto & i : inputPaths) {
+            auto p = store.printStorePath(i);
+            pathsInChroot.insert_or_assign(p, store.toRealPath(p));
+        }
+
         /* If we're repairing, checking or rebuilding part of a
            multiple-outputs derivation, it's possible that we're
            rebuilding a path that is in settings.sandbox-paths
@@ -378,13 +397,6 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
             chownToBuilder(*cgroup + "/cgroup.procs");
             chownToBuilder(*cgroup + "/cgroup.threads");
             // chownToBuilder(*cgroup + "/cgroup.subtree_control");
-        }
-
-        pathsInChroot = getPathsInSandbox();
-
-        for (auto & i : inputPaths) {
-            auto p = store.printStorePath(i);
-            pathsInChroot.insert_or_assign(p, store.toRealPath(p));
         }
     }
 
@@ -657,8 +669,8 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
         }
 
         for (auto & i : ss) {
-            // For backwards-compatibiliy, resolve all the symlinks in the
-            // chroot paths
+            // For backwards-compatibility, resolve all the symlinks in the
+            // chroot paths.
             auto canonicalPath = canonPath(i, true);
             pathsInChroot.emplace(i, canonicalPath);
         }
@@ -772,11 +784,7 @@ struct LinuxDerivationBuilder : DerivationBuilderImpl
         if (rmdir("real-root") == -1)
             throw SysError("cannot remove real-root directory");
 
-        // FIXME: move to LinuxDerivationBuilder
-        setupSeccomp();
-
-        // FIXME: move to LinuxDerivationBuilder
-        linux::setPersonality(drv.platform);
+        LinuxDerivationBuilder::enterChroot();
     }
 
     void setUser() override

@@ -24,7 +24,11 @@ StorePath EvalState::devirtualize(const StorePath & path, StringMap * rewrites)
 {
     if (auto mount = storeFS->getMount(CanonPath(store->printStorePath(path)))) {
         auto storePath = fetchToStore(
-            *store, SourcePath{ref(mount)}, settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy, path.name());
+            fetchSettings,
+            *store,
+            SourcePath{ref(mount)},
+            settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
+            path.name());
         assert(storePath.name() == path.name());
         if (rewrites)
             rewrites->emplace(path.hashPart(), storePath.hashPart());
@@ -56,14 +60,13 @@ std::string EvalState::computeBaseName(const SourcePath & path, PosIdx pos)
 {
     if (path.accessor == rootFS) {
         if (auto storePath = store->maybeParseStorePath(path.path.abs())) {
-            warn(
-                "Copying '%s' to the store again\n"
+            debug(
+                "Copying '%s' to the store again.\n"
                 "You can make Nix evaluate faster and copy fewer files by replacing `./.` with the `self` flake input, "
-                "or `builtins.path { path = ./.; name = \"source\"; }`\n\n"
-                "Location: %s\n",
-                path,
-                positions[pos]);
-            return std::string(fetchToStore(*store, path, FetchMode::DryRun, storePath->name()).to_string());
+                "or `builtins.path { path = ./.; name = \"source\"; }`.\n",
+                path);
+            return std::string(
+                fetchToStore(fetchSettings, *store, path, FetchMode::DryRun, storePath->name()).to_string());
         }
     }
     return std::string(path.baseName());
@@ -72,8 +75,9 @@ std::string EvalState::computeBaseName(const SourcePath & path, PosIdx pos)
 StorePath EvalState::mountInput(
     fetchers::Input & input, const fetchers::Input & originalInput, ref<SourceAccessor> accessor, bool requireLockable)
 {
-    auto storePath = settings.lazyTrees ? StorePath::random(input.getName())
-                                        : fetchToStore(*store, accessor, FetchMode::Copy, input.getName());
+    auto storePath = settings.lazyTrees
+                         ? StorePath::random(input.getName())
+                         : fetchToStore(fetchSettings, *store, accessor, FetchMode::Copy, input.getName());
 
     allowPath(storePath); // FIXME: should just whitelist the entire virtual store
 
@@ -84,7 +88,7 @@ StorePath EvalState::mountInput(
             if (store->isValidPath(storePath))
                 _narHash = store->queryPathInfo(storePath)->narHash;
             else
-                _narHash = fetchToStore2(*store, accessor, FetchMode::DryRun, input.getName()).second;
+                _narHash = fetchToStore2(fetchSettings, *store, accessor, FetchMode::DryRun, input.getName()).second;
         }
         return _narHash;
     };

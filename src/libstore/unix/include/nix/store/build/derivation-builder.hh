@@ -104,14 +104,6 @@ struct DerivationBuilderCallbacks
      */
     virtual void closeLogFile() = 0;
 
-    /**
-     * Aborts if any output is not valid or corrupt, and otherwise
-     * returns a 'SingleDrvOutputs' structure containing all outputs.
-     *
-     * @todo Probably should just be in `DerivationGoal`.
-     */
-    virtual SingleDrvOutputs assertPathValidity() = 0;
-
     virtual void appendLogTailErrorMsg(std::string & msg) = 0;
 
     /**

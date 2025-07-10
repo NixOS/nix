@@ -29,7 +29,6 @@ AutoCloseFD createUnixDomainSocket()
     return fdSocket;
 }
 
-
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
 {
     auto fdSocket = nix::createUnixDomainSocket();
@@ -100,7 +99,6 @@ static void bindConnectProcHelper(
     }
 }
 
-
 void bind(Socket fd, const std::string & path)
 {
     unlink(path.c_str());
@@ -108,10 +106,9 @@ void bind(Socket fd, const std::string & path)
     bindConnectProcHelper("bind", ::bind, fd, path);
 }
 
-
-void connect(Socket fd, const std::string & path)
+void connect(Socket fd, const std::filesystem::path & path)
 {
-    bindConnectProcHelper("connect", ::connect, fd, path);
+    bindConnectProcHelper("connect", ::connect, fd, path.string());
 }
 
 AutoCloseFD connect(const std::filesystem::path & path)

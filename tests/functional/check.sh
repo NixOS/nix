@@ -22,6 +22,11 @@ clearStore
 nix-build dependencies.nix --no-out-link
 nix-build dependencies.nix --no-out-link --check
 
+# Make sure checking just one output works (#13293)
+nix-build multiple-outputs.nix -A a --no-out-link
+nix-store --delete "$(nix-build multiple-outputs.nix -A a.second --no-out-link)"
+nix-build multiple-outputs.nix -A a.first --no-out-link --check
+
 # Build failure exit codes (100, 104, etc.) are from
 # doc/manual/source/command-ref/status-build-failure.md
 

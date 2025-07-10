@@ -1,22 +1,15 @@
 #include "nix/store/build/derivation-builder.hh"
+#include "nix/util/file-system.hh"
 #include "nix/store/local-store.hh"
 #include "nix/util/processes.hh"
-#include "nix/store/indirect-root-store.hh"
-#include "nix/store/build/hook-instance.hh"
-#include "nix/store/build/worker.hh"
 #include "nix/store/builtins.hh"
-#include "nix/store/builtins/buildenv.hh"
 #include "nix/store/path-references.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/util.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/git.hh"
-#include "nix/util/compression.hh"
 #include "nix/store/daemon.hh"
 #include "nix/util/topo-sort.hh"
-#include "nix/util/callback.hh"
-#include "nix/util/json-utils.hh"
-#include "nix/util/current-process.hh"
 #include "nix/store/build/child.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
@@ -81,7 +74,7 @@ public:
         : DerivationBuilderParams{std::move(params)}
         , store{store}
         , miscMethods{std::move(miscMethods)}
-        , derivationType(drv.type())
+        , derivationType{drv.type()}
       { }
 
 protected:
@@ -126,7 +119,7 @@ protected:
     };
     typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
 
-    typedef std::map<std::string, std::string> Environment;
+    typedef StringMap Environment;
     Environment env;
 
     /**
@@ -621,23 +614,33 @@ static void replaceValidPath(const Path & storePath, const Path & tmpPath)
        tmpPath (the replacement), so we have to move it out of the
        way first.  We'd better not be interrupted here, because if
        we're repairing (say) Glibc, we end up with a broken system. */
-    Path oldPath = fmt("%1%.old-%2%-%3%", storePath, getpid(), rand());
-    if (pathExists(storePath))
-        movePath(storePath, oldPath);
+    Path oldPath;
 
+    if (pathExists(storePath)) {
+        // why do we loop here?
+        // although makeTempPath should be unique, we can't
+        // guarantee that.
+        do {
+            oldPath = makeTempPath(storePath, ".old");
+            // store paths are often directories so we can't just unlink() it
+            // let's make sure the path doesn't exist before we try to use it
+        } while (pathExists(oldPath));
+        movePath(storePath, oldPath);
+    }
     try {
         movePath(tmpPath, storePath);
     } catch (...) {
         try {
             // attempt to recover
-            movePath(oldPath, storePath);
+            if (!oldPath.empty())
+                movePath(oldPath, storePath);
         } catch (...) {
             ignoreExceptionExceptInterrupt();
         }
         throw;
     }
-
-    deletePath(oldPath);
+    if (!oldPath.empty())
+        deletePath(oldPath);
 }
 
 bool DerivationBuilderImpl::decideWhetherDiskFull()
@@ -701,6 +704,18 @@ static void handleChildException(bool sendException)
     }
 }
 
+static bool checkNotWorldWritable(std::filesystem::path path)
+{
+    while (true) {
+        auto st = lstat(path);
+        if (st.st_mode & S_IWOTH)
+            return false;
+        if (path == path.parent_path()) break;
+        path = path.parent_path();
+    }
+    return true;
+}
+
 void DerivationBuilderImpl::checkSystem()
 {
     /* Right platform? */
@@ -718,7 +733,7 @@ void DerivationBuilderImpl::checkSystem()
 
         // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware - we should tell them to run the command to install Darwin 2
         if (drv.platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin")
-          msg += fmt("\nNote: run `%s` to run programs for x86_64-darwin", Magenta("/usr/sbin/softwareupdate --install-rosetta"));
+            msg += fmt("\nNote: run `%s` to run programs for x86_64-darwin", Magenta("/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
 
         throw BuildError(msg);
     }
@@ -733,10 +748,16 @@ void DerivationBuilderImpl::startBuilder()
        calls. */
     prepareUser();
 
+    auto buildDir = getLocalStore(store).config->getBuildDir();
+
+    createDirs(buildDir);
+
+    if (buildUser && !checkNotWorldWritable(buildDir))
+        throw Error("Path %s or a parent directory is world-writable or a symlink. That's not allowed for security.", buildDir);
+
     /* Create a temporary directory where the build will take
        place. */
-    topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
-
+    topTmpDir = createTempDir(buildDir, "nix-build-" + std::string(drvPath.name()), 0700);
     setBuildTmpDir();
     assert(!tmpDir.empty());
 
@@ -892,8 +913,8 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
             optional = true;
             i.pop_back();
         }
-        size_t p = i.find('=');
 
+        size_t p = i.find('=');
         std::string inside, outside;
         if (p == std::string::npos) {
             inside = i;
@@ -903,16 +924,15 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
             outside = i.substr(p + 1);
         }
 
-        if (!optional && !maybeLstat(outside)) {
-          throw SysError("path '%s' is configured as part of the `sandbox-paths` option, but is inaccessible", outside);
-        }
+        if (!optional && !maybeLstat(outside))
+            throw SysError("path '%s' is configured as part of the `sandbox-paths` option, but is inaccessible", outside);
 
         pathsInChroot[inside] = {outside, optional};
     }
+
     if (hasPrefix(store.storeDir, tmpDirInSandbox()))
-    {
         throw Error("`sandbox-build-dir` must not contain the storeDir");
-    }
+
     pathsInChroot[tmpDirInSandbox()] = tmpDir;
 
     /* Add the closure of store paths to the chroot. */
@@ -923,7 +943,7 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
                 store.computeFSClosure(store.toStorePath(i.second.source).first, closure);
         } catch (InvalidPath & e) {
         } catch (Error & e) {
-            e.addTrace({}, "while processing 'sandbox-paths'");
+            e.addTrace({}, "while processing sandbox path '%s'", i.second.source);
             throw;
         }
     for (auto & i : closure) {
@@ -1100,7 +1120,6 @@ void DerivationBuilderImpl::initEnv()
                 env[i.first + "Path"] = tmpDirInSandbox() + "/" + fn;
             }
         }
-
     }
 
     /* For convenience, set an environment pointing to the top build
@@ -1939,7 +1958,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
            also a source for non-determinism. */
         if (delayedException)
             std::rethrow_exception(delayedException);
-        return miscMethods->assertPathValidity();
+        return {};
     }
 
     /* Apply output checks. */
@@ -2228,23 +2247,21 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     }
 
     #ifdef __linux__
-    if (useSandbox) {
-        if (!mountAndPidNamespacesSupported()) {
-            if (!settings.sandboxFallback)
-                throw Error("this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
-            debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
-            useSandbox = false;
-        }
+    if (useSandbox && !mountAndPidNamespacesSupported()) {
+        if (!settings.sandboxFallback)
+            throw Error("this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
+        debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
+        useSandbox = false;
     }
 
     if (useSandbox)
-        return std::make_unique<LinuxDerivationBuilder>(
+        return std::make_unique<ChrootLinuxDerivationBuilder>(
             store,
             std::move(miscMethods),
             std::move(params));
     #endif
 
-    if (params.drvOptions.useUidRange(params.drv))
+    if (!useSandbox && params.drvOptions.useUidRange(params.drv))
         throw Error("feature 'uid-range' is only supported in sandboxed builds");
 
     #ifdef __APPLE__
@@ -2253,6 +2270,11 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
         std::move(miscMethods),
         std::move(params),
         useSandbox);
+    #elif defined(__linux__)
+    return std::make_unique<LinuxDerivationBuilder>(
+        store,
+        std::move(miscMethods),
+        std::move(params));
     #else
     if (useSandbox)
         throw Error("sandboxing builds is not supported on this platform");

@@ -138,9 +138,9 @@ struct ExprPath : Expr
     ref<SourceAccessor> accessor;
     std::string s;
     Value v;
-    ExprPath(ref<SourceAccessor> accessor, std::string s, PosIdx pos) : accessor(accessor), s(std::move(s))
+    ExprPath(ref<SourceAccessor> accessor, std::string s) : accessor(accessor), s(std::move(s))
     {
-        v.mkPath(&*accessor, this->s.c_str(), pos.get());
+        v.mkPath(&*accessor, this->s.c_str());
     }
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
@@ -306,6 +306,9 @@ struct Formal
 struct Formals
 {
     typedef std::vector<Formal> Formals_;
+    /**
+     * @pre Sorted according to predicate (std::tie(a.name, a.pos) < std::tie(b.name, b.pos)).
+     */
     Formals_ formals;
     bool ellipsis;
 

@@ -19,7 +19,7 @@ namespace nix {
     const char *one_liner =
         "this is the other problem line of code";
 
-    TEST(logEI, catpuresBasicProperties) {
+    TEST(logEI, capturesBasicProperties) {
 
         MakeError(TestError, Error);
         ErrorInfo::programName = std::optional("error-unit-test");

@@ -67,17 +67,21 @@ TEST_F(nix_api_store_test, ReturnsValidStorePath)
     ASSERT_NE(result, nullptr);
     ASSERT_STREQ("name", result->path.name().data());
     ASSERT_STREQ(PATH_SUFFIX.substr(1).c_str(), result->path.to_string().data());
+    nix_store_path_free(result);
 }
 
 TEST_F(nix_api_store_test, SetsLastErrCodeToNixOk)
 {
-    nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
     ASSERT_EQ(ctx->last_err_code, NIX_OK);
+    nix_store_path_free(path);
 }
 
 TEST_F(nix_api_store_test, DoesNotCrashWhenContextIsNull)
 {
-    ASSERT_NO_THROW(nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str()));
+    StorePath * path = nullptr;
+    ASSERT_NO_THROW(path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str()));
+    nix_store_path_free(path);
 }
 
 TEST_F(nix_api_store_test, get_version)
@@ -115,6 +119,7 @@ TEST_F(nix_api_store_test, nix_store_is_valid_path_not_in_store)
 {
     StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
     ASSERT_EQ(false, nix_store_is_valid_path(ctx, store, path));
+    nix_store_path_free(path);
 }
 
 TEST_F(nix_api_store_test, nix_store_real_path)

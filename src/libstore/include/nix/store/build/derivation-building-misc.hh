@@ -1,6 +1,6 @@
 #pragma once
 /**
- * @file Misc type defitions for both local building and remote (RPC building)
+ * @file Misc type definitions for both local building and remote (RPC building)
  */
 
 #include "nix/util/hash.hh"

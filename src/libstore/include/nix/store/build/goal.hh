@@ -50,6 +50,16 @@ enum struct JobCategory {
      * A substitution an arbitrary store object; it will use network resources.
      */
     Substitution,
+    /**
+     * A goal that does no "real" work by itself, and just exists to depend on
+     * other goals which *do* do real work. These goals therefore are not
+     * limited.
+     *
+     * These goals cannot infinitely create themselves, so there is no risk of
+     * a "fork bomb" type situation (which would be a problem even though the
+     * goal do no real work) either.
+     */
+    Administration,
 };
 
 struct Goal : public std::enable_shared_from_this<Goal>
@@ -61,7 +71,7 @@ private:
     Goals waitees;
 
 public:
-    typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure} ExitCode;
+    typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters} ExitCode;
 
     /**
      * Backlink to the worker.
@@ -84,12 +94,6 @@ public:
      * failed because there are no substituters.
      */
     size_t nrNoSubstituters = 0;
-
-    /**
-     * Number of substitution goals we are/were waiting for that
-     * failed because they had unsubstitutable references.
-     */
-    size_t nrIncompleteClosure = 0;
 
     /**
      * Name of this goal for debugging purposes.
@@ -345,17 +349,6 @@ protected:
     std::optional<Co> top_co;
 
     /**
-     * The entry point for the goal
-     */
-    virtual Co init() = 0;
-
-    /**
-     * Wrapper around @ref init since virtual functions
-     * can't be used in constructors.
-     */
-    inline Co init_wrapper();
-
-    /**
      * Signals that the goal is done.
      * `co_return` the result. If you're not inside a coroutine, you can ignore
      * the return value safely.
@@ -378,12 +371,23 @@ public:
     BuildResult getBuildResult(const DerivedPath &) const;
 
     /**
+     * Hack to say that this goal should not log `ex`, but instead keep
+     * it around. Set by a waitee which sees itself as the designated
+     * continuation of this goal, responsible for reporting its
+     * successes or failures.
+     *
+     * @todo this is yet another not-nice hack in the goal system that
+     * we ought to get rid of. See #11927
+     */
+    bool preserveException = false;
+
+    /**
      * Exception containing an error message, if any.
      */
     std::optional<Error> ex;
 
-    Goal(Worker & worker)
-        : worker(worker), top_co(init_wrapper())
+    Goal(Worker & worker, Co init)
+        : worker(worker), top_co(std::move(init))
     {
         // top_co shouldn't have a goal already, should be nullptr.
         assert(!top_co->handle.promise().goal);
@@ -446,7 +450,3 @@ template<typename... ArgTypes>
 struct std::coroutine_traits<nix::Goal::Co, ArgTypes...> {
     using promise_type = nix::Goal::promise_type;
 };
-
-nix::Goal::Co nix::Goal::init_wrapper() {
-    co_return init();
-}

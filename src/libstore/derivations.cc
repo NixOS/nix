@@ -412,7 +412,7 @@ Derivation parseDerivation(
         expect(str, "rvWithVersion(");
         auto versionS = parseString(str);
         if (*versionS == "xp-dyn-drv") {
-            // Only verison we have so far
+            // Only version we have so far
             version = DerivationATermVersion::DynamicDerivations;
             xpSettings.require(Xp::DynamicDerivations);
         } else {
@@ -553,7 +553,7 @@ static void unparseDerivedPathMapNode(const StoreDirConfig & store, std::string 
  * derivation?
  *
  * In other words, does it on the output of derivation that is itself an
- * ouput of a derivation? This corresponds to a dependency that is an
+ * output of a derivation? This corresponds to a dependency that is an
  * inductive derived path with more than one layer of
  * `DerivedPath::Built`.
  */
@@ -1333,6 +1333,11 @@ nlohmann::json Derivation::toJSON(const StoreDirConfig & store) const
     res["args"] = args;
     res["env"] = env;
 
+    if (auto it = env.find("__json"); it != env.end()) {
+        res["env"].erase("__json");
+        res["structuredAttrs"] = nlohmann::json::parse(it->second);
+    }
+
     return res;
 }
 
@@ -1396,7 +1401,17 @@ Derivation Derivation::fromJSON(
     res.platform = getString(valueAt(json, "system"));
     res.builder = getString(valueAt(json, "builder"));
     res.args = getStringList(valueAt(json, "args"));
-    res.env = getStringMap(valueAt(json, "env"));
+
+    auto envJson = valueAt(json, "env");
+    try {
+        res.env = getStringMap(envJson);
+    } catch (Error & e) {
+        e.addTrace({}, "while reading key 'env'");
+        throw;
+    }
+
+    if (auto structuredAttrs = get(json, "structuredAttrs"))
+        res.env.insert_or_assign("__json", structuredAttrs->dump());
 
     return res;
 }

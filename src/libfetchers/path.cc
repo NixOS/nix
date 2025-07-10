@@ -4,6 +4,7 @@
 #include "nix/fetchers/store-path-accessor.hh"
 #include "nix/fetchers/cache.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 namespace nix::fetchers {
 
@@ -127,8 +128,6 @@ struct PathInputScheme : InputScheme
 
         auto absPath = getAbsPath(input);
 
-        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying %s to the store", absPath));
-
         // FIXME: check whether access to 'path' is allowed.
         auto storePath = store->maybeParseStorePath(absPath.string());
 
@@ -137,6 +136,7 @@ struct PathInputScheme : InputScheme
 
         time_t mtime = 0;
         if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying %s to the store", absPath));
             // FIXME: try to substitute storePath.
             auto src = sinkToSource([&](Sink & sink) {
                 mtime = dumpPathAndGetMtime(absPath.string(), sink, defaultPathFilter);
@@ -150,7 +150,7 @@ struct PathInputScheme : InputScheme
         // store, pre-create an entry in the fetcher cache.
         auto info = store->queryPathInfo(*storePath);
         accessor->fingerprint = fmt("path:%s", store->queryPathInfo(*storePath)->narHash.to_string(HashFormat::SRI, true));
-        fetchers::getCache()->upsert(
+        input.settings->getCache()->upsert(
             makeSourcePathToHashCacheKey(*accessor->fingerprint, ContentAddressMethod::Raw::NixArchive, "/"),
             {{"hash", info->narHash.to_string(HashFormat::SRI, true)}});
 

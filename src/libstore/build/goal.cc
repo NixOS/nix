@@ -151,11 +151,11 @@ Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
     trace("done");
     assert(top_co);
     assert(exitCode == ecBusy);
-    assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure);
+    assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters);
     exitCode = result;
 
     if (ex) {
-        if (!waiters.empty())
+        if (!preserveException && !waiters.empty())
             logError(ex->info());
         else
             this->ex = std::move(*ex);
@@ -170,11 +170,9 @@ Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
 
             goal->trace(fmt("waitee '%s' done; %d left", name, goal->waitees.size()));
 
-            if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure) ++goal->nrFailed;
+            if (result == ecFailed || result == ecNoSubstituters) ++goal->nrFailed;
 
             if (result == ecNoSubstituters) ++goal->nrNoSubstituters;
-
-            if (result == ecIncompleteClosure) ++goal->nrIncompleteClosure;
 
             if (goal->waitees.empty()) {
                 worker.wakeUp(goal);

@@ -214,7 +214,7 @@ struct DerivationType {
     /**
      * Impure derivation type
      *
-     * This is similar at buil-time to the content addressed, not standboxed, not fixed
+     * This is similar at build-time to the content addressed, not standboxed, not fixed
      * type, but has some restrictions on its usage.
      */
     struct Impure {
