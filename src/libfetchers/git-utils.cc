@@ -1,6 +1,7 @@
 #include "nix/fetchers/git-utils.hh"
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/cache.hh"
+#include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/signals.hh"
@@ -321,8 +322,17 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
             for (size_t n = 0; n < git_commit_parentcount(commit->get()); ++n) {
                 git_commit * parent;
-                if (git_commit_parent(&parent, commit->get(), n))
-                    throw Error("getting parent of Git commit '%s': %s", *git_commit_id(commit->get()), git_error_last()->message);
+                if (git_commit_parent(&parent, commit->get(), n)) {
+                    throw Error(
+                        "Failed to retrieve the parent of Git commit '%s': %s. "
+                        "This may be due to an incomplete repository history. "
+                        "To resolve this, either enable the shallow parameter in your flake URL (?shallow=1) "
+                        "or add set the shallow parameter to true in builtins.fetchGit, "
+                        "or fetch the complete history for this branch.",
+                        *git_commit_id(commit->get()),
+                        git_error_last()->message
+                    );
+                }
                 todo.push(Commit(parent));
             }
         }
@@ -367,7 +377,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         if (git_config_iterator_glob_new(Setter(it), config.get(), "^submodule\\..*\\.(path|url|branch)$"))
             throw Error("iterating over .gitmodules: %s", git_error_last()->message);
 
-        std::map<std::string, std::string> entries;
+        StringMap entries;
 
         while (true) {
             git_config_entry * entry = nullptr;
@@ -586,7 +596,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         });
 
         /* Evaluate result through status code and checking if public
-           key fingerprints appear on stderr. This is neccessary
+           key fingerprints appear on stderr. This is necessary
            because the git command might also succeed due to the
            commit being signed by gpg keys that are present in the
            users key agent. */
@@ -610,18 +620,18 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             throw Error("Commit signature verification on commit %s failed: %s", rev.gitRev(), output);
     }
 
-    Hash treeHashToNarHash(const Hash & treeHash) override
+    Hash treeHashToNarHash(const fetchers::Settings & settings, const Hash & treeHash) override
     {
         auto accessor = getAccessor(treeHash, false, "");
 
         fetchers::Cache::Key cacheKey{"treeHashToNarHash", {{"treeHash", treeHash.gitRev()}}};
 
-        if (auto res = fetchers::getCache()->lookup(cacheKey))
+        if (auto res = settings.getCache()->lookup(cacheKey))
             return Hash::parseAny(fetchers::getStrAttr(*res, "narHash"), HashAlgorithm::SHA256);
 
         auto narHash = accessor->hashPath(CanonPath::root);
 
-        fetchers::getCache()->upsert(cacheKey, fetchers::Attrs({{"narHash", narHash.to_string(HashFormat::SRI, true)}}));
+        settings.getCache()->upsert(cacheKey, fetchers::Attrs({{"narHash", narHash.to_string(HashFormat::SRI, true)}}));
 
         return narHash;
     }

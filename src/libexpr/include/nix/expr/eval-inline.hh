@@ -92,12 +92,20 @@ Env & EvalState::allocEnv(size_t size)
 [[gnu::always_inline]]
 void EvalState::forceValue(Value & v, const PosIdx pos)
 {
+#if 0
     auto type = v.internalType.load(std::memory_order_acquire);
 
     if (isFinished(type))
         goto done;
 
     if (type == tThunk) {
+#endif
+
+    if (v.isThunk()) {
+#if 0
+        Env * env = v.thunk().env;
+        assert(env || v.isBlackhole());
+        Expr * expr = v.thunk().expr;
         try {
             if (!v.internalType.compare_exchange_strong(type, tPending, std::memory_order_acquire, std::memory_order_acquire)) {
                 if (type == tPending || type == tAwaited) {
@@ -118,7 +126,9 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
             v.mkFailed();
             throw;
         }
+#endif
     }
+#if 0
     else if (type == tApp) {
         try {
             if (!v.internalType.compare_exchange_strong(type, tPending, std::memory_order_acquire, std::memory_order_acquire)) {
@@ -146,6 +156,7 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
  done:
     if (type == tFailed)
         std::rethrow_exception(v.payload.failed->ex);
+#endif
 }
 
 

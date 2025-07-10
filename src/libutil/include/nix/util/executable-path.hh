@@ -8,7 +8,7 @@ namespace nix {
 MakeError(ExecutableLookupError, Error);
 
 /**
- * @todo rename, it is not just good for execuatable paths, but also
+ * @todo rename, it is not just good for executable paths, but also
  * other lists of paths.
  */
 struct ExecutablePath
@@ -51,7 +51,7 @@ struct ExecutablePath
      *
      * @param exe This must just be a name, and not contain any `/` (or
      * `\` on Windows). in case it does, per the spec no lookup should
-     * be perfomed, and the path (it is not just a file name) as is.
+     * be performed, and the path (it is not just a file name) as is.
      * This is the caller's respsonsibility.
      *
      * This is a pure function, except for the default `isExecutable`

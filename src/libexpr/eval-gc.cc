@@ -4,6 +4,7 @@
 #include "nix/util/config-global.hh"
 #include "nix/util/serialise.hh"
 #include "nix/expr/eval-gc.hh"
+#include "nix/expr/value.hh"
 
 #include "expr-config-private.hh"
 
@@ -87,6 +88,13 @@ static inline void initGCReal()
     GC_INIT();
 
     GC_allow_register_threads();
+
+    /* Register valid displacements in case we are using alignment niches
+       for storing the type information. This way tagged pointers are considered
+       to be valid, even when they are not aligned. */
+    if constexpr (detail::useBitPackedValueStorage<sizeof(void *)>)
+        for (std::size_t i = 1; i < sizeof(std::uintptr_t); ++i)
+            GC_register_displacement(i);
 
     GC_set_oom_fn(oomHandler);
 

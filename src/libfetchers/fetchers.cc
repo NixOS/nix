@@ -135,7 +135,7 @@ ParsedURL Input::toURL() const
     return scheme->toURL(*this);
 }
 
-std::string Input::toURLString(const std::map<std::string, std::string> & extraQuery) const
+std::string Input::toURLString(const StringMap & extraQuery) const
 {
     auto url = toURL();
     for (auto & attr : extraQuery)
@@ -198,7 +198,7 @@ std::tuple<StorePath, ref<SourceAccessor>, Input> Input::fetchToStore(ref<Store>
     try {
         auto [accessor, result] = getAccessorUnchecked(store);
 
-        auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, result.getName());
+        auto storePath = nix::fetchToStore(*settings, *store, SourcePath(accessor), FetchMode::Copy, result.getName());
 
         auto narHash = store->queryPathInfo(storePath)->narHash;
         result.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));

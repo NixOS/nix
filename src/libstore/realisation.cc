@@ -96,7 +96,7 @@ Realisation Realisation::fromJSON(
 
     std::map <DrvOutput, StorePath> dependentRealisations;
     if (auto jsonDependencies = json.find("dependentRealisations"); jsonDependencies != json.end())
-        for (auto & [jsonDepId, jsonDepOutPath] : jsonDependencies->get<std::map<std::string, std::string>>())
+        for (auto & [jsonDepId, jsonDepOutPath] : jsonDependencies->get<StringMap>())
             dependentRealisations.insert({DrvOutput::parse(jsonDepId), StorePath(jsonDepOutPath)});
 
     return Realisation{

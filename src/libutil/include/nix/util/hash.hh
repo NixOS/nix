@@ -38,7 +38,7 @@ enum struct HashFormat : int {
     /// @brief Lowercase hexadecimal encoding. @see base16Chars
     Base16,
     /// @brief "<hash algo>:<Base 64 hash>", format of the SRI integrity attribute.
-    /// @see W3C recommendation [Subresource Intergrity](https://www.w3.org/TR/SRI/).
+    /// @see W3C recommendation [Subresource Integrity](https://www.w3.org/TR/SRI/).
     SRI
 };
 
@@ -68,7 +68,7 @@ struct Hash
 
     /**
      * Parse a hash from a string representation like the above, except the
-     * type prefix is mandatory is there is no separate arguement.
+     * type prefix is mandatory is there is no separate argument.
      */
     static Hash parseAnyPrefixed(std::string_view s);
 

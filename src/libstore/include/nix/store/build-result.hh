@@ -16,7 +16,7 @@ struct BuildResult
 {
     /**
      * @note This is directly used in the nix-store --serve protocol.
-     * That means we need to worry about compatability across versions.
+     * That means we need to worry about compatibility across versions.
      * Therefore, don't remove status codes, and only add new status
      * codes at the end of the list.
      */

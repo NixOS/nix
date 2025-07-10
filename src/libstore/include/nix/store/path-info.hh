@@ -51,7 +51,7 @@ struct UnkeyedValidPathInfo
     Hash narHash;
 
     /**
-     * Other store objects this store object referes to.
+     * Other store objects this store object refers to.
      */
     StorePathSet references;
 

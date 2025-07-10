@@ -338,7 +338,7 @@ struct MixEnvironment : virtual Args
 
     StringSet keepVars;
     StringSet unsetVars;
-    std::map<std::string, std::string> setVars;
+    StringMap setVars;
     bool ignoreEnvironment;
 
     MixEnvironment();

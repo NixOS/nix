@@ -71,6 +71,18 @@ struct KeyedBuildResult;
 
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
+/**
+ * Information about what paths will be built or substituted, returned
+ * by Store::queryMissing().
+ */
+struct MissingPaths
+{
+    StorePathSet willBuild;
+    StorePathSet willSubstitute;
+    StorePathSet unknown;
+    uint64_t downloadSize{0};
+    uint64_t narSize{0};
+};
 
 /**
  * About the class hierarchy of the store types:
@@ -382,7 +394,7 @@ public:
 
     /**
      * Query the mapping outputName => outputPath for the given
-     * derivation. All outputs are mentioned so ones mising the mapping
+     * derivation. All outputs are mentioned so ones missing the mapping
      * are mapped to `std::nullopt`.
      */
     virtual std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(
@@ -694,9 +706,7 @@ public:
      * derivations that will be built, and the set of output paths that
      * will be substituted.
      */
-    virtual void queryMissing(const std::vector<DerivedPath> & targets,
-        StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-        uint64_t & downloadSize, uint64_t & narSize);
+    virtual MissingPaths queryMissing(const std::vector<DerivedPath> & targets);
 
     /**
      * Sort a set of paths topologically under the references
@@ -809,7 +819,7 @@ protected:
 
     /**
      * Helper for methods that are not unsupported: this is used for
-     * default definitions for virtual methods that are meant to be overriden.
+     * default definitions for virtual methods that are meant to be overridden.
      *
      * @todo Using this should be a last resort. It is better to make
      * the method "virtual pure" and/or move it to a subclass.

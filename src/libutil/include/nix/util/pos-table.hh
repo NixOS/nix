@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "nix/util/lru-cache.hh"
 #include "nix/util/pos-idx.hh"
 #include "nix/util/position.hh"
 #include "nix/util/sync.hh"
@@ -37,9 +38,20 @@ public:
     };
 
 private:
+    /**
+     * Vector of byte offsets (in the virtual input buffer) of initial line character's position.
+     * Sorted by construction. Binary search over it allows for efficient translation of arbitrary
+     * byte offsets in the virtual input buffer to its line + column position.
+     */
     using Lines = std::vector<uint32_t>;
+    /**
+     * Cache from byte offset in the virtual buffer of Origins -> @ref Lines in that origin.
+     */
+    using LinesCache = LRUCache<uint32_t, Lines>;
 
     mutable Sync<std::map<uint32_t, Lines>> lines;
+
+    mutable Sync<LinesCache> linesCache;
 
     // FIXME: this could be made lock-free (at least for access) if we
     // have a data structure where pointers to existing positions are
@@ -50,9 +62,6 @@ private:
     };
 
     SharedSync<State> state_;
-
-public:
-    PosTable() {}
 
     const Origin * resolve(PosIdx p) const
     {
@@ -69,6 +78,11 @@ public:
     }
 
 public:
+    PosTable(std::size_t linesCacheCapacity = 65536)
+        : linesCache(linesCacheCapacity)
+    {
+    }
+
     Origin addOrigin(Pos::Origin origin, size_t size)
     {
         auto state(state_.lock());

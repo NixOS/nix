@@ -481,11 +481,11 @@ struct GitInputScheme : InputScheme
         return repoInfo;
     }
 
-    uint64_t getLastModified(const RepoInfo & repoInfo, const std::filesystem::path & repoDir, const Hash & rev) const
+    uint64_t getLastModified(const Settings & settings, const RepoInfo & repoInfo, const std::filesystem::path & repoDir, const Hash & rev) const
     {
         Cache::Key key{"gitLastModified", {{"rev", rev.gitRev()}}};
 
-        auto cache = getCache();
+        auto cache = settings.getCache();
 
         if (auto res = cache->lookup(key))
             return getIntAttr(*res, "lastModified");
@@ -497,11 +497,11 @@ struct GitInputScheme : InputScheme
         return lastModified;
     }
 
-    uint64_t getRevCount(const RepoInfo & repoInfo, const std::filesystem::path & repoDir, const Hash & rev) const
+    uint64_t getRevCount(const Settings & settings, const RepoInfo & repoInfo, const std::filesystem::path & repoDir, const Hash & rev) const
     {
         Cache::Key key{"gitRevCount", {{"rev", rev.gitRev()}}};
 
-        auto cache = getCache();
+        auto cache = settings.getCache();
 
         if (auto revCountAttrs = cache->lookup(key))
             return getIntAttr(*revCountAttrs, "revCount");
@@ -679,12 +679,12 @@ struct GitInputScheme : InputScheme
 
         Attrs infoAttrs({
             {"rev", rev.gitRev()},
-            {"lastModified", getLastModified(repoInfo, repoDir, rev)},
+            {"lastModified", getLastModified(*input.settings, repoInfo, repoDir, rev)},
         });
 
         if (!getShallowAttr(input))
             infoAttrs.insert_or_assign("revCount",
-                getRevCount(repoInfo, repoDir, rev));
+                getRevCount(*input.settings, repoInfo, repoDir, rev));
 
         printTalkative("using revision %s of repo '%s'", rev.gitRev(), repoInfo.locationToArg());
 
@@ -799,8 +799,10 @@ struct GitInputScheme : InputScheme
             auto rev = repoInfo.workdirInfo.headRev.value_or(nullRev);
 
             input.attrs.insert_or_assign("rev", rev.gitRev());
-            input.attrs.insert_or_assign("revCount",
-                rev == nullRev ? 0 : getRevCount(repoInfo, repoPath, rev));
+            if (!getShallowAttr(input)) {
+                input.attrs.insert_or_assign("revCount",
+                    rev == nullRev ? 0 : getRevCount(*input.settings, repoInfo, repoPath, rev));
+            }
 
             verifyCommit(input, repo);
         } else {
@@ -819,7 +821,7 @@ struct GitInputScheme : InputScheme
         input.attrs.insert_or_assign(
             "lastModified",
             repoInfo.workdirInfo.headRev
-            ? getLastModified(repoInfo, repoPath, *repoInfo.workdirInfo.headRev)
+            ? getLastModified(*input.settings, repoInfo, repoPath, *repoInfo.workdirInfo.headRev)
             : 0);
 
         return {accessor, std::move(input)};

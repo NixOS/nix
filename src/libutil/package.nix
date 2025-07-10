@@ -37,6 +37,8 @@ mkMesonLibrary (finalAttrs: {
     ./include/nix/util/meson.build
     ./linux/meson.build
     ./linux/include/nix/util/meson.build
+    ./freebsd/meson.build
+    ./freebsd/include/nix/util/meson.build
     ./unix/meson.build
     ./unix/include/nix/util/meson.build
     ./windows/meson.build

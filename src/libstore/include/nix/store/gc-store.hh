@@ -98,7 +98,7 @@ struct GCResults
  *    Some views have only a no-op temp roots even though others to the
  *    same store allow triggering GC. For instance one can't add a root
  *    over ssh, but that doesn't prevent someone from gc-ing that store
- *    accesed via SSH locally).
+ *    accessed via SSH locally).
  *
  *  - The derived `LocalFSStore` class has `LocalFSStore::addPermRoot`,
  *    which is not part of this class because it relies on the notion of

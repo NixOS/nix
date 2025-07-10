@@ -40,5 +40,9 @@ in
 
       # Test that /nix/store is available via an overlayfs mount.
       machine.succeed("nix shell --store /tmp/nix ${pkgA} --command cowsay foo >&2")
+
+      # Building in /tmp should fail for security reasons.
+      err = machine.fail("nix build --offline --store /tmp/nix --expr 'builtins.derivation { name = \"foo\"; system = \"x86_64-linux\"; builder = \"/foo\"; }' 2>&1")
+      assert "is world-writable" in err
     '';
 }

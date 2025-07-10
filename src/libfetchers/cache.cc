@@ -1,4 +1,5 @@
 #include "nix/fetchers/cache.hh"
+#include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/users.hh"
 #include "nix/store/sqlite.hh"
 #include "nix/util/sync.hh"
@@ -163,10 +164,12 @@ struct CacheImpl : Cache
     }
 };
 
-ref<Cache> getCache()
+ref<Cache> Settings::getCache() const
 {
-    static auto cache = std::make_shared<CacheImpl>();
-    return ref<Cache>(cache);
+    auto cache(_cache.lock());
+    if (!*cache)
+        *cache = std::make_shared<CacheImpl>();
+    return ref<Cache>(*cache);
 }
 
 }

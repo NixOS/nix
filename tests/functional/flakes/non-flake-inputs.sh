@@ -37,11 +37,20 @@ cat > "$flake3Dir/flake.nix" <<EOF
       url = "$nonFlakeDir/README.md";
       flake = false;
     };
+    nonFlakeFile3 = {
+      url = "$nonFlakeDir?dir=README.md";
+      flake = false;
+    };
+    relativeNonFlakeFile = {
+      url = ./config.nix;
+      flake = false;
+    };
   };
 
   description = "Fnord";
 
   outputs = inputs: rec {
+    inherit inputs;
     packages.$system.xyzzy = inputs.flake2.packages.$system.bar;
     packages.$system.sth = inputs.flake1.packages.$system.foo;
     packages.$system.fnord =
@@ -87,6 +96,44 @@ nix build -o "$TEST_ROOT/result" flake3#sth
 mv "$flake2Dir.tmp" "$flake2Dir"
 mv "$nonFlakeDir.tmp" "$nonFlakeDir"
 _NIX_TEST_BARF_ON_UNCACHEABLE='' nix build -o "$TEST_ROOT/result" flake3#xyzzy flake3#fnord
+
+# Check non-flake inputs have a sourceInfo and an outPath
+#
+# This may look redundant, but the other checks below happen in a command
+# substitution subshell, so failures there will not exit this shell
+export _NIX_TEST_BARF_ON_UNCACHEABLE='' # FIXME
+nix eval --raw flake3#inputs.nonFlake.outPath
+nix eval --raw flake3#inputs.nonFlake.sourceInfo.outPath
+nix eval --raw flake3#inputs.nonFlakeFile.outPath
+nix eval --raw flake3#inputs.nonFlakeFile.sourceInfo.outPath
+nix eval --raw flake3#inputs.nonFlakeFile2.outPath
+nix eval --raw flake3#inputs.nonFlakeFile2.sourceInfo.outPath
+nix eval --raw flake3#inputs.nonFlakeFile3.outPath
+nix eval --raw flake3#inputs.nonFlakeFile3.sourceInfo.outPath
+nix eval --raw flake3#inputs.relativeNonFlakeFile.outPath
+nix eval --raw flake3#inputs.relativeNonFlakeFile.sourceInfo.outPath
+
+# Check non-flake file inputs have the expected outPaths
+[[
+  $(nix eval --raw flake3#inputs.nonFlake.outPath) \
+  = $(nix eval --raw flake3#inputs.nonFlake.sourceInfo.outPath)
+]]
+[[
+  $(nix eval --raw flake3#inputs.nonFlakeFile.outPath) \
+  = $(nix eval --raw flake3#inputs.nonFlakeFile.sourceInfo.outPath)
+]]
+[[
+  $(nix eval --raw flake3#inputs.nonFlakeFile2.outPath) \
+  = $(nix eval --raw flake3#inputs.nonFlakeFile2.sourceInfo.outPath)
+]]
+[[
+  $(nix eval --raw flake3#inputs.nonFlakeFile3.outPath) \
+  = $(nix eval --raw flake3#inputs.nonFlakeFile3.sourceInfo.outPath)/README.md
+]]
+[[
+  $(nix eval --raw flake3#inputs.relativeNonFlakeFile.outPath) \
+  = $(nix eval --raw flake3#inputs.relativeNonFlakeFile.sourceInfo.outPath)/config.nix
+]]
 
 # Make branch "removeXyzzy" where flake3 doesn't have xyzzy anymore
 git -C "$flake3Dir" checkout -b removeXyzzy

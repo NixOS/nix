@@ -72,7 +72,7 @@ void SourceAccessor::dumpPath(
 
             /* If we're on a case-insensitive system like macOS, undo
                the case hack applied by restorePath(). */
-            std::map<std::string, std::string> unhacked;
+            StringMap unhacked;
             for (auto & i : readDirectory(path))
                 if (archiveSettings.useCaseHack) {
                     std::string name(i.first);

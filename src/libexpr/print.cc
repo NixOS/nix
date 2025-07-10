@@ -419,8 +419,8 @@ private:
         if (depth < options.maxDepth) {
             increaseIndent();
             output << "[";
-            auto listItems = v.listItems();
-            auto prettyPrint = shouldPrettyPrintList(listItems);
+            auto listItems = v.listView();
+            auto prettyPrint = shouldPrettyPrintList(listItems.span());
 
             size_t currentListItemsPrinted = 0;
 
@@ -457,13 +457,13 @@ private:
 
         if (v.isLambda()) {
             output << "lambda";
-            if (v.payload.lambda.fun) {
-                if (v.payload.lambda.fun->name) {
-                    output << " " << state.symbols[v.payload.lambda.fun->name];
+            if (v.lambda().fun) {
+                if (v.lambda().fun->name) {
+                    output << " " << state.symbols[v.lambda().fun->name];
                 }
 
                 std::ostringstream s;
-                s << state.positions[v.payload.lambda.fun->pos];
+                s << state.positions[v.lambda().fun->pos];
                 output << " @ " << filterANSIEscapes(toView(s));
             }
         } else if (v.isPrimOp()) {

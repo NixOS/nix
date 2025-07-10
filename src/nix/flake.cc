@@ -58,7 +58,7 @@ LockedFlake FlakeCommand::lockFlake()
 std::vector<FlakeRef> FlakeCommand::getFlakeRefsForCompletion()
 {
     return {
-        // Like getFlakeRef but with expandTilde calld first
+        // Like getFlakeRef but with expandTilde called first
         parseFlakeRef(fetchSettings, expandTilde(flakeUrl), std::filesystem::current_path().string())
     };
 }
@@ -496,8 +496,8 @@ struct CmdFlakeCheck : FlakeCommand
                 if (!v.isLambda()) {
                     throw Error("overlay is not a function, but %s instead", showType(v));
                 }
-                if (v.payload.lambda.fun->hasFormals()
-                    || !argHasName(v.payload.lambda.fun->arg, "final"))
+                if (v.lambda().fun->hasFormals()
+                    || !argHasName(v.lambda().fun->arg, "final"))
                     throw Error("overlay does not take an argument named 'final'");
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
@@ -841,8 +841,31 @@ struct CmdFlakeCheck : FlakeCommand
             // FIXME: should start building while evaluating.
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("running %d flake checks", drvPaths.size()));
-            store->buildPaths(drvPaths);
+
+            auto missing = store->queryMissing(drvPaths);
+
+            /* This command doesn't need to actually substitute
+               derivation outputs if they're missing but
+               substitutable. So filter out derivations that are
+               substitutable or already built. */
+            std::vector<DerivedPath> toBuild;
+            for (auto & path : drvPaths) {
+                std::visit(overloaded {
+                    [&](const DerivedPath::Built & bfd) {
+                        auto drvPathP = std::get_if<DerivedPath::Opaque>(&*bfd.drvPath);
+                        if (!drvPathP || missing.willBuild.contains(drvPathP->path))
+                            toBuild.push_back(path);
+                    },
+                    [&](const DerivedPath::Opaque & bo) {
+                        if (!missing.willSubstitute.contains(bo.path))
+                            toBuild.push_back(path);
+                    },
+                }, path.raw());
+            }
+
+            store->buildPaths(toBuild);
         }
+
         if (hasErrors)
             throw Error("some errors were encountered during the evaluation");
 
@@ -1060,6 +1083,10 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 {
     std::string dstUri;
 
+    CheckSigsFlag checkSigs = CheckSigs;
+
+    SubstituteFlag substitute = NoSubstitute;
+
     CmdFlakeArchive()
     {
         addFlag({
@@ -1067,6 +1094,11 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
             .description = "URI of the destination Nix store",
             .labels = {"store-uri"},
             .handler = {&dstUri},
+        });
+        addFlag({
+            .longName = "no-check-sigs",
+            .description = "Do not require that paths are signed by trusted keys.",
+            .handler = {&checkSigs, NoCheckSigs},
         });
     }
 
@@ -1134,7 +1166,8 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         if (!dryRun && !dstUri.empty()) {
             ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
-            copyPaths(*store, *dstStore, sources);
+
+            copyPaths(*store, *dstStore, sources, NoRepair, checkSigs, substitute);
         }
     }
 };
@@ -1452,7 +1485,7 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
         auto originalRef = getFlakeRef();
         auto resolvedRef = originalRef.resolve(store);
         auto [accessor, lockedRef] = resolvedRef.lazyFetch(store);
-        auto storePath = fetchToStore(*store, accessor, FetchMode::Copy, lockedRef.input.getName());
+        auto storePath = fetchToStore(getEvalState()->fetchSettings, *store, accessor, FetchMode::Copy, lockedRef.input.getName());
         auto hash = store->queryPathInfo(storePath)->narHash;
 
         if (json) {

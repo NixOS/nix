@@ -140,6 +140,8 @@ sources = files(
   'eval-cache.cc',
   'eval-error.cc',
   'eval-gc.cc',
+  'eval-profiler-settings.cc',
+  'eval-profiler.cc',
   'eval-settings.cc',
   'eval.cc',
   'function-trace.cc',

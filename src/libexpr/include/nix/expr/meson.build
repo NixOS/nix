@@ -14,6 +14,8 @@ headers = [config_pub_h] + files(
   'eval-error.hh',
   'eval-gc.hh',
   'eval-inline.hh',
+  'eval-profiler-settings.hh',
+  'eval-profiler.hh',
   'eval-settings.hh',
   'eval.hh',
   'function-trace.hh',

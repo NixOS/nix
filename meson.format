@@ -1,0 +1,7 @@
+indent_by = '  '
+space_array = true
+kwargs_force_multiline = false
+wide_colon = true
+group_arg_value = true
+indent_before_comments = ' '
+use_editor_config = true

@@ -12,7 +12,7 @@
 namespace nix {
 
 PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
-    : Goal(worker)
+    : Goal(worker, init())
     , storePath(storePath)
     , repair(repair)
     , ca(ca)
@@ -181,7 +181,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
 
     if (nrFailed > 0) {
         co_return done(
-            nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed,
+            nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed,
             BuildResult::DependencyFailed,
             fmt("some references of path '%s' could not be realised", worker.store.printStorePath(storePath)));
     }

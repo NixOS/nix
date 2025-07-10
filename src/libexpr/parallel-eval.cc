@@ -127,6 +127,7 @@ void FutureVector::finishAll()
     }
 }
 
+#if 0
 struct WaiterDomain
 {
     std::condition_variable cv;
@@ -140,9 +141,11 @@ static Sync<WaiterDomain> & getWaiterDomain(Value & v)
     debug("HASH %x -> %d", &v, domain);
     return waiterDomains[domain];
 }
+#endif
 
 InternalType EvalState::waitOnThunk(Value & v, bool awaited)
 {
+#if 0
     nrThunksAwaited++;
 
     auto domain = getWaiterDomain(v).lock();
@@ -203,8 +206,11 @@ InternalType EvalState::waitOnThunk(Value & v, bool awaited)
         }
         nrSpuriousWakeups++;
     }
+#endif
+    assert(false);
 }
 
+#if 0
 void Value::notifyWaiters()
 {
     debug("NOTIFY %x", this);
@@ -213,5 +219,6 @@ void Value::notifyWaiters()
 
     domain->cv.notify_all(); // FIXME
 }
+#endif
 
 }

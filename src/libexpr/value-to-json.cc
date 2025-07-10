@@ -115,7 +115,7 @@ json printValueAsJSON(EvalState & state, bool strict,
 
             case nList: {
                 res = json::array();
-                for (const auto & [i, elem] : enumerate(v.listItems())) {
+                for (const auto & [i, elem] : enumerate(v.listView())) {
                     try {
                         res.push_back(json());
                         recurse(res.back(), *elem, pos);

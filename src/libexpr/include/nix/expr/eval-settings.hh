@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/expr/eval-profiler-settings.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/source-path.hh"
 
@@ -12,7 +13,7 @@ struct PrimOp;
 struct EvalSettings : Config
 {
     /**
-     * Function used to interpet look path entries of a given scheme.
+     * Function used to interpret look path entries of a given scheme.
      *
      * The argument is the non-scheme part of the lookup path entry (see
      * `LookupPathHooks` below).
@@ -203,6 +204,29 @@ struct EvalSettings : Config
           `flamegraph.pl`.
         )"};
 
+    Setting<EvalProfilerMode> evalProfilerMode{this, EvalProfilerMode::disabled, "eval-profiler",
+        R"(
+          Enables evaluation profiling. The following modes are supported:
+
+          * `flamegraph` stack sampling profiler. Outputs folded format, one line per stack (suitable for `flamegraph.pl` and compatible tools).
+
+          Use [`eval-profile-file`](#conf-eval-profile-file) to specify where the profile is saved.
+
+          See [Using the `eval-profiler`](@docroot@/advanced-topics/eval-profiler.md).
+        )"};
+
+    Setting<Path> evalProfileFile{this, "nix.profile", "eval-profile-file",
+        R"(
+          Specifies the file where [evaluation profile](#conf-eval-profiler) is saved.
+        )"};
+
+    Setting<uint32_t> evalProfilerFrequency{this, 99, "eval-profiler-frequency",
+        R"(
+          Specifies the sampling rate in hertz for sampling evaluation profilers.
+          Use `0` to sample the stack after each function call.
+          See [`eval-profiler`](#conf-eval-profiler).
+        )"};
+
     Setting<bool> useEvalCache{this, true, "eval-cache",
         R"(
             Whether to use the flake evaluation cache.
@@ -212,7 +236,7 @@ struct EvalSettings : Config
 
     Setting<bool> ignoreExceptionsDuringTry{this, false, "ignore-try",
         R"(
-          If set to true, ignore exceptions inside 'tryEval' calls when evaluating nix expressions in
+          If set to true, ignore exceptions inside 'tryEval' calls when evaluating Nix expressions in
           debug mode (using the --debugger flag). By default, the debugger pauses on all exceptions.
         )"};
 

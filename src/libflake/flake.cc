@@ -234,8 +234,8 @@ static Flake readFlake(
     if (auto outputs = vInfo.attrs()->get(sOutputs)) {
         expectType(state, nFunction, *outputs->value, outputs->pos);
 
-        if (outputs->value->isLambda() && outputs->value->payload.lambda.fun->hasFormals()) {
-            for (auto & formal : outputs->value->payload.lambda.fun->formals->formals) {
+        if (outputs->value->isLambda() && outputs->value->lambda().fun->hasFormals()) {
+            for (auto & formal : outputs->value->lambda().fun->formals->formals) {
                 if (formal.name != state.sSelf)
                     flake.inputs.emplace(state.symbols[formal.name], FlakeInput {
                         .ref = parseFlakeRef(state.fetchSettings, std::string(state.symbols[formal.name]))
@@ -258,7 +258,7 @@ static Flake readFlake(
                     state.symbols[setting.name],
                     std::string(state.forceStringNoCtx(*setting.value, setting.pos, "")));
             else if (setting.value->type() == nPath) {
-                auto storePath = fetchToStore(*state.store, setting.value->path(), FetchMode::Copy);
+                auto storePath = fetchToStore(state.fetchSettings, *state.store, setting.value->path(), FetchMode::Copy);
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
                     state.store->printStorePath(storePath));
@@ -273,7 +273,7 @@ static Flake readFlake(
                     Explicit<bool> { state.forceBool(*setting.value, setting.pos, "") });
             else if (setting.value->type() == nList) {
                 std::vector<std::string> ss;
-                for (auto elem : setting.value->listItems()) {
+                for (auto elem : setting.value->listView()) {
                     if (elem->type() != nString)
                         state.error<TypeError>("list element in flake configuration setting '%s' is %s while a string is expected",
                             state.symbols[setting.name], showType(*setting.value)).debugThrow();
@@ -522,7 +522,7 @@ LockedFlake lockFlake(
 
                     /* Resolve relative 'path:' inputs relative to
                        the source path of the overrider. */
-                    auto overridenSourcePath = hasOverride ? i->second.sourcePath : sourcePath;
+                    auto overriddenSourcePath = hasOverride ? i->second.sourcePath : sourcePath;
 
                     /* Respect the "flakeness" of the input even if we
                        override it. */
@@ -544,7 +544,7 @@ LockedFlake lockFlake(
                     if (!input.ref)
                         input.ref = FlakeRef::fromAttrs(state.fetchSettings, {{"type", "indirect"}, {"id", std::string(id)}});
 
-                    auto overridenParentPath =
+                    auto overriddenParentPath =
                         input.ref->input.isRelative()
                         ? std::optional<InputAttrPath>(hasOverride ? i->second.parentInputAttrPath : inputAttrPathPrefix)
                         : std::nullopt;
@@ -553,8 +553,8 @@ LockedFlake lockFlake(
                     {
                         if (auto relativePath = input.ref->input.isRelative()) {
                             return SourcePath {
-                                overridenSourcePath.accessor,
-                                CanonPath(*relativePath, overridenSourcePath.path.parent().value())
+                                overriddenSourcePath.accessor,
+                                CanonPath(*relativePath, overriddenSourcePath.path.parent().value())
                             };
                         } else
                             return std::nullopt;
@@ -589,7 +589,7 @@ LockedFlake lockFlake(
 
                     if (oldLock
                         && oldLock->originalRef.canonicalize() == input.ref->canonicalize()
-                        && oldLock->parentInputAttrPath == overridenParentPath
+                        && oldLock->parentInputAttrPath == overriddenParentPath
                         && !hasCliOverride)
                     {
                         debug("keeping existing input '%s'", inputAttrPathS);
@@ -711,7 +711,7 @@ LockedFlake lockFlake(
                                 inputFlake.lockedRef,
                                 ref,
                                 true,
-                                overridenParentPath);
+                                overriddenParentPath);
 
                             node->inputs.insert_or_assign(id, childNode);
 
@@ -723,16 +723,12 @@ LockedFlake lockFlake(
                             Finally cleanup([&]() { parents.pop_back(); });
 
                             /* Recursively process the inputs of this
-                               flake. Also, unless we already have this flake
-                               in the top-level lock file, use this flake's
-                               own lock file. */
+                               flake, using its own lock file. */
                             nodePaths.emplace(childNode, inputFlake.path.parent());
                             computeLocks(
                                 inputFlake.inputs, childNode, inputAttrPath,
-                                oldLock
-                                ? std::dynamic_pointer_cast<const Node>(oldLock)
-                                : readLockFile(state.fetchSettings, inputFlake.lockFilePath()).root.get_ptr(),
-                                oldLock ? followsPrefix : inputAttrPath,
+                                readLockFile(state.fetchSettings, inputFlake.lockFilePath()).root.get_ptr(),
+                                inputAttrPath,
                                 inputFlake.path,
                                 false);
 
@@ -760,7 +756,7 @@ LockedFlake lockFlake(
                                 }
                             }();
 
-                            auto childNode = make_ref<LockedNode>(lockedRef, ref, false, overridenParentPath);
+                            auto childNode = make_ref<LockedNode>(lockedRef, ref, false, overriddenParentPath);
 
                             nodePaths.emplace(childNode, path);
 
@@ -815,7 +811,7 @@ LockedFlake lockFlake(
                                 "Not writing lock file of flake '%s' because it has an unlocked input ('%s'). "
                                 "Use '--allow-dirty-locks' to allow this anyway.", topRef, *unlockedInput);
                         if (state.fetchSettings.warnDirty)
-                            warn("Not writing lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
+                            warn("not writing lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
                     } else {
                         if (!lockFlags.updateLockFile)
                             throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);

@@ -2,6 +2,7 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/primops.hh"
 #include "nix/expr/print-options.hh"
+#include "nix/expr/symbol-table.hh"
 #include "nix/util/exit.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
@@ -91,18 +92,14 @@ std::string printValue(EvalState & state, Value & v)
     return out.str();
 }
 
+Value * Value::toPtr(SymbolStr str) noexcept
+{
+    return const_cast<Value *>(str.valuePtr());
+}
+
 void Value::print(EvalState & state, std::ostream & str, PrintOptions options)
 {
     printValue(state, str, *this, options);
-}
-
-const Value * getPrimOp(const Value &v) {
-    const Value * primOp = &v;
-    while (primOp->isPrimOpApp()) {
-        primOp = primOp->payload.primOpApp.left;
-    }
-    assert(primOp->isPrimOp());
-    return primOp;
 }
 
 std::string_view showType(ValueType type, bool withArticle)
@@ -131,12 +128,12 @@ std::string showType(const Value & v)
     // Allow selecting a subset of enum values
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wswitch-enum"
-    switch (v.internalType) {
-        case tString: return v.payload.string.context ? "a string with context" : "a string";
+    switch (v.getInternalType()) {
+        case tString: return v.context() ? "a string with context" : "a string";
         case tPrimOp:
-            return fmt("the built-in function '%s'", std::string(v.payload.primOp->name));
+            return fmt("the built-in function '%s'", std::string(v.primOp()->name));
         case tPrimOpApp:
-            return fmt("the partially applied built-in function '%s'", std::string(getPrimOp(v)->payload.primOp->name));
+            return fmt("the partially applied built-in function '%s'", v.primOpAppPrimOp()->name);
         case tExternal: return v.external()->showType();
         case tThunk: return v.isBlackhole() ? "a black hole" : "a thunk";
         case tApp: return "a function application";
@@ -151,12 +148,10 @@ PosIdx Value::determinePos(const PosIdx pos) const
     // Allow selecting a subset of enum values
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wswitch-enum"
-    if (this->pos != 0)
-        return PosIdx(this->pos);
-    switch (internalType) {
+    switch (getInternalType()) {
         case tAttrs: return attrs()->pos;
-        case tLambda: return payload.lambda.fun->pos;
-        case tApp: return payload.app.left->determinePos(pos);
+        case tLambda: return lambda().fun->pos;
+        case tApp: return app().left->determinePos(pos);
         default: return pos;
     }
     #pragma GCC diagnostic pop
@@ -166,11 +161,11 @@ bool Value::isTrivial() const
 {
     return
         isFinished()
-        || (internalType == tThunk
-            && ((dynamic_cast<ExprAttrs *>(payload.thunk.expr)
-                    && ((ExprAttrs *) payload.thunk.expr)->dynamicAttrs.empty())
-                || dynamic_cast<ExprLambda *>(payload.thunk.expr)
-                || dynamic_cast<ExprList *>(payload.thunk.expr)));
+        || (isa<tThunk>()
+            && ((dynamic_cast<ExprAttrs *>(thunk().expr)
+                    && ((ExprAttrs *) thunk().expr)->dynamicAttrs.empty())
+                || dynamic_cast<ExprLambda *>(thunk().expr)
+                || dynamic_cast<ExprList *>(thunk().expr)));
 }
 
 
@@ -217,6 +212,7 @@ EvalState::EvalState(
     , sRight(symbols.create("right"))
     , sWrong(symbols.create("wrong"))
     , sStructuredAttrs(symbols.create("__structuredAttrs"))
+    , sJson(symbols.create("__json"))
     , sAllowedReferences(symbols.create("allowedReferences"))
     , sAllowedRequisites(symbols.create("allowedRequisites"))
     , sDisallowedReferences(symbols.create("disallowedReferences"))
@@ -372,8 +368,20 @@ EvalState::EvalState(
     );
 
     createBaseEnv(settings);
-}
 
+    /* Register function call tracer. */
+    if (settings.traceFunctionCalls)
+        profiler.addProfiler(make_ref<FunctionCallTrace>());
+
+    switch (settings.evalProfilerMode) {
+    case EvalProfilerMode::flamegraph:
+        profiler.addProfiler(makeSampleStackProfiler(
+            *this, settings.evalProfileFile.get(), settings.evalProfilerFrequency));
+        break;
+    case EvalProfilerMode::disabled:
+        break;
+    }
+}
 
 EvalState::~EvalState()
 {
@@ -470,7 +478,10 @@ void EvalState::checkURI(const std::string & uri)
 Value * EvalState::addConstant(const std::string & name, Value & v, Constant info)
 {
     Value * v2 = allocValue();
+    // FIXME
+    #if 0
     v2->finishValue(v.internalType, v.payload);
+    #endif
     addConstant(name, v2, info);
     return v2;
 }
@@ -487,7 +498,7 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
 
            We might know the type of a thunk in advance, so be allowed
            to just write it down in that case. */
-        if (v->internalType != tUninitialized) {
+        if (v->isFinished()) {
             if (auto gotType = v->type(); gotType != nThunk)
                 assert(info.type == gotType);
         }
@@ -495,7 +506,7 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
         /* Install value the base environment. */
         staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
-        getBuiltins().payload.attrs->push_back(Attr(symbols.create(name2), v));
+        const_cast<Bindings *>(getBuiltins().attrs())->push_back(Attr(symbols.create(name2), v));
     }
 }
 
@@ -517,13 +528,15 @@ std::ostream & operator<<(std::ostream & output, const PrimOp & primOp)
 
 const PrimOp * Value::primOpAppPrimOp() const
 {
-    Value * left = payload.primOpApp.left;
+    Value * left = primOpApp().left;
     while (left && !left->isPrimOp()) {
-        left = left->payload.primOpApp.left;
+        left = left->primOpApp().left;
     }
 
     if (!left)
         return nullptr;
+
+    assert(left->isPrimOp());
     return left->primOp();
 }
 
@@ -531,7 +544,7 @@ const PrimOp * Value::primOpAppPrimOp() const
 void Value::mkPrimOp(PrimOp * p)
 {
     p->check();
-    finishValue(tPrimOp, { .primOp = p });
+    setStorage(p);
 }
 
 
@@ -563,7 +576,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
     else {
         staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
-        getBuiltins().payload.attrs->push_back(Attr(symbols.create(primOp.name), v));
+        const_cast<Bindings *>(getBuiltins().attrs())->push_back(Attr(symbols.create(primOp.name), v));
     }
 
     return v;
@@ -600,7 +613,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             };
     }
     if (v.isLambda()) {
-        auto exprLambda = v.payload.lambda.fun;
+        auto exprLambda = v.lambda().fun;
 
         std::ostringstream s;
         std::string name;
@@ -647,7 +660,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             Value & functor = *v.attrs()->find(sFunctor)->value;
             Value * vp[] = {&v};
             Value partiallyApplied;
-            // The first paramater is not user-provided, and may be
+            // The first parameter is not user-provided, and may be
             // handled by code that is opaque to the user, like lib.const = x: y: y;
             // So preferably we show docs that are relevant to the
             // "partially applied" function returned by e.g. `const`.
@@ -910,7 +923,7 @@ void Value::mkStringMove(const char * s, const NixStringContext & context)
 
 void Value::mkPath(const SourcePath & path)
 {
-    mkPath(&*path.accessor, makeImmutableString(path.path.abs()), noPos.get());
+    mkPath(&*path.accessor, makeImmutableString(path.path.abs()));
 }
 
 
@@ -1580,9 +1593,14 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 {
     auto _level = addCallDepth(pos);
 
-    auto trace = settings.traceFunctionCalls
-        ? std::make_unique<FunctionCallTrace>(positions[pos])
-        : nullptr;
+    auto neededHooks = profiler.getNeededHooks();
+    if (neededHooks.test(EvalProfiler::preFunctionCall)) [[unlikely]]
+        profiler.preFunctionCallHook(*this, fun, args, pos);
+
+    Finally traceExit_{[&](){
+        if (profiler.getNeededHooks().test(EvalProfiler::postFunctionCall)) [[unlikely]]
+            profiler.postFunctionCallHook(*this, fun, args, pos);
+    }};
 
     forceValue(fun, pos);
 
@@ -1605,13 +1623,13 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 
         if (vCur.isLambda()) {
 
-            ExprLambda & lambda(*vCur.payload.lambda.fun);
+            ExprLambda & lambda(*vCur.lambda().fun);
 
             auto size =
                 (!lambda.arg ? 0 : 1) +
                 (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
             Env & env2(allocEnv(size));
-            env2.up = vCur.payload.lambda.env;
+            env2.up = vCur.lambda().env;
 
             Displacement displ = 0;
 
@@ -1641,7 +1659,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                                              symbols[i.name])
                                     .atPos(lambda.pos)
                                     .withTrace(pos, "from call site")
-                                    .withFrame(*vCur.payload.lambda.env, lambda)
+                                    .withFrame(*vCur.lambda().env, lambda)
                                     .debugThrow();
                         }
                         env2.values[displ++] = i.def->maybeThunk(*this, env2);
@@ -1668,7 +1686,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                                 .atPos(lambda.pos)
                                 .withTrace(pos, "from call site")
                                 .withSuggestions(suggestions)
-                                .withFrame(*vCur.payload.lambda.env, lambda)
+                                .withFrame(*vCur.lambda().env, lambda)
                                 .debugThrow();
                         }
                     unreachable();
@@ -1743,7 +1761,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             Value * primOp = &vCur;
             while (primOp->isPrimOpApp()) {
                 argsDone++;
-                primOp = primOp->payload.primOpApp.left;
+                primOp = primOp->primOpApp().left;
             }
             assert(primOp->isPrimOp());
             auto arity = primOp->primOp()->arity;
@@ -1760,8 +1778,8 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 
                 Value * vArgs[maxPrimOpArity];
                 auto n = argsDone;
-                for (Value * arg = &vCur; arg->isPrimOpApp(); arg = arg->payload.primOpApp.left)
-                    vArgs[--n] = arg->payload.primOpApp.right;
+                for (Value * arg = &vCur; arg->isPrimOpApp(); arg = arg->primOpApp().left)
+                    vArgs[--n] = arg->primOpApp().right;
 
                 for (size_t i = 0; i < argsLeft; ++i)
                     vArgs[argsDone + i] = args[i];
@@ -1871,14 +1889,14 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
         }
     }
 
-    if (!fun.isLambda() || !fun.payload.lambda.fun->hasFormals()) {
+    if (!fun.isLambda() || !fun.lambda().fun->hasFormals()) {
         res = fun;
         return;
     }
 
-    auto attrs = buildBindings(std::max(static_cast<uint32_t>(fun.payload.lambda.fun->formals->formals.size()), args.size()));
+    auto attrs = buildBindings(std::max(static_cast<uint32_t>(fun.lambda().fun->formals->formals.size()), args.size()));
 
-    if (fun.payload.lambda.fun->formals->ellipsis) {
+    if (fun.lambda().fun->formals->ellipsis) {
         // If the formals have an ellipsis (eg the function accepts extra args) pass
         // all available automatic arguments (which includes arguments specified on
         // the command line via --arg/--argstr)
@@ -1886,7 +1904,7 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
             attrs.insert(v);
     } else {
         // Otherwise, only pass the arguments that the function accepts
-        for (auto & i : fun.payload.lambda.fun->formals->formals) {
+        for (auto & i : fun.lambda().fun->formals->formals) {
             auto j = args.get(i.name);
             if (j) {
                 attrs.insert(*j);
@@ -1896,7 +1914,7 @@ Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
 https://nixos.org/manual/nix/stable/language/constructs.html#functions.)", symbols[i.name])
-                    .atPos(i.pos).withFrame(*fun.payload.lambda.env, *fun.payload.lambda.fun).debugThrow();
+                    .atPos(i.pos).withFrame(*fun.lambda().env, *fun.lambda().fun).debugThrow();
             }
         }
     }
@@ -2054,9 +2072,10 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * const * lists, co
     auto list = buildList(len);
     auto out = list.elems;
     for (size_t n = 0, pos = 0; n < nrLists; ++n) {
-        auto l = lists[n]->listSize();
+        auto listView = lists[n]->listView();
+        auto l = listView.size();
         if (l)
-            memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
+            memcpy(out + pos, listView.data(), l * sizeof(Value *));
         pos += l;
     }
     v.mkList(list);
@@ -2197,8 +2216,9 @@ void EvalState::forceValueDeep(Value & v)
             for (auto & i : *v.attrs())
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
-                    auto dts = debugRepl && i.value->internalType == tThunk
-                        ? makeDebugTraceStacker(*this, *i.value->payload.thunk.expr, *i.value->payload.thunk.env, i.pos,
+                    // FIXME: race, thunk might be updated by another thread
+                    auto dts = debugRepl && i.value->isThunk()
+                        ? makeDebugTraceStacker(*this, *i.value->thunk().expr, *i.value->thunk().env, i.pos,
                             "while evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;
 
@@ -2210,7 +2230,7 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
-            for (auto v2 : v.listItems())
+            for (auto v2 : v.listView())
                 recurse(*v2);
         }
     };
@@ -2278,8 +2298,18 @@ bool EvalState::forceBool(Value & v, const PosIdx pos, std::string_view errorCtx
     return v.boolean();
 }
 
+Bindings::const_iterator EvalState::getAttr(Symbol attrSym, const Bindings * attrSet, std::string_view errorCtx)
+{
+    auto value = attrSet->find(attrSym);
+    if (value == attrSet->end()) {
+        error<TypeError>("attribute '%s' missing", symbols[attrSym])
+            .withTrace(noPos, errorCtx)
+            .debugThrow();
+    }
+    return value;
+}
 
-bool EvalState::isFunctor(Value & fun)
+bool EvalState::isFunctor(const Value & fun) const
 {
     return fun.type() == nAttrs && fun.attrs()->find(sFunctor) != fun.attrs()->end();
 }
@@ -2322,8 +2352,8 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
 
 void copyContext(const Value & v, NixStringContext & context, const ExperimentalFeatureSettings & xpSettings)
 {
-    if (v.payload.string.context)
-        for (const char * * p = v.payload.string.context; *p; ++p)
+    if (v.context())
+        for (const char * * p = v.context(); *p; ++p)
             context.insert(NixStringContextElem::parse(*p, xpSettings));
 }
 
@@ -2399,7 +2429,7 @@ BackedStringView EvalState::coerceToString(
             !canonicalizePath && !copyToStore
             ? // FIXME: hack to preserve path literals that end in a
               // slash, as in /foo/${x}.
-              v.payload.path.path
+              v.pathStr()
             : copyToStore
             ? store->printStorePath(copyPathToStore(context, v.path(), v.determinePos(pos)))
             : ({
@@ -2452,7 +2482,8 @@ BackedStringView EvalState::coerceToString(
 
         if (v.isList()) {
             std::string result;
-            for (auto [n, v2] : enumerate(v.listItems())) {
+            auto listView = v.listView();
+            for (auto [n, v2] : enumerate(listView)) {
                 try {
                     result += *coerceToString(pos, *v2, context,
                             "while evaluating one element of the list",
@@ -2490,6 +2521,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
         ? *dstPathCached
         : [&]() {
             auto dstPath = fetchToStore(
+                fetchSettings,
                 *store,
                 path.resolveSymlinks(SymlinkResolution::Ancestors),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
@@ -2534,7 +2566,7 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
         }
     }
 
-    /* Any other value should be coercable to a string, interpreted
+    /* Any other value should be coercible to a string, interpreted
        relative to the root filesystem. */
     auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
     if (path == "" || path[0] != '/')
@@ -2680,14 +2712,14 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         return;
 
     case nPath:
-        if (v1.payload.path.accessor != v2.payload.path.accessor) {
+        if (v1.pathAccessor() != v2.pathAccessor()) {
             error<AssertionError>(
                 "path '%s' is not equal to path '%s' because their accessors are different",
                 ValuePrinter(*this, v1, errorPrintOptions),
                 ValuePrinter(*this, v2, errorPrintOptions))
                 .debugThrow();
         }
-        if (strcmp(v1.payload.path.path, v2.payload.path.path) != 0) {
+        if (strcmp(v1.pathStr(), v2.pathStr()) != 0) {
             error<AssertionError>(
                 "path '%s' is not equal to path '%s'",
                 ValuePrinter(*this, v1, errorPrintOptions),
@@ -2711,7 +2743,7 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         }
         for (size_t n = 0; n < v1.listSize(); ++n) {
             try {
-                assertEqValues(*v1.listElems()[n], *v2.listElems()[n], pos, errorCtx);
+                assertEqValues(*v1.listView()[n], *v2.listView()[n], pos, errorCtx);
             } catch (Error & e) {
                 e.addTrace(positions[pos], "while comparing list element %d", n);
                 throw;
@@ -2857,8 +2889,8 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         case nPath:
             return
                 // FIXME: compare accessors by their fingerprint.
-                v1.payload.path.accessor == v2.payload.path.accessor
-                && strcmp(v1.payload.path.path, v2.payload.path.path) == 0;
+                v1.pathAccessor() == v2.pathAccessor()
+                && strcmp(v1.pathStr(), v2.pathStr()) == 0;
 
         case nNull:
             return true;
@@ -2866,7 +2898,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         case nList:
             if (v1.listSize() != v2.listSize()) return false;
             for (size_t n = 0; n < v1.listSize(); ++n)
-                if (!eqValues(*v1.listElems()[n], *v2.listElems()[n], pos, errorCtx)) return false;
+                if (!eqValues(*v1.listView()[n], *v2.listView()[n], pos, errorCtx)) return false;
             return true;
 
         case nAttrs: {
@@ -2916,7 +2948,7 @@ bool EvalState::fullGC() {
     GC_gcollect();
     // Check that it ran. We might replace this with a version that uses more
     // of the boehm API to get this reliably, at a maintenance cost.
-    // We use a 1K margin because technically this has a race condtion, but we
+    // We use a 1K margin because technically this has a race condition, but we
     // probably won't encounter it in practice, because the CLI isn't concurrent
     // like that.
     return GC_get_bytes_since_gc() < 1024;
@@ -3213,7 +3245,7 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
                 store,
                 fetchSettings,
                 EvalSettings::resolvePseudoUrl(value));
-            auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
+            auto storePath = fetchToStore(fetchSettings, *store, SourcePath(accessor), FetchMode::Copy);
             return finish(this->storePath(storePath));
         } catch (Error & e) {
             logWarning({

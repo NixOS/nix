@@ -33,6 +33,7 @@ size_t ContiguousArena::allocate(size_t bytes)
 
 Symbol SymbolTable::create(std::string_view s)
 {
+    #if 0
     std::size_t hash = std::hash<std::string_view>{}(s);
     auto domain = hash % symbolDomains.size();
 
@@ -59,13 +60,17 @@ Symbol SymbolTable::create(std::string_view s)
     symbols->emplace(std::string_view(p, s.size()), id);
 
     return Symbol(id);
+    #endif
+    assert(false);
 }
 
-size_t SymbolTable::size() const
+size_t SymbolTable::size() const noexcept
 {
     size_t res = 0;
+    #if 0
     for (auto & domain : symbolDomains)
         res += domain.readLock()->size();
+    #endif
     return res;
 }
 

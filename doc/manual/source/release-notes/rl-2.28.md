@@ -82,7 +82,7 @@ This completes the infrastructure overhaul for the [RFC 132](https://github.com/
   Although this change is not as critical, we figured it would be good to do this API change at the same time, also.
   Also note that we try to keep the C API compatible, but we decided to break this function because it was young and likely not in widespread use yet. This frees up time to make important progress on the rest of the C API.
 
-# Contributors
+## Contributors
 
 This earlier-than-usual release was made possible by the following 16 contributors:
 

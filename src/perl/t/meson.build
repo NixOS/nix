@@ -7,6 +7,7 @@
 
 nix_perl_tests = files(
   'init.t',
+  # hack for trailing newline
 )
 
 

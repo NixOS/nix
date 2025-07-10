@@ -4,6 +4,7 @@
 #include "nix/fetchers/store-path-accessor.hh"
 #include "nix/fetchers/cache.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 namespace nix::fetchers {
 
@@ -149,7 +150,7 @@ struct PathInputScheme : InputScheme
         // store, pre-create an entry in the fetcher cache.
         auto info = store->queryPathInfo(*storePath);
         accessor->fingerprint = fmt("path:%s", store->queryPathInfo(*storePath)->narHash.to_string(HashFormat::SRI, true));
-        fetchers::getCache()->upsert(
+        input.settings->getCache()->upsert(
             makeSourcePathToHashCacheKey(*accessor->fingerprint, ContentAddressMethod::Raw::NixArchive, "/"),
             {{"hash", info->narHash.to_string(HashFormat::SRI, true)}});
 

@@ -151,8 +151,11 @@ nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -
 grepQuiet "don't know how to build" "$TEST_ROOT/log"
 grepQuiet "building.*input-1" "$TEST_ROOT/log"
 grepQuiet "building.*input-2" "$TEST_ROOT/log"
-grepQuiet "copying path.*input-0" "$TEST_ROOT/log"
-grepQuiet "copying path.*top" "$TEST_ROOT/log"
+
+# Removed for now since 299141ecbd08bae17013226dbeae71e842b4fdd7 / issue #77 is reverted
+
+#grepQuiet "copying path.*input-0" "$TEST_ROOT/log"
+#grepQuiet "copying path.*top" "$TEST_ROOT/log"
 
 
 # Create a signed binary cache.

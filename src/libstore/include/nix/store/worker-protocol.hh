@@ -89,7 +89,7 @@ struct WorkerProto
     struct BasicServerConnection;
 
     /**
-     * Extra information provided as part of protocol negotation.
+     * Extra information provided as part of protocol negotiation.
      */
     struct ClientHandshakeInfo;
 

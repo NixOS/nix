@@ -3,6 +3,7 @@
 
 #include "nix/expr/attr-set.hh"
 #include "nix/expr/eval-error.hh"
+#include "nix/expr/eval-profiler.hh"
 #include "nix/util/types.hh"
 #include "nix/expr/value.hh"
 #include "nix/expr/nixexpr.hh"
@@ -218,7 +219,7 @@ public:
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
-        sRight, sWrong, sStructuredAttrs,
+        sRight, sWrong, sStructuredAttrs, sJson,
         sAllowedReferences, sAllowedRequisites, sDisallowedReferences, sDisallowedRequisites,
         sMaxSize, sMaxClosureSize,
         sBuilder, sArgs,
@@ -551,6 +552,11 @@ public:
     std::string_view forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     std::string_view forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx);
 
+    /**
+     * Get attribute from an attribute set and throw an error if it doesn't exist.
+     */
+    Bindings::const_iterator getAttr(Symbol attrSym, const Bindings * attrSet, std::string_view errorCtx);
+
     template<typename... Args>
     [[gnu::noinline]]
     void addErrorTrace(Error & e, const Args & ... formatArgs) const;
@@ -767,7 +773,7 @@ public:
      */
     void assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx);
 
-    bool isFunctor(Value & fun);
+    bool isFunctor(const Value & fun) const;
 
     void callFunction(Value & fun, std::span<Value *> args, Value & vRes, const PosIdx pos);
 
@@ -946,6 +952,9 @@ private:
 
     typedef std::map<ExprLambda *, size_t> FunctionCalls;
     FunctionCalls functionCalls;
+
+    /** Evaluation/call profiler. */
+    MultiEvalProfiler profiler;
 
     void incrFunctionCall(ExprLambda * fun);
 

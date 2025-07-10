@@ -10,7 +10,7 @@ struct ParsedURL
     std::string scheme;
     std::optional<std::string> authority;
     std::string path;
-    std::map<std::string, std::string> query;
+    StringMap query;
     std::string fragment;
 
     std::string to_string() const;
@@ -30,9 +30,9 @@ MakeError(BadURL, Error);
 std::string percentDecode(std::string_view in);
 std::string percentEncode(std::string_view s, std::string_view keep="");
 
-std::map<std::string, std::string> decodeQuery(const std::string & query);
+StringMap decodeQuery(const std::string & query);
 
-std::string encodeQuery(const std::map<std::string, std::string> & query);
+std::string encodeQuery(const StringMap & query);
 
 ParsedURL parseURL(const std::string & url);
 
