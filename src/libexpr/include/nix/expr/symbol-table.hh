@@ -2,7 +2,6 @@
 ///@file
 
 #include <memory_resource>
-#include <array>
 
 #include "nix/expr/value.hh"
 #include "nix/util/error.hh"
@@ -81,39 +80,18 @@ class SymbolStr
 
         std::string_view s;
         std::size_t hash;
-        std::pmr::polymorphic_allocator<char> & alloc;
+        ContiguousArena & arena;
 
-        Key(std::string_view s, std::pmr::polymorphic_allocator<char> & stringAlloc)
+        Key(std::string_view s, ContiguousArena & arena)
             : s(s)
             , hash(HashType{}(s))
-            , alloc(stringAlloc) {}
+            , arena(arena) {}
     };
 
 public:
     SymbolStr(const SymbolValue & s) noexcept : s(&s) {}
 
     SymbolStr(const Key & key);
-    #if 0
-    {
-        auto size = key.s.size();
-        if (size >= std::numeric_limits<uint32_t>::max()) {
-            throw Error("Size of symbol exceeds 4GiB and cannot be stored");
-        }
-        // for multi-threaded implementations: lock store and allocator here
-        const auto & [v, idx] = key.store.add(SymbolValue{});
-        if (size == 0) {
-            v.mkString("", nullptr);
-        } else {
-            auto s = key.alloc.allocate(size + 1);
-            memcpy(s, key.s.data(), size);
-            s[size] = '\0';
-            v.mkString(s, nullptr);
-        }
-        v.size_ = size;
-        v.idx = idx;
-        this->s = &v;
-    }
-    #endif
 
     bool operator == (std::string_view s2) const noexcept
     {
@@ -151,13 +129,6 @@ public:
     {
         return s;
     }
-
-    #if 0
-    explicit operator Symbol() const noexcept
-    {
-        return Symbol{s->idx + 1};
-    }
-    #endif
 
     struct Hash
     {
@@ -219,11 +190,13 @@ private:
 
 public:
 
+    constexpr static size_t alignment = 8;
+
     SymbolTable()
         : arena(1 << 30)
     {
-        // Reserve symbol ID 0.
-        arena.allocate(1);
+        // Reserve symbol ID 0 and ensure alignment of the first allocation.
+        arena.allocate(alignment);
     }
 
     /**
@@ -247,7 +220,10 @@ public:
         return SymbolStr(* (SymbolValue *) (arena.data + s.id));
     }
 
-    size_t size() const noexcept;
+    size_t size() const noexcept
+    {
+        return symbols.size();
+    }
 
     size_t totalSize() const
     {
@@ -257,6 +233,8 @@ public:
     template<typename T>
     void dump(T callback) const
     {
+        // FIXME
+        #if 0
         std::string_view left{arena.data, arena.size};
         while (!left.empty()) {
             auto p = left.find((char) 0);
@@ -264,6 +242,7 @@ public:
             callback(left.substr(0, p));
             left = left.substr(p + 1);
         }
+        #endif
     }
 };
 

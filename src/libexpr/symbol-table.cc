@@ -33,45 +33,34 @@ size_t ContiguousArena::allocate(size_t bytes)
 
 Symbol SymbolTable::create(std::string_view s)
 {
-    #if 0
-    std::size_t hash = std::hash<std::string_view>{}(s);
-    auto domain = hash % symbolDomains.size();
+    uint32_t idx;
 
+    auto visit = [&](const SymbolStr & sym)
     {
-        auto symbols(symbolDomains[domain].readLock());
-        auto it = symbols->find(s);
-        if (it != symbols->end())
-            return Symbol(it->second);
-    }
+        idx = ((const char *) sym.s) - arena.data;
+    };
 
-    // Most symbols are looked up more than once, so we trade off insertion performance
-    // for lookup performance.
-    auto symbols(symbolDomains[domain].lock());
-    auto it = symbols->find(s);
-    if (it != symbols->end())
-        return Symbol(it->second);
+    symbols.insert_and_visit(SymbolStr::Key{s, arena}, visit, visit);
 
-    // Atomically allocate space for the symbol in the arena.
-    auto id = arena.allocate(s.size() + 1);
-    auto p = const_cast<char *>(arena.data) + id;
-    memcpy(p, s.data(), s.size());
-    p[s.size()] = 0;
-
-    symbols->emplace(std::string_view(p, s.size()), id);
-
-    return Symbol(id);
-    #endif
-    assert(false);
+    return Symbol(idx);
 }
 
-size_t SymbolTable::size() const noexcept
+SymbolStr::SymbolStr(const SymbolStr::Key & key)
 {
-    size_t res = 0;
-    #if 0
-    for (auto & domain : symbolDomains)
-        res += domain.readLock()->size();
-    #endif
-    return res;
+    auto rawSize = sizeof(Value) + key.s.size() + 1;
+    auto size = ((rawSize + SymbolTable::alignment - 1) / SymbolTable::alignment) * SymbolTable::alignment;
+
+    auto id = key.arena.allocate(size);
+
+    auto v = (SymbolValue *) (const_cast<char *>(key.arena.data) + id);
+    auto s = (char *) (v + 1);
+
+    memcpy(s, key.s.data(), key.s.size());
+    s[key.s.size()] = 0;
+
+    v->mkString(s, nullptr);
+
+    this->s = v;
 }
 
 }
