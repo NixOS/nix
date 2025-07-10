@@ -221,6 +221,113 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
         return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100 : 0) : buildUser->getGID();
     }
 
+    bool setSupplementaryGroups;
+
+    /**
+     * Return parent_gid -> (mapped_gid, mapped_name)
+     *
+     * Keys are host/parent gid's (can't have duplicates obviously). Values
+     * are the mapped/target (gid, name) pairs. Each mapped gid (name) may
+     * only appear once in the result.
+     */
+    std::map<gid_t, std::tuple<gid_t, std::string>> getSupplementaryGIDMap()
+    {
+        // Primary GID (sandboxGid) is always mapped and it would make no
+        // sense to assign as a supplementary group as well.
+        //
+        // It would be technically harmless to allow mapping and assigning 0,
+        // aside from some potential confusion. It's only disallowed here
+        // because the root group is declared always anyway. Allowing it here
+        // would result in a duplicate /etc/group entry.
+        //
+        // Allowing assigning nogroup 65534 would be very bad, especially if
+        // root 0 wasn't mapped, as it's the fallback group to which all
+        // unmapped GIDs get mapped to (including root).
+        std::vector<gid_t> reserved_gids = {sandboxGid(), 0, 65534};
+        std::vector<std::string> reserved_names = {"root", "nixbld", "nogroup"};
+
+        std::map<gid_t, std::tuple<gid_t, std::string>> gid_map;
+
+        struct group grp;
+        struct group * gr = nullptr;
+        long bufsize = sysconf(_SC_GETGR_R_SIZE_MAX);
+        if (bufsize == -1) bufsize = 16384;
+        std::vector<char> buffer;
+
+        for (const auto & group_entry : settings.supplementaryGroups.get()) {
+            std::string group_name = group_entry;
+            std::optional<gid_t> mapped_gid;
+
+            // parse "name[:gid]"
+            auto pos = group_entry.find(":");
+            if (pos != std::string::npos) {
+                std::string gid_str = group_entry.substr(pos + 1);
+                group_name = group_entry.substr(0, pos);
+                try {
+                    mapped_gid = static_cast<gid_t>(std::stoul(gid_str));
+                } catch (...) {
+                    throw Error("Invalid GID number in '%s'", gid_str);
+                }
+            }
+
+            while (true) {
+                buffer.resize(bufsize);
+                int ret = getgrnam_r(group_name.c_str(), &grp, buffer.data(), buffer.size(), &gr);
+                if (ret == 0) {
+                    break;
+                } else if (ret == ERANGE) { // buffer too small
+                    bufsize *= 2;
+                } else if (ret != 0)
+                    throw Error("getgrnam_r failed for group '%s': %s", group_name, strerror(ret));
+            }
+
+            if (!gr) {
+                debug("Supplementary group '%s' not found", group_name);
+                continue;
+            }
+
+            // host GID sanity checks
+            gid_t parent_gid = gr->gr_gid;
+            if (parent_gid == 0)
+                throw Error("Group '%s': mapping the root group (GID 0) is not a good idea", group_name);
+            if (gid_map.contains(parent_gid))
+                throw Error("Group '%s': parent GID %d is already mapped", group_name, parent_gid);
+
+            /* Mapped GID sanity checks
+
+               65535 is the special invalid/overflow GID distinct from
+               nogroup. We don't want to allow that.
+
+               2^16 and above are not allowed because it would seem impossible
+               to assign them. In a quick test higher GIDs got truncated to
+               65534. Might have something to do with how we're forced to call
+               setgroups before setting up the namespace. */
+            if (!mapped_gid)
+                mapped_gid = parent_gid;
+            if (mapped_gid > 65534)
+                throw Error("Group '%s': mapped GID %d is too large (>65534)", group_name, mapped_gid.value());
+            if (std::find(reserved_gids.begin(), reserved_gids.end(), mapped_gid.value()) != reserved_gids.end())
+                throw Error("Group '%s': mapped GID %d conflicts with reserved GID", group_name, mapped_gid.value());
+
+            // mapped name sanity checks
+            std::string mapped_name = gr->gr_name;
+            if (std::find(reserved_names.begin(), reserved_names.end(), mapped_name) != reserved_names.end()) {
+                mapped_name += "-host";
+                debug("Group '%s': name conflicts with reserved name; renaming to '%s'", group_name, mapped_name);
+                if (std::find(reserved_names.begin(), reserved_names.end(), mapped_name) != reserved_names.end()) {
+                    warn("Group '%s': original and alternative name '%s' both conflict with reserved names; skipping this group", group_name, mapped_name);
+                    continue;
+                }
+            }
+
+            gid_map[parent_gid] = std::make_tuple(mapped_gid.value(), std::move(mapped_name));
+            reserved_gids.push_back(mapped_gid.value());
+            reserved_names.push_back(std::get<1>(gid_map[parent_gid]));
+        }
+
+        return gid_map;
+    }
+
     bool needsHashRewrite() override
     {
         return false;
@@ -292,6 +399,8 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
             }
         }
 
+        setSupplementaryGroups = settings.autoAllocateUids && getuid() == 0;
+
         // Kill any processes left in the cgroup or build user.
         DerivationBuilderImpl::prepareUser();
     }
@@ -343,12 +452,17 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
-        writeFile(
-            chrootRootDir + "/etc/group",
-            fmt("root:x:0:\n"
-                "nixbld:!:%1%:\n"
-                "nogroup:x:65534:\n",
-                sandboxGid()));
+        std::ostringstream oss;
+        oss << fmt(
+            "root:x:0:\n"
+            "nogroup:x:65534:\n"
+            "nixbld:!:%d:\n", sandboxGid());
+
+        if (setSupplementaryGroups)
+            for (const auto & [parent_gid, mapped] : getSupplementaryGIDMap())
+                oss << fmt("%s:x:%d:nixbld\n", std::get<1>(mapped), std::get<0>(mapped));
+
+        writeFile(chrootRootDir + "/etc/group", oss.str());
 
         /* Create /etc/hosts with localhost entry. */
         if (derivationType.isSandboxed())
@@ -452,6 +566,13 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
 
         usingUserNamespace = userNamespacesSupported();
 
+        // NOTE: setting supplementary groups like this only only works in
+        // certain conditions (root permissions).
+        std::vector<gid_t> supplementaryGroups;
+        if (setSupplementaryGroups)
+            for (const auto & [parent_gid, mapped] : getSupplementaryGIDMap())
+                supplementaryGroups.push_back(std::get<0>(mapped));
+
         Pipe sendPid;
         sendPid.create();
 
@@ -464,9 +585,9 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
             openSlave();
 
             try {
-                /* Drop additional groups here because we can't do it
+                /* Drop and/or set additional groups here because we can't do it
                    after we've created the new user namespace. */
-                if (setgroups(0, 0) == -1) {
+                if (setgroups(supplementaryGroups.size(), supplementaryGroups.data()) == -1) {
                     if (errno != EPERM)
                         throw SysError("setgroups failed");
                     if (settings.requireDropSupplementaryGroups)
@@ -522,7 +643,17 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
             if (!buildUser || buildUser->getUIDCount() == 1)
                 writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
 
-            writeFile("/proc/" + std::to_string(pid) + "/gid_map", fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
+            std::ostringstream oss;
+
+            // Primary GID mapping
+            oss << fmt("%d %d %d", sandboxGid(), hostGid, nrIds);
+
+            if (setSupplementaryGroups)
+                // Supplementary GIDs one by one
+                for (const auto & [parent_gid, mapped] : getSupplementaryGIDMap())
+                    oss << fmt("\n%d %d 1", std::get<0>(mapped), parent_gid);
+
+            writeFile("/proc/" + std::to_string(pid) + "/gid_map", oss.str());
         } else {
             debug("note: not using a user namespace");
             if (!buildUser)
