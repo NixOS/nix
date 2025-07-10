@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.29 and Determinate Nix 3.7.0.<!-- differences -->
+This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.8.0.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -94,3 +94,9 @@ This section lists the differences between upstream Nix 2.29 and Determinate Nix
 * `nix store delete` now explains why deletion fails by @edolstra in [DeterminateSystems/nix-src#130](https://github.com/DeterminateSystems/nix-src/pull/130)
 
 * New command: `nix flake prefetch-inputs` for improved CI performance, by @edolstra in [DeterminateSystems/nix-src#127](https://github.com/DeterminateSystems/nix-src/pull/127)
+
+<!-- Determinate Nix version 3.8.0 -->
+
+* nix flake check: Skip substitutable derivations by @edolstra in [DeterminateSystems/nix-src#134](https://github.com/DeterminateSystems/nix-src/pull/134)
+
+* lockFlake(): When updating a lock, respect the input's lock file by @edolstra in [DeterminateSystems/nix-src#137](https://github.com/DeterminateSystems/nix-src/pull/137)
