@@ -4122,9 +4122,9 @@ static RegisterPrimOp primop_lessThan({
     .name = "__lessThan",
     .args = {"e1", "e2"},
     .doc = R"(
-      Return `true` if the number *e1* is less than the number *e2*, and
-      `false` otherwise. Evaluation aborts if either *e1* or *e2* does not
-      evaluate to a number.
+      Return `true` if the value *e1* is less than the value *e2*, and `false` otherwise.
+      Evaluation aborts if either *e1* or *e2* does not evaluate to a number, string or path.
+      Furthermore, it aborts if *e2* does not match *e1*'s type according to the aforementioned classification of number, string or path.
     )",
     .fun = prim_lessThan,
 });
