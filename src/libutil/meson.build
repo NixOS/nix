@@ -57,7 +57,7 @@ deps_private += blake3
 
 boost = dependency(
   'boost',
-  modules : ['context', 'coroutine', 'iostreams'],
+  modules : ['context', 'coroutine', 'iostreams', 'url'],
   include_type: 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we

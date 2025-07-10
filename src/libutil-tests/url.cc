@@ -1,5 +1,7 @@
 #include "nix/util/url.hh"
+#include "nix/util/tests/gmock-matchers.hh"
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 namespace nix {
 
@@ -269,6 +271,12 @@ namespace nix {
         ASSERT_EQ(d, s);
     }
 
+    TEST(percentDecode, incompleteEncoding)
+    {
+        ASSERT_THAT(
+            []() { percentDecode("%1"); },
+            ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("error: invalid URI parameter '%1': incomplete pct-encoding")));
+    }
 
     /* ----------------------------------------------------------------------------
      * percentEncode
