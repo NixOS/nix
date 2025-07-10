@@ -7,12 +7,7 @@
 #include "nix/util/error.hh"
 
 #include <boost/version.hpp>
-#define USE_FLAT_SYMBOL_SET (BOOST_VERSION >= 108100)
-#if USE_FLAT_SYMBOL_SET
-#  include <boost/unordered/unordered_flat_set.hpp>
-#else
-#  include <boost/unordered/unordered_set.hpp>
-#endif
+#include <boost/unordered/unordered_flat_set.hpp>
 
 namespace nix {
 
@@ -214,12 +209,7 @@ private:
      * Transparent lookup of string view for a pointer to a ChunkedVector entry -> return offset into the store.
      * ChunkedVector references are never invalidated.
      */
-#if USE_FLAT_SYMBOL_SET
     boost::unordered_flat_set<SymbolStr, SymbolStr::Hash, SymbolStr::Equal> symbols{SymbolStr::chunkSize};
-#else
-    using SymbolValueAlloc = std::pmr::polymorphic_allocator<SymbolStr>;
-    boost::unordered_set<SymbolStr, SymbolStr::Hash, SymbolStr::Equal, SymbolValueAlloc> symbols{SymbolStr::chunkSize, {&buffer}};
-#endif
 
 public:
 
@@ -287,5 +277,3 @@ struct std::hash<nix::Symbol>
         return std::hash<decltype(s.id)>{}(s.id);
     }
 };
-
-#undef USE_FLAT_SYMBOL_SET

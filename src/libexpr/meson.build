@@ -41,6 +41,7 @@ boost = dependency(
   'boost',
   modules : ['container', 'context'],
   include_type: 'system',
+  version: '>=1.81.0'
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
