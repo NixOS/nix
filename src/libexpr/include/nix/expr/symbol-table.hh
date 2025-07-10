@@ -220,19 +220,7 @@ public:
         // Most symbols are looked up more than once, so we trade off insertion performance
         // for lookup performance.
         // FIXME: make this thread-safe.
-        return [&]<typename T>(T && key) -> Symbol {
-            if constexpr (requires { symbols.insert<T>(key); }) {
-                auto [it, _] = symbols.insert<T>(key);
-                return Symbol(*it);
-            } else {
-                auto it = symbols.find<T>(key);
-                if (it != symbols.end())
-                    return Symbol(*it);
-
-                it = symbols.emplace(key).first;
-                return Symbol(*it);
-            }
-        }(SymbolStr::Key{store, s, stringAlloc});
+        return Symbol(*symbols.insert(SymbolStr::Key{store, s, stringAlloc}).first);
     }
 
     std::vector<SymbolStr> resolve(const std::vector<Symbol> & symbols) const
