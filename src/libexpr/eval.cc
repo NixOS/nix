@@ -1564,7 +1564,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                                              symbols[i.name])
                                     .atPos(lambda.pos)
                                     .withTrace(pos, "from call site")
-                                    .withFrame(*fun.payload.lambda.env, lambda)
+                                    .withFrame(*vCur.payload.lambda.env, lambda)
                                     .debugThrow();
                         }
                         env2.values[displ++] = i.def->maybeThunk(*this, env2);
@@ -1591,7 +1591,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                                 .atPos(lambda.pos)
                                 .withTrace(pos, "from call site")
                                 .withSuggestions(suggestions)
-                                .withFrame(*fun.payload.lambda.env, lambda)
+                                .withFrame(*vCur.payload.lambda.env, lambda)
                                 .debugThrow();
                         }
                     unreachable();
