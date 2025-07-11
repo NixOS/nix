@@ -444,7 +444,11 @@ struct GitInputScheme : InputScheme
         // repo, treat as a remote URI to force a clone.
         static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1"; // for testing
         auto url = parseURL(getStrAttr(input.attrs, "url"));
-        bool isBareRepository = url.scheme == "file" && !pathExists(url.path + "/.git");
+
+        // Why are we checking for bare repository?
+        // well if it's a bare repository we want to force a git fetch rather than copying the folder
+        bool isBareRepository = url.scheme == "file" && pathExists(url.path) &&
+                                                     !pathExists(url.path + "/.git");
         //
         // FIXME: here we turn a possibly relative path into an absolute path.
         // This allows relative git flake inputs to be resolved against the
@@ -461,6 +465,12 @@ struct GitInputScheme : InputScheme
                     "This is not supported and will stop working in a future release. "
                     "See https://github.com/NixOS/nix/issues/12281 for details.",
                     url);
+            }
+
+            // If we don't check here for the path existence, then we can give libgit2 any directory
+            // and it will initialize them as git directories.
+            if (!pathExists(url.path)) {
+                throw Error("The path '%s' does not exist.", url.path);
             }
             repoInfo.location = std::filesystem::absolute(url.path);
         } else {
@@ -599,7 +609,7 @@ struct GitInputScheme : InputScheme
                 ? cacheDir / ref
                 : cacheDir / "refs/heads" / ref;
 
-            bool doFetch;
+            bool doFetch = false;
             time_t now = time(0);
 
             /* If a rev was specified, we need to fetch if it's not in the
