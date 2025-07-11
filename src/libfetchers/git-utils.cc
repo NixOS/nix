@@ -552,11 +552,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             // we're using --quiet for now. Should process its stderr.
             .args = gitArgs,
             .input = {},
+            .mergeStderrToStdout = true,
             .isInteractive = true
         });
-        
+
         if (status > 0) {
-            throw Error("Failed to fetch git repository %s: %s", url, output);
+            throw Error("Failed to fetch git repository %s : %s", url, output);
         }
     }
 
