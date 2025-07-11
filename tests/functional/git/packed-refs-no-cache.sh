@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 
+# Please see https://github.com/NixOS/nix/issues/13457
+# for a higher description of the purpose of the test.
+# tl;dr;fetchGit will utilize the git cache and avoid refetching when possible.
+# It relies on the presence of either the commit when rev is provided
+# or checks if the ref refs/heads/<ref_name> if ref is provided.
+#
+# Unfortunately, git can occasionally "pack references" which moves the references
+# from individual files to a single unifies file.
+# When this occurs, nix can no longer check for the presence of the ref to check
+# for the mtime and will refetch unnecessarily.
+
 source ../common.sh
 
 requireGit
