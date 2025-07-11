@@ -514,14 +514,10 @@ public:
      * application, call the function and overwrite `v` with the
      * result.  Otherwise, this is a no-op.
      */
-    inline void forceValue(Value & v, const PosIdx pos);
-
-    /**
-     * Given a thunk that was observed to be in the pending or awaited
-     * state, wait for it to finish. Returns the new type of the
-     * value.
-     */
-    InternalType waitOnThunk(Value & v, bool awaited);
+    inline void forceValue(Value & v, const PosIdx pos)
+    {
+        v.force(*this, pos);
+    }
 
     void tryFixupBlackHolePos(Value & v, PosIdx pos);
 
@@ -938,6 +934,7 @@ private:
     std::atomic<uint64_t> nrPrimOpCalls = 0;
     std::atomic<uint64_t> nrFunctionCalls = 0;
 
+public:
     std::atomic<uint64_t> nrThunksAwaited{0};
     std::atomic<uint64_t> nrThunksAwaitedSlow{0};
     std::atomic<uint64_t> usWaiting{0};
@@ -945,6 +942,7 @@ private:
     std::atomic<uint64_t> maxWaiting{0};
     std::atomic<uint64_t> nrSpuriousWakeups{0};
 
+private:
     bool countCalls;
 
     typedef std::map<std::string, size_t> PrimOpCalls;

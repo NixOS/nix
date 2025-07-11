@@ -127,7 +127,6 @@ void FutureVector::finishAll()
     }
 }
 
-#if 0
 struct WaiterDomain
 {
     std::condition_variable cv;
@@ -135,90 +134,94 @@ struct WaiterDomain
 
 static std::array<Sync<WaiterDomain>, 128> waiterDomains;
 
-static Sync<WaiterDomain> & getWaiterDomain(Value & v)
+static Sync<WaiterDomain> & getWaiterDomain(detail::ValueBase & v)
 {
     auto domain = (((size_t) &v) >> 5) % waiterDomains.size();
     debug("HASH %x -> %d", &v, domain);
     return waiterDomains[domain];
 }
-#endif
 
-InternalType EvalState::waitOnThunk(Value & v, bool awaited)
+template<>
+ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOnThunk(EvalState & state, bool awaited)
 {
-#if 0
-    nrThunksAwaited++;
+    state.nrThunksAwaited++;
 
-    auto domain = getWaiterDomain(v).lock();
+    auto domain = getWaiterDomain(*this).lock();
 
     if (awaited) {
         /* Make sure that the value is still awaited, now that we're
            holding the domain lock. */
-        auto type = v.internalType.load(std::memory_order_acquire);
+        auto p0_ = p0.load(std::memory_order_acquire);
+        auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
 
         /* If the value has been finalized in the meantime (i.e. is no
            longer pending), we're done. */
-        if (type != tAwaited) {
-            debug("VALUE DONE RIGHT AWAY 2 %x", &v);
-            assert(isFinished(type));
-            return type;
+        if (pd != pdAwaited) {
+            debug("VALUE DONE RIGHT AWAY 2 %x", this);
+            assert(pd != pdThunk && pd != pdPending);
+            return p0_;
         }
     } else {
         /* Mark this value as being waited on. */
-        auto type = tPending;
-        if (!v.internalType.compare_exchange_strong(
-                type, tAwaited, std::memory_order_relaxed, std::memory_order_acquire)) {
+        PackedPointer p0_ = pdPending;
+        if (!p0.compare_exchange_strong(
+                p0_, pdAwaited, std::memory_order_relaxed, std::memory_order_acquire)) {
             /* If the value has been finalized in the meantime (i.e. is
                no longer pending), we're done. */
-            if (type != tAwaited) {
-                debug("VALUE DONE RIGHT AWAY %x", &v);
-                assert(isFinished(type));
-                return type;
+            auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
+            if (pd != pdAwaited) {
+                debug("VALUE DONE RIGHT AWAY %x", this);
+                assert(pd != pdThunk && pd != pdPending);
+                return p0_;
             }
             /* The value was already in the "waited on" state, so we're
                not the only thread waiting on it. */
-            debug("ALREADY AWAITED %x", &v);
+            debug("ALREADY AWAITED %x", this);
         } else
-            debug("PENDING -> AWAITED %x", &v);
+            debug("PENDING -> AWAITED %x", this);
     }
 
     /* Wait for another thread to finish this value. */
-    debug("AWAIT %x", &v);
+    debug("AWAIT %x", this);
 
-    if (settings.evalCores <= 1)
-        error<InfiniteRecursionError>("infinite recursion encountered").atPos(v.determinePos(noPos)).debugThrow();
+    if (state.settings.evalCores <= 1)
+        state
+            .error<InfiniteRecursionError>("infinite recursion encountered")
+            .atPos(((Value &) *this).determinePos(noPos))
+            .debugThrow();
 
-    nrThunksAwaitedSlow++;
-    currentlyWaiting++;
-    maxWaiting = std::max(maxWaiting.load(std::memory_order_acquire), currentlyWaiting.load(std::memory_order_acquire));
+    state.nrThunksAwaitedSlow++;
+    state.currentlyWaiting++;
+    state.maxWaiting = std::max(
+        state.maxWaiting.load(std::memory_order_acquire),
+        state.currentlyWaiting.load(std::memory_order_acquire));
 
     auto now1 = std::chrono::steady_clock::now();
 
     while (true) {
         domain.wait(domain->cv);
-        debug("WAKEUP %x", &v);
-        auto type = v.internalType.load(std::memory_order_acquire);
-        if (type != tAwaited) {
-            assert(isFinished(type));
+        debug("WAKEUP %x", this);
+        auto p0_ = p0.load(std::memory_order_acquire);
+        auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
+        if (pd != pdAwaited) {
+            assert(pd != pdThunk && pd != pdPending);
             auto now2 = std::chrono::steady_clock::now();
-            usWaiting += std::chrono::duration_cast<std::chrono::microseconds>(now2 - now1).count();
-            currentlyWaiting--;
-            return type;
+            state.usWaiting += std::chrono::duration_cast<std::chrono::microseconds>(now2 - now1).count();
+            state.currentlyWaiting--;
+            return p0_;
         }
-        nrSpuriousWakeups++;
+        state.nrSpuriousWakeups++;
     }
-#endif
-    assert(false);
 }
 
-#if 0
-void Value::notifyWaiters()
+template<>
+void ValueStorage<sizeof(void *)>::notifyWaiters()
 {
     debug("NOTIFY %x", this);
 
     auto domain = getWaiterDomain(*this).lock();
 
-    domain->cv.notify_all(); // FIXME
+    domain->cv.notify_all();
 }
-#endif
 
 }

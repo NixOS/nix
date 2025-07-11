@@ -478,10 +478,8 @@ void EvalState::checkURI(const std::string & uri)
 Value * EvalState::addConstant(const std::string & name, Value & v, Constant info)
 {
     Value * v2 = allocValue();
-    // FIXME
-    #if 0
-    v2->finishValue(v.internalType, v.payload);
-    #endif
+    // Do a raw copy since `operator =` barfs on thunks.
+    memcpy((char *) v2, (char *) &v, sizeof(Value));
     addConstant(name, v2, info);
     return v2;
 }

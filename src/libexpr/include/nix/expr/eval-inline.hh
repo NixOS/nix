@@ -89,74 +89,55 @@ Env & EvalState::allocEnv(size_t size)
 }
 
 
-[[gnu::always_inline]]
-void EvalState::forceValue(Value & v, const PosIdx pos)
+template<std::size_t ptrSize>
+void ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<ptrSize>>>::force(EvalState & state, PosIdx pos)
 {
-#if 0
-    auto type = v.internalType.load(std::memory_order_acquire);
+    // FIXME: check that the compiler won't reorder this below the
+    // load of p0.
+    auto p1_ = p1;
+    auto p0_ = p0.load(std::memory_order_acquire);
 
-    if (isFinished(type))
-        goto done;
+    auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
 
-    if (type == tThunk) {
-#endif
-
-    if (v.isThunk()) {
-#if 0
-        Env * env = v.thunk().env;
-        assert(env || v.isBlackhole());
-        Expr * expr = v.thunk().expr;
+    if (pd == pdThunk) {
         try {
-            if (!v.internalType.compare_exchange_strong(type, tPending, std::memory_order_acquire, std::memory_order_acquire)) {
-                if (type == tPending || type == tAwaited) {
-                    waitOnThunk(v, type == tAwaited);
+            // Atomically set the thunk to "pending".
+            if (!p0.compare_exchange_strong(p0_, pdPending, std::memory_order_acquire, std::memory_order_acquire)) {
+                pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
+                if (pd == pdPending || pd == pdAwaited) {
+                    // The thunk is already "pending" or "awaited", so
+                    // we need to wait for it.
+                    p0_ = waitOnThunk(state, pd == pdAwaited);
                     goto done;
                 }
-                if (isFinished(type))
-                    goto done;
-                printError("NO LONGER THUNK %x %d", this, type);
-                abort();
+                assert(pd != pdThunk);
+                // Another thread finished this thunk, no need to wait.
+                goto done;
             }
-            Env * env = v.payload.thunk.env;
-            Expr * expr = v.payload.thunk.expr;
-            assert(env);
-            expr->eval(*this, *env, v);
-        } catch (...) {
-            tryFixupBlackHolePos(v, pos);
-            v.mkFailed();
-            throw;
-        }
-#endif
-    }
-#if 0
-    else if (type == tApp) {
-        try {
-            if (!v.internalType.compare_exchange_strong(type, tPending, std::memory_order_acquire, std::memory_order_acquire)) {
-                if (type == tPending || type == tAwaited) {
-                    waitOnThunk(v, type == tAwaited);
-                    goto done;
-                }
-                if (isFinished(type))
-                    goto done;
-                printError("NO LONGER APP %x %d", this, type);
-                abort();
+
+            bool isApp = p1_ & discriminatorMask;
+            if (isApp) {
+                auto left = untagPointer<Value *>(p0_);
+                auto right = untagPointer<Value *>(p1_);
+                state.callFunction(*left, *right, (Value &) *this, pos);
+            } else {
+                auto env = untagPointer<Env *>(p0_);
+                auto expr = untagPointer<Expr *>(p1_);
+                expr->eval(state, *env, (Value &) *this);
             }
-            callFunction(*v.payload.app.left, *v.payload.app.right, v, pos);
         } catch (...) {
-            tryFixupBlackHolePos(v, pos);
-            v.mkFailed();
+            state.tryFixupBlackHolePos((Value &) *this, pos);
+            setStorage(new Value::Failed{.ex = std::current_exception()});
             throw;
         }
     }
-    else if (type == tPending || type == tAwaited)
-        type = waitOnThunk(v, type == tAwaited);
-    else
-        abort();
+
+    else if (pd == pdPending || pd == pdAwaited)
+        p0_ = waitOnThunk(state, pd == pdAwaited);
 
  done:
-    if (type == tFailed)
-        std::rethrow_exception(v.payload.failed->ex);
-#endif
+    if (InternalType(p0_ & 0xff) == tFailed)
+        std::rethrow_exception((std::bit_cast<Failed *>(p1))->ex);
 }
 
 
