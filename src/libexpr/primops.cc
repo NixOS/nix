@@ -4109,6 +4109,40 @@ static RegisterPrimOp primop_bitXor({
     .fun = prim_bitXor,
 });
 
+static void prim_bitShiftLeft(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitShiftLeft");
+    auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitShiftLeft");
+
+    v.mkInt(i1.value << i2.value);
+}
+
+static RegisterPrimOp primop_bitShiftLeft({
+    .name = "__bitShiftLeft",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Return the integer *e1* shifted left by *e2*.
+    )",
+    .fun = prim_bitShiftLeft,
+});
+
+static void prim_bitShiftRight(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitShiftRight");
+    auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitShiftRight");
+
+    v.mkInt(i1.value >> i2.value);
+}
+
+static RegisterPrimOp primop_bitShiftRight({
+    .name = "__bitShiftRight",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Return the integer *e1* shifted right by *e2*.
+    )",
+    .fun = prim_bitShiftRight,
+});
+
 static void prim_lessThan(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
