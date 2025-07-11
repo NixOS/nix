@@ -135,7 +135,7 @@ static void fetchTree(
                 attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
             } else if (state.symbols[attr.name] == "publicKeys") {
                 experimentalFeatureSettings.require(Xp::VerifiedFetches);
-                attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, context).dump());
+                attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, false, *attr.value, pos, context).dump());
             }
             else
                 state.error<TypeError>("argument '%s' to '%s' is %s while a string, Boolean or integer is expected",
