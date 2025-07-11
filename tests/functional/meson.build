@@ -213,6 +213,7 @@ endif
 subdir('ca')
 subdir('dyn-drv')
 subdir('flakes')
+subdir('git')
 subdir('git-hashing')
 subdir('local-overlay-store')
 
