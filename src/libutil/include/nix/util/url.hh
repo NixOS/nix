@@ -34,6 +34,17 @@ StringMap decodeQuery(const std::string & query);
 
 std::string encodeQuery(const StringMap & query);
 
+/**
+ * Parse a Nix URL into a ParsedURL.
+ *
+ * Nix URI is mostly compliant with RFC3986, but with some deviations:
+ * - Literal spaces are allowed and don't have to be percent encoded.
+ *   This is mostly done for backward compatibility.
+ *
+ * @note IPv6 ZoneId literals (RFC4007) are represented in URIs according to RFC6874.
+ *
+ * @throws BadURL
+ */
 ParsedURL parseURL(const std::string & url);
 
 /**
