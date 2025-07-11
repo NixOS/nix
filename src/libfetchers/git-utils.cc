@@ -545,7 +545,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             append(gitArgs, {"--depth", "1"});
         append(gitArgs, {std::string("--"), url, refspec});
 
-        runProgram(RunOptions {
+        auto [status, output] = runProgram(RunOptions {
             .program = "git",
             .lookupPath = true,
             // FIXME: git stderr messes up our progress indicator, so
@@ -554,6 +554,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             .input = {},
             .isInteractive = true
         });
+        
+        if (status > 0) {
+            throw Error("Failed to fetch git repository %s: %s", url, output);
+        }
     }
 
     void verifyCommit(
