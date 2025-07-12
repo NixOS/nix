@@ -14,6 +14,8 @@ jobs:
       with:
         fetch-depth: 0
     - uses: cachix/install-nix-action@v31
+      with:
+        install_url: "https://releases.nixos.org/nix/nix-2.29.1/install"
     - run: nix --experimental-features 'nix-command flakes' flake show --all-systems --json
 
   tests:
@@ -36,6 +38,7 @@ jobs:
         fetch-depth: 0
     - uses: cachix/install-nix-action@v31
       with:
+        install_url: "https://releases.nixos.org/nix/nix-2.29.1/install"
         # The sandbox would otherwise be disabled by default on Darwin
         extra_nix_config: |
           sandbox = true
