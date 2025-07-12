@@ -338,8 +338,6 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
             .WithBucket(config->bucketName)
             .WithKey(path));
 
-        printError("Checking for file");
-
         if (!res.IsSuccess()) {
             auto & error = res.GetError();
             if (error.GetErrorType() == Aws::S3::S3Errors::RESOURCE_NOT_FOUND
