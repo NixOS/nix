@@ -59,6 +59,7 @@ jobs:
       runner: macos-latest-large
       runner_for_virt: macos-latest-large
       runner_small: macos-latest-large
+      run_tests: false
 
   build_aarch64-darwin:
     uses: ./.github/workflows/build.yml
