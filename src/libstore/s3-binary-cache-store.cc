@@ -37,10 +37,11 @@ namespace nix {
 struct S3Error : public Error
 {
     Aws::S3::S3Errors err;
+    Aws::String exceptionName;
 
     template<typename... Args>
-    S3Error(Aws::S3::S3Errors err, const Args & ... args)
-        : Error(args...), err(err) { };
+    S3Error(Aws::S3::S3Errors err, Aws::String exceptionName, const Args & ... args)
+        : Error(args...), err(err), exceptionName(exceptionName) { };
 };
 
 /* Helper: given an Outcome<R, E>, return R in case of success, or
@@ -51,6 +52,7 @@ R && checkAws(std::string_view s, Aws::Utils::Outcome<R, E> && outcome)
     if (!outcome.IsSuccess())
         throw S3Error(
             outcome.GetError().GetErrorType(),
+            outcome.GetError().GetExceptionName(),
             fmt(
                 "%s: %s (request id: %s)",
                 s,
@@ -226,7 +228,13 @@ S3Helper::FileTransferResult S3Helper::getObject(
 
     } catch (S3Error & e) {
         if ((e.err != Aws::S3::S3Errors::NO_SUCH_KEY) &&
-            (e.err != Aws::S3::S3Errors::ACCESS_DENIED)) throw;
+            (e.err != Aws::S3::S3Errors::ACCESS_DENIED) &&
+            // Expired tokens are not really an error, more of a caching problem. Should be treated same as 403.
+            //
+            // AWS unwilling to provide a specific error type for the situation (https://github.com/aws/aws-sdk-cpp/issues/1843)
+            // so use this hack
+            (e.exceptionName != "ExpiredToken")
+        ) throw;
     }
 
     auto now2 = std::chrono::steady_clock::now();
@@ -325,15 +333,22 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
     {
         stats.head++;
 
+        // error: AWS error fetching 'vjgpmfn7s6vkynymnk8jfx2fcxnsbd6b.narinfo': Unable to parse ExceptionName: ExpiredToken Message: The provided token has expired.
         auto res = s3Helper.client->HeadObject(
             Aws::S3::Model::HeadObjectRequest()
             .WithBucket(config->bucketName)
             .WithKey(path));
 
+        printError("Checking for file");
+
         if (!res.IsSuccess()) {
             auto & error = res.GetError();
             if (error.GetErrorType() == Aws::S3::S3Errors::RESOURCE_NOT_FOUND
                 || error.GetErrorType() == Aws::S3::S3Errors::NO_SUCH_KEY
+                // Expired tokens are not really an error, more of a caching problem. Should be treated same as 403.
+                // AWS unwilling to provide a specific error type for the situation (https://github.com/aws/aws-sdk-cpp/issues/1843)
+                // so use this hack
+                || (error.GetErrorType() == Aws::S3::S3Errors::UNKNOWN && error.GetExceptionName() == "ExpiredToken")
                 // If bucket listing is disabled, 404s turn into 403s
                 || error.GetErrorType() == Aws::S3::S3Errors::ACCESS_DENIED)
                 return false;
