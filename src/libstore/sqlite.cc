@@ -8,8 +8,148 @@
 
 #include <atomic>
 #include <thread>
+#include <chrono>
+#include <fstream>
+#include <map>
+#include <algorithm>
+#include <nlohmann/json.hpp>
+#include "nix/util/sync.hh"
+#include "nix/util/logging.hh"
+
+using json = nlohmann::json;
 
 namespace nix {
+
+// Get current timestamp in milliseconds
+static int64_t getCurrentTimestampMs() {
+    auto now = std::chrono::system_clock::now();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()).count();
+}
+
+// For summary statistics
+struct QuerySummary {
+    int count = 0;
+    double totalTimeMs = 0.0;
+};
+
+// Performance tracking for SQLite queries
+struct SQLitePerfState {
+    std::ofstream perfFile;
+    bool enabled = false;
+    
+    // Summary statistics
+    std::map<std::string, QuerySummary> querySummary;
+    size_t totalQueries = 0;
+    double totalTimeMs = 0.0;
+};
+
+static Sync<SQLitePerfState> perfState;
+
+static void dumpSQLiteStats() {
+    auto state(perfState.lock());
+    
+    if (!state->enabled || state->totalQueries == 0) return;
+    
+    if (state->perfFile.is_open()) {
+        // Output summary as JSON
+        json summaryJson;
+        summaryJson["type"] = "summary";
+        summaryJson["timestamp_ms"] = getCurrentTimestampMs();
+        summaryJson["total_queries"] = state->totalQueries;
+        summaryJson["total_time_ms"] = std::round(state->totalTimeMs * 1000) / 1000;
+        
+        // Sort queries by total time
+        std::vector<std::pair<std::string, QuerySummary>> sortedQueries(
+            state->querySummary.begin(), state->querySummary.end());
+        std::sort(sortedQueries.begin(), sortedQueries.end(),
+            [](const auto& a, const auto& b) { return a.second.totalTimeMs > b.second.totalTimeMs; });
+        
+        auto topQueries = json::array();
+        int count = 0;
+        for (const auto& [query, summary] : sortedQueries) {
+            if (++count > 20) break; // Show top 20
+            json queryObj;
+            queryObj["query"] = query;
+            queryObj["count"] = summary.count;
+            queryObj["total_time_ms"] = std::round(summary.totalTimeMs * 1000) / 1000;
+            topQueries.push_back(queryObj);
+        }
+        summaryJson["top_queries"] = topQueries;
+        
+        try {
+            state->perfFile << summaryJson.dump() << std::endl;
+            state->perfFile.close();
+        } catch (...) {
+            // Best effort - we're in a destructor
+            ignoreExceptionInDestructor();
+        }
+    }
+}
+
+static int profileCallback(unsigned int traceType, void* ctx, void* p, void* x) {
+    if (traceType != SQLITE_TRACE_PROFILE) return 0;
+    
+    auto stmt = static_cast<sqlite3_stmt*>(p);
+    auto nanoseconds = *static_cast<sqlite3_int64*>(x);
+    
+    const char* sql = sqlite3_sql(stmt);
+    if (!sql) return 0;
+    
+    // Get expanded SQL with bound parameters if available
+    char* expandedSql = sqlite3_expanded_sql(stmt);
+    std::string queryStr = expandedSql ? expandedSql : sql;
+    if (expandedSql) sqlite3_free(expandedSql);
+    
+    // Get database filename
+    sqlite3* db = sqlite3_db_handle(stmt);
+    const char* dbPath = sqlite3_db_filename(db, "main");
+    std::string dbName = dbPath ? dbPath : "in-memory";
+    
+    // Convert nanoseconds to milliseconds
+    double milliseconds = nanoseconds / 1000000.0;
+    
+    {
+        auto state(perfState.lock());
+        
+        if (!state->enabled) return 0;
+        
+        // Update summary statistics
+        state->totalQueries++;
+        state->totalTimeMs += milliseconds;
+        auto& summary = state->querySummary[queryStr];
+        summary.count++;
+        summary.totalTimeMs += milliseconds;
+        
+        // Write to file immediately if file is open
+        if (state->perfFile.is_open()) {
+            try {
+                // JSON Lines format
+                json queryJson;
+                queryJson["timestamp_ms"] = getCurrentTimestampMs();
+                queryJson["database"] = dbName;
+                queryJson["execution_time_ms"] = std::round(milliseconds * 1000) / 1000;
+                queryJson["query"] = queryStr;
+                state->perfFile << queryJson.dump() << std::endl;
+                state->perfFile.flush();
+            } catch (...) {
+                // Disable on write errors to prevent flooding with errors
+                state->enabled = false;
+                state->perfFile.close();
+                warn("disabling SQLite profiling due to write errors");
+            }
+        }
+    }
+    
+    return 0;
+}
+
+// Register cleanup handler
+static struct SQLitePerfCleanup {
+    ~SQLitePerfCleanup() {
+        dumpSQLiteStats();
+    }
+} sqlitePerfCleanup;
 
 SQLiteError::SQLiteError(const char *path, const char *errMsg, int errNo, int extendedErrNo, int offset, HintFmt && hf)
   : Error(""), path(path), errMsg(errMsg), errNo(errNo), extendedErrNo(extendedErrNo), offset(offset)
@@ -75,6 +215,43 @@ SQLite::SQLite(const Path & path, SQLiteOpenMode mode)
     if (getEnv("NIX_DEBUG_SQLITE_TRACES") == "1") {
         // To debug sqlite statements; trace all of them
         sqlite3_trace(db, &traceSQL, nullptr);
+    }
+
+    // Enable performance profiling if requested
+    auto perfEnv = getEnv("NIX_SQLITE_PROFILE");
+    if (perfEnv.has_value() && !perfEnv->empty()) {
+        auto state(perfState.lock());
+        
+        // Only initialize once
+        if (!state->enabled) {
+            state->enabled = true;
+            
+            std::string perfFilePath = *perfEnv;
+            if (perfFilePath == "1") {
+                // Default to a file in the current directory
+                perfFilePath = "nix-sqlite-profile.jsonl";
+            }
+            
+            state->perfFile.open(perfFilePath, std::ios::app);
+            if (state->perfFile.is_open()) {
+                // Output start event as JSON
+                json startJson;
+                startJson["type"] = "start";
+                startJson["timestamp_ms"] = getCurrentTimestampMs();
+                state->perfFile << startJson.dump() << std::endl;
+                state->perfFile.flush();
+            } else {
+                state->enabled = false;
+                warn("failed to open SQLite profile log file '%s'", perfFilePath);
+            }
+        }
+        
+        // Enable trace callback with profiling (per connection)
+        if (state->enabled) {
+            if (sqlite3_trace_v2(db, SQLITE_TRACE_PROFILE, profileCallback, nullptr) != SQLITE_OK) {
+                SQLiteError::throw_(db, "enabling performance profiling");
+            }
+        }
     }
 
     exec("pragma foreign_keys = 1");

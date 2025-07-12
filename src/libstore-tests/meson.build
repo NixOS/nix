@@ -74,6 +74,7 @@ sources = files(
   'references.cc',
   's3-binary-cache-store.cc',
   'serve-protocol.cc',
+  'sqlite-profiling.cc',
   'ssh-store.cc',
   'store-reference.cc',
   'uds-remote-store.cc',

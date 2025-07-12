@@ -113,6 +113,7 @@ suites = [
       'repl.sh',
       'binary-cache-build-remote.sh',
       'search.sh',
+      'sqlite-profiling.sh',
       'logging.sh',
       'export.sh',
       'config.sh',
