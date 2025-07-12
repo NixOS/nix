@@ -1,5 +1,7 @@
 #include "nix/util/url.hh"
+#include "nix/util/tests/gmock-matchers.hh"
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 namespace nix {
 
@@ -115,8 +117,8 @@ namespace nix {
         ASSERT_EQ(parsed, expected);
     }
 
-    TEST(parseURL, parseScopedRFC4007IPv6Address) {
-        auto s = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080";
+    TEST(parseURL, parseScopedRFC6874IPv6Address) {
+        auto s = "http://[fe80::818c:da4d:8975:415c\%25enp0s25]:8080";
         auto parsed = parseURL(s);
 
         ParsedURL expected {
@@ -269,6 +271,12 @@ namespace nix {
         ASSERT_EQ(d, s);
     }
 
+    TEST(percentDecode, incompleteEncoding)
+    {
+        ASSERT_THAT(
+            []() { percentDecode("%1"); },
+            ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("error: invalid URI parameter '%1': incomplete pct-encoding")));
+    }
 
     /* ----------------------------------------------------------------------------
      * percentEncode
