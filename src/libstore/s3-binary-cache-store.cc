@@ -333,7 +333,6 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
     {
         stats.head++;
 
-        // error: AWS error fetching 'vjgpmfn7s6vkynymnk8jfx2fcxnsbd6b.narinfo': Unable to parse ExceptionName: ExpiredToken Message: The provided token has expired.
         auto res = s3Helper.client->HeadObject(
             Aws::S3::Model::HeadObjectRequest()
             .WithBucket(config->bucketName)
