@@ -46,32 +46,6 @@ void CommonProto::Serialise<ContentAddress>::write(const StoreDirConfig & store,
 }
 
 
-Realisation CommonProto::Serialise<Realisation>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)
-{
-    std::string rawInput = readString(conn.from);
-    return Realisation::fromJSON(
-        nlohmann::json::parse(rawInput),
-        "remote-protocol"
-    );
-}
-
-void CommonProto::Serialise<Realisation>::write(const StoreDirConfig & store, CommonProto::WriteConn conn, const Realisation & realisation)
-{
-    conn.to << realisation.toJSON().dump();
-}
-
-
-DrvOutput CommonProto::Serialise<DrvOutput>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)
-{
-    return DrvOutput::parse(readString(conn.from));
-}
-
-void CommonProto::Serialise<DrvOutput>::write(const StoreDirConfig & store, CommonProto::WriteConn conn, const DrvOutput & drvOutput)
-{
-    conn.to << drvOutput.to_string();
-}
-
-
 std::optional<StorePath> CommonProto::Serialise<std::optional<StorePath>>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)
 {
     auto s = readString(conn.from);

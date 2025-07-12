@@ -13,7 +13,7 @@ namespace nix {
 
 /* Note: you generally shouldn't change the protocol version. Define a
    new `WorkerProto::Feature` instead. */
-#define PROTOCOL_VERSION (1 << 8 | 38)
+#define PROTOCOL_VERSION (1 << 8 | 39)
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -37,6 +37,9 @@ struct BuildResult;
 struct KeyedBuildResult;
 struct ValidPathInfo;
 struct UnkeyedValidPathInfo;
+struct DrvOutput;
+struct UnkeyedRealisation;
+struct Realisation;
 enum BuildMode : uint8_t;
 enum TrustedFlag : bool;
 
@@ -263,6 +266,14 @@ DECLARE_WORKER_SERIALISER(ValidPathInfo);
 template<>
 DECLARE_WORKER_SERIALISER(UnkeyedValidPathInfo);
 template<>
+DECLARE_WORKER_SERIALISER(DrvOutput);
+template<>
+DECLARE_WORKER_SERIALISER(UnkeyedRealisation);
+template<>
+DECLARE_WORKER_SERIALISER(Realisation);
+template<>
+DECLARE_WORKER_SERIALISER(std::optional<UnkeyedRealisation>);
+template<>
 DECLARE_WORKER_SERIALISER(BuildMode);
 template<>
 DECLARE_WORKER_SERIALISER(std::optional<TrustedFlag>);
@@ -279,8 +290,8 @@ DECLARE_WORKER_SERIALISER(std::set<T COMMA_ Compare>);
 template<typename... Ts>
 DECLARE_WORKER_SERIALISER(std::tuple<Ts...>);
 
-template<typename K, typename V>
-DECLARE_WORKER_SERIALISER(std::map<K COMMA_ V>);
+template<typename K, typename V, typename Compare>
+DECLARE_WORKER_SERIALISER(std::map<K COMMA_ V COMMA_ Compare>);
 #undef COMMA_
 
 }
