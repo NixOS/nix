@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.8.1.<!-- differences -->
+This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.8.2.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -104,3 +104,9 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 <!-- Determinate Nix version 3.8.1 -->
 
 * Address ifdef problem with macOS/BSD sandboxing by @gustavderdrache in [DeterminateSystems/nix-src#142](https://github.com/DeterminateSystems/nix-src/pull/142)
+
+<!-- Determinate Nix version 3.8.2 -->
+
+* ci: don't run the full test suite for x86_64-darwin by @grahamc in [DeterminateSystems/nix-src#144](https://github.com/DeterminateSystems/nix-src/pull/144)
+
+* Try publishing the manual again by @grahamc in [DeterminateSystems/nix-src#145](https://github.com/DeterminateSystems/nix-src/pull/145)
