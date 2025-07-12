@@ -68,7 +68,6 @@ protected:
 
         return lineCount > 0 && hasStart;
     }
-
 };
 
 TEST_F(SQLiteProfilingTest, disabled_by_default)
