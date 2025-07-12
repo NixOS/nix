@@ -194,10 +194,6 @@ size_t StringSource::read(char * data, size_t len)
 }
 
 
-#if BOOST_VERSION >= 106300 && BOOST_VERSION < 106600
-#error Coroutines are broken in this version of Boost!
-#endif
-
 std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
 {
     struct SourceToSink : FinishSink

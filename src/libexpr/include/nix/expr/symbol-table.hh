@@ -7,12 +7,7 @@
 #include "nix/util/error.hh"
 
 #include <boost/version.hpp>
-#define USE_FLAT_SYMBOL_SET (BOOST_VERSION >= 108100)
-#if USE_FLAT_SYMBOL_SET
-#  include <boost/unordered/unordered_flat_set.hpp>
-#else
-#  include <boost/unordered/unordered_set.hpp>
-#endif
+#include <boost/unordered/unordered_flat_set.hpp>
 
 namespace nix {
 
@@ -214,12 +209,7 @@ private:
      * Transparent lookup of string view for a pointer to a ChunkedVector entry -> return offset into the store.
      * ChunkedVector references are never invalidated.
      */
-#if USE_FLAT_SYMBOL_SET
     boost::unordered_flat_set<SymbolStr, SymbolStr::Hash, SymbolStr::Equal> symbols{SymbolStr::chunkSize};
-#else
-    using SymbolValueAlloc = std::pmr::polymorphic_allocator<SymbolStr>;
-    boost::unordered_set<SymbolStr, SymbolStr::Hash, SymbolStr::Equal, SymbolValueAlloc> symbols{SymbolStr::chunkSize, {&buffer}};
-#endif
 
 public:
 
@@ -230,19 +220,7 @@ public:
         // Most symbols are looked up more than once, so we trade off insertion performance
         // for lookup performance.
         // FIXME: make this thread-safe.
-        return [&]<typename T>(T && key) -> Symbol {
-            if constexpr (requires { symbols.insert<T>(key); }) {
-                auto [it, _] = symbols.insert<T>(key);
-                return Symbol(*it);
-            } else {
-                auto it = symbols.find<T>(key);
-                if (it != symbols.end())
-                    return Symbol(*it);
-
-                it = symbols.emplace(key).first;
-                return Symbol(*it);
-            }
-        }(SymbolStr::Key{store, s, stringAlloc});
+        return Symbol(*symbols.insert(SymbolStr::Key{store, s, stringAlloc}).first);
     }
 
     std::vector<SymbolStr> resolve(const std::vector<Symbol> & symbols) const
@@ -287,5 +265,3 @@ struct std::hash<nix::Symbol>
         return std::hash<decltype(s.id)>{}(s.id);
     }
 };
-
-#undef USE_FLAT_SYMBOL_SET
