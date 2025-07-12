@@ -29,6 +29,15 @@ on:
         required: false
         default: false
         type: boolean
+      publish_manual:
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      manual_netlify_auth_token:
+        required: false
+      manual_netlify_site_id:
+        required: false
 
 jobs:
   build:
@@ -179,6 +188,7 @@ jobs:
       - name: Build manual
         run: nix build .#hydraJobs.manual
       - uses: nwtgck/actions-netlify@v3.0
+        if: inputs.publish_manual
         with:
           publish-dir: "./result/share/doc/nix/manual"
           production-branch: detsys-main
@@ -192,8 +202,8 @@ jobs:
           enable-commit-status: true
           overwrites-pull-request-comment: true
         env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.manual_netlify_auth_token }}
+          NETLIFY_SITE_ID: ${{ secrets.manual_netlify_site_id }}
 
   success:
     needs:
