@@ -9,6 +9,23 @@ namespace nix {
 
 MakeError(UploadToHTTP, Error);
 
+HttpAuthMethod parseHttpAuthMethod(const std::string &str) {
+    static const std::map<std::string, HttpAuthMethod> map = {
+        {"none", HttpAuthMethod::NONE},
+        {"basic", HttpAuthMethod::BASIC},
+        {"digest", HttpAuthMethod::DIGEST},
+        {"negotiate", HttpAuthMethod::NEGOTIATE},
+        {"ntlm", HttpAuthMethod::NTLM},
+        {"bearer", HttpAuthMethod::BEARER},
+        {"any", HttpAuthMethod::ANY},
+        {"anysafe", HttpAuthMethod::ANYSAFE}};
+    auto it = map.find(str);
+    if (it == map.end()) {
+       throw UsageError("option authmethod has invalid value '%s'", str);
+    }
+    return it->second;
+}
+
 
 StringSet HttpBinaryCacheStoreConfig::uriSchemes()
 {
@@ -152,11 +169,13 @@ protected:
 
     FileTransferRequest makeRequest(const std::string & path)
     {
-        return FileTransferRequest(
+        auto request = FileTransferRequest(
             hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
             ? path
             : config->cacheUri + "/" + path);
-
+        request.authmethod = parseHttpAuthMethod(config->authmethod);
+        request.bearer_token = config->bearer_token;
+        return request;
     }
 
     void getFile(const std::string & path, Sink & sink) override

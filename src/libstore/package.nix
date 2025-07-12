@@ -72,6 +72,7 @@ mkMesonLibrary (finalAttrs: {
   propagatedBuildInputs = [
     nix-util
     nlohmann_json
+    curl
   ];
 
   mesonFlags =
