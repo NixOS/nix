@@ -42,6 +42,7 @@ jobs:
       run_vm_tests: true
       run_regression_tests: true
       publish_manual: true
+    secrets:
       manual_netlify_auth_token: ${{ secrets.NETLIFY_AUTH_TOKEN }}
       manual_netlify_site_id: ${{ secrets.NETLIFY_SITE_ID }}
 

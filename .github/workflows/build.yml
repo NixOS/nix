@@ -33,14 +33,11 @@ on:
         required: false
         default: false
         type: boolean
+    secrets:
       manual_netlify_auth_token:
         required: false
-        default: ""
-        type: string
       manual_netlify_site_id:
         required: false
-        default: ""
-        type: string
 
 jobs:
   build:
@@ -205,8 +202,8 @@ jobs:
           enable-commit-status: true
           overwrites-pull-request-comment: true
         env:
-          NETLIFY_AUTH_TOKEN: ${{ inputs.manual_netlify_auth_token }}
-          NETLIFY_SITE_ID: ${{ inputs.manual_netlify_site_id }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.manual_netlify_auth_token }}
+          NETLIFY_SITE_ID: ${{ secrets.manual_netlify_site_id }}
 
   success:
     needs:
