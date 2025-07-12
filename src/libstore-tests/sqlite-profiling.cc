@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
-#include "nix/store/sqlite.hh"
-#include "nix/util/util.hh"
-#include "nix/util/finally.hh"
+#include "sqlite.hh"
+#include "util.hh"
+#include "finally.hh"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <thread>

@@ -1,8 +1,8 @@
-#include "nix/store/sqlite.hh"
-#include "nix/store/globals.hh"
-#include "nix/util/util.hh"
-#include "nix/util/url.hh"
-#include "nix/util/signals.hh"
+#include "sqlite.hh"
+#include "globals.hh"
+#include "util.hh"
+#include "url.hh"
+#include "signals.hh"
 
 #include <sqlite3.h>
 
@@ -13,8 +13,8 @@
 #include <map>
 #include <algorithm>
 #include <nlohmann/json.hpp>
-#include "nix/util/sync.hh"
-#include "nix/util/logging.hh"
+#include "sync.hh"
+#include "logging.hh"
 
 using json = nlohmann::json;
 
