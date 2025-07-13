@@ -13,10 +13,13 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v31
+    - uses: ./.github/actions/install-nix-action
       with:
-        install_url: "https://releases.nixos.org/nix/nix-2.29.1/install"
-    - run: nix --experimental-features 'nix-command flakes' flake show --all-systems --json
+        dogfood: true
+        extra_nix_config:
+          experimental-features = nix-command flakes
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+    - run: nix flake show --all-systems --json
 
   tests:
     strategy:
@@ -36,9 +39,10 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v31
+    - uses: ./.github/actions/install-nix-action
       with:
-        install_url: "https://releases.nixos.org/nix/nix-2.29.1/install"
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        dogfood: true
         # The sandbox would otherwise be disabled by default on Darwin
         extra_nix_config: |
           sandbox = true
