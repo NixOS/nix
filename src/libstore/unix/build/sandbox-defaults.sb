@@ -29,12 +29,14 @@ R""(
 ; Allow getpwuid.
 (allow mach-lookup (global-name "com.apple.system.opendirectoryd.libinfo"))
 
-; Access to /tmp.
+; Access to /tmp and the build directory.
 ; The network-outbound/network-inbound ones are for unix domain sockets, which
 ; we allow access to in TMPDIR (but if we allow them more broadly, you could in
 ; theory escape the sandbox)
 (allow file* process-exec network-outbound network-inbound
-       (literal "/tmp") (subpath TMPDIR))
+       (literal "/tmp")
+       (subpath TMPDIR)
+       (subpath (param "_NIX_BUILD_TOP")))
 
 ; Some packages like to read the system version.
 (allow file-read*
