@@ -17,6 +17,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
         : DerivationBuilderImpl(store, std::move(miscMethods), std::move(params))
         , externalBuilder(std::move(externalBuilder))
     {
+        experimentalFeatureSettings.require(Xp::ExternalBuilders);
     }
 
     static std::unique_ptr<ExternalDerivationBuilder> newIfSupported(
