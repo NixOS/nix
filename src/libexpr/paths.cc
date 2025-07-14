@@ -60,7 +60,7 @@ std::string EvalState::computeBaseName(const SourcePath & path, PosIdx pos)
 {
     if (path.accessor == rootFS) {
         if (auto storePath = store->maybeParseStorePath(path.path.abs())) {
-            warn(
+            debug(
                 "Copying '%s' to the store again.\n"
                 "You can make Nix evaluate faster and copy fewer files by replacing `./.` with the `self` flake input, "
                 "or `builtins.path { path = ./.; name = \"source\"; }`.\n",
