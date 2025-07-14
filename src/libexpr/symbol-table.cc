@@ -35,10 +35,7 @@ Symbol SymbolTable::create(std::string_view s)
 {
     uint32_t idx;
 
-    auto visit = [&](const SymbolStr & sym)
-    {
-        idx = ((const char *) sym.s) - arena.data;
-    };
+    auto visit = [&](const SymbolStr & sym) { idx = ((const char *) sym.s) - arena.data; };
 
     symbols.insert_and_visit(SymbolStr::Key{s, arena}, visit, visit);
 

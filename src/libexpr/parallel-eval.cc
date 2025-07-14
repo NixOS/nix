@@ -164,8 +164,7 @@ ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOn
     } else {
         /* Mark this value as being waited on. */
         PackedPointer p0_ = pdPending;
-        if (!p0.compare_exchange_strong(
-                p0_, pdAwaited, std::memory_order_relaxed, std::memory_order_acquire)) {
+        if (!p0.compare_exchange_strong(p0_, pdAwaited, std::memory_order_relaxed, std::memory_order_acquire)) {
             /* If the value has been finalized in the meantime (i.e. is
                no longer pending), we're done. */
             auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
@@ -185,16 +184,14 @@ ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOn
     debug("AWAIT %x", this);
 
     if (state.settings.evalCores <= 1)
-        state
-            .error<InfiniteRecursionError>("infinite recursion encountered")
+        state.error<InfiniteRecursionError>("infinite recursion encountered")
             .atPos(((Value &) *this).determinePos(noPos))
             .debugThrow();
 
     state.nrThunksAwaitedSlow++;
     state.currentlyWaiting++;
     state.maxWaiting = std::max(
-        state.maxWaiting.load(std::memory_order_acquire),
-        state.currentlyWaiting.load(std::memory_order_acquire));
+        state.maxWaiting.load(std::memory_order_acquire), state.currentlyWaiting.load(std::memory_order_acquire));
 
     auto now1 = std::chrono::steady_clock::now();
 

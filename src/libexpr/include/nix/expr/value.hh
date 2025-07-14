@@ -562,9 +562,7 @@ class ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<pt
         static_assert(discriminator >= pdListN && discriminator <= pdPath);
         auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
         assertAligned(firstFieldPayload);
-        finish(
-            static_cast<int>(discriminator) | firstFieldPayload,
-            std::bit_cast<PackedPointer>(untaggableField));
+        finish(static_cast<int>(discriminator) | firstFieldPayload, std::bit_cast<PackedPointer>(untaggableField));
     }
 
     template<InternalType type, typename T, typename U>
@@ -629,16 +627,16 @@ protected:
         }
     }
 
-#define NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(TYPE, SET, MEMBER_A, MEMBER_B)                              \
-                                                                                                       \
-    void getStorage(TYPE & val) const noexcept                                                         \
-    {                                                                                                  \
-        getPairOfPointersPayload(val MEMBER_A, val MEMBER_B);                                          \
-    }                                                                                                  \
-                                                                                                       \
-    void setStorage(TYPE val) noexcept                                                                 \
-    {                                                                                                  \
-        SET<detail::payloadTypeToInternalType<TYPE>>(val MEMBER_A, val MEMBER_B);                      \
+#define NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(TYPE, SET, MEMBER_A, MEMBER_B)         \
+                                                                                  \
+    void getStorage(TYPE & val) const noexcept                                    \
+    {                                                                             \
+        getPairOfPointersPayload(val MEMBER_A, val MEMBER_B);                     \
+    }                                                                             \
+                                                                                  \
+    void setStorage(TYPE val) noexcept                                            \
+    {                                                                             \
+        SET<detail::payloadTypeToInternalType<TYPE>>(val MEMBER_A, val MEMBER_B); \
     }
 
     NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(SmallList, setPairOfPointersPayload, [0], [1])
@@ -761,17 +759,18 @@ protected:
         setSingleDWordPayload<tFailed>(std::bit_cast<PackedPointer>(failed));
     }
 
-    ValueStorage()
-    { }
+    ValueStorage() {}
 
     ValueStorage(const ValueStorage & v)
-    { *this = v; }
+    {
+        *this = v;
+    }
 
     /**
      * Copy a value. This is not allowed to be a thunk to avoid
      * accidental work duplication.
      */
-    ValueStorage & operator =(const ValueStorage & v)
+    ValueStorage & operator=(const ValueStorage & v)
     {
         auto p1_ = v.p1;
         auto p0_ = v.p0.load(std::memory_order_acquire);
