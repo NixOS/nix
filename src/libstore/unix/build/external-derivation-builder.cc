@@ -84,8 +84,10 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
         json.emplace("realStoreDir", getLocalStore(store).config->realStoreDir.get());
         json.emplace("system", drv.platform);
 
-        // FIXME: maybe write this JSON into the builder's stdin instead....?
-        auto jsonFile = topTmpDir + "/build.json";
+        // TODO(cole-h): writing this to stdin is too much effort right now, if we want to revisit
+        // that, see this comment by Eelco about how to make it not suck:
+        // https://github.com/DeterminateSystems/nix-src/pull/141#discussion_r2205493257
+        auto jsonFile = std::filesystem::path{topTmpDir} / "build.json";
         writeFile(jsonFile, json.dump());
 
         pid = startProcess([&]() {
