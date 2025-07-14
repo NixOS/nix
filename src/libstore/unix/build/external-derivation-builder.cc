@@ -4,11 +4,6 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
 {
     Settings::ExternalBuilder externalBuilder;
 
-    /**
-     * Pipe for talking to the spawned builder.
-     */
-    Pipe toBuilder;
-
     ExternalDerivationBuilder(
         Store & store,
         std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
@@ -89,21 +84,22 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
         json.emplace("realStoreDir", getLocalStore(store).config->realStoreDir.get());
         json.emplace("system", drv.platform);
 
-        toBuilder.create();
+        // FIXME: maybe write this JSON into the builder's stdin instead....?
+        auto jsonFile = topTmpDir + "/build.json";
+        writeFile(jsonFile, json.dump());
 
         pid = startProcess([&]() {
             openSlave();
             try {
                 commonChildInit();
 
-                if (dup2(toBuilder.readSide.get(), STDIN_FILENO) == -1)
-                    throw SysError("duping to-builder read side to builder's stdin");
-
                 Strings args = {externalBuilder.program};
 
                 if (!externalBuilder.args.empty()) {
                     args.insert(args.end(), externalBuilder.args.begin(), externalBuilder.args.end());
                 }
+
+                args.insert(args.end(), jsonFile);
 
                 debug("executing external builder: %s", concatStringsSep(" ", args));
                 execv(externalBuilder.program.c_str(), stringsToCharPtrs(args).data());
@@ -114,9 +110,6 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
                 _exit(1);
             }
         });
-
-        writeFull(toBuilder.writeSide.get(), json.dump());
-        toBuilder.close();
     }
 };
 

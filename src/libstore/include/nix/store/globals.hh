@@ -1248,7 +1248,7 @@ public:
         R"(
           Helper programs that execute derivations.
 
-          The program is passed a JSON document that describes the build environment on standard input.
+          The program is passed a JSON document that describes the build environment as the final argument.
           The JSON document looks like this:
 
             {
