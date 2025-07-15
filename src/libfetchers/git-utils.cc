@@ -1435,9 +1435,9 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(
     auto self = ref<GitRepoImpl>(shared_from_this());
     ref<SourceAccessor> fileAccessor = AllowListSourceAccessor::create(
                                            makeFSSourceAccessor(path),
-                                           std::set<CanonPath>{wd.files},
+                                           /*allowedPrefixes=*/wd.files,
                                            // Always allow access to the root, but not its children.
-                                           boost::unordered_flat_set<CanonPath>{CanonPath::root},
+                                           /*allowedPaths=*/{CanonPath::root},
                                            std::move(makeNotAllowedError))
                                            .cast<SourceAccessor>();
     if (options.exportIgnore)
