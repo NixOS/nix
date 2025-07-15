@@ -3,7 +3,7 @@
 #include "nix/util/signals.hh"
 #include "nix/util/sync.hh"
 
-#include <unordered_map>
+#include <boost/unordered/concurrent_flat_map.hpp>
 
 namespace nix {
 
@@ -90,25 +90,21 @@ bool PosixSourceAccessor::pathExists(const CanonPath & path)
 
 std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
 {
-    static std::array<SharedSync<std::unordered_map<Path, std::optional<struct stat>>>, 32> _cache;
-
-    auto domain = std::hash<CanonPath>{}(path) % _cache.size();
+    using Cache = boost::concurrent_flat_map<Path, std::optional<struct stat>>;
+    static Cache cache;
 
     // Note: we convert std::filesystem::path to Path because the
     // former is not hashable on libc++.
     Path absPath = makeAbsPath(path).string();
 
-    {
-        auto cache(_cache[domain].readLock());
-        auto i = cache->find(absPath);
-        if (i != cache->end()) return i->second;
-    }
+    std::optional<Cache::mapped_type> res;
+    cache.cvisit(absPath, [&](auto & x) { res.emplace(x.second); });
+    if (res) return *res;
 
     auto st = nix::maybeLstat(absPath.c_str());
 
-    auto cache(_cache[domain].lock());
-    if (cache->size() >= 16384) cache->clear();
-    cache->emplace(absPath, st);
+    if (cache.size() >= 16384) cache.clear();
+    cache.emplace(absPath, st);
 
     return st;
 }
