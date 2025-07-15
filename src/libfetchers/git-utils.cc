@@ -1171,11 +1171,16 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             auto state(_state.lock());
             for (auto & [path, target] : hardLinks) {
                 if (target.isRoot()) continue;
-                auto [mode, child] = state->root.lookup(target);
-                auto oid = std::get_if<git_oid>(&child);
-                if (!oid)
-                    throw Error("cannot create a hard link from '%s' to directory '%s'", path, target);
-                addNode(*state, path, {mode, *oid});
+                try {
+                    auto [mode, child] = state->root.lookup(target);
+                    auto oid = std::get_if<git_oid>(&child);
+                    if (!oid)
+                        throw Error("cannot create a hard link to a directory");
+                    addNode(*state, path, {mode, *oid});
+                } catch (Error & e) {
+                    e.addTrace(nullptr, "while creating a hard link from '%s' to '%s'", path, target);
+                    throw;
+                }
             }
         }
 
