@@ -306,11 +306,6 @@ struct ValueBase
     {
         std::exception_ptr ex;
     };
-
-    struct Pending
-    {
-        // FIXME: store thread ID?
-    };
 };
 
 template<typename T>
@@ -338,7 +333,6 @@ struct PayloadTypeToInternalType
     MACRO(ValueBase::PrimOpApplicationThunk, primOpApp, tPrimOpApp) \
     MACRO(ExternalValueBase *, external, tExternal)                 \
     MACRO(ValueBase::Failed *, failed, tFailed)                     \
-    MACRO(ValueBase::Pending, pending, tPending)                    \
     MACRO(NixFloat, fpoint, tFloat)
 
 #define NIX_VALUE_PAYLOAD_TYPE(T, FIELD_NAME, DISCRIMINATOR) \
