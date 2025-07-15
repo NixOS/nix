@@ -93,7 +93,7 @@ SQLite::~SQLite()
 void SQLite::isCache()
 {
     exec("pragma synchronous = off");
-    exec("pragma main.journal_mode = truncate");
+    exec("pragma main.journal_mode = wal");
 }
 
 void SQLite::exec(const std::string & stmt)
