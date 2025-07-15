@@ -49,8 +49,6 @@ private:
      */
     using LinesCache = LRUCache<uint32_t, Lines>;
 
-    mutable Sync<std::map<uint32_t, Lines>> lines;
-
     mutable Sync<LinesCache> linesCache;
 
     // FIXME: this could be made lock-free (at least for access) if we
