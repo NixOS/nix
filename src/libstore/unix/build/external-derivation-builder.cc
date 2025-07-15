@@ -106,6 +106,9 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
 
                 args.insert(args.end(), jsonFile);
 
+                if (chdir(tmpDir.c_str()) == -1)
+                    throw SysError("changing into '%1%'", tmpDir);
+
                 chownToBuilder(topTmpDir);
 
                 setUser();
