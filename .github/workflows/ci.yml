@@ -41,6 +41,10 @@ jobs:
       run_tests: true
       run_vm_tests: true
       run_regression_tests: true
+      publish_manual: true
+    secrets:
+      manual_netlify_auth_token: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      manual_netlify_site_id: ${{ secrets.NETLIFY_SITE_ID }}
 
   build_aarch64-linux:
     uses: ./.github/workflows/build.yml
@@ -59,6 +63,7 @@ jobs:
       runner: macos-latest-large
       runner_for_virt: macos-latest-large
       runner_small: macos-latest-large
+      run_tests: false
 
   build_aarch64-darwin:
     uses: ./.github/workflows/build.yml
