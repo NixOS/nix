@@ -1030,11 +1030,10 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             })
     { }
 
-    struct Directory;
+    struct Child;
 
     struct Directory
     {
-        using Child = std::pair<git_filemode_t, std::variant<Directory, git_oid>>;
         std::map<std::string, Child> children;
         std::optional<git_oid> oid;
 
@@ -1047,7 +1046,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
                 auto i = cur->children.find(std::string(name));
                 if (i == cur->children.end())
                     throw Error("path '%s' does not exist", path);
-                auto dir = std::get_if<Directory>(&i->second.second);
+                auto dir = std::get_if<Directory>(&i->second.file);
                 if (!dir)
                     throw Error("path '%s' has a non-directory parent", path);
                 cur = dir;
@@ -1060,6 +1059,12 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         }
     };
 
+    struct Child
+    {
+        git_filemode_t mode;
+        std::variant<Directory, git_oid> file;
+    };
+
     struct State
     {
         Directory root;
@@ -1067,7 +1072,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
     Sync<State> _state;
 
-    void addNode(State & state, const CanonPath & path, Directory::Child && child)
+    void addNode(State & state, const CanonPath & path, Child && child)
     {
         assert(!path.isRoot());
         auto parent = path.parent();
@@ -1077,7 +1082,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         for (auto & i : *parent) {
             auto child = std::get_if<Directory>(&cur->children.emplace(
                     std::string(i),
-                    Directory::Child{GIT_FILEMODE_TREE, {Directory()}}).first->second.second);
+                    Child{GIT_FILEMODE_TREE, {Directory()}}).first->second.file);
             assert(child);
             cur = child;
         }
@@ -1125,7 +1130,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
             auto state(_state.lock());
             addNode(*state, path,
-                Directory::Child{
+                Child{
                     executable
                     ? GIT_FILEMODE_BLOB_EXECUTABLE
                     : GIT_FILEMODE_BLOB,
@@ -1151,7 +1156,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
                 throw Error("creating a blob object for tarball symlink member '%s': %s", path, git_error_last()->message);
 
             auto state(_state.lock());
-            addNode(*state, path, Directory::Child{GIT_FILEMODE_LINK, oid});
+            addNode(*state, path, Child{GIT_FILEMODE_LINK, oid});
         });
     }
 
@@ -1193,7 +1198,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             {
                 std::set<Directory *> edges;
                 for (auto & child : node->children)
-                    if (auto dir = std::get_if<Directory>(&child.second.second))
+                    if (auto dir = std::get_if<Directory>(&child.second.file))
                         edges.insert(dir);
                 return edges;
             },
@@ -1207,9 +1212,9 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
                 TreeBuilder builder(b);
 
                 for (auto & [name, child] : node->children) {
-                    auto oid_p = std::get_if<git_oid>(&child.second);
-                    auto oid = oid_p ? *oid_p : std::get<Directory>(child.second).oid.value();
-                    if (git_treebuilder_insert(nullptr, builder.get(), name.c_str(), &oid, child.first))
+                    auto oid_p = std::get_if<git_oid>(&child.file);
+                    auto oid = oid_p ? *oid_p : std::get<Directory>(child.file).oid.value();
+                    if (git_treebuilder_insert(nullptr, builder.get(), name.c_str(), &oid, child.mode))
                         throw Error("adding a file to a tree builder: %s", git_error_last()->message);
                 }
 
