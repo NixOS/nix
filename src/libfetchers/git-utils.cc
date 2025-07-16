@@ -1063,6 +1063,11 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     {
         git_filemode_t mode;
         std::variant<Directory, git_oid> file;
+
+        /// Sequential numbering of the file in the tarball. This is
+        /// used to make sure we only import the latest version of a
+        /// path.
+        size_t id{0};
     };
 
     struct State
@@ -1087,9 +1092,15 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             cur = child;
         }
 
-        // FIXME: handle conflicts
-        cur->children.emplace(std::string(*path.baseName()), std::move(child));
+        std::string name(*path.baseName());
+
+        if (auto prev = cur->children.find(name);
+            prev == cur->children.end()
+            || prev->second.id < child.id)
+            cur->children.insert_or_assign(name, std::move(child));
     }
+
+    size_t nextId = 0;
 
     void createRegularFile(
         const CanonPath & path,
@@ -1112,7 +1123,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
         func(crf);
 
-        workers.enqueue([this, path, data{std::move(crf.data)}, executable(crf.executable)]()
+        workers.enqueue([this, path, data{std::move(crf.data)}, executable(crf.executable), id(nextId++)]()
         {
             auto repo(repoPool.get());
 
@@ -1134,7 +1145,9 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
                     executable
                     ? GIT_FILEMODE_BLOB_EXECUTABLE
                     : GIT_FILEMODE_BLOB,
-                    oid});
+                    oid,
+                    id
+                });
         });
     }
 
@@ -1177,11 +1190,11 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             for (auto & [path, target] : hardLinks) {
                 if (target.isRoot()) continue;
                 try {
-                    auto [mode, child] = state->root.lookup(target);
-                    auto oid = std::get_if<git_oid>(&child);
+                    auto child = state->root.lookup(target);
+                    auto oid = std::get_if<git_oid>(&child.file);
                     if (!oid)
                         throw Error("cannot create a hard link to a directory");
-                    addNode(*state, path, {mode, *oid});
+                    addNode(*state, path, {child.mode, *oid});
                 } catch (Error & e) {
                     e.addTrace(nullptr, "while creating a hard link from '%s' to '%s'", path, target);
                     throw;

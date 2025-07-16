@@ -111,4 +111,4 @@ tar rvf "$TEST_ROOT/tar.tar" -C "$TEST_ROOT/tar_root" ./a/b/xyzzy ./bla
 path="$(nix flake prefetch --refresh --json "tarball+file://$TEST_ROOT/tar.tar" | jq -r .storePath)"
 [[ $(cat "$path/a/b/xyzzy") = xyzzy ]]
 [[ $(cat "$path/a/b/foo") = foo ]]
-#[[ $(cat "$path/bla") = abc ]]
+[[ $(cat "$path/bla") = abc ]]
