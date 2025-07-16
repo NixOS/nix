@@ -234,9 +234,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
      */
     git_odb_backend * mempack_backend;
 
-    GitRepoImpl(std::filesystem::path _path, bool create, bool bare)
+    bool useMempack;
+
+    GitRepoImpl(std::filesystem::path _path, bool create, bool bare, bool useMempack = false)
         : path(std::move(_path))
         , bare(bare)
+        , useMempack(useMempack)
     {
         initLibGit2();
 
@@ -244,18 +247,18 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         if (git_repository_open(Setter(repo), path.string().c_str()))
             throw Error("opening Git repository %s: %s", path, git_error_last()->message);
 
-        #if 0
-        ObjectDb odb;
-        if (git_repository_odb(Setter(odb), repo.get()))
-            throw Error("getting Git object database: %s", git_error_last()->message);
+        if (useMempack) {
+            ObjectDb odb;
+            if (git_repository_odb(Setter(odb), repo.get()))
+                throw Error("getting Git object database: %s", git_error_last()->message);
 
-        // mempack_backend will be owned by the repository, so we are not expected to free it ourselves.
-        if (git_mempack_new(&mempack_backend))
-            throw Error("creating mempack backend: %s", git_error_last()->message);
+            // mempack_backend will be owned by the repository, so we are not expected to free it ourselves.
+            if (git_mempack_new(&mempack_backend))
+                throw Error("creating mempack backend: %s", git_error_last()->message);
 
-        if (git_odb_add_backend(odb.get(), mempack_backend, 999))
-            throw Error("adding mempack backend to Git object database: %s", git_error_last()->message);
-        #endif
+            if (git_odb_add_backend(odb.get(), mempack_backend, 999))
+                throw Error("adding mempack backend to Git object database: %s", git_error_last()->message);
+        }
     }
 
     operator git_repository * ()
@@ -263,7 +266,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return repo.get();
     }
 
-    void flush() override {
+    void flush() override
+    {
+        if (!useMempack) return;
+
         checkInterrupt();
 
         git_buf buf = GIT_BUF_INIT;
@@ -1014,6 +1020,15 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 {
     ref<GitRepoImpl> repo;
 
+    bool useMempack =
+        // On macOS, mempack is beneficial.
+        #ifdef __linux__
+        false
+        #else
+        true
+        #endif
+        ;
+
     Pool<GitRepoImpl> repoPool;
 
     unsigned int concurrency = std::min(std::thread::hardware_concurrency(), 4U);
@@ -1024,9 +1039,9 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         : repo(repo)
         , repoPool(
             std::numeric_limits<size_t>::max(),
-            [repo]() -> ref<GitRepoImpl>
+            [repo, useMempack(useMempack)]() -> ref<GitRepoImpl>
             {
-                return make_ref<GitRepoImpl>(repo->path, false, repo->bare);
+                return make_ref<GitRepoImpl>(repo->path, false, repo->bare, useMempack);
             })
     { }
 
@@ -1203,6 +1218,20 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
         auto & root = _state.lock()->root;
 
+        auto doFlush = [&]()
+        {
+            auto repos = repoPool.clear();
+            ThreadPool workers{repos.size()};
+            for (auto & repo : repos)
+                workers.enqueue([repo]()
+                {
+                    repo->flush();
+                });
+            workers.process();
+        };
+
+        if (useMempack) doFlush();
+
         processGraph<Directory *>(
             {&root},
             [&](Directory * const & node) -> std::set<Directory *>
@@ -1235,7 +1264,9 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
                 node->oid = oid;
             },
             true,
-            concurrency);
+            useMempack ? 1 : concurrency);
+
+        if (useMempack) doFlush();
 
         return toHash(root.oid.value());
     }
