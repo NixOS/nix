@@ -1,0 +1,16 @@
+# Renames of build.cc prior to split
+e0be04129b058680b3b3c64098cf3a0aa9d3901e
+d0004bfcab0741e76c65f28e46b9c06a7979d49c
+904e315dae7a937465b762a0c0e8ccb4ccd27dc0
+3633b3572b66c4fdbbff1f578687bf5926da969b
+dc5225cde5aa1cd240483caf08f4efdaab11ddae
+f0b8987299285c398a6db2ca32f3007a441c3a90
+184bfc301e19ce9b11ace6ae0bd5a753da4e2931
+9629290eda0828f842a9a5d1965c237d921091f8
+fc72cb07601dde8266ff2afd57f30381a66bb4c3
+
+# Copy {,local-}derivation-goal.{cc,h}, prior to file split
+05cc5a858717c092e1835e2b0fec4c4b1a7fc97e
+
+# Copy `local-derivation-goal.cc` to `derivation-builder.{cc,hh}`, prior to file split
+6c2a7fdc496b9558985e8971eadfe415887c356c
