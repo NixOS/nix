@@ -1127,7 +1127,6 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         {
             auto repo(repoPool.get());
 
-            // FIXME: leak
             git_writestream * stream = nullptr;
             if (git_blob_create_from_stream(&stream, *repo, nullptr))
                 throw Error("creating a blob stream object: %s", git_error_last()->message);
