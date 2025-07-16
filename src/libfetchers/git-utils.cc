@@ -1204,7 +1204,6 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         auto & root = _state.lock()->root;
 
         processGraph<Directory *>(
-            //workers2,
             {&root},
             [&](Directory * const & node) -> std::set<Directory *>
             {
@@ -1237,10 +1236,6 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             },
             true,
             concurrency);
-
-        #if 0
-        repo->flush();
-        #endif
 
         return toHash(root.oid.value());
     }
