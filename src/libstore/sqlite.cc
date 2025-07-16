@@ -93,7 +93,7 @@ SQLite::~SQLite()
 void SQLite::isCache()
 {
     exec("pragma synchronous = off");
-    exec("pragma main.journal_mode = truncate");
+    exec("pragma main.journal_mode = wal");
 }
 
 void SQLite::exec(const std::string & stmt)
@@ -250,7 +250,7 @@ void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
     if (now > nextWarning) {
         nextWarning = now + 10;
         logWarning({
-            .msg = HintFmt(e.what())
+            .msg = e.info().msg
         });
     }
 
