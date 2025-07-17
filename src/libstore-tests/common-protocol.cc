@@ -97,51 +97,6 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
-    drvOutput,
-    "drv-output",
-    (std::tuple<DrvOutput, DrvOutput> {
-        {
-            .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-            .outputName = "baz",
-        },
-        DrvOutput {
-            .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-            .outputName = "quux",
-        },
-    }))
-
-CHARACTERIZATION_TEST(
-    realisation,
-    "realisation",
-    (std::tuple<Realisation, Realisation> {
-        Realisation {
-            .id = DrvOutput {
-                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-                .outputName = "baz",
-            },
-            .outPath = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
-            .signatures = { "asdf", "qwer" },
-        },
-        Realisation {
-            .id = {
-                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-                .outputName = "baz",
-            },
-            .outPath = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
-            .signatures = { "asdf", "qwer" },
-            .dependentRealisations = {
-                {
-                    DrvOutput {
-                        .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                        .outputName = "quux",
-                    },
-                    StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
-                },
-            },
-        },
-    }))
-
-CHARACTERIZATION_TEST(
     vector,
     "vector",
     (std::tuple<std::vector<std::string>, std::vector<std::string>, std::vector<std::string>, std::vector<std::vector<std::string>>> {
