@@ -917,7 +917,7 @@ ReplExitStatus AbstractNixRepl::runSimple(
         return values;
     };
     LookupPath lookupPath = {};
-    auto repl = std::make_unique<NixRepl>(
+    auto repl = new NixRepl(
             lookupPath,
             openStore(),
             evalState,
