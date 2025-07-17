@@ -313,7 +313,11 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Settings::ExternalBuilder, systems, program, 
 
 template<> Settings::ExternalBuilders BaseSetting<Settings::ExternalBuilders>::parse(const std::string & str) const
 {
-    return nlohmann::json::parse(str).template get<Settings::ExternalBuilders>();
+    try {
+        return nlohmann::json::parse(str).template get<Settings::ExternalBuilders>();
+    } catch (std::exception & e) {
+        throw UsageError("parsing setting '%s': %s", name, e.what());
+    }
 }
 
 template<> std::string BaseSetting<Settings::ExternalBuilders>::to_string() const
