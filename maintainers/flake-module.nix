@@ -177,6 +177,20 @@
               ''^tests/functional/lang/eval-fail-set\.nix$''
             ];
           };
+          clang-tidy = {
+            enable = true;
+            # TODO: this requires meson to have been configured
+            # we could optionally wrap this in a script that runs meson first
+            # but for now let us keep it simple
+            #
+            # clang-tidy doesn't work well running it on multiple files
+            # TODO: change this to use run-clang-tidy.py
+            entry = "${pkgs.writeShellScript "clang-tidy-wrapper" ''
+              for file in "$@"; do
+              "${pkgs.clang-tools}/bin/clang-tidy" --fix -p ./build "$file"
+              done
+            ''}";
+          };
           clang-format = {
             enable = true;
             # https://github.com/cachix/git-hooks.nix/pull/532
