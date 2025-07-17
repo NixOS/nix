@@ -1383,7 +1383,7 @@ static void derivationStrictInternal(
 
                     if (i->name == state.sStructuredAttrs) continue;
 
-                    jsonObject->emplace(key, printValueAsJSON(state, true, *i->value, pos, context));
+                    jsonObject->emplace(key, printValueAsJSON(state, true, false, *i->value, pos, context));
 
                     if (i->name == state.sBuilder)
                         drv.builder = state.forceString(*i->value, context, pos, context_below);
@@ -2325,7 +2325,7 @@ static void prim_toJSON(EvalState & state, const PosIdx pos, Value * * args, Val
 {
     std::ostringstream out;
     NixStringContext context;
-    printValueAsJSON(state, true, *args[0], pos, out, context);
+    printValueAsJSON(state, true, false, *args[0], pos, out, context);
     v.mkString(toView(out), context);
 }
 

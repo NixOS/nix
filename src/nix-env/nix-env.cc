@@ -984,7 +984,7 @@ static void queryJSON(Globals & globals, std::vector<PackageInfo> & elems, bool 
                         metaObj[j] = nullptr;
                     } else {
                         NixStringContext context;
-                        metaObj[j] = printValueAsJSON(*globals.state, true, *v, noPos, context);
+                        metaObj[j] = printValueAsJSON(*globals.state, true, false, *v, noPos, context);
                     }
                 }
             }

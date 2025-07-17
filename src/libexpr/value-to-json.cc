@@ -6,12 +6,13 @@
 #include <cstdlib>
 #include <iomanip>
 #include <nlohmann/json.hpp>
+#include <typeinfo>
 
 
 namespace nix {
 using json = nlohmann::json;
 // TODO: rename. It doesn't print.
-json printValueAsJSON(EvalState & state, bool strict,
+json printValueAsJSON(EvalState & state, bool strict, bool replaceEvalErrors,
     Value & v, const PosIdx pos, NixStringContext & context, bool copyToStore)
 {
     checkInterrupt();
@@ -54,13 +55,27 @@ json printValueAsJSON(EvalState & state, bool strict,
                 break;
             }
             if (auto i = v.attrs()->get(state.sOutPath))
-                return printValueAsJSON(state, strict, *i->value, i->pos, context, copyToStore);
+                return printValueAsJSON(state, strict, replaceEvalErrors, *i->value, i->pos, context, copyToStore);
             else {
                 out = json::object();
                 for (auto & a : v.attrs()->lexicographicOrder(state.symbols)) {
                     try {
-                        out.emplace(state.symbols[a->name], printValueAsJSON(state, strict, *a->value, a->pos, context, copyToStore));
+                        out.emplace(state.symbols[a->name], printValueAsJSON(state, strict, replaceEvalErrors, *a->value, a->pos, context, copyToStore));
                     } catch (Error & e) {
+                        std::cerr << "Caught an Error of type: " << typeid(e).name() << std::endl;
+                        // std::cerr << "Caught an Error of type: " << e.message() << std::endl;
+                        // std::cerr << "Caught an Error of type: " << e.what() << std::endl;
+
+                        // TODO: Figure out what Error is here?
+                        // We seem to be not catching FileNotFoundError.
+                        bool isEvalError = dynamic_cast<EvalError *>(&e);
+                        bool isFileNotFoundError = dynamic_cast<FileNotFound *>(&e);
+                        // Restrict replaceEvalErrors only only evaluation errors
+                        if (replaceEvalErrors && (isEvalError || isFileNotFoundError)) {
+                            out.emplace(state.symbols[a->name], "«evaluation error»");
+                            continue;
+                        }
+
                         e.addTrace(state.positions[a->pos],
                             HintFmt("while evaluating attribute '%1%'", state.symbols[a->name]));
                         throw;
@@ -75,8 +90,9 @@ json printValueAsJSON(EvalState & state, bool strict,
             int i = 0;
             for (auto elem : v.listView()) {
                 try {
-                    out.push_back(printValueAsJSON(state, strict, *elem, pos, context, copyToStore));
+                    out.push_back(printValueAsJSON(state, strict, replaceEvalErrors, *elem, pos, context, copyToStore));
                 } catch (Error & e) {
+                    // TODO: Missing catch
                     e.addTrace(state.positions[pos],
                         HintFmt("while evaluating list element at index %1%", i));
                     throw;
@@ -106,11 +122,11 @@ json printValueAsJSON(EvalState & state, bool strict,
     return out;
 }
 
-void printValueAsJSON(EvalState & state, bool strict,
+void printValueAsJSON(EvalState & state, bool strict, bool replaceEvalErrors,
     Value & v, const PosIdx pos, std::ostream & str, NixStringContext & context, bool copyToStore)
 {
     try {
-        str << printValueAsJSON(state, strict, v, pos, context, copyToStore);
+        str << printValueAsJSON(state, strict, replaceEvalErrors, v, pos, context, copyToStore);
     } catch (nlohmann::json::exception & e) {
         throw JSONSerializationError("JSON serialization error: %s", e.what());
     }

@@ -54,7 +54,7 @@ void PosixSourceAccessor::readFile(
     #endif
         ));
     if (!fd)
-        throw SysError("opening file '%1%'", ap.string());
+        throw SysError("opening file9 '%1%'", ap.string());
 
     struct stat st;
     if (fstat(fromDescriptorReadOnly(fd.get()), &st) == -1)
