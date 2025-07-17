@@ -365,6 +365,15 @@ string_parts_interpolated
 path_start
   : PATH {
     std::string_view literal({$1.p, $1.l});
+
+    /* check for short path literals */
+    if (state->settings.warnShortPathLiterals && literal.front() != '/' && literal.front() != '.') {
+        logWarning({
+            .msg = HintFmt("relative path literal '%s' should be prefixed with '.' for clarity: './%s'. (" ANSI_BOLD "warn-short-path-literals" ANSI_NORMAL " = true)", literal, literal),
+            .pos = state->positions[CUR_POS]
+        });
+    }
+
     Path path(absPath(literal, state->basePath.path.abs()));
     /* add back in the trailing '/' to the first segment */
     if (literal.size() > 1 && literal.back() == '/')
