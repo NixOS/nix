@@ -6,40 +6,48 @@
 #include <unistd.h>
 #include <assert.h>
 #include <string.h>
+#include <memory>
+
+struct FdDeleter {
+    void operator()(int* fd) { if (fd && *fd >= 0) close(*fd); delete fd; }
+};
+using AutoCloseFD = std::unique_ptr<int, FdDeleter>;
 
 int main(int argc, char **argv) {
 
     assert(argc == 2);
 
-    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    auto sock = AutoCloseFD(new int(socket(AF_UNIX, SOCK_STREAM, 0)));
+    assert(sock && *sock >= 0);
 
     // Bind to the socket.
     struct sockaddr_un data;
     data.sun_family = AF_UNIX;
     data.sun_path[0] = 0;
     strncpy(data.sun_path + 1, argv[1], sizeof(data.sun_path) - 1);
-    int res = bind(sock, (const struct sockaddr *)&data,
+    int res = bind(*sock, (const struct sockaddr *)&data,
         offsetof(struct sockaddr_un, sun_path)
         + strlen(argv[1])
         + 1);
     if (res < 0) perror("bind");
 
-    res = listen(sock, 1);
+    res = listen(*sock, 1);
     if (res < 0) perror("listen");
 
-    int smuggling_fd = -1;
+    AutoCloseFD smuggling_fd;
 
     // Accept the connection a first time to receive the file descriptor.
     fprintf(stderr, "%s\n", "Waiting for the first connection");
-    int a = accept(sock, 0, 0);
-    if (a < 0) perror("accept");
+    auto a = AutoCloseFD(new int(accept(*sock, 0, 0)));
+    assert(a && *a >= 0);
 
     struct msghdr msg = {0};
-    msg.msg_control = malloc(128);
+    auto msg_control = std::unique_ptr<char[]>(new char[128]());
+    msg.msg_control = msg_control.get();
     msg.msg_controllen = 128;
 
     // Receive the file descriptor as sent by the smuggler.
-    recvmsg(a, &msg, 0);
+    recvmsg(*a, &msg, 0);
 
     struct cmsghdr *hdr = CMSG_FIRSTHDR(&msg);
     while (hdr) {
@@ -47,22 +55,24 @@ int main(int argc, char **argv) {
           && hdr->cmsg_type == SCM_RIGHTS) {
 
             // Grab the copy of the file descriptor.
-            memcpy((void *)&smuggling_fd, CMSG_DATA(hdr), sizeof(int));
+            int temp_fd;
+            memcpy((void *)&temp_fd, CMSG_DATA(hdr), sizeof(int));
+            smuggling_fd.reset(new int(temp_fd));
         }
 
         hdr = CMSG_NXTHDR(&msg, hdr);
     }
     fprintf(stderr, "%s\n", "Got the file descriptor. Now waiting for the second connection");
-    close(a);
+    a.reset();
 
     // Wait for a second connection, which will tell us that the build is
     // done
-    a = accept(sock, 0, 0);
-    if (a < 0) perror("accept");
+    a.reset(new int(accept(*sock, 0, 0)));
+    assert(a && *a >= 0);
     fprintf(stderr, "%s\n", "Got a second connection, rewriting the file");
     // Write a new content to the file
-    if (ftruncate(smuggling_fd, 0)) perror("ftruncate");
+    if (smuggling_fd && ftruncate(*smuggling_fd, 0)) perror("ftruncate");
     const char * new_content = "Pwned\n";
-    int written_bytes = write(smuggling_fd, new_content, strlen(new_content));
-    if (written_bytes != strlen(new_content)) perror("write");
+    ssize_t written_bytes = smuggling_fd ? write(*smuggling_fd, new_content, strlen(new_content)) : -1;
+    if (written_bytes != (ssize_t)strlen(new_content)) perror("write");
 }
