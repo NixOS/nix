@@ -207,6 +207,12 @@ protected:
     }
 
     /**
+     * Throw an exception if we can't do this derivation because of
+     * missing system features.
+     */
+    virtual void checkSystem();
+
+    /**
      * Return the paths that should be made available in the sandbox.
      * This includes:
      *
@@ -710,13 +716,8 @@ static bool checkNotWorldWritable(std::filesystem::path path)
     return true;
 }
 
-void DerivationBuilderImpl::startBuilder()
+void DerivationBuilderImpl::checkSystem()
 {
-    /* Make sure that no other processes are executing under the
-       sandbox uids. This must be done before any chownToBuilder()
-       calls. */
-    prepareUser();
-
     /* Right platform? */
     if (!drvOptions.canBuildLocally(store, drv)) {
         auto msg = fmt(
@@ -736,6 +737,16 @@ void DerivationBuilderImpl::startBuilder()
 
         throw BuildError(msg);
     }
+}
+
+void DerivationBuilderImpl::startBuilder()
+{
+    checkSystem();
+
+    /* Make sure that no other processes are executing under the
+       sandbox uids. This must be done before any chownToBuilder()
+       calls. */
+    prepareUser();
 
     auto buildDir = getLocalStore(store).config->getBuildDir();
 
@@ -1053,7 +1064,7 @@ void DerivationBuilderImpl::processSandboxSetupMessages()
                 e.addTrace({}, "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
                     store.printStorePath(drvPath),
                     statusToString(status),
-                    concatStringsSep("|", msgs));
+                    concatStringsSep("\n", msgs));
                 throw;
             }
         }();
@@ -2192,6 +2203,7 @@ StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
 // FIXME: do this properly
 #include "linux-derivation-builder.cc"
 #include "darwin-derivation-builder.cc"
+#include "external-derivation-builder.cc"
 
 namespace nix {
 
@@ -2200,6 +2212,9 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params)
 {
+    if (auto builder = ExternalDerivationBuilder::newIfSupported(store, miscMethods, params))
+        return builder;
+
     bool useSandbox = false;
 
     /* Are we doing a sandboxed build? */
