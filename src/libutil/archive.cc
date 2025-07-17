@@ -142,14 +142,14 @@ static void parseContents(CreateRegularFileSink & sink, Source & source)
     sink.preallocateContents(size);
 
     uint64_t left = size;
-    std::array<char, 65536> buf;
+    auto buf = std::make_unique<std::array<char, 65536>>();
 
     while (left) {
         checkInterrupt();
-        auto n = buf.size();
+        auto n = buf->size();
         if ((uint64_t)n > left) n = left;
-        source(buf.data(), n);
-        sink({buf.data(), n});
+        source(buf->data(), n);
+        sink({buf->data(), n});
         left -= n;
     }
 
