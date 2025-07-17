@@ -79,20 +79,7 @@ Path absPath(PathView path, std::optional<PathView> dir, bool resolveSymlinks)
         // lives long enough for the call to `canonPath`, and allows us
         // to just accept a `std::string_view`.
         if (!dir) {
-#ifdef __GNU__
-            /* GNU (aka. GNU/Hurd) doesn't have any limitation on path
-               lengths and doesn't define `PATH_MAX'.  */
-            char *buf = getcwd(NULL, 0);
-            if (buf == NULL)
-#else
-            char buf[PATH_MAX];
-            if (!getcwd(buf, sizeof(buf)))
-#endif
-                throw SysError("cannot get cwd");
-            scratch = concatStrings(buf, "/", path);
-#ifdef __GNU__
-            free(buf);
-#endif
+            scratch = concatStrings(getCurrentWorkingDirectory().string(), "/", path);
         } else
             scratch = concatStrings(*dir, "/", path);
         path = scratch;
@@ -103,6 +90,15 @@ Path absPath(PathView path, std::optional<PathView> dir, bool resolveSymlinks)
 std::filesystem::path absPath(const std::filesystem::path & path, bool resolveSymlinks)
 {
     return absPath(path.string(), std::nullopt, resolveSymlinks);
+}
+
+std::filesystem::path getCurrentWorkingDirectory()
+{
+    try {
+        return std::filesystem::current_path();
+    } catch (const std::filesystem::filesystem_error & e) {
+        throw SysError("cannot get current working directory: %s", e.what());
+    }
 }
 
 Path canonPath(PathView path, bool resolveSymlinks)

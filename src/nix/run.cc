@@ -11,6 +11,7 @@
 #include "nix/util/source-accessor.hh"
 #include "nix/expr/eval.hh"
 #include "nix/util/util.hh"
+#include "nix/util/file-system.hh"
 #include <filesystem>
 
 #ifdef __linux__
@@ -222,15 +223,13 @@ void chrootHelper(int argc, char * * argv)
                 createSymlink(readLink(src), dst);
         }
 
-        char * cwd = getcwd(0, 0);
-        if (!cwd) throw SysError("getting current directory");
-        Finally freeCwd([&]() { free(cwd); });
+        auto cwd = getCurrentWorkingDirectory();
 
         if (chroot(tmpDir.c_str()) == -1)
             throw SysError("chrooting into '%s'", tmpDir);
 
-        if (chdir(cwd) == -1)
-            throw SysError("chdir to '%s' in chroot", cwd);
+        if (chdir(cwd.c_str()) == -1)
+            throw SysError("chdir to '%s' in chroot", cwd.string());
     } else
         if (mount("overlay", storeDir.c_str(), "overlay", MS_MGC_VAL, fmt("lowerdir=%s:%s", storeDir, realStoreDir).c_str()) == -1)
             if (mount(realStoreDir.c_str(), storeDir.c_str(), "", MS_BIND, 0) == -1)
