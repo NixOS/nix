@@ -34,14 +34,14 @@ let
         stdenv = pkgs.pkgsStatic.stdenv;
       }
       ''
-        $CC -static -o $out ${./sender.c}
+        $CC -static -o $out ${./sender.cc}
       '';
 
   # Okay, so we have a file descriptor shipped out of the FOD now. But the
   # Nix store is read-only, right? .. Well, yeah. But this file descriptor
   # lives in a mount namespace where it is not! So even when this file exists
   # in the actual Nix store, we're capable of just modifying its contents...
-  smuggler = pkgs.writeCBin "smuggler" (builtins.readFile ./smuggler.c);
+  smuggler = pkgs.writeCBin "smuggler" (builtins.readFile ./smuggler.cc);
 
   # The abstract socket path used to exfiltrate the file descriptor
   socketName = "FODSandboxExfiltrationSocket";

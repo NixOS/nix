@@ -10,7 +10,7 @@ let
         stdenv = pkgs.pkgsStatic.stdenv;
       }
       ''
-        $CC -static -o $out ${./attacker.c}
+        $CC -static -o $out ${./attacker.cc}
       '';
 
   try-open-build-dir = pkgs.writeScript "try-open-build-dir" ''
