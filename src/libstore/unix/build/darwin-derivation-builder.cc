@@ -1,5 +1,7 @@
 #ifdef __APPLE__
 
+#  include "darwin-derivation-builder.hh"
+#  include "unix-derivation-builder.hh"
 #  include <spawn.h>
 #  include <sys/sysctl.h>
 #  include <sandbox.h>
@@ -9,6 +11,8 @@ extern "C" int
 sandbox_init_with_parameters(const char * profile, uint64_t flags, const char * const parameters[], char ** errorbuf);
 
 namespace nix {
+
+namespace {
 
 struct DarwinDerivationBuilder : DerivationBuilderImpl
 {
@@ -205,6 +209,17 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
             NULL, drv.builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
     }
 };
+
+} // anonymous namespace
+
+std::unique_ptr<DerivationBuilder> makeDarwinDerivationBuilder(
+    Store & store,
+    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+    DerivationBuilderParams params,
+    bool useSandbox)
+{
+    return std::make_unique<DarwinDerivationBuilder>(store, std::move(miscMethods), std::move(params), useSandbox);
+}
 
 } // namespace nix
 
