@@ -58,6 +58,13 @@ inline Path absPath(const Path & path, std::optional<PathView> dir = {}, bool re
 std::filesystem::path absPath(const std::filesystem::path & path, bool resolveSymlinks = false);
 
 /**
+ * Get the current working directory as a std::filesystem::path.
+ *
+ * @throws SysError if getting the current directory fails
+ */
+std::filesystem::path getCurrentWorkingDirectory();
+
+/**
  * Canonicalise a path by removing all `.` or `..` components and
  * double or trailing slashes.  Optionally resolves all symlink
  * components such that each component of the resulting path is *not*
