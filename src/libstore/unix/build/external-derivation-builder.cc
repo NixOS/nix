@@ -29,9 +29,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
 
     bool prepareBuild() override
     {
-        // External builds don't use build users, so this always
-        // succeeds.
-        return true;
+        return DerivationBuilderImpl::prepareBuild();
     }
 
     Path tmpDirInSandbox() override
@@ -49,7 +47,12 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
 
     void prepareUser() override
     {
-        // Nothing to do here since we don't have a build user.
+        DerivationBuilderImpl::prepareUser();
+    }
+
+    void setUser() override
+    {
+        DerivationBuilderImpl::setUser();
     }
 
     void checkSystem() override
@@ -102,6 +105,13 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
                 }
 
                 args.insert(args.end(), jsonFile);
+
+                if (chdir(tmpDir.c_str()) == -1)
+                    throw SysError("changing into '%1%'", tmpDir);
+
+                chownToBuilder(topTmpDir);
+
+                setUser();
 
                 debug("executing external builder: %s", concatStringsSep(" ", args));
                 execv(externalBuilder.program.c_str(), stringsToCharPtrs(args).data());
