@@ -105,4 +105,4 @@ struct LookupPath::Elem
     static LookupPath::Elem parse(std::string_view rawElem);
 };
 
-}
+} // namespace nix

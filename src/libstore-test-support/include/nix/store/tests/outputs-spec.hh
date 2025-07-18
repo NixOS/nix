@@ -11,8 +11,9 @@ namespace rc {
 using namespace nix;
 
 template<>
-struct Arbitrary<OutputsSpec> {
+struct Arbitrary<OutputsSpec>
+{
     static Gen<OutputsSpec> arbitrary();
 };
 
-}
+} // namespace rc

@@ -19,6 +19,7 @@ public:
     {
         experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::Flakes);
     }
+
     void TearDown() override {}
 };
 
@@ -98,4 +99,4 @@ TEST_F(AccessKeysTest, multipleSourceHut)
     ASSERT_EQ(token, "token");
 }
 
-}
+} // namespace nix::fetchers

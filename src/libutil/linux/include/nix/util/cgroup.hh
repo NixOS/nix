@@ -34,4 +34,4 @@ std::string getCurrentCgroup();
  */
 std::string getRootCgroup();
 
-}
+} // namespace nix

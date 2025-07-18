@@ -27,9 +27,7 @@ ref<SourceAccessor> makeNarAccessor(Source & source);
  */
 using GetNarBytes = std::function<std::string(uint64_t, uint64_t)>;
 
-ref<SourceAccessor> makeLazyNarAccessor(
-    const std::string & listing,
-    GetNarBytes getNarBytes);
+ref<SourceAccessor> makeLazyNarAccessor(const std::string & listing, GetNarBytes getNarBytes);
 
 /**
  * Write a JSON representation of the contents of a NAR (except file
@@ -37,4 +35,4 @@ ref<SourceAccessor> makeLazyNarAccessor(
  */
 nlohmann::json listNar(ref<SourceAccessor> accessor, const CanonPath & path, bool recurse);
 
-}
+} // namespace nix

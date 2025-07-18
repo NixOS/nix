@@ -49,4 +49,4 @@ OsString string_to_os_string(std::string_view s);
 #  define OS_STR(s) L##s
 #endif
 
-}
+} // namespace nix

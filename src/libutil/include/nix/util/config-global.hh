@@ -35,4 +35,4 @@ struct GlobalConfig : public AbstractConfig
 
 extern GlobalConfig globalConfig;
 
-}
+} // namespace nix
