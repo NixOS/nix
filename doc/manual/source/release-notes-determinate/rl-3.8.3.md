@@ -6,7 +6,7 @@
 
 ### Non-blocking evaluation caching
 
-Users reporting evaluation would occasionally block other evaluation processes.
+Users reported evaluation would occasionally block other evaluation processes.
 
 The evaluation cache database is now opened in write-ahead mode to prevent delaying evaluations.
 
