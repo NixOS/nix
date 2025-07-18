@@ -56,4 +56,72 @@ in
       touch $out
     '';
   };
+
+  test_sandbox_path_options = mkDerivation {
+    name = "test-sandobx-path-options";
+    buildCommand = ''
+        (
+          set -x
+          # "/paths/readonly":    { "source": "'"$symlinkDir"', "options":["ro=rec"] },
+          # "/paths/options":     { "source": "'"$symlinkDir"', "options":["noexec","nosuid","nodev"] },
+          # "/paths/propagation": { "source": "'"$symlinkDir"', "options":["rslave"] }
+
+          readonly=/paths/readonly
+          opts=/paths/options
+          propagate=/paths/propagation
+
+          # Check if readonly path exists and is mounted read-only
+          if [ -e "$readonly" ]; then
+              cat /proc/self/mountinfo |
+              while IFS= read -r line; do
+                  case "$line" in
+                      *" $readonly "*)
+                          opt=$(printf %s "$line" | cut -d ' ' -f 6)
+                          case "$opt" in
+                              *ro*) echo "readonly: ro found";;
+                          esac
+                          ;;
+                  esac
+              done
+          fi
+
+          # Check for noexec, nosuid, nodev in options
+          if [ -e "$opts" ]; then
+              val=$(cat /proc/self/mountinfo |
+                  while IFS= read -r line; do
+                      case "$line" in
+                          *" $opts "*)
+                              echo "$line" | cut -d ' ' -f 6
+                              break
+                              ;;
+                      esac
+                  done
+              )
+
+              for x in noexec nosuid nodev; do
+                  case "$val" in
+                      *"$x"*) echo "$opts: $x found";;
+                  esac
+              done
+          fi
+
+          # Check if propagation is shared (master present in field 7)
+          if [ -e "$propagate" ]; then
+              cat /proc/self/mountinfo |
+              while IFS= read -r line; do
+                  case "$line" in
+                      *" $propagate "*)
+                          prop=$(printf %s "$line" | cut -d ' ' -f 7)
+                          case "$prop" in
+                              *master*) echo "propagate: master found";;
+                          esac
+                          ;;
+                  esac
+              done
+          fi
+
+          touch $out
+      )
+    '';
+  };
 }

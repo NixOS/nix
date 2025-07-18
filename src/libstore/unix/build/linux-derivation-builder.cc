@@ -3,6 +3,7 @@
 #  include "nix/store/personality.hh"
 #  include "nix/util/cgroup.hh"
 #  include "nix/util/linux-namespaces.hh"
+#  include "nix/util/mount.hh"
 #  include "linux/fchmodat2-compat.hh"
 
 #  include <sys/ioctl.h>
@@ -121,36 +122,9 @@ static void setupSeccomp()
 #  endif
 }
 
-static void doBind(const Path & source, const Path & target, bool optional = false)
+static void doBind(SandboxPath v, const Path & target)
 {
-    debug("bind mounting '%1%' to '%2%'", source, target);
-
-    auto bindMount = [&]() {
-        if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-            throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
-    };
-
-    auto maybeSt = maybeLstat(source);
-    if (!maybeSt) {
-        if (optional)
-            return;
-        else
-            throw SysError("getting attributes of path '%1%'", source);
-    }
-    auto st = *maybeSt;
-
-    if (S_ISDIR(st.st_mode)) {
-        createDirs(target);
-        bindMount();
-    } else if (S_ISLNK(st.st_mode)) {
-        // Symlinks can (apparently) not be bind-mounted, so just copy it
-        createDirs(dirOf(target));
-        copyFile(std::filesystem::path(source), std::filesystem::path(target), false);
-    } else {
-        createDirs(dirOf(target));
-        writeFile(target, "");
-        bindMount();
-    }
+    v.bindMount(target);
 }
 
 struct LinuxDerivationBuilder : DerivationBuilderImpl
@@ -311,7 +285,7 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
         printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootParentDir);
 
         if (mkdir(chrootParentDir.c_str(), 0700) == -1)
-            throw SysError("cannot create '%s'", chrootRootDir);
+            throw SysError("cannot create '%s'", chrootParentDir);
 
         chrootRootDir = chrootParentDir + "/root";
 
@@ -592,6 +566,11 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
         if (setdomainname(domainname, sizeof(domainname)) == -1)
             throw SysError("cannot set domain name");
 
+        /* Prepare sandbox paths: if non-private propagation is needed we must
+         * open those source paths before we make all private. */
+        for (auto & v : pathsInChroot)
+            v.second.prepare();
+
         /* Make all filesystems private.  This is necessary
            because subtrees may have been mounted as "shared"
            (MS_SHARED).  (Systemd does this, for instance.)  Even
@@ -694,7 +673,7 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
             } else
 #  endif
             {
-                doBind(i.second.source, chrootRootDir + i.first, i.second.optional);
+                doBind(i.second, chrootRootDir + i.first);
             }
         }
 
