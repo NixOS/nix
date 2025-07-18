@@ -30,18 +30,27 @@ struct PathViewNG : OsStringView
 
     PathViewNG(const std::filesystem::path & path)
         : OsStringView{path.native()}
-    { }
+    {
+    }
 
     PathViewNG(const OsString & path)
         : OsStringView{path}
-    { }
+    {
+    }
 
-    const string_view & native() const { return *this; }
-    string_view & native() { return *this; }
+    const string_view & native() const
+    {
+        return *this;
+    }
+
+    string_view & native()
+    {
+        return *this;
+    }
 };
 
 std::optional<std::filesystem::path> maybePath(PathView path);
 
 std::filesystem::path pathNG(PathView path);
 
-}
+} // namespace nix

@@ -32,4 +32,4 @@ struct InputCache
     virtual ~InputCache() = default;
 };
 
-}
+} // namespace nix::fetchers

@@ -19,12 +19,14 @@ Strings EvalSettings::parseNixPath(const std::string & s)
         auto start2 = p;
 
         while (p != s.end() && *p != ':') {
-            if (*p == '=') start2 = p + 1;
+            if (*p == '=')
+                start2 = p + 1;
             ++p;
         }
 
         if (p == s.end()) {
-            if (p != start) res.push_back(std::string(start, p));
+            if (p != start)
+                res.push_back(std::string(start, p));
             break;
         }
 
@@ -32,10 +34,12 @@ Strings EvalSettings::parseNixPath(const std::string & s)
             auto prefix = std::string(start2, s.end());
             if (EvalSettings::isPseudoUrl(prefix) || hasPrefix(prefix, "flake:")) {
                 ++p;
-                while (p != s.end() && *p != ':') ++p;
+                while (p != s.end() && *p != ':')
+                    ++p;
             }
             res.push_back(std::string(start, p));
-            if (p == s.end()) break;
+            if (p == s.end())
+                break;
         }
 
         ++p;
@@ -75,11 +79,14 @@ Strings EvalSettings::getDefaultNixPath()
 
 bool EvalSettings::isPseudoUrl(std::string_view s)
 {
-    if (s.compare(0, 8, "channel:") == 0) return true;
+    if (s.compare(0, 8, "channel:") == 0)
+        return true;
     size_t pos = s.find("://");
-    if (pos == std::string::npos) return false;
+    if (pos == std::string::npos)
+        return false;
     std::string scheme(s, 0, pos);
-    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3" || scheme == "ssh";
+    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git"
+           || scheme == "s3" || scheme == "ssh";
 }
 
 std::string EvalSettings::resolvePseudoUrl(std::string_view url)
@@ -98,9 +105,7 @@ const std::string & EvalSettings::getCurrentSystem() const
 
 Path getNixDefExpr()
 {
-    return settings.useXDGBaseDirectories
-        ? getStateDir() + "/defexpr"
-        : getHome() + "/.nix-defexpr";
+    return settings.useXDGBaseDirectories ? getStateDir() + "/defexpr" : getHome() + "/.nix-defexpr";
 }
 
 } // namespace nix
