@@ -155,4 +155,4 @@ TEST_F(nix_api_util_context, nix_err_code)
     ASSERT_EQ(nix_err_code(ctx), NIX_ERR_UNKNOWN);
 }
 
-}
+} // namespace nixC

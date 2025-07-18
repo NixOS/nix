@@ -58,4 +58,4 @@ struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfi
     }
 };
 
-}
+} // namespace nix

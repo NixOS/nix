@@ -43,4 +43,4 @@ struct ReceiveInterrupts
     ~ReceiveInterrupts() {}
 };
 
-}
+} // namespace nix

@@ -179,7 +179,7 @@ struct DerivationOptions
     bool useUidRange(const BasicDerivation & drv) const;
 };
 
-};
+}; // namespace nix
 
 JSON_IMPL(DerivationOptions);
 JSON_IMPL(DerivationOptions::OutputChecks)

@@ -10,13 +10,12 @@
 
 namespace nix {
 
-void runNix(Path program, const Strings & args,
-    const std::optional<std::string> & input = {})
+void runNix(Path program, const Strings & args, const std::optional<std::string> & input = {})
 {
     auto subprocessEnv = getEnv();
     subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
-    //isInteractive avoid grabling interactive commands
-    runProgram2(RunOptions {
+    // isInteractive avoid grabling interactive commands
+    runProgram2(RunOptions{
         .program = getNixBin(program).string(),
         .args = args,
         .environment = subprocessEnv,
@@ -29,7 +28,8 @@ void runNix(Path program, const Strings & args,
 
 struct CmdRepl : RawInstallablesCommand
 {
-    CmdRepl() {
+    CmdRepl()
+    {
         evalSettings.pureEval = false;
     }
 
@@ -61,8 +61,8 @@ struct CmdRepl : RawInstallablesCommand
     std::string doc() override
     {
         return
-          #include "repl.md"
-          ;
+#include "repl.md"
+            ;
     }
 
     void applyDefaultInstallables(std::vector<std::string> & rawInstallables) override
@@ -75,13 +75,13 @@ struct CmdRepl : RawInstallablesCommand
     void run(ref<Store> store, std::vector<std::string> && rawInstallables) override
     {
         auto state = getEvalState();
-        auto getValues = [&]()->AbstractNixRepl::AnnotatedValues{
+        auto getValues = [&]() -> AbstractNixRepl::AnnotatedValues {
             auto installables = parseInstallables(store, rawInstallables);
             AbstractNixRepl::AnnotatedValues values;
-            for (auto & installable_: installables){
+            for (auto & installable_ : installables) {
                 auto & installable = InstallableValue::require(*installable_);
                 auto what = installable.what();
-                if (file){
+                if (file) {
                     auto [val, pos] = installable.toValue(*state);
                     auto what = installable.what();
                     state->forceValue(*val, pos);
@@ -89,21 +89,15 @@ struct CmdRepl : RawInstallablesCommand
                     auto valPost = state->allocValue();
                     state->autoCallFunction(*autoArgs, *val, *valPost);
                     state->forceValue(*valPost, pos);
-                    values.push_back( {valPost, what });
+                    values.push_back({valPost, what});
                 } else {
                     auto [val, pos] = installable.toValue(*state);
-                    values.push_back( {val, what} );
+                    values.push_back({val, what});
                 }
             }
             return values;
         };
-        auto repl = AbstractNixRepl::create(
-            lookupPath,
-            openStore(),
-            state,
-            getValues,
-            runNix
-        );
+        auto repl = AbstractNixRepl::create(lookupPath, openStore(), state, getValues, runNix);
         repl->autoArgs = getAutoArgs(*repl->state);
         repl->initEnv();
         repl->mainLoop();
@@ -112,4 +106,4 @@ struct CmdRepl : RawInstallablesCommand
 
 static auto rCmdRepl = registerCommand<CmdRepl>("repl");
 
-}
+} // namespace nix

@@ -12,4 +12,4 @@ namespace nix {
  */
 Strings editorFor(const SourcePath & file, uint32_t line);
 
-}
+} // namespace nix

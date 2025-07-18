@@ -13,12 +13,10 @@ LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
     // Default `?root` from `rootDir` if non set
     // FIXME don't duplicate description once we don't have root setting
     , rootDir{
-        this,
-        !rootDir.empty() && params.count("root") == 0
-            ? (std::optional<Path>{rootDir})
-            : std::nullopt,
-        "root",
-        "Directory prefixed to all other paths."}
+          this,
+          !rootDir.empty() && params.count("root") == 0 ? (std::optional<Path>{rootDir}) : std::nullopt,
+          "root",
+          "Directory prefixed to all other paths."}
 {
 }
 
@@ -35,7 +33,8 @@ struct LocalStoreAccessor : PosixSourceAccessor
     LocalStoreAccessor(ref<LocalFSStore> store, bool requireValidPath)
         : store(store)
         , requireValidPath(requireValidPath)
-    { }
+    {
+    }
 
     CanonPath toRealPath(const CanonPath & path)
     {
@@ -49,7 +48,7 @@ struct LocalStoreAccessor : PosixSourceAccessor
     {
         /* Handle the case where `path` is (a parent of) the store. */
         if (isDirOrInDir(store->storeDir, path.abs()))
-            return Stat{ .type = tDirectory };
+            return Stat{.type = tDirectory};
 
         return PosixSourceAccessor::maybeLstat(toRealPath(path));
     }
@@ -59,10 +58,7 @@ struct LocalStoreAccessor : PosixSourceAccessor
         return PosixSourceAccessor::readDirectory(toRealPath(path));
     }
 
-    void readFile(
-        const CanonPath & path,
-        Sink & sink,
-        std::function<void(uint64_t)> sizeCallback) override
+    void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override
     {
         return PosixSourceAccessor::readFile(toRealPath(path), sink, sizeCallback);
     }
@@ -75,9 +71,8 @@ struct LocalStoreAccessor : PosixSourceAccessor
 
 ref<SourceAccessor> LocalFSStore::getFSAccessor(bool requireValidPath)
 {
-    return make_ref<LocalStoreAccessor>(ref<LocalFSStore>(
-            std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())),
-        requireValidPath);
+    return make_ref<LocalStoreAccessor>(
+        ref<LocalFSStore>(std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())), requireValidPath);
 }
 
 void LocalFSStore::narFromPath(const StorePath & path, Sink & sink)
@@ -95,10 +90,8 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
 
     for (int j = 0; j < 2; j++) {
 
-        Path logPath =
-            j == 0
-            ? fmt("%s/%s/%s/%s", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
-            : fmt("%s/%s/%s", logDir, drvsLogDir, baseName);
+        Path logPath = j == 0 ? fmt("%s/%s/%s/%s", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
+                              : fmt("%s/%s/%s", logDir, drvsLogDir, baseName);
         Path logBz2Path = logPath + ".bz2";
 
         if (pathExists(logPath))
@@ -107,12 +100,12 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
         else if (pathExists(logBz2Path)) {
             try {
                 return decompress("bzip2", readFile(logBz2Path));
-            } catch (Error &) { }
+            } catch (Error &) {
+            }
         }
-
     }
 
     return std::nullopt;
 }
 
-}
+} // namespace nix

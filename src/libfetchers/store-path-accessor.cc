@@ -12,4 +12,4 @@ ref<SourceAccessor> makeStorePathAccessor(ref<Store> store, const StorePath & st
     return accessor;
 }
 
-}
+} // namespace nix

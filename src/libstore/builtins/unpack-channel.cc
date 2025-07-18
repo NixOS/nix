@@ -3,15 +3,16 @@
 
 namespace nix {
 
-namespace fs { using namespace std::filesystem; }
+namespace fs {
+using namespace std::filesystem;
+}
 
-void builtinUnpackChannel(
-    const BasicDerivation & drv,
-    const std::map<std::string, Path> & outputs)
+void builtinUnpackChannel(const BasicDerivation & drv, const std::map<std::string, Path> & outputs)
 {
     auto getAttr = [&](const std::string & name) -> const std::string & {
         auto i = drv.env.find(name);
-        if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
+        if (i == drv.env.end())
+            throw Error("attribute '%s' missing", name);
         return i->second;
     };
 
@@ -44,4 +45,4 @@ void builtinUnpackChannel(
     }
 }
 
-}
+} // namespace nix

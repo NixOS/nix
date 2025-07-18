@@ -180,7 +180,7 @@ bool DerivationOptions::useUidRange(const BasicDerivation & drv) const
     return getRequiredSystemFeatures(drv).count("uid-range");
 }
 
-}
+} // namespace nix
 
 namespace nlohmann {
 
@@ -270,4 +270,4 @@ void adl_serializer<DerivationOptions::OutputChecks>::to_json(json & json, Deriv
     json["disallowedRequisites"] = c.disallowedRequisites;
 }
 
-}
+} // namespace nlohmann

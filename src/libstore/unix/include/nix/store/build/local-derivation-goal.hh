@@ -101,13 +101,18 @@ struct LocalDerivationGoal : public DerivationGoal
     /**
      * Stuff we need to pass to initChild().
      */
-    struct ChrootPath {
+    struct ChrootPath
+    {
         Path source;
         bool optional;
+
         ChrootPath(Path source = "", bool optional = false)
-            : source(source), optional(optional)
-        { }
+            : source(source)
+            , optional(optional)
+        {
+        }
     };
+
     typedef map<Path, ChrootPath> PathsInChroot; // maps target path to source path
     PathsInChroot pathsInChroot;
 
@@ -137,8 +142,15 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     OutputPathMap scratchOutputs;
 
-    uid_t sandboxUid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID(); }
-    gid_t sandboxGid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100  : 0) : buildUser->getGID(); }
+    uid_t sandboxUid()
+    {
+        return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID();
+    }
+
+    gid_t sandboxGid()
+    {
+        return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100 : 0) : buildUser->getGID();
+    }
 
     const static Path homeDir;
 
@@ -177,6 +189,7 @@ struct LocalDerivationGoal : public DerivationGoal
     {
         return inputPaths.count(path) || addedPaths.count(path);
     }
+
     bool isAllowed(const DrvOutput & id)
     {
         return addedDrvOutputs.count(id);
@@ -258,9 +271,7 @@ struct LocalDerivationGoal : public DerivationGoal
     /**
      * Create a file in `tmpDir` owned by the builder.
      */
-    void writeBuilderFile(
-        const std::string & name,
-        std::string_view contents);
+    void writeBuilderFile(const std::string & name, std::string_view contents);
 
     int getChildStatus() override;
 
@@ -336,4 +347,4 @@ struct LocalDerivationGoal : public DerivationGoal
     StorePath makeFallbackPath(OutputNameView outputName);
 };
 
-}
+} // namespace nix

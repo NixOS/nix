@@ -53,4 +53,4 @@ void setLogFormat(const LogFormat & logFormat)
     logger = makeDefaultLogger();
 }
 
-}
+} // namespace nix

@@ -40,4 +40,4 @@ SSHMaster CommonSSHStoreConfig::createSSHMaster(bool useMaster, Descriptor logFD
     };
 }
 
-}
+} // namespace nix

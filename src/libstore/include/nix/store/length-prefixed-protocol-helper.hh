@@ -30,23 +30,24 @@ struct StoreDirConfig;
 template<class Inner, typename T>
 struct LengthPrefixedProtoHelper;
 
-#define LENGTH_PREFIXED_PROTO_HELPER(Inner, T) \
-    struct LengthPrefixedProtoHelper< Inner, T > \
-    { \
-        static T read(const StoreDirConfig & store, typename Inner::ReadConn conn); \
+#define LENGTH_PREFIXED_PROTO_HELPER(Inner, T)                                                          \
+    struct LengthPrefixedProtoHelper<Inner, T>                                                          \
+    {                                                                                                   \
+        static T read(const StoreDirConfig & store, typename Inner::ReadConn conn);                     \
         static void write(const StoreDirConfig & store, typename Inner::WriteConn conn, const T & str); \
-    private: \
-        /*! \
-         * Read this as simply `using S = Inner::Serialise;`. \
-         * \
-         * It would be nice to use that directly, but C++ doesn't seem to allow \
-         * it. The `typename` keyword needed to refer to `Inner` seems to greedy \
-         * (low precedence), and then C++ complains that `Serialise` is not a \
-         * type parameter but a real type. \
-         * \
-         * Making this `S` alias seems to be the only way to avoid these issues. \
-         */ \
-        template<typename U> using S = typename Inner::template Serialise<U>; \
+    private:                                                                                            \
+        /*!                                                                                             \
+         * Read this as simply `using S = Inner::Serialise;`.                                           \
+         *                                                                                              \
+         * It would be nice to use that directly, but C++ doesn't seem to allow                         \
+         * it. The `typename` keyword needed to refer to `Inner` seems to greedy                        \
+         * (low precedence), and then C++ complains that `Serialise` is not a                           \
+         * type parameter but a real type.                                                              \
+         *                                                                                              \
+         * Making this `S` alias seems to be the only way to avoid these issues.                        \
+         */                                                                                             \
+        template<typename U>                                                                            \
+        using S = typename Inner::template Serialise<U>;                                                \
     }
 
 template<class Inner, typename T>
@@ -64,8 +65,7 @@ LENGTH_PREFIXED_PROTO_HELPER(Inner, LENGTH_PREFIXED_PROTO_HELPER_X);
 
 template<class Inner, typename T>
 std::vector<T>
-LengthPrefixedProtoHelper<Inner, std::vector<T>>::read(
-    const StoreDirConfig & store, typename Inner::ReadConn conn)
+LengthPrefixedProtoHelper<Inner, std::vector<T>>::read(const StoreDirConfig & store, typename Inner::ReadConn conn)
 {
     std::vector<T> resSet;
     auto size = readNum<size_t>(conn.from);
@@ -76,8 +76,7 @@ LengthPrefixedProtoHelper<Inner, std::vector<T>>::read(
 }
 
 template<class Inner, typename T>
-void
-LengthPrefixedProtoHelper<Inner, std::vector<T>>::write(
+void LengthPrefixedProtoHelper<Inner, std::vector<T>>::write(
     const StoreDirConfig & store, typename Inner::WriteConn conn, const std::vector<T> & resSet)
 {
     conn.to << resSet.size();
@@ -88,8 +87,7 @@ LengthPrefixedProtoHelper<Inner, std::vector<T>>::write(
 
 template<class Inner, typename T>
 std::set<T>
-LengthPrefixedProtoHelper<Inner, std::set<T>>::read(
-    const StoreDirConfig & store, typename Inner::ReadConn conn)
+LengthPrefixedProtoHelper<Inner, std::set<T>>::read(const StoreDirConfig & store, typename Inner::ReadConn conn)
 {
     std::set<T> resSet;
     auto size = readNum<size_t>(conn.from);
@@ -100,8 +98,7 @@ LengthPrefixedProtoHelper<Inner, std::set<T>>::read(
 }
 
 template<class Inner, typename T>
-void
-LengthPrefixedProtoHelper<Inner, std::set<T>>::write(
+void LengthPrefixedProtoHelper<Inner, std::set<T>>::write(
     const StoreDirConfig & store, typename Inner::WriteConn conn, const std::set<T> & resSet)
 {
     conn.to << resSet.size();
@@ -112,8 +109,7 @@ LengthPrefixedProtoHelper<Inner, std::set<T>>::write(
 
 template<class Inner, typename K, typename V>
 std::map<K, V>
-LengthPrefixedProtoHelper<Inner, std::map<K, V>>::read(
-    const StoreDirConfig & store, typename Inner::ReadConn conn)
+LengthPrefixedProtoHelper<Inner, std::map<K, V>>::read(const StoreDirConfig & store, typename Inner::ReadConn conn)
 {
     std::map<K, V> resMap;
     auto size = readNum<size_t>(conn.from);
@@ -126,8 +122,7 @@ LengthPrefixedProtoHelper<Inner, std::map<K, V>>::read(
 }
 
 template<class Inner, typename K, typename V>
-void
-LengthPrefixedProtoHelper<Inner, std::map<K, V>>::write(
+void LengthPrefixedProtoHelper<Inner, std::map<K, V>>::write(
     const StoreDirConfig & store, typename Inner::WriteConn conn, const std::map<K, V> & resMap)
 {
     conn.to << resMap.size();
@@ -139,22 +134,18 @@ LengthPrefixedProtoHelper<Inner, std::map<K, V>>::write(
 
 template<class Inner, typename... Ts>
 std::tuple<Ts...>
-LengthPrefixedProtoHelper<Inner, std::tuple<Ts...>>::read(
-    const StoreDirConfig & store, typename Inner::ReadConn conn)
+LengthPrefixedProtoHelper<Inner, std::tuple<Ts...>>::read(const StoreDirConfig & store, typename Inner::ReadConn conn)
 {
-    return std::tuple<Ts...> {
+    return std::tuple<Ts...>{
         S<Ts>::read(store, conn)...,
     };
 }
 
 template<class Inner, typename... Ts>
-void
-LengthPrefixedProtoHelper<Inner, std::tuple<Ts...>>::write(
+void LengthPrefixedProtoHelper<Inner, std::tuple<Ts...>>::write(
     const StoreDirConfig & store, typename Inner::WriteConn conn, const std::tuple<Ts...> & res)
 {
-    std::apply([&]<typename... Us>(const Us &... args) {
-        (S<Us>::write(store, conn, args), ...);
-    }, res);
+    std::apply([&]<typename... Us>(const Us &... args) { (S<Us>::write(store, conn, args), ...); }, res);
 }
 
-}
+} // namespace nix

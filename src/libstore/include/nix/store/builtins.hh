@@ -12,8 +12,6 @@ void builtinFetchurl(
     const std::string & netrcData,
     const std::string & caFileData);
 
-void builtinUnpackChannel(
-    const BasicDerivation & drv,
-    const std::map<std::string, Path> & outputs);
+void builtinUnpackChannel(const BasicDerivation & drv, const std::map<std::string, Path> & outputs);
 
-}
+} // namespace nix

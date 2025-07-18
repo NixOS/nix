@@ -23,4 +23,4 @@ Gen<OutputsSpec> Arbitrary<OutputsSpec>::arbitrary()
         });
 }
 
-}
+} // namespace rc

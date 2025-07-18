@@ -8,23 +8,19 @@
 namespace nix {
 
 LocalBinaryCacheStoreConfig::LocalBinaryCacheStoreConfig(
-    std::string_view scheme,
-    PathView binaryCacheDir,
-    const Params & params)
+    std::string_view scheme, PathView binaryCacheDir, const Params & params)
     : StoreConfig(params)
     , BinaryCacheStoreConfig(params)
     , binaryCacheDir(binaryCacheDir)
 {
 }
 
-
 std::string LocalBinaryCacheStoreConfig::doc()
 {
     return
-      #include "local-binary-cache-store.md"
-      ;
+#include "local-binary-cache-store.md"
+        ;
 }
-
 
 struct LocalBinaryCacheStore : virtual LocalBinaryCacheStoreConfig, virtual BinaryCacheStore
 {
@@ -32,10 +28,7 @@ struct LocalBinaryCacheStore : virtual LocalBinaryCacheStoreConfig, virtual Bina
      * @param binaryCacheDir `file://` is a short-hand for `file:///`
      * for now.
      */
-    LocalBinaryCacheStore(
-        std::string_view scheme,
-        PathView binaryCacheDir,
-        const Params & params)
+    LocalBinaryCacheStore(std::string_view scheme, PathView binaryCacheDir, const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
         , LocalBinaryCacheStoreConfig(scheme, binaryCacheDir, params)
@@ -55,7 +48,8 @@ protected:
 
     bool fileExists(const std::string & path) override;
 
-    void upsertFile(const std::string & path,
+    void upsertFile(
+        const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) override
     {
@@ -87,12 +81,9 @@ protected:
         for (auto & entry : DirectoryIterator{binaryCacheDir}) {
             checkInterrupt();
             auto name = entry.path().filename().string();
-            if (name.size() != 40 ||
-                !hasSuffix(name, ".narinfo"))
+            if (name.size() != 40 || !hasSuffix(name, ".narinfo"))
                 continue;
-            paths.insert(parseStorePath(
-                    storeDir + "/" + name.substr(0, name.size() - 8)
-                    + "-" + MissingName));
+            paths.insert(parseStorePath(storeDir + "/" + name.substr(0, name.size() - 8) + "-" + MissingName));
         }
 
         return paths;
@@ -129,4 +120,4 @@ std::set<std::string> LocalBinaryCacheStoreConfig::uriSchemes()
 
 static RegisterStoreImplementation<LocalBinaryCacheStore, LocalBinaryCacheStoreConfig> regLocalBinaryCacheStore;
 
-}
+} // namespace nix

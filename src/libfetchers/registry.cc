@@ -10,9 +10,7 @@
 
 namespace nix::fetchers {
 
-std::shared_ptr<Registry> Registry::read(
-    const Settings & settings,
-    const Path & path, RegistryType type)
+std::shared_ptr<Registry> Registry::read(const Settings & settings, const Path & path, RegistryType type)
 {
     debug("reading registry '%s'", path);
 
@@ -37,13 +35,11 @@ std::shared_ptr<Registry> Registry::read(
                     toAttrs.erase(j);
                 }
                 auto exact = i.find("exact");
-                registry->entries.push_back(
-                    Entry {
-                        .from = Input::fromAttrs(settings, jsonToAttrs(i["from"])),
-                        .to = Input::fromAttrs(settings, std::move(toAttrs)),
-                        .extraAttrs = extraAttrs,
-                        .exact = exact != i.end() && exact.value()
-                    });
+                registry->entries.push_back(Entry{
+                    .from = Input::fromAttrs(settings, jsonToAttrs(i["from"])),
+                    .to = Input::fromAttrs(settings, std::move(toAttrs)),
+                    .extraAttrs = extraAttrs,
+                    .exact = exact != i.end() && exact.value()});
             }
         }
 
@@ -81,17 +77,9 @@ void Registry::write(const Path & path)
     writeFile(path, json.dump(2));
 }
 
-void Registry::add(
-    const Input & from,
-    const Input & to,
-    const Attrs & extraAttrs)
+void Registry::add(const Input & from, const Input & to, const Attrs & extraAttrs)
 {
-    entries.emplace_back(
-        Entry {
-            .from = from,
-            .to = to,
-            .extraAttrs = extraAttrs
-        });
+    entries.emplace_back(Entry{.from = from, .to = to, .extraAttrs = extraAttrs});
 }
 
 void Registry::remove(const Input & input)
@@ -108,8 +96,7 @@ static Path getSystemRegistryPath()
 
 static std::shared_ptr<Registry> getSystemRegistry(const Settings & settings)
 {
-    static auto systemRegistry =
-        Registry::read(settings, getSystemRegistryPath(), Registry::System);
+    static auto systemRegistry = Registry::read(settings, getSystemRegistryPath(), Registry::System);
     return systemRegistry;
 }
 
@@ -120,29 +107,23 @@ Path getUserRegistryPath()
 
 std::shared_ptr<Registry> getUserRegistry(const Settings & settings)
 {
-    static auto userRegistry =
-        Registry::read(settings, getUserRegistryPath(), Registry::User);
+    static auto userRegistry = Registry::read(settings, getUserRegistryPath(), Registry::User);
     return userRegistry;
 }
 
 std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const Path & p)
 {
-    static auto customRegistry =
-        Registry::read(settings, p, Registry::Custom);
+    static auto customRegistry = Registry::read(settings, p, Registry::Custom);
     return customRegistry;
 }
 
 std::shared_ptr<Registry> getFlagRegistry(const Settings & settings)
 {
-    static auto flagRegistry =
-        std::make_shared<Registry>(settings, Registry::Flag);
+    static auto flagRegistry = std::make_shared<Registry>(settings, Registry::Flag);
     return flagRegistry;
 }
 
-void overrideRegistry(
-    const Input & from,
-    const Input & to,
-    const Attrs & extraAttrs)
+void overrideRegistry(const Input & from, const Input & to, const Attrs & extraAttrs)
 {
     getFlagRegistry(*from.settings)->add(from, to, extraAttrs);
 }
@@ -178,10 +159,7 @@ Registries getRegistries(const Settings & settings, ref<Store> store)
     return registries;
 }
 
-std::pair<Input, Attrs> lookupInRegistries(
-    ref<Store> store,
-    const Input & _input,
-    UseRegistries useRegistries)
+std::pair<Input, Attrs> lookupInRegistries(ref<Store> store, const Input & _input, UseRegistries useRegistries)
 {
     Attrs extraAttrs;
     int n = 0;
@@ -190,10 +168,11 @@ std::pair<Input, Attrs> lookupInRegistries(
     if (useRegistries == UseRegistries::No)
         return {input, extraAttrs};
 
- restart:
+restart:
 
     n++;
-    if (n > 100) throw Error("cycle detected in flake registry for '%s'", input.to_string());
+    if (n > 100)
+        throw Error("cycle detected in flake registry for '%s'", input.to_string());
 
     for (auto & registry : getRegistries(*input.settings, store)) {
         if (useRegistries == UseRegistries::Limited
@@ -229,4 +208,4 @@ std::pair<Input, Attrs> lookupInRegistries(
     return {input, extraAttrs};
 }
 
-}
+} // namespace nix::fetchers

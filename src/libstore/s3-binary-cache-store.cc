@@ -2,31 +2,31 @@
 
 #if NIX_WITH_S3_SUPPORT
 
-#include <assert.h>
+#  include <assert.h>
 
-#include "nix/store/s3.hh"
-#include "nix/store/nar-info.hh"
-#include "nix/store/nar-info-disk-cache.hh"
-#include "nix/store/globals.hh"
-#include "nix/util/compression.hh"
-#include "nix/store/filetransfer.hh"
-#include "nix/util/signals.hh"
+#  include "nix/store/s3.hh"
+#  include "nix/store/nar-info.hh"
+#  include "nix/store/nar-info-disk-cache.hh"
+#  include "nix/store/globals.hh"
+#  include "nix/util/compression.hh"
+#  include "nix/store/filetransfer.hh"
+#  include "nix/util/signals.hh"
 
-#include <aws/core/Aws.h>
-#include <aws/core/VersionConfig.h>
-#include <aws/core/auth/AWSCredentialsProvider.h>
-#include <aws/core/auth/AWSCredentialsProviderChain.h>
-#include <aws/core/client/ClientConfiguration.h>
-#include <aws/core/client/DefaultRetryStrategy.h>
-#include <aws/core/utils/logging/FormattedLogSystem.h>
-#include <aws/core/utils/logging/LogMacros.h>
-#include <aws/core/utils/threading/Executor.h>
-#include <aws/s3/S3Client.h>
-#include <aws/s3/model/GetObjectRequest.h>
-#include <aws/s3/model/HeadObjectRequest.h>
-#include <aws/s3/model/ListObjectsRequest.h>
-#include <aws/s3/model/PutObjectRequest.h>
-#include <aws/transfer/TransferManager.h>
+#  include <aws/core/Aws.h>
+#  include <aws/core/VersionConfig.h>
+#  include <aws/core/auth/AWSCredentialsProvider.h>
+#  include <aws/core/auth/AWSCredentialsProviderChain.h>
+#  include <aws/core/client/ClientConfiguration.h>
+#  include <aws/core/client/DefaultRetryStrategy.h>
+#  include <aws/core/utils/logging/FormattedLogSystem.h>
+#  include <aws/core/utils/logging/LogMacros.h>
+#  include <aws/core/utils/threading/Executor.h>
+#  include <aws/s3/S3Client.h>
+#  include <aws/s3/model/GetObjectRequest.h>
+#  include <aws/s3/model/HeadObjectRequest.h>
+#  include <aws/s3/model/ListObjectsRequest.h>
+#  include <aws/s3/model/PutObjectRequest.h>
+#  include <aws/transfer/TransferManager.h>
 
 using namespace Aws::Transfer;
 
@@ -37,8 +37,9 @@ struct S3Error : public Error
     Aws::S3::S3Errors err;
 
     template<typename... Args>
-    S3Error(Aws::S3::S3Errors err, const Args & ... args)
-        : Error(args...), err(err) { };
+    S3Error(Aws::S3::S3Errors err, const Args &... args)
+        : Error(args...)
+        , err(err){};
 };
 
 /* Helper: given an Outcome<R, E>, return R in case of success, or
@@ -49,11 +50,7 @@ R && checkAws(std::string_view s, Aws::Utils::Outcome<R, E> && outcome)
     if (!outcome.IsSuccess())
         throw S3Error(
             outcome.GetError().GetErrorType(),
-            fmt(
-                "%s: %s (request id: %s)",
-                s,
-                outcome.GetError().GetMessage(),
-                outcome.GetError().GetRequestId()));
+            fmt("%s: %s (request id: %s)", s, outcome.GetError().GetMessage(), outcome.GetError().GetRequestId()));
     return outcome.GetResultWithOwnership();
 }
 
@@ -66,9 +63,9 @@ class AwsLogger : public Aws::Utils::Logging::FormattedLogSystem
         debug("AWS: %s", chomp(statement));
     }
 
-#if !(AWS_SDK_VERSION_MAJOR <= 1 && AWS_SDK_VERSION_MINOR <= 7 && AWS_SDK_VERSION_PATCH <= 115)
+#  if !(AWS_SDK_VERSION_MAJOR <= 1 && AWS_SDK_VERSION_MINOR <= 7 && AWS_SDK_VERSION_PATCH <= 115)
     void Flush() override {}
-#endif
+#  endif
 };
 
 static void initAWS()
@@ -83,9 +80,7 @@ static void initAWS()
 
         if (verbosity >= lvlDebug) {
             options.loggingOptions.logLevel =
-                verbosity == lvlDebug
-                ? Aws::Utils::Logging::LogLevel::Debug
-                : Aws::Utils::Logging::LogLevel::Trace;
+                verbosity == lvlDebug ? Aws::Utils::Logging::LogLevel::Debug : Aws::Utils::Logging::LogLevel::Trace;
             options.loggingOptions.logger_create_fn = [options]() {
                 return std::make_shared<AwsLogger>(options.loggingOptions.logLevel);
             };
@@ -96,37 +91,34 @@ static void initAWS()
 }
 
 S3Helper::S3Helper(
-    const std::string & profile,
-    const std::string & region,
-    const std::string & scheme,
-    const std::string & endpoint)
+    const std::string & profile, const std::string & region, const std::string & scheme, const std::string & endpoint)
     : config(makeConfig(region, scheme, endpoint))
     , client(make_ref<Aws::S3::S3Client>(
-            profile == ""
-            ? std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
-                std::make_shared<Aws::Auth::DefaultAWSCredentialsProviderChain>())
-            : std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
-                std::make_shared<Aws::Auth::ProfileConfigFileAWSCredentialsProvider>(profile.c_str())),
-            *config,
-            // FIXME: https://github.com/aws/aws-sdk-cpp/issues/759
-#if AWS_SDK_VERSION_MAJOR == 1 && AWS_SDK_VERSION_MINOR < 3
-            false,
-#else
-            Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
-#endif
-            endpoint.empty()))
+          profile == "" ? std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
+                              std::make_shared<Aws::Auth::DefaultAWSCredentialsProviderChain>())
+                        : std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
+                              std::make_shared<Aws::Auth::ProfileConfigFileAWSCredentialsProvider>(profile.c_str())),
+          *config,
+// FIXME: https://github.com/aws/aws-sdk-cpp/issues/759
+#  if AWS_SDK_VERSION_MAJOR == 1 && AWS_SDK_VERSION_MINOR < 3
+          false,
+#  else
+          Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
+#  endif
+          endpoint.empty()))
 {
 }
 
 /* Log AWS retries. */
 class RetryStrategy : public Aws::Client::DefaultRetryStrategy
 {
-    bool ShouldRetry(const Aws::Client::AWSError<Aws::Client::CoreErrors>& error, long attemptedRetries) const override
+    bool ShouldRetry(const Aws::Client::AWSError<Aws::Client::CoreErrors> & error, long attemptedRetries) const override
     {
         checkInterrupt();
         auto retry = Aws::Client::DefaultRetryStrategy::ShouldRetry(error, attemptedRetries);
         if (retry)
-            printError("AWS error '%s' (%s; request id: %s), will retry in %d ms",
+            printError(
+                "AWS error '%s' (%s; request id: %s), will retry in %d ms",
                 error.GetExceptionName(),
                 error.GetMessage(),
                 error.GetRequestId(),
@@ -135,10 +127,8 @@ class RetryStrategy : public Aws::Client::DefaultRetryStrategy
     }
 };
 
-ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(
-    const std::string & region,
-    const std::string & scheme,
-    const std::string & endpoint)
+ref<Aws::Client::ClientConfiguration>
+S3Helper::makeConfig(const std::string & region, const std::string & scheme, const std::string & endpoint)
 {
     initAWS();
     auto res = make_ref<Aws::Client::ClientConfiguration>();
@@ -157,38 +147,30 @@ ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(
     return res;
 }
 
-S3Helper::FileTransferResult S3Helper::getObject(
-    const std::string & bucketName, const std::string & key)
+S3Helper::FileTransferResult S3Helper::getObject(const std::string & bucketName, const std::string & key)
 {
     std::string uri = "s3://" + bucketName + "/" + key;
-    Activity act(*logger, lvlTalkative, actFileTransfer,
-        fmt("downloading '%s'", uri),
-        Logger::Fields{uri}, getCurActivity());
+    Activity act(
+        *logger, lvlTalkative, actFileTransfer, fmt("downloading '%s'", uri), Logger::Fields{uri}, getCurActivity());
 
-    auto request =
-        Aws::S3::Model::GetObjectRequest()
-        .WithBucket(bucketName)
-        .WithKey(key);
+    auto request = Aws::S3::Model::GetObjectRequest().WithBucket(bucketName).WithKey(key);
 
-    request.SetResponseStreamFactory([&]() {
-        return Aws::New<std::stringstream>("STRINGSTREAM");
-    });
+    request.SetResponseStreamFactory([&]() { return Aws::New<std::stringstream>("STRINGSTREAM"); });
 
     size_t bytesDone = 0;
     size_t bytesExpected = 0;
-    request.SetDataReceivedEventHandler([&](const Aws::Http::HttpRequest * req, Aws::Http::HttpResponse * resp, long long l) {
-        if (!bytesExpected && resp->HasHeader("Content-Length")) {
-            if (auto length = string2Int<size_t>(resp->GetHeader("Content-Length"))) {
-                bytesExpected = *length;
+    request.SetDataReceivedEventHandler(
+        [&](const Aws::Http::HttpRequest * req, Aws::Http::HttpResponse * resp, long long l) {
+            if (!bytesExpected && resp->HasHeader("Content-Length")) {
+                if (auto length = string2Int<size_t>(resp->GetHeader("Content-Length"))) {
+                    bytesExpected = *length;
+                }
             }
-        }
-        bytesDone += l;
-        act.progress(bytesDone, bytesExpected);
-    });
+            bytesDone += l;
+            act.progress(bytesDone, bytesExpected);
+        });
 
-    request.SetContinueRequestHandler([](const Aws::Http::HttpRequest*) {
-        return !isInterrupted();
-    });
+    request.SetContinueRequestHandler([](const Aws::Http::HttpRequest *) { return !isInterrupted(); });
 
     FileTransferResult res;
 
@@ -196,17 +178,15 @@ S3Helper::FileTransferResult S3Helper::getObject(
 
     try {
 
-        auto result = checkAws(fmt("AWS error fetching '%s'", key),
-            client->GetObject(request));
+        auto result = checkAws(fmt("AWS error fetching '%s'", key), client->GetObject(request));
 
         act.progress(result.GetContentLength(), result.GetContentLength());
 
-        res.data = decompress(result.GetContentEncoding(),
-            dynamic_cast<std::stringstream &>(result.GetBody()).str());
+        res.data = decompress(result.GetContentEncoding(), dynamic_cast<std::stringstream &>(result.GetBody()).str());
 
     } catch (S3Error & e) {
-        if ((e.err != Aws::S3::S3Errors::NO_SUCH_KEY) &&
-            (e.err != Aws::S3::S3Errors::ACCESS_DENIED)) throw;
+        if ((e.err != Aws::S3::S3Errors::NO_SUCH_KEY) && (e.err != Aws::S3::S3Errors::ACCESS_DENIED))
+            throw;
     }
 
     auto now2 = std::chrono::steady_clock::now();
@@ -219,13 +199,11 @@ S3Helper::FileTransferResult S3Helper::getObject(
 S3BinaryCacheStore::S3BinaryCacheStore(const Params & params)
     : BinaryCacheStoreConfig(params)
     , BinaryCacheStore(params)
-{ }
-
+{
+}
 
 S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
-    std::string_view uriScheme,
-    std::string_view bucketName,
-    const Params & params)
+    std::string_view uriScheme, std::string_view bucketName, const Params & params)
     : StoreConfig(params)
     , BinaryCacheStoreConfig(params)
     , bucketName(bucketName)
@@ -242,10 +220,9 @@ S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
 std::string S3BinaryCacheStoreConfig::doc()
 {
     return
-      #include "s3-binary-cache-store.md"
-      ;
+#  include "s3-binary-cache-store.md"
+        ;
 }
-
 
 struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual S3BinaryCacheStore
 {
@@ -253,10 +230,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
     S3Helper s3Helper;
 
-    S3BinaryCacheStoreImpl(
-        std::string_view uriScheme,
-        std::string_view bucketName,
-        const Params & params)
+    S3BinaryCacheStoreImpl(std::string_view uriScheme, std::string_view bucketName, const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
         , S3BinaryCacheStoreConfig(uriScheme, bucketName, params)
@@ -307,10 +281,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     {
         stats.head++;
 
-        auto res = s3Helper.client->HeadObject(
-            Aws::S3::Model::HeadObjectRequest()
-            .WithBucket(bucketName)
-            .WithKey(path));
+        auto res =
+            s3Helper.client->HeadObject(Aws::S3::Model::HeadObjectRequest().WithBucket(bucketName).WithKey(path));
 
         if (!res.IsSuccess()) {
             auto & error = res.GetError();
@@ -345,29 +317,31 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
             cv.wait(lk);
         }
 
-        AsyncContext(const Activity & act) : act(act) {}
+        AsyncContext(const Activity & act)
+            : act(act)
+        {
+        }
     };
 
-    void uploadFile(const std::string & path,
+    void uploadFile(
+        const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType,
         const std::string & contentEncoding)
     {
         std::string uri = "s3://" + bucketName + "/" + path;
-        Activity act(*logger, lvlTalkative, actFileTransfer,
-            fmt("uploading '%s'", uri),
-            Logger::Fields{uri}, getCurActivity());
+        Activity act(
+            *logger, lvlTalkative, actFileTransfer, fmt("uploading '%s'", uri), Logger::Fields{uri}, getCurActivity());
         istream->seekg(0, istream->end);
         auto size = istream->tellg();
         istream->seekg(0, istream->beg);
 
         auto maxThreads = std::thread::hardware_concurrency();
 
-        static std::shared_ptr<Aws::Utils::Threading::PooledThreadExecutor>
-            executor = std::make_shared<Aws::Utils::Threading::PooledThreadExecutor>(maxThreads);
+        static std::shared_ptr<Aws::Utils::Threading::PooledThreadExecutor> executor =
+            std::make_shared<Aws::Utils::Threading::PooledThreadExecutor>(maxThreads);
 
-        std::call_once(transferManagerCreated, [&]()
-        {
+        std::call_once(transferManagerCreated, [&]() {
             if (multipartUpload) {
                 TransferManagerConfiguration transferConfig(executor.get());
 
@@ -376,8 +350,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
                 transferConfig.uploadProgressCallback =
                     [](const TransferManager * transferManager,
-                        const std::shared_ptr<const TransferHandle> & transferHandle)
-                    {
+                       const std::shared_ptr<const TransferHandle> & transferHandle) {
                         auto context = std::dynamic_pointer_cast<const AsyncContext>(transferHandle->GetContext());
                         size_t bytesDone = transferHandle->GetBytesTransferred();
                         size_t bytesTotal = transferHandle->GetBytesTotalSize();
@@ -390,8 +363,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
                     };
                 transferConfig.transferStatusUpdatedCallback =
                     [](const TransferManager * transferManager,
-                        const std::shared_ptr<const TransferHandle> & transferHandle)
-                    {
+                       const std::shared_ptr<const TransferHandle> & transferHandle) {
                         auto context = std::dynamic_pointer_cast<const AsyncContext>(transferHandle->GetContext());
                         context->notify();
                     };
@@ -408,11 +380,13 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
                 throw Error("setting a content encoding is not supported with S3 multi-part uploads");
 
             auto context = std::make_shared<AsyncContext>(act);
-            std::shared_ptr<TransferHandle> transferHandle =
-                transferManager->UploadFile(
-                    istream, bucketName, path, mimeType,
-                    Aws::Map<Aws::String, Aws::String>(),
-                    context /*, contentEncoding */);
+            std::shared_ptr<TransferHandle> transferHandle = transferManager->UploadFile(
+                istream,
+                bucketName,
+                path,
+                mimeType,
+                Aws::Map<Aws::String, Aws::String>(),
+                context /*, contentEncoding */);
 
             TransferStatus status = transferHandle->GetStatus();
             while (status == TransferStatus::IN_PROGRESS || status == TransferStatus::NOT_STARTED) {
@@ -427,20 +401,19 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
             act.progress(transferHandle->GetBytesTransferred(), transferHandle->GetBytesTotalSize());
 
             if (status == TransferStatus::FAILED)
-                throw Error("AWS error: failed to upload 's3://%s/%s': %s",
-                    bucketName, path, transferHandle->GetLastError().GetMessage());
+                throw Error(
+                    "AWS error: failed to upload 's3://%s/%s': %s",
+                    bucketName,
+                    path,
+                    transferHandle->GetLastError().GetMessage());
 
             if (status != TransferStatus::COMPLETED)
-                throw Error("AWS error: transfer status of 's3://%s/%s' in unexpected state",
-                    bucketName, path);
+                throw Error("AWS error: transfer status of 's3://%s/%s' in unexpected state", bucketName, path);
 
         } else {
             act.progress(0, size);
 
-            auto request =
-                Aws::S3::Model::PutObjectRequest()
-                .WithBucket(bucketName)
-                .WithKey(path);
+            auto request = Aws::S3::Model::PutObjectRequest().WithBucket(bucketName).WithKey(path);
 
             size_t bytesSent = 0;
             request.SetDataSentEventHandler([&](const Aws::Http::HttpRequest * req, long long l) {
@@ -448,9 +421,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
                 act.progress(bytesSent, size);
             });
 
-            request.SetContinueRequestHandler([](const Aws::Http::HttpRequest*) {
-                return !isInterrupted();
-            });
+            request.SetContinueRequestHandler([](const Aws::Http::HttpRequest *) { return !isInterrupted(); });
 
             request.SetContentType(mimeType);
 
@@ -459,32 +430,28 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
             request.SetBody(istream);
 
-            auto result = checkAws(fmt("AWS error uploading '%s'", path),
-                s3Helper.client->PutObject(request));
+            auto result = checkAws(fmt("AWS error uploading '%s'", path), s3Helper.client->PutObject(request));
 
             act.progress(size, size);
         }
 
         auto now2 = std::chrono::steady_clock::now();
 
-        auto duration =
-            std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1)
-                .count();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
 
-        printInfo("uploaded 's3://%s/%s' (%d bytes) in %d ms",
-            bucketName, path, size, duration);
+        printInfo("uploaded 's3://%s/%s' (%d bytes) in %d ms", bucketName, path, size, duration);
 
         stats.putTimeMs += duration;
         stats.putBytes += std::max(size, (decltype(size)) 0);
         stats.put++;
     }
 
-    void upsertFile(const std::string & path,
+    void upsertFile(
+        const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) override
     {
-        auto compress = [&](std::string compression)
-        {
+        auto compress = [&](std::string compression) {
             auto compressed = nix::compress(compression, StreamToSourceAdapter(istream).drain());
             return std::make_shared<std::stringstream>(std::move(compressed));
         };
@@ -510,8 +477,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         stats.getTimeMs += res.durationMs;
 
         if (res.data) {
-            printTalkative("downloaded 's3://%s/%s' (%d bytes) in %d ms",
-                bucketName, path, res.data->size(), res.durationMs);
+            printTalkative(
+                "downloaded 's3://%s/%s' (%d bytes) in %d ms", bucketName, path, res.data->size(), res.durationMs);
 
             sink(*res.data);
         } else
@@ -526,21 +493,19 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         do {
             debug("listing bucket 's3://%s' from key '%s'...", bucketName, marker);
 
-            auto res = checkAws(fmt("AWS error listing bucket '%s'", bucketName),
+            auto res = checkAws(
+                fmt("AWS error listing bucket '%s'", bucketName),
                 s3Helper.client->ListObjects(
-                    Aws::S3::Model::ListObjectsRequest()
-                    .WithBucket(bucketName)
-                    .WithDelimiter("/")
-                    .WithMarker(marker)));
+                    Aws::S3::Model::ListObjectsRequest().WithBucket(bucketName).WithDelimiter("/").WithMarker(marker)));
 
             auto & contents = res.GetContents();
 
-            debug("got %d keys, next marker '%s'",
-                contents.size(), res.GetNextMarker());
+            debug("got %d keys, next marker '%s'", contents.size(), res.GetNextMarker());
 
             for (const auto & object : contents) {
                 auto & key = object.GetKey();
-                if (key.size() != 40 || !hasSuffix(key, ".narinfo")) continue;
+                if (key.size() != 40 || !hasSuffix(key, ".narinfo"))
+                    continue;
                 paths.insert(parseStorePath(storeDir + "/" + key.substr(0, key.size() - 8) + "-" + MissingName));
             }
 
@@ -563,6 +528,6 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
 static RegisterStoreImplementation<S3BinaryCacheStoreImpl, S3BinaryCacheStoreConfig> regS3BinaryCacheStore;
 
-}
+} // namespace nix
 
 #endif

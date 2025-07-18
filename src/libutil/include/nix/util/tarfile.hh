@@ -43,4 +43,4 @@ void unpackTarfile(const std::filesystem::path & tarFile, const std::filesystem:
 
 time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & parseSink);
 
-}
+} // namespace nix

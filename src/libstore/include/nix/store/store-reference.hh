@@ -88,4 +88,4 @@ struct StoreReference
  */
 std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::string & uri);
 
-}
+} // namespace nix

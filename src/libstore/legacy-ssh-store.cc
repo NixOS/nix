@@ -15,10 +15,7 @@
 
 namespace nix {
 
-LegacySSHStoreConfig::LegacySSHStoreConfig(
-    std::string_view scheme,
-    std::string_view authority,
-    const Params & params)
+LegacySSHStoreConfig::LegacySSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
     : StoreConfig(params)
     , CommonSSHStoreConfig(scheme, authority, params)
 {
@@ -27,10 +24,9 @@ LegacySSHStoreConfig::LegacySSHStoreConfig(
 std::string LegacySSHStoreConfig::doc()
 {
     return
-      #include "legacy-ssh-store.md"
-      ;
+#include "legacy-ssh-store.md"
+        ;
 }
-
 
 struct LegacySSHStore::Connection : public ServeProto::BasicClientConnection
 {
@@ -38,26 +34,21 @@ struct LegacySSHStore::Connection : public ServeProto::BasicClientConnection
     bool good = true;
 };
 
-LegacySSHStore::LegacySSHStore(
-    std::string_view scheme,
-    std::string_view host,
-    const Params & params)
+LegacySSHStore::LegacySSHStore(std::string_view scheme, std::string_view host, const Params & params)
     : StoreConfig(params)
     , CommonSSHStoreConfig(scheme, host, params)
     , LegacySSHStoreConfig(scheme, host, params)
     , Store(params)
     , connections(make_ref<Pool<Connection>>(
-        std::max(1, (int) maxConnections),
-        [this]() { return openConnection(); },
-        [](const ref<Connection> & r) { return r->good; }
-        ))
+          std::max(1, (int) maxConnections),
+          [this]() { return openConnection(); },
+          [](const ref<Connection> & r) { return r->good; }))
     , master(createSSHMaster(
-        // Use SSH master only if using more than 1 connection.
-        connections->capacity() > 1,
-        logFD))
+          // Use SSH master only if using more than 1 connection.
+          connections->capacity() > 1,
+          logFD))
 {
 }
-
 
 ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
 {
@@ -79,8 +70,7 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
     StringSink saved;
     TeeSource tee(conn->from, saved);
     try {
-        conn->remoteVersion = ServeProto::BasicClientConnection::handshake(
-            conn->to, tee, SERVE_PROTOCOL_VERSION, host);
+        conn->remoteVersion = ServeProto::BasicClientConnection::handshake(conn->to, tee, SERVE_PROTOCOL_VERSION, host);
     } catch (SerialisationError & e) {
         // in.close(): Don't let the remote block on us not writing.
         conn->sshConn->in.close();
@@ -88,8 +78,7 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
             NullSink nullSink;
             tee.drainInto(nullSink);
         }
-        throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
-            host, chomp(saved.s));
+        throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'", host, chomp(saved.s));
     } catch (EndOfFile & e) {
         throw Error("cannot connect to '%1%'", host);
     }
@@ -97,14 +86,12 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
     return conn;
 };
 
-
 std::string LegacySSHStore::getUri()
 {
     return *uriSchemes().begin() + "://" + host;
 }
 
-std::map<StorePath, UnkeyedValidPathInfo> LegacySSHStore::queryPathInfosUncached(
-    const StorePathSet & paths)
+std::map<StorePath, UnkeyedValidPathInfo> LegacySSHStore::queryPathInfosUncached(const StorePathSet & paths)
 {
     auto conn(connections->get());
 
@@ -123,8 +110,8 @@ std::map<StorePath, UnkeyedValidPathInfo> LegacySSHStore::queryPathInfosUncached
     return infos;
 }
 
-void LegacySSHStore::queryPathInfoUncached(const StorePath & path,
-    Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
+void LegacySSHStore::queryPathInfoUncached(
+    const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     try {
         auto infos = queryPathInfosUncached({path});
@@ -136,20 +123,17 @@ void LegacySSHStore::queryPathInfoUncached(const StorePath & path,
             auto & [path2, info] = *infos.begin();
 
             assert(path == path2);
-            return callback(std::make_shared<ValidPathInfo>(
-                std::move(path),
-                std::move(info)
-            ));
+            return callback(std::make_shared<ValidPathInfo>(std::move(path), std::move(info)));
         }
         default:
             throw Error("More path infos returned than queried");
         }
-    } catch (...) { callback.rethrow(); }
+    } catch (...) {
+        callback.rethrow();
+    }
 }
 
-
-void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source,
-    RepairFlag repair, CheckSigsFlag checkSigs)
+void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
 {
     debug("adding path '%s' to remote host '%s'", printStorePath(info.path), host);
 
@@ -157,18 +141,12 @@ void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source,
 
     if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 5) {
 
-        conn->to
-            << ServeProto::Command::AddToStoreNar
-            << printStorePath(info.path)
-            << (info.deriver ? printStorePath(*info.deriver) : "")
-            << info.narHash.to_string(HashFormat::Base16, false);
+        conn->to << ServeProto::Command::AddToStoreNar << printStorePath(info.path)
+                 << (info.deriver ? printStorePath(*info.deriver) : "")
+                 << info.narHash.to_string(HashFormat::Base16, false);
         ServeProto::write(*this, *conn, info.references);
-        conn->to
-            << info.registrationTime
-            << info.narSize
-            << info.ultimate
-            << info.sigs
-            << renderContentAddress(info.ca);
+        conn->to << info.registrationTime << info.narSize << info.ultimate << info.sigs
+                 << renderContentAddress(info.ca);
         try {
             copyNAR(source, conn->to);
         } catch (...) {
@@ -189,34 +167,23 @@ void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source,
                 conn->good = false;
                 throw;
             }
-            sink
-                << exportMagic
-                << printStorePath(info.path);
+            sink << exportMagic << printStorePath(info.path);
             ServeProto::write(*this, *conn, info.references);
-            sink
-                << (info.deriver ? printStorePath(*info.deriver) : "")
-                << 0
-                << 0;
+            sink << (info.deriver ? printStorePath(*info.deriver) : "") << 0 << 0;
         });
-
     }
 }
 
-
 void LegacySSHStore::narFromPath(const StorePath & path, Sink & sink)
 {
-    narFromPath(path, [&](auto & source) {
-        copyNAR(source, sink);
-    });
+    narFromPath(path, [&](auto & source) { copyNAR(source, sink); });
 }
-
 
 void LegacySSHStore::narFromPath(const StorePath & path, std::function<void(Source &)> fun)
 {
     auto conn(connections->get());
     conn->narFromPath(*this, path, fun);
 }
-
 
 static ServeProto::BuildOptions buildSettings()
 {
@@ -230,9 +197,7 @@ static ServeProto::BuildOptions buildSettings()
     };
 }
 
-
-BuildResult LegacySSHStore::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-    BuildMode buildMode)
+BuildResult LegacySSHStore::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode)
 {
     auto conn(connections->get());
 
@@ -242,20 +207,17 @@ BuildResult LegacySSHStore::buildDerivation(const StorePath & drvPath, const Bas
 }
 
 std::function<BuildResult()> LegacySSHStore::buildDerivationAsync(
-    const StorePath & drvPath, const BasicDerivation & drv,
-    const ServeProto::BuildOptions & options)
+    const StorePath & drvPath, const BasicDerivation & drv, const ServeProto::BuildOptions & options)
 {
     // Until we have C++23 std::move_only_function
     auto conn = std::make_shared<Pool<Connection>::Handle>(connections->get());
     (*conn)->putBuildDerivationRequest(*this, drvPath, drv, options);
 
-    return [this,conn]() -> BuildResult {
-        return (*conn)->getBuildDerivationResponse(*this);
-    };
+    return [this, conn]() -> BuildResult { return (*conn)->getBuildDerivationResponse(*this); };
 }
 
-
-void LegacySSHStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore)
+void LegacySSHStore::buildPaths(
+    const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore)
 {
     if (evalStore && evalStore.get() != this)
         throw Error("building on an SSH store is incompatible with '--eval-store'");
@@ -266,17 +228,20 @@ void LegacySSHStore::buildPaths(const std::vector<DerivedPath> & drvPaths, Build
     Strings ss;
     for (auto & p : drvPaths) {
         auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
-        std::visit(overloaded {
-            [&](const StorePathWithOutputs & s) {
-                ss.push_back(s.to_string(*this));
+        std::visit(
+            overloaded{
+                [&](const StorePathWithOutputs & s) { ss.push_back(s.to_string(*this)); },
+                [&](const StorePath & drvPath) {
+                    throw Error(
+                        "wanted to fetch '%s' but the legacy ssh protocol doesn't support merely substituting drv files via the build paths command. It would build them instead. Try using ssh-ng://",
+                        printStorePath(drvPath));
+                },
+                [&](std::monostate) {
+                    throw Error(
+                        "wanted build derivation that is itself a build product, but the legacy ssh protocol doesn't support that. Try using ssh-ng://");
+                },
             },
-            [&](const StorePath & drvPath) {
-                throw Error("wanted to fetch '%s' but the legacy ssh protocol doesn't support merely substituting drv files via the build paths command. It would build them instead. Try using ssh-ng://", printStorePath(drvPath));
-            },
-            [&](std::monostate) {
-                throw Error("wanted build derivation that is itself a build product, but the legacy ssh protocol doesn't support that. Try using ssh-ng://");
-            },
-        }, sOrDrvPath);
+            sOrDrvPath);
     }
     conn->to << ss;
 
@@ -293,10 +258,8 @@ void LegacySSHStore::buildPaths(const std::vector<DerivedPath> & drvPaths, Build
     }
 }
 
-
-void LegacySSHStore::computeFSClosure(const StorePathSet & paths,
-    StorePathSet & out, bool flipDirection,
-    bool includeOutputs, bool includeDerivers)
+void LegacySSHStore::computeFSClosure(
+    const StorePathSet & paths, StorePathSet & out, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {
     if (flipDirection || includeDerivers) {
         Store::computeFSClosure(paths, out, flipDirection, includeOutputs, includeDerivers);
@@ -305,9 +268,7 @@ void LegacySSHStore::computeFSClosure(const StorePathSet & paths,
 
     auto conn(connections->get());
 
-    conn->to
-        << ServeProto::Command::QueryClosure
-        << includeOutputs;
+    conn->to << ServeProto::Command::QueryClosure << includeOutputs;
     ServeProto::write(*this, *conn, paths);
     conn->to.flush();
 
@@ -315,24 +276,17 @@ void LegacySSHStore::computeFSClosure(const StorePathSet & paths,
         out.insert(i);
 }
 
-
-StorePathSet LegacySSHStore::queryValidPaths(const StorePathSet & paths,
-    SubstituteFlag maybeSubstitute)
+StorePathSet LegacySSHStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
 {
     auto conn(connections->get());
-    return conn->queryValidPaths(*this,
-        false, paths, maybeSubstitute);
+    return conn->queryValidPaths(*this, false, paths, maybeSubstitute);
 }
 
-
-StorePathSet LegacySSHStore::queryValidPaths(const StorePathSet & paths,
-    bool lock, SubstituteFlag maybeSubstitute)
+StorePathSet LegacySSHStore::queryValidPaths(const StorePathSet & paths, bool lock, SubstituteFlag maybeSubstitute)
 {
     auto conn(connections->get());
-    return conn->queryValidPaths(*this,
-        lock, paths, maybeSubstitute);
+    return conn->queryValidPaths(*this, lock, paths, maybeSubstitute);
 }
-
 
 void LegacySSHStore::addMultipleToStoreLegacy(Store & srcStore, const StorePathSet & paths)
 {
@@ -350,19 +304,16 @@ void LegacySSHStore::addMultipleToStoreLegacy(Store & srcStore, const StorePathS
         throw Error("remote machine failed to import closure");
 }
 
-
 void LegacySSHStore::connect()
 {
     auto conn(connections->get());
 }
-
 
 unsigned int LegacySSHStore::getProtocol()
 {
     auto conn(connections->get());
     return conn->remoteVersion;
 }
-
 
 pid_t LegacySSHStore::getConnectionPid()
 {
@@ -375,7 +326,6 @@ pid_t LegacySSHStore::getConnectionPid()
 #endif
 }
 
-
 LegacySSHStore::ConnectionStats LegacySSHStore::getConnectionStats()
 {
     auto conn(connections->get());
@@ -384,7 +334,6 @@ LegacySSHStore::ConnectionStats LegacySSHStore::getConnectionStats()
         .bytesSent = conn->to.written,
     };
 }
-
 
 /**
  * The legacy ssh protocol doesn't support checking for trusted-user.
@@ -395,7 +344,6 @@ std::optional<TrustedFlag> isTrustedClient()
     return std::nullopt;
 }
 
-
 static RegisterStoreImplementation<LegacySSHStore, LegacySSHStoreConfig> regLegacySSHStore;
 
-}
+} // namespace nix

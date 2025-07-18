@@ -7,7 +7,7 @@
 
 namespace nix {
 
-typedef std::function<void(int, char * *)> MainFunction;
+typedef std::function<void(int, char **)> MainFunction;
 
 struct RegisterLegacyCommand
 {
@@ -16,9 +16,10 @@ struct RegisterLegacyCommand
 
     RegisterLegacyCommand(const std::string & name, MainFunction fun)
     {
-        if (!commands) commands = new Commands;
+        if (!commands)
+            commands = new Commands;
         (*commands)[name] = fun;
     }
 };
 
-}
+} // namespace nix

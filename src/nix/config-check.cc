@@ -10,7 +10,9 @@
 #include "nix/store/worker-protocol.hh"
 #include "nix/util/executable-path.hh"
 
-namespace nix::fs { using namespace std::filesystem; }
+namespace nix::fs {
+using namespace std::filesystem;
+}
 
 using namespace nix;
 
@@ -26,21 +28,24 @@ std::string formatProtocol(unsigned int proto)
     return "unknown";
 }
 
-bool checkPass(std::string_view msg) {
+bool checkPass(std::string_view msg)
+{
     notice(ANSI_GREEN "[PASS] " ANSI_NORMAL + msg);
     return true;
 }
 
-bool checkFail(std::string_view msg) {
+bool checkFail(std::string_view msg)
+{
     notice(ANSI_RED "[FAIL] " ANSI_NORMAL + msg);
     return false;
 }
 
-void checkInfo(std::string_view msg) {
+void checkInfo(std::string_view msg)
+{
     notice(ANSI_BLUE "[INFO] " ANSI_NORMAL + msg);
 }
 
-}
+} // namespace
 
 struct CmdConfigCheck : StoreCommand
 {
@@ -59,7 +64,10 @@ struct CmdConfigCheck : StoreCommand
         return "check your system for potential problems and print a PASS or FAIL for each check";
     }
 
-    Category category() override { return catNixInstallation; }
+    Category category() override
+    {
+        return catNixInstallation;
+    }
 
     void run(ref<Store> store) override
     {
@@ -83,7 +91,7 @@ struct CmdConfigCheck : StoreCommand
         for (auto & dir : ExecutablePath::load().directories) {
             auto candidate = dir / "nix-env";
             if (fs::exists(candidate))
-                dirs.insert(fs::canonical(candidate).parent_path() );
+                dirs.insert(fs::canonical(candidate).parent_path());
         }
 
         if (dirs.size() != 1) {
@@ -106,22 +114,23 @@ struct CmdConfigCheck : StoreCommand
             try {
                 auto userEnv = fs::weakly_canonical(profileDir);
 
-                auto noContainsProfiles = [&]{
+                auto noContainsProfiles = [&] {
                     for (auto && part : profileDir)
-                        if (part == "profiles") return false;
+                        if (part == "profiles")
+                            return false;
                     return true;
                 };
 
                 if (store->isStorePath(userEnv.string()) && hasSuffix(userEnv.string(), "user-environment")) {
                     while (noContainsProfiles() && std::filesystem::is_symlink(profileDir))
-                        profileDir = fs::weakly_canonical(
-                            profileDir.parent_path() / fs::read_symlink(profileDir));
+                        profileDir = fs::weakly_canonical(profileDir.parent_path() / fs::read_symlink(profileDir));
 
                     if (noContainsProfiles())
                         dirs.insert(dir);
                 }
             } catch (SystemError &) {
-            } catch (std::filesystem::filesystem_error &) {}
+            } catch (std::filesystem::filesystem_error &) {
+            }
         }
 
         if (!dirs.empty()) {
@@ -141,8 +150,8 @@ struct CmdConfigCheck : StoreCommand
     bool checkStoreProtocol(unsigned int storeProto)
     {
         unsigned int clientProto = GET_PROTOCOL_MAJOR(SERVE_PROTOCOL_VERSION) == GET_PROTOCOL_MAJOR(storeProto)
-            ? SERVE_PROTOCOL_VERSION
-            : PROTOCOL_VERSION;
+                                       ? SERVE_PROTOCOL_VERSION
+                                       : PROTOCOL_VERSION;
 
         if (clientProto != storeProto) {
             std::ostringstream ss;
@@ -160,9 +169,7 @@ struct CmdConfigCheck : StoreCommand
     void checkTrustedUser(ref<Store> store)
     {
         if (auto trustedMay = store->isTrustedClient()) {
-            std::string_view trusted = trustedMay.value()
-                ? "trusted"
-                : "not trusted";
+            std::string_view trusted = trustedMay.value() ? "trusted" : "not trusted";
             checkInfo(fmt("You are %s by store uri: %s", trusted, store->getUri()));
         } else {
             checkInfo(fmt("Store uri: %s doesn't have a notion of trusted user", store->getUri()));
@@ -170,4 +177,4 @@ struct CmdConfigCheck : StoreCommand
     }
 };
 
-static auto rCmdConfigCheck = registerCommand2<CmdConfigCheck>({ "config", "check" });
+static auto rCmdConfigCheck = registerCommand2<CmdConfigCheck>({"config", "check"});
