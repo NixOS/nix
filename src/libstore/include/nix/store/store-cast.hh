@@ -21,4 +21,4 @@ T & require(Store & store)
     return *castedStore;
 }
 
-}
+} // namespace nix

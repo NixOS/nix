@@ -48,6 +48,6 @@ void AsyncPipe::close()
     writeSide.close();
 }
 
-}
+} // namespace nix::windows
 
 #endif

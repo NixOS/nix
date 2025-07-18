@@ -323,4 +323,4 @@ MissingPaths RestrictedStore::queryMissing(const std::vector<DerivedPath> & targ
     return res;
 }
 
-}
+} // namespace nix

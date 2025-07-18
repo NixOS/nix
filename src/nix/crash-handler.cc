@@ -55,7 +55,7 @@ void onTerminate()
 
     std::abort();
 }
-}
+} // namespace
 
 void registerCrashHandler()
 {
@@ -65,4 +65,4 @@ void registerCrashHandler()
     // If you want signals, set up a minidump system and do it out-of-process.
     std::set_terminate(onTerminate);
 }
-}
+} // namespace nix

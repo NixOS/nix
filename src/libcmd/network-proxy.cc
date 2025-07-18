@@ -47,4 +47,4 @@ bool haveNetworkProxyConnection()
     return false;
 }
 
-}
+} // namespace nix

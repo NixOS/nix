@@ -68,4 +68,4 @@ Gen<DerivedPath> Arbitrary<DerivedPath>::arbitrary()
     });
 }
 
-}
+} // namespace rc
