@@ -96,3 +96,12 @@ nix-sandbox-build symlink-derivation.nix -A test_sandbox_paths \
     --option extra-sandbox-paths "/dir=$TEST_ROOT" \
     --option extra-sandbox-paths "/symlinkDir=$symlinkDir" \
     --option extra-sandbox-paths "/symlink=$symlinkcert"
+
+nix-sandbox-build symlink-derivation.nix -A test_sandbox_path_options \
+    --option extra-sandbox-paths "$(echo '{
+        "/paths/optional":    { "source": "'"$symlinkDir"'-no-such-path", "optional": true },
+        "/paths/readonly":    { "source": "'"$symlinkDir"'", "readOnly": true },
+        "/paths/readonly-rec":{ "source": "'"$symlinkDir"'", "options": ["ro=rec"] },
+        "/paths/options":     { "source": "'"$symlinkDir"'", "options": ["noexec", "nosuid", "nodev"] },
+        "/paths/propagation": { "source": "'"$symlinkDir"'", "options": ["rslave"] }
+    }')"

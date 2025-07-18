@@ -5,6 +5,9 @@
 #include <limits>
 
 #include <sys/types.h>
+#ifdef __linux__
+#include "nix/util/mount.hh"
+#endif
 
 #include "nix/util/types.hh"
 #include "nix/util/configuration.hh"
@@ -17,6 +20,98 @@
 namespace nix {
 
 typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
+
+struct SandboxPath;
+#ifdef __linux__
+template class BindMountPath<SandboxPath>;
+#endif
+struct SandboxPath
+#ifdef __linux__
+    : BindMountPath<SandboxPath>
+#endif
+{
+public:
+#ifndef __linux__
+    using MountOpt = std::string;
+#endif
+
+    Path source;
+
+    /**
+     * Ignore path if source is missing.
+     */
+    bool optional;
+
+    /**
+     * Sets the MS_RDONLY mount option.
+     */
+    bool readOnly;
+
+    /**
+     * Mount recursively (MS_BIND | MS_REC).
+     */
+    bool recursive;
+
+    std::vector<MountOpt> options;
+
+    /* This template is to enable the full implicit conversion from e.g. const
+     * char[], even when binding a reference. Code can specify paths with
+     * literals and nothing extra. */
+    template<typename SomePath, std::enable_if_t<std::is_convertible_v<SomePath, Path>, int> = 0>
+    SandboxPath(
+        SomePath && src,
+        bool optional = false,
+        bool readOnly = false,
+        bool recursive = true,
+        std::initializer_list<MountOpt> opts = {})
+    : source(std::forward<SomePath>(src))
+    , optional(optional)
+    , readOnly(readOnly)
+    , recursive(recursive)
+    , options(std::move(opts))
+    {
+    }
+
+    SandboxPath() : SandboxPath("") { }
+
+    friend void from_json(const nlohmann::json &, SandboxPath &);
+    friend void to_json(nlohmann::json &, const std::pair<Path, SandboxPath> &);
+};
+
+/**
+ * We keep record of the original strings so that e.g. "config show" can keep
+ * using the old non-JSON format.
+ */
+struct SandboxPaths
+{
+    using Paths = std::map<Path, SandboxPath, std::less<>>;
+
+    Paths value;
+    Strings configSources;
+
+    SandboxPaths(Paths && paths = {}, Strings && configSources = {})
+        : value(std::move(paths)), configSources(std::move(configSources)) { }
+
+    explicit SandboxPaths(Strings && targets)
+        : configSources({concatStringsSep<Strings>(" ", targets)})
+    {
+        for (auto & target : targets)
+            value.insert_or_assign(target, SandboxPath(std::move(target)));
+    }
+
+    explicit SandboxPaths(const std::string & str, std::string && name)
+    {
+        auto setting = BaseSetting<SandboxPaths>{{}, false, std::move(name) + "-sandbox-paths", ""};
+        setting.set(str);
+        *this = setting.get();
+    }
+
+    auto begin() const { return value.begin(); }
+    auto end() const { return value.end(); }
+
+    friend void from_json(const nlohmann::json &, SandboxPaths &);
+    friend void to_json(nlohmann::json &, const SandboxPaths &);
+};
 
 struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
@@ -627,19 +722,128 @@ public:
         )",
         {"build-use-chroot", "build-use-sandbox"}};
 
-    Setting<PathSet> sandboxPaths{
+    Setting<SandboxPaths> sandboxPaths{
         this, {}, "sandbox-paths",
         R"(
-          A list of paths bind-mounted into Nix sandbox environments. You can
-          use the syntax `target=source` to mount a path in a different
-          location in the sandbox; for instance, `/bin=/nix-bin` mounts
-          the path `/nix-bin` as `/bin` inside the sandbox. If *source* is
-          followed by `?`, then it is not an error if *source* does not exist;
-          for example, `/dev/nvidiactl?` specifies that `/dev/nvidiactl`
-          only be mounted in the sandbox if it exists in the host filesystem.
+          A list of paths bind-mounted into Nix sandbox environments. Two
+          syntaxes are supported:
 
-          If the source is in the Nix store, then its closure is added to
-          the sandbox as well.
+          1. Original (old) syntax: Strings separated by whitespace. Entries
+             are parsed as `TARGET[=SOURCE][?]`. Only the `TARGET` path is
+             required.
+
+             `SOURCE` can be set following an equals sign (`=`) to specify a
+             different source path (the value of `TARGET` is used by default
+             for the source path as well). For instance, `/bin=/nix-bin` would
+             mount path `/nix-bin` in `/bin` inside the sandbox.
+
+             A `?` suffix can be used to make it not an error if the `SOURCE`
+             path does not exist. Without it an error is raised for an
+             unavailable path. For instance, `/dev/nvidiactl?` specifies that
+             `/dev/nvidiactl` will only be mounted in the sandbox if it exists
+             in the host filesystem.
+
+          2. JSON syntax (new): Using this form more configurable settings
+             become available. All paths are specified in a single JSON object
+             so that every key is a target path inside the sandbox and the
+             corresponding values can contain additional (platform-specific)
+             settings.
+
+             **Example:**
+
+             > ```nix
+             > extra-sandbox-paths = {
+             >   "/path/to" : {
+             >     "source"   : "/path/from",
+             >     "optional" : true,
+             >     "readOnly" : true,
+             >     "options"  : [ "optionA", "optionB", ... ],
+             >   }, ...
+             > }
+             > ```
+
+          The following keys are recognized per element:
+
+          1. `source` (string, default: same as target path)
+
+             This should point to the source path that is mounted (directory,
+             file or symbolic link to).
+
+             If the source is in the Nix store, then its closure will be added
+             to the sandbox as well.
+
+          2. `optional` (boolean, default: false)
+
+             This corresponds to the `?` suffix in the legacy format.
+
+          3. `readOnly` (boolean, default: false)
+
+             When `true`, the bind-mount is made read-only. Linux Only.
+
+          4. `recursive` (boolean, default: true)
+
+             When this is `true`, all bindable mounts mounted under source are
+             also bind-mounted. Otherwise only the top-most path is mounted.
+             inux Only.
+
+          5. `options` (string array, default: [])
+
+             This setting can be used to add/modify (some) mount(-point) flags
+             directly. All flags are currently only implemented on Linux.
+
+             **Path and atime settings:**
+
+             - `ro[=rec]`: Make paths read-only. `readOnly` is same as `ro`.
+
+             - `rw[=rec]`: Make paths read-write.
+
+             - `[no]suid[=rec]`: Enable SUID binaries. Default: `nosuid=rec`.
+
+             - `[no]dev[=rec]`
+
+             - `[no]exec[=rec]`: Allow executubles.
+
+             - `[no]symfollow[=rec]` (Linux 5.10+)
+
+             - `[no]diratime[=rec]`: Like `noatime` but limited to directories.
+
+             - `noatime[=rec]`: Mutually exclusive with `relatime` and
+               `strictatime`. Implies `nodiratime`.
+
+             - `relatime[=rec]`: Mutually exclusive with `noatime` and
+               `strictatime`. Usually default.
+
+             - `strictatime[=rec]`: Mutually exclusive with `noatime` and
+               `relatime`.
+
+             **Canonicalization:**
+
+             - `[no]canonsrc`: resolve source path symlinks (default: yes).
+
+             - `[no]canondst`: resolve target path symlinks (default: no).
+
+             **Mount propagation:**
+
+             - `[r]private`: disable all mount propagation (default: `rprivate`).
+
+             - `[r]slave`: enable propagation from host -> sandbox.
+
+             - `[r]unbindable`: just like `[r]private`, but in addition disables further binds.
+
+             Some options have a recursive (starting with `r` or ending `=rec`)
+             version and a normal non-recursive one. Recursive options are
+             applied to the whole mount tree which is mounted when `recursive`
+             is enabled. Other options apply to the top-most mount only. You
+             can set both at the same time if you specify the non-recursive
+             value after any recursive value.
+
+          | New (JSON)                                 | Old                     |
+          |--------------------------------------------|-------------------------|
+          | `{"/bin/sh": {}}`                          | `/bin/sh`               |
+          | `{"/bin/sh": null}`                        | `/bin/sh`               |
+          | `{"/bin/sh": "/usr/bin/bash"}`             | `/bin/sh=/usr/bin/bash` |
+          | `{"/bin/sh": {"source": "/usr/bin/bash"}}` | `/bin/sh=/usr/bin/bash` |
+          | `{"/etc/nix/netrc": {"optional": true}}`   | `/etc/nix/netrc?`       |
 
           Depending on how Nix was built, the default value for this option
           may be empty or provide `/bin/sh` as a bind-mount of `bash`.
