@@ -30,7 +30,8 @@ openssl x509 -req -days 1 -in "$TEST_ROOT/client.csr" -CA "$TEST_ROOT/ca.crt" -C
   -set_serial 02 -out "$TEST_ROOT/client.crt" 2>/dev/null
 
 # Find a free port
-PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
+PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()') \
+    || skipTest "Cannot bind to a TCP port"
 
 # Start the SSL cache server
 python3 "${_NIX_TEST_SOURCE_DIR}/nix-binary-cache-ssl-server.py" \
