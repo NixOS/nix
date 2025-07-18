@@ -113,12 +113,6 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 
 <!-- Determinate Nix version 3.8.3 -->
 
-* Only build the manual on x86_64-linux by @edolstra in [DeterminateSystems/nix-src#148](https://github.com/DeterminateSystems/nix-src/pull/148)
-
 * Add an `external-builders` experimental feature by @cole-h in [DeterminateSystems/nix-src#141](https://github.com/DeterminateSystems/nix-src/pull/141)
-
-* Use WAL mode for SQLite cache databases by @edolstra in [DeterminateSystems/nix-src#150](https://github.com/DeterminateSystems/nix-src/pull/150)
-
-* external-derivation-builder: run under build user by @cole-h in [DeterminateSystems/nix-src#152](https://github.com/DeterminateSystems/nix-src/pull/152)
 
 * Add support for external builders by @edolstra in [DeterminateSystems/nix-src#78](https://github.com/DeterminateSystems/nix-src/pull/78)
