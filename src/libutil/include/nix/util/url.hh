@@ -15,7 +15,7 @@ struct ParsedURL
 
     std::string to_string() const;
 
-    bool operator==(const ParsedURL & other) const noexcept;
+    bool operator==(const ParsedURL & other) const noexcept = default;
 
     /**
      * Remove `.` and `..` path elements.

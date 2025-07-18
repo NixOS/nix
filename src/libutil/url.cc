@@ -110,12 +110,6 @@ std::ostream & operator<<(std::ostream & os, const ParsedURL & url)
     return os;
 }
 
-bool ParsedURL::operator==(const ParsedURL & other) const noexcept
-{
-    return scheme == other.scheme && authority == other.authority && path == other.path && query == other.query
-           && fragment == other.fragment;
-}
-
 ParsedURL ParsedURL::canonicalise()
 {
     ParsedURL res(*this);
