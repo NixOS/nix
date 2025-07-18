@@ -8,4 +8,4 @@ void observe_string_cb(const char * start, unsigned int n, void * user_data)
     *user_data_casted = std::string(start);
 }
 
-}
+} // namespace nix::testing

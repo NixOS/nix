@@ -40,4 +40,4 @@ struct StructuredAttrs
     static std::string writeShell(const nlohmann::json & prepared);
 };
 
-}
+} // namespace nix

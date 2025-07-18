@@ -23,4 +23,4 @@ public:
     StorePathSet getResultPaths();
 };
 
-}
+} // namespace nix

@@ -329,4 +329,4 @@ void RestrictedStore::queryMissing(
     next->queryMissing(allowed, willBuild, willSubstitute, unknown, downloadSize, narSize);
 }
 
-}
+} // namespace nix

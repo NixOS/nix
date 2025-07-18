@@ -120,6 +120,7 @@ TEST_F(nix_api_expr_test, nix_value_set_get_path_invalid)
     ASSERT_EQ(nullptr, nix_get_path_string(ctx, value));
     assert_ctx_err();
 }
+
 TEST_F(nix_api_expr_test, nix_value_set_get_path)
 {
     const char * p = "/nix/store/40s0qmrfb45vlh6610rk29ym318dswdr-myname";
@@ -399,4 +400,4 @@ TEST_F(nix_api_expr_test, nix_copy_value)
     nix_gc_decref(ctx, source);
 }
 
-}
+} // namespace nixC

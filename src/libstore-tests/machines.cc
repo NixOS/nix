@@ -13,16 +13,20 @@ using testing::Eq;
 using testing::Field;
 using testing::SizeIs;
 
-namespace nix::fs { using namespace std::filesystem; }
+namespace nix::fs {
+using namespace std::filesystem;
+}
 
 using namespace nix;
 
-TEST(machines, getMachinesWithEmptyBuilders) {
+TEST(machines, getMachinesWithEmptyBuilders)
+{
     auto actual = Machine::parseConfig({}, "");
     ASSERT_THAT(actual, SizeIs(0));
 }
 
-TEST(machines, getMachinesUriOnly) {
+TEST(machines, getMachinesUriOnly)
+{
     auto actual = Machine::parseConfig({"TEST_ARCH-TEST_OS"}, "nix@scratchy.labs.cs.uu.nl");
     ASSERT_THAT(actual, SizeIs(1));
     EXPECT_THAT(actual[0], Field(&Machine::storeUri, Eq(StoreReference::parse("ssh://nix@scratchy.labs.cs.uu.nl"))));
@@ -35,7 +39,8 @@ TEST(machines, getMachinesUriOnly) {
     EXPECT_THAT(actual[0], Field(&Machine::sshPublicHostKey, SizeIs(0)));
 }
 
-TEST(machines, getMachinesDefaults) {
+TEST(machines, getMachinesDefaults)
+{
     auto actual = Machine::parseConfig({"TEST_ARCH-TEST_OS"}, "nix@scratchy.labs.cs.uu.nl - - - - - - -");
     ASSERT_THAT(actual, SizeIs(1));
     EXPECT_THAT(actual[0], Field(&Machine::storeUri, Eq(StoreReference::parse("ssh://nix@scratchy.labs.cs.uu.nl"))));
@@ -48,33 +53,35 @@ TEST(machines, getMachinesDefaults) {
     EXPECT_THAT(actual[0], Field(&Machine::sshPublicHostKey, SizeIs(0)));
 }
 
-MATCHER_P(AuthorityMatches, authority, "") {
-    *result_listener
-        << "where the authority of "
-        << arg.render()
-        << " is "
-        << authority;
+MATCHER_P(AuthorityMatches, authority, "")
+{
+    *result_listener << "where the authority of " << arg.render() << " is " << authority;
     auto * generic = std::get_if<StoreReference::Specified>(&arg.variant);
-    if (!generic) return false;
+    if (!generic)
+        return false;
     return generic->authority == authority;
 }
 
-TEST(machines, getMachinesWithNewLineSeparator) {
+TEST(machines, getMachinesWithNewLineSeparator)
+{
     auto actual = Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl\nnix@itchy.labs.cs.uu.nl");
     ASSERT_THAT(actual, SizeIs(2));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
 }
 
-TEST(machines, getMachinesWithSemicolonSeparator) {
+TEST(machines, getMachinesWithSemicolonSeparator)
+{
     auto actual = Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl ; nix@itchy.labs.cs.uu.nl");
     EXPECT_THAT(actual, SizeIs(2));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
 }
 
-TEST(machines, getMachinesWithCommentsAndSemicolonSeparator) {
-    auto actual = Machine::parseConfig({},
+TEST(machines, getMachinesWithCommentsAndSemicolonSeparator)
+{
+    auto actual = Machine::parseConfig(
+        {},
         "# This is a comment ; this is still that comment\n"
         "nix@scratchy.labs.cs.uu.nl ; nix@itchy.labs.cs.uu.nl\n"
         "# This is also a comment ; this also is still that comment\n"
@@ -85,8 +92,10 @@ TEST(machines, getMachinesWithCommentsAndSemicolonSeparator) {
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scabby.labs.cs.uu.nl"))));
 }
 
-TEST(machines, getMachinesWithFunnyWhitespace) {
-    auto actual = Machine::parseConfig({},
+TEST(machines, getMachinesWithFunnyWhitespace)
+{
+    auto actual = Machine::parseConfig(
+        {},
         "        # commment ; comment\n"
         "   nix@scratchy.labs.cs.uu.nl ; nix@itchy.labs.cs.uu.nl   \n"
         "\n    \n"
@@ -99,8 +108,10 @@ TEST(machines, getMachinesWithFunnyWhitespace) {
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scabby.labs.cs.uu.nl"))));
 }
 
-TEST(machines, getMachinesWithCorrectCompleteSingleBuilder) {
-    auto actual = Machine::parseConfig({},
+TEST(machines, getMachinesWithCorrectCompleteSingleBuilder)
+{
+    auto actual = Machine::parseConfig(
+        {},
         "nix@scratchy.labs.cs.uu.nl     i686-linux      "
         "/home/nix/.ssh/id_scratchy_auto        8 3 kvm "
         "benchmark SSH+HOST+PUBLIC+KEY+BASE64+ENCODED==");
@@ -115,9 +126,10 @@ TEST(machines, getMachinesWithCorrectCompleteSingleBuilder) {
     EXPECT_THAT(actual[0], Field(&Machine::sshPublicHostKey, Eq("SSH+HOST+PUBLIC+KEY+BASE64+ENCODED==")));
 }
 
-TEST(machines,
-     getMachinesWithCorrectCompleteSingleBuilderWithTabColumnDelimiter) {
-    auto actual = Machine::parseConfig({},
+TEST(machines, getMachinesWithCorrectCompleteSingleBuilderWithTabColumnDelimiter)
+{
+    auto actual = Machine::parseConfig(
+        {},
         "nix@scratchy.labs.cs.uu.nl\ti686-linux\t/home/nix/.ssh/"
         "id_scratchy_auto\t8\t3\tkvm\tbenchmark\tSSH+HOST+PUBLIC+"
         "KEY+BASE64+ENCODED==");
@@ -132,8 +144,10 @@ TEST(machines,
     EXPECT_THAT(actual[0], Field(&Machine::sshPublicHostKey, Eq("SSH+HOST+PUBLIC+KEY+BASE64+ENCODED==")));
 }
 
-TEST(machines, getMachinesWithMultiOptions) {
-    auto actual = Machine::parseConfig({},
+TEST(machines, getMachinesWithMultiOptions)
+{
+    auto actual = Machine::parseConfig(
+        {},
         "nix@scratchy.labs.cs.uu.nl Arch1,Arch2 - - - "
         "SupportedFeature1,SupportedFeature2 "
         "MandatoryFeature1,MandatoryFeature2");
@@ -144,25 +158,17 @@ TEST(machines, getMachinesWithMultiOptions) {
     EXPECT_THAT(actual[0], Field(&Machine::mandatoryFeatures, ElementsAre("MandatoryFeature1", "MandatoryFeature2")));
 }
 
-TEST(machines, getMachinesWithIncorrectFormat) {
-    EXPECT_THROW(
-        Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - eight"),
-        FormatError);
-    EXPECT_THROW(
-        Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - -1"),
-        FormatError);
-    EXPECT_THROW(
-        Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - 8 three"),
-        FormatError);
-    EXPECT_THROW(
-        Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - 8 -3"),
-        UsageError);
-    EXPECT_THROW(
-        Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - 8 3 - - BAD_BASE64"),
-        FormatError);
+TEST(machines, getMachinesWithIncorrectFormat)
+{
+    EXPECT_THROW(Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - eight"), FormatError);
+    EXPECT_THROW(Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - -1"), FormatError);
+    EXPECT_THROW(Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - 8 three"), FormatError);
+    EXPECT_THROW(Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - 8 -3"), UsageError);
+    EXPECT_THROW(Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - 8 3 - - BAD_BASE64"), FormatError);
 }
 
-TEST(machines, getMachinesWithCorrectFileReference) {
+TEST(machines, getMachinesWithCorrectFileReference)
+{
     auto path = std::filesystem::weakly_canonical(getUnitTestData() / "machines/valid");
     ASSERT_TRUE(std::filesystem::exists(path));
 
@@ -173,7 +179,8 @@ TEST(machines, getMachinesWithCorrectFileReference) {
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@poochie.labs.cs.uu.nl"))));
 }
 
-TEST(machines, getMachinesWithCorrectFileReferenceToEmptyFile) {
+TEST(machines, getMachinesWithCorrectFileReferenceToEmptyFile)
+{
     std::filesystem::path path = "/dev/null";
     ASSERT_TRUE(std::filesystem::exists(path));
 
@@ -181,15 +188,18 @@ TEST(machines, getMachinesWithCorrectFileReferenceToEmptyFile) {
     ASSERT_THAT(actual, SizeIs(0));
 }
 
-TEST(machines, getMachinesWithIncorrectFileReference) {
+TEST(machines, getMachinesWithIncorrectFileReference)
+{
     auto path = std::filesystem::weakly_canonical("/not/a/file");
     ASSERT_TRUE(!std::filesystem::exists(path));
     auto actual = Machine::parseConfig({}, "@" + path.string());
     ASSERT_THAT(actual, SizeIs(0));
 }
 
-TEST(machines, getMachinesWithCorrectFileReferenceToIncorrectFile) {
+TEST(machines, getMachinesWithCorrectFileReferenceToIncorrectFile)
+{
     EXPECT_THROW(
-        Machine::parseConfig({}, "@" + std::filesystem::weakly_canonical(getUnitTestData() / "machines" / "bad_format").string()),
+        Machine::parseConfig(
+            {}, "@" + std::filesystem::weakly_canonical(getUnitTestData() / "machines" / "bad_format").string()),
         FormatError);
 }

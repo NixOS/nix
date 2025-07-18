@@ -8,7 +8,7 @@ BraceWrapping:
   AfterUnion: true
   SplitEmptyRecord: false
 PointerAlignment: Middle
-FixNamespaceComments: false
+FixNamespaceComments: true
 SortIncludes: Never
 #IndentPPDirectives: BeforeHash
 SpaceAfterCStyleCast: true
@@ -32,3 +32,4 @@ IndentPPDirectives: AfterHash
 PPIndentWidth: 2
 BinPackArguments: false
 BreakBeforeTernaryOperators: true
+SeparateDefinitionBlocks: Always

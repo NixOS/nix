@@ -34,4 +34,4 @@ Pos PosTable::operator[](PosIdx p) const
     return result;
 }
 
-}
+} // namespace nix

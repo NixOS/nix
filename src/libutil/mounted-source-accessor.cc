@@ -76,4 +76,4 @@ ref<SourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAcce
     return make_ref<MountedSourceAccessor>(std::move(mounts));
 }
 
-}
+} // namespace nix
