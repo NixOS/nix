@@ -110,14 +110,8 @@ protected:
     /**
      * Stuff we need to pass to initChild().
      */
-    struct ChrootPath {
-        Path source;
-        bool optional;
-        ChrootPath(Path source = "", bool optional = false)
-            : source(source), optional(optional)
-        { }
-    };
-    typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
+
+    typedef SandboxPaths::Paths PathsInChroot;
 
     typedef StringMap Environment;
     Environment env;
@@ -895,24 +889,14 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
 
     /* Allow a user-configurable set of directories from the
        host file system. */
-    for (auto i : settings.sandboxPaths.get()) {
-        if (i.empty()) continue;
-        bool optional = false;
-        if (i[i.size() - 1] == '?') {
-            optional = true;
-            i.pop_back();
-        }
-        size_t p = i.find('=');
-        if (p == std::string::npos)
-            pathsInChroot[i] = {i, optional};
-        else
-            pathsInChroot[i.substr(0, p)] = {i.substr(p + 1), optional};
-    }
+    for (const auto & [k, v] : settings.sandboxPaths.get())
+        pathsInChroot.insert_or_assign(k, v);
+
     if (hasPrefix(store.storeDir, tmpDirInSandbox()))
     {
         throw Error("`sandbox-build-dir` must not contain the storeDir");
     }
-    pathsInChroot[tmpDirInSandbox()] = tmpDir;
+    pathsInChroot.insert_or_assign(tmpDirInSandbox(), std::as_const(tmpDir));
 
     /* Add the closure of store paths to the chroot. */
     StorePathSet closure;
@@ -935,7 +919,7 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
     /* This works like the above, except on a per-derivation level */
     auto impurePaths = drvOptions.impureHostDeps;
 
-    for (auto & i : impurePaths) {
+    for (const auto & i : impurePaths) {
         bool found = false;
         /* Note: we're not resolving symlinks here to prevent
            giving a non-root user info about inaccessible
@@ -981,13 +965,9 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
             } else if (state == stExtraChrootDirs) {
                 if (line == "") {
                     state = stBegin;
-                } else {
-                    auto p = line.find('=');
-                    if (p == std::string::npos)
-                        pathsInChroot[line] = line;
-                    else
-                        pathsInChroot[line.substr(0, p)] = line.substr(p + 1);
-                }
+                } else
+                    for (auto & [k, v] : SandboxPaths::parse(line, "extra-sandbox-paths (via pre-build-hook)"))
+                        pathsInChroot.insert_or_assign(k, v);
             }
         }
     }

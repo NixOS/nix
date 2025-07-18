@@ -86,12 +86,12 @@ Settings::Settings()
     }
 
 #if (defined(__linux__) || defined(__FreeBSD__)) && defined(SANDBOX_SHELL)
-    sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
+    sandboxPaths = {{{"/bin/sh", SandboxPath(SANDBOX_SHELL)}}};
 #endif
 
     /* chroot-like behavior from Apple's sandbox */
 #ifdef __APPLE__
-    sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
+    sandboxPaths = tokenizeString<Strings>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
 }
@@ -295,6 +295,110 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
         .handler = {[this]() { override(smRelaxed); }},
     });
 }
+
+void to_json(nlohmann::json & j, const SandboxPath & v, const Path & target)
+{
+    static const SandboxPath def = {};
+    j = nlohmann::json::object();
+    if (v.source != def.source && v.source != target) j.emplace("source", v.source);
+    if (v.optional != def.optional) j.emplace("optional", v.optional);
+    if (v.recursive != def.recursive) j.emplace("recursive", v.recursive);
+    if (v.readOnly != def.readOnly) j.emplace("readOnly", v.readOnly);
+    if (v.options != def.options)
+        j.emplace("options",
+#ifdef __linux__
+                v.compactMountOpts
+#endif
+                (v.options));
+};
+void to_json(nlohmann::json & j, const SandboxPath & v) { to_json(j, v, ""); }
+
+void from_json(const nlohmann::json & j, SandboxPath & out)
+{
+    if (j.is_null()) return;
+    if (j.is_string())
+        out.source = j.get<Path>();
+    else {
+        out.source = j.value("source", out.source);
+        out.optional = j.value("optional", out.optional);
+        out.readOnly = j.value("readOnly", out.readOnly);
+        out.recursive = j.value("recursive", out.recursive);
+        out.options = j.value("options", out.options);
+    }
+};
+
+/**
+ * Parses either old ("path[=source][?]" strings) or new (json object) format
+ * sandbox-paths. Legacy format supports only a subset of available settings.
+ */
+SandboxPaths::Paths SandboxPaths::parse(const std::string_view & str, const std::string & ctx)
+{
+    Paths res;
+    auto add = [&](std::string target, SandboxPath v) {
+        if (target == "")
+            throw UsageError("setting '%s' is an object whose keys are paths and paths cannot be empty", ctx);
+        target = canonPath(std::move(target));
+        if (v.source == "") v.source = target;
+        if (!res.try_emplace(target, std::move(v)).second)
+            throw UsageError("Sandbox path declared twice in '%s': %s", ctx, target);
+    };
+    if (str.starts_with('{')) {
+        auto parsed = nlohmann::json::parse(str, nullptr, false, true).template
+            get<std::map<Path, SandboxPath>>();
+        for (auto & [k, v] : parsed)
+            add(k, std::move(v));
+    } else
+        for (std::string_view sv : tokenizeString<Strings>(str)) {
+            bool optional = sv.ends_with('?');
+            if (optional) sv.remove_suffix(1);
+            if (size_t eq = sv.find('='); eq != sv.npos)
+                add(std::string(sv, 0, eq), { std::string(sv.data() + eq + 1, sv.size() - eq - 1), optional });
+            else
+                add(std::string(sv), { "", optional });
+        }
+    return res;
+}
+
+template<> SandboxPaths BaseSetting<SandboxPaths>::parse(const std::string & str) const
+{
+    return { SandboxPaths::parse(str, this->name), { str } };
+}
+
+template<> struct BaseSetting<SandboxPaths>::trait
+{
+    static constexpr bool appendable = true;
+};
+
+template<> std::string BaseSetting<SandboxPaths>::to_string() const
+{
+    // Use JSON format if any config source uses it.
+    if (std::ranges::any_of(value.configSources,
+            [](const auto & s){ return s.starts_with('{'); })) {
+        nlohmann::json result = nlohmann::json::object();
+        /* This serialisation omits keys that are set to their default values. */
+        for (const auto & [target, val] : value.value) {
+            auto o = nlohmann::json::object();
+            to_json(o, val, target);
+            result.emplace(target, std::move(o));
+        }
+        return result.dump();
+    } else
+        return concatStringsSep(" ", value.configSources);
+}
+
+template<> void BaseSetting<SandboxPaths>::appendOrSet(SandboxPaths newValue, bool append)
+{
+    if (!append) {
+        value.value = std::move(newValue.value);
+        value.configSources = std::move(newValue.configSources);
+    } else {
+        for (auto & [k, v] : newValue.value)
+            value.value.insert_or_assign(k, std::move(v));
+        value.configSources.merge(std::move(newValue.configSources));
+    }
+}
+
+template class BaseSetting<SandboxPaths>;
 
 unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
 {
