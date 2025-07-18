@@ -10,6 +10,7 @@
 #include <sys/resource.h>
 #include "nix/util/cgroup.hh"
 
+#include <grp.h>
 #include <sys/mount.h>
 
 namespace nix {
@@ -142,6 +143,48 @@ void tryUnshareFilesystem()
 {
     if (unshare(CLONE_FS) != 0 && errno != EPERM && errno != ENOSYS)
         throw SysError("unsharing filesystem state");
+}
+
+bool SupplementaryGroup::isConflict(const SupplementaryGroup & other) const
+{
+    return group == other.group || (gid.has_value() && gid == other.gid);
+}
+
+std::string SupplementaryGroup::to_string() const
+{
+    return nlohmann::json(*this).dump();
+}
+
+std::ostream & operator<<(std::ostream & os, const SupplementaryGroups & groups)
+{
+    return os << nlohmann::json(groups).dump();
+}
+
+void to_json(nlohmann::json & j, const SupplementaryGroup & v)
+{
+    j.emplace("group", v.group);
+    if (v.gid.has_value()) j.emplace("gid", v.gid);
+}
+
+void from_json(const nlohmann::json & j, SupplementaryGroup & r)
+{
+    static auto getGroup = [&r](const auto & j) {
+        if (j.is_string()) {
+            r.group = j.template get<std::string>();
+            if (r.group.empty())
+                throw Error("supplementary-groups: group must not be empty");
+        } else if (j.is_number())
+            r.group = fmt("%i", j.template get<uint>());
+        else
+            throw Error("supplementary-groups: expected string or number: %1%", j.dump());
+    };
+    if (j.is_object()) {
+        if (j.contains("group"))
+            getGroup(j.at("group"));
+        r.gid = j.value("gid", r.gid);
+        r.name = j.value("name", r.name);
+    } else
+        getGroup(j);
 }
 
 }

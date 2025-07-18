@@ -4,6 +4,8 @@
 #include <optional>
 
 #include "nix/util/types.hh"
+#include "nix/util/abstract-setting-to-json.hh"
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -31,5 +33,27 @@ void tryUnshareFilesystem();
 bool userNamespacesSupported();
 
 bool mountAndPidNamespacesSupported();
+
+struct SupplementaryGroup
+{
+public:
+    std::string group;
+    std::optional<gid_t> gid;
+    std::string name;
+    SupplementaryGroup(std::string group = "", const std::optional<gid_t> gid = std::nullopt, std::string name = "")
+        : group(std::move(group))
+        , gid(gid)
+        , name(std::move(name))
+    {
+    }
+    std::string to_string() const;
+    bool isConflict(const SupplementaryGroup &) const;
+};
+
+typedef std::vector<SupplementaryGroup> SupplementaryGroups;
+
+std::ostream & operator<<(std::ostream & os, const SupplementaryGroups & groups);
+void to_json(nlohmann::json & j, const SupplementaryGroup & v);
+void from_json(const nlohmann::json & j, SupplementaryGroup & r);
 
 }

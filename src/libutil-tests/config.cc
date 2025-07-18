@@ -176,7 +176,8 @@ namespace nix {
               "description": "description\n",
               "documentDefault": true,
               "value": "value",
-              "experimentalFeature": null
+              "experimentalFeature": null,
+              "valueJsonFormat": null
             }
           })#"_json);
     }
@@ -203,7 +204,8 @@ namespace nix {
               "description": "description\n",
               "documentDefault": true,
               "value": "value",
-              "experimentalFeature": "flakes"
+              "experimentalFeature": "flakes",
+              "valueJsonFormat": null
             }
           })#"_json);
     }

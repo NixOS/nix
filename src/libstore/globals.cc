@@ -307,6 +307,54 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
     }
 }
 
+#ifdef __linux__
+template<> SupplementaryGroups BaseSetting<SupplementaryGroups>::parse(const std::string & str) const
+{
+    SupplementaryGroups items = {};
+    if (str.empty()) return items;
+    else if (str.starts_with("[")) // read json
+        items = nlohmann::json::parse(str, nullptr, false, true).template get<SupplementaryGroups>();
+    else { // read strings
+        for (auto & part : splitString<StringSet>(str, " ")) {
+            auto parts = splitString<std::vector<std::string>>(part, ":");
+            if (parts.size() == 2) {
+                items.emplace_back(parts[0], string2Int<gid_t>(parts[1]));
+            } else if (parts.size() == 1) {
+                items.emplace_back(parts[0]);
+            } else
+                throw Error("unexpected item: %s", part);
+        }
+    }
+    return items;
+}
+
+template<> struct BaseSetting<SupplementaryGroups>::trait
+{
+    static constexpr bool appendable = true;
+};
+
+template<> void BaseSetting<SupplementaryGroups>::appendOrSet(SupplementaryGroups newValue, bool append)
+{
+    if (!append) {
+        value = std::move(newValue);
+    } else {
+        value.insert(value.end(), newValue.begin(), newValue.end());
+        for (auto i0 = value.begin(); i0 != value.end(); ++i0)
+            for (auto it = i0 + 1; it != value.end();)
+                if (i0->isConflict(*it))
+                    it = value.erase(it);
+                else
+                    ++it;
+    }
+}
+
+template<> std::string BaseSetting<SupplementaryGroups>::to_string() const
+{
+    return nlohmann::json(value).dump();
+}
+
+template class BaseSetting<SupplementaryGroups>;
+#endif
 
 static void preloadNSS()
 {

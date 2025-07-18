@@ -229,6 +229,12 @@ protected:
     const bool documentDefault;
 
     /**
+     * Indicates whether values may support JSON (de)serialization.
+     * Currently only for documentation generation.
+     */
+    const std::optional<bool> valueJsonFormat;
+
+    /**
      * Parse the string into a `T`.
      *
      * Used by `set()`.
@@ -252,11 +258,13 @@ public:
         const std::string & name,
         const std::string & description,
         const StringSet & aliases = {},
-        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt,
+        const std::optional<bool> valueJsonFormat = std::nullopt)
         : AbstractSetting(name, description, aliases, experimentalFeature)
         , value(def)
         , defaultValue(def)
         , documentDefault(documentDefault)
+        , valueJsonFormat(valueJsonFormat)
     { }
 
     operator const T &() const { return value; }
@@ -325,8 +333,9 @@ public:
         const std::string & description,
         const StringSet & aliases = {},
         const bool documentDefault = true,
-        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
-        : BaseSetting<T>(def, documentDefault, name, description, aliases, std::move(experimentalFeature))
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt,
+        const std::optional<bool> valueJsonFormat = std::nullopt)
+        : BaseSetting<T>(def, documentDefault, name, description, aliases, std::move(experimentalFeature), valueJsonFormat)
     {
         options->addSetting(this);
     }

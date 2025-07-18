@@ -12,6 +12,10 @@
 #include "nix/util/experimental-features.hh"
 #include "nix/util/users.hh"
 
+#ifdef __linux__
+#include "nix/util/linux-namespaces.hh"
+#endif
+
 #include "nix/store/config.hh"
 
 namespace nix {
@@ -481,6 +485,49 @@ public:
         #endif
         "id-count",
         "The number of UIDs/GIDs to use for dynamic ID allocation."};
+
+    #ifdef __linux__
+    Setting<SupplementaryGroups> supplementaryGroups{this,
+        {SupplementaryGroup("kvm")},
+        "supplementary-groups",
+        R"(
+          A list of supplementary groups to be added to build users.
+          Particularly useful together with dynamic UID/GID allocation
+          [`auto-allocate-uids`](#conf-auto-allocate-uids). The value should be
+          a JSON list of objects with the following keys:
+
+          - `group` (required)
+
+            A string (group name) or number (group ID) that should match a group
+            on the system. If the group does not exist on the system and `gid`
+            is also unset, the item is silently ignored.
+
+          - `gid` (optional)
+
+            A number that specifies the GID to assign inside the sandbox. If
+            not specified then the GID of the system group shall be used.
+
+          - `name` (optional)
+
+            (String) overrides the name that shall be used in the sandbox for
+            the group.
+
+          Example:
+
+          > ```nix
+          > extra-supplementary-groups = [
+          >   { "group": "nixbld" },
+          >   { "group": "users", "gid": 10100 }
+          > ]
+          > ```
+
+          This will map the `nixbld` group using its assigned GID (usually 30000).
+          The `users` group is mapped to GID 10100. If the system does not
+          define that group then GID 10100 is used instead on the host side as
+          well.
+        )",
+        {"build-supplementary-groups"}, true, {}, true};
+    #endif
 
     #ifdef __linux__
     Setting<bool> useCgroups{
