@@ -45,11 +45,10 @@ struct MixLs : virtual Args, MixJSON
         auto showFile = [&](const CanonPath & curPath, std::string_view relPath) {
             if (verbose) {
                 auto st = accessor->lstat(curPath);
-                std::string tp =
-                    st.type == SourceAccessor::Type::tRegular ?
-                        (st.isExecutable ? "-r-xr-xr-x" : "-r--r--r--") :
-                    st.type == SourceAccessor::Type::tSymlink ? "lrwxrwxrwx" :
-                    "dr-xr-xr-x";
+                std::string tp = st.type == SourceAccessor::Type::tRegular
+                                     ? (st.isExecutable ? "-r-xr-xr-x" : "-r--r--r--")
+                                 : st.type == SourceAccessor::Type::tSymlink ? "lrwxrwxrwx"
+                                                                             : "dr-xr-xr-x";
                 auto line = fmt("%s %20d %s", tp, st.fileSize.value_or(0), relPath);
                 if (st.type == SourceAccessor::Type::tSymlink)
                     line += " -> " + accessor->readLink(curPath);
@@ -66,9 +65,10 @@ struct MixLs : virtual Args, MixJSON
             }
         };
 
-        doPath = [&](const SourceAccessor::Stat & st, const CanonPath & curPath,
-            std::string_view relPath, bool showDirectory)
-        {
+        doPath = [&](const SourceAccessor::Stat & st,
+                     const CanonPath & curPath,
+                     std::string_view relPath,
+                     bool showDirectory) {
             if (st.type == SourceAccessor::Type::tDirectory && !showDirectory) {
                 auto names = accessor->readDirectory(curPath);
                 for (auto & [name, type] : names)
@@ -79,7 +79,9 @@ struct MixLs : virtual Args, MixJSON
 
         auto path2 = CanonPath(path);
         auto st = accessor->lstat(path2);
-        doPath(st, path2,
+        doPath(
+            st,
+            path2,
             st.type == SourceAccessor::Type::tDirectory ? "." : path2.baseName().value_or(""),
             showDirectory);
     }
@@ -99,11 +101,7 @@ struct CmdLsStore : StoreCommand, MixLs
 {
     CmdLsStore()
     {
-        expectArgs({
-            .label = "path",
-            .handler = {&path},
-            .completer = completePath
-        });
+        expectArgs({.label = "path", .handler = {&path}, .completer = completePath});
     }
 
     std::string description() override
@@ -114,8 +112,8 @@ struct CmdLsStore : StoreCommand, MixLs
     std::string doc() override
     {
         return
-          #include "store-ls.md"
-          ;
+#include "store-ls.md"
+            ;
     }
 
     void run(ref<Store> store) override
@@ -130,19 +128,15 @@ struct CmdLsNar : Command, MixLs
 
     CmdLsNar()
     {
-        expectArgs({
-            .label = "nar",
-            .handler = {&narPath},
-            .completer = completePath
-        });
+        expectArgs({.label = "nar", .handler = {&narPath}, .completer = completePath});
         expectArg("path", &path);
     }
 
     std::string doc() override
     {
         return
-          #include "nar-ls.md"
-          ;
+#include "nar-ls.md"
+            ;
     }
 
     std::string description() override

@@ -27,6 +27,7 @@ public:
 
 private:
     int _x;
+
     static void print_function(void * self, nix_printer * printer) {}
 
     static void show_type_function(void * self, nix_string_return * res) {}
@@ -65,4 +66,4 @@ TEST_F(nix_api_expr_test, nix_expr_eval_external)
     ASSERT_STREQ("nix-external<MyExternalValueDesc( 42 )>", string_value.c_str());
 }
 
-}
+} // namespace nixC

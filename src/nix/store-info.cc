@@ -17,8 +17,8 @@ struct CmdPingStore : StoreCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "store-info.md"
-          ;
+#include "store-info.md"
+            ;
     }
 
     void run(ref<Store> store) override
@@ -32,9 +32,7 @@ struct CmdPingStore : StoreCommand, MixJSON
                 notice("Trusted: %s", *trusted);
         } else {
             nlohmann::json res;
-            Finally printRes([&]() {
-                logger->cout("%s", res);
-            });
+            Finally printRes([&]() { logger->cout("%s", res); });
 
             res["url"] = store->getUri();
             store->connect();
@@ -54,7 +52,6 @@ struct CmdInfoStore : CmdPingStore
         CmdPingStore::run(store);
     }
 };
-
 
 static auto rCmdPingStore = registerCommand2<CmdPingStore>({"store", "info"});
 static auto rCmdInfoStore = registerCommand2<CmdInfoStore>({"store", "ping"});

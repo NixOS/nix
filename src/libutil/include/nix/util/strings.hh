@@ -95,4 +95,4 @@ extern template std::string dropEmptyInitThenConcatStringsSep(std::string_view, 
  * Arguments that need to be passed to ssh with spaces in them.
  */
 std::list<std::string> shellSplitString(std::string_view s);
-}
+} // namespace nix

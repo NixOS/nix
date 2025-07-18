@@ -9,7 +9,7 @@ namespace nix {
 
 struct UserLock
 {
-    virtual ~UserLock() { }
+    virtual ~UserLock() {}
 
     /**
      * Get the first and last UID.
@@ -40,4 +40,4 @@ std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useUserNamespace);
 
 bool useBuildUsers();
 
-}
+} // namespace nix

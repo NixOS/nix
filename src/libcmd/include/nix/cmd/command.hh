@@ -374,4 +374,4 @@ void printClosureDiff(
  */
 void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & buildables, LocalFSStore & store);
 
-}
+} // namespace nix

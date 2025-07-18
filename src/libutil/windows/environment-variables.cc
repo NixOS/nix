@@ -43,5 +43,5 @@ int setEnvOs(const OsString & name, const OsString & value)
     return -SetEnvironmentVariableW(name.c_str(), value.c_str());
 }
 
-}
+} // namespace nix
 #endif

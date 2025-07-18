@@ -44,4 +44,4 @@ protected:
     }
 };
 
-}
+} // namespace nixC

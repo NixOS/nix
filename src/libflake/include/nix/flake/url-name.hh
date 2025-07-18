@@ -17,4 +17,4 @@ namespace nix {
  */
 std::optional<std::string> getNameFromURL(const ParsedURL & url);
 
-}
+} // namespace nix

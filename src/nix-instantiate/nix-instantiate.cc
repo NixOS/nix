@@ -17,19 +17,23 @@
 #include <map>
 #include <iostream>
 
-
 using namespace nix;
-
 
 static Path gcRoot;
 static int rootNr = 0;
 
-
 enum OutputKind { okPlain, okRaw, okXML, okJSON };
 
-void processExpr(EvalState & state, const Strings & attrPaths,
-    bool parseOnly, bool strict, Bindings & autoArgs,
-    bool evalOnly, OutputKind output, bool location, Expr * e)
+void processExpr(
+    EvalState & state,
+    const Strings & attrPaths,
+    bool parseOnly,
+    bool strict,
+    Bindings & autoArgs,
+    bool evalOnly,
+    OutputKind output,
+    bool location,
+    Expr * e)
 {
     if (parseOnly) {
         e->show(state.symbols, std::cout);
@@ -53,15 +57,16 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 state.autoCallFunction(autoArgs, v, vRes);
             if (output == okRaw)
                 std::cout << *state.coerceToString(noPos, vRes, context, "while generating the nix-instantiate output");
-                // We intentionally don't output a newline here. The default PS1 for Bash in NixOS starts with a newline
-                // and other interactive shells like Zsh are smart enough to print a missing newline before the prompt.
+            // We intentionally don't output a newline here. The default PS1 for Bash in NixOS starts with a newline
+            // and other interactive shells like Zsh are smart enough to print a missing newline before the prompt.
             else if (output == okXML)
                 printValueAsXML(state, strict, location, vRes, std::cout, context, noPos);
             else if (output == okJSON) {
                 printValueAsJSON(state, strict, vRes, v.determinePos(noPos), std::cout, context);
                 std::cout << std::endl;
             } else {
-                if (strict) state.forceValueDeep(vRes);
+                if (strict)
+                    state.forceValueDeep(vRes);
                 std::set<const void *> seen;
                 printAmbiguous(vRes, state.symbols, std::cout, &seen, std::numeric_limits<int>::max());
                 std::cout << std::endl;
@@ -82,7 +87,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                     printGCWarning();
                 else {
                     Path rootName = absPath(gcRoot);
-                    if (++rootNr > 1) rootName += "-" + std::to_string(rootNr);
+                    if (++rootNr > 1)
+                        rootName += "-" + std::to_string(rootNr);
                     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
                     if (store2)
                         drvPathS = store2->addPermRoot(drvPath, rootName);
@@ -93,8 +99,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     }
 }
 
-
-static int main_nix_instantiate(int argc, char * * argv)
+static int main_nix_instantiate(int argc, char ** argv)
 {
     {
         Strings files;
@@ -169,7 +174,8 @@ static int main_nix_instantiate(int argc, char * * argv)
 
         Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 
-        if (attrPaths.empty()) attrPaths = {""};
+        if (attrPaths.empty())
+            attrPaths = {""};
 
         if (findFile) {
             for (auto & i : files) {
@@ -184,17 +190,16 @@ static int main_nix_instantiate(int argc, char * * argv)
 
         if (readStdin) {
             Expr * e = state->parseStdin();
-            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
-                evalOnly, outputKind, xmlOutputSourceLocation, e);
+            processExpr(
+                *state, attrPaths, parseOnly, strict, autoArgs, evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
 
         for (auto & i : files) {
-            Expr * e = fromArgs
-                ? state->parseExprFromString(i, state->rootPath("."))
-                : state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, i)));
-            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
-                evalOnly, outputKind, xmlOutputSourceLocation, e);
+            Expr * e = fromArgs ? state->parseExprFromString(i, state->rootPath("."))
+                                : state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, i)));
+            processExpr(
+                *state, attrPaths, parseOnly, strict, autoArgs, evalOnly, outputKind, xmlOutputSourceLocation, e);
         }
 
         state->maybePrintStats();

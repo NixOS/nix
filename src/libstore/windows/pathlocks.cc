@@ -155,5 +155,5 @@ FdLock::FdLock(Descriptor desc, LockType lockType, bool wait, std::string_view w
         acquired = lockFile(desc, lockType, false);
 }
 
-}
+} // namespace nix
 #endif

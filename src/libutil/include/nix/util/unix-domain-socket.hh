@@ -80,4 +80,4 @@ void bind(Socket fd, const std::string & path);
  */
 void connect(Socket fd, const std::string & path);
 
-}
+} // namespace nix

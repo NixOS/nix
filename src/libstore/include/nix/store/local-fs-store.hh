@@ -20,29 +20,28 @@ struct LocalFSStoreConfig : virtual StoreConfig
      */
     LocalFSStoreConfig(PathView path, const Params & params);
 
-    const OptionalPathSetting rootDir{this, std::nullopt,
-        "root",
-        "Directory prefixed to all other paths."};
+    const OptionalPathSetting rootDir{this, std::nullopt, "root", "Directory prefixed to all other paths."};
 
-    const PathSetting stateDir{this,
+    const PathSetting stateDir{
+        this,
         rootDir.get() ? *rootDir.get() + "/nix/var/nix" : settings.nixStateDir,
         "state",
         "Directory where Nix will store state."};
 
-    const PathSetting logDir{this,
+    const PathSetting logDir{
+        this,
         rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : settings.nixLogDir,
         "log",
         "directory where Nix will store log files."};
 
-    const PathSetting realStoreDir{this,
-        rootDir.get() ? *rootDir.get() + "/nix/store" : storeDir, "real",
-        "Physical path of the Nix store."};
+    const PathSetting realStoreDir{
+        this, rootDir.get() ? *rootDir.get() + "/nix/store" : storeDir, "real", "Physical path of the Nix store."};
 };
 
 class LocalFSStore : public virtual LocalFSStoreConfig,
-    public virtual Store,
-    public virtual GcStore,
-    public virtual LogStore
+                     public virtual Store,
+                     public virtual GcStore,
+                     public virtual LogStore
 {
 public:
     inline static std::string operationName = "Local Filesystem Store";
@@ -70,7 +69,10 @@ public:
      */
     virtual Path addPermRoot(const StorePath & storePath, const Path & gcRoot) = 0;
 
-    virtual Path getRealStoreDir() { return realStoreDir; }
+    virtual Path getRealStoreDir()
+    {
+        return realStoreDir;
+    }
 
     Path toRealPath(const Path & storePath) override
     {
@@ -79,7 +81,6 @@ public:
     }
 
     std::optional<std::string> getBuildLogExact(const StorePath & path) override;
-
 };
 
-}
+} // namespace nix

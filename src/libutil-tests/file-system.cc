@@ -297,4 +297,4 @@ TEST(DirectoryIterator, nonexistent)
     ASSERT_THROW(DirectoryIterator("/schnitzel/darmstadt/pommes"), SysError);
 }
 
-}
+} // namespace nix

@@ -19,7 +19,7 @@ using std::map;
 struct HookInstance;
 #endif
 
-typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
+typedef enum { rpAccept, rpDecline, rpPostpone } HookReply;
 
 /**
  * Unless we are repairing, we don't both to test validity and just assume it,
@@ -31,25 +31,30 @@ enum struct PathStatus {
     Valid,
 };
 
-struct InitialOutputStatus {
+struct InitialOutputStatus
+{
     StorePath path;
     PathStatus status;
+
     /**
      * Valid in the store, and additionally non-corrupt if we are repairing
      */
-    bool isValid() const {
+    bool isValid() const
+    {
         return status == PathStatus::Valid;
     }
+
     /**
      * Merely present, allowed to be corrupt
      */
-    bool isPresent() const {
-        return status == PathStatus::Corrupt
-            || status == PathStatus::Valid;
+    bool isPresent() const
+    {
+        return status == PathStatus::Corrupt || status == PathStatus::Valid;
     }
 };
 
-struct InitialOutput {
+struct InitialOutput
+{
     bool wanted;
     Hash outputHash;
     std::optional<InitialOutputStatus> known;
@@ -214,11 +219,13 @@ struct DerivationGoal : public Goal
      */
     std::string machineName;
 
-    DerivationGoal(const StorePath & drvPath,
-        const OutputsSpec & wantedOutputs, Worker & worker,
-        BuildMode buildMode = bmNormal);
-    DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-        const OutputsSpec & wantedOutputs, Worker & worker,
+    DerivationGoal(
+        const StorePath & drvPath, const OutputsSpec & wantedOutputs, Worker & worker, BuildMode buildMode = bmNormal);
+    DerivationGoal(
+        const StorePath & drvPath,
+        const BasicDerivation & drv,
+        const OutputsSpec & wantedOutputs,
+        Worker & worker,
         BuildMode buildMode = bmNormal);
     virtual ~DerivationGoal();
 
@@ -264,7 +271,7 @@ struct DerivationGoal : public Goal
     /**
      * Sign the newly built realisation if the store allows it
      */
-    virtual void signRealisation(Realisation&) {}
+    virtual void signRealisation(Realisation &) {}
 
     /**
      * Close the log file.
@@ -326,20 +333,18 @@ struct DerivationGoal : public Goal
 
     void started();
 
-    Done done(
-        BuildResult::Status status,
-        SingleDrvOutputs builtOutputs = {},
-        std::optional<Error> ex = {});
+    Done done(BuildResult::Status status, SingleDrvOutputs builtOutputs = {}, std::optional<Error> ex = {});
 
     void waiteeDone(GoalPtr waitee, ExitCode result) override;
 
     StorePathSet exportReferences(const StorePathSet & storePaths);
 
-    JobCategory jobCategory() const override {
+    JobCategory jobCategory() const override
+    {
         return JobCategory::Build;
     };
 };
 
 MakeError(NotDeterministic, BuildError);
 
-}
+} // namespace nix

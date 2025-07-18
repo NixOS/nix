@@ -48,4 +48,4 @@ public:
 
 std::string writeStructuredAttrsShell(const nlohmann::json & json);
 
-}
+} // namespace nix

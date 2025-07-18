@@ -29,8 +29,8 @@ struct CmdStoreGC : StoreCommand, MixDryRun
     std::string doc() override
     {
         return
-          #include "store-gc.md"
-          ;
+#include "store-gc.md"
+            ;
     }
 
     void run(ref<Store> store) override

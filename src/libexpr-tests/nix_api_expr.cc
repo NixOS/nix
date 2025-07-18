@@ -394,6 +394,7 @@ static void primop_bad_return_thunk(
 {
     nix_init_apply(context, ret, args[0], args[1]);
 }
+
 TEST_F(nix_api_expr_test, nix_expr_primop_bad_return_thunk)
 {
     PrimOp * primop =

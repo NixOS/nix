@@ -11,7 +11,9 @@
 #include <filesystem>
 #include <gtest/gtest.h>
 
-namespace fs { using namespace std::filesystem; }
+namespace fs {
+using namespace std::filesystem;
+}
 
 namespace nixC {
 class nix_api_store_test : public nix_api_util_context
@@ -44,8 +46,9 @@ protected:
         // no `mkdtemp` with MinGW
         auto tmpl = nix::defaultTempDir() + "/tests_nix-store.";
         for (size_t i = 0; true; ++i) {
-            nixDir = tmpl + std::string { i };
-            if (fs::create_directory(nixDir)) break;
+            nixDir = tmpl + std::string{i};
+            if (fs::create_directory(nixDir))
+                break;
         }
 #else
         // resolve any symlinks in i.e. on macOS /tmp -> /private/tmp
@@ -70,4 +73,4 @@ protected:
         };
     }
 };
-}
+} // namespace nixC

@@ -27,4 +27,4 @@ struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
     std::string doc() override;
 };
 
-}
+} // namespace nix

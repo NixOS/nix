@@ -6,7 +6,7 @@
 
 namespace nix {
 
-//static constexpr auto commonArgsCategory = "Miscellaneous common options";
+// static constexpr auto commonArgsCategory = "Miscellaneous common options";
 static constexpr auto loggingCategory = "Logging-related options";
 static constexpr auto miscCategory = "Miscellaneous global options";
 
@@ -58,13 +58,12 @@ struct MixRepair : virtual Args
     {
         addFlag({
             .longName = "repair",
-            .description =
-                "During evaluation, rewrite missing or corrupted files in the Nix store. "
-                "During building, rebuild missing or corrupted store paths.",
+            .description = "During evaluation, rewrite missing or corrupted files in the Nix store. "
+                           "During building, rebuild missing or corrupted store paths.",
             .category = miscCategory,
             .handler = {&repair, Repair},
         });
     }
 };
 
-}
+} // namespace nix

@@ -25,8 +25,8 @@
 
 #ifdef _WIN32
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
 
 namespace nix {
 
@@ -383,6 +383,6 @@ int execvpe(const wchar_t * file0, const wchar_t * const argv[], const wchar_t *
     return _wexecve(file.c_str(), argv, envp);
 }
 
-}
+} // namespace nix
 
 #endif

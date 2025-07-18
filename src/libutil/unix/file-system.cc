@@ -69,4 +69,4 @@ void setWriteTime(const fs::path & path, time_t accessedTime, time_t modificatio
 #endif
 }
 
-}
+} // namespace nix

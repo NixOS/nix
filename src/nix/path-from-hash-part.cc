@@ -23,8 +23,8 @@ struct CmdPathFromHashPart : StoreCommand
     std::string doc() override
     {
         return
-          #include "path-from-hash-part.md"
-          ;
+#include "path-from-hash-part.md"
+            ;
     }
 
     void run(ref<Store> store) override

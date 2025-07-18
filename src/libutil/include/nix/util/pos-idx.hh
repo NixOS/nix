@@ -49,7 +49,7 @@ public:
 
 inline PosIdx noPos = {};
 
-}
+} // namespace nix
 
 namespace std {
 

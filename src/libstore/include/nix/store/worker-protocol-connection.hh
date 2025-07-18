@@ -168,4 +168,4 @@ struct WorkerProto::BasicServerConnection : WorkerProto::BasicConnection
     void postHandshake(const StoreDirConfig & store, const ClientHandshakeInfo & info);
 };
 
-}
+} // namespace nix

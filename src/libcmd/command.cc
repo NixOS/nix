@@ -397,4 +397,4 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
     }
 }
 
-}
+} // namespace nix

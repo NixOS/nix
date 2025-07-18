@@ -39,14 +39,11 @@ void builtinFetchurl(
     auto fileTransfer = makeFileTransfer();
 
     auto fetch = [&](const std::string & url) {
-
         auto source = sinkToSource([&](Sink & sink) {
-
             FileTransferRequest request(url);
             request.decompress = false;
 
-            auto decompressor = makeDecompressionSink(
-                unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
+            auto decompressor = makeDecompressionSink(unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
             fileTransfer->download(std::move(request), *decompressor);
             decompressor->finish();
         });
@@ -68,8 +65,11 @@ void builtinFetchurl(
     if (dof && dof->ca.method.getFileIngestionMethod() == FileIngestionMethod::Flat)
         for (auto hashedMirror : settings.hashedMirrors.get())
             try {
-                if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
-                fetch(hashedMirror + printHashAlgo(dof->ca.hash.algo) + "/" + dof->ca.hash.to_string(HashFormat::Base16, false));
+                if (!hasSuffix(hashedMirror, "/"))
+                    hashedMirror += '/';
+                fetch(
+                    hashedMirror + printHashAlgo(dof->ca.hash.algo) + "/"
+                    + dof->ca.hash.to_string(HashFormat::Base16, false));
                 return;
             } catch (Error & e) {
                 debug(e.what());
@@ -79,4 +79,4 @@ void builtinFetchurl(
     fetch(mainUrl);
 }
 
-}
+} // namespace nix

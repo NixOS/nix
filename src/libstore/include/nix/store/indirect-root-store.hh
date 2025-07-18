@@ -72,4 +72,4 @@ protected:
     void makeSymlink(const Path & link, const Path & target);
 };
 
-}
+} // namespace nix

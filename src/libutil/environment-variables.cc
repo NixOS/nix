@@ -48,4 +48,4 @@ void replaceEnv(const std::map<std::string, std::string> & newEnv)
         setEnv(newEnvVar.first.c_str(), newEnvVar.second.c_str());
 }
 
-}
+} // namespace nix

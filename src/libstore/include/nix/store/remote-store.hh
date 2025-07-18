@@ -8,24 +8,24 @@
 #include "nix/store/gc-store.hh"
 #include "nix/store/log-store.hh"
 
-
 namespace nix {
-
 
 class Pipe;
 class Pid;
 struct FdSink;
 struct FdSource;
-template<typename T> class Pool;
+template<typename T>
+class Pool;
 
 struct RemoteStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<int> maxConnections{this, 1, "max-connections",
-        "Maximum number of concurrent connections to the Nix daemon."};
+    const Setting<int> maxConnections{
+        this, 1, "max-connections", "Maximum number of concurrent connections to the Nix daemon."};
 
-    const Setting<unsigned int> maxConnectionAge{this,
+    const Setting<unsigned int> maxConnectionAge{
+        this,
         std::numeric_limits<unsigned int>::max(),
         "max-connection-age",
         "Maximum age of a connection before it is closed."};
@@ -36,9 +36,9 @@ struct RemoteStoreConfig : virtual StoreConfig
  * DaemonStore.
  */
 class RemoteStore : public virtual RemoteStoreConfig,
-    public virtual Store,
-    public virtual GcStore,
-    public virtual LogStore
+                    public virtual Store,
+                    public virtual GcStore,
+                    public virtual LogStore
 {
 public:
 
@@ -48,13 +48,12 @@ public:
 
     bool isValidPathUncached(const StorePath & path) override;
 
-    StorePathSet queryValidPaths(const StorePathSet & paths,
-        SubstituteFlag maybeSubstitute = NoSubstitute) override;
+    StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     StorePathSet queryAllValidPaths() override;
 
-    void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+    void queryPathInfoUncached(
+        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
 
@@ -62,24 +61,24 @@ public:
 
     StorePathSet queryDerivationOutputs(const StorePath & path) override;
 
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore = nullptr) override;
+    std::map<std::string, std::optional<StorePath>>
+    queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore = nullptr) override;
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
-    void querySubstitutablePathInfos(const StorePathCAMap & paths,
-        SubstitutablePathInfos & infos) override;
+    void querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos) override;
 
     /**
      * Add a content-addressable store path. `dump` will be drained.
      */
     ref<const ValidPathInfo> addCAToStore(
-            Source & dump,
-            std::string_view name,
-            ContentAddressMethod caMethod,
-            HashAlgorithm hashAlgo,
-            const StorePathSet & references,
-            RepairFlag repair);
+        Source & dump,
+        std::string_view name,
+        ContentAddressMethod caMethod,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
+        RepairFlag repair);
 
     /**
      * Add a content-addressable store path. `dump` will be drained.
@@ -93,34 +92,25 @@ public:
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) override;
 
-    void addToStore(const ValidPathInfo & info, Source & nar,
-        RepairFlag repair, CheckSigsFlag checkSigs) override;
+    void addToStore(const ValidPathInfo & info, Source & nar, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    void addMultipleToStore(
-        Source & source,
-        RepairFlag repair,
-        CheckSigsFlag checkSigs) override;
+    void addMultipleToStore(Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    void addMultipleToStore(
-        PathsSource && pathsToCopy,
-        Activity & act,
-        RepairFlag repair,
-        CheckSigsFlag checkSigs) override;
+    void
+    addMultipleToStore(PathsSource && pathsToCopy, Activity & act, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     void registerDrvOutput(const Realisation & info) override;
 
-    void queryRealisationUncached(const DrvOutput &,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+    void queryRealisationUncached(
+        const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
-    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
+    void
+    buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
 
     std::vector<KeyedBuildResult> buildPathsWithResults(
-        const std::vector<DerivedPath> & paths,
-        BuildMode buildMode,
-        std::shared_ptr<Store> evalStore) override;
+        const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
 
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode) override;
+    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode) override;
 
     void ensurePath(const StorePath & path) override;
 
@@ -143,13 +133,19 @@ public:
      * without it being a breaking change.
      */
     void repairPath(const StorePath & path) override
-    { unsupported("repairPath"); }
+    {
+        unsupported("repairPath");
+    }
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
-    void queryMissing(const std::vector<DerivedPath> & targets,
-        StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-        uint64_t & downloadSize, uint64_t & narSize) override;
+    void queryMissing(
+        const std::vector<DerivedPath> & targets,
+        StorePathSet & willBuild,
+        StorePathSet & willSubstitute,
+        StorePathSet & unknown,
+        uint64_t & downloadSize,
+        uint64_t & narSize) override;
 
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
@@ -193,9 +189,7 @@ private:
 
     std::atomic_bool failed{false};
 
-    void copyDrvsFromEvalStore(
-        const std::vector<DerivedPath> & paths,
-        std::shared_ptr<Store> evalStore);
+    void copyDrvsFromEvalStore(const std::vector<DerivedPath> & paths, std::shared_ptr<Store> evalStore);
 };
 
-}
+} // namespace nix

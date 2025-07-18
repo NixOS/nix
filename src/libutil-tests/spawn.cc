@@ -33,4 +33,4 @@ TEST(SpawnTest, windowsEscape)
     ASSERT_EQ(space, R"("hello world")");
 }
 #endif
-}
+} // namespace nix
