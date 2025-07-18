@@ -57,7 +57,7 @@ deps_private += blake3
 
 boost = dependency(
   'boost',
-  modules : ['context', 'coroutine', 'iostreams'],
+  modules : ['context', 'coroutine', 'iostreams', 'url'],
   include_type: 'system',
   version: '>=1.82.0'
 )

@@ -4,6 +4,8 @@
 #include "nix/util/split.hh"
 #include "nix/util/canon-path.hh"
 
+#include <boost/url.hpp>
+
 namespace nix {
 
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
@@ -48,21 +50,17 @@ ParsedURL parseURL(const std::string & url)
 
 std::string percentDecode(std::string_view in)
 {
-    std::string decoded;
-    for (size_t i = 0; i < in.size();) {
-        if (in[i] == '%') {
-            if (i + 2 >= in.size())
-                throw BadURL("invalid URI parameter '%s'", in);
-            try {
-                decoded += std::stoul(std::string(in, i + 1, 2), 0, 16);
-                i += 3;
-            } catch (...) {
-                throw BadURL("invalid URI parameter '%s'", in);
-            }
-        } else
-            decoded += in[i++];
-    }
-    return decoded;
+    auto pctView = boost::urls::make_pct_string_view(in);
+    if (pctView.has_value())
+        return pctView->decode();
+    auto error = pctView.error();
+    throw BadURL("invalid URI parameter '%s': %s", in, error.message());
+}
+
+std::string percentEncode(std::string_view s, std::string_view keep)
+{
+    return boost::urls::encode(
+        s, [keep](char c) { return boost::urls::unreserved_chars(c) || keep.find(c) != keep.npos; });
 }
 
 StringMap decodeQuery(const std::string & query)
@@ -84,19 +82,6 @@ StringMap decodeQuery(const std::string & query)
 
 const static std::string allowedInQuery = ":@/?";
 const static std::string allowedInPath = ":@/";
-
-std::string percentEncode(std::string_view s, std::string_view keep)
-{
-    std::string res;
-    for (auto & c : s)
-        // unreserved + keep
-        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || strchr("-._~", c)
-            || keep.find(c) != std::string::npos)
-            res += c;
-        else
-            res += fmt("%%%02X", c & 0xFF);
-    return res;
-}
 
 std::string encodeQuery(const StringMap & ss)
 {
