@@ -18,4 +18,4 @@ std::filesystem::path::string_type string_to_os_string(std::string_view s)
     return std::string{s};
 }
 
-}
+} // namespace nix

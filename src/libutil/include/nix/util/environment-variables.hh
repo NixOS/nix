@@ -66,4 +66,4 @@ void clearEnv();
  */
 void replaceEnv(const std::map<std::string, std::string> & newEnv);
 
-}
+} // namespace nix

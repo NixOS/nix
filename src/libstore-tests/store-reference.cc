@@ -120,4 +120,4 @@ URI_TEST(
         .params = {},
     }))
 
-}
+} // namespace nix

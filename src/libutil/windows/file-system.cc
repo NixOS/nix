@@ -27,5 +27,5 @@ Descriptor openDirectory(const std::filesystem::path & path)
         NULL);
 }
 
-}
+} // namespace nix
 #endif

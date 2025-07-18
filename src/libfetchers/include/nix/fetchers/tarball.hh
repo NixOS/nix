@@ -10,7 +10,7 @@
 namespace nix {
 class Store;
 struct SourceAccessor;
-}
+} // namespace nix
 
 namespace nix::fetchers {
 
@@ -24,11 +24,8 @@ struct DownloadFileResult
     std::optional<std::string> immutableUrl;
 };
 
-DownloadFileResult downloadFile(
-    ref<Store> store,
-    const std::string & url,
-    const std::string & name,
-    const Headers & headers = {});
+DownloadFileResult
+downloadFile(ref<Store> store, const std::string & url, const std::string & name, const Headers & headers = {});
 
 struct DownloadTarballResult
 {
@@ -42,9 +39,6 @@ struct DownloadTarballResult
  * Download and import a tarball into the Git cache. The result is the
  * Git tree hash of the root directory.
  */
-ref<SourceAccessor> downloadTarball(
-    ref<Store> store,
-    const Settings & settings,
-    const std::string & url);
+ref<SourceAccessor> downloadTarball(ref<Store> store, const Settings & settings, const std::string & url);
 
-}
+} // namespace nix::fetchers

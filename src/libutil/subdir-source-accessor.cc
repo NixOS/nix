@@ -56,4 +56,4 @@ ref<SourceAccessor> projectSubdirSourceAccessor(ref<SourceAccessor> parent, Cano
     return make_ref<SubdirSourceAccessor>(std::move(parent), std::move(subdirectory));
 }
 
-}
+} // namespace nix

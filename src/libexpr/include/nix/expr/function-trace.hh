@@ -13,4 +13,4 @@ struct FunctionCallTrace
     FunctionCallTrace(const Pos & pos);
     ~FunctionCallTrace();
 };
-}
+} // namespace nix
