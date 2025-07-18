@@ -124,9 +124,9 @@ TEST(parseURL, parseIPv4Address)
     ASSERT_EQ(parsed, expected);
 }
 
-TEST(parseURL, parseScopedRFC4007IPv6Address)
+TEST(parseURL, parseScopedRFC6874IPv6Address)
 {
-    auto s = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080";
+    auto s = "http://[fe80::818c:da4d:8975:415c\%25enp0s25]:8080";
     auto parsed = parseURL(s);
 
     ParsedURL expected{
