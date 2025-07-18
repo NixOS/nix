@@ -79,4 +79,4 @@ struct MuxablePipePollState
         std::function<void(Descriptor fd)> handleEOF);
 };
 
-}
+} // namespace nix

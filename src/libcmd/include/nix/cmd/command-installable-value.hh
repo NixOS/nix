@@ -20,4 +20,4 @@ struct InstallableValueCommand : InstallableCommand
     void run(ref<Store> store, ref<Installable> installable) override;
 };
 
-}
+} // namespace nix

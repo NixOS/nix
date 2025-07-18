@@ -15,8 +15,7 @@ namespace nix {
  * Contains `Source` and `Sink` for actual communication, along with
  * other information learned when negotiating the connection.
  */
-struct RemoteStore::Connection : WorkerProto::BasicClientConnection,
-  WorkerProto::ClientHandshakeInfo
+struct RemoteStore::Connection : WorkerProto::BasicClientConnection, WorkerProto::ClientHandshakeInfo
 {
     /**
      * Time this connection was established.
@@ -38,20 +37,29 @@ struct RemoteStore::ConnectionHandle
 
     ConnectionHandle(Pool<RemoteStore::Connection>::Handle && handle)
         : handle(std::move(handle))
-    { }
+    {
+    }
 
     ConnectionHandle(ConnectionHandle && h) noexcept
         : handle(std::move(h.handle))
-    { }
+    {
+    }
 
     ~ConnectionHandle();
 
-    RemoteStore::Connection & operator * () { return *handle; }
-    RemoteStore::Connection * operator -> () { return &*handle; }
+    RemoteStore::Connection & operator*()
+    {
+        return *handle;
+    }
+
+    RemoteStore::Connection * operator->()
+    {
+        return &*handle;
+    }
 
     void processStderr(Sink * sink = 0, Source * source = 0, bool flush = true, bool block = true);
 
     void withFramedSink(std::function<void(Sink & sink)> fun);
 };
 
-}
+} // namespace nix

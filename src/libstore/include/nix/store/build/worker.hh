@@ -202,31 +202,34 @@ public:
      */
 private:
     template<class G, typename... Args>
-    std::shared_ptr<G> initGoalIfNeeded(std::weak_ptr<G> & goal_weak, Args && ...args);
+    std::shared_ptr<G> initGoalIfNeeded(std::weak_ptr<G> & goal_weak, Args &&... args);
 
     std::shared_ptr<DerivationGoal> makeDerivationGoalCommon(
-        ref<const SingleDerivedPath> drvReq, const OutputsSpec & wantedOutputs,
+        ref<const SingleDerivedPath> drvReq,
+        const OutputsSpec & wantedOutputs,
         std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal);
 public:
     std::shared_ptr<DerivationGoal> makeDerivationGoal(
-        ref<const SingleDerivedPath> drvReq,
-        const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
+        ref<const SingleDerivedPath> drvReq, const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
     std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(
-        const StorePath & drvPath, const BasicDerivation & drv,
-        const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
+        const StorePath & drvPath,
+        const BasicDerivation & drv,
+        const OutputsSpec & wantedOutputs,
+        BuildMode buildMode = bmNormal);
 
     /**
      * @ref DerivationBuildingGoal "derivation goal"
      */
-    std::shared_ptr<DerivationBuildingGoal> makeDerivationBuildingGoal(
-        const StorePath & drvPath, const Derivation & drv,
-        BuildMode buildMode = bmNormal);
+    std::shared_ptr<DerivationBuildingGoal>
+    makeDerivationBuildingGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode = bmNormal);
 
     /**
      * @ref PathSubstitutionGoal "substitution goal"
      */
-    std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
-    std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(
+        const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(
+        const DrvOutput & id, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
     /**
      * Make a goal corresponding to the `DerivedPath`.
@@ -261,8 +264,11 @@ public:
      * Registers a running child process.  `inBuildSlot` means that
      * the process counts towards the jobs limit.
      */
-    void childStarted(GoalPtr goal, const std::set<MuxablePipePollState::CommChannel> & channels,
-        bool inBuildSlot, bool respectTimeouts);
+    void childStarted(
+        GoalPtr goal,
+        const std::set<MuxablePipePollState::CommChannel> & channels,
+        bool inBuildSlot,
+        bool respectTimeouts);
 
     /**
      * Unregisters a running child process.  `wakeSleepers` should be
@@ -336,10 +342,11 @@ public:
     void updateProgress()
     {
         actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
-        actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
+        actSubstitutions.progress(
+            doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
         act.setExpected(actFileTransfer, expectedDownloadSize + doneDownloadSize);
         act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
     }
 };
 
-}
+} // namespace nix

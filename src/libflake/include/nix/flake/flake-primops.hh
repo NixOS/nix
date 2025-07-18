@@ -13,4 +13,4 @@ nix::PrimOp getFlake(const Settings & settings);
 extern nix::PrimOp parseFlakeRef;
 extern nix::PrimOp flakeRefToString;
 
-} // namespace nix::flake
+} // namespace nix::flake::primops

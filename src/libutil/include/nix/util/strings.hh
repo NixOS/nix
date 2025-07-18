@@ -132,4 +132,4 @@ public:
     }
 };
 
-}
+} // namespace nix

@@ -4,7 +4,7 @@
 #include <optional>
 
 #ifndef _WIN32
-# include <sys/resource.h>
+#  include <sys/resource.h>
 #endif
 
 #include "nix/util/types.hh"
@@ -38,4 +38,4 @@ void restoreProcessContext(bool restoreMounts = true);
  */
 std::optional<Path> getSelfExe();
 
-}
+} // namespace nix

@@ -20,7 +20,8 @@ struct RegisterBuiltinBuilder
 {
     typedef std::map<std::string, BuiltinBuilder> BuiltinBuilders;
 
-    static BuiltinBuilders & builtinBuilders() {
+    static BuiltinBuilders & builtinBuilders()
+    {
         static BuiltinBuilders builders;
         return builders;
     }
@@ -31,4 +32,4 @@ struct RegisterBuiltinBuilder
     }
 };
 
-}
+} // namespace nix

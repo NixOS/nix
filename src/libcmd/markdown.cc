@@ -18,25 +18,24 @@ static std::string doRenderMarkdownToTerminal(std::string_view markdown)
 {
     int windowWidth = getWindowSize().second;
 
-#if HAVE_LOWDOWN_1_4
-    struct lowdown_opts_term opts_term {
+#  if HAVE_LOWDOWN_1_4
+    struct lowdown_opts_term opts_term{
         .cols = (size_t) std::max(windowWidth - 5, 60),
         .hmargin = 0,
         .vmargin = 0,
     };
-#endif
-    struct lowdown_opts opts
-    {
+#  endif
+    struct lowdown_opts opts{
         .type = LOWDOWN_TERM,
-#if HAVE_LOWDOWN_1_4
+#  if HAVE_LOWDOWN_1_4
         .term = opts_term,
-#endif
+#  endif
         .maxdepth = 20,
-#if !HAVE_LOWDOWN_1_4
+#  if !HAVE_LOWDOWN_1_4
         .cols = (size_t) std::max(windowWidth - 5, 60),
         .hmargin = 0,
         .vmargin = 0,
-#endif
+#  endif
         .feat = LOWDOWN_COMMONMARK | LOWDOWN_FENCED | LOWDOWN_DEFLIST | LOWDOWN_TABLES,
         .oflags = LOWDOWN_TERM_NOLINK,
     };

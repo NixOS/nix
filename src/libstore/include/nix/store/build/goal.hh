@@ -20,8 +20,9 @@ class Worker;
 typedef std::shared_ptr<Goal> GoalPtr;
 typedef std::weak_ptr<Goal> WeakGoalPtr;
 
-struct CompareGoalPtrs {
-    bool operator() (const GoalPtr & a, const GoalPtr & b) const;
+struct CompareGoalPtrs
+{
+    bool operator()(const GoalPtr & a, const GoalPtr & b) const;
 };
 
 /**
@@ -71,7 +72,7 @@ private:
     Goals waitees;
 
 public:
-    typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters} ExitCode;
+    typedef enum { ecBusy, ecSuccess, ecFailed, ecNoSubstituters } ExitCode;
 
     /**
      * Backlink to the worker.
@@ -116,22 +117,25 @@ public:
      * Suspend our goal and wait until we get `work`-ed again.
      * `co_await`-able by @ref Co.
      */
-    struct Suspend {};
+    struct Suspend
+    {};
 
     /**
      * Return from the current coroutine and suspend our goal
      * if we're not busy anymore, or jump to the next coroutine
      * set to be executed/resumed.
      */
-    struct Return {};
+    struct Return
+    {};
 
     /**
      * `co_return`-ing this will end the goal.
      * If you're not inside a coroutine, you can safely discard this.
      */
-    struct [[nodiscard]] Done {
-        private:
-        Done(){}
+    struct [[nodiscard]] Done
+    {
+    private:
+        Done() {}
 
         friend Goal;
     };
@@ -185,18 +189,24 @@ public:
      *
      * @todo Support returning data natively
      */
-    struct [[nodiscard]] Co {
+    struct [[nodiscard]] Co
+    {
         /**
          * The underlying handle.
          */
         handle_type handle;
 
-        explicit Co(handle_type handle) : handle(handle) {};
-        void operator=(Co&&);
-        Co(Co&& rhs);
+        explicit Co(handle_type handle)
+            : handle(handle) {};
+        void operator=(Co &&);
+        Co(Co && rhs);
         ~Co();
 
-        bool await_ready() { return false; };
+        bool await_ready()
+        {
+            return false;
+        };
+
         /**
          * When we `co_await` another `Co`-returning coroutine,
          * we tell the caller of `caller_coroutine.resume()` to switch to our coroutine (@ref handle).
@@ -217,21 +227,29 @@ public:
      * Used on initial suspend, does the same as `std::suspend_always`,
      * but asserts that everything has been set correctly.
      */
-    struct InitialSuspend {
+    struct InitialSuspend
+    {
         /**
          * Handle of coroutine that does the
          * initial suspend
          */
         handle_type handle;
 
-        bool await_ready() { return false; };
-        void await_suspend(handle_type handle_) {
+        bool await_ready()
+        {
+            return false;
+        };
+
+        void await_suspend(handle_type handle_)
+        {
             handle = handle_;
         }
-        void await_resume() {
+
+        void await_resume()
+        {
             assert(handle);
-            assert(handle.promise().goal); // goal must be set
-            assert(handle.promise().goal->top_co); // top_co of goal must be set
+            assert(handle.promise().goal);                           // goal must be set
+            assert(handle.promise().goal->top_co);                   // top_co of goal must be set
             assert(handle.promise().goal->top_co->handle == handle); // top_co of goal must be us
         }
     };
@@ -240,7 +258,8 @@ public:
      * Promise type for coroutines defined using @ref Co.
      * Attached to coroutine handle.
      */
-    struct promise_type {
+    struct promise_type
+    {
         /**
          * Either this is who called us, or it is who we will tail-call.
          * It is what we "jump" to once we are done.
@@ -251,7 +270,7 @@ public:
          * The goal that we're a part of.
          * Set either in @ref Co::await_suspend or in constructor of @ref Goal.
          */
-        Goal* goal = nullptr;
+        Goal * goal = nullptr;
 
         /**
          * Is set to false when destructed to ensure we don't use a
@@ -262,8 +281,13 @@ public:
         /**
          * The awaiter used by @ref final_suspend.
          */
-        struct final_awaiter {
-            bool await_ready() noexcept { return false; };
+        struct final_awaiter
+        {
+            bool await_ready() noexcept
+            {
+                return false;
+            };
+
             /**
              * Here we execute our continuation, by passing it back to the caller.
              * C++ compiler will create code that takes that and executes it promptly.
@@ -271,7 +295,11 @@ public:
              * thus it must be destroyed.
              */
             std::coroutine_handle<> await_suspend(handle_type h) noexcept;
-            void await_resume() noexcept { assert(false); };
+
+            void await_resume() noexcept
+            {
+                assert(false);
+            };
         };
 
         /**
@@ -285,13 +313,19 @@ public:
          * We use this opportunity to set the @ref goal field
          * and `top_co` field of @ref Goal.
          */
-        InitialSuspend initial_suspend() { return {}; };
+        InitialSuspend initial_suspend()
+        {
+            return {};
+        };
 
         /**
          * Called on `co_return`. Creates @ref final_awaiter which
          * either jumps to continuation or suspends goal.
          */
-        final_awaiter final_suspend() noexcept { return {}; };
+        final_awaiter final_suspend() noexcept
+        {
+            return {};
+        };
 
         /**
          * Does nothing, but provides an opportunity for
@@ -318,24 +352,33 @@ public:
          * the continuation of the new continuation. Thus, the continuation
          * passed to @ref return_value must not have a continuation set.
          */
-        void return_value(Co&&);
+        void return_value(Co &&);
 
         /**
          * If an exception is thrown inside a coroutine,
          * we re-throw it in the context of the "resumer" of the continuation.
          */
-        void unhandled_exception() { throw; };
+        void unhandled_exception()
+        {
+            throw;
+        };
 
         /**
          * Allows awaiting a @ref Co.
          */
-        Co&& await_transform(Co&& co) { return static_cast<Co&&>(co); }
+        Co && await_transform(Co && co)
+        {
+            return static_cast<Co &&>(co);
+        }
 
         /**
          * Allows awaiting a @ref Suspend.
          * Always suspends.
          */
-        std::suspend_always await_transform(Suspend) { return {}; };
+        std::suspend_always await_transform(Suspend)
+        {
+            return {};
+        };
     };
 
 protected:
@@ -356,7 +399,7 @@ protected:
     Done amDone(ExitCode result, std::optional<Error> ex = {});
 
 public:
-    virtual void cleanup() { }
+    virtual void cleanup() {}
 
     /**
      * Project a `BuildResult` with just the information that pertains
@@ -387,7 +430,8 @@ public:
     std::optional<Error> ex;
 
     Goal(Worker & worker, Co init)
-        : worker(worker), top_co(std::move(init))
+        : worker(worker)
+        , top_co(std::move(init))
     {
         // top_co shouldn't have a goal already, should be nullptr.
         assert(!top_co->handle.promise().goal);
@@ -444,9 +488,10 @@ protected:
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);
 
-}
+} // namespace nix
 
 template<typename... ArgTypes>
-struct std::coroutine_traits<nix::Goal::Co, ArgTypes...> {
+struct std::coroutine_traits<nix::Goal::Co, ArgTypes...>
+{
     using promise_type = nix::Goal::promise_type;
 };
