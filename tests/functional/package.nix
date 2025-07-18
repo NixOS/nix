@@ -10,6 +10,11 @@
   jq,
   git,
   mercurial,
+
+  curl,
+  openssl,
+  python3,
+
   util-linux,
   unixtools,
 
@@ -56,6 +61,11 @@ mkMesonDerivation (
         git
         mercurial
         unixtools.script
+
+        # for store tests
+        curl
+        openssl
+        python3
       ]
       ++ lib.optionals stdenv.hostPlatform.isLinux [
         # For various sandboxing tests that needs a statically-linked shell,

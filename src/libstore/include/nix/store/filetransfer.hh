@@ -65,6 +65,8 @@ struct FileTransferRequest
     std::string uri;
     Headers headers;
     std::string expectedETag;
+    Path sslCert;
+    Path sslKey;
     bool verifyTLS = true;
     bool head = false;
     bool post = false;
