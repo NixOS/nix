@@ -213,7 +213,8 @@ private:
 
     std::optional<bool> _useSupplementaryGroups;
 
-    bool useSupplementaryGroupsInner() {
+    bool useSupplementaryGroupsInner()
+    {
         if (!_useSupplementaryGroups.has_value())
             _useSupplementaryGroups = std::optional(useSupplementaryGroups());
         return *_useSupplementaryGroups;
@@ -242,8 +243,8 @@ public:
         return "nixbld";
     };
 
-    gid_t hostGid = (gid_t)-1;
-    uid_t hostUid = (uid_t)-1;
+    gid_t hostGid = (gid_t) -1;
+    uid_t hostUid = (uid_t) -1;
 
     /* Host primary UID and GID. */
     void setPrimaryID(uid_t uid, gid_t gid, uint nrids)

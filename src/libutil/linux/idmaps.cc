@@ -26,7 +26,8 @@ static std::ofstream open_ofstream(const Path & fp)
  * The inverse parameter should be true when writing maps for idmapped mount
  * namespaces: the nsid and host_id are then flipped.
  */
-static void writeIDMap(const pid_t pid, const IDMap & idmap, const IDMapping::T type, bool inverse = false, IDMap::Vec filter = {})
+static void
+writeIDMap(const pid_t pid, const IDMap & idmap, const IDMapping::T type, bool inverse = false, IDMap::Vec filter = {})
 {
     if (type == IDMapping::T::Both) {
         writeIDMap(pid, idmap, IDMapping::T::User, inverse, filter);
@@ -279,9 +280,10 @@ void IDMap::transform(const IDMapping::T type, id_t from, id_t to)
 IDMap::Vec IDMap::collect(const IDMapping::T type, const IDMap::Vec & filter) const
 {
     Vec res;
-    auto matches = [](auto fis, auto q){
+    auto matches = [](auto fis, auto q) {
         for (auto & fi : fis) {
-            if (!fi.contains(q.type)) continue;
+            if (!fi.contains(q.type))
+                continue;
             if ((fi.mapped_id <= q.host_id) && (q.host_id + q.range <= fi.mapped_id + fi.range))
                 return true;
         }
@@ -480,11 +482,12 @@ static IDMap::Vec readIDMapFile(const Path & filename, const IDMapping::T type)
     std::ifstream file(filename);
     if (!file)
         throw SysError("Opening file for reading: %s", filename);
-    Finally finally([&](){ file.close(); });
+    Finally finally([&]() { file.close(); });
     IDMap::Vec result;
     std::string line;
     while (std::getline(file, line)) {
-        if (line.empty()) continue;
+        if (line.empty())
+            continue;
         auto items = tokenizeString<std::vector<std::string>>(line, " \t\n");
         result.insert({type, *string2Int<id_t>(items[1]), *string2Int<id_t>(items[0]), *string2Int<uint>(items[2])});
     }
