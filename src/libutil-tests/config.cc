@@ -176,7 +176,8 @@ namespace nix {
               "description": "description\n",
               "documentDefault": true,
               "value": "value",
-              "experimentalFeature": null
+              "experimentalFeature": null,
+              "jsonSchema": null
             }
           })#"_json);
     }
@@ -203,7 +204,8 @@ namespace nix {
               "description": "description\n",
               "documentDefault": true,
               "value": "value",
-              "experimentalFeature": "flakes"
+              "experimentalFeature": "flakes",
+              "jsonSchema": null
             }
           })#"_json);
     }
@@ -273,6 +275,16 @@ namespace nix {
         config.getSettings(settings);
         ASSERT_FALSE(settings.empty());
         ASSERT_EQ(settings["name-of-the-setting"].value, "second-value");
+    }
+
+    TEST(Config, applyConfigMultiLine) {
+        Config config;
+        std::map<std::string, Config::SettingInfo> settings;
+        Setting<StringSet> setting{&config, {}, "name-of-the-setting", "description"};
+        config.applyConfig("name-of-the-setting = first-value\n  second-value\n");
+        config.getSettings(settings);
+        ASSERT_FALSE(settings.empty());
+        ASSERT_EQ(settings["name-of-the-setting"].value, "first-value second-value");
     }
 
     TEST(Config, applyConfigFailsOnMissingIncludes) {
