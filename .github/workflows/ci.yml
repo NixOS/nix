@@ -81,13 +81,13 @@ jobs:
       with:
         name: installer-${{matrix.os}}
         path: out
-    - name: Serving installer
-      id: serving_installer
-      run: ./scripts/serve-installer-for-github-actions
+    - name: Looking up the installer tarball URL
+      id: installer-tarball-url
+      run: echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
     - uses: cachix/install-nix-action@v31
       with:
-        install_url: 'http://localhost:8126/install'
-        install_options: "--tarball-url-prefix http://localhost:8126/"
+        install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
+        install_options: ${{ format('--tarball-url-prefix {0}', steps.installer-tarball-url.outputs.installer-url) }}
     - run: sudo apt install fish zsh
       if: matrix.os == 'linux'
     - run: brew install fish
