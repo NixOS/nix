@@ -365,18 +365,33 @@ in
 
   nix-cmd = callPackage ../src/libcmd/package.nix { };
 
+  /**
+    The Nix command line interface. Note that this does not include its tests, whereas `nix-everything` does.
+  */
   nix-cli = callPackage ../src/nix/package.nix { version = fineVersion; };
 
   nix-functional-tests = callPackage ../tests/functional/package.nix {
     version = fineVersion;
   };
 
+  /**
+    The manual as would be published on https://nix.dev/reference/nix-manual
+  */
   nix-manual = callPackage ../doc/manual/package.nix { version = fineVersion; };
+  /**
+    Doxygen pages for C++ code
+  */
   nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { version = fineVersion; };
+  /**
+    Doxygen pages for the public C API
+  */
   nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { version = fineVersion; };
 
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
 
+  /**
+    Combined package that has the CLI, libraries, and (assuming non-cross, no overrides) it requires that all tests succeed.
+  */
   nix-everything = callPackage ../packaging/everything.nix { } // {
     # Note: no `passthru.overrideAllMesonComponents` etc
     #       This would propagate into `nix.overrideAttrs f`, but then discard
