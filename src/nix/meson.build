@@ -186,6 +186,7 @@ this_exe = executable(
   include_directories : include_dirs,
   link_args: linker_export_flags,
   install : true,
+  cpp_pch : ['pch/precompiled-headers.hh']
 )
 
 meson.override_find_program('nix', this_exe)
