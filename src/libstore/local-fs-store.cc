@@ -44,7 +44,7 @@ struct LocalStoreAccessor : PosixSourceAccessor
     void requireStoreObject(const CanonPath & path)
     {
         auto [storePath, rest] = store->toStorePath(store->storeDir + path.abs());
-        if (requireValidPath && !store->isValidPath(storePath))
+        if (requireValidPath && !store->maybeQueryPathInfo(storePath))
             throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
     }
 
