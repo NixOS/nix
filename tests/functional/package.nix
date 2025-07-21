@@ -39,6 +39,7 @@ mkMesonDerivation (
 
     workDir = ./.;
     fileset = fileset.unions [
+      ../../nix-meson-build-support
       ../../scripts/nix-profile.sh.in
       ../../.version
       ../../tests/functional
