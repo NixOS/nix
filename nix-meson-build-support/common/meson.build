@@ -18,3 +18,14 @@ add_project_arguments(
   '-Wno-deprecated-declarations',
   language : 'cpp',
 )
+
+# This is a clang-only option for improving build times.
+# It forces the instantiation of templates in the PCH itself and
+# not every translation unit it's included in.
+# It's available starting from clang 11, which is old enough to not
+# bother checking the version.
+# This feature helps in particular with the expensive nlohmann::json template
+# instantiations in libutil and libstore.
+if cxx.get_id() == 'clang'
+  add_project_arguments('-fpch-instantiate-templates', language : 'cpp')
+endif
