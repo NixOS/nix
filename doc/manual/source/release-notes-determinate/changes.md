@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.8.3.<!-- differences -->
+This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.8.4.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -116,3 +116,7 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 * Add an `external-builders` experimental feature by @cole-h in [DeterminateSystems/nix-src#141](https://github.com/DeterminateSystems/nix-src/pull/141)
 
 * Add support for external builders by @edolstra in [DeterminateSystems/nix-src#78](https://github.com/DeterminateSystems/nix-src/pull/78)
+
+<!-- Determinate Nix version 3.8.4 -->
+
+* Revert "Use WAL mode for SQLite cache databases" by @grahamc in [DeterminateSystems/nix-src#155](https://github.com/DeterminateSystems/nix-src/pull/155)
