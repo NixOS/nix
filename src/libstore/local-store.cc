@@ -466,12 +466,11 @@ void LocalStore::openDB(State & state, bool create)
         throw SysError("Nix database directory '%1%' is not writable", dbDir);
 
     /* Open the Nix database. */
-    std::string dbPath = dbDir + "/db.sqlite";
     auto & db(state.db);
     auto openMode = config->readOnly ? SQLiteOpenMode::Immutable
                   : create ? SQLiteOpenMode::Normal
                   : SQLiteOpenMode::NoCreate;
-    state.db = SQLite(dbPath, openMode);
+    state.db = SQLite(std::filesystem::path(dbDir) / "db.sqlite", openMode);
 
 #ifdef __CYGWIN__
     /* The cygwin version of sqlite3 has a patch which calls

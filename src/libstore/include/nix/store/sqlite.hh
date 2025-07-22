@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <filesystem>
 #include <functional>
 #include <string>
 
@@ -39,7 +40,7 @@ struct SQLite
 {
     sqlite3 * db = 0;
     SQLite() { }
-    SQLite(const Path & path, SQLiteOpenMode mode = SQLiteOpenMode::Normal);
+    SQLite(const std::filesystem::path & path, SQLiteOpenMode mode = SQLiteOpenMode::Normal);
     SQLite(const SQLite & from) = delete;
     SQLite& operator = (const SQLite & from) = delete;
     // NOTE: This is noexcept since we are only copying and assigning raw pointers.
