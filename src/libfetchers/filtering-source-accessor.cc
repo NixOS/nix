@@ -68,9 +68,8 @@ std::pair<CanonPath, std::optional<std::string>> FilteringSourceAccessor::getFin
 void FilteringSourceAccessor::checkAccess(const CanonPath & path)
 {
     if (!isAllowed(path))
-        throw makeNotAllowedError
-            ? makeNotAllowedError(path)
-            : RestrictedPathError("access to path '%s' is forbidden", showPath(path));
+        throw makeNotAllowedError ? makeNotAllowedError(path)
+                                  : RestrictedPathError("access to path '%s' is forbidden", showPath(path));
 }
 
 struct AllowListSourceAccessorImpl : AllowListSourceAccessor
@@ -86,13 +85,12 @@ struct AllowListSourceAccessorImpl : AllowListSourceAccessor
         : AllowListSourceAccessor(SourcePath(next), std::move(makeNotAllowedError))
         , allowedPrefixes(std::move(allowedPrefixes))
         , allowedPaths(std::move(allowedPaths))
-    { }
+    {
+    }
 
     bool isAllowed(const CanonPath & path) override
     {
-        return
-            allowedPaths.contains(path)
-            || path.isAllowed(allowedPrefixes);
+        return allowedPaths.contains(path) || path.isAllowed(allowedPrefixes);
     }
 
     void allowPrefix(CanonPath prefix) override
@@ -108,19 +106,17 @@ ref<AllowListSourceAccessor> AllowListSourceAccessor::create(
     MakeNotAllowedError && makeNotAllowedError)
 {
     return make_ref<AllowListSourceAccessorImpl>(
-        next,
-        std::move(allowedPrefixes),
-        std::move(allowedPaths),
-        std::move(makeNotAllowedError));
+        next, std::move(allowedPrefixes), std::move(allowedPaths), std::move(makeNotAllowedError));
 }
 
 bool CachingFilteringSourceAccessor::isAllowed(const CanonPath & path)
 {
     auto i = cache.find(path);
-    if (i != cache.end()) return i->second;
+    if (i != cache.end())
+        return i->second;
     auto res = isAllowedUncached(path);
     cache.emplace(path, res);
     return res;
 }
 
-}
+} // namespace nix

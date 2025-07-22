@@ -14,4 +14,4 @@ namespace nix {
  */
 std::string renderMarkdownToTerminal(std::string_view markdown);
 
-}
+} // namespace nix

@@ -117,4 +117,4 @@ void initPlugins()
     pluginSettings.pluginFiles.pluginsLoaded = true;
 }
 
-}
+} // namespace nix

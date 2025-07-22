@@ -15,11 +15,7 @@ namespace nix {
 using std::map;
 
 /** Used internally */
-void runPostBuildHook(
-    Store & store,
-    Logger & logger,
-    const StorePath & drvPath,
-    const StorePathSet & outputPaths);
+void runPostBuildHook(Store & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
 
 /**
  * A goal for building some or all of the outputs of a derivation.
@@ -76,15 +72,23 @@ struct DerivationGoal : public Goal
 
     std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds;
 
-    DerivationGoal(ref<const SingleDerivedPath> drvReq,
-        const OutputsSpec & wantedOutputs, Worker & worker,
+    DerivationGoal(
+        ref<const SingleDerivedPath> drvReq,
+        const OutputsSpec & wantedOutputs,
+        Worker & worker,
         BuildMode buildMode = bmNormal);
-    DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-        const OutputsSpec & wantedOutputs, Worker & worker,
+    DerivationGoal(
+        const StorePath & drvPath,
+        const BasicDerivation & drv,
+        const OutputsSpec & wantedOutputs,
+        Worker & worker,
         BuildMode buildMode = bmNormal);
     ~DerivationGoal() = default;
 
-    void timedOut(Error && ex) override { unreachable(); };
+    void timedOut(Error && ex) override
+    {
+        unreachable();
+    };
 
     std::string key() override;
 
@@ -129,9 +133,10 @@ struct DerivationGoal : public Goal
         SingleDrvOutputs builtOutputs = {},
         std::optional<Error> ex = {});
 
-    JobCategory jobCategory() const override {
+    JobCategory jobCategory() const override
+    {
         return JobCategory::Administration;
     };
 };
 
-}
+} // namespace nix

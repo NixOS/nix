@@ -1,4 +1,5 @@
 #pragma once
+
 ///@file
 
 namespace nix {
@@ -8,4 +9,4 @@ namespace nix {
  */
 void commonChildInit();
 
-}
+} // namespace nix

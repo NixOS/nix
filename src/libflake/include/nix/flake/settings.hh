@@ -42,4 +42,4 @@ struct Settings : public Config
         true};
 };
 
-}
+} // namespace nix::flake

@@ -497,4 +497,4 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
     });
 };
 
-}
+} // namespace nix

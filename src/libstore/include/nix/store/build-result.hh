@@ -51,29 +51,44 @@ struct BuildResult
     static std::string_view statusToString(Status status)
     {
         switch (status) {
-        case Built: return "Built";
-        case Substituted: return "Substituted";
-        case AlreadyValid: return "AlreadyValid";
-        case PermanentFailure: return "PermanentFailure";
-        case InputRejected: return "InputRejected";
-        case OutputRejected: return "OutputRejected";
-        case TransientFailure: return "TransientFailure";
-        case CachedFailure: return "CachedFailure";
-        case TimedOut: return "TimedOut";
-        case MiscFailure: return "MiscFailure";
-        case DependencyFailed: return "DependencyFailed";
-        case LogLimitExceeded: return "LogLimitExceeded";
-        case NotDeterministic: return "NotDeterministic";
-        case ResolvesToAlreadyValid: return "ResolvesToAlreadyValid";
-        case NoSubstituters: return "NoSubstituters";
-        default: return "Unknown";
+        case Built:
+            return "Built";
+        case Substituted:
+            return "Substituted";
+        case AlreadyValid:
+            return "AlreadyValid";
+        case PermanentFailure:
+            return "PermanentFailure";
+        case InputRejected:
+            return "InputRejected";
+        case OutputRejected:
+            return "OutputRejected";
+        case TransientFailure:
+            return "TransientFailure";
+        case CachedFailure:
+            return "CachedFailure";
+        case TimedOut:
+            return "TimedOut";
+        case MiscFailure:
+            return "MiscFailure";
+        case DependencyFailed:
+            return "DependencyFailed";
+        case LogLimitExceeded:
+            return "LogLimitExceeded";
+        case NotDeterministic:
+            return "NotDeterministic";
+        case ResolvesToAlreadyValid:
+            return "ResolvesToAlreadyValid";
+        case NoSubstituters:
+            return "NoSubstituters";
+        default:
+            return "Unknown";
         };
     }
 
-    std::string toString() const {
-        return
-            std::string(statusToString(status))
-            + ((errorMsg == "") ? "" : " : " + errorMsg);
+    std::string toString() const
+    {
+        return std::string(statusToString(status)) + ((errorMsg == "") ? "" : " : " + errorMsg);
     }
 
     /**
@@ -106,8 +121,8 @@ struct BuildResult
      */
     std::optional<std::chrono::microseconds> cpuUser, cpuSystem;
 
-    bool operator ==(const BuildResult &) const noexcept;
-    std::strong_ordering operator <=>(const BuildResult &) const noexcept;
+    bool operator==(const BuildResult &) const noexcept;
+    std::strong_ordering operator<=>(const BuildResult &) const noexcept;
 
     bool success()
     {
@@ -132,11 +147,13 @@ struct KeyedBuildResult : BuildResult
 
     // Hack to work around a gcc "may be used uninitialized" warning.
     KeyedBuildResult(BuildResult res, DerivedPath path)
-        : BuildResult(std::move(res)), path(std::move(path))
-    { }
+        : BuildResult(std::move(res))
+        , path(std::move(path))
+    {
+    }
 };
 
 void to_json(nlohmann::json & json, const BuildResult & buildResult);
 void to_json(nlohmann::json & json, const KeyedBuildResult & buildResult);
 
-}
+} // namespace nix
