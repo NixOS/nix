@@ -8,5 +8,3 @@ namespace nix::linux {
 void setPersonality(std::string_view system);
 
 }
-
-

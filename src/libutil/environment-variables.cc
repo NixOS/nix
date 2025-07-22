@@ -48,4 +48,4 @@ void replaceEnv(const StringMap & newEnv)
         setEnv(newEnvVar.first.c_str(), newEnvVar.second.c_str());
 }
 
-}
+} // namespace nix

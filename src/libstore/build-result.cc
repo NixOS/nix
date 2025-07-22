@@ -46,4 +46,4 @@ void to_json(nlohmann::json & json, const KeyedBuildResult & buildResult)
     json["path"] = std::move(path);
 }
 
-}
+} // namespace nix

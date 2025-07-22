@@ -105,4 +105,4 @@ ref<MountedSourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<Sou
     return make_ref<MountedSourceAccessorImpl>(std::move(mounts));
 }
 
-}
+} // namespace nix

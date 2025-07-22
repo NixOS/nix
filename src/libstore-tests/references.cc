@@ -42,4 +42,4 @@ TEST(references, scan)
     }
 }
 
-}
+} // namespace nix

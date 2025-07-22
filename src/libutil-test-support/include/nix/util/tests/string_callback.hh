@@ -12,4 +12,4 @@ inline void * observe_string_cb_data(std::string & out)
 
 #define OBSERVE_STRING(str) nix::testing::observe_string_cb, nix::testing::observe_string_cb_data(str)
 
-}
+} // namespace nix::testing

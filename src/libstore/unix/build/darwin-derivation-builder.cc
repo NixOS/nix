@@ -204,6 +204,6 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
     }
 };
 
-}
+} // namespace nix
 
 #endif

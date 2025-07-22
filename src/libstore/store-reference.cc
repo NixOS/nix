@@ -113,4 +113,4 @@ std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::stri
     return {uri, params};
 }
 
-}
+} // namespace nix

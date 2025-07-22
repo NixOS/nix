@@ -15,4 +15,4 @@ std::map<std::string, nlohmann::json> BaseSetting<T>::toJSONObject() const
     obj.emplace("documentDefault", documentDefault);
     return obj;
 }
-}
+} // namespace nix

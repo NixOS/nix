@@ -130,6 +130,6 @@ struct S3BinaryCacheStore : virtual BinaryCacheStore
     virtual const Stats & getS3Stats() = 0;
 };
 
-}
+} // namespace nix
 
 #endif

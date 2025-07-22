@@ -54,4 +54,4 @@ struct ForwardingSourceAccessor : SourceAccessor
     }
 };
 
-}
+} // namespace nix
