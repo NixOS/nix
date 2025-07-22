@@ -69,10 +69,10 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        Path cacheDir = getCacheDir() + "/eval-cache-v5";
+        auto cacheDir = std::filesystem::path(getCacheDir()) / "eval-cache-v5";
         createDirs(cacheDir);
 
-        Path dbPath = cacheDir + "/" + fingerprint.to_string(HashFormat::Base16, false) + ".sqlite";
+        auto dbPath = cacheDir / (fingerprint.to_string(HashFormat::Base16, false) + ".sqlite");
 
         state->db = SQLite(dbPath);
         state->db.isCache();
