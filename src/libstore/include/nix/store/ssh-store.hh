@@ -60,4 +60,4 @@ struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfi
     ref<Store> openStore() const override;
 };
 
-}
+} // namespace nix

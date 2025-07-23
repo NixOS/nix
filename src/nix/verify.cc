@@ -57,8 +57,8 @@ struct CmdVerify : StorePathsCommand
     std::string doc() override
     {
         return
-          #include "verify.md"
-          ;
+#include "verify.md"
+            ;
     }
 
     void run(ref<Store> store, StorePaths && storePaths) override
@@ -77,9 +77,7 @@ struct CmdVerify : StorePathsCommand
         std::atomic<size_t> failed{0};
         std::atomic<size_t> active{0};
 
-        auto update = [&]() {
-            act.progress(done, storePaths.size(), active, failed);
-        };
+        auto update = [&]() { act.progress(done, storePaths.size(), active, failed); };
 
         ThreadPool pool;
 
@@ -108,7 +106,8 @@ struct CmdVerify : StorePathsCommand
                     if (hash.first != info->narHash) {
                         corrupted++;
                         act2.result(resCorruptedPath, store->printStorePath(info->path));
-                        printError("path '%s' was modified! expected hash '%s', got '%s'",
+                        printError(
+                            "path '%s' was modified! expected hash '%s', got '%s'",
                             store->printStorePath(info->path),
                             info->narHash.to_string(HashFormat::Nix32, true),
                             hash.first.to_string(HashFormat::Nix32, true));
@@ -130,21 +129,25 @@ struct CmdVerify : StorePathsCommand
 
                         auto doSigs = [&](StringSet sigs) {
                             for (const auto & sig : sigs) {
-                                if (!sigsSeen.insert(sig).second) continue;
+                                if (!sigsSeen.insert(sig).second)
+                                    continue;
                                 if (validSigs < ValidPathInfo::maxSigs && info->checkSignature(*store, publicKeys, sig))
                                     validSigs++;
                             }
                         };
 
-                        if (info->isContentAddressed(*store)) validSigs = ValidPathInfo::maxSigs;
+                        if (info->isContentAddressed(*store))
+                            validSigs = ValidPathInfo::maxSigs;
 
                         doSigs(info->sigs);
 
                         for (auto & store2 : substituters) {
-                            if (validSigs >= actualSigsNeeded) break;
+                            if (validSigs >= actualSigsNeeded)
+                                break;
                             try {
                                 auto info2 = store2->queryPathInfo(info->path);
-                                if (info2->isContentAddressed(*store)) validSigs = ValidPathInfo::maxSigs;
+                                if (info2->isContentAddressed(*store))
+                                    validSigs = ValidPathInfo::maxSigs;
                                 doSigs(info2->sigs);
                             } catch (InvalidPath &) {
                             } catch (Error & e) {
@@ -161,7 +164,6 @@ struct CmdVerify : StorePathsCommand
                         act2.result(resUntrustedPath, store->printStorePath(info->path));
                         printError("path '%s' is untrusted", store->printStorePath(info->path));
                     }
-
                 }
 
                 done++;
@@ -179,10 +181,7 @@ struct CmdVerify : StorePathsCommand
 
         pool.process();
 
-        throw Exit(
-            (corrupted ? 1 : 0) |
-            (untrusted ? 2 : 0) |
-            (failed ? 4 : 0));
+        throw Exit((corrupted ? 1 : 0) | (untrusted ? 2 : 0) | (failed ? 4 : 0));
     }
 };
 

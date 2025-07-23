@@ -18,6 +18,7 @@ protected:
         state = nix_state_create(nullptr, nullptr, store);
         value = nix_alloc_value(nullptr, state);
     }
+
     ~nix_api_expr_test()
     {
         nix_gc_decref(nullptr, value);
@@ -28,4 +29,4 @@ protected:
     nix_value * value;
 };
 
-}
+} // namespace nixC

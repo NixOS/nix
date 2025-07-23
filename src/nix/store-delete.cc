@@ -9,7 +9,7 @@ using namespace nix;
 
 struct CmdStoreDelete : StorePathsCommand
 {
-    GCOptions options { .action = GCOptions::gcDeleteSpecific };
+    GCOptions options{.action = GCOptions::gcDeleteSpecific};
 
     CmdStoreDelete()
     {
@@ -28,8 +28,8 @@ struct CmdStoreDelete : StorePathsCommand
     std::string doc() override
     {
         return
-          #include "store-delete.md"
-          ;
+#include "store-delete.md"
+            ;
     }
 
     void run(ref<Store> store, StorePaths && storePaths) override

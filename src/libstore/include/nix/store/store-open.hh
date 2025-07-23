@@ -40,4 +40,4 @@ ref<Store> openStore(
  */
 std::list<ref<Store>> getDefaultSubstituters();
 
-}
+} // namespace nix

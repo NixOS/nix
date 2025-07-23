@@ -11,9 +11,18 @@ class Exit : public std::exception
 {
 public:
     int status;
-    Exit() : status(0) { }
-    explicit Exit(int status) : status(status) { }
+
+    Exit()
+        : status(0)
+    {
+    }
+
+    explicit Exit(int status)
+        : status(status)
+    {
+    }
+
     virtual ~Exit();
 };
 
-}
+} // namespace nix
