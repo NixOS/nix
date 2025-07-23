@@ -212,6 +212,14 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
    lowdown. */
 static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 {
+    // Check for aliases if subcommand has exactly one element
+    if (subcommand.size() == 1) {
+        auto alias = toplevel.aliases.find(subcommand[0]);
+        if (alias != toplevel.aliases.end()) {
+            subcommand = alias->second.replacement;
+        }
+    }
+
     auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
 
     evalSettings.restrictEval = false;
