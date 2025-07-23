@@ -91,4 +91,4 @@ ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && 
     return make_ref<UnionSourceAccessor>(std::move(accessors));
 }
 
-}
+} // namespace nix

@@ -60,4 +60,4 @@ SymbolStr::SymbolStr(const SymbolStr::Key & key)
     this->s = v;
 }
 
-}
+} // namespace nix

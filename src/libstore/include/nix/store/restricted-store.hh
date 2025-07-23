@@ -57,4 +57,4 @@ struct RestrictionContext
  */
 ref<Store> makeRestrictedStore(ref<LocalStore::Config> config, ref<LocalStore> next, RestrictionContext & context);
 
-}
+} // namespace nix

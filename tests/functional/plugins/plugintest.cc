@@ -5,8 +5,7 @@ using namespace nix;
 
 struct MySettings : Config
 {
-    Setting<bool> settingSet{this, false, "setting-set",
-        "Whether the plugin-defined setting was set"};
+    Setting<bool> settingSet{this, false, "setting-set", "Whether the plugin-defined setting was set"};
 };
 
 MySettings mySettings;

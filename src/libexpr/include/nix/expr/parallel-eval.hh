@@ -74,4 +74,4 @@ struct FutureVector
     void finishAll();
 };
 
-}
+} // namespace nix

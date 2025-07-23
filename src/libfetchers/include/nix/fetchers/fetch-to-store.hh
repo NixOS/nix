@@ -37,4 +37,4 @@ std::pair<StorePath, Hash> fetchToStore2(
 fetchers::Cache::Key
 makeSourcePathToHashCacheKey(const std::string & fingerprint, ContentAddressMethod method, const std::string & path);
 
-}
+} // namespace nix

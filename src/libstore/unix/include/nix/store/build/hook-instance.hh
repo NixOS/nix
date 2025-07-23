@@ -38,4 +38,4 @@ struct HookInstance
     ~HookInstance();
 };
 
-}
+} // namespace nix

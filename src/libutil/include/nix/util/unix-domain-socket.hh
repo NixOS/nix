@@ -92,4 +92,4 @@ AutoCloseFD connect(const std::filesystem::path & path);
  */
 AutoCloseFD connect(const std::filesystem::path & path);
 
-}
+} // namespace nix

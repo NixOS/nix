@@ -23,10 +23,10 @@ inline void * allocBytes(size_t n)
 #else
     p = calloc(n, 1);
 #endif
-    if (!p) throw std::bad_alloc();
+    if (!p)
+        throw std::bad_alloc();
     return p;
 }
-
 
 [[gnu::always_inline]]
 Value * EvalState::allocValue()
@@ -36,11 +36,13 @@ Value * EvalState::allocValue()
        GC_malloc_many returns a linked list of objects of the given size, where the first word
        of each object is also the pointer to the next object in the list. This also means that we
        have to explicitly clear the first word of every object we take. */
-    thread_local static std::shared_ptr<void *> valueAllocCache{std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
+    thread_local static std::shared_ptr<void *> valueAllocCache{
+        std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
 
     if (!*valueAllocCache) {
         *valueAllocCache = GC_malloc_many(sizeof(Value));
-        if (!*valueAllocCache) throw std::bad_alloc();
+        if (!*valueAllocCache)
+            throw std::bad_alloc();
     }
 
     /* GC_NEXT is a convenience macro for accessing the first word of an object.
@@ -56,7 +58,6 @@ Value * EvalState::allocValue()
     return (Value *) p;
 }
 
-
 [[gnu::always_inline]]
 Env & EvalState::allocEnv(size_t size)
 {
@@ -68,11 +69,13 @@ Env & EvalState::allocEnv(size_t size)
 #if NIX_USE_BOEHMGC
     if (size == 1) {
         /* see allocValue for explanations. */
-        thread_local static std::shared_ptr<void *> env1AllocCache{std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
+        thread_local static std::shared_ptr<void *> env1AllocCache{
+            std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
 
         if (!*env1AllocCache) {
             *env1AllocCache = GC_malloc_many(sizeof(Env) + sizeof(Value *));
-            if (!*env1AllocCache) throw std::bad_alloc();
+            if (!*env1AllocCache)
+                throw std::bad_alloc();
         }
 
         void * p = *env1AllocCache;
@@ -88,9 +91,9 @@ Env & EvalState::allocEnv(size_t size)
     return *env;
 }
 
-
 template<std::size_t ptrSize>
-void ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<ptrSize>>>::force(EvalState & state, PosIdx pos)
+void ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<ptrSize>>>::force(
+    EvalState & state, PosIdx pos)
 {
     // FIXME: check that the compiler won't reorder this below the
     // load of p0.
@@ -135,11 +138,10 @@ void ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<ptr
     else if (pd == pdPending || pd == pdAwaited)
         p0_ = waitOnThunk(state, pd == pdAwaited);
 
- done:
+done:
     if (InternalType(p0_ & 0xff) == tFailed)
         std::rethrow_exception((std::bit_cast<Failed *>(p1))->ex);
 }
-
 
 [[gnu::always_inline]]
 inline void EvalState::forceAttrs(Value & v, const PosIdx pos, std::string_view errorCtx)
@@ -147,42 +149,37 @@ inline void EvalState::forceAttrs(Value & v, const PosIdx pos, std::string_view 
     forceAttrs(v, [&]() { return pos; }, errorCtx);
 }
 
-
-template <typename Callable>
+template<typename Callable>
 [[gnu::always_inline]]
 inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view errorCtx)
 {
     PosIdx pos = getPos();
     forceValue(v, pos);
     if (v.type() != nAttrs) {
-        error<TypeError>(
-            "expected a set but found %1%: %2%",
-            showType(v),
-            ValuePrinter(*this, v, errorPrintOptions)
-        ).withTrace(pos, errorCtx).debugThrow();
+        error<TypeError>("expected a set but found %1%: %2%", showType(v), ValuePrinter(*this, v, errorPrintOptions))
+            .withTrace(pos, errorCtx)
+            .debugThrow();
     }
 }
-
 
 [[gnu::always_inline]]
 inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view errorCtx)
 {
     forceValue(v, pos);
     if (!v.isList()) {
-        error<TypeError>(
-            "expected a list but found %1%: %2%",
-            showType(v),
-            ValuePrinter(*this, v, errorPrintOptions)
-        ).withTrace(pos, errorCtx).debugThrow();
+        error<TypeError>("expected a list but found %1%: %2%", showType(v), ValuePrinter(*this, v, errorPrintOptions))
+            .withTrace(pos, errorCtx)
+            .debugThrow();
     }
 }
 
 [[gnu::always_inline]]
-inline CallDepth EvalState::addCallDepth(const PosIdx pos) {
+inline CallDepth EvalState::addCallDepth(const PosIdx pos)
+{
     if (callDepth > settings.maxCallDepth)
         error<EvalBaseError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
 
     return CallDepth(callDepth);
 };
 
-}
+} // namespace nix

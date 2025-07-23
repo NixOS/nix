@@ -73,4 +73,4 @@ ref<InputCache> InputCache::create()
     return make_ref<InputCacheImpl>();
 }
 
-}
+} // namespace nix::fetchers

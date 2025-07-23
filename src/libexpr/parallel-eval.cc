@@ -221,4 +221,4 @@ void ValueStorage<sizeof(void *)>::notifyWaiters()
     domain->cv.notify_all();
 }
 
-}
+} // namespace nix

@@ -296,4 +296,4 @@ void peeksort(Iter begin, Iter end, Comparator comp = {})
     peeksortImpl(peeksortImpl, begin, end, /*leftRunEnd=*/begin, /*rightRunBegin=*/end);
 }
 
-}
+} // namespace nix

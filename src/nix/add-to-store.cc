@@ -35,15 +35,13 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
     void run(ref<Store> store) override
     {
-        if (!namePart) namePart = baseNameOf(path);
+        if (!namePart)
+            namePart = baseNameOf(path);
 
         auto sourcePath = PosixSourceAccessor::createAtRoot(makeParentCanonical(path));
 
-        auto storePath = dryRun
-            ? store->computeStorePath(
-                *namePart, sourcePath, caMethod, hashAlgo, {}).first
-            : store->addToStoreSlow(
-                *namePart, sourcePath, caMethod, hashAlgo, {}).path;
+        auto storePath = dryRun ? store->computeStorePath(*namePart, sourcePath, caMethod, hashAlgo, {}).first
+                                : store->addToStoreSlow(*namePart, sourcePath, caMethod, hashAlgo, {}).path;
 
         logger->cout("%s", store->printStorePath(storePath));
     }
@@ -59,8 +57,8 @@ struct CmdAdd : CmdAddToStore
     std::string doc() override
     {
         return
-          #include "add.md"
-          ;
+#include "add.md"
+            ;
     }
 };
 

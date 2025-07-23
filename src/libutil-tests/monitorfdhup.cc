@@ -17,6 +17,6 @@ TEST(MonitorFdHup, shouldNotBlock)
         MonitorFdHup monitor(p.readSide.get());
     }
 }
-}
+} // namespace nix
 
 #endif

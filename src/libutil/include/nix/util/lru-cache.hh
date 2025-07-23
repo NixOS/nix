@@ -141,4 +141,4 @@ public:
     }
 };
 
-}
+} // namespace nix

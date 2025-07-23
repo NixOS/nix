@@ -31,4 +31,4 @@ static inline std::string list(std::string_view a)
     return ss.str();
 }
 
-}
+} // namespace nix::regex

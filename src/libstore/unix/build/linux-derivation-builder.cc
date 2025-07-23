@@ -878,6 +878,6 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
     }
 };
 
-}
+} // namespace nix
 
 #endif

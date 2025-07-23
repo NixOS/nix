@@ -49,16 +49,32 @@ private:
     /// The offset of the symbol in `SymbolTable::arena`.
     uint32_t id;
 
-    explicit Symbol(uint32_t id) noexcept : id(id) {}
+    explicit Symbol(uint32_t id) noexcept
+        : id(id)
+    {
+    }
 
 public:
-    Symbol() noexcept : id(0) {}
+    Symbol() noexcept
+        : id(0)
+    {
+    }
 
     [[gnu::always_inline]]
-    explicit operator bool() const noexcept { return id > 0; }
+    explicit operator bool() const noexcept
+    {
+        return id > 0;
+    }
 
-    auto operator<=>(const Symbol other) const noexcept { return id <=> other.id; }
-    bool operator==(const Symbol other) const noexcept { return id == other.id; }
+    auto operator<=>(const Symbol other) const noexcept
+    {
+        return id <=> other.id;
+    }
+
+    bool operator==(const Symbol other) const noexcept
+    {
+        return id == other.id;
+    }
 
     friend class std::hash<Symbol>;
 };
@@ -85,15 +101,20 @@ class SymbolStr
         Key(std::string_view s, ContiguousArena & arena)
             : s(s)
             , hash(HashType{}(s))
-            , arena(arena) {}
+            , arena(arena)
+        {
+        }
     };
 
 public:
-    SymbolStr(const SymbolValue & s) noexcept : s(&s) {}
+    SymbolStr(const SymbolValue & s) noexcept
+        : s(&s)
+    {
+    }
 
     SymbolStr(const Key & key);
 
-    bool operator == (std::string_view s2) const noexcept
+    bool operator==(std::string_view s2) const noexcept
     {
         return *s == s2;
     }
@@ -104,13 +125,12 @@ public:
         return s->c_str();
     }
 
-    [[gnu::always_inline]]
-    operator std::string_view () const noexcept
+    [[gnu::always_inline]] operator std::string_view() const noexcept
     {
         return *s;
     }
 
-    friend std::ostream & operator <<(std::ostream & os, const SymbolStr & symbol);
+    friend std::ostream & operator<<(std::ostream & os, const SymbolStr & symbol);
 
     [[gnu::always_inline]]
     bool empty() const noexcept
@@ -217,7 +237,7 @@ public:
     {
         if (s.id == 0 || s.id > arena.size)
             unreachable();
-        return SymbolStr(* (SymbolValue *) (arena.data + s.id));
+        return SymbolStr(*(SymbolValue *) (arena.data + s.id));
     }
 
     size_t size() const noexcept
@@ -233,8 +253,8 @@ public:
     template<typename T>
     void dump(T callback) const
     {
-        // FIXME
-        #if 0
+// FIXME
+#if 0
         std::string_view left{arena.data, arena.size};
         while (!left.empty()) {
             auto p = left.find((char) 0);
@@ -242,11 +262,11 @@ public:
             callback(left.substr(0, p));
             left = left.substr(p + 1);
         }
-        #endif
+#endif
     }
 };
 
-}
+} // namespace nix
 
 template<>
 struct std::hash<nix::Symbol>

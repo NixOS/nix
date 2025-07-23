@@ -13,12 +13,12 @@ namespace nix {
 
 #ifdef __linux__
 
-static std::vector<gid_t> get_group_list(const char *username, gid_t group_id)
+static std::vector<gid_t> get_group_list(const char * username, gid_t group_id)
 {
     std::vector<gid_t> gids;
     gids.resize(32); // Initial guess
 
-    auto getgroupl_failed {[&] {
+    auto getgroupl_failed{[&] {
         int ngroups = gids.size();
         int err = getgrouplist(username, group_id, gids.data(), &ngroups);
         gids.resize(ngroups);
@@ -35,7 +35,6 @@ static std::vector<gid_t> get_group_list(const char *username, gid_t group_id)
 }
 #endif
 
-
 struct SimpleUserLock : UserLock
 {
     AutoCloseFD fdUserLock;
@@ -43,11 +42,27 @@ struct SimpleUserLock : UserLock
     gid_t gid;
     std::vector<gid_t> supplementaryGIDs;
 
-    uid_t getUID() override { assert(uid); return uid; }
-    uid_t getUIDCount() override { return 1; }
-    gid_t getGID() override { assert(gid); return gid; }
+    uid_t getUID() override
+    {
+        assert(uid);
+        return uid;
+    }
 
-    std::vector<gid_t> getSupplementaryGIDs() override { return supplementaryGIDs; }
+    uid_t getUIDCount() override
+    {
+        return 1;
+    }
+
+    gid_t getGID() override
+    {
+        assert(gid);
+        return gid;
+    }
+
+    std::vector<gid_t> getSupplementaryGIDs() override
+    {
+        return supplementaryGIDs;
+    }
 
     static std::unique_ptr<UserLock> acquire()
     {
@@ -61,7 +76,7 @@ struct SimpleUserLock : UserLock
 
         /* Copy the result of getgrnam. */
         Strings users;
-        for (char * * p = gr->gr_mem; *p; ++p) {
+        for (char ** p = gr->gr_mem; *p; ++p) {
             debug("found build user '%s'", *p);
             users.push_back(*p);
         }
@@ -78,7 +93,7 @@ struct SimpleUserLock : UserLock
             if (!pw)
                 throw Error("the user '%s' in the group '%s' does not exist", i, settings.buildUsersGroup);
 
-            auto fnUserLock = fmt("%s/userpool/%s", settings.nixStateDir,pw->pw_uid);
+            auto fnUserLock = fmt("%s/userpool/%s", settings.nixStateDir, pw->pw_uid);
 
             AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
             if (!fd)
@@ -95,7 +110,7 @@ struct SimpleUserLock : UserLock
                 if (lock->uid == getuid() || lock->uid == geteuid())
                     throw Error("the Nix user should not be a member of '%s'", settings.buildUsersGroup);
 
-                #ifdef __linux__
+#ifdef __linux__
                 /* Get the list of supplementary groups of this user. This is
                  * usually either empty or contains a group such as "kvm". */
 
@@ -104,7 +119,7 @@ struct SimpleUserLock : UserLock
                     if (gid != lock->gid)
                         lock->supplementaryGIDs.push_back(gid);
                 }
-                #endif
+#endif
 
                 return lock;
             }
@@ -121,19 +136,33 @@ struct AutoUserLock : UserLock
     gid_t firstGid = 0;
     uid_t nrIds = 1;
 
-    uid_t getUID() override { assert(firstUid); return firstUid; }
+    uid_t getUID() override
+    {
+        assert(firstUid);
+        return firstUid;
+    }
 
-    gid_t getUIDCount() override { return nrIds; }
+    gid_t getUIDCount() override
+    {
+        return nrIds;
+    }
 
-    gid_t getGID() override { assert(firstGid); return firstGid; }
+    gid_t getGID() override
+    {
+        assert(firstGid);
+        return firstGid;
+    }
 
-    std::vector<gid_t> getSupplementaryGIDs() override { return {}; }
+    std::vector<gid_t> getSupplementaryGIDs() override
+    {
+        return {};
+    }
 
     static std::unique_ptr<UserLock> acquire(uid_t nrIds, bool useUserNamespace)
     {
-        #if !defined(__linux__)
+#if !defined(__linux__)
         useUserNamespace = false;
-        #endif
+#endif
 
         experimentalFeatureSettings.require(Xp::AutoAllocateUids);
         assert(settings.startId > 0);
@@ -172,7 +201,8 @@ struct AutoUserLock : UserLock
                 else {
                     struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
                     if (!gr)
-                        throw Error("the group '%s' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
+                        throw Error(
+                            "the group '%s' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
                     lock->firstGid = gr->gr_gid;
                 }
                 lock->nrIds = nrIds;
@@ -194,15 +224,15 @@ std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useUserNamespace)
 
 bool useBuildUsers()
 {
-    #ifdef __linux__
+#ifdef __linux__
     static bool b = (settings.buildUsersGroup != "" || settings.autoAllocateUids) && isRootUser();
     return b;
-    #elif defined(__APPLE__) || defined(__FreeBSD__)
+#elif defined(__APPLE__) || defined(__FreeBSD__)
     static bool b = settings.buildUsersGroup != "" && isRootUser();
     return b;
-    #else
+#else
     return false;
-    #endif
+#endif
 }
 
-}
+} // namespace nix
