@@ -13,10 +13,13 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v31
+    - uses: ./.github/actions/install-nix-action
       with:
-        install_url: "https://releases.nixos.org/nix/nix-2.29.1/install"
-    - run: nix --experimental-features 'nix-command flakes' flake show --all-systems --json
+        dogfood: true
+        extra_nix_config:
+          experimental-features = nix-command flakes
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+    - run: nix flake show --all-systems --json
 
   tests:
     strategy:
@@ -36,9 +39,10 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v31
+    - uses: ./.github/actions/install-nix-action
       with:
-        install_url: "https://releases.nixos.org/nix/nix-2.29.1/install"
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        dogfood: true
         # The sandbox would otherwise be disabled by default on Darwin
         extra_nix_config: |
           sandbox = true
@@ -178,7 +182,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: ./.github/actions/install-nix-action
+        with:
+          dogfood: true
+          extra_nix_config:
+            experimental-features = nix-command flakes
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: |
           nix build -L \
@@ -204,6 +213,11 @@ jobs:
         with:
           repository: NixOS/flake-regressions-data
           path: flake-regressions/tests
-      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: ./.github/actions/install-nix-action
+        with:
+          dogfood: true
+          extra_nix_config:
+            experimental-features = nix-command flakes
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=25 flake-regressions/eval-all.sh

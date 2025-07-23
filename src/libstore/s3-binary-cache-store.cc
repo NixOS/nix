@@ -289,8 +289,6 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
         , s3Helper(config->profile, config->region, config->scheme, config->endpoint)
     {
         diskCache = getNarInfoDiskCache();
-
-        init();
     }
 
     std::string getUri() override
@@ -597,10 +595,12 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
 
 ref<Store> S3BinaryCacheStoreImpl::Config::openStore() const
 {
-    return make_ref<S3BinaryCacheStoreImpl>(ref{
+    auto store = make_ref<S3BinaryCacheStoreImpl>(ref{
         // FIXME we shouldn't actually need a mutable config
         std::const_pointer_cast<S3BinaryCacheStore::Config>(shared_from_this())
     });
+    store->init();
+    return store;
 }
 
 static RegisterStoreImplementation<S3BinaryCacheStoreImpl::Config> regS3BinaryCacheStore;

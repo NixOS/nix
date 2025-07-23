@@ -8,6 +8,7 @@ nix = find_program('nix', native : true)
 
 mdbook = find_program('mdbook', native : true)
 bash = find_program('bash', native : true)
+rsync = find_program('rsync', required: true, native: true)
 
 pymod = import('python')
 python = pymod.find_installation('python3')
@@ -84,7 +85,7 @@ manual = custom_target(
         @0@ @INPUT0@ @CURRENT_SOURCE_DIR@ > @DEPFILE@
         @0@ @INPUT1@ summary @2@ < @CURRENT_SOURCE_DIR@/source/SUMMARY.md.in > @2@/source/SUMMARY.md
         sed -e 's|@version@|@3@|g' < @INPUT2@ > @2@/book.toml
-        rsync -r --include='*.md' @CURRENT_SOURCE_DIR@/ @2@/
+        @4@ -r --include='*.md' @CURRENT_SOURCE_DIR@/ @2@/
         (cd @2@; RUST_LOG=warn @1@ build -d @2@ 3>&2 2>&1 1>&3) | { grep -Fv "because fragment resolution isn't implemented" || :; } 3>&2 2>&1 1>&3
         rm -rf @2@/manual
         mv @2@/html @2@/manual
@@ -94,6 +95,7 @@ manual = custom_target(
       mdbook.full_path(),
       meson.current_build_dir(),
       meson.project_version(),
+      rsync.full_path(),
     ),
   ],
   input : [

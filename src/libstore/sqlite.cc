@@ -250,7 +250,7 @@ void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
     if (now > nextWarning) {
         nextWarning = now + 10;
         logWarning({
-            .msg = HintFmt(e.what())
+            .msg = e.info().msg
         });
     }
 
