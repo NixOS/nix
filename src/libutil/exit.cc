@@ -4,4 +4,4 @@ namespace nix {
 
 Exit::~Exit() {}
 
-}
+} // namespace nix

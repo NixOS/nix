@@ -21,7 +21,7 @@ struct Arbitrary<nix::checked::Checked<T>>
     }
 };
 
-}
+} // namespace rc
 
 namespace nix::checked {
 
@@ -155,4 +155,4 @@ TEST(Checked, div_signed_special_cases)
     checkDivision<int16_t, int64_t>(0, 0);
 }
 
-}
+} // namespace nix::checked

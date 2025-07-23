@@ -36,4 +36,4 @@ std::filesystem::path getNixBin(std::optional<std::string_view> binaryNameOpt)
     return getBinaryName();
 }
 
-}
+} // namespace nix

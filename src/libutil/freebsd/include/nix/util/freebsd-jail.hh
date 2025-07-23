@@ -17,4 +17,4 @@ public:
     void reset(int j);
 };
 
-}
+} // namespace nix

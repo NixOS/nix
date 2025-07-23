@@ -102,4 +102,4 @@ Implementations::Map & Implementations::registered()
     return registered;
 }
 
-}
+} // namespace nix

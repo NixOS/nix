@@ -15,43 +15,41 @@ PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && argRoot)
 }
 
 PosixSourceAccessor::PosixSourceAccessor()
-    : PosixSourceAccessor(std::filesystem::path {})
-{ }
+    : PosixSourceAccessor(std::filesystem::path{})
+{
+}
 
 SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
 {
     std::filesystem::path path2 = absPath(path);
     return {
         make_ref<PosixSourceAccessor>(path2.root_path()),
-        CanonPath { path2.relative_path().string() },
+        CanonPath{path2.relative_path().string()},
     };
 }
 
 std::filesystem::path PosixSourceAccessor::makeAbsPath(const CanonPath & path)
 {
-    return root.empty()
-        ? (std::filesystem::path { path.abs() })
-        : path.isRoot()
-        ? /* Don't append a slash for the root of the accessor, since
-             it can be a non-directory (e.g. in the case of `fetchTree
-             { type = "file" }`). */
-          root
-        : root / path.rel();
+    return root.empty()    ? (std::filesystem::path{path.abs()})
+           : path.isRoot() ? /* Don't append a slash for the root of the accessor, since
+                                it can be a non-directory (e.g. in the case of `fetchTree
+                                { type = "file" }`). */
+               root
+                           : root / path.rel();
 }
 
-void PosixSourceAccessor::readFile(
-    const CanonPath & path,
-    Sink & sink,
-    std::function<void(uint64_t)> sizeCallback)
+void PosixSourceAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
 {
     assertNoSymlinks(path);
 
     auto ap = makeAbsPath(path);
 
-    AutoCloseFD fd = toDescriptor(open(ap.string().c_str(), O_RDONLY
-    #ifndef _WIN32
-        | O_NOFOLLOW | O_CLOEXEC
-    #endif
+    AutoCloseFD fd = toDescriptor(open(
+        ap.string().c_str(),
+        O_RDONLY
+#ifndef _WIN32
+            | O_NOFOLLOW | O_CLOEXEC
+#endif
         ));
     if (!fd)
         throw SysError("opening file '%1%'", ap.string());
@@ -71,8 +69,7 @@ void PosixSourceAccessor::readFile(
         if (rd == -1) {
             if (errno != EINTR)
                 throw SysError("reading from file '%s'", showPath(path));
-        }
-        else if (rd == 0)
+        } else if (rd == 0)
             throw SysError("unexpected end-of-file reading '%s'", showPath(path));
         else {
             assert(rd <= left);
@@ -84,7 +81,8 @@ void PosixSourceAccessor::readFile(
 
 bool PosixSourceAccessor::pathExists(const CanonPath & path)
 {
-    if (auto parent = path.parent()) assertNoSymlinks(*parent);
+    if (auto parent = path.parent())
+        assertNoSymlinks(*parent);
     return nix::pathExists(makeAbsPath(path).string());
 }
 
@@ -99,11 +97,13 @@ std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & pa
 
     std::optional<Cache::mapped_type> res;
     cache.cvisit(absPath, [&](auto & x) { res.emplace(x.second); });
-    if (res) return *res;
+    if (res)
+        return *res;
 
     auto st = nix::maybeLstat(absPath.c_str());
 
-    if (cache.size() >= 16384) cache.clear();
+    if (cache.size() >= 16384)
+        cache.clear();
     cache.emplace(absPath, st);
 
     return st;
@@ -111,22 +111,25 @@ std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & pa
 
 std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonPath & path)
 {
-    if (auto parent = path.parent()) assertNoSymlinks(*parent);
+    if (auto parent = path.parent())
+        assertNoSymlinks(*parent);
     auto st = cachedLstat(path);
-    if (!st) return std::nullopt;
+    if (!st)
+        return std::nullopt;
     mtime = std::max(mtime, st->st_mtime);
-    return Stat {
-        .type =
-            S_ISREG(st->st_mode) ? tRegular :
-            S_ISDIR(st->st_mode) ? tDirectory :
-            S_ISLNK(st->st_mode) ? tSymlink :
-            S_ISCHR(st->st_mode) ? tChar :
-            S_ISBLK(st->st_mode) ? tBlock :
+    return Stat{
+        .type = S_ISREG(st->st_mode)   ? tRegular
+                : S_ISDIR(st->st_mode) ? tDirectory
+                : S_ISLNK(st->st_mode) ? tSymlink
+                : S_ISCHR(st->st_mode) ? tChar
+                : S_ISBLK(st->st_mode) ? tBlock
+                :
 #ifdef S_ISSOCK
-            S_ISSOCK(st->st_mode) ? tSocket :
+                S_ISSOCK(st->st_mode) ? tSocket
+                :
 #endif
-            S_ISFIFO(st->st_mode) ? tFifo :
-            tUnknown,
+                S_ISFIFO(st->st_mode) ? tFifo
+                                      : tUnknown,
         .fileSize = S_ISREG(st->st_mode) ? std::optional<uint64_t>(st->st_size) : std::nullopt,
         .isExecutable = S_ISREG(st->st_mode) && st->st_mode & S_IXUSR,
     };
@@ -148,7 +151,8 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
                  * libstdc++ implementation [1] and the standard proposal
                  * about the caching variations of directory_entry [2].
 
-                 * [1]: https://github.com/gcc-mirror/gcc/blob/8ea555b7b4725dbc5d9286f729166cd54ce5b615/libstdc%2B%2B-v3/include/bits/fs_dir.h#L341-L348
+                 * [1]:
+                 https://github.com/gcc-mirror/gcc/blob/8ea555b7b4725dbc5d9286f729166cd54ce5b615/libstdc%2B%2B-v3/include/bits/fs_dir.h#L341-L348
                  * [2]: https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0317r1.html
                  */
 
@@ -185,7 +189,8 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
 
 std::string PosixSourceAccessor::readLink(const CanonPath & path)
 {
-    if (auto parent = path.parent()) assertNoSymlinks(*parent);
+    if (auto parent = path.parent())
+        assertNoSymlinks(*parent);
     return nix::readLink(makeAbsPath(path).string());
 }
 
@@ -214,4 +219,4 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root)
 {
     return make_ref<PosixSourceAccessor>(std::move(root));
 }
-}
+} // namespace nix

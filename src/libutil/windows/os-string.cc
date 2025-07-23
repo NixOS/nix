@@ -23,6 +23,6 @@ std::filesystem::path::string_type string_to_os_string(std::string_view s)
     return converter.from_bytes(std::string{s});
 }
 
-}
+} // namespace nix
 
 #endif

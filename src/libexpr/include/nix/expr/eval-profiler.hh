@@ -111,4 +111,4 @@ public:
 
 ref<EvalProfiler> makeSampleStackProfiler(EvalState & state, std::filesystem::path profileFile, uint64_t frequency);
 
-}
+} // namespace nix

@@ -13,4 +13,4 @@ EvalProfilerMode BaseSetting<EvalProfilerMode>::parse(const std::string & str) c
 template<>
 std::string BaseSetting<EvalProfilerMode>::to_string() const;
 
-}
+} // namespace nix

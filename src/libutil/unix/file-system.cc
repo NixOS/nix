@@ -66,4 +66,4 @@ void setWriteTime(
 #endif
 }
 
-}
+} // namespace nix

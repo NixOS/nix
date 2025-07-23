@@ -19,4 +19,4 @@ extern const StringSet networkProxyVariables;
  */
 bool haveNetworkProxyConnection();
 
-}
+} // namespace nix

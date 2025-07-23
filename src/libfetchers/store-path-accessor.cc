@@ -8,4 +8,4 @@ ref<SourceAccessor> makeStorePathAccessor(ref<Store> store, const StorePath & st
     return projectSubdirSourceAccessor(store->getFSAccessor(), storePath.to_string());
 }
 
-}
+} // namespace nix
