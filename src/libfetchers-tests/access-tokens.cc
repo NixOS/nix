@@ -16,6 +16,7 @@ protected:
 
 public:
     void SetUp() override {}
+
     void TearDown() override {}
 };
 
@@ -95,4 +96,4 @@ TEST_F(AccessKeysTest, multipleSourceHut)
     ASSERT_EQ(token, "token");
 }
 
-}
+} // namespace nix::fetchers

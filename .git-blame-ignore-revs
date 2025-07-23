@@ -1,0 +1,2 @@
+# bulk initial re-formatting with clang-format
+e4f62e46088919428a68bd8014201dc8e379fed7 # !autorebase ./maintainers/format.sh --until-stable

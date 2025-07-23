@@ -33,4 +33,4 @@ struct CompatibilitySettings : public Config
     )"};
 };
 
-};
+}; // namespace nix

@@ -15,8 +15,7 @@ namespace nix {
  * their string representation and documentation in the corresponding
  * `.cc` file as well.
  */
-enum struct ExperimentalFeature
-{
+enum struct ExperimentalFeature {
     CaDerivations,
     ImpureDerivations,
     FetchTree,
@@ -50,8 +49,7 @@ using Xp = ExperimentalFeature;
  * Parse an experimental feature (enum value) from its name. Experimental
  * feature flag names are hyphenated and do not contain spaces.
  */
-const std::optional<ExperimentalFeature> parseExperimentalFeature(
-        const std::string_view & name);
+const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::string_view & name);
 
 /**
  * Show the name of an experimental feature. This is the opposite of
@@ -69,9 +67,7 @@ nlohmann::json documentExperimentalFeatures();
 /**
  * Shorthand for `str << showExperimentalFeature(feature)`.
  */
-std::ostream & operator<<(
-        std::ostream & str,
-        const ExperimentalFeature & feature);
+std::ostream & operator<<(std::ostream & str, const ExperimentalFeature & feature);
 
 /**
  * Parse a set of strings to the corresponding set of experimental
@@ -101,4 +97,4 @@ public:
 void to_json(nlohmann::json &, const ExperimentalFeature &);
 void from_json(const nlohmann::json &, ExperimentalFeature &);
 
-}
+} // namespace nix

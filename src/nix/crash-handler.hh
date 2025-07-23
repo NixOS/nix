@@ -1,4 +1,5 @@
 #pragma once
+
 /// @file Crash handler for Nix that prints back traces (hopefully in instances where it is not just going to crash the
 /// process itself).
 
@@ -8,4 +9,4 @@ namespace nix {
  * detectStackOverflow().  */
 void registerCrashHandler();
 
-}
+} // namespace nix

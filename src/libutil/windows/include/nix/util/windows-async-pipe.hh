@@ -25,5 +25,5 @@ public:
     void close();
 };
 
-}
+} // namespace nix::windows
 #endif

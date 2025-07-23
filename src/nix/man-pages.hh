@@ -25,4 +25,4 @@ std::filesystem::path getNixManDir();
  */
 void showManPage(const std::string & name);
 
-}
+} // namespace nix

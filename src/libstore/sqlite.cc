@@ -5,7 +5,7 @@
 #include "nix/util/signals.hh"
 
 #ifdef __linux__
-#include <sys/vfs.h>
+#  include <sys/vfs.h>
 #endif
 
 #include <sqlite3.h>
@@ -15,11 +15,18 @@
 
 namespace nix {
 
-SQLiteError::SQLiteError(const char *path, const char *errMsg, int errNo, int extendedErrNo, int offset, HintFmt && hf)
-  : Error(""), path(path), errMsg(errMsg), errNo(errNo), extendedErrNo(extendedErrNo), offset(offset)
+SQLiteError::SQLiteError(
+    const char * path, const char * errMsg, int errNo, int extendedErrNo, int offset, HintFmt && hf)
+    : Error("")
+    , path(path)
+    , errMsg(errMsg)
+    , errNo(errNo)
+    , extendedErrNo(extendedErrNo)
+    , offset(offset)
 {
     auto offsetStr = (offset == -1) ? "" : "at offset " + std::to_string(offset) + ": ";
-    err.msg = HintFmt("%s: %s%s, %s (in '%s')",
+    err.msg = HintFmt(
+        "%s: %s%s, %s (in '%s')",
         Uncolored(hf.str()),
         offsetStr,
         sqlite3_errstr(extendedErrNo),
@@ -39,9 +46,7 @@ SQLiteError::SQLiteError(const char *path, const char *errMsg, int errNo, int ex
     if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {
         auto exp = SQLiteBusy(path, errMsg, err, exterr, offset, std::move(hf));
         exp.err.msg = HintFmt(
-            err == SQLITE_PROTOCOL
-                ? "SQLite database '%s' is busy (SQLITE_PROTOCOL)"
-                : "SQLite database '%s' is busy",
+            err == SQLITE_PROTOCOL ? "SQLite database '%s' is busy (SQLITE_PROTOCOL)" : "SQLite database '%s' is busy",
             path ? path : "(in-memory)");
         throw exp;
     } else
@@ -59,10 +64,10 @@ static void traceSQL(void * x, const char * sql)
 
 SQLite::SQLite(const std::filesystem::path & path, SQLiteOpenMode mode)
 {
+#ifdef __linux__
     // Work around a ZFS issue where SQLite's truncate() call on
     // db.sqlite-shm can randomly take up to a few seconds. See
     // https://github.com/openzfs/zfs/issues/14290#issuecomment-3074672917.
-    #ifdef __linux__
     try {
         auto shmFile = path;
         shmFile += "-shm";
@@ -71,22 +76,22 @@ SQLite::SQLite(const std::filesystem::path & path, SQLiteOpenMode mode)
             struct statfs fs;
             if (fstatfs(fd.get(), &fs))
                 throw SysError("statfs() on '%s'", shmFile);
-            if (fs.f_type == /* ZFS_SUPER_MAGIC */ 801189825
-                && fdatasync(fd.get()) != 0)
+            if (fs.f_type == /* ZFS_SUPER_MAGIC */ 801189825 && fdatasync(fd.get()) != 0)
                 throw SysError("fsync() on '%s'", shmFile);
         }
     } catch (...) {
         throw;
     }
-    #endif
+#endif
 
     // useSQLiteWAL also indicates what virtual file system we need.  Using
     // `unix-dotfile` is needed on NFS file systems and on Windows' Subsystem
     // for Linux (WSL) where useSQLiteWAL should be false by default.
-    const char *vfs = settings.useSQLiteWAL ? 0 : "unix-dotfile";
+    const char * vfs = settings.useSQLiteWAL ? 0 : "unix-dotfile";
     bool immutable = mode == SQLiteOpenMode::Immutable;
     int flags = immutable ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE;
-    if (mode == SQLiteOpenMode::Normal) flags |= SQLITE_OPEN_CREATE;
+    if (mode == SQLiteOpenMode::Normal)
+        flags |= SQLITE_OPEN_CREATE;
     auto uri = "file:" + percentEncode(path.string()) + "?immutable=" + (immutable ? "1" : "0");
     int ret = sqlite3_open_v2(uri.c_str(), &db, SQLITE_OPEN_URI | flags, vfs);
     if (ret != SQLITE_OK) {
@@ -168,7 +173,7 @@ SQLiteStmt::Use::~Use()
     sqlite3_reset(stmt);
 }
 
-SQLiteStmt::Use & SQLiteStmt::Use::operator () (std::string_view value, bool notNull)
+SQLiteStmt::Use & SQLiteStmt::Use::operator()(std::string_view value, bool notNull)
 {
     if (notNull) {
         if (sqlite3_bind_text(stmt, curArg++, value.data(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
@@ -178,7 +183,7 @@ SQLiteStmt::Use & SQLiteStmt::Use::operator () (std::string_view value, bool not
     return *this;
 }
 
-SQLiteStmt::Use & SQLiteStmt::Use::operator () (const unsigned char * data, size_t len, bool notNull)
+SQLiteStmt::Use & SQLiteStmt::Use::operator()(const unsigned char * data, size_t len, bool notNull)
 {
     if (notNull) {
         if (sqlite3_bind_blob(stmt, curArg++, data, len, SQLITE_TRANSIENT) != SQLITE_OK)
@@ -188,7 +193,7 @@ SQLiteStmt::Use & SQLiteStmt::Use::operator () (const unsigned char * data, size
     return *this;
 }
 
-SQLiteStmt::Use & SQLiteStmt::Use::operator () (int64_t value, bool notNull)
+SQLiteStmt::Use & SQLiteStmt::Use::operator()(int64_t value, bool notNull)
 {
     if (notNull) {
         if (sqlite3_bind_int64(stmt, curArg++, value) != SQLITE_OK)
@@ -274,16 +279,14 @@ void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
     time_t now = time(0);
     if (now > nextWarning) {
         nextWarning = now + 10;
-        logWarning({
-            .msg = HintFmt(e.what())
-        });
+        logWarning({.msg = HintFmt(e.what())});
     }
 
     /* Sleep for a while since retrying the transaction right away
        is likely to fail again. */
     checkInterrupt();
     /* <= 0.1s */
-    std::this_thread::sleep_for(std::chrono::milliseconds { rand() % 100 });
+    std::this_thread::sleep_for(std::chrono::milliseconds{rand() % 100});
 }
 
-}
+} // namespace nix

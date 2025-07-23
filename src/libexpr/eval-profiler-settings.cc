@@ -46,4 +46,4 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
 /* Explicit instantiation of templates */
 template class BaseSetting<EvalProfilerMode>;
 
-}
+} // namespace nix

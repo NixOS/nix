@@ -17,4 +17,4 @@ struct MountedSourceAccessor : SourceAccessor
 
 ref<MountedSourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts);
 
-}
+} // namespace nix

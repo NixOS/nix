@@ -8,13 +8,13 @@
  * Force the default versions of all constructors (copy, move, copy
  * assignment).
  */
-#define FORCE_DEFAULT_CONSTRUCTORS(CLASS_NAME) \
-    CLASS_NAME(const CLASS_NAME &) = default; \
-    CLASS_NAME(CLASS_NAME &) = default; \
-    CLASS_NAME(CLASS_NAME &&) = default; \
-    \
-    CLASS_NAME & operator =(const CLASS_NAME &) = default; \
-    CLASS_NAME & operator =(CLASS_NAME &) = default;
+#define FORCE_DEFAULT_CONSTRUCTORS(CLASS_NAME)            \
+    CLASS_NAME(const CLASS_NAME &) = default;             \
+    CLASS_NAME(CLASS_NAME &) = default;                   \
+    CLASS_NAME(CLASS_NAME &&) = default;                  \
+                                                          \
+    CLASS_NAME & operator=(const CLASS_NAME &) = default; \
+    CLASS_NAME & operator=(CLASS_NAME &) = default;
 
 /**
  * Make a wrapper constructor. All args are forwarded to the
@@ -22,9 +22,10 @@
  *
  * The moral equivalent of `using Raw::Raw;`
  */
-#define MAKE_WRAPPER_CONSTRUCTOR(CLASS_NAME) \
-    FORCE_DEFAULT_CONSTRUCTORS(CLASS_NAME) \
-    \
-    CLASS_NAME(auto &&... arg) \
+#define MAKE_WRAPPER_CONSTRUCTOR(CLASS_NAME)       \
+    FORCE_DEFAULT_CONSTRUCTORS(CLASS_NAME)         \
+                                                   \
+    CLASS_NAME(auto &&... arg)                     \
         : raw(std::forward<decltype(arg)>(arg)...) \
-    { }
+    {                                              \
+    }

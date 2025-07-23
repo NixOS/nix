@@ -109,4 +109,4 @@ StorePath EvalState::mountInput(
     return storePath;
 }
 
-}
+} // namespace nix

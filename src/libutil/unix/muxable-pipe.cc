@@ -44,4 +44,4 @@ void MuxablePipePollState::iterate(
     }
 }
 
-}
+} // namespace nix

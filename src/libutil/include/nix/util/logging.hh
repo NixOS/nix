@@ -48,14 +48,18 @@ typedef uint64_t ActivityId;
 struct LoggerSettings : Config
 {
     Setting<bool> showTrace{
-        this, false, "show-trace",
+        this,
+        false,
+        "show-trace",
         R"(
           Whether Nix should print out a stack trace in case of Nix
           expression evaluation errors.
         )"};
 
     Setting<Path> jsonLogPath{
-        this, "", "json-log-path",
+        this,
+        "",
+        "json-log-path",
         R"(
           A file or Unix domain socket to which JSON records of Nix's log output are
           written, in the same format as `--log-format internal-json`
@@ -77,23 +81,40 @@ public:
     {
         // FIXME: use std::variant.
         enum { tInt = 0, tString = 1 } type;
+
         uint64_t i = 0;
         std::string s;
-        Field(const std::string & s) : type(tString), s(s) { }
-        Field(const char * s) : type(tString), s(s) { }
-        Field(const uint64_t & i) : type(tInt), i(i) { }
+
+        Field(const std::string & s)
+            : type(tString)
+            , s(s)
+        {
+        }
+
+        Field(const char * s)
+            : type(tString)
+            , s(s)
+        {
+        }
+
+        Field(const uint64_t & i)
+            : type(tInt)
+            , i(i)
+        {
+        }
     };
 
     typedef std::vector<Field> Fields;
 
-    virtual ~Logger() { }
+    virtual ~Logger() {}
 
-    virtual void stop() { };
+    virtual void stop() {};
 
     /**
      * Guard object to resume the logger when done.
      */
-    struct Suspension {
+    struct Suspension
+    {
         Finally<std::function<void()>> _finalize;
     };
 
@@ -101,11 +122,14 @@ public:
 
     std::optional<Suspension> suspendIf(bool cond);
 
-    virtual void pause() { };
-    virtual void resume() { };
+    virtual void pause() {};
+    virtual void resume() {};
 
     // Whether the logger prints the whole build log
-    virtual bool isVerbose() { return false; }
+    virtual bool isVerbose()
+    {
+        return false;
+    }
 
     virtual void log(Verbosity lvl, std::string_view s) = 0;
 
@@ -124,28 +148,34 @@ public:
 
     virtual void warn(const std::string & msg);
 
-    virtual void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
-        const std::string & s, const Fields & fields, ActivityId parent) { };
+    virtual void startActivity(
+        ActivityId act,
+        Verbosity lvl,
+        ActivityType type,
+        const std::string & s,
+        const Fields & fields,
+        ActivityId parent) {};
 
-    virtual void stopActivity(ActivityId act) { };
+    virtual void stopActivity(ActivityId act) {};
 
-    virtual void result(ActivityId act, ResultType type, const Fields & fields) { };
+    virtual void result(ActivityId act, ResultType type, const Fields & fields) {};
 
-    virtual void result(ActivityId act, ResultType type, const nlohmann::json & json) { };
+    virtual void result(ActivityId act, ResultType type, const nlohmann::json & json) {};
 
     virtual void writeToStdout(std::string_view s);
 
     template<typename... Args>
-    inline void cout(const Args & ... args)
+    inline void cout(const Args &... args)
     {
         writeToStdout(fmt(args...));
     }
 
     virtual std::optional<char> ask(std::string_view s)
-    { return {}; }
+    {
+        return {};
+    }
 
-    virtual void setPrintBuildLogs(bool printBuildLogs)
-    { }
+    virtual void setPrintBuildLogs(bool printBuildLogs) {}
 };
 
 /**
@@ -155,8 +185,10 @@ public:
  */
 struct nop
 {
-    template<typename... T> nop(T...)
-    { }
+    template<typename... T>
+    nop(T...)
+    {
+    }
 };
 
 ActivityId getCurActivity();
@@ -168,22 +200,31 @@ struct Activity
 
     const ActivityId id;
 
-    Activity(Logger & logger, Verbosity lvl, ActivityType type, const std::string & s = "",
-        const Logger::Fields & fields = {}, ActivityId parent = getCurActivity());
+    Activity(
+        Logger & logger,
+        Verbosity lvl,
+        ActivityType type,
+        const std::string & s = "",
+        const Logger::Fields & fields = {},
+        ActivityId parent = getCurActivity());
 
-    Activity(Logger & logger, ActivityType type,
-        const Logger::Fields & fields = {}, ActivityId parent = getCurActivity())
-        : Activity(logger, lvlError, type, "", fields, parent) { };
+    Activity(
+        Logger & logger, ActivityType type, const Logger::Fields & fields = {}, ActivityId parent = getCurActivity())
+        : Activity(logger, lvlError, type, "", fields, parent) {};
 
     Activity(const Activity & act) = delete;
 
     ~Activity();
 
     void progress(uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) const
-    { result(resProgress, done, expected, running, failed); }
+    {
+        result(resProgress, done, expected, running, failed);
+    }
 
     void setExpected(ActivityType type2, uint64_t expected) const
-    { result(resSetExpected, type2, expected); }
+    {
+        result(resSetExpected, type2, expected);
+    }
 
     void result(ResultType type, const nlohmann::json & json) const
     {
@@ -191,7 +232,7 @@ struct Activity
     }
 
     template<typename... Args>
-    void result(ResultType type, const Args & ... args) const
+    void result(ResultType type, const Args &... args) const
     {
         Logger::Fields fields;
         nop{(fields.emplace_back(Logger::Field(args)), 1)...};
@@ -209,8 +250,17 @@ struct Activity
 struct PushActivity
 {
     const ActivityId prevAct;
-    PushActivity(ActivityId act) : prevAct(getCurActivity()) { setCurActivity(act); }
-    ~PushActivity() { setCurActivity(prevAct); }
+
+    PushActivity(ActivityId act)
+        : prevAct(getCurActivity())
+    {
+        setCurActivity(act);
+    }
+
+    ~PushActivity()
+    {
+        setCurActivity(prevAct);
+    }
 };
 
 extern std::unique_ptr<Logger> logger;
@@ -222,9 +272,8 @@ std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
  * list of loggers in `extraLoggers`. Only `mainLogger` is used for
  * writing to stdout and getting user input.
  */
-std::unique_ptr<Logger> makeTeeLogger(
-    std::unique_ptr<Logger> mainLogger,
-    std::vector<std::unique_ptr<Logger>> && extraLoggers);
+std::unique_ptr<Logger>
+makeTeeLogger(std::unique_ptr<Logger> mainLogger, std::vector<std::unique_ptr<Logger>> && extraLoggers);
 
 std::unique_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix = true);
 
@@ -240,16 +289,20 @@ std::optional<nlohmann::json> parseJSONMessage(const std::string & msg, std::str
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".
  */
-bool handleJSONLogMessage(nlohmann::json & json,
-    const Activity & act, std::map<ActivityId, Activity> & activities,
+bool handleJSONLogMessage(
+    nlohmann::json & json,
+    const Activity & act,
+    std::map<ActivityId, Activity> & activities,
     std::string_view source,
     bool trusted);
 
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".
  */
-bool handleJSONLogMessage(const std::string & msg,
-    const Activity & act, std::map<ActivityId, Activity> & activities,
+bool handleJSONLogMessage(
+    const std::string & msg,
+    const Activity & act,
+    std::map<ActivityId, Activity> & activities,
     std::string_view source,
     bool trusted);
 
@@ -264,11 +317,11 @@ extern Verbosity verbosity;
  * intervention or that need more explanation.  Use the 'print' macros for more
  * lightweight status messages.
  */
-#define logErrorInfo(level, errorInfo...) \
-    do { \
-        if ((level) <= nix::verbosity) {     \
-            logger->logEI((level), errorInfo);  \
-        } \
+#define logErrorInfo(level, errorInfo...)      \
+    do {                                       \
+        if ((level) <= nix::verbosity) {       \
+            logger->logEI((level), errorInfo); \
+        }                                      \
     } while (0)
 
 #define logError(errorInfo...) logErrorInfo(lvlError, errorInfo)
@@ -280,11 +333,11 @@ extern Verbosity verbosity;
  * arguments are evaluated lazily.
  */
 #define printMsgUsing(loggerParam, level, args...) \
-    do { \
-        auto __lvl = level; \
-        if (__lvl <= nix::verbosity) { \
-            loggerParam->log(__lvl, fmt(args)); \
-        } \
+    do {                                           \
+        auto __lvl = level;                        \
+        if (__lvl <= nix::verbosity) {             \
+            loggerParam->log(__lvl, fmt(args));    \
+        }                                          \
     } while (0)
 #define printMsg(level, args...) printMsgUsing(logger, level, args)
 
@@ -299,7 +352,7 @@ extern Verbosity verbosity;
  * if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix.
  */
 template<typename... Args>
-inline void warn(const std::string & fs, const Args & ... args)
+inline void warn(const std::string & fs, const Args &... args)
 {
     boost::format f(fs);
     formatHelper(f, args...);
@@ -314,4 +367,4 @@ inline void warn(const std::string & fs, const Args & ... args)
 
 void writeToStderr(std::string_view s);
 
-}
+} // namespace nix

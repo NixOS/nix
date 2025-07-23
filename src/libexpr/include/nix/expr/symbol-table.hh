@@ -46,16 +46,32 @@ class Symbol
 private:
     uint32_t id;
 
-    explicit Symbol(uint32_t id) noexcept : id(id) {}
+    explicit Symbol(uint32_t id) noexcept
+        : id(id)
+    {
+    }
 
 public:
-    Symbol() noexcept : id(0) {}
+    Symbol() noexcept
+        : id(0)
+    {
+    }
 
     [[gnu::always_inline]]
-    explicit operator bool() const noexcept { return id > 0; }
+    explicit operator bool() const noexcept
+    {
+        return id > 0;
+    }
 
-    auto operator<=>(const Symbol other) const noexcept { return id <=> other.id; }
-    bool operator==(const Symbol other) const noexcept { return id == other.id; }
+    auto operator<=>(const Symbol other) const noexcept
+    {
+        return id <=> other.id;
+    }
+
+    bool operator==(const Symbol other) const noexcept
+    {
+        return id == other.id;
+    }
 
     friend class std::hash<Symbol>;
 };
@@ -87,11 +103,16 @@ class SymbolStr
             : store(store)
             , s(s)
             , hash(HashType{}(s))
-            , alloc(stringAlloc) {}
+            , alloc(stringAlloc)
+        {
+        }
     };
 
 public:
-    SymbolStr(const SymbolValue & s) noexcept : s(&s) {}
+    SymbolStr(const SymbolValue & s) noexcept
+        : s(&s)
+    {
+    }
 
     SymbolStr(const Key & key)
     {
@@ -114,7 +135,7 @@ public:
         this->s = &v;
     }
 
-    bool operator == (std::string_view s2) const noexcept
+    bool operator==(std::string_view s2) const noexcept
     {
         return *s == s2;
     }
@@ -125,13 +146,12 @@ public:
         return s->c_str();
     }
 
-    [[gnu::always_inline]]
-    operator std::string_view () const noexcept
+    [[gnu::always_inline]] operator std::string_view() const noexcept
     {
         return *s;
     }
 
-    friend std::ostream & operator <<(std::ostream & os, const SymbolStr & symbol);
+    friend std::ostream & operator<<(std::ostream & os, const SymbolStr & symbol);
 
     [[gnu::always_inline]]
     bool empty() const noexcept
@@ -218,7 +238,8 @@ private:
     boost::unordered_flat_set<SymbolStr, SymbolStr::Hash, SymbolStr::Equal> symbols{SymbolStr::chunkSize};
 #else
     using SymbolValueAlloc = std::pmr::polymorphic_allocator<SymbolStr>;
-    boost::unordered_set<SymbolStr, SymbolStr::Hash, SymbolStr::Equal, SymbolValueAlloc> symbols{SymbolStr::chunkSize, {&buffer}};
+    boost::unordered_set<SymbolStr, SymbolStr::Hash, SymbolStr::Equal, SymbolValueAlloc> symbols{
+        SymbolStr::chunkSize, {&buffer}};
 #endif
 
 public:
@@ -226,7 +247,8 @@ public:
     /**
      * Converts a string into a symbol.
      */
-    Symbol create(std::string_view s) {
+    Symbol create(std::string_view s)
+    {
         // Most symbols are looked up more than once, so we trade off insertion performance
         // for lookup performance.
         // FIXME: make this thread-safe.
@@ -277,7 +299,7 @@ public:
     }
 };
 
-}
+} // namespace nix
 
 template<>
 struct std::hash<nix::Symbol>

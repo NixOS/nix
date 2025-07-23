@@ -1,4 +1,5 @@
 #pragma once
+
 ///@file
 
 namespace nix {
@@ -9,4 +10,4 @@ namespace nix {
  */
 void initPlugins();
 
-}
+} // namespace nix
