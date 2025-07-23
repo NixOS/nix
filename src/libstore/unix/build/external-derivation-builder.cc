@@ -125,4 +125,4 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
     }
 };
 
-}
+} // namespace nix

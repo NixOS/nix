@@ -43,7 +43,7 @@ void checkGTestWith(Testable && testable, MakeTestParams makeTestParams)
         throw std::runtime_error(ss.str());
     }
 }
-}
+} // namespace rc::detail
 
 #define RC_GTEST_PROP_WITH_PARAMS(TestCase, Name, MakeParams, ArgList)                      \
     void rapidCheck_propImpl_##TestCase##_##Name ArgList;                                   \

@@ -6,12 +6,7 @@
 namespace nix {
 
 // See: https://github.com/NixOS/nix/issues/9730
-void printAmbiguous(
-    EvalState & state,
-    Value & v,
-    std::ostream & str,
-    std::set<const void *> * seen,
-    int depth)
+void printAmbiguous(EvalState & state, Value & v, std::ostream & str, std::set<const void *> * seen, int depth)
 {
     checkInterrupt();
 
@@ -104,4 +99,4 @@ void printAmbiguous(
     }
 }
 
-}
+} // namespace nix

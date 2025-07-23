@@ -7,15 +7,9 @@
 
 using namespace nix;
 
-static std::string hilite(const std::string & s, size_t pos, size_t len,
-    const std::string & colour = ANSI_RED)
+static std::string hilite(const std::string & s, size_t pos, size_t len, const std::string & colour = ANSI_RED)
 {
-    return
-        std::string(s, 0, pos)
-        + colour
-        + std::string(s, pos, len)
-        + ANSI_NORMAL
-        + std::string(s, pos + len);
+    return std::string(s, 0, pos) + colour + std::string(s, pos, len) + ANSI_NORMAL + std::string(s, pos + len);
 }
 
 static std::string filterPrintable(const std::string & s)
@@ -49,13 +43,15 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         addFlag({
             .longName = "all",
             .shortName = 'a',
-            .description = "Show all edges in the dependency graph leading from *package* to *dependency*, rather than just a shortest path.",
+            .description =
+                "Show all edges in the dependency graph leading from *package* to *dependency*, rather than just a shortest path.",
             .handler = {&all, true},
         });
 
         addFlag({
             .longName = "precise",
-            .description = "For each edge in the dependency graph, show the files in the parent that cause the dependency.",
+            .description =
+                "For each edge in the dependency graph, show the files in the parent that cause the dependency.",
             .handler = {&precise, true},
         });
     }
@@ -68,11 +64,14 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
     std::string doc() override
     {
         return
-          #include "why-depends.md"
-          ;
+#include "why-depends.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
     void run(ref<Store> store) override
     {
@@ -127,11 +126,12 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         std::map<StorePath, Node> graph;
 
         for (auto & path : closure)
-            graph.emplace(path, Node {
-                .path = path,
-                .refs = store->queryPathInfo(path)->references,
-                .dist = path == dependencyPath ? 0 : inf
-            });
+            graph.emplace(
+                path,
+                Node{
+                    .path = path,
+                    .refs = store->queryPathInfo(path)->references,
+                    .dist = path == dependencyPath ? 0 : inf});
 
         // Transpose the graph.
         for (auto & node : graph)
@@ -159,7 +159,6 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                         queue.push(&node2);
                     }
                 }
-
             }
         }
 
@@ -169,26 +168,29 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
            and `dependency`. */
         std::function<void(Node &, const std::string &, const std::string &)> printNode;
 
-        struct BailOut { };
+        struct BailOut
+        {};
 
         printNode = [&](Node & node, const std::string & firstPad, const std::string & tailPad) {
             CanonPath pathS(node.path.to_string());
 
             assert(node.dist != inf);
             if (precise) {
-                logger->cout("%s%s%s%s" ANSI_NORMAL,
+                logger->cout(
+                    "%s%s%s%s" ANSI_NORMAL,
                     firstPad,
                     node.visited ? "\e[38;5;244m" : "",
                     firstPad != "" ? "→ " : "",
                     pathS.abs());
             }
 
-            if (node.path == dependencyPath && !all
-                && packagePath != dependencyPath)
+            if (node.path == dependencyPath && !all && packagePath != dependencyPath)
                 throw BailOut();
 
-            if (node.visited) return;
-            if (precise) node.visited = true;
+            if (node.visited)
+                return;
+            if (precise)
+                node.visited = true;
 
             /* Sort the references by distance to `dependency` to
                ensure that the shortest path is printed first. */
@@ -196,9 +198,11 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
             StringSet hashes;
 
             for (auto & ref : node.refs) {
-                if (ref == node.path && packagePath != dependencyPath) continue;
+                if (ref == node.path && packagePath != dependencyPath)
+                    continue;
                 auto & node2 = graph.at(ref);
-                if (node2.dist == inf) continue;
+                if (node2.dist == inf)
+                    continue;
                 refs.emplace(node2.dist, &node2);
                 hashes.insert(std::string(node2.path.hashPart()));
             }
@@ -233,11 +237,13 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                         if (pos != std::string::npos) {
                             size_t margin = 32;
                             auto pos2 = pos >= margin ? pos - margin : 0;
-                            hits[hash].emplace_back(fmt("%s: …%s…",
+                            hits[hash].emplace_back(
+                                fmt("%s: …%s…",
                                     p2,
-                                    hilite(filterPrintable(
-                                            std::string(contents, pos2, pos - pos2 + hash.size() + margin)),
-                                        pos - pos2, StorePath::HashLen,
+                                    hilite(
+                                        filterPrintable(std::string(contents, pos2, pos - pos2 + hash.size() + margin)),
+                                        pos - pos2,
+                                        StorePath::HashLen,
                                         getColour(hash))));
                         }
                     }
@@ -249,15 +255,16 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                     for (auto & hash : hashes) {
                         auto pos = target.find(hash);
                         if (pos != std::string::npos)
-                            hits[hash].emplace_back(fmt("%s -> %s", p2,
-                                    hilite(target, pos, StorePath::HashLen, getColour(hash))));
+                            hits[hash].emplace_back(
+                                fmt("%s -> %s", p2, hilite(target, pos, StorePath::HashLen, getColour(hash))));
                     }
                 }
             };
 
             // FIXME: should use scanForReferences().
 
-            if (precise) visitPath(pathS);
+            if (precise)
+                visitPath(pathS);
 
             for (auto & ref : refs) {
                 std::string hash(ref.second->path.hashPart());
@@ -266,15 +273,16 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
 
                 for (auto & hit : hits[hash]) {
                     bool first = hit == *hits[hash].begin();
-                    logger->cout("%s%s%s", tailPad,
-                              (first ? (last ? treeLast : treeConn) : (last ? treeNull : treeLine)),
-                              hit);
-                    if (!all) break;
+                    logger->cout(
+                        "%s%s%s", tailPad, (first ? (last ? treeLast : treeConn) : (last ? treeNull : treeLine)), hit);
+                    if (!all)
+                        break;
                 }
 
                 if (!precise) {
                     auto pathS = store->printStorePath(ref.second->path);
-                    logger->cout("%s%s%s%s" ANSI_NORMAL,
+                    logger->cout(
+                        "%s%s%s%s" ANSI_NORMAL,
                         firstPad,
                         ref.second->visited ? "\e[38;5;244m" : "",
                         last ? treeLast : treeConn,
@@ -282,9 +290,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                     node.visited = true;
                 }
 
-                printNode(*ref.second,
-                    tailPad + (last ? treeNull : treeLine),
-                    tailPad + (last ? treeNull : treeLine));
+                printNode(*ref.second, tailPad + (last ? treeNull : treeLine), tailPad + (last ? treeNull : treeLine));
             }
         };
 
@@ -294,7 +300,8 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                 logger->cout("%s", store->printStorePath(graph.at(packagePath).path));
             }
             printNode(graph.at(packagePath), "", "");
-        } catch (BailOut & ) { }
+        } catch (BailOut &) {
+        }
     }
 };
 

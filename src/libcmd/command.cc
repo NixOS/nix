@@ -402,4 +402,4 @@ void MixOutLinkBase::createOutLinksMaybe(const std::vector<BuiltPathWithResult> 
             createOutLinks(outLink, toBuiltPaths(buildables), *store2);
 }
 
-}
+} // namespace nix

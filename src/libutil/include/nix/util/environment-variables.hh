@@ -66,4 +66,4 @@ void clearEnv();
  */
 void replaceEnv(const StringMap & newEnv);
 
-}
+} // namespace nix

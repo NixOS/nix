@@ -85,4 +85,4 @@ struct RegisterStoreImplementation
     }
 };
 
-}
+} // namespace nix

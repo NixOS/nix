@@ -8,4 +8,4 @@ void InstallableValueCommand::run(ref<Store> store, ref<Installable> installable
     run(store, installableValue);
 }
 
-}
+} // namespace nix
