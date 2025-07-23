@@ -11,4 +11,4 @@ ref<SourceAccessor> makeStorePathAccessor(ref<Store> store, const StorePath & st
 
 SourcePath getUnfilteredRootPath(CanonPath path);
 
-}
+} // namespace nix

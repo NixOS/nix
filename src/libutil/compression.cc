@@ -39,12 +39,15 @@ struct ArchiveDecompressionSource : Source
     std::unique_ptr<TarArchive> archive = 0;
     Source & src;
     std::optional<std::string> compressionMethod;
+
     ArchiveDecompressionSource(Source & src, std::optional<std::string> compressionMethod = std::nullopt)
         : src(src)
         , compressionMethod(std::move(compressionMethod))
     {
     }
+
     ~ArchiveDecompressionSource() override {}
+
     size_t read(char * data, size_t len) override
     {
         struct archive_entry * ae;
@@ -139,16 +142,19 @@ private:
 struct NoneSink : CompressionSink
 {
     Sink & nextSink;
+
     NoneSink(Sink & nextSink, int level = COMPRESSION_LEVEL_DEFAULT)
         : nextSink(nextSink)
     {
         if (level != COMPRESSION_LEVEL_DEFAULT)
             warn("requested compression level '%d' not supported by compression method 'none'", level);
     }
+
     void finish() override
     {
         flush();
     }
+
     void writeUnbuffered(std::string_view data) override
     {
         nextSink(data);
@@ -307,4 +313,4 @@ std::string compress(const std::string & method, std::string_view in, const bool
     return std::move(ssink.s);
 }
 
-}
+} // namespace nix

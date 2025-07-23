@@ -27,4 +27,4 @@ StorePath fetchToStore(
 fetchers::Cache::Key makeFetchToStoreCacheKey(
     const std::string & name, const std::string & fingerprint, ContentAddressMethod method, const std::string & path);
 
-}
+} // namespace nix

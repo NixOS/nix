@@ -10,4 +10,4 @@ StoreDirConfig::StoreDirConfig(const Params & params)
 {
 }
 
-}
+} // namespace nix

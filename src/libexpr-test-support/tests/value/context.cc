@@ -36,4 +36,4 @@ Gen<NixStringContextElem> Arbitrary<NixStringContextElem>::arbitrary()
         });
 }
 
-}
+} // namespace rc

@@ -12,12 +12,12 @@ struct AbstractNixRepl
 
     AbstractNixRepl(ref<EvalState> state)
         : state(state)
-    { }
+    {
+    }
 
-    virtual ~AbstractNixRepl()
-    { }
+    virtual ~AbstractNixRepl() {}
 
-    typedef std::vector<std::pair<Value*,std::string>> AnnotatedValues;
+    typedef std::vector<std::pair<Value *, std::string>> AnnotatedValues;
 
     using RunNix = void(Path program, const Strings & args, const std::optional<std::string> & input);
 
@@ -33,13 +33,11 @@ struct AbstractNixRepl
         std::function<AnnotatedValues()> getValues,
         RunNix * runNix = nullptr);
 
-    static ReplExitStatus runSimple(
-        ref<EvalState> evalState,
-        const ValMap & extraEnv);
+    static ReplExitStatus runSimple(ref<EvalState> evalState, const ValMap & extraEnv);
 
     virtual void initEnv() = 0;
 
     virtual ReplExitStatus mainLoop() = 0;
 };
 
-}
+} // namespace nix

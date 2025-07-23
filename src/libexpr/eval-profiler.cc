@@ -352,4 +352,4 @@ ref<EvalProfiler> makeSampleStackProfiler(EvalState & state, std::filesystem::pa
     return make_ref<SampleStack>(state, profileFile, period);
 }
 
-}
+} // namespace nix
