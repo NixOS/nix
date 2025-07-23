@@ -111,6 +111,25 @@ static DownloadTarballResult downloadTarball_(
     const Headers & headers,
     const std::string & displayPrefix)
 {
+
+    // Some friendly error messages for common mistakes.
+    // Namely lets catch when the url is a local file path, but
+    // it is not in fact a tarball.
+    if (url.rfind("file://", 0) == 0) {
+        // Remove "file://" prefix to get the local file path
+        std::string localPath = url.substr(7);
+        if (!std::filesystem::exists(localPath)) {
+            throw Error("tarball '%s' does not exist.", localPath);
+        }
+        if (std::filesystem::is_directory(localPath)) {
+            if (std::filesystem::exists(localPath + "/.git")) {
+                throw Error(
+                    "tarball '%s' is a git repository, not a tarball. Please use `git+file` as the scheme.", localPath);
+            }
+            throw Error("tarball '%s' is a directory, not a file.", localPath);
+        }
+    }
+
     Cache::Key cacheKey{"tarball", {{"url", url}}};
 
     auto cached = settings.getCache()->lookupExpired(cacheKey);

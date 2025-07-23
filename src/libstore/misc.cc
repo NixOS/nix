@@ -98,13 +98,9 @@ const ContentAddress * getDerivationCA(const BasicDerivation & drv)
     return nullptr;
 }
 
-void Store::queryMissing(const std::vector<DerivedPath> & targets,
-    StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
-    uint64_t & downloadSize_, uint64_t & narSize_)
+MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 {
     Activity act(*logger, lvlDebug, actUnknown, "querying info about missing paths");
-
-    downloadSize_ = narSize_ = 0;
 
     // FIXME: make async.
     ThreadPool pool(fileTransferSettings.httpConnections);
@@ -112,9 +108,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
     struct State
     {
         std::unordered_set<std::string> done;
-        StorePathSet & unknown, & willSubstitute, & willBuild;
-        uint64_t & downloadSize;
-        uint64_t & narSize;
+        MissingPaths res;
     };
 
     struct DrvState
@@ -125,7 +119,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
         DrvState(size_t left) : left(left) { }
     };
 
-    Sync<State> state_(State{{}, unknown_, willSubstitute_, willBuild_, downloadSize_, narSize_});
+    Sync<State> state_;
 
     std::function<void(DerivedPath)> doPath;
 
@@ -143,7 +137,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
     auto mustBuildDrv = [&](const StorePath & drvPath, const Derivation & drv) {
         {
             auto state(state_.lock());
-            state->willBuild.insert(drvPath);
+            state->res.willBuild.insert(drvPath);
         }
 
         for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map) {
@@ -203,7 +197,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
             if (!isValidPath(drvPath)) {
                 // FIXME: we could try to substitute the derivation.
                 auto state(state_.lock());
-                state->unknown.insert(drvPath);
+                state->res.unknown.insert(drvPath);
                 return;
             }
 
@@ -282,7 +276,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
 
             if (infos.empty()) {
                 auto state(state_.lock());
-                state->unknown.insert(bo.path);
+                state->res.unknown.insert(bo.path);
                 return;
             }
 
@@ -291,9 +285,9 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
 
             {
                 auto state(state_.lock());
-                state->willSubstitute.insert(bo.path);
-                state->downloadSize += info->second.downloadSize;
-                state->narSize += info->second.narSize;
+                state->res.willSubstitute.insert(bo.path);
+                state->res.downloadSize += info->second.downloadSize;
+                state->res.narSize += info->second.narSize;
             }
 
             for (auto & ref : info->second.references)
@@ -306,6 +300,8 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
         pool.enqueue(std::bind(doPath, path));
 
     pool.process();
+
+    return std::move(state_.lock()->res);
 }
 
 

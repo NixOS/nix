@@ -211,6 +211,8 @@ struct EvalSettings : Config
           * `flamegraph` stack sampling profiler. Outputs folded format, one line per stack (suitable for `flamegraph.pl` and compatible tools).
 
           Use [`eval-profile-file`](#conf-eval-profile-file) to specify where the profile is saved.
+
+          See [Using the `eval-profiler`](@docroot@/advanced-topics/eval-profiler.md).
         )"};
 
     Setting<Path> evalProfileFile{this, "nix.profile", "eval-profile-file",

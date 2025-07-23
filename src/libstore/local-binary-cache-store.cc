@@ -39,7 +39,6 @@ struct LocalBinaryCacheStore :
         , BinaryCacheStore{*config}
         , config{config}
     {
-        init();
     }
 
     void init() override;
@@ -126,10 +125,12 @@ StringSet LocalBinaryCacheStoreConfig::uriSchemes()
 }
 
 ref<Store> LocalBinaryCacheStoreConfig::openStore() const {
-    return make_ref<LocalBinaryCacheStore>(ref{
+    auto store = make_ref<LocalBinaryCacheStore>(ref{
         // FIXME we shouldn't actually need a mutable config
         std::const_pointer_cast<LocalBinaryCacheStore::Config>(shared_from_this())
     });
+    store->init();
+    return store;
 }
 
 static RegisterStoreImplementation<LocalBinaryCacheStore::Config> regLocalBinaryCacheStore;

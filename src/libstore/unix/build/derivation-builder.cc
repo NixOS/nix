@@ -1083,7 +1083,7 @@ void DerivationBuilderImpl::initEnv()
     env["NIX_STORE"] = store.storeDir;
 
     /* The maximum number of cores to utilize for parallel building. */
-    env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores);
+    env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores ? settings.buildCores : settings.getDefaultCores());
 
     /* In non-structured mode, set all bindings either directory in the
        environment or via a file, as specified by

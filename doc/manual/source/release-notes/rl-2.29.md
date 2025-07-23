@@ -111,7 +111,7 @@ This fact is counterbalanced by the fact that most of those changes are bug fixe
   This in particular prevents parts of GCC 14's diagnostics from being improperly filtered away.
 
 
-# Contributors
+## Contributors
 
 
 This release was made possible by the following 40 contributors:

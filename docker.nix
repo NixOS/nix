@@ -1,10 +1,10 @@
 {
   # Core dependencies
-  pkgs,
-  lib,
-  dockerTools,
-  runCommand,
-  buildPackages,
+  pkgs ? import <nixpkgs> { },
+  lib ? pkgs.lib,
+  dockerTools ? pkgs.dockerTools,
+  runCommand ? pkgs.runCommand,
+  buildPackages ? pkgs.buildPackages,
   # Image configuration
   name ? "nix",
   tag ? "latest",
@@ -28,24 +28,24 @@
   },
   Cmd ? [ (lib.getExe bashInteractive) ],
   # Default Packages
-  nix,
-  bashInteractive,
-  coreutils-full,
-  gnutar,
-  gzip,
-  gnugrep,
-  which,
-  curl,
-  less,
-  wget,
-  man,
-  cacert,
-  findutils,
-  iana-etc,
-  gitMinimal,
-  openssh,
+  nix ? pkgs.nix,
+  bashInteractive ? pkgs.bashInteractive,
+  coreutils-full ? pkgs.coreutils-full,
+  gnutar ? pkgs.gnutar,
+  gzip ? pkgs.gzip,
+  gnugrep ? pkgs.gnugrep,
+  which ? pkgs.which,
+  curl ? pkgs.curl,
+  less ? pkgs.less,
+  wget ? pkgs.wget,
+  man ? pkgs.man,
+  cacert ? pkgs.cacert,
+  findutils ? pkgs.findutils,
+  iana-etc ? pkgs.iana-etc,
+  gitMinimal ? pkgs.gitMinimal,
+  openssh ? pkgs.openssh,
   # Other dependencies
-  shadow,
+  shadow ? pkgs.shadow,
 }:
 let
   defaultPkgs = [
@@ -184,11 +184,14 @@ let
       } " = ";
     };
 
-  nixConfContents = toConf {
-    sandbox = false;
-    build-users-group = "nixbld";
-    trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
-  };
+  nixConfContents = toConf (
+    {
+      sandbox = false;
+      build-users-group = "nixbld";
+      trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
+    }
+    // nixConf
+  );
 
   userHome = if uid == 0 then "/root" else "/home/${uname}";
 
