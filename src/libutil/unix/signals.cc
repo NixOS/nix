@@ -1,8 +1,8 @@
-#include "signals.hh"
-#include "util.hh"
-#include "error.hh"
-#include "sync.hh"
-#include "terminal.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/util.hh"
+#include "nix/util/error.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/terminal.hh"
 
 #include <thread>
 
@@ -105,7 +105,7 @@ void unix::setChildSignalMask(sigset_t * sigs)
 {
     assert(sigs); // C style function, but think of sigs as a reference
 
-#if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
+#if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 1) || (defined(_XOPEN_SOURCE) && _XOPEN_SOURCE) || (defined(_POSIX_SOURCE) && _POSIX_SOURCE)
     sigemptyset(&savedSignalMask);
     // There's no "assign" or "copy" function, so we rely on (math) idempotence
     // of the or operator: a or a = a.

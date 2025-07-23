@@ -1,7 +1,7 @@
-#include "command.hh"
-#include "store-api.hh"
-#include "make-content-addressed.hh"
-#include "common-args.hh"
+#include "nix/cmd/command.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/make-content-addressed.hh"
+#include "nix/main/common-args.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -44,7 +44,7 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
             }
             auto json = json::object();
             json["rewrites"] = jsonRewrites;
-            logger->cout("%s", json);
+            printJSON(json);
         } else {
             for (auto & path : storePaths) {
                 auto i = remappings.find(path);

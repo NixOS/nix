@@ -17,14 +17,14 @@
 
 #include <variant>
 
-#include "finally.hh"
-#include "util.hh"
-#include "users.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/util.hh"
+#include "nix/util/users.hh"
 
-#include "nixexpr.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "parser-state.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/expr/parser-state.hh"
 
 // Bison seems to have difficulty growing the parser stack when using C++ with
 // a custom location type. This undocumented macro tells Bison that our
@@ -179,7 +179,12 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
 
 %%
 
-start: expr { state->result = $1; };
+start: expr {
+  state->result = $1;
+
+  // This parser does not use yynerrs; suppress the warning.
+  (void) yynerrs;
+};
 
 expr: expr_function;
 
@@ -514,7 +519,7 @@ formal
 
 %%
 
-#include "eval.hh"
+#include "nix/expr/eval.hh"
 
 
 namespace nix {

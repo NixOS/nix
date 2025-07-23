@@ -26,6 +26,9 @@ let
   # Despite the use of the 10.13 deployment target here, the aligned
   # allocation function Clang uses with this setting actually works
   # all the way back to 10.6.
+  # NOTE: this is not just a version constraint, but a request to make Darwin
+  #       provide this version level of support. Removing this minimum version
+  #       request will regress the above error.
   darwinStdenv = pkgs.overrideSDK prevStdenv { darwinMinVersion = "10.13"; };
 
 in
@@ -35,6 +38,7 @@ scope: {
   aws-sdk-cpp =
     (pkgs.aws-sdk-cpp.override {
       apis = [
+        "identity-management"
         "s3"
         "transfer"
       ];
@@ -57,7 +61,9 @@ scope: {
         "--with-container"
         "--with-context"
         "--with-coroutine"
+        "--with-iostreams"
       ];
+      enableIcu = false;
     }).overrideAttrs
       (old: {
         # Need to remove `--with-*` to use `--with-libraries=...`
@@ -65,39 +71,37 @@ scope: {
         installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
       });
 
-  libgit2 = pkgs.libgit2.overrideAttrs (
-    attrs:
-    {
-      cmakeFlags = attrs.cmakeFlags or [ ] ++ [ "-DUSE_SSH=exec" ];
-    }
-    # libgit2: Nixpkgs 24.11 has < 1.9.0, which needs our patches
-    // lib.optionalAttrs (!lib.versionAtLeast pkgs.libgit2.version "1.9.0") {
-      nativeBuildInputs =
-        attrs.nativeBuildInputs or [ ]
-        # gitMinimal does not build on Windows. See packbuilder patch.
-        ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
-          # Needed for `git apply`; see `prePatch`
-          pkgs.buildPackages.gitMinimal
-        ];
-      # Only `git apply` can handle git binary patches
-      prePatch =
-        attrs.prePatch or ""
-        + lib.optionalString (!stdenv.hostPlatform.isWindows) ''
-          patch() {
-            git apply
-          }
-        '';
-      patches =
-        attrs.patches or [ ]
-        ++ [
-          ./patches/libgit2-mempack-thin-packfile.patch
-        ]
-        # gitMinimal does not build on Windows, but fortunately this patch only
-        # impacts interruptibility
-        ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
-          # binary patch; see `prePatch`
-          ./patches/libgit2-packbuilder-callback-interruptible.patch
-        ];
-    }
-  );
+  libgit2 =
+    if lib.versionAtLeast pkgs.libgit2.version "1.9.0" then
+      pkgs.libgit2
+    else
+      pkgs.libgit2.overrideAttrs (attrs: {
+        # libgit2: Nixpkgs 24.11 has < 1.9.0, which needs our patches
+        nativeBuildInputs =
+          attrs.nativeBuildInputs or [ ]
+          # gitMinimal does not build on Windows. See packbuilder patch.
+          ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
+            # Needed for `git apply`; see `prePatch`
+            pkgs.buildPackages.gitMinimal
+          ];
+        # Only `git apply` can handle git binary patches
+        prePatch =
+          attrs.prePatch or ""
+          + lib.optionalString (!stdenv.hostPlatform.isWindows) ''
+            patch() {
+              git apply
+            }
+          '';
+        patches =
+          attrs.patches or [ ]
+          ++ [
+            ./patches/libgit2-mempack-thin-packfile.patch
+          ]
+          # gitMinimal does not build on Windows, but fortunately this patch only
+          # impacts interruptibility
+          ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
+            # binary patch; see `prePatch`
+            ./patches/libgit2-packbuilder-callback-interruptible.patch
+          ];
+      });
 }

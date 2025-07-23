@@ -1,7 +1,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "tests/libexpr.hh"
+#include "nix/expr/tests/libexpr.hh"
 
 namespace nix {
 
@@ -33,7 +33,7 @@ namespace nix {
                 ASSERT_EQ(PrintToString(e.info().msg),
                           PrintToString(HintFmt("puppy")));
                 auto trace = e.info().traces.rbegin();
-                ASSERT_EQ(e.info().traces.size(), 2);
+                ASSERT_EQ(e.info().traces.size(), 2u);
                 ASSERT_EQ(PrintToString(trace->hint),
                           PrintToString(HintFmt("doggy")));
                 trace++;
@@ -54,8 +54,8 @@ namespace nix {
             } catch (Error & e2) {
                 e.addTrace(state.positions[noPos], "beans2");
                 //e2.addTrace(state.positions[noPos], "Something", "");
-                ASSERT_TRUE(e.info().traces.size() == 2);
-                ASSERT_TRUE(e2.info().traces.size() == 0);
+                ASSERT_TRUE(e.info().traces.size() == 2u);
+                ASSERT_TRUE(e2.info().traces.size() == 0u);
                 ASSERT_FALSE(&e.info() == &e2.info());
             }
         }
@@ -71,7 +71,7 @@ namespace nix {
             } catch (BaseError & e) {                                       \
                 ASSERT_EQ(PrintToString(e.info().msg),                      \
                           PrintToString(message));                          \
-                ASSERT_EQ(e.info().traces.size(), 1) << "while testing " args << std::endl << e.what(); \
+                ASSERT_EQ(e.info().traces.size(), 1u) << "while testing " args << std::endl << e.what(); \
                 auto trace = e.info().traces.rbegin();                      \
                 ASSERT_EQ(PrintToString(trace->hint),                       \
                           PrintToString(HintFmt("while calling the '%s' builtin", name))); \
@@ -90,7 +90,7 @@ namespace nix {
             } catch (BaseError & e) {                                       \
                 ASSERT_EQ(PrintToString(e.info().msg),                      \
                           PrintToString(message));                          \
-                ASSERT_EQ(e.info().traces.size(), 2) << "while testing " args << std::endl << e.what(); \
+                ASSERT_EQ(e.info().traces.size(), 2u) << "while testing " args << std::endl << e.what(); \
                 auto trace = e.info().traces.rbegin();                      \
                 ASSERT_EQ(PrintToString(trace->hint),                       \
                           PrintToString(context));                          \
@@ -112,7 +112,7 @@ namespace nix {
             } catch (BaseError & e) {                                       \
                 ASSERT_EQ(PrintToString(e.info().msg),                      \
                           PrintToString(message));                          \
-                ASSERT_EQ(e.info().traces.size(), 3) << "while testing " args << std::endl << e.what(); \
+                ASSERT_EQ(e.info().traces.size(), 3u) << "while testing " args << std::endl << e.what(); \
                 auto trace = e.info().traces.rbegin();                      \
                 ASSERT_EQ(PrintToString(trace->hint),                       \
                           PrintToString(context1));                         \
@@ -137,7 +137,7 @@ namespace nix {
             } catch (BaseError & e) {                                       \
                 ASSERT_EQ(PrintToString(e.info().msg),                      \
                           PrintToString(message));                          \
-                ASSERT_EQ(e.info().traces.size(), 4) << "while testing " args << std::endl << e.what(); \
+                ASSERT_EQ(e.info().traces.size(), 4u) << "while testing " args << std::endl << e.what(); \
                 auto trace = e.info().traces.rbegin();                      \
                 ASSERT_EQ(PrintToString(trace->hint),                       \
                           PrintToString(context1));                         \
@@ -458,7 +458,7 @@ namespace nix {
                       HintFmt("expected a function but found %s: %s", "a list", Uncolored("[ ]")),
                       HintFmt("while evaluating the first argument passed to builtins.filterSource"));
 
-        // Usupported by store "dummy"
+        // Unsupported by store "dummy"
 
         // ASSERT_TRACE2("filterSource (_: 1) ./.",
         //               TypeError,
@@ -636,7 +636,7 @@ namespace nix {
                       HintFmt("expected a set but found %s: %s", "a list", Uncolored("[ ]")),
                       HintFmt("while evaluating the second argument passed to builtins.mapAttrs"));
 
-        // XXX: defered
+        // XXX: deferred
         // ASSERT_TRACE2("mapAttrs \"\" { foo.bar = 1; }",
         //               TypeError,
         //               HintFmt("attempt to call something which is not a function but %s", "a string"),
@@ -666,9 +666,9 @@ namespace nix {
                       HintFmt("expected a set but found %s: %s", "an integer", Uncolored(ANSI_CYAN "1" ANSI_NORMAL)),
                       HintFmt("while evaluating a value of the list passed as second argument to builtins.zipAttrsWith"));
 
-        // XXX: How to properly tell that the fucntion takes two arguments ?
+        // XXX: How to properly tell that the function takes two arguments ?
         // The same question also applies to sort, and maybe others.
-        // Due to lazyness, we only create a thunk, and it fails later on.
+        // Due to laziness, we only create a thunk, and it fails later on.
         // ASSERT_TRACE2("zipAttrsWith (_: 1) [ { foo = 1; } ]",
         //               TypeError,
         //               HintFmt("attempt to call something which is not a function but %s", "an integer"),
@@ -877,7 +877,7 @@ namespace nix {
                       HintFmt("expected a function but found %s: %s", "an integer", Uncolored(ANSI_CYAN "1" ANSI_NORMAL)),
                       HintFmt("while evaluating the first argument passed to builtins.genList"));
 
-        // XXX: defered
+        // XXX: deferred
         // ASSERT_TRACE2("genList (x: x + \"foo\") 2 #TODO",
         //               TypeError,
         //               HintFmt("cannot add %s to an integer", "a string"),

@@ -6,10 +6,10 @@
 #include "nix_api_value.h"
 #include "nix_api_expr_internal.h"
 
-#include "tests/nix_api_expr.hh"
-#include "tests/string_callback.hh"
+#include "nix/expr/tests/nix_api_expr.hh"
+#include "nix/util/tests/string_callback.hh"
 
-#include "gmock/gmock.h"
+#include <gmock/gmock.h>
 #include <cstddef>
 #include <cstdlib>
 #include <gtest/gtest.h>
@@ -134,12 +134,12 @@ TEST_F(nix_api_expr_test, nix_build_and_init_list_invalid)
 {
     ASSERT_EQ(nullptr, nix_get_list_byidx(ctx, nullptr, state, 0));
     assert_ctx_err();
-    ASSERT_EQ(0, nix_get_list_size(ctx, nullptr));
+    ASSERT_EQ(0u, nix_get_list_size(ctx, nullptr));
     assert_ctx_err();
 
     ASSERT_EQ(nullptr, nix_get_list_byidx(ctx, value, state, 0));
     assert_ctx_err();
-    ASSERT_EQ(0, nix_get_list_size(ctx, value));
+    ASSERT_EQ(0u, nix_get_list_size(ctx, value));
     assert_ctx_err();
 }
 
@@ -163,7 +163,7 @@ TEST_F(nix_api_expr_test, nix_build_and_init_list)
     ASSERT_EQ(42, nix_get_int(ctx, nix_get_list_byidx(ctx, value, state, 0)));
     ASSERT_EQ(43, nix_get_int(ctx, nix_get_list_byidx(ctx, value, state, 1)));
     ASSERT_EQ(nullptr, nix_get_list_byidx(ctx, value, state, 2));
-    ASSERT_EQ(10, nix_get_list_size(ctx, value));
+    ASSERT_EQ(10u, nix_get_list_size(ctx, value));
 
     ASSERT_STREQ("a list", nix_get_typename(ctx, value));
     ASSERT_EQ(NIX_TYPE_LIST, nix_get_type(ctx, value));
@@ -180,7 +180,7 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr_invalid)
     assert_ctx_err();
     ASSERT_EQ(nullptr, nix_get_attr_name_byidx(ctx, nullptr, state, 0));
     assert_ctx_err();
-    ASSERT_EQ(0, nix_get_attrs_size(ctx, nullptr));
+    ASSERT_EQ(0u, nix_get_attrs_size(ctx, nullptr));
     assert_ctx_err();
     ASSERT_EQ(false, nix_has_attr_byname(ctx, nullptr, state, "no-value"));
     assert_ctx_err();
@@ -191,7 +191,7 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr_invalid)
     assert_ctx_err();
     ASSERT_EQ(nullptr, nix_get_attr_name_byidx(ctx, value, state, 0));
     assert_ctx_err();
-    ASSERT_EQ(0, nix_get_attrs_size(ctx, value));
+    ASSERT_EQ(0u, nix_get_attrs_size(ctx, value));
     assert_ctx_err();
     ASSERT_EQ(false, nix_has_attr_byname(ctx, value, state, "no-value"));
     assert_ctx_err();
@@ -215,7 +215,7 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr)
     nix_make_attrs(ctx, value, builder);
     nix_bindings_builder_free(builder);
 
-    ASSERT_EQ(2, nix_get_attrs_size(ctx, value));
+    ASSERT_EQ(2u, nix_get_attrs_size(ctx, value));
 
     nix_value * out_value = nix_get_attr_byname(ctx, value, state, "a");
     ASSERT_EQ(42, nix_get_int(ctx, out_value));
@@ -374,7 +374,7 @@ TEST_F(nix_api_expr_test, nix_value_init_apply_lazy_arg)
 
     auto n = nix_get_attrs_size(ctx, r);
     assert_ctx_ok();
-    ASSERT_EQ(1, n);
+    ASSERT_EQ(1u, n);
 
     // nix_get_attr_byname isn't lazy (it could have been) so it will throw the exception
     nix_value * foo = nix_get_attr_byname(ctx, r, state, "foo");

@@ -1,8 +1,8 @@
-#include "progress-bar.hh"
-#include "terminal.hh"
-#include "sync.hh"
-#include "store-api.hh"
-#include "names.hh"
+#include "nix/main/progress-bar.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/sync.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/names.hh"
 
 #include <atomic>
 #include <map>
@@ -73,8 +73,13 @@ private:
         uint64_t corruptedPaths = 0, untrustedPaths = 0;
 
         bool active = true;
-        bool paused = false;
+        size_t suspensions = 0;
         bool haveUpdate = true;
+
+        bool isPaused() const
+        {
+            return suspensions > 0;
+        }
     };
 
     /** Helps avoid unnecessary redraws, see `redraw()` */
@@ -130,18 +135,30 @@ public:
 
     void pause() override {
         auto state (state_.lock());
-        state->paused = true;
+        state->suspensions++;
+        if (state->suspensions > 1) {
+            // already paused
+            return;
+        }
+
         if (state->active)
             writeToStderr("\r\e[K");
     }
 
     void resume() override {
         auto state (state_.lock());
-        state->paused = false;
-        if (state->active)
-            writeToStderr("\r\e[K");
-        state->haveUpdate = true;
-        updateCV.notify_one();
+        if (state->suspensions == 0) {
+            log(lvlError, "nix::ProgressBar: resume() called without a matching preceding pause(). This is a bug.");
+            return;
+        } else {
+            state->suspensions--;
+        }
+        if (state->suspensions == 0) {
+            if (state->active)
+                writeToStderr("\r\e[K");
+            state->haveUpdate = true;
+            updateCV.notify_one();
+        }
     }
 
     bool isVerbose() override
@@ -242,7 +259,7 @@ public:
         update(*state);
     }
 
-    /* Check whether an activity has an ancestore with the specified
+    /* Check whether an activity has an ancestor with the specified
        type. */
     bool hasAncestor(State & state, ActivityType type, ActivityId act)
     {
@@ -365,7 +382,7 @@ public:
     /**
      * Redraw, if the output has changed.
      *
-     * Excessive redrawing is noticable on slow terminals, and it interferes
+     * Excessive redrawing is noticeable on slow terminals, and it interferes
      * with text selection in some terminals, including libvte-based terminal
      * emulators.
      */
@@ -383,7 +400,7 @@ public:
         auto nextWakeup = std::chrono::milliseconds::max();
 
         state.haveUpdate = false;
-        if (state.paused || !state.active) return nextWakeup;
+        if (state.isPaused() || !state.active) return nextWakeup;
 
         std::string line;
 

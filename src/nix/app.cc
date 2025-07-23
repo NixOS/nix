@@ -1,13 +1,13 @@
-#include "installables.hh"
-#include "installable-derived-path.hh"
-#include "installable-value.hh"
-#include "store-api.hh"
-#include "eval-inline.hh"
-#include "eval-cache.hh"
-#include "names.hh"
-#include "command.hh"
-#include "derivations.hh"
-#include "downstream-placeholder.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/cmd/installable-derived-path.hh"
+#include "nix/cmd/installable-value.hh"
+#include "nix/store/store-api.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/eval-cache.hh"
+#include "nix/store/names.hh"
+#include "nix/cmd/command.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/downstream-placeholder.hh"
 
 namespace nix {
 
@@ -129,18 +129,23 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
         throw Error("attribute '%s' has unsupported type '%s'", cursor->getAttrPathStr(), type);
 }
 
-// FIXME: move to libcmd
-App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
+std::vector<BuiltPathWithResult> UnresolvedApp::build(ref<Store> evalStore, ref<Store> store)
 {
-    auto res = unresolved;
-
     Installables installableContext;
 
     for (auto & ctxElt : unresolved.context)
         installableContext.push_back(
             make_ref<InstallableDerivedPath>(store, DerivedPath { ctxElt }));
 
-    auto builtContext = Installable::build(evalStore, store, Realise::Outputs, installableContext);
+    return Installable::build(evalStore, store, Realise::Outputs, installableContext);
+}
+
+// FIXME: move to libcmd
+App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
+{
+    auto res = unresolved;
+
+    auto builtContext = build(evalStore, store);
     res.program = resolveString(*store, unresolved.program, builtContext);
     if (!store->isInStore(res.program))
         throw Error("app program '%s' is not in the Nix store", res.program);

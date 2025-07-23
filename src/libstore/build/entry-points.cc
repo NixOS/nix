@@ -1,11 +1,9 @@
-#include "worker.hh"
-#include "substitution-goal.hh"
-#ifndef _WIN32 // TODO Enable building on Windows
-#  include "derivation-creation-and-realisation-goal.hh"
-#  include "derivation-goal.hh"
-#endif
-#include "local-store.hh"
-#include "strings.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/build/worker.hh"
+#include "nix/store/build/substitution-goal.hh"
+#include "nix/store/build/derivation-trampoline-goal.hh"
+#include "nix/store/local-store.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
 
@@ -29,12 +27,9 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
                 ex = std::move(i->ex);
         }
         if (i->exitCode != Goal::ecSuccess) {
-#ifndef _WIN32 // TODO Enable building on Windows
-            if (auto i2 = dynamic_cast<DerivationCreationAndRealisationGoal *>(i.get()))
+            if (auto i2 = dynamic_cast<DerivationTrampolineGoal *>(i.get()))
                 failed.insert(i2->drvReq->to_string(*this));
-            else
-#endif
-            if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
+            else if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
                 failed.insert(printStorePath(i2->storePath));
         }
     }
@@ -71,7 +66,7 @@ std::vector<KeyedBuildResult> Store::buildPathsWithResults(
 
     for (auto & [req, goalPtr] : state)
         results.emplace_back(KeyedBuildResult {
-            goalPtr->getBuildResult(req),
+            goalPtr->buildResult,
             /* .path = */ req,
         });
 
@@ -82,19 +77,11 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
     BuildMode buildMode)
 {
     Worker worker(*this, *this);
-#ifndef _WIN32 // TODO Enable building on Windows
-    auto goal = worker.makeBasicDerivationGoal(drvPath, drv, OutputsSpec::All {}, buildMode);
-#else
-    std::shared_ptr<Goal> goal;
-    throw UnimplementedError("Building derivations not yet implemented on windows.");
-#endif
+    auto goal = worker.makeDerivationTrampolineGoal(drvPath, OutputsSpec::All {}, drv, buildMode);
 
     try {
         worker.run(Goals{goal});
-        return goal->getBuildResult(DerivedPath::Built {
-            .drvPath = makeConstantStorePathRef(drvPath),
-            .outputs = OutputsSpec::All {},
-        });
+        return goal->buildResult;
     } catch (Error & e) {
         return BuildResult {
             .status = BuildResult::MiscFailure,

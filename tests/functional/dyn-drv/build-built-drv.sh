@@ -19,7 +19,7 @@ clearStore
 drvDep=$(nix-instantiate ./text-hashed-output.nix -A producingDrv)
 
 # Store layer needs bugfix
-requireDaemonNewerThan "2.27pre20250205"
+requireDaemonNewerThan "2.30pre20250515"
 
 out2=$(nix build "${drvDep}^out^out" --no-link)
 

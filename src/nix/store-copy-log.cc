@@ -1,10 +1,10 @@
-#include "command.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "store-cast.hh"
-#include "log-store.hh"
-#include "sync.hh"
-#include "thread-pool.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-cast.hh"
+#include "nix/store/log-store.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/thread-pool.hh"
 
 #include <atomic>
 

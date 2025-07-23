@@ -1,11 +1,13 @@
-#include "logging.hh"
-#include "file-descriptor.hh"
-#include "environment-variables.hh"
-#include "terminal.hh"
-#include "util.hh"
-#include "config-global.hh"
-#include "source-path.hh"
-#include "position.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/util.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/position.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/unix-domain-socket.hh"
 
 #include <atomic>
 #include <sstream>
@@ -41,6 +43,19 @@ void Logger::writeToStdout(std::string_view s)
     Descriptor standard_out = getStandardOutput();
     writeFull(standard_out, s);
     writeFull(standard_out, "\n");
+}
+
+Logger::Suspension Logger::suspend()
+{
+    pause();
+    return Suspension { ._finalize = {[this](){this->resume();}} };
+}
+
+std::optional<Logger::Suspension> Logger::suspendIf(bool cond)
+{
+    if (cond)
+        return suspend();
+    return {};
 }
 
 class SimpleLogger : public Logger
@@ -151,7 +166,7 @@ Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     logger.startActivity(id, lvl, type, s, fields, parent);
 }
 
-void to_json(nlohmann::json & json, std::shared_ptr<Pos> pos)
+void to_json(nlohmann::json & json, std::shared_ptr<const Pos> pos)
 {
     if (pos) {
         json["line"] = pos->line;
@@ -168,8 +183,12 @@ void to_json(nlohmann::json & json, std::shared_ptr<Pos> pos)
 
 struct JSONLogger : Logger {
     Descriptor fd;
+    bool includeNixPrefix;
 
-    JSONLogger(Descriptor fd) : fd(fd) { }
+    JSONLogger(Descriptor fd, bool includeNixPrefix)
+        : fd(fd)
+        , includeNixPrefix(includeNixPrefix)
+    { }
 
     bool isVerbose() override {
         return true;
@@ -188,9 +207,33 @@ struct JSONLogger : Logger {
                 unreachable();
     }
 
+    struct State
+    {
+        bool enabled = true;
+    };
+
+    Sync<State> _state;
+
     void write(const nlohmann::json & json)
     {
-        writeLine(fd, "@nix " + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
+        auto line =
+            (includeNixPrefix ? "@nix " : "") +
+            json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+
+        /* Acquire a lock to prevent log messages from clobbering each
+           other. */
+        try {
+            auto state(_state.lock());
+            if (state->enabled)
+                writeLine(fd, line);
+        } catch (...) {
+            bool enabled = false;
+            std::swap(_state.lock()->enabled, enabled);
+            if (enabled) {
+                ignoreExceptionExceptInterrupt();
+                logger->warn("disabling JSON logger due to write errors");
+            }
+        }
     }
 
     void log(Verbosity lvl, std::string_view s) override
@@ -262,9 +305,49 @@ struct JSONLogger : Logger {
     }
 };
 
-std::unique_ptr<Logger> makeJSONLogger(Descriptor fd)
+std::unique_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix)
 {
-    return std::make_unique<JSONLogger>(fd);
+    return std::make_unique<JSONLogger>(fd, includeNixPrefix);
+}
+
+std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix)
+{
+    struct JSONFileLogger : JSONLogger {
+        AutoCloseFD fd;
+
+        JSONFileLogger(AutoCloseFD && fd, bool includeNixPrefix)
+            : JSONLogger(fd.get(), includeNixPrefix)
+            , fd(std::move(fd))
+        { }
+    };
+
+    AutoCloseFD fd =
+        std::filesystem::is_socket(path)
+        ? connect(path)
+        : toDescriptor(open(path.string().c_str(), O_CREAT | O_APPEND | O_WRONLY, 0644));
+    if (!fd)
+        throw SysError("opening log file %1%", path);
+
+    return std::make_unique<JSONFileLogger>(std::move(fd), includeNixPrefix);
+}
+
+void applyJSONLogger()
+{
+    if (!loggerSettings.jsonLogPath.get().empty()) {
+        try {
+            std::vector<std::unique_ptr<Logger>> loggers;
+            loggers.push_back(makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false));
+            try {
+                logger = makeTeeLogger(std::move(logger), std::move(loggers));
+            } catch (...) {
+                // `logger` is now gone so give up.
+                abort();
+            }
+        } catch (...) {
+            ignoreExceptionExceptInterrupt();
+        }
+
+    }
 }
 
 static Logger::Fields getFields(nlohmann::json & json)

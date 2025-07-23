@@ -1,7 +1,7 @@
-#include "serve-protocol-connection.hh"
-#include "serve-protocol-impl.hh"
-#include "build-result.hh"
-#include "derivations.hh"
+#include "nix/store/serve-protocol-connection.hh"
+#include "nix/store/serve-protocol-impl.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/derivations.hh"
 
 namespace nix {
 

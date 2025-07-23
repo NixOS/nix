@@ -1,15 +1,15 @@
-#include "filetransfer.hh"
-#include "cache.hh"
-#include "globals.hh"
-#include "store-api.hh"
-#include "types.hh"
-#include "url-parts.hh"
-#include "git.hh"
-#include "fetchers.hh"
-#include "fetch-settings.hh"
-#include "tarball.hh"
-#include "tarfile.hh"
-#include "git-utils.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/fetchers/cache.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url-parts.hh"
+#include "nix/util/git.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/fetch-settings.hh"
+#include "nix/fetchers/tarball.hh"
+#include "nix/util/tarfile.hh"
+#include "nix/fetchers/git-utils.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>
@@ -149,6 +149,9 @@ struct GitArchiveInputScheme : InputScheme
         };
         if (auto narHash = input.getNarHash())
             url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
+        auto host = maybeGetStrAttr(input.attrs, "host");
+        if (host)
+            url.query.insert_or_assign("host", *host);
         return url;
     }
 
@@ -172,7 +175,7 @@ struct GitArchiveInputScheme : InputScheme
         return input;
     }
 
-    // Search for the longest possible match starting from the begining and ending at either the end or a path segment.
+    // Search for the longest possible match starting from the beginning and ending at either the end or a path segment.
     std::optional<std::string> getAccessToken(const fetchers::Settings & settings, const std::string & host, const std::string & url) const override
     {
         auto tokens = settings.accessTokens.get();
@@ -262,7 +265,7 @@ struct GitArchiveInputScheme : InputScheme
         input.attrs.erase("ref");
         input.attrs.insert_or_assign("rev", rev->gitRev());
 
-        auto cache = getCache();
+        auto cache = input.settings->getCache();
 
         Cache::Key treeHashKey{"gitRevToTreeHash", {{"rev", rev->gitRev()}}};
         Cache::Key lastModifiedKey{"gitRevToLastModified", {{"rev", rev->gitRev()}}};
@@ -404,7 +407,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, "source", headers).storePath)));
+                    downloadFile(store, *input.settings, url, "source", headers).storePath)));
 
         return RefInfo {
             .rev = Hash::parseAny(std::string { json["sha"] }, HashAlgorithm::SHA1),
@@ -478,7 +481,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, "source", headers).storePath)));
+                    downloadFile(store, *input.settings, url, "source", headers).storePath)));
 
         if (json.is_array() && json.size() >= 1 && json[0]["id"] != nullptr) {
           return RefInfo {
@@ -548,7 +551,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::string refUri;
         if (ref == "HEAD") {
             auto file = store->toRealPath(
-                downloadFile(store, fmt("%s/HEAD", base_url), "source", headers).storePath);
+                downloadFile(store, *input.settings, fmt("%s/HEAD", base_url), "source", headers).storePath);
             std::ifstream is(file);
             std::string line;
             getline(is, line);
@@ -564,7 +567,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::regex refRegex(refUri);
 
         auto file = store->toRealPath(
-            downloadFile(store, fmt("%s/info/refs", base_url), "source", headers).storePath);
+            downloadFile(store, *input.settings, fmt("%s/info/refs", base_url), "source", headers).storePath);
         std::ifstream is(file);
 
         std::string line;

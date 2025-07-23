@@ -1,8 +1,8 @@
-#if ENABLE_S3
+#include "nix/store/s3-binary-cache-store.hh"
+
+#if NIX_WITH_S3_SUPPORT
 
 #  include <gtest/gtest.h>
-
-#  include "s3-binary-cache-store.hh"
 
 namespace nix {
 

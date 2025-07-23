@@ -1,29 +1,34 @@
 #include <algorithm>
 #include <cstring>
 
-#include "current-process.hh"
-#include "util.hh"
-#include "finally.hh"
-#include "file-system.hh"
-#include "processes.hh"
-#include "signals.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/util.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/signals.hh"
 #include <math.h>
 
 #ifdef __APPLE__
 # include <mach-o/dyld.h>
 #endif
 
-#if __linux__
+#ifdef __linux__
 # include <mutex>
-# include "cgroup.hh"
-# include "namespaces.hh"
+# include "nix/util/cgroup.hh"
+# include "nix/util/linux-namespaces.hh"
+#endif
+
+#ifdef __FreeBSD__
+# include <sys/param.h>
+# include <sys/sysctl.h>
 #endif
 
 namespace nix {
 
 unsigned int getMaxCPU()
 {
-    #if __linux__
+    #ifdef __linux__
     try {
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS) return 0;
@@ -57,7 +62,7 @@ size_t savedStackSize = 0;
 void setStackSize(size_t stackSize)
 {
     struct rlimit limit;
-    if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
+    if (getrlimit(RLIMIT_STACK, &limit) == 0 && static_cast<size_t>(limit.rlim_cur) < stackSize) {
         savedStackSize = limit.rlim_cur;
         limit.rlim_cur = std::min(static_cast<rlim_t>(stackSize), limit.rlim_max);
         if (setrlimit(RLIMIT_STACK, &limit) != 0) {
@@ -82,7 +87,7 @@ void restoreProcessContext(bool restoreMounts)
     unix::restoreSignals();
     #endif
     if (restoreMounts) {
-        #if __linux__
+        #ifdef __linux__
         restoreMountNamespace();
         #endif
     }
@@ -106,15 +111,33 @@ std::optional<Path> getSelfExe()
 {
     static auto cached = []() -> std::optional<Path>
     {
-        #if __linux__ || __GNU__
+        #if defined(__linux__) || defined(__GNU__)
         return readLink("/proc/self/exe");
-        #elif __APPLE__
+        #elif defined(__APPLE__)
         char buf[1024];
         uint32_t size = sizeof(buf);
         if (_NSGetExecutablePath(buf, &size) == 0)
             return buf;
         else
             return std::nullopt;
+        #elif defined(__FreeBSD__)
+        int sysctlName[] = {
+            CTL_KERN,
+            KERN_PROC,
+            KERN_PROC_PATHNAME,
+            -1,
+        };
+        size_t pathLen = 0;
+        if (sysctl(sysctlName, sizeof(sysctlName) / sizeof(sysctlName[0]), nullptr, &pathLen, nullptr, 0) < 0) {
+               return std::nullopt;
+        }
+
+        std::vector<char> path(pathLen);
+        if (sysctl(sysctlName, sizeof(sysctlName) / sizeof(sysctlName[0]), path.data(), &pathLen, nullptr, 0) < 0) {
+            return std::nullopt;
+        }
+
+        return Path(path.begin(), path.end());
         #else
         return std::nullopt;
         #endif

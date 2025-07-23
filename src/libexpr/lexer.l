@@ -1,3 +1,4 @@
+%option 8bit
 %option reentrant bison-bridge bison-locations
 %option align
 %option noyywrap
@@ -16,7 +17,7 @@
 
 %top {
 #include "parser-tab.hh" // YYSTYPE
-#include "parser-state.hh"
+#include "nix/expr/parser-state.hh"
 }
 
 %{
@@ -24,8 +25,7 @@
 #pragma clang diagnostic ignored "-Wunneeded-internal-declaration"
 #endif
 
-#include "nixexpr.hh"
-#include "parser-tab.hh"
+#include "nix/expr/nixexpr.hh"
 #include "lexer-helpers.hh"
 
 namespace nix {

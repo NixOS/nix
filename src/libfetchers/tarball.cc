@@ -1,19 +1,21 @@
-#include "tarball.hh"
-#include "fetchers.hh"
-#include "cache.hh"
-#include "filetransfer.hh"
-#include "store-api.hh"
-#include "archive.hh"
-#include "tarfile.hh"
-#include "types.hh"
-#include "store-path-accessor.hh"
-#include "store-api.hh"
-#include "git-utils.hh"
+#include "nix/fetchers/tarball.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/cache.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/tarfile.hh"
+#include "nix/util/types.hh"
+#include "nix/fetchers/store-path-accessor.hh"
+#include "nix/store/store-api.hh"
+#include "nix/fetchers/git-utils.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 namespace nix::fetchers {
 
 DownloadFileResult downloadFile(
     ref<Store> store,
+    const Settings & settings,
     const std::string & url,
     const std::string & name,
     const Headers & headers)
@@ -25,7 +27,7 @@ DownloadFileResult downloadFile(
         {"name", name},
     }}};
 
-    auto cached = getCache()->lookupStorePath(key, *store);
+    auto cached = settings.getCache()->lookupStorePath(key, *store);
 
     auto useCached = [&]() -> DownloadFileResult
     {
@@ -92,7 +94,7 @@ DownloadFileResult downloadFile(
         key.second.insert_or_assign("url", url);
         assert(!res.urls.empty());
         infoAttrs.insert_or_assign("url", *res.urls.rbegin());
-        getCache()->upsert(key, *store, infoAttrs, *storePath);
+        settings.getCache()->upsert(key, *store, infoAttrs, *storePath);
     }
 
     return {
@@ -104,13 +106,33 @@ DownloadFileResult downloadFile(
 }
 
 static DownloadTarballResult downloadTarball_(
+    const Settings & settings,
     const std::string & url,
     const Headers & headers,
     const std::string & displayPrefix)
 {
+
+    // Some friendly error messages for common mistakes.
+    // Namely lets catch when the url is a local file path, but
+    // it is not in fact a tarball.
+    if (url.rfind("file://", 0) == 0) {
+        // Remove "file://" prefix to get the local file path
+        std::string localPath = url.substr(7);
+        if (!std::filesystem::exists(localPath)) {
+            throw Error("tarball '%s' does not exist.", localPath);
+        }
+        if (std::filesystem::is_directory(localPath)) {
+            if (std::filesystem::exists(localPath + "/.git")) {
+                throw Error(
+                    "tarball '%s' is a git repository, not a tarball. Please use `git+file` as the scheme.", localPath);
+            }
+            throw Error("tarball '%s' is a directory, not a file.", localPath);
+        }
+    }
+
     Cache::Key cacheKey{"tarball", {{"url", url}}};
 
-    auto cached = getCache()->lookupExpired(cacheKey);
+    auto cached = settings.getCache()->lookupExpired(cacheKey);
 
     auto attrsToResult = [&](const Attrs & infoAttrs)
     {
@@ -196,7 +218,7 @@ static DownloadTarballResult downloadTarball_(
     /* Insert a cache entry for every URL in the redirect chain. */
     for (auto & url : res->urls) {
         cacheKey.second.insert_or_assign("url", url);
-        getCache()->upsert(cacheKey, infoAttrs);
+        settings.getCache()->upsert(cacheKey, infoAttrs);
     }
 
     // FIXME: add a cache entry for immutableUrl? That could allow
@@ -224,7 +246,7 @@ ref<SourceAccessor> downloadTarball(
 // An input scheme corresponding to a curl-downloadable resource.
 struct CurlInputScheme : InputScheme
 {
-    const std::set<std::string> transportUrlSchemes = {"file", "http", "https"};
+    const StringSet transportUrlSchemes = {"file", "http", "https"};
 
     bool hasTarballExtension(std::string_view path) const
     {
@@ -236,7 +258,7 @@ struct CurlInputScheme : InputScheme
 
     virtual bool isValidURL(const ParsedURL & url, bool requireTree) const = 0;
 
-    static const std::set<std::string> specialParams;
+    static const StringSet specialParams;
 
     std::optional<Input> inputFromURL(
         const Settings & settings,
@@ -341,7 +363,7 @@ struct FileInputScheme : CurlInputScheme
            the Nix store directly, since there is little deduplication
            benefit in using the Git cache for single big files like
            tarballs. */
-        auto file = downloadFile(store, getStrAttr(input.attrs, "url"), input.getName());
+        auto file = downloadFile(store, *input.settings, getStrAttr(input.attrs, "url"), input.getName());
 
         auto narHash = store->queryPathInfo(file.storePath)->narHash;
         input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
@@ -373,6 +395,7 @@ struct TarballInputScheme : CurlInputScheme
         auto input(_input);
 
         auto result = downloadTarball_(
+            *input.settings,
             getStrAttr(input.attrs, "url"),
             {},
             "«" + input.to_string() + "»");
@@ -390,7 +413,7 @@ struct TarballInputScheme : CurlInputScheme
             input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
         input.attrs.insert_or_assign("narHash",
-            getTarballCache()->treeHashToNarHash(result.treeHash).to_string(HashFormat::SRI, true));
+            getTarballCache()->treeHashToNarHash(*input.settings, result.treeHash).to_string(HashFormat::SRI, true));
 
         return {result.accessor, input};
     }

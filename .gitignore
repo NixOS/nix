@@ -14,7 +14,7 @@
 /tests/functional/lang/*.err
 /tests/functional/lang/*.ast
 
-outputs/
+/outputs
 
 *~
 
@@ -47,3 +47,6 @@ result-*
 .DS_Store
 
 flake-regressions
+
+# direnv
+.direnv/

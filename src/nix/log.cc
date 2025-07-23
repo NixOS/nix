@@ -1,8 +1,8 @@
-#include "command.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "log-store.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/log-store.hh"
 
 using namespace nix;
 
@@ -35,7 +35,7 @@ struct CmdLog : InstallableCommand
         // For compat with CLI today, TODO revisit
         auto oneUp = std::visit(overloaded {
             [&](const DerivedPath::Opaque & bo) {
-                return make_ref<SingleDerivedPath>(bo);
+                return make_ref<const SingleDerivedPath>(bo);
             },
             [&](const DerivedPath::Built & bfd) {
                 return bfd.drvPath;

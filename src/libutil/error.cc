@@ -1,19 +1,19 @@
 #include <algorithm>
 
-#include "error.hh"
-#include "environment-variables.hh"
-#include "signals.hh"
-#include "terminal.hh"
-#include "position.hh"
+#include "nix/util/error.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/position.hh"
 
 #include <iostream>
 #include <optional>
-#include "serialise.hh"
+#include "nix/util/serialise.hh"
 #include <sstream>
 
 namespace nix {
 
-void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint, TracePrint print)
+void BaseError::addTrace(std::shared_ptr<const Pos> && e, HintFmt hint, TracePrint print)
 {
     err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .print = print });
 }
@@ -146,7 +146,7 @@ static bool printUnknownLocations = getEnv("_NIX_EVAL_SHOW_UNKNOWN_LOCATIONS").h
  *
  * @return true if a position was printed.
  */
-static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std::shared_ptr<Pos> & pos) {
+static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std::shared_ptr<const Pos> & pos) {
     bool hasPos = pos && *pos;
     if (hasPos) {
         oss << indent << ANSI_BLUE << "at " ANSI_WARNING << *pos << ANSI_NORMAL << ":";

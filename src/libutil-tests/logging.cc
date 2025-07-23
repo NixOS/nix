@@ -1,7 +1,7 @@
 #if 0
 
-#include "logging.hh"
-#include "nixexpr.hh"
+#include "nix/util/logging.hh"
+#include "nix/expr/nixexpr.hh"
 #include <fstream>
 
 #include <gtest/gtest.h>
@@ -19,7 +19,7 @@ namespace nix {
     const char *one_liner =
         "this is the other problem line of code";
 
-    TEST(logEI, catpuresBasicProperties) {
+    TEST(logEI, capturesBasicProperties) {
 
         MakeError(TestError, Error);
         ErrorInfo::programName = std::optional("error-unit-test");

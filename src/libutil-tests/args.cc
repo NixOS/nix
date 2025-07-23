@@ -1,5 +1,5 @@
-#include "args.hh"
-#include "fs-sink.hh"
+#include "nix/util/args.hh"
+#include "nix/util/fs-sink.hh"
 #include <list>
 
 #include <gtest/gtest.h>
@@ -9,7 +9,7 @@ namespace nix {
 
     TEST(parseShebangContent, basic) {
         std::list<std::string> r = parseShebangContent("hi there");
-        ASSERT_EQ(r.size(), 2);
+        ASSERT_EQ(r.size(), 2u);
         auto i = r.begin();
         ASSERT_EQ(*i++, "hi");
         ASSERT_EQ(*i++, "there");
@@ -17,26 +17,26 @@ namespace nix {
 
     TEST(parseShebangContent, empty) {
         std::list<std::string> r = parseShebangContent("");
-        ASSERT_EQ(r.size(), 0);
+        ASSERT_EQ(r.size(), 0u);
     }
 
     TEST(parseShebangContent, doubleBacktick) {
         std::list<std::string> r = parseShebangContent("``\"ain't that nice\"``");
-        ASSERT_EQ(r.size(), 1);
+        ASSERT_EQ(r.size(), 1u);
         auto i = r.begin();
         ASSERT_EQ(*i++, "\"ain't that nice\"");
     }
 
     TEST(parseShebangContent, doubleBacktickEmpty) {
         std::list<std::string> r = parseShebangContent("````");
-        ASSERT_EQ(r.size(), 1);
+        ASSERT_EQ(r.size(), 1u);
         auto i = r.begin();
         ASSERT_EQ(*i++, "");
     }
 
     TEST(parseShebangContent, doubleBacktickMarkdownInlineCode) {
         std::list<std::string> r = parseShebangContent("``# I'm markdown section about `coolFunction` ``");
-        ASSERT_EQ(r.size(), 1);
+        ASSERT_EQ(r.size(), 1u);
         auto i = r.begin();
         ASSERT_EQ(*i++, "# I'm markdown section about `coolFunction`");
     }
@@ -44,49 +44,49 @@ namespace nix {
     TEST(parseShebangContent, doubleBacktickMarkdownCodeBlockNaive) {
         std::list<std::string> r = parseShebangContent("``Example 1\n```nix\na: a\n``` ``");
         auto i = r.begin();
-        ASSERT_EQ(r.size(), 1);
+        ASSERT_EQ(r.size(), 1u);
         ASSERT_EQ(*i++, "Example 1\n``nix\na: a\n``");
     }
 
     TEST(parseShebangContent, doubleBacktickMarkdownCodeBlockCorrect) {
         std::list<std::string> r = parseShebangContent("``Example 1\n````nix\na: a\n```` ``");
         auto i = r.begin();
-        ASSERT_EQ(r.size(), 1);
+        ASSERT_EQ(r.size(), 1u);
         ASSERT_EQ(*i++, "Example 1\n```nix\na: a\n```");
     }
 
     TEST(parseShebangContent, doubleBacktickMarkdownCodeBlock2) {
         std::list<std::string> r = parseShebangContent("``Example 1\n````nix\na: a\n````\nExample 2\n````nix\na: a\n```` ``");
         auto i = r.begin();
-        ASSERT_EQ(r.size(), 1);
+        ASSERT_EQ(r.size(), 1u);
         ASSERT_EQ(*i++, "Example 1\n```nix\na: a\n```\nExample 2\n```nix\na: a\n```");
     }
 
     TEST(parseShebangContent, singleBacktickInDoubleBacktickQuotes) {
         std::list<std::string> r = parseShebangContent("``` ``");
         auto i = r.begin();
-        ASSERT_EQ(r.size(), 1);
+        ASSERT_EQ(r.size(), 1u);
         ASSERT_EQ(*i++, "`");
     }
 
     TEST(parseShebangContent, singleBacktickAndSpaceInDoubleBacktickQuotes) {
         std::list<std::string> r = parseShebangContent("```  ``");
         auto i = r.begin();
-        ASSERT_EQ(r.size(), 1);
+        ASSERT_EQ(r.size(), 1u);
         ASSERT_EQ(*i++, "` ");
     }
 
     TEST(parseShebangContent, doubleBacktickInDoubleBacktickQuotes) {
         std::list<std::string> r = parseShebangContent("````` ``");
         auto i = r.begin();
-        ASSERT_EQ(r.size(), 1);
+        ASSERT_EQ(r.size(), 1u);
         ASSERT_EQ(*i++, "``");
     }
 
     TEST(parseShebangContent, increasingQuotes) {
         std::list<std::string> r = parseShebangContent("```` ``` `` ````` `` `````` ``");
         auto i = r.begin();
-        ASSERT_EQ(r.size(), 4);
+        ASSERT_EQ(r.size(), 4u);
         ASSERT_EQ(*i++, "");
         ASSERT_EQ(*i++, "`");
         ASSERT_EQ(*i++, "``");
@@ -146,7 +146,7 @@ RC_GTEST_PROP(
     auto escaped = escape(orig);
     // RC_LOG() << "escaped: <[[" << escaped << "]]>" << std::endl;
     auto ss = parseShebangContent(escaped);
-    RC_ASSERT(ss.size() == 1);
+    RC_ASSERT(ss.size() == 1u);
     RC_ASSERT(*ss.begin() == orig);
 }
 
@@ -156,7 +156,7 @@ RC_GTEST_PROP(
     (const std::string & one, const std::string & two))
 {
     auto ss = parseShebangContent(escape(one) + " " + escape(two));
-    RC_ASSERT(ss.size() == 2);
+    RC_ASSERT(ss.size() == 2u);
     auto i = ss.begin();
     RC_ASSERT(*i++ == one);
     RC_ASSERT(*i++ == two);

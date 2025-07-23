@@ -1,13 +1,13 @@
-#include "nixexpr.hh"
-#include "eval.hh"
-#include "symbol-table.hh"
-#include "util.hh"
-#include "print.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/symbol-table.hh"
+#include "nix/util/util.hh"
+#include "nix/expr/print.hh"
 
 #include <cstdlib>
 #include <sstream>
 
-#include "strings-inline.hh"
+#include "nix/util/strings-inline.hh"
 
 namespace nix {
 
@@ -601,47 +601,12 @@ void ExprLambda::setDocComment(DocComment docComment) {
     }
 };
 
-
-
-/* Position table. */
-
-Pos PosTable::operator[](PosIdx p) const
-{
-    auto origin = resolve(p);
-    if (!origin)
-        return {};
-
-    const auto offset = origin->offsetOf(p);
-
-    Pos result{0, 0, origin->origin};
-    auto lines = this->lines.lock();
-    auto linesForInput = (*lines)[origin->offset];
-
-    if (linesForInput.empty()) {
-        auto source = result.getSource().value_or("");
-        const char * begin = source.data();
-        for (Pos::LinesIterator it(source), end; it != end; it++)
-            linesForInput.push_back(it->data() - begin);
-        if (linesForInput.empty())
-            linesForInput.push_back(0);
-    }
-    // as above: the first line starts at byte 0 and is always present
-    auto lineStartOffset = std::prev(
-        std::upper_bound(linesForInput.begin(), linesForInput.end(), offset));
-
-    result.line = 1 + (lineStartOffset - linesForInput.begin());
-    result.column = 1 + (offset - *lineStartOffset);
-    return result;
-}
-
-
-
 /* Symbol table. */
 
 size_t SymbolTable::totalSize() const
 {
     size_t n = 0;
-    dump([&] (const std::string & s) { n += s.size(); });
+    dump([&] (SymbolStr s) { n += s.size(); });
     return n;
 }
 

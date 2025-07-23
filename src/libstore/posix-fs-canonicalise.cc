@@ -1,13 +1,15 @@
-#if HAVE_ACL_SUPPORT
+#include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/util.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/store-api.hh"
+
+#include "store-config-private.hh"
+
+#if NIX_SUPPORT_ACL
 # include <sys/xattr.h>
 #endif
-
-#include "posix-fs-canonicalise.hh"
-#include "file-system.hh"
-#include "signals.hh"
-#include "util.hh"
-#include "globals.hh"
-#include "store-api.hh"
 
 namespace nix {
 
@@ -56,7 +58,7 @@ static void canonicalisePathMetaData_(
 {
     checkInterrupt();
 
-#if __APPLE__
+#ifdef __APPLE__
     /* Remove flags, in particular UF_IMMUTABLE which would prevent
        the file from being garbage-collected. FIXME: Use
        setattrlist() to remove other attributes as well. */
@@ -72,7 +74,7 @@ static void canonicalisePathMetaData_(
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
         throw Error("file '%1%' has an unsupported type", path);
 
-#if HAVE_ACL_SUPPORT
+#if NIX_SUPPORT_ACL
     /* Remove extended attributes / ACLs. */
     ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
 
@@ -134,7 +136,7 @@ static void canonicalisePathMetaData_(
 #endif
 
     if (S_ISDIR(st.st_mode)) {
-        for (auto & i : std::filesystem::directory_iterator{path}) {
+        for (auto & i : DirectoryIterator{path}) {
             checkInterrupt();
             canonicalisePathMetaData_(
                 i.path().string(),

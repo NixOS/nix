@@ -1,12 +1,12 @@
-#include "serialise.hh"
-#include "util.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/util.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
 #ifdef _WIN32
 # include <winnt.h>
 # include <fileapi.h>
-# include "windows-error.hh"
+# include "nix/util/windows-error.hh"
 #endif
 
 namespace nix {
@@ -98,7 +98,7 @@ void AutoCloseFD::fsync() const
         result =
 #ifdef _WIN32
             ::FlushFileBuffers(fd)
-#elif __APPLE__
+#elif defined(__APPLE__)
             ::fcntl(fd, F_FULLFSYNC)
 #else
             ::fsync(fd)
@@ -113,7 +113,7 @@ void AutoCloseFD::fsync() const
 
 void AutoCloseFD::startFsync() const
 {
-#if __linux__
+#ifdef __linux__
         if (fd != -1) {
             /* Ignore failure, since fsync must be run later anyway. This is just a performance optimization. */
             ::sync_file_range(fd, 0, 0, SYNC_FILE_RANGE_WRITE);

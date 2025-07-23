@@ -1,15 +1,15 @@
-#include "command.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "common-args.hh"
-#include "nar-info.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/main/common-args.hh"
+#include "nix/store/nar-info.hh"
 
 #include <algorithm>
 #include <array>
 
 #include <nlohmann/json.hpp>
 
-#include "strings.hh"
+#include "nix/util/strings.hh"
 
 using namespace nix;
 using nlohmann::json;
@@ -154,11 +154,11 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             pathLen = std::max(pathLen, store->printStorePath(storePath).size());
 
         if (json) {
-            logger->cout(pathInfoToJSON(
+            printJSON(pathInfoToJSON(
                 *store,
                 // FIXME: preserve order?
                 StorePathSet(storePaths.begin(), storePaths.end()),
-                showClosureSize).dump());
+                showClosureSize));
         }
 
         else {

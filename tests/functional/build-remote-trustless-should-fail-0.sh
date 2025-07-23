@@ -12,7 +12,6 @@ requiresUnprivilegedUserNamespaces
 [[ $busybox =~ busybox ]] || skipTest "no busybox"
 
 unset NIX_STORE_DIR
-unset NIX_STATE_DIR
 
 # We first build a dependency of the derivation we eventually want to
 # build.

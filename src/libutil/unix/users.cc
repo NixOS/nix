@@ -1,15 +1,13 @@
-#include "util.hh"
-#include "users.hh"
-#include "environment-variables.hh"
-#include "file-system.hh"
+#include "nix/util/util.hh"
+#include "nix/util/users.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/file-system.hh"
 
 #include <pwd.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 namespace nix {
-
-namespace fs { using namespace std::filesystem; }
 
 std::string getUserName()
 {

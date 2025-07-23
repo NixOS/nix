@@ -1,16 +1,16 @@
-#include "current-process.hh"
-#include "environment-variables.hh"
-#include "error.hh"
-#include "executable-path.hh"
-#include "file-descriptor.hh"
-#include "file-path.hh"
-#include "signals.hh"
-#include "processes.hh"
-#include "finally.hh"
-#include "serialise.hh"
-#include "file-system.hh"
-#include "util.hh"
-#include "windows-error.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/executable-path.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-path.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/util.hh"
+#include "nix/util/windows-error.hh"
 
 #include <cerrno>
 #include <cstdlib>
@@ -312,11 +312,7 @@ void runProgram2(const RunOptions & options)
     // TODO: Implement shebang / program interpreter lookup on Windows
     auto interpreter = getProgramInterpreter(realProgram);
 
-    std::optional<Finally<std::function<void()>>> resumeLoggerDefer;
-    if (options.isInteractive) {
-        logger->pause();
-        resumeLoggerDefer.emplace([]() { logger->resume(); });
-    }
+    auto suspension = logger->suspendIf(options.isInteractive);
 
     Pid pid = spawnProcess(interpreter.has_value() ? *interpreter : realProgram, options, out, in);
 

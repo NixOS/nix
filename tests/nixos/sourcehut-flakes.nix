@@ -48,7 +48,7 @@ let
 
   nixpkgs-repo = pkgs.runCommand "nixpkgs-flake" { } ''
     dir=NixOS-nixpkgs-${nixpkgs.shortRev}
-    cp -prd ${nixpkgs} $dir
+    cp -rd --preserve=ownership,timestamps ${nixpkgs} $dir
 
     # Set the correct timestamp in the tarball.
     find $dir -print0 | xargs -0 touch -h -t ${builtins.substring 0 12 nixpkgs.lastModifiedDate}.${
@@ -139,8 +139,8 @@ in
       start_all()
 
       sourcehut.wait_for_unit("httpd.service")
-      sourcehut.wait_for_unit("network-online.target")
-      client.wait_for_unit("network-online.target")
+      sourcehut.wait_for_unit("network-addresses-eth1.service")
+      client.wait_for_unit("network-addresses-eth1.service")
 
       client.succeed("curl -v https://git.sr.ht/ >&2")
       client.succeed("nix registry list | grep nixpkgs")

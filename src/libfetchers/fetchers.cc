@@ -1,10 +1,10 @@
-#include "fetchers.hh"
-#include "store-api.hh"
-#include "source-path.hh"
-#include "fetch-to-store.hh"
-#include "json-utils.hh"
-#include "store-path-accessor.hh"
-#include "fetch-settings.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/source-path.hh"
+#include "nix/fetchers/fetch-to-store.hh"
+#include "nix/util/json-utils.hh"
+#include "nix/fetchers/store-path-accessor.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -12,24 +12,26 @@ namespace nix::fetchers {
 
 using InputSchemeMap = std::map<std::string_view, std::shared_ptr<InputScheme>>;
 
-std::unique_ptr<InputSchemeMap> inputSchemes = nullptr;
+static InputSchemeMap & inputSchemes()
+{
+    static InputSchemeMap inputSchemeMap;
+    return inputSchemeMap;
+}
 
 void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
 {
-    if (!inputSchemes)
-        inputSchemes = std::make_unique<InputSchemeMap>();
     auto schemeName = inputScheme->schemeName();
-    if (inputSchemes->count(schemeName) > 0)
+    if (!inputSchemes().emplace(schemeName, std::move(inputScheme)).second)
         throw Error("Input scheme with name %s already registered", schemeName);
-    inputSchemes->insert_or_assign(schemeName, std::move(inputScheme));
 }
 
-nlohmann::json dumpRegisterInputSchemeInfo() {
+nlohmann::json dumpRegisterInputSchemeInfo()
+{
     using nlohmann::json;
 
     auto res = json::object();
 
-    for (auto & [name, scheme] : *inputSchemes) {
+    for (auto & [name, scheme] : inputSchemes()) {
         auto & r = res[name] = json::object();
         r["allowedAttrs"] = scheme->allowedAttrs();
     }
@@ -57,7 +59,7 @@ Input Input::fromURL(
     const Settings & settings,
     const ParsedURL & url, bool requireTree)
 {
-    for (auto & [_, inputScheme] : *inputSchemes) {
+    for (auto & [_, inputScheme] : inputSchemes()) {
         auto res = inputScheme->inputFromURL(settings, url, requireTree);
         if (res) {
             experimentalFeatureSettings.require(inputScheme->experimentalFeature());
@@ -91,8 +93,8 @@ Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
     };
 
     std::shared_ptr<InputScheme> inputScheme = ({
-        auto i = inputSchemes->find(schemeName);
-        i == inputSchemes->end() ? nullptr : i->second;
+        auto i = get(inputSchemes(), schemeName);
+        i ? *i : nullptr;
     });
 
     if (!inputScheme) return raw();
@@ -132,7 +134,7 @@ ParsedURL Input::toURL() const
     return scheme->toURL(*this);
 }
 
-std::string Input::toURLString(const std::map<std::string, std::string> & extraQuery) const
+std::string Input::toURLString(const StringMap & extraQuery) const
 {
     auto url = toURL();
     for (auto & attr : extraQuery)
@@ -196,7 +198,7 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
         try {
             auto [accessor, result] = getAccessorUnchecked(store);
 
-            auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, result.getName());
+            auto storePath = nix::fetchToStore(*settings, *store, SourcePath(accessor), FetchMode::Copy, result.getName());
 
             auto narHash = store->queryPathInfo(storePath)->narHash;
             result.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
@@ -322,6 +324,8 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
             auto accessor = makeStorePathAccessor(store, storePath);
 
             accessor->fingerprint = getFingerprint(store);
+
+            accessor->setPathDisplay("«" + to_string() + "»");
 
             return {accessor, *this};
         } catch (Error & e) {

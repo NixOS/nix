@@ -77,7 +77,7 @@
   `<nix/fetchurl.nix>` is also known as the builtin derivation builder `builtin:fetchurl`. It's not to be confused with the evaluation-time function `builtins.fetchurl`, which was not affected by this issue.
 
 
-# Contributors
+## Contributors
 
 This release was made possible by the following 58 contributors:
 

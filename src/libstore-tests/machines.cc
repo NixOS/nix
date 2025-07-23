@@ -1,8 +1,8 @@
-#include "machines.hh"
-#include "file-system.hh"
-#include "util.hh"
+#include "nix/store/machines.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/util.hh"
 
-#include "tests/characterization.hh"
+#include "nix/util/tests/characterization.hh"
 
 #include <gtest/gtest.h>
 #include <gmock/gmock-matchers.h>
@@ -73,6 +73,32 @@ TEST(machines, getMachinesWithSemicolonSeparator) {
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
 }
 
+TEST(machines, getMachinesWithCommentsAndSemicolonSeparator) {
+    auto actual = Machine::parseConfig({},
+        "# This is a comment ; this is still that comment\n"
+        "nix@scratchy.labs.cs.uu.nl ; nix@itchy.labs.cs.uu.nl\n"
+        "# This is also a comment ; this also is still that comment\n"
+        "nix@scabby.labs.cs.uu.nl\n");
+    EXPECT_THAT(actual, SizeIs(3));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scabby.labs.cs.uu.nl"))));
+}
+
+TEST(machines, getMachinesWithFunnyWhitespace) {
+    auto actual = Machine::parseConfig({},
+        "        # comment ; comment\n"
+        "   nix@scratchy.labs.cs.uu.nl ; nix@itchy.labs.cs.uu.nl   \n"
+        "\n    \n"
+        "\n ;;; \n"
+        "\n ; ; \n"
+        "nix@scabby.labs.cs.uu.nl\n\n");
+    EXPECT_THAT(actual, SizeIs(3));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scabby.labs.cs.uu.nl"))));
+}
+
 TEST(machines, getMachinesWithCorrectCompleteSingleBuilder) {
     auto actual = Machine::parseConfig({},
         "nix@scratchy.labs.cs.uu.nl     i686-linux      "
@@ -137,8 +163,8 @@ TEST(machines, getMachinesWithIncorrectFormat) {
 }
 
 TEST(machines, getMachinesWithCorrectFileReference) {
-    auto path = fs::weakly_canonical(getUnitTestData() / "machines/valid");
-    ASSERT_TRUE(fs::exists(path));
+    auto path = std::filesystem::weakly_canonical(getUnitTestData() / "machines/valid");
+    ASSERT_TRUE(std::filesystem::exists(path));
 
     auto actual = Machine::parseConfig({}, "@" + path.string());
     ASSERT_THAT(actual, SizeIs(3));
@@ -148,22 +174,22 @@ TEST(machines, getMachinesWithCorrectFileReference) {
 }
 
 TEST(machines, getMachinesWithCorrectFileReferenceToEmptyFile) {
-    fs::path path = "/dev/null";
-    ASSERT_TRUE(fs::exists(path));
+    std::filesystem::path path = "/dev/null";
+    ASSERT_TRUE(std::filesystem::exists(path));
 
     auto actual = Machine::parseConfig({}, "@" + path.string());
     ASSERT_THAT(actual, SizeIs(0));
 }
 
 TEST(machines, getMachinesWithIncorrectFileReference) {
-    auto path = fs::weakly_canonical("/not/a/file");
-    ASSERT_TRUE(!fs::exists(path));
+    auto path = std::filesystem::weakly_canonical("/not/a/file");
+    ASSERT_TRUE(!std::filesystem::exists(path));
     auto actual = Machine::parseConfig({}, "@" + path.string());
     ASSERT_THAT(actual, SizeIs(0));
 }
 
 TEST(machines, getMachinesWithCorrectFileReferenceToIncorrectFile) {
     EXPECT_THROW(
-        Machine::parseConfig({}, "@" + fs::weakly_canonical(getUnitTestData() / "machines" / "bad_format").string()),
+        Machine::parseConfig({}, "@" + std::filesystem::weakly_canonical(getUnitTestData() / "machines" / "bad_format").string()),
         FormatError);
 }

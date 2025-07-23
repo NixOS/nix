@@ -1,6 +1,3 @@
-#include "config-util.hh"
-#include "config-store.hh"
-
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
@@ -9,11 +6,11 @@
 #undef do_open
 #undef do_close
 
-#include "derivations.hh"
-#include "realisation.hh"
-#include "globals.hh"
-#include "store-api.hh"
-#include "posix-source-accessor.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/store-open.hh"
+#include "nix/util/posix-source-accessor.hh"
 
 #include <sodium.h>
 #include <nlohmann/json.hpp>

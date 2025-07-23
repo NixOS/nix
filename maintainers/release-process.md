@@ -39,10 +39,6 @@ release:
 * Proof-read / edit / rearrange the release notes if needed. Breaking changes
   and highlights should go to the top.
 
-* Run `maintainers/release-credits` to make sure the credits script works
-  and produces a sensible output. Some emails might not automatically map to
-  a GitHub handle.
-
 * Push.
 
   ```console

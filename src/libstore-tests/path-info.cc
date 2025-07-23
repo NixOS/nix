@@ -1,10 +1,10 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
-#include "path-info.hh"
+#include "nix/store/path-info.hh"
 
-#include "tests/characterization.hh"
-#include "tests/libstore.hh"
+#include "nix/util/tests/characterization.hh"
+#include "nix/store/tests/libstore.hh"
 
 namespace nix {
 
@@ -93,7 +93,7 @@ TEST_F(PathInfoTest, PathInfo_full_shortRefs) {
     ValidPathInfo it = makeFullKeyed(*store, true);
     // it.references = unkeyed.references;
     auto refs = it.shortRefs();
-    ASSERT_EQ(refs.size(), 2);
+    ASSERT_EQ(refs.size(), 2u);
     ASSERT_EQ(*refs.begin(), "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar");
     ASSERT_EQ(*++refs.begin(), "n5wkd9frr45pa74if5gpz9j7mifg27fh-foo");
 }

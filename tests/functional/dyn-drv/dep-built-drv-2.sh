@@ -3,7 +3,7 @@
 source common.sh
 
 # Store layer needs bugfix
-requireDaemonNewerThan "2.27pre20250205"
+requireDaemonNewerThan "2.30pre20250515"
 
 TODO_NixOS # can't enable a sandbox feature easily
 

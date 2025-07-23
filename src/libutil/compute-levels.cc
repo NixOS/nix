@@ -1,7 +1,10 @@
-#include "types.hh"
+#include "nix/util/types.hh"
+
+#include "util-config-private.hh"
 
 #if HAVE_LIBCPUID
-#include <libcpuid/libcpuid.h>
+#  include <libcpuid/libcpuid.h>
+#  include <map>
 #endif
 
 namespace nix {
@@ -10,61 +13,21 @@ namespace nix {
 
 StringSet computeLevels() {
     StringSet levels;
+    struct cpu_id_t data;
 
-    if (!cpuid_present())
+    const std::map<cpu_feature_level_t, std::string> feature_strings = {
+        { FEATURE_LEVEL_X86_64_V1, "x86_64-v1" },
+        { FEATURE_LEVEL_X86_64_V2, "x86_64-v2" },
+        { FEATURE_LEVEL_X86_64_V3, "x86_64-v3" },
+        { FEATURE_LEVEL_X86_64_V4, "x86_64-v4" },
+    };
+
+    if (cpu_identify(NULL, &data) < 0)
         return levels;
 
-    cpu_raw_data_t raw;
-    cpu_id_t data;
-
-    if (cpuid_get_raw_data(&raw) < 0)
-        return levels;
-
-    if (cpu_identify(&raw, &data) < 0)
-        return levels;
-
-    if (!(data.flags[CPU_FEATURE_CMOV] &&
-            data.flags[CPU_FEATURE_CX8] &&
-            data.flags[CPU_FEATURE_FPU] &&
-            data.flags[CPU_FEATURE_FXSR] &&
-            data.flags[CPU_FEATURE_MMX] &&
-            data.flags[CPU_FEATURE_SSE] &&
-            data.flags[CPU_FEATURE_SSE2]))
-        return levels;
-
-    levels.insert("x86_64-v1");
-
-    if (!(data.flags[CPU_FEATURE_CX16] &&
-            data.flags[CPU_FEATURE_LAHF_LM] &&
-            data.flags[CPU_FEATURE_POPCNT] &&
-            // SSE3
-            data.flags[CPU_FEATURE_PNI] &&
-            data.flags[CPU_FEATURE_SSSE3] &&
-            data.flags[CPU_FEATURE_SSE4_1] &&
-            data.flags[CPU_FEATURE_SSE4_2]))
-        return levels;
-
-    levels.insert("x86_64-v2");
-
-    if (!(data.flags[CPU_FEATURE_AVX] &&
-            data.flags[CPU_FEATURE_AVX2] &&
-            data.flags[CPU_FEATURE_F16C] &&
-            data.flags[CPU_FEATURE_FMA3] &&
-            // LZCNT
-            data.flags[CPU_FEATURE_ABM] &&
-            data.flags[CPU_FEATURE_MOVBE]))
-        return levels;
-
-    levels.insert("x86_64-v3");
-
-    if (!(data.flags[CPU_FEATURE_AVX512F] &&
-            data.flags[CPU_FEATURE_AVX512BW] &&
-            data.flags[CPU_FEATURE_AVX512CD] &&
-            data.flags[CPU_FEATURE_AVX512DQ] &&
-            data.flags[CPU_FEATURE_AVX512VL]))
-        return levels;
-
-    levels.insert("x86_64-v4");
+    for (auto & [level, levelString] : feature_strings)
+        if (data.feature_level >= level)
+            levels.insert(levelString);
 
     return levels;
 }

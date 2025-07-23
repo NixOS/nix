@@ -76,7 +76,7 @@
 
 - Evaluation caching now works for dirty Git workdirs [#11992](https://github.com/NixOS/nix/pull/11992)
 
-# Contributors
+## Contributors
 
 This release was made possible by the following 45 contributors:
 

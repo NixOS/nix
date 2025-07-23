@@ -1,7 +1,7 @@
-#include "realisation.hh"
-#include "store-api.hh"
-#include "closure.hh"
-#include "signature/local-keys.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/closure.hh"
+#include "nix/util/signature/local-keys.hh"
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -96,7 +96,7 @@ Realisation Realisation::fromJSON(
 
     std::map <DrvOutput, StorePath> dependentRealisations;
     if (auto jsonDependencies = json.find("dependentRealisations"); jsonDependencies != json.end())
-        for (auto & [jsonDepId, jsonDepOutPath] : jsonDependencies->get<std::map<std::string, std::string>>())
+        for (auto & [jsonDepId, jsonDepOutPath] : jsonDependencies->get<StringMap>())
             dependentRealisations.insert({DrvOutput::parse(jsonDepId), StorePath(jsonDepOutPath)});
 
     return Realisation{

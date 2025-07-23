@@ -1,0 +1,36 @@
+{
+  "args": [
+    "-c",
+    "echo hello > $out"
+  ],
+  "builder": "/bin/bash",
+  "env": {
+    "dev": "/02qcpld1y6xhs5gz9bchpxaw0xdhmsp5dv88lh25r2ss44kh8dxz",
+    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9"
+  },
+  "inputDrvs": {},
+  "inputSrcs": [],
+  "name": "advanced-attributes-structured-attrs-defaults",
+  "outputs": {
+    "dev": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    },
+    "out": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    }
+  },
+  "structuredAttrs": {
+    "builder": "/bin/bash",
+    "name": "advanced-attributes-structured-attrs-defaults",
+    "outputHashAlgo": "sha256",
+    "outputHashMode": "recursive",
+    "outputs": [
+      "out",
+      "dev"
+    ],
+    "system": "my-system"
+  },
+  "system": "my-system"
+}

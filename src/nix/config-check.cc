@@ -1,14 +1,14 @@
 #include <sstream>
 
-#include "command.hh"
-#include "exit.hh"
-#include "logging.hh"
-#include "serve-protocol.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
-#include "worker-protocol.hh"
-#include "executable-path.hh"
+#include "nix/cmd/command.hh"
+#include "nix/util/exit.hh"
+#include "nix/util/logging.hh"
+#include "nix/store/serve-protocol.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/worker-protocol.hh"
+#include "nix/util/executable-path.hh"
 
 namespace nix::fs { using namespace std::filesystem; }
 
@@ -78,12 +78,12 @@ struct CmdConfigCheck : StoreCommand
 
     bool checkNixInPath()
     {
-        std::set<fs::path> dirs;
+        std::set<std::filesystem::path> dirs;
 
         for (auto & dir : ExecutablePath::load().directories) {
             auto candidate = dir / "nix-env";
-            if (fs::exists(candidate))
-                dirs.insert(fs::canonical(candidate).parent_path() );
+            if (std::filesystem::exists(candidate))
+                dirs.insert(std::filesystem::canonical(candidate).parent_path() );
         }
 
         if (dirs.size() != 1) {
@@ -99,12 +99,12 @@ struct CmdConfigCheck : StoreCommand
 
     bool checkProfileRoots(ref<Store> store)
     {
-        std::set<fs::path> dirs;
+        std::set<std::filesystem::path> dirs;
 
         for (auto & dir : ExecutablePath::load().directories) {
             auto profileDir = dir.parent_path();
             try {
-                auto userEnv = fs::weakly_canonical(profileDir);
+                auto userEnv = std::filesystem::weakly_canonical(profileDir);
 
                 auto noContainsProfiles = [&]{
                     for (auto && part : profileDir)
@@ -114,8 +114,8 @@ struct CmdConfigCheck : StoreCommand
 
                 if (store->isStorePath(userEnv.string()) && hasSuffix(userEnv.string(), "user-environment")) {
                     while (noContainsProfiles() && std::filesystem::is_symlink(profileDir))
-                        profileDir = fs::weakly_canonical(
-                            profileDir.parent_path() / fs::read_symlink(profileDir));
+                        profileDir = std::filesystem::weakly_canonical(
+                            profileDir.parent_path() / std::filesystem::read_symlink(profileDir));
 
                     if (noContainsProfiles())
                         dirs.insert(dir);

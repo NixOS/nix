@@ -1,30 +1,28 @@
-#include "command.hh"
-#include "installable-flake.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "eval.hh"
-#include "eval-inline.hh"
-#include "eval-settings.hh"
-#include "flake/flake.hh"
-#include "get-drvs.hh"
-#include "signals.hh"
-#include "store-api.hh"
-#include "derivations.hh"
-#include "outputs-spec.hh"
-#include "attr-path.hh"
-#include "fetchers.hh"
-#include "registry.hh"
-#include "eval-cache.hh"
-#include "markdown.hh"
-#include "users.hh"
-#include "fetch-to-store.hh"
-#include "local-fs-store.hh"
+#include "flake-command.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/expr/get-drvs.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/registry.hh"
+#include "nix/expr/eval-cache.hh"
+#include "nix/cmd/markdown.hh"
+#include "nix/util/users.hh"
+#include "nix/fetchers/fetch-to-store.hh"
+#include "nix/store/local-fs-store.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
 #include <iomanip>
 
-#include "strings-inline.hh"
+#include "nix/util/strings-inline.hh"
 
 namespace nix::fs { using namespace std::filesystem; }
 
@@ -33,43 +31,36 @@ using namespace nix::flake;
 using json = nlohmann::json;
 
 struct CmdFlakeUpdate;
-class FlakeCommand : virtual Args, public MixFlakeOptions
+
+FlakeCommand::FlakeCommand()
 {
-protected:
-    std::string flakeUrl = ".";
+    expectArgs({
+        .label = "flake-url",
+        .optional = true,
+        .handler = {&flakeUrl},
+        .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+            completeFlakeRef(completions, getStore(), prefix);
+        }}
+    });
+}
 
-public:
+FlakeRef FlakeCommand::getFlakeRef()
+{
+    return parseFlakeRef(fetchSettings, flakeUrl, std::filesystem::current_path().string()); //FIXME
+}
 
-    FlakeCommand()
-    {
-        expectArgs({
-            .label = "flake-url",
-            .optional = true,
-            .handler = {&flakeUrl},
-            .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
-                completeFlakeRef(completions, getStore(), prefix);
-            }}
-        });
-    }
+LockedFlake FlakeCommand::lockFlake()
+{
+    return flake::lockFlake(flakeSettings, *getEvalState(), getFlakeRef(), lockFlags);
+}
 
-    FlakeRef getFlakeRef()
-    {
-        return parseFlakeRef(fetchSettings, flakeUrl, fs::current_path().string()); //FIXME
-    }
-
-    LockedFlake lockFlake()
-    {
-        return flake::lockFlake(flakeSettings, *getEvalState(), getFlakeRef(), lockFlags);
-    }
-
-    std::vector<FlakeRef> getFlakeRefsForCompletion() override
-    {
-        return {
-            // Like getFlakeRef but with expandTilde calld first
-            parseFlakeRef(fetchSettings, expandTilde(flakeUrl), fs::current_path().string())
-        };
-    }
-};
+std::vector<FlakeRef> FlakeCommand::getFlakeRefsForCompletion()
+{
+    return {
+        // Like getFlakeRef but with expandTilde called first
+        parseFlakeRef(fetchSettings, expandTilde(flakeUrl), std::filesystem::current_path().string())
+    };
+}
 
 struct CmdFlakeUpdate : FlakeCommand
 {
@@ -90,7 +81,7 @@ public:
             .handler={&flakeUrl},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
                 completeFlakeRef(completions, getStore(), prefix);
-            }}
+            }},
         });
         expectArgs({
             .label="inputs",
@@ -111,7 +102,7 @@ public:
             }},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
                 completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
-            }}
+            }},
         });
 
         /* Remove flags that don't make sense. */
@@ -242,7 +233,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             j["locks"] = lockedFlake.lockFile.toJSON().first;
             if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
                 j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
-            logger->cout("%s", j.dump());
+            printJSON(j);
         } else {
             logger->cout(
                 ANSI_BOLD "Resolved URL:" ANSI_NORMAL "  %s",
@@ -336,12 +327,12 @@ struct CmdFlakeCheck : FlakeCommand
         addFlag({
             .longName = "no-build",
             .description = "Do not build checks.",
-            .handler = {&build, false}
+            .handler = {&build, false},
         });
         addFlag({
             .longName = "all-systems",
             .description = "Check the outputs for all systems.",
-            .handler = {&checkAllSystems, true}
+            .handler = {&checkAllSystems, true},
         });
     }
 
@@ -386,7 +377,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        std::set<std::string> omittedSystems;
+        StringSet omittedSystems;
 
         // FIXME: rewrite to use EvalCache.
 
@@ -492,8 +483,8 @@ struct CmdFlakeCheck : FlakeCommand
                 if (!v.isLambda()) {
                     throw Error("overlay is not a function, but %s instead", showType(v));
                 }
-                if (v.payload.lambda.fun->hasFormals()
-                    || !argHasName(v.payload.lambda.fun->arg, "final"))
+                if (v.lambda().fun->hasFormals()
+                    || !argHasName(v.lambda().fun->arg, "final"))
                     throw Error("overlay does not take an argument named 'final'");
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
@@ -874,7 +865,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     defaultTemplateAttrPathsPrefixes,
                     defaultTemplateAttrPaths,
                     prefix);
-            }}
+            }},
         });
     }
 
@@ -885,7 +876,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto evalState = getEvalState();
 
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(
-            fetchSettings, templateUrl, fs::current_path().string());
+            fetchSettings, templateUrl, std::filesystem::current_path().string());
 
         auto installable = InstallableFlake(nullptr,
             evalState, std::move(templateFlakeRef), templateName, ExtendedOutputsSpec::Default(),
@@ -899,25 +890,25 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         NixStringContext context;
         auto templateDir = evalState->coerceToPath(noPos, templateDirAttr, context, "");
 
-        std::vector<fs::path> changedFiles;
-        std::vector<fs::path> conflictedFiles;
+        std::vector<std::filesystem::path> changedFiles;
+        std::vector<std::filesystem::path> conflictedFiles;
 
-        std::function<void(const SourcePath & from, const fs::path & to)> copyDir;
-        copyDir = [&](const SourcePath & from, const fs::path & to)
+        std::function<void(const SourcePath & from, const std::filesystem::path & to)> copyDir;
+        copyDir = [&](const SourcePath & from, const std::filesystem::path & to)
         {
-            fs::create_directories(to);
+            createDirs(to);
 
             for (auto & [name, entry] : from.readDirectory()) {
                 checkInterrupt();
                 auto from2 = from / name;
                 auto to2 = to / name;
                 auto st = from2.lstat();
-                auto to_st = fs::symlink_status(to2);
+                auto to_st = std::filesystem::symlink_status(to2);
                 if (st.type == SourceAccessor::tDirectory)
                     copyDir(from2, to2);
                 else if (st.type == SourceAccessor::tRegular) {
                     auto contents = from2.readFile();
-                    if (fs::exists(to_st)) {
+                    if (std::filesystem::exists(to_st)) {
                         auto contents2 = readFile(to2.string());
                         if (contents != contents2) {
                             printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
@@ -931,8 +922,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 }
                 else if (st.type == SourceAccessor::tSymlink) {
                     auto target = from2.readLink();
-                    if (fs::exists(to_st)) {
-                        if (fs::read_symlink(to2) != target) {
+                    if (std::filesystem::exists(to_st)) {
+                        if (std::filesystem::read_symlink(to2) != target) {
                             printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2.string(), from2);
                             conflictedFiles.push_back(to2);
                         } else {
@@ -951,7 +942,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         copyDir(templateDir, flakeDir);
 
-        if (!changedFiles.empty() && fs::exists(std::filesystem::path{flakeDir} / ".git")) {
+        if (!changedFiles.empty() && std::filesystem::exists(std::filesystem::path{flakeDir} / ".git")) {
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
             for (auto & s : changedFiles) args.emplace_back(s.string());
             runProgram("git", true, args);
@@ -1034,7 +1025,7 @@ struct CmdFlakeClone : FlakeCommand
             .shortName = 'f',
             .description = "Clone the flake to path *dest*.",
             .labels = {"path"},
-            .handler = {&destDir}
+            .handler = {&destDir},
         });
     }
 
@@ -1051,13 +1042,22 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 {
     std::string dstUri;
 
+    CheckSigsFlag checkSigs = CheckSigs;
+
+    SubstituteFlag substitute = NoSubstitute;
+
     CmdFlakeArchive()
     {
         addFlag({
             .longName = "to",
             .description = "URI of the destination Nix store",
             .labels = {"store-uri"},
-            .handler = {&dstUri}
+            .handler = {&dstUri},
+        });
+        addFlag({
+            .longName = "no-check-sigs",
+            .description = "Do not require that paths are signed by trusted keys.",
+            .handler = {&checkSigs, NoCheckSigs},
         });
     }
 
@@ -1115,14 +1115,15 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
                 {"path", store->printStorePath(storePath)},
                 {"inputs", traverse(*flake.lockFile.root)},
             };
-            logger->cout("%s", jsonRoot);
+            printJSON(jsonRoot);
         } else {
             traverse(*flake.lockFile.root);
         }
 
         if (!dryRun && !dstUri.empty()) {
             ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
-            copyPaths(*store, *dstStore, sources);
+
+            copyPaths(*store, *dstStore, sources, NoRepair, checkSigs, substitute);
         }
     }
 };
@@ -1137,12 +1138,12 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         addFlag({
             .longName = "legacy",
             .description = "Show the contents of the `legacyPackages` output.",
-            .handler = {&showLegacy, true}
+            .handler = {&showLegacy, true},
         });
         addFlag({
             .longName = "all-systems",
             .description = "Show the contents of outputs for all systems.",
-            .handler = {&showAllSystems, true}
+            .handler = {&showAllSystems, true},
         });
     }
 
@@ -1329,18 +1330,34 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
                         }
                     } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else
-                            throw Error("expected a derivation");
+                        try {
+                            if (visitor.isDerivation())
+                                showDerivation();
+                            else
+                                throw Error("expected a derivation");
+                        } catch (IFDError & e) {
+                            if (!json) {
+                                logger->cout(fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL, headerPrefix));
+                            } else {
+                                logger->warn(fmt("%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                            }
+                        }
                     }
                 }
 
                 else if (attrPath.size() > 0 && attrPathS[0] == "hydraJobs") {
-                    if (visitor.isDerivation())
-                        showDerivation();
-                    else
-                        recurse();
+                    try {
+                        if (visitor.isDerivation())
+                            showDerivation();
+                        else
+                            recurse();
+                    } catch (IFDError & e) {
+                        if (!json) {
+                            logger->cout(fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL, headerPrefix));
+                        } else {
+                            logger->warn(fmt("%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                        }
+                    }
                 }
 
                 else if (attrPath.size() > 0 && attrPathS[0] == "legacyPackages") {
@@ -1359,11 +1376,19 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
                         }
                     } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else if (attrPath.size() <= 2)
-                            // FIXME: handle recurseIntoAttrs
-                            recurse();
+                        try {
+                            if (visitor.isDerivation())
+                                showDerivation();
+                            else if (attrPath.size() <= 2)
+                                // FIXME: handle recurseIntoAttrs
+                                recurse();
+                        } catch (IFDError & e) {
+                            if (!json) {
+                                logger->cout(fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL, headerPrefix));
+                            } else {
+                                logger->warn(fmt("%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                            }
+                        }
                     }
                 }
 
@@ -1427,7 +1452,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
         auto j = visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
         if (json)
-            logger->cout("%s", j.dump());
+            printJSON(j);
     }
 };
 
@@ -1443,7 +1468,7 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
             .description = "Create symlink named *path* to the resulting store path.",
             .labels = {"path"},
             .handler = {&outLink},
-            .completer = completePath
+            .completer = completePath,
         });
     }
 
@@ -1464,7 +1489,7 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
         auto originalRef = getFlakeRef();
         auto resolvedRef = originalRef.resolve(store);
         auto [accessor, lockedRef] = resolvedRef.lazyFetch(store);
-        auto storePath = fetchToStore(*store, accessor, FetchMode::Copy, lockedRef.input.getName());
+        auto storePath = fetchToStore(getEvalState()->fetchSettings, *store, accessor, FetchMode::Copy, lockedRef.input.getName());
         auto hash = store->queryPathInfo(storePath)->narHash;
 
         if (json) {
@@ -1473,7 +1498,8 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
             res["hash"] = hash.to_string(HashFormat::SRI, true);
             res["original"] = fetchers::attrsToJSON(resolvedRef.toAttrs());
             res["locked"] = fetchers::attrsToJSON(lockedRef.toAttrs());
-            logger->cout(res.dump());
+            res["locked"].erase("__final"); // internal for now
+            printJSON(res);
         } else {
             notice("Downloaded '%s' to '%s' (hash '%s').",
                 lockedRef.to_string(),
@@ -1493,21 +1519,7 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
 struct CmdFlake : NixMultiCommand
 {
     CmdFlake()
-        : NixMultiCommand(
-            "flake",
-            {
-                {"update", []() { return make_ref<CmdFlakeUpdate>(); }},
-                {"lock", []() { return make_ref<CmdFlakeLock>(); }},
-                {"metadata", []() { return make_ref<CmdFlakeMetadata>(); }},
-                {"info", []() { return make_ref<CmdFlakeInfo>(); }},
-                {"check", []() { return make_ref<CmdFlakeCheck>(); }},
-                {"init", []() { return make_ref<CmdFlakeInit>(); }},
-                {"new", []() { return make_ref<CmdFlakeNew>(); }},
-                {"clone", []() { return make_ref<CmdFlakeClone>(); }},
-                {"archive", []() { return make_ref<CmdFlakeArchive>(); }},
-                {"show", []() { return make_ref<CmdFlakeShow>(); }},
-                {"prefetch", []() { return make_ref<CmdFlakePrefetch>(); }},
-            })
+        : NixMultiCommand("flake", RegisterCommand::getCommandsFor({"flake"}))
     {
     }
 
@@ -1531,3 +1543,14 @@ struct CmdFlake : NixMultiCommand
 };
 
 static auto rCmdFlake = registerCommand<CmdFlake>("flake");
+static auto rCmdFlakeArchive = registerCommand2<CmdFlakeArchive>({"flake", "archive"});
+static auto rCmdFlakeCheck = registerCommand2<CmdFlakeCheck>({"flake", "check"});
+static auto rCmdFlakeClone = registerCommand2<CmdFlakeClone>({"flake", "clone"});
+static auto rCmdFlakeInfo = registerCommand2<CmdFlakeInfo>({"flake", "info"});
+static auto rCmdFlakeInit = registerCommand2<CmdFlakeInit>({"flake", "init"});
+static auto rCmdFlakeLock = registerCommand2<CmdFlakeLock>({"flake", "lock"});
+static auto rCmdFlakeMetadata = registerCommand2<CmdFlakeMetadata>({"flake", "metadata"});
+static auto rCmdFlakeNew = registerCommand2<CmdFlakeNew>({"flake", "new"});
+static auto rCmdFlakePrefetch = registerCommand2<CmdFlakePrefetch>({"flake", "prefetch"});
+static auto rCmdFlakeShow = registerCommand2<CmdFlakeShow>({"flake", "show"});
+static auto rCmdFlakeUpdate = registerCommand2<CmdFlakeUpdate>({"flake", "update"});

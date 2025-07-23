@@ -5,7 +5,7 @@ source common.sh
 out1=$(nix-build ./text-hashed-output.nix -A hello --no-out-link)
 
 # Store layer needs bugfix
-requireDaemonNewerThan "2.27pre20250205"
+requireDaemonNewerThan "2.30pre20250515"
 
 clearStore
 

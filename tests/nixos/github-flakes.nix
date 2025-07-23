@@ -81,7 +81,7 @@ let
     mkdir -p $out/archive
 
     dir=NixOS-nixpkgs-${nixpkgs.shortRev}
-    cp -prd ${nixpkgs} $dir
+    cp -rd --preserve=ownership,timestamps ${nixpkgs} $dir
     # Set the correct timestamp in the tarball.
     find $dir -print0 | xargs -0 touch -h -t ${builtins.substring 0 12 nixpkgs.lastModifiedDate}.${
       builtins.substring 12 2 nixpkgs.lastModifiedDate
@@ -187,9 +187,9 @@ in
            github.succeed("cat /var/log/httpd/*.log >&2")
 
       github.wait_for_unit("httpd.service")
-      github.wait_for_unit("network-online.target")
+      github.wait_for_unit("network-addresses-eth1.service")
 
-      client.wait_for_unit("network-online.target")
+      client.wait_for_unit("network-addresses-eth1.service")
       client.succeed("curl -v https://github.com/ >&2")
       out = client.succeed("nix registry list")
       print(out)
@@ -227,7 +227,7 @@ in
       # Fetching without a narHash should succeed if trust-github is set and fail otherwise.
       client.succeed(f"nix eval --raw --expr 'builtins.fetchTree github:github:fancy-enterprise/private-flake/{info['revision']}'")
       out = client.fail(f"nix eval --no-trust-tarballs-from-git-forges --raw --expr 'builtins.fetchTree github:github:fancy-enterprise/private-flake/{info['revision']}' 2>&1")
-      assert "will not fetch unlocked input" in out, "--no-trust-tarballs-from-git-forges did not fail with the expected error"
+      assert "doesn't fetch unlocked input" in out, "--no-trust-tarballs-from-git-forges did not fail with the expected error"
 
       # Shut down the web server. The flake should be cached on the client.
       github.succeed("systemctl stop httpd.service")

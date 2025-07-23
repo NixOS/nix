@@ -1,17 +1,18 @@
-#include "command.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "filetransfer.hh"
-#include "finally.hh"
-#include "loggers.hh"
-#include "tarfile.hh"
-#include "attr-path.hh"
-#include "eval-inline.hh"
-#include "legacy.hh"
-#include "posix-source-accessor.hh"
-#include "misc-store-flags.hh"
-#include "terminal.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/util/finally.hh"
+#include "nix/main/loggers.hh"
+#include "nix/util/tarfile.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/cmd/legacy.hh"
+#include "nix/util/posix-source-accessor.hh"
+#include "nix/cmd/misc-store-flags.hh"
+#include "nix/util/terminal.hh"
+
 #include "man-pages.hh"
 
 #include <nlohmann/json.hpp>
@@ -45,7 +46,7 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
     if (mirrorList->value->listSize() < 1)
         throw Error("mirror URL '%s' did not expand to anything", url);
 
-    std::string mirror(state.forceString(*mirrorList->value->listElems()[0], noPos, "while evaluating the first available mirror"));
+    std::string mirror(state.forceString(*mirrorList->value->listView()[0], noPos, "while evaluating the first available mirror"));
     return mirror + (hasSuffix(mirror, "/") ? "" : "/") + s.substr(p + 1);
 }
 
@@ -115,11 +116,11 @@ std::tuple<StorePath, Hash> prefetchFile(
             createDirs(unpacked);
             unpackTarfile(tmpFile.string(), unpacked);
 
-            auto entries = std::filesystem::directory_iterator{unpacked};
+            auto entries = DirectoryIterator{unpacked};
             /* If the archive unpacks to a single file/directory, then use
                that as the top-level. */
             tmpFile = entries->path();
-            auto fileCount = std::distance(entries, std::filesystem::directory_iterator{});
+            auto fileCount = std::distance(entries, DirectoryIterator{});
             if (fileCount != 1) {
                 /* otherwise, use the directory itself */
                 tmpFile = unpacked;
@@ -220,7 +221,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             state->forceList(*attr->value, noPos, "while evaluating the urls to prefetch");
             if (attr->value->listSize() < 1)
                 throw Error("'urls' list is empty");
-            url = state->forceString(*attr->value->listElems()[0], noPos, "while evaluating the first url from the urls list");
+            url = state->forceString(*attr->value->listView()[0], noPos, "while evaluating the first url from the urls list");
 
             /* Extract the hash mode. */
             auto attr2 = v.attrs()->get(state->symbols.create("outputHashMode"));
@@ -274,7 +275,7 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             .longName = "name",
             .description = "Override the name component of the resulting store path. It defaults to the base name of *url*.",
             .labels = {"name"},
-            .handler = {&name}
+            .handler = {&name},
         });
 
         addFlag({
@@ -283,7 +284,7 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             .labels = {"hash"},
             .handler = {[&](std::string s) {
                 expectedHash = Hash::parseAny(s, hashAlgo);
-            }}
+            }},
         });
 
         addFlag(flag::hashAlgo("hash-type", &hashAlgo));
@@ -326,7 +327,7 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             auto res = nlohmann::json::object();
             res["storePath"] = store->printStorePath(storePath);
             res["hash"] = hash.to_string(HashFormat::SRI, true);
-            logger->cout(res.dump());
+            printJSON(res);
         } else {
             notice("Downloaded '%s' to '%s' (hash '%s').",
                 url,

@@ -1,6 +1,6 @@
-#include "loggers.hh"
-#include "environment-variables.hh"
-#include "progress-bar.hh"
+#include "nix/main/loggers.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/main/progress-bar.hh"
 
 namespace nix {
 

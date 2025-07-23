@@ -1,12 +1,14 @@
-#include "profiles.hh"
-#include "shared.hh"
-#include "globals.hh"
-#include "filetransfer.hh"
-#include "store-api.hh"
-#include "legacy.hh"
-#include "eval-settings.hh" // for defexpr
-#include "users.hh"
-#include "tarball.hh"
+#include "nix/store/profiles.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/store/store-open.hh"
+#include "nix/cmd/legacy.hh"
+#include "nix/cmd/common-eval-args.hh"
+#include "nix/expr/eval-settings.hh" // for defexpr
+#include "nix/util/users.hh"
+#include "nix/fetchers/tarball.hh"
+#include "nix/fetchers/fetch-settings.hh"
 #include "self-exe.hh"
 #include "man-pages.hh"
 
@@ -16,7 +18,7 @@
 
 using namespace nix;
 
-typedef std::map<std::string, std::string> Channels;
+typedef StringMap Channels;
 
 static Channels channels;
 static std::filesystem::path channelsList;
@@ -114,7 +116,7 @@ static void update(const StringSet & channelNames)
             // We want to download the url to a file to see if it's a tarball while also checking if we
             // got redirected in the process, so that we can grab the various parts of a nix channel
             // definition from a consistent location if the redirect changes mid-download.
-            auto result = fetchers::downloadFile(store, url, std::string(baseNameOf(url)));
+            auto result = fetchers::downloadFile(store, fetchSettings, url, std::string(baseNameOf(url)));
             auto filename = store->toRealPath(result.storePath);
             url = result.effectiveUrl;
 
@@ -128,9 +130,9 @@ static void update(const StringSet & channelNames)
             if (!unpacked) {
                 // Download the channel tarball.
                 try {
-                    filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.xz", "nixexprs.tar.xz").storePath);
+                    filename = store->toRealPath(fetchers::downloadFile(store, fetchSettings, url + "/nixexprs.tar.xz", "nixexprs.tar.xz").storePath);
                 } catch (FileTransferError & e) {
-                    filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2").storePath);
+                    filename = store->toRealPath(fetchers::downloadFile(store, fetchSettings, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2").storePath);
                 }
             }
             // Regardless of where it came from, add the expression representing this channel to accumulated expression

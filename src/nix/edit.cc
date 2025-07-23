@@ -1,9 +1,9 @@
-#include "current-process.hh"
-#include "command-installable-value.hh"
-#include "shared.hh"
-#include "eval.hh"
-#include "attr-path.hh"
-#include "editor-for.hh"
+#include "nix/util/current-process.hh"
+#include "nix/cmd/command-installable-value.hh"
+#include "nix/main/shared.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/cmd/editor-for.hh"
 
 #include <unistd.h>
 

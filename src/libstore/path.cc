@@ -1,4 +1,4 @@
-#include "store-dir-config.hh"
+#include "nix/store/store-dir-config.hh"
 
 namespace nix {
 
@@ -75,7 +75,7 @@ StorePath StorePath::random(std::string_view name)
     return StorePath(Hash::random(HashAlgorithm::SHA1), name);
 }
 
-StorePath StoreDirConfig::parseStorePath(std::string_view path) const
+StorePath MixStoreDirMethods::parseStorePath(std::string_view path) const
 {
     // On Windows, `/nix/store` is not a canonical path. More broadly it
     // is unclear whether this function should be using the native
@@ -94,7 +94,7 @@ StorePath StoreDirConfig::parseStorePath(std::string_view path) const
     return StorePath(baseNameOf(p));
 }
 
-std::optional<StorePath> StoreDirConfig::maybeParseStorePath(std::string_view path) const
+std::optional<StorePath> MixStoreDirMethods::maybeParseStorePath(std::string_view path) const
 {
     try {
         return parseStorePath(path);
@@ -103,24 +103,24 @@ std::optional<StorePath> StoreDirConfig::maybeParseStorePath(std::string_view pa
     }
 }
 
-bool StoreDirConfig::isStorePath(std::string_view path) const
+bool MixStoreDirMethods::isStorePath(std::string_view path) const
 {
     return (bool) maybeParseStorePath(path);
 }
 
-StorePathSet StoreDirConfig::parseStorePathSet(const PathSet & paths) const
+StorePathSet MixStoreDirMethods::parseStorePathSet(const PathSet & paths) const
 {
     StorePathSet res;
     for (auto & i : paths) res.insert(parseStorePath(i));
     return res;
 }
 
-std::string StoreDirConfig::printStorePath(const StorePath & path) const
+std::string MixStoreDirMethods::printStorePath(const StorePath & path) const
 {
     return (storeDir + "/").append(path.to_string());
 }
 
-PathSet StoreDirConfig::printStorePathSet(const StorePathSet & paths) const
+PathSet MixStoreDirMethods::printStorePathSet(const StorePathSet & paths) const
 {
     PathSet res;
     for (auto & i : paths) res.insert(printStorePath(i));

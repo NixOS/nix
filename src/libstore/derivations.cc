@@ -1,14 +1,14 @@
-#include "derivations.hh"
-#include "downstream-placeholder.hh"
-#include "store-api.hh"
-#include "globals.hh"
-#include "types.hh"
-#include "util.hh"
-#include "split.hh"
-#include "common-protocol.hh"
-#include "common-protocol-impl.hh"
-#include "strings-inline.hh"
-#include "json-utils.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/downstream-placeholder.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+#include "nix/util/split.hh"
+#include "nix/store/common-protocol.hh"
+#include "nix/store/common-protocol-impl.hh"
+#include "nix/util/strings-inline.hh"
+#include "nix/util/json-utils.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
@@ -412,7 +412,7 @@ Derivation parseDerivation(
         expect(str, "rvWithVersion(");
         auto versionS = parseString(str);
         if (*versionS == "xp-dyn-drv") {
-            // Only verison we have so far
+            // Only version we have so far
             version = DerivationATermVersion::DynamicDerivations;
             xpSettings.require(Xp::DynamicDerivations);
         } else {
@@ -553,7 +553,7 @@ static void unparseDerivedPathMapNode(const StoreDirConfig & store, std::string 
  * derivation?
  *
  * In other words, does it on the output of derivation that is itself an
- * ouput of a derivation? This corresponds to a dependency that is an
+ * output of a derivation? This corresponds to a dependency that is an
  * inductive derived path with more than one layer of
  * `DerivedPath::Built`.
  */
@@ -1052,49 +1052,36 @@ static void rewriteDerivation(Store & store, BasicDerivation & drv, const String
 
 std::optional<BasicDerivation> Derivation::tryResolve(Store & store, Store * evalStore) const
 {
-    std::map<std::pair<StorePath, std::string>, StorePath> inputDrvOutputs;
-
-    std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accum;
-    accum = [&](auto & inputDrv, auto & node) {
-        for (auto & [outputName, outputPath] : store.queryPartialDerivationOutputMap(inputDrv, evalStore)) {
-            if (outputPath) {
-                inputDrvOutputs.insert_or_assign({inputDrv, outputName}, *outputPath);
-                if (auto p = get(node.childMap, outputName))
-                    accum(*outputPath, *p);
+    return tryResolve(
+        store,
+        [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
+            try {
+                return resolveDerivedPath(store, SingleDerivedPath::Built{drvPath, outputName}, evalStore);
+            } catch (Error &) {
+                return std::nullopt;
             }
-        }
-    };
-
-    for (auto & [inputDrv, node] : inputDrvs.map)
-        accum(inputDrv, node);
-
-    return tryResolve(store, inputDrvOutputs);
+        });
 }
 
 static bool tryResolveInput(
     Store & store, StorePathSet & inputSrcs, StringMap & inputRewrites,
     const DownstreamPlaceholder * placeholderOpt,
-    const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode,
-    const std::map<std::pair<StorePath, std::string>, StorePath> & inputDrvOutputs)
+    ref<const SingleDerivedPath> drvPath, const DerivedPathMap<StringSet>::ChildNode & inputNode,
+    std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)> queryResolutionChain)
 {
-    auto getOutput = [&](const std::string & outputName) {
-        auto * actualPathOpt = get(inputDrvOutputs, { inputDrv, outputName });
-        if (!actualPathOpt)
-            warn("output %s of input %s missing, aborting the resolving",
-                outputName,
-                store.printStorePath(inputDrv)
-            );
-        return actualPathOpt;
-    };
-
     auto getPlaceholder = [&](const std::string & outputName) {
         return placeholderOpt
             ? DownstreamPlaceholder::unknownDerivation(*placeholderOpt, outputName)
-            : DownstreamPlaceholder::unknownCaOutput(inputDrv, outputName);
+            : [&]{
+                auto * p = std::get_if<SingleDerivedPath::Opaque>(&drvPath->raw());
+                // otherwise we should have had a placeholder to build-upon already
+                assert(p);
+                return DownstreamPlaceholder::unknownCaOutput(p->path, outputName);
+            }();
     };
 
     for (auto & outputName : inputNode.value) {
-        auto actualPathOpt = getOutput(outputName);
+        auto actualPathOpt = queryResolutionChain(drvPath, outputName);
         if (!actualPathOpt) return false;
         auto actualPath = *actualPathOpt;
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
@@ -1106,13 +1093,12 @@ static bool tryResolveInput(
     }
 
     for (auto & [outputName, childNode] : inputNode.childMap) {
-        auto actualPathOpt = getOutput(outputName);
-        if (!actualPathOpt) return false;
-        auto actualPath = *actualPathOpt;
         auto nextPlaceholder = getPlaceholder(outputName);
         if (!tryResolveInput(store, inputSrcs, inputRewrites,
-            &nextPlaceholder, actualPath, childNode,
-            inputDrvOutputs))
+            &nextPlaceholder,
+            make_ref<const SingleDerivedPath>(SingleDerivedPath::Built{drvPath, outputName}),
+            childNode,
+            queryResolutionChain))
             return false;
     }
     return true;
@@ -1120,7 +1106,7 @@ static bool tryResolveInput(
 
 std::optional<BasicDerivation> Derivation::tryResolve(
     Store & store,
-    const std::map<std::pair<StorePath, std::string>, StorePath> & inputDrvOutputs) const
+    std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)> queryResolutionChain) const
 {
     BasicDerivation resolved { *this };
 
@@ -1129,7 +1115,7 @@ std::optional<BasicDerivation> Derivation::tryResolve(
 
     for (auto & [inputDrv, inputNode] : inputDrvs.map)
         if (!tryResolveInput(store, resolved.inputSrcs, inputRewrites,
-            nullptr, inputDrv, inputNode, inputDrvOutputs))
+            nullptr, make_ref<const SingleDerivedPath>(SingleDerivedPath::Opaque{inputDrv}), inputNode, queryResolutionChain))
             return std::nullopt;
 
     rewriteDerivation(store, resolved, inputRewrites);
@@ -1242,13 +1228,13 @@ DerivationOutput DerivationOutput::fromJSON(
         keys.insert(key);
 
     auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashAlgorithm> {
-        auto & method_ = getString(valueAt(json, "method"));
-        ContentAddressMethod method = ContentAddressMethod::parse(method_);
+        ContentAddressMethod method = ContentAddressMethod::parse(
+            getString(valueAt(json, "method")));
         if (method == ContentAddressMethod::Raw::Text)
             xpSettings.require(Xp::DynamicDerivations);
 
-        auto & hashAlgo_ = getString(valueAt(json, "hashAlgo"));
-        auto hashAlgo = parseHashAlgo(hashAlgo_);
+        auto hashAlgo = parseHashAlgo(
+            getString(valueAt(json, "hashAlgo")));
         return { std::move(method), std::move(hashAlgo) };
     };
 
@@ -1347,6 +1333,11 @@ nlohmann::json Derivation::toJSON(const StoreDirConfig & store) const
     res["args"] = args;
     res["env"] = env;
 
+    if (auto it = env.find("__json"); it != env.end()) {
+        res["env"].erase("__json");
+        res["structuredAttrs"] = nlohmann::json::parse(it->second);
+    }
+
     return res;
 }
 
@@ -1365,10 +1356,11 @@ Derivation Derivation::fromJSON(
     res.name = getString(valueAt(json, "name"));
 
     try {
-        for (auto & [outputName, output] : getObject(valueAt(json, "outputs"))) {
+        auto outputs = getObject(valueAt(json, "outputs"));
+        for (auto & [outputName, output] : outputs) {
             res.outputs.insert_or_assign(
                 outputName,
-                DerivationOutput::fromJSON(store, res.name, outputName, output));
+                DerivationOutput::fromJSON(store, res.name, outputName, output, xpSettings));
         }
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'outputs'");
@@ -1376,7 +1368,8 @@ Derivation Derivation::fromJSON(
     }
 
     try {
-        for (auto & input : getArray(valueAt(json, "inputSrcs")))
+        auto inputSrcs = getArray(valueAt(json, "inputSrcs"));
+        for (auto & input : inputSrcs)
             res.inputSrcs.insert(store.parseStorePath(static_cast<const std::string &>(input)));
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'inputSrcs'");
@@ -1389,13 +1382,15 @@ Derivation Derivation::fromJSON(
             auto & json = getObject(_json);
             DerivedPathMap<StringSet>::ChildNode node;
             node.value = getStringSet(valueAt(json, "outputs"));
-            for (auto & [outputId, childNode] : getObject(valueAt(json, "dynamicOutputs"))) {
+            auto drvs = getObject(valueAt(json, "dynamicOutputs"));
+            for (auto & [outputId, childNode] : drvs) {
                 xpSettings.require(Xp::DynamicDerivations);
                 node.childMap[outputId] = doInput(childNode);
             }
             return node;
         };
-        for (auto & [inputDrvPath, inputOutputs] : getObject(valueAt(json, "inputDrvs")))
+        auto drvs = getObject(valueAt(json, "inputDrvs"));
+        for (auto & [inputDrvPath, inputOutputs] : drvs)
             res.inputDrvs.map[store.parseStorePath(inputDrvPath)] =
                 doInput(inputOutputs);
     } catch (Error & e) {
@@ -1406,7 +1401,17 @@ Derivation Derivation::fromJSON(
     res.platform = getString(valueAt(json, "system"));
     res.builder = getString(valueAt(json, "builder"));
     res.args = getStringList(valueAt(json, "args"));
-    res.env = getStringMap(valueAt(json, "env"));
+
+    auto envJson = valueAt(json, "env");
+    try {
+        res.env = getStringMap(envJson);
+    } catch (Error & e) {
+        e.addTrace({}, "while reading key 'env'");
+        throw;
+    }
+
+    if (auto structuredAttrs = get(json, "structuredAttrs"))
+        res.env.insert_or_assign("__json", structuredAttrs->dump());
 
     return res;
 }

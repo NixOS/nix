@@ -3,11 +3,11 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
-#include "common-protocol.hh"
-#include "common-protocol-impl.hh"
-#include "build-result.hh"
-#include "tests/protocol.hh"
-#include "tests/characterization.hh"
+#include "nix/store/common-protocol.hh"
+#include "nix/store/common-protocol-impl.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/tests/protocol.hh"
+#include "nix/util/tests/characterization.hh"
 
 namespace nix {
 
@@ -154,7 +154,7 @@ CHARACTERIZATION_TEST(
 CHARACTERIZATION_TEST(
     set,
     "set",
-    (std::tuple<std::set<std::string>, std::set<std::string>, std::set<std::string>, std::set<std::set<std::string>>> {
+    (std::tuple<StringSet, StringSet, StringSet, std::set<StringSet>> {
         { },
         { "" },
         { "", "foo", "bar" },

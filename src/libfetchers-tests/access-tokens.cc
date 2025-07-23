@@ -1,9 +1,10 @@
-#include <gtest/gtest.h>
-#include "fetchers.hh"
-#include "fetch-settings.hh"
-#include "json-utils.hh"
 #include <nlohmann/json.hpp>
-#include "tests/characterization.hh"
+#include <gtest/gtest.h>
+
+#include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/json-utils.hh"
+#include "nix/util/tests/characterization.hh"
 
 namespace nix::fetchers {
 

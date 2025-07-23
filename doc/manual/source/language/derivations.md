@@ -1,7 +1,7 @@
 # Derivations
 
 The most important built-in function is `derivation`, which is used to describe a single store-layer [store derivation].
-Consult the [store chapter](@docroot@/store/drv.md) for what a store derivation is;
+Consult the [store chapter](@docroot@/store/derivation/index.md) for what a store derivation is;
 this section just concerns how to create one from the Nix language.
 
 This builtin function takes as input an attribute set, the attributes of which specify the inputs to the process.
@@ -16,7 +16,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 - [`name`]{#attr-name} ([String](@docroot@/language/types.md#type-string))
 
   A symbolic name for the derivation.
-  See [derivation outputs](@docroot@/store/drv.md#outputs) for what this is affects.
+  See [derivation outputs](@docroot@/store/derivation/index.md#outputs) for what this is affects.
 
   [store path]: @docroot@/store/store-path.md
 
@@ -34,7 +34,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 
 - [`system`]{#attr-system} ([String](@docroot@/language/types.md#type-string))
 
-  See [system](@docroot@/store/drv.md#system).
+  See [system](@docroot@/store/derivation/index.md#system).
 
   > **Example**
   >
@@ -64,7 +64,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 
 - [`builder`]{#attr-builder} ([Path](@docroot@/language/types.md#type-path) | [String](@docroot@/language/types.md#type-string))
 
-  See [builder](@docroot@/store/drv.md#builder).
+  See [builder](@docroot@/store/derivation/index.md#builder).
 
   > **Example**
   >
@@ -113,7 +113,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 
   Default: `[ ]`
 
-  See [args](@docroot@/store/drv.md#args).
+  See [args](@docroot@/store/derivation/index.md#args).
 
   > **Example**
   >

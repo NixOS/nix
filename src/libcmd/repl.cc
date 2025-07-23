@@ -2,34 +2,34 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "error.hh"
-#include "repl-interacter.hh"
-#include "repl.hh"
+#include "nix/util/error.hh"
+#include "nix/cmd/repl-interacter.hh"
+#include "nix/cmd/repl.hh"
 
-#include "ansicolor.hh"
-#include "shared.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "attr-path.hh"
-#include "signals.hh"
-#include "store-api.hh"
-#include "log-store.hh"
-#include "common-eval-args.hh"
-#include "get-drvs.hh"
-#include "derivations.hh"
-#include "globals.hh"
-#include "flake/flake.hh"
-#include "flake/lockfile.hh"
-#include "users.hh"
-#include "editor-for.hh"
-#include "finally.hh"
-#include "markdown.hh"
-#include "local-fs-store.hh"
-#include "print.hh"
-#include "ref.hh"
-#include "value.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/main/shared.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/log-store.hh"
+#include "nix/cmd/common-eval-args.hh"
+#include "nix/expr/get-drvs.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/globals.hh"
+#include "nix/flake/flake.hh"
+#include "nix/flake/lockfile.hh"
+#include "nix/util/users.hh"
+#include "nix/cmd/editor-for.hh"
+#include "nix/util/finally.hh"
+#include "nix/cmd/markdown.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/expr/print.hh"
+#include "nix/util/ref.hh"
+#include "nix/expr/value.hh"
 
-#include "strings.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
 
@@ -61,11 +61,15 @@ struct NixRepl
 {
     size_t debugTraceIndex;
 
+    // Arguments passed to :load, saved so they can be reloaded with :reload
     Strings loadedFiles;
+    // Arguments passed to :load-flake, saved so they can be reloaded with :reload
+    Strings loadedFlakes;
     std::function<AnnotatedValues()> getValues;
 
     const static int envSize = 32768;
     std::shared_ptr<StaticEnv> staticEnv;
+    Value lastLoaded;
     Env * env;
     int displ;
     StringSet varNames;
@@ -90,7 +94,9 @@ struct NixRepl
     void loadFile(const Path & path);
     void loadFlake(const std::string & flakeRef);
     void loadFiles();
-    void reloadFiles();
+    void loadFlakes();
+    void reloadFilesAndFlakes();
+    void showLastLoaded();
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol name, Value & v);
     Expr * parseString(std::string s);
@@ -102,8 +108,7 @@ struct NixRepl
                               unsigned int maxDepth = std::numeric_limits<unsigned int>::max())
     {
         // Hide the progress bar during printing because it might interfere
-        logger->pause();
-        Finally resumeLoggerDefer([]() { logger->resume(); });
+        auto suspension = logger->suspend();
         ::nix::printValue(*state, str, v, PrintOptions {
             .ansiColors = true,
             .force = true,
@@ -125,7 +130,7 @@ std::string removeWhitespace(std::string s)
 
 
 NixRepl::NixRepl(const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalState> state,
-            std::function<NixRepl::AnnotatedValues()> getValues, RunNix * runNix = nullptr)
+            std::function<NixRepl::AnnotatedValues()> getValues, RunNix * runNix)
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
     , getValues(getValues)
@@ -141,22 +146,21 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
         out << ANSI_RED "error: " << ANSI_NORMAL;
     out << dt.hint.str() << "\n";
 
-    // prefer direct pos, but if noPos then try the expr.
-    auto pos = dt.pos
-        ? dt.pos
-        : positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
+    auto pos = dt.getPos(positions);
 
     if (pos) {
-        out << *pos;
-        if (auto loc = pos->getCodeLines()) {
+        out << pos;
+        if (auto loc = pos.getCodeLines()) {
             out << "\n";
-            printCodeLines(out, "", *pos, *loc);
+            printCodeLines(out, "", pos, *loc);
             out << "\n";
         }
     }
 
     return out;
 }
+
+MakeError(IncompleteReplExpr, ParseError);
 
 static bool isFirstRepl = true;
 
@@ -180,18 +184,20 @@ ReplExitStatus NixRepl::mainLoop()
 
     while (true) {
         // Hide the progress bar while waiting for user input, so that it won't interfere.
-        logger->pause();
-        // When continuing input from previous lines, don't print a prompt, just align to the same
-        // number of chars as the prompt.
-        if (!interacter->getLine(input, input.empty() ? ReplPromptType::ReplPrompt : ReplPromptType::ContinuationPrompt)) {
-            // Ctrl-D should exit the debugger.
-            state->debugStop = false;
-            logger->cout("");
-            // TODO: Should Ctrl-D exit just the current debugger session or
-            // the entire program?
-            return ReplExitStatus::QuitAll;
+        {
+            auto suspension = logger->suspend();
+            // When continuing input from previous lines, don't print a prompt, just align to the same
+            // number of chars as the prompt.
+            if (!interacter->getLine(input, input.empty() ? ReplPromptType::ReplPrompt : ReplPromptType::ContinuationPrompt)) {
+                // Ctrl-D should exit the debugger.
+                state->debugStop = false;
+                logger->cout("");
+                // TODO: Should Ctrl-D exit just the current debugger session or
+                // the entire program?
+                return ReplExitStatus::QuitAll;
+            }
+            // `suspension` resumes the logger
         }
-        logger->resume();
         try {
             switch (processLine(input)) {
                 case ProcessLineResult::Quit:
@@ -203,16 +209,8 @@ ReplExitStatus NixRepl::mainLoop()
                 default:
                     unreachable();
             }
-        } catch (ParseError & e) {
-            if (e.msg().find("unexpected end of file") != std::string::npos) {
-                // For parse errors on incomplete input, we continue waiting for the next line of
-                // input without clearing the input so far.
-                continue;
-            } else {
-              printMsg(lvlError, e.msg());
-            }
-        } catch (EvalError & e) {
-            printMsg(lvlError, e.msg());
+        } catch (IncompleteReplExpr &) {
+            continue;
         } catch (Error & e) {
             printMsg(lvlError, e.msg());
         } catch (Interrupted & e) {
@@ -246,14 +244,13 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
         try {
             auto dir = std::string(cur, 0, slash);
             auto prefix2 = std::string(cur, slash + 1);
-            for (auto & entry : std::filesystem::directory_iterator{dir == "" ? "/" : dir}) {
+            for (auto & entry : DirectoryIterator{dir == "" ? "/" : dir}) {
                 checkInterrupt();
                 auto name = entry.path().filename().string();
                 if (name[0] != '.' && hasPrefix(name, prefix2))
                     completions.insert(prev + entry.path().string());
             }
         } catch (Error &) {
-        } catch (std::filesystem::filesystem_error &) {
         }
     } else if ((dot = cur.rfind('.')) == std::string::npos) {
         /* This is a variable name; look it up in the current scope. */
@@ -293,7 +290,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
         } catch (BadURL & e) {
             // Quietly ignore BadURL flake-related errors.
         } catch (FileNotFound & e) {
-            // Quietly ignore non-existent file beeing `import`-ed.
+            // Quietly ignore non-existent file being `import`-ed.
         }
     }
 
@@ -377,6 +374,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
              << "                               current profile\n"
              << "  :l, :load <path>             Load Nix expression and add it to scope\n"
              << "  :lf, :load-flake <ref>       Load Nix flake and add it to scope\n"
+             << "  :ll, :last-loaded            Show most recently loaded variables added to scope\n"
              << "  :p, :print <expr>            Evaluate and print expression recursively\n"
              << "                               Strings are printed directly, without escaping.\n"
              << "  :q, :quit                    Exit nix-repl\n"
@@ -467,9 +465,13 @@ ProcessLineResult NixRepl::processLine(std::string line)
         loadFlake(arg);
     }
 
+    else if (command == ":ll" || command == ":last-loaded") {
+        showLastLoaded();
+    }
+
     else if (command == ":r" || command == ":reload") {
         state->resetFileCache();
-        reloadFiles();
+        reloadFilesAndFlakes();
     }
 
     else if (command == ":e" || command == ":edit") {
@@ -482,7 +484,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 auto path = state->coerceToPath(noPos, v, context, "while evaluating the filename to edit");
                 return {path, 0};
             } else if (v.isLambda()) {
-                auto pos = state->positions[v.payload.lambda.fun->pos];
+                auto pos = state->positions[v.lambda().fun->pos];
                 if (auto path = std::get_if<SourcePath>(&pos.origin))
                     return {*path, pos.line};
                 else
@@ -504,7 +506,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
         // Reload right after exiting the editor
         state->resetFileCache();
-        reloadFiles();
+        reloadFilesAndFlakes();
     }
 
     else if (command == ":t") {
@@ -586,6 +588,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
     else if (command == ":p" || command == ":print") {
         Value v;
         evalString(arg, v);
+        auto suspension = logger->suspend();
         if (v.type() == nString) {
             std::cout << v.string_view();
         } else {
@@ -694,6 +697,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         } else {
             Value v;
             evalString(line, v);
+            auto suspension = logger->suspend();
             printValue(std::cout, v, 1);
             std::cout << std::endl;
         }
@@ -716,6 +720,9 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
 {
     if (flakeRefS.empty())
         throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
+
+    loadedFlakes.remove(flakeRefS);
+    loadedFlakes.push_back(flakeRefS);
 
     std::filesystem::path cwd;
     try {
@@ -754,12 +761,23 @@ void NixRepl::initEnv()
         varNames.emplace(state->symbols[i.first]);
 }
 
+void NixRepl::showLastLoaded()
+{
+    RunPager pager;
 
-void NixRepl::reloadFiles()
+    for (auto & i : *lastLoaded.attrs()) {
+        std::string_view name = state->symbols[i.name];
+        logger->cout(name);
+    }
+}
+
+
+void NixRepl::reloadFilesAndFlakes()
 {
     initEnv();
 
     loadFiles();
+    loadFlakes();
 }
 
 
@@ -780,6 +798,18 @@ void NixRepl::loadFiles()
 }
 
 
+void NixRepl::loadFlakes()
+{
+    Strings old = loadedFlakes;
+    loadedFlakes.clear();
+
+    for (auto & i : old) {
+        notice("Loading flake '%1%'...", i);
+        loadFlake(i);
+    }
+}
+
+
 void NixRepl::addAttrsToScope(Value & attrs)
 {
     state->forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); }, "while evaluating an attribute set to be merged in the global scope");
@@ -794,6 +824,27 @@ void NixRepl::addAttrsToScope(Value & attrs)
     staticEnv->sort();
     staticEnv->deduplicate();
     notice("Added %1% variables.", attrs.attrs()->size());
+
+    lastLoaded = attrs;
+
+    const int max_print = 20;
+    int counter = 0;
+    std::ostringstream loaded;
+    for (auto & i : attrs.attrs()->lexicographicOrder(state->symbols)) {
+        if (counter >= max_print)
+            break;
+
+        if (counter > 0)
+            loaded << ", ";
+
+        printIdentifier(loaded, state->symbols[i->name]);
+        counter += 1;
+    }
+
+    notice("%1%", loaded.str());
+
+    if (attrs.attrs()->size() > max_print)
+        notice("... and %1% more; view with :ll", attrs.attrs()->size() - max_print);
 }
 
 
@@ -818,7 +869,17 @@ Expr * NixRepl::parseString(std::string s)
 
 void NixRepl::evalString(std::string s, Value & v)
 {
-    Expr * e = parseString(s);
+    Expr * e;
+    try {
+        e = parseString(s);
+    } catch (ParseError & e) {
+        if (e.msg().find("unexpected end of file") != std::string::npos)
+            // For parse errors on incomplete input, we continue waiting for the next line of
+            // input without clearing the input so far.
+            throw IncompleteReplExpr(e.msg());
+        else
+            throw;
+    }
     e->eval(*state, *env, v);
     state->forceValue(v, v.determinePos(noPos));
 }
@@ -839,9 +900,10 @@ std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
 {
     return std::make_unique<NixRepl>(
         lookupPath,
-        openStore(),
+        std::move(store),
         state,
-        getValues
+        getValues,
+        runNix
     );
 }
 
@@ -859,7 +921,8 @@ ReplExitStatus AbstractNixRepl::runSimple(
             lookupPath,
             openStore(),
             evalState,
-            getValues
+            getValues,
+            /*runNix=*/nullptr
         );
 
     repl->initEnv();

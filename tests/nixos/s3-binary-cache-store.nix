@@ -67,14 +67,15 @@ in
 
       # Create a binary cache.
       server.wait_for_unit("minio")
-      server.wait_for_unit("network-online.target")
+      server.wait_for_unit("network-addresses-eth1.service")
+      server.wait_for_open_port(9000)
 
       server.succeed("mc config host add minio http://localhost:9000 ${accessKey} ${secretKey} --api s3v4")
       server.succeed("mc mb minio/my-cache")
 
       server.succeed("${env} nix copy --to '${storeUrl}' ${pkgA}")
 
-      client.wait_for_unit("network-online.target")
+      client.wait_for_unit("network-addresses-eth1.service")
 
       # Test fetchurl on s3:// URLs while we're at it.
       client.succeed("${env} nix eval --impure --expr 'builtins.fetchurl { name = \"foo\"; url = \"s3://my-cache/nix-cache-info?endpoint=http://server:9000&region=eu-west-1\"; }'")

@@ -3,8 +3,8 @@
 
 #include <gtest/gtest.h>
 
-#include "error.hh"
-#include "json-utils.hh"
+#include "nix/util/error.hh"
+#include "nix/util/json-utils.hh"
 
 namespace nix {
 
@@ -50,7 +50,7 @@ TEST(from_json, optionalInt) {
 TEST(from_json, vectorOfOptionalInts) {
     nlohmann::json json = { 420, nullptr };
     std::vector<std::optional<int>> vals = json;
-    ASSERT_EQ(vals.size(), 2);
+    ASSERT_EQ(vals.size(), 2u);
     ASSERT_TRUE(vals.at(0).has_value());
     ASSERT_EQ(*vals.at(0), 420);
     ASSERT_FALSE(vals.at(1).has_value());
@@ -63,9 +63,7 @@ TEST(valueAt, simpleObject) {
 
     auto nested = R"({ "hello": { "world": "" } })"_json;
 
-    auto & nestedObject = valueAt(getObject(nested), "hello");
-
-    ASSERT_EQ(valueAt(nestedObject, "world"), "");
+    ASSERT_EQ(valueAt(valueAt(getObject(nested), "hello"), "world"), "");
 }
 
 TEST(valueAt, missingKey) {
@@ -83,7 +81,7 @@ TEST(getObject, rightAssertions) {
 
     auto nested = R"({ "object": { "object": {} } })"_json;
 
-    auto & nestedObject = getObject(valueAt(getObject(nested), "object"));
+    auto nestedObject = getObject(valueAt(getObject(nested), "object"));
 
     ASSERT_EQ(nestedObject, getObject(nlohmann::json::parse(R"({ "object": {} })")));
     ASSERT_EQ(getObject(valueAt(getObject(nestedObject), "object")), (nlohmann::json::object_t {}));
@@ -130,19 +128,29 @@ TEST(getString, wrongAssertions) {
     ASSERT_THROW(getString(valueAt(json, "boolean")), Error);
 }
 
-TEST(getInteger, rightAssertions) {
-    auto simple = R"({ "int": 0 })"_json;
+TEST(getIntegralNumber, rightAssertions) {
+    auto simple = R"({ "int": 0, "signed": -1 })"_json;
 
-    ASSERT_EQ(getInteger(valueAt(getObject(simple), "int")), 0);
+    ASSERT_EQ(getUnsigned(valueAt(getObject(simple), "int")), 0u);
+    ASSERT_EQ(getInteger<int8_t>(valueAt(getObject(simple), "int")), 0);
+    ASSERT_EQ(getInteger<int8_t>(valueAt(getObject(simple), "signed")), -1);
 }
 
-TEST(getInteger, wrongAssertions) {
-    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
+TEST(getIntegralNumber, wrongAssertions) {
+    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "signed": -256, "large": 128, "boolean": false })"_json;
 
-    ASSERT_THROW(getInteger(valueAt(json, "object")), Error);
-    ASSERT_THROW(getInteger(valueAt(json, "array")), Error);
-    ASSERT_THROW(getInteger(valueAt(json, "string")), Error);
-    ASSERT_THROW(getInteger(valueAt(json, "boolean")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(json, "object")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(json, "array")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(json, "string")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(json, "boolean")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(json, "signed")), Error);
+
+    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "object")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "array")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "string")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "boolean")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "large")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "signed")), Error);
 }
 
 TEST(getBoolean, rightAssertions) {

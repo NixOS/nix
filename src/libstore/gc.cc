@@ -1,20 +1,23 @@
-#include "derivations.hh"
-#include "globals.hh"
-#include "local-store.hh"
-#include "finally.hh"
-#include "unix-domain-socket.hh"
-#include "signals.hh"
-#include "posix-fs-canonicalise.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/local-store.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/unix-domain-socket.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
+
+#include "store-config-private.hh"
 
 #if !defined(__linux__)
 // For shelling out to lsof
-#  include "processes.hh"
+#  include "nix/util/processes.hh"
 #endif
+
+#include <boost/regex.hpp>
 
 #include <functional>
 #include <queue>
 #include <algorithm>
-#include <regex>
 #include <random>
 
 #include <climits>
@@ -41,7 +44,7 @@ static std::string gcRootsDir = "gcroots";
 void LocalStore::addIndirectRoot(const Path & path)
 {
     std::string hash = hashString(HashAlgorithm::SHA1, path).to_string(HashFormat::Nix32, false);
-    Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", stateDir, gcRootsDir, hash));
+    Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", config->stateDir, gcRootsDir, hash));
     makeSymlink(realRoot, path);
 }
 
@@ -80,7 +83,7 @@ void LocalStore::createTempRootsFile()
 
 void LocalStore::addTempRoot(const StorePath & path)
 {
-    if (readOnly) {
+    if (config->readOnly) {
       debug("Read-only store doesn't support creating lock files for temp roots, but nothing can be deleted anyways.");
       return;
     }
@@ -107,7 +110,7 @@ void LocalStore::addTempRoot(const StorePath & path)
         auto fdRootsSocket(_fdRootsSocket.lock());
 
         if (!*fdRootsSocket) {
-            auto socketPath = stateDir.get() + gcSocketPath;
+            auto socketPath = config->stateDir.get() + gcSocketPath;
             debug("connecting to '%s'", socketPath);
             *fdRootsSocket = createUnixDomainSocket();
             try {
@@ -162,7 +165,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
 {
     /* Read the `temproots' directory for per-process temporary root
        files. */
-    for (auto & i : std::filesystem::directory_iterator{tempRootsDir}) {
+    for (auto & i : DirectoryIterator{tempRootsDir}) {
         checkInterrupt();
         auto name = i.path().filename().string();
         if (name[0] == '.') {
@@ -230,7 +233,7 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
             type = std::filesystem::symlink_status(path).type();
 
         if (type == std::filesystem::file_type::directory) {
-            for (auto & i : std::filesystem::directory_iterator{path}) {
+            for (auto & i : DirectoryIterator{path}) {
                 checkInterrupt();
                 findRoots(i.path().string(), i.symlink_status().type(), roots);
             }
@@ -245,7 +248,7 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
             else {
                 target = absPath(target, dirOf(path));
                 if (!pathExists(target)) {
-                    if (isInDir(path, stateDir + "/" + gcRootsDir + "/auto")) {
+                    if (isInDir(path, std::filesystem::path{config->stateDir.get()} / gcRootsDir / "auto")) {
                         printInfo("removing stale link from '%1%' to '%2%'", path, target);
                         unlink(path.c_str());
                     }
@@ -286,8 +289,8 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
 void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 {
     /* Process direct roots in {gcroots,profiles}. */
-    findRoots(stateDir + "/" + gcRootsDir, std::filesystem::file_type::unknown, roots);
-    findRoots(stateDir + "/profiles", std::filesystem::file_type::unknown, roots);
+    findRoots(config->stateDir + "/" + gcRootsDir, std::filesystem::file_type::unknown, roots);
+    findRoots(config->stateDir + "/profiles", std::filesystem::file_type::unknown, roots);
 
     /* Add additional roots returned by different platforms-specific
        heuristics.  This is typically used to add running programs to
@@ -329,11 +332,11 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
 
 static std::string quoteRegexChars(const std::string & raw)
 {
-    static auto specialRegex = std::regex(R"([.^$\\*+?()\[\]{}|])");
-    return std::regex_replace(raw, specialRegex, R"(\$&)");
+    static auto specialRegex = boost::regex(R"([.^$\\*+?()\[\]{}|])");
+    return boost::regex_replace(raw, specialRegex, R"(\$&)");
 }
 
-#if __linux__
+#ifdef __linux__
 static void readFileRoots(const std::filesystem::path & path, UncheckedRoots & roots)
 {
     try {
@@ -352,12 +355,12 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     auto procDir = AutoCloseDir{opendir("/proc")};
     if (procDir) {
         struct dirent * ent;
-        auto digitsRegex = std::regex(R"(^\d+$)");
-        auto mapRegex = std::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
-        auto storePathRegex = std::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
+        static const auto digitsRegex = boost::regex(R"(^\d+$)");
+        static const auto mapRegex = boost::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
+        auto storePathRegex = boost::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
-            if (std::regex_match(ent->d_name, digitsRegex)) {
+            if (boost::regex_match(ent->d_name, digitsRegex)) {
                 try {
                     readProcLink(fmt("/proc/%s/exe" ,ent->d_name), unchecked);
                     readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
@@ -384,15 +387,15 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
                     std::filesystem::path mapFile = fmt("/proc/%s/maps", ent->d_name);
                     auto mapLines = tokenizeString<std::vector<std::string>>(readFile(mapFile.string()), "\n");
                     for (const auto & line : mapLines) {
-                        auto match = std::smatch{};
-                        if (std::regex_match(line, match, mapRegex))
+                        auto match = boost::smatch{};
+                        if (boost::regex_match(line, match, mapRegex))
                             unchecked[match[1]].emplace(mapFile.string());
                     }
 
                     auto envFile = fmt("/proc/%s/environ", ent->d_name);
                     auto envString = readFile(envFile);
-                    auto env_end = std::sregex_iterator{};
-                    for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
+                    auto env_end = boost::sregex_iterator{};
+                    for (auto i = boost::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
                         unchecked[i->str()].emplace(envFile);
                 } catch (SystemError & e) {
                     if (errno == ENOENT || errno == EACCES || errno == ESRCH)
@@ -411,12 +414,12 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     // Because of this we disable lsof when running the tests.
     if (getEnv("_NIX_TEST_NO_LSOF") != "1") {
         try {
-            std::regex lsofRegex(R"(^n(/.*)$)");
+            boost::regex lsofRegex(R"(^n(/.*)$)");
             auto lsofLines =
                 tokenizeString<std::vector<std::string>>(runProgram(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
             for (const auto & line : lsofLines) {
-                std::smatch match;
-                if (std::regex_match(line, match, lsofRegex))
+                boost::smatch match;
+                if (boost::regex_match(line, match, lsofRegex))
                     unchecked[match[1].str()].emplace("{lsof}");
             }
         } catch (ExecError & e) {
@@ -425,7 +428,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     }
 #endif
 
-#if __linux__
+#ifdef __linux__
     readFileRoots("/proc/sys/kernel/modprobe", unchecked);
     readFileRoots("/proc/sys/kernel/fbsplash", unchecked);
     readFileRoots("/proc/sys/kernel/poweroff_cmd", unchecked);
@@ -496,7 +499,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         readFile(*p);
 
     /* Start the server for receiving new roots. */
-    auto socketPath = stateDir.get() + gcSocketPath;
+    auto socketPath = config->stateDir.get() + gcSocketPath;
     createDirs(dirOf(socketPath));
     auto fdServer = createUnixDomainSocket(socketPath, 0666);
 
@@ -633,7 +636,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     auto deleteFromStore = [&](std::string_view baseName)
     {
         Path path = storeDir + "/" + std::string(baseName);
-        Path realPath = realStoreDir + "/" + std::string(baseName);
+        Path realPath = config->realStoreDir + "/" + std::string(baseName);
 
         /* There may be temp directories in the store that are still in use
            by another process. We need to be sure that we can acquire an
@@ -772,7 +775,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                     deleteFromStore(path.to_string());
                     referrersCache.erase(path);
                 } catch (PathInUse &e) {
-                    // If we end up here, it's likely a new occurence
+                    // If we end up here, it's likely a new occurrence
                     // of https://github.com/NixOS/nix/issues/11923
                     printError("BUG: %s", e.what());
                 }
@@ -802,8 +805,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             printInfo("determining live/dead paths...");
 
         try {
-            AutoCloseDir dir(opendir(realStoreDir.get().c_str()));
-            if (!dir) throw SysError("opening directory '%1%'", realStoreDir);
+            AutoCloseDir dir(opendir(config->realStoreDir.get().c_str()));
+            if (!dir) throw SysError("opening directory '%1%'", config->realStoreDir);
 
             /* Read the store and delete all paths that are invalid or
                unreachable. We don't use readDirectory() here so that
@@ -905,8 +908,8 @@ void LocalStore::autoGC(bool sync)
             return std::stoll(readFile(*fakeFreeSpaceFile));
 
         struct statvfs st;
-        if (statvfs(realStoreDir.get().c_str(), &st))
-            throw SysError("getting filesystem info about '%s'", realStoreDir);
+        if (statvfs(config->realStoreDir.get().c_str(), &st))
+            throw SysError("getting filesystem info about '%s'", config->realStoreDir);
 
         return (uint64_t) st.f_bavail * st.f_frsize;
     };

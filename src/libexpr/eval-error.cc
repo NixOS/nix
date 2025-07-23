@@ -1,6 +1,6 @@
-#include "eval-error.hh"
-#include "eval.hh"
-#include "value.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
 
 namespace nix {
 
@@ -45,7 +45,7 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::withFrame(const Env & env, const Expr
     // TODO: check compatibility with nested debugger calls.
     // TODO: What side-effects??
     error.state.debugTraces.push_front(DebugTrace{
-        .pos = error.state.positions[expr.getPos()],
+        .pos = expr.getPos(),
         .expr = expr,
         .env = env,
         .hint = HintFmt("Fake frame for debugging purposes"),
@@ -110,5 +110,6 @@ template class EvalErrorBuilder<UndefinedVarError>;
 template class EvalErrorBuilder<MissingArgumentError>;
 template class EvalErrorBuilder<InfiniteRecursionError>;
 template class EvalErrorBuilder<InvalidPathError>;
+template class EvalErrorBuilder<IFDError>;
 
 }

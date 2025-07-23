@@ -1,6 +1,10 @@
+#include "cmd-config-private.hh"
+
 #include <cstdio>
 
-#ifdef USE_READLINE
+#include <signal.h>
+
+#if USE_READLINE
 #include <readline/history.h>
 #include <readline/readline.h>
 #else
@@ -14,12 +18,12 @@ extern "C" {
 }
 #endif
 
-#include "signals.hh"
-#include "finally.hh"
-#include "repl-interacter.hh"
-#include "file-system.hh"
-#include "repl.hh"
-#include "environment-variables.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/finally.hh"
+#include "nix/cmd/repl-interacter.hh"
+#include "nix/util/file-system.hh"
+#include "nix/cmd/repl.hh"
+#include "nix/util/environment-variables.hh"
 
 namespace nix {
 
@@ -35,7 +39,7 @@ void sigintHandler(int signo)
 
 static detail::ReplCompleterMixin * curRepl; // ugly
 
-#ifndef USE_READLINE
+#if !USE_READLINE
 static char * completionCallback(char * s, int * match)
 {
     auto possible = curRepl->completePrefix(s);
@@ -113,14 +117,14 @@ ReadlineLikeInteracter::Guard ReadlineLikeInteracter::init(detail::ReplCompleter
     } catch (SystemError & e) {
         logWarning(e.info());
     }
-#ifndef USE_READLINE
+#if !USE_READLINE
     el_hist_size = 1000;
 #endif
     read_history(historyFile.c_str());
     auto oldRepl = curRepl;
     curRepl = repl;
     Guard restoreRepl([oldRepl] { curRepl = oldRepl; });
-#ifndef USE_READLINE
+#if !USE_READLINE
     rl_set_complete_func(completionCallback);
     rl_set_list_possib_func(listPossibleCallback);
 #endif
@@ -133,7 +137,7 @@ static constexpr const char * promptForType(ReplPromptType promptType)
     case ReplPromptType::ReplPrompt:
         return "nix-repl> ";
     case ReplPromptType::ContinuationPrompt:
-        return "          ";
+        return "        > "; // 9 spaces + >
     }
     assert(false);
 }
@@ -183,7 +187,7 @@ bool ReadlineLikeInteracter::getLine(std::string & input, ReplPromptType promptT
     // quite useful for reading the test output, so we add it here.
     if (auto e = getEnv("_NIX_TEST_REPL_ECHO"); s && e && *e == "1")
     {
-#ifndef USE_READLINE
+#if !USE_READLINE
         // This is probably not right for multi-line input, but we don't use that
         // in the characterisation tests, so it's fine.
         std::cout << promptForType(promptType) << s << std::endl;

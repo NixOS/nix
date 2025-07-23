@@ -32,19 +32,15 @@ deps_private += rapidcheck
 gtest = dependency('gtest')
 deps_private += gtest
 
-gtest = dependency('gmock')
-deps_private += gtest
+gmock = dependency('gmock')
+deps_private += gmock
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  '-include', 'config-expr.hh',
-  '-include', 'config-util.h',
-  '-include', 'config-store.h',
-  '-include', 'config-expr.h',
-  language : 'cpp',
+configdata = configuration_data()
+configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
+
+config_priv_h = configure_file(
+  configuration : configdata,
+  output : 'expr-tests-config.hh',
 )
 
 subdir('nix-meson-build-support/common')
@@ -72,6 +68,7 @@ include_dirs = [include_directories('.')]
 this_exe = executable(
   meson.project_name(),
   sources,
+  config_priv_h,
   dependencies : deps_private_subproject + deps_private + deps_other,
   include_directories : include_dirs,
   # TODO: -lrapidcheck, see ../libutil-support/build.meson

@@ -1,8 +1,8 @@
 #include <regex>
 
-#include "path-with-outputs.hh"
-#include "store-api.hh"
-#include "strings.hh"
+#include "nix/store/path-with-outputs.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/strings.hh"
 
 
 namespace nix {
@@ -82,9 +82,9 @@ std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s)
 {
     size_t n = s.find("!");
     return n == s.npos
-        ? std::make_pair(s, std::set<std::string>())
+        ? std::make_pair(s, StringSet())
         : std::make_pair(s.substr(0, n),
-            tokenizeString<std::set<std::string>>(s.substr(n + 1), ","));
+            tokenizeString<StringSet>(s.substr(n + 1), ","));
 }
 
 

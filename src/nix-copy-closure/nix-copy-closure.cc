@@ -1,7 +1,7 @@
-#include "shared.hh"
-#include "realisation.hh"
-#include "store-api.hh"
-#include "legacy.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-open.hh"
+#include "nix/cmd/legacy.hh"
 #include "man-pages.hh"
 
 using namespace nix;

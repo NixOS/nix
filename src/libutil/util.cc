@@ -1,7 +1,7 @@
-#include "util.hh"
-#include "fmt.hh"
-#include "file-path.hh"
-#include "signals.hh"
+#include "nix/util/util.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/file-path.hh"
+#include "nix/util/signals.hh"
 
 #include <array>
 #include <cctype>
@@ -171,7 +171,7 @@ std::string toLower(std::string s)
 }
 
 
-std::string shellEscape(const std::string_view s)
+std::string escapeShellArgAlways(const std::string_view s)
 {
     std::string r;
     r.reserve(s.size() + 2);
@@ -190,8 +190,10 @@ void ignoreExceptionInDestructor(Verbosity lvl)
     try {
         try {
             throw;
+        } catch (Error & e) {
+            printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.info().msg);
         } catch (std::exception & e) {
-            printMsg(lvl, "error (ignored): %1%", e.what());
+            printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.what());
         }
     } catch (...) { }
 }
@@ -202,8 +204,10 @@ void ignoreExceptionExceptInterrupt(Verbosity lvl)
         throw;
     } catch (const Interrupted & e) {
         throw;
+    } catch (Error & e) {
+        printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.info().msg);
     } catch (std::exception & e) {
-        printMsg(lvl, "error (ignored): %1%", e.what());
+        printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.what());
     }
 }
 

@@ -24,7 +24,7 @@ is a JSON object with the following fields:
 
 
   * `method`:
-    For an output which will be [content addresed], a string representing the [method](@docroot@/store/store-object/content-address.md) of content addressing that is chosen.
+    For an output which will be [content addressed], a string representing the [method](@docroot@/store/store-object/content-address.md) of content addressing that is chosen.
     Valid method strings are:
 
     - [`flat`](@docroot@/store/store-object/content-address.md#method-flat)
@@ -35,7 +35,7 @@ is a JSON object with the following fields:
     Otherwise, `null`.
 
   * `hashAlgo`:
-    For an output which will be [content addresed], the name of the hash algorithm used.
+    For an output which will be [content addressed], the name of the hash algorithm used.
     Valid algorithm strings are:
 
     - `blake3`
@@ -91,3 +91,7 @@ is a JSON object with the following fields:
 
 * `env`:
   The environment passed to the `builder`.
+
+* `structuredAttrs`:
+  [Strucutured Attributes](@docroot@/store/derivation/index.md#structured-attrs), only defined if the derivation contains them.
+  Structured attributes are JSON, and thus embedded as-is.

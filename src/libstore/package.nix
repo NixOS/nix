@@ -21,6 +21,10 @@
   version,
 
   embeddedSandboxShell ? stdenv.hostPlatform.isStatic,
+
+  withAWS ?
+    # Default is this way because there have been issues building this dependency
+    stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin),
 }:
 
 let
@@ -39,8 +43,11 @@ mkMesonLibrary (finalAttrs: {
     ./.version
     ./meson.build
     ./meson.options
+    ./include/nix/store/meson.build
     ./linux/meson.build
+    ./linux/include/nix/store/meson.build
     ./unix/meson.build
+    ./unix/include/nix/store/meson.build
     ./windows/meson.build
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
@@ -60,9 +67,7 @@ mkMesonLibrary (finalAttrs: {
     ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
     # There have been issues building these dependencies
     ++ lib.optional stdenv.hostPlatform.isDarwin darwin.apple_sdk.libs.sandbox
-    ++ lib.optional (
-      stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin)
-    ) aws-sdk-cpp;
+    ++ lib.optional withAWS aws-sdk-cpp;
 
   propagatedBuildInputs = [
     nix-util
@@ -77,13 +82,6 @@ mkMesonLibrary (finalAttrs: {
     ++ lib.optionals stdenv.hostPlatform.isLinux [
       (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")
     ];
-
-  env = {
-    # Needed for Meson to find Boost.
-    # https://github.com/NixOS/nixpkgs/issues/86131.
-    BOOST_INCLUDEDIR = "${lib.getDev boost}/include";
-    BOOST_LIBRARYDIR = "${lib.getLib boost}/lib";
-  };
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

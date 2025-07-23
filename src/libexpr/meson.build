@@ -14,7 +14,8 @@ cxx = meson.get_compiler('cpp')
 
 subdir('nix-meson-build-support/deps-lists')
 
-configdata = configuration_data()
+configdata_pub = configuration_data()
+configdata_priv = configuration_data()
 
 deps_private_maybe_subproject = [
 ]
@@ -25,6 +26,16 @@ deps_public_maybe_subproject = [
 ]
 subdir('nix-meson-build-support/subprojects')
 subdir('nix-meson-build-support/big-objs')
+
+# Check for each of these functions, and create a define like `#define HAVE_LCHOWN 1`.
+check_funcs = [
+  'sysconf',
+]
+foreach funcspec : check_funcs
+  define_name = 'HAVE_' + funcspec.underscorify().to_upper()
+  define_value = cxx.has_function(funcspec).to_int()
+  configdata_priv.set(define_name, define_value)
+endforeach
 
 boost = dependency(
   'boost',
@@ -47,11 +58,13 @@ if bdw_gc.found()
   ]
     define_name = 'HAVE_' + funcspec.underscorify().to_upper()
     define_value = cxx.has_function(funcspec).to_int()
-    configdata.set(define_name, define_value)
+    configdata_priv.set(define_name, define_value)
   endforeach
-  configdata.set('GC_THREADS', 1)
+  # Affects ABI, because it changes what bdw_gc itself does!
+  configdata_pub.set('GC_THREADS', 1)
 endif
-configdata.set('HAVE_BOEHMGC', bdw_gc.found().to_int())
+# Used in public header. Affects ABI!
+configdata_pub.set('NIX_USE_BOEHMGC', bdw_gc.found().to_int())
 
 toml11 = dependency(
   'toml11',
@@ -61,19 +74,9 @@ toml11 = dependency(
 )
 deps_other += toml11
 
-config_h = configure_file(
-  configuration : configdata,
-  output : 'config-expr.hh',
-)
-
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  # '-include', 'config-fetchers.h',
-  '-include', 'config-expr.hh',
-  language : 'cpp',
+config_priv_h = configure_file(
+  configuration : configdata_priv,
+  output : 'expr-config-private.hh',
 )
 
 subdir('nix-meson-build-support/common')
@@ -109,6 +112,7 @@ lexer_tab = custom_target(
   ],
   command : [
     'flex',
+    '-Cf', # Use full scanner tables
     '--outfile',
     '@OUTPUT0@',
     '--header-file=' + '@OUTPUT1@',
@@ -126,7 +130,6 @@ generated_headers = []
 foreach header : [
   'imported-drv-to-derivation.nix',
   'fetchurl.nix',
-  'call-flake.nix',
 ]
   generated_headers += gen_header.process(header)
 endforeach
@@ -137,6 +140,8 @@ sources = files(
   'eval-cache.cc',
   'eval-error.cc',
   'eval-gc.cc',
+  'eval-profiler-settings.cc',
+  'eval-profiler.cc',
   'eval-settings.cc',
   'eval.cc',
   'function-trace.cc',
@@ -154,53 +159,28 @@ sources = files(
   'value/context.cc',
 )
 
-include_dirs = [include_directories('.')]
-
-headers = [config_h] + files(
-  'attr-path.hh',
-  'attr-set.hh',
-  'eval-cache.hh',
-  'eval-error.hh',
-  'eval-gc.hh',
-  'eval-inline.hh',
-  'eval-settings.hh',
-  'eval.hh',
-  'function-trace.hh',
-  'gc-small-vector.hh',
-  'get-drvs.hh',
-  'json-to-value.hh',
-  # internal: 'lexer-helpers.hh',
-  'nixexpr.hh',
-  'parser-state.hh',
-  'pos-idx.hh',
-  'pos-table.hh',
-  'primops.hh',
-  'print-ambiguous.hh',
-  'print-options.hh',
-  'print.hh',
-  'repl-exit-status.hh',
-  'search-path.hh',
-  'symbol-table.hh',
-  'value-to-json.hh',
-  'value-to-xml.hh',
-  'value.hh',
-  'value/context.hh',
-)
+subdir('include/nix/expr')
 
 subdir('primops')
+
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 this_library = library(
   'nixexpr',
   sources,
+  config_priv_h,
   parser_tab,
   lexer_tab,
   generated_headers,
   dependencies : deps_public + deps_private + deps_other,
+  include_directories : include_dirs,
+  link_args: linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
 )
 
-install_headers(headers, subdir : 'nix', preserve_path : true)
+install_headers(headers, subdir : 'nix/expr', preserve_path : true)
 
 libraries_private = []
 

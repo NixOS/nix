@@ -1,4 +1,4 @@
-#include "source-accessor.hh"
+#include "nix/util/source-accessor.hh"
 
 namespace nix {
 

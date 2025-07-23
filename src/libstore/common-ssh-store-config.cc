@@ -1,7 +1,7 @@
 #include <regex>
 
-#include "common-ssh-store-config.hh"
-#include "ssh.hh"
+#include "nix/store/common-ssh-store-config.hh"
+#include "nix/store/ssh.hh"
 
 namespace nix {
 
@@ -28,7 +28,7 @@ CommonSSHStoreConfig::CommonSSHStoreConfig(std::string_view scheme, std::string_
 {
 }
 
-SSHMaster CommonSSHStoreConfig::createSSHMaster(bool useMaster, Descriptor logFD)
+SSHMaster CommonSSHStoreConfig::createSSHMaster(bool useMaster, Descriptor logFD) const
 {
     return {
         host,

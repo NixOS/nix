@@ -32,15 +32,6 @@ deps_private += rapidcheck
 gtest = dependency('gtest', main : true)
 deps_private += gtest
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  '-include', 'config-expr.hh',
-  language : 'cpp',
-)
-
 subdir('nix-meson-build-support/common')
 
 sources = files(
@@ -69,6 +60,7 @@ test(
   env : {
     '_NIX_TEST_UNIT_DATA': meson.current_source_dir() / 'data',
     'NIX_CONFIG': 'extra-experimental-features = flakes',
+    'HOME': meson.current_build_dir() / 'test-home',
   },
   protocol : 'gtest',
 )

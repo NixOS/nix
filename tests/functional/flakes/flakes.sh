@@ -160,6 +160,7 @@ expect 1 nix build -o "$TEST_ROOT/result" "$flake2Dir#bar" --no-update-lock-file
 nix build -o "$TEST_ROOT/result" "$flake2Dir#bar" --commit-lock-file
 [[ -e "$flake2Dir/flake.lock" ]]
 [[ -z $(git -C "$flake2Dir" diff main || echo failed) ]]
+[[ $(jq --indent 0 --compact-output . < "$flake2Dir/flake.lock") =~ ^'{"nodes":{"flake1":{"locked":{"lastModified":'.*',"narHash":"sha256-'.*'","ref":"refs/heads/master","rev":"'.*'","revCount":2,"type":"git","url":"file:///'.*'"},"original":{"id":"flake1","type":"indirect"}},"root":{"inputs":{"flake1":"flake1"}}},"root":"root","version":7}'$ ]]
 
 # Rerunning the build should not change the lockfile.
 nix build -o "$TEST_ROOT/result" "$flake2Dir#bar"
@@ -220,6 +221,13 @@ nix store gc
 nix registry list --flake-registry "file://$registry" --refresh | grepQuiet flake3
 mv "$registry.tmp" "$registry"
 
+# Ensure that locking ignores the user registry.
+mkdir -p "$TEST_HOME/.config/nix"
+ln -sfn "$registry" "$TEST_HOME/.config/nix/registry.json"
+nix flake metadata --flake-registry '' flake1
+expectStderr 1 nix flake update --flake-registry '' --flake "$flake3Dir" | grepQuiet "cannot find flake 'flake:flake1' in the flake registries"
+rm "$TEST_HOME/.config/nix/registry.json"
+
 # Test whether flakes are registered as GC roots for offline use.
 # FIXME: use tarballs rather than git.
 rm -rf "$TEST_HOME/.cache"
@@ -259,6 +267,7 @@ nix registry add user-flake2 "git+file://$percentEncodedFlake2Dir"
 [[ $(nix --flake-registry "" registry list | wc -l) == 2 ]]
 nix --flake-registry "" registry list | grepQuietInverse '^global' # nothing in global registry
 nix --flake-registry "" registry list | grepQuiet '^user'
+nix flake metadata --flake-registry "" user-flake1 | grepQuiet 'URL:.*flake1.*'
 nix registry remove user-flake1
 nix registry remove user-flake2
 [[ $(nix registry list | wc -l) == 4 ]]
@@ -423,3 +432,41 @@ nix flake metadata "$flake2Dir" --reference-lock-file $TEST_ROOT/flake2-overridd
 
 # reference-lock-file can only be used if allow-dirty is set.
 expectStderr 1 nix flake metadata "$flake2Dir" --no-allow-dirty --reference-lock-file $TEST_ROOT/flake2-overridden.lock
+
+# After changing an input (flake2 from newFlake2Rev to prevFlake2Rev), we should have the transitive inputs locked by revision $prevFlake2Rev of flake2.
+prevFlake1Rev=$(nix flake metadata --json "$flake1Dir" | jq -r .revision)
+prevFlake2Rev=$(nix flake metadata --json "$flake2Dir" | jq -r .revision)
+
+echo "# bla" >> "$flake1Dir/flake.nix"
+git -C "$flake1Dir" commit flake.nix -m 'bla'
+
+nix flake update --flake "$flake2Dir"
+git -C "$flake2Dir" commit flake.lock -m 'bla'
+
+newFlake1Rev=$(nix flake metadata --json "$flake1Dir" | jq -r .revision)
+newFlake2Rev=$(nix flake metadata --json "$flake2Dir" | jq -r .revision)
+
+cat > "$flake3Dir/flake.nix" <<EOF
+{
+  inputs.flake2.url = "flake:flake2/master/$newFlake2Rev";
+
+  outputs = { self, flake2 }: {
+  };
+}
+EOF
+git -C "$flake3Dir" commit flake.nix -m 'bla'
+
+rm "$flake3Dir/flake.lock"
+nix flake lock "$flake3Dir"
+[[ "$(nix flake metadata --json "$flake3Dir" | jq -r .locks.nodes.flake1.locked.rev)" = $newFlake1Rev ]]
+
+cat > "$flake3Dir/flake.nix" <<EOF
+{
+  inputs.flake2.url = "flake:flake2/master/$prevFlake2Rev";
+
+  outputs = { self, flake2 }: {
+  };
+}
+EOF
+
+[[ "$(nix flake metadata --json "$flake3Dir" | jq -r .locks.nodes.flake1.locked.rev)" = $prevFlake1Rev ]]

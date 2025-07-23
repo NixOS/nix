@@ -1,12 +1,12 @@
-#include "url.hh"
+#include "nix/util/url.hh"
 #include <gtest/gtest.h>
 
 namespace nix {
 
 /* ----------- tests for url.hh --------------------------------------------------*/
 
-    std::string print_map(std::map<std::string, std::string> m) {
-        std::map<std::string, std::string>::iterator it;
+    std::string print_map(StringMap m) {
+        StringMap::iterator it;
         std::string s = "{ ";
         for (it = m.begin(); it != m.end(); ++it) {
             s += "{ ";

@@ -7,7 +7,7 @@ The format of this specification is close to [Extended Backus–Naur form](https
 Regular users do *not* need to know this information --- store paths can be treated as black boxes computed from the properties of the store objects they refer to.
 But for those interested in exactly how Nix works, e.g. if they are reimplementing it, this information can be useful.
 
-[store path](@docroot@/store/store-path.md)
+[store path]: @docroot@/store/store-path.md
 
 ## Store path proper
 
@@ -20,14 +20,17 @@ where
 
 - `store-dir` = the [store directory](@docroot@/store/store-path.md#store-directory)
 
-- `digest` = base-32 representation of the first 160 bits of a [SHA-256] hash of `fingerprint`
+- `digest` = base-32 representation of the compressed to 160 bits [SHA-256] hash of `fingerprint`
 
-  This the hash part of the store name
+For the definition of the hash compression algorithm, please refer to the section 5.1 of
+the [Nix thesis](https://edolstra.github.io/pubs/phd-thesis.pdf), which also defines the
+specifics of base-32 encoding. Note that base-32 encoding processes the hash bytestring from
+the end, while base-16 processes in from the beginning.
 
 ## Fingerprint
 
 - ```ebnf
-  fingerprint = type ":" sha256 ":" inner-digest ":" store ":" name
+  fingerprint = type ":sha256:" inner-digest ":" store ":" name
   ```
 
   Note that it includes the location of the store as well as the name to make sure that changes to either of those are reflected in the hash
@@ -53,7 +56,7 @@ where
     method of content addressing store objects,
     if the hash algorithm is [SHA-256].
     Just like in the "Text" case, we can have the store objects referenced by their paths.
-    Additionally, we can have an optional `:self` label to denote self reference.
+    Additionally, we can have an optional `:self` label to denote self-reference.
 
   - ```ebnf
     | "output:" id
@@ -70,7 +73,8 @@ where
     `id` is the name of the output (usually, "out").
     For content-addressed store objects, `id`, is always "out".
 
-- `inner-digest` = base-16 representation of a SHA-256 hash of `inner-fingerprint`
+- `inner-digest` = base-16 representation of a SHA-256 hash of `inner-fingerprint`.
+  The base-16 encoding uses lower-cased hex digits.
 
 ## Inner fingerprint
 
@@ -82,7 +86,7 @@ where
 
   - if `type` = `"source:" ...`:
 
-    the hash of the [Nix Archive (NAR)] serialization of the [file system object](@docroot@/store/file-system-object.md) of the store object.
+    the [Nix Archive (NAR)] serialization of the [file system object](@docroot@/store/file-system-object.md) of the store object.
 
   - if `type` = `"output:" id`:
 

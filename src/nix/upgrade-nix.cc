@@ -1,13 +1,13 @@
-#include "processes.hh"
-#include "command.hh"
-#include "common-args.hh"
-#include "store-api.hh"
-#include "filetransfer.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "attr-path.hh"
-#include "names.hh"
-#include "executable-path.hh"
+#include "nix/util/processes.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/common-args.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/store/names.hh"
+#include "nix/util/executable-path.hh"
 #include "self-exe.hh"
 
 using namespace nix;
@@ -23,14 +23,14 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
             .shortName = 'p',
             .description = "The path to the Nix profile to upgrade.",
             .labels = {"profile-dir"},
-            .handler = {&profileDir}
+            .handler = {&profileDir},
         });
 
         addFlag({
             .longName = "nix-store-paths-url",
             .description = "The URL of the file that contains the store paths of the latest Nix release.",
             .labels = {"url"},
-            .handler = {&(std::string&) settings.upgradeNixStorePathUrl}
+            .handler = {&(std::string&) settings.upgradeNixStorePathUrl},
         });
     }
 

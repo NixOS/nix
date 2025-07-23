@@ -1,11 +1,11 @@
-#include "globals.hh"
-#include "config-global.hh"
-#include "current-process.hh"
-#include "archive.hh"
-#include "args.hh"
-#include "abstract-setting-to-json.hh"
-#include "compute-levels.hh"
-#include "signals.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/args.hh"
+#include "nix/util/abstract-setting-to-json.hh"
+#include "nix/util/compute-levels.hh"
+#include "nix/util/signals.hh"
 
 #include <algorithm>
 #include <map>
@@ -25,17 +25,17 @@
 # include <dlfcn.h>
 #endif
 
-#if __APPLE__
-# include "processes.hh"
+#ifdef __APPLE__
+# include "nix/util/processes.hh"
 #endif
 
-#include "config-impl.hh"
+#include "nix/util/config-impl.hh"
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>
 #endif
 
-#include "strings.hh"
+#include "store-config-private.hh"
 
 namespace nix {
 
@@ -85,12 +85,12 @@ Settings::Settings()
         builders = concatStringsSep("\n", ss);
     }
 
-#if defined(__linux__) && defined(SANDBOX_SHELL)
+#if (defined(__linux__) || defined(__FreeBSD__)) && defined(SANDBOX_SHELL)
     sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
 #endif
 
     /* chroot-like behavior from Apple's sandbox */
-#if __APPLE__
+#ifdef __APPLE__
     sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
@@ -140,7 +140,7 @@ std::vector<Path> getUserConfigFiles()
     return files;
 }
 
-unsigned int Settings::getDefaultCores()
+unsigned int Settings::getDefaultCores() const
 {
     const unsigned int concurrency = std::max(1U, std::thread::hardware_concurrency());
     const unsigned int maxCPU = getMaxCPU();
@@ -151,7 +151,7 @@ unsigned int Settings::getDefaultCores()
       return concurrency;
 }
 
-#if __APPLE__
+#ifdef __APPLE__
 static bool hasVirt() {
 
     int hasVMM;
@@ -181,16 +181,16 @@ StringSet Settings::getDefaultSystemFeatures()
        actually require anything special on the machines. */
     StringSet features{"nixos-test", "benchmark", "big-parallel"};
 
-    #if __linux__
+    #ifdef __linux__
     features.insert("uid-range");
     #endif
 
-    #if __linux__
+    #ifdef __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
         features.insert("kvm");
     #endif
 
-    #if __APPLE__
+    #ifdef __APPLE__
     if (hasVirt())
         features.insert("apple-virt");
     #endif
@@ -202,19 +202,19 @@ StringSet Settings::getDefaultExtraPlatforms()
 {
     StringSet extraPlatforms;
 
-    if (std::string{SYSTEM} == "x86_64-linux" && !isWSL1())
+    if (std::string{NIX_LOCAL_SYSTEM} == "x86_64-linux" && !isWSL1())
         extraPlatforms.insert("i686-linux");
 
-#if __linux__
+#ifdef __linux__
     StringSet levels = computeLevels();
     for (auto iter = levels.begin(); iter != levels.end(); ++iter)
         extraPlatforms.insert(*iter + "-linux");
-#elif __APPLE__
+#elif defined(__APPLE__)
     // Rosetta 2 emulation layer can run x86_64 binaries on aarch64
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
     // always exec with their own binary preferences.
-    if (std::string{SYSTEM} == "aarch64-darwin" &&
+    if (std::string{NIX_LOCAL_SYSTEM} == "aarch64-darwin" &&
         runProgram(RunOptions {.program = "arch", .args = {"-arch", "x86_64", "/usr/bin/true"}, .mergeStderrToStdout = true}).first == 0)
         extraPlatforms.insert("x86_64-darwin");
 #endif
@@ -224,7 +224,7 @@ StringSet Settings::getDefaultExtraPlatforms()
 
 bool Settings::isWSL1()
 {
-#if __linux__
+#ifdef __linux__
     struct utsname utsbuf;
     uname(&utsbuf);
     // WSL1 uses -Microsoft suffix
@@ -278,21 +278,21 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
         .aliases = aliases,
         .description = "Enable sandboxing.",
         .category = category,
-        .handler = {[this]() { override(smEnabled); }}
+        .handler = {[this]() { override(smEnabled); }},
     });
     args.addFlag({
         .longName = "no-" + name,
         .aliases = aliases,
         .description = "Disable sandboxing.",
         .category = category,
-        .handler = {[this]() { override(smDisabled); }}
+        .handler = {[this]() { override(smDisabled); }},
     });
     args.addFlag({
         .longName = "relaxed-" + name,
         .aliases = aliases,
         .description = "Enable sandboxing, but allow builds to disable it.",
         .category = category,
-        .handler = {[this]() { override(smRelaxed); }}
+        .handler = {[this]() { override(smRelaxed); }},
     });
 }
 
@@ -374,7 +374,7 @@ void initLibStore(bool loadConfig) {
        [1] https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-initialize.mm#L614-L636
     */
     curl_global_init(CURL_GLOBAL_ALL);
-#if __APPLE__
+#ifdef __APPLE__
     /* On macOS, don't use the per-session TMPDIR (as set e.g. by
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */

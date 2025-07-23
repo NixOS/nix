@@ -1,10 +1,10 @@
-#include "installable-flake.hh"
-#include "command-installable-value.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
-#include "eval-inline.hh"
+#include "nix/cmd/installable-flake.hh"
+#include "nix/cmd/command-installable-value.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/expr/eval-inline.hh"
 
 namespace nix::fs { using namespace std::filesystem; }
 
@@ -24,7 +24,7 @@ struct CmdBundle : InstallableValueCommand
             .handler = {&bundler},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
                 completeFlakeRef(completions, getStore(), prefix);
-            }}
+            }},
         });
 
         addFlag({
@@ -33,7 +33,7 @@ struct CmdBundle : InstallableValueCommand
             .description = "Override the name of the symlink to the build result. It defaults to the base name of the app.",
             .labels = {"path"},
             .handler = {&outLink},
-            .completer = completePath
+            .completer = completePath,
         });
 
     }
@@ -80,7 +80,7 @@ struct CmdBundle : InstallableValueCommand
 
         auto [bundlerFlakeRef, bundlerName, extendedOutputsSpec] =
             parseFlakeRefWithFragmentAndExtendedOutputsSpec(
-                fetchSettings, bundler, fs::current_path().string());
+                fetchSettings, bundler, std::filesystem::current_path().string());
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         InstallableFlake bundler{this,
             evalState, std::move(bundlerFlakeRef), bundlerName, std::move(extendedOutputsSpec),

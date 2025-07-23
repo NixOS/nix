@@ -2,9 +2,9 @@
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
-#include "tests/path.hh"
-#include "tests/libexpr.hh"
-#include "tests/value/context.hh"
+#include "nix/store/tests/path.hh"
+#include "nix/expr/tests/libexpr.hh"
+#include "nix/expr/tests/value/context.hh"
 
 namespace nix {
 
@@ -124,7 +124,9 @@ RC_GTEST_PROP(
     prop_round_rip,
     (const NixStringContextElem & o))
 {
-    RC_ASSERT(o == NixStringContextElem::parse(o.to_string()));
+    ExperimentalFeatureSettings xpSettings;
+    xpSettings.set("experimental-features", "dynamic-derivations");
+    RC_ASSERT(o == NixStringContextElem::parse(o.to_string(), xpSettings));
 }
 
 #endif
