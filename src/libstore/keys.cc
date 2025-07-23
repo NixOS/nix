@@ -28,4 +28,4 @@ PublicKeys getDefaultPublicKeys()
     return publicKeys;
 }
 
-}
+} // namespace nix

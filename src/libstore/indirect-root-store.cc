@@ -42,4 +42,4 @@ Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _g
     return gcRoot;
 }
 
-}
+} // namespace nix

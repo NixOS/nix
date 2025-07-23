@@ -1,10 +1,10 @@
 #if 0
 
-#include "nix/util/logging.hh"
-#include "nix/expr/nixexpr.hh"
-#include <fstream>
+#  include "nix/util/logging.hh"
+#  include "nix/expr/nixexpr.hh"
+#  include <fstream>
 
-#include <gtest/gtest.h>
+#  include <gtest/gtest.h>
 
 namespace nix {
 

@@ -8,18 +8,20 @@ namespace nix {
 
 MakeError(InvalidDerivationOutputId, Error);
 
-DrvOutput DrvOutput::parse(const std::string &strRep) {
+DrvOutput DrvOutput::parse(const std::string & strRep)
+{
     size_t n = strRep.find("!");
     if (n == strRep.npos)
         throw InvalidDerivationOutputId("Invalid derivation output id %s", strRep);
 
     return DrvOutput{
         .drvHash = Hash::parseAnyPrefixed(strRep.substr(0, n)),
-        .outputName = strRep.substr(n+1),
+        .outputName = strRep.substr(n + 1),
     };
 }
 
-std::string DrvOutput::to_string() const {
+std::string DrvOutput::to_string() const
+{
     return strHash() + "!" + outputName;
 }
 
@@ -32,23 +34,21 @@ std::set<Realisation> Realisation::closure(Store & store, const std::set<Realisa
 
 void Realisation::closure(Store & store, const std::set<Realisation> & startOutputs, std::set<Realisation> & res)
 {
-    auto getDeps = [&](const Realisation& current) -> std::set<Realisation> {
+    auto getDeps = [&](const Realisation & current) -> std::set<Realisation> {
         std::set<Realisation> res;
-        for (auto& [currentDep, _] : current.dependentRealisations) {
+        for (auto & [currentDep, _] : current.dependentRealisations) {
             if (auto currentRealisation = store.queryRealisation(currentDep))
                 res.insert(*currentRealisation);
             else
-                throw Error(
-                    "Unrealised derivation '%s'", currentDep.to_string());
+                throw Error("Unrealised derivation '%s'", currentDep.to_string());
         }
         return res;
     };
 
     computeClosure<Realisation>(
-        startOutputs, res,
-        [&](const Realisation& current,
-            std::function<void(std::promise<std::set<Realisation>>&)>
-                processEdges) {
+        startOutputs,
+        res,
+        [&](const Realisation & current, std::function<void(std::promise<std::set<Realisation>> &)> processEdges) {
             std::promise<std::set<Realisation>> promise;
             try {
                 auto res = getDeps(current);
@@ -60,7 +60,8 @@ void Realisation::closure(Store & store, const std::set<Realisation> & startOutp
         });
 }
 
-nlohmann::json Realisation::toJSON() const {
+nlohmann::json Realisation::toJSON() const
+{
     auto jsonDependentRealisations = nlohmann::json::object();
     for (auto & [depId, depOutPath] : dependentRealisations)
         jsonDependentRealisations.emplace(depId.to_string(), depOutPath.to_string());
@@ -72,9 +73,8 @@ nlohmann::json Realisation::toJSON() const {
     };
 }
 
-Realisation Realisation::fromJSON(
-    const nlohmann::json& json,
-    const std::string& whence) {
+Realisation Realisation::fromJSON(const nlohmann::json & json, const std::string & whence)
+{
     auto getOptionalField = [&](std::string fieldName) -> std::optional<std::string> {
         auto fieldIterator = json.find(fieldName);
         if (fieldIterator == json.end())
@@ -85,16 +85,14 @@ Realisation Realisation::fromJSON(
         if (auto field = getOptionalField(fieldName))
             return *field;
         else
-            throw Error(
-                "Drv output info file '%1%' is corrupt, missing field %2%",
-                whence, fieldName);
+            throw Error("Drv output info file '%1%' is corrupt, missing field %2%", whence, fieldName);
     };
 
     StringSet signatures;
     if (auto signaturesIterator = json.find("signatures"); signaturesIterator != json.end())
         signatures.insert(signaturesIterator->begin(), signaturesIterator->end());
 
-    std::map <DrvOutput, StorePath> dependentRealisations;
+    std::map<DrvOutput, StorePath> dependentRealisations;
     if (auto jsonDependencies = json.find("dependentRealisations"); jsonDependencies != json.end())
         for (auto & [jsonDepId, jsonDepOutPath] : jsonDependencies->get<StringMap>())
             dependentRealisations.insert({DrvOutput::parse(jsonDepId), StorePath(jsonDepOutPath)});
@@ -114,7 +112,7 @@ std::string Realisation::fingerprint() const
     return serialized.dump();
 }
 
-void Realisation::sign(const Signer &signer)
+void Realisation::sign(const Signer & signer)
 {
     signatures.insert(signer.signDetached(fingerprint()));
 }
@@ -137,11 +135,10 @@ size_t Realisation::checkSignatures(const PublicKeys & publicKeys) const
     return good;
 }
 
-
-SingleDrvOutputs filterDrvOutputs(const OutputsSpec& wanted, SingleDrvOutputs&& outputs)
+SingleDrvOutputs filterDrvOutputs(const OutputsSpec & wanted, SingleDrvOutputs && outputs)
 {
     SingleDrvOutputs ret = std::move(outputs);
-    for (auto it = ret.begin(); it != ret.end(); ) {
+    for (auto it = ret.begin(); it != ret.end();) {
         if (!wanted.contains(it->first))
             it = ret.erase(it);
         else
@@ -150,13 +147,14 @@ SingleDrvOutputs filterDrvOutputs(const OutputsSpec& wanted, SingleDrvOutputs&& 
     return ret;
 }
 
-StorePath RealisedPath::path() const {
+StorePath RealisedPath::path() const
+{
     return std::visit([](auto && arg) { return arg.getPath(); }, raw);
 }
 
 bool Realisation::isCompatibleWith(const Realisation & other) const
 {
-    assert (id == other.id);
+    assert(id == other.id);
     if (outPath == other.outPath) {
         if (dependentRealisations.empty() != other.dependentRealisations.empty()) {
             warn(
@@ -172,27 +170,24 @@ bool Realisation::isCompatibleWith(const Realisation & other) const
     return false;
 }
 
-void RealisedPath::closure(
-    Store& store,
-    const RealisedPath::Set& startPaths,
-    RealisedPath::Set& ret)
+void RealisedPath::closure(Store & store, const RealisedPath::Set & startPaths, RealisedPath::Set & ret)
 {
     // FIXME: This only builds the store-path closure, not the real realisation
     // closure
     StorePathSet initialStorePaths, pathsClosure;
-    for (auto& path : startPaths)
+    for (auto & path : startPaths)
         initialStorePaths.insert(path.path());
     store.computeFSClosure(initialStorePaths, pathsClosure);
     ret.insert(startPaths.begin(), startPaths.end());
     ret.insert(pathsClosure.begin(), pathsClosure.end());
 }
 
-void RealisedPath::closure(Store& store, RealisedPath::Set & ret) const
+void RealisedPath::closure(Store & store, RealisedPath::Set & ret) const
 {
     RealisedPath::closure(store, {*this}, ret);
 }
 
-RealisedPath::Set RealisedPath::closure(Store& store) const
+RealisedPath::Set RealisedPath::closure(Store & store) const
 {
     RealisedPath::Set ret;
     closure(store, ret);
