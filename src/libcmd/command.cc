@@ -3,7 +3,7 @@
 
 #include "nix/cmd/command.hh"
 #include "nix/cmd/markdown.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/derivations.hh"
 #include "nix/expr/nixexpr.hh"
@@ -14,12 +14,10 @@
 
 namespace nix {
 
-RegisterCommand::Commands * RegisterCommand::commands = nullptr;
-
 nix::Commands RegisterCommand::getCommandsFor(const std::vector<std::string> & prefix)
 {
     nix::Commands res;
-    for (auto & [name, command] : *RegisterCommand::commands)
+    for (auto & [name, command] : RegisterCommand::commands())
         if (name.size() == prefix.size() + 1) {
             bool equal = true;
             for (size_t i = 0; i < prefix.size(); ++i)
@@ -40,7 +38,7 @@ nlohmann::json NixMultiCommand::toJSON()
 void NixMultiCommand::run()
 {
     if (!command) {
-        std::set<std::string> subCommandTextLines;
+        StringSet subCommandTextLines;
         for (auto & [name, _] : commands)
             subCommandTextLines.insert(fmt("- `%s`", name));
         std::string markdownError =
@@ -395,6 +393,13 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
             },
             buildable.raw());
     }
+}
+
+void MixOutLinkBase::createOutLinksMaybe(const std::vector<BuiltPathWithResult> & buildables, ref<Store> & store)
+{
+    if (outLink != "")
+        if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
+            createOutLinks(outLink, toBuiltPaths(buildables), *store2);
 }
 
 }

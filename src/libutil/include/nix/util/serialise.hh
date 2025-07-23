@@ -564,7 +564,7 @@ struct FramedSink : nix::BufferedSink
 
     void writeUnbuffered(std::string_view data) override
     {
-        /* Don't send more data if an error has occured. */
+        /* Don't send more data if an error has occurred. */
         checkError();
 
         to << data.size();

@@ -3,6 +3,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/derived-path-map.hh"
 #include "nix/store/build/goal.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/muxable-pipe.hh"
@@ -14,6 +15,7 @@ namespace nix {
 
 /* Forward definition. */
 struct DerivationGoal;
+struct DerivationBuildingGoal;
 struct PathSubstitutionGoal;
 class DrvOutputSubstitutionGoal;
 
@@ -103,7 +105,10 @@ private:
      * Maps used to prevent multiple instantiations of a goal for the
      * same derivation / path.
      */
-    std::map<StorePath, std::weak_ptr<DerivationGoal>> derivationGoals;
+
+    DerivedPathMap<std::weak_ptr<DerivationGoal>> derivationGoals;
+
+    std::map<StorePath, std::weak_ptr<DerivationBuildingGoal>> derivationBuildingGoals;
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
 
@@ -196,16 +201,26 @@ public:
      * @ref DerivationGoal "derivation goal"
      */
 private:
+    template<class G, typename... Args>
+    std::shared_ptr<G> initGoalIfNeeded(std::weak_ptr<G> & goal_weak, Args && ...args);
+
     std::shared_ptr<DerivationGoal> makeDerivationGoalCommon(
-        const StorePath & drvPath, const OutputsSpec & wantedOutputs,
+        ref<const SingleDerivedPath> drvReq, const OutputsSpec & wantedOutputs,
         std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal);
 public:
     std::shared_ptr<DerivationGoal> makeDerivationGoal(
-        const StorePath & drvPath,
+        ref<const SingleDerivedPath> drvReq,
         const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
     std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(
         const StorePath & drvPath, const BasicDerivation & drv,
         const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
+
+    /**
+     * @ref DerivationBuildingGoal "derivation goal"
+     */
+    std::shared_ptr<DerivationBuildingGoal> makeDerivationBuildingGoal(
+        const StorePath & drvPath, const Derivation & drv,
+        BuildMode buildMode = bmNormal);
 
     /**
      * @ref PathSubstitutionGoal "substitution goal"

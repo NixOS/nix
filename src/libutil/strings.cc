@@ -26,18 +26,18 @@ __attribute__((no_sanitize("undefined"))) std::string_view toView(const std::ost
 }
 
 template std::list<std::string> tokenizeString(std::string_view s, std::string_view separators);
-template std::set<std::string> tokenizeString(std::string_view s, std::string_view separators);
+template StringSet tokenizeString(std::string_view s, std::string_view separators);
 template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
 
 template std::list<std::string> splitString(std::string_view s, std::string_view separators);
-template std::set<std::string> splitString(std::string_view s, std::string_view separators);
+template StringSet splitString(std::string_view s, std::string_view separators);
 template std::vector<std::string> splitString(std::string_view s, std::string_view separators);
 
 template std::list<OsString>
 basicSplitString(std::basic_string_view<OsChar> s, std::basic_string_view<OsChar> separators);
 
 template std::string concatStringsSep(std::string_view, const std::list<std::string> &);
-template std::string concatStringsSep(std::string_view, const std::set<std::string> &);
+template std::string concatStringsSep(std::string_view, const StringSet &);
 template std::string concatStringsSep(std::string_view, const std::vector<std::string> &);
 template std::string concatStringsSep(std::string_view, const boost::container::small_vector<std::string, 64> &);
 
@@ -49,7 +49,7 @@ typedef std::string_view strings_4[4];
 template std::string concatStringsSep(std::string_view, const strings_4 &);
 
 template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const std::list<std::string> &);
-template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const std::set<std::string> &);
+template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const StringSet &);
 template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const std::vector<std::string> &);
 
 /**

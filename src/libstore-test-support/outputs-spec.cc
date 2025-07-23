@@ -14,8 +14,9 @@ Gen<OutputsSpec> Arbitrary<OutputsSpec>::arbitrary()
                 return gen::just((OutputsSpec) OutputsSpec::All{});
             case 1:
                 return gen::map(
-                    gen::nonEmpty(gen::container<StringSet>(
-                        gen::map(gen::arbitrary<StorePathName>(), [](StorePathName n) { return n.name; }))),
+                    gen::nonEmpty(
+                        gen::container<StringSet>(
+                            gen::map(gen::arbitrary<StorePathName>(), [](StorePathName n) { return n.name; }))),
                     [](StringSet names) { return (OutputsSpec) OutputsSpec::Names{names}; });
             default:
                 assert(false);

@@ -21,6 +21,7 @@ struct App
 struct UnresolvedApp
 {
     App unresolved;
+    std::vector<BuiltPathWithResult> build(ref<Store> evalStore, ref<Store> store);
     App resolve(ref<Store> evalStore, ref<Store> store);
 };
 

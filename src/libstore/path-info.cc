@@ -40,6 +40,14 @@ void ValidPathInfo::sign(const Store & store, const Signer & signer)
     sigs.insert(signer.signDetached(fingerprint(store)));
 }
 
+void ValidPathInfo::sign(const Store & store, const std::vector<std::unique_ptr<Signer>> & signers)
+{
+    auto fingerprint = this->fingerprint(store);
+    for (auto & signer: signers) {
+        sigs.insert(signer->signDetached(fingerprint));
+    }
+}
+
 std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithReferences() const
 {
     if (! ca)
@@ -192,7 +200,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
 
     auto & json = getObject(_json);
     res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
-    res.narSize = getInteger(valueAt(json, "narSize"));
+    res.narSize = getUnsigned(valueAt(json, "narSize"));
 
     try {
         auto references = getStringList(valueAt(json, "references"));
@@ -216,7 +224,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
 
     if (json.contains("registrationTime"))
         if (auto * rawRegistrationTime = getNullable(valueAt(json, "registrationTime")))
-            res.registrationTime = getInteger(*rawRegistrationTime);
+            res.registrationTime = getInteger<time_t>(*rawRegistrationTime);
 
     if (json.contains("ultimate"))
         res.ultimate = getBoolean(valueAt(json, "ultimate"));

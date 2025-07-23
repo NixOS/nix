@@ -67,7 +67,7 @@ struct ProfileElement
      * Return a string representing an installable corresponding to the current
      * element, either a flakeref or a plain store path
      */
-    std::set<std::string> toInstallables(Store & store)
+    StringSet toInstallables(Store & store)
     {
         if (source)
             return {source->to_string()};
@@ -289,12 +289,12 @@ struct ProfileManifest
 
         while (i != prev.elements.end() || j != cur.elements.end()) {
             if (j != cur.elements.end() && (i == prev.elements.end() || i->first > j->first)) {
-                logger->cout("%s%s: ∅ -> %s", indent, j->second.identifier(), j->second.versions());
+                logger->cout("%s%s: %s added", indent, j->second.identifier(), j->second.versions());
                 changes = true;
                 ++j;
             }
             else if (i != prev.elements.end() && (j == cur.elements.end() || i->first < j->first)) {
-                logger->cout("%s%s: %s -> ∅", indent, i->second.identifier(), i->second.versions());
+                logger->cout("%s%s: %s removed", indent, i->second.identifier(), i->second.versions());
                 changes = true;
                 ++i;
             }
@@ -600,7 +600,7 @@ public:
         });
     }
 
-    std::set<std::string> getMatchingElementNames(ProfileManifest & manifest) {
+    StringSet getMatchingElementNames(ProfileManifest & manifest) {
         if (_matchers.empty()) {
             throw UsageError("No packages specified.");
         }
@@ -614,7 +614,7 @@ public:
             return {};
         }
 
-        std::set<std::string> result;
+        StringSet result;
         for (auto & matcher : _matchers) {
             bool foundMatch = false;
             for (auto & [name, element] : manifest.elements) {
@@ -800,7 +800,7 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
         ProfileManifest manifest(*getEvalState(), *profile);
 
         if (json) {
-            std::cout << manifest.toJSON(*store).dump() << "\n";
+            printJSON(manifest.toJSON(*store));
         } else {
             for (const auto & [i, e] : enumerate(manifest.elements)) {
                 auto & [name, element] = e;

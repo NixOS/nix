@@ -9,7 +9,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/globals.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/util/posix-source-accessor.hh"
 
 #include <sodium.h>

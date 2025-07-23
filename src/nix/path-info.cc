@@ -154,11 +154,11 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             pathLen = std::max(pathLen, store->printStorePath(storePath).size());
 
         if (json) {
-            logger->cout(pathInfoToJSON(
+            printJSON(pathInfoToJSON(
                 *store,
                 // FIXME: preserve order?
                 StorePathSet(storePaths.begin(), storePaths.end()),
-                showClosureSize).dump());
+                showClosureSize));
         }
 
         else {

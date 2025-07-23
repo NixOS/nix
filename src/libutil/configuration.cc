@@ -220,7 +220,7 @@ void Config::convertToArgs(Args & args, const std::string & category)
 AbstractSetting::AbstractSetting(
     const std::string & name,
     const std::string & description,
-    const std::set<std::string> & aliases,
+    const StringSet & aliases,
     std::optional<ExperimentalFeature> experimentalFeature)
     : name(name)
     , description(stripIndentation(description))
@@ -428,7 +428,7 @@ PathSetting::PathSetting(Config * options,
     const Path & def,
     const std::string & name,
     const std::string & description,
-    const std::set<std::string> & aliases)
+    const StringSet & aliases)
     : BaseSetting<Path>(def, true, name, description, aliases)
 {
     options->addSetting(this);
@@ -444,7 +444,7 @@ OptionalPathSetting::OptionalPathSetting(Config * options,
     const std::optional<Path> & def,
     const std::string & name,
     const std::string & description,
-    const std::set<std::string> & aliases)
+    const StringSet & aliases)
     : BaseSetting<std::optional<Path>>(def, true, name, description, aliases)
 {
     options->addSetting(this);

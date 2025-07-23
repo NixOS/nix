@@ -54,7 +54,7 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      *
      * @note Unlike Unix, this method should *not* follow symlinks. Nix
      * by default wants to manipulate symlinks explicitly, and not
-     * implictly follow them, as they are frequently untrusted user data
+     * implicitly follow them, as they are frequently untrusted user data
      * and thus may point to arbitrary locations. Acting on the targets
      * targets of symlinks should only occasionally be done, and only
      * with care.
@@ -183,6 +183,27 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
     std::optional<std::string> fingerprint;
 
     /**
+     * Return the fingerprint for `path`. This is usually the
+     * fingerprint of the current accessor, but for composite
+     * accessors (like `MountedSourceAccessor`), we want to return the
+     * fingerprint of the "inner" accessor if the current one lacks a
+     * fingerprint.
+     *
+     * So this method is intended to return the most-outer accessor
+     * that has a fingerprint for `path`. It also returns the path that `path`
+     * corresponds to in that accessor.
+     *
+     * For example: in a `MountedSourceAccessor` that has
+     * `/nix/store/foo` mounted,
+     * `getFingerprint("/nix/store/foo/bar")` will return the path
+     * `/bar` and the fingerprint of the `/nix/store/foo` accessor.
+     */
+    virtual std::pair<CanonPath, std::optional<std::string>> getFingerprint(const CanonPath & path)
+    {
+        return {path, fingerprint};
+    }
+
+    /**
      * Return the maximum last-modified time of the files in this
      * tree, if available.
      */
@@ -219,5 +240,11 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root);
  * underlying accessors. Earlier accessors take precedence over later.
  */
 ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors);
+
+/**
+ * Creates a new source accessor which is confined to the subdirectory
+ * of the given source accessor.
+ */
+ref<SourceAccessor> projectSubdirSourceAccessor(ref<SourceAccessor>, CanonPath subdirectory);
 
 }

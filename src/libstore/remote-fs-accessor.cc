@@ -51,7 +51,7 @@ ref<SourceAccessor> RemoteFSAccessor::addToCache(std::string_view hashPart, std:
 
 std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPath & path)
 {
-    auto [storePath, restPath_] = store->toStorePath(path.abs());
+    auto [storePath, restPath_] = store->toStorePath(store->storeDir + path.abs());
     auto restPath = CanonPath(restPath_);
 
     if (requireValidPath && !store->isValidPath(storePath))

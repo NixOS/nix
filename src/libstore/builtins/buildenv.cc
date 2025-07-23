@@ -19,12 +19,12 @@ struct State
 /* For each activated package, create symlinks */
 static void createLinks(State & state, const Path & srcDir, const Path & dstDir, int priority)
 {
-    std::filesystem::directory_iterator srcFiles;
+    DirectoryIterator srcFiles;
 
     try {
-        srcFiles = std::filesystem::directory_iterator{srcDir};
-    } catch (std::filesystem::filesystem_error & e) {
-        if (e.code() == std::errc::not_a_directory) {
+        srcFiles = DirectoryIterator{srcDir};
+    } catch (SysError & e) {
+        if (e.errNo == ENOTDIR) {
             warn("not including '%s' in the user environment because it's not a directory", srcDir);
             return;
         }
@@ -124,7 +124,7 @@ void buildProfile(const Path & out, Packages && pkgs)
 {
     State state;
 
-    std::set<Path> done, postponed;
+    PathSet done, postponed;
 
     auto addPkg = [&](const Path & pkgDir, int priority) {
         if (!done.insert(pkgDir).second) return;
@@ -158,7 +158,7 @@ void buildProfile(const Path & out, Packages && pkgs)
      */
     auto priorityCounter = 1000;
     while (!postponed.empty()) {
-        std::set<Path> pkgDirs;
+        PathSet pkgDirs;
         postponed.swap(pkgDirs);
         for (const auto & pkgDir : pkgDirs)
             addPkg(pkgDir, priorityCounter++);

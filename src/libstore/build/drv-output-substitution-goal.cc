@@ -3,6 +3,7 @@
 #include "nix/store/build/worker.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/util/callback.hh"
+#include "nix/store/store-open.hh"
 
 namespace nix {
 
@@ -11,7 +12,7 @@ DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(
     Worker & worker,
     RepairFlag repair,
     std::optional<ContentAddress> ca)
-    : Goal(worker, DerivedPath::Opaque { StorePath::dummy })
+    : Goal(worker, init())
     , id(id)
 {
     name = fmt("substitution of '%s'", id.to_string());
@@ -87,6 +88,8 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 
         bool failed = false;
 
+        Goals waitees;
+
         for (const auto & [depId, depPath] : outputInfo->dependentRealisations) {
             if (depId != id) {
                 if (auto localOutputInfo = worker.store.queryRealisation(depId);
@@ -103,13 +106,13 @@ Goal::Co DrvOutputSubstitutionGoal::init()
                     failed = true;
                     break;
                 }
-                addWaitee(worker.makeDrvOutputSubstitutionGoal(depId));
+                waitees.insert(worker.makeDrvOutputSubstitutionGoal(depId));
             }
         }
 
         if (failed) continue;
 
-        co_return realisationFetched(outputInfo, sub);
+        co_return realisationFetched(std::move(waitees), outputInfo, sub);
     }
 
     /* None left.  Terminate this goal and let someone else deal
@@ -127,16 +130,16 @@ Goal::Co DrvOutputSubstitutionGoal::init()
     co_return amDone(substituterFailed ? ecFailed : ecNoSubstituters);
 }
 
-Goal::Co DrvOutputSubstitutionGoal::realisationFetched(std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub) {
-    addWaitee(worker.makePathSubstitutionGoal(outputInfo->outPath));
+Goal::Co DrvOutputSubstitutionGoal::realisationFetched(Goals waitees, std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub) {
+    waitees.insert(worker.makePathSubstitutionGoal(outputInfo->outPath));
 
-    if (!waitees.empty()) co_await Suspend{};
+    co_await await(std::move(waitees));
 
     trace("output path substituted");
 
     if (nrFailed > 0) {
         debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
-        co_return amDone(nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed);
+        co_return amDone(nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed);
     }
 
     worker.store.registerDrvOutput(*outputInfo);

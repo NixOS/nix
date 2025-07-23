@@ -4,6 +4,8 @@ source ./common.sh
 
 requireGit
 
+unset _NIX_TEST_BARF_ON_UNCACHEABLE
+
 # Test a "vendored" subflake dependency. This is a relative path flake
 # which doesn't reference the root flake and has its own lock file.
 #

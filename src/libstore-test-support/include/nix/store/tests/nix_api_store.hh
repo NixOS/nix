@@ -11,8 +11,6 @@
 #include <filesystem>
 #include <gtest/gtest.h>
 
-namespace fs { using namespace std::filesystem; }
-
 namespace nixC {
 class nix_api_store_test : public nix_api_util_context
 {
@@ -27,15 +25,17 @@ public:
     {
         nix_store_free(store);
 
-        for (auto & path : fs::recursive_directory_iterator(nixDir)) {
-            fs::permissions(path, fs::perms::owner_all);
+        for (auto & path : std::filesystem::recursive_directory_iterator(nixDir)) {
+            std::filesystem::permissions(path, std::filesystem::perms::owner_all);
         }
-        fs::remove_all(nixDir);
+        std::filesystem::remove_all(nixDir);
     }
 
     Store * store;
     std::string nixDir;
     std::string nixStoreDir;
+    std::string nixStateDir;
+    std::string nixLogDir;
 
 protected:
     void init_local_store()
@@ -45,7 +45,7 @@ protected:
         auto tmpl = nix::defaultTempDir() + "/tests_nix-store.";
         for (size_t i = 0; true; ++i) {
             nixDir = tmpl + std::string { i };
-            if (fs::create_directory(nixDir)) break;
+            if (std::filesystem::create_directory(nixDir)) break;
         }
 #else
         // resolve any symlinks in i.e. on macOS /tmp -> /private/tmp
@@ -55,11 +55,13 @@ protected:
 #endif
 
         nixStoreDir = nixDir + "/my_nix_store";
+        nixStateDir = nixDir + "/my_state";
+        nixLogDir = nixDir + "/my_log";
 
         // Options documented in `nix help-stores`
         const char * p1[] = {"store", nixStoreDir.c_str()};
-        const char * p2[] = {"state", (new std::string(nixDir + "/my_state"))->c_str()};
-        const char * p3[] = {"log", (new std::string(nixDir + "/my_log"))->c_str()};
+        const char * p2[] = {"state", nixStateDir.c_str()};
+        const char * p3[] = {"log", nixLogDir.c_str()};
 
         const char ** params[] = {p1, p2, p3, nullptr};
 

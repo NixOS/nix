@@ -24,11 +24,11 @@
 namespace nix {
 
 /* TODO: Separate these store types into different files, give them better names */
-RemoteStore::RemoteStore(const Params & params)
-    : RemoteStoreConfig(params)
-    , Store(params)
+RemoteStore::RemoteStore(const Config & config)
+    : Store{config}
+    , config{config}
     , connections(make_ref<Pool<Connection>>(
-            std::max(1, (int) maxConnections),
+            std::max(1, config.maxConnections.get()),
             [this]() {
                 auto conn = openConnectionWrapper();
                 try {
@@ -44,7 +44,7 @@ RemoteStore::RemoteStore(const Params & params)
                     r->to.good()
                     && r->from.good()
                     && std::chrono::duration_cast<std::chrono::seconds>(
-                        std::chrono::steady_clock::now() - r->startTime).count() < maxConnectionAge;
+                        std::chrono::steady_clock::now() - r->startTime).count() < this->config.maxConnectionAge;
             }
             ))
 {
@@ -122,7 +122,7 @@ void RemoteStore::setOptions(Connection & conn)
        << settings.useSubstitutes;
 
     if (GET_PROTOCOL_MINOR(conn.protoVersion) >= 12) {
-        std::map<std::string, Config::SettingInfo> overrides;
+        std::map<std::string, nix::Config::SettingInfo> overrides;
         settings.getSettings(overrides, true); // libstore settings
         fileTransferSettings.getSettings(overrides, true);
         overrides.erase(settings.keepFailed.name);
@@ -855,9 +855,7 @@ void RemoteStore::addSignatures(const StorePath & storePath, const StringSet & s
 }
 
 
-void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
-    StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
-    uint64_t & downloadSize, uint64_t & narSize)
+MissingPaths RemoteStore::queryMissing(const std::vector<DerivedPath> & targets)
 {
     {
         auto conn(getConnection());
@@ -868,16 +866,16 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
         conn->to << WorkerProto::Op::QueryMissing;
         WorkerProto::write(*this, *conn, targets);
         conn.processStderr();
-        willBuild = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
-        willSubstitute = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
-        unknown = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
-        conn->from >> downloadSize >> narSize;
-        return;
+        MissingPaths res;
+        res.willBuild = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+        res.willSubstitute = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+        res.unknown = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+        conn->from >> res.downloadSize >> res.narSize;
+        return res;
     }
 
  fallback:
-    return Store::queryMissing(targets, willBuild, willSubstitute,
-        unknown, downloadSize, narSize);
+    return Store::queryMissing(targets);
 }
 
 

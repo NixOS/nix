@@ -8,7 +8,12 @@ namespace nix {
 struct GlobalConfig : public AbstractConfig
 {
     typedef std::vector<Config *> ConfigRegistrations;
-    static ConfigRegistrations * configRegistrations;
+
+    static ConfigRegistrations & configRegistrations()
+    {
+        static ConfigRegistrations configRegistrations;
+        return configRegistrations;
+    }
 
     bool set(const std::string & name, const std::string & value) override;
 

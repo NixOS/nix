@@ -1,3 +1,5 @@
+#include <nlohmann/json.hpp>
+
 #include "nix/main/common-args.hh"
 #include "nix/util/args/root.hh"
 #include "nix/util/config-global.hh"
@@ -93,5 +95,18 @@ void MixCommonArgs::initialFlagsProcessed()
     pluginsInited();
 }
 
-
+template <typename T, typename>
+void MixPrintJSON::printJSON(const T /* nlohmann::json */ & json)
+{
+    auto suspension = logger->suspend();
+    if (outputPretty) {
+        logger->writeToStdout(json.dump(2));
+    } else {
+        logger->writeToStdout(json.dump());
+    }
 }
+
+template void MixPrintJSON::printJSON(const nlohmann::json & json);
+
+
+} // namespace nix

@@ -4,8 +4,6 @@
 
 #include <unordered_set>
 
-#include <unordered_set>
-
 namespace nix {
 
 /**
@@ -38,6 +36,8 @@ struct FilteringSourceAccessor : SourceAccessor
 
     std::string readFile(const CanonPath & path) override;
 
+    void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override;
+
     bool pathExists(const CanonPath & path) override;
 
     Stat lstat(const CanonPath & path) override;
@@ -49,6 +49,8 @@ struct FilteringSourceAccessor : SourceAccessor
     std::string readLink(const CanonPath & path) override;
 
     std::string showPath(const CanonPath & path) override;
+
+    std::pair<CanonPath, std::optional<std::string>> getFingerprint(const CanonPath & path) override;
 
     /**
      * Call `makeNotAllowedError` to throw a `RestrictedPathError`

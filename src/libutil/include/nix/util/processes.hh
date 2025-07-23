@@ -103,7 +103,7 @@ struct RunOptions
     std::optional<uid_t> gid;
 #endif
     std::optional<Path> chdir;
-    std::optional<std::map<std::string, std::string>> environment;
+    std::optional<StringMap> environment;
     std::optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;

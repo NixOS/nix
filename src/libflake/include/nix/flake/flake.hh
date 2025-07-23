@@ -69,7 +69,7 @@ struct ConfigFile
 };
 
 /**
- * The contents of a flake.nix file.
+ * A flake in context
  */
 struct Flake
 {
@@ -139,7 +139,7 @@ struct LockedFlake
 
     /**
      * Source tree accessors for nodes that have been fetched in
-     * lockFlake(); in particular, the root node and the overriden
+     * lockFlake(); in particular, the root node and the overridden
      * inputs.
      */
     std::map<ref<Node>, SourcePath> nodePaths;

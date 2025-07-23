@@ -63,7 +63,7 @@ struct CmdConfigShow : Command, MixJSON
 
         if (json) {
             // FIXME: use appropriate JSON types (bool, ints, etc).
-            logger->cout("%s", globalConfig.toJSON().dump());
+            printJSON(globalConfig.toJSON());
         } else {
             logger->cout("%s", globalConfig.toKeyValue());
         }

@@ -33,8 +33,8 @@ public:
     typedef void (DrvOutputSubstitutionGoal::*GoalState)();
     GoalState state;
 
-    Co init() override;
-    Co realisationFetched(std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub);
+    Co init();
+    Co realisationFetched(Goals waitees, std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub);
 
     void timedOut(Error && ex) override { unreachable(); };
 

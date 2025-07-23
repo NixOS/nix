@@ -176,7 +176,7 @@ NarInfo NarInfo::fromJSON(
             std::nullopt);
 
     if (json.contains("downloadSize"))
-        res.fileSize = getInteger(valueAt(json, "downloadSize"));
+        res.fileSize = getUnsigned(valueAt(json, "downloadSize"));
 
     return res;
 }

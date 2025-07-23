@@ -2,12 +2,10 @@
 /**
  * @file
  *
- * Utiltities for working with the file sytem and file paths.
+ * Utilities for working with the file system and file paths.
  */
 
 #include "nix/util/types.hh"
-#include "nix/util/error.hh"
-#include "nix/util/logging.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-path.hh"
 
@@ -18,12 +16,8 @@
 #ifdef _WIN32
 # include <windef.h>
 #endif
-#include <signal.h>
 
-#include <atomic>
 #include <functional>
-#include <map>
-#include <sstream>
 #include <optional>
 
 /**
@@ -105,13 +99,13 @@ std::string_view baseNameOf(std::string_view path);
  * Check whether 'path' is a descendant of 'dir'. Both paths must be
  * canonicalized.
  */
-bool isInDir(std::string_view path, std::string_view dir);
+bool isInDir(const std::filesystem::path & path, const std::filesystem::path & dir);
 
 /**
  * Check whether 'path' is equal to 'dir' or a descendant of
  * 'dir'. Both paths must be canonicalized.
  */
-bool isDirOrInDir(std::string_view path, std::string_view dir);
+bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::path & dir);
 
 /**
  * Get status of `path`.
@@ -126,26 +120,8 @@ std::optional<struct stat> maybeLstat(const Path & path);
 
 /**
  * @return true iff the given path exists.
- *
- * In the process of being deprecated for `fs::symlink_exists`.
  */
-bool pathExists(const Path & path);
-
-namespace fs {
-
-/**
- * TODO: we may actually want to use pathExists instead of this function
- *  ```
- *  symlink_exists(p) = std::filesystem::exists(std::filesystem::symlink_status(p))
- *  ```
- *  Missing convenience analogous to
- *  ```
- *  std::filesystem::exists(p) = std::filesystem::exists(std::filesystem::status(p))
- *  ```
- */
-bool symlink_exists(const std::filesystem::path & path);
-
-} // namespace fs
+bool pathExists(const std::filesystem::path & path);
 
 /**
  * Canonicalize a path except for the last component.
@@ -191,22 +167,28 @@ Descriptor openDirectory(const std::filesystem::path & path);
  */
 std::string readFile(const Path & path);
 std::string readFile(const std::filesystem::path & path);
-void readFile(const Path & path, Sink & sink);
+void readFile(const Path & path, Sink & sink, bool memory_map = true);
+
+enum struct FsSync { Yes, No };
 
 /**
  * Write a string to a file.
  */
-void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, bool sync = false);
-static inline void writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode = 0666, bool sync = false)
+void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No);
+
+static inline void writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No)
 {
     return writeFile(path.string(), s, mode, sync);
 }
 
-void writeFile(const Path & path, Source & source, mode_t mode = 0666, bool sync = false);
-static inline void writeFile(const std::filesystem::path & path, Source & source, mode_t mode = 0666, bool sync = false)
+void writeFile(const Path & path, Source & source, mode_t mode = 0666, FsSync sync = FsSync::No);
+
+static inline void writeFile(const std::filesystem::path & path, Source & source, mode_t mode = 0666, FsSync sync = FsSync::No)
 {
     return writeFile(path.string(), source, mode, sync);
 }
+
+void writeFile(AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No);
 
 /**
  * Flush a path's parent directory to disk.
@@ -335,7 +317,7 @@ typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
  * Create a temporary directory.
  */
 Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
-    bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
+                   mode_t mode = 0755);
 
 /**
  * Create a temporary file, returning a file handle and its path.
@@ -354,10 +336,107 @@ Path defaultTempDir();
 bool isExecutableFileAmbient(const std::filesystem::path & exe);
 
 /**
+ * Return temporary path constructed by appending a suffix to a root path.
+ *
+ * The constructed path looks like `<root><suffix>-<pid>-<unique>`. To create a
+ * path nested in a directory, provide a suffix starting with `/`.
+ */
+Path makeTempPath(const Path & root, const Path & suffix = ".tmp");
+
+/**
  * Used in various places.
  */
 typedef std::function<bool(const Path & path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
+
+/**
+ * Change permissions of a file only if necessary.
+ *
+ * @details
+ * Skip chmod call if the directory already has the requested permissions.
+ * This is to avoid failing when the executing user lacks permissions to change the
+ * directory's permissions even if it would be no-op.
+ *
+ * @param path Path to the file to change the permissions for.
+ * @param mode New file mode.
+ * @param mask Used for checking if the file already has requested permissions.
+ *
+ * @return true if permissions changed, false otherwise.
+ */
+bool chmodIfNeeded(const std::filesystem::path & path, mode_t mode, mode_t mask = S_IRWXU | S_IRWXG | S_IRWXO);
+
+/**
+  * @brief A directory iterator that can be used to iterate over the
+  * contents of a directory. It is similar to std::filesystem::directory_iterator
+  * but throws NixError on failure instead of std::filesystem::filesystem_error.
+  */
+class DirectoryIterator {
+public:
+    // --- Iterator Traits ---
+    using iterator_category = std::input_iterator_tag;
+    using value_type        = std::filesystem::directory_entry;
+    using difference_type   = std::ptrdiff_t;
+    using pointer           = const std::filesystem::directory_entry*;
+    using reference         = const std::filesystem::directory_entry&;
+
+    // Default constructor (represents end iterator)
+    DirectoryIterator() noexcept = default;
+
+    // Constructor taking a path
+    explicit DirectoryIterator(const std::filesystem::path& p);
+
+    reference operator*() const {
+        // Accessing the value itself doesn't typically throw filesystem_error
+        // after successful construction/increment, but underlying operations might.
+        // If directory_entry methods called via -> could throw, add try-catch there.
+        return *it_;
+    }
+
+    pointer operator->() const {
+        return &(*it_);
+    }
+
+
+    DirectoryIterator& operator++();
+
+    // Postfix increment operator
+    DirectoryIterator operator++(int) {
+        DirectoryIterator temp = *this;
+        ++(*this); // Uses the prefix increment's try-catch logic
+        return temp;
+    }
+
+    // Equality comparison
+    friend bool operator==(const DirectoryIterator& a, const DirectoryIterator& b) noexcept {
+        return a.it_ == b.it_;
+    }
+
+    // Inequality comparison
+    friend bool operator!=(const DirectoryIterator& a, const DirectoryIterator& b) noexcept {
+        return !(a == b);
+    }
+
+    // Allow direct use in range-based for loops if iterating over an instance
+    DirectoryIterator begin() const { return *this; }
+    DirectoryIterator end() const { return DirectoryIterator{}; }
+
+
+private:
+    std::filesystem::directory_iterator it_;
+};
+
+#ifdef __FreeBSD__
+class AutoUnmount
+{
+    Path path;
+    bool del;
+public:
+    AutoUnmount(Path&);
+    AutoUnmount();
+    ~AutoUnmount();
+    void cancel();
+};
+#endif
 
 }

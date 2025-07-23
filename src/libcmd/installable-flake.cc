@@ -117,7 +117,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
             .drvPath = makeConstantStorePathRef(std::move(drvPath)),
             .outputs = std::visit(overloaded {
                 [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
-                    std::set<std::string> outputsToInstall;
+                    StringSet outputsToInstall;
                     if (auto aOutputSpecified = attr->maybeGetAttr(state->sOutputSpecified)) {
                         if (aOutputSpecified->getBool()) {
                             if (auto aOutputName = attr->maybeGetAttr("outputName"))

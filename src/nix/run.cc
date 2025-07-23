@@ -10,6 +10,7 @@
 #include "nix/util/finally.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/expr/eval.hh"
+#include "nix/util/util.hh"
 #include <filesystem>
 
 #ifdef __linux__
@@ -19,6 +20,8 @@
 
 #include <queue>
 
+extern char ** environ __attribute__((weak));
+
 namespace nix::fs { using namespace std::filesystem; }
 
 using namespace nix;
@@ -27,13 +30,36 @@ std::string chrootHelperName = "__run_in_chroot";
 
 namespace nix {
 
+/* Convert `env` to a list of strings suitable for `execve`'s `envp` argument. */
+Strings toEnvp(StringMap env)
+{
+    Strings envStrs;
+    for (auto & i : env) {
+        envStrs.push_back(i.first + "=" + i.second);
+    }
+
+    return envStrs;
+}
+
 void execProgramInStore(ref<Store> store,
     UseLookupPath useLookupPath,
     const std::string & program,
     const Strings & args,
-    std::optional<std::string_view> system)
+    std::optional<std::string_view> system,
+    std::optional<StringMap> env)
 {
     logger->stop();
+
+    char **envp;
+    Strings envStrs;
+    std::vector<char *> envCharPtrs;
+    if (env.has_value()) {
+        envStrs = toEnvp(env.value());
+        envCharPtrs = stringsToCharPtrs(envStrs);
+        envp = envCharPtrs.data();
+    } else {
+        envp = environ;
+    }
 
     restoreProcessContext();
 
@@ -54,7 +80,7 @@ void execProgramInStore(ref<Store> store,
         Strings helperArgs = { chrootHelperName, store->storeDir, store2->getRealStoreDir(), std::string(system.value_or("")), program };
         for (auto & arg : args) helperArgs.push_back(arg);
 
-        execv(getSelfExe().value_or("nix").c_str(), stringsToCharPtrs(helperArgs).data());
+        execve(getSelfExe().value_or("nix").c_str(), stringsToCharPtrs(helperArgs).data(), envp);
 
         throw SysError("could not execute chroot helper");
     }
@@ -64,10 +90,12 @@ void execProgramInStore(ref<Store> store,
         linux::setPersonality(*system);
 #endif
 
-    if (useLookupPath == UseLookupPath::Use)
+    if (useLookupPath == UseLookupPath::Use) {
+        // We have to set `environ` by hand because there is no `execvpe` on macOS.
+        environ = envp;
         execvp(program.c_str(), stringsToCharPtrs(args).data());
-    else
-        execv(program.c_str(), stringsToCharPtrs(args).data());
+    } else
+        execve(program.c_str(), stringsToCharPtrs(args).data(), envp);
 
     throw SysError("unable to execute '%s'", program);
 }
@@ -172,25 +200,25 @@ void chrootHelper(int argc, char * * argv)
     if (!pathExists(storeDir)) {
         // FIXME: Use overlayfs?
 
-        fs::path tmpDir = createTempDir();
+        std::filesystem::path tmpDir = createTempDir();
 
         createDirs(tmpDir + storeDir);
 
         if (mount(realStoreDir.c_str(), (tmpDir + storeDir).c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-        for (const auto & entry : fs::directory_iterator{"/"}) {
+        for (const auto & entry : DirectoryIterator{"/"}) {
             checkInterrupt();
             const auto & src = entry.path();
-            fs::path dst = tmpDir / entry.path().filename();
+            std::filesystem::path dst = tmpDir / entry.path().filename();
             if (pathExists(dst)) continue;
             auto st = entry.symlink_status();
-            if (fs::is_directory(st)) {
+            if (std::filesystem::is_directory(st)) {
                 if (mkdir(dst.c_str(), 0700) == -1)
                     throw SysError("creating directory '%s'", dst);
                 if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
                     throw SysError("mounting '%s' on '%s'", src, dst);
-            } else if (fs::is_symlink(st))
+            } else if (std::filesystem::is_symlink(st))
                 createSymlink(readLink(src), dst);
         }
 
@@ -208,9 +236,9 @@ void chrootHelper(int argc, char * * argv)
             if (mount(realStoreDir.c_str(), storeDir.c_str(), "", MS_BIND, 0) == -1)
                 throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-    writeFile(fs::path{"/proc/self/setgroups"}, "deny");
-    writeFile(fs::path{"/proc/self/uid_map"}, fmt("%d %d %d", uid, uid, 1));
-    writeFile(fs::path{"/proc/self/gid_map"}, fmt("%d %d %d", gid, gid, 1));
+    writeFile(std::filesystem::path{"/proc/self/setgroups"}, "deny");
+    writeFile(std::filesystem::path{"/proc/self/uid_map"}, fmt("%d %d %d", uid, uid, 1));
+    writeFile(std::filesystem::path{"/proc/self/gid_map"}, fmt("%d %d %d", gid, gid, 1));
 
 #ifdef __linux__
     if (system != "")

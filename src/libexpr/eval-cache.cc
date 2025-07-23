@@ -492,7 +492,7 @@ Value & AttrCursor::forceValue()
 Suggestions AttrCursor::getSuggestionsForAttr(Symbol name)
 {
     auto attrNames = getAttrs();
-    std::set<std::string> strAttrNames;
+    StringSet strAttrNames;
     for (auto & name : attrNames)
         strAttrNames.insert(std::string(root->state.symbols[name]));
 
@@ -724,7 +724,7 @@ std::vector<std::string> AttrCursor::getListOfStrings()
 
     std::vector<std::string> res;
 
-    for (auto & elem : v.listItems())
+    for (auto elem : v.listView())
         res.push_back(std::string(root->state.forceStringNoCtx(*elem, noPos, "while evaluating an attribute for caching")));
 
     if (root->db)

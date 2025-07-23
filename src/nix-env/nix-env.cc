@@ -9,7 +9,7 @@
 #include "nix/store/profiles.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/main/shared.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
 #include "user-env.hh"
 #include "nix/expr/value-to-json.hh"
@@ -238,9 +238,9 @@ static void checkSelectorUse(DrvNames & selectors)
 
 namespace {
 
-std::set<std::string> searchByPrefix(const PackageInfos & allElems, std::string_view prefix) {
+StringSet searchByPrefix(const PackageInfos & allElems, std::string_view prefix) {
     constexpr std::size_t maxResults = 3;
-    std::set<std::string> result;
+    StringSet result;
     for (const auto & packageInfo : allElems) {
         const auto drvName = DrvName { packageInfo.queryName() };
         if (hasPrefix(drvName.name, prefix)) {
@@ -1265,7 +1265,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                             } else if (v->type() == nList) {
                                 attrs2["type"] = "strings";
                                 XMLOpenElement m(xml, "meta", attrs2);
-                                for (auto elem : v->listItems()) {
+                                for (auto elem : v->listView()) {
                                     if (elem->type() != nString) continue;
                                     XMLAttrs attrs3;
                                     attrs3["value"] = elem->c_str();

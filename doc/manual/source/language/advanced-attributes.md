@@ -53,31 +53,23 @@ Derivations can declare some infrequently used optional attributes.
 
   - [`__structuredAttrs`]{#adv-attr-structuredAttrs}\
     If the special attribute `__structuredAttrs` is set to `true`, the other derivation
-    attributes are serialised into a file in JSON format. The environment variable
-    `NIX_ATTRS_JSON_FILE` points to the exact location of that file both in a build
-    and a [`nix-shell`](../command-ref/nix-shell.md). This obviates the need for
-    [`passAsFile`](#adv-attr-passAsFile) since JSON files have no size restrictions,
-    unlike process environments.
+    attributes are serialised into a file in JSON format.
 
-    It also makes it possible to tweak derivation settings in a structured way; see
-    [`outputChecks`](#adv-attr-outputChecks) for example.
+    This obviates the need for [`passAsFile`](#adv-attr-passAsFile) since JSON files have no size restrictions, unlike process environments.
+    It also makes it possible to tweak derivation settings in a structured way;
+    see [`outputChecks`](#adv-attr-outputChecks) for example.
 
-    As a convenience to Bash builders,
-    Nix writes a script that initialises shell variables
-    corresponding to all attributes that are representable in Bash. The
-    environment variable `NIX_ATTRS_SH_FILE` points to the exact
-    location of the script, both in a build and a
-    [`nix-shell`](../command-ref/nix-shell.md). This includes non-nested
-    (associative) arrays. For example, the attribute `hardening.format = true`
-    ends up as the Bash associative array element `${hardening[format]}`.
+    See the [corresponding section in the derivation page](@docroot@/store/derivation/index.md#structured-attrs) for further details.
 
     > **Warning**
     >
-    > If set to `true`, other advanced attributes such as [`allowedReferences`](#adv-attr-allowedReferences), [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
+    > If set to `true`, other advanced attributes such as [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
     [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites), maxSize, and maxClosureSize.
     will have no effect.
 
 ## Output checks
+
+See the [corresponding section in the derivation output page](@docroot@/store/derivation/outputs/index.md).
 
   - [`allowedReferences`]{#adv-attr-allowedReferences}\
     The optional attribute `allowedReferences` specifies a list of legal
@@ -280,7 +272,7 @@ All other combinations are invalid.
 
   <!--
 
-  `__contentAddressed` is ignored, becaused fixed-output derivations always content-address their outputs, by definition.
+  `__contentAddressed` is ignored, because fixed-output derivations always content-address their outputs, by definition.
 
   **TODO CHECK**
 
@@ -333,17 +325,17 @@ Here is more information on the `output*` attributes, and what values they may b
 
   - [`outputHashAlgo`]{#adv-attr-outputHashAlgo}
 
-    This specifies the hash alorithm used to digest the [file system object] data of a content-addressing derivation output.
+    This specifies the hash algorithm used to digest the [file system object] data of a content-addressing derivation output.
 
     This works in conjunction with [`outputHashMode`](#adv-attr-outputHashAlgo).
-    Specifying one without the other is an error (unless [`outputHash` is also specified and includes its own hash algorithm as described below).
+    Specifying one without the other is an error (unless `outputHash` is also specified and includes its own hash algorithm as described below).
 
     The `outputHashAlgo` attribute specifies the hash algorithm used to compute the hash.
-    It can currently be `"blake3"`, "sha1"`, `"sha256"`, `"sha512"`, or `null`.
+    It can currently be `"blake3"`, `"sha1"`, `"sha256"`, `"sha512"`, or `null`.
 
     `outputHashAlgo` can only be `null` when `outputHash` follows the SRI format, because in that case the choice of hash algorithm is determined by `outputHash`.
 
-  - [`outputHash`]{#adv-attr-outputHashAlgo}; [`outputHash`]{#adv-attr-outputHashMode}\
+  - [`outputHash`]{#adv-attr-outputHashAlgo}; [`outputHash`]{#adv-attr-outputHashMode}
 
     This will specify the output hash of the single output of a [fixed-output derivation].
 

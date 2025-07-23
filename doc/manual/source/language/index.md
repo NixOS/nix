@@ -1,6 +1,6 @@
 # Nix Language
 
-The Nix language is designed for conveniently creating and composing *derivations* – precise descriptions of how contents of existing files are used to derive new files.
+The Nix language is designed for conveniently creating and composing [derivations](@docroot@/glossary.md#gloss-derivation) – precise descriptions of how contents of existing files are used to derive new files.
 
 > **Tip**
 >
@@ -11,7 +11,14 @@ The language is:
 
 - *domain-specific*
 
-  It comes with [built-in functions](@docroot@/language/builtins.md) to integrate with the Nix store, which manages files and performs the derivations declared in the Nix language.
+  The Nix language is purpose-built for working with text files.
+  Its most characteristic features are:
+
+  - [File system path primitives](@docroot@/language/types.md#type-path), for accessing source files
+  - [Indented strings](@docroot@/language/string-literals.md) and [string interpolation](@docroot@/language/string-interpolation.md), for creating file contents
+  - [Strings with contexts](@docroot@/language/string-context.md), for transparently linking files
+
+  It comes with [built-in functions](@docroot@/language/builtins.md) to integrate with the [Nix store](@docroot@/store/index.md), which manages files and enables [realising](@docroot@/glossary.md#gloss-realise) derivations declared in the Nix language.
 
 - *declarative*
 

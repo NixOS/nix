@@ -50,21 +50,33 @@ enum struct JobCategory {
      * A substitution an arbitrary store object; it will use network resources.
      */
     Substitution,
+    /**
+     * A goal that does no "real" work by itself, and just exists to depend on
+     * other goals which *do* do real work. These goals therefore are not
+     * limited.
+     *
+     * These goals cannot infinitely create themselves, so there is no risk of
+     * a "fork bomb" type situation (which would be a problem even though the
+     * goal do no real work) either.
+     */
+    Administration,
 };
 
 struct Goal : public std::enable_shared_from_this<Goal>
 {
-    typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure} ExitCode;
+private:
+    /**
+     * Goals that this goal is waiting for.
+     */
+    Goals waitees;
+
+public:
+    typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters} ExitCode;
 
     /**
      * Backlink to the worker.
      */
     Worker & worker;
-
-    /**
-     * Goals that this goal is waiting for.
-     */
-    Goals waitees;
 
     /**
      * Goals waiting for this one to finish.  Must use weak pointers
@@ -84,12 +96,6 @@ struct Goal : public std::enable_shared_from_this<Goal>
     size_t nrNoSubstituters = 0;
 
     /**
-     * Number of substitution goals we are/were waiting for that
-     * failed because they had unsubstitutable references.
-     */
-    size_t nrIncompleteClosure = 0;
-
-    /**
      * Name of this goal for debugging purposes.
      */
     std::string name;
@@ -104,8 +110,8 @@ protected:
      * Build result.
      */
     BuildResult buildResult;
-public:
 
+public:
     /**
      * Suspend our goal and wait until we get `work`-ed again.
      * `co_await`-able by @ref Co.
@@ -332,6 +338,7 @@ public:
         std::suspend_always await_transform(Suspend) { return {}; };
     };
 
+protected:
     /**
      * The coroutine being currently executed.
      * MUST be updated when switching the coroutine being executed.
@@ -342,23 +349,13 @@ public:
     std::optional<Co> top_co;
 
     /**
-     * The entry point for the goal
-     */
-    virtual Co init() = 0;
-
-    /**
-     * Wrapper around @ref init since virtual functions
-     * can't be used in constructors.
-     */
-    inline Co init_wrapper();
-
-    /**
      * Signals that the goal is done.
      * `co_return` the result. If you're not inside a coroutine, you can ignore
      * the return value safely.
      */
     Done amDone(ExitCode result, std::optional<Error> ex = {});
 
+public:
     virtual void cleanup() { }
 
     /**
@@ -374,12 +371,23 @@ public:
     BuildResult getBuildResult(const DerivedPath &) const;
 
     /**
+     * Hack to say that this goal should not log `ex`, but instead keep
+     * it around. Set by a waitee which sees itself as the designated
+     * continuation of this goal, responsible for reporting its
+     * successes or failures.
+     *
+     * @todo this is yet another not-nice hack in the goal system that
+     * we ought to get rid of. See #11927
+     */
+    bool preserveException = false;
+
+    /**
      * Exception containing an error message, if any.
      */
     std::optional<Error> ex;
 
-    Goal(Worker & worker, DerivedPath path)
-        : worker(worker), top_co(init_wrapper())
+    Goal(Worker & worker, Co init)
+        : worker(worker), top_co(std::move(init))
     {
         // top_co shouldn't have a goal already, should be nullptr.
         assert(!top_co->handle.promise().goal);
@@ -393,10 +401,6 @@ public:
     }
 
     void work();
-
-    void addWaitee(GoalPtr waitee);
-
-    virtual void waiteeDone(GoalPtr waitee, ExitCode result);
 
     virtual void handleChildOutput(Descriptor fd, std::string_view data)
     {
@@ -429,6 +433,13 @@ public:
      * @see JobCategory
      */
     virtual JobCategory jobCategory() const = 0;
+
+protected:
+    Co await(Goals waitees);
+
+    Co waitForAWhile();
+    Co waitForBuildSlot();
+    Co yield();
 };
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);
@@ -439,7 +450,3 @@ template<typename... ArgTypes>
 struct std::coroutine_traits<nix::Goal::Co, ArgTypes...> {
     using promise_type = nix::Goal::promise_type;
 };
-
-nix::Goal::Co nix::Goal::init_wrapper() {
-    co_return init();
-}

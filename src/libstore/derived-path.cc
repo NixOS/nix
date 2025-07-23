@@ -170,7 +170,7 @@ void drvRequireExperiment(
 }
 
 SingleDerivedPath::Built SingleDerivedPath::Built::parse(
-    const StoreDirConfig & store, ref<SingleDerivedPath> drv,
+    const StoreDirConfig & store, ref<const SingleDerivedPath> drv,
     OutputNameView output,
     const ExperimentalFeatureSettings & xpSettings)
 {
@@ -182,7 +182,7 @@ SingleDerivedPath::Built SingleDerivedPath::Built::parse(
 }
 
 DerivedPath::Built DerivedPath::Built::parse(
-    const StoreDirConfig & store, ref<SingleDerivedPath> drv,
+    const StoreDirConfig & store, ref<const SingleDerivedPath> drv,
     OutputNameView outputsS,
     const ExperimentalFeatureSettings & xpSettings)
 {
@@ -201,7 +201,7 @@ static SingleDerivedPath parseWithSingle(
     return n == s.npos
         ? (SingleDerivedPath) SingleDerivedPath::Opaque::parse(store, s)
         : (SingleDerivedPath) SingleDerivedPath::Built::parse(store,
-            make_ref<SingleDerivedPath>(parseWithSingle(
+            make_ref<const SingleDerivedPath>(parseWithSingle(
                 store,
                 s.substr(0, n),
                 separator,
@@ -234,7 +234,7 @@ static DerivedPath parseWith(
     return n == s.npos
         ? (DerivedPath) DerivedPath::Opaque::parse(store, s)
         : (DerivedPath) DerivedPath::Built::parse(store,
-            make_ref<SingleDerivedPath>(parseWithSingle(
+            make_ref<const SingleDerivedPath>(parseWithSingle(
                 store,
                 s.substr(0, n),
                 separator,

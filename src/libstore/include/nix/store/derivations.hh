@@ -214,7 +214,7 @@ struct DerivationType {
     /**
      * Impure derivation type
      *
-     * This is similar at buil-time to the content addressed, not standboxed, not fixed
+     * This is similar at build-time to the content addressed, not standboxed, not fixed
      * type, but has some restrictions on its usage.
      */
     struct Impure {
@@ -343,7 +343,7 @@ struct Derivation : BasicDerivation
     /**
      * inputs that are sub-derivations
      */
-    DerivedPathMap<std::set<OutputName>> inputDrvs;
+    DerivedPathMap<std::set<OutputName, std::less<>>> inputDrvs;
 
     /**
      * Print a derivation.
@@ -369,7 +369,7 @@ struct Derivation : BasicDerivation
      */
     std::optional<BasicDerivation> tryResolve(
         Store & store,
-        const std::map<std::pair<StorePath, std::string>, StorePath> & inputDrvOutputs) const;
+        std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)> queryResolutionChain) const;
 
     /**
      * Check that the derivation is valid and does not present any

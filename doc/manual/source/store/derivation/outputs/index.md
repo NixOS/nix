@@ -2,7 +2,7 @@
 
 As stated on the [main pages on derivations](../index.md#store-derivation),
 a derivation produces [store objects](@docroot@/store/store-object.md), which are known as the *outputs* of the derivation.
-Indeed, the entire point of derivations is to produce these outputs, and to reliably and reproducably produce these derivations each time the derivation is run.
+Indeed, the entire point of derivations is to produce these outputs, and to reliably and reproducibly produce these derivations each time the derivation is run.
 
 One of the parts of a derivation is its *outputs specification*, which specifies certain information about the outputs the derivation produces when run.
 The outputs specification is a map, from names to specifications for individual outputs.
@@ -83,11 +83,11 @@ The rules for this are fairly concise:
 
   - A content-addressing derivation may be pure or impure
 
-   - If it is impure, it may be be fixed (typical), or it may be floating if the additional [`impure-derivations`][xp-feature-impure-derivations] experimental feature is enabled.
+   - If it is impure, it may be fixed (typical), or it may be floating if the additional [`impure-derivations`][xp-feature-impure-derivations] experimental feature is enabled.
 
    - If it is pure, it must be floating.
 
-   - Pure, fixed content-addressing derivations are not suppported
+   - Pure, fixed content-addressing derivations are not supported
 
      > There is no use for this forth combination.
      > The sole purpose of an output's store path being fixed is to support the derivation being impure.

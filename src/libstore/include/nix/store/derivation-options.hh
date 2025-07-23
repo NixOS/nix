@@ -13,16 +13,16 @@ namespace nix {
 
 class Store;
 struct BasicDerivation;
-class ParsedDerivation;
+struct StructuredAttrs;
 
 /**
  * This represents all the special options on a `Derivation`.
  *
  * Currently, these options are parsed from the environment variables
- * with the aid of `ParsedDerivation`.
+ * with the aid of `StructuredAttrs`.
  *
  * The first goal of this data type is to make sure that no other code
- * uses `ParsedDerivation` to ad-hoc parse some additional options. That
+ * uses `StructuredAttrs` to ad-hoc parse some additional options. That
  * ensures this data type is up to date and fully correct.
  *
  * The second goal of this data type is to allow an alternative to
@@ -96,6 +96,27 @@ struct DerivationOptions
     StringSet passAsFile;
 
     /**
+     * The `exportReferencesGraph' feature allows the references graph
+     * to be passed to a builder
+     *
+     * ### Legacy case
+     *
+     * Given a `name` `pathSet` key-value pair, the references graph of
+     * `pathSet` will be stored in a text file `name' in the temporary
+     * build directory.  The text files have the format used by
+     * `nix-store
+     * --register-validity'.  However, the `deriver` fields are left
+     *  empty.
+     *
+     * ### "Structured attributes" case
+     *
+     * The same information will be put put in the final structured
+     * attributes give to the builder. The set of paths in the original JSON
+     * is replaced with a list of `PathInfo` in JSON format.
+     */
+    std::map<std::string, StringSet> exportReferencesGraph;
+
+    /**
      * env: __sandboxProfile
      *
      * Just for Darwin
@@ -149,10 +170,11 @@ struct DerivationOptions
     /**
      * Parse this information from its legacy encoding as part of the
      * environment. This should not be used with nice greenfield formats
-     * (e.g. JSON) but is necessary for supporing old formats (e.g.
+     * (e.g. JSON) but is necessary for supporting old formats (e.g.
      * ATerm).
      */
-    static DerivationOptions fromParsedDerivation(const ParsedDerivation & parsed, bool shouldWarn = true);
+    static DerivationOptions
+    fromStructuredAttrs(const StringMap & env, const StructuredAttrs * parsed, bool shouldWarn = true);
 
     /**
      * @param drv Must be the same derivation we parsed this from. In

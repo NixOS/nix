@@ -15,7 +15,7 @@ namespace nix {
 namespace {
 
 // This function is needed to handle non-blocking reads/writes. This is needed in the buildhook, because
-// somehow the json logger file descriptor ends up beeing non-blocking and breaks remote-building.
+// somehow the json logger file descriptor ends up being non-blocking and breaks remote-building.
 // TODO: get rid of buildhook and remove this function again (https://github.com/NixOS/nix/issues/12688)
 void pollFD(int fd, int events)
 {
@@ -191,7 +191,7 @@ void unix::closeExtraFDs()
 
 #ifdef __linux__
     try {
-        for (auto & s : std::filesystem::directory_iterator{"/proc/self/fd"}) {
+        for (auto & s : DirectoryIterator{"/proc/self/fd"}) {
             checkInterrupt();
             auto fd = std::stoi(s.path().filename());
             if (fd > MAX_KEPT_FD) {
@@ -201,7 +201,6 @@ void unix::closeExtraFDs()
         }
         return;
     } catch (SysError &) {
-    } catch (std::filesystem::filesystem_error &) {
     }
 #endif
 

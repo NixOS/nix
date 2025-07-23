@@ -85,7 +85,7 @@ Settings::Settings()
         builders = concatStringsSep("\n", ss);
     }
 
-#if defined(__linux__) && defined(SANDBOX_SHELL)
+#if (defined(__linux__) || defined(__FreeBSD__)) && defined(SANDBOX_SHELL)
     sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
 #endif
 
@@ -309,6 +309,21 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
     }
 }
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Settings::ExternalBuilder, systems, program, args);
+
+template<> Settings::ExternalBuilders BaseSetting<Settings::ExternalBuilders>::parse(const std::string & str) const
+{
+    try {
+        return nlohmann::json::parse(str).template get<Settings::ExternalBuilders>();
+    } catch (std::exception & e) {
+        throw UsageError("parsing setting '%s': %s", name, e.what());
+    }
+}
+
+template<> std::string BaseSetting<Settings::ExternalBuilders>::to_string() const
+{
+    return nlohmann::json(value).dump();
+}
 
 static void preloadNSS()
 {

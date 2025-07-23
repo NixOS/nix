@@ -96,3 +96,8 @@ nix-sandbox-build symlink-derivation.nix -A test_sandbox_paths \
     --option extra-sandbox-paths "/dir=$TEST_ROOT" \
     --option extra-sandbox-paths "/symlinkDir=$symlinkDir" \
     --option extra-sandbox-paths "/symlink=$symlinkcert"
+
+# Nonexistent sandbox paths should error early in the build process
+expectStderr 1 nix-sandbox-build --option extra-sandbox-paths '/does-not-exist' \
+    -E 'with import '"${config_nix}"'; mkDerivation { name = "trivial"; buildCommand = "echo > $out"; }' |
+    grepQuiet "path '/does-not-exist' is configured as part of the \`sandbox-paths\` option, but is inaccessible"

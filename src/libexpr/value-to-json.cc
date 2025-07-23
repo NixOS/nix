@@ -11,6 +11,7 @@ namespace nix {
 
 using json = nlohmann::json;
 
+// TODO: rename. It doesn't print.
 json printValueAsJSON(EvalState & state, bool strict,
     Value & v, const PosIdx pos, NixStringContext & context, bool copyToStore)
 {
@@ -38,7 +39,7 @@ json printValueAsJSON(EvalState & state, bool strict,
         case nPath:
             if (copyToStore)
                 out = state.store->printStorePath(
-                    state.copyPathToStore(context, v.path()));
+                    state.copyPathToStore(context, v.path(), v.determinePos(pos)));
             else
                 out = v.path().path.abs();
             break;
@@ -73,7 +74,7 @@ json printValueAsJSON(EvalState & state, bool strict,
         case nList: {
             out = json::array();
             int i = 0;
-            for (auto elem : v.listItems()) {
+            for (auto elem : v.listView()) {
                 try {
                     out.push_back(printValueAsJSON(state, strict, *elem, pos, context, copyToStore));
                 } catch (Error & e) {

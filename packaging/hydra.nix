@@ -48,6 +48,7 @@ let
         "nix-store-test-support"
         "nix-store-tests"
         "nix-fetchers"
+        "nix-fetchers-c"
         "nix-fetchers-tests"
         "nix-expr"
         "nix-expr-c"
@@ -185,6 +186,19 @@ in
           nix = self.packages.${system}.nix-cli;
           pkgs = nixpkgsFor.${system}.native;
         }
+      );
+
+      nixpkgsLibTestsLazy = forAllSystems (
+        system:
+        lib.overrideDerivation
+          (import (nixpkgs + "/lib/tests/test-with-nix.nix") {
+            lib = nixpkgsFor.${system}.native.lib;
+            nix = self.packages.${system}.nix-cli;
+            pkgs = nixpkgsFor.${system}.native;
+          })
+          (_: {
+            "NIX_CONFIG" = "lazy-trees = true";
+          })
       );
     };
 

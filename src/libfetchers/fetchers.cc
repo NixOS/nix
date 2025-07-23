@@ -5,6 +5,7 @@
 #include "nix/util/json-utils.hh"
 #include "nix/fetchers/store-path-accessor.hh"
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/forwarding-source-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -12,24 +13,26 @@ namespace nix::fetchers {
 
 using InputSchemeMap = std::map<std::string_view, std::shared_ptr<InputScheme>>;
 
-std::unique_ptr<InputSchemeMap> inputSchemes = nullptr;
+static InputSchemeMap & inputSchemes()
+{
+    static InputSchemeMap inputSchemeMap;
+    return inputSchemeMap;
+}
 
 void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
 {
-    if (!inputSchemes)
-        inputSchemes = std::make_unique<InputSchemeMap>();
     auto schemeName = inputScheme->schemeName();
-    if (inputSchemes->count(schemeName) > 0)
+    if (!inputSchemes().emplace(schemeName, std::move(inputScheme)).second)
         throw Error("Input scheme with name %s already registered", schemeName);
-    inputSchemes->insert_or_assign(schemeName, std::move(inputScheme));
 }
 
-nlohmann::json dumpRegisterInputSchemeInfo() {
+nlohmann::json dumpRegisterInputSchemeInfo()
+{
     using nlohmann::json;
 
     auto res = json::object();
 
-    for (auto & [name, scheme] : *inputSchemes) {
+    for (auto & [name, scheme] : inputSchemes()) {
         auto & r = res[name] = json::object();
         r["allowedAttrs"] = scheme->allowedAttrs();
     }
@@ -57,7 +60,7 @@ Input Input::fromURL(
     const Settings & settings,
     const ParsedURL & url, bool requireTree)
 {
-    for (auto & [_, inputScheme] : *inputSchemes) {
+    for (auto & [_, inputScheme] : inputSchemes()) {
         auto res = inputScheme->inputFromURL(settings, url, requireTree);
         if (res) {
             experimentalFeatureSettings.require(inputScheme->experimentalFeature());
@@ -91,8 +94,8 @@ Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
     };
 
     std::shared_ptr<InputScheme> inputScheme = ({
-        auto i = inputSchemes->find(schemeName);
-        i == inputSchemes->end() ? nullptr : i->second;
+        auto i = get(inputSchemes(), schemeName);
+        i ? *i : nullptr;
     });
 
     if (!inputScheme) return raw();
@@ -132,7 +135,7 @@ ParsedURL Input::toURL() const
     return scheme->toURL(*this);
 }
 
-std::string Input::toURLString(const std::map<std::string, std::string> & extraQuery) const
+std::string Input::toURLString(const StringMap & extraQuery) const
 {
     auto url = toURL();
     for (auto & attr : extraQuery)
@@ -291,6 +294,21 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessor(ref<Store> store) const
     }
 }
 
+/**
+ * Helper class that ensures that paths in substituted source trees
+ * are rendered as `«input»/path` rather than
+ * `«input»/nix/store/<hash>-source/path`.
+ */
+struct SubstitutedSourceAccessor : ForwardingSourceAccessor
+{
+    using ForwardingSourceAccessor::ForwardingSourceAccessor;
+
+    std::string showPath(const CanonPath & path) override
+    {
+        return displayPrefix + path.abs() + displaySuffix;
+    }
+};
+
 std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> store) const
 {
     // FIXME: cache the accessor
@@ -318,10 +336,12 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
             debug("using substituted/cached input '%s' in '%s'",
                 to_string(), store->printStorePath(storePath));
 
-            auto accessor = makeStorePathAccessor(store, storePath);
+            auto accessor = make_ref<SubstitutedSourceAccessor>(makeStorePathAccessor(store, storePath));
 
             accessor->fingerprint = getFingerprint(store);
 
+            // FIXME: ideally we would use the `showPath()` of the
+            // "real" accessor for this fetcher type.
             accessor->setPathDisplay("«" + to_string() + "»");
 
             return {accessor, *this};
@@ -332,8 +352,10 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
     auto [accessor, result] = scheme->getAccessor(store, *this);
 
-    assert(!accessor->fingerprint);
-    accessor->fingerprint = result.getFingerprint(store);
+    if (!accessor->fingerprint)
+        accessor->fingerprint = result.getFingerprint(store);
+    else
+        result.cachedFingerprint = accessor->fingerprint;
 
     return {accessor, std::move(result)};
 }

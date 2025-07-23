@@ -79,7 +79,7 @@ TEST(base64Encode, encodeAndDecodeNonPrintable)
     auto encoded = base64Encode(s);
     auto decoded = base64Decode(encoded);
 
-    EXPECT_EQ(decoded.length(), 255);
+    EXPECT_EQ(decoded.length(), 255u);
     ASSERT_EQ(decoded, s);
 }
 

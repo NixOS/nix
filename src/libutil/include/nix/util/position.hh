@@ -43,15 +43,10 @@ struct Pos
     Pos() { }
     Pos(uint32_t line, uint32_t column, Origin origin)
         : line(line), column(column), origin(origin) { }
-    Pos(Pos & other) = default;
-    Pos(const Pos & other) = default;
-    Pos(Pos && other) = default;
-    Pos(const Pos * other);
 
     explicit operator bool() const { return line > 0; }
 
-    /* TODO: Why std::shared_ptr<Pos> and not std::shared_ptr<const Pos>? */
-    operator std::shared_ptr<Pos>() const;
+    operator std::shared_ptr<const Pos>() const;
 
     /**
      * Return the contents of the source file.

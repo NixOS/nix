@@ -26,7 +26,7 @@ struct WorkerProto::BasicConnection
     /**
      * The set of features that both sides support.
      */
-    std::set<Feature> features;
+    FeatureSet features;
 
     /**
      * Coercion to `WorkerProto::ReadConn`. This makes it easy to use the
@@ -92,15 +92,12 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
      * @param supportedFeatures The protocol features that we support.
      */
     // FIXME: this should probably be a constructor.
-    static std::tuple<Version, std::set<Feature>> handshake(
-        BufferedSink & to,
-        Source & from,
-        WorkerProto::Version localVersion,
-        const std::set<Feature> & supportedFeatures);
+    static std::tuple<Version, FeatureSet> handshake(
+        BufferedSink & to, Source & from, WorkerProto::Version localVersion, const FeatureSet & supportedFeatures);
 
     /**
      * After calling handshake, must call this to exchange some basic
-     * information abou the connection.
+     * information about the connection.
      */
     ClientHandshakeInfo postHandshake(const StoreDirConfig & store);
 
@@ -155,15 +152,12 @@ struct WorkerProto::BasicServerConnection : WorkerProto::BasicConnection
      * @param supportedFeatures The protocol features that we support.
      */
     // FIXME: this should probably be a constructor.
-    static std::tuple<Version, std::set<Feature>> handshake(
-        BufferedSink & to,
-        Source & from,
-        WorkerProto::Version localVersion,
-        const std::set<Feature> & supportedFeatures);
+    static std::tuple<Version, FeatureSet> handshake(
+        BufferedSink & to, Source & from, WorkerProto::Version localVersion, const FeatureSet & supportedFeatures);
 
     /**
      * After calling handshake, must call this to exchange some basic
-     * information abou the connection.
+     * information about the connection.
      */
     void postHandshake(const StoreDirConfig & store, const ClientHandshakeInfo & info);
 };

@@ -1,51 +1,35 @@
 #pragma once
 ///@file
 
-#include <list>
-#include <map>
-#include <unordered_map>
-
-#include "nix/util/types.hh"
+#include <memory_resource>
+#include "nix/expr/value.hh"
 #include "nix/util/chunked-vector.hh"
 #include "nix/util/error.hh"
 
+#include <boost/version.hpp>
+#define USE_FLAT_SYMBOL_SET (BOOST_VERSION >= 108100)
+#if USE_FLAT_SYMBOL_SET
+#  include <boost/unordered/unordered_flat_set.hpp>
+#else
+#  include <boost/unordered/unordered_set.hpp>
+#endif
+
 namespace nix {
 
-/**
- * This class mainly exists to give us an operator<< for ostreams. We could also
- * return plain strings from SymbolTable, but then we'd have to wrap every
- * instance of a symbol that is fmt()ed, which is inconvenient and error-prone.
- */
-class SymbolStr
+class SymbolValue : protected Value
 {
+    friend class SymbolStr;
     friend class SymbolTable;
 
-private:
-    const std::string * s;
+    uint32_t size_;
+    uint32_t idx;
 
-    explicit SymbolStr(const std::string & symbol): s(&symbol) {}
+    SymbolValue() = default;
 
 public:
-    bool operator == (std::string_view s2) const
+    operator std::string_view() const noexcept
     {
-        return *s == s2;
-    }
-
-    const char * c_str() const
-    {
-        return s->c_str();
-    }
-
-    operator const std::string_view () const
-    {
-        return *s;
-    }
-
-    friend std::ostream & operator <<(std::ostream & os, const SymbolStr & symbol);
-
-    bool empty() const
-    {
-        return s->empty();
+        return {c_str(), size_};
     }
 };
 
@@ -56,22 +40,159 @@ public:
  */
 class Symbol
 {
+    friend class SymbolStr;
     friend class SymbolTable;
 
 private:
     uint32_t id;
 
-    explicit Symbol(uint32_t id): id(id) {}
+    explicit Symbol(uint32_t id) noexcept : id(id) {}
 
 public:
-    Symbol() : id(0) {}
+    Symbol() noexcept : id(0) {}
 
-    explicit operator bool() const { return id > 0; }
+    [[gnu::always_inline]]
+    explicit operator bool() const noexcept { return id > 0; }
 
-    auto operator<=>(const Symbol other) const { return id <=> other.id; }
-    bool operator==(const Symbol other) const { return id == other.id; }
+    auto operator<=>(const Symbol other) const noexcept { return id <=> other.id; }
+    bool operator==(const Symbol other) const noexcept { return id == other.id; }
 
     friend class std::hash<Symbol>;
+};
+
+/**
+ * This class mainly exists to give us an operator<< for ostreams. We could also
+ * return plain strings from SymbolTable, but then we'd have to wrap every
+ * instance of a symbol that is fmt()ed, which is inconvenient and error-prone.
+ */
+class SymbolStr
+{
+    friend class SymbolTable;
+
+    constexpr static size_t chunkSize{8192};
+    using SymbolValueStore = ChunkedVector<SymbolValue, chunkSize>;
+
+    const SymbolValue * s;
+
+    struct Key
+    {
+        using HashType = boost::hash<std::string_view>;
+
+        SymbolValueStore & store;
+        std::string_view s;
+        std::size_t hash;
+        std::pmr::polymorphic_allocator<char> & alloc;
+
+        Key(SymbolValueStore & store, std::string_view s, std::pmr::polymorphic_allocator<char> & stringAlloc)
+            : store(store)
+            , s(s)
+            , hash(HashType{}(s))
+            , alloc(stringAlloc) {}
+    };
+
+public:
+    SymbolStr(const SymbolValue & s) noexcept : s(&s) {}
+
+    SymbolStr(const Key & key)
+    {
+        auto size = key.s.size();
+        if (size >= std::numeric_limits<uint32_t>::max()) {
+            throw Error("Size of symbol exceeds 4GiB and cannot be stored");
+        }
+        // for multi-threaded implementations: lock store and allocator here
+        const auto & [v, idx] = key.store.add(SymbolValue{});
+        if (size == 0) {
+            v.mkString("", nullptr);
+        } else {
+            auto s = key.alloc.allocate(size + 1);
+            memcpy(s, key.s.data(), size);
+            s[size] = '\0';
+            v.mkString(s, nullptr);
+        }
+        v.size_ = size;
+        v.idx = idx;
+        this->s = &v;
+    }
+
+    bool operator == (std::string_view s2) const noexcept
+    {
+        return *s == s2;
+    }
+
+    [[gnu::always_inline]]
+    const char * c_str() const noexcept
+    {
+        return s->c_str();
+    }
+
+    [[gnu::always_inline]]
+    operator std::string_view () const noexcept
+    {
+        return *s;
+    }
+
+    friend std::ostream & operator <<(std::ostream & os, const SymbolStr & symbol);
+
+    [[gnu::always_inline]]
+    bool empty() const noexcept
+    {
+        return s->size_ == 0;
+    }
+
+    [[gnu::always_inline]]
+    size_t size() const noexcept
+    {
+        return s->size_;
+    }
+
+    [[gnu::always_inline]]
+    const Value * valuePtr() const noexcept
+    {
+        return s;
+    }
+
+    explicit operator Symbol() const noexcept
+    {
+        return Symbol{s->idx + 1};
+    }
+
+    struct Hash
+    {
+        using is_transparent = void;
+        using is_avalanching = std::true_type;
+
+        std::size_t operator()(SymbolStr str) const
+        {
+            return Key::HashType{}(*str.s);
+        }
+
+        std::size_t operator()(const Key & key) const noexcept
+        {
+            return key.hash;
+        }
+    };
+
+    struct Equal
+    {
+        using is_transparent = void;
+
+        bool operator()(SymbolStr a, SymbolStr b) const noexcept
+        {
+            // strings are unique, so that a pointer comparison is OK
+            return a.s == b.s;
+        }
+
+        bool operator()(SymbolStr a, const Key & b) const noexcept
+        {
+            return a == b.s;
+        }
+
+        [[gnu::always_inline]]
+        bool operator()(const Key & a, SymbolStr b) const noexcept
+        {
+            return operator()(b, a);
+        }
+    };
 };
 
 /**
@@ -81,27 +202,47 @@ public:
 class SymbolTable
 {
 private:
-    std::unordered_map<std::string_view, std::pair<const std::string *, uint32_t>> symbols;
-    ChunkedVector<std::string, 8192> store{16};
+    /**
+     * SymbolTable is an append only data structure.
+     * During its lifetime the monotonic buffer holds all strings and nodes, if the symbol set is node based.
+     */
+    std::pmr::monotonic_buffer_resource buffer;
+    std::pmr::polymorphic_allocator<char> stringAlloc{&buffer};
+    SymbolStr::SymbolValueStore store{16};
+
+    /**
+     * Transparent lookup of string view for a pointer to a ChunkedVector entry -> return offset into the store.
+     * ChunkedVector references are never invalidated.
+     */
+#if USE_FLAT_SYMBOL_SET
+    boost::unordered_flat_set<SymbolStr, SymbolStr::Hash, SymbolStr::Equal> symbols{SymbolStr::chunkSize};
+#else
+    using SymbolValueAlloc = std::pmr::polymorphic_allocator<SymbolStr>;
+    boost::unordered_set<SymbolStr, SymbolStr::Hash, SymbolStr::Equal, SymbolValueAlloc> symbols{SymbolStr::chunkSize, {&buffer}};
+#endif
 
 public:
 
     /**
-     * converts a string into a symbol.
+     * Converts a string into a symbol.
      */
-    Symbol create(std::string_view s)
-    {
+    Symbol create(std::string_view s) {
         // Most symbols are looked up more than once, so we trade off insertion performance
         // for lookup performance.
-        // TODO: could probably be done more efficiently with transparent Hash and Equals
-        // on the original implementation using unordered_set
         // FIXME: make this thread-safe.
-        auto it = symbols.find(s);
-        if (it != symbols.end()) return Symbol(it->second.second + 1);
+        return [&]<typename T>(T && key) -> Symbol {
+            if constexpr (requires { symbols.insert<T>(key); }) {
+                auto [it, _] = symbols.insert<T>(key);
+                return Symbol(*it);
+            } else {
+                auto it = symbols.find<T>(key);
+                if (it != symbols.end())
+                    return Symbol(*it);
 
-        const auto & [rawSym, idx] = store.add(std::string(s));
-        symbols.emplace(rawSym, std::make_pair(&rawSym, idx));
-        return Symbol(idx + 1);
+                it = symbols.emplace(key).first;
+                return Symbol(*it);
+            }
+        }(SymbolStr::Key{store, s, stringAlloc});
     }
 
     std::vector<SymbolStr> resolve(const std::vector<Symbol> & symbols) const
@@ -115,12 +256,14 @@ public:
 
     SymbolStr operator[](Symbol s) const
     {
-        if (s.id == 0 || s.id > store.size())
+        uint32_t idx = s.id - uint32_t(1);
+        if (idx >= store.size())
             unreachable();
-        return SymbolStr(store[s.id - 1]);
+        return store[idx];
     }
 
-    size_t size() const
+    [[gnu::always_inline]]
+    size_t size() const noexcept
     {
         return store.size();
     }
@@ -144,3 +287,5 @@ struct std::hash<nix::Symbol>
         return std::hash<decltype(s.id)>{}(s.id);
     }
 };
+
+#undef USE_FLAT_SYMBOL_SET

@@ -13,8 +13,10 @@ std::optional<OsString> getEnvOs(const OsString & key)
         return std::nullopt;
     }
 
-    // Allocate a buffer to hold the environment variable value
-    std::wstring value{bufferSize, L'\0'};
+    /* Allocate a buffer to hold the environment variable value.
+       WARNING: Do not even think about using uniform initialization here,
+       we DONT want to call the initializer list ctor accidentally. */
+    std::wstring value(bufferSize, L'\0');
 
     // Retrieve the environment variable value
     DWORD resultSize = GetEnvironmentVariableW(key.c_str(), &value[0], bufferSize);

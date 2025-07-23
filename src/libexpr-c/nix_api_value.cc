@@ -252,7 +252,7 @@ const char * nix_get_path_string(nix_c_context * context, const nix_value * valu
         // We could use v.path().to_string().c_str(), but I'm concerned this
         // crashes. Looks like .path() allocates a CanonPath with a copy of the
         // string, then it gets the underlying data from that.
-        return v.payload.path.path;
+        return v.pathStr();
     }
     NIXC_CATCH_ERRS_NULL
 }
@@ -324,7 +324,7 @@ nix_value * nix_get_list_byidx(nix_c_context * context, const nix_value * value,
     try {
         auto & v = check_value_in(value);
         assert(v.type() == nix::nList);
-        auto * p = v.listElems()[ix];
+        auto * p = v.listView()[ix];
         nix_gc_incref(nullptr, p);
         if (p != nullptr)
             state->state.forceValue(*p, nix::noPos);

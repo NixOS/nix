@@ -4,7 +4,7 @@
  *
  * Template implementations (as opposed to mere declarations).
  *
- * This file is an exmample of the "impl.hh" pattern. See the
+ * This file is an example of the "impl.hh" pattern. See the
  * contributing guide.
  */
 
@@ -25,11 +25,11 @@ namespace nix {
         LengthPrefixedProtoHelper<CommonProto, T >::write(store, conn, t); \
     }
 
+#define COMMA_ ,
 COMMON_USE_LENGTH_PREFIX_SERIALISER(template<typename T>, std::vector<T>)
-COMMON_USE_LENGTH_PREFIX_SERIALISER(template<typename T>, std::set<T>)
+COMMON_USE_LENGTH_PREFIX_SERIALISER(template<typename T COMMA_ typename Compare>, std::set<T COMMA_ Compare>)
 COMMON_USE_LENGTH_PREFIX_SERIALISER(template<typename... Ts>, std::tuple<Ts...>)
 
-#define COMMA_ ,
 COMMON_USE_LENGTH_PREFIX_SERIALISER(
     template<typename K COMMA_ typename V>,
     std::map<K COMMA_ V>)

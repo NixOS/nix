@@ -149,6 +149,9 @@ struct GitArchiveInputScheme : InputScheme
         };
         if (auto narHash = input.getNarHash())
             url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
+        auto host = maybeGetStrAttr(input.attrs, "host");
+        if (host)
+            url.query.insert_or_assign("host", *host);
         return url;
     }
 
@@ -172,7 +175,7 @@ struct GitArchiveInputScheme : InputScheme
         return input;
     }
 
-    // Search for the longest possible match starting from the begining and ending at either the end or a path segment.
+    // Search for the longest possible match starting from the beginning and ending at either the end or a path segment.
     std::optional<std::string> getAccessToken(const fetchers::Settings & settings, const std::string & host, const std::string & url) const override
     {
         auto tokens = settings.accessTokens.get();

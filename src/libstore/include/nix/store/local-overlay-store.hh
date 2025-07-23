@@ -56,19 +56,21 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           The store directory is passed as an argument to the invoked executable.
         )"};
 
-    const std::string name() override { return "Experimental Local Overlay Store"; }
+    static const std::string name() { return "Experimental Local Overlay Store"; }
 
-    std::optional<ExperimentalFeature> experimentalFeature() const override
+    static std::optional<ExperimentalFeature> experimentalFeature()
     {
         return ExperimentalFeature::LocalOverlayStore;
     }
 
-    static std::set<std::string> uriSchemes()
+    static StringSet uriSchemes()
     {
         return { "local-overlay" };
     }
 
-    std::string doc() override;
+    static std::string doc();
+
+    ref<Store> openStore() const override;
 
 protected:
     /**
@@ -79,7 +81,9 @@ protected:
      * at that file path. It might be stored in the lower layer instead,
      * or it might not be part of this store at all.
      */
-    Path toUpperPath(const StorePath & path);
+    Path toUpperPath(const StorePath & path) const;
+
+    friend struct LocalOverlayStore;
 };
 
 /**
@@ -88,8 +92,20 @@ protected:
  * Documentation on overridden methods states how they differ from their
  * `LocalStore` counterparts.
  */
-class LocalOverlayStore : public virtual LocalOverlayStoreConfig, public virtual LocalStore
+struct LocalOverlayStore : virtual LocalStore
 {
+    using Config = LocalOverlayStoreConfig;
+
+    ref<const Config> config;
+
+    LocalOverlayStore(ref<const Config>);
+
+    std::string getUri() override
+    {
+        return "local-overlay://";
+    }
+
+private:
     /**
      * The store beneath us.
      *
@@ -99,20 +115,6 @@ class LocalOverlayStore : public virtual LocalOverlayStoreConfig, public virtual
      */
     ref<LocalFSStore> lowerStore;
 
-public:
-    LocalOverlayStore(const Params & params)
-        : LocalOverlayStore("local-overlay", "", params)
-    {
-    }
-
-    LocalOverlayStore(std::string_view scheme, PathView path, const Params & params);
-
-    std::string getUri() override
-    {
-        return "local-overlay://";
-    }
-
-private:
     /**
      * First copy up any lower store realisation with the same key, so we
      * merge rather than mask it.

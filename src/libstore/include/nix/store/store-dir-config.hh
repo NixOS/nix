@@ -18,22 +18,18 @@ struct SourcePath;
 MakeError(BadStorePath, Error);
 MakeError(BadStorePathName, BadStorePath);
 
-struct StoreDirConfig : public Config
+/**
+ * @todo This should just be part of `StoreDirConfig`. However, it would
+ * be a huge amount of churn if `Store` didn't have these methods
+ * anymore, forcing a bunch of code to go from `store.method(...)` to
+ * `store.config.method(...)`.
+ *
+ * So we instead pull out the methods into their own mix-in, so can put
+ * them directly on the Store too.
+ */
+struct MixStoreDirMethods
 {
-    using Config::Config;
-
-    StoreDirConfig() = delete;
-
-    virtual ~StoreDirConfig() = default;
-
-    const PathSetting storeDir_{this, settings.nixStore,
-        "store",
-        R"(
-          Logical location of the Nix store, usually
-          `/nix/store`. Note that you can only copy store paths
-          between stores if they have the same `store` setting.
-        )"};
-    const Path storeDir = storeDir_;
+    const Path & storeDir;
 
     // pure methods
 
@@ -56,7 +52,7 @@ struct StoreDirConfig : public Config
      * Display a set of paths in human-readable form (i.e., between quotes
      * and separated by commas).
      */
-    std::string showPaths(const StorePathSet & paths);
+    std::string showPaths(const StorePathSet & paths) const;
 
     /**
      * @return true if *path* is in the Nix store (but not the Nix
@@ -93,7 +89,7 @@ struct StoreDirConfig : public Config
 
     /**
      * Read-only variant of addToStore(). It returns the store
-     * path for the given file sytem object.
+     * path for the given file system object.
      */
     std::pair<StorePath, Hash> computeStorePath(
         std::string_view name,
@@ -102,6 +98,40 @@ struct StoreDirConfig : public Config
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = {},
         PathFilter & filter = defaultPathFilter) const;
+};
+
+/**
+ * Need to make this a separate class so I can get the right
+ * initialization order in the constructor for `StoreDirConfig`.
+ */
+struct StoreDirConfigBase : Config
+{
+    using Config::Config;
+
+    const PathSetting storeDir_{this, settings.nixStore,
+        "store",
+        R"(
+          Logical location of the Nix store, usually
+          `/nix/store`. Note that you can only copy store paths
+          between stores if they have the same `store` setting.
+        )"};
+};
+
+/**
+ * The order of `StoreDirConfigBase` and then `MixStoreDirMethods` is
+ * very important. This ensures that `StoreDirConfigBase::storeDir_`
+ * is initialized before we have our one chance (because references are
+ * immutable) to initialize `MixStoreDirMethods::storeDir`.
+ */
+struct StoreDirConfig : StoreDirConfigBase, MixStoreDirMethods
+{
+    using Params = StringMap;
+
+    StoreDirConfig(const Params & params);
+
+    StoreDirConfig() = delete;
+
+    virtual ~StoreDirConfig() = default;
 };
 
 }

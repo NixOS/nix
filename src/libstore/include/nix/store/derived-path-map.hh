@@ -21,8 +21,11 @@ namespace nix {
  *
  * @param V A type to instantiate for each output. It should probably
  * should be an "optional" type so not every interior node has to have a
- * value. `* const Something` or `std::optional<Something>` would be
- * good choices for "optional" types.
+ * value. For example, the scheduler uses
+ * `DerivedPathMap<std::weak_ptr<DerivationCreationAndRealisationGoal>>` to
+ * remember which goals correspond to which outputs. `* const Something`
+ * or `std::optional<Something>` would also be good choices for
+ * "optional" types.
  */
 template<typename V>
 struct DerivedPathMap {
@@ -91,20 +94,20 @@ struct DerivedPathMap {
 };
 
 template<>
-bool DerivedPathMap<std::set<std::string>>::ChildNode::operator == (
-    const DerivedPathMap<std::set<std::string>>::ChildNode &) const noexcept;
+bool DerivedPathMap<StringSet>::ChildNode::operator == (
+    const DerivedPathMap<StringSet>::ChildNode &) const noexcept;
 
 // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
 #if 0
 template<>
-std::strong_ordering DerivedPathMap<std::set<std::string>>::ChildNode::operator <=> (
-    const DerivedPathMap<std::set<std::string>>::ChildNode &) const noexcept;
+std::strong_ordering DerivedPathMap<StringSet>::ChildNode::operator <=> (
+    const DerivedPathMap<StringSet>::ChildNode &) const noexcept;
 
 template<>
-inline auto DerivedPathMap<std::set<std::string>>::operator <=> (const DerivedPathMap<std::set<std::string>> &) const noexcept = default;
+inline auto DerivedPathMap<StringSet>::operator <=> (const DerivedPathMap<StringSet> &) const noexcept = default;
 #endif
 
-extern template struct DerivedPathMap<std::set<std::string>>::ChildNode;
-extern template struct DerivedPathMap<std::set<std::string>>;
+extern template struct DerivedPathMap<StringSet>::ChildNode;
+extern template struct DerivedPathMap<StringSet>;
 
 }

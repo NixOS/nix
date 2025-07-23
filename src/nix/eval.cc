@@ -16,7 +16,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 {
     bool raw = false;
     std::optional<std::string> apply;
-    std::optional<fs::path> writeTo;
+    std::optional<std::filesystem::path> writeTo;
 
     CmdEval() : InstallableValueCommand()
     {
@@ -76,19 +76,19 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
         if (writeTo) {
             logger->stop();
 
-            if (fs::symlink_exists(*writeTo))
+            if (pathExists(*writeTo))
                 throw Error("path '%s' already exists", writeTo->string());
 
-            std::function<void(Value & v, const PosIdx pos, const fs::path & path)> recurse;
+            std::function<void(Value & v, const PosIdx pos, const std::filesystem::path & path)> recurse;
 
-            recurse = [&](Value & v, const PosIdx pos, const fs::path & path)
+            recurse = [&](Value & v, const PosIdx pos, const std::filesystem::path & path)
             {
                 state->forceValue(v, pos);
                 if (v.type() == nString)
                     // FIXME: disallow strings with contexts?
                     writeFile(path.string(), v.string_view());
                 else if (v.type() == nAttrs) {
-                    [[maybe_unused]] bool directoryCreated = fs::create_directory(path);
+                    [[maybe_unused]] bool directoryCreated = std::filesystem::create_directory(path);
                     // Directory should not already exist
                     assert(directoryCreated);
                     for (auto & attr : *v.attrs()) {
@@ -122,9 +122,11 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
         }
 
         else if (json) {
+            // FIXME: use printJSON
+            auto j = printValueAsJSON(*state, true, *v, pos, context, false);
             logger->cout("%s",
                 state->devirtualize(
-                    printValueAsJSON(*state, true, *v, pos, context, false).dump(),
+                    outputPretty ? j.dump(2) : j.dump(),
                     context));
         }
 

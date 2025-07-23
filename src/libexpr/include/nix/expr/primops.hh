@@ -27,7 +27,12 @@ constexpr size_t conservativeStackReservation = 16;
 struct RegisterPrimOp
 {
     typedef std::vector<PrimOp> PrimOps;
-    static PrimOps * primOps;
+
+    static PrimOps & primOps()
+    {
+        static PrimOps primOps;
+        return primOps;
+    }
 
     /**
      * You can register a constant by passing an arity of 0. fun

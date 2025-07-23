@@ -151,17 +151,21 @@ let
     ];
     separateDebugInfo = !stdenv.hostPlatform.isStatic;
     hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
-    env =
-      prevAttrs.env or { }
-      // lib.optionalAttrs (
-        stdenv.isLinux
-        && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")
-        && !(stdenv.hostPlatform.useLLVM or false)
-      ) { LDFLAGS = "-fuse-ld=gold"; };
   };
 
   mesonLibraryLayer = finalAttrs: prevAttrs: {
     outputs = prevAttrs.outputs or [ "out" ] ++ [ "dev" ];
+  };
+
+  fixupStaticLayer = finalAttrs: prevAttrs: {
+    postFixup =
+      prevAttrs.postFixup or ""
+      + lib.optionalString (stdenv.hostPlatform.isStatic) ''
+        # HACK: Otherwise the result will have the entire buildInputs closure
+        # injected by the pkgsStatic stdenv
+        # <https://github.com/NixOS/nixpkgs/issues/83667>
+        rm -f $out/nix-support/propagated-build-inputs
+      '';
   };
 
   # Work around weird `--as-needed` linker behavior with BSD, see
@@ -209,6 +213,7 @@ in
 {
   version = baseVersion + versionSuffix;
   inherit versionSuffix;
+  inherit officialRelease;
   inherit maintainers;
 
   inherit filesetToSource;
@@ -298,6 +303,7 @@ in
     scope.sourceLayer
     setVersionLayer
     mesonLayer
+    fixupStaticLayer
     scope.mesonComponentOverrides
   ];
   mkMesonExecutable = mkPackageBuilder [
@@ -307,6 +313,7 @@ in
     setVersionLayer
     mesonLayer
     mesonBuildLayer
+    fixupStaticLayer
     scope.mesonComponentOverrides
   ];
   mkMesonLibrary = mkPackageBuilder [
@@ -317,6 +324,7 @@ in
     setVersionLayer
     mesonBuildLayer
     mesonLibraryLayer
+    fixupStaticLayer
     scope.mesonComponentOverrides
   ];
 
@@ -331,6 +339,7 @@ in
   nix-store-tests = callPackage ../src/libstore-tests/package.nix { };
 
   nix-fetchers = callPackage ../src/libfetchers/package.nix { };
+  nix-fetchers-c = callPackage ../src/libfetchers-c/package.nix { };
   nix-fetchers-tests = callPackage ../src/libfetchers-tests/package.nix { };
 
   nix-expr = callPackage ../src/libexpr/package.nix { };

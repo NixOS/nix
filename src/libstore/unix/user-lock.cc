@@ -7,6 +7,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/util/users.hh"
+#include "nix/util/logging.hh"
 
 namespace nix {
 
@@ -196,7 +197,7 @@ bool useBuildUsers()
     #ifdef __linux__
     static bool b = (settings.buildUsersGroup != "" || settings.autoAllocateUids) && isRootUser();
     return b;
-    #elif defined(__APPLE__)
+    #elif defined(__APPLE__) || defined(__FreeBSD__)
     static bool b = settings.buildUsersGroup != "" && isRootUser();
     return b;
     #else

@@ -22,8 +22,9 @@ LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
 {
 }
 
-LocalFSStore::LocalFSStore(const Params & params)
-    : Store(params)
+LocalFSStore::LocalFSStore(const Config & config)
+    : Store{static_cast<const Store::Config &>(*this)}
+    , config{config}
 {
 }
 
@@ -33,30 +34,35 @@ struct LocalStoreAccessor : PosixSourceAccessor
     bool requireValidPath;
 
     LocalStoreAccessor(ref<LocalFSStore> store, bool requireValidPath)
-        : store(store)
+        : PosixSourceAccessor(std::filesystem::path{store->config.realStoreDir.get()})
+        , store(store)
         , requireValidPath(requireValidPath)
-    { }
-
-    CanonPath toRealPath(const CanonPath & path)
     {
-        auto [storePath, rest] = store->toStorePath(path.abs());
+    }
+
+
+    void requireStoreObject(const CanonPath & path)
+    {
+        auto [storePath, rest] = store->toStorePath(store->storeDir + path.abs());
         if (requireValidPath && !store->isValidPath(storePath))
             throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
-        return CanonPath(store->getRealStoreDir()) / storePath.to_string() / CanonPath(rest);
     }
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
-        /* Handle the case where `path` is (a parent of) the store. */
-        if (isDirOrInDir(store->storeDir, path.abs()))
+        /* Also allow `path` to point to the entire store, which is
+           needed for resolving symlinks. */
+        if (path.isRoot())
             return Stat{ .type = tDirectory };
 
-        return PosixSourceAccessor::maybeLstat(toRealPath(path));
+        requireStoreObject(path);
+        return PosixSourceAccessor::maybeLstat(path);
     }
 
     DirEntries readDirectory(const CanonPath & path) override
     {
-        return PosixSourceAccessor::readDirectory(toRealPath(path));
+        requireStoreObject(path);
+        return PosixSourceAccessor::readDirectory(path);
     }
 
     void readFile(
@@ -64,12 +70,14 @@ struct LocalStoreAccessor : PosixSourceAccessor
         Sink & sink,
         std::function<void(uint64_t)> sizeCallback) override
     {
-        return PosixSourceAccessor::readFile(toRealPath(path), sink, sizeCallback);
+        requireStoreObject(path);
+        return PosixSourceAccessor::readFile(path, sink, sizeCallback);
     }
 
     std::string readLink(const CanonPath & path) override
     {
-        return PosixSourceAccessor::readLink(toRealPath(path));
+        requireStoreObject(path);
+        return PosixSourceAccessor::readLink(path);
     }
 };
 
@@ -97,8 +105,8 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
 
         Path logPath =
             j == 0
-            ? fmt("%s/%s/%s/%s", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
-            : fmt("%s/%s/%s", logDir, drvsLogDir, baseName);
+            ? fmt("%s/%s/%s/%s", config.logDir.get(), drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
+            : fmt("%s/%s/%s", config.logDir.get(), drvsLogDir, baseName);
         Path logBz2Path = logPath + ".bz2";
 
         if (pathExists(logPath))

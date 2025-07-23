@@ -52,20 +52,24 @@ typename DerivedPathMap<V>::ChildNode * DerivedPathMap<V>::findSlot(const Single
 
 // instantiations
 
+#include "nix/store/build/derivation-goal.hh"
 namespace nix {
 
 template<>
-bool DerivedPathMap<std::set<std::string>>::ChildNode::operator == (
-    const DerivedPathMap<std::set<std::string>>::ChildNode &) const noexcept = default;
+bool DerivedPathMap<StringSet>::ChildNode::operator == (
+    const DerivedPathMap<StringSet>::ChildNode &) const noexcept = default;
 
 // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
 #if 0
 template<>
-std::strong_ordering DerivedPathMap<std::set<std::string>>::ChildNode::operator <=> (
-    const DerivedPathMap<std::set<std::string>>::ChildNode &) const noexcept = default;
+std::strong_ordering DerivedPathMap<StringSet>::ChildNode::operator <=> (
+    const DerivedPathMap<StringSet>::ChildNode &) const noexcept = default;
 #endif
 
-template struct DerivedPathMap<std::set<std::string>>::ChildNode;
-template struct DerivedPathMap<std::set<std::string>>;
+template struct DerivedPathMap<StringSet>::ChildNode;
+template struct DerivedPathMap<StringSet>;
+
+template struct DerivedPathMap<std::weak_ptr<DerivationGoal>>;
+
 
 };

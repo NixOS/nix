@@ -52,8 +52,10 @@ struct LengthPrefixedProtoHelper;
 template<class Inner, typename T>
 LENGTH_PREFIXED_PROTO_HELPER(Inner, std::vector<T>);
 
-template<class Inner, typename T>
-LENGTH_PREFIXED_PROTO_HELPER(Inner, std::set<T>);
+#define COMMA_ ,
+template<class Inner, typename T, typename Compare>
+LENGTH_PREFIXED_PROTO_HELPER(Inner, std::set<T COMMA_ Compare>);
+#undef COMMA_
 
 template<class Inner, typename... Ts>
 LENGTH_PREFIXED_PROTO_HELPER(Inner, std::tuple<Ts...>);
@@ -86,12 +88,11 @@ LengthPrefixedProtoHelper<Inner, std::vector<T>>::write(
     }
 }
 
-template<class Inner, typename T>
-std::set<T>
-LengthPrefixedProtoHelper<Inner, std::set<T>>::read(
+template<class Inner, typename T, typename Compare>
+std::set<T, Compare> LengthPrefixedProtoHelper<Inner, std::set<T, Compare>>::read(
     const StoreDirConfig & store, typename Inner::ReadConn conn)
 {
-    std::set<T> resSet;
+    std::set<T, Compare> resSet;
     auto size = readNum<size_t>(conn.from);
     while (size--) {
         resSet.insert(S<T>::read(store, conn));
@@ -99,10 +100,9 @@ LengthPrefixedProtoHelper<Inner, std::set<T>>::read(
     return resSet;
 }
 
-template<class Inner, typename T>
-void
-LengthPrefixedProtoHelper<Inner, std::set<T>>::write(
-    const StoreDirConfig & store, typename Inner::WriteConn conn, const std::set<T> & resSet)
+template<class Inner, typename T, typename Compare>
+void LengthPrefixedProtoHelper<Inner, std::set<T, Compare>>::write(
+    const StoreDirConfig & store, typename Inner::WriteConn conn, const std::set<T, Compare> & resSet)
 {
     conn.to << resSet.size();
     for (auto & key : resSet) {

@@ -112,6 +112,7 @@ lexer_tab = custom_target(
   ],
   command : [
     'flex',
+    '-Cf', # Use full scanner tables
     '--outfile',
     '@OUTPUT0@',
     '--header-file=' + '@OUTPUT1@',
@@ -139,6 +140,8 @@ sources = files(
   'eval-cache.cc',
   'eval-error.cc',
   'eval-gc.cc',
+  'eval-profiler-settings.cc',
+  'eval-profiler.cc',
   'eval-settings.cc',
   'eval.cc',
   'function-trace.cc',

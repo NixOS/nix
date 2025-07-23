@@ -38,7 +38,7 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
     std::filesystem::path profileDir = dirOf(profile);
     auto profileName = std::string(baseNameOf(profile));
 
-    for (auto & i : std::filesystem::directory_iterator{profileDir}) {
+    for (auto & i : DirectoryIterator{profileDir}) {
         checkInterrupt();
         if (auto n = parseName(profileName, i.path().filename().string())) {
             auto path = i.path().string();
@@ -331,7 +331,7 @@ Path getDefaultProfile()
         if (!pathExists(profileLink)) {
             replaceSymlink(profile, profileLink);
         }
-        // Backwards compatibiliy measure: Make root's profile available as
+        // Backwards compatibility measure: Make root's profile available as
         // `.../default` as it's what NixOS and most of the init scripts expect
         Path globalProfileLink = settings.nixStateDir + "/profiles/default";
         if (isRootUser() && !pathExists(globalProfileLink)) {

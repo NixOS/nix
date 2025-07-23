@@ -14,7 +14,6 @@ execUnshare <<EOF
 
   # Avoid store dir being inside sandbox build-dir
   unset NIX_STORE_DIR
-  unset NIX_STATE_DIR
 
   setLocalStore () {
     export NIX_REMOTE=\$TEST_ROOT/\$1

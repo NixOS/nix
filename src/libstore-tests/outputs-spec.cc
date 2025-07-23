@@ -7,7 +7,7 @@
 namespace nix {
 
 TEST(OutputsSpec, no_empty_names) {
-    ASSERT_DEATH(OutputsSpec::Names { std::set<std::string> { } }, "");
+    ASSERT_DEATH(OutputsSpec::Names { StringSet { } }, "");
 }
 
 #define TEST_DONT_PARSE(NAME, STR)           \
@@ -46,7 +46,7 @@ TEST(OutputsSpec, names_underscore) {
     ASSERT_EQ(expected.to_string(), str);
 }
 
-TEST(OutputsSpec, names_numberic) {
+TEST(OutputsSpec, names_numeric) {
     std::string_view str = "01";
     OutputsSpec expected = OutputsSpec::Names { "01" };
     ASSERT_EQ(OutputsSpec::parse(str), expected);
@@ -126,7 +126,7 @@ TEST_DONT_PARSE(star_second, "^foo,*")
 
 #undef TEST_DONT_PARSE
 
-TEST(ExtendedOutputsSpec, defeault) {
+TEST(ExtendedOutputsSpec, default) {
     std::string_view str = "foo";
     auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(str);
     ASSERT_EQ(prefix, "foo");

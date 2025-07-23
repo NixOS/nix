@@ -374,7 +374,7 @@ VERSIONED_CHARACTERIZATION_TEST(
     set,
     "set",
     defaultVersion,
-    (std::tuple<std::set<std::string>, std::set<std::string>, std::set<std::string>, std::set<std::set<std::string>>> {
+    (std::tuple<StringSet, StringSet, StringSet, std::set<StringSet>> {
         { },
         { "" },
         { "", "foo", "bar" },

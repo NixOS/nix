@@ -8,8 +8,6 @@ using namespace nix;
 
 struct MixLs : virtual Args, MixJSON
 {
-    std::string path;
-
     bool recursive = false;
     bool verbose = false;
     bool showDirectory = false;
@@ -38,7 +36,7 @@ struct MixLs : virtual Args, MixJSON
         });
     }
 
-    void listText(ref<SourceAccessor> accessor)
+    void listText(ref<SourceAccessor> accessor, CanonPath path)
     {
         std::function<void(const SourceAccessor::Stat &, const CanonPath &, std::string_view, bool)> doPath;
 
@@ -77,26 +75,27 @@ struct MixLs : virtual Args, MixJSON
                 showFile(curPath, relPath);
         };
 
-        auto path2 = CanonPath(path);
-        auto st = accessor->lstat(path2);
-        doPath(st, path2,
-            st.type == SourceAccessor::Type::tDirectory ? "." : path2.baseName().value_or(""),
+        auto st = accessor->lstat(path);
+        doPath(st, path,
+            st.type == SourceAccessor::Type::tDirectory ? "." : path.baseName().value_or(""),
             showDirectory);
     }
 
-    void list(ref<SourceAccessor> accessor)
+    void list(ref<SourceAccessor> accessor, CanonPath path)
     {
         if (json) {
             if (showDirectory)
                 throw UsageError("'--directory' is useless with '--json'");
-            logger->cout("%s", listNar(accessor, CanonPath(path), recursive));
+            logger->cout("%s", listNar(accessor, path, recursive));
         } else
-            listText(accessor);
+            listText(accessor, std::move(path));
     }
 };
 
 struct CmdLsStore : StoreCommand, MixLs
 {
+    std::string path;
+
     CmdLsStore()
     {
         expectArgs({
@@ -120,13 +119,16 @@ struct CmdLsStore : StoreCommand, MixLs
 
     void run(ref<Store> store) override
     {
-        list(store->getFSAccessor());
+        auto [storePath, rest] = store->toStorePath(path);
+        list(store->getFSAccessor(), CanonPath{storePath.to_string()} / CanonPath{rest});
     }
 };
 
 struct CmdLsNar : Command, MixLs
 {
     Path narPath;
+
+    std::string path;
 
     CmdLsNar()
     {
@@ -152,7 +154,7 @@ struct CmdLsNar : Command, MixLs
 
     void run() override
     {
-        list(makeNarAccessor(readFile(narPath)));
+        list(makeNarAccessor(readFile(narPath)), CanonPath{path});
     }
 };
 

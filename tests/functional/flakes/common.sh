@@ -2,6 +2,8 @@
 
 source ../common.sh
 
+export _NIX_TEST_BARF_ON_UNCACHEABLE=1
+
 # shellcheck disable=SC2034 # this variable is used by tests that source this file
 registry=$TEST_ROOT/registry.json
 
@@ -86,6 +88,19 @@ writeDependentFlake() {
   };
 }
 EOF
+}
+
+writeIfdFlake() {
+    local flakeDir="$1"
+    cat > "$flakeDir/flake.nix" <<EOF
+{
+  outputs = { self }: {
+    packages.$system.default = import ./ifd.nix;
+  };
+}
+EOF
+
+    cp -n ../ifd.nix ../dependencies.nix ../dependencies.builder0.sh "${config_nix}" "$flakeDir/"
 }
 
 writeTrivialFlake() {

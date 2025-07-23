@@ -5,6 +5,7 @@
 #include "nix/store/realisation.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/util/util.hh"
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/thread-pool.hh"
@@ -29,13 +30,13 @@ using json = nlohmann::json;
 namespace nix {
 
 
-bool StoreDirConfig::isInStore(PathView path) const
+bool MixStoreDirMethods::isInStore(PathView path) const
 {
     return isInDir(path, storeDir);
 }
 
 
-std::pair<StorePath, Path> StoreDirConfig::toStorePath(PathView path) const
+std::pair<StorePath, Path> MixStoreDirMethods::toStorePath(PathView path) const
 {
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
@@ -77,7 +78,7 @@ to match.
 */
 
 
-StorePath StoreDirConfig::makeStorePath(std::string_view type,
+StorePath MixStoreDirMethods::makeStorePath(std::string_view type,
     std::string_view hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
@@ -88,14 +89,14 @@ StorePath StoreDirConfig::makeStorePath(std::string_view type,
 }
 
 
-StorePath StoreDirConfig::makeStorePath(std::string_view type,
+StorePath MixStoreDirMethods::makeStorePath(std::string_view type,
     const Hash & hash, std::string_view name) const
 {
     return makeStorePath(type, hash.to_string(HashFormat::Base16, true), name);
 }
 
 
-StorePath StoreDirConfig::makeOutputPath(std::string_view id,
+StorePath MixStoreDirMethods::makeOutputPath(std::string_view id,
     const Hash & hash, std::string_view name) const
 {
     return makeStorePath("output:" + std::string { id }, hash, outputPathName(name, id));
@@ -106,7 +107,7 @@ StorePath StoreDirConfig::makeOutputPath(std::string_view id,
    hacky, but we can't put them in, say, <s2> (per the grammar above)
    since that would be ambiguous. */
 static std::string makeType(
-    const StoreDirConfig & store,
+    const MixStoreDirMethods & store,
     std::string && type,
     const StoreReferences & references)
 {
@@ -119,7 +120,7 @@ static std::string makeType(
 }
 
 
-StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
+StorePath MixStoreDirMethods::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
 {
     if (info.method == FileIngestionMethod::Git && info.hash.algo != HashAlgorithm::SHA1)
         throw Error("Git file ingestion must use SHA-1 hash");
@@ -141,7 +142,7 @@ StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const Fixed
 }
 
 
-StorePath StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
+StorePath MixStoreDirMethods::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
 {
     // New template
     return std::visit(overloaded {
@@ -162,7 +163,7 @@ StorePath StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const
 }
 
 
-std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
+std::pair<StorePath, Hash> MixStoreDirMethods::computeStorePath(
     std::string_view name,
     const SourcePath & path,
     ContentAddressMethod method,
@@ -217,7 +218,7 @@ StorePath Store::addToStore(
         if (settings.warnLargePathThreshold && lengthSource.total >= settings.warnLargePathThreshold) {
             static bool failOnLargePath = getEnv("_NIX_TEST_FAIL_ON_LARGE_PATH").value_or("") == "1";
             if (failOnLargePath)
-                throw Error("won't copy large path '%s' to the store (%d)", path, renderSize(lengthSource.total));
+                throw Error("doesn't copy large path '%s' to the store (%d)", path, renderSize(lengthSource.total));
             warn("copied large path '%s' to the store (%d)", path, renderSize(lengthSource.total));
         }
     });
@@ -336,10 +337,10 @@ digraph graphname {
     node [shape=box]
     fileSource -> narSink
     narSink [style=dashed]
-    narSink -> unsualHashTee [style = dashed, label = "Recursive && !SHA-256"]
+    narSink -> unusualHashTee [style = dashed, label = "Recursive && !SHA-256"]
     narSink -> narHashSink [style = dashed, label = "else"]
-    unsualHashTee -> narHashSink
-    unsualHashTee -> caHashSink
+    unusualHashTee -> narHashSink
+    unusualHashTee -> caHashSink
     fileSource -> parseSink
     parseSink [style=dashed]
     parseSink-> fileSink [style = dashed, label = "Flat"]
@@ -424,7 +425,7 @@ ValidPathInfo Store::addToStoreSlow(
     return info;
 }
 
-StringSet StoreConfig::getDefaultSystemFeatures()
+StringSet Store::Config::getDefaultSystemFeatures()
 {
     auto res = settings.systemFeatures.get();
 
@@ -437,9 +438,10 @@ StringSet StoreConfig::getDefaultSystemFeatures()
     return res;
 }
 
-Store::Store(const Params & params)
-    : StoreConfig(params)
-    , state({(size_t) pathInfoCacheSize})
+Store::Store(const Store::Config & config)
+    : MixStoreDirMethods{config}
+    , config{config}
+    , state({(size_t) config.pathInfoCacheSize})
 {
     assertLibStoreInitialized();
 }
@@ -573,7 +575,7 @@ bool Store::isValidPath(const StorePath & storePath)
 {
     {
         auto state_(state.lock());
-        auto res = state_->pathInfoCache.get(std::string(storePath.to_string()));
+        auto res = state_->pathInfoCache.get(storePath.to_string());
         if (res && res->isKnownNow()) {
             stats.narInfoReadAverted++;
             return res->didExist();
@@ -585,7 +587,7 @@ bool Store::isValidPath(const StorePath & storePath)
         if (res.first != NarInfoDiskCache::oUnknown) {
             stats.narInfoReadAverted++;
             auto state_(state.lock());
-            state_->pathInfoCache.upsert(std::string(storePath.to_string()),
+            state_->pathInfoCache.upsert(storePath.to_string(),
                 res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{} : PathInfoCacheValue { .value = res.second });
             return res.first == NarInfoDiskCache::oValid;
         }
@@ -644,7 +646,7 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
     auto hashPart = std::string(storePath.hashPart());
 
     {
-        auto res = state.lock()->pathInfoCache.get(std::string(storePath.to_string()));
+        auto res = state.lock()->pathInfoCache.get(storePath.to_string());
         if (res && res->isKnownNow()) {
             stats.narInfoReadAverted++;
             if (res->didExist())
@@ -660,7 +662,7 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
             stats.narInfoReadAverted++;
             {
                 auto state_(state.lock());
-                state_->pathInfoCache.upsert(std::string(storePath.to_string()),
+                state_->pathInfoCache.upsert(storePath.to_string(),
                     res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{} : PathInfoCacheValue{ .value = res.second });
                 if (res.first == NarInfoDiskCache::oInvalid ||
                     !goodStorePath(storePath, res.second->path))
@@ -704,7 +706,7 @@ void Store::queryPathInfo(const StorePath & storePath,
 
                 {
                     auto state_(state.lock());
-                    state_->pathInfoCache.upsert(std::string(storePath.to_string()), PathInfoCacheValue { .value = info });
+                    state_->pathInfoCache.upsert(storePath.to_string(), PathInfoCacheValue { .value = info });
                 }
 
                 if (!info || !goodStorePath(storePath, info->path)) {
@@ -792,15 +794,12 @@ void Store::substitutePaths(const StorePathSet & paths)
     for (auto & path : paths)
         if (!path.isDerivation())
             paths2.emplace_back(DerivedPath::Opaque{path});
-    uint64_t downloadSize, narSize;
-    StorePathSet willBuild, willSubstitute, unknown;
-    queryMissing(paths2,
-        willBuild, willSubstitute, unknown, downloadSize, narSize);
+    auto missing = queryMissing(paths2);
 
-    if (!willSubstitute.empty())
+    if (!missing.willSubstitute.empty())
         try {
             std::vector<DerivedPath> subs;
-            for (auto & p : willSubstitute) subs.emplace_back(DerivedPath::Opaque{p});
+            for (auto & p : missing.willSubstitute) subs.emplace_back(DerivedPath::Opaque{p});
             buildPaths(subs);
         } catch (Error & e) {
             logWarning(e.info());
@@ -1209,7 +1208,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
 }
 
 
-std::string StoreDirConfig::showPaths(const StorePathSet & paths)
+std::string MixStoreDirMethods::showPaths(const StorePathSet & paths) const
 {
     std::string s;
     for (auto & i : paths) {
@@ -1237,7 +1236,7 @@ static Derivation readDerivationCommon(Store & store, const StorePath & drvPath,
     auto accessor = store.getFSAccessor(requireValidPath);
     try {
         return parseDerivation(store,
-            accessor->readFile(CanonPath(store.printStorePath(drvPath))),
+            accessor->readFile(CanonPath(drvPath.to_string())),
             Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
         throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.msg());
@@ -1278,103 +1277,32 @@ Derivation Store::readDerivation(const StorePath & drvPath)
 Derivation Store::readInvalidDerivation(const StorePath & drvPath)
 { return readDerivationCommon(*this, drvPath, false); }
 
-}
 
-
-#include "nix/store/local-store.hh"
-#include "nix/store/uds-remote-store.hh"
-
-
-namespace nix {
-
-ref<Store> openStore(const std::string & uri,
-    const Store::Params & extraParams)
+void Store::signPathInfo(ValidPathInfo & info)
 {
-    return openStore(StoreReference::parse(uri, extraParams));
+    // FIXME: keep secret keys in memory.
+
+    auto secretKeyFiles = settings.secretKeyFiles;
+
+    for (auto & secretKeyFile : secretKeyFiles.get()) {
+        SecretKey secretKey(readFile(secretKeyFile));
+        LocalSigner signer(std::move(secretKey));
+        info.sign(*this, signer);
+    }
 }
 
-ref<Store> openStore(StoreReference && storeURI)
+
+void Store::signRealisation(Realisation & realisation)
 {
-    auto & params = storeURI.params;
+    // FIXME: keep secret keys in memory.
 
-    auto store = std::visit(overloaded {
-        [&](const StoreReference::Auto &) -> std::shared_ptr<Store> {
-            auto stateDir = getOr(params, "state", settings.nixStateDir);
-            if (access(stateDir.c_str(), R_OK | W_OK) == 0)
-                return std::make_shared<LocalStore>(params);
-            else if (pathExists(settings.nixDaemonSocketFile))
-                return std::make_shared<UDSRemoteStore>(params);
-            #ifdef __linux__
-            else if (!pathExists(stateDir)
-                && params.empty()
-                && !isRootUser()
-                && !getEnv("NIX_STORE_DIR").has_value()
-                && !getEnv("NIX_STATE_DIR").has_value())
-            {
-                /* If /nix doesn't exist, there is no daemon socket, and
-                   we're not root, then automatically set up a chroot
-                   store in ~/.local/share/nix/root. */
-                auto chrootStore = getDataDir() + "/root";
-                if (!pathExists(chrootStore)) {
-                    try {
-                        createDirs(chrootStore);
-                    } catch (SystemError & e) {
-                        return std::make_shared<LocalStore>(params);
-                    }
-                    warn("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
-                } else
-                    debug("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
-                return std::make_shared<LocalStore>("local", chrootStore, params);
-            }
-            #endif
-            else
-                return std::make_shared<LocalStore>(params);
-        },
-        [&](const StoreReference::Specified & g) {
-            for (const auto & implem : *Implementations::registered)
-                if (implem.uriSchemes.count(g.scheme))
-                    return implem.create(g.scheme, g.authority, params);
+    auto secretKeyFiles = settings.secretKeyFiles;
 
-            throw Error("don't know how to open Nix store with scheme '%s'", g.scheme);
-        },
-    }, storeURI.variant);
-
-    experimentalFeatureSettings.require(store->experimentalFeature());
-    store->warnUnknownSettings();
-    store->init();
-
-    return ref<Store> { store };
+    for (auto & secretKeyFile : secretKeyFiles.get()) {
+        SecretKey secretKey(readFile(secretKeyFile));
+        LocalSigner signer(std::move(secretKey));
+        realisation.sign(signer);
+    }
 }
-
-std::list<ref<Store>> getDefaultSubstituters()
-{
-    static auto stores([]() {
-        std::list<ref<Store>> stores;
-
-        StringSet done;
-
-        auto addStore = [&](const std::string & uri) {
-            if (!done.insert(uri).second) return;
-            try {
-                stores.push_back(openStore(uri));
-            } catch (Error & e) {
-                logWarning(e.info());
-            }
-        };
-
-        for (const auto & uri : settings.substituters.get())
-            addStore(uri);
-
-        stores.sort([](ref<Store> & a, ref<Store> & b) {
-            return a->priority < b->priority;
-        });
-
-        return stores;
-    } ());
-
-    return stores;
-}
-
-std::vector<StoreFactory> * Implementations::registered = 0;
 
 }

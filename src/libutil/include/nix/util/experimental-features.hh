@@ -35,6 +35,7 @@ enum struct ExperimentalFeature
     MountedSSHStore,
     VerifiedFetches,
     PipeOperators,
+    ExternalBuilders,
     BLAKE3Hashes,
 };
 
@@ -76,7 +77,7 @@ std::ostream & operator<<(
  * Parse a set of strings to the corresponding set of experimental
  * features, ignoring (but warning for) any unknown feature.
  */
-std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> &);
+std::set<ExperimentalFeature> parseFeatures(const StringSet &);
 
 /**
  * An experimental feature was required for some (experimental)

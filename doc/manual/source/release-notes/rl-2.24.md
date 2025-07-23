@@ -173,7 +173,7 @@
   **Deprecation**: Use `nix32` instead of `base32` as `toHashFormat`
 
   For the builtin `convertHash`, the `toHashFormat` parameter now accepts the same hash formats as the `--to`/`--from`
-  parameters of the `nix hash conert` command: `"base16"`, `"nix32"`, `"base64"`, and `"sri"`. The former `"base32"` value
+  parameters of the `nix hash convert` command: `"base16"`, `"nix32"`, `"base64"`, and `"sri"`. The former `"base32"` value
   remains as a deprecated alias for `"nix32"`. Please convert your code from:
 
   ```nix
@@ -284,7 +284,7 @@
 
   `<nix/fetchurl.nix>` is also known as the builtin derivation builder `builtin:fetchurl`. It's not to be confused with the evaluation-time function `builtins.fetchurl`, which was not affected by this issue.
 
-# Contributors
+## Contributors
 
 This release was made possible by the following 43 contributors:
 

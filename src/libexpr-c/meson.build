@@ -37,12 +37,10 @@ include_dirs = [include_directories('.')]
 
 headers = files(
   'nix_api_expr.h',
+  'nix_api_expr_internal.h',
   'nix_api_external.h',
   'nix_api_value.h',
 )
-
-# TODO move this header to libexpr, maybe don't use it in tests?
-headers += files('nix_api_expr_internal.h')
 
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')

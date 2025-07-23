@@ -2,8 +2,9 @@
 #include "nix/main/shared.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/filetransfer.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/cmd/legacy.hh"
+#include "nix/cmd/common-eval-args.hh"
 #include "nix/expr/eval-settings.hh" // for defexpr
 #include "nix/util/users.hh"
 #include "nix/fetchers/tarball.hh"
@@ -17,7 +18,7 @@
 
 using namespace nix;
 
-typedef std::map<std::string, std::string> Channels;
+typedef StringMap Channels;
 
 static Channels channels;
 static std::filesystem::path channelsList;

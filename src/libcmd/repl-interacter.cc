@@ -2,6 +2,8 @@
 
 #include <cstdio>
 
+#include <signal.h>
+
 #if USE_READLINE
 #include <readline/history.h>
 #include <readline/readline.h>
@@ -135,7 +137,7 @@ static constexpr const char * promptForType(ReplPromptType promptType)
     case ReplPromptType::ReplPrompt:
         return "nix-repl> ";
     case ReplPromptType::ContinuationPrompt:
-        return "          ";
+        return "        > "; // 9 spaces + >
     }
     assert(false);
 }

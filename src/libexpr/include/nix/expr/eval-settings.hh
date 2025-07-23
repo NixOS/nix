@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/expr/eval-profiler-settings.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/source-path.hh"
 
@@ -12,7 +13,7 @@ struct PrimOp;
 struct EvalSettings : Config
 {
     /**
-     * Function used to interpet look path entries of a given scheme.
+     * Function used to interpret look path entries of a given scheme.
      *
      * The argument is the non-scheme part of the lookup path entry (see
      * `LookupPathHooks` below).
@@ -131,9 +132,9 @@ struct EvalSettings : Config
     Setting<bool> restrictEval{
         this, false, "restrict-eval",
         R"(
-          If set to `true`, the Nix evaluator will not allow access to any
+          If set to `true`, the Nix evaluator doesn't allow access to any
           files outside of
-          [`builtins.nixPath`](@docroot@/language/builtins.md#builtins-nixPath),
+          [`builtins.nixPath`](@docroot@/language/builtins.md#builtins-nixPath)
           or to URIs outside of
           [`allowed-uris`](@docroot@/command-ref/conf-file.md#conf-allowed-uris).
         )"};
@@ -151,14 +152,24 @@ struct EvalSettings : Config
         )"
         };
 
+    Setting<bool> traceImportFromDerivation{
+        this, false, "trace-import-from-derivation",
+        R"(
+          By default, Nix allows [Import from Derivation](@docroot@/language/import-from-derivation.md).
+
+          When this setting is `true`, Nix logs a warning indicating that it performed such an import.
+          This option has no effect if `allow-import-from-derivation` is disabled.
+        )"
+        };
+
     Setting<bool> enableImportFromDerivation{
         this, true, "allow-import-from-derivation",
         R"(
           By default, Nix allows [Import from Derivation](@docroot@/language/import-from-derivation.md).
 
-          With this option set to `false`, Nix will throw an error when evaluating an expression that uses this feature,
+          With this option set to `false`, Nix throws an error when evaluating an expression that uses this feature,
           even when the required store object is readily available.
-          This ensures that evaluation will not require any builds to take place,
+          This ensures that evaluation doesn't require any builds to take place,
           regardless of the state of the store.
         )"};
 
@@ -177,8 +188,8 @@ struct EvalSettings : Config
 
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
         R"(
-          If set to `true`, the Nix evaluator will trace every function call.
-          Nix will print a log message at the "vomit" level for every function
+          If set to `true`, the Nix evaluator traces every function call.
+          Nix prints a log message at the "vomit" level for every function
           entrance and function exit.
 
               function-trace entered undefined position at 1565795816999559622
@@ -193,6 +204,29 @@ struct EvalSettings : Config
           `flamegraph.pl`.
         )"};
 
+    Setting<EvalProfilerMode> evalProfilerMode{this, EvalProfilerMode::disabled, "eval-profiler",
+        R"(
+          Enables evaluation profiling. The following modes are supported:
+
+          * `flamegraph` stack sampling profiler. Outputs folded format, one line per stack (suitable for `flamegraph.pl` and compatible tools).
+
+          Use [`eval-profile-file`](#conf-eval-profile-file) to specify where the profile is saved.
+
+          See [Using the `eval-profiler`](@docroot@/advanced-topics/eval-profiler.md).
+        )"};
+
+    Setting<Path> evalProfileFile{this, "nix.profile", "eval-profile-file",
+        R"(
+          Specifies the file where [evaluation profile](#conf-eval-profiler) is saved.
+        )"};
+
+    Setting<uint32_t> evalProfilerFrequency{this, 99, "eval-profiler-frequency",
+        R"(
+          Specifies the sampling rate in hertz for sampling evaluation profilers.
+          Use `0` to sample the stack after each function call.
+          See [`eval-profiler`](#conf-eval-profiler).
+        )"};
+
     Setting<bool> useEvalCache{this, true, "eval-cache",
         R"(
             Whether to use the flake evaluation cache.
@@ -202,8 +236,8 @@ struct EvalSettings : Config
 
     Setting<bool> ignoreExceptionsDuringTry{this, false, "ignore-try",
         R"(
-          If set to true, ignore exceptions inside 'tryEval' calls when evaluating nix expressions in
-          debug mode (using the --debugger flag). By default the debugger will pause on all exceptions.
+          If set to true, ignore exceptions inside 'tryEval' calls when evaluating Nix expressions in
+          debug mode (using the --debugger flag). By default, the debugger pauses on all exceptions.
         )"};
 
     Setting<bool> traceVerbose{this, false, "trace-verbose",
@@ -215,7 +249,7 @@ struct EvalSettings : Config
     Setting<bool> builtinsTraceDebugger{this, false, "debugger-on-trace",
         R"(
           If set to true and the `--debugger` flag is given, the following functions
-          will enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
+          enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
 
           * [`builtins.trace`](@docroot@/language/builtins.md#builtins-trace)
           * [`builtins.traceVerbose`](@docroot@/language/builtins.md#builtins-traceVerbose)
@@ -228,7 +262,7 @@ struct EvalSettings : Config
     Setting<bool> builtinsDebuggerOnWarn{this, false, "debugger-on-warn",
         R"(
           If set to true and the `--debugger` flag is given, [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn)
-          will enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
+          enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
 
           This is useful for debugging warnings in third-party Nix code.
 
@@ -237,9 +271,9 @@ struct EvalSettings : Config
 
     Setting<bool> builtinsAbortOnWarn{this, false, "abort-on-warn",
         R"(
-          If set to true, [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn) will throw an error when logging a warning.
+          If set to true, [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn) throws an error when logging a warning.
 
-          This will give you a stack trace that leads to the location of the warning.
+          This gives you a stack trace that leads to the location of the warning.
 
           This is useful for finding information about warnings in third-party Nix code when you can not start the interactive debugger, such as when Nix is called from a non-interactive script. See [`debugger-on-warn`](#conf-debugger-on-warn).
 
@@ -252,6 +286,19 @@ struct EvalSettings : Config
         R"(
           If set to true, flakes and trees fetched by [`builtins.fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree) are only copied to the Nix store when they're used as a dependency of a derivation. This avoids copying (potentially large) source trees unnecessarily.
         )"};
+
+    // FIXME: this setting should really be in libflake, but it's
+    // currently needed in mountInput().
+    Setting<bool> lazyLocks{
+        this,
+        false,
+        "lazy-locks",
+        R"(
+          If enabled, Nix only includes NAR hashes in lock file entries if they're necessary to lock the input (i.e. when there is no other attribute that allows the content to be verified, like a Git revision).
+          This is not backward compatible with older versions of Nix.
+          If disabled, lock file entries always contain a NAR hash.
+        )"
+    };
 };
 
 /**

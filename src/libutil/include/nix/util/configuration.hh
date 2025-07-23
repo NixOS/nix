@@ -179,7 +179,7 @@ public:
 
     const std::string name;
     const std::string description;
-    const std::set<std::string> aliases;
+    const StringSet aliases;
 
     int created = 123;
 
@@ -192,7 +192,7 @@ protected:
     AbstractSetting(
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases,
+        const StringSet & aliases,
         std::optional<ExperimentalFeature> experimentalFeature = std::nullopt);
 
     virtual ~AbstractSetting();
@@ -251,7 +251,7 @@ public:
         const bool documentDefault,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {},
+        const StringSet & aliases = {},
         std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
         : AbstractSetting(name, description, aliases, experimentalFeature)
         , value(def)
@@ -323,7 +323,7 @@ public:
         const T & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {},
+        const StringSet & aliases = {},
         const bool documentDefault = true,
         std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
         : BaseSetting<T>(def, documentDefault, name, description, aliases, std::move(experimentalFeature))
@@ -349,7 +349,7 @@ public:
         const Path & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {});
+        const StringSet & aliases = {});
 
     Path parse(const std::string & str) const override;
 
@@ -371,7 +371,7 @@ public:
         const std::optional<Path> & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {});
+        const StringSet & aliases = {});
 
     std::optional<Path> parse(const std::string & str) const override;
 

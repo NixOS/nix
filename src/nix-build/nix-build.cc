@@ -12,7 +12,7 @@
 #include "nix/util/current-process.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivation-options.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/realisation.hh"
@@ -147,7 +147,7 @@ static void main_nix_build(int argc, char * * argv)
     std::string outLink = "./result";
 
     // List of environment variables kept for --pure
-    std::set<std::string> keepVars{
+    StringSet keepVars{
         "HOME", "XDG_RUNTIME_DIR", "USER", "LOGNAME", "DISPLAY",
         "WAYLAND_DISPLAY", "WAYLAND_SOCKET", "PATH", "TERM", "IN_NIX_SHELL",
         "NIX_SHELL_PRESERVE_PROMPT", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL",
@@ -255,16 +255,16 @@ static void main_nix_build(int argc, char * * argv)
 
             std::ostringstream joined;
             for (const auto & i : savedArgs)
-                joined << shellEscape(i) << ' ';
+                joined << escapeShellArgAlways(i) << ' ';
 
             if (std::regex_search(interpreter, std::regex("ruby"))) {
                 // Hack for Ruby. Ruby also examines the shebang. It tries to
                 // read the shebang to understand which packages to read from. Since
                 // this is handled via nix-shell -p, we wrap our ruby script execution
                 // in ruby -e 'load' which ignores the shebangs.
-                envCommand = fmt("exec %1% %2% -e 'load(ARGV.shift)' -- %3% %4%", execArgs, interpreter, shellEscape(script), toView(joined));
+                envCommand = fmt("exec %1% %2% -e 'load(ARGV.shift)' -- %3% %4%", execArgs, interpreter, escapeShellArgAlways(script), toView(joined));
             } else {
-                envCommand = fmt("exec %1% %2% %3% %4%", execArgs, interpreter, shellEscape(script), toView(joined));
+                envCommand = fmt("exec %1% %2% %3% %4%", execArgs, interpreter, escapeShellArgAlways(script), toView(joined));
             }
         }
 
@@ -387,8 +387,8 @@ static void main_nix_build(int argc, char * * argv)
                 return false;
             }
             bool add = false;
-            if (v.type() == nFunction && v.payload.lambda.fun->hasFormals()) {
-                for (auto & i : v.payload.lambda.fun->formals->formals) {
+            if (v.type() == nFunction && v.lambda().fun->hasFormals()) {
+                for (auto & i : v.lambda().fun->formals->formals) {
                     if (state->symbols[i.name] == "inNixShell") {
                         add = true;
                         break;
@@ -420,15 +420,8 @@ static void main_nix_build(int argc, char * * argv)
     state->maybePrintStats();
 
     auto buildPaths = [&](const std::vector<DerivedPath> & paths) {
-        /* Note: we do this even when !printMissing to efficiently
-           fetch binary cache data. */
-        uint64_t downloadSize, narSize;
-        StorePathSet willBuild, willSubstitute, unknown;
-        store->queryMissing(paths,
-            willBuild, willSubstitute, unknown, downloadSize, narSize);
-
         if (settings.printMissing)
-            printMissing(ref<Store>(store), willBuild, willSubstitute, unknown, downloadSize, narSize);
+            printMissing(ref<Store>(store), paths);
 
         if (!dryRun)
             store->buildPaths(paths, buildMode, evalStore);
@@ -474,7 +467,7 @@ static void main_nix_build(int argc, char * * argv)
 
             } catch (Error & e) {
                 logError(e.info());
-                notice("will use bash from your environment");
+                notice("uses bash from your environment");
                 shell = "bash";
             }
         }
@@ -544,8 +537,16 @@ static void main_nix_build(int argc, char * * argv)
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
-        ParsedDerivation parsedDrv(packageInfo.requireDrvPath(), drv);
-        DerivationOptions drvOptions = DerivationOptions::fromParsedDerivation(parsedDrv);
+        auto parsedDrv = StructuredAttrs::tryParse(drv.env);
+        DerivationOptions drvOptions;
+        try {
+            drvOptions = DerivationOptions::fromStructuredAttrs(
+                drv.env,
+                parsedDrv ? &*parsedDrv : nullptr);
+        } catch (Error & e) {
+            e.addTrace({}, "while parsing derivation '%s'", store->printStorePath(packageInfo.requireDrvPath()));
+            throw;
+        }
 
         int fileNr = 0;
 
@@ -560,7 +561,7 @@ static void main_nix_build(int argc, char * * argv)
 
         std::string structuredAttrsRC;
 
-        if (parsedDrv.hasStructuredAttrs()) {
+        if (parsedDrv) {
             StorePathSet inputs;
 
             std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputClosure;
@@ -578,19 +579,22 @@ static void main_nix_build(int argc, char * * argv)
             for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
                 accumInputClosure(inputDrv, inputNode);
 
-            if (auto structAttrs = parsedDrv.prepareStructuredAttrs(*store, inputs)) {
-                auto json = structAttrs.value();
-                structuredAttrsRC = writeStructuredAttrsShell(json);
+            auto json = parsedDrv->prepareStructuredAttrs(
+                *store,
+                drvOptions,
+                inputs,
+                drv.outputs);
 
-                auto attrsJSON = (tmpDir.path() / ".attrs.json").string();
-                writeFile(attrsJSON, json.dump());
+            structuredAttrsRC = StructuredAttrs::writeShell(json);
 
-                auto attrsSH = (tmpDir.path() / ".attrs.sh").string();
-                writeFile(attrsSH, structuredAttrsRC);
+            auto attrsJSON = (tmpDir.path() / ".attrs.json").string();
+            writeFile(attrsJSON, json.dump());
 
-                env["NIX_ATTRS_SH_FILE"] = attrsSH;
-                env["NIX_ATTRS_JSON_FILE"] = attrsJSON;
-            }
+            auto attrsSH = (tmpDir.path() / ".attrs.sh").string();
+            writeFile(attrsSH, structuredAttrsRC);
+
+            env["NIX_ATTRS_SH_FILE"] = attrsSH;
+            env["NIX_ATTRS_JSON_FILE"] = attrsJSON;
         }
 
         /* Run a shell using the derivation's environment.  For
@@ -626,12 +630,12 @@ static void main_nix_build(int argc, char * * argv)
                 "unset TZ; %6%"
                 "shopt -s execfail;"
                 "%7%",
-                shellEscape(tmpDir.path().string()),
+                escapeShellArgAlways(tmpDir.path().string()),
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
-                shellEscape(dirOf(*shell)),
-                shellEscape(*shell),
-                (getenv("TZ") ? (std::string("export TZ=") + shellEscape(getenv("TZ")) + "; ") : ""),
+                escapeShellArgAlways(dirOf(*shell)),
+                escapeShellArgAlways(*shell),
+                (getenv("TZ") ? (std::string("export TZ=") + escapeShellArgAlways(getenv("TZ")) + "; ") : ""),
                 envCommand);
         vomit("Sourcing nix-shell with file %s and contents:\n%s", rcfile, rc);
         writeFile(rcfile, rc);

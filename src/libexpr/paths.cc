@@ -56,14 +56,14 @@ std::string EvalState::devirtualize(std::string_view s, const NixStringContext &
     return rewriteStrings(std::string(s), rewrites);
 }
 
-std::string EvalState::computeBaseName(const SourcePath & path)
+std::string EvalState::computeBaseName(const SourcePath & path, PosIdx pos)
 {
     if (path.accessor == rootFS) {
         if (auto storePath = store->maybeParseStorePath(path.path.abs())) {
-            warn(
-                "Performing inefficient double copy of path '%s' to the store. "
-                "This can typically be avoided by rewriting an attribute like `src = ./.` "
-                "to `src = builtins.path { path = ./.; name = \"source\"; }`.",
+            debug(
+                "Copying '%s' to the store again.\n"
+                "You can make Nix evaluate faster and copy fewer files by replacing `./.` with the `self` flake input, "
+                "or `builtins.path { path = ./.; name = \"source\"; }`.\n",
                 path);
             return std::string(
                 fetchToStore(fetchSettings, *store, path, FetchMode::DryRun, storePath->name()).to_string());
@@ -85,24 +85,30 @@ StorePath EvalState::mountInput(
 
     allowPath(storePath); // FIXME: should just whitelist the entire virtual store
 
+    std::optional<Hash> _narHash;
+
+    auto getNarHash = [&]() {
+        if (!_narHash) {
+            if (store->isValidPath(storePath))
+                _narHash = store->queryPathInfo(storePath)->narHash;
+            else
+                _narHash = fetchToStore2(fetchSettings, *store, accessor, FetchMode::DryRun, input.getName()).second;
+        }
+        return _narHash;
+    };
+
     storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
 
-    if ((forceNarHash || (requireLockable && (!settings.lazyTrees || !input.isLocked()))) && !input.getNarHash()) {
-        auto narHash = accessor->hashPath(CanonPath::root);
-        input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
-    }
+    if (forceNarHash || (requireLockable && (!settings.lazyTrees || !settings.lazyLocks || !input.isLocked()) && !input.getNarHash()))
+        input.attrs.insert_or_assign("narHash", getNarHash()->to_string(HashFormat::SRI, true));
 
-    // FIXME: what to do with the NAR hash in lazy mode?
-    if (!settings.lazyTrees && originalInput.getNarHash()) {
-        auto expected = originalInput.computeStorePath(*store);
-        if (storePath != expected)
-            throw Error(
-                (unsigned int) 102,
-                "NAR hash mismatch in input '%s', expected '%s' but got '%s'",
-                originalInput.to_string(),
-                store->printStorePath(storePath),
-                store->printStorePath(expected));
-    }
+    if (originalInput.getNarHash() && *getNarHash() != *originalInput.getNarHash())
+        throw Error(
+            (unsigned int) 102,
+            "NAR hash mismatch in input '%s', expected '%s' but got '%s'",
+            originalInput.to_string(),
+            getNarHash()->to_string(HashFormat::SRI, true),
+            originalInput.getNarHash()->to_string(HashFormat::SRI, true));
 
     return storePath;
 }

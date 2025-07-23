@@ -41,29 +41,13 @@ static nlohmann::json builtPathsWithResultToJSON(const std::vector<BuiltPathWith
     return res;
 }
 
-struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
+struct CmdBuild : InstallablesCommand, MixOutLinkByDefault, MixDryRun, MixJSON, MixProfile
 {
-    Path outLink = "result";
     bool printOutputPaths = false;
     BuildMode buildMode = bmNormal;
 
     CmdBuild()
     {
-        addFlag({
-            .longName = "out-link",
-            .shortName = 'o',
-            .description = "Use *path* as prefix for the symlinks to the build results. It defaults to `result`.",
-            .labels = {"path"},
-            .handler = {&outLink},
-            .completer = completePath,
-        });
-
-        addFlag({
-            .longName = "no-link",
-            .description = "Do not create symlinks to the build results.",
-            .handler = {&outLink, Path("")},
-        });
-
         addFlag({
             .longName = "print-out-paths",
             .description = "Print the resulting output paths",
@@ -101,7 +85,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
             printMissing(store, pathsToBuild, lvlError);
 
             if (json)
-                logger->cout("%s", derivedPathsToJSON(pathsToBuild, *store).dump());
+                printJSON(derivedPathsToJSON(pathsToBuild, *store));
 
             return;
         }
@@ -114,9 +98,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
         if (json) logger->cout("%s", builtPathsWithResultToJSON(buildables, *store).dump());
 
-        if (outLink != "")
-            if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                createOutLinks(outLink, toBuiltPaths(buildables), *store2);
+        createOutLinksMaybe(buildables, store);
 
         if (printOutputPaths) {
             logger->stop();

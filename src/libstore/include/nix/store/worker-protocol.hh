@@ -89,7 +89,7 @@ struct WorkerProto
     struct BasicServerConnection;
 
     /**
-     * Extra information provided as part of protocol negotation.
+     * Extra information provided as part of protocol negotiation.
      */
     struct ClientHandshakeInfo;
 
@@ -135,8 +135,9 @@ struct WorkerProto
     }
 
     using Feature = std::string;
+    using FeatureSet = std::set<Feature, std::less<>>;
 
-    static const std::set<Feature> allFeatures;
+    static const FeatureSet allFeatures;
 };
 
 enum struct WorkerProto::Op : uint64_t
@@ -272,12 +273,12 @@ DECLARE_WORKER_SERIALISER(WorkerProto::ClientHandshakeInfo);
 
 template<typename T>
 DECLARE_WORKER_SERIALISER(std::vector<T>);
-template<typename T>
-DECLARE_WORKER_SERIALISER(std::set<T>);
+#define COMMA_ ,
+template<typename T, typename Compare>
+DECLARE_WORKER_SERIALISER(std::set<T COMMA_ Compare>);
 template<typename... Ts>
 DECLARE_WORKER_SERIALISER(std::tuple<Ts...>);
 
-#define COMMA_ ,
 template<typename K, typename V>
 DECLARE_WORKER_SERIALISER(std::map<K COMMA_ V>);
 #undef COMMA_

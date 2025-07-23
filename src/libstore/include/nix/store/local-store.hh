@@ -34,7 +34,39 @@ struct OptimiseStats
     uint64_t bytesFreed = 0;
 };
 
-struct LocalStoreConfig : virtual LocalFSStoreConfig
+struct LocalBuildStoreConfig : virtual LocalFSStoreConfig
+{
+
+private:
+    /**
+      Input for computing the build directory. See `getBuildDir()`.
+     */
+     Setting<std::optional<Path>> buildDir{this, std::nullopt, "build-dir",
+        R"(
+            The directory on the host, in which derivations' temporary build directories are created.
+
+            If not set, Nix will use the `builds` subdirectory of its configured state directory.
+
+            Note that builds are often performed by the Nix daemon, so its `build-dir` applies.
+
+            Nix will create this directory automatically with suitable permissions if it does not exist.
+            Otherwise its permissions must allow all users to traverse the directory (i.e. it must have `o+x` set, in unix parlance) for non-sandboxed builds to work correctly.
+
+            This is also the location where [`--keep-failed`](@docroot@/command-ref/opt-common.md#opt-keep-failed) leaves its files.
+
+            If Nix runs without sandbox, or if the platform does not support sandboxing with bind mounts (e.g. macOS), then the [`builder`](@docroot@/language/derivations.md#attr-builder)'s environment will contain this directory, instead of the virtual location [`sandbox-build-dir`](#conf-sandbox-build-dir).
+
+            > **Warning**
+            >
+            > `build-dir` must not be set to a world-writable directory.
+            > Placing temporary build directories in a world-writable place allows other users to access or modify build data that is currently in use.
+            > This alone is merely an impurity, but combined with another factor this has allowed malicious derivations to escape the build sandbox.
+        )"};
+public:
+    Path getBuildDir() const;
+};
+
+struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>, virtual LocalFSStoreConfig, virtual LocalBuildStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
 
@@ -54,7 +86,7 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
         R"(
           Allow this store to be opened when its [database](@docroot@/glossary.md#gloss-nix-database) is on a read-only filesystem.
 
-          Normally Nix will attempt to open the store database in read-write mode, even for querying (when write access is not needed), causing it to fail if the database is on a read-only filesystem.
+          Normally Nix attempts to open the store database in read-write mode, even for querying (when write access is not needed), causing it to fail if the database is on a read-only filesystem.
 
           Enable read-only mode to disable locking and open the SQLite database with the [`immutable` parameter](https://www.sqlite.org/c3ref/open.html) set.
 
@@ -65,18 +97,26 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
           > While the filesystem the database resides on might appear to be read-only, consider whether another user or system might have write access to it.
         )"};
 
-    const std::string name() override { return "Local Store"; }
+    static const std::string name() { return "Local Store"; }
 
-    static std::set<std::string> uriSchemes()
+    static StringSet uriSchemes()
     { return {"local"}; }
 
-    std::string doc() override;
+    static std::string doc();
+
+    ref<Store> openStore() const override;
 };
 
-class LocalStore : public virtual LocalStoreConfig
-    , public virtual IndirectRootStore
-    , public virtual GcStore
+class LocalStore :
+    public virtual IndirectRootStore,
+    public virtual GcStore
 {
+public:
+
+    using Config = LocalStoreConfig;
+
+    ref<const LocalStoreConfig> config;
+
 private:
 
     /**
@@ -144,11 +184,7 @@ public:
      * Initialise the local store, upgrading the schema if
      * necessary.
      */
-    LocalStore(const Params & params);
-    LocalStore(
-        std::string_view scheme,
-        PathView path,
-        const Params & params);
+    LocalStore(ref<const Config> params);
 
     ~LocalStore();
 
@@ -396,16 +432,8 @@ private:
     bool isValidPath_(State & state, const StorePath & path);
     void queryReferrers(State & state, const StorePath & path, StorePathSet & referrers);
 
-    /**
-     * Add signatures to a ValidPathInfo or Realisation using the secret keys
-     * specified by the ‘secret-key-files’ option.
-     */
-    void signPathInfo(ValidPathInfo & info);
-    void signRealisation(Realisation &);
-
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
-    friend struct LocalDerivationGoal;
     friend struct PathSubstitutionGoal;
     friend struct SubstitutionGoal;
     friend struct DerivationGoal;

@@ -12,7 +12,7 @@ repo=$TEST_ROOT/./git
 
 export _NIX_FORCE_HTTP=1
 
-rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix $TEST_ROOT/worktree $TEST_ROOT/shallow $TEST_ROOT/minimal
+rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix $TEST_ROOT/worktree $TEST_ROOT/minimal
 
 git init $repo
 git -C $repo config user.email "foobar@example.com"
@@ -81,7 +81,7 @@ path2=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"
 [[ $(nix eval --raw --expr "builtins.readFile (fetchGit { url = file://$repo; rev = \"$rev2\"; } + \"/hello\")") = world ]]
 
 # But without a hash, it fails.
-expectStderr 1 nix eval --expr 'builtins.fetchGit "file:///foo"' | grepQuiet "'fetchGit' will not fetch unlocked input"
+expectStderr 1 nix eval --expr 'builtins.fetchGit "file:///foo"' | grepQuiet "'fetchGit' doesn't fetch unlocked input"
 
 # Fetch again. This should be cached.
 mv $repo ${repo}-tmp
@@ -216,18 +216,6 @@ git -C $TEST_ROOT/minimal fetch $repo $rev2
 git -C $TEST_ROOT/minimal checkout $rev2
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit { url = $TEST_ROOT/minimal; }).rev") = $rev2 ]]
 
-# Fetching a shallow repo shouldn't work by default, because we can't
-# return a revCount.
-git clone --depth 1 file://$repo $TEST_ROOT/shallow
-(! nix eval --impure --raw --expr "(builtins.fetchGit { url = $TEST_ROOT/shallow; ref = \"dev\"; }).outPath")
-
-# But you can request a shallow clone, which won't return a revCount.
-path6=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow\"; ref = \"dev\"; shallow = true; }).outPath")
-[[ $path3 = $path6 ]]
-[[ $(nix eval --impure --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow\"; ref = \"dev\"; shallow = true; }).revCount or 123") == 123 ]]
-
-expectStderr 1 nix eval --expr 'builtins.fetchTree { type = "git"; url = "file:///foo"; }' | grepQuiet "'fetchTree' will not fetch unlocked input"
-
 # Explicit ref = "HEAD" should work, and produce the same outPath as without ref
 path7=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).outPath")
 path8=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; }).outPath")
@@ -292,17 +280,20 @@ path11=$(nix eval --impure --raw --expr "(builtins.fetchGit ./.).outPath")
 empty="$TEST_ROOT/empty"
 git init "$empty"
 
-emptyAttrs='{ lastModified = 0; lastModifiedDate = "19700101000000"; narHash = "sha256-pQpattmS9VmO3ZIQUFn66az8GSmB4IvYhTTCFn6SUmo="; rev = "0000000000000000000000000000000000000000"; revCount = 0; shortRev = "0000000"; submodules = false; }'
-
-[[ $(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]") = $emptyAttrs ]]
+emptyAttrs="{ lastModified = 0; lastModifiedDate = \"19700101000000\"; narHash = \"sha256-pQpattmS9VmO3ZIQUFn66az8GSmB4IvYhTTCFn6SUmo=\"; rev = \"0000000000000000000000000000000000000000\"; revCount = 0; shortRev = \"0000000\"; submodules = false; }"
+result=$(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]")
+[[ "$result" = "$emptyAttrs" ]]
 
 echo foo > "$empty/x"
 
-[[ $(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]") = $emptyAttrs ]]
+result=$(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]")
+[[ "$result" = "$emptyAttrs" ]]
 
 git -C "$empty" add x
 
-[[ $(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]") = '{ lastModified = 0; lastModifiedDate = "19700101000000"; narHash = "sha256-wzlAGjxKxpaWdqVhlq55q5Gxo4Bf860+kLeEa/v02As="; rev = "0000000000000000000000000000000000000000"; revCount = 0; shortRev = "0000000"; submodules = false; }' ]]
+expected_attrs="{ lastModified = 0; lastModifiedDate = \"19700101000000\"; narHash = \"sha256-wzlAGjxKxpaWdqVhlq55q5Gxo4Bf860+kLeEa/v02As=\"; rev = \"0000000000000000000000000000000000000000\"; revCount = 0; shortRev = \"0000000\"; submodules = false; }"
+result=$(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]")
+[[ "$result" = "$expected_attrs" ]]
 
 # Test a repo with an empty commit.
 git -C "$empty" rm -f x

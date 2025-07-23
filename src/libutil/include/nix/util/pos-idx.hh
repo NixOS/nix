@@ -8,19 +8,19 @@ namespace nix {
 
 class PosIdx
 {
-    friend struct LazyPosAcessors;
+    friend struct LazyPosAccessors;
     friend class PosTable;
     friend class std::hash<PosIdx>;
 
 private:
     uint32_t id;
 
+public:
     explicit PosIdx(uint32_t id)
         : id(id)
     {
     }
 
-public:
     PosIdx()
         : id(0)
     {
@@ -44,6 +44,11 @@ public:
     size_t hash() const noexcept
     {
         return std::hash<uint32_t>{}(id);
+    }
+
+    uint32_t get() const
+    {
+        return id;
     }
 };
 

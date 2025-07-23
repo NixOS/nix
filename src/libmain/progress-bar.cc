@@ -259,7 +259,7 @@ public:
         update(*state);
     }
 
-    /* Check whether an activity has an ancestore with the specified
+    /* Check whether an activity has an ancestor with the specified
        type. */
     bool hasAncestor(State & state, ActivityType type, ActivityId act)
     {
@@ -382,7 +382,7 @@ public:
     /**
      * Redraw, if the output has changed.
      *
-     * Excessive redrawing is noticable on slow terminals, and it interferes
+     * Excessive redrawing is noticeable on slow terminals, and it interferes
      * with text selection in some terminals, including libvte-based terminal
      * emulators.
      */

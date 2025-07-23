@@ -65,6 +65,7 @@ sources = files(
   'position.cc',
   'processes.cc',
   'references.cc',
+  'sort.cc',
   'spawn.cc',
   'strings.cc',
   'suggestions.cc',

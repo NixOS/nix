@@ -17,6 +17,7 @@ subdir('nix-meson-build-support/deps-lists')
 deps_private_maybe_subproject = [
   dependency('nix-store-test-support'),
   dependency('nix-fetchers'),
+  dependency('nix-fetchers-c'),
 ]
 deps_public_maybe_subproject = [
 ]
@@ -39,6 +40,7 @@ subdir('nix-meson-build-support/common')
 sources = files(
   'access-tokens.cc',
   'git-utils.cc',
+  'nix_api_fetchers.cc',
   'public-key.cc',
 )
 

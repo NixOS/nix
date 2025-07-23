@@ -132,18 +132,23 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
         throw Error("attribute '%s' has unsupported type '%s'", cursor->getAttrPathStr(), type);
 }
 
-// FIXME: move to libcmd
-App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
+std::vector<BuiltPathWithResult> UnresolvedApp::build(ref<Store> evalStore, ref<Store> store)
 {
-    auto res = unresolved;
-
     Installables installableContext;
 
     for (auto & ctxElt : unresolved.context)
         installableContext.push_back(
             make_ref<InstallableDerivedPath>(store, DerivedPath { ctxElt }));
 
-    auto builtContext = Installable::build(evalStore, store, Realise::Outputs, installableContext);
+    return Installable::build(evalStore, store, Realise::Outputs, installableContext);
+}
+
+// FIXME: move to libcmd
+App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
+{
+    auto res = unresolved;
+
+    auto builtContext = build(evalStore, store);
     res.program = resolveString(*store, unresolved.program, builtContext);
     if (!store->isInStore(res.program))
         throw Error("app program '%s' is not in the Nix store", res.program);

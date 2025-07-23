@@ -3,8 +3,6 @@
 
 namespace nix {
 
-namespace fs { using namespace std::filesystem; }
-
 static void builtinUnpackChannel(const BuiltinBuilderContext & ctx)
 {
     auto getAttr = [&](const std::string & name) -> const std::string & {
@@ -13,11 +11,11 @@ static void builtinUnpackChannel(const BuiltinBuilderContext & ctx)
         return i->second;
     };
 
-    fs::path out{ctx.outputs.at("out")};
+    std::filesystem::path out{ctx.outputs.at("out")};
     auto & channelName = getAttr("channelName");
     auto & src = getAttr("src");
 
-    if (fs::path{channelName}.filename().string() != channelName) {
+    if (std::filesystem::path{channelName}.filename().string() != channelName) {
         throw Error("channelName is not allowed to contain filesystem separators, got %1%", channelName);
     }
 
@@ -27,21 +25,17 @@ static void builtinUnpackChannel(const BuiltinBuilderContext & ctx)
 
     size_t fileCount;
     std::string fileName;
-    try {
-        auto entries = fs::directory_iterator{out};
-        fileName = entries->path().string();
-        fileCount = std::distance(fs::begin(entries), fs::end(entries));
-    } catch (fs::filesystem_error &) {
-        throw SysError("failed to read directory %1%", out.string());
-    }
+    auto entries = DirectoryIterator{out};
+    fileName = entries->path().string();
+    fileCount = std::distance(entries.begin(), entries.end());
 
     if (fileCount != 1)
         throw Error("channel tarball '%s' contains more than one file", src);
 
     auto target = out / channelName;
     try {
-        fs::rename(fileName, target);
-    } catch (fs::filesystem_error &) {
+        std::filesystem::rename(fileName, target);
+    } catch (std::filesystem::filesystem_error &) {
         throw SysError("failed to rename %1% to %2%", fileName, target.string());
     }
 }

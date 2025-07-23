@@ -1,5 +1,5 @@
 #include "nix/expr/primops.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/make-content-addressed.hh"
 #include "nix/util/url.hh"
@@ -124,12 +124,12 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
     for (auto & attr : *args[0]->attrs()) {
         const auto & attrName = state.symbols[attr.name];
         auto attrHint = [&]() -> std::string {
-            return "while evaluating the '" + attrName + "' attribute passed to builtins.fetchClosure";
+            return fmt("while evaluating the attribute '%s' passed to builtins.fetchClosure", attrName);
         };
 
         if (attrName == "fromPath") {
             NixStringContext context;
-            fromPath = state.coerceToStorePath(attr.pos, *attr.value, context, attrHint());
+            fromPath = state.coerceToStorePath(attr.pos, *attr.value, context, attrHint()); // FIXME: overflow
         }
 
         else if (attrName == "toPath") {
@@ -214,7 +214,7 @@ static RegisterPrimOp primop_fetchClosure({
     .doc = R"(
       Fetch a store path [closure](@docroot@/glossary.md#gloss-closure) from a binary cache, and return the store path as a string with context.
 
-      This function can be invoked in three ways, that we will discuss in order of preference.
+      This function can be invoked in three ways that we will discuss in order of preference.
 
       **Fetch a content-addressed store path**
 

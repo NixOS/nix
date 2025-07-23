@@ -9,7 +9,7 @@
 #include "nix/fetchers/registry.hh"
 #include "nix/flake/flakeref.hh"
 #include "nix/flake/settings.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/cmd/command.hh"
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/fetch-to-store.hh"
@@ -18,7 +18,6 @@
 
 namespace nix {
 
-namespace fs { using namespace std::filesystem; }
 
 EvalSettings evalSettings {
     settings.readOnlyMode,
@@ -123,8 +122,8 @@ MixEvalArgs::MixEvalArgs()
         .category = category,
         .labels = {"original-ref", "resolved-ref"},
         .handler = {[&](std::string _from, std::string _to) {
-            auto from = parseFlakeRef(fetchSettings, _from, fs::current_path().string());
-            auto to = parseFlakeRef(fetchSettings, _to, fs::current_path().string());
+            auto from = parseFlakeRef(fetchSettings, _from, std::filesystem::current_path().string());
+            auto to = parseFlakeRef(fetchSettings, _to, std::filesystem::current_path().string());
             fetchers::Attrs extraAttrs;
             if (to.subdir != "") extraAttrs["dir"] = to.subdir;
             fetchers::overrideRegistry(from.input, to.input, extraAttrs);

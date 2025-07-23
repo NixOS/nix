@@ -6,7 +6,7 @@ namespace nix {
 
 bool GlobalConfig::set(const std::string & name, const std::string & value)
 {
-    for (auto & config : *configRegistrations)
+    for (auto & config : configRegistrations())
         if (config->set(name, value))
             return true;
 
@@ -17,20 +17,20 @@ bool GlobalConfig::set(const std::string & name, const std::string & value)
 
 void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
 {
-    for (auto & config : *configRegistrations)
+    for (auto & config : configRegistrations())
         config->getSettings(res, overriddenOnly);
 }
 
 void GlobalConfig::resetOverridden()
 {
-    for (auto & config : *configRegistrations)
+    for (auto & config : configRegistrations())
         config->resetOverridden();
 }
 
 nlohmann::json GlobalConfig::toJSON()
 {
     auto res = nlohmann::json::object();
-    for (const auto & config : *configRegistrations)
+    for (const auto & config : configRegistrations())
         res.update(config->toJSON());
     return res;
 }
@@ -47,19 +47,15 @@ std::string GlobalConfig::toKeyValue()
 
 void GlobalConfig::convertToArgs(Args & args, const std::string & category)
 {
-    for (auto & config : *configRegistrations)
+    for (auto & config : configRegistrations())
         config->convertToArgs(args, category);
 }
 
 GlobalConfig globalConfig;
 
-GlobalConfig::ConfigRegistrations * GlobalConfig::configRegistrations;
-
 GlobalConfig::Register::Register(Config * config)
 {
-    if (!configRegistrations)
-        configRegistrations = new ConfigRegistrations;
-    configRegistrations->emplace_back(config);
+    configRegistrations().emplace_back(config);
 }
 
 ExperimentalFeatureSettings experimentalFeatureSettings;

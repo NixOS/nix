@@ -69,7 +69,9 @@ nix flake metadata "$flake1Dir" | grepQuiet 'URL:.*flake1.*'
 # Test 'nix flake metadata --json'.
 json=$(nix flake metadata flake1 --json | jq .)
 [[ $(echo "$json" | jq -r .description) = 'Bla bla' ]]
-[[ -d $(echo "$json" | jq -r .path) ]]
+if [[ $(nix config show lazy-trees) = false ]]; then
+    [[ -d $(echo "$json" | jq -r .path) ]]
+fi
 [[ $(echo "$json" | jq -r .lastModified) = $(git -C "$flake1Dir" log -n1 --format=%ct) ]]
 hash1=$(echo "$json" | jq -r .revision)
 [[ -n $(echo "$json" | jq -r .fingerprint) ]]
@@ -109,6 +111,11 @@ nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir#default"
 # Test explicit packages.default with query.
 nix build -o "$TEST_ROOT/result" "$flake1Dir?ref=HEAD#default"
 nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir?ref=HEAD#default"
+
+# Check that the fetcher cache works.
+if [[ $(nix config show lazy-trees) = false ]]; then
+    nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir?ref=HEAD#default" -vvvvv 2>&1 | grepQuiet "source path.*cache hit"
+fi
 
 # Check that relative paths are allowed for git flakes.
 # This may change in the future once git submodule support is refined.
@@ -161,7 +168,12 @@ expect 1 nix build -o "$TEST_ROOT/result" "$flake2Dir#bar" --no-update-lock-file
 nix build -o "$TEST_ROOT/result" "$flake2Dir#bar" --commit-lock-file
 [[ -e "$flake2Dir/flake.lock" ]]
 [[ -z $(git -C "$flake2Dir" diff main || echo failed) ]]
-[[ $(jq --indent 0 . < "$flake2Dir/flake.lock") =~ ^'{"nodes":{"flake1":{"locked":{"lastModified":'.*',"narHash":"sha256-'.*'","ref":"refs/heads/master","rev":"'.*'","revCount":2,"type":"git","url":"file:///'.*'"},"original":{"id":"flake1","type":"indirect"}},"root":{"inputs":{"flake1":"flake1"}}},"root":"root","version":7}'$ ]]
+[[ $(jq --indent 0 --compact-output . < "$flake2Dir/flake.lock") =~ ^'{"nodes":{"flake1":{"locked":{"lastModified":'[0-9]*',"narHash":"sha256-'.*'","ref":"refs/heads/master","rev":"'.*'","revCount":2,"type":"git","url":"file:///'.*'"},"original":{"id":"flake1","type":"indirect"}},"root":{"inputs":{"flake1":"flake1"}}},"root":"root","version":7}'$ ]]
+if [[ $(nix config show lazy-trees) = true ]]; then
+    # Test that `lazy-locks` causes NAR hashes to be omitted from the lock file.
+    nix flake update --flake "$flake2Dir" --commit-lock-file --lazy-locks
+    [[ $(jq --indent 0 --compact-output . < "$flake2Dir/flake.lock") =~ ^'{"nodes":{"flake1":{"locked":{"lastModified":'[0-9]*',"ref":"refs/heads/master","rev":"'.*'","revCount":2,"type":"git","url":"file:///'.*'"},"original":{"id":"flake1","type":"indirect"}},"root":{"inputs":{"flake1":"flake1"}}},"root":"root","version":7}'$ ]]
+fi
 
 # Rerunning the build should not change the lockfile.
 nix build -o "$TEST_ROOT/result" "$flake2Dir#bar"
@@ -362,6 +374,7 @@ nix build -o $TEST_ROOT/result git+file://$flakeGitBare
 mkdir -p $flake5Dir
 writeDependentFlake $flake5Dir
 nix flake lock path://$flake5Dir
+[[ "$(nix flake metadata path://$flake5Dir --json | jq -r .fingerprint)" != null ]]
 
 # Test tarball flakes.
 tar cfz $TEST_ROOT/flake.tar.gz -C $TEST_ROOT flake5
@@ -433,3 +446,41 @@ nix flake metadata "$flake2Dir" --reference-lock-file $TEST_ROOT/flake2-overridd
 
 # reference-lock-file can only be used if allow-dirty is set.
 expectStderr 1 nix flake metadata "$flake2Dir" --no-allow-dirty --reference-lock-file $TEST_ROOT/flake2-overridden.lock
+
+# After changing an input (flake2 from newFlake2Rev to prevFlake2Rev), we should have the transitive inputs locked by revision $prevFlake2Rev of flake2.
+prevFlake1Rev=$(nix flake metadata --json "$flake1Dir" | jq -r .revision)
+prevFlake2Rev=$(nix flake metadata --json "$flake2Dir" | jq -r .revision)
+
+echo "# bla" >> "$flake1Dir/flake.nix"
+git -C "$flake1Dir" commit flake.nix -m 'bla'
+
+nix flake update --flake "$flake2Dir"
+git -C "$flake2Dir" commit flake.lock -m 'bla'
+
+newFlake1Rev=$(nix flake metadata --json "$flake1Dir" | jq -r .revision)
+newFlake2Rev=$(nix flake metadata --json "$flake2Dir" | jq -r .revision)
+
+cat > "$flake3Dir/flake.nix" <<EOF
+{
+  inputs.flake2.url = "flake:flake2/master/$newFlake2Rev";
+
+  outputs = { self, flake2 }: {
+  };
+}
+EOF
+git -C "$flake3Dir" commit flake.nix -m 'bla'
+
+rm "$flake3Dir/flake.lock"
+nix flake lock "$flake3Dir"
+[[ "$(nix flake metadata --json "$flake3Dir" | jq -r .locks.nodes.flake1.locked.rev)" = $newFlake1Rev ]]
+
+cat > "$flake3Dir/flake.nix" <<EOF
+{
+  inputs.flake2.url = "flake:flake2/master/$prevFlake2Rev";
+
+  outputs = { self, flake2 }: {
+  };
+}
+EOF
+
+[[ "$(nix flake metadata --json "$flake3Dir" | jq -r .locks.nodes.flake1.locked.rev)" = $prevFlake1Rev ]]

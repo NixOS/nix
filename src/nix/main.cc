@@ -5,10 +5,10 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/store/globals.hh"
-#include "nix/util/config-global.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/main/shared.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/store-registration.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/finally.hh"
 #include "nix/main/loggers.hh"
@@ -38,7 +38,7 @@
 #endif
 
 #ifdef __linux__
-# include "nix/util/namespaces.hh"
+# include "nix/util/linux-namespaces.hh"
 #endif
 
 #ifndef _WIN32
@@ -191,13 +191,12 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         res["args"] = toJSON();
 
         auto stores = nlohmann::json::object();
-        for (auto & implem : *Implementations::registered) {
-            auto storeConfig = implem.getConfig();
-            auto storeName = storeConfig->name();
+        for (auto & [storeName, implem] : Implementations::registered()) {
             auto & j = stores[storeName];
-            j["doc"] = storeConfig->doc();
-            j["settings"] = storeConfig->toJSON();
-            j["experimentalFeature"] = storeConfig->experimentalFeature();
+            j["doc"] = implem.doc;
+            j["uri-schemes"] = implem.uriSchemes;
+            j["settings"] = implem.getConfig()->toJSON();
+            j["experimentalFeature"] = implem.experimentalFeature;
         }
         res["stores"] = std::move(stores);
         res["fetchers"] = fetchers::dumpRegisterInputSchemeInfo();
@@ -371,7 +370,7 @@ void mainWrapped(int argc, char * * argv)
     }
 
     {
-        auto legacy = (*RegisterLegacyCommand::commands)[programName];
+        auto legacy = RegisterLegacyCommand::commands()[programName];
         if (legacy) return legacy(argc, argv);
     }
 

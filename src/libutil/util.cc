@@ -171,7 +171,7 @@ std::string toLower(std::string s)
 }
 
 
-std::string shellEscape(const std::string_view s)
+std::string escapeShellArgAlways(const std::string_view s)
 {
     std::string r;
     r.reserve(s.size() + 2);

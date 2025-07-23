@@ -13,13 +13,13 @@ namespace nix {
 
 /**
  * An (owned) output name. Just a type alias used to make code more
- * readible.
+ * readable.
  */
 typedef std::string OutputName;
 
 /**
  * A borrowed output name. Just a type alias used to make code more
- * readible.
+ * readable.
  */
 typedef std::string_view OutputNameView;
 
@@ -27,20 +27,24 @@ struct OutputsSpec {
     /**
      * A non-empty set of outputs, specified by name
      */
-    struct Names : std::set<OutputName> {
-        using std::set<OutputName>::set;
+    struct Names : std::set<OutputName, std::less<>> {
+    private:
+        using BaseType = std::set<OutputName, std::less<>>;
+
+    public:
+        using BaseType::BaseType;
 
         /* These need to be "inherited manually" */
 
-        Names(const std::set<OutputName> & s)
-            : std::set<OutputName>(s)
+        Names(const BaseType & s)
+            : BaseType(s)
         { assert(!empty()); }
 
         /**
          * Needs to be "inherited manually"
          */
-        Names(std::set<OutputName> && s)
-            : std::set<OutputName>(s)
+        Names(BaseType && s)
+            : BaseType(std::move(s))
         { assert(!empty()); }
 
         /* This set should always be non-empty, so we delete this

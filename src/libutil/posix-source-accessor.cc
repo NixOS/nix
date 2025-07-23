@@ -138,42 +138,49 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
 {
     assertNoSymlinks(path);
     DirEntries res;
-    try {
-        for (auto & entry : std::filesystem::directory_iterator{makeAbsPath(path)}) {
-            checkInterrupt();
-            auto type = [&]() -> std::optional<Type> {
-                std::filesystem::file_type nativeType;
-                try {
-                    nativeType = entry.symlink_status().type();
-                } catch (std::filesystem::filesystem_error & e) {
-                    // We cannot always stat the child. (Ideally there is no
-                    // stat because the native directory entry has the type
-                    // already, but this isn't always the case.)
-                    if (e.code() == std::errc::permission_denied || e.code() == std::errc::operation_not_permitted)
-                        return std::nullopt;
-                    else throw;
-                }
+    for (auto & entry : DirectoryIterator{makeAbsPath(path)}) {
+        checkInterrupt();
+        auto type = [&]() -> std::optional<Type> {
+            try {
+                /* WARNING: We are specifically not calling symlink_status()
+                 * here, because that always translates to `stat` call and
+                 * doesn't make use of any caching. Instead, we have to
+                 * rely on the myriad of `is_*` functions, which actually do
+                 * the caching. If you are in doubt then take a look at the
+                 * libstdc++ implementation [1] and the standard proposal
+                 * about the caching variations of directory_entry [2].
 
-                // cannot exhaustively enumerate because implementation-specific
-                // additional file types are allowed.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wswitch-enum"
-            switch (nativeType) {
-            case std::filesystem::file_type::regular: return Type::tRegular; break;
-            case std::filesystem::file_type::symlink: return Type::tSymlink; break;
-            case std::filesystem::file_type::directory: return Type::tDirectory; break;
-            case std::filesystem::file_type::character: return Type::tChar; break;
-            case std::filesystem::file_type::block: return Type::tBlock; break;
-            case std::filesystem::file_type::fifo: return Type::tFifo; break;
-            case std::filesystem::file_type::socket: return Type::tSocket; break;
-            default: return tUnknown;
+                 * [1]: https://github.com/gcc-mirror/gcc/blob/8ea555b7b4725dbc5d9286f729166cd54ce5b615/libstdc%2B%2B-v3/include/bits/fs_dir.h#L341-L348
+                 * [2]: https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0317r1.html
+                 */
+
+                /* Check for symlink first, because other getters follow symlinks. */
+                if (entry.is_symlink())
+                    return tSymlink;
+                if (entry.is_regular_file())
+                    return tRegular;
+                if (entry.is_directory())
+                    return tDirectory;
+                if (entry.is_character_file())
+                    return tChar;
+                if (entry.is_block_file())
+                    return tBlock;
+                if (entry.is_fifo())
+                    return tFifo;
+                if (entry.is_socket())
+                    return tSocket;
+                return tUnknown;
+            } catch (std::filesystem::filesystem_error & e) {
+                // We cannot always stat the child. (Ideally there is no
+                // stat because the native directory entry has the type
+                // already, but this isn't always the case.)
+                if (e.code() == std::errc::permission_denied || e.code() == std::errc::operation_not_permitted)
+                    return std::nullopt;
+                else
+                    throw;
             }
-#pragma GCC diagnostic pop
-            }();
-            res.emplace(entry.path().filename().string(), type);
-        }
-    } catch (std::filesystem::filesystem_error & e) {
-        throw SysError("reading directory %1%", showPath(path));
+        }();
+        res.emplace(entry.path().filename().string(), type);
     }
     return res;
 }

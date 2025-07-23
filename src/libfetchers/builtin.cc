@@ -4,6 +4,7 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/store/store-open.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -18,7 +19,7 @@ static void builtinFetchTree(const BuiltinBuilderContext & ctx)
     if (!(ctx.drv.type().isFixed() || ctx.drv.type().isImpure()))
         throw Error("'builtin:fetch-tree' must be a fixed-output or impure derivation");
 
-    if (!ctx.structuredAttrs)
+    if (!ctx.parsedDrv)
         throw Error("'builtin:fetch-tree' must have '__structuredAttrs = true'");
 
     setenv("NIX_CACHE_HOME", ctx.tmpDirInSandbox.c_str(), 1);
@@ -36,7 +37,7 @@ static void builtinFetchTree(const BuiltinBuilderContext & ctx)
 
     // FIXME: disable use of the git/tarball cache
 
-    auto input = Input::fromAttrs(myFetchSettings, jsonToAttrs((*ctx.structuredAttrs)["input"]));
+    auto input = Input::fromAttrs(myFetchSettings, jsonToAttrs(ctx.parsedDrv->structuredAttrs["input"]));
 
     std::cerr << fmt("fetching '%s'...\n", input.to_string());
 

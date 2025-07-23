@@ -11,8 +11,8 @@ R""(
   baloo-widgets: 20.08.1 → 20.08.2
   bluez-qt: +12.6 KiB
   dolphin: 20.08.1 → 20.08.2, +13.9 KiB
-  kdeconnect: 20.08.2 → ∅, -6597.8 KiB
-  kdeconnect-kde: ∅ → 20.08.2, +6599.7 KiB
+  kdeconnect: 20.08.2 removed, -6597.8 KiB
+  kdeconnect-kde: 20.08.2 added, +6599.7 KiB
   …
   ```
 
@@ -34,9 +34,9 @@ dolphin: 20.08.1 → 20.08.2, +13.9 KiB
 
 No size change is shown if it's below the threshold. If the package
 does not exist in either the *before* or *after* closures, it is
-represented using `∅` (empty set) on the appropriate side of the
-arrow. If a package has an empty version string, the version is
-rendered as `ε` (epsilon).
+represented using `added` or `removed`.
+If a package has an empty version string, the version is
+rendered as `(no version)`.
 
 There may be multiple versions of a package in each closure. In that
 case, only the changed versions are shown. Thus,

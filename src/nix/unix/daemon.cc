@@ -7,6 +7,7 @@
 #include "nix/store/local-store.hh"
 #include "nix/store/remote-store.hh"
 #include "nix/store/remote-store-connection.hh"
+#include "nix/store/store-open.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/globals.hh"
@@ -244,7 +245,7 @@ static PeerInfo getPeerInfo(int remote)
  */
 static ref<Store> openUncachedStore()
 {
-    Store::Params params; // FIXME: get params from somewhere
+    Store::Config::Params params; // FIXME: get params from somewhere
     // Disable caching since the client already does that.
     params["path-info-cache-size"] = "0";
     return openStore(settings.storeUri, params);
@@ -480,7 +481,7 @@ static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
  * @param forceTrustClientOpt See `daemonLoop()` and the parameter with
  * the same name over there for details.
  *
- * @param procesOps Whether to force processing ops even if the next
+ * @param processOps Whether to force processing ops even if the next
  * store also is a remote store and could process it directly.
  */
 static void runDaemon(bool stdio, std::optional<TrustedFlag> forceTrustClientOpt, bool processOps)
@@ -571,7 +572,7 @@ struct CmdDaemon : Command
 
         addFlag({
             .longName = "force-untrusted",
-            .description = "Force the daemon to not trust connecting clients. The connection will be processed by the receiving daemon before forwarding commands.",
+            .description = "Force the daemon to not trust connecting clients. The connection is processed by the receiving daemon before forwarding commands.",
             .handler = {[&]() {
                 isTrustedOpt = NotTrusted;
             }},

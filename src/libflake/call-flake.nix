@@ -39,15 +39,10 @@ let
   allNodes = mapAttrs (
     key: node:
     let
+      hasOverride = overrides ? ${key};
+      isRelative = node.locked.type or null == "path" && builtins.substring 0 1 node.locked.path != "/";
 
       parentNode = allNodes.${getInputByPath lockFile.root node.parent};
-
-      flakeDir =
-        let
-          dir = overrides.${key}.dir or node.locked.path or "";
-          parentDir = parentNode.flakeDir;
-        in
-        if node ? parent then parentDir + ("/" + dir) else dir;
 
       sourceInfo =
         if node.buildTime or false then
@@ -60,13 +55,10 @@ let
             outputHashMode = "recursive";
             outputHash = node.locked.narHash;
           }
-        else if overrides ? ${key} then
+        else if hasOverride then
           overrides.${key}.sourceInfo
-        else if node.locked.type == "path" && builtins.substring 0 1 node.locked.path != "/" then
+        else if isRelative then
           parentNode.sourceInfo
-          // {
-            outPath = parentNode.sourceInfo.outPath + ("/" + flakeDir);
-          }
         else
           # FIXME: remove obsolete node.info.
           # Note: lock file entries are always final.
@@ -74,7 +66,11 @@ let
 
       subdir = overrides.${key}.dir or node.locked.dir or "";
 
-      outPath = sourceInfo + ((if subdir == "" then "" else "/") + subdir);
+      outPath =
+        if !hasOverride && isRelative then
+          parentNode.outPath + (if node.locked.path == "" then "" else "/" + node.locked.path)
+        else
+          sourceInfo.outPath + (if subdir == "" then "" else "/" + subdir);
 
       flake = import (outPath + "/flake.nix");
 
@@ -110,9 +106,9 @@ let
           assert !(node.buildTime or false);
           result
         else
-          sourceInfo;
+          sourceInfo // { inherit sourceInfo outPath; };
 
-      inherit flakeDir sourceInfo;
+      inherit outPath sourceInfo;
     }
   ) lockFile.nodes;
 

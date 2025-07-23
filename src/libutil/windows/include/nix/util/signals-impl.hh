@@ -25,6 +25,7 @@ inline void setInterruptThrown()
 static inline bool isInterrupted()
 {
     /* Do nothing for now */
+    return false;
 }
 
 inline void checkInterrupt()

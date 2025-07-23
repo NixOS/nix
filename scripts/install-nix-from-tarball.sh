@@ -167,7 +167,11 @@ for i in $(cd "$self/store" >/dev/null && echo ./*); do
         rm -rf "$i_tmp"
     fi
     if ! [ -e "$dest/store/$i" ]; then
-        cp -RPp "$self/store/$i" "$i_tmp"
+        if [ "$(uname -s)" = "Darwin" ]; then
+            cp -RPp "$self/store/$i" "$i_tmp"
+        else
+            cp -RP --preserve=ownership,timestamps "$self/store/$i" "$i_tmp"
+        fi
         chmod -R a-w "$i_tmp"
         chmod +w "$i_tmp"
         mv "$i_tmp" "$dest/store/$i"
