@@ -110,4 +110,4 @@ makeTeeLogger(std::unique_ptr<Logger> mainLogger, std::vector<std::unique_ptr<Lo
     return std::make_unique<TeeLogger>(std::move(allLoggers));
 }
 
-}
+} // namespace nix

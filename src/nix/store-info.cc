@@ -17,8 +17,8 @@ struct CmdInfoStore : StoreCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "store-info.md"
-          ;
+#include "store-info.md"
+            ;
     }
 
     void run(ref<Store> store) override
@@ -32,9 +32,7 @@ struct CmdInfoStore : StoreCommand, MixJSON
                 notice("Trusted: %s", *trusted);
         } else {
             nlohmann::json res;
-            Finally printRes([&]() {
-                printJSON(res);
-            });
+            Finally printRes([&]() { printJSON(res); });
 
             res["url"] = store->getUri();
             store->connect();

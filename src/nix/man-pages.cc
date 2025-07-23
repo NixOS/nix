@@ -27,4 +27,4 @@ void showManPage(const std::string & name)
     throw SysError("command 'man %1%' failed", name.c_str());
 }
 
-}
+} // namespace nix

@@ -98,4 +98,4 @@ struct CachingFilteringSourceAccessor : FilteringSourceAccessor
     virtual bool isAllowedUncached(const CanonPath & path) = 0;
 };
 
-}
+} // namespace nix

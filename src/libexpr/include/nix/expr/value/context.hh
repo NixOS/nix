@@ -15,7 +15,7 @@ public:
     std::string_view raw;
 
     template<typename... Args>
-    BadNixStringContextElem(std::string_view raw_, const Args & ... args)
+    BadNixStringContextElem(std::string_view raw_, const Args &... args)
         : Error("")
     {
         raw = raw_;
@@ -24,7 +24,8 @@ public:
     }
 };
 
-struct NixStringContextElem {
+struct NixStringContextElem
+{
     /**
      * Plain opaque path to some store object.
      *
@@ -41,7 +42,8 @@ struct NixStringContextElem {
      *
      * Encoded in the form `=<drvPath>`.
      */
-    struct DrvDeep {
+    struct DrvDeep
+    {
         StorePath drvPath;
 
         GENERATE_CMP(DrvDeep, me->drvPath);
@@ -78,12 +80,7 @@ struct NixStringContextElem {
         GENERATE_CMP(Path, me->storePath);
     };
 
-    using Raw = std::variant<
-        Opaque,
-        DrvDeep,
-        Built,
-        Path
-    >;
+    using Raw = std::variant<Opaque, DrvDeep, Built, Path>;
 
     Raw raw;
 
@@ -99,9 +96,8 @@ struct NixStringContextElem {
      *
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
-    static NixStringContextElem parse(
-        std::string_view s,
-        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+    static NixStringContextElem
+    parse(std::string_view s, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     std::string to_string() const;
 };
 
@@ -113,4 +109,4 @@ typedef std::set<NixStringContextElem> NixStringContext;
  */
 bool hasContext(const NixStringContext & context);
 
-}
+} // namespace nix

@@ -44,7 +44,7 @@ void checkLibArchive(archive * archive, int err, const std::string & reason)
 }
 
 constexpr auto defaultBufferSize = std::size_t{65536};
-}
+} // namespace
 
 void TarArchive::check(int err, const std::string & reason)
 {
@@ -247,4 +247,4 @@ time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & 
     return lastModified;
 }
 
-}
+} // namespace nix

@@ -12,4 +12,4 @@ namespace nix {
  */
 int execvpe(const OsChar * file0, const OsChar * const argv[], const OsChar * const envp[]);
 
-}
+} // namespace nix

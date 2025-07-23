@@ -17,4 +17,4 @@ enum class ReplExitStatus {
     Continue,
 };
 
-}
+} // namespace nix

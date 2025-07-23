@@ -89,7 +89,8 @@ void processGraph(
     bool discoverNodes = false,
     size_t maxThreads = 0)
 {
-    struct Graph {
+    struct Graph
+    {
         std::set<T> known;
         std::set<T> left;
         std::map<T, std::set<T>> refs, rrefs;
@@ -104,7 +105,6 @@ void processGraph(
     ThreadPool pool(maxThreads);
 
     worker = [&](const T & node) {
-
         {
             auto graph(graph_.lock());
             auto i = graph->refs.find(node);
@@ -113,30 +113,29 @@ void processGraph(
             goto doWork;
         }
 
-    getRefs:
-        {
-            auto refs = getEdges(node);
-            refs.erase(node);
+    getRefs: {
+        auto refs = getEdges(node);
+        refs.erase(node);
 
-            {
-                auto graph(graph_.lock());
-                for (auto & ref : refs) {
-                    if (discoverNodes) {
-                        auto [i, inserted] = graph->known.insert(ref);
-                        if (inserted) {
-                            pool.enqueue(std::bind(worker, std::ref(*i)));
-                            graph->left.insert(ref);
-                        }
-                    }
-                    if (graph->left.count(ref)) {
-                        graph->refs[node].insert(ref);
-                        graph->rrefs[ref].insert(node);
+        {
+            auto graph(graph_.lock());
+            for (auto & ref : refs) {
+                if (discoverNodes) {
+                    auto [i, inserted] = graph->known.insert(ref);
+                    if (inserted) {
+                        pool.enqueue(std::bind(worker, std::ref(*i)));
+                        graph->left.insert(ref);
                     }
                 }
-                if (graph->refs[node].empty())
-                    goto doWork;
+                if (graph->left.count(ref)) {
+                    graph->refs[node].insert(ref);
+                    graph->rrefs[ref].insert(node);
+                }
             }
+            if (graph->refs[node].empty())
+                goto doWork;
         }
+    }
 
         return;
 
@@ -178,4 +177,4 @@ void processGraph(
         throw Error("graph processing incomplete (cyclic reference?)");
 }
 
-}
+} // namespace nix

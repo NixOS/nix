@@ -23,4 +23,4 @@ TEST(LegacySSHStore, constructConfig)
             "bar",
         }));
 }
-}
+} // namespace nix

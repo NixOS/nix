@@ -40,12 +40,11 @@ Gen<NixStringContextElem> Arbitrary<NixStringContextElem>::arbitrary()
                 return gen::map(
                     gen::arbitrary<NixStringContextElem::Built>(), [](NixStringContextElem a) { return a; });
             case 3:
-                return gen::map(
-                    gen::arbitrary<NixStringContextElem::Path>(), [](NixStringContextElem a) { return a; });
+                return gen::map(gen::arbitrary<NixStringContextElem::Path>(), [](NixStringContextElem a) { return a; });
             default:
                 assert(false);
             }
         });
 }
 
-}
+} // namespace rc

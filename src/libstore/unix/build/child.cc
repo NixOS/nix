@@ -34,4 +34,4 @@ void commonChildInit()
     close(fdDevNull);
 }
 
-}
+} // namespace nix
