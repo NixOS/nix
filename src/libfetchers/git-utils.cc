@@ -360,7 +360,13 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     Hash resolveRef(std::string ref) override
     {
         Object object;
-        if (git_revparse_single(Setter(object), *this, ref.c_str()))
+
+        // Using the rev-parse notation which libgit2 supports, make sure we peel
+        // the ref ultimately down to the underlying commit.
+        // This is to handle the case where it may be an annotated tag which itself has
+        // an object_id.
+        std::string peeledRef = ref + "^{commit}";
+        if (git_revparse_single(Setter(object), *this, peeledRef.c_str()))
             throw Error("resolving Git reference '%s': %s", ref, git_error_last()->message);
         auto oid = git_object_id(object.get());
         return toHash(*oid);

@@ -236,10 +236,10 @@ path9=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$rep
 # Specifying a ref without a rev shouldn't pick a cached rev for a different ref
 export _NIX_FORCE_HTTP=1
 rev_tag1_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"refs/tags/tag1\"; }).rev")
-rev_tag1=$(git -C $repo rev-parse refs/tags/tag1)
+rev_tag1=$(git -C $repo rev-parse refs/tags/tag1^{commit})
 [[ $rev_tag1_nix = $rev_tag1 ]]
 rev_tag2_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"refs/tags/tag2\"; }).rev")
-rev_tag2=$(git -C $repo rev-parse refs/tags/tag2)
+rev_tag2=$(git -C $repo rev-parse refs/tags/tag2^{commit})
 [[ $rev_tag2_nix = $rev_tag2 ]]
 unset _NIX_FORCE_HTTP
 
