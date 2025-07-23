@@ -34,14 +34,12 @@ nix build -o "$TEST_ROOT/result" flake1/branch1#root
 find "$TEST_ROOT/result/" | grepQuiet some-file
 [[ "$commit" != "$commit2" ]]
 
-
 nix registry pin flake1
 # new output something like:
 # user   flake:flake1 git+file:///tmp/nix-test/flakes/registry-pin/flake1?ref=refs/heads/master&rev=c55c61f18fa23762b1dc700af6f33af012ec6772
 # global flake:flake1 git+file:///tmp/nix-test/flakes/registry-pin/flake1
 nix registry list | grepQuiet '^global' # global flake1
 nix registry list | grepQuiet '^user' # user flake1
-nix registry remove --registry "$registry" flake1
 
 nix build -o "$TEST_ROOT/result" flake1#root
 find "$TEST_ROOT/result/" | grepInverse some-file
