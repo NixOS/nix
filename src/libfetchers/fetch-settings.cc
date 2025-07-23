@@ -3,11 +3,9 @@
 
 namespace nix::fetchers {
 
-Settings::Settings()
-{
-}
+Settings::Settings() {}
 
-}
+} // namespace nix::fetchers
 
 namespace nix {
 
@@ -15,4 +13,4 @@ fetchers::Settings fetchSettings;
 
 static GlobalConfig::Register rFetchSettings(&fetchSettings);
 
-}
+} // namespace nix

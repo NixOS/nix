@@ -8,7 +8,7 @@
 namespace nix {
 class Store;
 class StorePath;
-}
+} // namespace nix
 
 namespace nix::flake {
 
@@ -27,7 +27,7 @@ struct Node : std::enable_shared_from_this<Node>
 
     std::map<FlakeId, Edge> inputs;
 
-    virtual ~Node() { }
+    virtual ~Node() {}
 };
 
 /**
@@ -54,11 +54,10 @@ struct LockedNode : Node
         , isFlake(isFlake)
         , buildTime(buildTime)
         , parentInputAttrPath(std::move(parentInputAttrPath))
-    { }
+    {
+    }
 
-    LockedNode(
-        const fetchers::Settings & fetchSettings,
-        const nlohmann::json & json);
+    LockedNode(const fetchers::Settings & fetchSettings, const nlohmann::json & json);
 
     StorePath computeStorePath(Store & store) const;
 };
@@ -68,9 +67,7 @@ struct LockFile
     ref<Node> root = make_ref<Node>();
 
     LockFile() {};
-    LockFile(
-        const fetchers::Settings & fetchSettings,
-        std::string_view contents, std::string_view path);
+    LockFile(const fetchers::Settings & fetchSettings, std::string_view contents, std::string_view path);
 
     typedef std::map<ref<const Node>, std::string> KeyMap;
 
@@ -84,7 +81,7 @@ struct LockFile
      */
     std::optional<FlakeRef> isUnlocked(const fetchers::Settings & fetchSettings) const;
 
-    bool operator ==(const LockFile & other) const;
+    bool operator==(const LockFile & other) const;
 
     std::shared_ptr<Node> findInput(const InputAttrPath & path);
 
@@ -98,10 +95,10 @@ struct LockFile
     void check();
 };
 
-std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile);
+std::ostream & operator<<(std::ostream & stream, const LockFile & lockFile);
 
 InputAttrPath parseInputAttrPath(std::string_view s);
 
 std::string printInputAttrPath(const InputAttrPath & path);
 
-}
+} // namespace nix::flake

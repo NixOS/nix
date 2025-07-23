@@ -54,4 +54,4 @@ static void builtinFetchTree(const BuiltinBuilderContext & ctx)
 
 static RegisterBuiltinBuilder registerUnpackChannel("fetch-tree", builtinFetchTree);
 
-}
+} // namespace nix

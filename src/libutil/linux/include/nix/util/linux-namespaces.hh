@@ -32,4 +32,4 @@ bool userNamespacesSupported();
 
 bool mountAndPidNamespacesSupported();
 
-}
+} // namespace nix

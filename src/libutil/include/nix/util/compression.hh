@@ -29,4 +29,4 @@ MakeError(UnknownCompressionMethod, Error);
 
 MakeError(CompressionError, Error);
 
-}
+} // namespace nix

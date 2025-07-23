@@ -176,6 +176,7 @@ public:
     {
         return &elems[0];
     }
+
     iterator end()
     {
         return &elems[size];
@@ -306,7 +307,7 @@ NIX_VALUE_STORAGE_FOR_EACH_FIELD(NIX_VALUE_PAYLOAD_TYPE)
 template<typename T>
 inline constexpr InternalType payloadTypeToInternalType = PayloadTypeToInternalType<T>::value;
 
-}
+} // namespace detail
 
 /**
  * Discriminated union of types stored in the value.
@@ -865,10 +866,12 @@ public:
     {
         return isa<tThunk>();
     };
+
     inline bool isApp() const
     {
         return isa<tApp>();
     };
+
     inline bool isBlackhole() const;
 
     // type() == nFunction
@@ -876,10 +879,12 @@ public:
     {
         return isa<tLambda>();
     };
+
     inline bool isPrimOp() const
     {
         return isa<tPrimOp>();
     };
+
     inline bool isPrimOpApp() const
     {
         return isa<tPrimOpApp>();
@@ -1171,4 +1176,4 @@ typedef std::shared_ptr<Value *> RootValue;
 RootValue allocRootValue(Value * v);
 
 void forceNoNullByte(std::string_view s, std::function<Pos()> = nullptr);
-}
+} // namespace nix

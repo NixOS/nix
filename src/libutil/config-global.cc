@@ -62,4 +62,4 @@ ExperimentalFeatureSettings experimentalFeatureSettings;
 
 static GlobalConfig::Register rSettings(&experimentalFeatureSettings);
 
-}
+} // namespace nix

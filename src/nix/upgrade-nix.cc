@@ -30,15 +30,20 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
     std::string doc() override
     {
         return
-          #include "upgrade-nix.md"
-          ;
+#include "upgrade-nix.md"
+            ;
     }
 
-    Category category() override { return catNixInstallation; }
+    Category category() override
+    {
+        return catNixInstallation;
+    }
 
     void run(ref<Store> store) override
     {
-        throw Error("The upgrade-nix command isn't available in Determinate Nix; use %s instead", "sudo determinate-nixd upgrade");
+        throw Error(
+            "The upgrade-nix command isn't available in Determinate Nix; use %s instead",
+            "sudo determinate-nixd upgrade");
     }
 };
 

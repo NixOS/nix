@@ -105,4 +105,4 @@ struct ServeProto::BasicServerConnection
     static ServeProto::Version handshake(BufferedSink & to, Source & from, ServeProto::Version localVersion);
 };
 
-}
+} // namespace nix

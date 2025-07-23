@@ -12,4 +12,4 @@ void Settings::configureEvalSettings(nix::EvalSettings & evalSettings) const
     evalSettings.extraPrimOps.emplace_back(primops::flakeRefToString);
 }
 
-} // namespace nix
+} // namespace nix::flake

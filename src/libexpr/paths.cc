@@ -99,7 +99,9 @@ StorePath EvalState::mountInput(
 
     storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
 
-    if (forceNarHash || (requireLockable && (!settings.lazyTrees || !settings.lazyLocks || !input.isLocked()) && !input.getNarHash()))
+    if (forceNarHash
+        || (requireLockable && (!settings.lazyTrees || !settings.lazyLocks || !input.isLocked())
+            && !input.getNarHash()))
         input.attrs.insert_or_assign("narHash", getNarHash()->to_string(HashFormat::SRI, true));
 
     if (originalInput.getNarHash() && *getNarHash() != *originalInput.getNarHash())
@@ -113,4 +115,4 @@ StorePath EvalState::mountInput(
     return storePath;
 }
 
-}
+} // namespace nix
