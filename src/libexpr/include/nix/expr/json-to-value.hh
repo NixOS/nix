@@ -14,4 +14,4 @@ MakeError(JSONParseError, Error);
 
 void parseJSON(EvalState & state, const std::string_view & s, Value & v);
 
-}
+} // namespace nix

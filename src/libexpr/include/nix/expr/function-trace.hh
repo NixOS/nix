@@ -22,4 +22,4 @@ public:
     postFunctionCallHook(EvalState & state, const Value & v, std::span<Value *> args, const PosIdx pos) override;
 };
 
-}
+} // namespace nix

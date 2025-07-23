@@ -45,4 +45,4 @@ class Store;
 
 StorePathWithOutputs followLinksToStorePathWithOutputs(const Store & store, std::string_view pathWithOutputs);
 
-}
+} // namespace nix

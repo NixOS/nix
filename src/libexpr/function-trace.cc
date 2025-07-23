@@ -19,4 +19,4 @@ void FunctionCallTrace::postFunctionCallHook(
     printMsg(lvlInfo, "function-trace exited %1% at %2%", state.positions[pos], ns.count());
 }
 
-}
+} // namespace nix

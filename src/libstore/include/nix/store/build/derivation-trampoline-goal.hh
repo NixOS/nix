@@ -131,4 +131,4 @@ private:
     void commonInit();
 };
 
-}
+} // namespace nix

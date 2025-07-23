@@ -1,4 +1,5 @@
 #pragma once
+
 /**
  * @file
  *
@@ -18,4 +19,4 @@ namespace nix {
 #define ANSI_MAGENTA "\e[35;1m"
 #define ANSI_CYAN "\e[36;1m"
 
-}
+} // namespace nix

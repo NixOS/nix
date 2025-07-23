@@ -103,4 +103,4 @@ void ServeProto::BasicClientConnection::importPaths(const StoreDirConfig & store
         throw Error("remote machine failed to import closure");
 }
 
-}
+} // namespace nix
