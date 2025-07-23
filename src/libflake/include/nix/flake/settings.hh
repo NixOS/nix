@@ -50,4 +50,4 @@ struct Settings : public Config
         Xp::Flakes};
 };
 
-}
+} // namespace nix::flake

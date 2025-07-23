@@ -28,7 +28,6 @@ static uint64_t getStoreObjectsTotalSize(Store & store, const StorePathSet & clo
     return totalNarSize;
 }
 
-
 /**
  * Write a JSON representation of store object metadata, such as the
  * hash and the references.
@@ -36,10 +35,7 @@ static uint64_t getStoreObjectsTotalSize(Store & store, const StorePathSet & clo
  * @param showClosureSize If true, the closure size of each path is
  * included.
  */
-static json pathInfoToJSON(
-    Store & store,
-    const StorePathSet & storePaths,
-    bool showClosureSize)
+static json pathInfoToJSON(Store & store, const StorePathSet & storePaths, bool showClosureSize)
 {
     json::object_t jsonAllObjects = json::object();
 
@@ -70,7 +66,8 @@ static json pathInfoToJSON(
                         if (auto * depNarInfo = dynamic_cast<const NarInfo *>(&*depInfo))
                             totalDownloadSize += depNarInfo->fileSize;
                         else
-                            throw Error("Missing .narinfo for dep %s of %s",
+                            throw Error(
+                                "Missing .narinfo for dep %s of %s",
                                 store.printStorePath(p),
                                 store.printStorePath(storePath));
                     }
@@ -86,7 +83,6 @@ static json pathInfoToJSON(
     }
     return jsonAllObjects;
 }
-
 
 struct CmdPathInfo : StorePathsCommand, MixJSON
 {
@@ -133,11 +129,14 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "path-info.md"
-          ;
+#include "path-info.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
     void printSize(std::ostream & str, uint64_t value)
     {
@@ -186,15 +185,17 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                 if (showSigs) {
                     str << '\t';
                     Strings ss;
-                    if (info->ultimate) ss.push_back("ultimate");
-                    if (info->ca) ss.push_back("ca:" + renderContentAddress(*info->ca));
-                    for (auto & sig : info->sigs) ss.push_back(sig);
+                    if (info->ultimate)
+                        ss.push_back("ultimate");
+                    if (info->ca)
+                        ss.push_back("ca:" + renderContentAddress(*info->ca));
+                    for (auto & sig : info->sigs)
+                        ss.push_back(sig);
                     str << concatStringsSep(" ", ss);
                 }
 
                 logger->cout(str.str());
             }
-
         }
     }
 };

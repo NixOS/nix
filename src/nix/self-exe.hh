@@ -30,4 +30,4 @@ namespace nix {
  */
 std::filesystem::path getNixBin(std::optional<std::string_view> binary_name = {});
 
-}
+} // namespace nix

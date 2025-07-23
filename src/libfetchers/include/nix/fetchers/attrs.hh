@@ -41,4 +41,4 @@ StringMap attrsToQuery(const Attrs & attrs);
 
 Hash getRevAttr(const Attrs & attrs, const std::string & name);
 
-}
+} // namespace nix::fetchers

@@ -321,4 +321,4 @@ void WorkerProto::BasicClientConnection::importPaths(
     auto importedPaths = WorkerProto::Serialise<StorePathSet>::read(store, *this);
     assert(importedPaths.size() <= importedPaths.size());
 }
-}
+} // namespace nix

@@ -24,4 +24,4 @@ public:
     std::vector<FlakeRef> getFlakeRefsForCompletion() override;
 };
 
-}
+} // namespace nix

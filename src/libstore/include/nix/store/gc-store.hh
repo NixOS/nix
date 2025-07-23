@@ -13,7 +13,6 @@ using GcRootInfo = std::string;
 
 typedef std::unordered_map<StorePath, std::unordered_set<GcRootInfo>> Roots;
 
-
 struct GCOptions
 {
     /**
@@ -64,7 +63,6 @@ struct GCOptions
     bool censor = false;
 };
 
-
 struct GCResults
 {
     /**
@@ -79,7 +77,6 @@ struct GCResults
      */
     uint64_t bytesFreed = 0;
 };
-
 
 /**
  * Mix-in class for \ref Store "stores" which expose a notion of garbage
@@ -126,4 +123,4 @@ struct GcStore : public virtual Store
     virtual void collectGarbage(const GCOptions & options, GCResults & results) = 0;
 };
 
-}
+} // namespace nix
