@@ -1,15 +1,15 @@
-#include "attrs.hh"
-#include "primops.hh"
-#include "eval-inline.hh"
-#include "eval-settings.hh"
-#include "store-api.hh"
-#include "fetchers.hh"
-#include "filetransfer.hh"
-#include "registry.hh"
-#include "tarball.hh"
-#include "url.hh"
-#include "value-to-json.hh"
-#include "fetch-to-store.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/expr/primops.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/store/store-api.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/fetchers/registry.hh"
+#include "nix/fetchers/tarball.hh"
+#include "nix/util/url.hh"
+#include "nix/expr/value-to-json.hh"
+#include "nix/fetchers/fetch-to-store.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -181,7 +181,7 @@ static void fetchTree(
     }
 
     if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
-        input = lookupInRegistries(state.store, input).first;
+        input = lookupInRegistries(state.store, input, fetchers::UseRegistries::Limited).first;
 
     if (state.settings.pureEval && !input.isLocked()) {
         if (input.getNarHash())
@@ -191,7 +191,7 @@ static void fetchTree(
                 input.to_string());
         else
             state.error<EvalError>(
-                "in pure evaluation mode, '%s' will not fetch unlocked input '%s'",
+                "in pure evaluation mode, '%s' doesn't fetch unlocked input '%s'",
                 fetcher, input.to_string()).atPos(pos).debugThrow();
     }
 
@@ -243,7 +243,7 @@ static RegisterPrimOp primop_fetchTree({
       That is, `fetchTree` is idempotent.
 
       Downloads are cached in `$XDG_CACHE_HOME/nix`.
-      The remote source will be fetched from the network if both are true:
+      The remote source is fetched from the network if both are true:
       - A NAR hash is supplied and the corresponding store path is not [valid](@docroot@/glossary.md#gloss-validity), that is, not available in the store
 
         > **Note**
@@ -305,7 +305,7 @@ static RegisterPrimOp primop_fetchTree({
       - `"tarball"`
 
         Download a tar archive and extract it into the Nix store.
-        This has the same underyling implementation as [`builtins.fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball)
+        This has the same underlying implementation as [`builtins.fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball)
 
         - `url` (String, required)
 
@@ -338,7 +338,7 @@ static RegisterPrimOp primop_fetchTree({
 
           > **Note**
           >
-          > If the URL points to a local directory, and no `ref` or `rev` is given, Nix will only consider files added to the Git index, as listed by `git ls-files` but use the *current file contents* of the Git working directory.
+          > If the URL points to a local directory, and no `ref` or `rev` is given, Nix only considers files added to the Git index, as listed by `git ls-files` but use the *current file contents* of the Git working directory.
 
         - `ref` (String, optional)
 
@@ -537,11 +537,12 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     auto storePath =
         unpack
         ? fetchToStore(
+            state.fetchSettings,
             *state.store,
             fetchers::downloadTarball(state.store, state.fetchSettings, *url),
             FetchMode::Copy,
             name)
-        : fetchers::downloadFile(state.store, *url, name).storePath;
+        : fetchers::downloadFile(state.store, state.fetchSettings, *url, name).storePath;
 
     if (expectedHash) {
         auto hash = unpack
@@ -680,7 +681,7 @@ static RegisterPrimOp primop_fetchGit({
         This option has no effect once `shallow` cloning is enabled.
 
         By default, the `ref` value is prefixed with `refs/heads/`.
-        As of 2.3.0, Nix will not prefix `refs/heads/` if `ref` starts with `refs/`.
+        As of 2.3.0, Nix doesn't prefix `refs/heads/` if `ref` starts with `refs/`.
 
       - `submodules` (default: `false`)
 
@@ -839,7 +840,7 @@ static RegisterPrimOp primop_fetchGit({
           }
           ```
 
-          Nix will refetch the branch according to the [`tarball-ttl`](@docroot@/command-ref/conf-file.md#conf-tarball-ttl) setting.
+          Nix refetches the branch according to the [`tarball-ttl`](@docroot@/command-ref/conf-file.md#conf-tarball-ttl) setting.
 
           This behavior is disabled in [pure evaluation mode](@docroot@/command-ref/conf-file.md#conf-pure-eval).
 
@@ -850,9 +851,9 @@ static RegisterPrimOp primop_fetchGit({
           ```
 
       If the URL points to a local directory, and no `ref` or `rev` is
-      given, `fetchGit` will use the current content of the checked-out
-      files, even if they are not committed or added to Git's index. It will
-      only consider files added to the Git repository, as listed by `git ls-files`.
+      given, `fetchGit` uses the current content of the checked-out
+      files, even if they are not committed or added to Git's index. It
+      only considers files added to the Git repository, as listed by `git ls-files`.
     )",
     .fun = prim_fetchGit,
 });

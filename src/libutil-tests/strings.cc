@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
-#include "strings.hh"
-#include "error.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 
@@ -78,6 +78,42 @@ TEST(concatStringsSep, buildSingleString)
     strings.push_back("this");
 
     ASSERT_EQ(concatStringsSep(",", strings), "this");
+}
+
+TEST(concatMapStringsSep, empty)
+{
+    Strings strings;
+
+    ASSERT_EQ(concatMapStringsSep(",", strings, [](const std::string & s) { return s; }), "");
+}
+
+TEST(concatMapStringsSep, justOne)
+{
+    Strings strings;
+    strings.push_back("this");
+
+    ASSERT_EQ(concatMapStringsSep(",", strings, [](const std::string & s) { return s; }), "this");
+}
+
+TEST(concatMapStringsSep, two)
+{
+    Strings strings;
+    strings.push_back("this");
+    strings.push_back("that");
+
+    ASSERT_EQ(concatMapStringsSep(",", strings, [](const std::string & s) { return s; }), "this,that");
+}
+
+TEST(concatMapStringsSep, map)
+{
+    StringMap strings;
+    strings["this"] = "that";
+    strings["1"] = "one";
+
+    ASSERT_EQ(
+        concatMapStringsSep(
+            ", ", strings, [](const std::pair<std::string, std::string> & s) { return s.first + " -> " + s.second; }),
+        "1 -> one, this -> that");
 }
 
 /* ----------------------------------------------------------------------------

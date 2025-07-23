@@ -1,4 +1,4 @@
-#include "hilite.hh"
+#include "nix/util/hilite.hh"
 
 namespace nix {
 
@@ -23,7 +23,7 @@ std::string hiliteMatches(
         auto m = *it;
         size_t start = m.position();
         out.append(s.substr(last_end, m.position() - last_end));
-        // Merge continous matches
+        // Merge continuous matches
         ssize_t end = start + m.length();
         while (++it != matches.end() && (*it).position() <= end) {
             auto n = *it;

@@ -14,47 +14,20 @@ cxx = meson.get_compiler('cpp')
 
 subdir('nix-meson-build-support/deps-lists')
 
-configdata = configuration_data()
-
 deps_private_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
+  dependency('nix-fetchers'),
   dependency('nix-expr'),
   dependency('nix-flake'),
 ]
 deps_public_maybe_subproject = [
   dependency('nix-util-c'),
   dependency('nix-store-c'),
+  dependency('nix-fetchers-c'),
   dependency('nix-expr-c'),
 ]
 subdir('nix-meson-build-support/subprojects')
-
-# TODO rename, because it will conflict with downstream projects
-configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
-
-config_h = configure_file(
-  configuration : configdata,
-  output : 'config-flake.h',
-)
-
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-
-  # From C++ libraries, only for internals
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  '-include', 'config-expr.hh',
-  # not generated (yet?)
-  # '-include', 'config-flake.hh',
-
-  # From C libraries, for our public, installed headers too
-  '-include', 'config-util.h',
-  '-include', 'config-store.h',
-  '-include', 'config-expr.h',
-  '-include', 'config-flake.h',
-  language : 'cpp',
-)
 
 subdir('nix-meson-build-support/common')
 
@@ -64,8 +37,9 @@ sources = files(
 
 include_dirs = [include_directories('.')]
 
-headers = [config_h] + files(
+headers = files(
   'nix_api_flake.h',
+  'nix_api_flake_internal.hh',
 )
 
 # TODO move this header to libexpr, maybe don't use it in tests?
@@ -84,7 +58,7 @@ this_library = library(
   install : true,
 )
 
-install_headers(headers, subdir : 'nix', preserve_path : true)
+install_headers(headers, preserve_path : true)
 
 libraries_private = []
 

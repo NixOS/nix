@@ -1,46 +1,124 @@
-#include "derivation-options.hh"
-#include "json-utils.hh"
-#include "parsed-derivations.hh"
-#include "types.hh"
-#include "util.hh"
+#include "nix/store/derivation-options.hh"
+#include "nix/util/json-utils.hh"
+#include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+
 #include <optional>
 #include <string>
 #include <variant>
+#include <regex>
 
 namespace nix {
+
+static std::optional<std::string>
+getStringAttr(const StringMap & env, const StructuredAttrs * parsed, const std::string & name)
+{
+    if (parsed) {
+        auto i = parsed->structuredAttrs.find(name);
+        if (i == parsed->structuredAttrs.end())
+            return {};
+        else {
+            if (!i->is_string())
+                throw Error("attribute '%s' of must be a string", name);
+            return i->get<std::string>();
+        }
+    } else {
+        auto i = env.find(name);
+        if (i == env.end())
+            return {};
+        else
+            return i->second;
+    }
+}
+
+static bool getBoolAttr(const StringMap & env, const StructuredAttrs * parsed, const std::string & name, bool def)
+{
+    if (parsed) {
+        auto i = parsed->structuredAttrs.find(name);
+        if (i == parsed->structuredAttrs.end())
+            return def;
+        else {
+            if (!i->is_boolean())
+                throw Error("attribute '%s' must be a Boolean", name);
+            return i->get<bool>();
+        }
+    } else {
+        auto i = env.find(name);
+        if (i == env.end())
+            return def;
+        else
+            return i->second == "1";
+    }
+}
+
+static std::optional<Strings>
+getStringsAttr(const StringMap & env, const StructuredAttrs * parsed, const std::string & name)
+{
+    if (parsed) {
+        auto i = parsed->structuredAttrs.find(name);
+        if (i == parsed->structuredAttrs.end())
+            return {};
+        else {
+            if (!i->is_array())
+                throw Error("attribute '%s' must be a list of strings", name);
+            Strings res;
+            for (auto j = i->begin(); j != i->end(); ++j) {
+                if (!j->is_string())
+                    throw Error("attribute '%s' must be a list of strings", name);
+                res.push_back(j->get<std::string>());
+            }
+            return res;
+        }
+    } else {
+        auto i = env.find(name);
+        if (i == env.end())
+            return {};
+        else
+            return tokenizeString<Strings>(i->second);
+    }
+}
+
+static std::optional<StringSet>
+getStringSetAttr(const StringMap & env, const StructuredAttrs * parsed, const std::string & name)
+{
+    auto ss = getStringsAttr(env, parsed, name);
+    return ss ? (std::optional{StringSet{ss->begin(), ss->end()}}) : (std::optional<StringSet>{});
+}
 
 using OutputChecks = DerivationOptions::OutputChecks;
 
 using OutputChecksVariant = std::variant<OutputChecks, std::map<std::string, OutputChecks>>;
 
-DerivationOptions DerivationOptions::fromParsedDerivation(const ParsedDerivation & parsed, bool shouldWarn)
+DerivationOptions
+DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAttrs * parsed, bool shouldWarn)
 {
     DerivationOptions defaults = {};
 
-    auto structuredAttrs = parsed.structuredAttrs.get();
-
-    if (shouldWarn && structuredAttrs) {
-        if (get(*structuredAttrs, "allowedReferences")) {
+    if (shouldWarn && parsed) {
+        if (get(parsed->structuredAttrs, "allowedReferences")) {
             warn(
                 "'structuredAttrs' disables the effect of the top-level attribute 'allowedReferences'; use 'outputChecks' instead");
         }
-        if (get(*structuredAttrs, "allowedRequisites")) {
+        if (get(parsed->structuredAttrs, "allowedRequisites")) {
             warn(
                 "'structuredAttrs' disables the effect of the top-level attribute 'allowedRequisites'; use 'outputChecks' instead");
         }
-        if (get(*structuredAttrs, "disallowedRequisites")) {
+        if (get(parsed->structuredAttrs, "disallowedRequisites")) {
             warn(
                 "'structuredAttrs' disables the effect of the top-level attribute 'disallowedRequisites'; use 'outputChecks' instead");
         }
-        if (get(*structuredAttrs, "disallowedReferences")) {
+        if (get(parsed->structuredAttrs, "disallowedReferences")) {
             warn(
                 "'structuredAttrs' disables the effect of the top-level attribute 'disallowedReferences'; use 'outputChecks' instead");
         }
-        if (get(*structuredAttrs, "maxSize")) {
+        if (get(parsed->structuredAttrs, "maxSize")) {
             warn(
                 "'structuredAttrs' disables the effect of the top-level attribute 'maxSize'; use 'outputChecks' instead");
         }
-        if (get(*structuredAttrs, "maxClosureSize")) {
+        if (get(parsed->structuredAttrs, "maxClosureSize")) {
             warn(
                 "'structuredAttrs' disables the effect of the top-level attribute 'maxClosureSize'; use 'outputChecks' instead");
         }
@@ -48,9 +126,9 @@ DerivationOptions DerivationOptions::fromParsedDerivation(const ParsedDerivation
 
     return {
         .outputChecks = [&]() -> OutputChecksVariant {
-            if (auto structuredAttrs = parsed.structuredAttrs.get()) {
+            if (parsed) {
                 std::map<std::string, OutputChecks> res;
-                if (auto outputChecks = get(*structuredAttrs, "outputChecks")) {
+                if (auto outputChecks = get(parsed->structuredAttrs, "outputChecks")) {
                     for (auto & [outputName, output] : getObject(*outputChecks)) {
                         OutputChecks checks;
 
@@ -68,7 +146,6 @@ DerivationOptions DerivationOptions::fromParsedDerivation(const ParsedDerivation
                                         throw Error("attribute '%s' must be a list of strings", name);
                                     res.insert(j->get<std::string>());
                                 }
-                                checks.disallowedRequisites = res;
                                 return res;
                             }
                             return {};
@@ -88,10 +165,10 @@ DerivationOptions DerivationOptions::fromParsedDerivation(const ParsedDerivation
                 return OutputChecks{
                     // legacy non-structured-attributes case
                     .ignoreSelfRefs = true,
-                    .allowedReferences = parsed.getStringSetAttr("allowedReferences"),
-                    .disallowedReferences = parsed.getStringSetAttr("disallowedReferences").value_or(StringSet{}),
-                    .allowedRequisites = parsed.getStringSetAttr("allowedRequisites"),
-                    .disallowedRequisites = parsed.getStringSetAttr("disallowedRequisites").value_or(StringSet{}),
+                    .allowedReferences = getStringSetAttr(env, parsed, "allowedReferences"),
+                    .disallowedReferences = getStringSetAttr(env, parsed, "disallowedReferences").value_or(StringSet{}),
+                    .allowedRequisites = getStringSetAttr(env, parsed, "allowedRequisites"),
+                    .disallowedRequisites = getStringSetAttr(env, parsed, "disallowedRequisites").value_or(StringSet{}),
                 };
             }
         }(),
@@ -99,8 +176,8 @@ DerivationOptions DerivationOptions::fromParsedDerivation(const ParsedDerivation
             [&] {
                 std::map<std::string, bool> res;
 
-                if (auto structuredAttrs = parsed.structuredAttrs.get()) {
-                    if (auto udr = get(*structuredAttrs, "unsafeDiscardReferences")) {
+                if (parsed) {
+                    if (auto udr = get(parsed->structuredAttrs, "unsafeDiscardReferences")) {
                         for (auto & [outputName, output] : getObject(*udr)) {
                             if (!output.is_boolean())
                                 throw Error("attribute 'unsafeDiscardReferences.\"%s\"' must be a Boolean", outputName);
@@ -114,8 +191,8 @@ DerivationOptions DerivationOptions::fromParsedDerivation(const ParsedDerivation
         .passAsFile =
             [&] {
                 StringSet res;
-                if (auto * passAsFileString = get(parsed.drv.env, "passAsFile")) {
-                    if (parsed.hasStructuredAttrs()) {
+                if (auto * passAsFileString = get(env, "passAsFile")) {
+                    if (parsed) {
                         if (shouldWarn) {
                             warn(
                                 "'structuredAttrs' disables the effect of the top-level attribute 'passAsFile'; because all JSON is always passed via file");
@@ -126,16 +203,49 @@ DerivationOptions DerivationOptions::fromParsedDerivation(const ParsedDerivation
                 }
                 return res;
             }(),
+        .exportReferencesGraph =
+            [&] {
+                std::map<std::string, StringSet> ret;
+
+                if (parsed) {
+                    auto e = optionalValueAt(parsed->structuredAttrs, "exportReferencesGraph");
+                    if (!e || !e->is_object())
+                        return ret;
+                    for (auto & [key, value] : getObject(*e)) {
+                        if (value.is_array())
+                            ret.insert_or_assign(key, value);
+                        else if (value.is_string())
+                            ret.insert_or_assign(key, StringSet{value});
+                        else
+                            throw Error("'exportReferencesGraph' value is not an array or a string");
+                    }
+                } else {
+                    auto s = getOr(env, "exportReferencesGraph", "");
+                    Strings ss = tokenizeString<Strings>(s);
+                    if (ss.size() % 2 != 0)
+                        throw Error("odd number of tokens in 'exportReferencesGraph': '%1%'", s);
+                    for (Strings::iterator i = ss.begin(); i != ss.end();) {
+                        auto fileName = std::move(*i++);
+                        static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
+                        if (!std::regex_match(fileName, regex))
+                            throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
+
+                        auto & storePathS = *i++;
+                        ret.insert_or_assign(std::move(fileName), StringSet{storePathS});
+                    }
+                }
+                return ret;
+            }(),
         .additionalSandboxProfile =
-            parsed.getStringAttr("__sandboxProfile").value_or(defaults.additionalSandboxProfile),
-        .noChroot = parsed.getBoolAttr("__noChroot", defaults.noChroot),
-        .impureHostDeps = parsed.getStringSetAttr("__impureHostDeps").value_or(defaults.impureHostDeps),
-        .impureEnvVars = parsed.getStringSetAttr("impureEnvVars").value_or(defaults.impureEnvVars),
-        .allowLocalNetworking = parsed.getBoolAttr("__darwinAllowLocalNetworking", defaults.allowLocalNetworking),
+            getStringAttr(env, parsed, "__sandboxProfile").value_or(defaults.additionalSandboxProfile),
+        .noChroot = getBoolAttr(env, parsed, "__noChroot", defaults.noChroot),
+        .impureHostDeps = getStringSetAttr(env, parsed, "__impureHostDeps").value_or(defaults.impureHostDeps),
+        .impureEnvVars = getStringSetAttr(env, parsed, "impureEnvVars").value_or(defaults.impureEnvVars),
+        .allowLocalNetworking = getBoolAttr(env, parsed, "__darwinAllowLocalNetworking", defaults.allowLocalNetworking),
         .requiredSystemFeatures =
-            parsed.getStringSetAttr("requiredSystemFeatures").value_or(defaults.requiredSystemFeatures),
-        .preferLocalBuild = parsed.getBoolAttr("preferLocalBuild", defaults.preferLocalBuild),
-        .allowSubstitutes = parsed.getBoolAttr("allowSubstitutes", defaults.allowSubstitutes),
+            getStringSetAttr(env, parsed, "requiredSystemFeatures").value_or(defaults.requiredSystemFeatures),
+        .preferLocalBuild = getBoolAttr(env, parsed, "preferLocalBuild", defaults.preferLocalBuild),
+        .allowSubstitutes = getBoolAttr(env, parsed, "allowSubstitutes", defaults.allowSubstitutes),
     };
 }
 
@@ -160,7 +270,7 @@ bool DerivationOptions::canBuildLocally(Store & localStore, const BasicDerivatio
         return false;
 
     for (auto & feature : getRequiredSystemFeatures(drv))
-        if (!localStore.systemFeatures.get().count(feature))
+        if (!localStore.config.systemFeatures.get().count(feature))
             return false;
 
     return true;

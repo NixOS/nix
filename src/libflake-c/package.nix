@@ -4,6 +4,7 @@
 
   nix-store-c,
   nix-expr-c,
+  nix-fetchers-c,
   nix-flake,
 
   # Configuration Options
@@ -35,6 +36,7 @@ mkMesonLibrary (finalAttrs: {
   propagatedBuildInputs = [
     nix-expr-c
     nix-store-c
+    nix-fetchers-c
     nix-flake
   ];
 

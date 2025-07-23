@@ -1,9 +1,9 @@
-#include "file-system.hh"
-#include "signals.hh"
-#include "finally.hh"
-#include "serialise.hh"
-#include "windows-error.hh"
-#include "file-path.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/windows-error.hh"
+#include "nix/util/file-path.hh"
 
 #ifdef _WIN32
 #include <fileapi.h>
@@ -47,7 +47,7 @@ void writeFull(HANDLE handle, std::string_view s, bool allowInterrupts)
         if (allowInterrupts) checkInterrupt();
         DWORD res;
 #if _WIN32_WINNT >= 0x0600
-        auto path = handleToPath(handle); // debug; do it before becuase handleToPath changes lasterror
+        auto path = handleToPath(handle); // debug; do it before because handleToPath changes lasterror
         if (!WriteFile(handle, s.data(), s.size(), &res, NULL)) {
             throw WinError("writing to file %1%:%2%", handle, path);
         }

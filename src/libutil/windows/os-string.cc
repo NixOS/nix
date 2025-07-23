@@ -3,9 +3,9 @@
 #include <iostream>
 #include <locale>
 
-#include "file-path.hh"
-#include "file-path-impl.hh"
-#include "util.hh"
+#include "nix/util/file-path.hh"
+#include "nix/util/file-path-impl.hh"
+#include "nix/util/util.hh"
 
 #ifdef _WIN32
 

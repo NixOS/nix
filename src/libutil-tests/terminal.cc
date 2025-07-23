@@ -1,7 +1,7 @@
-#include "util.hh"
-#include "types.hh"
-#include "terminal.hh"
-#include "strings.hh"
+#include "nix/util/util.hh"
+#include "nix/util/types.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/strings.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
@@ -64,6 +64,14 @@ TEST(filterANSIEscapes, utf8)
 TEST(filterANSIEscapes, osc8)
 {
     ASSERT_EQ(filterANSIEscapes("\e]8;;http://example.com\e\\This is a link\e]8;;\e\\"), "This is a link");
+}
+
+TEST(filterANSIEscapes, osc8_bell_as_sep)
+{
+    // gcc-14 uses \a as a separator, xterm style:
+    //   https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda
+    ASSERT_EQ(filterANSIEscapes("\e]8;;http://example.com\aThis is a link\e]8;;\a"), "This is a link");
+    ASSERT_EQ(filterANSIEscapes("\e]8;;http://example.com\a\\This is a link\e]8;;\a"), "\\This is a link");
 }
 
 } // namespace nix

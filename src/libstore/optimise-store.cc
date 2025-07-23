@@ -1,8 +1,8 @@
-#include "local-store.hh"
-#include "globals.hh"
-#include "signals.hh"
-#include "posix-fs-canonicalise.hh"
-#include "posix-source-accessor.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/util/posix-source-accessor.hh"
 
 #include <cstdlib>
 #include <cstring>
@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <regex>
 
+#include "store-config-private.hh"
 
 namespace nix {
 
@@ -96,11 +97,11 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     auto st = lstat(path);
 
-#if __APPLE__
+#ifdef __APPLE__
     /* HFS/macOS has some undocumented security feature disabling hardlinking for
        special files within .app dirs. Known affected paths include
        *.app/Contents/{PkgInfo,Resources/\*.lproj,_CodeSignature} and .DS_Store.
-       See https://github.com/NixOS/nix/issues/1443 and 
+       See https://github.com/NixOS/nix/issues/1443 and
        https://github.com/NixOS/nix/pull/2230 for more discussion. */
 
     if (std::regex_search(path, std::regex("\\.app/Contents/.+$")))
@@ -215,14 +216,14 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        the store itself (we don't want or need to mess with its
        permissions). */
     const Path dirOfPath(dirOf(path));
-    bool mustToggle = dirOfPath != realStoreDir.get();
+    bool mustToggle = dirOfPath != config->realStoreDir.get();
     if (mustToggle) makeWritable(dirOfPath);
 
     /* When we're done, make the directory read-only again and reset
        its timestamp back to 0. */
     MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : "");
 
-    std::filesystem::path tempLink = fmt("%1%/.tmp-link-%2%-%3%", realStoreDir, getpid(), rand());
+    std::filesystem::path tempLink = fmt("%1%/.tmp-link-%2%-%3%", config->realStoreDir, getpid(), rand());
 
     try {
         std::filesystem::create_hard_link(linkPath, tempLink);
@@ -284,7 +285,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
-            optimisePath_(&act, stats, realStoreDir + "/" + std::string(i.to_string()), inodeHash, NoRepair);
+            optimisePath_(&act, stats, config->realStoreDir + "/" + std::string(i.to_string()), inodeHash, NoRepair);
         }
         done++;
         act.progress(done, paths.size());

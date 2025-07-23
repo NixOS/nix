@@ -1,6 +1,6 @@
-#include "file-system.hh"
-#include "unix-domain-socket.hh"
-#include "util.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/unix-domain-socket.hh"
+#include "nix/util/util.hh"
 
 #ifdef _WIN32
 # include <winsock2.h>
@@ -8,7 +8,7 @@
 #else
 # include <sys/socket.h>
 # include <sys/un.h>
-# include "processes.hh"
+# include "nix/util/processes.hh"
 #endif
 #include <unistd.h>
 
@@ -28,7 +28,6 @@ AutoCloseFD createUnixDomainSocket()
 #endif
     return fdSocket;
 }
-
 
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
 {
@@ -100,7 +99,6 @@ static void bindConnectProcHelper(
     }
 }
 
-
 void bind(Socket fd, const std::string & path)
 {
     unlink(path.c_str());
@@ -108,10 +106,16 @@ void bind(Socket fd, const std::string & path)
     bindConnectProcHelper("bind", ::bind, fd, path);
 }
 
-
-void connect(Socket fd, const std::string & path)
+void connect(Socket fd, const std::filesystem::path & path)
 {
-    bindConnectProcHelper("connect", ::connect, fd, path);
+    bindConnectProcHelper("connect", ::connect, fd, path.string());
+}
+
+AutoCloseFD connect(const std::filesystem::path & path)
+{
+    auto fd = createUnixDomainSocket();
+    nix::connect(toSocket(fd.get()), path);
+    return fd;
 }
 
 }

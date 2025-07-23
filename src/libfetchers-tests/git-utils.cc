@@ -1,24 +1,20 @@
-#include "git-utils.hh"
-#include "file-system.hh"
-#include "gmock/gmock.h"
+#include "nix/fetchers/git-utils.hh"
+#include "nix/util/file-system.hh"
+#include <gmock/gmock.h>
 #include <git2/global.h>
 #include <git2/repository.h>
 #include <git2/types.h>
 #include <gtest/gtest.h>
-#include "fs-sink.hh"
-#include "serialise.hh"
-#include "git-lfs-fetch.hh"
+#include "nix/util/fs-sink.hh"
+#include "nix/util/serialise.hh"
+#include "nix/fetchers/git-lfs-fetch.hh"
 
 namespace nix {
-
-namespace fs {
-using namespace std::filesystem;
-}
 
 class GitUtilsTest : public ::testing::Test
 {
     // We use a single repository for all tests.
-    fs::path tmpDir;
+    std::filesystem::path tmpDir;
     std::unique_ptr<AutoDelete> delTmpDir;
 
 public:
@@ -90,11 +86,11 @@ TEST_F(GitUtilsTest, sink_basic)
     auto result = repo->dereferenceSingletonDirectory(sink->flush());
     auto accessor = repo->getAccessor(result, false, getRepoName());
     auto entries = accessor->readDirectory(CanonPath::root);
-    ASSERT_EQ(entries.size(), 5);
+    ASSERT_EQ(entries.size(), 5u);
     ASSERT_EQ(accessor->readFile(CanonPath("hello")), "hello world");
     ASSERT_EQ(accessor->readFile(CanonPath("bye")), "thanks for all the fish");
     ASSERT_EQ(accessor->readLink(CanonPath("bye-link")), "bye");
-    ASSERT_EQ(accessor->readDirectory(CanonPath("empty")).size(), 0);
+    ASSERT_EQ(accessor->readDirectory(CanonPath("empty")).size(), 0u);
     ASSERT_EQ(accessor->readFile(CanonPath("links/foo")), "hello world");
 };
 

@@ -1,11 +1,13 @@
-#include "common-args.hh"
-#include "args/root.hh"
-#include "config-global.hh"
-#include "globals.hh"
-#include "logging.hh"
-#include "loggers.hh"
-#include "util.hh"
-#include "plugin.hh"
+#include <nlohmann/json.hpp>
+
+#include "nix/main/common-args.hh"
+#include "nix/util/args/root.hh"
+#include "nix/util/config-global.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/logging.hh"
+#include "nix/main/loggers.hh"
+#include "nix/util/util.hh"
+#include "nix/main/plugin.hh"
 
 namespace nix {
 
@@ -57,7 +59,7 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
                     if (hasPrefix(s.first, prefix))
                         completions.add(s.first, fmt("Set the `%s` setting.", s.first));
             }
-        }
+        },
     });
 
     addFlag({
@@ -75,7 +77,7 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
         .labels = Strings{"jobs"},
         .handler = {[=](std::string s) {
             settings.set("max-jobs", s);
-        }}
+        }},
     });
 
     std::string cat = "Options to override configuration settings";
@@ -93,5 +95,18 @@ void MixCommonArgs::initialFlagsProcessed()
     pluginsInited();
 }
 
-
+template <typename T, typename>
+void MixPrintJSON::printJSON(const T /* nlohmann::json */ & json)
+{
+    auto suspension = logger->suspend();
+    if (outputPretty) {
+        logger->writeToStdout(json.dump(2));
+    } else {
+        logger->writeToStdout(json.dump());
+    }
 }
+
+template void MixPrintJSON::printJSON(const nlohmann::json & json);
+
+
+} // namespace nix

@@ -19,45 +19,100 @@ let
 
   testNixVersions =
     pkgs: daemon:
-    pkgs.nixComponents.nix-functional-tests.override {
+    pkgs.nixComponents2.nix-functional-tests.override {
       pname = "nix-daemon-compat-tests";
       version = "${pkgs.nix.version}-with-daemon-${daemon.version}";
 
       test-daemon = daemon;
     };
 
-  # Technically we could just return `pkgs.nixComponents`, but for Hydra it's
+  # Technically we could just return `pkgs.nixComponents2`, but for Hydra it's
   # convention to transpose it, and to transpose it efficiently, we need to
   # enumerate them manually, so that we don't evaluate unnecessary package sets.
-  forAllPackages = lib.genAttrs [
-    "nix-everything"
-    "nix-util"
-    "nix-util-c"
-    "nix-util-test-support"
-    "nix-util-tests"
-    "nix-store"
-    "nix-store-c"
-    "nix-store-test-support"
-    "nix-store-tests"
-    "nix-fetchers"
-    "nix-fetchers-tests"
-    "nix-expr"
-    "nix-expr-c"
-    "nix-expr-test-support"
-    "nix-expr-tests"
-    "nix-flake"
-    "nix-flake-tests"
-    "nix-main"
-    "nix-main-c"
-    "nix-cmd"
-    "nix-cli"
-    "nix-functional-tests"
-  ];
+  # See listingIsComplete below.
+  forAllPackages = forAllPackages' { };
+  forAllPackages' =
+    {
+      enableBindings ? false,
+      enableDocs ? false, # already have separate attrs for these
+    }:
+    lib.genAttrs (
+      [
+        "nix-everything"
+        "nix-util"
+        "nix-util-c"
+        "nix-util-test-support"
+        "nix-util-tests"
+        "nix-store"
+        "nix-store-c"
+        "nix-store-test-support"
+        "nix-store-tests"
+        "nix-fetchers"
+        "nix-fetchers-c"
+        "nix-fetchers-tests"
+        "nix-expr"
+        "nix-expr-c"
+        "nix-expr-test-support"
+        "nix-expr-tests"
+        "nix-flake"
+        "nix-flake-c"
+        "nix-flake-tests"
+        "nix-main"
+        "nix-main-c"
+        "nix-cmd"
+        "nix-cli"
+        "nix-functional-tests"
+      ]
+      ++ lib.optionals enableBindings [
+        "nix-perl-bindings"
+      ]
+      ++ lib.optionals enableDocs [
+        "nix-manual"
+        "nix-internal-api-docs"
+        "nix-external-api-docs"
+      ]
+    );
 in
 {
+  /**
+    An internal check to make sure our package listing is complete.
+  */
+  listingIsComplete =
+    let
+      arbitrarySystem = "x86_64-linux";
+      listedPkgs = forAllPackages' {
+        enableBindings = true;
+        enableDocs = true;
+      } (_: null);
+      actualPkgs = lib.concatMapAttrs (
+        k: v: if lib.strings.hasPrefix "nix-" k then { ${k} = null; } else { }
+      ) nixpkgsFor.${arbitrarySystem}.native.nixComponents2;
+      diff = lib.concatStringsSep "\n" (
+        lib.concatLists (
+          lib.mapAttrsToList (
+            k: _:
+            if (listedPkgs ? ${k}) && !(actualPkgs ? ${k}) then
+              [ "- ${k}: redundant?" ]
+            else if !(listedPkgs ? ${k}) && (actualPkgs ? ${k}) then
+              [ "- ${k}: missing?" ]
+            else
+              [ ]
+          ) (listedPkgs // actualPkgs)
+        )
+      );
+    in
+    if listedPkgs == actualPkgs then
+      { }
+    else
+      throw ''
+        Please update the components list in hydra.nix (or fix this check)
+        Differences:
+        ${diff}
+      '';
+
   # Binary package for various platforms.
   build = forAllPackages (
-    pkgName: forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.${pkgName})
+    pkgName: forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.${pkgName})
   );
 
   shellInputs = removeAttrs (forAllSystems (
@@ -67,7 +122,7 @@ in
   buildStatic = forAllPackages (
     pkgName:
     lib.genAttrs linux64BitSystems (
-      system: nixpkgsFor.${system}.native.pkgsStatic.nixComponents.${pkgName}
+      system: nixpkgsFor.${system}.native.pkgsStatic.nixComponents2.${pkgName}
     )
   );
 
@@ -84,7 +139,7 @@ in
         forAllCrossSystems (
           crossSystem:
           lib.genAttrs [ "x86_64-linux" ] (
-            system: nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName}
+            system: nixpkgsFor.${system}.cross.${crossSystem}.nixComponents2.${pkgName}
           )
         )
       )
@@ -94,7 +149,7 @@ in
     let
       components = forAllSystems (
         system:
-        nixpkgsFor.${system}.native.nixComponents.overrideScope (
+        nixpkgsFor.${system}.native.nixComponents2.overrideScope (
           self: super: {
             nix-expr = super.nix-expr.override { enableGC = false; };
           }
@@ -103,7 +158,7 @@ in
     in
     forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
 
-  buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-cli);
+  buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.nix-cli);
 
   # Toggles some settings for better coverage. Windows needs these
   # library combinations, and Debian build Nix with GNU readline too.
@@ -111,7 +166,7 @@ in
     let
       components = forAllSystems (
         system:
-        nixpkgsFor.${system}.native.nixComponents.overrideScope (
+        nixpkgsFor.${system}.native.nixComponents2.overrideScope (
           self: super: {
             nix-cmd = super.nix-cmd.override {
               enableMarkdown = false;
@@ -124,7 +179,7 @@ in
     forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
 
   # Perl bindings for various platforms.
-  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-perl-bindings);
+  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.nix-perl-bindings);
 
   # Binary tarball for various platforms, containing a Nix store
   # with the closure of 'nix' package, and the second half of
@@ -174,13 +229,13 @@ in
   # };
 
   # Nix's manual
-  manual = nixpkgsFor.x86_64-linux.native.nixComponents.nix-manual;
+  manual = nixpkgsFor.x86_64-linux.native.nixComponents2.nix-manual;
 
   # API docs for Nix's unstable internal C++ interfaces.
-  internal-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-internal-api-docs;
+  internal-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents2.nix-internal-api-docs;
 
   # API docs for Nix's C bindings.
-  external-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-external-api-docs;
+  external-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents2.nix-external-api-docs;
 
   # System tests.
   tests =

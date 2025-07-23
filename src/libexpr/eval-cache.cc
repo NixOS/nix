@@ -1,11 +1,11 @@
-#include "users.hh"
-#include "eval-cache.hh"
-#include "sqlite.hh"
-#include "eval.hh"
-#include "eval-inline.hh"
-#include "store-api.hh"
+#include "nix/util/users.hh"
+#include "nix/expr/eval-cache.hh"
+#include "nix/store/sqlite.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/store/store-api.hh"
 // Need specialization involving `SymbolStr` just in this one module.
-#include "strings-inline.hh"
+#include "nix/util/strings-inline.hh"
 
 namespace nix::eval_cache {
 
@@ -418,6 +418,14 @@ Value & AttrCursor::getValue()
     return **_value;
 }
 
+void AttrCursor::fetchCachedValue()
+{
+    if (!cachedValue)
+        cachedValue = root->db->getAttr(getKey());
+    if (cachedValue && std::get_if<failed_t>(&cachedValue->second) && parent)
+        throw CachedEvalError(parent->first, parent->second);
+}
+
 std::vector<Symbol> AttrCursor::getAttrPath() const
 {
     if (parent) {
@@ -484,7 +492,7 @@ Value & AttrCursor::forceValue()
 Suggestions AttrCursor::getSuggestionsForAttr(Symbol name)
 {
     auto attrNames = getAttrs();
-    std::set<std::string> strAttrNames;
+    StringSet strAttrNames;
     for (auto & name : attrNames)
         strAttrNames.insert(std::string(root->state.symbols[name]));
 
@@ -494,14 +502,13 @@ Suggestions AttrCursor::getSuggestionsForAttr(Symbol name)
 std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
 {
     if (root->db) {
-        if (!cachedValue)
-            cachedValue = root->db->getAttr(getKey());
+        fetchCachedValue();
 
         if (cachedValue) {
             if (auto attrs = std::get_if<std::vector<Symbol>>(&cachedValue->second)) {
                 for (auto & attr : *attrs)
                     if (attr == name)
-                        return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), attr));
+                        return std::make_shared<AttrCursor>(root, std::make_pair(ref(shared_from_this()), attr));
                 return nullptr;
             } else if (std::get_if<placeholder_t>(&cachedValue->second)) {
                 auto attr = root->db->getAttr({cachedValue->first, name});
@@ -512,7 +519,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
                         throw CachedEvalError(ref(shared_from_this()), name);
                     else
                         return std::make_shared<AttrCursor>(root,
-                            std::make_pair(shared_from_this(), name), nullptr, std::move(attr));
+                            std::make_pair(ref(shared_from_this()), name), nullptr, std::move(attr));
                 }
                 // Incomplete attrset, so need to fall thru and
                 // evaluate to see whether 'name' exists
@@ -547,7 +554,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
     }
 
     return make_ref<AttrCursor>(
-        root, std::make_pair(shared_from_this(), name), attr->value, std::move(cachedValue2));
+        root, std::make_pair(ref(shared_from_this()), name), attr->value, std::move(cachedValue2));
 }
 
 std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(std::string_view name)
@@ -585,8 +592,7 @@ OrSuggestions<ref<AttrCursor>> AttrCursor::findAlongAttrPath(const std::vector<S
 std::string AttrCursor::getString()
 {
     if (root->db) {
-        if (!cachedValue)
-            cachedValue = root->db->getAttr(getKey());
+        fetchCachedValue();
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
                 debug("using cached string attribute '%s'", getAttrPathStr());
@@ -607,8 +613,7 @@ std::string AttrCursor::getString()
 string_t AttrCursor::getStringWithContext()
 {
     if (root->db) {
-        if (!cachedValue)
-            cachedValue = root->db->getAttr(getKey());
+        fetchCachedValue();
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
                 bool valid = true;
@@ -654,8 +659,7 @@ string_t AttrCursor::getStringWithContext()
 bool AttrCursor::getBool()
 {
     if (root->db) {
-        if (!cachedValue)
-            cachedValue = root->db->getAttr(getKey());
+        fetchCachedValue();
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto b = std::get_if<bool>(&cachedValue->second)) {
                 debug("using cached Boolean attribute '%s'", getAttrPathStr());
@@ -676,8 +680,7 @@ bool AttrCursor::getBool()
 NixInt AttrCursor::getInt()
 {
     if (root->db) {
-        if (!cachedValue)
-            cachedValue = root->db->getAttr(getKey());
+        fetchCachedValue();
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto i = std::get_if<int_t>(&cachedValue->second)) {
                 debug("using cached integer attribute '%s'", getAttrPathStr());
@@ -698,8 +701,7 @@ NixInt AttrCursor::getInt()
 std::vector<std::string> AttrCursor::getListOfStrings()
 {
     if (root->db) {
-        if (!cachedValue)
-            cachedValue = root->db->getAttr(getKey());
+        fetchCachedValue();
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto l = std::get_if<std::vector<std::string>>(&cachedValue->second)) {
                 debug("using cached list of strings attribute '%s'", getAttrPathStr());
@@ -719,7 +721,7 @@ std::vector<std::string> AttrCursor::getListOfStrings()
 
     std::vector<std::string> res;
 
-    for (auto & elem : v.listItems())
+    for (auto elem : v.listView())
         res.push_back(std::string(root->state.forceStringNoCtx(*elem, noPos, "while evaluating an attribute for caching")));
 
     if (root->db)
@@ -731,8 +733,7 @@ std::vector<std::string> AttrCursor::getListOfStrings()
 std::vector<Symbol> AttrCursor::getAttrs()
 {
     if (root->db) {
-        if (!cachedValue)
-            cachedValue = root->db->getAttr(getKey());
+        fetchCachedValue();
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto attrs = std::get_if<std::vector<Symbol>>(&cachedValue->second)) {
                 debug("using cached attrset attribute '%s'", getAttrPathStr());

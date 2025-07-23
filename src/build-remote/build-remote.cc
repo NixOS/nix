@@ -5,23 +5,23 @@
 #include <memory>
 #include <tuple>
 #include <iomanip>
-#if __APPLE__
+#ifdef __APPLE__
 #include <sys/time.h>
 #endif
 
-#include "machines.hh"
-#include "shared.hh"
-#include "plugin.hh"
-#include "pathlocks.hh"
-#include "globals.hh"
-#include "serialise.hh"
-#include "build-result.hh"
-#include "store-api.hh"
-#include "strings.hh"
-#include "derivations.hh"
-#include "local-store.hh"
-#include "legacy.hh"
-#include "experimental-features.hh"
+#include "nix/store/machines.hh"
+#include "nix/main/shared.hh"
+#include "nix/main/plugin.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/serialise.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/store-open.hh"
+#include "nix/util/strings.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/local-store.hh"
+#include "nix/cmd/legacy.hh"
+#include "nix/util/experimental-features.hh"
 
 using namespace nix;
 using std::cin;
@@ -42,9 +42,9 @@ static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
     return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri.render()), slot), true);
 }
 
-static bool allSupportedLocally(Store & store, const std::set<std::string>& requiredFeatures) {
+static bool allSupportedLocally(Store & store, const StringSet& requiredFeatures) {
     for (auto & feature : requiredFeatures)
-        if (!store.systemFeatures.get().count(feature)) return false;
+        if (!store.config.systemFeatures.get().count(feature)) return false;
     return true;
 }
 
@@ -85,7 +85,7 @@ static int main_build_remote(int argc, char * * argv)
            that gets cleared on reboot, but it wouldn't work on macOS. */
         auto currentLoadName = "/current-load";
         if (auto localStore = store.dynamic_pointer_cast<LocalFSStore>())
-            currentLoad = std::string { localStore->stateDir } + currentLoadName;
+            currentLoad = std::string { localStore->config.stateDir } + currentLoadName;
         else
             currentLoad = settings.nixStateDir + currentLoadName;
 
@@ -113,7 +113,7 @@ static int main_build_remote(int argc, char * * argv)
             auto amWilling = readInt(source);
             auto neededSystem = readString(source);
             drvPath = store->parseStorePath(readString(source));
-            auto requiredFeatures = readStrings<std::set<std::string>>(source);
+            auto requiredFeatures = readStrings<StringSet>(source);
 
             /* It would be possible to build locally after some builds clear out,
                so don't show the warning now: */
@@ -225,7 +225,7 @@ static int main_build_remote(int argc, char * * argv)
                     break;
                 }
 
-#if __APPLE__
+#ifdef __APPLE__
                 futimes(bestSlotLock.get(), NULL);
 #else
                 futimens(bestSlotLock.get(), NULL);
@@ -329,8 +329,17 @@ connected:
                 drv.inputSrcs = store->parseStorePathSet(inputs);
             optResult = sshStore->buildDerivation(*drvPath, (const BasicDerivation &) drv);
             auto & result = *optResult;
-            if (!result.success())
+            if (!result.success()) {
+                if (settings.keepFailed) {
+                    warn(
+                        "The failed build directory was kept on the remote builder due to `--keep-failed`.%s",
+                        (settings.thisSystem == drv.platform || settings.extraPlatforms.get().count(drv.platform) > 0)
+                            ? " You can re-run the command with `--builders ''` to disable remote building for this invocation."
+                            : ""
+                    );
+                }
                 throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
+            }
         } else {
             copyClosure(*store, *sshStore, StorePathSet {*drvPath}, NoRepair, NoCheckSigs, substitute);
             auto res = sshStore->buildPathsWithResults({

@@ -1,7 +1,7 @@
-#include "primops.hh"
-#include "eval-inline.hh"
-#include "derivations.hh"
-#include "store-api.hh"
+#include "nix/expr/primops.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/store-api.hh"
 
 namespace nix {
 
@@ -240,7 +240,7 @@ static RegisterPrimOp primop_getContext({
       The string context tracks references to derivations within a string.
       It is represented as an attribute set of [store derivation](@docroot@/glossary.md#gloss-store-derivation) paths mapping to output names.
 
-      Using [string interpolation](@docroot@/language/string-interpolation.md) on a derivation will add that derivation to the string context.
+      Using [string interpolation](@docroot@/language/string-interpolation.md) on a derivation adds that derivation to the string context.
       For example,
 
       ```nix
@@ -312,7 +312,7 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
                     name
                 ).atPos(i.pos).debugThrow();
             }
-            for (auto elem : attr->value->listItems()) {
+            for (auto elem : attr->value->listView()) {
                 auto outputName = state.forceStringNoCtx(*elem, attr->pos, "while evaluating an output name within a string context");
                 context.emplace(NixStringContextElem::Built {
                     .drvPath = makeConstantStorePathRef(namePath),

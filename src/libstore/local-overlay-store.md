@@ -85,7 +85,7 @@ The parts of a local overlay store are as follows:
     > The location of the database instead depends on the [`state`](#store-experimental-local-overlay-store-state) setting.
     > It is always `${state}/db`.
 
-    This contains the metadata of all of the upper layer [store objects][store object] (everything beyond their file system objects), and also duplicate copies of some lower layer store object's metadta.
+    This contains the metadata of all of the upper layer [store objects][store object] (everything beyond their file system objects), and also duplicate copies of some lower layer store object's metadata.
     The duplication is so the metadata for the [closure](@docroot@/glossary.md#gloss-closure) of upper layer [store objects][store object] can be found entirely within the upper layer.
     (This allows us to use the same SQL Schema as the [local store]'s SQLite database, as foreign keys in that schema enforce closure metadata to be self-contained in this way.)
 

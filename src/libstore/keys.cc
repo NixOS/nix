@@ -1,6 +1,6 @@
-#include "file-system.hh"
-#include "globals.hh"
-#include "keys.hh"
+#include "nix/util/file-system.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/keys.hh"
 
 namespace nix {
 

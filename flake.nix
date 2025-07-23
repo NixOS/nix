@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
@@ -143,52 +143,42 @@
           # without "polluting" the top level "`pkgs`" attrset.
           # This also has the benefit of providing us with a distinct set of packages
           # we can iterate over.
-          nixComponents =
+          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
+          nixComponents2 =
             lib.makeScopeWithSplicing'
               {
                 inherit (final) splicePackages;
-                inherit (final.nixDependencies) newScope;
+                inherit (final.nixDependencies2) newScope;
               }
               {
-                otherSplices = final.generateSplicesForMkScope "nixComponents";
+                otherSplices = final.generateSplicesForMkScope "nixComponents2";
                 f = import ./packaging/components.nix {
                   inherit (final) lib;
                   inherit officialRelease;
                   pkgs = final;
                   src = self;
+                  maintainers = [ ];
                 };
               };
 
           # The dependencies are in their own scope, so that they don't have to be
-          # in Nixpkgs top level `pkgs` or `nixComponents`.
-          nixDependencies =
+          # in Nixpkgs top level `pkgs` or `nixComponents2`.
+          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
+          nixDependencies2 =
             lib.makeScopeWithSplicing'
               {
                 inherit (final) splicePackages;
-                inherit (final) newScope; # layered directly on pkgs, unlike nixComponents above
+                inherit (final) newScope; # layered directly on pkgs, unlike nixComponents2 above
               }
               {
-                otherSplices = final.generateSplicesForMkScope "nixDependencies";
+                otherSplices = final.generateSplicesForMkScope "nixDependencies2";
                 f = import ./packaging/dependencies.nix {
                   inherit inputs stdenv;
                   pkgs = final;
                 };
               };
 
-          nix = final.nixComponents.nix-cli;
-
-          # See https://github.com/NixOS/nixpkgs/pull/214409
-          # Remove when fixed in this flake's nixpkgs
-          pre-commit =
-            if prev.stdenv.hostPlatform.system == "i686-linux" then
-              (prev.pre-commit.override (o: {
-                dotnet-sdk = "";
-              })).overridePythonAttrs
-                (o: {
-                  doCheck = false;
-                })
-            else
-              prev.pre-commit;
+          nix = final.nixComponents2.nix-cli;
         };
 
     in
@@ -263,18 +253,46 @@
           flatMapAttrs
             (
               {
-                "" = nixpkgsFor.${system}.native;
+                # Run all tests with UBSAN enabled. Running both with ubsan and
+                # without doesn't seem to have much immediate benefit for doubling
+                # the GHA CI workaround.
+                #
+                # TODO: Work toward enabling "address,undefined" if it seems feasible.
+                # This would maybe require dropping Boost coroutines and ignoring intentional
+                # memory leaks with detect_leaks=0.
+                "" = rec {
+                  nixpkgs = nixpkgsFor.${system}.native;
+                  nixComponents = nixpkgs.nixComponents2.overrideScope (
+                    nixCompFinal: nixCompPrev: {
+                      mesonComponentOverrides = _finalAttrs: prevAttrs: {
+                        mesonFlags =
+                          (prevAttrs.mesonFlags or [ ])
+                          # TODO: Macos builds instrumented with ubsan take very long
+                          # to run functional tests.
+                          ++ lib.optionals (!nixpkgs.stdenv.hostPlatform.isDarwin) [
+                            (lib.mesonOption "b_sanitize" "undefined")
+                          ];
+                      };
+                    }
+                  );
+                };
               }
               // lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.hostPlatform.isDarwin) {
                 # TODO: enable static builds for darwin, blocked on:
                 #       https://github.com/NixOS/nixpkgs/issues/320448
                 # TODO: disabled to speed up GHA CI.
-                #"static-" = nixpkgsFor.${system}.native.pkgsStatic;
+                # "static-" = {
+                #   nixpkgs = nixpkgsFor.${system}.native.pkgsStatic;
+                # };
               }
             )
             (
-              nixpkgsPrefix: nixpkgs:
-              flatMapAttrs nixpkgs.nixComponents (
+              nixpkgsPrefix:
+              {
+                nixpkgs,
+                nixComponents ? nixpkgs.nixComponents2,
+              }:
+              flatMapAttrs nixComponents (
                 pkgName: pkg:
                 flatMapAttrs pkg.tests or { } (
                   testName: test: {
@@ -283,7 +301,7 @@
                 )
               )
               // lib.optionalAttrs (nixpkgs.stdenv.hostPlatform == nixpkgs.stdenv.buildPlatform) {
-                "${nixpkgsPrefix}nix-functional-tests" = nixpkgs.nixComponents.nix-functional-tests;
+                "${nixpkgsPrefix}nix-functional-tests" = nixComponents.nix-functional-tests;
               }
             )
         // devFlake.checks.${system} or { }
@@ -302,9 +320,9 @@
           binaryTarball = self.hydraJobs.binaryTarball.${system};
           # TODO probably should be `nix-cli`
           nix = self.packages.${system}.nix-everything;
-          nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
-          nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
-          nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
+          nix-manual = nixpkgsFor.${system}.native.nixComponents2.nix-manual;
+          nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-internal-api-docs;
+          nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-external-api-docs;
         }
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         //
@@ -322,6 +340,7 @@
               "nix-store-tests" = { };
 
               "nix-fetchers" = { };
+              "nix-fetchers-c" = { };
               "nix-fetchers-tests" = { };
 
               "nix-expr" = { };
@@ -330,6 +349,7 @@
               "nix-expr-tests" = { };
 
               "nix-flake" = { };
+              "nix-flake-c" = { };
               "nix-flake-tests" = { };
 
               "nix-main" = { };
@@ -356,9 +376,9 @@
               }:
               {
                 # These attributes go right into `packages.<system>`.
-                "${pkgName}" = nixpkgsFor.${system}.native.nixComponents.${pkgName};
-                "${pkgName}-static" = nixpkgsFor.${system}.native.pkgsStatic.nixComponents.${pkgName};
-                "${pkgName}-llvm" = nixpkgsFor.${system}.native.pkgsLLVM.nixComponents.${pkgName};
+                "${pkgName}" = nixpkgsFor.${system}.native.nixComponents2.${pkgName};
+                "${pkgName}-static" = nixpkgsFor.${system}.native.pkgsStatic.nixComponents2.${pkgName};
+                "${pkgName}-llvm" = nixpkgsFor.${system}.native.pkgsLLVM.nixComponents2.${pkgName};
               }
               // lib.optionalAttrs supportsCross (
                 flatMapAttrs (lib.genAttrs crossSystems (_: { })) (
@@ -366,7 +386,7 @@
                   { }:
                   {
                     # These attributes go right into `packages.<system>`.
-                    "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName};
+                    "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents2.${pkgName};
                   }
                 )
               )
@@ -376,7 +396,7 @@
                 {
                   # These attributes go right into `packages.<system>`.
                   "${pkgName}-${stdenvName}" =
-                    nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.nixComponents.${pkgName};
+                    nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.nixComponents2.${pkgName};
                 }
               )
             )
@@ -384,8 +404,7 @@
           dockerImage =
             let
               pkgs = nixpkgsFor.${system}.native;
-              image = import ./docker.nix {
-                inherit pkgs;
+              image = pkgs.callPackage ./docker.nix {
                 tag = pkgs.nix.version;
               };
             in

@@ -31,12 +31,32 @@
 
   The industry term for storage and retrieval systems using [content addressing](#gloss-content-address). A Nix store also has [input addressing](#gloss-input-addressed-store-object), and metadata.
 
+- [derivation]{#gloss-derivation}
+
+  A derivation can be thought of as a [pure function](https://en.wikipedia.org/wiki/Pure_function) that produces new [store objects][store object] from existing store objects.
+
+  Derivations are implemented as [operating system processes that run in a sandbox](@docroot@/store/building.md#builder-execution).
+  This sandbox by default only allows reading from store objects specified as inputs, and only allows writing to designated [outputs][output] to be [captured as store objects](@docroot@/store/building.md#processing-outputs).
+
+  A derivation is typically specified as a [derivation expression] in the [Nix language], and [instantiated][instantiate] to a [store derivation].
+  There are multiple ways of obtaining store objects from store derivatons, collectively called [realisation][realise].
+
+  [derivation]: #gloss-derivation
+
 - [store derivation]{#gloss-store-derivation}
 
-  A single build task.
+  A [derivation] represented as a [store object].
+
   See [Store Derivation](@docroot@/store/derivation/index.md#store-derivation) for details.
 
   [store derivation]: #gloss-store-derivation
+
+- [directed acyclic graph]{#gloss-directed-acyclic-graph}
+
+  A [directed acyclic graph](https://en.wikipedia.org/wiki/Directed_acyclic_graph) (DAG) is graph whose edges are given a direction ("a to b" is not the same edge as "b to a"), and for which no possible path (created by joining together edges) forms a cycle.
+
+  DAGs are very important to Nix.
+  In particular, the non-self-[references][reference] of [store object][store object] form a cycle.
 
 - [derivation path]{#gloss-derivation-path}
 
@@ -50,10 +70,7 @@
 
 - [derivation expression]{#gloss-derivation-expression}
 
-  A description of a [store derivation] in the Nix language.
-  The output(s) of a derivation are store objects.
-  Derivations are typically specified in Nix expressions using the [`derivation` primitive](./language/derivations.md).
-  These are translated into store layer *derivations* (implicitly by `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
+  A description of a [store derivation] using the [`derivation` primitive](./language/derivations.md) in the [Nix language].
 
   [derivation expression]: #gloss-derivation-expression
 
@@ -71,9 +88,8 @@
 
   This can be achieved by:
   - Fetching a pre-built [store object] from a [substituter]
-  - Running the [`builder`](@docroot@/language/derivations.md#attr-builder) executable as specified in the corresponding [store derivation]
+  - [Building](@docroot@/store/building.md) the corresponding [store derivation]
   - Delegating to a [remote machine](@docroot@/command-ref/conf-file.md#conf-builders) and retrieving the outputs
-  <!-- TODO: link [running] to build process page, #8888 -->
 
   See [`nix-store --realise`](@docroot@/command-ref/nix-store/realise.md) for a detailed description of the algorithm.
 
@@ -156,6 +172,8 @@
   non-[fixed-output](#gloss-fixed-output-derivation)
   derivation.
 
+  See [input-addressing derivation outputs](store/derivation/outputs/input-address.md) for details.
+
 - [content-addressed store object]{#gloss-content-addressed-store-object}
 
   A [store object] which is [content-addressed](#gloss-content-address),
@@ -215,22 +233,24 @@
 
   > **Example**
   >
-  > Building and deploying software using Nix entails writing Nix expressions as a high-level description of packages and compositions thereof.
+  > Building and deploying software using Nix entails writing Nix expressions to describe [packages][package] and compositions thereof.
 
 - [reference]{#gloss-reference}
 
-  A [store object] `O` is said to have a *reference* to a store object `P` if a [store path] to `P` appears in the contents of `O`.
+  An edge from one [store object] to another.
 
-  Store objects can refer to both other store objects and themselves.
-  References from a store object to itself are called *self-references*.
-  References other than a self-reference must not form a cycle.
+  See [References](@docroot@/store/store-object.md#references) for details.
 
   [reference]: #gloss-reference
+
+  See [References](@docroot@/store/store-object.md#references) for details.
 
 - [reachable]{#gloss-reachable}
 
   A store path `Q` is reachable from another store path `P` if `Q`
   is in the *closure* of the *references* relation.
+
+  See [References](@docroot@/store/store-object.md#references) for details.
 
 - [closure]{#gloss-closure}
 
@@ -248,7 +268,20 @@
   to a store object at path `Q`, then `Q` is in the closure of `P`. Further, if `Q`
   references `R` then `R` is also in the closure of `P`.
 
+  See [References](@docroot@/store/store-object.md#references) for details.
+
   [closure]: #gloss-closure
+
+- [requisite]{#gloss-requisite}
+
+  A store object [reachable] by a path (chain of references) from a given [store object].
+  The [closure] is the set of requisites.
+
+  See [References](@docroot@/store/store-object.md#references) for details.
+
+- [referrer]{#gloss-reference}
+
+  A reversed edge from one [store object] to another.
 
 - [output]{#gloss-output}
 
@@ -320,7 +353,7 @@
 
   See [Nix Archive](store/file-system-object/content-address.html#serial-nix-archive) for details.
 
-- [`∅`]{#gloss-emtpy-set}
+- [`∅`]{#gloss-empty-set}
 
   The empty set symbol. In the context of profile history, this denotes a package is not present in a particular version of the profile.
 
@@ -330,18 +363,17 @@
 
 - [package]{#package}
 
-  1. A software package; a collection of files and other data.
+  A software package; files that belong together for a particular purpose, and metadata.
 
-  2. A [package attribute set].
+  Nix represents files as [file system objects][file system object], and how they belong together is encoded as [references][reference] between [store objects][store object] that contain these file system objects.
 
-- [package attribute set]{#package-attribute-set}
+  The [Nix language] allows denoting packages in terms of [attribute sets](@docroot@/language/types.md#attribute-set) containing:
+  - attributes that refer to the files of a package, typically in the form of [derivation outputs](#output),
+  - attributes with metadata, such as information about how the package is supposed to be used.
 
-  An [attribute set](@docroot@/language/types.md#attribute-set) containing the attribute `type = "derivation";` (derivation for historical reasons), as well as other attributes, such as
-  - attributes that refer to the files of a [package], typically in the form of [derivation outputs](#output),
-  - attributes that declare something about how the package is supposed to be installed or used,
-  - other metadata or arbitrary attributes.
+  The exact shape of these attribute sets is up to convention.
 
-  [package attribute set]: #package-attribute-set
+  [package]: #package
 
 - [string interpolation]{#gloss-string-interpolation}
 

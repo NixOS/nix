@@ -4,7 +4,7 @@ source common.sh
 
 clearStoreIfPossible
 
-if [[ -n ${CONTENT_ADDRESSED:-} ]]; then
+if [[ -n ${NIX_TESTS_CA_BY_DEFAULT:-} ]]; then
     shellDotNix="$PWD/ca-shell.nix"
 else
     shellDotNix="$PWD/shell.nix"

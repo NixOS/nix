@@ -1,25 +1,23 @@
 #include <algorithm>
 #include <nlohmann/json.hpp>
 
-#include "command.hh"
-#include "markdown.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
-#include "derivations.hh"
-#include "nixexpr.hh"
-#include "profiles.hh"
-#include "repl.hh"
-#include "strings.hh"
-#include "environment-variables.hh"
+#include "nix/cmd/command.hh"
+#include "nix/cmd/markdown.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/derivations.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/store/profiles.hh"
+#include "nix/cmd/repl.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/environment-variables.hh"
 
 namespace nix {
-
-RegisterCommand::Commands * RegisterCommand::commands = nullptr;
 
 nix::Commands RegisterCommand::getCommandsFor(const std::vector<std::string> & prefix)
 {
     nix::Commands res;
-    for (auto & [name, command] : *RegisterCommand::commands)
+    for (auto & [name, command] : RegisterCommand::commands())
         if (name.size() == prefix.size() + 1) {
             bool equal = true;
             for (size_t i = 0; i < prefix.size(); ++i)
@@ -40,7 +38,7 @@ nlohmann::json NixMultiCommand::toJSON()
 void NixMultiCommand::run()
 {
     if (!command) {
-        std::set<std::string> subCommandTextLines;
+        StringSet subCommandTextLines;
         for (auto & [name, _] : commands)
             subCommandTextLines.insert(fmt("- `%s`", name));
         std::string markdownError =
@@ -237,12 +235,13 @@ void StorePathCommand::run(ref<Store> store, StorePaths && storePaths)
 
 MixProfile::MixProfile()
 {
-    addFlag(
-        {.longName = "profile",
-         .description = "The profile to operate on.",
-         .labels = {"path"},
-         .handler = {&profile},
-         .completer = completePath});
+    addFlag({
+        .longName = "profile",
+        .description = "The profile to operate on.",
+        .labels = {"path"},
+        .handler = {&profile},
+        .completer = completePath,
+    });
 }
 
 void MixProfile::updateProfile(const StorePath & storePath)
@@ -394,6 +393,13 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
             },
             buildable.raw());
     }
+}
+
+void MixOutLinkBase::createOutLinksMaybe(const std::vector<BuiltPathWithResult> & buildables, ref<Store> & store)
+{
+    if (outLink != "")
+        if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
+            createOutLinks(outLink, toBuiltPaths(buildables), *store2);
 }
 
 }

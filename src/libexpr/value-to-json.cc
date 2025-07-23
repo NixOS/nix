@@ -1,7 +1,7 @@
-#include "value-to-json.hh"
-#include "eval-inline.hh"
-#include "store-api.hh"
-#include "signals.hh"
+#include "nix/expr/value-to-json.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/signals.hh"
 
 #include <cstdlib>
 #include <iomanip>
@@ -10,6 +10,7 @@
 
 namespace nix {
 using json = nlohmann::json;
+// TODO: rename. It doesn't print.
 json printValueAsJSON(EvalState & state, bool strict,
     Value & v, const PosIdx pos, NixStringContext & context, bool copyToStore)
 {
@@ -72,7 +73,7 @@ json printValueAsJSON(EvalState & state, bool strict,
         case nList: {
             out = json::array();
             int i = 0;
-            for (auto elem : v.listItems()) {
+            for (auto elem : v.listView()) {
                 try {
                     out.push_back(printValueAsJSON(state, strict, *elem, pos, context, copyToStore));
                 } catch (Error & e) {

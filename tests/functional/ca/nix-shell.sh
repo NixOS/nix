@@ -2,6 +2,6 @@
 
 source common.sh
 
-CONTENT_ADDRESSED=true
+NIX_TESTS_CA_BY_DEFAULT=true
 cd ..
 source ./nix-shell.sh

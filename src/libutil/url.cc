@@ -1,8 +1,8 @@
-#include "url.hh"
-#include "url-parts.hh"
-#include "util.hh"
-#include "split.hh"
-#include "canon-path.hh"
+#include "nix/util/url.hh"
+#include "nix/util/url-parts.hh"
+#include "nix/util/util.hh"
+#include "nix/util/split.hh"
+#include "nix/util/canon-path.hh"
 
 namespace nix {
 
@@ -70,9 +70,9 @@ std::string percentDecode(std::string_view in)
     return decoded;
 }
 
-std::map<std::string, std::string> decodeQuery(const std::string & query)
+StringMap decodeQuery(const std::string & query)
 {
-    std::map<std::string, std::string> result;
+    StringMap result;
 
     for (const auto & s : tokenizeString<Strings>(query, "&")) {
         auto e = s.find('=');
@@ -108,7 +108,7 @@ std::string percentEncode(std::string_view s, std::string_view keep)
     return res;
 }
 
-std::string encodeQuery(const std::map<std::string, std::string> & ss)
+std::string encodeQuery(const StringMap & ss)
 {
     std::string res;
     bool first = true;

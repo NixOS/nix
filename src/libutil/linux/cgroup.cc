@@ -1,8 +1,8 @@
-#include "cgroup.hh"
-#include "signals.hh"
-#include "util.hh"
-#include "file-system.hh"
-#include "finally.hh"
+#include "nix/util/cgroup.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/util.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/finally.hh"
 
 #include <chrono>
 #include <cmath>
@@ -31,9 +31,9 @@ std::optional<Path> getCgroupFS()
 }
 
 // FIXME: obsolete, check for cgroup2
-std::map<std::string, std::string> getCgroups(const Path & cgroupFile)
+StringMap getCgroups(const Path & cgroupFile)
 {
-    std::map<std::string, std::string> cgroups;
+    StringMap cgroups;
 
     for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cgroupFile), "\n")) {
         static std::regex regex("([0-9]+):([^:]*):(.*)");
@@ -65,7 +65,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
 
     /* Otherwise, manually kill every process in the subcgroups and
        this cgroup. */
-    for (auto & entry : std::filesystem::directory_iterator{cgroup}) {
+    for (auto & entry : DirectoryIterator{cgroup}) {
         checkInterrupt();
         if (entry.symlink_status().type() != std::filesystem::file_type::directory) continue;
         destroyCgroup(cgroup / entry.path().filename(), false);
@@ -134,7 +134,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
     }
 
     if (rmdir(cgroup.c_str()) == -1)
-        throw SysError("deleting cgroup '%s'", cgroup);
+        throw SysError("deleting cgroup %s", cgroup);
 
     return stats;
 }

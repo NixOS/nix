@@ -1,5 +1,5 @@
-#include "source-accessor.hh"
-#include "archive.hh"
+#include <atomic>
+#include "nix/util/source-accessor.hh"
 
 namespace nix {
 
@@ -114,9 +114,11 @@ CanonPath SourceAccessor::resolveSymlinks(
                     if (!linksAllowed--)
                         throw Error("infinite symlink recursion in path '%s'", showPath(path));
                     auto target = readLink(res);
-                    res.pop();
-                    if (isAbsolute(target))
+                    if (isAbsolute(target)) {
                         res = CanonPath::root;
+                    } else {
+                        res.pop();
+                    }
                     todo.splice(todo.begin(), tokenizeString<std::list<std::string>>(target, "/"));
                 }
             }

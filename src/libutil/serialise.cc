@@ -1,6 +1,6 @@
-#include "serialise.hh"
-#include "signals.hh"
-#include "util.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/util.hh"
 
 #include <cstring>
 #include <cerrno>
@@ -11,7 +11,7 @@
 #ifdef _WIN32
 # include <fileapi.h>
 # include <winsock2.h>
-# include "windows-error.hh"
+# include "nix/util/windows-error.hh"
 #else
 # include <poll.h>
 #endif
@@ -193,10 +193,6 @@ size_t StringSource::read(char * data, size_t len)
     return n;
 }
 
-
-#if BOOST_VERSION >= 106300 && BOOST_VERSION < 106600
-#error Coroutines are broken in this version of Boost!
-#endif
 
 std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
 {

@@ -1,4 +1,4 @@
-#include "tests/libexpr.hh"
+#include "nix/expr/tests/libexpr.hh"
 
 namespace nix {
     // Testing of trivial expressions
@@ -143,7 +143,7 @@ namespace nix {
         // Usually Nix rejects duplicate keys in an attrset but it does allow
         // so if it is an attribute set that contains disjoint sets of keys.
         // The below is equivalent to `{a.b = 1; a.c = 2; }`.
-        // The attribute set `a` will be a Thunk at first as the attribuets
+        // The attribute set `a` will be a Thunk at first as the attributes
         // have to be merged (or otherwise computed) and that is done in a lazy
         // manner.
 

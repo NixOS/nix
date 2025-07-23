@@ -1,98 +1,27 @@
-#include "parsed-derivations.hh"
+#include "nix/store/parsed-derivations.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/derivation-options.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
 
 namespace nix {
 
-ParsedDerivation::ParsedDerivation(const StorePath & drvPath, BasicDerivation & drv)
-    : drvPath(drvPath), drv(drv)
+std::optional<StructuredAttrs> StructuredAttrs::tryParse(const StringPairs & env)
 {
     /* Parse the __json attribute, if any. */
-    auto jsonAttr = drv.env.find("__json");
-    if (jsonAttr != drv.env.end()) {
+    auto jsonAttr = env.find("__json");
+    if (jsonAttr != env.end()) {
         try {
-            structuredAttrs = std::make_unique<nlohmann::json>(nlohmann::json::parse(jsonAttr->second));
+            return StructuredAttrs {
+                .structuredAttrs = nlohmann::json::parse(jsonAttr->second),
+            };
         } catch (std::exception & e) {
-            throw Error("cannot process __json attribute of '%s': %s", drvPath.to_string(), e.what());
+            throw Error("cannot process __json attribute: %s", e.what());
         }
     }
-}
-
-ParsedDerivation::~ParsedDerivation() { }
-
-std::optional<std::string> ParsedDerivation::getStringAttr(const std::string & name) const
-{
-    if (structuredAttrs) {
-        auto i = structuredAttrs->find(name);
-        if (i == structuredAttrs->end())
-            return {};
-        else {
-            if (!i->is_string())
-                throw Error("attribute '%s' of derivation '%s' must be a string", name, drvPath.to_string());
-            return i->get<std::string>();
-        }
-    } else {
-        auto i = drv.env.find(name);
-        if (i == drv.env.end())
-            return {};
-        else
-            return i->second;
-    }
-}
-
-bool ParsedDerivation::getBoolAttr(const std::string & name, bool def) const
-{
-    if (structuredAttrs) {
-        auto i = structuredAttrs->find(name);
-        if (i == structuredAttrs->end())
-            return def;
-        else {
-            if (!i->is_boolean())
-                throw Error("attribute '%s' of derivation '%s' must be a Boolean", name, drvPath.to_string());
-            return i->get<bool>();
-        }
-    } else {
-        auto i = drv.env.find(name);
-        if (i == drv.env.end())
-            return def;
-        else
-            return i->second == "1";
-    }
-}
-
-std::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name) const
-{
-    if (structuredAttrs) {
-        auto i = structuredAttrs->find(name);
-        if (i == structuredAttrs->end())
-            return {};
-        else {
-            if (!i->is_array())
-                throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath.to_string());
-            Strings res;
-            for (auto j = i->begin(); j != i->end(); ++j) {
-                if (!j->is_string())
-                    throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath.to_string());
-                res.push_back(j->get<std::string>());
-            }
-            return res;
-        }
-    } else {
-        auto i = drv.env.find(name);
-        if (i == drv.env.end())
-            return {};
-        else
-            return tokenizeString<Strings>(i->second);
-    }
-}
-
-std::optional<StringSet> ParsedDerivation::getStringSetAttr(const std::string & name) const
-{
-    auto ss = getStringsAttr(name);
-    return ss
-        ? (std::optional{StringSet{ss->begin(), ss->end()}})
-        : (std::optional<StringSet>{});
+    return {};
 }
 
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
@@ -151,44 +80,39 @@ static nlohmann::json pathInfoToJSON(
     return jsonList;
 }
 
-std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths)
+nlohmann::json StructuredAttrs::prepareStructuredAttrs(
+    Store & store,
+    const DerivationOptions & drvOptions,
+    const StorePathSet & inputPaths,
+    const DerivationOutputs & outputs) const
 {
-    if (!structuredAttrs) return std::nullopt;
-
-    auto json = *structuredAttrs;
+    /* Copy to then modify */
+    auto json = structuredAttrs;
 
     /* Add an "outputs" object containing the output paths. */
-    nlohmann::json outputs;
-    for (auto & i : drv.outputs)
-        outputs[i.first] = hashPlaceholder(i.first);
-    json["outputs"] = outputs;
+    nlohmann::json outputsJson;
+    for (auto & i : outputs)
+        outputsJson[i.first] = hashPlaceholder(i.first);
+    json["outputs"] = std::move(outputsJson);
 
     /* Handle exportReferencesGraph. */
-    auto e = json.find("exportReferencesGraph");
-    if (e != json.end() && e->is_object()) {
-        for (auto i = e->begin(); i != e->end(); ++i) {
-            StorePathSet storePaths;
-            for (auto & p : *i)
-                storePaths.insert(store.toStorePath(p.get<std::string>()).first);
-            json[i.key()] = pathInfoToJSON(store,
-                store.exportReferences(storePaths, inputPaths));
-        }
+    for (auto & [key, inputPaths] : drvOptions.exportReferencesGraph) {
+        StorePathSet storePaths;
+        for (auto & p : inputPaths)
+            storePaths.insert(store.toStorePath(p).first);
+        json[key] = pathInfoToJSON(store,
+            store.exportReferences(storePaths, storePaths));
     }
 
     return json;
 }
 
-/* As a convenience to bash scripts, write a shell file that
-   maps all attributes that are representable in bash -
-   namely, strings, integers, nulls, Booleans, and arrays and
-   objects consisting entirely of those values. (So nested
-   arrays or objects are not supported.) */
-std::string writeStructuredAttrsShell(const nlohmann::json & json)
+std::string StructuredAttrs::writeShell(const nlohmann::json & json)
 {
 
     auto handleSimpleType = [](const nlohmann::json & value) -> std::optional<std::string> {
         if (value.is_string())
-            return shellEscape(value.get<std::string_view>());
+            return escapeShellArgAlways(value.get<std::string_view>());
 
         if (value.is_number()) {
             auto f = value.get<float>();
@@ -236,7 +160,7 @@ std::string writeStructuredAttrsShell(const nlohmann::json & json)
             for (auto & [key2, value2] : value.items()) {
                 auto s3 = handleSimpleType(value2);
                 if (!s3) { good = false; break; }
-                s2 += fmt("[%s]=%s ", shellEscape(key2), *s3);
+                s2 += fmt("[%s]=%s ", escapeShellArgAlways(key2), *s3);
             }
 
             if (good)

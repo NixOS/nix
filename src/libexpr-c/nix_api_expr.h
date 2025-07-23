@@ -286,6 +286,11 @@ nix_err nix_gc_incref(nix_c_context * context, const void * object);
 /**
  * @brief Decrement the garbage collector reference counter for the given object
  *
+ * We also provide typed `nix_*_decref` functions, which are
+ *   - safer to use
+ *   - easier to integrate when deriving bindings
+ *   - allow more flexibility
+ *
  * @param[out] context Optional, stores error information
  * @param[in] object The object to stop referencing
  */

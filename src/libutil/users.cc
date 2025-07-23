@@ -1,7 +1,7 @@
-#include "util.hh"
-#include "users.hh"
-#include "environment-variables.hh"
-#include "file-system.hh"
+#include "nix/util/util.hh"
+#include "nix/util/users.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/file-system.hh"
 
 namespace nix {
 

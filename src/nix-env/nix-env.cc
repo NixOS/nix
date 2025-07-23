@@ -1,22 +1,22 @@
-#include "users.hh"
-#include "attr-path.hh"
-#include "common-eval-args.hh"
-#include "derivations.hh"
-#include "eval.hh"
-#include "get-drvs.hh"
-#include "globals.hh"
-#include "names.hh"
-#include "profiles.hh"
-#include "path-with-outputs.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
+#include "nix/util/users.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/cmd/common-eval-args.hh"
+#include "nix/store/derivations.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/get-drvs.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/names.hh"
+#include "nix/store/profiles.hh"
+#include "nix/store/path-with-outputs.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/local-fs-store.hh"
 #include "user-env.hh"
-#include "value-to-json.hh"
-#include "xml-writer.hh"
-#include "legacy.hh"
-#include "eval-settings.hh" // for defexpr
-#include "terminal.hh"
+#include "nix/expr/value-to-json.hh"
+#include "nix/util/xml-writer.hh"
+#include "nix/cmd/legacy.hh"
+#include "nix/expr/eval-settings.hh" // for defexpr
+#include "nix/util/terminal.hh"
 #include "man-pages.hh"
 
 #include <cerrno>
@@ -238,9 +238,9 @@ static void checkSelectorUse(DrvNames & selectors)
 
 namespace {
 
-std::set<std::string> searchByPrefix(const PackageInfos & allElems, std::string_view prefix) {
+StringSet searchByPrefix(const PackageInfos & allElems, std::string_view prefix) {
     constexpr std::size_t maxResults = 3;
-    std::set<std::string> result;
+    StringSet result;
     for (const auto & packageInfo : allElems) {
         const auto drvName = DrvName { packageInfo.queryName() };
         if (hasPrefix(drvName.name, prefix)) {
@@ -1265,7 +1265,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                             } else if (v->type() == nList) {
                                 attrs2["type"] = "strings";
                                 XMLOpenElement m(xml, "meta", attrs2);
-                                for (auto elem : v->listItems()) {
+                                for (auto elem : v->listView()) {
                                     if (elem->type() != nString) continue;
                                     XMLAttrs attrs3;
                                     attrs3["value"] = elem->c_str();

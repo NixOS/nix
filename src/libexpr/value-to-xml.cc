@@ -1,7 +1,7 @@
-#include "value-to-xml.hh"
-#include "xml-writer.hh"
-#include "eval-inline.hh"
-#include "signals.hh"
+#include "nix/expr/value-to-xml.hh"
+#include "nix/util/xml-writer.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/util/signals.hh"
 
 #include <cstdlib>
 
@@ -114,7 +114,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
         case nList: {
             XMLOpenElement _(doc, "list");
-            for (auto v2 : v.listItems())
+            for (auto v2 : v.listView())
                 printValueAsXML(state, strict, location, *v2, doc, context, drvsSeen, pos);
             break;
         }
@@ -126,18 +126,18 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
                 break;
             }
             XMLAttrs xmlAttrs;
-            if (location) posToXML(state, xmlAttrs, state.positions[v.payload.lambda.fun->pos]);
+            if (location) posToXML(state, xmlAttrs, state.positions[v.lambda().fun->pos]);
             XMLOpenElement _(doc, "function", xmlAttrs);
 
-            if (v.payload.lambda.fun->hasFormals()) {
+            if (v.lambda().fun->hasFormals()) {
                 XMLAttrs attrs;
-                if (v.payload.lambda.fun->arg) attrs["name"] = state.symbols[v.payload.lambda.fun->arg];
-                if (v.payload.lambda.fun->formals->ellipsis) attrs["ellipsis"] = "1";
+                if (v.lambda().fun->arg) attrs["name"] = state.symbols[v.lambda().fun->arg];
+                if (v.lambda().fun->formals->ellipsis) attrs["ellipsis"] = "1";
                 XMLOpenElement _(doc, "attrspat", attrs);
-                for (auto & i : v.payload.lambda.fun->formals->lexicographicOrder(state.symbols))
+                for (auto & i : v.lambda().fun->formals->lexicographicOrder(state.symbols))
                     doc.writeEmptyElement("attr", singletonAttrs("name", state.symbols[i.name]));
             } else
-                doc.writeEmptyElement("varpat", singletonAttrs("name", state.symbols[v.payload.lambda.fun->arg]));
+                doc.writeEmptyElement("varpat", singletonAttrs("name", state.symbols[v.lambda().fun->arg]));
 
             break;
         }

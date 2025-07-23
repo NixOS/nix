@@ -1,11 +1,11 @@
 #include <unordered_set>
 #include <queue>
 
-#include "command.hh"
-#include "eval.hh"
+#include "nix/cmd/command.hh"
+#include "nix/expr/eval.hh"
 #include "run.hh"
-#include "strings.hh"
-#include "executable-path.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/executable-path.hh"
 
 using namespace nix;
 
@@ -38,16 +38,17 @@ struct CmdShell : InstallablesCommand, MixEnvironment
 
     CmdShell()
     {
-        addFlag(
-            {.longName = "command",
-             .shortName = 'c',
-             .description = "Command and arguments to be executed, defaulting to `$SHELL`",
-             .labels = {"command", "args"},
-             .handler = {[&](std::vector<std::string> ss) {
-                 if (ss.empty())
-                     throw UsageError("--command requires at least one argument");
-                 command = ss;
-             }}});
+        addFlag({
+            .longName = "command",
+            .shortName = 'c',
+            .description = "Command and arguments to be executed, defaulting to `$SHELL`",
+            .labels = {"command", "args"},
+            .handler = {[&](std::vector<std::string> ss) {
+                if (ss.empty())
+                    throw UsageError("--command requires at least one argument");
+                command = ss;
+            }},
+        });
     }
 
     std::string description() override
@@ -64,10 +65,10 @@ struct CmdShell : InstallablesCommand, MixEnvironment
 
     void run(ref<Store> store, Installables && installables) override
     {
+        auto state = getEvalState();
+
         auto outPaths =
             Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, installables);
-
-        auto accessor = store->getFSAccessor();
 
         std::unordered_set<StorePath> done;
         std::queue<StorePath> todo;
@@ -84,13 +85,16 @@ struct CmdShell : InstallablesCommand, MixEnvironment
             if (!done.insert(path).second)
                 continue;
 
-            if (true)
-                pathAdditions.push_back(store->printStorePath(path) + "/bin");
+            auto binDir = state->storeFS->resolveSymlinks(CanonPath(store->printStorePath(path)) / "bin");
+            if (!store->isInStore(binDir.abs()))
+                throw Error("path '%s' is not in the Nix store", binDir);
 
-            auto propPath = accessor->resolveSymlinks(
+            pathAdditions.push_back(binDir.abs());
+
+            auto propPath = state->storeFS->resolveSymlinks(
                 CanonPath(store->printStorePath(path)) / "nix-support" / "propagated-user-env-packages");
-            if (auto st = accessor->maybeLstat(propPath); st && st->type == SourceAccessor::tRegular) {
-                for (auto & p : tokenizeString<Paths>(accessor->readFile(propPath)))
+            if (auto st = state->storeFS->maybeLstat(propPath); st && st->type == SourceAccessor::tRegular) {
+                for (auto & p : tokenizeString<Paths>(state->storeFS->readFile(propPath)))
                     todo.push(store->parseStorePath(p));
             }
         }
@@ -107,7 +111,7 @@ struct CmdShell : InstallablesCommand, MixEnvironment
 
         // Release our references to eval caches to ensure they are persisted to disk, because
         // we are about to exec out of this process without running C++ destructors.
-        getEvalState()->evalCaches.clear();
+        state->evalCaches.clear();
 
         execProgramInStore(store, UseLookupPath::Use, *command.begin(), args);
     }

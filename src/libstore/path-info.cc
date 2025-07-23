@@ -1,10 +1,10 @@
 #include <nlohmann/json.hpp>
 
-#include "path-info.hh"
-#include "store-api.hh"
-#include "json-utils.hh"
-#include "comparator.hh"
-#include "strings.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/json-utils.hh"
+#include "nix/util/comparator.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
 
@@ -38,6 +38,14 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
 void ValidPathInfo::sign(const Store & store, const Signer & signer)
 {
     sigs.insert(signer.signDetached(fingerprint(store)));
+}
+
+void ValidPathInfo::sign(const Store & store, const std::vector<std::unique_ptr<Signer>> & signers)
+{
+    auto fingerprint = this->fingerprint(store);
+    for (auto & signer: signers) {
+        sigs.insert(signer->signDetached(fingerprint));
+    }
 }
 
 std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithReferences() const
@@ -192,7 +200,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
 
     auto & json = getObject(_json);
     res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
-    res.narSize = getInteger(valueAt(json, "narSize"));
+    res.narSize = getUnsigned(valueAt(json, "narSize"));
 
     try {
         auto references = getStringList(valueAt(json, "references"));
@@ -216,7 +224,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
 
     if (json.contains("registrationTime"))
         if (auto * rawRegistrationTime = getNullable(valueAt(json, "registrationTime")))
-            res.registrationTime = getInteger(*rawRegistrationTime);
+            res.registrationTime = getInteger<time_t>(*rawRegistrationTime);
 
     if (json.contains("ultimate"))
         res.ultimate = getBoolean(valueAt(json, "ultimate"));

@@ -3,11 +3,12 @@
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
 
-#include "path.hh"
-#include "store-api.hh"
-#include "build-result.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/build-result.hh"
 
-#include "globals.hh"
+#include "nix/store/globals.hh"
 
 nix_err nix_libstore_init(nix_c_context * context)
 {
@@ -42,7 +43,7 @@ Store * nix_store_open(nix_c_context * context, const char * uri, const char ***
         if (!params)
             return new Store{nix::openStore(uri_str)};
 
-        nix::Store::Params params_map;
+        nix::Store::Config::Params params_map;
         for (size_t i = 0; params[i] != nullptr; i++) {
             params_map[params[i][0]] = params[i][1];
         }

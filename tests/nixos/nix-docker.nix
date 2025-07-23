@@ -1,21 +1,15 @@
 # Test the container built by ../../docker.nix.
 
 {
-  lib,
   config,
-  nixpkgs,
-  hostPkgs,
   ...
 }:
 
 let
   pkgs = config.nodes.machine.nixpkgs.pkgs;
 
-  nixImage = import ../../docker.nix {
-    inherit (config.nodes.machine.nixpkgs) pkgs;
-  };
-  nixUserImage = import ../../docker.nix {
-    inherit (config.nodes.machine.nixpkgs) pkgs;
+  nixImage = pkgs.callPackage ../../docker.nix { };
+  nixUserImage = pkgs.callPackage ../../docker.nix {
     name = "nix-user";
     uid = 1000;
     gid = 1000;
@@ -61,7 +55,7 @@ in
     { nodes }:
     ''
       cache.wait_for_unit("harmonia.service")
-      cache.wait_for_unit("network-online.target")
+      cache.wait_for_unit("network-addresses-eth1.service")
 
       machine.succeed("mkdir -p /etc/containers")
       machine.succeed("""echo '{"default":[{"type":"insecureAcceptAnything"}]}' > /etc/containers/policy.json""")

@@ -1,10 +1,10 @@
-#include "fetch-settings.hh"
-#include "registry.hh"
-#include "tarball.hh"
-#include "users.hh"
-#include "globals.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
+#include "nix/fetchers/fetch-settings.hh"
+#include "nix/fetchers/registry.hh"
+#include "nix/fetchers/tarball.hh"
+#include "nix/util/users.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/local-fs-store.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -14,6 +14,8 @@ std::shared_ptr<Registry> Registry::read(
     const Settings & settings,
     const Path & path, RegistryType type)
 {
+    debug("reading registry '%s'", path);
+
     auto registry = std::make_shared<Registry>(settings, type);
 
     if (!pathExists(path))
@@ -154,7 +156,7 @@ static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, re
         }
 
         if (!isAbsolute(path)) {
-            auto storePath = downloadFile(store, path, "flake-registry.json").storePath;
+            auto storePath = downloadFile(store, settings, path, "flake-registry.json").storePath;
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
                 store2->addPermRoot(storePath, getCacheDir() + "/flake-registry.json");
             path = store->toRealPath(storePath);
@@ -179,11 +181,14 @@ Registries getRegistries(const Settings & settings, ref<Store> store)
 std::pair<Input, Attrs> lookupInRegistries(
     ref<Store> store,
     const Input & _input,
-    const RegistryFilter & filter)
+    UseRegistries useRegistries)
 {
     Attrs extraAttrs;
     int n = 0;
     Input input(_input);
+
+    if (useRegistries == UseRegistries::No)
+        return {input, extraAttrs};
 
  restart:
 
@@ -191,17 +196,21 @@ std::pair<Input, Attrs> lookupInRegistries(
     if (n > 100) throw Error("cycle detected in flake registry for '%s'", input.to_string());
 
     for (auto & registry : getRegistries(*input.settings, store)) {
-        if (filter && !filter(registry->type)) continue;
+        if (useRegistries == UseRegistries::Limited
+            && !(registry->type == fetchers::Registry::Flag || registry->type == fetchers::Registry::Global))
+            continue;
         // FIXME: O(n)
         for (auto & entry : registry->entries) {
             if (entry.exact) {
                 if (entry.from == input) {
+                    debug("resolved flakeref '%s' against registry %d exactly", input.to_string(), registry->type);
                     input = entry.to;
                     extraAttrs = entry.extraAttrs;
                     goto restart;
                 }
             } else {
                 if (entry.from.contains(input)) {
+                    debug("resolved flakeref '%s' against registry %d", input.to_string(), registry->type);
                     input = entry.to.applyOverrides(
                         !entry.from.getRef() && input.getRef() ? input.getRef() : std::optional<std::string>(),
                         !entry.from.getRev() && input.getRev() ? input.getRev() : std::optional<Hash>());

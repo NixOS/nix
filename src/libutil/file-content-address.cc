@@ -1,7 +1,7 @@
-#include "file-content-address.hh"
-#include "archive.hh"
-#include "git.hh"
-#include "source-path.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/git.hh"
+#include "nix/util/source-path.hh"
 
 namespace nix {
 
@@ -22,7 +22,7 @@ FileSerialisationMethod parseFileSerialisationMethod(std::string_view input)
     if (ret)
         return *ret;
     else
-        throw UsageError("Unknown file serialiation method '%s', expect `flat` or `nar`");
+        throw UsageError("Unknown file serialiation method '%s', expect `flat` or `nar`", input);
 }
 
 
@@ -35,7 +35,7 @@ FileIngestionMethod parseFileIngestionMethod(std::string_view input)
         if (ret)
             return static_cast<FileIngestionMethod>(*ret);
         else
-            throw UsageError("Unknown file ingestion method '%s', expect `flat`, `nar`, or `git`");
+            throw UsageError("Unknown file ingestion method '%s', expect `flat`, `nar`, or `git`", input);
     }
 }
 
@@ -93,7 +93,7 @@ void restorePath(
 {
     switch (method) {
     case FileSerialisationMethod::Flat:
-        writeFile(path, source, 0666, startFsync);
+        writeFile(path, source, 0666, startFsync ? FsSync::Yes : FsSync::No);
         break;
     case FileSerialisationMethod::NixArchive:
         restorePath(path, source, startFsync);

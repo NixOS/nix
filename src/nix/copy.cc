@@ -1,7 +1,7 @@
-#include "command.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/local-fs-store.hh"
 
 using namespace nix;
 
@@ -21,7 +21,7 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile
             .description = "Create symlinks prefixed with *path* to the top-level store paths fetched from the source store.",
             .labels = {"path"},
             .handler = {&outLink},
-            .completer = completePath
+            .completer = completePath,
         });
 
         addFlag({

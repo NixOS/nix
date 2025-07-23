@@ -128,3 +128,36 @@ pull_request_rules:
         labels:
           - automatic backport
           - merge-queue
+
+  - name: backport patches to 2.28
+    conditions:
+      - label=backport 2.28-maintenance
+    actions:
+      backport:
+        branches:
+          - "2.28-maintenance"
+        labels:
+          - automatic backport
+          - merge-queue
+
+  - name: backport patches to 2.29
+    conditions:
+      - label=backport 2.29-maintenance
+    actions:
+      backport:
+        branches:
+          - "2.29-maintenance"
+        labels:
+          - automatic backport
+          - merge-queue
+
+  - name: backport patches to 2.30
+    conditions:
+      - label=backport 2.30-maintenance
+    actions:
+      backport:
+        branches:
+          - "2.30-maintenance"
+        labels:
+          - automatic backport
+          - merge-queue

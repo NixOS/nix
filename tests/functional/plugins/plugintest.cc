@@ -1,5 +1,5 @@
-#include "config-global.hh"
-#include "primops.hh"
+#include "nix/util/config-global.hh"
+#include "nix/expr/primops.hh"
 
 using namespace nix;
 

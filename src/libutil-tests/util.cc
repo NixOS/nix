@@ -1,8 +1,8 @@
-#include "util.hh"
-#include "types.hh"
-#include "file-system.hh"
-#include "terminal.hh"
-#include "strings.hh"
+#include "nix/util/util.hh"
+#include "nix/util/types.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/strings.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
@@ -79,7 +79,7 @@ TEST(base64Encode, encodeAndDecodeNonPrintable)
     auto encoded = base64Encode(s);
     auto decoded = base64Decode(encoded);
 
-    EXPECT_EQ(decoded.length(), 255);
+    EXPECT_EQ(decoded.length(), 255u);
     ASSERT_EQ(decoded, s);
 }
 

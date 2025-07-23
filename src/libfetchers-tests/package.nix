@@ -5,6 +5,7 @@
   mkMesonExecutable,
 
   nix-fetchers,
+  nix-fetchers-c,
   nix-store-test-support,
 
   libgit2,
@@ -40,6 +41,7 @@ mkMesonExecutable (finalAttrs: {
 
   buildInputs = [
     nix-fetchers
+    nix-fetchers-c
     nix-store-test-support
     rapidcheck
     gtest

@@ -5,12 +5,14 @@
 #include "nix_api_expr.h"
 #include "nix_api_value.h"
 
-#include "tests/nix_api_expr.hh"
-#include "tests/string_callback.hh"
-#include "file-system.hh"
+#include "nix/expr/tests/nix_api_expr.hh"
+#include "nix/util/tests/string_callback.hh"
+#include "nix/util/file-system.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+
+#include "expr-tests-config.hh"
 
 namespace nixC {
 
@@ -220,7 +222,7 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context)
         names.push_back(name);
     }
     std::sort(names.begin(), names.end());
-    ASSERT_EQ(3, names.size());
+    ASSERT_EQ(3u, names.size());
     EXPECT_THAT(names[0], testing::StrEq("just-a-file"));
     EXPECT_THAT(names[1], testing::StrEq("letsbuild"));
     EXPECT_THAT(names[2], testing::StrEq("not-actually-built-yet.drv"));

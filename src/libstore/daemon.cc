@@ -1,23 +1,24 @@
-#include "daemon.hh"
-#include "signals.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-connection.hh"
-#include "worker-protocol-impl.hh"
-#include "build-result.hh"
-#include "store-api.hh"
-#include "store-cast.hh"
-#include "gc-store.hh"
-#include "log-store.hh"
-#include "indirect-root-store.hh"
-#include "path-with-outputs.hh"
-#include "finally.hh"
-#include "archive.hh"
-#include "derivations.hh"
-#include "args.hh"
-#include "git.hh"
+#include "nix/store/daemon.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/worker-protocol.hh"
+#include "nix/store/worker-protocol-connection.hh"
+#include "nix/store/worker-protocol-impl.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-cast.hh"
+#include "nix/store/gc-store.hh"
+#include "nix/store/log-store.hh"
+#include "nix/store/indirect-root-store.hh"
+#include "nix/store/path-with-outputs.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/archive.hh"
+#include "nix/store/derivations.hh"
+#include "nix/util/args.hh"
+#include "nix/util/git.hh"
+#include "nix/util/logging.hh"
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
-# include "monitor-fd.hh"
+# include "nix/util/monitor-fd.hh"
 #endif
 
 #include <sstream>
@@ -947,14 +948,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case WorkerProto::Op::QueryMissing: {
         auto targets = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         logger->startWork();
-        StorePathSet willBuild, willSubstitute, unknown;
-        uint64_t downloadSize, narSize;
-        store->queryMissing(targets, willBuild, willSubstitute, unknown, downloadSize, narSize);
+        auto missing = store->queryMissing(targets);
         logger->stopWork();
-        WorkerProto::write(*store, wconn, willBuild);
-        WorkerProto::write(*store, wconn, willSubstitute);
-        WorkerProto::write(*store, wconn, unknown);
-        conn.to << downloadSize << narSize;
+        WorkerProto::write(*store, wconn, missing.willBuild);
+        WorkerProto::write(*store, wconn, missing.willSubstitute);
+        WorkerProto::write(*store, wconn, missing.unknown);
+        conn.to << missing.downloadSize << missing.narSize;
         break;
     }
 
@@ -1025,6 +1024,7 @@ void processConnection(
 {
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
+    (void) monitor; // suppress warning
 #endif
 
     /* Exchange the greeting. */
@@ -1049,6 +1049,7 @@ void processConnection(
     if (!recursive) {
         prevLogger_ = std::move(logger);
         logger = std::move(tunnelLogger_);
+        applyJSONLogger();
     }
 
     unsigned int opCount = 0;

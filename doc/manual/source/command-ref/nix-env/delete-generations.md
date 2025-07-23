@@ -27,7 +27,7 @@ This operation deletes the specified generations of the current profile.
   >
   > Older *and newer* generations will be deleted by this operation.
   >
-  > One might expect this to just delete older generations than the curent one, but that is only true if the current generation is also the latest.
+  > One might expect this to just delete older generations than the current one, but that is only true if the current generation is also the latest.
   > Because one can roll back to a previous generation, it is possible to have generations newer than the current one.
   > They will also be deleted.
 

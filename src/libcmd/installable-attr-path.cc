@@ -1,21 +1,21 @@
-#include "globals.hh"
-#include "installable-attr-path.hh"
-#include "outputs-spec.hh"
-#include "util.hh"
-#include "command.hh"
-#include "attr-path.hh"
-#include "common-eval-args.hh"
-#include "derivations.hh"
-#include "eval-inline.hh"
-#include "eval.hh"
-#include "get-drvs.hh"
-#include "store-api.hh"
-#include "shared.hh"
-#include "flake/flake.hh"
-#include "eval-cache.hh"
-#include "url.hh"
-#include "registry.hh"
-#include "build-result.hh"
+#include "nix/store/globals.hh"
+#include "nix/cmd/installable-attr-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/util.hh"
+#include "nix/cmd/command.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/cmd/common-eval-args.hh"
+#include "nix/store/derivations.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/get-drvs.hh"
+#include "nix/store/store-api.hh"
+#include "nix/main/shared.hh"
+#include "nix/flake/flake.hh"
+#include "nix/expr/eval-cache.hh"
+#include "nix/util/url.hh"
+#include "nix/fetchers/registry.hh"
+#include "nix/store/build-result.hh"
 
 #include <regex>
 #include <queue>
@@ -72,7 +72,7 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
 
         auto newOutputs = std::visit(overloaded {
             [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
-                std::set<std::string> outputsToInstall;
+                StringSet outputsToInstall;
                 for (auto & output : packageInfo.queryOutputs(false, true))
                     outputsToInstall.insert(output.first);
                 if (outputsToInstall.empty())

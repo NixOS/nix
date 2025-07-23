@@ -1,14 +1,17 @@
-#include "error.hh"
-#include "environment-variables.hh"
-#include "eval-settings.hh"
-#include "config-global.hh"
-#include "serialise.hh"
-#include "eval-gc.hh"
+#include "nix/util/error.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/serialise.hh"
+#include "nix/expr/eval-gc.hh"
+#include "nix/expr/value.hh"
 
-#if HAVE_BOEHMGC
+#include "expr-config-private.hh"
+
+#if NIX_USE_BOEHMGC
 
 #  include <pthread.h>
-#  if __FreeBSD__
+#  ifdef __FreeBSD__
 #    include <pthread_np.h>
 #  endif
 
@@ -24,7 +27,7 @@
 
 namespace nix {
 
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
 /* Called when the Boehm GC runs out of memory. */
 static void * oomHandler(size_t requested)
 {
@@ -49,6 +52,13 @@ static inline void initGCReal()
     GC_start_performance_measurement();
 
     GC_INIT();
+
+    /* Register valid displacements in case we are using alignment niches
+       for storing the type information. This way tagged pointers are considered
+       to be valid, even when they are not aligned. */
+    if constexpr (detail::useBitPackedValueStorage<sizeof(void *)>)
+        for (std::size_t i = 1; i < sizeof(std::uintptr_t); ++i)
+            GC_register_displacement(i);
 
     GC_set_oom_fn(oomHandler);
 
@@ -94,7 +104,7 @@ void initGC()
     if (gcInitialised)
         return;
 
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     initGCReal();
 
     gcCyclesAfterInit = GC_get_gc_no();

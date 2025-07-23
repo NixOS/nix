@@ -1,25 +1,30 @@
-#include "args/root.hh"
-#include "current-process.hh"
-#include "command.hh"
-#include "common-args.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "globals.hh"
-#include "legacy.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "filetransfer.hh"
-#include "finally.hh"
-#include "loggers.hh"
-#include "markdown.hh"
-#include "memory-source-accessor.hh"
-#include "terminal.hh"
-#include "users.hh"
-#include "network-proxy.hh"
-#include "eval-cache.hh"
-#include "flake/flake.hh"
+#include "nix/util/args/root.hh"
+#include "nix/util/current-process.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/common-args.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/store/globals.hh"
+#include "nix/cmd/legacy.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/store-registration.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/util/finally.hh"
+#include "nix/main/loggers.hh"
+#include "nix/cmd/markdown.hh"
+#include "nix/util/memory-source-accessor.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/users.hh"
+#include "nix/cmd/network-proxy.hh"
+#include "nix/expr/eval-cache.hh"
+#include "nix/flake/flake.hh"
+#include "nix/flake/settings.hh"
+#include "nix/util/json-utils.hh"
+
 #include "self-exe.hh"
-#include "json-utils.hh"
+#include "crash-handler.hh"
+#include "cli-config-private.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -32,8 +37,8 @@
 # include <netinet/in.h>
 #endif
 
-#if __linux__
-# include "namespaces.hh"
+#ifdef __linux__
+# include "nix/util/linux-namespaces.hh"
 #endif
 
 #ifndef _WIN32
@@ -42,22 +47,9 @@ extern std::string chrootHelperName;
 void chrootHelper(int argc, char * * argv);
 #endif
 
-#include "strings.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
-
-enum struct AliasStatus {
-    /** Aliases that don't go away */
-    AcceptedShorthand,
-    /** Aliases that will go away */
-    Deprecated,
-};
-
-/** An alias, except for the original syntax, which is in the map key. */
-struct AliasInfo {
-    AliasStatus status;
-    std::vector<std::string> replacement;
-};
 
 /* Check if we have a non-loopback/link-local network interface. */
 static bool haveInternet()
@@ -162,53 +154,33 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
             .handler = {[&]() { refresh = true; }},
             .experimentalFeature = Xp::NixCommand,
         });
-    }
 
-    std::map<std::string, AliasInfo> aliases = {
-        {"add-to-store", { AliasStatus::Deprecated, {"store", "add-path"}}},
-        {"cat-nar", { AliasStatus::Deprecated, {"nar", "cat"}}},
-        {"cat-store", { AliasStatus::Deprecated, {"store", "cat"}}},
-        {"copy-sigs", { AliasStatus::Deprecated, {"store", "copy-sigs"}}},
-        {"dev-shell", { AliasStatus::Deprecated, {"develop"}}},
-        {"diff-closures", { AliasStatus::Deprecated, {"store", "diff-closures"}}},
-        {"dump-path", { AliasStatus::Deprecated, {"store", "dump-path"}}},
-        {"hash-file", { AliasStatus::Deprecated, {"hash", "file"}}},
-        {"hash-path", { AliasStatus::Deprecated, {"hash", "path"}}},
-        {"ls-nar", { AliasStatus::Deprecated, {"nar", "ls"}}},
-        {"ls-store", { AliasStatus::Deprecated, {"store", "ls"}}},
-        {"make-content-addressable", { AliasStatus::Deprecated, {"store", "make-content-addressed"}}},
-        {"optimise-store", { AliasStatus::Deprecated, {"store", "optimise"}}},
-        {"ping-store", { AliasStatus::Deprecated, {"store", "info"}}},
-        {"sign-paths", { AliasStatus::Deprecated, {"store", "sign"}}},
-        {"shell", { AliasStatus::AcceptedShorthand, {"env", "shell"}}},
-        {"show-derivation", { AliasStatus::Deprecated, {"derivation", "show"}}},
-        {"show-config", { AliasStatus::Deprecated, {"config", "show"}}},
-        {"to-base16", { AliasStatus::Deprecated, {"hash", "to-base16"}}},
-        {"to-base32", { AliasStatus::Deprecated, {"hash", "to-base32"}}},
-        {"to-base64", { AliasStatus::Deprecated, {"hash", "to-base64"}}},
-        {"verify", { AliasStatus::Deprecated, {"store", "verify"}}},
-        {"doctor", { AliasStatus::Deprecated, {"config", "check"}}},
+        aliases = {
+            {"add-to-store", { AliasStatus::Deprecated, {"store", "add-path"}}},
+            {"cat-nar", { AliasStatus::Deprecated, {"nar", "cat"}}},
+            {"cat-store", { AliasStatus::Deprecated, {"store", "cat"}}},
+            {"copy-sigs", { AliasStatus::Deprecated, {"store", "copy-sigs"}}},
+            {"dev-shell", { AliasStatus::Deprecated, {"develop"}}},
+            {"diff-closures", { AliasStatus::Deprecated, {"store", "diff-closures"}}},
+            {"dump-path", { AliasStatus::Deprecated, {"store", "dump-path"}}},
+            {"hash-file", { AliasStatus::Deprecated, {"hash", "file"}}},
+            {"hash-path", { AliasStatus::Deprecated, {"hash", "path"}}},
+            {"ls-nar", { AliasStatus::Deprecated, {"nar", "ls"}}},
+            {"ls-store", { AliasStatus::Deprecated, {"store", "ls"}}},
+            {"make-content-addressable", { AliasStatus::Deprecated, {"store", "make-content-addressed"}}},
+            {"optimise-store", { AliasStatus::Deprecated, {"store", "optimise"}}},
+            {"ping-store", { AliasStatus::Deprecated, {"store", "info"}}},
+            {"sign-paths", { AliasStatus::Deprecated, {"store", "sign"}}},
+            {"shell", { AliasStatus::AcceptedShorthand, {"env", "shell"}}},
+            {"show-derivation", { AliasStatus::Deprecated, {"derivation", "show"}}},
+            {"show-config", { AliasStatus::Deprecated, {"config", "show"}}},
+            {"to-base16", { AliasStatus::Deprecated, {"hash", "to-base16"}}},
+            {"to-base32", { AliasStatus::Deprecated, {"hash", "to-base32"}}},
+            {"to-base64", { AliasStatus::Deprecated, {"hash", "to-base64"}}},
+            {"verify", { AliasStatus::Deprecated, {"store", "verify"}}},
+            {"doctor", { AliasStatus::Deprecated, {"config", "check"}}},
+        };
     };
-
-    bool aliasUsed = false;
-
-    Strings::iterator rewriteArgs(Strings & args, Strings::iterator pos) override
-    {
-        if (aliasUsed || command || pos == args.end()) return pos;
-        auto arg = *pos;
-        auto i = aliases.find(arg);
-        if (i == aliases.end()) return pos;
-        auto & info = i->second;
-        if (info.status == AliasStatus::Deprecated) {
-            warn("'%s' is a deprecated alias for '%s'",
-                arg, concatStringsSep(" ", info.replacement));
-        }
-        pos = args.erase(pos);
-        for (auto j = info.replacement.rbegin(); j != info.replacement.rend(); ++j)
-            pos = args.insert(pos, *j);
-        aliasUsed = true;
-        return pos;
-    }
 
     std::string description() override
     {
@@ -235,13 +207,12 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         res["args"] = toJSON();
 
         auto stores = nlohmann::json::object();
-        for (auto & implem : *Implementations::registered) {
-            auto storeConfig = implem.getConfig();
-            auto storeName = storeConfig->name();
+        for (auto & [storeName, implem] : Implementations::registered()) {
             auto & j = stores[storeName];
-            j["doc"] = storeConfig->doc();
-            j["settings"] = storeConfig->toJSON();
-            j["experimentalFeature"] = storeConfig->experimentalFeature();
+            j["doc"] = implem.doc;
+            j["uri-schemes"] = implem.uriSchemes;
+            j["settings"] = implem.getConfig()->toJSON();
+            j["experimentalFeature"] = implem.experimentalFeature;
         }
         res["stores"] = std::move(stores);
         res["fetchers"] = fetchers::dumpRegisterInputSchemeInfo();
@@ -254,6 +225,14 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
    lowdown. */
 static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 {
+    // Check for aliases if subcommand has exactly one element
+    if (subcommand.size() == 1) {
+        auto alias = toplevel.aliases.find(subcommand[0]);
+        if (alias != toplevel.aliases.end()) {
+            subcommand = alias->second.replacement;
+        }
+    }
+
     auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
 
     evalSettings.restrictEval = false;
@@ -367,6 +346,8 @@ void mainWrapped(int argc, char * * argv)
 {
     savedArgv = argv;
 
+    registerCrashHandler();
+
     /* The chroot helper needs to be run before any threads have been
        started. */
 #ifndef _WIN32
@@ -378,7 +359,7 @@ void mainWrapped(int argc, char * * argv)
 
     initNix();
     initGC();
-    flake::initLib(flakeSettings);
+    flakeSettings.configureEvalSettings(evalSettings);
 
     /* Set the build hook location
 
@@ -391,7 +372,7 @@ void mainWrapped(int argc, char * * argv)
         "__build-remote",
     });
 
-    #if __linux__
+    #ifdef __linux__
     if (isRootUser()) {
         try {
             saveMountNamespace();
@@ -413,7 +394,7 @@ void mainWrapped(int argc, char * * argv)
     }
 
     {
-        auto legacy = (*RegisterLegacyCommand::commands)[programName];
+        auto legacy = RegisterLegacyCommand::commands()[programName];
         if (legacy) return legacy(argc, argv);
     }
 
@@ -505,6 +486,8 @@ void mainWrapped(int argc, char * * argv)
     } catch (UsageError &) {
         if (!args.helpRequested && !args.completions) throw;
     }
+
+    applyJSONLogger();
 
     if (args.helpRequested) {
         std::vector<std::string> subcommand;

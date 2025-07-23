@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "hash.hh"
+#include "nix/util/hash.hh"
 
 namespace nix {
 

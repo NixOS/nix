@@ -29,6 +29,7 @@ mkMesonLibrary (finalAttrs: {
     ./.version
     ./meson.build
     # ./meson.options
+    ./include/nix/expr/tests/meson.build
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];

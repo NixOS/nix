@@ -1,23 +1,23 @@
-#include "command.hh"
-#include "installable-flake.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "derivations.hh"
-#include "archive.hh"
-#include "builtins/buildenv.hh"
-#include "flake/flakeref.hh"
+#include "nix/cmd/command.hh"
+#include "nix/cmd/installable-flake.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/derivations.hh"
+#include "nix/util/archive.hh"
+#include "nix/store/builtins/buildenv.hh"
+#include "nix/flake/flakeref.hh"
 #include "../nix-env/user-env.hh"
-#include "profiles.hh"
-#include "names.hh"
-#include "url.hh"
-#include "flake/url-name.hh"
+#include "nix/store/profiles.hh"
+#include "nix/store/names.hh"
+#include "nix/util/url.hh"
+#include "nix/flake/url-name.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
 #include <iomanip>
 
-#include "strings.hh"
+#include "nix/util/strings.hh"
 
 using namespace nix;
 
@@ -67,7 +67,7 @@ struct ProfileElement
      * Return a string representing an installable corresponding to the current
      * element, either a flakeref or a plain store path
      */
-    std::set<std::string> toInstallables(Store & store)
+    StringSet toInstallables(Store & store)
     {
         if (source)
             return {source->to_string()};
@@ -338,14 +338,14 @@ builtPathsPerInstallable(
     return res;
 }
 
-struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
+struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
 {
     std::optional<int64_t> priority;
 
-    CmdProfileInstall() {
+    CmdProfileAdd() {
         addFlag({
             .longName = "priority",
-            .description = "The priority of the package to install.",
+            .description = "The priority of the package to add.",
             .labels = {"priority"},
             .handler = {&priority},
         });
@@ -353,13 +353,13 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
     std::string description() override
     {
-        return "install a package into a profile";
+        return "add a package to a profile";
     }
 
     std::string doc() override
     {
         return
-          #include "profile-install.md"
+          #include "profile-add.md"
           ;
     }
 
@@ -415,7 +415,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     && existingSource->originalRef == elementSource->originalRef
                     && existingSource->attrPath == elementSource->attrPath
                     ) {
-                    warn("'%s' is already installed", elementName);
+                    warn("'%s' is already added", elementName);
                     continue;
                 }
             }
@@ -462,15 +462,15 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 "\n"
                 "  nix profile remove %3%\n"
                 "\n"
-                "The new package can also be installed next to the existing one by assigning a different priority.\n"
+                "The new package can also be added next to the existing one by assigning a different priority.\n"
                 "The conflicting packages have a priority of %5%.\n"
                 "To prioritise the new package:\n"
                 "\n"
-                "  nix profile install %4% --priority %6%\n"
+                "  nix profile add %4% --priority %6%\n"
                 "\n"
                 "To prioritise the existing package:\n"
                 "\n"
-                "  nix profile install %4% --priority %7%\n",
+                "  nix profile add %4% --priority %7%\n",
                 originalConflictingFilePath,
                 newConflictingFilePath,
                 originalEntryName,
@@ -600,7 +600,7 @@ public:
         });
     }
 
-    std::set<std::string> getMatchingElementNames(ProfileManifest & manifest) {
+    StringSet getMatchingElementNames(ProfileManifest & manifest) {
         if (_matchers.empty()) {
             throw UsageError("No packages specified.");
         }
@@ -614,7 +614,7 @@ public:
             return {};
         }
 
-        std::set<std::string> result;
+        StringSet result;
         for (auto & matcher : _matchers) {
             bool foundMatch = false;
             for (auto & [name, element] : manifest.elements) {
@@ -708,16 +708,14 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
             if (!element.source) {
                 warn(
-                    "Found package '%s', but it was not installed from a flake, so it can't be checked for upgrades!",
-                    element.identifier()
-                );
+                    "Found package '%s', but it was not added from a flake, so it can't be checked for upgrades!",
+                    element.identifier());
                 continue;
             }
             if (element.source->originalRef.input.isLocked()) {
                 warn(
-                    "Found package '%s', but it was installed from a locked flake reference so it can't be upgraded!",
-                    element.identifier()
-                );
+                    "Found package '%s', but it was added from a locked flake reference so it can't be upgraded!",
+                    element.identifier());
                 continue;
             }
 
@@ -787,7 +785,7 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
 {
     std::string description() override
     {
-        return "list installed packages";
+        return "list packages in the profile";
     }
 
     std::string doc() override
@@ -802,7 +800,7 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
         ProfileManifest manifest(*getEvalState(), *profile);
 
         if (json) {
-            std::cout << manifest.toJSON(*store).dump() << "\n";
+            printJSON(manifest.toJSON(*store));
         } else {
             for (const auto & [i, e] : enumerate(manifest.elements)) {
                 auto & [name, element] = e;
@@ -978,7 +976,7 @@ struct CmdProfile : NixMultiCommand
         : NixMultiCommand(
             "profile",
             {
-              {"install", []() { return make_ref<CmdProfileInstall>(); }},
+              {"add", []() { return make_ref<CmdProfileAdd>(); }},
               {"remove", []() { return make_ref<CmdProfileRemove>(); }},
               {"upgrade", []() { return make_ref<CmdProfileUpgrade>(); }},
               {"list", []() { return make_ref<CmdProfileList>(); }},
@@ -987,7 +985,11 @@ struct CmdProfile : NixMultiCommand
               {"rollback", []() { return make_ref<CmdProfileRollback>(); }},
               {"wipe-history", []() { return make_ref<CmdProfileWipeHistory>(); }},
           })
-    { }
+    {
+        aliases = {
+            {"install", { AliasStatus::Deprecated, {"add"}}},
+        };
+    }
 
     std::string description() override
     {

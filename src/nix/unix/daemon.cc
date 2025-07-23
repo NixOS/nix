@@ -1,20 +1,21 @@
 ///@file
 
-#include "signals.hh"
-#include "unix-domain-socket.hh"
-#include "command.hh"
-#include "shared.hh"
-#include "local-store.hh"
-#include "remote-store.hh"
-#include "remote-store-connection.hh"
-#include "serialise.hh"
-#include "archive.hh"
-#include "globals.hh"
-#include "config-global.hh"
-#include "derivations.hh"
-#include "finally.hh"
-#include "legacy.hh"
-#include "daemon.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/unix-domain-socket.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/remote-store.hh"
+#include "nix/store/remote-store-connection.hh"
+#include "nix/store/store-open.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/archive.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/config-global.hh"
+#include "nix/store/derivations.hh"
+#include "nix/util/finally.hh"
+#include "nix/cmd/legacy.hh"
+#include "nix/store/daemon.hh"
 #include "man-pages.hh"
 
 #include <algorithm>
@@ -34,11 +35,11 @@
 #include <grp.h>
 #include <fcntl.h>
 
-#if __linux__
-#include "cgroup.hh"
+#ifdef __linux__
+#include "nix/util/cgroup.hh"
 #endif
 
-#if __APPLE__ || __FreeBSD__
+#if defined(__APPLE__) || defined(__FreeBSD__)
 #include <sys/ucred.h>
 #endif
 
@@ -244,7 +245,7 @@ static PeerInfo getPeerInfo(int remote)
  */
 static ref<Store> openUncachedStore()
 {
-    Store::Params params; // FIXME: get params from somewhere
+    Store::Config::Params params; // FIXME: get params from somewhere
     // Disable caching since the client already does that.
     params["path-info-cache-size"] = "0";
     return openStore(settings.storeUri, params);
@@ -317,7 +318,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
     //  Get rid of children automatically; don't let them become zombies.
     setSigChldAction(true);
 
-    #if __linux__
+    #ifdef __linux__
     if (settings.useCgroups) {
         experimentalFeatureSettings.require(Xp::Cgroups);
 
@@ -480,7 +481,7 @@ static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
  * @param forceTrustClientOpt See `daemonLoop()` and the parameter with
  * the same name over there for details.
  *
- * @param procesOps Whether to force processing ops even if the next
+ * @param processOps Whether to force processing ops even if the next
  * store also is a remote store and could process it directly.
  */
 static void runDaemon(bool stdio, std::optional<TrustedFlag> forceTrustClientOpt, bool processOps)
@@ -546,7 +547,7 @@ static int main_nix_daemon(int argc, char * * argv)
 
 static RegisterLegacyCommand r_nix_daemon("nix-daemon", main_nix_daemon);
 
-struct CmdDaemon : StoreCommand
+struct CmdDaemon : Command
 {
     bool stdio = false;
     std::optional<TrustedFlag> isTrustedOpt = std::nullopt;
@@ -571,7 +572,7 @@ struct CmdDaemon : StoreCommand
 
         addFlag({
             .longName = "force-untrusted",
-            .description = "Force the daemon to not trust connecting clients. The connection will be processed by the receiving daemon before forwarding commands.",
+            .description = "Force the daemon to not trust connecting clients. The connection is processed by the receiving daemon before forwarding commands.",
             .handler = {[&]() {
                 isTrustedOpt = NotTrusted;
             }},
@@ -615,7 +616,7 @@ struct CmdDaemon : StoreCommand
           ;
     }
 
-    void run(ref<Store> store) override
+    void run() override
     {
         runDaemon(stdio, isTrustedOpt, processOps);
     }

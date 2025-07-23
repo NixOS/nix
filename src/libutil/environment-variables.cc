@@ -1,5 +1,5 @@
-#include "util.hh"
-#include "environment-variables.hh"
+#include "nix/util/util.hh"
+#include "nix/util/environment-variables.hh"
 
 extern char ** environ __attribute__((weak));
 
@@ -21,9 +21,9 @@ std::optional<std::string> getEnvNonEmpty(const std::string & key)
     return value;
 }
 
-std::map<std::string, std::string> getEnv()
+StringMap getEnv()
 {
-    std::map<std::string, std::string> env;
+    StringMap env;
     for (size_t i = 0; environ[i]; ++i) {
         auto s = environ[i];
         auto eq = strchr(s, '=');
@@ -41,7 +41,7 @@ void clearEnv()
         unsetenv(name.first.c_str());
 }
 
-void replaceEnv(const std::map<std::string, std::string> & newEnv)
+void replaceEnv(const StringMap & newEnv)
 {
     clearEnv();
     for (auto & newEnvVar : newEnv)

@@ -1,5 +1,5 @@
-#include "util.hh"
-#include "value/context.hh"
+#include "nix/util/util.hh"
+#include "nix/expr/value/context.hh"
 
 #include <optional>
 

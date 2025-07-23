@@ -1,11 +1,11 @@
-#include "worker-protocol-connection.hh"
-#include "worker-protocol-impl.hh"
-#include "build-result.hh"
-#include "derivations.hh"
+#include "nix/store/worker-protocol-connection.hh"
+#include "nix/store/worker-protocol-impl.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/derivations.hh"
 
 namespace nix {
 
-const std::set<WorkerProto::Feature> WorkerProto::allFeatures{};
+const WorkerProto::FeatureSet WorkerProto::allFeatures{};
 
 WorkerProto::BasicClientConnection::~BasicClientConnection()
 {
@@ -146,21 +146,20 @@ void WorkerProto::BasicClientConnection::processStderr(
     }
 }
 
-static std::set<WorkerProto::Feature>
-intersectFeatures(const std::set<WorkerProto::Feature> & a, const std::set<WorkerProto::Feature> & b)
+static WorkerProto::FeatureSet intersectFeatures(const WorkerProto::FeatureSet & a, const WorkerProto::FeatureSet & b)
 {
-    std::set<WorkerProto::Feature> res;
+    WorkerProto::FeatureSet res;
     for (auto & x : a)
         if (b.contains(x))
             res.insert(x);
     return res;
 }
 
-std::tuple<WorkerProto::Version, std::set<WorkerProto::Feature>> WorkerProto::BasicClientConnection::handshake(
+std::tuple<WorkerProto::Version, WorkerProto::FeatureSet> WorkerProto::BasicClientConnection::handshake(
     BufferedSink & to,
     Source & from,
     WorkerProto::Version localVersion,
-    const std::set<WorkerProto::Feature> & supportedFeatures)
+    const WorkerProto::FeatureSet & supportedFeatures)
 {
     to << WORKER_MAGIC_1 << localVersion;
     to.flush();
@@ -178,21 +177,21 @@ std::tuple<WorkerProto::Version, std::set<WorkerProto::Feature>> WorkerProto::Ba
     auto protoVersion = std::min(daemonVersion, localVersion);
 
     /* Exchange features. */
-    std::set<WorkerProto::Feature> daemonFeatures;
+    WorkerProto::FeatureSet daemonFeatures;
     if (GET_PROTOCOL_MINOR(protoVersion) >= 38) {
         to << supportedFeatures;
         to.flush();
-        daemonFeatures = readStrings<std::set<WorkerProto::Feature>>(from);
+        daemonFeatures = readStrings<WorkerProto::FeatureSet>(from);
     }
 
     return {protoVersion, intersectFeatures(daemonFeatures, supportedFeatures)};
 }
 
-std::tuple<WorkerProto::Version, std::set<WorkerProto::Feature>> WorkerProto::BasicServerConnection::handshake(
+std::tuple<WorkerProto::Version, WorkerProto::FeatureSet> WorkerProto::BasicServerConnection::handshake(
     BufferedSink & to,
     Source & from,
     WorkerProto::Version localVersion,
-    const std::set<WorkerProto::Feature> & supportedFeatures)
+    const WorkerProto::FeatureSet & supportedFeatures)
 {
     unsigned int magic = readInt(from);
     if (magic != WORKER_MAGIC_1)
@@ -204,9 +203,9 @@ std::tuple<WorkerProto::Version, std::set<WorkerProto::Feature>> WorkerProto::Ba
     auto protoVersion = std::min(clientVersion, localVersion);
 
     /* Exchange features. */
-    std::set<WorkerProto::Feature> clientFeatures;
+    WorkerProto::FeatureSet clientFeatures;
     if (GET_PROTOCOL_MINOR(protoVersion) >= 38) {
-        clientFeatures = readStrings<std::set<WorkerProto::Feature>>(from);
+        clientFeatures = readStrings<WorkerProto::FeatureSet>(from);
         to << supportedFeatures;
         to.flush();
     }

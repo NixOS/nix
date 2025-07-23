@@ -33,6 +33,7 @@ let
     {
       settings,
       doc,
+      uri-schemes,
       experimentalFeature,
     }:
     let

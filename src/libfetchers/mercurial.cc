@@ -1,13 +1,13 @@
-#include "fetchers.hh"
-#include "processes.hh"
-#include "users.hh"
-#include "cache.hh"
-#include "globals.hh"
-#include "tarfile.hh"
-#include "store-api.hh"
-#include "url-parts.hh"
-#include "store-path-accessor.hh"
-#include "fetch-settings.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/users.hh"
+#include "nix/fetchers/cache.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/tarfile.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/url-parts.hh"
+#include "nix/fetchers/store-path-accessor.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 #include <sys/time.h>
 
@@ -194,7 +194,7 @@ struct MercurialInputScheme : InputScheme
 
                 input.attrs.insert_or_assign("ref", chomp(runHg({ "branch", "-R", actualUrl })));
 
-                auto files = tokenizeString<std::set<std::string>>(
+                auto files = tokenizeString<StringSet>(
                     runHg({ "status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0" }), "\0"s);
 
                 Path actualPath(absPath(actualUrl));
@@ -253,13 +253,13 @@ struct MercurialInputScheme : InputScheme
         }};
 
         if (!input.getRev()) {
-            if (auto res = getCache()->lookupWithTTL(refToRevKey))
+            if (auto res = input.settings->getCache()->lookupWithTTL(refToRevKey))
                 input.attrs.insert_or_assign("rev", getRevAttr(*res, "rev").gitRev());
         }
 
         /* If we have a rev, check if we have a cached store path. */
         if (auto rev = input.getRev()) {
-            if (auto res = getCache()->lookupStorePath(revInfoKey(*rev), *store))
+            if (auto res = input.settings->getCache()->lookupStorePath(revInfoKey(*rev), *store))
                 return makeResult(res->value, res->storePath);
         }
 
@@ -309,7 +309,7 @@ struct MercurialInputScheme : InputScheme
 
         /* Now that we have the rev, check the cache again for a
            cached store path. */
-        if (auto res = getCache()->lookupStorePath(revInfoKey(rev), *store))
+        if (auto res = input.settings->getCache()->lookupStorePath(revInfoKey(rev), *store))
             return makeResult(res->value, res->storePath);
 
         Path tmpDir = createTempDir();
@@ -326,9 +326,9 @@ struct MercurialInputScheme : InputScheme
         });
 
         if (!origRev)
-            getCache()->upsert(refToRevKey, {{"rev", rev.gitRev()}});
+            input.settings->getCache()->upsert(refToRevKey, {{"rev", rev.gitRev()}});
 
-        getCache()->upsert(revInfoKey(rev), *store, infoAttrs, storePath);
+        input.settings->getCache()->upsert(revInfoKey(rev), *store, infoAttrs, storePath);
 
         return makeResult(infoAttrs, std::move(storePath));
     }

@@ -1,8 +1,8 @@
-#include "experimental-features.hh"
-#include "fmt.hh"
-#include "util.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/util.hh"
 
-#include "nlohmann/json.hpp"
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -107,7 +107,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .name = "git-hashing",
         .description = R"(
             Allow creating (content-addressed) store objects which are hashed via Git's hashing algorithm.
-            These store objects will not be understandable by older versions of Nix.
+            These store objects aren't understandable by older versions of Nix.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/41",
     },
@@ -358,7 +358,7 @@ nlohmann::json documentExperimentalFeatures()
     return (nlohmann::json) res;
 }
 
-std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> & rawFeatures)
+std::set<ExperimentalFeature> parseFeatures(const StringSet & rawFeatures)
 {
     std::set<ExperimentalFeature> res;
     for (auto & rawFeature : rawFeatures)

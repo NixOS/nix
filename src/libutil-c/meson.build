@@ -23,24 +23,11 @@ deps_public_maybe_subproject = [
 ]
 subdir('nix-meson-build-support/subprojects')
 
-# TODO rename, because it will conflict with downstream projects
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
-config_h = configure_file(
+config_priv_h = configure_file(
   configuration : configdata,
-  output : 'config-util.h',
-)
-
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-
-  # From C++ libraries, only for internals
-  '-include', 'config-util.hh',
-
-  # From C libraries, for our public, installed headers too
-  '-include', 'config-util.h',
-  language : 'cpp',
+  output : 'nix_api_util_config.h',
 )
 
 subdir('nix-meson-build-support/common')
@@ -51,7 +38,7 @@ sources = files(
 
 include_dirs = [include_directories('.')]
 
-headers = [config_h] + files(
+headers = files(
   'nix_api_util.h',
 )
 
@@ -64,6 +51,7 @@ subdir('nix-meson-build-support/windows-version')
 this_library = library(
   'nixutilc',
   sources,
+  config_priv_h,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args: linker_export_flags,
@@ -71,7 +59,7 @@ this_library = library(
   install : true,
 )
 
-install_headers(headers, subdir : 'nix', preserve_path : true)
+install_headers(headers, preserve_path : true)
 
 libraries_private = []
 

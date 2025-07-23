@@ -1,6 +1,6 @@
-#include "machines.hh"
-#include "globals.hh"
-#include "store-api.hh"
+#include "nix/store/machines.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/store-open.hh"
 
 #include <algorithm>
 
@@ -47,7 +47,7 @@ bool Machine::systemSupported(const std::string & system) const
     return system == "builtin" || (systemTypes.count(system) > 0);
 }
 
-bool Machine::allSupported(const std::set<std::string> & features) const
+bool Machine::allSupported(const StringSet & features) const
 {
     return std::all_of(features.begin(), features.end(),
         [&](const std::string & feature) {
@@ -56,7 +56,7 @@ bool Machine::allSupported(const std::set<std::string> & features) const
         });
 }
 
-bool Machine::mandatoryMet(const std::set<std::string> & features) const
+bool Machine::mandatoryMet(const StringSet & features) const
 {
     return std::all_of(mandatoryFeatures.begin(), mandatoryFeatures.end(),
         [&](const std::string & feature) {
@@ -105,33 +105,36 @@ ref<Store> Machine::openStore() const
 static std::vector<std::string> expandBuilderLines(const std::string & builders)
 {
     std::vector<std::string> result;
-    for (auto line : tokenizeString<std::vector<std::string>>(builders, "\n;")) {
-        trim(line);
+    for (auto line : tokenizeString<std::vector<std::string>>(builders, "\n")) {
         line.erase(std::find(line.begin(), line.end(), '#'), line.end());
-        if (line.empty()) continue;
+        for (auto entry : tokenizeString<std::vector<std::string>>(line, ";")) {
+            entry = trim(entry);
 
-        if (line[0] == '@') {
-            const std::string path = trim(std::string(line, 1));
-            std::string text;
-            try {
-                text = readFile(path);
-            } catch (const SysError & e) {
-                if (e.errNo != ENOENT)
-                    throw;
-                debug("cannot find machines file '%s'", path);
+            if (entry.empty()) {
+                // skip blank entries
+            } else if (entry[0] == '@') {
+                const std::string path = trim(std::string_view{entry}.substr(1));
+                std::string text;
+                try {
+                    text = readFile(path);
+                } catch (const SysError & e) {
+                    if (e.errNo != ENOENT)
+                        throw;
+                    debug("cannot find machines file '%s'", path);
+                    continue;
+                }
+
+                const auto entrys = expandBuilderLines(text);
+                result.insert(end(result), begin(entrys), end(entrys));
+            } else {
+                result.emplace_back(entry);
             }
-
-            const auto lines = expandBuilderLines(text);
-            result.insert(end(result), begin(lines), end(lines));
-            continue;
         }
-
-        result.emplace_back(line);
     }
     return result;
 }
 
-static Machine parseBuilderLine(const std::set<std::string> & defaultSystems, const std::string & line)
+static Machine parseBuilderLine(const StringSet & defaultSystems, const std::string & line)
 {
     const auto tokens = tokenizeString<std::vector<std::string>>(line);
 
@@ -175,7 +178,7 @@ static Machine parseBuilderLine(const std::set<std::string> & defaultSystems, co
         // `storeUri`
         tokens[0],
         // `systemTypes`
-        isSet(1) ? tokenizeString<std::set<std::string>>(tokens[1], ",") : defaultSystems,
+        isSet(1) ? tokenizeString<StringSet>(tokens[1], ",") : defaultSystems,
         // `sshKey`
         isSet(2) ? tokens[2] : "",
         // `maxJobs`
@@ -183,15 +186,15 @@ static Machine parseBuilderLine(const std::set<std::string> & defaultSystems, co
         // `speedFactor`
         isSet(4) ? parseFloatField(4) : 1.0f,
         // `supportedFeatures`
-        isSet(5) ? tokenizeString<std::set<std::string>>(tokens[5], ",") : std::set<std::string>{},
+        isSet(5) ? tokenizeString<StringSet>(tokens[5], ",") : StringSet{},
         // `mandatoryFeatures`
-        isSet(6) ? tokenizeString<std::set<std::string>>(tokens[6], ",") : std::set<std::string>{},
+        isSet(6) ? tokenizeString<StringSet>(tokens[6], ",") : StringSet{},
         // `sshPublicHostKey`
         isSet(7) ? ensureBase64(7) : ""
     };
 }
 
-static Machines parseBuilderLines(const std::set<std::string> & defaultSystems, const std::vector<std::string> & builders)
+static Machines parseBuilderLines(const StringSet & defaultSystems, const std::vector<std::string> & builders)
 {
     Machines result;
     std::transform(
@@ -200,7 +203,7 @@ static Machines parseBuilderLines(const std::set<std::string> & defaultSystems, 
     return result;
 }
 
-Machines Machine::parseConfig(const std::set<std::string> & defaultSystems, const std::string & s)
+Machines Machine::parseConfig(const StringSet & defaultSystems, const std::string & s)
 {
     const auto builderLines = expandBuilderLines(s);
     return parseBuilderLines(defaultSystems, builderLines);

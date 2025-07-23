@@ -6,6 +6,6 @@ file=build-hook-ca-floating.nix
 
 enableFeatures "ca-derivations"
 
-CONTENT_ADDRESSED=true
+NIX_TESTS_CA_BY_DEFAULT=true
 
 source build-remote.sh

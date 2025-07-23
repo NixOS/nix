@@ -17,6 +17,7 @@ subdir('nix-meson-build-support/deps-lists')
 deps_private_maybe_subproject = [
   dependency('nix-store-test-support'),
   dependency('nix-fetchers'),
+  dependency('nix-fetchers-c'),
 ]
 deps_public_maybe_subproject = [
 ]
@@ -34,20 +35,12 @@ deps_private += gtest
 libgit2 = dependency('libgit2')
 deps_private += libgit2
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  # '-include', 'config-fetchers.h',
-  language : 'cpp',
-)
-
 subdir('nix-meson-build-support/common')
 
 sources = files(
   'access-tokens.cc',
   'git-utils.cc',
+  'nix_api_fetchers.cc',
   'public-key.cc',
 )
 

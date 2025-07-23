@@ -7,7 +7,7 @@ project('nix', 'cpp',
     'errorlogs=true', # Please print logs for tests that fail
     'localstatedir=/nix/var',
   ],
-  meson_version : '>= 1.1',
+  meson_version : '>= 1.4',
   license : 'LGPL-2.1-or-later',
 )
 
@@ -39,35 +39,25 @@ configdata = configuration_data()
 configdata.set_quoted('NIX_CLI_VERSION', meson.project_version())
 
 fs = import('fs')
+prefix = get_option('prefix')
 
 bindir = get_option('bindir')
-if not fs.is_absolute(bindir)
-  bindir = get_option('prefix') / bindir
-endif
+bindir = fs.is_absolute(bindir) ? bindir : prefix / bindir
 configdata.set_quoted('NIX_BIN_DIR', bindir)
 
-config_h = configure_file(
-  configuration : configdata,
-  output : 'config-nix-cli.hh',
-)
+mandir = get_option('mandir')
+mandir = fs.is_absolute(mandir) ? mandir : prefix / mandir
+configdata.set_quoted('NIX_MAN_DIR', mandir)
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  '-include', 'config-expr.hh',
-  #'-include', 'config-fetchers.hh',
-  '-include', 'config-main.hh',
-  '-include', 'config-cmd.hh',
-  '-include', 'config-nix-cli.hh',
-  language : 'cpp',
+config_priv_h = configure_file(
+  configuration : configdata,
+  output : 'cli-config-private.hh',
 )
 
 subdir('nix-meson-build-support/common')
 subdir('nix-meson-build-support/generate-header')
 
-nix_sources = [config_h] + files(
+nix_sources = [config_priv_h] + files(
   'add-to-store.cc',
   'app.cc',
   'self-exe.cc',
@@ -77,6 +67,7 @@ nix_sources = [config_h] + files(
   'config-check.cc',
   'config.cc',
   'copy.cc',
+  'crash-handler.cc',
   'derivation-add.cc',
   'derivation-show.cc',
   'derivation.cc',
@@ -87,7 +78,7 @@ nix_sources = [config_h] + files(
   'env.cc',
   'eval.cc',
   'flake.cc',
-  'fmt.cc',
+  'formatter.cc',
   'hash.cc',
   'log.cc',
   'ls.cc',
@@ -186,16 +177,6 @@ if host_machine.system() != 'windows'
   ]
 endif
 
-fs = import('fs')
-prefix = get_option('prefix')
-
-mandir = get_option('mandir')
-mandir = fs.is_absolute(mandir) ? mandir : prefix / mandir
-
-cpp_args= [
-  '-DNIX_MAN_DIR="@0@"'.format(mandir)
-]
-
 include_dirs = [include_directories('.')]
 
 this_exe = executable(
@@ -203,7 +184,6 @@ this_exe = executable(
   sources,
   dependencies : deps_private_subproject + deps_private + deps_other,
   include_directories : include_dirs,
-  cpp_args : cpp_args,
   link_args: linker_export_flags,
   install : true,
 )
@@ -246,7 +226,7 @@ foreach linkname : nix_symlinks
     # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
     build_by_default: true
   )
-  # TODO(Ericson3214): Dosen't yet work
+  # TODO(Ericson3214): Doesn't yet work
   #meson.override_find_program(linkname, t)
 endforeach
 
@@ -266,7 +246,7 @@ custom_target(
   # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
   build_by_default: true
 )
-# TODO(Ericson3214): Dosen't yet work
+# TODO(Ericson3214): Doesn't yet work
 #meson.override_find_program(linkname, t)
 
 localstatedir = nix_store.get_variable(

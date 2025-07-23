@@ -2,11 +2,11 @@
 #include <stdexcept>
 #include <string>
 
-#include "eval.hh"
-#include "eval-gc.hh"
-#include "globals.hh"
-#include "eval-settings.hh"
-#include "ref.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-gc.hh"
+#include "nix/store/globals.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/util/ref.hh"
 
 #include "nix_api_expr.h"
 #include "nix_api_expr_internal.h"
@@ -15,7 +15,7 @@
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
 
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
 #  include <mutex>
 #endif
 
@@ -199,7 +199,9 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c
             != NIX_OK)
         return nullptr;
 
-    return nix_eval_state_build(context, builder);
+    auto *state = nix_eval_state_build(context, builder);
+    nix_eval_state_builder_free(builder);
+    return state;
 }
 
 void nix_state_free(EvalState * state)
@@ -207,7 +209,7 @@ void nix_state_free(EvalState * state)
     delete state;
 }
 
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
 std::unordered_map<
     const void *,
     unsigned int,
@@ -283,7 +285,7 @@ nix_err nix_value_decref(nix_c_context * context, nix_value *x)
 
 void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * obj, void * cd))
 {
-#if HAVE_BOEHMGC
+#if NIX_USE_BOEHMGC
     GC_REGISTER_FINALIZER(obj, finalizer, cd, 0, 0);
 #endif
 }

@@ -27,7 +27,7 @@ nix store info --store ssh://username@mac
 ```
 
 To specify an SSH identity file as part of the remote store URI add a
-query paramater, e.g.
+query parameter, e.g.
 
 ```console
 nix store info --store ssh://username@mac?ssh-key=/home/alice/my-key

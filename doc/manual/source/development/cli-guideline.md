@@ -170,9 +170,9 @@ sensitive.
 
 
 ```shell
-$ nix init --template=template#pyton
+$ nix init --template=template#python
 ------------------------------------------------------------------------
-  Error! Template `template#pyton` not found.
+  Error! Template `template#python` not found.
 ------------------------------------------------------------------------
 Initializing Nix project at `/path/to/here`.
       Select a template for you new project:

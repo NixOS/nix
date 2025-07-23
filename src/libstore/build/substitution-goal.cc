@@ -1,14 +1,15 @@
-#include "worker.hh"
-#include "substitution-goal.hh"
-#include "nar-info.hh"
-#include "finally.hh"
-#include "signals.hh"
+#include "nix/store/build/worker.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/build/substitution-goal.hh"
+#include "nix/store/nar-info.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/signals.hh"
 #include <coroutine>
 
 namespace nix {
 
 PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
-    : Goal(worker, DerivedPath::Opaque { storePath })
+    : Goal(worker, init())
     , storePath(storePath)
     , repair(repair)
     , ca(ca)
@@ -121,20 +122,22 @@ Goal::Co PathSubstitutionGoal::init()
         /* Bail out early if this substituter lacks a valid
            signature. LocalStore::addToStore() also checks for this, but
            only after we've downloaded the path. */
-        if (!sub->isTrusted && worker.store.pathInfoIsUntrusted(*info))
+        if (!sub->config.isTrusted && worker.store.pathInfoIsUntrusted(*info))
         {
             warn("ignoring substitute for '%s' from '%s', as it's not signed by any of the keys in 'trusted-public-keys'",
                 worker.store.printStorePath(storePath), sub->getUri());
             continue;
         }
 
+        Goals waitees;
+
         /* To maintain the closure invariant, we first have to realise the
            paths referenced by this one. */
         for (auto & i : info->references)
             if (i != storePath) /* ignore self-references */
-                addWaitee(worker.makePathSubstitutionGoal(i));
+                waitees.insert(worker.makePathSubstitutionGoal(i));
 
-        if (!waitees.empty()) co_await Suspend{};
+        co_await await(std::move(waitees));
 
         // FIXME: consider returning boolean instead of passing in reference
         bool out = false; // is mutated by tryToRun
@@ -166,17 +169,21 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
 
     if (nrFailed > 0) {
         co_return done(
-            nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed,
+            nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed,
             BuildResult::DependencyFailed,
             fmt("some references of path '%s' could not be realised", worker.store.printStorePath(storePath)));
     }
 
     for (auto & i : info->references)
-        if (i != storePath) /* ignore self-references */
-            assert(worker.store.isValidPath(i));
+         /* ignore self-references */
+        if (i != storePath) {
+            if (!worker.store.isValidPath(i)) {
+                throw Error("reference '%s' of path '%s' is not a valid path",
+                            worker.store.printStorePath(i), worker.store.printStorePath(storePath));
+            }
+        }
 
-    worker.wakeUp(shared_from_this());
-    co_await Suspend{};
+    co_await yield();
 
     trace("trying to run");
 
@@ -184,8 +191,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
        if maxSubstitutionJobs == 0, we still allow a substituter to run. This
        prevents infinite waiting. */
     while (worker.getNrSubstitutions() >= std::max(1U, (unsigned int) settings.maxSubstitutionJobs)) {
-        worker.waitForBuildSlot(shared_from_this());
-        co_await Suspend{};
+        co_await waitForBuildSlot();
     }
 
     auto maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
@@ -210,7 +216,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
             PushActivity pact(act.id);
 
             copyStorePath(*sub, worker.store,
-                subPath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
+                subPath, repair, sub->config.isTrusted ? NoCheckSigs : CheckSigs);
 
             promise.set_value();
         } catch (...) {

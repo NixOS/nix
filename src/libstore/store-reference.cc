@@ -1,10 +1,10 @@
 #include <regex>
 
-#include "error.hh"
-#include "url.hh"
-#include "store-reference.hh"
-#include "file-system.hh"
-#include "util.hh"
+#include "nix/util/error.hh"
+#include "nix/util/url.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

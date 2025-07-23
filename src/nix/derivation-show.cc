@@ -1,17 +1,17 @@
 // FIXME: integrate this with `nix path-info`?
 // FIXME: rename to 'nix store derivation show'?
 
-#include "command.hh"
-#include "common-args.hh"
-#include "store-api.hh"
-#include "archive.hh"
-#include "derivations.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/common-args.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/archive.hh"
+#include "nix/store/derivations.hh"
 #include <nlohmann/json.hpp>
 
 using namespace nix;
 using json = nlohmann::json;
 
-struct CmdShowDerivation : InstallablesCommand
+struct CmdShowDerivation : InstallablesCommand, MixPrintJSON
 {
     bool recursive = false;
 
@@ -21,7 +21,7 @@ struct CmdShowDerivation : InstallablesCommand
             .longName = "recursive",
             .shortName = 'r',
             .description = "Include the dependencies of the specified derivations.",
-            .handler = {&recursive, true}
+            .handler = {&recursive, true},
         });
     }
 
@@ -57,7 +57,7 @@ struct CmdShowDerivation : InstallablesCommand
             jsonRoot[store->printStorePath(drvPath)] =
                 store->readDerivation(drvPath).toJSON(*store);
         }
-        logger->cout(jsonRoot.dump(2));
+        printJSON(jsonRoot);
     }
 };
 

@@ -1,37 +1,35 @@
-#include "globals.hh"
-#include "installables.hh"
-#include "installable-derived-path.hh"
-#include "installable-attr-path.hh"
-#include "installable-flake.hh"
-#include "outputs-spec.hh"
-#include "users.hh"
-#include "util.hh"
-#include "command.hh"
-#include "attr-path.hh"
-#include "common-eval-args.hh"
-#include "derivations.hh"
-#include "eval-inline.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "get-drvs.hh"
-#include "store-api.hh"
-#include "shared.hh"
-#include "flake/flake.hh"
-#include "eval-cache.hh"
-#include "url.hh"
-#include "registry.hh"
-#include "build-result.hh"
+#include "nix/store/globals.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/cmd/installable-derived-path.hh"
+#include "nix/cmd/installable-attr-path.hh"
+#include "nix/cmd/installable-flake.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/users.hh"
+#include "nix/util/util.hh"
+#include "nix/cmd/command.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/cmd/common-eval-args.hh"
+#include "nix/store/derivations.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/expr/get-drvs.hh"
+#include "nix/store/store-api.hh"
+#include "nix/main/shared.hh"
+#include "nix/flake/flake.hh"
+#include "nix/expr/eval-cache.hh"
+#include "nix/util/url.hh"
+#include "nix/fetchers/registry.hh"
+#include "nix/store/build-result.hh"
 
 #include <regex>
 #include <queue>
 
 #include <nlohmann/json.hpp>
 
-#include "strings-inline.hh"
+#include "nix/util/strings-inline.hh"
 
 namespace nix {
-
-namespace fs { using namespace std::filesystem; }
 
 void completeFlakeInputAttrPath(
     AddCompletions & completions,
@@ -40,7 +38,7 @@ void completeFlakeInputAttrPath(
     std::string_view prefix)
 {
     for (auto & flakeRef : flakeRefs) {
-        auto flake = flake::getFlake(*evalState, flakeRef, true);
+        auto flake = flake::getFlake(*evalState, flakeRef, fetchers::UseRegistries::All);
         for (auto & input : flake.inputs)
             if (hasPrefix(input.first, prefix))
                 completions.add(input.first);
@@ -64,21 +62,21 @@ MixFlakeOptions::MixFlakeOptions()
         .handler = {[&]() {
             lockFlags.recreateLockFile = true;
             warn("'--recreate-lock-file' is deprecated and will be removed in a future version; use 'nix flake update' instead.");
-        }}
+        }},
     });
 
     addFlag({
         .longName = "no-update-lock-file",
         .description = "Do not allow any updates to the flake's lock file.",
         .category = category,
-        .handler = {&lockFlags.updateLockFile, false}
+        .handler = {&lockFlags.updateLockFile, false},
     });
 
     addFlag({
         .longName = "no-write-lock-file",
         .description = "Do not write the flake's newly generated lock file.",
         .category = category,
-        .handler = {&lockFlags.writeLockFile, false}
+        .handler = {&lockFlags.writeLockFile, false},
     });
 
     addFlag({
@@ -94,14 +92,14 @@ MixFlakeOptions::MixFlakeOptions()
         .handler = {[&]() {
             lockFlags.useRegistries = false;
             warn("'--no-registries' is deprecated; use '--no-use-registries'");
-        }}
+        }},
     });
 
     addFlag({
         .longName = "commit-lock-file",
         .description = "Commit changes to the flake's lock file.",
         .category = category,
-        .handler = {&lockFlags.commitLockFile, true}
+        .handler = {&lockFlags.commitLockFile, true},
     });
 
     addFlag({
@@ -121,7 +119,7 @@ MixFlakeOptions::MixFlakeOptions()
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
             completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
-        }}
+        }},
     });
 
     addFlag({
@@ -141,7 +139,7 @@ MixFlakeOptions::MixFlakeOptions()
             } else if (n == 1) {
                 completeFlakeRef(completions, getEvalState()->store, prefix);
             }
-        }}
+        }},
     });
 
     addFlag({
@@ -152,7 +150,7 @@ MixFlakeOptions::MixFlakeOptions()
         .handler = {[&](std::string lockFilePath) {
             lockFlags.referenceLockFilePath = {getFSSourceAccessor(), CanonPath(absPath(lockFilePath))};
         }},
-        .completer = completePath
+        .completer = completePath,
     });
 
     addFlag({
@@ -163,7 +161,7 @@ MixFlakeOptions::MixFlakeOptions()
         .handler = {[&](std::string lockFilePath) {
             lockFlags.outputLockFilePath = lockFilePath;
         }},
-        .completer = completePath
+        .completer = completePath,
     });
 
     addFlag({
@@ -190,7 +188,7 @@ MixFlakeOptions::MixFlakeOptions()
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
             completeFlakeRef(completions, getEvalState()->store, prefix);
-        }}
+        }},
     });
 }
 
@@ -201,12 +199,12 @@ SourceExprCommand::SourceExprCommand()
         .shortName = 'f',
         .description =
             "Interpret [*installables*](@docroot@/command-ref/new-cli/nix.md#installables) as attribute paths relative to the Nix expression stored in *file*. "
-            "If *file* is the character -, then a Nix expression will be read from standard input. "
+            "If *file* is the character -, then a Nix expression is read from standard input. "
             "Implies `--impure`.",
         .category = installablesCategory,
         .labels = {"file"},
         .handler = {&file},
-        .completer = completePath
+        .completer = completePath,
     });
 
     addFlag({
@@ -214,7 +212,7 @@ SourceExprCommand::SourceExprCommand()
         .description = "Interpret [*installables*](@docroot@/command-ref/new-cli/nix.md#installables) as attribute paths relative to the Nix expression *expr*.",
         .category = installablesCategory,
         .labels = {"expr"},
-        .handler = {&expr}
+        .handler = {&expr},
     });
 }
 
@@ -343,7 +341,7 @@ void completeFlakeRefWithFragment(
             auto flakeRefS = std::string(prefix.substr(0, hash));
 
             // TODO: ideally this would use the command base directory instead of assuming ".".
-            auto flakeRef = parseFlakeRef(fetchSettings, expandTilde(flakeRefS), fs::current_path().string());
+            auto flakeRef = parseFlakeRef(fetchSettings, expandTilde(flakeRefS), std::filesystem::current_path().string());
 
             auto evalCache = openEvalCache(*evalState,
                 std::make_shared<flake::LockedFlake>(lockFlake(
@@ -491,7 +489,11 @@ Installables SourceExprCommand::parseInstallables(
             throw UsageError("'--file' and '--expr' are exclusive");
 
         // FIXME: backward compatibility hack
-        if (file) evalSettings.pureEval = false;
+        if (file) {
+            if (evalSettings.pureEval && evalSettings.pureEval.overridden)
+                throw UsageError("'--file' is not compatible with '--pure-eval'");
+            evalSettings.pureEval = false;
+        }
 
         auto state = getEvalState();
         auto vFile = state->allocValue();
@@ -834,7 +836,7 @@ RawInstallablesCommand::RawInstallablesCommand()
     addFlag({
         .longName = "stdin",
         .description = "Read installables from the standard input. No default installable applied.",
-        .handler = {&readFromStdIn, true}
+        .handler = {&readFromStdIn, true},
     });
 
     expectArgs({
@@ -847,7 +849,7 @@ RawInstallablesCommand::RawInstallablesCommand()
 void RawInstallablesCommand::applyDefaultInstallables(std::vector<std::string> & rawInstallables)
 {
     if (rawInstallables.empty()) {
-        // FIXME: commands like "nix profile install" should not have a
+        // FIXME: commands like "nix profile add" should not have a
         // default, probably.
         rawInstallables.push_back(".");
     }

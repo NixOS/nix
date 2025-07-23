@@ -1,7 +1,7 @@
-#include "canon-path.hh"
-#include "util.hh"
-#include "file-path-impl.hh"
-#include "strings-inline.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/util.hh"
+#include "nix/util/file-path-impl.hh"
+#include "nix/util/strings-inline.hh"
 
 namespace nix {
 

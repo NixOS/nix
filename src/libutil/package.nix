@@ -34,9 +34,15 @@ mkMesonLibrary (finalAttrs: {
     ./widecharwidth
     ./meson.build
     ./meson.options
+    ./include/nix/util/meson.build
     ./linux/meson.build
+    ./linux/include/nix/util/meson.build
+    ./freebsd/meson.build
+    ./freebsd/include/nix/util/meson.build
     ./unix/meson.build
+    ./unix/include/nix/util/meson.build
     ./windows/meson.build
+    ./windows/include/nix/util/meson.build
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];
@@ -57,13 +63,6 @@ mkMesonLibrary (finalAttrs: {
   mesonFlags = [
     (lib.mesonEnable "cpuid" stdenv.hostPlatform.isx86_64)
   ];
-
-  env = {
-    # Needed for Meson to find Boost.
-    # https://github.com/NixOS/nixpkgs/issues/86131.
-    BOOST_INCLUDEDIR = "${lib.getDev boost}/include";
-    BOOST_LIBRARYDIR = "${lib.getLib boost}/lib";
-  };
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

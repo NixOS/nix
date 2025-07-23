@@ -4,6 +4,8 @@
   lndir,
   buildEnv,
 
+  maintainers,
+
   nix-util,
   nix-util-c,
   nix-util-tests,
@@ -13,6 +15,7 @@
   nix-store-tests,
 
   nix-fetchers,
+  nix-fetchers-c,
   nix-fetchers-tests,
 
   nix-expr,
@@ -39,6 +42,8 @@
   nix-perl-bindings,
 
   testers,
+
+  patchedSrc ? null,
 }:
 
 let
@@ -50,6 +55,7 @@ let
         nix-store
         nix-store-c
         nix-fetchers
+        nix-fetchers-c
         nix-expr
         nix-expr-c
         nix-flake
@@ -68,48 +74,6 @@ let
           ;
       };
 
-  dev = stdenv.mkDerivation (finalAttrs: {
-    name = "nix-${nix-cli.version}-dev";
-    pname = "nix";
-    version = nix-cli.version;
-    dontUnpack = true;
-    dontBuild = true;
-    libs = map lib.getDev (lib.attrValues libs);
-    installPhase = ''
-      mkdir -p $out/nix-support
-      echo $libs >> $out/nix-support/propagated-build-inputs
-    '';
-    passthru = {
-      tests = {
-        pkg-config = testers.hasPkgConfigModules {
-          package = finalAttrs.finalPackage;
-        };
-      };
-
-      # If we were to fully emulate output selection here, we'd confuse the Nix CLIs,
-      # because they rely on `drvPath`.
-      dev = finalAttrs.finalPackage.out;
-
-      libs = throw "`nix.dev.libs` is not meant to be used; use `nix.libs` instead.";
-    };
-    meta = {
-      mainProgram = "nix";
-      pkgConfigModules = [
-        "nix-cmd"
-        "nix-expr"
-        "nix-expr-c"
-        "nix-fetchers"
-        "nix-flake"
-        "nix-flake-c"
-        "nix-main"
-        "nix-main-c"
-        "nix-store"
-        "nix-store-c"
-        "nix-util"
-        "nix-util-c"
-      ];
-    };
-  });
   devdoc = buildEnv {
     name = "nix-${nix-cli.version}-devdoc";
     paths = [
@@ -192,21 +156,27 @@ stdenv.mkDerivation (finalAttrs: {
       devPaths = lib.mapAttrsToList (_k: lib.getDev) finalAttrs.finalPackage.libs;
     in
     ''
-      mkdir -p $out $dev $doc $man
+      mkdir -p $out $dev/nix-support
+
+      # Custom files
+      echo $libs >> $dev/nix-support/propagated-build-inputs
+      echo ${nix-cli} ${lib.escapeShellArgs devPaths} >> $dev/nix-support/propagated-build-inputs
 
       # Merged outputs
       lndir ${nix-cli} $out
+
       for lib in ${lib.escapeShellArgs devPaths}; do
         lndir $lib $dev
       done
 
       # Forwarded outputs
-      ln -s ${nix-manual} $doc
-      ln -s ${nix-manual.man} $man
+      ln -sT ${nix-manual} $doc
+      ln -sT ${nix-manual.man} $man
     '';
 
   passthru = {
     inherit (nix-cli) version;
+    src = patchedSrc;
 
     /**
       These are the libraries that are part of the Nix project. They are used
@@ -248,7 +218,30 @@ stdenv.mkDerivation (finalAttrs: {
   meta = {
     mainProgram = "nix";
     description = "The Nix package manager";
-    pkgConfigModules = dev.meta.pkgConfigModules;
+    longDescription = nix-cli.meta.longDescription;
+    homepage = nix-cli.meta.homepage;
+    license = nix-cli.meta.license;
+    maintainers = maintainers;
+    platforms = nix-cli.meta.platforms;
+    outputsToInstall = [
+      "out"
+      "man"
+    ];
+    pkgConfigModules = [
+      "nix-cmd"
+      "nix-expr"
+      "nix-expr-c"
+      "nix-fetchers"
+      "nix-fetchers-c"
+      "nix-flake"
+      "nix-flake-c"
+      "nix-main"
+      "nix-main-c"
+      "nix-store"
+      "nix-store-c"
+      "nix-util"
+      "nix-util-c"
+    ];
   };
 
 })

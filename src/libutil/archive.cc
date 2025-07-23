@@ -5,19 +5,19 @@
 
 #include <strings.h> // for strcasecmp
 
-#include "archive.hh"
-#include "config-global.hh"
-#include "posix-source-accessor.hh"
-#include "source-path.hh"
-#include "file-system.hh"
-#include "signals.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/posix-source-accessor.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/signals.hh"
 
 namespace nix {
 
 struct ArchiveSettings : Config
 {
     Setting<bool> useCaseHack{this,
-        #if __APPLE__
+        #ifdef __APPLE__
             true,
         #else
             false,
@@ -72,7 +72,7 @@ void SourceAccessor::dumpPath(
 
             /* If we're on a case-insensitive system like macOS, undo
                the case hack applied by restorePath(). */
-            std::map<std::string, std::string> unhacked;
+            StringMap unhacked;
             for (auto & i : readDirectory(path))
                 if (archiveSettings.useCaseHack) {
                     std::string name(i.first);

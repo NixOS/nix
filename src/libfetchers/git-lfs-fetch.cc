@@ -1,10 +1,10 @@
-#include "git-lfs-fetch.hh"
-#include "git-utils.hh"
-#include "filetransfer.hh"
-#include "processes.hh"
-#include "url.hh"
-#include "users.hh"
-#include "hash.hh"
+#include "nix/fetchers/git-lfs-fetch.hh"
+#include "nix/fetchers/git-utils.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/url.hh"
+#include "nix/util/users.hh"
+#include "nix/util/hash.hh"
 
 #include <git2/attr.h>
 #include <git2/config.h>
@@ -44,10 +44,11 @@ static void downloadToSink(
 
 static std::string getLfsApiToken(const ParsedURL & url)
 {
-    auto [status, output] = runProgram(RunOptions{
-        .program = "ssh",
-        .args = {*url.authority, "git-lfs-authenticate", url.path, "download"},
-    });
+    auto [status, output] = runProgram(
+        RunOptions{
+            .program = "ssh",
+            .args = {*url.authority, "git-lfs-authenticate", url.path, "download"},
+        });
 
     if (output.empty())
         throw Error(

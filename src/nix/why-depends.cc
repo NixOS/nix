@@ -1,7 +1,7 @@
-#include "command.hh"
-#include "store-api.hh"
-#include "source-accessor.hh"
-#include "shared.hh"
+#include "nix/cmd/command.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/main/shared.hh"
 
 #include <queue>
 
@@ -172,7 +172,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         struct BailOut { };
 
         printNode = [&](Node & node, const std::string & firstPad, const std::string & tailPad) {
-            CanonPath pathS(store->printStorePath(node.path));
+            CanonPath pathS(node.path.to_string());
 
             assert(node.dist != inf);
             if (precise) {
@@ -193,7 +193,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
             /* Sort the references by distance to `dependency` to
                ensure that the shortest path is printed first. */
             std::multimap<size_t, Node *> refs;
-            std::set<std::string> hashes;
+            StringSet hashes;
 
             for (auto & ref : node.refs) {
                 if (ref == node.path && packagePath != dependencyPath) continue;

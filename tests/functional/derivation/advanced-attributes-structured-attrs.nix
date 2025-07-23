@@ -1,6 +1,21 @@
+{ contentAddress }:
+
 let
+  caArgs =
+    if contentAddress then
+      {
+        __contentAddressed = true;
+        outputHashMode = "recursive";
+        outputHashAlgo = "sha256";
+      }
+    else
+      { };
+
+  derivation' = args: derivation (caArgs // args);
+
   system = "my-system";
-  foo = derivation {
+
+  foo = derivation' {
     inherit system;
     name = "foo";
     builder = "/bin/bash";
@@ -8,8 +23,13 @@ let
       "-c"
       "echo foo > $out"
     ];
+    outputs = [
+      "out"
+      "dev"
+    ];
   };
-  bar = derivation {
+
+  bar = derivation' {
     inherit system;
     name = "bar";
     builder = "/bin/bash";
@@ -17,9 +37,14 @@ let
       "-c"
       "echo bar > $out"
     ];
+    outputs = [
+      "out"
+      "dev"
+    ];
   };
+
 in
-derivation {
+derivation' {
   inherit system;
   name = "advanced-attributes-structured-attrs";
   builder = "/bin/bash";
@@ -41,11 +66,11 @@ derivation {
   outputChecks = {
     out = {
       allowedReferences = [ foo ];
-      allowedRequisites = [ foo ];
+      allowedRequisites = [ foo.dev ];
     };
     bin = {
       disallowedReferences = [ bar ];
-      disallowedRequisites = [ bar ];
+      disallowedRequisites = [ bar.dev ];
     };
     dev = {
       maxSize = 789;
@@ -58,4 +83,6 @@ derivation {
   ];
   preferLocalBuild = true;
   allowSubstitutes = false;
+  exportReferencesGraph.refs1 = [ foo ];
+  exportReferencesGraph.refs2 = [ bar.drvPath ];
 }

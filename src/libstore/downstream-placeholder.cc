@@ -1,5 +1,5 @@
-#include "downstream-placeholder.hh"
-#include "derivations.hh"
+#include "nix/store/downstream-placeholder.hh"
+#include "nix/store/derivations.hh"
 
 namespace nix {
 

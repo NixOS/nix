@@ -1,7 +1,7 @@
-#include "print-ambiguous.hh"
-#include "print.hh"
-#include "signals.hh"
-#include "eval.hh"
+#include "nix/expr/print-ambiguous.hh"
+#include "nix/expr/print.hh"
+#include "nix/util/signals.hh"
+#include "nix/expr/eval.hh"
 
 namespace nix {
 
@@ -50,11 +50,13 @@ void printAmbiguous(
         break;
     }
     case nList:
-        if (seen && v.listSize() && !seen->insert(v.listElems()).second)
+        /* Use pointer to the Value instead of pointer to the elements, because
+           that would need to explicitly handle the case of SmallList. */
+        if (seen && v.listSize() && !seen->insert(&v).second)
             str << "«repeated»";
         else {
             str << "[ ";
-            for (auto v2 : v.listItems()) {
+            for (auto v2 : v.listView()) {
                 if (v2)
                     printAmbiguous(*v2, symbols, str, seen, depth - 1);
                 else
