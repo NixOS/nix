@@ -410,6 +410,21 @@ public:
           Set it to 1 to warn on all paths.
         )"};
 
+#ifdef __linux__
+    Setting<std::filesystem::path> pastaPath{
+        this,
+        "",
+        "pasta-path",
+        R"(
+          If set to an absolute path, enables fully sandboxing fixed-output
+          derivations, by using `pasta` to pass network traffic between the
+          private network namespace. This allows for greater levels of isolation
+          of builds to the host.
+        )",
+        {},
+        false};
+#endif
+
     /**
      * Get the options needed for profile directory functions.
      */

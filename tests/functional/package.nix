@@ -12,6 +12,7 @@
   mercurial,
   unixtools,
   util-linux,
+  passt,
 
   nix-store,
   nix-expr,
@@ -55,6 +56,8 @@ mkMesonDerivation (
       git
       mercurial
       unixtools.script
+
+      passt
 
       # Explicitly splice the hostHost variant to fix LLVM tests. The nix-cli
       # has to be in PATH, but must come from the host context where it's built

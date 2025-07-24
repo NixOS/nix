@@ -34,3 +34,10 @@ option(
   value : true,
   description : 'Check JSON schema validity of schemas and examples (requires jv)',
 )
+
+option(
+  'pasta-path',
+  type : 'string',
+  value : 'pasta',
+  description : 'Path to the location of pasta (provided by passt)',
+)

@@ -19,6 +19,7 @@
 
   busybox-sandbox-shell ? null,
   pkgsStatic,
+  passt ? null,
 
   # Configuration Options
 
@@ -93,6 +94,9 @@ mkMesonLibrary (finalAttrs: {
   ]
   ++ lib.optionals withSandboxShell [
     (lib.mesonOption "sandbox-shell" sandboxShell)
+  ]
+  ++ [
+    (lib.mesonOption "pasta-path" "${passt}/bin/pasta")
   ];
 
   meta = {

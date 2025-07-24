@@ -10,6 +10,7 @@ coreutils=@coreutils@
 
 dot=@dot@
 busybox="@sandbox_shell@"
+pasta_path=@pasta_path@
 
 version=@PACKAGE_VERSION@
 system=@system@
