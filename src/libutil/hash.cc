@@ -20,23 +20,6 @@
 
 namespace nix {
 
-static size_t regularHashSize(HashAlgorithm type)
-{
-    switch (type) {
-    case HashAlgorithm::BLAKE3:
-        return blake3HashSize;
-    case HashAlgorithm::MD5:
-        return md5HashSize;
-    case HashAlgorithm::SHA1:
-        return sha1HashSize;
-    case HashAlgorithm::SHA256:
-        return sha256HashSize;
-    case HashAlgorithm::SHA512:
-        return sha512HashSize;
-    }
-    unreachable();
-}
-
 const StringSet hashAlgorithms = {"blake3", "md5", "sha1", "sha256", "sha512"};
 
 const StringSet hashFormats = {"base64", "nix32", "base16", "sri"};
