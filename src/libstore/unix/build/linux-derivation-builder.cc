@@ -1,9 +1,13 @@
 #ifdef __linux__
 
+#  include "nix/store/globals.hh"
 #  include "nix/store/personality.hh"
 #  include "nix/util/cgroup.hh"
+#  include "nix/util/file-system.hh"
 #  include "nix/util/linux-namespaces.hh"
+#  include "nix/util/strings.hh"
 #  include "linux/fchmodat2-compat.hh"
+#  include "pasta.hh"
 
 #  include <sys/ioctl.h>
 #  include <net/if.h>
@@ -190,12 +194,34 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
      */
     std::optional<Path> cgroup;
 
+    /**
+     * Process ID of pasta, if we're using it for network isolation.
+     */
+    Pid pastaPid;
+
+    /**
+     * Whether pasta was started for this build.
+     */
+    bool runPasta = false;
+
     ChrootLinuxDerivationBuilder(
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
         , ChrootDerivationBuilder{store, std::move(miscMethods), std::move(params)}
         , LinuxDerivationBuilder{store, std::move(miscMethods), std::move(params)}
     {
+    }
+
+    ~ChrootLinuxDerivationBuilder()
+    {
+        // pasta being left around mostly happens when builds are aborted
+        if (pastaPid) {
+            try {
+                pasta::killPasta(pastaPid);
+            } catch (Error & e) {
+                // Ignore errors during cleanup
+            }
+        }
     }
 
     uid_t sandboxUid()
@@ -433,6 +459,19 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1\n");
         userNamespaceSyncDone = true;
+
+        /* Set up pasta for network isolation if enabled and this is a fixed-output derivation */
+        bool privateNetwork = derivationType.isSandboxed();
+        runPasta = !privateNetwork && settings.pastaPath != "" && pathExists("/dev/net/tun");
+
+        if (runPasta) {
+            pastaPid = pasta::setupPasta(
+                settings.pastaPath,
+                pid,
+                buildUser ? std::optional(buildUser->getUID()) : std::nullopt,
+                buildUser ? std::optional(buildUser->getGID()) : std::nullopt,
+                usingUserNamespace);
+        }
     }
 
     void enterChroot() override
@@ -443,6 +482,10 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             throw Error("user namespace initialisation failed");
 
         userNamespaceSync.readSide = -1;
+
+        if (runPasta) {
+            pasta::waitForPastaInterface();
+        }
 
         if (derivationType.isSandboxed()) {
 
@@ -532,8 +575,17 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                happens when testing Nix building fixed-output derivations
                within a pure derivation. */
             for (auto & path : {"/etc/resolv.conf", "/etc/services", "/etc/hosts"})
-                if (pathExists(path))
-                    ss.push_back(path);
+                if (pathExists(path)) {
+                    // Special handling for resolv.conf when using pasta
+                    if (runPasta && std::string(path) == "/etc/resolv.conf") {
+                        // We'll write a modified version instead of bind-mounting
+                        auto resolvConf = readFile(std::string(path));
+                        auto modifiedResolvConf = pasta::rewriteResolvConf(resolvConf);
+                        writeFile(chrootRootDir + "/etc/resolv.conf", modifiedResolvConf);
+                    } else {
+                        ss.push_back(path);
+                    }
+                }
 
             if (settings.caFile != "") {
                 Path caFile = settings.caFile;
@@ -689,6 +741,10 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 buildResult.cpuSystem = stats.cpuSystem;
             }
             return;
+        }
+
+        if (pastaPid) {
+            pasta::killPasta(pastaPid);
         }
 
         DerivationBuilderImpl::killSandbox(getStats);

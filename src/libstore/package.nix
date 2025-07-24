@@ -15,6 +15,7 @@
   sqlite,
 
   busybox-sandbox-shell ? null,
+  passt ? null,
 
   # Configuration Options
 
@@ -77,6 +78,9 @@ mkMesonLibrary (finalAttrs: {
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
     (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")
+  ]
+  ++ [
+    (lib.mesonOption "pasta-path" "${passt}/bin/pasta")
   ];
 
   meta = {

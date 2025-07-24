@@ -6,4 +6,16 @@ sources += files(
   'user-lock.cc',
 )
 
+if host_machine.system() == 'linux'
+  sources += files(
+    'build/pasta.cc',
+  )
+endif
+
+if host_machine.system() == 'darwin'
+  sources += files(
+    'build/darwin-derivation-builder.cc',
+  )
+endif
+
 subdir('include/nix/store')

@@ -21,6 +21,7 @@ busybox = find_program('busybox', native : true, required : false)
 # guaranteed to exist either.
 coreutils = find_program('ls', native : true)
 dot = find_program('dot', native : true, required : false)
+pasta_path = find_program('pasta', native : false, required : false)
 
 nix_bin_dir = fs.parent(nix.full_path())
 
@@ -35,6 +36,15 @@ test_confdata = {
   'PACKAGE_VERSION' : meson.project_version(),
   'system' : nix_system_cpu + '-' + host_machine.system(),
 }
+if pasta_path.found()
+  test_confdata += {
+    'pasta_path': pasta_path.full_path(),
+  }
+else
+  test_confdata += {
+    'pasta_path': '',
+  }
+endif
 
 # Just configures `common/vars-and-functions.sh.in`.
 # Done as a subdir() so Meson places it under `common` in the build directory as well.
@@ -127,6 +137,7 @@ suites = [
       'misc.sh',
       'dump-db.sh',
       'linux-sandbox.sh',
+      'pasta-network.sh',
       'supplementary-groups.sh',
       'build-dry.sh',
       'structured-attrs.sh',

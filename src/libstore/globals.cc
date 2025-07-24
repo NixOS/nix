@@ -89,6 +89,10 @@ Settings::Settings()
     sandboxPaths = {{"/bin/sh", {.source = SANDBOX_SHELL}}};
 #endif
 
+#if defined(__linux__) && defined(PASTA_PATH)
+    pastaPath.setDefault(PASTA_PATH);
+#endif
+
     /* chroot-like behavior from Apple's sandbox */
 #ifdef __APPLE__
     for (PathView p : {

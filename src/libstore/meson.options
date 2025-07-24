@@ -33,3 +33,10 @@ option(
   value : '/nix/var/log/nix',
   description : 'path to store logs in for Nix',
 )
+
+option(
+  'pasta-path',
+  type : 'string',
+  value : 'pasta',
+  description : 'Path to the location of pasta (provided by passt)',
+)

@@ -259,6 +259,15 @@ configdata_priv.set_quoted(
 : 'lsof',
 )
 
+# Find pasta for network isolation
+if host_machine.system() == 'linux'
+  pasta_path = get_option('pasta-path')
+  pasta = find_program(pasta_path, required : false, native : false)
+  if pasta.found()
+    configdata_priv.set_quoted('PASTA_PATH', pasta.full_path())
+  endif
+endif
+
 config_priv_h = configure_file(
   configuration : configdata_priv,
   output : 'store-config-private.hh',
