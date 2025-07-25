@@ -48,12 +48,6 @@ Path getCachePath(std::string_view key, bool shallow)
 }
 
 // Returns the name of the HEAD branch.
-//
-// Returns the head branch name as reported by git ls-remote --symref, e.g., if
-// ls-remote returns the output below, "main" is returned based on the ref line.
-//
-//   ref: refs/heads/main       HEAD
-//   ...
 std::optional<std::string> readHead(const Path & path)
 {
     return git::defaultRemoteBranch(path);

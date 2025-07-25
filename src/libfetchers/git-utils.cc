@@ -149,7 +149,7 @@ static Object peelToTreeOrBlob(git_object * obj)
         return peelObject<Object>(obj, GIT_OBJECT_TREE);
 }
 
-std::optional<std::string> git::defaultRemoteBranch(const std::string & path)
+std::optional<std::string> git::defaultRemoteBranch(const std::string & url)
 {
     initLibGit2(); // just to be safe init libgit2
 
@@ -158,7 +158,7 @@ std::optional<std::string> git::defaultRemoteBranch(const std::string & path)
         throw Error("Failed to initialize in-memory bare repo: %s", git_error_last()->message);
 
     Remote remote;
-    if (git_remote_create_anonymous(Setter(remote), repo.get(), path.c_str()) != 0)
+    if (git_remote_create_anonymous(Setter(remote), repo.get(), url.c_str()) != 0)
         throw Error("Failed to create anonymous remote: %s", git_error_last()->message);
 
     if (git_remote_connect(remote.get(), GIT_DIRECTION_FETCH, nullptr, nullptr, nullptr) != 0)

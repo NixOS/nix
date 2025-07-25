@@ -23,8 +23,15 @@ struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
 };
 
 namespace git {
-std::optional<std::string> defaultRemoteBranch(const std::string & path);
-}
+
+/**
+ * Read the HEAD ref of a Git repository at the given path.
+ *
+ * This will create a temporary in-memory repository and ask the remote
+ * (url) for the HEAD ref.
+ */
+std::optional<std::string> defaultRemoteBranch(const std::string & url);
+} // namespace git
 
 struct GitRepo
 {
