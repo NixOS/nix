@@ -16,8 +16,9 @@ nix_perl_scripts = files(
   'Utils.pm',
 )
 
+nix_perl_scripts_copy_tgts = []
 foreach f : nix_perl_scripts
-  fs.copyfile(f)
+  nix_perl_scripts_copy_tgts += fs.copyfile(f)
 endforeach
 
 

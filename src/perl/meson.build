@@ -191,6 +191,6 @@ if get_option('tests').enabled()
     yath,
     args : [ 'test' ],
     workdir : meson.current_build_dir(),
-    depends : [ nix_perl_store_lib ],
+    depends : [ nix_perl_store_lib ] + nix_perl_tests_copy_tgts + nix_perl_scripts_copy_tgts,
   )
 endif
