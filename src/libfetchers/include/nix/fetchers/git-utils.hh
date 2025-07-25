@@ -22,6 +22,10 @@ struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
     virtual Hash flush() = 0;
 };
 
+namespace git {
+std::optional<std::string> defaultRemoteBranch(const std::string & path);
+}
+
 struct GitRepo
 {
     virtual ~GitRepo() {}

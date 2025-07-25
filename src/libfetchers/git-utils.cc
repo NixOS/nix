@@ -22,6 +22,7 @@
 #include <git2/refs.h>
 #include <git2/remote.h>
 #include <git2/repository.h>
+#include <git2/sys/repository.h>
 #include <git2/revparse.h>
 #include <git2/status.h>
 #include <git2/submodule.h>
@@ -146,6 +147,33 @@ static Object peelToTreeOrBlob(git_object * obj)
         return dupObject<Object>(obj);
     else
         return peelObject<Object>(obj, GIT_OBJECT_TREE);
+}
+
+std::optional<std::string> git::defaultRemoteBranch(const std::string & path)
+{
+    initLibGit2(); // just to be safe init libgit2
+
+    Repository repo;
+    if (git_repository_new(Setter(repo)))
+        throw Error("Failed to initialize in-memory bare repo: %s", git_error_last()->message);
+
+    Remote remote;
+    if (git_remote_create_anonymous(Setter(remote), repo.get(), path.c_str()) != 0)
+        throw Error("Failed to create anonymous remote: %s", git_error_last()->message);
+
+    if (git_remote_connect(remote.get(), GIT_DIRECTION_FETCH, nullptr, nullptr, nullptr) != 0)
+        throw Error("Failed to connect to remote: %s", git_error_last()->message);
+
+    git_buf buf = GIT_BUF_INIT;
+    std::optional<std::string> result;
+
+    if (git_remote_default_branch(&buf, remote.get()) == 0 && buf.ptr)
+        result = std::string(buf.ptr);
+
+    git_buf_dispose(&buf);
+    git_remote_disconnect(remote.get()); // still manual for clarity
+
+    return result;
 }
 
 struct PackBuilderContext
