@@ -64,6 +64,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
 
     for (auto & c : context) {
         auto ensureValid = [&](const StorePath & p) {
+            waitForPath(p);
             if (!store->isValidPath(p))
                 error<InvalidPathError>(store->printStorePath(p)).debugThrow();
         };
@@ -298,6 +299,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
         if (!state.store->isStorePath(path2))
             return std::nullopt;
         auto storePath = state.store->parseStorePath(path2);
+        state.waitForPath(storePath);
         if (!(state.store->isValidPath(storePath) && isDerivation(path2)))
             return std::nullopt;
         return storePath;
@@ -1589,6 +1591,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                 [&](const NixStringContextElem::DrvDeep & d) {
                     /* !!! This doesn't work if readOnlyMode is set. */
                     StorePathSet refs;
+                    // FIXME: don't need to wait, we only need the references.
+                    state.waitForPath(d.drvPath);
                     state.store->computeFSClosure(d.drvPath, refs);
                     for (auto & j : refs) {
                         drv.inputSrcs.insert(j);
@@ -1729,7 +1733,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
     }
 
     /* Write the resulting term into the Nix store directory. */
-    auto drvPath = writeDerivation(*state.store, drv, state.repair);
+    auto drvPath = writeDerivation(*state.store, *state.asyncPathWriter, drv, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
 
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);

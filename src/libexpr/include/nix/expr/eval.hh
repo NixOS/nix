@@ -47,6 +47,7 @@ struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct MemorySourceAccessor;
 struct MountedSourceAccessor;
+struct AsyncPathWriter;
 
 namespace eval_cache {
 class EvalCache;
@@ -321,6 +322,8 @@ public:
     int trylevel;
     std::list<DebugTrace> debugTraces;
     std::map<const Expr *, const std::shared_ptr<const StaticEnv>> exprEnvs;
+
+    ref<AsyncPathWriter> asyncPathWriter;
 
     const std::shared_ptr<const StaticEnv> getStaticEnv(const Expr & expr) const
     {
@@ -935,6 +938,10 @@ public:
     bool callPathFilter(Value * filterFun, const SourcePath & path, PosIdx pos);
 
     DocComment getDocCommentForPos(PosIdx pos);
+
+    void waitForPath(const StorePath & path);
+    void waitForPath(const SingleDerivedPath & path);
+    void waitForAllPaths();
 
 private:
 

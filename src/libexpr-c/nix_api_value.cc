@@ -345,6 +345,7 @@ nix_value * nix_get_attr_byname(nix_c_context * context, const nix_value * value
         if (attr) {
             nix_gc_incref(nullptr, attr->value);
             state->state.forceValue(*attr->value, nix::noPos);
+            state->state.waitForAllPaths();
             return as_nix_value_ptr(attr->value);
         }
         nix_set_err_msg(context, NIX_ERR_KEY, "missing attribute");
