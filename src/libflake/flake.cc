@@ -34,7 +34,19 @@ static StorePath copyInputToStore(
     auto narHash = state.store->queryPathInfo(storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
-    assert(!originalInput.getNarHash() || storePath == originalInput.computeStorePath(*state.store));
+    if (originalInput.getNarHash() && storePath != originalInput.computeStorePath(*state.store)) {
+        throw Error(
+            "NAR hash mismatch for flake input '%s':\n"
+            "  expected: %s (store path: %s)\n"
+            "  got:      %s (store path: %s)\n"
+            "This typically happens when the content at the specified path has changed since the NAR hash was recorded.",
+            input.to_string(),
+            originalInput.getNarHash()->to_string(HashFormat::SRI, true),
+            originalInput.computeStorePath(*state.store).to_string(),
+            narHash.to_string(HashFormat::SRI, true),
+            storePath.to_string()
+        );
+    }
 
     return storePath;
 }
