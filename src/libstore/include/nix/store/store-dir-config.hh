@@ -3,8 +3,8 @@
 #include "nix/store/path.hh"
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
-#include "nix/store/globals.hh"
-#include "nix/util/configuration.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/store/config-parse.hh"
 
 #include <map>
 #include <string>
@@ -18,6 +18,20 @@ MakeError(BadStorePath, Error);
 MakeError(BadStorePathName, BadStorePath);
 
 /**
+ * Underlying store directory configuration type.
+ *
+ * Don't worry to much about the `F` parameter, it just some abstract
+ * nonsense for the "higher-kinded data" pattern. It is used in each
+ * settings record in order to ensure don't forgot to parse or document
+ * settings field.
+ */
+template<template<typename> class F>
+struct StoreDirConfigT
+{
+    F<Path> _storeDir;
+};
+
+/**
  * @todo This should just be part of `StoreDirConfig`. However, it would
  * be a huge amount of churn if `Store` didn't have these methods
  * anymore, forcing a bunch of code to go from `store.method(...)` to
@@ -29,8 +43,6 @@ MakeError(BadStorePathName, BadStorePath);
 struct MixStoreDirMethods
 {
     const Path & storeDir;
-
-    // pure methods
 
     StorePath parseStorePath(std::string_view path) const;
 
@@ -97,37 +109,24 @@ struct MixStoreDirMethods
 };
 
 /**
- * Need to make this a separate class so I can get the right
- * initialization order in the constructor for `StoreDirConfig`.
+ * Store directory configuration type.
+ *
+ * Combines the underlying `*T` type (with plain values for the fields)
+ * and the methods.
+ *
+ * The order of `StoreDirConfigT<config::PlainValue>` and then
+ * `MixStoreDirMethods` is very important. This ensures that
+ * `StoreDirConfigT<config::PlainValue>::storeDir_` is initialized
+ * before we have our one chance (because references are immutable) to
+ * initialize `MixStoreDirMethods::storeDir`.
  */
-struct StoreDirConfigBase : Config
+struct StoreDirConfig : StoreDirConfigT<config::PlainValue>, MixStoreDirMethods
 {
-    using Config::Config;
+    using Params = StoreReference::Params;
 
-    const PathSetting storeDir_{
-        this,
-        settings.nixStore,
-        "store",
-        R"(
-          Logical location of the Nix store, usually
-          `/nix/store`. Note that you can only copy store paths
-          between stores if they have the same `store` setting.
-        )"};
-};
-
-/**
- * The order of `StoreDirConfigBase` and then `MixStoreDirMethods` is
- * very important. This ensures that `StoreDirConfigBase::storeDir_`
- * is initialized before we have our one chance (because references are
- * immutable) to initialize `MixStoreDirMethods::storeDir`.
- */
-struct StoreDirConfig : StoreDirConfigBase, MixStoreDirMethods
-{
-    using Params = StringMap;
+    static config::SettingDescriptionMap descriptions();
 
     StoreDirConfig(const Params & params);
-
-    StoreDirConfig() = delete;
 
     virtual ~StoreDirConfig() = default;
 };
