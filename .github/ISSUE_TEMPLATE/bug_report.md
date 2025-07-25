@@ -45,7 +45,7 @@ assignees: ''
 - [ ] checked [latest Nix manual] \([source])
 - [ ] checked [open bug issues and pull requests] for possible duplicates
 
-[latest Nix manual]: https://nixos.org/manual/nix/unstable/
+[latest Nix manual]: https://nix.dev/manual/nix/development/
 [source]: https://github.com/NixOS/nix/tree/master/doc/manual/source
 [open bug issues and pull requests]: https://github.com/NixOS/nix/labels/bug
 
