@@ -21,6 +21,7 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/input-cache.hh"
+#include "nix/store/async-path-writer.hh"
 
 #include "parser-tab.hh"
 
@@ -326,6 +327,7 @@ EvalState::EvalState(
     , debugRepl(nullptr)
     , debugStop(false)
     , trylevel(0)
+    , asyncPathWriter(AsyncPathWriter::make(store))
     , regexCache(makeRegexCache())
 #if NIX_USE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
@@ -1024,6 +1026,7 @@ std::string EvalState::mkSingleDerivedPathStringRaw(const SingleDerivedPath & p)
                 auto optStaticOutputPath = std::visit(
                     overloaded{
                         [&](const SingleDerivedPath::Opaque & o) {
+                            waitForPath(o.path);
                             auto drv = store->readDerivation(o.path);
                             auto i = drv.outputs.find(b.output);
                             if (i == drv.outputs.end())
@@ -3247,6 +3250,26 @@ void forceNoNullByte(std::string_view s, std::function<Pos()> pos)
         }
         throw error;
     }
+}
+
+void EvalState::waitForPath(const StorePath & path)
+{
+    asyncPathWriter->waitForPath(path);
+}
+
+void EvalState::waitForPath(const SingleDerivedPath & path)
+{
+    std::visit(
+        overloaded{
+            [&](const DerivedPathOpaque & p) { waitForPath(p.path); },
+            [&](const SingleDerivedPathBuilt & p) { waitForPath(*p.drvPath); },
+        },
+        path.raw());
+}
+
+void EvalState::waitForAllPaths()
+{
+    asyncPathWriter->waitForAllPaths();
 }
 
 } // namespace nix

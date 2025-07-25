@@ -74,6 +74,7 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                 std::visit(
                     overloaded{
                         [&](const NixStringContextElem::DrvDeep & d) -> DerivedPath {
+                            state.waitForPath(d.drvPath);
                             /* We want all outputs of the drv */
                             return DerivedPath::Built{
                                 .drvPath = makeConstantStorePathRef(d.drvPath),
@@ -81,6 +82,7 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                             };
                         },
                         [&](const NixStringContextElem::Built & b) -> DerivedPath {
+                            state.waitForPath(*b.drvPath);
                             return DerivedPath::Built{
                                 .drvPath = b.drvPath,
                                 .outputs = OutputsSpec::Names{b.output},

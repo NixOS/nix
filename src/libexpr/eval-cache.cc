@@ -708,6 +708,7 @@ StorePath AttrCursor::forceDerivation()
         /* The eval cache contains 'drvPath', but the actual path has
            been garbage-collected. So force it to be regenerated. */
         aDrvPath->forceValue();
+        root->state.waitForPath(drvPath);
         if (!root->state.store->isValidPath(drvPath))
             throw Error(
                 "don't know how to recreate store derivation '%s'!", root->state.store->printStorePath(drvPath));

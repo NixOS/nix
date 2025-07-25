@@ -333,6 +333,7 @@ StorePath NixRepl::getDerivationPath(Value & v)
     auto drvPath = packageInfo->queryDrvPath();
     if (!drvPath)
         throw Error("expression did not evaluate to a valid derivation (no 'drvPath' attribute)");
+    state->waitForPath(*drvPath);
     if (!state->store->isValidPath(*drvPath))
         throw Error("expression evaluated to invalid derivation '%s'", state->store->printStorePath(*drvPath));
     return *drvPath;

@@ -102,6 +102,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
     }
 
     auto drvPath = attr->forceDerivation();
+    state->waitForPath(drvPath);
 
     std::optional<NixInt::Inner> priority;
 
