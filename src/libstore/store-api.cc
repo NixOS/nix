@@ -107,8 +107,11 @@ static std::string makeType(const MixStoreDirMethods & store, std::string && typ
 
 StorePath MixStoreDirMethods::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
 {
-    if (info.method == FileIngestionMethod::Git && info.hash.algo != HashAlgorithm::SHA1)
-        throw Error("Git file ingestion must use SHA-1 hash");
+    if (info.method == FileIngestionMethod::Git
+        && !(info.hash.algo == HashAlgorithm::SHA1 || info.hash.algo == HashAlgorithm::SHA256)) {
+        throw Error(
+            "Git file ingestion must use SHA-1 or SHA-256 hash, but instead using: %s", printHashAlgo(info.hash.algo));
+    }
 
     if (info.hash.algo == HashAlgorithm::SHA256 && info.method == FileIngestionMethod::NixArchive) {
         return makeStorePath(makeType(*this, "source", info.references), info.hash, name);

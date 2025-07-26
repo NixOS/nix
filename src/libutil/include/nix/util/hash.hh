@@ -12,11 +12,26 @@ MakeError(BadHash, Error);
 
 enum struct HashAlgorithm : char { MD5 = 42, SHA1, SHA256, SHA512, BLAKE3 };
 
-const int blake3HashSize = 32;
-const int md5HashSize = 16;
-const int sha1HashSize = 20;
-const int sha256HashSize = 32;
-const int sha512HashSize = 64;
+/**
+ * @return the size of a hash for the given algorithm
+ */
+constexpr inline size_t regularHashSize(HashAlgorithm type)
+{
+    switch (type) {
+    case HashAlgorithm::BLAKE3:
+        return 32;
+    case HashAlgorithm::MD5:
+        return 16;
+    case HashAlgorithm::SHA1:
+        return 20;
+    case HashAlgorithm::SHA256:
+        return 32;
+    case HashAlgorithm::SHA512:
+        return 64;
+    default:
+        assert(false);
+    }
+}
 
 extern const StringSet hashAlgorithms;
 
