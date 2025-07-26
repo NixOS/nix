@@ -282,7 +282,10 @@ let
 
           # may get replaced by pkgs.dockerTools.caCertificates
           mkdir -p $out/etc/ssl/certs
+          # Old NixOS compatibility.
           ln -s /nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt $out/etc/ssl/certs
+          # NixOS canonical location
+          ln -s /nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt $out/etc/ssl/certs/ca-certificates.crt
 
           cat $passwdContentsPath > $out/etc/passwd
           echo "" >> $out/etc/passwd
