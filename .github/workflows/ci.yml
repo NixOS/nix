@@ -29,9 +29,18 @@ jobs:
           - scenario: on ubuntu
             runs-on: ubuntu-24.04
             os: linux
+            sanitizers: false
+            primary: true
           - scenario: on macos
             runs-on: macos-14
             os: darwin
+            sanitizers: false
+            primary: true
+          - scenario: on ubuntu (with sanitizers)
+            runs-on: ubuntu-24.04
+            os: linux
+            sanitizers: true
+            primary: false
     name: tests ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 60
@@ -52,13 +61,21 @@ jobs:
     # https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
     - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       if: matrix.os == 'linux'
-    - run: scripts/build-checks
-    - run: scripts/prepare-installer-for-github-actions
+    - name: Run component tests
+      run: |
+        nix build --file ci/gha/tests componentTests -L \
+          --arg withSanitizers ${{ matrix.sanitizers }}
+    - name: Run flake checks and prepare the installer tarball
+      run: |
+        ci/gha/tests/build-checks
+        ci/gha/tests/prepare-installer-for-github-actions
+      if: ${{ matrix.primary }}
     - name: Upload installer tarball
       uses: actions/upload-artifact@v4
       with:
         name: installer-${{matrix.os}}
         path: out/*
+      if: ${{ matrix.primary }}
 
   installer_test:
     needs: [tests]
