@@ -240,7 +240,9 @@ in
   # System tests.
   tests =
     import ../tests/nixos {
-      inherit lib nixpkgs nixpkgsFor;
+      inherit lib nixpkgs;
+      pkgs = nixpkgsFor.x86_64-linux.native;
+      nixComponents = nixpkgsFor.x86_64-linux.native.nixComponents2;
       inherit (self.inputs) nixpkgs-23-11;
     }
     // {
