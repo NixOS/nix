@@ -160,6 +160,8 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
 
         if (getEnv("_NIX_TEST_NO_SANDBOX") != "1") {
             Strings sandboxArgs;
+            sandboxArgs.push_back("_NIX_BUILD_TOP");
+            sandboxArgs.push_back(tmpDir);
             sandboxArgs.push_back("_GLOBAL_TMP_DIR");
             sandboxArgs.push_back(globalTmpDir);
             if (drvOptions.allowLocalNetworking) {
