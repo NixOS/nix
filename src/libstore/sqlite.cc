@@ -75,9 +75,9 @@ SQLite::SQLite(const std::filesystem::path & path, SQLiteOpenMode mode)
         if (fd) {
             struct statfs fs;
             if (fstatfs(fd.get(), &fs))
-                throw SysError("statfs() on '%s'", shmFile);
+                throw SysError("statfs() on '%s' to work around ZFS issue", shmFile);
             if (fs.f_type == /* ZFS_SUPER_MAGIC */ 801189825 && fdatasync(fd.get()) != 0)
-                throw SysError("fsync() on '%s'", shmFile);
+                throw SysError("fsync() on '%s' to work around ZFS issue", shmFile);
         }
     } catch (...) {
         throw;
