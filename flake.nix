@@ -337,25 +337,11 @@
         # Add "passthru" tests
         //
           flatMapAttrs
-            (
-              {
-                "" = {
-                  pkgs = nixpkgsFor.${system}.native;
-                };
-              }
-              // lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.hostPlatform.isDarwin) {
-                # TODO: enable static builds for darwin, blocked on:
-                #       https://github.com/NixOS/nixpkgs/issues/320448
-                # TODO: disabled to speed up GHA CI.
-                # "static-" = {
-                #   pkgs = nixpkgsFor.${system}.native.pkgsStatic;
-                # };
-                "sanitized-" = {
-                  pkgs = nixpkgsFor.${system}.native;
-                  withSanitizers = true;
-                };
-              }
-            )
+            {
+              "" = {
+                pkgs = nixpkgsFor.${system}.native;
+              };
+            }
             (
               nixpkgsPrefix: args:
               (import ./ci/gha/tests (
