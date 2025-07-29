@@ -45,7 +45,7 @@ std::pair<StorePath, Hash> fetchToStore2(
             auto hash = Hash::parseSRI(fetchers::getStrAttr(*res, "hash"));
             auto storePath =
                 store.makeFixedOutputPathFromCA(name, ContentAddressWithReferences::fromParts(method, hash, {}));
-            if (mode == FetchMode::DryRun || store.isValidPath(storePath)) {
+            if (mode == FetchMode::DryRun || store.maybeQueryPathInfo(storePath)) {
                 debug(
                     "source path '%s' cache hit in '%s' (hash '%s')",
                     path,

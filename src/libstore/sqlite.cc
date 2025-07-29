@@ -4,6 +4,10 @@
 #include "nix/util/url.hh"
 #include "nix/util/signals.hh"
 
+#ifdef __linux__
+#  include <sys/vfs.h>
+#endif
+
 #include <sqlite3.h>
 
 #include <atomic>
@@ -58,8 +62,28 @@ static void traceSQL(void * x, const char * sql)
     notice("SQL<[%1%]>", sql);
 };
 
-SQLite::SQLite(const Path & path, SQLiteOpenMode mode)
+SQLite::SQLite(const std::filesystem::path & path, SQLiteOpenMode mode)
 {
+#ifdef __linux__
+    // Work around a ZFS issue where SQLite's truncate() call on
+    // db.sqlite-shm can randomly take up to a few seconds. See
+    // https://github.com/openzfs/zfs/issues/14290#issuecomment-3074672917.
+    try {
+        auto shmFile = path;
+        shmFile += "-shm";
+        AutoCloseFD fd = open(shmFile.string().c_str(), O_RDWR | O_CLOEXEC);
+        if (fd) {
+            struct statfs fs;
+            if (fstatfs(fd.get(), &fs))
+                throw SysError("statfs() on '%s' to work around ZFS issue", shmFile);
+            if (fs.f_type == /* ZFS_SUPER_MAGIC */ 801189825 && fdatasync(fd.get()) != 0)
+                throw SysError("fsync() on '%s' to work around ZFS issue", shmFile);
+        }
+    } catch (...) {
+        throw;
+    }
+#endif
+
     // useSQLiteWAL also indicates what virtual file system we need.  Using
     // `unix-dotfile` is needed on NFS file systems and on Windows' Subsystem
     // for Linux (WSL) where useSQLiteWAL should be false by default.
@@ -68,7 +92,7 @@ SQLite::SQLite(const Path & path, SQLiteOpenMode mode)
     int flags = immutable ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE;
     if (mode == SQLiteOpenMode::Normal)
         flags |= SQLITE_OPEN_CREATE;
-    auto uri = "file:" + percentEncode(path) + "?immutable=" + (immutable ? "1" : "0");
+    auto uri = "file:" + percentEncode(path.string()) + "?immutable=" + (immutable ? "1" : "0");
     int ret = sqlite3_open_v2(uri.c_str(), &db, SQLITE_OPEN_URI | flags, vfs);
     if (ret != SQLITE_OK) {
         const char * err = sqlite3_errstr(ret);

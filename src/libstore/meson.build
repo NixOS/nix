@@ -25,10 +25,12 @@ configdata_priv.set_quoted('PACKAGE_VERSION', meson.project_version())
 
 configdata_priv.set_quoted('DETERMINATE_NIX_VERSION', fs.read('../../.version-determinate').strip())
 
+subdir('nix-meson-build-support/default-system-cpu')
+
 # Used in public header.
 configdata_pub.set_quoted(
   'NIX_LOCAL_SYSTEM',
-  host_machine.cpu_family() + '-' + host_machine.system(),
+  nix_system_cpu + '-' + host_machine.system(),
   description :
     'This is the system name Nix expects for local running instance of Nix.\n\n'
     + 'See the "system" setting for additional details',
@@ -253,6 +255,7 @@ config_priv_h = configure_file(
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'async-path-writer.cc',
   'binary-cache-store.cc',
   'build-result.cc',
   'build/derivation-goal.cc',

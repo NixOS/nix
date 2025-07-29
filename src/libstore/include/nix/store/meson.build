@@ -10,6 +10,7 @@ config_pub_h = configure_file(
 )
 
 headers = [config_pub_h] + files(
+  'async-path-writer.hh',
   'binary-cache-store.hh',
   'build-result.hh',
   'build/derivation-goal.hh',

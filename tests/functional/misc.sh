@@ -44,3 +44,7 @@ out="$(expectStderr 0 nix-instantiate --option foobar baz --expr '{}')"
 
 out="$(expectStderr 0 nix-instantiate '{}' --option foobar baz --expr )"
 [[ "$(echo "$out" | grep foobar | wc -l)" = 1 ]]
+
+if [[ $(uname) = Linux && $(uname -m) = i686 ]]; then
+    [[ $(nix config show system) = i686-linux ]]
+fi

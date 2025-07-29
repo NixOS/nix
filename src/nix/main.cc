@@ -86,6 +86,19 @@ static bool haveInternet()
 #endif
 }
 
+static void disableNet()
+{
+    // FIXME: should check for command line overrides only.
+    if (!settings.useSubstitutes.overridden)
+        settings.useSubstitutes = false;
+    if (!settings.tarballTtl.overridden)
+        settings.tarballTtl = std::numeric_limits<unsigned int>::max();
+    if (!fileTransferSettings.tries.overridden)
+        fileTransferSettings.tries = 0;
+    if (!fileTransferSettings.connectTimeout.overridden)
+        fileTransferSettings.connectTimeout = 1;
+}
+
 std::string programPath;
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
@@ -213,6 +226,14 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
    lowdown. */
 static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 {
+    // Check for aliases if subcommand has exactly one element
+    if (subcommand.size() == 1) {
+        auto alias = toplevel.aliases.find(subcommand[0]);
+        if (alias != toplevel.aliases.end()) {
+            subcommand = alias->second.replacement;
+        }
+    }
+
     auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
 
     evalSettings.restrictEval = false;
@@ -470,6 +491,12 @@ void mainWrapped(int argc, char ** argv)
         }
     });
 
+    if (getEnv("NIX_GET_COMPLETIONS"))
+        /* Avoid fetching stuff during tab completion. We have to this
+           early because we haven't checked `haveInternet()` yet
+           (below). */
+        disableNet();
+
     try {
         auto isNixCommand = std::regex_search(programName, std::regex("nix$"));
         auto allowShebang = isNixCommand && argc > 1;
@@ -513,17 +540,8 @@ void mainWrapped(int argc, char ** argv)
         args.useNet = false;
     }
 
-    if (!args.useNet) {
-        // FIXME: should check for command line overrides only.
-        if (!settings.useSubstitutes.overridden)
-            settings.useSubstitutes = false;
-        if (!settings.tarballTtl.overridden)
-            settings.tarballTtl = std::numeric_limits<unsigned int>::max();
-        if (!fileTransferSettings.tries.overridden)
-            fileTransferSettings.tries = 0;
-        if (!fileTransferSettings.connectTimeout.overridden)
-            fileTransferSettings.connectTimeout = 1;
-    }
+    if (!args.useNet)
+        disableNet();
 
     if (args.refresh) {
         settings.tarballTtl = 0;

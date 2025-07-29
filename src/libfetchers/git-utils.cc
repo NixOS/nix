@@ -8,6 +8,8 @@
 #include "nix/util/users.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/sync.hh"
+#include "nix/util/thread-pool.hh"
+#include "nix/util/pool.hh"
 
 #include <git2/attr.h>
 #include <git2/blob.h>
@@ -219,20 +221,28 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
     /** Location of the repository on disk. */
     std::filesystem::path path;
+
+    bool bare;
+
     /**
      * libgit2 repository. Note that new objects are not written to disk,
      * because we are using a mempack backend. For writing to disk, see
      * `flush()`, which is also called by `GitFileSystemObjectSink::sync()`.
      */
     Repository repo;
+
     /**
      * In-memory object store for efficient batched writing to packfiles.
      * Owned by `repo`.
      */
     git_odb_backend * mempack_backend;
 
-    GitRepoImpl(std::filesystem::path _path, bool create, bool bare)
+    bool useMempack;
+
+    GitRepoImpl(std::filesystem::path _path, bool create, bool bare, bool useMempack = false)
         : path(std::move(_path))
+        , bare(bare)
+        , useMempack(useMempack)
     {
         initLibGit2();
 
@@ -240,16 +250,18 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         if (git_repository_open(Setter(repo), path.string().c_str()))
             throw Error("opening Git repository %s: %s", path, git_error_last()->message);
 
-        ObjectDb odb;
-        if (git_repository_odb(Setter(odb), repo.get()))
-            throw Error("getting Git object database: %s", git_error_last()->message);
+        if (useMempack) {
+            ObjectDb odb;
+            if (git_repository_odb(Setter(odb), repo.get()))
+                throw Error("getting Git object database: %s", git_error_last()->message);
 
-        // mempack_backend will be owned by the repository, so we are not expected to free it ourselves.
-        if (git_mempack_new(&mempack_backend))
-            throw Error("creating mempack backend: %s", git_error_last()->message);
+            // mempack_backend will be owned by the repository, so we are not expected to free it ourselves.
+            if (git_mempack_new(&mempack_backend))
+                throw Error("creating mempack backend: %s", git_error_last()->message);
 
-        if (git_odb_add_backend(odb.get(), mempack_backend, 999))
-            throw Error("adding mempack backend to Git object database: %s", git_error_last()->message);
+            if (git_odb_add_backend(odb.get(), mempack_backend, 999))
+                throw Error("adding mempack backend to Git object database: %s", git_error_last()->message);
+        }
     }
 
     operator git_repository *()
@@ -259,6 +271,9 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     void flush() override
     {
+        if (!useMempack)
+            return;
+
         checkInterrupt();
 
         git_buf buf = GIT_BUF_INIT;
@@ -988,216 +1003,239 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 {
     ref<GitRepoImpl> repo;
 
-    struct PendingDir
-    {
-        std::string name;
-        TreeBuilder builder;
-    };
+    bool useMempack =
+// On macOS, mempack is beneficial.
+#ifdef __linux__
+        false
+#else
+        true
+#endif
+        ;
 
-    std::vector<PendingDir> pendingDirs;
+    Pool<GitRepoImpl> repoPool;
 
-    void pushBuilder(std::string name)
-    {
-        const git_tree_entry * entry;
-        Tree prevTree = nullptr;
+    unsigned int concurrency = std::min(std::thread::hardware_concurrency(), 4U);
 
-        if (!pendingDirs.empty() && (entry = git_treebuilder_get(pendingDirs.back().builder.get(), name.c_str()))) {
-            /* Clone a tree that we've already finished. This happens
-               if a tarball has directory entries that are not
-               contiguous. */
-            if (git_tree_entry_type(entry) != GIT_OBJECT_TREE)
-                throw Error("parent of '%s' is not a directory", name);
-
-            if (git_tree_entry_to_object((git_object **) (git_tree **) Setter(prevTree), *repo, entry))
-                throw Error("looking up parent of '%s': %s", name, git_error_last()->message);
-        }
-
-        git_treebuilder * b;
-        if (git_treebuilder_new(&b, *repo, prevTree.get()))
-            throw Error("creating a tree builder: %s", git_error_last()->message);
-        pendingDirs.push_back({.name = std::move(name), .builder = TreeBuilder(b)});
-    };
+    ThreadPool workers{concurrency};
 
     GitFileSystemObjectSinkImpl(ref<GitRepoImpl> repo)
         : repo(repo)
+        , repoPool(std::numeric_limits<size_t>::max(), [repo, useMempack(useMempack)]() -> ref<GitRepoImpl> {
+            return make_ref<GitRepoImpl>(repo->path, false, repo->bare, useMempack);
+        })
     {
-        pushBuilder("");
     }
 
-    std::pair<git_oid, std::string> popBuilder()
+    struct Child;
+
+    struct Directory
     {
-        assert(!pendingDirs.empty());
-        auto pending = std::move(pendingDirs.back());
-        git_oid oid;
-        if (git_treebuilder_write(&oid, pending.builder.get()))
-            throw Error("creating a tree object: %s", git_error_last()->message);
-        pendingDirs.pop_back();
-        return {oid, pending.name};
+        std::map<std::string, Child> children;
+        std::optional<git_oid> oid;
+
+        Child & lookup(const CanonPath & path)
+        {
+            assert(!path.isRoot());
+            auto parent = path.parent();
+            auto cur = this;
+            for (auto & name : *parent) {
+                auto i = cur->children.find(std::string(name));
+                if (i == cur->children.end())
+                    throw Error("path '%s' does not exist", path);
+                auto dir = std::get_if<Directory>(&i->second.file);
+                if (!dir)
+                    throw Error("path '%s' has a non-directory parent", path);
+                cur = dir;
+            }
+
+            auto i = cur->children.find(std::string(*path.baseName()));
+            if (i == cur->children.end())
+                throw Error("path '%s' does not exist", path);
+            return i->second;
+        }
     };
 
-    void addToTree(const std::string & name, const git_oid & oid, git_filemode_t mode)
+    struct Child
     {
-        assert(!pendingDirs.empty());
-        auto & pending = pendingDirs.back();
-        if (git_treebuilder_insert(nullptr, pending.builder.get(), name.c_str(), &oid, mode))
-            throw Error("adding a file to a tree builder: %s", git_error_last()->message);
+        git_filemode_t mode;
+        std::variant<Directory, git_oid> file;
+
+        /// Sequential numbering of the file in the tarball. This is
+        /// used to make sure we only import the latest version of a
+        /// path.
+        size_t id{0};
     };
 
-    void updateBuilders(std::span<const std::string> names)
+    struct State
     {
-        // Find the common prefix of pendingDirs and names.
-        size_t prefixLen = 0;
-        for (; prefixLen < names.size() && prefixLen + 1 < pendingDirs.size(); ++prefixLen)
-            if (names[prefixLen] != pendingDirs[prefixLen + 1].name)
-                break;
+        Directory root;
+    };
 
-        // Finish the builders that are not part of the common prefix.
-        for (auto n = pendingDirs.size(); n > prefixLen + 1; --n) {
-            auto [oid, name] = popBuilder();
-            addToTree(name, oid, GIT_FILEMODE_TREE);
+    Sync<State> _state;
+
+    void addNode(State & state, const CanonPath & path, Child && child)
+    {
+        assert(!path.isRoot());
+        auto parent = path.parent();
+
+        Directory * cur = &state.root;
+
+        for (auto & i : *parent) {
+            auto child = std::get_if<Directory>(
+                &cur->children.emplace(std::string(i), Child{GIT_FILEMODE_TREE, {Directory()}}).first->second.file);
+            assert(child);
+            cur = child;
         }
 
-        // Create builders for the new directories.
-        for (auto n = prefixLen; n < names.size(); ++n)
-            pushBuilder(names[n]);
-    };
+        std::string name(*path.baseName());
 
-    bool prepareDirs(const std::vector<std::string> & pathComponents, bool isDir)
-    {
-        std::span<const std::string> pathComponents2{pathComponents};
-
-        updateBuilders(isDir ? pathComponents2 : pathComponents2.first(pathComponents2.size() - 1));
-
-        return true;
+        if (auto prev = cur->children.find(name); prev == cur->children.end() || prev->second.id < child.id)
+            cur->children.insert_or_assign(name, std::move(child));
     }
+
+    size_t nextId = 0;
 
     void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func) override
     {
-        auto pathComponents = tokenizeString<std::vector<std::string>>(path.rel(), "/");
-        if (!prepareDirs(pathComponents, false))
-            return;
-
-        git_writestream * stream = nullptr;
-        if (git_blob_create_from_stream(&stream, *repo, nullptr))
-            throw Error("creating a blob stream object: %s", git_error_last()->message);
-
         struct CRF : CreateRegularFileSink
         {
-            const CanonPath & path;
-            GitFileSystemObjectSinkImpl & back;
-            git_writestream * stream;
+            std::string data;
             bool executable = false;
-
-            CRF(const CanonPath & path, GitFileSystemObjectSinkImpl & back, git_writestream * stream)
-                : path(path)
-                , back(back)
-                , stream(stream)
-            {
-            }
 
             void operator()(std::string_view data) override
             {
-                if (stream->write(stream, data.data(), data.size()))
-                    throw Error("writing a blob for tarball member '%s': %s", path, git_error_last()->message);
+                this->data += data;
             }
 
             void isExecutable() override
             {
                 executable = true;
             }
-        } crf{path, *this, stream};
+        } crf;
 
         func(crf);
 
-        git_oid oid;
-        if (git_blob_create_from_stream_commit(&oid, stream))
-            throw Error("creating a blob object for tarball member '%s': %s", path, git_error_last()->message);
+        workers.enqueue([this, path, data{std::move(crf.data)}, executable(crf.executable), id(nextId++)]() {
+            auto repo(repoPool.get());
 
-        addToTree(*pathComponents.rbegin(), oid, crf.executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB);
+            git_writestream * stream = nullptr;
+            if (git_blob_create_from_stream(&stream, *repo, nullptr))
+                throw Error("creating a blob stream object: %s", git_error_last()->message);
+
+            if (stream->write(stream, data.data(), data.size()))
+                throw Error("writing a blob for tarball member '%s': %s", path, git_error_last()->message);
+
+            git_oid oid;
+            if (git_blob_create_from_stream_commit(&oid, stream))
+                throw Error("creating a blob object for tarball member '%s': %s", path, git_error_last()->message);
+
+            auto state(_state.lock());
+            addNode(*state, path, Child{executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB, oid, id});
+        });
     }
 
     void createDirectory(const CanonPath & path) override
     {
-        auto pathComponents = tokenizeString<std::vector<std::string>>(path.rel(), "/");
-        (void) prepareDirs(pathComponents, true);
+        if (path.isRoot())
+            return;
+        auto state(_state.lock());
+        addNode(*state, path, {GIT_FILEMODE_TREE, Directory()});
     }
 
     void createSymlink(const CanonPath & path, const std::string & target) override
     {
-        auto pathComponents = tokenizeString<std::vector<std::string>>(path.rel(), "/");
-        if (!prepareDirs(pathComponents, false))
-            return;
+        workers.enqueue([this, path, target]() {
+            auto repo(repoPool.get());
 
-        git_oid oid;
-        if (git_blob_create_from_buffer(&oid, *repo, target.c_str(), target.size()))
-            throw Error("creating a blob object for tarball symlink member '%s': %s", path, git_error_last()->message);
+            git_oid oid;
+            if (git_blob_create_from_buffer(&oid, *repo, target.c_str(), target.size()))
+                throw Error(
+                    "creating a blob object for tarball symlink member '%s': %s", path, git_error_last()->message);
 
-        addToTree(*pathComponents.rbegin(), oid, GIT_FILEMODE_LINK);
+            auto state(_state.lock());
+            addNode(*state, path, Child{GIT_FILEMODE_LINK, oid});
+        });
     }
+
+    std::map<CanonPath, CanonPath> hardLinks;
 
     void createHardlink(const CanonPath & path, const CanonPath & target) override
     {
-        std::vector<std::string> pathComponents;
-        for (auto & c : path)
-            pathComponents.emplace_back(c);
-
-        if (!prepareDirs(pathComponents, false))
-            return;
-
-        // We can't just look up the path from the start of the root, since
-        // some parent directories may not have finished yet, so we compute
-        // a relative path that helps us find the right git_tree_builder or object.
-        auto relTarget = CanonPath(path).parent()->makeRelative(target);
-
-        auto dir = pendingDirs.rbegin();
-
-        // For each ../ component at the start, go up one directory.
-        // CanonPath::makeRelative() always puts all .. elements at the start,
-        // so they're all handled by this loop:
-        std::string_view relTargetLeft(relTarget);
-        while (hasPrefix(relTargetLeft, "../")) {
-            if (dir == pendingDirs.rend())
-                throw Error("invalid hard link target '%s' for path '%s'", target, path);
-            ++dir;
-            relTargetLeft = relTargetLeft.substr(3);
-        }
-        if (dir == pendingDirs.rend())
-            throw Error("invalid hard link target '%s' for path '%s'", target, path);
-
-        // Look up the remainder of the target, starting at the
-        // top-most `git_treebuilder`.
-        std::variant<git_treebuilder *, git_oid> curDir{dir->builder.get()};
-        Object tree; // needed to keep `entry` alive
-        const git_tree_entry * entry = nullptr;
-
-        for (auto & c : CanonPath(relTargetLeft)) {
-            if (auto builder = std::get_if<git_treebuilder *>(&curDir)) {
-                assert(*builder);
-                if (!(entry = git_treebuilder_get(*builder, std::string(c).c_str())))
-                    throw Error("cannot find hard link target '%s' for path '%s'", target, path);
-                curDir = *git_tree_entry_id(entry);
-            } else if (auto oid = std::get_if<git_oid>(&curDir)) {
-                tree = lookupObject(*repo, *oid, GIT_OBJECT_TREE);
-                if (!(entry = git_tree_entry_byname((const git_tree *) &*tree, std::string(c).c_str())))
-                    throw Error("cannot find hard link target '%s' for path '%s'", target, path);
-                curDir = *git_tree_entry_id(entry);
-            }
-        }
-
-        assert(entry);
-
-        addToTree(*pathComponents.rbegin(), *git_tree_entry_id(entry), git_tree_entry_filemode(entry));
+        hardLinks.insert_or_assign(path, target);
     }
 
     Hash flush() override
     {
-        updateBuilders({});
+        workers.process();
 
-        auto [oid, _name] = popBuilder();
+        /* Create hard links. */
+        {
+            auto state(_state.lock());
+            for (auto & [path, target] : hardLinks) {
+                if (target.isRoot())
+                    continue;
+                try {
+                    auto child = state->root.lookup(target);
+                    auto oid = std::get_if<git_oid>(&child.file);
+                    if (!oid)
+                        throw Error("cannot create a hard link to a directory");
+                    addNode(*state, path, {child.mode, *oid});
+                } catch (Error & e) {
+                    e.addTrace(nullptr, "while creating a hard link from '%s' to '%s'", path, target);
+                    throw;
+                }
+            }
+        }
 
-        repo->flush();
+        auto & root = _state.lock()->root;
 
-        return toHash(oid);
+        auto doFlush = [&]() {
+            auto repos = repoPool.clear();
+            ThreadPool workers{repos.size()};
+            for (auto & repo : repos)
+                workers.enqueue([repo]() { repo->flush(); });
+            workers.process();
+        };
+
+        if (useMempack)
+            doFlush();
+
+        processGraph<Directory *>(
+            {&root},
+            [&](Directory * const & node) -> std::set<Directory *> {
+                std::set<Directory *> edges;
+                for (auto & child : node->children)
+                    if (auto dir = std::get_if<Directory>(&child.second.file))
+                        edges.insert(dir);
+                return edges;
+            },
+            [&](Directory * const & node) {
+                auto repo(repoPool.get());
+
+                git_treebuilder * b;
+                if (git_treebuilder_new(&b, *repo, nullptr))
+                    throw Error("creating a tree builder: %s", git_error_last()->message);
+                TreeBuilder builder(b);
+
+                for (auto & [name, child] : node->children) {
+                    auto oid_p = std::get_if<git_oid>(&child.file);
+                    auto oid = oid_p ? *oid_p : std::get<Directory>(child.file).oid.value();
+                    if (git_treebuilder_insert(nullptr, builder.get(), name.c_str(), &oid, child.mode))
+                        throw Error("adding a file to a tree builder: %s", git_error_last()->message);
+                }
+
+                git_oid oid;
+                if (git_treebuilder_write(&oid, builder.get()))
+                    throw Error("creating a tree object: %s", git_error_last()->message);
+                node->oid = oid;
+            },
+            true,
+            useMempack ? 1 : concurrency);
+
+        if (useMempack)
+            doFlush();
+
+        return toHash(root.oid.value());
     }
 };
 

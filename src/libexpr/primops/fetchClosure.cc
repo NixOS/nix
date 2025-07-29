@@ -136,7 +136,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value ** args
 
         if (attrName == "fromPath") {
             NixStringContext context;
-            fromPath = state.coerceToStorePath(attr.pos, *attr.value, context, attrHint()); // FIXME: overflow
+            fromPath = state.coerceToStorePath(attr.pos, *attr.value, context, attrHint());
         }
 
         else if (attrName == "toPath") {
