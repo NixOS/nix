@@ -5089,10 +5089,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         )",
         });
 
-    if (!settings.pureEval)
-        v.mkInt(time(0));
-    else
-        v.mkNull();
+    v.mkInt(time(0));
     addConstant(
         "__currentTime",
         v,
@@ -5120,10 +5117,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
             .impureOnly = true,
         });
 
-    if (!settings.pureEval)
-        v.mkString(settings.getCurrentSystem());
-    else
-        v.mkNull();
+    v.mkString(settings.getCurrentSystem());
     addConstant(
         "__currentSystem",
         v,
