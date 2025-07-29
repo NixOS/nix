@@ -112,6 +112,7 @@ suites = [
       'impure-eval.sh',
       'pure-eval.sh',
       'eval.sh',
+      'short-path-literals.sh',
       'repl.sh',
       'binary-cache-build-remote.sh',
       'search.sh',
