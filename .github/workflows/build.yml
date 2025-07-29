@@ -160,7 +160,6 @@ jobs:
           NIX_CONFIG: ${{ matrix.nix_config }}
           PREFETCH: "1"
           GC_INITIAL_HEAP_SIZE: "32G"
-          NIX_REMOTE: "/tmp/nix"
         run: |
           set -x
           echo "PARALLEL: $PARALLEL"
@@ -171,6 +170,7 @@ jobs:
           fi
           nix build -L --out-link ./new-nix
           export PATH=$(pwd)/new-nix/bin:$PATH
+          [[ $(type -p nix) = $(pwd)/new-nix/bin/nix ]]
 
           nix config show lazy-trees
           nix config show eval-cores
@@ -180,7 +180,7 @@ jobs:
           if ! flake-regressions/eval-all.sh; then
             echo "Some failed, trying again"
             printf "\n\n\n\n\n\n\n\n"
-            flake-regressions/eval-all.sh
+            NIX_REMOTE=/tmp/nix flake-regressions/eval-all.sh
           fi
 
   manual:
