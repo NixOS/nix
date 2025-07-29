@@ -160,6 +160,7 @@ jobs:
           NIX_CONFIG: ${{ matrix.nix_config }}
           PREFETCH: "1"
           GC_INITIAL_HEAP_SIZE: "32G"
+          NIX_REMOTE: "/tmp/nix"
         run: |
           set -x
           echo "PARALLEL: $PARALLEL"
