@@ -203,7 +203,7 @@ ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOn
         if (pd != pdAwaited) {
             assert(pd != pdThunk && pd != pdPending);
             auto now2 = std::chrono::steady_clock::now();
-            state.usWaiting += std::chrono::duration_cast<std::chrono::microseconds>(now2 - now1).count();
+            state.microsecondsWaiting += std::chrono::duration_cast<std::chrono::microseconds>(now2 - now1).count();
             state.currentlyWaiting--;
             return p0_;
         }

@@ -967,7 +967,7 @@ private:
 public:
     std::atomic<uint64_t> nrThunksAwaited{0};
     std::atomic<uint64_t> nrThunksAwaitedSlow{0};
-    std::atomic<uint64_t> usWaiting{0};
+    std::atomic<uint64_t> microsecondsWaiting{0};
     std::atomic<uint64_t> currentlyWaiting{0};
     std::atomic<uint64_t> maxWaiting{0};
     std::atomic<uint64_t> nrSpuriousWakeups{0};

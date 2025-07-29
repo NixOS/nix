@@ -3025,7 +3025,7 @@ void EvalState::printStatistics()
     topObj["nrThunksAwaitedSlow"] = nrThunksAwaitedSlow.load();
     topObj["nrSpuriousWakeups"] = nrSpuriousWakeups.load();
     topObj["maxWaiting"] = maxWaiting.load();
-    topObj["waitingTime"] = usWaiting / (double) 1000000;
+    topObj["waitingTime"] = microsecondsWaiting / (double) 1000000;
     topObj["nrAvoided"] = nrAvoided.load();
     topObj["nrLookups"] = nrLookups.load();
     topObj["nrPrimOpCalls"] = nrPrimOpCalls.load();
