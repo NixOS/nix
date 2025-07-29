@@ -126,7 +126,8 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
       ++ lib.optional stdenv.hostPlatform.isLinux pkgs.buildPackages.mold-wrapped;
 
     buildInputs =
-      attrs.buildInputs or [ ]
+      [ pkgs.gbenchmark ]
+      ++ attrs.buildInputs or [ ]
       ++ pkgs.nixComponents2.nix-util.buildInputs
       ++ pkgs.nixComponents2.nix-store.buildInputs
       ++ pkgs.nixComponents2.nix-store-tests.externalBuildInputs
