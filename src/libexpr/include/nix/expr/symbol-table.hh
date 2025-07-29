@@ -20,7 +20,7 @@ class SymbolValue : protected Value
     operator std::string_view() const noexcept
     {
         // The actual string is stored directly after the value.
-        return (char *) (this + 1);
+        return reinterpret_cast<const char *>(this + 1);
     }
 };
 
@@ -135,13 +135,13 @@ public:
     [[gnu::always_inline]]
     bool empty() const noexcept
     {
-        return ((std::string_view) *s).empty();
+        return static_cast<std::string_view>(*s).empty();
     }
 
     [[gnu::always_inline]]
     size_t size() const noexcept
     {
-        return ((std::string_view) *s).size();
+        return static_cast<std::string_view>(*s).size();
     }
 
     [[gnu::always_inline]]
@@ -237,7 +237,7 @@ public:
     {
         if (s.id == 0 || s.id > arena.size)
             unreachable();
-        return SymbolStr(*(SymbolValue *) (arena.data + s.id));
+        return SymbolStr(*reinterpret_cast<const SymbolValue *>(arena.data + s.id));
     }
 
     size_t size() const noexcept
