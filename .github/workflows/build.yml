@@ -145,7 +145,6 @@ jobs:
         with:
           repository: DeterminateSystems/flake-regressions
           path: flake-regressions
-          ref: prefetch
       - name: Checkout flake-regressions-data
         uses: actions/checkout@v4
         with:
