@@ -95,15 +95,16 @@ template<std::size_t ptrSize>
 void ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<ptrSize>>>::force(
     EvalState & state, PosIdx pos)
 {
-    // FIXME: check that the compiler won't reorder this below the
-    // load of p0.
-    auto p1_ = p1;
     auto p0_ = p0.load(std::memory_order_acquire);
 
     auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
 
     if (pd == pdThunk) {
         try {
+            // The value we get here is only valid if we can set the
+            // thunk to pending.
+            auto p1_ = p1;
+
             // Atomically set the thunk to "pending".
             if (!p0.compare_exchange_strong(p0_, pdPending, std::memory_order_acquire, std::memory_order_acquire)) {
                 pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
