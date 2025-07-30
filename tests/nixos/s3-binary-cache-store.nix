@@ -68,6 +68,7 @@ in
       # Create a binary cache.
       server.wait_for_unit("minio")
       server.wait_for_unit("network-addresses-eth1.service")
+      server.wait_for_open_port(9000)
 
       server.succeed("mc config host add minio http://localhost:9000 ${accessKey} ${secretKey} --api s3v4")
       server.succeed("mc mb minio/my-cache")
