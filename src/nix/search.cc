@@ -211,7 +211,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
         if (!json && !results)
             throw Error("no results for the given search term(s)!");
 
-        printError("Found %d matching packages.", results);
+        notice("Found %d matching packages.", results);
     }
 };
 
