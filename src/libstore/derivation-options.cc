@@ -92,6 +92,12 @@ using OutputChecks = DerivationOptions::OutputChecks;
 
 using OutputChecksVariant = std::variant<OutputChecks, std::map<std::string, OutputChecks>>;
 
+DerivationOptions DerivationOptions::fromStructuredAttrs(
+    const StringMap & env, const std::optional<StructuredAttrs> & parsed, bool shouldWarn)
+{
+    return fromStructuredAttrs(env, parsed ? &*parsed : nullptr);
+}
+
 DerivationOptions
 DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAttrs * parsed, bool shouldWarn)
 {

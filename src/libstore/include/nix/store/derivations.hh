@@ -7,6 +7,7 @@
 #include "nix/store/content-address.hh"
 #include "nix/util/repair-flag.hh"
 #include "nix/store/derived-path-map.hh"
+#include "nix/store/parsed-derivations.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/variant-wrapper.hh"
 
@@ -286,7 +287,12 @@ struct BasicDerivation
     std::string platform;
     Path builder;
     Strings args;
+    /**
+     * Must not contain the key `__json`, at least in order to serialize to A-Term.
+     */
     StringPairs env;
+    std::optional<StructuredAttrs> structuredAttrs;
+
     std::string name;
 
     BasicDerivation() = default;

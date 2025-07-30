@@ -32,12 +32,9 @@ DerivationBuildingGoal::DerivationBuildingGoal(
 {
     drv = std::make_unique<Derivation>(drv_);
 
-    if (auto parsedOpt = StructuredAttrs::tryParse(drv->env)) {
-        parsedDrv = std::make_unique<StructuredAttrs>(*parsedOpt);
-    }
     try {
         drvOptions =
-            std::make_unique<DerivationOptions>(DerivationOptions::fromStructuredAttrs(drv->env, parsedDrv.get()));
+            std::make_unique<DerivationOptions>(DerivationOptions::fromStructuredAttrs(drv->env, drv->structuredAttrs));
     } catch (Error & e) {
         e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
         throw;
@@ -661,7 +658,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     buildMode,
                     buildResult,
                     *drv,
-                    parsedDrv.get(),
                     *drvOptions,
                     inputPaths,
                     initialOutputs,

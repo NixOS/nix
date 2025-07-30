@@ -28,15 +28,6 @@ struct DerivationBuilderParams
     const Derivation & drv;
 
     /**
-     * The "structured attrs" of `drv`, if it has them.
-     *
-     * @todo this should be part of `Derivation`.
-     *
-     * @todo this should be renamed from `parsedDrv`.
-     */
-    const StructuredAttrs * parsedDrv;
-
-    /**
      * The derivation options of `drv`.
      *
      * @todo this should be part of `Derivation`.
@@ -63,14 +54,12 @@ struct DerivationBuilderParams
         const BuildMode & buildMode,
         BuildResult & buildResult,
         const Derivation & drv,
-        const StructuredAttrs * parsedDrv,
         const DerivationOptions & drvOptions,
         const StorePathSet & inputPaths,
         std::map<std::string, InitialOutput> & initialOutputs)
         : drvPath{drvPath}
         , buildResult{buildResult}
         , drv{drv}
-        , parsedDrv{parsedDrv}
         , drvOptions{drvOptions}
         , inputPaths{inputPaths}
         , initialOutputs{initialOutputs}
