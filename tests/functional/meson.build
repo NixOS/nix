@@ -48,7 +48,7 @@ configure_file(
 suites = [
   {
     'name' : 'main',
-    'deps': [],
+    'deps': [nix],
     'tests': [
       'test-infra.sh',
       'gc.sh',

@@ -2497,6 +2497,8 @@ static RegisterPrimOp primop_fromJSON({
       ```
 
       returns the value `{ x = [ 1 2 3 ]; y = null; }`.
+
+      This function supports JSON with comments.
     )",
     .fun = prim_fromJSON,
 });
