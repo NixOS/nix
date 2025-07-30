@@ -1,16 +1,23 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/parallel-eval.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 
 thread_local bool Executor::amWorkerThread{false};
 
-Executor::Executor(const EvalSettings & evalSettings)
-    : enabled(evalSettings.evalCores > 1)
+unsigned int Executor::getEvalCores(const EvalSettings & evalSettings)
 {
-    debug("executor using %d threads", evalSettings.evalCores);
+    return evalSettings.evalCores == 0UL ? Settings::getDefaultCores() : evalSettings.evalCores;
+}
+
+Executor::Executor(const EvalSettings & evalSettings)
+    : evalCores(getEvalCores(evalSettings))
+    , enabled(evalSettings.evalCores > 1)
+{
+    debug("executor using %d threads", evalCores);
     auto state(state_.lock());
-    for (size_t n = 0; n < evalSettings.evalCores; ++n)
+    for (size_t n = 0; n < evalCores; ++n)
         state->threads.push_back(std::thread([&]() {
 #if NIX_USE_BOEHMGC
             GC_stack_base sb;
@@ -183,7 +190,7 @@ ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOn
     /* Wait for another thread to finish this value. */
     debug("AWAIT %x", this);
 
-    if (state.settings.evalCores <= 1)
+    if (state.executor->evalCores <= 1)
         state.error<InfiniteRecursionError>("infinite recursion encountered")
             .atPos(((Value &) *this).determinePos(noPos))
             .debugThrow();

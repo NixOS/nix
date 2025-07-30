@@ -354,6 +354,8 @@ struct EvalSettings : Config
         "eval-cores",
         R"(
           The number of threads used to evaluate Nix expressions.
+
+          The value `0` causes Nix to use all available CPU cores in the system.
         )"};
 };
 

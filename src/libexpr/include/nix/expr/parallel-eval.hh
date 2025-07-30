@@ -34,11 +34,15 @@ struct Executor
         bool quit = false;
     };
 
+    const unsigned int evalCores;
+
     const bool enabled;
 
     Sync<State> state_;
 
     std::condition_variable wakeup;
+
+    static unsigned int getEvalCores(const EvalSettings & evalSettings);
 
     Executor(const EvalSettings & evalSettings);
 

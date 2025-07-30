@@ -45,8 +45,6 @@ const uint32_t maxIdsPerBuild =
 class Settings : public Config
 {
 
-    unsigned int getDefaultCores();
-
     StringSet getDefaultSystemFeatures();
 
     StringSet getDefaultExtraPlatforms();
@@ -56,6 +54,8 @@ class Settings : public Config
     Path getDefaultSSLCertFile();
 
 public:
+
+    static unsigned int getDefaultCores();
 
     Settings();
 
