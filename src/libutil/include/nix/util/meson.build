@@ -16,6 +16,7 @@ headers = files(
   'comparator.hh',
   'compression.hh',
   'compute-levels.hh',
+  'config-abstract.hh',
   'config-global.hh',
   'config-impl.hh',
   'configuration.hh',
