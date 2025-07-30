@@ -1,4 +1,5 @@
 #include "store-config-private.hh"
+#include <cstdint>
 
 /*
  * Determine the syscall number for `fchmodat2`.
