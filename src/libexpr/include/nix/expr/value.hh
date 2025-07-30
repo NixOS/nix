@@ -451,11 +451,6 @@ public:
         return internalType == tList1 || internalType == tList2 || internalType == tListN;
     }
 
-    Value * const * listElems()
-    {
-        return internalType == tList1 || internalType == tList2 ? payload.smallList : payload.bigList.elems;
-    }
-
     std::span<Value * const> listItems() const
     {
         assert(isList());
