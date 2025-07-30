@@ -154,11 +154,12 @@ jobs:
       - uses: DeterminateSystems/flakehub-cache-action@main
       - name: Run flake regression tests
         env:
-          PARALLEL: ${{ !contains(matrix.nix_config, 'eval-cores') && '-P 50%' || '-P 1' }}
+          #PARALLEL: ${{ !contains(matrix.nix_config, 'eval-cores') && '-P 50%' || '-P 1' }}
+          PARALLEL: '-P 1'
           FLAKE_REGRESSION_GLOB: ${{ matrix.glob }}
           NIX_CONFIG: ${{ matrix.nix_config }}
           PREFETCH: "1"
-          GC_INITIAL_HEAP_SIZE: "32G"
+          #GC_INITIAL_HEAP_SIZE: "32G"
         run: |
           set -x
           echo "PARALLEL: $PARALLEL"
