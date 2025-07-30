@@ -253,16 +253,20 @@ public:
     template<typename T>
     void dump(T callback) const
     {
-// FIXME
-#if 0
         std::string_view left{arena.data, arena.size};
-        while (!left.empty()) {
-            auto p = left.find((char) 0);
-            if (p == left.npos) break;
-            callback(left.substr(0, p));
-            left = left.substr(p + 1);
+        left = left.substr(alignment);
+        while (true) {
+            if (left.empty())
+                break;
+            left = left.substr(sizeof(Value));
+            auto p = left.find('\0');
+            assert(p != left.npos);
+            auto sym = left.substr(0, p);
+            callback(sym);
+            // skip alignment padding
+            auto n = sym.size() + 1;
+            left = left.substr(n + (n % 8 ? 8 - (n % 8) : 0));
         }
-#endif
     }
 };
 
