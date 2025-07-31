@@ -25,7 +25,7 @@ The *requisites* of a store object are all store objects reachable by paths of r
 
 [transitive closure]: https://en.wikipedia.org/wiki/Transitive_closure
 
-We can also take the [transpose graph] ofthe references graph, where we reverse the orientation of all edges.
+We can also take the [transpose graph] of the references graph, where we reverse the orientation of all edges.
 The *referrers* of a store object are the store objects that reference it.
 
 [transpose graph]: https://en.wikipedia.org/wiki/Transpose_graph
