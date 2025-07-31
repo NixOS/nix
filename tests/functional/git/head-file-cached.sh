@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# The purpose of this test is to ensure that the HEAD file in the git cache
+# is cached correctly and it is read on subsequent fetchGit calls
+# and does not change when the branch is switched or new commits are made.
+# It is related to investigating https://github.com/NixOS/nix/issues/13556
+
 source ../common.sh
 
 requireGit
