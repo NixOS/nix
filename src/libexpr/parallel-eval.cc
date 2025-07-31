@@ -114,7 +114,14 @@ std::vector<std::future<void>> Executor::spawn(std::vector<std::pair<work_t, uin
     return futures;
 }
 
-FutureVector::~FutureVector() {}
+FutureVector::~FutureVector()
+{
+    try {
+        finishAll();
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
+}
 
 void FutureVector::spawn(std::vector<std::pair<Executor::work_t, uint8_t>> && work)
 {
@@ -126,6 +133,7 @@ void FutureVector::spawn(std::vector<std::pair<Executor::work_t, uint8_t>> && wo
 
 void FutureVector::finishAll()
 {
+    std::exception_ptr ex;
     while (true) {
         std::vector<std::future<void>> futures;
         {
@@ -135,7 +143,6 @@ void FutureVector::finishAll()
         debug("got %d futures", futures.size());
         if (futures.empty())
             break;
-        std::exception_ptr ex;
         for (auto & future : futures)
             try {
                 future.get();
@@ -146,9 +153,9 @@ void FutureVector::finishAll()
                 } else
                     ex = std::current_exception();
             }
-        if (ex)
-            std::rethrow_exception(ex);
     }
+    if (ex)
+        std::rethrow_exception(ex);
 }
 
 struct WaiterDomain
