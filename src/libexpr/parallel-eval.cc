@@ -36,7 +36,7 @@ Executor::~Executor()
     std::vector<std::thread> threads;
     {
         auto state(state_.lock());
-        state->quit = true;
+        quit = true;
         std::swap(threads, state->threads);
         debug("executor shutting down with %d items left", state->queue.size());
     }
@@ -49,6 +49,10 @@ Executor::~Executor()
 
 void Executor::worker()
 {
+    ReceiveInterrupts receiveInterrupts;
+
+    unix::interruptCheck = [&]() { return (bool) quit; };
+
     amWorkerThread = true;
 
     while (true) {
@@ -56,8 +60,16 @@ void Executor::worker()
 
         while (true) {
             auto state(state_.lock());
-            if (state->quit)
+            if (quit) {
+                // Set an `Interrupted` exception on all promises so
+                // we get a nicer error than "std::future_error:
+                // Broken promise".
+                auto ex = std::make_exception_ptr(Interrupted("interrupted by the user"));
+                for (auto & item : state->queue)
+                    item.second.promise.set_exception(ex);
+                state->queue.clear();
                 return;
+            }
             if (!state->queue.empty()) {
                 item = std::move(state->queue.begin()->second);
                 state->queue.erase(state->queue.begin());
@@ -69,6 +81,9 @@ void Executor::worker()
         try {
             item.work();
             item.promise.set_value();
+        } catch (const Interrupted &) {
+            quit = true;
+            item.promise.set_exception(std::current_exception());
         } catch (...) {
             item.promise.set_exception(std::current_exception());
         }
@@ -98,6 +113,8 @@ std::vector<std::future<void>> Executor::spawn(std::vector<std::pair<work_t, uin
 
     return futures;
 }
+
+FutureVector::~FutureVector() {}
 
 void FutureVector::spawn(std::vector<std::pair<Executor::work_t, uint8_t>> && work)
 {

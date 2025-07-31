@@ -31,8 +31,9 @@ struct Executor
     {
         std::multimap<uint64_t, Item> queue;
         std::vector<std::thread> threads;
-        bool quit = false;
     };
+
+    std::atomic_bool quit{false};
 
     const unsigned int evalCores;
 
@@ -65,6 +66,8 @@ struct FutureVector
     };
 
     Sync<State> state_;
+
+    ~FutureVector();
 
     // FIXME: add a destructor that cancels/waits for all futures.
 
