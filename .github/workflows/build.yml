@@ -192,7 +192,7 @@ jobs:
         if: inputs.publish_manual && inputs.system == 'x86_64-linux'
         with:
           publish-dir: "./result/share/doc/nix/manual"
-          production-branch: detsys-main
+          production-branch: main
           github-token: ${{ secrets.GITHUB_TOKEN }}
           deploy-message: "Deploy from GitHub Actions"
           # NOTE(cole-h): We have a perpetual PR displaying our changes against upstream open, but
