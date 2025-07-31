@@ -126,7 +126,7 @@ LocalStore::LocalStore(std::string_view scheme, PathView path, const Params & pa
     Path gcRootsDir = stateDir + "/gcroots";
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
-        createSymlink(profilesDir, gcRootsDir + "/profiles");
+        replaceSymlink(profilesDir, gcRootsDir + "/profiles");
     }
 
     for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
