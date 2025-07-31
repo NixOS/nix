@@ -6,7 +6,6 @@ on:
     branches:
       # NOTE: make sure any branches here are also valid directory names,
       # otherwise creating the directory and uploading to s3 will fail
-      - detsys-main
       - main
       - master
   merge_group:
@@ -125,7 +124,7 @@ jobs:
           ids_project_name: determinate-nix
           ids_binary_prefix: determinate-nix
           skip_acl: true
-          allowed_branches: '["detsys-main"]'
+          allowed_branches: '["main"]'
 
   publish:
     needs:

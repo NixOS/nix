@@ -30,5 +30,5 @@ assignees: ""
 - [ ] checked [open bug issues and pull requests] for possible duplicates
 
 [latest Determinate Nix manual]: https://manual.determinate.systems/
-[source]: https://github.com/DeterminateSystems/nix-src/tree/detsys-main/doc/manual/source
+[source]: https://github.com/DeterminateSystems/nix-src/tree/main/doc/manual/source
 [open bug issues and pull requests]: https://github.com/DeterminateSystems/nix-src/labels/bug
