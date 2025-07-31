@@ -94,12 +94,15 @@ FlakeRef parseFlakeRef(
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
  */
+<<<<<<< HEAD
 std::optional<FlakeRef> maybeParseFlake(
     const fetchers::Settings & fetchSettings, const std::string & url, const std::optional<Path> & baseDir = {});
 
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
  */
+=======
+>>>>>>> 75412ebc3 (libflake: Remove unused maybeParseFlakeRef and maybeParseFlakeRefWithFragment)
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
@@ -111,12 +114,15 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
  */
+<<<<<<< HEAD
 std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
     const fetchers::Settings & fetchSettings, const std::string & url, const std::optional<Path> & baseDir = {});
 
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
  */
+=======
+>>>>>>> 75412ebc3 (libflake: Remove unused maybeParseFlakeRef and maybeParseFlakeRefWithFragment)
 std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
