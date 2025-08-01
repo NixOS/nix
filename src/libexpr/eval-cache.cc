@@ -69,7 +69,7 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        auto cacheDir = std::filesystem::path(getCacheDir()) / "eval-cache-v5";
+        auto cacheDir = std::filesystem::path(getCacheDir()) / "eval-cache-v6";
         createDirs(cacheDir);
 
         auto dbPath = cacheDir / (fingerprint.to_string(HashFormat::Base16, false) + ".sqlite");
