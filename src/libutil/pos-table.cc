@@ -15,21 +15,35 @@ Pos PosTable::operator[](PosIdx p) const
     const auto offset = origin->offsetOf(p);
 
     Pos result{0, 0, origin->origin};
-    auto lines = this->lines.lock();
-    auto linesForInput = (*lines)[origin->offset];
+    auto linesCache = this->linesCache.lock();
 
-    if (linesForInput.empty()) {
-        auto source = result.getSource().value_or("");
-        const char * begin = source.data();
-        for (Pos::LinesIterator it(source), end; it != end; it++)
-            linesForInput.push_back(it->data() - begin);
-        if (linesForInput.empty())
-            linesForInput.push_back(0);
+    /* Try the origin's line cache */
+    const auto * linesForInput = linesCache->getOrNullptr(origin->offset);
+
+    auto fillCacheForOrigin = [](std::string_view content) {
+        auto contentLines = Lines();
+
+        const char * begin = content.data();
+        for (Pos::LinesIterator it(content), end; it != end; it++)
+            contentLines.push_back(it->data() - begin);
+        if (contentLines.empty())
+            contentLines.push_back(0);
+
+        return contentLines;
+    };
+
+    /* Calculate line offsets and fill the cache */
+    if (!linesForInput) {
+        auto originContent = result.getSource().value_or("");
+        linesCache->upsert(origin->offset, fillCacheForOrigin(originContent));
+        linesForInput = linesCache->getOrNullptr(origin->offset);
     }
-    // as above: the first line starts at byte 0 and is always present
-    auto lineStartOffset = std::prev(std::upper_bound(linesForInput.begin(), linesForInput.end(), offset));
 
-    result.line = 1 + (lineStartOffset - linesForInput.begin());
+    assert(linesForInput);
+
+    // as above: the first line starts at byte 0 and is always present
+    auto lineStartOffset = std::prev(std::upper_bound(linesForInput->begin(), linesForInput->end(), offset));
+    result.line = 1 + (lineStartOffset - linesForInput->begin());
     result.column = 1 + (offset - *lineStartOffset);
     return result;
 }
