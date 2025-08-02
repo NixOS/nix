@@ -19,6 +19,9 @@ add_project_arguments(
   language : 'cpp',
 )
 
+# GCC doesn't benefit much from precompiled headers.
+do_pch = cxx.get_id() == 'clang'
+
 # This is a clang-only option for improving build times.
 # It forces the instantiation of templates in the PCH itself and
 # not every translation unit it's included in.

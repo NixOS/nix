@@ -178,7 +178,7 @@ this_library = library(
   link_args: linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
-  cpp_pch : ['pch/precompiled-headers.hh']
+  cpp_pch : do_pch ? ['pch/precompiled-headers.hh'] : []
 )
 
 install_headers(headers, subdir : 'nix/expr', preserve_path : true)
