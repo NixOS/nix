@@ -59,7 +59,9 @@ in
           inherit getStdenv;
         }).overrideScope
           (
-            _: _: {
+            final: prev: {
+              nix-store-tests = prev.nix-store-tests.override { withBenchmarks = true; };
+
               mesonComponentOverrides = finalAttrs: prevAttrs: {
                 mesonFlags =
                   (prevAttrs.mesonFlags or [ ])

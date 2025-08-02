@@ -110,14 +110,21 @@ test(
 if get_option('benchmarks')
   gbenchmark = dependency('benchmark', required : true)
 
+  benchmark_sources = files(
+    'bench-main.cc',
+    'derivation-parser-bench.cc',
+  )
+
   benchmark_exe = executable(
     'nix-store-benchmarks',
-    'derivation-parser-bench.cc',
+    benchmark_sources,
     config_priv_h,
     dependencies : deps_private_subproject + deps_private + deps_other + [gbenchmark],
     include_directories : include_dirs,
     link_args: linker_export_flags,
-    install : false,
+    install : true,
     cpp_args : ['-DNIX_UNIT_TEST_DATA="' + meson.current_source_dir() + '/data"'],
   )
+
+  benchmark('nix-store-benchmarks', benchmark_exe)
 endif
