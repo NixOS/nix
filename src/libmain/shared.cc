@@ -338,29 +338,34 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
     std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
         try {
-            fun();
-        } catch (...) {
-            /* Subtle: we have to make sure that any `interrupted'
-               condition is discharged before we reach printMsg()
-               below, since otherwise it will throw an (uncaught)
-               exception. */
-            setInterruptThrown();
-            throw;
+            try {
+                fun();
+            } catch (...) {
+                /* Subtle: we have to make sure that any `interrupted'
+                   condition is discharged before we reach printMsg()
+                   below, since otherwise it will throw an (uncaught)
+                   exception. */
+                setInterruptThrown();
+                throw;
+            }
+        } catch (Exit & e) {
+            return e.status;
+        } catch (UsageError & e) {
+            logError(e.info());
+            printError("Try '%1% --help' for more information.", programName);
+            return 1;
+        } catch (BaseError & e) {
+            logError(e.info());
+            return e.info().status;
+        } catch (std::bad_alloc & e) {
+            printError(error + "out of memory");
+            return 1;
+        } catch (std::exception & e) {
+            printError(error + e.what());
+            return 1;
         }
-    } catch (Exit & e) {
-        return e.status;
-    } catch (UsageError & e) {
-        logError(e.info());
-        printError("Try '%1% --help' for more information.", programName);
-        return 1;
-    } catch (BaseError & e) {
-        logError(e.info());
-        return e.info().status;
-    } catch (std::bad_alloc & e) {
-        printError(error + "out of memory");
-        return 1;
-    } catch (std::exception & e) {
-        printError(error + e.what());
+    } catch (...) {
+        /* In case logger also throws just give up. */
         return 1;
     }
 
