@@ -122,7 +122,7 @@ if get_option('benchmarks')
     dependencies : deps_private_subproject + deps_private + deps_other + [gbenchmark],
     include_directories : include_dirs,
     link_args: linker_export_flags,
-    install : false,
+    install : true,
     cpp_args : ['-DNIX_UNIT_TEST_DATA="' + meson.current_source_dir() + '/data"'],
   )
 
