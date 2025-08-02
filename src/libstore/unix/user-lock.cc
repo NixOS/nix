@@ -7,6 +7,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/util/users.hh"
+#include "nix/util/logging.hh"
 
 namespace nix {
 
