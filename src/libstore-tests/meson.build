@@ -113,6 +113,7 @@ if get_option('benchmarks')
   benchmark_sources = files(
     'bench-main.cc',
     'derivation-parser-bench.cc',
+    'ref-scan-bench.cc',
   )
 
   benchmark_exe = executable(
