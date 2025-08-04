@@ -72,7 +72,19 @@ static std::string printHash16(const Hash & hash)
 }
 
 // omitted: E O U T
-const std::string nix32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
+constexpr char nix32Chars[] = "0123456789abcdfghijklmnpqrsvwxyz";
+
+constexpr const std::array<unsigned char, 256> reverseNix32Map = [] {
+    std::array<unsigned char, 256> map{};
+
+    for (size_t i = 0; i < map.size(); ++i)
+        map[i] = 0xFF; // invalid
+
+    for (unsigned char i = 0; i < 32; ++i)
+        map[static_cast<unsigned char>(nix32Chars[i])] = i;
+
+    return map;
+}();
 
 static std::string printHash32(const Hash & hash)
 {
@@ -217,12 +229,11 @@ Hash::Hash(std::string_view rest, HashAlgorithm algo, bool isSRI)
 
         for (unsigned int n = 0; n < rest.size(); ++n) {
             char c = rest[rest.size() - n - 1];
-            unsigned char digit;
-            for (digit = 0; digit < nix32Chars.size(); ++digit) /* !!! slow */
-                if (nix32Chars[digit] == c)
-                    break;
-            if (digit >= 32)
-                throw BadHash("invalid base-32 hash '%s'", rest);
+            unsigned char digit = reverseNix32Map[static_cast<unsigned char>(c)];
+
+            if (digit == 0xFF)
+                throw BadHash("invalid base-32 hash: '%s'", rest);
+
             unsigned int b = n * 5;
             unsigned int i = b / 8;
             unsigned int j = b % 8;
