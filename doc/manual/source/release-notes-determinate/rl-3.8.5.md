@@ -38,8 +38,7 @@ PR: [DeterminateSystems/nix-src#161](https://github.com/DeterminateSystems/nix-s
 Opening the Nix database is usually instantaneous but sometimes has a several second latency.
 Determinate Nix works around this issue, eliminating the frustrating random stall when running Nix commands.
 
-PR: [DeterminateSystems/nix-src#158](https://
-github.com/DeterminateSystems/nix-src/pull/158)
+PR: [DeterminateSystems/nix-src#158](https://github.com/DeterminateSystems/nix-src/pull/158)
 
 ### Other changes
 
