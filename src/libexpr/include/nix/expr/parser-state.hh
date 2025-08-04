@@ -71,7 +71,7 @@ struct LexerState
     /**
      * @brief Maps some positions to a DocComment, where the comment is relevant to the location.
      */
-    std::unordered_map<PosIdx, DocComment> & positionToDocComment;
+    DocCommentMap & positionToDocComment;
 
     PosTable & positions;
     PosTable::Origin origin;
