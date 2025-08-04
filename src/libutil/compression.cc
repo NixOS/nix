@@ -215,7 +215,7 @@ std::string decompress(const std::string & method, std::string_view in)
 
 std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Sink & nextSink)
 {
-    if (method == "none" || method == "")
+    if (method == "none" || method == "" || method == "identity")
         return std::make_unique<NoneSink>(nextSink);
     else if (method == "br")
         return std::make_unique<BrotliDecompressionSink>(nextSink);
