@@ -18,6 +18,8 @@
 #include "nix/util/sort.hh"
 
 #include <boost/container/small_vector.hpp>
+#include <boost/unordered/concurrent_flat_map.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <nlohmann/json.hpp>
 
 #include <sys/types.h>
@@ -1750,7 +1752,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
        read them later. */
     {
         auto h = hashDerivationModulo(*state.store, drv, false);
-        drvHashes.lock()->insert_or_assign(drvPath, h);
+        drvHashes.insert_or_assign(drvPath, std::move(h));
     }
 
     auto result = state.buildBindings(1 + drv.outputs.size());
@@ -4027,7 +4029,7 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value ** args, Val
         auto name = state.forceStringNoCtx(
             res, pos, "while evaluating the return value of the grouping function passed to builtins.groupBy");
         auto sym = state.symbols.create(name);
-        auto vector = attrs.try_emplace(sym, ValueVector()).first;
+        auto vector = attrs.try_emplace<ValueVector>(sym, {}).first;
         vector->second.push_back(vElem);
     }
 
@@ -4562,27 +4564,19 @@ static RegisterPrimOp primop_convertHash({
 
 struct RegexCache
 {
-    struct State
-    {
-        std::unordered_map<std::string, std::regex, StringViewHash, std::equal_to<>> cache;
-    };
-
-    Sync<State> state_;
+    boost::concurrent_flat_map<std::string, std::regex, StringViewHash, std::equal_to<>> cache;
 
     std::regex get(std::string_view re)
     {
-        auto state(state_.lock());
-        auto it = state->cache.find(re);
-        if (it != state->cache.end())
-            return it->second;
+        std::regex regex;
         /* No std::regex constructor overload from std::string_view, but can be constructed
            from a pointer + size or an iterator range. */
-        return state->cache
-            .emplace(
-                std::piecewise_construct,
-                std::forward_as_tuple(re),
-                std::forward_as_tuple(/*s=*/re.data(), /*count=*/re.size(), std::regex::extended))
-            .first->second;
+        cache.try_emplace_and_cvisit(re,
+            /*s=*/re.data(), /*count=*/re.size(), std::regex::extended,
+            [&regex](const auto & kv) { regex = kv.second; },
+            [&regex](const auto & kv) { regex = kv.second; }
+        );
+        return regex;
     }
 };
 
@@ -4826,7 +4820,7 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value ** ar
         from.emplace_back(state.forceString(
             *elem, pos, "while evaluating one of the strings to replace passed to builtins.replaceStrings"));
 
-    std::unordered_map<size_t, std::string_view> cache;
+    boost::unordered_flat_map<size_t, std::string_view> cache;
     auto to = args[1]->listView();
 
     NixStringContext context;

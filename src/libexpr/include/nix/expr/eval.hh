@@ -20,6 +20,8 @@
 // For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
 #include "nix/expr/config.hh"
 
+#include <boost/unordered/concurrent_flat_map.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <map>
 #include <optional>
 #include <functional>
@@ -162,7 +164,7 @@ typedef std::
     map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *>>>
         ValMap;
 
-typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
+typedef boost::unordered_flat_map<PosIdx, DocComment, std::hash<PosIdx>> DocCommentMap;
 
 struct Env
 {
@@ -395,7 +397,7 @@ public:
     bool inDebugger = false;
     int trylevel;
     std::list<DebugTrace> debugTraces;
-    std::map<const Expr *, const std::shared_ptr<const StaticEnv>> exprEnvs;
+    boost::unordered_flat_map<const Expr *, const std::shared_ptr<const StaticEnv>> exprEnvs;
 
     const std::shared_ptr<const StaticEnv> getStaticEnv(const Expr & expr) const
     {
@@ -438,12 +440,12 @@ private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    Sync<std::unordered_map<SourcePath, StorePath>> srcToStore;
+    boost::concurrent_flat_map<SourcePath, StorePath, std::hash<SourcePath>> srcToStore;
 
     /**
      * A cache from path names to parse trees.
      */
-    typedef std::unordered_map<
+    typedef boost::unordered_flat_map<
         SourcePath,
         Expr *,
         std::hash<SourcePath>,
@@ -455,7 +457,7 @@ private:
     /**
      * A cache from path names to values.
      */
-    typedef std::unordered_map<
+    typedef boost::unordered_flat_map<
         SourcePath,
         Value,
         std::hash<SourcePath>,
@@ -468,11 +470,11 @@ private:
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
      * Grouped by file.
      */
-    std::unordered_map<SourcePath, DocCommentMap> positionToDocComment;
+    boost::unordered_flat_map<SourcePath, DocCommentMap, std::hash<SourcePath>> positionToDocComment;
 
     LookupPath lookupPath;
 
-    std::map<std::string, std::optional<SourcePath>> lookupPathResolved;
+    boost::unordered_flat_map<std::string, std::optional<SourcePath>> lookupPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -746,7 +748,7 @@ public:
     /**
      * Internal primops not exposed to the user.
      */
-    std::unordered_map<
+    boost::unordered_flat_map<
         std::string,
         Value *,
         std::hash<std::string>,
@@ -1017,10 +1019,10 @@ private:
 
     bool countCalls;
 
-    typedef std::map<std::string, size_t> PrimOpCalls;
+    typedef boost::unordered_flat_map<std::string, size_t> PrimOpCalls;
     PrimOpCalls primOpCalls;
 
-    typedef std::map<ExprLambda *, size_t> FunctionCalls;
+    typedef boost::unordered_flat_map<ExprLambda *, size_t> FunctionCalls;
     FunctionCalls functionCalls;
 
     /** Evaluation/call profiler. */
@@ -1028,7 +1030,7 @@ private:
 
     void incrFunctionCall(ExprLambda * fun);
 
-    typedef std::map<PosIdx, size_t> AttrSelects;
+    typedef boost::unordered_flat_map<PosIdx, size_t, std::hash<PosIdx>> AttrSelects;
     AttrSelects attrSelects;
 
     friend struct ExprOpUpdate;
