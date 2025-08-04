@@ -50,9 +50,13 @@ scope: {
         requiredSystemFeatures = [ ];
       };
 
-  boehmgc = pkgs.boehmgc.override {
-    enableLargeConfig = true;
-  };
+  boehmgc =
+    (pkgs.boehmgc.override {
+      enableLargeConfig = true;
+    }).overrideAttrs
+      (attrs: {
+        patches = attrs.patches or [ ] ++ [ ./patches/bdwgc-bigger-mark-stack.patch ];
+      });
 
   # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
   boost =
