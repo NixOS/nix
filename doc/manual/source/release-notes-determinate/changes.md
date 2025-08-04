@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.8.4.<!-- differences -->
+This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.8.5.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -120,3 +120,13 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 <!-- Determinate Nix version 3.8.4 -->
 
 * Revert "Use WAL mode for SQLite cache databases" by @grahamc in [DeterminateSystems/nix-src#155](https://github.com/DeterminateSystems/nix-src/pull/155)
+
+<!-- Determinate Nix version 3.8.5 -->
+
+* Tab completing arguments to Nix avoids network access. [DeterminateSystems/nix-src#161](https://github.com/DeterminateSystems/nix-src/pull/161)
+
+* Nix on ZFS no longer stalls for multiple seconds at a time [DeterminateSystems/nix-src#158](https://github.com/DeterminateSystems/nix-src/pull/158)
+
+* Importing Nixpkgs and other tarballs to the cache 2-4x faster [DeterminateSystems/nix-src#149](https://github.com/DeterminateSystems/nix-src/pull/149)
+
+* Adding paths to the store is significantly faster [DeterminateSystems/nix-src#162](https://github.com/DeterminateSystems/nix-src/pull/162)
