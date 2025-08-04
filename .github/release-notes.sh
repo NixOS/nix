@@ -61,9 +61,9 @@ linkify_gh() {
 
 (
     cat doc/manual/source/SUMMARY.md.in \
-        | sed 's/\(<!-- next -->\)$/\1\n  - [Release '"$DETERMINATE_NIX_VERSION"' ('"$DATE"')](release-notes-determinate\/rl-'"$DETERMINATE_NIX_VERSION"'.md)/'
+        | sed 's/\(<!-- next -->\)$/\1\n  - [Release '"$DETERMINATE_NIX_VERSION"' ('"$DATE"')](release-notes-determinate\/'"$TAG_NAME"'.md)/'
 ) > "$scratch/summary.md"
 
 mv "$scratch/changes.md" doc/manual/source/release-notes-determinate/changes.md
-mv "$scratch/rl.md" "doc/manual/source/release-notes-determinate/rl-${DETERMINATE_NIX_VERSION}.md"
+mv "$scratch/rl.md" "doc/manual/source/release-notes-determinate/v${DETERMINATE_NIX_VERSION}.md"
 mv "$scratch/summary.md" doc/manual/source/SUMMARY.md.in
