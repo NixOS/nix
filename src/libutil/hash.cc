@@ -273,7 +273,7 @@ Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashAlgorithm> ha
         return Hash::parseAny(hashStr, ha);
 }
 
-union Ctx
+union Hash::Ctx
 {
     blake3_hasher blake3;
     MD5_CTX md5;
@@ -282,7 +282,7 @@ union Ctx
     SHA512_CTX sha512;
 };
 
-static void start(HashAlgorithm ha, Ctx & ctx)
+static void start(HashAlgorithm ha, Hash::Ctx & ctx)
 {
     if (ha == HashAlgorithm::BLAKE3)
         blake3_hasher_init(&ctx.blake3);
@@ -317,7 +317,7 @@ void blake3_hasher_update_with_heuristics(blake3_hasher * blake3, std::string_vi
     }
 }
 
-static void update(HashAlgorithm ha, Ctx & ctx, std::string_view data)
+static void update(HashAlgorithm ha, Hash::Ctx & ctx, std::string_view data)
 {
     if (ha == HashAlgorithm::BLAKE3)
         blake3_hasher_update_with_heuristics(&ctx.blake3, data);
@@ -331,7 +331,7 @@ static void update(HashAlgorithm ha, Ctx & ctx, std::string_view data)
         SHA512_Update(&ctx.sha512, data.data(), data.size());
 }
 
-static void finish(HashAlgorithm ha, Ctx & ctx, unsigned char * hash)
+static void finish(HashAlgorithm ha, Hash::Ctx & ctx, unsigned char * hash)
 {
     if (ha == HashAlgorithm::BLAKE3)
         blake3_hasher_finalize(&ctx.blake3, hash, BLAKE3_OUT_LEN);
@@ -347,7 +347,7 @@ static void finish(HashAlgorithm ha, Ctx & ctx, unsigned char * hash)
 
 Hash hashString(HashAlgorithm ha, std::string_view s, const ExperimentalFeatureSettings & xpSettings)
 {
-    Ctx ctx;
+    Hash::Ctx ctx;
     Hash hash(ha, xpSettings);
     start(ha, ctx);
     update(ha, ctx, s);
@@ -365,7 +365,7 @@ Hash hashFile(HashAlgorithm ha, const Path & path)
 HashSink::HashSink(HashAlgorithm ha)
     : ha(ha)
 {
-    ctx = new Ctx;
+    ctx = new Hash::Ctx;
     bytes = 0;
     start(ha, *ctx);
 }
@@ -393,7 +393,7 @@ HashResult HashSink::finish()
 HashResult HashSink::currentHash()
 {
     flush();
-    Ctx ctx2 = *ctx;
+    Hash::Ctx ctx2 = *ctx;
     Hash hash(ha);
     nix::finish(ha, ctx2, hash.hash);
     return HashResult(hash, bytes);

@@ -57,6 +57,9 @@ extern const StringSet hashFormats;
 
 struct Hash
 {
+    /** Opaque handle type for the hash calculation state. */
+    union Ctx;
+
     constexpr static size_t maxHashSize = 64;
     size_t hashSize = 0;
     uint8_t hash[maxHashSize] = {};
@@ -224,8 +227,6 @@ std::optional<HashAlgorithm> parseHashAlgoOpt(std::string_view s);
  */
 std::string_view printHashAlgo(HashAlgorithm ha);
 
-union Ctx;
-
 struct AbstractHashSink : virtual Sink
 {
     virtual HashResult finish() = 0;
@@ -235,7 +236,7 @@ class HashSink : public BufferedSink, public AbstractHashSink
 {
 private:
     HashAlgorithm ha;
-    Ctx * ctx;
+    Hash::Ctx * ctx;
     uint64_t bytes;
 
 public:
