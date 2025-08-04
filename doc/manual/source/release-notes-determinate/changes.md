@@ -123,22 +123,10 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 
 <!-- Determinate Nix version 3.8.5 -->
 
-* Apply upstream formatting changes by @edolstra in [DeterminateSystems/nix-src#159](https://github.com/DeterminateSystems/nix-src/pull/159)
+* Tab completing arguments to Nix avoids network access. [DeterminateSystems/nix-src#161](https://github.com/DeterminateSystems/nix-src/pull/161)
 
-* Avoid isValidPath(), use queryPathInfo() instead by @edolstra in [DeterminateSystems/nix-src#157](https://github.com/DeterminateSystems/nix-src/pull/157)
+* Nix on ZFS no longer stalls for multiple seconds at a time [DeterminateSystems/nix-src#158](https://github.com/DeterminateSystems/nix-src/pull/158)
 
-* Imply --offline during tab completion by @edolstra in [DeterminateSystems/nix-src#161](https://github.com/DeterminateSystems/nix-src/pull/161)
+* Importing Nixpkgs and other tarballs to the cache 2-4x faster [DeterminateSystems/nix-src#149](https://github.com/DeterminateSystems/nix-src/pull/149)
 
-* SQLite: fsync db.sqlite-shm before opening the database by @edolstra in [DeterminateSystems/nix-src#158](https://github.com/DeterminateSystems/nix-src/pull/158)
-
-* Make GitFileSystemObjectSink multi-threaded by @edolstra in [DeterminateSystems/nix-src#149](https://github.com/DeterminateSystems/nix-src/pull/149)
-
-* Sync with upstream 2.30.2 by @edolstra in [DeterminateSystems/nix-src#160](https://github.com/DeterminateSystems/nix-src/pull/160)
-
-* Add paths to the store asynchronously by @edolstra in [DeterminateSystems/nix-src#162](https://github.com/DeterminateSystems/nix-src/pull/162)
-
-* Remove obsolete FIXME by @edolstra in [DeterminateSystems/nix-src#163](https://github.com/DeterminateSystems/nix-src/pull/163)
-
-* Rename detsys-main to main by @grahamc in [DeterminateSystems/nix-src#164](https://github.com/DeterminateSystems/nix-src/pull/164)
-
-* fixup: perpetual PR number by @cole-h in [DeterminateSystems/nix-src#166](https://github.com/DeterminateSystems/nix-src/pull/166)
+* Adding paths to the store is significantly faster [DeterminateSystems/nix-src#162](https://github.com/DeterminateSystems/nix-src/pull/162)
