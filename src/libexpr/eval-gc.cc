@@ -15,8 +15,6 @@
 #    include <pthread_np.h>
 #  endif
 
-#  include <gc/gc.h>
-#  include <gc/gc_cpp.h>
 #  include <gc/gc_allocator.h>
 
 #  include <boost/coroutine2/coroutine.hpp>
