@@ -8,21 +8,10 @@ namespace nix {
 
 // URI stuff.
 const static std::string pctEncoded = "(?:%[0-9a-fA-F][0-9a-fA-F])";
-const static std::string schemeNameRegex = "(?:[a-z][a-z0-9+.-]*)";
-const static std::string ipv6AddressSegmentRegex = "[0-9a-fA-F:]+(?:%\\w+)?";
-const static std::string ipv6AddressRegex = "(?:\\[" + ipv6AddressSegmentRegex + "\\]|" + ipv6AddressSegmentRegex + ")";
 const static std::string unreservedRegex = "(?:[a-zA-Z0-9-._~])";
 const static std::string subdelimsRegex = "(?:[!$&'\"()*+,;=])";
-const static std::string hostnameRegex = "(?:(?:" + unreservedRegex + "|" + pctEncoded + "|" + subdelimsRegex + ")*)";
-const static std::string hostRegex = "(?:" + ipv6AddressRegex + "|" + hostnameRegex + ")";
-const static std::string userRegex = "(?:(?:" + unreservedRegex + "|" + pctEncoded + "|" + subdelimsRegex + "|:)*)";
-const static std::string authorityRegex = "(?:" + userRegex + "@)?" + hostRegex + "(?::[0-9]+)?";
 const static std::string pcharRegex = "(?:" + unreservedRegex + "|" + pctEncoded + "|" + subdelimsRegex + "|[:@])";
-const static std::string queryRegex = "(?:" + pcharRegex + "|[/? \"])*";
 const static std::string fragmentRegex = "(?:" + pcharRegex + "|[/? \"^])*";
-const static std::string segmentRegex = "(?:" + pcharRegex + "*)";
-const static std::string absPathRegex = "(?:(?:/" + segmentRegex + ")*/?)";
-const static std::string pathRegex = "(?:" + segmentRegex + "(?:/" + segmentRegex + ")*/?)";
 
 /// A Git ref (i.e. branch or tag name).
 /// \todo check that this is correct.

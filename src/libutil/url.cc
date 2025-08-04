@@ -4,99 +4,119 @@
 #include "nix/util/split.hh"
 #include "nix/util/canon-path.hh"
 
+#include <boost/url.hpp>
+
 namespace nix {
 
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
 std::regex badGitRefRegex(badGitRefRegexS, std::regex::ECMAScript);
 std::regex revRegex(revRegexS, std::regex::ECMAScript);
 
-ParsedURL parseURL(const std::string & url)
+/**
+ * Drop trailing shevron for output installable syntax.
+ *
+ * FIXME: parseURL shouldn't really be used for parsing the OutputSpec, but it does
+ * get used. That code should actually use ExtendedOutputsSpec::parseOpt.
+ */
+static std::string_view dropShevronSuffix(std::string_view url)
 {
-    static std::regex uriRegex(
-        "((" + schemeNameRegex + "):" + "(?:(?://(" + authorityRegex + ")(" + absPathRegex + "))|(/?" + pathRegex
-            + ")))" + "(?:\\?(" + queryRegex + "))?" + "(?:#(" + fragmentRegex + "))?",
-        std::regex::ECMAScript);
+    auto shevron = url.rfind("^");
+    if (shevron == std::string_view::npos)
+        return url;
+    return url.substr(0, shevron);
+}
 
-    std::smatch match;
+/**
+ * Percent encode spaces in the url.
+ */
+static std::string percentEncodeSpaces(std::string_view url)
+{
+    return replaceStrings(std::string(url), " ", percentEncode(" "));
+}
 
-    if (std::regex_match(url, match, uriRegex)) {
-        std::string scheme = match[2];
-        auto authority = match[3].matched ? std::optional<std::string>(match[3]) : std::nullopt;
-        std::string path = match[4].matched ? match[4] : match[5];
-        auto & query = match[6];
-        auto & fragment = match[7];
+ParsedURL parseURL(const std::string & url)
+try {
+    /* Drop the shevron suffix used for the flakerefs. Shevron character is reserved and
+       shouldn't appear in normal URIs. */
+    auto unparsedView = dropShevronSuffix(url);
+    /* For back-compat literal spaces are allowed. */
+    auto withFixedSpaces = percentEncodeSpaces(unparsedView);
+    auto urlView = boost::urls::url_view(withFixedSpaces);
 
-        auto transportIsFile = parseUrlScheme(scheme).transport == "file";
+    if (!urlView.has_scheme())
+        throw BadURL("'%s' doesn't have a scheme", url);
 
-        if (authority && *authority != "" && transportIsFile)
-            throw BadURL("file:// URL '%s' has unexpected authority '%s'", url, *authority);
+    auto scheme = urlView.scheme();
+    auto authority = [&]() -> std::optional<std::string> {
+        if (urlView.has_authority())
+            return percentDecode(urlView.authority().buffer());
+        return std::nullopt;
+    }();
 
-        if (transportIsFile && path.empty())
-            path = "/";
+    auto transportIsFile = parseUrlScheme(scheme).transport == "file";
+    if (authority && *authority != "" && transportIsFile)
+        throw BadURL("file:// URL '%s' has unexpected authority '%s'", url, *authority);
 
-        return ParsedURL{
-            .scheme = scheme,
-            .authority = authority,
-            .path = percentDecode(path),
-            .query = decodeQuery(query),
-            .fragment = percentDecode(std::string(fragment))};
-    }
+    auto path = urlView.path();         /* Does pct-decoding */
+    auto fragment = urlView.fragment(); /* Does pct-decoding */
 
-    else
-        throw BadURL("'%s' is not a valid URL", url);
+    if (transportIsFile && path.empty())
+        path = "/";
+
+    /* Get the raw query. Store URI supports smuggling doubly nested queries, where
+       the inner &/? are pct-encoded. */
+    auto query = std::string_view(urlView.encoded_query());
+
+    return ParsedURL{
+        .scheme = scheme,
+        .authority = authority,
+        .path = path,
+        .query = decodeQuery(std::string(query)),
+        .fragment = fragment,
+    };
+} catch (boost::system::system_error & e) {
+    throw BadURL("'%s' is not a valid URL: %s", url, e.code().message());
 }
 
 std::string percentDecode(std::string_view in)
 {
-    std::string decoded;
-    for (size_t i = 0; i < in.size();) {
-        if (in[i] == '%') {
-            if (i + 2 >= in.size())
-                throw BadURL("invalid URI parameter '%s'", in);
-            try {
-                decoded += std::stoul(std::string(in, i + 1, 2), 0, 16);
-                i += 3;
-            } catch (...) {
-                throw BadURL("invalid URI parameter '%s'", in);
-            }
-        } else
-            decoded += in[i++];
-    }
-    return decoded;
+    auto pctView = boost::urls::make_pct_string_view(in);
+    if (pctView.has_value())
+        return pctView->decode();
+    auto error = pctView.error();
+    throw BadURL("invalid URI parameter '%s': %s", in, error.message());
+}
+
+std::string percentEncode(std::string_view s, std::string_view keep)
+{
+    return boost::urls::encode(
+        s, [keep](char c) { return boost::urls::unreserved_chars(c) || keep.find(c) != keep.npos; });
 }
 
 StringMap decodeQuery(const std::string & query)
-{
+try {
+    /* For back-compat literal spaces are allowed. */
+    auto withFixedSpaces = percentEncodeSpaces(query);
+
     StringMap result;
 
-    for (const auto & s : tokenizeString<Strings>(query, "&")) {
-        auto e = s.find('=');
-        if (e == std::string::npos) {
-            warn("dubious URI query '%s' is missing equal sign '%s', ignoring", s, "=");
+    auto encodedQuery = boost::urls::params_encoded_view(withFixedSpaces);
+    for (auto && [key, value, value_specified] : encodedQuery) {
+        if (!value_specified) {
+            warn("dubious URI query '%s' is missing equal sign '%s', ignoring", std::string_view(key), "=");
             continue;
         }
 
-        result.emplace(s.substr(0, e), percentDecode(std::string_view(s).substr(e + 1)));
+        result.emplace(key.decode(), value.decode());
     }
 
     return result;
+} catch (boost::system::system_error & e) {
+    throw BadURL("invalid URI query '%s': %s", query, e.code().message());
 }
 
 const static std::string allowedInQuery = ":@/?";
 const static std::string allowedInPath = ":@/";
-
-std::string percentEncode(std::string_view s, std::string_view keep)
-{
-    std::string res;
-    for (auto & c : s)
-        // unreserved + keep
-        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || strchr("-._~", c)
-            || keep.find(c) != std::string::npos)
-            res += c;
-        else
-            res += fmt("%%%02X", c & 0xFF);
-    return res;
-}
 
 std::string encodeQuery(const StringMap & ss)
 {
@@ -123,12 +143,6 @@ std::ostream & operator<<(std::ostream & os, const ParsedURL & url)
 {
     os << url.to_string();
     return os;
-}
-
-bool ParsedURL::operator==(const ParsedURL & other) const noexcept
-{
-    return scheme == other.scheme && authority == other.authority && path == other.path && query == other.query
-           && fragment == other.fragment;
 }
 
 ParsedURL ParsedURL::canonicalise()
@@ -171,6 +185,7 @@ std::string fixGitURL(const std::string & url)
 // https://www.rfc-editor.org/rfc/rfc3986#section-3.1
 bool isValidSchemeName(std::string_view s)
 {
+    const static std::string schemeNameRegex = "(?:[a-z][a-z0-9+.-]*)";
     static std::regex regex(schemeNameRegex, std::regex::ECMAScript);
 
     return std::regex_match(s.begin(), s.end(), regex, std::regex_constants::match_default);

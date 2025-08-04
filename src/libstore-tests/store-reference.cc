@@ -85,9 +85,23 @@ static StoreReference localExample_2{
         },
 };
 
+static StoreReference localExample_3{
+    .variant =
+        StoreReference::Specified{
+            .scheme = "local",
+        },
+    .params =
+        {
+            {"root", "/foo bar/baz"},
+        },
+};
+
 URI_TEST(local_1, localExample_1)
 
 URI_TEST(local_2, localExample_2)
+
+/* Test path with spaces */
+URI_TEST(local_3, localExample_3)
 
 URI_TEST_READ(local_shorthand_1, localExample_1)
 

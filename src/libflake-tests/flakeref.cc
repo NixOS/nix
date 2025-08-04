@@ -48,6 +48,13 @@ TEST(parseFlakeRef, path)
         ASSERT_EQ(flakeref.to_string(), "path:/foo/bar?revCount=123");
         ASSERT_EQ(fragment, "bla");
     }
+
+    {
+        auto s = "/foo bar/baz?dir=bla space";
+        auto flakeref = parseFlakeRef(fetchSettings, s);
+        ASSERT_EQ(flakeref.to_string(), "path:/foo%20bar/baz?dir=bla%20space");
+        ASSERT_EQ(flakeref.toAttrs().at("dir"), fetchers::Attr("bla space"));
+    }
 }
 
 TEST(to_string, doesntReencodeUrl)
