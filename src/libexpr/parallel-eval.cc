@@ -109,7 +109,10 @@ std::vector<std::future<void>> Executor::spawn(std::vector<std::pair<work_t, uin
         }
     }
 
-    wakeup.notify_all(); // FIXME
+    if (items.size() == 1)
+        wakeup.notify_one();
+    else
+        wakeup.notify_all();
 
     return futures;
 }
