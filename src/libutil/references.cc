@@ -1,6 +1,7 @@
 #include "nix/util/references.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/archive.hh"
+#include "nix/util/base-nix-32.hh"
 
 #include <map>
 #include <cstdlib>
@@ -17,7 +18,7 @@ static void search(std::string_view s, StringSet & hashes, StringSet & seen)
         int j;
         bool match = true;
         for (j = refLength - 1; j >= 0; --j)
-            if (reverseNix32Map[(unsigned char) s[i + j]] == 0xFF) {
+            if (!BaseNix32::lookupReverse(s[i + j])) {
                 i += j + 1;
                 match = false;
                 break;

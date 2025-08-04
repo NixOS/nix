@@ -11,6 +11,7 @@
 #include "nix/util/archive.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/split.hh"
+#include "nix/util/base-nix-32.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -71,39 +72,10 @@ static std::string printHash16(const Hash & hash)
     return buf;
 }
 
-// omitted: E O U T
-constexpr char nix32Chars[] = "0123456789abcdfghijklmnpqrsvwxyz";
-
-constexpr const std::array<unsigned char, 256> reverseNix32Map = [] {
-    std::array<unsigned char, 256> map{};
-
-    for (size_t i = 0; i < map.size(); ++i)
-        map[i] = 0xFF; // invalid
-
-    for (unsigned char i = 0; i < 32; ++i)
-        map[static_cast<unsigned char>(nix32Chars[i])] = i;
-
-    return map;
-}();
-
 static std::string printHash32(const Hash & hash)
 {
     assert(hash.hashSize);
-    size_t len = hash.base32Len();
-    assert(len);
-
-    std::string s;
-    s.reserve(len);
-
-    for (int n = (int) len - 1; n >= 0; n--) {
-        unsigned int b = n * 5;
-        unsigned int i = b / 8;
-        unsigned int j = b % 8;
-        unsigned char c = (hash.hash[i] >> j) | (i >= hash.hashSize - 1 ? 0 : hash.hash[i + 1] << (8 - j));
-        s.push_back(nix32Chars[c & 0x1f]);
-    }
-
-    return s;
+    return BaseNix32::encode({&hash.hash[0], hash.hashSize});
 }
 
 std::string printHash16or32(const Hash & hash)
@@ -229,10 +201,12 @@ Hash::Hash(std::string_view rest, HashAlgorithm algo, bool isSRI)
 
         for (unsigned int n = 0; n < rest.size(); ++n) {
             char c = rest[rest.size() - n - 1];
-            unsigned char digit = reverseNix32Map[static_cast<unsigned char>(c)];
+            auto digit_opt = BaseNix32::lookupReverse(c);
 
-            if (digit == 0xFF)
+            if (!digit_opt)
                 throw BadHash("invalid base-32 hash: '%s'", rest);
+
+            uint8_t digit = std::move(*digit_opt);
 
             unsigned int b = n * 5;
             unsigned int i = b / 8;

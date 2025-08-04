@@ -8,6 +8,7 @@ headers = files(
   'archive.hh',
   'args.hh',
   'args/root.hh',
+  'base-nix-32.hh',
   'callback.hh',
   'canon-path.hh',
   'checked-arithmetic.hh',

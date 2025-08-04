@@ -35,8 +35,6 @@ constexpr inline size_t regularHashSize(HashAlgorithm type)
 
 extern const StringSet hashAlgorithms;
 
-extern const std::array<unsigned char, 256> reverseNix32Map;
-
 /**
  * @brief Enumeration representing the hash formats.
  */
@@ -44,7 +42,7 @@ enum struct HashFormat : int {
     /// @brief Base 64 encoding.
     /// @see [IETF RFC 4648, section 4](https://datatracker.ietf.org/doc/html/rfc4648#section-4).
     Base64,
-    /// @brief Nix-specific base-32 encoding. @see nix32Chars
+    /// @brief Nix-specific base-32 encoding. @see BaseNix32
     Nix32,
     /// @brief Lowercase hexadecimal encoding. @see base16Chars
     Base16,
