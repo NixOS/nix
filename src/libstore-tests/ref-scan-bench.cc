@@ -1,5 +1,6 @@
 #include "nix/util/references.hh"
 #include "nix/store/path.hh"
+#include "nix/util/base-nix-32.hh"
 
 #include <benchmark/benchmark.h>
 
@@ -10,9 +11,9 @@ using namespace nix;
 template<typename OIt>
 static void randomReference(std::mt19937 & urng, OIt outIter)
 {
-    auto dist = std::uniform_int_distribution<std::size_t>(0, nix32Chars.size() - 1);
+    auto dist = std::uniform_int_distribution<std::size_t>(0, BaseNix32::characters.size() - 1);
     dist(urng);
-    std::generate_n(outIter, StorePath::HashLen, [&]() { return nix32Chars[dist(urng)]; });
+    std::generate_n(outIter, StorePath::HashLen, [&]() { return BaseNix32::characters[dist(urng)]; });
 }
 
 /**
