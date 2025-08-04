@@ -85,6 +85,7 @@ static inline void initGCReal()
 
     GC_INIT();
 
+    /* Enable parallel marking. */
     GC_allow_register_threads();
 
     /* Register valid displacements in case we are using alignment niches
