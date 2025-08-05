@@ -12,6 +12,8 @@ class FlakeCommand : virtual Args, public MixFlakeOptions
 {
 protected:
     std::string flakeUrl = ".";
+    CheckSigsFlag checkSigs = CheckSigs;
+    SubstituteFlag substitute = NoSubstitute;
 
 public:
 

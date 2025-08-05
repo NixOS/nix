@@ -36,13 +36,27 @@ struct CmdFlakeUpdate;
 
 FlakeCommand::FlakeCommand()
 {
-    expectArgs(
-        {.label = "flake-url",
-         .optional = true,
-         .handler = {&flakeUrl},
-         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
-             completeFlakeRef(completions, getStore(), prefix);
-         }}});
+    expectArgs({
+        .label = "flake-url",
+        .optional = true,
+        .handler = {&flakeUrl},
+        .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+            completeFlakeRef(completions, getStore(), prefix);
+        }}
+    });
+
+    addFlag({
+        .longName = "no-check-sigs",
+        .description = "Do not require that paths are signed by trusted keys.",
+        .handler = {&checkSigs, NoCheckSigs},
+    });
+
+    addFlag({
+        .longName = "substitute-on-destination",
+        .shortName = 's',
+        .description = "Whether to try substitutes on the destination store (only supported by SSH stores).",
+        .handler = {&substitute, Substitute},
+    });
 }
 
 FlakeRef FlakeCommand::getFlakeRef()
@@ -1086,7 +1100,6 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         if (!dryRun && !dstUri.empty()) {
             ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
-
             copyPaths(*store, *dstStore, sources, NoRepair, checkSigs, substitute);
         }
     }
