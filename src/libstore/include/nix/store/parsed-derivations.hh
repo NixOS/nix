@@ -16,6 +16,8 @@ typedef std::map<std::string, DerivationOutput> DerivationOutputs;
 
 struct StructuredAttrs
 {
+    static constexpr std::string_view envVarName{"__json"};
+
     nlohmann::json structuredAttrs;
 
     bool operator==(const StructuredAttrs &) const = default;
@@ -23,7 +25,7 @@ struct StructuredAttrs
     /**
      * Unconditionally parse from a JSON string. Used by `tryExtract`.
      */
-    static StructuredAttrs parse(const std::string & encoded);
+    static StructuredAttrs parse(std::string_view encoded);
 
     /**
      * Like `tryParse`, but removes the env var which encoded the structured

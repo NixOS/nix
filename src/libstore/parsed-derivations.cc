@@ -8,16 +8,14 @@
 
 namespace nix {
 
-static constexpr std::string_view envVarName = "__json";
-
-StructuredAttrs StructuredAttrs::parse(const std::string & encoded)
+StructuredAttrs StructuredAttrs::parse(std::string_view encoded)
 {
     try {
         return StructuredAttrs{
             .structuredAttrs = nlohmann::json::parse(encoded),
         };
     } catch (std::exception & e) {
-        throw Error("cannot process __json attribute: %s", e.what());
+        throw Error("cannot process %s attribute: %s", envVarName, e.what());
     }
 }
 
