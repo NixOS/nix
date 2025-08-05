@@ -13,9 +13,13 @@
 #include "nix/util/archive.hh"
 #include "nix/util/compression.hh"
 #include "nix/store/common-protocol.hh"
+<<<<<<< HEAD
 #include "nix/store/common-protocol-impl.hh"
 #include "nix/util/topo-sort.hh"
 #include "nix/util/callback.hh"
+=======
+#include "nix/store/common-protocol-impl.hh" // Don't remove is actually needed
+>>>>>>> 6aed9d877 (cherry-pick https://gerrit.lix.systems/c/lix/+/2100)
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
 
 #include <regex>
