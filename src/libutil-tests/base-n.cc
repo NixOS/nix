@@ -65,4 +65,46 @@ TEST(base64Decode, decodeThrowsOnInvalidChar)
     ASSERT_THROW(base64::decode("cXVvZCBlcm_0IGRlbW9uc3RyYW5kdW0="), Error);
 }
 
+// A SHA-512 hash. Hex encoded to be clearer / distinct from the Base64 test case.
+const std::string expectedDecoded = base16::decode(
+    "ee0f754c1bd8a18428ad14eaa3ead80ff8b96275af5012e7a8384f1f10490da056eec9ae3cc791a7a13a24e16e54df5bccdd109c7d53a14534bbd7360a300b11");
+
+struct Base64TrailingParseCase
+{
+    std::string sri;
+};
+
+class Base64TrailParseTest : public ::testing::TestWithParam<Base64TrailingParseCase>
+{};
+
+TEST_P(Base64TrailParseTest, AcceptsVariousSha512Paddings)
+{
+    auto sri = GetParam().sri;
+    auto decoded = base64::decode(sri);
+
+    EXPECT_EQ(decoded, expectedDecoded);
+}
+
+/* Nix's Base64 implementation has historically accepted trailing
+   garbage. We may want to warn about this in the future, but we cannot
+   take it away suddenly.
+
+   Test case taken from Snix:
+   https://git.snix.dev/snix/snix/src/commit/2a29b90c7f3f3c52b5bdae50260fb0bd903c6b38/snix/nix-compat/src/nixhash/mod.rs#L431
+ */
+INSTANTIATE_TEST_SUITE_P(
+    Sha512Paddings,
+    Base64TrailParseTest,
+    ::testing::Values(
+        Base64TrailingParseCase{
+            "7g91TBvYoYQorRTqo+rYD/i5YnWvUBLnqDhPHxBJDaBW7smuPMeRp6E6JOFuVN9bzN0QnH1ToUU0u9c2CjALEQ"},
+        Base64TrailingParseCase{
+            "7g91TBvYoYQorRTqo+rYD/i5YnWvUBLnqDhPHxBJDaBW7smuPMeRp6E6JOFuVN9bzN0QnH1ToUU0u9c2CjALEQ="},
+        Base64TrailingParseCase{
+            "7g91TBvYoYQorRTqo+rYD/i5YnWvUBLnqDhPHxBJDaBW7smuPMeRp6E6JOFuVN9bzN0QnH1ToUU0u9c2CjALEQ=="},
+        Base64TrailingParseCase{
+            "7g91TBvYoYQorRTqo+rYD/i5YnWvUBLnqDhPHxBJDaBW7smuPMeRp6E6JOFuVN9bzN0QnH1ToUU0u9c2CjALEQ==="},
+        Base64TrailingParseCase{
+            "7g91TBvYoYQorRTqo+rYD/i5YnWvUBLnqDhPHxBJDaBW7smuPMeRp6E6JOFuVN9bzN0QnH1ToUU0u9c2CjALEQ== cheesecake"}));
+
 } // namespace nix
