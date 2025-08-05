@@ -2,6 +2,7 @@
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/cache.hh"
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/base-n.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/signals.hh"
@@ -608,7 +609,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             // Calculate sha256 fingerprint from public key and escape the regex symbol '+' to match the key literally
             std::string keyDecoded;
             try {
-                keyDecoded = base64Decode(k.key);
+                keyDecoded = base64::decode(k.key);
             } catch (Error & e) {
                 e.addTrace({}, "while decoding public key '%s' used for git signature", k.key);
             }

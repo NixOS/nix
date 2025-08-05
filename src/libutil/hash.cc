@@ -11,6 +11,7 @@
 #include "nix/util/archive.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/split.hh"
+#include "nix/util/base-n.hh"
 #include "nix/util/base-nix-32.hh"
 
 #include <sys/types.h>
@@ -59,25 +60,6 @@ std::strong_ordering Hash::operator<=>(const Hash & h) const noexcept
     return std::strong_ordering::equivalent;
 }
 
-const std::string base16Chars = "0123456789abcdef";
-
-static std::string printHash16(const Hash & hash)
-{
-    std::string buf;
-    buf.reserve(hash.hashSize * 2);
-    for (unsigned int i = 0; i < hash.hashSize; i++) {
-        buf.push_back(base16Chars[hash.hash[i] >> 4]);
-        buf.push_back(base16Chars[hash.hash[i] & 0x0f]);
-    }
-    return buf;
-}
-
-static std::string printHash32(const Hash & hash)
-{
-    assert(hash.hashSize);
-    return BaseNix32::encode({&hash.hash[0], hash.hashSize});
-}
-
 std::string printHash16or32(const Hash & hash)
 {
     assert(static_cast<char>(hash.algo));
@@ -91,16 +73,20 @@ std::string Hash::to_string(HashFormat hashFormat, bool includeAlgo) const
         s += printHashAlgo(algo);
         s += hashFormat == HashFormat::SRI ? '-' : ':';
     }
+    const auto bytes = std::as_bytes(std::span<const uint8_t>{&hash[0], hashSize});
     switch (hashFormat) {
     case HashFormat::Base16:
-        s += printHash16(*this);
+        assert(hashSize);
+        s += base16::encode(bytes);
         break;
     case HashFormat::Nix32:
-        s += printHash32(*this);
+        assert(hashSize);
+        s += BaseNix32::encode(bytes);
         break;
     case HashFormat::Base64:
     case HashFormat::SRI:
-        s += base64Encode(std::string_view((const char *) hash, hashSize));
+        assert(hashSize);
+        s += base64::encode(bytes);
         break;
     }
     return s;
@@ -180,63 +166,38 @@ Hash Hash::parseNonSRIUnprefixed(std::string_view s, HashAlgorithm algo)
 Hash::Hash(std::string_view rest, HashAlgorithm algo, bool isSRI)
     : Hash(algo)
 {
-    if (!isSRI && rest.size() == base16Len()) {
+    auto [decode, formatName] = [&]() -> std::pair<decltype(base16::decode) *, std::string_view> {
+        if (isSRI) {
+            /* In the SRI case, we always are using Base64. If the
+               length is wrong, get an error later. */
+            return {base64::decode, "SRI"};
+        } else {
+            /* Otherwise, decide via the length of the hash (for the
+               given algorithm) what base encoding it is. */
 
-        auto parseHexDigit = [&](char c) {
-            if (c >= '0' && c <= '9')
-                return c - '0';
-            if (c >= 'A' && c <= 'F')
-                return c - 'A' + 10;
-            if (c >= 'a' && c <= 'f')
-                return c - 'a' + 10;
-            throw BadHash("invalid base-16 hash '%s'", rest);
-        };
+            if (rest.size() == base16::encodedLength(hashSize))
+                return {base16::decode, "base16"};
 
-        for (unsigned int i = 0; i < hashSize; i++) {
-            hash[i] = parseHexDigit(rest[i * 2]) << 4 | parseHexDigit(rest[i * 2 + 1]);
+            if (rest.size() == BaseNix32::encodedLength(hashSize))
+                return {BaseNix32::decode, "nix32"};
+
+            if (rest.size() == base64::encodedLength(hashSize))
+                return {base64::decode, "Base64"};
         }
-    }
 
-    else if (!isSRI && rest.size() == base32Len()) {
-
-        for (unsigned int n = 0; n < rest.size(); ++n) {
-            char c = rest[rest.size() - n - 1];
-            auto digit_opt = BaseNix32::lookupReverse(c);
-
-            if (!digit_opt)
-                throw BadHash("invalid base-32 hash: '%s'", rest);
-
-            uint8_t digit = std::move(*digit_opt);
-
-            unsigned int b = n * 5;
-            unsigned int i = b / 8;
-            unsigned int j = b % 8;
-            hash[i] |= digit << j;
-
-            if (i < hashSize - 1) {
-                hash[i + 1] |= digit >> (8 - j);
-            } else {
-                if (digit >> (8 - j))
-                    throw BadHash("invalid base-32 hash '%s'", rest);
-            }
-        }
-    }
-
-    else if (isSRI || rest.size() == base64Len()) {
-        std::string d;
-        try {
-            d = base64Decode(rest);
-        } catch (Error & e) {
-            e.addTrace({}, "While decoding hash '%s'", rest);
-        }
-        if (d.size() != hashSize)
-            throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", rest);
-        assert(hashSize);
-        memcpy(hash, d.data(), hashSize);
-    }
-
-    else
         throw BadHash("hash '%s' has wrong length for hash algorithm '%s'", rest, printHashAlgo(this->algo));
+    }();
+
+    std::string d;
+    try {
+        d = decode(rest);
+    } catch (Error & e) {
+        e.addTrace({}, "While decoding hash '%s'", rest);
+    }
+    if (d.size() != hashSize)
+        throw BadHash("invalid %s hash '%s' %d %d", formatName, rest);
+    assert(hashSize);
+    memcpy(hash, d.data(), hashSize);
 }
 
 Hash Hash::random(HashAlgorithm algo)
