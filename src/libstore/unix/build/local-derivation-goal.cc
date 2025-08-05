@@ -529,6 +529,7 @@ void LocalDerivationGoal::startBuilder()
     killSandbox(false);
 
     /* Right platform? */
+<<<<<<< HEAD:src/libstore/unix/build/local-derivation-goal.cc
     if (!drvOptions->canBuildLocally(worker.store, *drv)) {
         // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware - we should
         // tell them to run the command to install Darwin 2
@@ -546,6 +547,25 @@ void LocalDerivationGoal::startBuilder()
                 settings.thisSystem,
                 concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
         }
+=======
+    if (!drvOptions.canBuildLocally(store, drv)) {
+        auto msg = fmt(
+            "Cannot build '%s'.\n"
+            "Reason: " ANSI_RED "required system or feature not available" ANSI_NORMAL "\n"
+            "Required system: '%s' with features {%s}\n"
+            "Current system: '%s' with features {%s}",
+            Magenta(store.printStorePath(drvPath)),
+            Magenta(drv.platform),
+            concatStringsSep(", ", drvOptions.getRequiredSystemFeatures(drv)),
+            Magenta(settings.thisSystem),
+            concatStringsSep<StringSet>(", ", store.config.systemFeatures));
+
+        // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware - we should tell them to run the command to install Darwin 2
+        if (drv.platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin")
+          msg += fmt("\nNote: run `%s` to run programs for x86_64-darwin", Magenta("/usr/sbin/softwareupdate --install-rosetta"));
+
+        throw BuildError(msg);
+>>>>>>> b04962b33 (Make platform checks throw BuildError like other failures):src/libstore/unix/build/derivation-builder.cc
     }
 
     /* Create a temporary directory where the build will take
