@@ -81,6 +81,8 @@ std::optional<std::string> RootArgs::needsCompletion(std::string_view s)
     return {};
 }
 
+namespace {
+
 /**
  * Basically this is `typedef std::optional<Parser> Parser(std::string_view s, Strings & r);`
  *
@@ -245,6 +247,8 @@ void ParseQuoted::operator()(std::shared_ptr<Parser> & state, Strings & r)
     }
     assert(false);
 }
+
+} // namespace
 
 Strings parseShebangContent(std::string_view s)
 {
