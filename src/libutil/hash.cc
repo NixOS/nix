@@ -94,6 +94,60 @@ std::string Hash::to_string(HashFormat hashFormat, bool includeAlgo) const
 
 Hash Hash::dummy(HashAlgorithm::SHA256);
 
+namespace {
+
+/// Private convenience
+struct DecodeNamePair
+{
+    decltype(base16::decode) * decode;
+    std::string_view encodingName;
+};
+
+} // namespace
+
+/**
+ * Given the expected size of the message once decoded it, figure out
+ * which encoding we are using by looking at the size of the encoded
+ * message.
+ */
+static DecodeNamePair baseFromSize(std::string_view rest, HashAlgorithm algo)
+{
+    auto hashSize = regularHashSize(algo);
+    if (rest.size() == base16::encodedLength(hashSize))
+        return {base16::decode, "base16"};
+
+    if (rest.size() == BaseNix32::encodedLength(hashSize))
+        return {BaseNix32::decode, "nix32"};
+
+    if (rest.size() == base64::encodedLength(hashSize))
+        return {base64::decode, "Base64"};
+
+    throw BadHash("hash '%s' has wrong length for hash algorithm '%s'", rest, printHashAlgo(algo));
+}
+
+/**
+ * Given the exact decoding function, and a display name for in error
+ * messages.
+ *
+ * @param rest the string view to parse. Must not include any `<algo>(:|-)` prefix.
+ */
+static Hash parseLowLevel(std::string_view rest, HashAlgorithm algo, DecodeNamePair pair)
+{
+    Hash res{algo};
+    std::string d;
+    try {
+        d = pair.decode(rest);
+    } catch (Error & e) {
+        e.addTrace({}, "While decoding hash '%s'", rest);
+    }
+    if (d.size() != res.hashSize)
+        throw BadHash("invalid %s hash '%s' %d %d", pair.encodingName, rest);
+    assert(res.hashSize);
+    memcpy(res.hash, d.data(), res.hashSize);
+
+    return res;
+}
+
 Hash Hash::parseSRI(std::string_view original)
 {
     auto rest = original;
@@ -104,16 +158,21 @@ Hash Hash::parseSRI(std::string_view original)
         throw BadHash("hash '%s' is not SRI", original);
     HashAlgorithm parsedType = parseHashAlgo(*hashRaw);
 
-    return Hash(rest, parsedType, true);
+    return parseLowLevel(rest, parsedType, {base64::decode, "SRI"});
 }
 
-// Mutates the string to eliminate the prefixes when found
-static std::pair<std::optional<HashAlgorithm>, bool> getParsedTypeAndSRI(std::string_view & rest)
+/**
+ * @param rest is the string to parse
+ *
+ * @param resolveAlgo resolves the parsed type (or throws an error when it is not
+ * possible.)
+ */
+static Hash parseAnyHelper(std::string_view rest, auto resolveAlgo)
 {
     bool isSRI = false;
 
     // Parse the hash type before the separator, if there was one.
-    std::optional<HashAlgorithm> optParsedType;
+    std::optional<HashAlgorithm> optParsedAlgo;
     {
         auto hashRaw = splitPrefixTo(rest, ':');
 
@@ -123,50 +182,12 @@ static std::pair<std::optional<HashAlgorithm>, bool> getParsedTypeAndSRI(std::st
                 isSRI = true;
         }
         if (hashRaw)
-            optParsedType = parseHashAlgo(*hashRaw);
+            optParsedAlgo = parseHashAlgo(*hashRaw);
     }
 
-    return {optParsedType, isSRI};
-}
+    HashAlgorithm algo = resolveAlgo(std::move(optParsedAlgo));
 
-Hash Hash::parseAnyPrefixed(std::string_view original)
-{
-    auto rest = original;
-    auto [optParsedType, isSRI] = getParsedTypeAndSRI(rest);
-
-    // Either the string or user must provide the type, if they both do they
-    // must agree.
-    if (!optParsedType)
-        throw BadHash("hash '%s' does not include a type", rest);
-
-    return Hash(rest, *optParsedType, isSRI);
-}
-
-Hash Hash::parseAny(std::string_view original, std::optional<HashAlgorithm> optAlgo)
-{
-    auto rest = original;
-    auto [optParsedType, isSRI] = getParsedTypeAndSRI(rest);
-
-    // Either the string or user must provide the type, if they both do they
-    // must agree.
-    if (!optParsedType && !optAlgo)
-        throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context", rest);
-    else if (optParsedType && optAlgo && *optParsedType != *optAlgo)
-        throw BadHash("hash '%s' should have type '%s'", original, printHashAlgo(*optAlgo));
-
-    HashAlgorithm hashAlgo = optParsedType ? *optParsedType : *optAlgo;
-    return Hash(rest, hashAlgo, isSRI);
-}
-
-Hash Hash::parseNonSRIUnprefixed(std::string_view s, HashAlgorithm algo)
-{
-    return Hash(s, algo, false);
-}
-
-Hash::Hash(std::string_view rest, HashAlgorithm algo, bool isSRI)
-    : Hash(algo)
-{
-    auto [decode, formatName] = [&]() -> std::pair<decltype(base16::decode) *, std::string_view> {
+    auto [decode, formatName] = [&]() -> DecodeNamePair {
         if (isSRI) {
             /* In the SRI case, we always are using Base64. If the
                length is wrong, get an error later. */
@@ -174,30 +195,42 @@ Hash::Hash(std::string_view rest, HashAlgorithm algo, bool isSRI)
         } else {
             /* Otherwise, decide via the length of the hash (for the
                given algorithm) what base encoding it is. */
-
-            if (rest.size() == base16::encodedLength(hashSize))
-                return {base16::decode, "base16"};
-
-            if (rest.size() == BaseNix32::encodedLength(hashSize))
-                return {BaseNix32::decode, "nix32"};
-
-            if (rest.size() == base64::encodedLength(hashSize))
-                return {base64::decode, "Base64"};
+            return baseFromSize(rest, algo);
         }
-
-        throw BadHash("hash '%s' has wrong length for hash algorithm '%s'", rest, printHashAlgo(this->algo));
     }();
 
-    std::string d;
-    try {
-        d = decode(rest);
-    } catch (Error & e) {
-        e.addTrace({}, "While decoding hash '%s'", rest);
-    }
-    if (d.size() != hashSize)
-        throw BadHash("invalid %s hash '%s' %d %d", formatName, rest);
-    assert(hashSize);
-    memcpy(hash, d.data(), hashSize);
+    return parseLowLevel(rest, algo, {decode, formatName});
+}
+
+Hash Hash::parseAnyPrefixed(std::string_view original)
+{
+    return parseAnyHelper(original, [&](std::optional<HashAlgorithm> optParsedAlgo) {
+        // Either the string or user must provide the type, if they both do they
+        // must agree.
+        if (!optParsedAlgo)
+            throw BadHash("hash '%s' does not include a type", original);
+
+        return *optParsedAlgo;
+    });
+}
+
+Hash Hash::parseAny(std::string_view original, std::optional<HashAlgorithm> optAlgo)
+{
+    return parseAnyHelper(original, [&](std::optional<HashAlgorithm> optParsedAlgo) {
+        // Either the string or user must provide the type, if they both do they
+        // must agree.
+        if (!optParsedAlgo && !optAlgo)
+            throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context", original);
+        else if (optParsedAlgo && optAlgo && *optParsedAlgo != *optAlgo)
+            throw BadHash("hash '%s' should have type '%s'", original, printHashAlgo(*optAlgo));
+
+        return optParsedAlgo ? *optParsedAlgo : *optAlgo;
+    });
+}
+
+Hash Hash::parseNonSRIUnprefixed(std::string_view s, HashAlgorithm algo)
+{
+    return parseLowLevel(s, algo, baseFromSize(s, algo));
 }
 
 Hash Hash::random(HashAlgorithm algo)
