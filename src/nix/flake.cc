@@ -1281,10 +1281,14 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         }
                     } else {
                         try {
-                            if (visitor.isDerivation())
-                                showDerivation();
-                            else
-                                throw Error("expected a derivation");
+                            if (visitor.isNull()) {
+                                j = nullptr;
+                            } else{
+                                if (visitor.isDerivation())
+                                    showDerivation();
+                                else
+                                    throw Error("expected a derivation");
+                            }
                         } catch (IFDError & e) {
                             if (!json) {
                                 logger->cout(
